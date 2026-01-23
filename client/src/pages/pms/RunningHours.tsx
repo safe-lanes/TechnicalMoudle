@@ -18,6 +18,7 @@ import { formatProfessionalDateTime } from "@/lib/dateUtils";
 import { useVessel } from "@/contexts/VesselContext";
 import { Marker } from "@/components/Marker";
 import ZeroRHConfirmationDialog from "@/components/ZeroRHConfirmationDialog";
+import MeterReplacedConfirmationDialog from "@/components/MeterReplacedConfirmationDialog";
 import { RENEWAL_ACTION_TYPES } from "@shared/schema";
 
 interface ChildRHData {
@@ -92,6 +93,15 @@ const RunningHours = () => {
     dateUpdated: string;
     dateLocal: string;
     comments: string;
+  } | null>(null);
+  
+  // Meter Replaced Confirmation Dialog state
+  const [isMeterReplacedDialogOpen, setIsMeterReplacedDialogOpen] = useState(false);
+  const [meterReplacedConfirmation, setMeterReplacedConfirmation] = useState<{
+    renewalActionType: typeof RENEWAL_ACTION_TYPES[number];
+    renewalReason: string;
+    renewalReference?: string;
+    renewalEvidenceUrls?: string[];
   } | null>(null);
   
   const { toast } = useToast();
@@ -377,6 +387,17 @@ const RunningHours = () => {
       return;
     }
     
+    // Validate meter replacement confirmation when meter replaced checkbox is checked
+    if (meterReplaced && !meterReplacedConfirmation) {
+      toast({
+        title: "Error",
+        description: "Meter replacement confirmation is required. Please complete the confirmation dialog.",
+        variant: "destructive",
+      });
+      setIsMeterReplacedDialogOpen(true);
+      return;
+    }
+    
     // Format date in vessel local time
     const dateLocal = selectedDate.toLocaleDateString('en-GB', {
       day: '2-digit',
@@ -414,7 +435,11 @@ const RunningHours = () => {
       comments: updateForm.comments,
       meterReplaced,
       oldMeterFinal: meterReplaced ? updateForm.oldMeterFinal : undefined,
-      newMeterStart: meterReplaced ? updateForm.newMeterStart : undefined
+      newMeterStart: meterReplaced ? updateForm.newMeterStart : undefined,
+      renewalActionType: meterReplaced && meterReplacedConfirmation ? meterReplacedConfirmation.renewalActionType : undefined,
+      renewalReason: meterReplaced && meterReplacedConfirmation ? meterReplacedConfirmation.renewalReason : undefined,
+      renewalReference: meterReplaced && meterReplacedConfirmation ? meterReplacedConfirmation.renewalReference : undefined,
+      renewalEvidenceUrls: meterReplaced && meterReplacedConfirmation ? meterReplacedConfirmation.renewalEvidenceUrls : undefined,
     });
   };
   
@@ -464,6 +489,36 @@ const RunningHours = () => {
     });
     setUpdateMode("setTotal");
     setMeterReplaced(false);
+    setMeterReplacedConfirmation(null);
+  };
+  
+  // Handler for meter replaced checkbox - opens confirmation dialog immediately
+  const handleMeterReplacedChange = (checked: boolean) => {
+    if (checked) {
+      setIsMeterReplacedDialogOpen(true);
+    } else {
+      setMeterReplaced(false);
+      setMeterReplacedConfirmation(null);
+    }
+  };
+  
+  // Handler for meter replacement confirmation dialog confirm
+  const handleMeterReplacedConfirm = (data: {
+    renewalActionType: typeof RENEWAL_ACTION_TYPES[number];
+    renewalReason: string;
+    renewalReference?: string;
+    renewalEvidenceUrls?: string[];
+  }) => {
+    setMeterReplacedConfirmation(data);
+    setMeterReplaced(true);
+    setIsMeterReplacedDialogOpen(false);
+  };
+  
+  // Handler for meter replacement confirmation dialog cancel
+  const handleMeterReplacedCancel = () => {
+    setIsMeterReplacedDialogOpen(false);
+    setMeterReplaced(false);
+    setMeterReplacedConfirmation(null);
   };
 
   const openBulkUpdate = () => {
@@ -783,9 +838,15 @@ const RunningHours = () => {
               <Checkbox 
                 id="meterReplaced"
                 checked={meterReplaced}
-                onCheckedChange={(checked) => setMeterReplaced(checked as boolean)}
+                onCheckedChange={(checked) => handleMeterReplacedChange(checked as boolean)}
+                data-testid="checkbox-meter-replaced"
               />
               <Label htmlFor="meterReplaced" className="text-sm">Meter replaced?</Label>
+              {meterReplaced && meterReplacedConfirmation && (
+                <span className="text-xs text-green-600 ml-2">
+                  ({meterReplacedConfirmation.renewalActionType})
+                </span>
+              )}
             </div>
 
             {/* Meter Replacement Fields */}
@@ -1128,6 +1189,18 @@ const RunningHours = () => {
           previousRH={pendingZeroRHUpdate.previousRH}
           entryDate={pendingZeroRHUpdate.dateLocal}
           onConfirm={handleZeroRHConfirm}
+        />
+      )}
+
+      {/* Meter Replaced Confirmation Dialog */}
+      {selectedComponent && (
+        <MeterReplacedConfirmationDialog
+          isOpen={isMeterReplacedDialogOpen}
+          onClose={handleMeterReplacedCancel}
+          componentName={selectedComponent.component}
+          componentCode={selectedComponent.componentCode || ''}
+          currentRH={parseFloat(selectedComponent.runningHours.replace(" hrs", "").replace(/,/g, ""))}
+          onConfirm={handleMeterReplacedConfirm}
         />
       )}
 
