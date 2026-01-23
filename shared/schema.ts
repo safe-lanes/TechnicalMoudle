@@ -2372,3 +2372,22 @@ export const insertShipCertificateMasterSchema = createInsertSchema(shipCertific
 
 export type InsertShipCertificateMaster = z.infer<typeof insertShipCertificateMasterSchema>;
 export type ShipCertificateMaster = typeof shipCertificatesMaster.$inferSelect;
+
+// Ship Certificates Labels Configuration (for Master tab category/group labels)
+export const shipCertificatesLabelsConfig = pgTable("ship_certificates_labels_config", {
+  id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
+  configType: text("config_type").notNull(), // 'master_category', 'master_group', 'company_group'
+  key: text("key").notNull(), // A, B, C for categories or 1, 2, 3 for groups
+  label: text("label").notNull().default(""),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow().$onUpdate(() => new Date()),
+});
+
+export const insertShipCertificatesLabelsConfigSchema = createInsertSchema(shipCertificatesLabelsConfig).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type InsertShipCertificatesLabelsConfig = z.infer<typeof insertShipCertificatesLabelsConfigSchema>;
+export type ShipCertificatesLabelsConfig = typeof shipCertificatesLabelsConfig.$inferSelect;

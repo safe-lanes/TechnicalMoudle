@@ -276,10 +276,48 @@ export default function ShipsCertificatesAdmin() {
     },
   });
   
+  // Load labels configuration from database
+  const { data: savedLabels } = useQuery<Record<string, Array<{key: string, label: string}>>>({
+    queryKey: ['/technical/api/admin/ship-certificates-labels'],
+  });
+  
+  // Save labels mutation
+  const saveLabelsMutation = useMutation({
+    mutationFn: async ({ configType, labels }: { configType: string, labels: LabelConfig[] }) => {
+      const response = await apiRequest('POST', '/technical/api/admin/ship-certificates-labels', { configType, labels });
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/technical/api/admin/ship-certificates-labels'] });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Failed to save labels",
+        description: error.message || "An error occurred",
+        variant: "destructive",
+      });
+    },
+  });
+  
   // Handle save button click
   const handleSave = () => {
     saveMutation.mutate(masterData);
   };
+  
+  // Load labels from database when available
+  useEffect(() => {
+    if (savedLabels) {
+      if (savedLabels.master_category && savedLabels.master_category.length > 0) {
+        setMasterCategoryLabels(savedLabels.master_category);
+      }
+      if (savedLabels.master_group && savedLabels.master_group.length > 0) {
+        setMasterGroupLabels(savedLabels.master_group);
+      }
+      if (savedLabels.company_group && savedLabels.company_group.length > 0) {
+        setCompanyGroupLabels(savedLabels.company_group);
+      }
+    }
+  }, [savedLabels]);
   
   // Track changes to master data
   const updateMasterDataWithTracking = (updater: (prev: MasterCertificate[]) => MasterCertificate[]) => {
@@ -413,10 +451,23 @@ export default function ShipsCertificatesAdmin() {
     setIsMasterLabelsOpen(true);
   };
   
-  const saveMasterLabels = () => {
+  const saveMasterLabels = async () => {
+    // Update local state
     setMasterCategoryLabels([...tempMasterCategoryLabels]);
     setMasterGroupLabels([...tempMasterGroupLabels]);
     setIsMasterLabelsOpen(false);
+    
+    // Save to database
+    try {
+      await saveLabelsMutation.mutateAsync({ configType: 'master_category', labels: tempMasterCategoryLabels });
+      await saveLabelsMutation.mutateAsync({ configType: 'master_group', labels: tempMasterGroupLabels });
+      toast({
+        title: "Labels saved",
+        description: "Category and group labels have been saved successfully.",
+      });
+    } catch (error) {
+      console.error("Error saving labels:", error);
+    }
   };
   
   const cancelMasterLabels = () => {

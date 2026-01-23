@@ -4,7 +4,7 @@ import { storage } from "./storage";
 import { getPool } from "./db";
 import * as fs from "fs";
 import * as path from "path";
-import { insertRunningHoursAuditSchema, cascadeRunningHoursSchema, insertWorkOrderSchema, insertWorkOrderExecutionSchema, insertDefectSchema, insertDefectActionSchema, insertDefectAttachmentSchema, insertComponentSchema, insertSpareSchema, insertMakerSchema, insertMasterListSchema, insertComponentDocumentSchema, insertComponentClassRegulatorySchema, insertComponentRequisitionSchema, equipmentCategories, defectCategories, defectTypes, shipCertificatesMaster, insertShipCertificateMasterSchema } from "@shared/schema";
+import { insertRunningHoursAuditSchema, cascadeRunningHoursSchema, insertWorkOrderSchema, insertWorkOrderExecutionSchema, insertDefectSchema, insertDefectActionSchema, insertDefectAttachmentSchema, insertComponentSchema, insertSpareSchema, insertMakerSchema, insertMasterListSchema, insertComponentDocumentSchema, insertComponentClassRegulatorySchema, insertComponentRequisitionSchema, equipmentCategories, defectCategories, defectTypes, shipCertificatesMaster, insertShipCertificateMasterSchema, shipCertificatesLabelsConfig } from "@shared/schema";
 import { getPostgresClient } from "./postgresClient";
 import { eq } from "drizzle-orm";
 import { computeWorkOrderStatus } from "@shared/workOrders/status";
@@ -9161,6 +9161,78 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error: any) {
       console.error("Error deleting ship certificate master:", error);
       res.status(500).json({ error: "Failed to delete certificate" });
+    }
+  });
+  
+  // ============================================================
+  // Ship Certificates Admin - Labels Configuration API Routes
+  // ============================================================
+  
+  // GET all labels configuration
+  app.get("/technical/api/admin/ship-certificates-labels", async (req, res) => {
+    try {
+      const postgres = await getPostgresClient();
+      if (!postgres) {
+        return res.status(503).json({ error: "Database not available" });
+      }
+      
+      const { db } = postgres;
+      const labels = await db.select().from(shipCertificatesLabelsConfig);
+      
+      // Transform to object grouped by configType
+      const result: Record<string, Array<{key: string, label: string}>> = {};
+      for (const item of labels) {
+        if (!result[item.configType]) {
+          result[item.configType] = [];
+        }
+        result[item.configType].push({ key: item.key, label: item.label });
+      }
+      
+      res.json(result);
+    } catch (error: any) {
+      console.error("Error fetching ship certificates labels config:", error);
+      res.status(500).json({ error: "Failed to fetch labels configuration" });
+    }
+  });
+  
+  // POST save labels configuration (bulk upsert)
+  app.post("/technical/api/admin/ship-certificates-labels", async (req, res) => {
+    try {
+      const postgres = await getPostgresClient();
+      if (!postgres) {
+        return res.status(503).json({ error: "Database not available" });
+      }
+      
+      const { db } = postgres;
+      const { configType, labels } = req.body;
+      
+      if (!configType || !Array.isArray(labels)) {
+        return res.status(400).json({ error: "Invalid request body: requires configType and labels array" });
+      }
+      
+      console.log(`💾 Saving ${labels.length} labels for config type: ${configType}...`);
+      
+      // Delete existing labels for this configType and re-insert
+      await db.delete(shipCertificatesLabelsConfig)
+        .where(eq(shipCertificatesLabelsConfig.configType, configType));
+      
+      // Insert new labels
+      if (labels.length > 0) {
+        const insertData = labels.map((item: {key: string, label: string}) => ({
+          configType,
+          key: item.key,
+          label: item.label || "",
+        }));
+        
+        await db.insert(shipCertificatesLabelsConfig).values(insertData);
+      }
+      
+      console.log(`✅ Labels saved for ${configType}: ${labels.length} entries`);
+      
+      res.json({ success: true, message: `Saved ${labels.length} labels for ${configType}` });
+    } catch (error: any) {
+      console.error("Error saving ship certificates labels config:", error);
+      res.status(500).json({ error: "Failed to save labels configuration", details: error.message });
     }
   });
   

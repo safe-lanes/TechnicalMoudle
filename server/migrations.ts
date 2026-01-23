@@ -230,6 +230,23 @@ const migrations: Migration[] = [
       CREATE INDEX IF NOT EXISTS idx_ship_cert_master_category ON ship_certificates_master (category);
       CREATE INDEX IF NOT EXISTS idx_ship_cert_master_group ON ship_certificates_master ("group")
     `
+  },
+  {
+    id: '014_ship_certificates_labels_config',
+    name: 'Create ship_certificates_labels_config table',
+    description: 'Stores category and group label configuration for Ship Certificates Admin module',
+    sql: `
+      CREATE TABLE IF NOT EXISTS ship_certificates_labels_config (
+        id SERIAL PRIMARY KEY,
+        config_type TEXT NOT NULL,
+        key TEXT NOT NULL,
+        label TEXT NOT NULL DEFAULT '',
+        created_at TIMESTAMP DEFAULT NOW(),
+        updated_at TIMESTAMP DEFAULT NOW(),
+        UNIQUE(config_type, key)
+      );
+      CREATE INDEX IF NOT EXISTS idx_ship_cert_labels_config_type ON ship_certificates_labels_config (config_type)
+    `
   }
 ];
 
