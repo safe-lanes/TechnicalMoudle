@@ -17,8 +17,17 @@ import {
   DialogTitle,
   DialogFooter,
 } from "@/components/ui/dialog";
-import { Plus, Pencil, Trash2, Search, Save, X, ChevronUp, ChevronDown, Loader2 } from "lucide-react";
+import { Plus, Pencil, Trash2, Search, Save, X, ChevronUp, ChevronDown, Loader2, Check, ChevronsUpDown, Ship } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from "@/components/ui/command";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
@@ -199,7 +208,6 @@ const mockVesselData: VesselCertificate[] = [
 const categories = ["All Categories", "Statutory", "Trading", "Class"];
 const groups = ["All Groups", "Safety", "Environment", "Cargo", "Navigation"];
 const companyGroups = ["A. Statutory", "B. Trading", "C. Class", "D. Other"];
-const vessels = ["Vessel 1", "Vessel 2", "Vessel 3"];
 
 // TODO: Replace these dropdown options with actual values from backend/configuration
 // Master Tab - Category dropdown options (A-F for now, will be replaced later)
@@ -226,7 +234,8 @@ export default function ShipsCertificatesAdmin() {
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("All Categories");
   const [selectedGroup, setSelectedGroup] = useState("All Groups");
-  const [selectedVessel, setSelectedVessel] = useState("Vessel 1");
+  const [selectedVessels, setSelectedVessels] = useState<string[]>([]);
+  const [vesselPopoverOpen, setVesselPopoverOpen] = useState(false);
   
   // Master data state with sequence management
   const [masterData, setMasterData] = useState<MasterCertificate[]>(STARTER_KIT_MASTER_DATA);
@@ -243,6 +252,41 @@ export default function ShipsCertificatesAdmin() {
   const { data: savedCertificates, isLoading: isLoadingCertificates } = useQuery({
     queryKey: ['/technical/api/admin/ship-certificates-master'],
   });
+  
+  // Fetch vessels from Vessel Master (Admin > Masters > Vessel Master ID:001)
+  const { data: vesselMasterData, isLoading: isLoadingVessels } = useQuery<{ id: string; name: string; }[]>({
+    queryKey: ['/technical/api/vessels'],
+  });
+  
+  // Extract vessel names for the dropdown
+  const vesselOptions = vesselMasterData?.map(v => v.name) || [];
+  
+  // Toggle vessel selection
+  const toggleVesselSelection = (vesselName: string) => {
+    setSelectedVessels(prev => 
+      prev.includes(vesselName)
+        ? prev.filter(v => v !== vesselName)
+        : [...prev, vesselName]
+    );
+  };
+  
+  // Toggle all vessels
+  const toggleAllVessels = () => {
+    if (selectedVessels.length === vesselOptions.length) {
+      setSelectedVessels([]);
+    } else {
+      setSelectedVessels([...vesselOptions]);
+    }
+  };
+  
+  // Auto-select all vessels when vessel data is loaded (only on initial load)
+  const [vesselsInitialized, setVesselsInitialized] = useState(false);
+  useEffect(() => {
+    if (vesselOptions.length > 0 && !vesselsInitialized) {
+      setSelectedVessels([...vesselOptions]);
+      setVesselsInitialized(true);
+    }
+  }, [vesselOptions, vesselsInitialized]);
   
   // Load saved certificates from database on mount
   useEffect(() => {
@@ -1227,28 +1271,105 @@ export default function ShipsCertificatesAdmin() {
   };
 
   const renderVesselTab = () => {
+    // Get display text for selected vessels
+    const getVesselDisplayText = () => {
+      if (selectedVessels.length === 0) return "Select vessels...";
+      if (selectedVessels.length === vesselOptions.length && vesselOptions.length > 0) return "All Vessels";
+      if (selectedVessels.length === 1) return selectedVessels[0];
+      return `${selectedVessels.length} vessels selected`;
+    };
+    
     return (
       <div className="space-y-4">
         <div className="flex items-center gap-3 flex-wrap">
-          <Select value={selectedVessel} onValueChange={setSelectedVessel}>
-            <SelectTrigger className="w-[160px]" data-testid="select-vessel">
-              <SelectValue placeholder="Select Vessel" />
-            </SelectTrigger>
-            <SelectContent>
-              {vessels.map((vessel) => (
-                <SelectItem key={vessel} value={vessel}>{vessel}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          <Popover open={vesselPopoverOpen} onOpenChange={setVesselPopoverOpen}>
+            <PopoverTrigger asChild>
+              <Button
+                variant="outline"
+                role="combobox"
+                aria-expanded={vesselPopoverOpen}
+                className="w-[220px] justify-between"
+                data-testid="select-vessel"
+              >
+                <div className="flex items-center gap-2">
+                  <Ship className="h-4 w-4" />
+                  <span className="truncate">{getVesselDisplayText()}</span>
+                </div>
+                <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-[220px] p-0" align="start">
+              <Command>
+                <CommandInput placeholder="Search vessels..." />
+                <CommandList>
+                  <CommandEmpty>No vessels found.</CommandEmpty>
+                  <CommandGroup>
+                    <CommandItem
+                      value="all-vessels"
+                      onSelect={() => toggleAllVessels()}
+                      className="cursor-pointer"
+                    >
+                      <div className={cn(
+                        "mr-2 flex h-4 w-4 items-center justify-center rounded-sm border border-primary",
+                        selectedVessels.length === vesselOptions.length && vesselOptions.length > 0
+                          ? "bg-primary text-primary-foreground"
+                          : "opacity-50"
+                      )}>
+                        {selectedVessels.length === vesselOptions.length && vesselOptions.length > 0 && (
+                          <Check className="h-3 w-3" />
+                        )}
+                      </div>
+                      <span className="font-medium">All Vessels</span>
+                    </CommandItem>
+                    {isLoadingVessels ? (
+                      <CommandItem disabled>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        Loading vessels...
+                      </CommandItem>
+                    ) : (
+                      vesselOptions.map((vessel) => (
+                        <CommandItem
+                          key={vessel}
+                          value={vessel}
+                          onSelect={() => toggleVesselSelection(vessel)}
+                          className="cursor-pointer"
+                        >
+                          <div className={cn(
+                            "mr-2 flex h-4 w-4 items-center justify-center rounded-sm border border-primary",
+                            selectedVessels.includes(vessel)
+                              ? "bg-primary text-primary-foreground"
+                              : "opacity-50"
+                          )}>
+                            {selectedVessels.includes(vessel) && <Check className="h-3 w-3" />}
+                          </div>
+                          <Ship className="mr-2 h-4 w-4 text-muted-foreground" />
+                          {vessel}
+                        </CommandItem>
+                      ))
+                    )}
+                  </CommandGroup>
+                </CommandList>
+              </Command>
+            </PopoverContent>
+          </Popover>
         </div>
 
-        {viewModes.vessel === "edit" && (
+        {viewModes.vessel === "edit" && selectedVessels.length > 0 && (
           <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <span className="text-sm font-medium text-blue-800">Revision Mode - Editing 1 vessel</span>
-                <Checkbox id="vessel-1" defaultChecked />
-                <label htmlFor="vessel-1" className="text-sm">Vessel 1</label>
+            <div className="flex items-center justify-between flex-wrap gap-2">
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="text-sm font-medium text-blue-800">
+                  Revision Mode - Editing {selectedVessels.length} vessel{selectedVessels.length > 1 ? 's' : ''}
+                </span>
+                {selectedVessels.slice(0, 3).map((vessel) => (
+                  <div key={vessel} className="flex items-center gap-1">
+                    <Checkbox id={`vessel-edit-${vessel}`} defaultChecked disabled />
+                    <label htmlFor={`vessel-edit-${vessel}`} className="text-sm">{vessel}</label>
+                  </div>
+                ))}
+                {selectedVessels.length > 3 && (
+                  <span className="text-sm text-blue-600">+{selectedVessels.length - 3} more</span>
+                )}
               </div>
               <span className="text-sm text-blue-600">Changes apply to all selected vessels</span>
             </div>
