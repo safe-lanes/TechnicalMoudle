@@ -199,13 +199,6 @@ const mockCompanyData: CompanyCertificate[] = [
   { id: 4, masterId: "MA003", companyId: "L0004", certificateLabel: "Fitness Cert.", requirementRef: "SOLAS XXX", companyGroup: "A. Statutory", ranking: "-" },
 ];
 
-const mockVesselData: VesselCertificate[] = [
-  { id: 1, masterId: "C0001", companyId: "L0001", certificateLabel: "Safety Equi. Cert.", requirementRef: "SOLAS XXX", companyGroup: "A. Statutory", applicable: true },
-  { id: 2, masterId: "C0002", companyId: "L0002", certificateLabel: "Safety Const. Cert.", requirementRef: "SOLAS XXX", companyGroup: "A. Statutory", applicable: true },
-  { id: 3, masterId: "CA002", companyId: "L0003", certificateLabel: "Anti Fouling Cert.", requirementRef: "SOLAS XXX", companyGroup: "A. Statutory", applicable: true },
-  { id: 4, masterId: "CA003", companyId: "L0004", certificateLabel: "Fitness Cert.", requirementRef: "SOLAS XXX", companyGroup: "A. Statutory", applicable: false },
-];
-
 const categories = ["All Categories", "Statutory", "Trading", "Class"];
 const groups = ["All Groups", "Safety", "Environment", "Cargo", "Navigation"];
 const companyGroups = ["A. Statutory", "B. Trading", "C. Class", "D. Other"];
@@ -375,6 +368,185 @@ export default function ShipsCertificatesAdmin() {
       }
     }
   }, [savedLabels]);
+
+  // ========== VESSEL CERTIFICATE APPLICABILITY ==========
+  
+  // Get selected vessel IDs for API calls
+  const getSelectedVesselIds = () => {
+    return vesselMasterData
+      .filter(v => selectedVessels.includes(v.name))
+      .map(v => String(v.id));
+  };
+  
+  // Fetch vessel certificate applicability for selected vessels
+  const selectedVesselIds = vesselMasterData
+    .filter(v => selectedVessels.includes(v.name))
+    .map(v => String(v.id));
+  
+  const vesselIdsQueryParam = selectedVesselIds.join(',');
+  
+  const { data: vesselApplicabilityData = [], isLoading: isLoadingApplicability, refetch: refetchApplicability } = useQuery<Array<{vesselId: string, masterId: string, isApplicable: boolean}>>({
+    queryKey: ['/technical/api/admin/vessel-certificate-applicability', vesselIdsQueryParam],
+    queryFn: async () => {
+      if (selectedVesselIds.length === 0) return [];
+      const response = await fetch(`/technical/api/admin/vessel-certificate-applicability?vesselIds=${vesselIdsQueryParam}`);
+      if (!response.ok) throw new Error('Failed to fetch applicability');
+      return response.json();
+    },
+    enabled: selectedVesselIds.length > 0,
+  });
+  
+  // Initialize vessel applicability mutation
+  const initializeVesselMutation = useMutation({
+    mutationFn: async ({ vesselId, vesselName }: { vesselId: string, vesselName: string }) => {
+      const response = await apiRequest('POST', '/technical/api/admin/vessel-certificate-applicability/initialize', { vesselId, vesselName });
+      return response.json();
+    },
+    onSuccess: () => {
+      refetchApplicability();
+    },
+    onError: (error: any, variables: { vesselId: string, vesselName: string }) => {
+      // Remove from initialized set to allow retry
+      setInitializedVesselIds(prev => {
+        const newSet = new Set(Array.from(prev));
+        newSet.delete(variables.vesselId);
+        return newSet;
+      });
+      toast({
+        title: "Initialization failed",
+        description: `Failed to initialize certificates for ${variables.vesselName}`,
+        variant: "destructive",
+      });
+    },
+  });
+  
+  // Update single applicability mutation
+  const updateApplicabilityMutation = useMutation({
+    mutationFn: async ({ vesselId, vesselName, masterId, isApplicable }: { vesselId: string, vesselName: string, masterId: string, isApplicable: boolean }) => {
+      const response = await apiRequest('PATCH', '/technical/api/admin/vessel-certificate-applicability', { vesselId, vesselName, masterId, isApplicable });
+      return response.json();
+    },
+    onSuccess: () => {
+      refetchApplicability();
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Update failed",
+        description: error.message || "Failed to update applicability",
+        variant: "destructive",
+      });
+    },
+  });
+  
+  // Bulk update applicability mutation
+  const bulkUpdateApplicabilityMutation = useMutation({
+    mutationFn: async ({ vessels, masterId, isApplicable }: { vessels: Array<{id: string, name: string}>, masterId: string, isApplicable: boolean }) => {
+      const response = await apiRequest('POST', '/technical/api/admin/vessel-certificate-applicability/bulk-update', { vessels, masterId, isApplicable });
+      return response.json();
+    },
+    onSuccess: () => {
+      refetchApplicability();
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Bulk update failed",
+        description: error.message || "Failed to update applicability for multiple vessels",
+        variant: "destructive",
+      });
+    },
+  });
+  
+  // Track vessels that have been initialized to prevent duplicate requests
+  const [initializedVesselIds, setInitializedVesselIds] = useState<Set<string>>(new Set());
+  
+  // Initialize selected vessels when they are first selected
+  useEffect(() => {
+    if (selectedVessels.length > 0 && vesselMasterData.length > 0 && !isLoadingApplicability) {
+      const existingVesselIds = new Set(vesselApplicabilityData.map((a: {vesselId: string}) => a.vesselId));
+      
+      // Find vessels that need initialization (not in DB and not already being initialized)
+      selectedVessels.forEach(vesselName => {
+        const vesselData = vesselMasterData.find(v => v.name === vesselName);
+        if (vesselData) {
+          const vesselId = String(vesselData.id);
+          const needsInit = !existingVesselIds.has(vesselId) && !initializedVesselIds.has(vesselId);
+          
+          if (needsInit) {
+            // Mark as being initialized to prevent duplicate requests
+            setInitializedVesselIds(prev => new Set(Array.from(prev).concat([vesselId])));
+            initializeVesselMutation.mutate({ vesselId, vesselName });
+          }
+        }
+      });
+    }
+  }, [selectedVessels, vesselMasterData, vesselApplicabilityData, isLoadingApplicability, initializedVesselIds]);
+  
+  // Get Company certificates (those with applicableToCompany = true)
+  const companyCertificates = masterData.filter(cert => cert.applicableToCompany);
+  
+  // Check for conflicts when multiple vessels are selected
+  const hasApplicabilityConflict = (): { hasConflict: boolean, conflictingMasterIds: string[] } => {
+    if (selectedVessels.length <= 1) return { hasConflict: false, conflictingMasterIds: [] };
+    
+    const vesselIds = getSelectedVesselIds();
+    const conflictingMasterIds: string[] = [];
+    
+    // For each company certificate, check if all selected vessels have the same applicability
+    companyCertificates.forEach(cert => {
+      const applicabilityValues = vesselIds.map(vesselId => {
+        const record = vesselApplicabilityData.find((a: any) => a.vesselId === vesselId && a.masterId === cert.masterId);
+        return record ? record.isApplicable : true; // Default to true if not yet initialized
+      });
+      
+      // Check if all values are the same
+      const allSame = applicabilityValues.every(val => val === applicabilityValues[0]);
+      if (!allSame) {
+        conflictingMasterIds.push(cert.masterId);
+      }
+    });
+    
+    return { hasConflict: conflictingMasterIds.length > 0, conflictingMasterIds };
+  };
+  
+  const conflictCheck = hasApplicabilityConflict();
+  
+  // Get applicability for a certificate (considering multi-vessel selection)
+  const getCertificateApplicability = (masterId: string): boolean | 'mixed' => {
+    const vesselIds = getSelectedVesselIds();
+    
+    if (vesselIds.length === 0) return true;
+    
+    const applicabilityValues = vesselIds.map(vesselId => {
+      const record = vesselApplicabilityData.find((a: any) => a.vesselId === vesselId && a.masterId === masterId);
+      return record ? record.isApplicable : true; // Default to true
+    });
+    
+    const allTrue = applicabilityValues.every(val => val === true);
+    const allFalse = applicabilityValues.every(val => val === false);
+    
+    if (allTrue) return true;
+    if (allFalse) return false;
+    return 'mixed';
+  };
+  
+  // Handle applicability checkbox change
+  const handleApplicabilityChange = (masterId: string, isApplicable: boolean) => {
+    const vesselIds = getSelectedVesselIds();
+    
+    if (vesselIds.length === 1) {
+      // Single vessel update
+      const vesselId = vesselIds[0];
+      const vesselName = selectedVessels[0];
+      updateApplicabilityMutation.mutate({ vesselId, vesselName, masterId, isApplicable });
+    } else {
+      // Multi-vessel bulk update
+      const vessels = selectedVessels.map(name => {
+        const vesselData = vesselMasterData.find(v => v.name === name);
+        return { id: String(vesselData?.id || ''), name };
+      });
+      bulkUpdateApplicabilityMutation.mutate({ vessels, masterId, isApplicable });
+    }
+  };
   
   // Track changes to master data
   const updateMasterDataWithTracking = (updater: (prev: MasterCertificate[]) => MasterCertificate[]) => {
@@ -1347,14 +1519,27 @@ export default function ShipsCertificatesAdmin() {
           </Popover>
         </div>
 
-        {viewModes.vessel === "edit" && selectedVessels.length > 0 && (
+        {selectedVessels.length > 0 && conflictCheck.hasConflict && (
+          <div className="bg-amber-50 border border-amber-300 rounded-lg p-3">
+            <div className="flex items-center gap-2">
+              <span className="text-amber-700 text-sm font-medium">
+                Conflict detected: Selected vessels have different applicability settings for {conflictCheck.conflictingMasterIds.length} certificate(s).
+              </span>
+              <span className="text-amber-600 text-sm">
+                Please select vessels with matching configurations or select one vessel at a time to edit.
+              </span>
+            </div>
+          </div>
+        )}
+
+        {selectedVessels.length > 0 && !conflictCheck.hasConflict && (
           <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
             <div className="flex items-center justify-between flex-wrap gap-2">
               <div className="flex items-center gap-2 flex-wrap">
                 <span className="text-sm font-medium text-blue-800">
-                  Revision Mode - Editing {selectedVessels.length} vessel{selectedVessels.length > 1 ? 's' : ''}
+                  {selectedVessels.length === 1 ? `Configuring: ${selectedVessels[0]}` : `Configuring ${selectedVessels.length} vessels`}
                 </span>
-                {selectedVessels.slice(0, 3).map((vessel) => (
+                {selectedVessels.length > 1 && selectedVessels.slice(0, 3).map((vessel) => (
                   <div key={vessel} className="flex items-center gap-1">
                     <Checkbox id={`vessel-edit-${vessel}`} defaultChecked disabled />
                     <label htmlFor={`vessel-edit-${vessel}`} className="text-sm">{vessel}</label>
@@ -1364,7 +1549,9 @@ export default function ShipsCertificatesAdmin() {
                   <span className="text-sm text-blue-600">+{selectedVessels.length - 3} more</span>
                 )}
               </div>
-              <span className="text-sm text-blue-600">Changes apply to all selected vessels</span>
+              {selectedVessels.length > 1 && (
+                <span className="text-sm text-blue-600">Changes apply to all selected vessels</span>
+              )}
             </div>
           </div>
         )}
@@ -1374,88 +1561,83 @@ export default function ShipsCertificatesAdmin() {
             <table className="w-full">
               <thead className="bg-[#52baf3] text-white text-sm">
                 <tr>
-                  {viewModes.vessel === "edit" && (
-                    <th className="px-3 py-3 text-center font-medium w-12">Applicable</th>
-                  )}
+                  <th className="px-3 py-3 text-center font-medium w-12">Applicable</th>
                   <th className="px-3 py-3 text-left font-medium w-12">#</th>
                   <th className="px-3 py-3 text-left font-medium">Master ID</th>
                   <th className="px-3 py-3 text-left font-medium">Company ID</th>
                   <th className="px-3 py-3 text-left font-medium">Certificate Label</th>
                   <th className="px-3 py-3 text-left font-medium">Requirement/Ref</th>
                   <th className="px-3 py-3 text-left font-medium">Company Group</th>
-                  {viewModes.vessel === "edit" && (
-                    <th className="px-3 py-3 text-center font-medium">Actions</th>
-                  )}
                 </tr>
               </thead>
               <tbody className="divide-y">
                 {selectedVessels.length === 0 ? (
                   <tr>
-                    <td colSpan={viewModes.vessel === "edit" ? 8 : 6} className="px-6 py-12 text-center">
+                    <td colSpan={7} className="px-6 py-12 text-center">
                       <div className="flex flex-col items-center gap-2">
                         <Ship className="h-12 w-12 text-muted-foreground/50" />
                         <p className="text-muted-foreground">Select at least one vessel to view certificate configuration</p>
                       </div>
                     </td>
                   </tr>
-                ) : mockVesselData.map((cert, idx) => (
-                  <tr key={cert.id} className="hover:bg-gray-50">
-                    {viewModes.vessel === "edit" && (
-                      <td className="px-3 py-3 text-center">
-                        <Checkbox 
-                          checked={cert.applicable}
-                          className="border-blue-500 data-[state=checked]:bg-blue-500"
-                          data-testid={`checkbox-vessel-applicable-${cert.id}`}
-                        />
-                      </td>
-                    )}
-                    <td className="px-3 py-3 text-sm">{idx + 1}</td>
-                    <td className="px-3 py-3 text-sm font-medium text-blue-600">{cert.masterId}</td>
-                    <td className="px-3 py-3 text-sm">{cert.companyId}</td>
-                    <td className="px-3 py-3 text-sm">{cert.certificateLabel}</td>
-                    <td className="px-3 py-3 text-sm">{cert.requirementRef}</td>
-                    <td className="px-3 py-3 text-sm">{cert.companyGroup}</td>
-                    {viewModes.vessel === "edit" && (
-                      <td className="px-3 py-3">
-                        <div className="flex items-center justify-center gap-1">
-                          <Button size="icon" variant="ghost" className="h-8 w-8" data-testid={`button-edit-vessel-${cert.id}`}>
-                            <Pencil className="h-4 w-4" />
-                          </Button>
-                          <Button size="icon" variant="ghost" className="h-8 w-8 text-destructive" data-testid={`button-delete-vessel-${cert.id}`}>
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      </td>
-                    )}
-                  </tr>
-                ))}
-                {selectedVessels.length > 0 && viewModes.vessel === "edit" && mockVesselData.length < 10 && Array.from({ length: Math.max(0, 10 - mockVesselData.length) }).map((_, idx) => (
-                  <tr key={`empty-vessel-${idx}`} className="hover:bg-gray-50">
-                    <td className="px-3 py-3 text-center"><Checkbox className="border-blue-500" /></td>
-                    <td className="px-3 py-3 text-sm text-muted-foreground">{mockVesselData.length + idx + 1}</td>
-                    <td className="px-3 py-3"><Input className="h-8 text-sm" placeholder="" /></td>
-                    <td className="px-3 py-3"><Input className="h-8 text-sm" placeholder="" /></td>
-                    <td className="px-3 py-3"><Input className="h-8 text-sm" placeholder="" /></td>
-                    <td className="px-3 py-3"><Input className="h-8 text-sm" placeholder="" /></td>
-                    <td className="px-3 py-3">
-                      <Select>
-                        <SelectTrigger className="h-8 text-sm"><SelectValue placeholder="Select" /></SelectTrigger>
-                        <SelectContent>
-                          {companyGroups.map(grp => (
-                            <SelectItem key={grp} value={grp}>{grp}</SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </td>
-                    <td className="px-3 py-3">
-                      <div className="flex items-center justify-center gap-1">
-                        <Button size="icon" variant="ghost" className="h-8 w-8"><Pencil className="h-4 w-4" /></Button>
-                        <Button size="icon" variant="ghost" className="h-8 w-8 text-destructive"><Trash2 className="h-4 w-4" /></Button>
+                ) : isLoadingApplicability ? (
+                  <tr>
+                    <td colSpan={7} className="px-6 py-12 text-center">
+                      <div className="flex flex-col items-center gap-2">
+                        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+                        <p className="text-muted-foreground">Loading certificate configuration...</p>
                       </div>
                     </td>
                   </tr>
-                ))}
-              </tbody>
+                ) : companyCertificates.length === 0 ? (
+                  <tr>
+                    <td colSpan={7} className="px-6 py-12 text-center">
+                      <div className="flex flex-col items-center gap-2">
+                        <Ship className="h-12 w-12 text-muted-foreground/50" />
+                        <p className="text-muted-foreground">No certificates are marked as applicable to Company. Configure the Company tab first.</p>
+                      </div>
+                    </td>
+                  </tr>
+                ) : companyCertificates.map((cert, idx) => {
+                  const applicability = getCertificateApplicability(cert.masterId);
+                  const isMixed = applicability === 'mixed';
+                  const isChecked = applicability === true;
+                  const companyGroupLabel = companyGroupLabels.find(g => g.key === cert.companyGroup)?.label || "";
+                  const displayCompanyGroup = cert.companyGroup ? `${cert.companyGroup}. ${companyGroupLabel}` : "";
+                  
+                  return (
+                    <tr key={cert.id} className={cn("hover:bg-gray-50", isMixed && "bg-amber-50")}>
+                      <td className="px-3 py-3 text-center">
+                        <div className="flex flex-col items-center gap-1">
+                          <Checkbox 
+                            checked={isMixed ? false : isChecked}
+                            onCheckedChange={(checked) => {
+                              if (!conflictCheck.hasConflict) {
+                                handleApplicabilityChange(cert.masterId, !!checked);
+                              }
+                            }}
+                            disabled={conflictCheck.hasConflict}
+                            className={cn(
+                              "border-blue-500 data-[state=checked]:bg-blue-500",
+                              isMixed && "border-amber-500 bg-amber-100"
+                            )}
+                            data-testid={`checkbox-vessel-applicable-${cert.id}`}
+                          />
+                          {isMixed && (
+                            <span className="text-xs text-amber-600">Mixed</span>
+                          )}
+                        </div>
+                      </td>
+                      <td className="px-3 py-3 text-sm">{idx + 1}</td>
+                      <td className="px-3 py-3 text-sm font-medium text-blue-600">{cert.masterId}</td>
+                      <td className="px-3 py-3 text-sm">{cert.companyId || `C${cert.masterId}`}</td>
+                      <td className="px-3 py-3 text-sm">{cert.certificateLabel || cert.certificateName}</td>
+                      <td className="px-3 py-3 text-sm">{cert.requirementRef}</td>
+                      <td className="px-3 py-3 text-sm">{displayCompanyGroup}</td>
+                    </tr>
+                  );
+                })}
+                              </tbody>
             </table>
           </div>
         </div>
