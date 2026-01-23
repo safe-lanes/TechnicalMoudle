@@ -4,7 +4,7 @@ import { storage } from "./storage";
 import { getPool } from "./db";
 import * as fs from "fs";
 import * as path from "path";
-import { insertRunningHoursAuditSchema, cascadeRunningHoursSchema, insertWorkOrderSchema, insertWorkOrderExecutionSchema, insertDefectSchema, insertDefectActionSchema, insertDefectAttachmentSchema, insertComponentSchema, insertSpareSchema, insertMakerSchema, insertMasterListSchema, insertComponentDocumentSchema, insertComponentClassRegulatorySchema, insertComponentRequisitionSchema, equipmentCategories, defectCategories, defectTypes } from "@shared/schema";
+import { insertRunningHoursAuditSchema, cascadeRunningHoursSchema, insertWorkOrderSchema, insertWorkOrderExecutionSchema, insertDefectSchema, insertDefectActionSchema, insertDefectAttachmentSchema, insertComponentSchema, insertSpareSchema, insertMakerSchema, insertMasterListSchema, insertComponentDocumentSchema, insertComponentClassRegulatorySchema, insertComponentRequisitionSchema, equipmentCategories, defectCategories, defectTypes, shipCertificatesMaster, insertShipCertificateMasterSchema } from "@shared/schema";
 import { getPostgresClient } from "./postgresClient";
 import { eq } from "drizzle-orm";
 import { computeWorkOrderStatus } from "@shared/workOrders/status";
@@ -9040,6 +9040,127 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error creating survey:", error);
       res.status(500).json({ error: "Failed to create survey" });
+    }
+  });
+  
+  // ============================================================
+  // Ship Certificates Admin - Master Certificate API Routes
+  // ============================================================
+  
+  // GET all ship certificates master entries
+  app.get("/technical/api/admin/ship-certificates-master", async (req, res) => {
+    try {
+      const postgres = await getPostgresClient();
+      if (!postgres) {
+        return res.status(503).json({ error: "Database not available" });
+      }
+      
+      const { db } = postgres;
+      const certificates = await db.select().from(shipCertificatesMaster).orderBy(shipCertificatesMaster.sequence);
+      
+      res.json(certificates);
+    } catch (error: any) {
+      console.error("Error fetching ship certificates master:", error);
+      res.status(500).json({ error: "Failed to fetch certificates" });
+    }
+  });
+  
+  // POST save all ship certificates master entries (bulk upsert)
+  app.post("/technical/api/admin/ship-certificates-master", async (req, res) => {
+    try {
+      const postgres = await getPostgresClient();
+      if (!postgres) {
+        return res.status(503).json({ error: "Database not available" });
+      }
+      
+      const { db } = postgres;
+      const certificates = req.body.certificates;
+      
+      if (!Array.isArray(certificates)) {
+        return res.status(400).json({ error: "certificates must be an array" });
+      }
+      
+      console.log(`💾 Saving ${certificates.length} ship certificates master entries...`);
+      
+      // Use a transaction to upsert all certificates
+      const { sql } = await import('drizzle-orm');
+      
+      let insertedCount = 0;
+      let updatedCount = 0;
+      
+      for (const cert of certificates) {
+        // Check if certificate already exists by masterId
+        const existing = await db.select().from(shipCertificatesMaster)
+          .where(eq(shipCertificatesMaster.masterId, cert.masterId))
+          .limit(1);
+        
+        if (existing.length > 0) {
+          // Update existing
+          await db.update(shipCertificatesMaster)
+            .set({
+              sequence: cert.sequence,
+              certificateName: cert.certificateName,
+              category: cert.category,
+              group: cert.group,
+              requirementRef: cert.requirementRef || null,
+              applicableToCompany: cert.applicableToCompany || false,
+              certificateLabel: cert.certificateLabel || null,
+              isActive: cert.isActive !== false,
+              updatedAt: new Date(),
+            })
+            .where(eq(shipCertificatesMaster.masterId, cert.masterId));
+          updatedCount++;
+        } else {
+          // Insert new
+          await db.insert(shipCertificatesMaster).values({
+            sequence: cert.sequence,
+            masterId: cert.masterId,
+            certificateName: cert.certificateName,
+            category: cert.category,
+            group: cert.group,
+            requirementRef: cert.requirementRef || null,
+            applicableToCompany: cert.applicableToCompany || false,
+            certificateLabel: cert.certificateLabel || null,
+            isActive: cert.isActive !== false,
+          });
+          insertedCount++;
+        }
+      }
+      
+      console.log(`✅ Ship certificates master saved: ${insertedCount} inserted, ${updatedCount} updated`);
+      
+      res.json({ 
+        success: true, 
+        message: `Saved ${certificates.length} certificates`,
+        inserted: insertedCount,
+        updated: updatedCount
+      });
+    } catch (error: any) {
+      console.error("Error saving ship certificates master:", error);
+      res.status(500).json({ error: "Failed to save certificates", details: error.message });
+    }
+  });
+  
+  // DELETE a ship certificate master entry by masterId
+  app.delete("/technical/api/admin/ship-certificates-master/:masterId", async (req, res) => {
+    try {
+      const postgres = await getPostgresClient();
+      if (!postgres) {
+        return res.status(503).json({ error: "Database not available" });
+      }
+      
+      const { db } = postgres;
+      const { masterId } = req.params;
+      
+      await db.delete(shipCertificatesMaster)
+        .where(eq(shipCertificatesMaster.masterId, masterId));
+      
+      console.log(`🗑️ Deleted ship certificate master: ${masterId}`);
+      
+      res.json({ success: true, message: `Deleted certificate ${masterId}` });
+    } catch (error: any) {
+      console.error("Error deleting ship certificate master:", error);
+      res.status(500).json({ error: "Failed to delete certificate" });
     }
   });
   

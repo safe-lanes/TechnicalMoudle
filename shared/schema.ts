@@ -2342,3 +2342,33 @@ export const insertDefectTypeSchema = createInsertSchema(defectTypes).omit({
 
 export type InsertDefectType = z.infer<typeof insertDefectTypeSchema>;
 export type DefectType = typeof defectTypes.$inferSelect;
+
+// Ship Certificates Admin - Master Certificate Definitions
+// This is the admin configuration for what certificates exist and their properties
+export const shipCertificatesMaster = pgTable("ship_certificates_master", {
+  id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
+  sequence: integer("sequence").notNull(),
+  masterId: text("master_id").notNull().unique(), // Format: CategoryLetter + GroupNumber + "-" + 3-digit sequence (e.g., A1-001)
+  certificateName: text("certificate_name").notNull(),
+  category: text("category").notNull(), // A-F category key
+  group: text("group").notNull(), // 1-10 group key
+  requirementRef: text("requirement_ref"), // Regulatory reference
+  applicableToCompany: boolean("applicable_to_company").notNull().default(false),
+  certificateLabel: text("certificate_label"), // Custom label when applicable to company
+  isActive: boolean("is_active").notNull().default(true),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+}, (table) => ({
+  sequenceIdx: index("idx_ship_cert_master_sequence").on(table.sequence),
+  categoryIdx: index("idx_ship_cert_master_category").on(table.category),
+  groupIdx: index("idx_ship_cert_master_group").on(table.group),
+}));
+
+export const insertShipCertificateMasterSchema = createInsertSchema(shipCertificatesMaster).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type InsertShipCertificateMaster = z.infer<typeof insertShipCertificateMasterSchema>;
+export type ShipCertificateMaster = typeof shipCertificatesMaster.$inferSelect;

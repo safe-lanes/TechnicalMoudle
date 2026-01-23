@@ -206,6 +206,30 @@ const migrations: Migration[] = [
       ALTER TABLE running_hours_audit ADD COLUMN IF NOT EXISTS component_name TEXT;
       CREATE INDEX IF NOT EXISTS idx_renewal_reset ON running_hours_audit (is_renewal_reset, vessel_id)
     `
+  },
+  {
+    id: '013_ship_certificates_master_table',
+    name: 'Create ship_certificates_master table for Admin configuration',
+    description: 'Creates the admin configuration table for master certificate definitions used by Cert & Surveys module',
+    sql: `
+      CREATE TABLE IF NOT EXISTS ship_certificates_master (
+        id SERIAL PRIMARY KEY,
+        sequence INTEGER NOT NULL,
+        master_id TEXT NOT NULL UNIQUE,
+        certificate_name TEXT NOT NULL,
+        category TEXT NOT NULL,
+        "group" TEXT NOT NULL,
+        requirement_ref TEXT,
+        applicable_to_company BOOLEAN NOT NULL DEFAULT false,
+        certificate_label TEXT,
+        is_active BOOLEAN NOT NULL DEFAULT true,
+        created_at TIMESTAMP DEFAULT NOW(),
+        updated_at TIMESTAMP DEFAULT NOW()
+      );
+      CREATE INDEX IF NOT EXISTS idx_ship_cert_master_sequence ON ship_certificates_master (sequence);
+      CREATE INDEX IF NOT EXISTS idx_ship_cert_master_category ON ship_certificates_master (category);
+      CREATE INDEX IF NOT EXISTS idx_ship_cert_master_group ON ship_certificates_master ("group")
+    `
   }
 ];
 
