@@ -352,8 +352,10 @@ export default function ShipsCertificatesAdmin() {
               <thead className="bg-[#52baf3] text-white text-sm">
                 <tr>
                   <th className="px-3 py-3 text-left font-medium w-12">#</th>
+                  <th className="px-3 py-3 text-left font-medium">Master ID</th>
                   <th className="px-3 py-3 text-left font-medium">Company ID</th>
-                  <th className="px-3 py-3 text-left font-medium">Requirement</th>
+                  <th className="px-3 py-3 text-left font-medium">Certificate Label</th>
+                  <th className="px-3 py-3 text-left font-medium">Requirement/Ref</th>
                   <th className="px-3 py-3 text-left font-medium">Company Group</th>
                   <th className="px-3 py-3 text-center font-medium">Reorder</th>
                 </tr>
@@ -362,6 +364,7 @@ export default function ShipsCertificatesAdmin() {
                 {filteredData.map((cert, idx) => (
                   <tr key={cert.id} className="hover:bg-gray-50">
                     <td className="px-3 py-3 text-sm">{idx + 1}</td>
+                    <td className="px-3 py-3 text-sm font-medium text-blue-600">{cert.masterId}</td>
                     <td className="px-3 py-3 text-sm">
                       {viewModes.company === "edit" ? (
                         <Input 
@@ -374,6 +377,7 @@ export default function ShipsCertificatesAdmin() {
                         cert.companyId || "-"
                       )}
                     </td>
+                    <td className="px-3 py-3 text-sm">{cert.certificateLabel}</td>
                     <td className="px-3 py-3 text-sm">
                       {viewModes.company === "edit" ? (
                         <Input 
