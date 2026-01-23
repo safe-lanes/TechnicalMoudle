@@ -636,6 +636,21 @@ export default function ShipsCertificatesAdmin() {
         certificateLabel: checked && !cert.certificateLabel ? cert.certificateName : cert.certificateLabel
       };
     }));
+    setHasUnsavedChanges(true);
+  };
+  
+  // Handle Select All toggle for applicableToCompany - applies to filtered certificates only
+  const handleSelectAllApplicable = (filteredIds: number[], checked: boolean) => {
+    setMasterData(prev => prev.map(cert => {
+      if (!filteredIds.includes(cert.id)) return cert;
+      return {
+        ...cert,
+        applicableToCompany: checked,
+        // Auto-populate Certificate Label with Certificate Name when checked (only if label is empty)
+        certificateLabel: checked && !cert.certificateLabel ? cert.certificateName : cert.certificateLabel
+      };
+    }));
+    setHasUnsavedChanges(true);
   };
   
   // Reorder the newly added certificate to the end of its Category+Group section
@@ -742,7 +757,28 @@ export default function ShipsCertificatesAdmin() {
                   <th className="px-3 py-3 text-left font-medium">Category</th>
                   <th className="px-3 py-3 text-left font-medium">Group</th>
                   <th className="px-3 py-3 text-left font-medium">Requirement/Ref</th>
-                  <th className="px-3 py-3 text-center font-medium">Applicable to Company</th>
+                  <th className="px-3 py-3 text-center font-medium">
+                    <div className="flex items-center justify-center gap-2">
+                      <span>Applicable to Company</span>
+                      {viewModes.master === "edit" && (() => {
+                        const allChecked = filteredData.length > 0 && filteredData.every(c => c.applicableToCompany);
+                        const someChecked = filteredData.some(c => c.applicableToCompany);
+                        const isIndeterminate = someChecked && !allChecked;
+                        return (
+                          <Checkbox
+                            checked={isIndeterminate ? "indeterminate" : allChecked}
+                            disabled={filteredData.length === 0}
+                            onCheckedChange={(checked) => {
+                              const filteredIds = filteredData.map(c => c.id);
+                              handleSelectAllApplicable(filteredIds, checked === true || checked === "indeterminate" ? !allChecked : true);
+                            }}
+                            className="border-white data-[state=checked]:bg-white data-[state=checked]:text-[#52baf3] data-[state=indeterminate]:bg-white data-[state=indeterminate]:text-[#52baf3]"
+                            data-testid="checkbox-select-all-applicable"
+                          />
+                        );
+                      })()}
+                    </div>
+                  </th>
                   <th className="px-3 py-3 text-left font-medium">Certificate Label</th>
                   {viewModes.master === "edit" && (
                     <th className="px-3 py-3 text-center font-medium">Actions</th>
