@@ -228,6 +228,13 @@ export default function ShipsCertificatesAdmin() {
   const [masterData, setMasterData] = useState<MasterCertificate[]>(STARTER_KIT_MASTER_DATA);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   
+  // Track if save was performed (to show Exit instead of Cancel)
+  const [hasSavedInSession, setHasSavedInSession] = useState<Record<string, boolean>>({
+    master: false,
+    company: false,
+    vessel: false,
+  });
+  
   // Fetch saved certificates from database
   const { data: savedCertificates, isLoading: isLoadingCertificates } = useQuery({
     queryKey: ['/technical/api/admin/ship-certificates-master'],
@@ -265,6 +272,7 @@ export default function ShipsCertificatesAdmin() {
         description: `${data.inserted || 0} new certificates added, ${data.updated || 0} updated`,
       });
       setHasUnsavedChanges(false);
+      setHasSavedInSession(prev => ({ ...prev, [activeTab]: true }));
       queryClient.invalidateQueries({ queryKey: ['/technical/api/admin/ship-certificates-master'] });
     },
     onError: (error: any) => {
@@ -707,10 +715,15 @@ export default function ShipsCertificatesAdmin() {
   const currentViewMode = viewModes[activeTab];
 
   const toggleViewMode = () => {
+    const isEnteringEdit = viewModes[activeTab] === "view";
     setViewModes(prev => ({
       ...prev,
       [activeTab]: prev[activeTab] === "view" ? "edit" : "view"
     }));
+    // Reset hasSavedInSession when entering Edit mode
+    if (isEnteringEdit) {
+      setHasSavedInSession(prev => ({ ...prev, [activeTab]: false }));
+    }
   };
 
   const exitEditMode = () => {
@@ -1354,7 +1367,7 @@ export default function ShipsCertificatesAdmin() {
                   onClick={exitEditMode}
                   data-testid="button-cancel"
                 >
-                  Cancel
+                  {hasSavedInSession[activeTab] ? "Exit" : "Cancel"}
                 </Button>
                 {activeTab === "master" && (
                   <>
