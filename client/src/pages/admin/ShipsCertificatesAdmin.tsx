@@ -1759,11 +1759,19 @@ export default function ShipsCertificatesAdmin() {
                 )}
                 {activeTab === "vessel" && (
                   <>
-                    <Button variant="outline" size="sm" className="bg-yellow-100 hover:bg-yellow-200 text-yellow-800 border-yellow-300" data-testid="button-save-draft">
-                      Save Draft
-                    </Button>
-                    <Button size="sm" className="bg-blue-600 hover:bg-blue-700" data-testid="button-submit">
-                      Submit
+                    <Button 
+                      size="sm"
+                      className="bg-green-600 hover:bg-green-700 gap-1"
+                      onClick={() => {
+                        setHasSavedInSession(prev => ({ ...prev, vessel: true }));
+                        toast({
+                          title: "Saved",
+                          description: "Vessel certificate applicability has been saved",
+                        });
+                      }}
+                      data-testid="button-save-vessel"
+                    >
+                      Save
                     </Button>
                   </>
                 )}
