@@ -403,51 +403,46 @@ const Dashboard = () => {
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Header */}
-      <div className="bg-white border-b border-gray-200">
-        <div className="px-6 py-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <h1 className="text-2xl font-bold text-gray-900" data-testid="text-dashboard-title">PMS Dashboard</h1>
-              <p className="text-sm text-gray-500">Planned Maintenance System Control Center</p>
-            </div>
-            <div className="flex items-center gap-3">
-              <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">
-                <CheckCircle className="w-3 h-3 mr-1" />
-                E-PMS Active
-              </Badge>
-              <span className="text-sm text-gray-500">
-                Last updated: {format(lastUpdated, 'HH:mm:ss')}
-              </span>
-              <Button variant="outline" size="sm" onClick={handleRefresh} data-testid="button-refresh">
-                <RefreshCw className="w-4 h-4" />
-              </Button>
+      <div className="px-6 py-4">
+        <div className="flex items-center justify-between">
+          <h1 className="text-2xl font-bold text-gray-900" data-testid="text-dashboard-title">PMS Dashboard</h1>
+          <div className="flex items-center gap-3">
+            <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">
+              <CheckCircle className="w-3 h-3 mr-1" />
+              E-PMS Active
+            </Badge>
+            <span className="text-sm text-gray-500">
+              Last updated: {format(lastUpdated, 'HH:mm:ss')}
+            </span>
+            <Button variant="outline" size="sm" onClick={handleRefresh} data-testid="button-refresh">
+              <RefreshCw className="w-4 h-4" />
+            </Button>
+          </div>
+        </div>
+
+        {/* Vessel Selector - Only visible for Sail_Admin */}
+        {isSailAdmin && (
+          <div className="flex items-center gap-4 mt-4">
+            <div className="flex items-center gap-2">
+              <Ship className="w-4 h-4 text-gray-500" />
+              <Select value={vesselId} onValueChange={handleVesselChange}>
+                <SelectTrigger className="w-48" data-testid="select-vessel">
+                  <SelectValue placeholder="Select vessel" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all" data-testid="option-all-vessels">
+                    All Vessels
+                  </SelectItem>
+                  {vessels.map(vessel => (
+                    <SelectItem key={vessel.id} value={vessel.id}>
+                      {vessel.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
           </div>
-
-          {/* Vessel Selector - Only visible for Sail_Admin */}
-          {isSailAdmin && (
-            <div className="flex items-center gap-4 mt-4">
-              <div className="flex items-center gap-2">
-                <Ship className="w-4 h-4 text-gray-500" />
-                <Select value={vesselId} onValueChange={handleVesselChange}>
-                  <SelectTrigger className="w-48" data-testid="select-vessel">
-                    <SelectValue placeholder="Select vessel" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all" data-testid="option-all-vessels">
-                      All Vessels
-                    </SelectItem>
-                    {vessels.map(vessel => (
-                      <SelectItem key={vessel.id} value={vessel.id}>
-                        {vessel.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-          )}
-        </div>
+        )}
       </div>
 
       {/* Main Content */}

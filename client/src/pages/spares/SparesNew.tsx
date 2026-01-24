@@ -1797,7 +1797,7 @@ const Spares: React.FC = () => {
       {/* Header */}
       <div className="mb-4">
         <div className="flex items-center gap-4 mb-4">
-          <h1 className="text-2xl font-semibold text-gray-800" data-testid={activeTab === 'inventory' ? "E1" : "E3.1"}>
+          <h1 className="text-2xl font-bold text-gray-800" data-testid={activeTab === 'inventory' ? "E1" : "E3.1"}>
             {activeTab === 'inventory' ? <Marker id="E1" /> : <Marker id="E3.1" />}
             {activeTab === 'inventory' ? 'Spares Inventory' : 'Spares - History of Transactions'}
           </h1>
@@ -1840,13 +1840,13 @@ const Spares: React.FC = () => {
               <FileSpreadsheet className="h-4 w-4 mr-1" />
               Export
             </Button>
-            <Button size="sm" className="bg-[#52baf3] hover:bg-[#40a8e0] text-white" onClick={() => setIsAddSpareModalOpen(true)} data-testid="E10">
+            <Button size="sm" className="bg-[#5dc86f] hover:bg-[#4db85f] text-white" onClick={() => setIsAddSpareModalOpen(true)} data-testid="E10">
               <Marker id="E10" />
               + Add Spare
             </Button>
-            <Button size="sm" className="bg-green-600 hover:bg-green-700 text-white" onClick={openBulkUpdateModal} data-testid="E11">
+            <Button size="sm" className="bg-[#5dc86f] hover:bg-[#4db85f] text-white" onClick={openBulkUpdateModal} data-testid="E11">
               <Marker id="E11" />
-              🔄 Bulk Update Spares
+              Bulk Update Spares
             </Button>
           </div>
         </div>

@@ -658,7 +658,7 @@ export default function DefectsLogWithTabs() {
               Filters
             </Button>
             <Button 
-              className="bg-green-600 hover:bg-green-700 text-white h-8" 
+              className="bg-[#5dc86f] hover:bg-[#4db85f] text-white h-8" 
               size="sm" 
               data-testid="button-new-defect"
               onClick={() => setNewDefectModalOpen(true)}

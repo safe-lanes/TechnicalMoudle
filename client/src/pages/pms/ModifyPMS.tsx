@@ -462,28 +462,30 @@ export default function ModifyPMS() {
       </div>
 
       {/* Main Content Area */}
-      <div className="flex-1 flex flex-col">
+      <div className="flex-1 flex flex-col bg-gray-50">
         {/* Header */}
-        <div className="bg-white p-6 border-b border-gray-200">
-          <h1 className="text-2xl font-bold text-gray-800 mb-4">Modify PMS - Change Requests</h1>
+        <div className="p-6">
+          <div className="flex items-center justify-between mb-4">
+            <h1 className="text-2xl font-bold text-gray-800">Modify PMS - Change Requests</h1>
+            <Button 
+              className="bg-[#5dc86f] hover:bg-[#4db85f] text-white px-6"
+              onClick={() => setIsNewRequestModalOpen(true)}
+            >
+              <Plus className="w-4 h-4 mr-2" />
+              New Change Request
+            </Button>
+          </div>
           
-          <div className="flex justify-between items-center">
+          <div className="flex items-center">
             <div className="relative">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
               <Input
                 placeholder="Search Status"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-10 w-80 border-gray-300"
+                className="pl-10 w-80 border-gray-300 bg-white"
               />
             </div>
-            <Button 
-              className="bg-[#52BAF3] hover:bg-[#40a8e0] text-white px-6"
-              onClick={() => setIsNewRequestModalOpen(true)}
-            >
-              <Plus className="w-4 h-4 mr-2" />
-              New Change Request
-            </Button>
           </div>
         </div>
 

@@ -1026,7 +1026,7 @@ const Stores: React.FC = () => {
           )}
         </div>
         <Button 
-          className="bg-[#52baf3] hover:bg-[#40a8e0] text-white" 
+          className="bg-[#5dc86f] hover:bg-[#4db85f] text-white" 
           onClick={openBulkUpdateModal}
           data-testid={viewMode === "inventory" ? getMarkerId(activeTab, "3") : getMarkerId(activeTab, "2.6")}
         >

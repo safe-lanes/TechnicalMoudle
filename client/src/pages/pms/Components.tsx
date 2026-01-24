@@ -2964,13 +2964,13 @@ const Components: React.FC = () => {
                 Back to Modify PMS
               </Button>
             )}
-            <h1 className={`text-2xl font-semibold ${isChangeRequestMode ? 'text-white' : 'text-gray-800'}`} data-testid="B1">
+            <h1 className={`text-2xl font-bold ${isChangeRequestMode ? 'text-white' : 'text-gray-800'}`} data-testid="B1">
               <Marker id="B1" /> Components {isChangeMode ? '- Edit Mode' : isChangeRequestMode ? '- Change Request Mode' : ''}
             </h1>
           </div>
           {!isChangeRequestMode && !isChangeMode && isSailAdmin && (
             <Button 
-              className="bg-[#52baf3] hover:bg-[#40a8e0] text-white"
+              className="bg-[#5dc86f] hover:bg-[#4db85f] text-white"
               onClick={() => {
                 setEditingComponentId(null);
                 setEditingComponentCode(null);

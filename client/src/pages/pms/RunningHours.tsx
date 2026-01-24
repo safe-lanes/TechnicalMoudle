@@ -627,9 +627,9 @@ const RunningHours = () => {
     <div className="space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-semibold text-gray-900" data-testid="D1"><Marker id="D1" />Running Hours</h1>
+        <h1 className="text-2xl font-bold text-gray-900" data-testid="D1"><Marker id="D1" />Running Hours</h1>
         <Button 
-          className="bg-green-600 hover:bg-green-700 text-white ml-[228px] mr-[228px]"
+          className="bg-[#5dc86f] hover:bg-[#4db85f] text-white"
           onClick={openBulkUpdate}
           data-testid="D5"
         >

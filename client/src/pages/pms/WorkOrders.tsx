@@ -455,18 +455,18 @@ const WorkOrders: React.FC = () => {
   };
 
   return (
-    <div className="flex flex-col h-full">
+    <div className="flex flex-col h-full bg-gray-50">
       {/* Header with Status Tabs */}
-      <div className="bg-white border-b border-gray-200">
-        <div className="flex items-center justify-between p-4">
-          <h1 className="text-xl font-semibold text-gray-900" data-testid="C1">
+      <div className="p-4">
+        <div className="flex items-center justify-between mb-4">
+          <h1 className="text-2xl font-bold text-gray-900" data-testid="C1">
             <Marker id="C1" />Work Orders (W.O)
           </h1>
           <div className="flex gap-2">
             {isSailAdmin && (
             <Button 
               size="sm" 
-              className="bg-[#52baf3] hover:bg-[#4aa3d9] text-white hidden"
+              className="bg-[#5dc86f] hover:bg-[#4db85f] text-white hidden"
               onClick={handleAddWorkOrderClick}
               data-testid="C2"
             >
@@ -477,7 +477,7 @@ const WorkOrders: React.FC = () => {
             )}
             <Button 
               size="sm" 
-              className="bg-green-600 hover:bg-green-700 text-white"
+              className="bg-[#5dc86f] hover:bg-[#4db85f] text-white"
               onClick={() => setUnplannedWorkOrderFormOpen(true)}
               data-testid="C3"
             >
@@ -489,7 +489,7 @@ const WorkOrders: React.FC = () => {
         </div>
         
         {/* Status Tabs */}
-        <div className="flex items-center gap-1 px-4 pb-2">
+        <div className="flex items-center gap-1">
           {tabs.map((tab, index) => {
             const markerId = index === 0 ? "C4" : index === 1 ? "C5" : index === 2 ? "C6" : index === 3 ? "C7" : "C8";
             return (
@@ -517,7 +517,7 @@ const WorkOrders: React.FC = () => {
       </div>
 
       {/* Filters */}
-      <div className="flex items-center gap-3 p-4 bg-gray-50 border-b border-gray-200">
+      <div className="flex items-center gap-3 px-4 pb-4">
         <Select value={vesselId} onValueChange={setVesselId}>
           <SelectTrigger className="w-48" data-testid="C15">
             <Marker id="C15" />
