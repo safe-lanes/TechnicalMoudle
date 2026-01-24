@@ -57,7 +57,7 @@ export const TopMenuBar: React.FC<TopMenuBarProps> = ({
   ];
 
   return (
-    <div className="bg-white border-b border-gray-200 shadow-sm relative">
+    <div className="bg-white border-b border-gray-200 shadow-sm relative sticky top-0 z-50">
       <div className="flex items-stretch h-16 bg-[#f5f5f5]">
         {/* SAIL Logo */}
         <div className="flex items-center px-4 bg-[#f5f5f5]">
