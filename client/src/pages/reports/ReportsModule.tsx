@@ -249,9 +249,9 @@ const ReportsModule = () => {
   // TODO: Add other category components when implemented
 
   return (
-    <div className="p-6 bg-[#fafafa] min-h-screen">
+    <div className="space-y-6">
       {/* Header */}
-      <div className="mb-6">
+      <div>
         <div className="flex justify-between items-center mb-4">
           <div>
             <h1 className="text-2xl font-bold text-gray-800" data-testid="G1"><Marker id="G1" />Reports</h1>

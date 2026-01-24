@@ -2916,7 +2916,7 @@ const Components: React.FC = () => {
   }
 
   return (
-    <div className={`h-full p-6 ${isModifyMode ? '' : isChangeMode ? 'bg-orange-50' : isChangeRequestMode ? 'bg-[#52baf3]' : 'bg-[#fafafa]'}`}>
+    <div className={`h-full space-y-4 ${isModifyMode ? '' : isChangeMode ? 'bg-orange-50' : isChangeRequestMode ? 'bg-[#52baf3]' : ''}`}>
       {/* Change Mode Banner */}
       {isChangeMode && (
         <div className="mb-4 p-4 bg-amber-50 border-b-2 border-amber-200">
@@ -2951,7 +2951,7 @@ const Components: React.FC = () => {
       )}
       
       {/* Header with SubModule Title */}
-      <div className="mb-6">
+      <div>
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-4">
             {isChangeRequestMode && (
