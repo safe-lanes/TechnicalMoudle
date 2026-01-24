@@ -455,9 +455,9 @@ const WorkOrders: React.FC = () => {
   };
 
   return (
-    <div className="flex flex-col h-full bg-gray-50">
+    <div className="flex flex-col h-full space-y-4">
       {/* Header with Status Tabs */}
-      <div className="p-4">
+      <div>
         <div className="flex items-center justify-between mb-4">
           <h1 className="text-2xl font-bold text-gray-900" data-testid="C1">
             <Marker id="C1" />Work Orders (W.O)
@@ -517,7 +517,7 @@ const WorkOrders: React.FC = () => {
       </div>
 
       {/* Filters */}
-      <div className="flex items-center gap-3 px-4 pb-4">
+      <div className="flex items-center gap-3">
         <Select value={vesselId} onValueChange={setVesselId}>
           <SelectTrigger className="w-48" data-testid="C15">
             <Marker id="C15" />

@@ -1008,9 +1008,9 @@ const Stores: React.FC = () => {
   };
 
   return (
-    <div className="flex-1 p-6 bg-gray-50 min-h-screen">
+    <div className="flex-1 space-y-6">
       {/* Header */}
-      <div className="flex justify-between items-center mb-6">
+      <div className="flex justify-between items-center">
         <div className="flex items-center gap-4">
           <h1 className="text-2xl font-bold text-gray-800" data-testid={viewMode === "inventory" ? getMarkerId(activeTab, "33") : getMarkerId(activeTab, "2.1")}>
             {viewMode === "inventory" && <Marker id={getMarkerId(activeTab, "33")} />}

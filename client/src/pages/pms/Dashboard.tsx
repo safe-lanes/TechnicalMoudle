@@ -401,9 +401,9 @@ const Dashboard = () => {
   const isLoading = isWorkOrdersLoading || isSparesLoading || isStoresLoading || isComponentsLoading;
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="space-y-6">
       {/* Header */}
-      <div className="px-6 py-4">
+      <div>
         <div className="flex items-center justify-between">
           <h1 className="text-2xl font-bold text-gray-900" data-testid="text-dashboard-title">PMS Dashboard</h1>
           <div className="flex items-center gap-3">
@@ -446,7 +446,7 @@ const Dashboard = () => {
       </div>
 
       {/* Main Content */}
-      <div className="px-6 py-6 space-y-6">
+      <div className="space-y-6">
         
         {/* Work Order Status KPI Cards - Clickable */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">

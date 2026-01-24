@@ -1793,9 +1793,9 @@ const Spares: React.FC = () => {
   };
 
   return (
-    <div className="h-full p-6 bg-[#fafafa]">
+    <div className="h-full space-y-4">
       {/* Header */}
-      <div className="mb-4">
+      <div>
         <div className="flex items-center gap-4 mb-4">
           <h1 className="text-2xl font-bold text-gray-800" data-testid={activeTab === 'inventory' ? "E1" : "E3.1"}>
             {activeTab === 'inventory' ? <Marker id="E1" /> : <Marker id="E3.1" />}
