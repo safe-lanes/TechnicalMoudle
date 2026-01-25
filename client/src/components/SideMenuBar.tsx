@@ -113,7 +113,7 @@ export const SideMenuBar: React.FC<SideMenuBarProps> = ({
   };
 
   return (
-    <div className="sticky top-16 h-[calc(100vh-64px)] flex flex-col items-center pt-2 pb-4 bg-[#16569e] w-20 min-w-[80px] flex-shrink-0 overflow-y-auto">
+    <div className="sticky top-[63px] h-[calc(100vh-63px)] flex flex-col items-center pt-2 pb-4 bg-[#16569e] w-20 min-w-[80px] flex-shrink-0 overflow-y-auto">
       {menuItems.map((item) => {
         const Icon = item.icon;
         const isSelected = item.id === selectedItem || 
