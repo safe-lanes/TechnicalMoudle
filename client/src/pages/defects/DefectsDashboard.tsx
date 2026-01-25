@@ -246,7 +246,7 @@ export default function DefectsDashboard() {
   return (
     <div className="flex flex-col bg-gray-50 dark:bg-gray-900" style={{ height: 'calc(100vh - 120px)' }}>
       {/* Header */}
-      <div className="pt-2 px-4 flex-shrink-0">
+      <div className="flex-shrink-0">
         <div className="flex items-center justify-between mb-4 gap-4">
           <h1 className="text-2xl font-bold text-black dark:text-white">Defects Dashboard</h1>
           <div className="flex items-center gap-3">
@@ -312,7 +312,7 @@ export default function DefectsDashboard() {
       </div>
 
       {/* Dashboard Content */}
-      <div className="px-4 flex-1 overflow-y-auto space-y-6">
+      <div className="flex-1 overflow-y-auto space-y-6">
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
         <KPICard
