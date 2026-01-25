@@ -642,10 +642,10 @@ export default function DefectsLogWithTabs() {
   ];
 
   return (
-    <div className="flex flex-col bg-gray-50 dark:bg-gray-900" style={{ height: 'calc(100vh - 120px)' }}>
-      <div className="pt-2 px-4 flex-shrink-0">
+    <div className="flex flex-col" style={{ height: 'calc(100vh - 120px)' }}>
+      <div className="flex-shrink-0">
         <div className="flex items-center justify-between mb-4 gap-4">
-          <h1 className="text-2xl font-bold text-black dark:text-white">Defects log</h1>
+          <h1 className="text-2xl font-bold text-black dark:text-white">Defects Log</h1>
           <div className="flex items-center gap-3">
             <Button
               variant="outline"

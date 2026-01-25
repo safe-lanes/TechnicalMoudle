@@ -7,7 +7,6 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Checkbox } from "@/components/ui/checkbox";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { 
   AlertTriangle, 
   CheckCircle, 
@@ -353,10 +352,8 @@ export default function DefectsLog() {
 
       {/* Main Content */}
       <div>
-        <Card>
-          <CardContent className="p-0">
             {/* Table Header */}
-            <div className="bg-sky-100 px-4 py-2 border-b overflow-x-auto">
+            <div className="bg-sky-100 px-4 py-2 border-b overflow-x-auto rounded-t-lg">
               <div className="grid gap-3 text-xs font-medium text-gray-700" style={{ gridTemplateColumns: 'minmax(90px,1fr) minmax(70px,1fr) minmax(70px,1fr) minmax(70px,1fr) minmax(80px,1fr) minmax(140px,2fr) minmax(110px,1.5fr) minmax(70px,1fr) minmax(70px,1fr) minmax(70px,1fr) minmax(60px,1fr) minmax(100px,1fr)' }}>
                 <div>ID</div>
                 <div>Vessel</div>
@@ -545,8 +542,6 @@ export default function DefectsLog() {
                 ))
               )}
             </div>
-          </CardContent>
-        </Card>
 
         {/* Pagination */}
         <div className="flex items-center justify-between mt-4 px-2">
