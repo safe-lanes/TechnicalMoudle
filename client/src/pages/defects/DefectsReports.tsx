@@ -128,16 +128,11 @@ export default function DefectsReports() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="space-y-6">
       {/* Header */}
-      <div className="bg-white border-b border-gray-200 px-6 py-4">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center space-x-4">
-            <h1 className="text-xl font-semibold text-gray-900 flex items-center gap-2">
-              <FileText className="w-5 h-5 text-blue-600" />
-              Defects Reports
-            </h1>
-          </div>
+      <div>
+        <div className="flex items-center justify-between mb-4">
+          <h1 className="text-2xl font-bold text-black dark:text-white">Defects Reports</h1>
         </div>
       </div>
 

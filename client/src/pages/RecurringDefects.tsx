@@ -527,9 +527,9 @@ export default function RecurringDefects() {
   }
 
   return (
-    <div>
-      <div className="flex justify-between items-center px-6 py-4 bg-gray-50">
-        <h1 className="text-2xl font-bold">Recurring Defects</h1>
+    <div className="space-y-6">
+      <div className="flex justify-between items-center">
+        <h1 className="text-2xl font-bold text-black dark:text-white">Recurring Defects</h1>
         <div className="flex items-center gap-2">
           <Button 
             variant="outline" 
@@ -552,7 +552,6 @@ export default function RecurringDefects() {
 
       {showFilters && renderFiltersBar()}
 
-      <div className="p-6">
       <Card>
         <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as any)}>
           <CardHeader>
@@ -607,7 +606,6 @@ export default function RecurringDefects() {
           </CardContent>
         </Tabs>
       </Card>
-      </div>
 
       {renderDrillDownPanel()}
 

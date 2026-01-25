@@ -633,7 +633,7 @@ export default function DefectsCoC() {
   return (
     <div className="flex flex-col bg-gray-50 dark:bg-gray-900" style={{ height: 'calc(100vh - 120px)' }}>
       {/* Header */}
-      <div className="pt-2 px-4 flex-shrink-0">
+      <div className="flex-shrink-0">
         <div className="flex items-center justify-between mb-4 gap-4">
           <h1 className="text-2xl font-bold text-black dark:text-white">Condition of Class (CoC) Defects</h1>
           <div className="flex items-center gap-3">

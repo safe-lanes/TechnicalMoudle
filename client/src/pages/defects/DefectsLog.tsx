@@ -221,18 +221,11 @@ export default function DefectsLog() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="space-y-6">
       {/* Header */}
-      <div className="bg-white border-b border-gray-200 px-6 py-4">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center space-x-4">
-            <h1 className="text-xl font-semibold text-gray-900 flex items-center gap-2">
-              <div className="w-6 h-6 bg-gray-200 rounded flex items-center justify-center">
-                <div className="w-3 h-3 bg-gray-600 rounded"></div>
-              </div>
-              Defects log
-            </h1>
-          </div>
+      <div>
+        <div className="flex items-center justify-between mb-4">
+          <h1 className="text-2xl font-bold text-black dark:text-white">Defects Log</h1>
 
           <div className="flex items-center space-x-3">
             <Button 
@@ -264,14 +257,14 @@ export default function DefectsLog() {
 
       {/* Filter Controls */}
       {showFilters && (
-        <div className="bg-white border-b border-gray-200">
+        <div className="mb-4">
           <VesselFleetGroupFilter
             value={vesselFilterValue}
             onChange={handleVesselFilterChange}
             showClearButton={true}
           />
           
-          <div className="px-6 pb-4">
+          <div className="pb-4">
             <div className="flex items-center justify-between gap-4">
               <div className="flex items-center gap-3 flex-wrap">
                 {/* Period */}
@@ -359,7 +352,7 @@ export default function DefectsLog() {
       )}
 
       {/* Main Content */}
-      <div className="p-6">
+      <div>
         <Card>
           <CardContent className="p-0">
             {/* Table Header */}
