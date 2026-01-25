@@ -121,8 +121,8 @@ export const TopMenuBar: React.FC<TopMenuBarProps> = ({
           <SyncStatusIndicator />
         </div>
       </div>
-      {/* Blue line at bottom border matching SAIL Phase 2 design - starts after sidebar area */}
-      <div className="absolute bottom-0 left-20 right-0 h-1 bg-[#52baf3]" />
+      {/* Blue line at bottom border matching SAIL Phase 2 design - full width */}
+      <div className="absolute bottom-0 left-0 right-0 h-1 bg-[#52baf3]" />
     </div>
   );
 };
