@@ -116,13 +116,15 @@ export const TechnicalModule = () => {
         onSubModuleChange={handleSubModuleChange}
       />
       
-      <div className="flex">
-        {/* Side Menu Bar */}
-        <SideMenuBar 
-          subModule={selectedSubModule}
-          selectedItem={selectedMenuItem}
-          onItemSelect={handleMenuItemSelect}
-        />
+      <div className="flex min-h-[calc(100vh-68px)]">
+        {/* Sidebar column with continuous dark blue background - wrapper provides full-height color */}
+        <div className="w-20 min-w-[80px] flex-shrink-0 bg-[#16569e]">
+          <SideMenuBar 
+            subModule={selectedSubModule}
+            selectedItem={selectedMenuItem}
+            onItemSelect={handleMenuItemSelect}
+          />
+        </div>
         
         {/* Main Content Area */}
         <div className="flex-1 p-6">
