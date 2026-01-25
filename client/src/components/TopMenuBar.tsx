@@ -29,11 +29,12 @@ export const TopMenuBar: React.FC<TopMenuBarProps> = ({
       icon: Grid3X3,
       isModule: true,
     },
-    {
-      id: "dashboard",
-      label: "Dashboard",
-      icon: BarChart3,
-    },
+    // Dashboard menu item hidden - will restore when functionality is added
+    // {
+    //   id: "dashboard",
+    //   label: "Dashboard",
+    //   icon: BarChart3,
+    // },
     {
       id: "cert-surveys",
       label: "Cert. & Surveys",
