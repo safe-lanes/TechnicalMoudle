@@ -253,10 +253,7 @@ const ReportsModule = () => {
       {/* Header */}
       <div>
         <div className="flex justify-between items-center mb-4">
-          <div>
-            <h1 className="text-2xl font-bold text-gray-800" data-testid="G1"><Marker id="G1" />Reports</h1>
-            <p className="text-gray-600" data-testid="G2"><Marker id="G2" />Generate and export comprehensive reports across all PMS modules</p>
-          </div>
+          <h1 className="text-2xl font-bold text-gray-800" data-testid="G1"><Marker id="G1" />Reports</h1>
           <div className="flex gap-3">
             <Button variant="outline" className="flex items-center gap-2" data-testid="G5">
               <Marker id="G5" />
