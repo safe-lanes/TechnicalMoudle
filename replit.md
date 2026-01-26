@@ -67,6 +67,16 @@ The application employs a modern full-stack architecture with a mobile-first, re
   - **Data Persistence**: React Query handles data fetching with cache invalidation; Save button with loading state and toast notifications
   - **Immutability Rule**: Master ID and Certificate Name are read-only after creation
 
+- **AI-Powered PMS Chatbot** (2026-01-26): Integrated AI assistant for vessel crew and shore-based technical teams to query maintenance data using natural language. Key implementation details:
+  - **AI Model**: Uses OpenAI GPT-4o via Replit's built-in AI integration (no API key required, billed to Replit credits)
+  - **Backend Service**: `server/services/chatbotService.ts` with 11 function-calling tools for data queries
+  - **Tools Available**: get_work_orders, get_overdue_work_orders, get_due_work_orders, get_work_order_detail, get_work_order_counts, get_low_stock_spares, get_critical_spares, get_components, get_running_hours, get_jobs, generate_deep_link
+  - **API Endpoint**: POST `/technical/api/chat` with requireAuth middleware protection
+  - **Frontend Components**: Floating ChatButton (bottom-right), side panel ChatPanel with suggested prompts, ChatMessage with react-markdown rendering
+  - **Context Injection**: Automatically passes vesselId, vesselName, currentPage, and userRole to AI for context-aware responses
+  - **Maritime-Aware**: System prompt includes maritime terminology (ROB, Running Hours, Class surveys, SFI codes, Chief Engineer)
+  - **Phase 1 Scope**: Read-only queries; future Phase 2 will add write actions with confirmation dialogs
+  - **Lazy Initialization**: OpenAI client is created on first use to avoid startup errors when API key isn't configured
 
 ## Bulk Import Format Rules
 

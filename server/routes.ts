@@ -18,6 +18,7 @@ import bulkRouter from "./routes/bulk";
 import alertRouter from "./routes/alerts";
 import formRouter from "./routes/forms";
 import fleetAdminRouter from "./routes/fleetAdmin";
+import chatbotRouter from "./routes/chatbot";
 import createChangeRequestsRouter from "./routes/changeRequests";
 import { ObjectStorageService, objectStorageClient, parseObjectPath, ObjectNotFoundError } from "./objectStorage";
 import { registerRunningHoursRoutes } from "./runningHoursRoutes";
@@ -6829,6 +6830,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   
   // Register Fleet Admin routes
   app.use("/technical/api/fleet-admin", fleetAdminRouter);
+  
+  // Register Chatbot routes
+  app.use(chatbotRouter);
   
   // Mount the Change Requests router  
   const changeRequestsRouter = createChangeRequestsRouter(storage);
