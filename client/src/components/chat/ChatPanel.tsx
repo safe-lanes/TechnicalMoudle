@@ -61,7 +61,7 @@ export function ChatPanel({ isOpen, onClose }: ChatPanelProps) {
 
   return (
     <div 
-      className="fixed right-0 top-0 h-full w-[420px] bg-background border-l shadow-lg z-50 flex flex-col"
+      className="fixed right-0 top-0 h-full w-[420px] bg-background border-l shadow-lg z-[9991] flex flex-col"
       data-testid="chat-panel"
     >
       <div className="flex items-center justify-between p-4 border-b">
