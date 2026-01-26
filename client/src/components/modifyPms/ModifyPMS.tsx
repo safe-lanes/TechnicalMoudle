@@ -198,18 +198,45 @@ export function ModifyPMS() {
 
   return (
     <>
-    <div className="flex h-screen bg-gray-100">
-      {/* Left Sidebar - Blue Background */}
-      <div className="w-64 bg-[#52BAF3] text-white">
-        <div className="p-4">
-          <div className="bg-[#40a8e0] px-4 py-3 rounded-t-lg">
-            <h2 className="text-white font-medium">Category</h2>
-          </div>
-          <div className="bg-white rounded-b-lg">
-            <div className="p-4 space-y-1">
+    <div className="space-y-4">
+      {/* Header with Title and Button */}
+      <div className="flex items-center justify-between">
+        <h1 className="text-2xl font-bold text-black dark:text-white">Modify PMS - Change Requests</h1>
+        <Button 
+          className="bg-[#5dc86f] hover:bg-[#4db85f] text-white px-6"
+          onClick={() => setIsNewRequestModalOpen(true)}
+        >
+          <Plus className="w-4 h-4 mr-2" />
+          New Change Request
+        </Button>
+      </div>
+
+      {/* Search Row */}
+      <div className="flex items-center">
+        <div className="relative">
+          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+          <input
+            type="text"
+            placeholder="Search Status"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="pl-10 w-80 border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+          />
+        </div>
+      </div>
+
+      {/* Main Content - Two Column Layout */}
+      <div className="flex gap-6" style={{ height: 'calc(100vh - 220px)' }}>
+        {/* Left Panel - Category List */}
+        <div className="w-[200px] flex-shrink-0">
+          <div className="bg-white rounded-lg shadow-sm h-full flex flex-col">
+            <div className="bg-[#52baf3] text-white px-4 py-2 font-semibold text-sm">
+              CATEGORY
+            </div>
+            <div className="flex-1">
               <button
                 onClick={() => setCategoryFilter('components')}
-                className={`w-full text-left px-3 py-2 text-sm rounded transition-colors ${
+                className={`w-full text-left px-4 py-3 text-sm border-b border-gray-200 transition-colors ${
                   categoryFilter === 'components'
                     ? 'bg-[#52BAF3] text-white font-medium'
                     : 'text-gray-700 hover:bg-gray-50'
@@ -219,7 +246,7 @@ export function ModifyPMS() {
               </button>
               <button
                 onClick={() => setCategoryFilter('jobs')}
-                className={`w-full text-left px-3 py-2 text-sm rounded transition-colors ${
+                className={`w-full text-left px-4 py-3 text-sm border-b border-gray-200 transition-colors ${
                   categoryFilter === 'jobs'
                     ? 'bg-[#52BAF3] text-white font-medium'
                     : 'text-gray-700 hover:bg-gray-50'
@@ -229,7 +256,7 @@ export function ModifyPMS() {
               </button>
               <button
                 onClick={() => setCategoryFilter('spares')}
-                className={`w-full text-left px-3 py-2 text-sm rounded transition-colors ${
+                className={`w-full text-left px-4 py-3 text-sm border-b border-gray-200 transition-colors ${
                   categoryFilter === 'spares'
                     ? 'bg-[#52BAF3] text-white font-medium'
                     : 'text-gray-700 hover:bg-gray-50'
@@ -239,7 +266,7 @@ export function ModifyPMS() {
               </button>
               <button
                 onClick={() => setCategoryFilter('stores')}
-                className={`w-full text-left px-3 py-2 text-sm rounded transition-colors ${
+                className={`w-full text-left px-4 py-3 text-sm transition-colors ${
                   categoryFilter === 'stores'
                     ? 'bg-[#52BAF3] text-white font-medium'
                     : 'text-gray-700 hover:bg-gray-50'
@@ -250,38 +277,10 @@ export function ModifyPMS() {
             </div>
           </div>
         </div>
-      </div>
 
-      {/* Main Content Area */}
-      <div className="flex-1 flex flex-col">
-        {/* Header */}
-        <div className="bg-white p-6 border-b border-gray-200">
-          <h1 className="text-2xl font-bold text-gray-800 mb-4">Modify PMS - Change Requests</h1>
-          
-          <div className="flex justify-between items-center">
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-              <input
-                type="text"
-                placeholder="Search Status"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-10 w-80 border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
-            </div>
-            <Button 
-              className="bg-[#52BAF3] hover:bg-[#40a8e0] text-white px-6"
-              onClick={() => setIsNewRequestModalOpen(true)}
-            >
-              <Plus className="w-4 h-4 mr-2" />
-              New Change Request
-            </Button>
-          </div>
-        </div>
-
-        {/* Table Content */}
-        <div className="flex-1 p-6">
-          <div className="bg-white rounded-lg border border-gray-200 h-full">
+        {/* Right Panel - Change Requests Table */}
+        <div className="flex-1">
+          <div className="bg-white rounded-lg shadow-sm h-full">
             {isLoading ? (
               <div className="text-center py-12 text-gray-500">Loading...</div>
             ) : filteredRequests.length === 0 ? (
