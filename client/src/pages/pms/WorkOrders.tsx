@@ -457,49 +457,23 @@ const WorkOrders: React.FC = () => {
   return (
     <div className="flex flex-col h-full space-y-4">
       {/* Header with Status Tabs */}
-      <div>
-        <div className="flex items-center justify-between mb-4">
-          <h1 className="text-2xl font-bold text-gray-900" data-testid="C1">
-            <Marker id="C1" />Work Orders (W.O)
-          </h1>
-          <div className="flex gap-2">
-            {isSailAdmin && (
-            <Button 
-              size="sm" 
-              className="bg-[#5dc86f] hover:bg-[#4db85f] text-white hidden"
-              onClick={handleAddWorkOrderClick}
-              data-testid="C2"
-            >
-              <Marker id="C2" />
-              <Plus className="h-4 w-4 mr-1" />
-              Add W.O
-            </Button>
-            )}
-            <Button 
-              size="sm" 
-              className="bg-[#5dc86f] hover:bg-[#4db85f] text-white"
-              onClick={() => setUnplannedWorkOrderFormOpen(true)}
-              data-testid="C3"
-            >
-              <Marker id="C3" />
-              <Plus className="h-4 w-4 mr-1" />
-              Unplanned W.O
-            </Button>
-          </div>
-        </div>
+      <div className="flex items-center justify-between relative">
+        <h1 className="text-2xl font-bold text-gray-900" data-testid="C1">
+          <Marker id="C1" />Work Orders (W.O)
+        </h1>
         
-        {/* Status Tabs */}
-        <div className="flex items-center gap-1">
+        {/* Status Tabs - Center aligned */}
+        <div className="absolute left-1/2 -translate-x-1/2 bg-gray-100 rounded-md p-1 flex items-center gap-1">
           {tabs.map((tab, index) => {
             const markerId = index === 0 ? "C4" : index === 1 ? "C5" : index === 2 ? "C6" : index === 3 ? "C7" : "C8";
             return (
               <button
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id)}
-                className={`px-3 py-1.5 rounded text-sm font-medium transition-colors ${
+                className={`px-4 py-1.5 rounded-md text-sm font-medium transition-colors ${
                   activeTab === tab.id
                     ? "bg-[#52baf3] text-white"
-                    : "bg-white text-gray-700 hover:bg-gray-50 border border-gray-300"
+                    : "text-gray-700 hover:bg-gray-200"
                 }`}
                 data-testid={markerId}
               >
@@ -513,6 +487,31 @@ const WorkOrders: React.FC = () => {
               </button>
             );
           })}
+        </div>
+        
+        <div className="flex gap-2">
+          {isSailAdmin && (
+          <Button 
+            size="sm" 
+            className="bg-[#5dc86f] hover:bg-[#4db85f] text-white hidden"
+            onClick={handleAddWorkOrderClick}
+            data-testid="C2"
+          >
+            <Marker id="C2" />
+            <Plus className="h-4 w-4 mr-1" />
+            Add W.O
+          </Button>
+          )}
+          <Button 
+            size="sm" 
+            className="bg-[#5dc86f] hover:bg-[#4db85f] text-white"
+            onClick={() => setUnplannedWorkOrderFormOpen(true)}
+            data-testid="C3"
+          >
+            <Marker id="C3" />
+            <Plus className="h-4 w-4 mr-1" />
+            Unplanned W.O
+          </Button>
         </div>
       </div>
 
