@@ -10,6 +10,7 @@ interface ChatRequestBody {
     vesselId: string;
     vesselName?: string;
     currentPage?: string;
+    pageHint?: string;
     userRole?: string;
   };
   conversationHistory?: Array<{ role: "user" | "assistant"; content: string }>;
@@ -31,6 +32,7 @@ router.post("/technical/api/chat", requireAuth, async (req: AuthenticatedRequest
       vesselId: context.vesselId,
       vesselName: context.vesselName,
       currentPage: context.currentPage,
+      pageHint: context.pageHint,
       userRole: req.user?.role || context.userRole || "Ship"
     };
 

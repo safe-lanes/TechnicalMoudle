@@ -16,7 +16,62 @@ interface ChatContext {
   vesselId: string;
   vesselName?: string;
   currentPage?: string;
+  pageHint?: string;
   userRole?: string;
+}
+
+interface PageContext {
+  page: string;
+  hint: string;
+}
+
+function getCurrentPageContext(location: string): PageContext {
+  if (location.includes('/pms/components') || location.includes('/components')) {
+    return {
+      page: 'Components',
+      hint: 'User is viewing the components list. Prioritize component and equipment queries.'
+    };
+  }
+  if (location.includes('/pms/work-orders') || location.includes('/work-orders') || location.includes('/workorders')) {
+    return {
+      page: 'Work Orders',
+      hint: 'User is viewing work orders. Prioritize maintenance and work order queries.'
+    };
+  }
+  if (location.includes('/spares')) {
+    return {
+      page: 'Spares Inventory',
+      hint: 'User is viewing spares. Prioritize spare parts and stock level queries.'
+    };
+  }
+  if (location.includes('/stores')) {
+    return {
+      page: 'Stores Inventory',
+      hint: 'User is viewing stores. Prioritize consumables and stores queries.'
+    };
+  }
+  if (location.includes('/running-hours') || location.includes('/running_hours')) {
+    return {
+      page: 'Running Hours',
+      hint: 'User is viewing running hours. Prioritize equipment hours and maintenance timing queries.'
+    };
+  }
+  if (location.includes('/defects')) {
+    return {
+      page: 'Defects',
+      hint: 'User is viewing defects. Prioritize defect and repair queries.'
+    };
+  }
+  if (location.includes('/admin')) {
+    return {
+      page: 'Admin',
+      hint: 'User is in admin section. May need fleet-level or configuration queries.'
+    };
+  }
+  return {
+    page: 'PMS Dashboard',
+    hint: 'User is on the main dashboard. Provide overview and summary information.'
+  };
 }
 
 export function useChat() {
@@ -28,7 +83,7 @@ export function useChat() {
   const [error, setError] = useState<string | null>(null);
 
   const currentVessel = vessels.find(v => v.id === vesselId);
-  const currentPage = location.split('/').pop() || 'dashboard';
+  const pageContext = getCurrentPageContext(location);
 
   const sendMessage = useCallback(async (content: string) => {
     if (!content.trim() || !vesselId) {
@@ -51,7 +106,8 @@ export function useChat() {
       const context: ChatContext = {
         vesselId,
         vesselName: currentVessel?.name,
-        currentPage,
+        currentPage: pageContext.page,
+        pageHint: pageContext.hint,
         userRole: currentUser?.role || "Ship"
       };
 
@@ -85,7 +141,7 @@ export function useChat() {
     } finally {
       setIsLoading(false);
     }
-  }, [vesselId, currentVessel, currentPage, currentUser, messages]);
+  }, [vesselId, currentVessel, pageContext, currentUser, messages]);
 
   const clearMessages = useCallback(() => {
     setMessages([]);

@@ -12,7 +12,7 @@ interface ChatPanelProps {
   onClose: () => void;
 }
 
-const SUGGESTED_PROMPTS = {
+const INITIAL_PROMPTS = {
   primary: [
     "Show overdue work orders",
     "Low stock spares",
@@ -26,6 +26,67 @@ const SUGGESTED_PROMPTS = {
     "What should I prioritize?"
   ]
 };
+
+interface Message {
+  id: string;
+  role: "user" | "assistant";
+  content: string;
+  timestamp: Date;
+  toolsUsed?: string[];
+}
+
+function getDynamicFollowUps(lastMessage: Message | undefined): string[] {
+  if (!lastMessage || lastMessage.role !== 'assistant') return [];
+  
+  const content = lastMessage.content.toLowerCase();
+  
+  // For work orders
+  if (content.includes('overdue') || content.includes('work order')) {
+    return [
+      'Show details of the most critical one',
+      'Which system has most overdue items?',
+      'What spares do I need for these?',
+      'Take me to work orders page'
+    ];
+  }
+  
+  // For spares
+  if (content.includes('spare') || content.includes('low stock') || content.includes('rob')) {
+    return [
+      'Show only critical items',
+      'Group by component',
+      'Draft requisition list',
+      'Navigate to spares page'
+    ];
+  }
+  
+  // For components
+  if (content.includes('component') || content.includes('equipment') || content.includes('running hours')) {
+    return [
+      'Show maintenance for this equipment',
+      'Check running hours',
+      'Related spares status',
+      'View in components page'
+    ];
+  }
+  
+  // For summaries
+  if (content.includes('status') || content.includes('summary') || content.includes('kpi')) {
+    return [
+      'Show overdue details',
+      'Low stock breakdown',
+      'Draft superintendent briefing',
+      'What needs priority?'
+    ];
+  }
+  
+  // Default suggestions
+  return [
+    'Show overdue work orders',
+    'Check low stock spares',
+    'PMS status summary'
+  ];
+}
 
 export function ChatPanel({ isOpen, onClose }: ChatPanelProps) {
   const [input, setInput] = useState("");
@@ -104,13 +165,13 @@ export function ChatPanel({ isOpen, onClose }: ChatPanelProps) {
                 </p>
               </div>
               <SuggestedPrompts 
-                prompts={SUGGESTED_PROMPTS.primary} 
+                prompts={INITIAL_PROMPTS.primary} 
                 onSelect={handlePromptClick}
                 label="Quick actions"
                 disabled={isLoading || !vesselId}
               />
               <SuggestedPrompts 
-                prompts={SUGGESTED_PROMPTS.secondary} 
+                prompts={INITIAL_PROMPTS.secondary} 
                 onSelect={handlePromptClick}
                 label="More options"
                 disabled={isLoading || !vesselId}
@@ -126,6 +187,14 @@ export function ChatPanel({ isOpen, onClose }: ChatPanelProps) {
                   <Loader2 className="h-4 w-4 animate-spin" />
                   <span className="text-sm">Thinking...</span>
                 </div>
+              )}
+              {!isLoading && messages.length > 0 && messages[messages.length - 1].role === 'assistant' && (
+                <SuggestedPrompts
+                  prompts={getDynamicFollowUps(messages[messages.length - 1])}
+                  onSelect={handlePromptClick}
+                  label="Quick follow-ups"
+                  disabled={isLoading || !vesselId}
+                />
               )}
             </div>
           )}

@@ -26,20 +26,70 @@ const SYSTEM_PROMPT = `You are a PMS Assistant for vessel maintenance operations
 - Highlight urgent/critical items prominently
 - Suggest relevant follow-up actions
 
-## Context
-- Current Vessel ID: {{vesselId}}
-- Current Vessel: {{vesselName}}
+## Current Context
+- Vessel ID: {{vesselId}}
+- Vessel Name: {{vesselName}}
 - Current Page: {{currentPage}}
+- Page Context: {{pageHint}}
 - User Role: {{userRole}}
 
-## Maritime Terminology You Understand
-- ROB (Remaining On Board) - spare parts quantity in stock
-- Running Hours (RH) - equipment operating hours
-- Class surveys - classification society inspections
-- Chief Engineer, 2nd Engineer, Captain - vessel officers
-- Main Engine, Aux Boiler, Generators - key equipment
-- SFI codes - standard equipment classification
-- PMS - Planned Maintenance System
+Use this context to prioritize relevant queries and suggest contextual actions.
+
+## Maritime Terminology & Query Understanding
+
+**Equipment Aliases** (understand these as the same thing):
+- "Main Engine" / "ME" / "prime mover" → Main Engine components
+- "Generators" / "Gen" / "DG" → Generator components
+- "Aux Boiler" / "Boiler" → Auxiliary Boiler
+- "Steering Gear" / "SG" → Steering system
+- "Emergency Generator" / "E/G" / "EG" → Emergency generator
+
+**Maintenance Terms**:
+- "class items" / "survey items" / "class work" → work orders with classRelated = Yes
+- "running hours based" / "RH jobs" → maintenanceBasis = "Running Hours"
+- "time based" / "calendar based" → maintenanceBasis = "Calendar"
+- "overdue" → status = "Overdue"
+- "due soon" / "coming up" → status = "Due" within next 7-30 days
+- "postponed" → check postponement status
+
+**Spares Terms**:
+- "low stock" / "below minimum" → ROB < Min
+- "critical spares" → critical = true AND ROB < Min
+- "out of stock" / "zero stock" → ROB = 0
+- "reorder" / "requisition" → spares needing attention
+
+**Time Ranges**:
+- "this week" → next 7 days
+- "this month" → next 30 days
+- "urgent" / "immediate" → overdue or critical
+- "coming up" / "soon" → next 7-14 days
+
+**Smart Queries**:
+- "what needs attention" → call get_overdue_work_orders + get_critical_spares
+- "what should I prioritize" → overdue + critical + high priority items
+- "status" / "summary" → call get_work_order_counts for KPI overview
+- "briefing" / "report" → formatted summary for superintendent
+
+## Conversation Memory & Follow-ups
+
+You have access to conversation history. Use it to:
+
+1. **Handle References**:
+   - "show me more" → refer to last query's results
+   - "the first one" → refer to first item in previous list
+   - "details on that" → get details of previously mentioned item
+   - "what about [other component]?" → apply same query pattern to new entity
+
+2. **Track Query Context**:
+   - If you just listed work orders, remember the list
+   - If user asks "show me number 3", use the work order ID from position 3
+   - If user asks about a component by name after a list, find its ID
+
+3. **Smart Drill-Down**:
+   User: "Show overdue work orders"
+   Bot: [lists 8 items]
+   User: "details on the Main Engine one"
+   Bot: [calls get_work_order_detail for the ME work order from previous list]
 
 ## Tool Usage Guidelines
 - ALWAYS call get_work_order_counts first for summary questions like "PMS status"
@@ -48,26 +98,45 @@ const SYSTEM_PROMPT = `You are a PMS Assistant for vessel maintenance operations
 - Combine multiple tool calls when needed (e.g., overdue WOs + low stock spares for priority analysis)
 - If a work order number/ID is mentioned, call get_work_order_detail
 
-## Response Format Examples
+## Response Formatting Rules
 
-When listing work orders:
-**Overdue Work Orders (8)**
-| WO# | Description | Overdue By |
-|-----|-------------|------------|
-| WO-1234 | ME Piston And Rings Inspection (500H) | 15 days |
-| WO-1235 | Provision Ref. Compressors Inspection | **CRITICAL** - 30 days |
+### CRITICAL: Never show raw data
+- NEVER show raw pipe-delimited data or unformatted JSON
+- ALWAYS parse tool results into readable markdown
+- Use bullet points and clear hierarchy
+- Include relevant numbers (counts, dates, hours)
+- Use emojis sparingly for visual hierarchy: ⚠️ (urgent), 🔧 (equipment), 🔴 (critical), ✅ (ok), 📋 (info)
 
-When summarizing KPIs:
+### For Components/Equipment:
+🔧 **Main Engine** (ME-001)
+- Running Hours: 45,234 RH
+- Status: Critical
+- Department: Engine Room
+
+### For Work Orders:
+⚠️ **WO-1234** - ME Piston Inspection
+- Component: Main Engine
+- Due: 2026-01-10 (15 days overdue)
+- Priority: High
+
+### For Spares:
+🔴 **Fuse FCF2-10A**
+- ROB: 5 | Min: 10 | Short: -5
+- Component: Electrical Panel
+- ⚠️ Order immediately
+
+### For Summary/Status:
 **PMS Status for {{vesselName}}**
-- ⚠️ **Overdue:** 8 work orders (need immediate attention)
+- ⚠️ **Overdue:** 8 work orders (immediate attention needed)
 - 📋 **Due:** 151 work orders
-- ✅ **Completed:** 6 work orders this period
-- 🔧 **215 spares** are low stock (87 at minimum, 128 below minimum)
+- ✅ **Completed:** 6 this period
+- 🔴 **Low Stock:** 215 spares (87 at minimum)
 
+### Always End With Actionable Suggestions:
 Would you like me to:
 - Show overdue work order details
-- Navigate to low stock spares
-- Draft a briefing for the superintendent
+- Navigate to low stock spares page
+- Draft a superintendent briefing
 
 ## Limitations (Phase 1 - Read Only)
 You can view and summarize data but cannot:
@@ -383,9 +452,12 @@ export async function executeTool(
       case "get_components": {
         let components = await storage.getComponents(vesselId);
         
-        if (args.critical) {
-          components = components.filter(c => c.critical === true);
+        // Filter by critical status (handle both boolean and explicit check)
+        if (args.critical !== undefined) {
+          components = components.filter(c => c.critical === args.critical);
         }
+        
+        // Case-insensitive search on name and component code
         if (args.search) {
           const searchLower = args.search.toLowerCase();
           components = components.filter(c => 
@@ -393,11 +465,16 @@ export async function executeTool(
             c.componentCode?.toLowerCase().includes(searchLower)
           );
         }
+        
+        // Filter by parent component
         if (args.parentId) {
           components = components.filter(c => c.parentId === args.parentId);
         }
         
-        return components.slice(0, 50).map(c => ({
+        // Apply configurable limit (default 50, max 100)
+        const limit = Math.min(args.limit || 50, 100);
+        
+        return components.slice(0, limit).map(c => ({
           id: c.id,
           componentCode: c.componentCode,
           name: c.name,
@@ -482,6 +559,7 @@ export interface ChatContext {
   vesselId: string;
   vesselName?: string;
   currentPage?: string;
+  pageHint?: string;
   userRole?: string;
 }
 
@@ -501,6 +579,7 @@ export async function processChatMessage(
     .replace(/\{\{vesselId\}\}/g, context.vesselId)
     .replace(/\{\{vesselName\}\}/g, context.vesselName || context.vesselId)
     .replace(/\{\{currentPage\}\}/g, context.currentPage || "Dashboard")
+    .replace(/\{\{pageHint\}\}/g, context.pageHint || "Provide general overview and status information.")
     .replace(/\{\{userRole\}\}/g, context.userRole || "User");
 
   const messages: ChatCompletionMessageParam[] = [
