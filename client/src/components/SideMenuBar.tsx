@@ -58,7 +58,7 @@ const menuConfigs: Record<string, MenuItem[]> = {
   defects: [
     { id: "dashboard", label: "Dashboard", icon: LayoutDashboard },
     { id: "defect-log", label: "Defect Log", icon: List },
-    { id: "coc", label: "CoC", sublabel: "Condition of Class", icon: Flag },
+    { id: "coc", label: "CoC", icon: Flag },
     { id: "recurring", label: "Recurring Defects", icon: RefreshCw },
     { id: "reports", label: "Reports", icon: FileText },
   ],
