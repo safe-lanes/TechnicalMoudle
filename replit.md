@@ -17,6 +17,16 @@ The application employs a modern full-stack architecture with a mobile-first, re
 - Work Order forms are single-page, scrollable designs with numbered subsections, styled to reflect professional maritime aesthetics.
 - AG Grid Enterprise is used for Certificates & Surveys tables, featuring custom styling and inline date editing.
 
+**UI Layout Standardization (January 2026)**:
+- TechnicalModule provides `p-6` padding to the main content area - individual pages should NOT add extra p-6
+- Standard page root: `<div className="space-y-6">` for consistent 24px vertical spacing
+- Standard header: `<div className="flex items-center justify-between">` with title left, action buttons right
+- Primary action buttons: Green (#5dc86f) for add/create actions
+- Secondary action buttons: Blue (#52baf3) for sync/export actions
+- TopMenuBar: All menu items have fixed 110px width to prevent dropdown position shifts
+- Centered pill-style tabs: `bg-gray-100` background with blue (#52baf3) active state
+- Full-height flex layouts (like Defects, Cert & Surveys): Use `h-full flex flex-col` with `mb-4` or `mb-6` for header spacing
+
 **Technical Implementations & Key Features**:
 - **Core PMS Logic**: Distinguishes between immutable Job templates and executable Work Order records with defined lifecycles.
 - **Vessel Context**: Supports dynamic vessel selection and an "All Vessels" aggregate view.
