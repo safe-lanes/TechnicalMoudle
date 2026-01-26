@@ -113,7 +113,7 @@ export const SideMenuBar: React.FC<SideMenuBarProps> = ({
   };
 
   return (
-    <div className="sticky top-[68px] h-[calc(100vh-68px)] flex flex-col items-center pt-2 pb-4 w-full overflow-y-auto">
+    <div className="sticky top-[68px] h-[calc(100vh-68px)] flex flex-col items-center pb-4 w-full overflow-y-auto">
       {menuItems.map((item) => {
         const Icon = item.icon;
         const isSelected = item.id === selectedItem || 
@@ -124,7 +124,7 @@ export const SideMenuBar: React.FC<SideMenuBarProps> = ({
             key={item.id}
             onClick={() => handleItemClick(item.id)}
             className={cn(
-              "w-full mb-4 flex flex-col items-center justify-center transition-all duration-200 px-2 h-14",
+              "w-full flex flex-col items-center justify-center transition-all duration-200 px-2 py-3 h-16",
               isSelected ? "bg-[#52baf3]" : "hover:bg-[#1d4ed8]",
               "group relative"
             )}
