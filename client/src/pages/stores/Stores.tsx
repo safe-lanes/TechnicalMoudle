@@ -1009,8 +1009,8 @@ const Stores: React.FC = () => {
 
   return (
     <div className="flex-1 space-y-6">
-      {/* Header */}
-      <div className="flex justify-between items-center">
+      {/* Header with centered module tabs */}
+      <div className="flex items-center justify-between relative">
         <div className="flex items-center gap-4">
           <h1 className="text-2xl font-bold text-gray-800" data-testid={viewMode === "inventory" ? getMarkerId(activeTab, "33") : getMarkerId(activeTab, "2.1")}>
             {viewMode === "inventory" && <Marker id={getMarkerId(activeTab, "33")} />}
@@ -1025,6 +1025,63 @@ const Stores: React.FC = () => {
             </span>
           )}
         </div>
+        
+        {/* Module Tabs - Center aligned with pill styling */}
+        <div className="absolute left-1/2 -translate-x-1/2 bg-gray-100 rounded-md p-1 flex items-center gap-1">
+          <button
+            onClick={() => setActiveTab("stores")}
+            className={`px-4 py-1.5 rounded-md text-sm font-medium transition-colors ${
+              activeTab === "stores"
+                ? "bg-[#52baf3] text-white"
+                : "text-gray-700 hover:bg-gray-200"
+            }`}
+            data-testid={viewMode === "inventory" ? "F.S" : getMarkerId(activeTab, "2.2")}
+          >
+            {viewMode === "inventory" && <Marker id="F.S" />}
+            {viewMode === "history" && <Marker id={getMarkerId(activeTab, "2.2")} />}
+            Stores
+          </button>
+          <button
+            onClick={() => setActiveTab("lubes")}
+            className={`px-4 py-1.5 rounded-md text-sm font-medium transition-colors ${
+              activeTab === "lubes"
+                ? "bg-[#52baf3] text-white"
+                : "text-gray-700 hover:bg-gray-200"
+            }`}
+            data-testid={viewMode === "inventory" ? "F.L" : getMarkerId(activeTab, "2.3")}
+          >
+            {viewMode === "inventory" && <Marker id="F.L" />}
+            {viewMode === "history" && <Marker id={getMarkerId(activeTab, "2.3")} />}
+            Lubes
+          </button>
+          <button
+            onClick={() => setActiveTab("chemicals")}
+            className={`px-4 py-1.5 rounded-md text-sm font-medium transition-colors ${
+              activeTab === "chemicals"
+                ? "bg-[#52baf3] text-white"
+                : "text-gray-700 hover:bg-gray-200"
+            }`}
+            data-testid={viewMode === "inventory" ? "F.C" : getMarkerId(activeTab, "2.4")}
+          >
+            {viewMode === "inventory" && <Marker id="F.C" />}
+            {viewMode === "history" && <Marker id={getMarkerId(activeTab, "2.4")} />}
+            Chemicals
+          </button>
+          <button
+            onClick={() => setActiveTab("others")}
+            className={`px-4 py-1.5 rounded-md text-sm font-medium transition-colors ${
+              activeTab === "others"
+                ? "bg-[#52baf3] text-white"
+                : "text-gray-700 hover:bg-gray-200"
+            }`}
+            data-testid={viewMode === "inventory" ? "F.O" : getMarkerId(activeTab, "2.5")}
+          >
+            {viewMode === "inventory" && <Marker id="F.O" />}
+            {viewMode === "history" && <Marker id={getMarkerId(activeTab, "2.5")} />}
+            Others
+          </button>
+        </div>
+        
         <Button 
           className="bg-[#5dc86f] hover:bg-[#4db85f] text-white" 
           onClick={openBulkUpdateModal}
@@ -1036,84 +1093,36 @@ const Stores: React.FC = () => {
         </Button>
       </div>
 
-      {/* Tabs */}
-      <div className="flex gap-1 mb-6">
-        <button
-          onClick={() => setActiveTab("stores")}
-          className={`px-6 py-2 rounded-t text-sm font-medium ${
-            activeTab === "stores"
-              ? "bg-[#52baf3] text-white"
-              : "bg-gray-200 text-gray-600 hover:bg-gray-300"
-          }`}
-          data-testid={viewMode === "inventory" ? "F.S" : getMarkerId(activeTab, "2.2")}
-        >
-          {viewMode === "inventory" && <Marker id="F.S" />}
-          {viewMode === "history" && <Marker id={getMarkerId(activeTab, "2.2")} />}
-          Stores
-        </button>
-        <button
-          onClick={() => setActiveTab("lubes")}
-          className={`px-6 py-2 rounded-t text-sm font-medium ${
-            activeTab === "lubes"
-              ? "bg-[#52baf3] text-white"
-              : "bg-gray-200 text-gray-600 hover:bg-gray-300"
-          }`}
-          data-testid={viewMode === "inventory" ? "F.L" : getMarkerId(activeTab, "2.3")}
-        >
-          {viewMode === "inventory" && <Marker id="F.L" />}
-          {viewMode === "history" && <Marker id={getMarkerId(activeTab, "2.3")} />}
-          Lubes
-        </button>
-        <button
-          onClick={() => setActiveTab("chemicals")}
-          className={`px-6 py-2 rounded-t text-sm font-medium ${
-            activeTab === "chemicals"
-              ? "bg-[#52baf3] text-white"
-              : "bg-gray-200 text-gray-600 hover:bg-gray-300"
-          }`}
-          data-testid={viewMode === "inventory" ? "F.C" : getMarkerId(activeTab, "2.4")}
-        >
-          {viewMode === "inventory" && <Marker id="F.C" />}
-          {viewMode === "history" && <Marker id={getMarkerId(activeTab, "2.4")} />}
-          Chemicals
-        </button>
-        <button
-          onClick={() => setActiveTab("others")}
-          className={`px-6 py-2 rounded-t text-sm font-medium ${
-            activeTab === "others"
-              ? "bg-[#52baf3] text-white"
-              : "bg-gray-200 text-gray-600 hover:bg-gray-300"
-          }`}
-          data-testid={viewMode === "inventory" ? "F.O" : getMarkerId(activeTab, "2.5")}
-        >
-          {viewMode === "inventory" && <Marker id="F.O" />}
-          {viewMode === "history" && <Marker id={getMarkerId(activeTab, "2.5")} />}
-          Others
-        </button>
-      </div>
-
-      {/* View Mode Tabs */}
-      <div className="flex gap-2 mb-4">
-        <Button
-          variant={viewMode === "inventory" ? "default" : "outline"}
-          onClick={() => setViewMode("inventory")}
-          className="text-sm"
-          data-testid={viewMode === "inventory" ? getMarkerId(activeTab, "1") : getMarkerId(activeTab, "2.7")}
-        >
-          {viewMode === "inventory" && <Marker id={getMarkerId(activeTab, "1")} />}
-          {viewMode === "history" && <Marker id={getMarkerId(activeTab, "2.7")} />}
-          Inventory
-        </Button>
-        <Button
-          variant={viewMode === "history" ? "default" : "outline"}
-          onClick={() => setViewMode("history")}
-          className="text-sm"
-          data-testid={viewMode === "inventory" ? getMarkerId(activeTab, "2") : getMarkerId(activeTab, "2.8")}
-        >
-          {viewMode === "inventory" && <Marker id={getMarkerId(activeTab, "2")} />}
-          {viewMode === "history" && <Marker id={getMarkerId(activeTab, "2.8")} />}
-          History
-        </Button>
+      {/* View Mode Tabs - Right aligned */}
+      <div className="flex justify-end">
+        <div className="bg-gray-100 rounded-md p-1 flex items-center gap-1">
+          <button
+            onClick={() => setViewMode("inventory")}
+            className={`px-4 py-1.5 rounded-md text-sm font-medium transition-colors ${
+              viewMode === "inventory"
+                ? "bg-[#52baf3] text-white"
+                : "text-gray-700 hover:bg-gray-200"
+            }`}
+            data-testid={viewMode === "inventory" ? getMarkerId(activeTab, "1") : getMarkerId(activeTab, "2.7")}
+          >
+            {viewMode === "inventory" && <Marker id={getMarkerId(activeTab, "1")} />}
+            {viewMode === "history" && <Marker id={getMarkerId(activeTab, "2.7")} />}
+            Inventory
+          </button>
+          <button
+            onClick={() => setViewMode("history")}
+            className={`px-4 py-1.5 rounded-md text-sm font-medium transition-colors ${
+              viewMode === "history"
+                ? "bg-[#52baf3] text-white"
+                : "text-gray-700 hover:bg-gray-200"
+            }`}
+            data-testid={viewMode === "inventory" ? getMarkerId(activeTab, "2") : getMarkerId(activeTab, "2.8")}
+          >
+            {viewMode === "inventory" && <Marker id={getMarkerId(activeTab, "2")} />}
+            {viewMode === "history" && <Marker id={getMarkerId(activeTab, "2.8")} />}
+            History
+          </button>
+        </div>
       </div>
 
       {/* Filters - Show different filters based on view mode */}
