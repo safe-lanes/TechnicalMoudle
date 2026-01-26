@@ -112,11 +112,8 @@ export const SideMenuBar: React.FC<SideMenuBarProps> = ({
     onItemSelect?.(itemId);
   };
 
-  const itemCount = menuItems.length;
-  const itemHeightPercent = 100 / itemCount;
-
   return (
-    <div className="sticky top-[68px] h-[calc(100vh-68px)] flex flex-col items-center w-full">
+    <div className="sticky top-[68px] h-[calc(100vh-68px)] flex flex-col items-center pt-2 pb-4 w-full overflow-y-auto">
       {menuItems.map((item) => {
         const Icon = item.icon;
         const isSelected = item.id === selectedItem || 
@@ -126,35 +123,32 @@ export const SideMenuBar: React.FC<SideMenuBarProps> = ({
           <button
             key={item.id}
             onClick={() => handleItemClick(item.id)}
-            style={{ height: `${itemHeightPercent}%` }}
             className={cn(
-              "w-full transition-all duration-200 group relative",
-              isSelected ? "bg-[#52baf3]" : "hover:bg-[#1d4ed8]"
+              "w-full mb-4 flex flex-col items-center justify-center transition-all duration-200 px-2 h-14",
+              isSelected ? "bg-[#52baf3]" : "hover:bg-[#1d4ed8]",
+              "group relative"
             )}
             role="link"
             aria-label={item.sublabel ? `${item.label}, ${item.sublabel}` : item.label}
             aria-current={isSelected ? "page" : undefined}
           >
-            {/* Icon content positioned at top of band */}
-            <div className="absolute top-0 left-0 right-0 h-[56px] flex flex-col items-center justify-center px-2">
-              <Icon
-                className={cn(
-                  "h-6 w-6 mb-1",
-                  isSelected ? "text-white" : "text-blue-100"
-                )}
-              />
-              <span className="text-white text-center leading-tight break-words text-[10px]">
-                {item.label}
-              </span>
-              {item.sublabel && (
-                <span className="text-[8px] text-blue-200 text-center leading-tight opacity-90">
-                  {item.sublabel}
-                </span>
+            <Icon
+              className={cn(
+                "h-6 w-6 mb-1",
+                isSelected ? "text-white" : "text-blue-100"
               )}
-            </div>
+            />
+            <span className="text-white text-center leading-tight break-words text-[10px]">
+              {item.label}
+            </span>
+            {item.sublabel && (
+              <span className="text-[8px] text-blue-200 text-center leading-tight opacity-90">
+                {item.sublabel}
+              </span>
+            )}
             
             {/* Tooltip on hover */}
-            <div className="absolute left-full top-4 ml-2 px-2 py-1 bg-gray-900 text-white text-xs rounded opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none whitespace-nowrap z-10">
+            <div className="absolute left-full ml-2 px-2 py-1 bg-gray-900 text-white text-xs rounded opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none whitespace-nowrap z-10">
               {item.sublabel ? `${item.label} - ${item.sublabel}` : item.label}
             </div>
           </button>
