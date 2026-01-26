@@ -478,7 +478,7 @@ export default function SurveysPage() {
 
   return (
     <div className="h-full flex flex-col bg-gray-50 overflow-hidden">
-      <div className="px-6 py-4 flex items-center justify-between flex-shrink-0">
+      <div className="flex items-center justify-between flex-shrink-0 mb-6">
         <h1 className="text-2xl font-bold text-gray-900">Surveys</h1>
         <div className="flex items-center gap-2">
           <FiltersToggle 

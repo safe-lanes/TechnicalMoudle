@@ -1646,7 +1646,7 @@ export default function ShipsCertificatesAdmin() {
   };
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-6">
       <div className="flex items-center justify-between relative">
         <h1 className="text-2xl font-semibold text-gray-800">Ship Certificates Admin</h1>
         

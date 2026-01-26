@@ -2916,7 +2916,7 @@ const Components: React.FC = () => {
   }
 
   return (
-    <div className={`h-full space-y-4 ${isModifyMode ? '' : isChangeMode ? 'bg-orange-50' : isChangeRequestMode ? 'bg-[#52baf3]' : ''}`}>
+    <div className={`h-full space-y-6 ${isModifyMode ? '' : isChangeMode ? 'bg-orange-50' : isChangeRequestMode ? 'bg-[#52baf3]' : ''}`}>
       {/* Change Mode Banner */}
       {isChangeMode && (
         <div className="mb-4 p-4 bg-amber-50 border-b-2 border-amber-200">
@@ -2951,8 +2951,7 @@ const Components: React.FC = () => {
       )}
       
       {/* Header with SubModule Title */}
-      <div>
-        <div className="flex items-center justify-between mb-4">
+      <div className="flex items-center justify-between">
           <div className="flex items-center gap-4">
             {isChangeRequestMode && (
               <Button
@@ -3029,7 +3028,6 @@ const Components: React.FC = () => {
             />
           </div>
         </div>
-      </div>
       {/* Main Content Area */}
       <div className="flex gap-6 h-[calc(100vh-200px)]">
         {/* Left Panel - Component Tree (30%) */}

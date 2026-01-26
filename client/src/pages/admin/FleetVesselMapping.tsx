@@ -362,15 +362,15 @@ export default function FleetVesselMapping() {
   const unmappedCount = fleetItems.filter(i => i.status === 'not-mapped').length;
 
   return (
-    <div className="p-6">
-      <div className="mb-6">
+    <div className="space-y-6">
+      <div>
         <h1 className="text-2xl font-bold text-gray-900">Fleet Vessel Mapping</h1>
         <p className="text-gray-600 mt-1">
           Map fleet-level templates to vessel-specific instances
         </p>
       </div>
 
-      <div className="flex items-center gap-4 mb-6">
+      <div className="flex items-center gap-4">
         <div className="relative flex-1 max-w-xs">
           <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
           <Input
