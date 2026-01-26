@@ -439,7 +439,7 @@ const Dashboard = () => {
         {/* Work Order Status KPI Cards - Clickable */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
           <Card 
-            className="cursor-pointer hover:shadow-lg transition-shadow border-l-4 border-l-red-500"
+            className="cursor-pointer hover:shadow-lg transition-shadow border-l-4 border-l-red-500 bg-white"
             onClick={() => navigateToWorkOrders('Overdue')}
             data-testid="card-overdue-wo"
           >
@@ -459,7 +459,7 @@ const Dashboard = () => {
           </Card>
 
           <Card 
-            className="cursor-pointer hover:shadow-lg transition-shadow border-l-4 border-l-amber-500"
+            className="cursor-pointer hover:shadow-lg transition-shadow border-l-4 border-l-amber-500 bg-white"
             onClick={() => navigateToWorkOrders('Due')}
             data-testid="card-due-wo"
           >
@@ -479,7 +479,7 @@ const Dashboard = () => {
           </Card>
 
           <Card 
-            className="cursor-pointer hover:shadow-lg transition-shadow border-l-4 border-l-blue-500"
+            className="cursor-pointer hover:shadow-lg transition-shadow border-l-4 border-l-blue-500 bg-white"
             onClick={() => navigateToWorkOrders('Pending Approval')}
             data-testid="card-pending-approval-wo"
           >
@@ -499,7 +499,7 @@ const Dashboard = () => {
           </Card>
 
           <Card 
-            className="cursor-pointer hover:shadow-lg transition-shadow border-l-4 border-l-green-500"
+            className="cursor-pointer hover:shadow-lg transition-shadow border-l-4 border-l-green-500 bg-white"
             onClick={() => navigateToWorkOrders('Completed')}
             data-testid="card-completed-wo"
           >
@@ -519,7 +519,7 @@ const Dashboard = () => {
           </Card>
 
           <Card 
-            className="cursor-pointer hover:shadow-lg transition-shadow border-l-4 border-l-gray-400"
+            className="cursor-pointer hover:shadow-lg transition-shadow border-l-4 border-l-gray-400 bg-white"
             onClick={() => navigateToWorkOrders('Planned')}
             data-testid="card-total-wo"
           >
@@ -542,7 +542,7 @@ const Dashboard = () => {
         {/* Charts Row - Work Order Status, Outstanding Tasks, and Spares Stock */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {/* Work Order Status Donut - Clickable */}
-          <Card data-testid="card-wo-status-chart">
+          <Card data-testid="card-wo-status-chart" className="bg-white">
             <CardHeader>
               <CardTitle>Work Order Status Distribution</CardTitle>
               <CardDescription>Click segments to view filtered work orders</CardDescription>
@@ -583,7 +583,7 @@ const Dashboard = () => {
           </Card>
 
           {/* Outstanding Tasks as Percentage of Monthly Planned Maintenance - NEW */}
-          <Card data-testid="card-outstanding-tasks-chart">
+          <Card data-testid="card-outstanding-tasks-chart" className="bg-white">
             <CardHeader>
               <CardTitle>Outstanding Tasks as % of Monthly Planned Maintenance</CardTitle>
               <CardDescription>
@@ -631,7 +631,7 @@ const Dashboard = () => {
           </Card>
 
           {/* Spares Stock Status Donut - Clickable */}
-          <Card data-testid="card-spares-status-chart">
+          <Card data-testid="card-spares-status-chart" className="bg-white">
             <CardHeader>
               <CardTitle>Spares Stock Status</CardTitle>
               <CardDescription>Click segments to view filtered spares</CardDescription>
@@ -671,7 +671,7 @@ const Dashboard = () => {
         {/* Actionable Tables Row */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           {/* Overdue Work Orders Table */}
-          <Card data-testid="card-overdue-table">
+          <Card data-testid="card-overdue-table" className="bg-white">
             <CardHeader className="flex flex-row items-center justify-between">
               <div>
                 <CardTitle className="flex items-center gap-2">
@@ -720,7 +720,7 @@ const Dashboard = () => {
           </Card>
 
           {/* Low Stock Spares Table */}
-          <Card data-testid="card-low-stock-table">
+          <Card data-testid="card-low-stock-table" className="bg-white">
             <CardHeader className="flex flex-row items-center justify-between">
               <div>
                 <CardTitle className="flex items-center gap-2">
@@ -776,7 +776,7 @@ const Dashboard = () => {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
           {/* Components Card */}
           <Card 
-            className="cursor-pointer hover:shadow-lg transition-shadow"
+            className="cursor-pointer hover:shadow-lg transition-shadow bg-white"
             onClick={navigateToComponents}
             data-testid="card-components-summary"
           >
@@ -797,7 +797,7 @@ const Dashboard = () => {
 
           {/* Spares Card */}
           <Card 
-            className="cursor-pointer hover:shadow-lg transition-shadow"
+            className="cursor-pointer hover:shadow-lg transition-shadow bg-white"
             onClick={() => navigateToSpares()}
             data-testid="card-spares-summary"
           >
@@ -822,7 +822,7 @@ const Dashboard = () => {
 
           {/* Stores Card */}
           <Card 
-            className="cursor-pointer hover:shadow-lg transition-shadow"
+            className="cursor-pointer hover:shadow-lg transition-shadow bg-white"
             onClick={() => navigateToStores()}
             data-testid="card-stores-summary"
           >
@@ -847,7 +847,7 @@ const Dashboard = () => {
 
           {/* Running Hours Card */}
           <Card 
-            className="cursor-pointer hover:shadow-lg transition-shadow"
+            className="cursor-pointer hover:shadow-lg transition-shadow bg-white"
             onClick={navigateToRunningHours}
             data-testid="card-running-hours-summary"
           >
@@ -871,7 +871,7 @@ const Dashboard = () => {
         </div>
 
         {/* Stores Breakdown */}
-        <Card data-testid="card-stores-breakdown">
+        <Card data-testid="card-stores-breakdown" className="bg-white">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Box className="w-5 h-5 text-teal-500" />
@@ -918,7 +918,7 @@ const Dashboard = () => {
         </Card>
 
         {/* Quick Actions */}
-        <Card data-testid="card-quick-actions">
+        <Card data-testid="card-quick-actions" className="bg-white">
           <CardHeader>
             <CardTitle>Quick Actions</CardTitle>
             <CardDescription>Navigate to sub-modules</CardDescription>
