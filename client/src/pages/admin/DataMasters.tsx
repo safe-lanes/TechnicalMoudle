@@ -477,42 +477,46 @@ export default function DataMasters() {
     : 'minmax(100px, 140px) 1fr 1fr minmax(60px, 80px)';
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold text-gray-900" data-testid="text-page-title">Data Masters</h1>
-        <Button
-          onClick={() => syncMastersMutation.mutate()}
-          disabled={syncMastersMutation.isPending}
-          className="bg-[#52baf3] hover:bg-[#3da8e0]"
-          data-testid="btn-sync-all"
-        >
-          {syncMastersMutation.isPending ? (
-            <>
-              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              Syncing...
-            </>
-          ) : (
-            <>
-              <RefreshCw className="mr-2 h-4 w-4" />
-              Sync All
-            </>
-          )}
-        </Button>
+    <div className="flex flex-col" style={{ height: 'calc(100vh - 120px)' }}>
+      {/* Header - Fixed */}
+      <div className="flex-shrink-0 space-y-6 mb-6">
+        <div className="flex items-center justify-between">
+          <h1 className="text-2xl font-bold text-gray-900" data-testid="text-page-title">Data Masters</h1>
+          <Button
+            onClick={() => syncMastersMutation.mutate()}
+            disabled={syncMastersMutation.isPending}
+            className="bg-[#52baf3] hover:bg-[#3da8e0]"
+            data-testid="btn-sync-all"
+          >
+            {syncMastersMutation.isPending ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                Syncing...
+              </>
+            ) : (
+              <>
+                <RefreshCw className="mr-2 h-4 w-4" />
+                Sync All
+              </>
+            )}
+          </Button>
+        </div>
+
+        <div className="relative max-w-sm">
+          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+          <Input
+            type="text"
+            placeholder="Search in selected Data Master"
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="pl-10 bg-white"
+            data-testid="input-search-master"
+          />
+        </div>
       </div>
 
-      <div className="relative max-w-sm">
-        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-        <Input
-          type="text"
-          placeholder="Search in selected Data Master"
-          value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
-          className="pl-10 bg-white"
-          data-testid="input-search-master"
-        />
-      </div>
-
-      <div className="flex gap-6">
+      {/* Main Content - Scrollable */}
+      <div className="flex-1 overflow-y-auto flex gap-6 min-h-0">
         <div className="w-80 flex-shrink-0 bg-white rounded-lg border border-gray-200 overflow-hidden">
           <div className="bg-[#52baf3] text-white px-4 py-3 font-medium text-sm">
             Data Master Name

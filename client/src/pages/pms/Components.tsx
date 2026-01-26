@@ -2916,42 +2916,44 @@ const Components: React.FC = () => {
   }
 
   return (
-    <div className={`h-full space-y-6 ${isModifyMode ? '' : isChangeMode ? 'bg-orange-50' : isChangeRequestMode ? 'bg-[#52baf3]' : ''}`}>
-      {/* Change Mode Banner */}
-      {isChangeMode && (
-        <div className="mb-4 p-4 bg-amber-50 border-b-2 border-amber-200">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div>
-                <h3 className="font-semibold text-amber-900">
-                  You are proposing changes to this record
-                </h3>
-                <p className="text-sm text-amber-700">
-                  {changeRequestTitle ? `Change Request: ${changeRequestTitle}` : 'Edited fields will be tracked and submitted for approval'}
-                </p>
+    <div className={`flex flex-col ${isModifyMode ? '' : isChangeMode ? 'bg-orange-50' : isChangeRequestMode ? 'bg-[#52baf3]' : ''}`} style={{ height: 'calc(100vh - 120px)' }}>
+      {/* Header - Fixed */}
+      <div className="flex-shrink-0">
+        {/* Change Mode Banner */}
+        {isChangeMode && (
+          <div className="mb-4 p-4 bg-amber-50 border-b-2 border-amber-200">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div>
+                  <h3 className="font-semibold text-amber-900">
+                    You are proposing changes to this record
+                  </h3>
+                  <p className="text-sm text-amber-700">
+                    {changeRequestTitle ? `Change Request: ${changeRequestTitle}` : 'Edited fields will be tracked and submitted for approval'}
+                  </p>
+                </div>
+              </div>
+              <div className="flex gap-2">
+                <Button
+                  variant="outline"
+                  onClick={handleCancelChangeMode}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  className="bg-amber-600 hover:bg-amber-700 text-white"
+                  onClick={() => setShowReviewDrawer(true)}
+                  disabled={getDiffs().length === 0}
+                >
+                  Review & Submit
+                </Button>
               </div>
             </div>
-            <div className="flex gap-2">
-              <Button
-                variant="outline"
-                onClick={handleCancelChangeMode}
-              >
-                Cancel
-              </Button>
-              <Button
-                className="bg-amber-600 hover:bg-amber-700 text-white"
-                onClick={() => setShowReviewDrawer(true)}
-                disabled={getDiffs().length === 0}
-              >
-                Review & Submit
-              </Button>
-            </div>
           </div>
-        </div>
-      )}
-      
-      {/* Header with SubModule Title */}
-      <div className="flex items-center justify-between">
+        )}
+        
+        {/* Header with SubModule Title */}
+        <div className="flex items-center justify-between mb-6">
           <div className="flex items-center gap-4">
             {isChangeRequestMode && (
               <Button
@@ -3028,8 +3030,11 @@ const Components: React.FC = () => {
             />
           </div>
         </div>
-      {/* Main Content Area */}
-      <div className="flex gap-6 h-[calc(100vh-200px)]">
+      </div>
+
+      {/* Main Content Area - Scrollable */}
+      <div className="flex-1 overflow-y-auto min-h-0">
+        <div className="flex gap-6 h-full min-h-0">
         {/* Left Panel - Component Tree (30%) */}
         <div className="w-[30%]" data-testid="B6">
           <div className="bg-white rounded-lg shadow-sm h-full flex flex-col">
@@ -3212,6 +3217,7 @@ const Components: React.FC = () => {
               <p className="text-gray-500">Select a component to view details</p>
             </div>
           )}
+        </div>
         </div>
       </div>
 

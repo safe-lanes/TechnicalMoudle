@@ -401,9 +401,9 @@ const Dashboard = () => {
   const isLoading = isWorkOrdersLoading || isSparesLoading || isStoresLoading || isComponentsLoading;
 
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div>
+    <div className="flex flex-col" style={{ height: 'calc(100vh - 120px)' }}>
+      {/* Header - Fixed */}
+      <div className="flex-shrink-0 mb-6">
         <div className="flex items-center justify-between">
           <h1 className="text-2xl font-bold text-gray-900" data-testid="text-dashboard-title">PMS Dashboard</h1>
         </div>
@@ -433,8 +433,8 @@ const Dashboard = () => {
         )}
       </div>
 
-      {/* Main Content */}
-      <div className="space-y-6">
+      {/* Main Content - Scrollable */}
+      <div className="flex-1 overflow-y-auto space-y-6">
         
         {/* Work Order Status KPI Cards - Clickable */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">

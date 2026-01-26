@@ -1008,9 +1008,11 @@ const Stores: React.FC = () => {
   };
 
   return (
-    <div className="flex-1 space-y-6">
-      {/* Header with centered module tabs */}
-      <div className="flex items-center justify-between relative">
+    <div className="flex flex-col" style={{ height: 'calc(100vh - 120px)' }}>
+      {/* Header - Fixed */}
+      <div className="flex-shrink-0 space-y-6 mb-4">
+        {/* Header with centered module tabs */}
+        <div className="flex items-center justify-between relative">
         <div className="flex items-center gap-4">
           <h1 className="text-2xl font-bold text-gray-800" data-testid={viewMode === "inventory" ? getMarkerId(activeTab, "33") : getMarkerId(activeTab, "2.1")}>
             {viewMode === "inventory" && <Marker id={getMarkerId(activeTab, "33")} />}
@@ -1274,10 +1276,13 @@ const Stores: React.FC = () => {
         </Button>
       </div>
       )}
+      </div>
 
-      {/* Table */}
-      {viewMode === "inventory" ? (
-      <div className="bg-white rounded-lg shadow overflow-hidden">
+      {/* Main Content - Scrollable */}
+      <div className="flex-1 overflow-y-auto">
+        {/* Table */}
+        {viewMode === "inventory" ? (
+        <div className="bg-white rounded-lg shadow overflow-hidden">
         {/* Table Header */}
         <div className="bg-[#52baf3] text-white p-4">
           <div className="grid gap-4 items-center text-sm font-medium" style={{gridTemplateColumns: FEATURES.IHM ? '2fr 2fr 2fr 0.8fr 0.8fr 0.8fr 0.8fr 1fr 0.6fr 1fr' : '2fr 2fr 2fr 0.8fr 0.8fr 0.8fr 0.8fr 1.5fr 1fr'}}>
@@ -2204,6 +2209,7 @@ const Stores: React.FC = () => {
           </div>
         </div>
       )}
+      </div>
       
       {/* Modify Mode Footer */}
       <ModifyStickyFooter

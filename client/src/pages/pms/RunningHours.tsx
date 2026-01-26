@@ -624,45 +624,47 @@ const RunningHours = () => {
   };
 
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold text-gray-900" data-testid="D1"><Marker id="D1" />Running Hours</h1>
-        <Button 
-          className="bg-[#5dc86f] hover:bg-[#4db85f] text-white"
-          onClick={openBulkUpdate}
-          data-testid="D5"
-        >
-          <Marker id="D5" /><span className="mr-2">+</span>
-          Bulk Update RH
-        </Button>
-      </div>
-
-      {/* Search and Export Row */}
-      <div className="flex items-center gap-4">
-        <div className="relative flex-1 max-w-md" data-testid="D2">
-          <Marker id="D2" />
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
-          <Input
-            placeholder="Search Component"
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="pl-10"
-          />
+    <div className="flex flex-col" style={{ height: 'calc(100vh - 120px)' }}>
+      {/* Header - Fixed */}
+      <div className="flex-shrink-0 space-y-6 mb-6">
+        <div className="flex items-center justify-between">
+          <h1 className="text-2xl font-bold text-gray-900" data-testid="D1"><Marker id="D1" />Running Hours</h1>
+          <Button 
+            className="bg-[#5dc86f] hover:bg-[#4db85f] text-white"
+            onClick={openBulkUpdate}
+            data-testid="D5"
+          >
+            <Marker id="D5" /><span className="mr-2">+</span>
+            Bulk Update RH
+          </Button>
         </div>
 
-        <Button variant="outline" className="flex items-center gap-2" onClick={exportToCSV} data-testid="D3">
-          <Marker id="D3" /><FileSpreadsheet className="h-4 w-4" />
-          Export
-        </Button>
+        {/* Search and Export Row */}
+        <div className="flex items-center gap-4">
+          <div className="relative flex-1 max-w-md" data-testid="D2">
+            <Marker id="D2" />
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+            <Input
+              placeholder="Search Component"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="pl-10"
+            />
+          </div>
 
-        <Button variant="outline" onClick={clearFilters} className="flex items-center gap-2" data-testid="D4">
-          <Marker id="D4" />Clear
-        </Button>
+          <Button variant="outline" className="flex items-center gap-2" onClick={exportToCSV} data-testid="D3">
+            <Marker id="D3" /><FileSpreadsheet className="h-4 w-4" />
+            Export
+          </Button>
+
+          <Button variant="outline" onClick={clearFilters} className="flex items-center gap-2" data-testid="D4">
+            <Marker id="D4" />Clear
+          </Button>
+        </div>
       </div>
 
-      {/* Table */}
-      <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
+      {/* Table - Scrollable */}
+      <div className="flex-1 overflow-y-auto bg-white rounded-lg border border-gray-200">
         {/* Table Header */}
         <div className="bg-[#52baf3] text-white px-4 py-3">
           <div className="grid grid-cols-9 gap-4 text-sm font-medium">

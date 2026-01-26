@@ -1793,9 +1793,10 @@ const Spares: React.FC = () => {
   };
 
   return (
-    <div className="h-full space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between relative">
+    <div className="flex flex-col" style={{ height: 'calc(100vh - 120px)' }}>
+      {/* Header - Fixed */}
+      <div className="flex-shrink-0 space-y-6 mb-4">
+        <div className="flex items-center justify-between relative">
         <div className="flex items-center gap-4">
           <h1 className="text-2xl font-bold text-gray-800" data-testid={activeTab === 'inventory' ? "E1" : "E3.1"}>
             {activeTab === 'inventory' ? <Marker id="E1" /> : <Marker id="E3.1" />}
@@ -1919,8 +1920,10 @@ const Spares: React.FC = () => {
           Clear
         </Button>
       </div>
-      {/* Main Content */}
-      <div className="flex gap-4 h-[calc(100%-180px)]">
+      </div>
+
+      {/* Main Content - Scrollable */}
+      <div className="flex-1 overflow-y-auto flex gap-4 min-h-0">
         {/* Left Panel - Component Tree */}
         <div className="w-80 bg-white border border-gray-200 rounded-lg overflow-hidden" data-testid="E12">
           <div className="text-white px-4 py-2 font-semibold bg-[#52baf3]">

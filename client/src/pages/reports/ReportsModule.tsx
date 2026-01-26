@@ -249,9 +249,9 @@ const ReportsModule = () => {
   // TODO: Add other category components when implemented
 
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div>
+    <div className="flex flex-col" style={{ height: 'calc(100vh - 120px)' }}>
+      {/* Header - Fixed */}
+      <div className="flex-shrink-0 mb-6">
         <div className="flex justify-between items-center mb-4">
           <h1 className="text-2xl font-bold text-gray-800" data-testid="G1"><Marker id="G1" />Reports</h1>
           <div className="flex gap-3">
@@ -288,8 +288,10 @@ const ReportsModule = () => {
         </div>
       </div>
 
-      {/* Global Filters */}
-      <GlobalFilters
+      {/* Content - Scrollable */}
+      <div className="flex-1 overflow-y-auto space-y-6">
+        {/* Global Filters */}
+        <GlobalFilters
         filters={globalFilters}
         onFiltersChange={handleFiltersChange}
         onReset={handleFiltersReset}
@@ -442,6 +444,7 @@ const ReportsModule = () => {
             </CardContent>
           </Card>
         </div>
+      </div>
       </div>
     </div>
   );

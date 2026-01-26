@@ -1646,9 +1646,11 @@ export default function ShipsCertificatesAdmin() {
   };
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between relative">
-        <h1 className="text-2xl font-semibold text-gray-800">Ship Certificates Admin</h1>
+    <div className="flex flex-col" style={{ height: 'calc(100vh - 120px)' }}>
+      {/* Header - Fixed */}
+      <div className="flex-shrink-0 mb-6">
+        <div className="flex items-center justify-between relative">
+          <h1 className="text-2xl font-semibold text-gray-800">Ship Certificates Admin</h1>
         
         <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as TabType)} className="absolute left-1/2 -translate-x-1/2">
           <TabsList className="bg-gray-100">
@@ -1790,9 +1792,11 @@ export default function ShipsCertificatesAdmin() {
               </Button>
             )}
           </div>
+        </div>
       </div>
 
-      <div className="mt-4">
+      {/* Main Content - Scrollable */}
+      <div className="flex-1 overflow-y-auto">
         {activeTab === "master" && renderMasterTab()}
         {activeTab === "company" && renderCompanyTab()}
         {activeTab === "vessel" && renderVesselTab()}
