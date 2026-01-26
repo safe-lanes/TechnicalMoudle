@@ -226,15 +226,15 @@ export default function BulkDataImport() {
   const currentMarkers = PAGE_MARKERS_BY_TEMPLATE[selectedVesselTemplate];
 
   return (
-    <div className="flex h-[calc(100vh-140px)]">
+    <div className="flex gap-6 h-[calc(100vh-140px)]">
       {/* Left Sidebar - Templates */}
-      <div className="w-72 bg-sky-500 p-4">
-        <Card className="bg-sky-500 border-none shadow-none">
-          <CardHeader className="pb-3">
-            <CardTitle className="text-white text-lg" data-testid={currentMarkers.templatesHeader}>TEMPLATES</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-2">
-            {currentTemplates.map((template) => {
+      <div className="w-[200px] flex-shrink-0">
+        <div className="bg-white rounded-lg shadow-sm h-full flex flex-col">
+          <div className="bg-[#52baf3] text-white px-4 py-2 font-semibold text-sm rounded-t-lg" data-testid={currentMarkers.templatesHeader}>
+            TEMPLATES
+          </div>
+          <div className="flex-1">
+            {currentTemplates.map((template, index) => {
               // Dynamic markers based on selected template tab
               const templateMarkerMap: Record<VesselTemplateType, string> = {
                 'machinery': currentMarkers.templateMachinery,
@@ -243,6 +243,7 @@ export default function BulkDataImport() {
                 'stores': currentMarkers.templateStores,
               };
               const markerId = !isFleetMode ? templateMarkerMap[template.id as VesselTemplateType] : undefined;
+              const isLast = index === currentTemplates.length - 1;
               return (
                 <button
                   key={template.id}
@@ -250,10 +251,12 @@ export default function BulkDataImport() {
                     ? setSelectedFleetTemplate(template.id as FleetTemplateType) 
                     : setSelectedVesselTemplate(template.id as VesselTemplateType)
                   }
-                  className={`w-full text-left px-4 py-3 rounded transition-colors ${
+                  className={`w-full text-left px-4 py-3 text-sm transition-colors ${
+                    !isLast ? 'border-b border-gray-200' : ''
+                  } ${
                     (isFleetMode ? selectedFleetTemplate : selectedVesselTemplate) === template.id
-                      ? 'bg-white text-sky-600 font-medium'
-                      : 'text-white hover:bg-sky-400'
+                      ? 'bg-[#52BAF3] text-white font-medium'
+                      : 'text-gray-700 hover:bg-gray-50'
                   }`}
                   data-testid={markerId || `template-${template.id}`}
                 >
@@ -261,8 +264,8 @@ export default function BulkDataImport() {
                 </button>
               );
             })}
-          </CardContent>
-        </Card>
+          </div>
+        </div>
       </div>
 
       {/* Right Panel - Template Content */}
