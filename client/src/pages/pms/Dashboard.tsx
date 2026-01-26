@@ -406,18 +406,6 @@ const Dashboard = () => {
       <div>
         <div className="flex items-center justify-between">
           <h1 className="text-2xl font-bold text-gray-900" data-testid="text-dashboard-title">PMS Dashboard</h1>
-          <div className="flex items-center gap-3">
-            <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">
-              <CheckCircle className="w-3 h-3 mr-1" />
-              E-PMS Active
-            </Badge>
-            <span className="text-sm text-gray-500">
-              Last updated: {format(lastUpdated, 'HH:mm:ss')}
-            </span>
-            <Button variant="outline" size="sm" onClick={handleRefresh} data-testid="button-refresh">
-              <RefreshCw className="w-4 h-4" />
-            </Button>
-          </div>
         </div>
 
         {/* Vessel Selector - Only visible for Sail_Admin */}
