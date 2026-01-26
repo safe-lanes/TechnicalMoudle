@@ -94,19 +94,19 @@ export default function PMSAdmin() {
           </TabsList>
         </div>
 
-        <TabsContent value="bulk-data-imp" className="m-0">
+        <TabsContent value="bulk-data-imp" className="mt-6">
           <BulkDataImport />
         </TabsContent>
 
-        <TabsContent value="alerts" className="m-0">
+        <TabsContent value="alerts" className="mt-6">
           <Alerts />
         </TabsContent>
 
-        <TabsContent value="forms" className="m-0">
+        <TabsContent value="forms" className="mt-6">
           <Forms />
         </TabsContent>
 
-        <TabsContent value="admin-4" className="m-0">
+        <TabsContent value="admin-4" className="mt-6">
           <Admin4Dashboard />
         </TabsContent>
       </Tabs>
