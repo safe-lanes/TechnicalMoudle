@@ -917,53 +917,6 @@ const Dashboard = () => {
           </CardContent>
         </Card>
 
-        {/* Quick Actions */}
-        <Card data-testid="card-quick-actions" className="bg-white">
-          <CardHeader>
-            <CardTitle>Quick Actions</CardTitle>
-            <CardDescription>Navigate to sub-modules</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              <Button 
-                variant="outline" 
-                className="h-16 flex flex-col gap-1"
-                onClick={() => navigateToWorkOrders()}
-                data-testid="button-goto-workorders"
-              >
-                <Wrench className="w-5 h-5" />
-                <span className="text-xs">Work Orders</span>
-              </Button>
-              <Button 
-                variant="outline" 
-                className="h-16 flex flex-col gap-1"
-                onClick={navigateToComponents}
-                data-testid="button-goto-components"
-              >
-                <Box className="w-5 h-5" />
-                <span className="text-xs">Components</span>
-              </Button>
-              <Button 
-                variant="outline" 
-                className="h-16 flex flex-col gap-1"
-                onClick={() => navigateToSpares()}
-                data-testid="button-goto-spares"
-              >
-                <Package className="w-5 h-5" />
-                <span className="text-xs">Spares</span>
-              </Button>
-              <Button 
-                variant="outline" 
-                className="h-16 flex flex-col gap-1"
-                onClick={navigateToReports}
-                data-testid="button-goto-reports"
-              >
-                <FileText className="w-5 h-5" />
-                <span className="text-xs">Reports</span>
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
 
       </div>
     </div>
