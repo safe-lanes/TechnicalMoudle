@@ -37,12 +37,12 @@ export default function PMSAdmin() {
   return (
     <div className="space-y-4">
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between relative">
           <h1 className="text-2xl font-bold text-black dark:text-white" data-testid="I4.QL.3.1">
             <Marker id="I4.QL.3.1" />{getPageTitle()}
           </h1>
           
-          <TabsList className="bg-gray-100">
+          <TabsList className="bg-gray-100 absolute left-1/2 -translate-x-1/2">
             {isSailAdmin && (
               <TabsTrigger 
                 value="bulk-data-imp" 
