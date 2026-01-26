@@ -50,33 +50,34 @@ export function ChatMessage({ message }: ChatMessageProps) {
           isAssistant ? "bg-muted" : "bg-primary text-primary-foreground"
         )}>
           {isAssistant ? (
-            <ReactMarkdown 
-              className="prose prose-sm dark:prose-invert max-w-none [&_table]:text-xs [&_th]:px-2 [&_td]:px-2 [&_p]:my-1 [&_ul]:my-1 [&_li]:my-0"
-              components={{
-                a: ({ href, children }) => (
-                  <button
-                    onClick={() => href && handleLinkClick(href)}
-                    className="text-primary hover:underline cursor-pointer bg-transparent border-none p-0 font-inherit"
-                    data-testid={`link-chat-${href?.replace(/[^a-z0-9]/gi, '-') || 'unknown'}`}
-                  >
-                    {children}
-                  </button>
-                ),
-                table: ({ children }) => (
-                  <div className="overflow-x-auto my-2">
-                    <table className="border-collapse text-xs w-full">{children}</table>
-                  </div>
-                ),
-                th: ({ children }) => (
-                  <th className="border border-border px-2 py-1 bg-muted font-medium text-left">{children}</th>
-                ),
-                td: ({ children }) => (
-                  <td className="border border-border px-2 py-1">{children}</td>
-                )
-              }}
-            >
-              {message.content}
-            </ReactMarkdown>
+            <div className="prose prose-sm dark:prose-invert max-w-none [&_table]:text-xs [&_th]:px-2 [&_td]:px-2 [&_p]:my-1 [&_ul]:my-1 [&_li]:my-0">
+              <ReactMarkdown 
+                components={{
+                  a: ({ href, children }) => (
+                    <button
+                      onClick={() => href && handleLinkClick(href)}
+                      className="text-primary hover:underline cursor-pointer bg-transparent border-none p-0 font-inherit"
+                      data-testid={`link-chat-${href?.replace(/[^a-z0-9]/gi, '-') || 'unknown'}`}
+                    >
+                      {children}
+                    </button>
+                  ),
+                  table: ({ children }) => (
+                    <div className="overflow-x-auto my-2">
+                      <table className="border-collapse text-xs w-full">{children}</table>
+                    </div>
+                  ),
+                  th: ({ children }) => (
+                    <th className="border border-border px-2 py-1 bg-muted font-medium text-left">{children}</th>
+                  ),
+                  td: ({ children }) => (
+                    <td className="border border-border px-2 py-1">{children}</td>
+                  )
+                }}
+              >
+                {message.content}
+              </ReactMarkdown>
+            </div>
           ) : (
             <p className="whitespace-pre-wrap">{message.content}</p>
           )}
