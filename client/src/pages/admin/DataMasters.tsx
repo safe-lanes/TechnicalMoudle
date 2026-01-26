@@ -477,8 +477,8 @@ export default function DataMasters() {
     : 'minmax(100px, 140px) 1fr 1fr minmax(60px, 80px)';
 
   return (
-    <div className="p-6">
-      <div className="mb-6 flex items-center justify-between">
+    <div className="space-y-6">
+      <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold text-gray-900" data-testid="text-page-title">Data Masters</h1>
         <Button
           onClick={() => syncMastersMutation.mutate()}
@@ -500,7 +500,7 @@ export default function DataMasters() {
         </Button>
       </div>
 
-      <div className="relative max-w-sm mb-6">
+      <div className="relative max-w-sm">
         <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
         <Input
           type="text"
