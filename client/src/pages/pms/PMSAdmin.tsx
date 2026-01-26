@@ -35,7 +35,7 @@ export default function PMSAdmin() {
   };
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-6">
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
         <div className="flex items-center justify-between relative">
           <h1 className="text-2xl font-bold text-black dark:text-white" data-testid="I4.QL.3.1">
