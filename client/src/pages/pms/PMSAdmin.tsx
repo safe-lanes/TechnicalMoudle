@@ -6,6 +6,7 @@ import Forms from "@/components/admin/Forms";
 import Admin4Dashboard from "../admin/Admin4Dashboard";
 import { Marker } from "@/components/Marker";
 import { useUIRole } from "@/contexts/UIRoleContext";
+import { cn } from "@/lib/utils";
 
 export default function PMSAdmin() {
   const { isSailAdmin } = useUIRole();
@@ -34,27 +35,33 @@ export default function PMSAdmin() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <div className="border-b bg-white">
-        <div className="px-6 py-4">
-          <h1 className="text-2xl font-bold text-gray-900" data-testid="I4.QL.3.1"><Marker id="I4.QL.3.1" />{getPageTitle()}</h1>
-        </div>
-        
-        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <TabsList className="w-full justify-start px-6 py-0 h-12 bg-transparent border-b rounded-none">
+    <div className="space-y-4">
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+        <div className="flex items-center justify-between">
+          <h1 className="text-2xl font-bold text-black dark:text-white" data-testid="I4.QL.3.1">
+            <Marker id="I4.QL.3.1" />{getPageTitle()}
+          </h1>
+          
+          <TabsList className="bg-gray-100">
             {isSailAdmin && (
-            <TabsTrigger 
-              value="bulk-data-imp" 
-              className="data-[state=active]:border-b-2 data-[state=active]:border-blue-500 rounded-none"
-              data-testid="I4.QL.3.2"
-            >
-              <Marker id="I4.QL.3.2" />
-              Bulk Data Imp
-            </TabsTrigger>
+              <TabsTrigger 
+                value="bulk-data-imp" 
+                className={cn(
+                  "px-4",
+                  activeTab === "bulk-data-imp" && "bg-[#52baf3] text-white data-[state=active]:bg-[#52baf3] data-[state=active]:text-white"
+                )}
+                data-testid="I4.QL.3.2"
+              >
+                <Marker id="I4.QL.3.2" />
+                Bulk Data Imp
+              </TabsTrigger>
             )}
             <TabsTrigger 
               value="alerts" 
-              className="data-[state=active]:border-b-2 data-[state=active]:border-blue-500 rounded-none"
+              className={cn(
+                "px-4",
+                activeTab === "alerts" && "bg-[#52baf3] text-white data-[state=active]:bg-[#52baf3] data-[state=active]:text-white"
+              )}
               data-testid="I4.QL.3.3"
             >
               <Marker id="I4.QL.3.3" />
@@ -62,41 +69,47 @@ export default function PMSAdmin() {
             </TabsTrigger>
             <TabsTrigger 
               value="forms" 
-              className="data-[state=active]:border-b-2 data-[state=active]:border-blue-500 rounded-none"
+              className={cn(
+                "px-4",
+                activeTab === "forms" && "bg-[#52baf3] text-white data-[state=active]:bg-[#52baf3] data-[state=active]:text-white"
+              )}
               data-testid="I4.QL.3.4"
             >
               <Marker id="I4.QL.3.4" />
               Forms
             </TabsTrigger>
             {isSailAdmin && (
-            <TabsTrigger 
-              value="admin-4" 
-              className="data-[state=active]:border-b-2 data-[state=active]:border-blue-500 rounded-none"
-              data-testid="I4.QL.3.5"
-            >
-              <Marker id="I4.QL.3.5" />
-              Master Data
-            </TabsTrigger>
+              <TabsTrigger 
+                value="admin-4" 
+                className={cn(
+                  "px-4",
+                  activeTab === "admin-4" && "bg-[#52baf3] text-white data-[state=active]:bg-[#52baf3] data-[state=active]:text-white"
+                )}
+                data-testid="I4.QL.3.5"
+              >
+                <Marker id="I4.QL.3.5" />
+                Master Data
+              </TabsTrigger>
             )}
           </TabsList>
+        </div>
 
-          <TabsContent value="bulk-data-imp" className="m-0">
-            <BulkDataImport />
-          </TabsContent>
+        <TabsContent value="bulk-data-imp" className="m-0">
+          <BulkDataImport />
+        </TabsContent>
 
-          <TabsContent value="alerts" className="m-0">
-            <Alerts />
-          </TabsContent>
+        <TabsContent value="alerts" className="m-0">
+          <Alerts />
+        </TabsContent>
 
-          <TabsContent value="forms" className="m-0">
-            <Forms />
-          </TabsContent>
+        <TabsContent value="forms" className="m-0">
+          <Forms />
+        </TabsContent>
 
-          <TabsContent value="admin-4" className="m-0">
-            <Admin4Dashboard />
-          </TabsContent>
-        </Tabs>
-      </div>
+        <TabsContent value="admin-4" className="m-0">
+          <Admin4Dashboard />
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }
