@@ -128,7 +128,7 @@ export const SideMenuBar: React.FC<SideMenuBarProps> = ({
             onClick={() => handleItemClick(item.id)}
             style={{ height: `${itemHeightPercent}%` }}
             className={cn(
-              "w-full flex flex-col items-center justify-center transition-all duration-200 px-2",
+              "w-full flex flex-col items-center justify-start pt-3 transition-all duration-200 px-2",
               isSelected ? "bg-[#52baf3]" : "hover:bg-[#1d4ed8]",
               "group relative"
             )}
