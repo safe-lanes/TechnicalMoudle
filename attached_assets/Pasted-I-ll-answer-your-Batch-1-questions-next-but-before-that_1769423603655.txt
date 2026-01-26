@@ -1,0 +1,159 @@
+I’ll answer your Batch 1 questions next, but before that I want to give you all the technical and data details you need so that later you can generate a very concrete implementation plan for the chatbot.
+
+Please ask me the following, in well‑structured batches, and wait for my answers between batches:
+
+Batch 2 – Tech stack and project structure (Replit)
+Ask me:
+
+Frontend stack
+
+Which frontend tech is used in this PMS project (plain HTML/JS, React, Next.js, Vue, Svelte, something else)?
+
+How is the current dashboard UI structured: single page with conditional rendering, multiple routes, or server‑rendered templates?
+
+Do I already use any component library (Bootstrap, Tailwind, Material UI, etc.)?
+
+Backend stack
+
+What backend runtime / framework is used (Node/Express, Flask/FastAPI, Django, PHP, etc.)?
+
+Is the backend in the same Replit project as the frontend or separate?
+
+How are APIs currently exposed (REST endpoints, server‑side rendering only, WebSocket, etc.)?
+
+Project structure
+
+Ask me to paste the top‑level folder/file tree of the Replit project (e.g., using tree or a manual copy), so you can see where to integrate chatbot code.
+
+Ask if there is an existing api folder or any existing routes/controllers where new chatbot endpoints should live.
+
+Authentication and sessions
+
+How do users authenticate today (simple login form, JWT, session cookies, OAuth, etc.)?
+
+How does the app know the current user’s role and selected vessel (e.g., stored in session, JWT claims, local storage, query params)?
+
+Is there any existing middleware that enforces role‑based access on APIs?
+
+Batch 3 – Data models and database
+Ask me:
+
+Database technology
+
+Which database is used (SQLite, PostgreSQL, MySQL, MongoDB, Replit DB, etc.)?
+
+Is there an ORM or query layer (Prisma, Sequelize, TypeORM, SQLAlchemy, etc.)?
+
+Core entities and schemas
+For each of these, ask me to either paste the schema/model definition or describe the fields in detail:
+
+WorkOrder: fields like id, code, title, description, component, system, frequency, due date, status, priority, running hours, vessel id, etc.
+
+Component / Equipment: id, name, system, location, running hours, vessel id, critical flag, etc.
+
+Spares: id, name, figure/part number, ROB, Min, critical flag, component/system, vessel id, etc.
+
+Stores / Inventory items: similar fields.
+
+Vessel: id, name, IMO, etc.
+
+User / Role: id, name, role, accessible vessels, permissions.
+
+Relationships
+
+How work orders link to components, spares, and vessels (foreign keys / linking tables).
+
+How user‑to‑vessel permissions are stored.
+
+Existing queries
+
+Ask if there are existing API endpoints or DB queries for:
+
+Listing work orders with filters (by vessel, status, date, component, etc.).
+
+Listing low‑stock/critical spares.
+
+Getting summary KPIs (counts, charts) that appear on the dashboard.
+
+Batch 4 – Existing APIs and UI behavior
+Ask me:
+
+Existing REST endpoints
+
+Ask me to list or paste existing API endpoints (method + path) that the frontend uses for:
+
+Work orders (list, detail, update status, create).
+
+Spares and stores inventory.
+
+Running hours updates.
+
+Dashboard KPIs/charts.
+
+Frontend integration points
+
+How does the dashboard currently fetch and refresh data (fetch/XHR, Axios, React Query, etc.)?
+
+Is there already any modal or side panel component that could be reused for a chatbot UI?
+
+Does the app already use WebSockets or SSE anywhere?
+
+Navigation/deep linking
+
+Can I currently open specific filtered views via URL query parameters or routes (e.g., /workorders?status=overdue&vessel=1)?
+
+If yes, ask me to list those patterns, so the chatbot can generate deep links.
+
+Batch 5 – LLM and infrastructure constraints
+Ask me:
+
+Model/provider preferences
+
+Which LLM provider and model do I plan to use from Replit (OpenAI, Anthropic, local model, etc.)?
+
+Can the backend make outbound HTTP calls freely (no firewall/proxy issues)?
+
+Cost and latency constraints
+
+Any limits on API usage or cost per month for LLM calls?
+
+Any performance expectations for chatbot responses?
+
+Data security and privacy
+
+Can PMS data be sent to the external LLM provider as context, or do we need masking/anonymization?
+
+Any data that must never leave the server (e.g., crew names, certain incidents)?
+
+Batch 6 – Chatbot behavior, UX, and safety
+Ask me:
+
+UI/UX for the chatbot
+
+Where in the dashboard should the chatbot appear (floating button, side panel, full page)?
+
+Should the chatbot be aware of the “current context” (selected vessel, current page/tab, filters) automatically?
+
+Do we want a “suggested prompts” section (chips like “Show overdue WOs”, “Low stock spares”)?
+
+Conversation memory and context
+
+Should the chatbot remember conversation context across messages for a session?
+
+How long should session history be kept (per session only, per user, etc.)?
+
+Safety and guardrails
+
+Any hard constraints on what the bot must not do or say (e.g., no financial decisions, no overriding class/flag requirements, no changing critical data without confirmation)?
+
+Should it log all actions taken (especially write actions) for audit?
+
+After you ask me Batches 2–6 above and I answer them, then we can finalize:
+
+The list of tools/functions and their exact request/response JSON shapes.
+
+The prompt templates (system + tool‑calling style).
+
+The exact files and code snippets to add/modify in this Replit PMS project (frontend and backend) to implement the chatbot.
+
+Please start now by asking me Batch 2 – Tech stack and project structure (Replit) exactly as outlined.

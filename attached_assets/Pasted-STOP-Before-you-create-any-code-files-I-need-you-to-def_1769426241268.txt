@@ -1,0 +1,141 @@
+STOP — Before you create any code files, I need you to define the complete scope of questions and capabilities for this PMS chatbot.
+
+Looking at my PMS Dashboard, I can see we have:
+​
+
+8 Overdue Work Orders
+
+151 Due Work Orders
+
+6 Completed
+
+189 Total Work Orders
+
+215 Low Stock Spares
+
+811 OK Stock Spares
+
+87 At Minimum Stock
+
+Components, Running Hours, Jobs, Stores modules
+
+Please create a comprehensive categorized list of example questions that vessel crew (Chief Engineer, Second Engineer, Captain), shore-based technical superintendents, and fleet managers would realistically ask the PMS chatbot.
+
+Organize them into these categories:
+
+1. Work Order Queries
+Start with these and add 10-15 more:
+
+"Show me all overdue work orders"
+
+"What work orders are due this week?"
+
+"Give me details on work order WO-12345"
+
+"Which systems have the most overdue maintenance?"
+
+"What maintenance is due in the next 30 days?"
+
+[Add more realistic variations]
+
+2. Component & Equipment Status
+"Show me all critical components"
+
+"What are the running hours for Main Engine?"
+
+"Which components have overdue maintenance?"
+
+[Add 10-15 more]
+
+3. Spares & Inventory Management
+"What spares are critically low in stock?"
+
+"Show me all spares below minimum"
+
+"Which Main Engine spares are low?"
+
+"What do I need to order urgently?"
+
+[Add 10-15 more]
+
+4. Maintenance Planning & Prioritization
+"What maintenance should I prioritize this week?"
+
+"Draft a maintenance status report for the superintendent"
+
+"Summarize PMS status for this vessel"
+
+"What's our maintenance completion rate?"
+
+[Add 10-15 more]
+
+5. Navigation & Deep Linking
+"Take me to overdue work orders"
+
+"Show me the spares inventory page"
+
+"Open critical components list"
+
+[Add 5-8 more]
+
+6. KPI & Reporting Queries
+"How many work orders are overdue vs due vs completed?"
+
+"What's our spare stock status breakdown?"
+
+"What percentage of monthly maintenance is outstanding?"
+
+[Add 10-15 more]
+
+7. Cross-Module / Advanced Queries
+Examples of questions that combine multiple data sources:
+
+"Which overdue work orders have critical spares that are also low in stock?"
+
+"Show me high running hour components with overdue maintenance"
+
+"What's the maintenance status for the Main Engine system?"
+
+[Add 10-15 more]
+
+For each category, please:
+
+List 10-15 realistic example questions in natural language (how people actually talk, not formal queries)
+
+Map each question to which tool(s) from your earlier list would be called:
+
+get_work_orders
+
+get_work_order_detail
+
+get_overdue_work_orders
+
+get_due_work_orders
+
+get_work_order_counts
+
+get_low_stock_spares
+
+get_critical_spares
+
+get_components
+
+get_running_hours
+
+get_jobs
+
+generate_deep_link
+
+Identify gaps — questions that would need:
+
+New tools/APIs
+
+Data that doesn't exist yet
+
+Multi-step reasoning
+
+Suggest conversational follow-ups — after the bot answers a question, what natural follow-up questions might users ask?
+
+Important: Think like a Chief Engineer at 2 AM dealing with equipment issues, or a superintendent preparing a weekly fleet report. The questions should be practical, urgent, and business-focused — not academic.
+
+Once I approve this scope, we'll design the exact system prompt, tool definitions, and suggested prompt chips for the UI.

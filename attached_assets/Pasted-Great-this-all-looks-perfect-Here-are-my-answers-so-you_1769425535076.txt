@@ -1,0 +1,79 @@
+Great, this all looks perfect. Here are my answers so you can switch to build mode.
+
+LLM Provider
+Use OpenAI (GPT‑4 class model) for now.
+
+I will add an OPENAI_API_KEY in Replit secrets, and you can assume the backend can read it from process.env.OPENAI_API_KEY.
+
+Start Building
+Yes, I’m ready for you to start building now.
+
+Please go ahead and:
+
+Use the tool list you proposed:
+
+get_work_orders({ vesselId, status?, componentCode?, limit? })
+
+get_work_order_detail({ workOrderId })
+
+get_overdue_work_orders({ vesselId })
+
+get_due_work_orders({ vesselId })
+
+get_work_order_counts({ vesselId })
+
+get_low_stock_spares({ vesselId })
+
+get_critical_spares({ vesselId })
+
+get_components({ vesselId, critical?, search? })
+
+get_running_hours({ componentId })
+
+get_jobs({ vesselId, componentId? })
+
+generate_deep_link({ page, filters })
+
+Use the file‑by‑file implementation plan you outlined:
+
+Backend
+
+server/routes/chatbot.ts – new chatbot route (POST /technical/api/chat) with LLM integration and tool dispatch.
+
+server/services/chatbotService.ts – tool execution functions + prompt templates + OpenAI call.
+
+server/routes.ts – wire in the chatbot router.
+
+Frontend
+
+client/src/components/chat/ChatPanel.tsx – side panel chat UI.
+
+client/src/components/chat/ChatButton.tsx – floating button bottom‑right.
+
+client/src/components/chat/ChatMessage.tsx – message bubble.
+
+client/src/components/chat/SuggestedPrompts.tsx – quick‑action chips for PMS use‑cases.
+
+client/src/hooks/useChat.ts – chat state & API calls to /technical/api/chat.
+
+client/src/contexts/ChatContext.tsx – context provider.
+
+client/src/App.tsx – wrap with ChatProvider and render ChatButton globally.
+
+For the first version, keep the chatbot read‑only (no write actions), but design the architecture so we can later add tools that perform mutations with explicit user confirmation.
+
+Please now generate:
+
+The detailed implementation task list (step‑by‑step),
+
+Plus example TypeScript skeletons for:
+
+server/routes/chatbot.ts
+
+server/services/chatbotService.ts
+
+client/src/components/chat/ChatPanel.tsx
+
+client/src/hooks/useChat.ts
+
+so I can start implementing them directly.
