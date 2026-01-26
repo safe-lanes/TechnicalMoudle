@@ -1795,8 +1795,8 @@ const Spares: React.FC = () => {
   return (
     <div className="h-full space-y-4">
       {/* Header */}
-      <div>
-        <div className="flex items-center gap-4 mb-4">
+      <div className="flex items-center justify-between relative">
+        <div className="flex items-center gap-4">
           <h1 className="text-2xl font-bold text-gray-800" data-testid={activeTab === 'inventory' ? "E1" : "E3.1"}>
             {activeTab === 'inventory' ? <Marker id="E1" /> : <Marker id="E3.1" />}
             {activeTab === 'inventory' ? 'Spares Inventory' : 'Spares - History of Transactions'}
@@ -1808,47 +1808,47 @@ const Spares: React.FC = () => {
           )}
         </div>
         
-        {/* Navigation Tabs with Buttons */}
-        <div className="flex justify-between items-center mb-4">
-          <div className="flex">
-            <button 
-              className={`px-4 py-2 rounded-l ${activeTab === 'inventory' ? 'bg-blue-600 text-white' : 'bg-gray-200 text-gray-600'}`}
-              onClick={() => setActiveTab('inventory')}
-              data-testid="E2"
-            >
-              <Marker id="E2" />
-              Inventory
-            </button>
-            <button 
-              className={`px-4 py-2 rounded-r ${activeTab === 'history' ? 'bg-blue-600 text-white' : 'bg-gray-200 text-gray-600'}`}
-              onClick={() => setActiveTab('history')}
-              data-testid={activeTab === 'history' ? "E3.3" : "E3"}
-            >
-              {activeTab === 'history' ? <Marker id="E3.3" /> : <Marker id="E3" />}
-              History
-            </button>
-          </div>
-          <div className="flex gap-2 items-center">
-            <Button 
-              variant="ghost" 
-              size="sm"
-              className="text-blue-600"
-              onClick={exportSparesToExcel}
-              data-testid="E9"
-            >
-              <Marker id="E9" />
-              <FileSpreadsheet className="h-4 w-4 mr-1" />
-              Export
-            </Button>
-            <Button size="sm" className="bg-[#5dc86f] hover:bg-[#4db85f] text-white" onClick={() => setIsAddSpareModalOpen(true)} data-testid="E10">
-              <Marker id="E10" />
-              + Add Spare
-            </Button>
-            <Button size="sm" className="bg-[#5dc86f] hover:bg-[#4db85f] text-white" onClick={openBulkUpdateModal} data-testid="E11">
-              <Marker id="E11" />
-              Bulk Update Spares
-            </Button>
-          </div>
+        {/* Navigation Tabs - Center aligned */}
+        <div className="absolute left-1/2 -translate-x-1/2 bg-gray-100 rounded-md p-1 flex items-center gap-1">
+          <button 
+            className={`px-4 py-1.5 rounded-md text-sm font-medium transition-colors ${activeTab === 'inventory' ? 'bg-[#52baf3] text-white' : 'text-gray-700 hover:bg-gray-200'}`}
+            onClick={() => setActiveTab('inventory')}
+            data-testid="E2"
+          >
+            <Marker id="E2" />
+            Inventory
+          </button>
+          <button 
+            className={`px-4 py-1.5 rounded-md text-sm font-medium transition-colors ${activeTab === 'history' ? 'bg-[#52baf3] text-white' : 'text-gray-700 hover:bg-gray-200'}`}
+            onClick={() => setActiveTab('history')}
+            data-testid={activeTab === 'history' ? "E3.3" : "E3"}
+          >
+            {activeTab === 'history' ? <Marker id="E3.3" /> : <Marker id="E3" />}
+            History
+          </button>
+        </div>
+        
+        {/* Action Buttons */}
+        <div className="flex gap-2 items-center">
+          <Button 
+            variant="ghost" 
+            size="sm"
+            className="text-blue-600"
+            onClick={exportSparesToExcel}
+            data-testid="E9"
+          >
+            <Marker id="E9" />
+            <FileSpreadsheet className="h-4 w-4 mr-1" />
+            Export
+          </Button>
+          <Button size="sm" className="bg-[#5dc86f] hover:bg-[#4db85f] text-white" onClick={() => setIsAddSpareModalOpen(true)} data-testid="E10">
+            <Marker id="E10" />
+            + Add Spare
+          </Button>
+          <Button size="sm" className="bg-[#5dc86f] hover:bg-[#4db85f] text-white" onClick={openBulkUpdateModal} data-testid="E11">
+            <Marker id="E11" />
+            Bulk Update Spares
+          </Button>
         </div>
       </div>
       {/* Search and Filters */}
