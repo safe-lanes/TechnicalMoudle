@@ -81,7 +81,7 @@ export const TopMenuBar: React.FC<TopMenuBarProps> = ({
               key={item.id}
               onClick={() => !item.isModule && onSubModuleChange(item.id)}
               className={cn(
-                "flex flex-col items-center justify-center px-6 min-w-[100px] transition-all duration-200 relative",
+                "flex flex-col items-center justify-center w-[110px] transition-all duration-200 relative",
                 "hover:bg-gray-50",
                 item.isModule && "bg-[#f5f5f5] border-r border-gray-200",
                 isSelected && !item.isModule && "bg-[#52baf3] text-white hover:bg-[#52baf3]",
