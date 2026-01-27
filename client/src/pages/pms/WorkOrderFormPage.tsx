@@ -2566,7 +2566,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                       <Button
                         variant="outline"
                         size="sm"
-                        onClick={() => handleUploadDocument('riskAssessment', riskAssessmentFileRef)}
+                        onClick={() => toast({ title: "Coming Soon", description: "This feature is coming soon." })}
                         data-testid="WOF.B1.9"
                       >
                         Upload
@@ -2579,10 +2579,10 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                       onChange={(e) => handleFileSelected(e, 'riskAssessment')}
                       accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
                     />
-                    <Button variant="ghost" size="icon" className="h-8 w-8">
+                    <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => toast({ title: "Coming Soon", description: "This feature is coming soon." })}>
                       <Link2 className="h-4 w-4 text-gray-500" />
                     </Button>
-                    <Button variant="ghost" size="icon" className="h-8 w-8">
+                    <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => toast({ title: "Coming Soon", description: "This feature is coming soon." })}>
                       <Paperclip className="h-4 w-4 text-gray-500" />
                     </Button>
                   </div>
@@ -2647,7 +2647,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                       <Button
                         variant="outline"
                         size="sm"
-                        onClick={() => handleUploadDocument('safetyChecklists', safetyChecklistFileRef)}
+                        onClick={() => toast({ title: "Coming Soon", description: "This feature is coming soon." })}
                         data-testid="WOF.B1.16"
                       >
                         Upload
@@ -2660,10 +2660,10 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                       onChange={(e) => handleFileSelected(e, 'safetyChecklists')}
                       accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
                     />
-                    <Button variant="ghost" size="icon" className="h-8 w-8">
+                    <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => toast({ title: "Coming Soon", description: "This feature is coming soon." })}>
                       <Link2 className="h-4 w-4 text-gray-500" />
                     </Button>
-                    <Button variant="ghost" size="icon" className="h-8 w-8">
+                    <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => toast({ title: "Coming Soon", description: "This feature is coming soon." })}>
                       <Paperclip className="h-4 w-4 text-gray-500" />
                     </Button>
                   </div>
@@ -2728,7 +2728,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                       <Button
                         variant="outline"
                         size="sm"
-                        onClick={() => handleUploadDocument('operationalForms', operationalFormFileRef)}
+                        onClick={() => toast({ title: "Coming Soon", description: "This feature is coming soon." })}
                         data-testid="button-upload-operational-forms"
                       >
                         Upload
@@ -2741,10 +2741,10 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                       onChange={(e) => handleFileSelected(e, 'operationalForms')}
                       accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
                     />
-                    <Button variant="ghost" size="icon" className="h-8 w-8">
+                    <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => toast({ title: "Coming Soon", description: "This feature is coming soon." })}>
                       <Link2 className="h-4 w-4 text-gray-500" />
                     </Button>
-                    <Button variant="ghost" size="icon" className="h-8 w-8">
+                    <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => toast({ title: "Coming Soon", description: "This feature is coming soon." })}>
                       <Paperclip className="h-4 w-4 text-gray-500" />
                     </Button>
                   </div>
@@ -3008,8 +3008,8 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                       Upload
                     </Button>
                     <div className="flex items-center gap-1.5 text-gray-400">
-                      <Link2 className="w-4 h-4 cursor-pointer hover:text-gray-600" />
-                      <Paperclip className="w-4 h-4 cursor-pointer hover:text-gray-600" />
+                      <Link2 className="w-4 h-4 cursor-pointer hover:text-gray-600" onClick={() => toast({ title: "Coming Soon", description: "This feature is coming soon." })} />
+                      <Paperclip className="w-4 h-4 cursor-pointer hover:text-gray-600" onClick={() => toast({ title: "Coming Soon", description: "This feature is coming soon." })} />
                     </div>
                   </div>
                 </div>
