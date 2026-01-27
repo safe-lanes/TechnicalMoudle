@@ -86,6 +86,7 @@ export interface AgGridTableProps {
   onGridReady?: (event: GridReadyEvent) => void;
   onCellValueChanged?: (event: CellValueChangedEvent) => void;
   onCellEditingStopped?: (event: CellEditingStoppedEvent) => void;
+  onSortChanged?: (event: any) => void;
   context?: any;
   height?: string | number;
   width?: string | number;
@@ -119,6 +120,7 @@ export const AgGridTable: React.FC<AgGridTableProps> = ({
   onGridReady,
   onCellValueChanged,
   onCellEditingStopped,
+  onSortChanged,
   context,
   height = '500px',
   width = '100%',
@@ -447,6 +449,7 @@ export const AgGridTable: React.FC<AgGridTableProps> = ({
         onGridReady={handleGridReady}
         onCellValueChanged={onCellValueChanged}
         onCellEditingStopped={onCellEditingStopped}
+        onSortChanged={onSortChanged}
         singleClickEdit={singleClickEdit}
         stopEditingWhenCellsLoseFocus={stopEditingWhenCellsLoseFocus}
       />

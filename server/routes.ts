@@ -8772,7 +8772,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // - vesselCertificateData: vessel-specific date fields and attachments
   
   // GET all certificates - joins the three tables to build certificate list
-  // Query params: vesselId, vesselName, page (default 1), limit (default 100)
+  // Query params: vesselId, vesselName, page (default 1), limit (default 100), sortBy, sortOrder
   app.get("/technical/api/certificates", async (req, res) => {
     try {
       const postgres = await getPostgresClient();
@@ -8786,6 +8786,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const page = parseInt(req.query.page as string) || 1;
       const limit = parseInt(req.query.limit as string) || 100;
       const offset = (page - 1) * limit;
+      const sortBy = req.query.sortBy as string | undefined;
+      const sortOrder = (req.query.sortOrder as string)?.toLowerCase() === 'desc' ? 'desc' : 'asc';
       
       // Step 1: Get applicable certificates for vessels from vesselCertificateApplicability
       let applicabilityQuery = db.select().from(vesselCertificateApplicability)
@@ -8890,6 +8892,73 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
       
+      // Apply server-side sorting before pagination
+      if (sortBy) {
+        certificates.sort((a, b) => {
+          let valA: any;
+          let valB: any;
+          
+          switch (sortBy) {
+            case 'id':
+            case 'companyId':
+              valA = a.id || '';
+              valB = b.id || '';
+              break;
+            case 'certificateName':
+            case 'name':
+              valA = a.certificateName || '';
+              valB = b.certificateName || '';
+              break;
+            case 'vessel':
+              valA = a.vessel || '';
+              valB = b.vessel || '';
+              break;
+            case 'type':
+            case 'companyGroup':
+              valA = a.type || '';
+              valB = b.type || '';
+              break;
+            case 'issueDate':
+              valA = a.issueDate || '';
+              valB = b.issueDate || '';
+              break;
+            case 'expiryDate':
+              valA = a.expiryDate || '';
+              valB = b.expiryDate || '';
+              break;
+            case 'lastAnnual':
+              valA = a.lastAnnual || '';
+              valB = b.lastAnnual || '';
+              break;
+            case 'lastInterm':
+              valA = a.lastInterm || '';
+              valB = b.lastInterm || '';
+              break;
+            case 'endorsementDate':
+              valA = a.endorsementDate || '';
+              valB = b.endorsementDate || '';
+              break;
+            case 'companySequence':
+              valA = a.companySequence ?? 9999;
+              valB = b.companySequence ?? 9999;
+              break;
+            default:
+              valA = a.companySequence ?? 9999;
+              valB = b.companySequence ?? 9999;
+          }
+          
+          // For string comparisons
+          if (typeof valA === 'string' && typeof valB === 'string') {
+            const comparison = valA.localeCompare(valB, undefined, { numeric: true, sensitivity: 'base' });
+            return sortOrder === 'desc' ? -comparison : comparison;
+          }
+          
+          // For numeric comparisons
+          const diff = (valA as number) - (valB as number);
+          return sortOrder === 'desc' ? -diff : diff;
+        });
+      }
+      
       // Apply pagination
       const total = certificates.length;
       const paginatedCerts = certificates.slice(offset, offset + limit);
@@ -8899,7 +8968,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         total, 
         page, 
         limit,
-        totalPages: Math.ceil(total / limit)
+        totalPages: Math.ceil(total / limit),
+        sortBy: sortBy || 'companySequence',
+        sortOrder
       });
     } catch (error) {
       console.error("Error fetching certificates:", error);

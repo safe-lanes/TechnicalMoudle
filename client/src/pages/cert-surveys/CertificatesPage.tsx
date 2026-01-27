@@ -284,10 +284,12 @@ export default function CertificatesPage() {
   const [attachmentSheetOpen, setAttachmentSheetOpen] = useState(false);
   const [selectedCertificate, setSelectedCertificate] = useState<CertificateData | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
+  const [sortBy, setSortBy] = useState<string | undefined>(undefined);
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
   const pageSize = 100;
   const { toast } = useToast();
 
-  // Build API URL with vessel filter and pagination
+  // Build API URL with vessel filter, pagination, and sorting
   const apiUrl = useMemo(() => {
     const params = new URLSearchParams();
     params.set('page', currentPage.toString());
@@ -298,11 +300,17 @@ export default function CertificatesPage() {
       params.set('vesselName', selectedVesselNames[0]);
     }
     
+    // Add server-side sorting parameters
+    if (sortBy) {
+      params.set('sortBy', sortBy);
+      params.set('sortOrder', sortOrder);
+    }
+    
     return `/technical/api/certificates?${params.toString()}`;
-  }, [currentPage, selectedVesselNames]);
+  }, [currentPage, selectedVesselNames, sortBy, sortOrder]);
 
   const { data: certificatesResponse, isLoading: isLoadingCertificates } = useQuery<CertificatesApiResponse>({
-    queryKey: ['/technical/api/certificates', currentPage, selectedVesselNames],
+    queryKey: ['/technical/api/certificates', currentPage, selectedVesselNames, sortBy, sortOrder],
     queryFn: async () => {
       const response = await fetch(apiUrl);
       if (!response.ok) throw new Error('Failed to fetch certificates');
@@ -729,6 +737,33 @@ export default function CertificatesPage() {
     };
   }, []);
 
+  const onSortChanged = useCallback((event: any) => {
+    const columnState = event.api.getColumnState();
+    const sortedColumn = columnState.find((col: any) => col.sort);
+    
+    if (sortedColumn) {
+      const fieldToApiMap: Record<string, string> = {
+        'id': 'companyId',
+        'certificateName': 'certificateName',
+        'type': 'companyGroup',
+        'vessel': 'vessel',
+        'issueDate': 'issueDate',
+        'expiryDate': 'expiryDate',
+        'lastAnnual': 'lastAnnual',
+        'lastInterm': 'lastInterm',
+        'endorsementDate': 'endorsementDate',
+      };
+      
+      const apiField = fieldToApiMap[sortedColumn.colId] || sortedColumn.colId;
+      setSortBy(apiField);
+      setSortOrder(sortedColumn.sort === 'desc' ? 'desc' : 'asc');
+      setCurrentPage(1);
+    } else {
+      setSortBy(undefined);
+      setSortOrder('asc');
+    }
+  }, []);
+
   const gridContext = useMemo(() => ({
     onOpenAttachments: handleOpenAttachments,
     onDateChange: handleDateChange,
@@ -794,6 +829,7 @@ export default function CertificatesPage() {
                   columnDefs={columnDefs}
                   onGridReady={onGridReady}
                   onCellEditingStopped={handleCellEditingStopped}
+                  onSortChanged={onSortChanged}
                   context={gridContext}
                   autoHeight={false}
                   height="100%"
