@@ -97,6 +97,7 @@ The application employs a modern full-stack architecture with a mobile-first, re
 - **Database Migration Strategy**: Uses a dual migration system with Drizzle-generated baseline migrations and custom `ALTER TABLE` migrations managed in `server/migrations.ts` for incremental schema changes. New columns must be added to both `shared/schema.ts` and `server/migrations.ts`.
 =======
 - **Database Migration Strategy**: Uses Drizzle file-based SQL migrations exclusively. All schema changes require updating `shared/schema.ts` first, then running `drizzle-kit generate` to create migration files. Legacy migrations 001-016 in `server/migrations.ts` remain for backward compatibility only - no new code-based migrations should be added.
+- **Vessel Data Source Strategy (January 2026)**: All vessel dropdown data uses the unified `useVessels()` hook which prioritizes local PMS data (`/technical/api/vessels`) with automatic fallback to external master-data API only when local data is unavailable. This ensures consistency between the VesselContext and all dropdown components.
 
 ## External Dependencies
 *   **Frontend**: `@radix-ui/*`, `@tanstack/react-query`, `wouter`, `tailwindcss`, `lucide-react`

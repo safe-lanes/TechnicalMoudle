@@ -1,0 +1,83 @@
+Prompt for Replit – Fleet Functionality Architecture & Data Flow
+Objective
+Provide a complete architectural overview of the Fleet functionality in the system.
+Scope of Analysis
+Analyse the Fleet module end-to-end, covering:
+Functional architecture
+Data flow
+Storage design
+Relationships between entities
+This is a read-only analysis task — do not modify any logic or data.
+Required Details
+1. Fleet Module Overview
+Explain:
+What the Fleet functionality is responsible for
+Key business use-cases it supports
+How it differs from vessel-specific operations
+2. Data Model & Storage Usage
+For every table involved in Fleet functionality, provide:
+Purpose of the table
+Type of data stored
+Whether it acts as:
+Master data
+Transactional data
+Mapping/relationship data
+How and when the table is read or written
+3. Table Interaction & Relationships
+Explain:
+How Fleet-level data links to:
+Vessels
+Components
+Jobs
+Spares
+Stores
+Whether relationships are:
+One-to-many
+Many-to-many
+Derived dynamically
+If foreign keys or implicit relations are used, list them clearly.
+4. API & Service Layer Flow
+Describe:
+APIs involved in Fleet operations
+Which APIs are:
+Read-only
+Write/update
+How data flows from:
+UI → API → storage
+storage → API → UI
+5. Business Logic Placement
+Clarify:
+Where Fleet-specific rules are implemented
+Which logic is:
+Fleet-level
+Vessel-level
+How data filtering or aggregation is done for Fleet views
+6. Read vs Write Responsibility
+For each major Fleet operation:
+Identify which tables are:
+Read only
+Mutated
+Explain why those tables are used
+7. Dependency & Coupling Analysis
+Analyse:
+How tightly Fleet functionality is coupled with:
+Maintenance
+Components
+Work Orders
+Inventory
+Any shared tables or reused logic
+8. Known Design Risks or Observations
+Call out:
+Any architectural complexity
+Areas prone to data inconsistency
+Hidden dependencies
+Potential scalability or maintainability concerns
+Output Format
+Structured sections
+Clear headings
+No code changes
+No assumptions beyond existing implementation
+Important Constraints
+Do not refactor or propose changes
+Do not simplify behaviour
+Do not omit any table involved in Fleet functionality

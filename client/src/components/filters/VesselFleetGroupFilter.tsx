@@ -5,7 +5,8 @@ import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Checkbox } from '@/components/ui/checkbox';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { useExternalVessels, useExternalFleetGroups, useExternalAdditionalGroups } from '@/hooks/useExternalMasterData';
+import { useVessels } from '@/hooks/useVessels';
+import { useExternalFleetGroups, useExternalAdditionalGroups } from '@/hooks/useExternalMasterData';
 
 type FilterMode = 'vessel' | 'fleet' | 'group';
 
@@ -55,16 +56,16 @@ export const VesselFleetGroupFilter = ({
   const [fleetDropdownOpen, setFleetDropdownOpen] = useState(false);
   const [groupDropdownOpen, setGroupDropdownOpen] = useState(false);
 
-  const { data: externalVessels = [], isLoading: vesselsLoading } = useExternalVessels();
+  const { data: vessels = [], isLoading: vesselsLoading } = useVessels();
   const { data: externalFleetGroups = [], isLoading: fleetsLoading } = useExternalFleetGroups();
   const { data: externalAdditionalGroups = [], isLoading: groupsLoading } = useExternalAdditionalGroups();
 
   const vesselOptions = useMemo(() => {
-    return externalVessels.map((v: any) => ({
-      id: getFieldValue(v, ['vuid', 'vesselId', 'id']),
-      name: getFieldValue(v, ['vessel', 'vesselName', 'name']),
+    return vessels.map((v) => ({
+      id: v.id,
+      name: v.name,
     })).filter((v: { id: string; name: string }) => v.id && v.name);
-  }, [externalVessels]);
+  }, [vessels]);
 
   const fleetOptions = useMemo(() => {
     return externalFleetGroups.map((f: any) => ({
@@ -97,7 +98,7 @@ export const VesselFleetGroupFilter = ({
         vesselNames.push(...names);
       }
     });
-    return [...new Set(vesselNames)];
+    return Array.from(new Set(vesselNames));
   }, [fleetOptions, parseVesselNamesFromString]);
 
   const getVesselNamesForGroups = useCallback((groupIds: string[]): string[] => {
@@ -110,7 +111,7 @@ export const VesselFleetGroupFilter = ({
         vesselNames.push(...names);
       }
     });
-    return [...new Set(vesselNames)];
+    return Array.from(new Set(vesselNames));
   }, [groupOptions, parseVesselNamesFromString]);
 
   const deriveResult = useCallback((newValue: VesselFleetGroupFilterValue): VesselFleetGroupFilterResult => {
