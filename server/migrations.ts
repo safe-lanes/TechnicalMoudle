@@ -1,4 +1,5 @@
 import { sql } from 'drizzle-orm';
+import { migrate } from 'drizzle-orm/node-postgres/migrator';
 import { resolvePostgres } from './postgresClient';
 import { isFileStorageForced } from './storageFactory';
 import { exec } from 'child_process';
@@ -552,7 +553,43 @@ export async function runMigrations(): Promise<{ applied: number; skipped: numbe
   }
 }
 
+export async function runDrizzleMigrations(): Promise<void> {
+  console.log('🔄 Running Drizzle file-based migrations...');
+  
+  if (isFileStorageForced()) {
+    console.log('⏭️  Skipping Drizzle migrations - file-based storage is active');
+    return;
+  }
+  
+  const postgres = await resolvePostgres();
+  if (!postgres) {
+    console.log('⏭️  Skipping Drizzle migrations - DATABASE_URL not configured');
+    return;
+  }
+  
+  const { db } = postgres;
+  const migrationsFolder = path.join(process.cwd(), 'migrations');
+  
+  if (!fs.existsSync(migrationsFolder)) {
+    console.log('⏭️  Skipping Drizzle migrations - migrations folder not found');
+    return;
+  }
+  
+  try {
+    await migrate(db, { migrationsFolder });
+    console.log('✅ Drizzle file-based migrations complete');
+  } catch (error: any) {
+    if (error.message?.includes('already exists') || error.code === '42P07') {
+      console.log('✅ Drizzle migrations complete (tables already exist)');
+    } else {
+      console.error('❌ Drizzle migration error:', error.message);
+      throw error;
+    }
+  }
+}
+
 export async function runBackupAndMigrations(): Promise<void> {
   await createDatabaseBackup();
   await runMigrations();
+  await runDrizzleMigrations();
 }
