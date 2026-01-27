@@ -8912,7 +8912,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { db } = postgres;
       
       const certId = req.params.id;
-      const [vesselId, masterId] = certId.includes('-') ? certId.split('-', 2) : [null, null];
+      // Use :: as separator to avoid conflicts with UUID dashes in vesselId
+      const [vesselId, masterId] = certId.includes('::') ? certId.split('::', 2) : [null, null];
       
       if (!vesselId || !masterId) {
         return res.status(404).json({ error: "Certificate not found" });
@@ -8989,12 +8990,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const certId = req.params.id;
       const { vesselId: bodyVesselId, masterId: bodyMasterId, ...updateData } = req.body;
       
-      // Try to parse ID as vesselId-masterId or use body params
+      // Try to parse ID as vesselId::masterId (using :: as separator to avoid conflicts with UUID dashes)
       let vesselId = bodyVesselId;
       let masterId = bodyMasterId;
       
-      if (certId.includes('-')) {
-        [vesselId, masterId] = certId.split('-', 2);
+      if (certId.includes('::')) {
+        [vesselId, masterId] = certId.split('::', 2);
       }
       
       if (!vesselId || !masterId) {

@@ -327,7 +327,8 @@ export default function CertificatesPage() {
   // Certificate ID format for API: vesselId-masterId (compound key)
   const getCertificateApiId = useCallback((cert: CertificateData) => {
     if (cert.vesselId && cert.masterId) {
-      return `${cert.vesselId}-${cert.masterId}`;
+      // Use :: as separator to avoid conflicts with dashes in vesselId (UUID format)
+      return `${cert.vesselId}::${cert.masterId}`;
     }
     return cert.id;
   }, []);
@@ -364,33 +365,39 @@ export default function CertificatesPage() {
       return;
     }
     
+    // For date fields, the DateCellEditor's handleDateChange already handles the save
+    // Skip duplicate PATCH call here
+    if (EDITABLE_DATE_FIELDS.includes(field)) {
+      console.log('[CertificatesPage] Skipping onCellEditingStopped for date field (handled by DateCellEditor)');
+      return;
+    }
+    
     if (value === oldValue) {
       console.log('[CertificatesPage] Value not changed, skipping update');
       return;
     }
     
-    if (EDITABLE_DATE_FIELDS.includes(field)) {
-      const today = new Date();
-      const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 
-                      'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-      const day = String(today.getDate()).padStart(2, '0');
-      const month = months[today.getMonth()];
-      const year = today.getFullYear();
-      const lastEditUpload = `${day} ${month} ${year}`;
-      
-      // Use compound key format for API: vesselId-masterId
-      const apiId = getCertificateApiId(data as CertificateData);
-      
-      console.log('[CertificatesPage] Sending PATCH request for certificate:', apiId, 'field:', field, 'value:', value);
-      
-      updateCertificateMutation.mutate({
-        id: apiId,
-        updates: {
-          [field]: value,
-          lastEditUpload,
-        },
-      });
-    }
+    // Handle non-date field updates
+    const today = new Date();
+    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 
+                    'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    const day = String(today.getDate()).padStart(2, '0');
+    const month = months[today.getMonth()];
+    const year = today.getFullYear();
+    const lastEditUpload = `${day} ${month} ${year}`;
+    
+    // Use compound key format for API: vesselId::masterId
+    const apiId = getCertificateApiId(data as CertificateData);
+    
+    console.log('[CertificatesPage] Sending PATCH request for certificate:', apiId, 'field:', field, 'value:', value);
+    
+    updateCertificateMutation.mutate({
+      id: apiId,
+      updates: {
+        [field]: value,
+        lastEditUpload,
+      },
+    });
   }, [updateCertificateMutation, getCertificateApiId]);
 
   const handleDateChange = useCallback((certId: string, field: string, newValue: string, certData?: CertificateData) => {
