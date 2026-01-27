@@ -8874,6 +8874,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             vessel: app.vesselName,
             vesselId: app.vesselId,
             masterId: app.masterId,
+            companySequence: master.companySequence ?? 9999,
             issueDate: certData?.issueDate || '',
             expiryDate: certData?.expiryDate || '',
             lastAnnual: certData?.lastAnnual || '',

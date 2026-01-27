@@ -191,6 +191,7 @@ interface CertificateData {
   vessel: string;
   vesselId?: string;
   masterId?: string;
+  companySequence?: number;
   issueDate: string;
   expiryDate: string;
   lastAnnual: string;
@@ -465,7 +466,33 @@ export default function CertificatesPage() {
       });
     }
     
-    return result;
+    // Default sorting: 1. Expiry Date (ascending), 2. Company Sequence (ascending)
+    // Create a copy to avoid mutating the original array
+    const sorted = [...result].sort((a, b) => {
+      // First sort by expiry date
+      const expiryA = a.expiryDate ? parseDisplayDate(a.expiryDate) : '';
+      const expiryB = b.expiryDate ? parseDisplayDate(b.expiryDate) : '';
+      
+      // Certificates without expiry dates go to the end
+      if (!expiryA && !expiryB) {
+        // Both have no expiry date, sort by company sequence
+        return (a.companySequence ?? 9999) - (b.companySequence ?? 9999);
+      }
+      if (!expiryA) return 1; // a goes after b
+      if (!expiryB) return -1; // b goes after a
+      
+      const dateA = new Date(expiryA);
+      const dateB = new Date(expiryB);
+      
+      if (dateA.getTime() !== dateB.getTime()) {
+        return dateA.getTime() - dateB.getTime(); // Earlier dates first
+      }
+      
+      // Same expiry date, sort by company sequence
+      return (a.companySequence ?? 9999) - (b.companySequence ?? 9999);
+    });
+    
+    return sorted;
   }, [certificates, selectedVesselNames, dueInFilter]);
 
   const columnDefs: ColDef[] = useMemo(() => [
