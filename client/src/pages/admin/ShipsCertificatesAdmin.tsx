@@ -1679,10 +1679,10 @@ export default function ShipsCertificatesAdmin() {
                             ))}
                           </SelectContent>
                         </Select>
-                        <Button size="icon" variant="ghost" onClick={saveNewCompanyEntry} className="h-8 w-8 text-green-600 hover:text-green-700" data-testid="button-save-new-company">
+                        <Button size="icon" variant="ghost" onClick={saveNewCompanyEntry} className="text-green-600" data-testid="button-save-new-company">
                           <Check className="h-4 w-4" />
                         </Button>
-                        <Button size="icon" variant="ghost" onClick={cancelNewCompanyEntry} className="h-8 w-8 text-red-600 hover:text-red-700" data-testid="button-cancel-new-company">
+                        <Button size="icon" variant="ghost" onClick={cancelNewCompanyEntry} className="text-red-600" data-testid="button-cancel-new-company">
                           <X className="h-4 w-4" />
                         </Button>
                       </div>
@@ -2042,10 +2042,10 @@ export default function ShipsCertificatesAdmin() {
                             ))}
                           </SelectContent>
                         </Select>
-                        <Button size="icon" variant="ghost" onClick={saveNewVesselEntry} className="h-8 w-8 text-green-600 hover:text-green-700" data-testid="button-save-new-vessel">
+                        <Button size="icon" variant="ghost" onClick={saveNewVesselEntry} className="text-green-600" data-testid="button-save-new-vessel">
                           <Check className="h-4 w-4" />
                         </Button>
-                        <Button size="icon" variant="ghost" onClick={cancelNewVesselEntry} className="h-8 w-8 text-red-600 hover:text-red-700" data-testid="button-cancel-new-vessel">
+                        <Button size="icon" variant="ghost" onClick={cancelNewVesselEntry} className="text-red-600" data-testid="button-cancel-new-vessel">
                           <X className="h-4 w-4" />
                         </Button>
                       </div>
