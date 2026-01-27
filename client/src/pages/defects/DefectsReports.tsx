@@ -8,6 +8,8 @@ import { BarChart3, PieChart, TrendingUp, FileSpreadsheet, FileText, FileDown, P
 import { apiRequest } from "@/lib/queryClient";
 import { cn } from "@/lib/utils";
 
+const COMING_SOON = true;
+
 interface ReportFilter {
   vesselId?: string;
   fleet?: string;
@@ -94,7 +96,8 @@ export default function DefectsReports() {
       const response = await fetch('/technical/api/vessels');
       if (!response.ok) throw new Error('Failed to fetch vessels');
       return response.json();
-    }
+    },
+    enabled: !COMING_SOON
   });
 
   const runReportMutation = useMutation({
@@ -119,7 +122,6 @@ export default function DefectsReports() {
     if (!selectedReport || !reportData) return;
     
     const filename = `Defects_${selectedReport}_${new Date().toISOString().split('T')[0]}.${format}`;
-    // TODO: Implement actual export logic
     console.log(`Exporting as ${filename}`);
   };
 
@@ -127,9 +129,19 @@ export default function DefectsReports() {
     setFilters(prev => ({ ...prev, [key]: value }));
   };
 
+  if (COMING_SOON) {
+    return (
+      <div className="space-y-6">
+        <div className="flex items-center justify-between">
+          <h1 className="text-2xl font-bold text-black dark:text-white">Defects Reports</h1>
+        </div>
+        <p className="text-lg text-muted-foreground">Coming Soon...</p>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6">
-      {/* Header */}
       <div>
         <div className="flex items-center justify-between mb-4">
           <h1 className="text-2xl font-bold text-black dark:text-white">Defects Reports</h1>
@@ -137,7 +149,6 @@ export default function DefectsReports() {
       </div>
 
       <div className="flex h-[calc(100vh-4rem)]">
-        {/* Left: Report Selector */}
         <div className="w-96 bg-white border-r border-gray-200 p-4 overflow-y-auto">
           <h2 className="text-sm font-semibold text-gray-700 mb-4">Select Report</h2>
           <div className="space-y-2">
@@ -171,9 +182,7 @@ export default function DefectsReports() {
           </div>
         </div>
 
-        {/* Right: Filter Panel and Report Display */}
         <div className="flex-1 flex flex-col">
-          {/* Filter Panel */}
           <div className="bg-white border-b border-gray-200 p-4">
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-sm font-semibold text-gray-700">Report Filters</h2>
@@ -218,7 +227,6 @@ export default function DefectsReports() {
               </div>
             </div>
 
-            {/* Filter Controls Grid */}
             <div className="grid grid-cols-4 gap-3">
               <div>
                 <Label className="text-xs">Vessel</Label>
@@ -376,7 +384,6 @@ export default function DefectsReports() {
             </div>
           </div>
 
-          {/* Report Display Area */}
           <div className="flex-1 p-6 overflow-y-auto">
             {!selectedReport ? (
               <div className="h-full flex items-center justify-center">
@@ -394,12 +401,10 @@ export default function DefectsReports() {
               </div>
             ) : (
               <div className="bg-white rounded-lg shadow-sm p-6">
-                {/* Report content will be rendered based on the selected report type */}
                 <h2 className="text-lg font-semibold mb-4">
                   {reportConfigs.find(r => r.id === selectedReport)?.name}
                 </h2>
                 
-                {/* Sample KPI Cards */}
                 <div className="grid grid-cols-4 gap-4 mb-6">
                   <Card>
                     <CardContent className="p-4">
@@ -427,7 +432,6 @@ export default function DefectsReports() {
                   </Card>
                 </div>
 
-                {/* Placeholder for charts and tables */}
                 <div className="bg-gray-50 rounded-lg p-12 text-center">
                   <p className="text-gray-500">
                     Report charts and detailed data will be displayed here
