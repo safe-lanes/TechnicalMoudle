@@ -2,8 +2,9 @@ import React, { useState } from 'react';
 import { Card } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-import { Edit, Search } from 'lucide-react';
+import { Edit, Search, FileText } from 'lucide-react';
 import FormConfigurationModal from './FormConfigurationModal';
+import { useUIRole } from '@/contexts/UIRoleContext';
 
 interface FormItem {
   id: string;
@@ -14,6 +15,7 @@ interface FormItem {
 }
 
 export default function Forms() {
+  const { isSailAdmin } = useUIRole();
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedForm, setSelectedForm] = useState<FormItem | null>(null);
   const [showConfigModal, setShowConfigModal] = useState(false);
@@ -53,6 +55,21 @@ export default function Forms() {
     setSelectedForm(form);
     setShowConfigModal(true);
   };
+
+  // Show "Features Coming Soon" for non-Sail Admin users
+  if (!isSailAdmin) {
+    return (
+      <Card className="p-0 overflow-hidden">
+        <div className="flex items-center justify-center py-24">
+          <div className="text-center">
+            <FileText className="h-16 w-16 text-gray-300 mx-auto mb-4" />
+            <h2 className="text-xl font-semibold text-gray-600">Features Coming Soon</h2>
+            <p className="text-gray-500 mt-2">Forms management features will be available in a future update.</p>
+          </div>
+        </div>
+      </Card>
+    );
+  }
 
   return (
     <>

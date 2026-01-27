@@ -13,6 +13,7 @@ import { Bell, Mail, AlertCircle, Clock, Package, Shield, HardDrive } from 'luci
 import AlertPolicyDrawer from '@/components/alerts/AlertPolicyDrawer';
 import AlertHistory from '@/components/alerts/AlertHistory';
 import { useVessel } from '@/contexts/VesselContext';
+import { useUIRole } from '@/contexts/UIRoleContext';
 
 interface AlertPolicy {
   id: number;
@@ -72,6 +73,7 @@ const alertTypeInfo = {
 export default function Alerts() {
   const { toast } = useToast();
   const { vesselId: selectedVesselId = 'V001' } = useVessel();
+  const { isSailAdmin } = useUIRole();
   const [selectedPolicy, setSelectedPolicy] = useState<AlertPolicy | null>(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [localPolicies, setLocalPolicies] = useState<AlertPolicy[]>([]);
@@ -191,6 +193,27 @@ export default function Alerts() {
 
   if (policiesLoading || configLoading) {
     return <div className="p-6">Loading alert configuration...</div>;
+  }
+
+  // Show "Features Coming Soon" for non-Sail Admin users
+  if (!isSailAdmin) {
+    return (
+      <div className="p-6 space-y-6">
+        <div className="bg-white rounded-lg shadow-sm">
+          <div className="px-6 py-4 border-b">
+            <h1 className="text-2xl font-semibold">Alert Configuration</h1>
+            <p className="text-sm text-gray-600 mt-1">Configure alert policies and notification preferences</p>
+          </div>
+          <div className="flex items-center justify-center py-24">
+            <div className="text-center">
+              <Bell className="h-16 w-16 text-gray-300 mx-auto mb-4" />
+              <h2 className="text-xl font-semibold text-gray-600">Features Coming Soon</h2>
+              <p className="text-gray-500 mt-2">Alert configuration features will be available in a future update.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
   }
 
   return (
