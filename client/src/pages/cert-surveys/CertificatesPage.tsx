@@ -93,12 +93,14 @@ const DateCellEditor = forwardRef<DateCellEditorHandle, ICellEditorParams>((prop
     const newDisplayValue = formatToDisplayDate(valueRef.current);
     const field = props.colDef?.field;
     const rowId = props.data?.id;
+    const rowData = props.data;
     
     console.log('[DateCellEditor] Committing value:', newDisplayValue, 'for field:', field, 'row:', rowId);
     
     if (field && rowId && props.node && props.context?.onDateChange) {
       props.node.setDataValue(field, newDisplayValue);
-      props.context.onDateChange(rowId, field, newDisplayValue);
+      // Pass the full row data to enable compound key construction (vesselId-masterId)
+      props.context.onDateChange(rowId, field, newDisplayValue, rowData);
     }
     
     props.stopEditing();
@@ -147,14 +149,23 @@ interface CertificateData {
   certificateName: string;
   type: string;
   vessel: string;
+  vesselId?: string;
+  masterId?: string;
   issueDate: string;
   expiryDate: string;
   lastAnnual: string;
   lastInterm: string;
   endorsementDate: string;
   lastEditUpload: string;
-  applicable: boolean;
   attachments?: FileAttachment[];
+}
+
+interface CertificatesApiResponse {
+  certificates: CertificateData[];
+  total: number;
+  page: number;
+  limit: number;
+  totalPages?: number;
 }
 
 const EDITABLE_DATE_FIELDS = ['issueDate', 'expiryDate', 'lastAnnual', 'lastInterm', 'endorsementDate'];
@@ -233,9 +244,11 @@ export default function CertificatesPage() {
   const [selectedCertificate, setSelectedCertificate] = useState<CertificateData | null>(null);
   const { toast } = useToast();
 
-  const { data: certificates = [], isLoading: isLoadingCertificates } = useQuery<CertificateData[]>({
+  const { data: certificatesResponse, isLoading: isLoadingCertificates } = useQuery<CertificatesApiResponse>({
     queryKey: ['/technical/api/certificates'],
   });
+  
+  const certificates = certificatesResponse?.certificates || [];
 
   const handleFilterChange = useCallback((result: VesselFleetGroupFilterResult) => {
     setFilterValue({
@@ -268,9 +281,13 @@ export default function CertificatesPage() {
     },
   });
 
-  const handleToggleApplicable = useCallback((id: string, newValue: boolean) => {
-    updateCertificateMutation.mutate({ id, updates: { applicable: newValue } });
-  }, [updateCertificateMutation]);
+  // Certificate ID format for API: vesselId-masterId (compound key)
+  const getCertificateApiId = useCallback((cert: CertificateData) => {
+    if (cert.vesselId && cert.masterId) {
+      return `${cert.vesselId}-${cert.masterId}`;
+    }
+    return cert.id;
+  }, []);
 
   const handleOpenAttachments = useCallback((certificate: CertificateData) => {
     setSelectedCertificate(certificate);
@@ -279,13 +296,14 @@ export default function CertificatesPage() {
 
   const handleAttachmentsChange = useCallback((attachments: FileAttachment[]) => {
     if (selectedCertificate) {
+      const apiId = getCertificateApiId(selectedCertificate);
       updateCertificateMutation.mutate({
-        id: selectedCertificate.id,
+        id: apiId,
         updates: { attachments },
       });
       setSelectedCertificate(prev => prev ? { ...prev, attachments } : null);
     }
-  }, [selectedCertificate, updateCertificateMutation]);
+  }, [selectedCertificate, updateCertificateMutation, getCertificateApiId]);
 
   const handleCellEditingStopped = useCallback((event: CellEditingStoppedEvent) => {
     const { data, colDef, value, oldValue } = event;
@@ -317,20 +335,23 @@ export default function CertificatesPage() {
       const year = today.getFullYear();
       const lastEditUpload = `${day} ${month} ${year}`;
       
-      console.log('[CertificatesPage] Sending PATCH request for certificate:', data.id, 'field:', field, 'value:', value);
+      // Use compound key format for API: vesselId-masterId
+      const apiId = getCertificateApiId(data as CertificateData);
+      
+      console.log('[CertificatesPage] Sending PATCH request for certificate:', apiId, 'field:', field, 'value:', value);
       
       updateCertificateMutation.mutate({
-        id: data.id,
+        id: apiId,
         updates: {
           [field]: value,
           lastEditUpload,
         },
       });
     }
-  }, [updateCertificateMutation]);
+  }, [updateCertificateMutation, getCertificateApiId]);
 
-  const handleDateChange = useCallback((id: string, field: string, newValue: string) => {
-    console.log('[CertificatesPage] handleDateChange called:', { id, field, newValue });
+  const handleDateChange = useCallback((certId: string, field: string, newValue: string, certData?: CertificateData) => {
+    console.log('[CertificatesPage] handleDateChange called:', { certId, field, newValue });
     
     const today = new Date();
     const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 
@@ -340,14 +361,20 @@ export default function CertificatesPage() {
     const year = today.getFullYear();
     const lastEditUpload = `${day} ${month} ${year}`;
     
+    // Use compound key format for API if available
+    let apiId = certId;
+    if (certData) {
+      apiId = getCertificateApiId(certData);
+    }
+    
     updateCertificateMutation.mutate({
-      id,
+      id: apiId,
       updates: {
         [field]: newValue,
         lastEditUpload,
       },
     });
-  }, [updateCertificateMutation]);
+  }, [updateCertificateMutation, getCertificateApiId]);
 
   const filteredCertificates = useMemo(() => {
     let result = certificates;
@@ -602,10 +629,9 @@ export default function CertificatesPage() {
   }, []);
 
   const gridContext = useMemo(() => ({
-    onToggleApplicable: handleToggleApplicable,
     onOpenAttachments: handleOpenAttachments,
     onDateChange: handleDateChange,
-  }), [handleToggleApplicable, handleOpenAttachments, handleDateChange]);
+  }), [handleOpenAttachments, handleDateChange]);
 
   return (
     <div className="h-full flex flex-col bg-gray-50 overflow-hidden">
