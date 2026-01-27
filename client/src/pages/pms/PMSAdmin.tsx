@@ -9,15 +9,16 @@ import { useUIRole } from "@/contexts/UIRoleContext";
 import { cn } from "@/lib/utils";
 
 export default function PMSAdmin() {
-  const { isSailAdmin } = useUIRole();
-  const [activeTab, setActiveTab] = useState(isSailAdmin ? "bulk-data-imp" : "alerts");
+  const { isSailAdmin, isClientAdmin, isHeadOfDept } = useUIRole();
+  const showAllAdminTabs = isSailAdmin || isClientAdmin || isHeadOfDept;
+  const [activeTab, setActiveTab] = useState(showAllAdminTabs ? "bulk-data-imp" : "alerts");
 
   // Reset to "alerts" tab when switching to Vessel role (since hidden tabs shouldn't be active)
   useEffect(() => {
-    if (!isSailAdmin && (activeTab === "bulk-data-imp" || activeTab === "admin-4")) {
+    if (!showAllAdminTabs && (activeTab === "bulk-data-imp" || activeTab === "admin-4")) {
       setActiveTab("alerts");
     }
-  }, [isSailAdmin, activeTab]);
+  }, [showAllAdminTabs, activeTab]);
 
   const getPageTitle = () => {
     switch (activeTab) {
@@ -43,7 +44,7 @@ export default function PMSAdmin() {
           </h1>
           
           <TabsList className="bg-gray-100 absolute left-1/2 -translate-x-1/2">
-            {isSailAdmin && (
+            {showAllAdminTabs && (
               <TabsTrigger 
                 value="bulk-data-imp" 
                 className={cn(
@@ -78,7 +79,7 @@ export default function PMSAdmin() {
               <Marker id="I4.QL.3.4" />
               Forms
             </TabsTrigger>
-            {isSailAdmin && (
+            {showAllAdminTabs && (
               <TabsTrigger 
                 value="admin-4" 
                 className={cn(
