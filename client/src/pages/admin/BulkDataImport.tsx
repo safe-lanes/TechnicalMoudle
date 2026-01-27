@@ -17,6 +17,7 @@ import FleetSparesUpload from "./bulk/FleetSparesUpload";
 import MasterListsUpload from "./bulk/MasterListsUpload";
 import BulkImportHistory from "./bulk/BulkImportHistory";
 import { useExternalVessels } from "@/hooks/useExternalMasterData";
+import { useUIRole } from "@/contexts/UIRoleContext";
 
 type VesselTemplateType = 'machinery' | 'stores' | 'spares' | 'jobs';
 type FleetTemplateType = 'maker-list' | 'master-data' | 'fleet-component' | 'fleet-jobs' | 'fleet-spares' | 'master-list';
@@ -197,8 +198,12 @@ const getVesselName = (entry: any): string => {
 };
 
 export default function BulkDataImport() {
+  const { isSailAdmin } = useUIRole();
   const { data: vesselMasterEntries = [] } = useExternalVessels();
-  const [isFleetMode, setIsFleetMode] = useState(false);
+  // Fleet mode is only available for Sail Admin
+  const [isFleetModeState, setIsFleetModeState] = useState(false);
+  const isFleetMode = isSailAdmin ? isFleetModeState : false;
+  const setIsFleetMode = isSailAdmin ? setIsFleetModeState : () => {};
   const [selectedVesselTemplate, setSelectedVesselTemplate] = useState<VesselTemplateType>('machinery');
   const [selectedFleetTemplate, setSelectedFleetTemplate] = useState<FleetTemplateType>('maker-list');
   const [selectedVessel, setSelectedVessel] = useState<string>('');
@@ -303,17 +308,19 @@ export default function BulkDataImport() {
               </>
             )}
             
-            {/* Fleet Data Import Toggle */}
-            <div className="flex items-center gap-2 px-4 py-2 border rounded-full bg-gray-50" data-testid={currentMarkers.fleetToggle}>
-              <Label htmlFor="fleet-toggle" className="text-sm font-medium text-gray-700 cursor-pointer">
-                Fleet Data Import
-              </Label>
-              <Switch
-                id="fleet-toggle"
-                checked={isFleetMode}
-                onCheckedChange={setIsFleetMode}
-              />
-            </div>
+            {/* Fleet Data Import Toggle - Only visible for Sail Admin */}
+            {isSailAdmin && (
+              <div className="flex items-center gap-2 px-4 py-2 border rounded-full bg-gray-50" data-testid={currentMarkers.fleetToggle}>
+                <Label htmlFor="fleet-toggle" className="text-sm font-medium text-gray-700 cursor-pointer">
+                  Fleet Data Import
+                </Label>
+                <Switch
+                  id="fleet-toggle"
+                  checked={isFleetMode}
+                  onCheckedChange={setIsFleetMode}
+                />
+              </div>
+            )}
             
             <div className="ml-auto flex items-center gap-3">
               <p className="text-sm text-gray-500" data-testid={currentMarkers.infoText}>
