@@ -57,6 +57,8 @@ const DateCellEditor = forwardRef<DateCellEditorHandle, ICellEditorParams>((prop
   const [value, setValue] = useState(initialValue);
   const valueRef = useRef(value);
   const hasChangedRef = useRef(false);
+  const blurTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const isCommittingRef = useRef(false);
   
   useEffect(() => {
     valueRef.current = value;
@@ -70,6 +72,12 @@ const DateCellEditor = forwardRef<DateCellEditorHandle, ICellEditorParams>((prop
         inputRef.current.select();
       }
     }, 0);
+    
+    return () => {
+      if (blurTimeoutRef.current) {
+        clearTimeout(blurTimeoutRef.current);
+      }
+    };
   }, []);
   
   useImperativeHandle(ref, () => ({
@@ -84,22 +92,34 @@ const DateCellEditor = forwardRef<DateCellEditorHandle, ICellEditorParams>((prop
   }));
   
   const commitAndSave = useCallback((cancelled: boolean = false) => {
-    if (cancelled || !hasChangedRef.current) {
-      console.log('[DateCellEditor] No changes or cancelled, skipping save');
-      props.stopEditing(cancelled);
+    if (isCommittingRef.current) {
+      console.log('[DateCellEditor] Already committing, skipping');
       return;
     }
+    
+    if (cancelled) {
+      console.log('[DateCellEditor] Cancelled, stopping edit');
+      props.stopEditing(true);
+      return;
+    }
+    
+    if (!hasChangedRef.current) {
+      console.log('[DateCellEditor] No changes, stopping edit');
+      props.stopEditing(false);
+      return;
+    }
+    
+    isCommittingRef.current = true;
     
     const newDisplayValue = formatToDisplayDate(valueRef.current);
     const field = props.colDef?.field;
     const rowId = props.data?.id;
     const rowData = props.data;
     
-    console.log('[DateCellEditor] Committing value:', newDisplayValue, 'for field:', field, 'row:', rowId);
+    console.log('[DateCellEditor] Committing value:', newDisplayValue, 'for field:', field, 'row:', rowId, 'rowData:', rowData);
     
     if (field && rowId && props.node && props.context?.onDateChange) {
       props.node.setDataValue(field, newDisplayValue);
-      // Pass the full row data to enable compound key construction (vesselId-masterId)
       props.context.onDateChange(rowId, field, newDisplayValue, rowData);
     }
     
@@ -107,22 +127,45 @@ const DateCellEditor = forwardRef<DateCellEditorHandle, ICellEditorParams>((prop
   }, [props]);
   
   const handleChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
-    console.log('[DateCellEditor] handleChange:', e.target.value);
-    setValue(e.target.value);
-    valueRef.current = e.target.value;
-    hasChangedRef.current = true;
-  }, []);
+    const newValue = e.target.value;
+    console.log('[DateCellEditor] handleChange:', newValue);
+    setValue(newValue);
+    valueRef.current = newValue;
+    hasChangedRef.current = newValue !== initialValue;
+    
+    if (blurTimeoutRef.current) {
+      clearTimeout(blurTimeoutRef.current);
+      blurTimeoutRef.current = null;
+    }
+    
+    if (newValue) {
+      setTimeout(() => {
+        commitAndSave(false);
+      }, 50);
+    }
+  }, [initialValue, commitAndSave]);
   
   const handleBlur = useCallback(() => {
     console.log('[DateCellEditor] handleBlur, value:', valueRef.current);
-    commitAndSave(false);
+    
+    blurTimeoutRef.current = setTimeout(() => {
+      if (!isCommittingRef.current) {
+        commitAndSave(false);
+      }
+    }, 150);
   }, [commitAndSave]);
   
   const handleKeyDown = useCallback((e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Enter') {
       e.preventDefault();
+      if (blurTimeoutRef.current) {
+        clearTimeout(blurTimeoutRef.current);
+      }
       commitAndSave(false);
     } else if (e.key === 'Escape') {
+      if (blurTimeoutRef.current) {
+        clearTimeout(blurTimeoutRef.current);
+      }
       commitAndSave(true);
     }
   }, [commitAndSave]);
