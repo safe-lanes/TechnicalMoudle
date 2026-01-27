@@ -283,13 +283,36 @@ export default function CertificatesPage() {
   const [gridApi, setGridApi] = useState<GridApi | null>(null);
   const [attachmentSheetOpen, setAttachmentSheetOpen] = useState(false);
   const [selectedCertificate, setSelectedCertificate] = useState<CertificateData | null>(null);
+  const [currentPage, setCurrentPage] = useState(1);
+  const pageSize = 100;
   const { toast } = useToast();
 
+  // Build API URL with vessel filter and pagination
+  const apiUrl = useMemo(() => {
+    const params = new URLSearchParams();
+    params.set('page', currentPage.toString());
+    params.set('limit', pageSize.toString());
+    
+    // Pass vessel name filter to API if a single vessel is selected
+    if (selectedVesselNames.length === 1) {
+      params.set('vesselName', selectedVesselNames[0]);
+    }
+    
+    return `/technical/api/certificates?${params.toString()}`;
+  }, [currentPage, selectedVesselNames]);
+
   const { data: certificatesResponse, isLoading: isLoadingCertificates } = useQuery<CertificatesApiResponse>({
-    queryKey: ['/technical/api/certificates'],
+    queryKey: ['/technical/api/certificates', currentPage, selectedVesselNames],
+    queryFn: async () => {
+      const response = await fetch(apiUrl);
+      if (!response.ok) throw new Error('Failed to fetch certificates');
+      return response.json();
+    },
   });
   
   const certificates = certificatesResponse?.certificates || [];
+  const totalCertificates = certificatesResponse?.total || 0;
+  const totalPages = certificatesResponse?.totalPages || 1;
 
   const handleFilterChange = useCallback((result: VesselFleetGroupFilterResult) => {
     setFilterValue({
@@ -299,6 +322,8 @@ export default function CertificatesPage() {
       selectedGroups: result.selectedGroups,
     });
     setSelectedVesselNames(result.selectedVesselNames);
+    // Reset to page 1 when filter changes
+    setCurrentPage(1);
   }, []);
 
   const updateCertificateMutation = useMutation({
@@ -306,6 +331,7 @@ export default function CertificatesPage() {
       return apiRequest('PATCH', `/technical/api/certificates/${id}`, updates);
     },
     onSuccess: () => {
+      // Invalidate all certificate queries (any page/filter combination)
       queryClient.invalidateQueries({ queryKey: ['/technical/api/certificates'] });
       toast({
         title: 'Updated',
@@ -427,13 +453,14 @@ export default function CertificatesPage() {
   const filteredCertificates = useMemo(() => {
     let result = certificates;
     
-    if (selectedVesselNames.length > 0) {
+    // Client-side vessel filtering only when multiple vessels selected
+    // (Single vessel filter is handled by API)
+    if (selectedVesselNames.length > 1) {
       const normalizedFilterNames = selectedVesselNames.map(n => n.toLowerCase().trim());
       result = result.filter(cert => {
         const certVessel = (cert.vessel || '').toLowerCase().trim();
-        return normalizedFilterNames.some(filterName => 
-          filterName === certVessel || certVessel.includes(filterName) || filterName.includes(certVessel)
-        );
+        // Use exact match to avoid "Vessel 11" matching "Vessel 1"
+        return normalizedFilterNames.some(filterName => filterName === certVessel);
       });
     }
     
@@ -789,8 +816,42 @@ export default function CertificatesPage() {
             
             <div className="bg-white border-t border-gray-200 px-4 py-3 flex justify-between items-center flex-shrink-0" style={{ marginTop: '-1px' }}>
               <div className="text-xs font-normal font-['Mulish',Helvetica] text-black">
-                Rows: {filteredCertificates.length}
+                {totalCertificates > 0 ? (
+                  <>
+                    Showing {((currentPage - 1) * pageSize) + 1}-{Math.min(currentPage * pageSize, totalCertificates)} of {totalCertificates}
+                  </>
+                ) : (
+                  <>Rows: {filteredCertificates.length}</>
+                )}
               </div>
+              
+              {/* Pagination Controls */}
+              {totalPages > 1 && (
+                <div className="flex items-center gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                    disabled={currentPage === 1}
+                    data-testid="button-prev-page"
+                  >
+                    Previous
+                  </Button>
+                  <span className="text-xs text-gray-600">
+                    Page {currentPage} of {totalPages}
+                  </span>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                    disabled={currentPage === totalPages}
+                    data-testid="button-next-page"
+                  >
+                    Next
+                  </Button>
+                </div>
+              )}
+              
               <div>
                 <AgGridTableActions 
                   gridApi={gridApi}

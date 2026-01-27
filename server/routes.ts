@@ -8802,10 +8802,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (vesselIdFilter) {
         filteredApplicability = applicabilityRecords.filter(r => r.vesselId === vesselIdFilter);
       } else if (vesselNameFilter) {
+        // Use exact match for vessel name (case-insensitive)
         const normalizedFilter = vesselNameFilter.toLowerCase().trim();
         filteredApplicability = applicabilityRecords.filter(r => 
-          r.vesselName.toLowerCase().trim().includes(normalizedFilter) ||
-          normalizedFilter.includes(r.vesselName.toLowerCase().trim())
+          r.vesselName.toLowerCase().trim() === normalizedFilter
         );
       }
       
