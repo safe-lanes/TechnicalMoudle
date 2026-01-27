@@ -6,7 +6,38 @@ This project is a full-stack Technical Module for a maritime Planned Maintenance
 ## User Preferences
 Preferred communication style: Simple, everyday language.
 
-**Critical Development Rule**: Whenever adding new database columns for any feature update, change, or addition, ALWAYS add a corresponding migration file to the `migrations/` folder. This ensures schema changes are tracked and can be applied automatically to any environment.
+**Critical Development Rule - Drizzle-Only Migration Policy (Permanent)**:
+All future database schema changes MUST follow this policy without exception:
+
+1. **Migration Type (Mandatory)**:
+   - Use Drizzle file-based SQL migrations ONLY
+   - All migrations must be generated using `drizzle-kit generate`
+   - Every schema change must result in a `.sql` file inside the `/migrations` directory
+
+2. **Prohibited Approaches (Never Use)**:
+   - No code-based migrations inside `server/migrations.ts`
+   - No JSON-driven or object-based migrations
+   - No embedded CREATE TABLE or ALTER TABLE SQL executed from TypeScript
+   - No "baseline" or full schema snapshot migrations for incremental changes
+
+3. **Incremental Migration Rules**:
+   - New tables → dedicated migration file
+   - New columns → ALTER TABLE ADD COLUMN
+   - Index changes → separate migration
+   - Enum updates → isolated migration
+   - One logical change per migration file
+
+4. **Migration Tracking**:
+   - Rely exclusively on Drizzle's migration tracking
+   - Do NOT introduce or extend custom migration tracking logic
+   - Do NOT duplicate migration state between code and SQL
+
+5. **Workflow**:
+   - Update `shared/schema.ts` with schema changes first
+   - Run `drizzle-kit generate` to create the migration SQL file
+   - Review the generated SQL before applying
+
+Note: Existing migrations 001-016 in `server/migrations.ts` remain functional for backward compatibility but no new code-based migrations should be added.
 
 ## System Architecture
 The application employs a modern full-stack architecture with a mobile-first, responsive design. The frontend is developed using React (TypeScript, Vite, Tailwind CSS, shadcn/ui, TanStack Query, Wouter), while the backend is powered by Express.js (TypeScript). PostgreSQL serves as the primary data store.
@@ -53,6 +84,7 @@ The application employs a modern full-stack architecture with a mobile-first, re
 - **ROB Lookup Reference Correction**: Fixed ROB fetch logic to use `PartCode` as the primary lookup key, with fallback to `PartNumber` for backward compatibility.
 - **Work Order Approval Spare Consumption Fix**: Ensured spare parts listed in B4 (Consumed Spare Parts) are deducted from inventory upon work order approval by adding consumption logic to the PATCH `/technical/api/work-orders/:id` route.
 - **Ship Certificates Admin Module**: Admin sub-module for managing ship certificate requirements with a 3-tab interface (Master, Company, Vessel), including configurable categories, groups, and company labels. Company tab persists company-specific fields (Company ID, Company Group, Company Sequence) to the database. Vessel tab features a searchable multi-select dropdown that fetches vessel options from Vessel Master (Admin > Masters, ID:001), with "All Vessels" toggle and auto-selection on load. Vessel tab shows Company certificates with interactive "Applicable" checkbox - all certificates default to checked (applicable) for new vessels, stored in vessel_certificate_applicability table. Multi-vessel conflict detection displays warning when selected vessels have different applicability settings and disables editing until vessels with matching configurations are selected.
+
 - **Certificate ID Format (January 2026)**: Certificate Master IDs use prefixes to distinguish origin and prevent conflicts:
   - **Master certificates**: Format `{category}-{seq}` (e.g., `A1-001`, `B10-004`) - from central Master list
   - **Company certificates**: Format `CMP-{seq}` (e.g., `CMP-001`, `CMP-002`) - company-specific additions with auto-generated IDs
@@ -63,6 +95,8 @@ The application employs a modern full-stack architecture with a mobile-first, re
 - **Surveys Display Integration (January 2026)**: The Cert & Surveys Surveys page now displays surveys from the Admin module configuration, following the same pattern as Certificates. Data is sourced from three joined tables: `vessel_survey_applicability` (which surveys are applicable per vessel), `ship_surveys_master` (survey details with Company ID, Name, Company Group, Company Sequence), and `vessel_survey_data` (per-vessel dates and attachments). Only applicable surveys are displayed, ordered by Company Sequence. API returns paginated results with format `{ surveys: [], total, page, limit, totalPages }`. Survey updates use compound key format `vesselId-masterId` for PATCH operations. Date columns: surveyDate, dueDate, firstRangeDate, secondRangeDate, postponed.
 - **Standard Sequencing Component (January 2026)**: Both Ship Certificates Admin and Ship Surveys Admin use a **number input field** for sequence reordering in edit mode. This is the standard pattern for all admin tables: a "Sequence" column header with an `<Input type="number">` that allows users to type a sequence number directly. When the value changes (on blur), the system automatically reorders other items to accommodate the new position. The old up/down arrow buttons pattern is deprecated and should not be used for future implementations.
 - **Database Migration Strategy**: Uses a dual migration system with Drizzle-generated baseline migrations and custom `ALTER TABLE` migrations managed in `server/migrations.ts` for incremental schema changes. New columns must be added to both `shared/schema.ts` and `server/migrations.ts`.
+=======
+- **Database Migration Strategy**: Uses Drizzle file-based SQL migrations exclusively. All schema changes require updating `shared/schema.ts` first, then running `drizzle-kit generate` to create migration files. Legacy migrations 001-016 in `server/migrations.ts` remain for backward compatibility only - no new code-based migrations should be added.
 
 ## External Dependencies
 *   **Frontend**: `@radix-ui/*`, `@tanstack/react-query`, `wouter`, `tailwindcss`, `lucide-react`
