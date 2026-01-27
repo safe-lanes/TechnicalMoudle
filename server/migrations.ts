@@ -277,6 +277,32 @@ const migrations: Migration[] = [
       CREATE INDEX IF NOT EXISTS idx_vessel_cert_vessel ON vessel_certificate_applicability(vessel_id);
       CREATE INDEX IF NOT EXISTS idx_vessel_cert_master ON vessel_certificate_applicability(master_id)
     `
+  },
+  {
+    id: '017_vessel_certificate_data_table',
+    name: 'Create vessel_certificate_data table',
+    description: 'Creates table to store vessel-specific certificate data (dates, attachments) for Cert & Surveys module',
+    sql: `
+      CREATE TABLE IF NOT EXISTS vessel_certificate_data (
+        id SERIAL PRIMARY KEY,
+        vessel_id TEXT NOT NULL,
+        vessel_name TEXT NOT NULL,
+        master_id TEXT NOT NULL,
+        issue_date TEXT,
+        expiry_date TEXT,
+        last_annual TEXT,
+        last_interm TEXT,
+        endorsement_date TEXT,
+        last_edit_upload TEXT,
+        attachments JSONB DEFAULT '[]',
+        created_at TIMESTAMP DEFAULT NOW(),
+        updated_at TIMESTAMP DEFAULT NOW(),
+        UNIQUE(vessel_id, master_id)
+      );
+      CREATE INDEX IF NOT EXISTS idx_vessel_cert_data_vessel_master ON vessel_certificate_data(vessel_id, master_id);
+      CREATE INDEX IF NOT EXISTS idx_vessel_cert_data_vessel ON vessel_certificate_data(vessel_id);
+      CREATE INDEX IF NOT EXISTS idx_vessel_cert_data_master ON vessel_certificate_data(master_id)
+    `
   }
 ];
 

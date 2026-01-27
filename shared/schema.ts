@@ -1,5 +1,5 @@
 
-import { pgTable, text, integer, boolean, timestamp, decimal, index, json, numeric, primaryKey, unique, pgEnum } from "drizzle-orm/pg-core";
+import { pgTable, text, integer, boolean, timestamp, decimal, index, json, jsonb, numeric, primaryKey, unique, pgEnum } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
@@ -2419,3 +2419,33 @@ export const insertVesselCertificateApplicabilitySchema = createInsertSchema(ves
 
 export type InsertVesselCertificateApplicability = z.infer<typeof insertVesselCertificateApplicabilitySchema>;
 export type VesselCertificateApplicability = typeof vesselCertificateApplicability.$inferSelect;
+
+// Vessel Certificate Data - stores vessel-specific certificate data (dates, attachments) for Cert & Surveys module
+export const vesselCertificateData = pgTable("vessel_certificate_data", {
+  id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
+  vesselId: text("vessel_id").notNull(), // External vessel ID from Vessel Master API
+  vesselName: text("vessel_name").notNull(), // Vessel name for display
+  masterId: text("master_id").notNull(), // References ship_certificates_master.master_id
+  issueDate: text("issue_date"), // Date certificate was issued
+  expiryDate: text("expiry_date"), // Date certificate expires
+  lastAnnual: text("last_annual"), // Date of last annual survey
+  lastInterm: text("last_interm"), // Date of last intermediate survey
+  endorsementDate: text("endorsement_date"), // Date of endorsement
+  lastEditUpload: text("last_edit_upload"), // Date of last edit or file upload
+  attachments: jsonb("attachments").$type<Array<{ name: string; size: number; key: string; uploadedAt: string }>>().default([]),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+}, (table) => ({
+  vesselMasterIdx: index("idx_vessel_cert_data_vessel_master").on(table.vesselId, table.masterId),
+  vesselIdx: index("idx_vessel_cert_data_vessel").on(table.vesselId),
+  masterIdx: index("idx_vessel_cert_data_master").on(table.masterId),
+}));
+
+export const insertVesselCertificateDataSchema = createInsertSchema(vesselCertificateData).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type InsertVesselCertificateData = z.infer<typeof insertVesselCertificateDataSchema>;
+export type VesselCertificateData = typeof vesselCertificateData.$inferSelect;
