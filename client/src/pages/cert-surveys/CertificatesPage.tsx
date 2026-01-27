@@ -133,17 +133,14 @@ const DateCellEditor = forwardRef<DateCellEditorHandle, ICellEditorParams>((prop
     valueRef.current = newValue;
     hasChangedRef.current = newValue !== initialValue;
     
+    // Clear any pending blur timeout since user is still interacting
     if (blurTimeoutRef.current) {
       clearTimeout(blurTimeoutRef.current);
       blurTimeoutRef.current = null;
     }
-    
-    if (newValue) {
-      setTimeout(() => {
-        commitAndSave(false);
-      }, 50);
-    }
-  }, [initialValue, commitAndSave]);
+    // Don't auto-commit on change - let user finish typing or selecting from calendar
+    // Commit will happen on blur (clicking away) or Enter key
+  }, [initialValue]);
   
   const handleBlur = useCallback(() => {
     console.log('[DateCellEditor] handleBlur, value:', valueRef.current);
