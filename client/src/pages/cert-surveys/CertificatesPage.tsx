@@ -145,11 +145,11 @@ const DateCellEditor = forwardRef<DateCellEditorHandle, ICellEditorParams>((prop
   const handleBlur = useCallback(() => {
     console.log('[DateCellEditor] handleBlur, value:', valueRef.current);
     
-    blurTimeoutRef.current = setTimeout(() => {
-      if (!isCommittingRef.current) {
-        commitAndSave(false);
-      }
-    }, 150);
+    // Must commit immediately on blur - AG Grid unmounts the editor right after blur
+    // so any timeout won't fire before the component is destroyed
+    if (!isCommittingRef.current) {
+      commitAndSave(false);
+    }
   }, [commitAndSave]);
   
   const handleKeyDown = useCallback((e: React.KeyboardEvent<HTMLInputElement>) => {
