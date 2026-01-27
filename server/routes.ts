@@ -4,9 +4,9 @@ import { storage } from "./storage";
 import { getPool } from "./db";
 import * as fs from "fs";
 import * as path from "path";
-import { insertRunningHoursAuditSchema, cascadeRunningHoursSchema, insertWorkOrderSchema, insertWorkOrderExecutionSchema, insertDefectSchema, insertDefectActionSchema, insertDefectAttachmentSchema, insertComponentSchema, insertSpareSchema, insertMakerSchema, insertMasterListSchema, insertComponentDocumentSchema, insertComponentClassRegulatorySchema, insertComponentRequisitionSchema, equipmentCategories, defectCategories, defectTypes, shipCertificatesMaster, insertShipCertificateMasterSchema, shipCertificatesLabelsConfig, vesselCertificateApplicability, insertVesselCertificateApplicabilitySchema } from "@shared/schema";
+import { insertRunningHoursAuditSchema, cascadeRunningHoursSchema, insertWorkOrderSchema, insertWorkOrderExecutionSchema, insertDefectSchema, insertDefectActionSchema, insertDefectAttachmentSchema, insertComponentSchema, insertSpareSchema, insertMakerSchema, insertMasterListSchema, insertComponentDocumentSchema, insertComponentClassRegulatorySchema, insertComponentRequisitionSchema, equipmentCategories, defectCategories, defectTypes, shipCertificatesMaster, insertShipCertificateMasterSchema, shipCertificatesLabelsConfig, vesselCertificateApplicability, insertVesselCertificateApplicabilitySchema, vesselCertificateData } from "@shared/schema";
 import { getPostgresClient } from "./postgresClient";
-import { eq } from "drizzle-orm";
+import { eq, and, asc, sql, inArray } from "drizzle-orm";
 import { computeWorkOrderStatus } from "@shared/workOrders/status";
 import { WORK_ORDER_THRESHOLDS } from "@shared/workOrders/constants";
 import { shouldGenerateWorkOrder } from "@shared/dateUtils";
@@ -8764,142 +8764,313 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // ========================================
-  // CERTIFICATES API ROUTES
+  // CERTIFICATES API ROUTES (Cert & Surveys Module)
   // ========================================
+  // Certificates data is now sourced from:
+  // - vesselCertificateApplicability: which certificates are applicable per vessel
+  // - shipCertificatesMaster: certificate details (Company ID, Name, Company Group)
+  // - vesselCertificateData: vessel-specific date fields and attachments
   
-  // Initialize certificates with sample data if empty (uses storage layer)
-  const initializeCertificates = async () => {
-    const existingCerts = await storage.getCertificates();
-    if (existingCerts.length === 0) {
-      const sampleCertificates = [
-        {
-          id: 'C1',
-          certificateName: 'International Ballast Water Management Certificate',
-          type: 'Flag',
-          vessel: 'MV Test',
-          issueDate: '01 Sep 2019',
-          expiryDate: '01 Sep 2024',
-          lastAnnual: '01 Sep 2024',
-          lastInterm: '01 Sep 2024',
-          endorsementDate: '01 Sep 2024',
-          lastEditUpload: '01 Sep 2024',
-          applicable: true,
-          attachments: [],
-        },
-        {
-          id: 'C2',
-          certificateName: 'International Ballast Water Management Certificate',
-          type: 'Flag',
-          vessel: 'MV Test',
-          issueDate: '01 Sep 2019',
-          expiryDate: '',
-          lastAnnual: '',
-          lastInterm: '',
-          endorsementDate: '',
-          lastEditUpload: '',
-          applicable: true,
-          attachments: [],
-        },
-        {
-          id: 'C3',
-          certificateName: 'Safety Management Certificate',
-          type: 'Class',
-          vessel: 'MV TEST 2',
-          issueDate: '15 Mar 2020',
-          expiryDate: '15 Mar 2025',
-          lastAnnual: '15 Mar 2024',
-          lastInterm: '15 Sep 2023',
-          endorsementDate: '15 Mar 2024',
-          lastEditUpload: '20 Oct 2024',
-          applicable: true,
-          attachments: [],
-        },
-        {
-          id: 'C4',
-          certificateName: 'International Oil Pollution Prevention Certificate',
-          type: 'Flag',
-          vessel: 'MT Nordic Star',
-          issueDate: '01 Jan 2021',
-          expiryDate: '01 Jan 2026',
-          lastAnnual: '01 Jan 2024',
-          lastInterm: '01 Jul 2023',
-          endorsementDate: '01 Jan 2024',
-          lastEditUpload: '15 Nov 2024',
-          applicable: false,
-          attachments: [],
-        },
-        {
-          id: 'C5',
-          certificateName: 'Cargo Ship Safety Equipment Certificate',
-          type: 'Class',
-          vessel: 'MT Pacific Voyager',
-          issueDate: '10 Jun 2022',
-          expiryDate: '10 Jun 2027',
-          lastAnnual: '10 Jun 2024',
-          lastInterm: '',
-          endorsementDate: '10 Jun 2024',
-          lastEditUpload: '25 Sep 2024',
-          applicable: true,
-          attachments: [],
-        },
-      ];
-      for (const cert of sampleCertificates) {
-        await storage.createCertificate(cert);
-      }
-      console.log('📋 Initialized certificates data with sample data via storage layer');
-    }
-  };
-  
-  // Initialize on startup (async)
-  initializeCertificates();
-  
-  // GET all certificates
+  // GET all certificates - joins the three tables to build certificate list
+  // Query params: vesselId, vesselName, page (default 1), limit (default 100)
   app.get("/technical/api/certificates", async (req, res) => {
     try {
-      const certificates = await storage.getCertificates();
-      res.json(certificates);
+      const postgres = await getPostgresClient();
+      if (!postgres) {
+        return res.status(500).json({ error: "Database not available" });
+      }
+      const { db } = postgres;
+      
+      const vesselIdFilter = req.query.vesselId as string | undefined;
+      const vesselNameFilter = req.query.vesselName as string | undefined;
+      const page = parseInt(req.query.page as string) || 1;
+      const limit = parseInt(req.query.limit as string) || 100;
+      const offset = (page - 1) * limit;
+      
+      // Step 1: Get applicable certificates for vessels from vesselCertificateApplicability
+      let applicabilityQuery = db.select().from(vesselCertificateApplicability)
+        .where(eq(vesselCertificateApplicability.isApplicable, true));
+      
+      const applicabilityRecords = await applicabilityQuery;
+      
+      if (applicabilityRecords.length === 0) {
+        return res.json({ certificates: [], total: 0, page, limit });
+      }
+      
+      // Filter by vessel if specified
+      let filteredApplicability = applicabilityRecords;
+      if (vesselIdFilter) {
+        filteredApplicability = applicabilityRecords.filter(r => r.vesselId === vesselIdFilter);
+      } else if (vesselNameFilter) {
+        const normalizedFilter = vesselNameFilter.toLowerCase().trim();
+        filteredApplicability = applicabilityRecords.filter(r => 
+          r.vesselName.toLowerCase().trim().includes(normalizedFilter) ||
+          normalizedFilter.includes(r.vesselName.toLowerCase().trim())
+        );
+      }
+      
+      if (filteredApplicability.length === 0) {
+        return res.json({ certificates: [], total: 0, page, limit });
+      }
+      
+      // Step 2: Get all master certificates referenced by applicability records
+      const masterIds = [...new Set(filteredApplicability.map(r => r.masterId))];
+      const masterRecords = await db.select().from(shipCertificatesMaster)
+        .where(
+          and(
+            eq(shipCertificatesMaster.applicableToCompany, true),
+            inArray(shipCertificatesMaster.masterId, masterIds)
+          )
+        )
+        .orderBy(asc(shipCertificatesMaster.companySequence));
+      
+      // Create a map for quick lookup
+      const masterMap = new Map(masterRecords.map(m => [m.masterId, m]));
+      
+      // Step 3: Get vessel certificate data (dates, attachments) for these certificates
+      const vesselCertDataRecords = await db.select().from(vesselCertificateData);
+      
+      // Create a map for vessel-certificate data lookup
+      const certDataMap = new Map<string, typeof vesselCertDataRecords[0]>();
+      for (const data of vesselCertDataRecords) {
+        const key = `${data.vesselId}-${data.masterId}`;
+        certDataMap.set(key, data);
+      }
+      
+      // Step 4: Build the certificate list
+      const certificates: any[] = [];
+      
+      // Group by vessel to maintain order
+      const vesselGroups = new Map<string, typeof filteredApplicability>();
+      for (const app of filteredApplicability) {
+        if (!vesselGroups.has(app.vesselId)) {
+          vesselGroups.set(app.vesselId, []);
+        }
+        vesselGroups.get(app.vesselId)!.push(app);
+      }
+      
+      // Process each vessel's certificates in sequence order
+      for (const [vesselId, apps] of vesselGroups) {
+        // Sort by master certificate sequence
+        const sortedApps = apps.sort((a, b) => {
+          const masterA = masterMap.get(a.masterId);
+          const masterB = masterMap.get(b.masterId);
+          const seqA = masterA?.companySequence ?? 9999;
+          const seqB = masterB?.companySequence ?? 9999;
+          return seqA - seqB;
+        });
+        
+        for (const app of sortedApps) {
+          const master = masterMap.get(app.masterId);
+          if (!master) continue;
+          
+          const dataKey = `${app.vesselId}-${app.masterId}`;
+          const certData = certDataMap.get(dataKey);
+          
+          certificates.push({
+            id: master.companyId || master.masterId,
+            certificateName: master.certificateLabel || master.certificateName,
+            type: master.companyGroup || '',
+            vessel: app.vesselName,
+            vesselId: app.vesselId,
+            masterId: app.masterId,
+            issueDate: certData?.issueDate || '',
+            expiryDate: certData?.expiryDate || '',
+            lastAnnual: certData?.lastAnnual || '',
+            lastInterm: certData?.lastInterm || '',
+            endorsementDate: certData?.endorsementDate || '',
+            lastEditUpload: certData?.lastEditUpload || '',
+            attachments: certData?.attachments || [],
+          });
+        }
+      }
+      
+      // Apply pagination
+      const total = certificates.length;
+      const paginatedCerts = certificates.slice(offset, offset + limit);
+      
+      res.json({ 
+        certificates: paginatedCerts, 
+        total, 
+        page, 
+        limit,
+        totalPages: Math.ceil(total / limit)
+      });
     } catch (error) {
       console.error("Error fetching certificates:", error);
       res.status(500).json({ error: "Failed to fetch certificates" });
     }
   });
   
-  // GET single certificate
+  // GET single certificate by compound key (vesselId-masterId) or companyId
   app.get("/technical/api/certificates/:id", async (req, res) => {
     try {
-      const certificate = await storage.getCertificate(req.params.id);
-      if (!certificate) {
+      const postgres = await getPostgresClient();
+      if (!postgres) {
+        return res.status(500).json({ error: "Database not available" });
+      }
+      const { db } = postgres;
+      
+      const certId = req.params.id;
+      const [vesselId, masterId] = certId.includes('-') ? certId.split('-', 2) : [null, null];
+      
+      if (!vesselId || !masterId) {
         return res.status(404).json({ error: "Certificate not found" });
       }
-      res.json(certificate);
+      
+      // Get applicability record
+      const appRecords = await db.select().from(vesselCertificateApplicability)
+        .where(
+          and(
+            eq(vesselCertificateApplicability.vesselId, vesselId),
+            eq(vesselCertificateApplicability.masterId, masterId),
+            eq(vesselCertificateApplicability.isApplicable, true)
+          )
+        )
+        .limit(1);
+      
+      if (appRecords.length === 0) {
+        return res.status(404).json({ error: "Certificate not found" });
+      }
+      const app = appRecords[0];
+      
+      // Get master certificate
+      const masterRecords = await db.select().from(shipCertificatesMaster)
+        .where(eq(shipCertificatesMaster.masterId, masterId))
+        .limit(1);
+      
+      if (masterRecords.length === 0) {
+        return res.status(404).json({ error: "Certificate master not found" });
+      }
+      const master = masterRecords[0];
+      
+      // Get certificate data
+      const dataRecords = await db.select().from(vesselCertificateData)
+        .where(
+          and(
+            eq(vesselCertificateData.vesselId, vesselId),
+            eq(vesselCertificateData.masterId, masterId)
+          )
+        )
+        .limit(1);
+      const certData = dataRecords[0];
+      
+      res.json({
+        id: master.companyId || master.masterId,
+        certificateName: master.certificateLabel || master.certificateName,
+        type: master.companyGroup || '',
+        vessel: app.vesselName,
+        vesselId: app.vesselId,
+        masterId: app.masterId,
+        issueDate: certData?.issueDate || '',
+        expiryDate: certData?.expiryDate || '',
+        lastAnnual: certData?.lastAnnual || '',
+        lastInterm: certData?.lastInterm || '',
+        endorsementDate: certData?.endorsementDate || '',
+        lastEditUpload: certData?.lastEditUpload || '',
+        attachments: certData?.attachments || [],
+      });
     } catch (error) {
       console.error("Error fetching certificate:", error);
       res.status(500).json({ error: "Failed to fetch certificate" });
     }
   });
   
-  // PATCH update certificate (for toggling applicable status)
+  // PATCH update certificate data (dates, attachments)
+  // ID format: vesselId-masterId
   app.patch("/technical/api/certificates/:id", async (req, res) => {
     try {
-      const updatedCertificate = await storage.updateCertificate(req.params.id, req.body);
-      res.json(updatedCertificate);
-    } catch (error: any) {
-      if (error.message?.includes('not found')) {
-        return res.status(404).json({ error: "Certificate not found" });
+      const postgres = await getPostgresClient();
+      if (!postgres) {
+        return res.status(500).json({ error: "Database not available" });
       }
+      const { db } = postgres;
+      
+      const certId = req.params.id;
+      const { vesselId: bodyVesselId, masterId: bodyMasterId, ...updateData } = req.body;
+      
+      // Try to parse ID as vesselId-masterId or use body params
+      let vesselId = bodyVesselId;
+      let masterId = bodyMasterId;
+      
+      if (certId.includes('-')) {
+        [vesselId, masterId] = certId.split('-', 2);
+      }
+      
+      if (!vesselId || !masterId) {
+        return res.status(400).json({ error: "vesselId and masterId are required" });
+      }
+      
+      // Get vessel name from applicability record
+      const appRecords = await db.select().from(vesselCertificateApplicability)
+        .where(
+          and(
+            eq(vesselCertificateApplicability.vesselId, vesselId),
+            eq(vesselCertificateApplicability.masterId, masterId)
+          )
+        )
+        .limit(1);
+      
+      const vesselName = appRecords[0]?.vesselName || '';
+      
+      // Check if data record exists
+      const existingData = await db.select().from(vesselCertificateData)
+        .where(
+          and(
+            eq(vesselCertificateData.vesselId, vesselId),
+            eq(vesselCertificateData.masterId, masterId)
+          )
+        )
+        .limit(1);
+      
+      let result;
+      if (existingData.length > 0) {
+        // Update existing record
+        result = await db.update(vesselCertificateData)
+          .set({ ...updateData, updatedAt: new Date() })
+          .where(
+            and(
+              eq(vesselCertificateData.vesselId, vesselId),
+              eq(vesselCertificateData.masterId, masterId)
+            )
+          )
+          .returning();
+      } else {
+        // Create new record
+        result = await db.insert(vesselCertificateData)
+          .values({
+            vesselId,
+            vesselName,
+            masterId,
+            ...updateData,
+          })
+          .returning();
+      }
+      
+      // Get full certificate for response
+      const masterRecords = await db.select().from(shipCertificatesMaster)
+        .where(eq(shipCertificatesMaster.masterId, masterId))
+        .limit(1);
+      const master = masterRecords[0];
+      
+      res.json({
+        id: master?.companyId || masterId,
+        certificateName: master?.certificateLabel || master?.certificateName || '',
+        type: master?.companyGroup || '',
+        vessel: vesselName,
+        vesselId,
+        masterId,
+        issueDate: result[0]?.issueDate || '',
+        expiryDate: result[0]?.expiryDate || '',
+        lastAnnual: result[0]?.lastAnnual || '',
+        lastInterm: result[0]?.lastInterm || '',
+        endorsementDate: result[0]?.endorsementDate || '',
+        lastEditUpload: result[0]?.lastEditUpload || '',
+        attachments: result[0]?.attachments || [],
+      });
+    } catch (error: any) {
       console.error("Error updating certificate:", error);
       res.status(500).json({ error: "Failed to update certificate" });
-    }
-  });
-  
-  // POST create new certificate
-  app.post("/technical/api/certificates", async (req, res) => {
-    try {
-      const newCertificate = await storage.createCertificate(req.body);
-      res.status(201).json(newCertificate);
-    } catch (error) {
-      console.error("Error creating certificate:", error);
-      res.status(500).json({ error: "Failed to create certificate" });
     }
   });
 
