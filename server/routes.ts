@@ -8851,12 +8851,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // Process each vessel's certificates in sequence order
       for (const [vesselId, apps] of vesselGroups) {
-        // Sort by master certificate sequence
+        // Sort by master certificate sequence (use companySequence if set, otherwise fall back to sequence)
         const sortedApps = apps.sort((a, b) => {
           const masterA = masterMap.get(a.masterId);
           const masterB = masterMap.get(b.masterId);
-          const seqA = masterA?.companySequence ?? 9999;
-          const seqB = masterB?.companySequence ?? 9999;
+          // Use companySequence if available, otherwise fall back to sequence field
+          const seqA = masterA?.companySequence ?? masterA?.sequence ?? 9999;
+          const seqB = masterB?.companySequence ?? masterB?.sequence ?? 9999;
           return seqA - seqB;
         });
         
@@ -8867,6 +8868,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
           const dataKey = `${app.vesselId}-${app.masterId}`;
           const certData = certDataMap.get(dataKey);
           
+          // Use companySequence if available, otherwise use sequence field
+          const effectiveSequence = master.companySequence ?? master.sequence ?? 9999;
+          
           certificates.push({
             id: master.companyId || master.masterId,
             certificateName: master.certificateLabel || master.certificateName,
@@ -8874,7 +8878,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             vessel: app.vesselName,
             vesselId: app.vesselId,
             masterId: app.masterId,
-            companySequence: master.companySequence ?? 9999,
+            companySequence: effectiveSequence,
             issueDate: certData?.issueDate || '',
             expiryDate: certData?.expiryDate || '',
             lastAnnual: certData?.lastAnnual || '',
