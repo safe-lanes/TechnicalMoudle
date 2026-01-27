@@ -396,9 +396,9 @@ export default function CertificatesPage() {
 
   const columnDefs: ColDef[] = useMemo(() => [
     {
-      headerName: 'ID',
+      headerName: 'Company ID',
       field: 'id',
-      width: 70,
+      width: 100,
       cellStyle: { fontSize: '13px', color: '#4f5863' },
       filter: 'agTextColumnFilter',
       sortable: true,
@@ -418,9 +418,9 @@ export default function CertificatesPage() {
       autoHeight: true,
     },
     {
-      headerName: 'Type',
+      headerName: 'Company Group',
       field: 'type',
-      width: 90,
+      width: 130,
       cellStyle: { fontSize: '13px', color: '#4f5863' },
       filter: 'agSetColumnFilter',
       sortable: true,
@@ -566,20 +566,6 @@ export default function CertificatesPage() {
       width: 110,
       cellStyle: { fontSize: '13px', color: '#888', fontStyle: 'italic' } as any,
       filter: 'agDateColumnFilter',
-      sortable: true,
-      resizable: true,
-    },
-    {
-      headerName: 'Applicable',
-      field: 'applicable',
-      width: 100,
-      cellRenderer: ApplicableCellRenderer,
-      cellClass: 'flex items-center justify-center',
-      filter: 'agSetColumnFilter',
-      filterParams: {
-        values: [true, false],
-        valueFormatter: (params: any) => params.value ? 'Yes' : 'No',
-      },
       sortable: true,
       resizable: true,
     },
