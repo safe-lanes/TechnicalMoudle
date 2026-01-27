@@ -6,6 +6,8 @@ interface UIRoleContextType {
   uiRole: UIRole;
   setUIRole: (role: UIRole) => void;
   isSailAdmin: boolean;
+  isClientAdmin: boolean;
+  isHeadOfDept: boolean;
   isVessel: boolean;
 }
 
@@ -36,6 +38,8 @@ export function UIRoleProvider({ children }: UIRoleProviderProps) {
     uiRole,
     setUIRole,
     isSailAdmin: uiRole === "Sail_Admin",
+    isClientAdmin: uiRole === "Client_Admin",
+    isHeadOfDept: uiRole === "Head_of_Dept",
     isVessel: uiRole === "Vessel",
   };
 
