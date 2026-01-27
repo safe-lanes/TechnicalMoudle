@@ -620,6 +620,28 @@ export default function ShipsCertificatesAdmin() {
   });
   const [newEntryError, setNewEntryError] = useState("");
   
+  // Company-specific certificates (not derived from Master)
+  const [companyOnlyCerts, setCompanyOnlyCerts] = useState<CompanyCertificate[]>([]);
+  const [isAddingNewCompany, setIsAddingNewCompany] = useState(false);
+  const [newCompanyEntryData, setNewCompanyEntryData] = useState<Partial<CompanyCertificate>>({
+    companyId: "",
+    certificateLabel: "",
+    requirementRef: "",
+    companyGroup: "",
+  });
+  const [newCompanyEntryError, setNewCompanyEntryError] = useState("");
+  
+  // Vessel-specific certificates (not derived from Company)
+  const [vesselOnlyCerts, setVesselOnlyCerts] = useState<VesselCertificate[]>([]);
+  const [isAddingNewVessel, setIsAddingNewVessel] = useState(false);
+  const [newVesselEntryData, setNewVesselEntryData] = useState<Partial<VesselCertificate>>({
+    applicable: true,
+    certificateLabel: "",
+    requirementRef: "",
+    companyGroup: "",
+  });
+  const [newVesselEntryError, setNewVesselEntryError] = useState("");
+  
   // Reorder confirmation dialog state
   const [showReorderConfirm, setShowReorderConfirm] = useState(false);
   const [pendingNewEntryId, setPendingNewEntryId] = useState<number | null>(null);
@@ -864,6 +886,100 @@ export default function ShipsCertificatesAdmin() {
       certificateLabel: "",
     });
     setNewEntryError("");
+  };
+  
+  // ===== Company Tab New Entry Functions =====
+  const handleAddNewCompany = () => {
+    setNewCompanyEntryData({
+      companyId: "",
+      certificateLabel: "",
+      requirementRef: "",
+      companyGroup: "",
+    });
+    setNewCompanyEntryError("");
+    setIsAddingNewCompany(true);
+  };
+  
+  const saveNewCompanyEntry = () => {
+    if (!newCompanyEntryData.certificateLabel?.trim()) {
+      setNewCompanyEntryError("Certificate Label is mandatory");
+      return;
+    }
+    
+    const newId = Math.max(...companyOnlyCerts.map(c => c.id), 0) + 1000;
+    
+    const newCert: CompanyCertificate = {
+      id: newId,
+      masterId: "",
+      companyId: newCompanyEntryData.companyId || "",
+      certificateLabel: newCompanyEntryData.certificateLabel?.trim() || "",
+      requirementRef: newCompanyEntryData.requirementRef || "",
+      companyGroup: newCompanyEntryData.companyGroup || "",
+      ranking: "-",
+    };
+    
+    setCompanyOnlyCerts(prev => [...prev, newCert]);
+    setIsAddingNewCompany(false);
+    setNewCompanyEntryError("");
+    setHasUnsavedChanges(true);
+  };
+  
+  const cancelNewCompanyEntry = () => {
+    setIsAddingNewCompany(false);
+    setNewCompanyEntryData({
+      companyId: "",
+      certificateLabel: "",
+      requirementRef: "",
+      companyGroup: "",
+    });
+    setNewCompanyEntryError("");
+  };
+  
+  // ===== Vessel Tab New Entry Functions =====
+  const handleAddNewVessel = () => {
+    setNewVesselEntryData({
+      applicable: true,
+      certificateLabel: "",
+      requirementRef: "",
+      companyGroup: "",
+    });
+    setNewVesselEntryError("");
+    setIsAddingNewVessel(true);
+  };
+  
+  const saveNewVesselEntry = () => {
+    if (!newVesselEntryData.certificateLabel?.trim()) {
+      setNewVesselEntryError("Certificate Label is mandatory");
+      return;
+    }
+    
+    const newId = Math.max(...vesselOnlyCerts.map(c => c.id), 0) + 2000;
+    
+    const newCert: VesselCertificate = {
+      id: newId,
+      masterId: "",
+      companyId: "",
+      certificateLabel: newVesselEntryData.certificateLabel?.trim() || "",
+      requirementRef: newVesselEntryData.requirementRef || "",
+      companyGroup: newVesselEntryData.companyGroup || "",
+      applicable: newVesselEntryData.applicable ?? true,
+    };
+    
+    setVesselOnlyCerts(prev => [...prev, newCert]);
+    setIsAddingNewVessel(false);
+    setNewVesselEntryError("");
+    setHasUnsavedChanges(true);
+  };
+  
+  const cancelNewVesselEntry = () => {
+    setIsAddingNewVessel(false);
+    setNewVesselEntryData({
+      applicable: true,
+      certificateLabel: "",
+      requirementRef: "",
+      companyGroup: "",
+    });
+    setNewVesselEntryError("");
   };
   
   // Update master certificate fields in state
@@ -1427,6 +1543,159 @@ export default function ShipsCertificatesAdmin() {
                     </td>
                   </tr>
                 ))}
+                
+                {/* Company-only certificates (not from Master) */}
+                {companyOnlyCerts.map((cert, idx) => (
+                  <tr key={`company-only-${cert.id}`} className="hover:bg-gray-50 bg-green-50">
+                    {viewModes.company === "edit" && (
+                      <td className="px-3 py-3 text-sm text-center">-</td>
+                    )}
+                    <td className="px-3 py-3 text-sm">{filteredData.length + idx + 1}</td>
+                    <td className="px-3 py-3 text-sm font-medium text-gray-400">-</td>
+                    <td className="px-3 py-3 text-sm">
+                      {viewModes.company === "edit" ? (
+                        <Input 
+                          defaultValue={cert.companyId}
+                          className="h-8 text-sm"
+                          placeholder=""
+                          onBlur={(e) => {
+                            setCompanyOnlyCerts(prev => prev.map(c => 
+                              c.id === cert.id ? { ...c, companyId: e.target.value } : c
+                            ));
+                          }}
+                          data-testid={`input-companyid-only-${cert.id}`}
+                        />
+                      ) : (
+                        cert.companyId || "-"
+                      )}
+                    </td>
+                    <td className="px-3 py-3 text-sm">
+                      {viewModes.company === "edit" ? (
+                        <Input 
+                          defaultValue={cert.certificateLabel}
+                          className="h-8 text-sm"
+                          onBlur={(e) => {
+                            setCompanyOnlyCerts(prev => prev.map(c => 
+                              c.id === cert.id ? { ...c, certificateLabel: e.target.value } : c
+                            ));
+                          }}
+                          data-testid={`input-label-only-${cert.id}`}
+                        />
+                      ) : (
+                        cert.certificateLabel
+                      )}
+                    </td>
+                    <td className="px-3 py-3 text-sm">
+                      {viewModes.company === "edit" ? (
+                        <Input 
+                          defaultValue={cert.requirementRef}
+                          className="h-8 text-sm"
+                          onBlur={(e) => {
+                            setCompanyOnlyCerts(prev => prev.map(c => 
+                              c.id === cert.id ? { ...c, requirementRef: e.target.value } : c
+                            ));
+                          }}
+                          data-testid={`input-requirement-only-${cert.id}`}
+                        />
+                      ) : (
+                        cert.requirementRef
+                      )}
+                    </td>
+                    <td className="px-3 py-3 text-sm">
+                      {viewModes.company === "edit" ? (
+                        <Select 
+                          defaultValue={cert.companyGroup}
+                          onValueChange={(value) => {
+                            setCompanyOnlyCerts(prev => prev.map(c => 
+                              c.id === cert.id ? { ...c, companyGroup: value } : c
+                            ));
+                          }}
+                        >
+                          <SelectTrigger className="h-8 text-sm" data-testid={`select-companygroup-only-${cert.id}`}>
+                            <SelectValue placeholder={getFormattedCompanyGroupLabel("A")} />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {companyGroupLabels.map((grp: LabelConfig) => (
+                              <SelectItem key={grp.key} value={grp.key}>
+                                {getFormattedCompanyGroupLabel(grp.key)}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      ) : (
+                        cert.companyGroup ? getFormattedCompanyGroupLabel(cert.companyGroup) : "-"
+                      )}
+                    </td>
+                  </tr>
+                ))}
+                
+                {/* New entry row for Company-specific certificate */}
+                {viewModes.company === "edit" && isAddingNewCompany && (
+                  <tr className="bg-blue-50">
+                    <td className="px-3 py-3 text-sm text-center">-</td>
+                    <td className="px-3 py-3 text-sm">New</td>
+                    <td className="px-3 py-3 text-sm font-medium text-gray-400">-</td>
+                    <td className="px-3 py-3 text-sm">
+                      <Input 
+                        value={newCompanyEntryData.companyId || ""}
+                        onChange={(e) => setNewCompanyEntryData(prev => ({ ...prev, companyId: e.target.value }))}
+                        className="h-8 text-sm"
+                        placeholder="Company ID"
+                        data-testid="input-new-company-id"
+                      />
+                    </td>
+                    <td className="px-3 py-3 text-sm">
+                      <Input 
+                        value={newCompanyEntryData.certificateLabel || ""}
+                        onChange={(e) => setNewCompanyEntryData(prev => ({ ...prev, certificateLabel: e.target.value }))}
+                        className="h-8 text-sm"
+                        placeholder="Certificate Label *"
+                        data-testid="input-new-company-label"
+                      />
+                    </td>
+                    <td className="px-3 py-3 text-sm">
+                      <Input 
+                        value={newCompanyEntryData.requirementRef || ""}
+                        onChange={(e) => setNewCompanyEntryData(prev => ({ ...prev, requirementRef: e.target.value }))}
+                        className="h-8 text-sm"
+                        placeholder="Requirement/Ref"
+                        data-testid="input-new-company-requirement"
+                      />
+                    </td>
+                    <td className="px-3 py-3 text-sm">
+                      <div className="flex items-center gap-2">
+                        <Select 
+                          value={newCompanyEntryData.companyGroup || ""}
+                          onValueChange={(value) => setNewCompanyEntryData(prev => ({ ...prev, companyGroup: value }))}
+                        >
+                          <SelectTrigger className="h-8 text-sm flex-1" data-testid="select-new-company-group">
+                            <SelectValue placeholder="Select Group" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {companyGroupLabels.map((grp: LabelConfig) => (
+                              <SelectItem key={grp.key} value={grp.key}>
+                                {getFormattedCompanyGroupLabel(grp.key)}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <Button size="icon" variant="ghost" onClick={saveNewCompanyEntry} className="h-8 w-8 text-green-600 hover:text-green-700" data-testid="button-save-new-company">
+                          <Check className="h-4 w-4" />
+                        </Button>
+                        <Button size="icon" variant="ghost" onClick={cancelNewCompanyEntry} className="h-8 w-8 text-red-600 hover:text-red-700" data-testid="button-cancel-new-company">
+                          <X className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </td>
+                  </tr>
+                )}
+                
+                {/* New entry error for Company tab */}
+                {viewModes.company === "edit" && isAddingNewCompany && newCompanyEntryError && (
+                  <tr>
+                    <td colSpan={7} className="px-3 py-2 text-sm text-red-500">{newCompanyEntryError}</td>
+                  </tr>
+                )}
               </tbody>
             </table>
           </div>
@@ -1637,7 +1906,160 @@ export default function ShipsCertificatesAdmin() {
                     </tr>
                   );
                 })}
-                              </tbody>
+                
+                {/* Vessel-only certificates (not from Company) */}
+                {selectedVessels.length > 0 && vesselOnlyCerts.map((cert, idx) => {
+                  const companyGroupLabel = companyGroupLabels.find(g => g.key === cert.companyGroup)?.label || "";
+                  const displayCompanyGroup = cert.companyGroup ? `${cert.companyGroup}. ${companyGroupLabel}` : "";
+                  
+                  return (
+                    <tr key={`vessel-only-${cert.id}`} className="hover:bg-gray-50 bg-green-50">
+                      <td className="px-3 py-3 text-center">
+                        <Checkbox 
+                          checked={cert.applicable}
+                          onCheckedChange={(checked) => {
+                            if (viewModes.vessel === "edit") {
+                              setVesselOnlyCerts(prev => prev.map(c => 
+                                c.id === cert.id ? { ...c, applicable: !!checked } : c
+                              ));
+                            }
+                          }}
+                          disabled={viewModes.vessel !== "edit"}
+                          className="border-blue-500 data-[state=checked]:bg-blue-500"
+                          data-testid={`checkbox-vessel-only-applicable-${cert.id}`}
+                        />
+                      </td>
+                      <td className="px-3 py-3 text-sm">{companyCertificates.length + idx + 1}</td>
+                      <td className="px-3 py-3 text-sm font-medium text-gray-400">-</td>
+                      <td className="px-3 py-3 text-sm text-gray-400">-</td>
+                      <td className="px-3 py-3 text-sm">
+                        {viewModes.vessel === "edit" ? (
+                          <Input 
+                            defaultValue={cert.certificateLabel}
+                            className="h-8 text-sm"
+                            onBlur={(e) => {
+                              setVesselOnlyCerts(prev => prev.map(c => 
+                                c.id === cert.id ? { ...c, certificateLabel: e.target.value } : c
+                              ));
+                            }}
+                            data-testid={`input-vessel-label-only-${cert.id}`}
+                          />
+                        ) : (
+                          cert.certificateLabel
+                        )}
+                      </td>
+                      <td className="px-3 py-3 text-sm">
+                        {viewModes.vessel === "edit" ? (
+                          <Input 
+                            defaultValue={cert.requirementRef}
+                            className="h-8 text-sm"
+                            onBlur={(e) => {
+                              setVesselOnlyCerts(prev => prev.map(c => 
+                                c.id === cert.id ? { ...c, requirementRef: e.target.value } : c
+                              ));
+                            }}
+                            data-testid={`input-vessel-requirement-only-${cert.id}`}
+                          />
+                        ) : (
+                          cert.requirementRef
+                        )}
+                      </td>
+                      <td className="px-3 py-3 text-sm">
+                        {viewModes.vessel === "edit" ? (
+                          <Select 
+                            defaultValue={cert.companyGroup}
+                            onValueChange={(value) => {
+                              setVesselOnlyCerts(prev => prev.map(c => 
+                                c.id === cert.id ? { ...c, companyGroup: value } : c
+                              ));
+                            }}
+                          >
+                            <SelectTrigger className="h-8 text-sm" data-testid={`select-vessel-companygroup-only-${cert.id}`}>
+                              <SelectValue placeholder="Select Group" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {companyGroupLabels.map((grp: LabelConfig) => (
+                                <SelectItem key={grp.key} value={grp.key}>
+                                  {getFormattedCompanyGroupLabel(grp.key)}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        ) : (
+                          displayCompanyGroup
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })}
+                
+                {/* New entry row for Vessel-specific certificate */}
+                {viewModes.vessel === "edit" && isAddingNewVessel && selectedVessels.length > 0 && (
+                  <tr className="bg-blue-50">
+                    <td className="px-3 py-3 text-center">
+                      <Checkbox 
+                        checked={newVesselEntryData.applicable ?? true}
+                        onCheckedChange={(checked) => setNewVesselEntryData(prev => ({ ...prev, applicable: !!checked }))}
+                        className="border-blue-500 data-[state=checked]:bg-blue-500"
+                        data-testid="checkbox-new-vessel-applicable"
+                      />
+                    </td>
+                    <td className="px-3 py-3 text-sm">New</td>
+                    <td className="px-3 py-3 text-sm font-medium text-gray-400">-</td>
+                    <td className="px-3 py-3 text-sm text-gray-400">-</td>
+                    <td className="px-3 py-3 text-sm">
+                      <Input 
+                        value={newVesselEntryData.certificateLabel || ""}
+                        onChange={(e) => setNewVesselEntryData(prev => ({ ...prev, certificateLabel: e.target.value }))}
+                        className="h-8 text-sm"
+                        placeholder="Certificate Label *"
+                        data-testid="input-new-vessel-label"
+                      />
+                    </td>
+                    <td className="px-3 py-3 text-sm">
+                      <Input 
+                        value={newVesselEntryData.requirementRef || ""}
+                        onChange={(e) => setNewVesselEntryData(prev => ({ ...prev, requirementRef: e.target.value }))}
+                        className="h-8 text-sm"
+                        placeholder="Requirement/Ref"
+                        data-testid="input-new-vessel-requirement"
+                      />
+                    </td>
+                    <td className="px-3 py-3 text-sm">
+                      <div className="flex items-center gap-2">
+                        <Select 
+                          value={newVesselEntryData.companyGroup || ""}
+                          onValueChange={(value) => setNewVesselEntryData(prev => ({ ...prev, companyGroup: value }))}
+                        >
+                          <SelectTrigger className="h-8 text-sm flex-1" data-testid="select-new-vessel-group">
+                            <SelectValue placeholder="Select Group" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {companyGroupLabels.map((grp: LabelConfig) => (
+                              <SelectItem key={grp.key} value={grp.key}>
+                                {getFormattedCompanyGroupLabel(grp.key)}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <Button size="icon" variant="ghost" onClick={saveNewVesselEntry} className="h-8 w-8 text-green-600 hover:text-green-700" data-testid="button-save-new-vessel">
+                          <Check className="h-4 w-4" />
+                        </Button>
+                        <Button size="icon" variant="ghost" onClick={cancelNewVesselEntry} className="h-8 w-8 text-red-600 hover:text-red-700" data-testid="button-cancel-new-vessel">
+                          <X className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </td>
+                  </tr>
+                )}
+                
+                {/* New entry error for Vessel tab */}
+                {viewModes.vessel === "edit" && isAddingNewVessel && newVesselEntryError && (
+                  <tr>
+                    <td colSpan={7} className="px-3 py-2 text-sm text-red-500">{newVesselEntryError}</td>
+                  </tr>
+                )}
+              </tbody>
             </table>
           </div>
         </div>
@@ -1786,6 +2208,30 @@ export default function ShipsCertificatesAdmin() {
                 className="bg-green-600 hover:bg-green-700 gap-1"
                 onClick={handleAddNew}
                 data-testid="button-new"
+              >
+                <Plus className="h-4 w-4" />
+                New
+              </Button>
+            )}
+            
+            {currentViewMode === "edit" && activeTab === "company" && (
+              <Button 
+                size="sm"
+                className="bg-green-600 hover:bg-green-700 gap-1"
+                onClick={handleAddNewCompany}
+                data-testid="button-new-company"
+              >
+                <Plus className="h-4 w-4" />
+                New
+              </Button>
+            )}
+            
+            {currentViewMode === "edit" && activeTab === "vessel" && selectedVessels.length > 0 && (
+              <Button 
+                size="sm"
+                className="bg-green-600 hover:bg-green-700 gap-1"
+                onClick={handleAddNewVessel}
+                data-testid="button-new-vessel"
               >
                 <Plus className="h-4 w-4" />
                 New
