@@ -21,7 +21,6 @@ import BulkUpdateSpares from "./pages/spares/BulkUpdateSpares";
 import BulkUpdateStores from "./pages/stores/BulkUpdateStores";
 
 import NotFound from "./pages/not-found";
-import { ChatButton } from "@/components/chat/ChatButton";
 
 function App() {
   return (
@@ -90,7 +89,6 @@ function App() {
                 <Route component={NotFound} />
               </Switch>
             </div>
-              <ChatButton />
               <Toaster />
                     </TooltipProvider>
                   </ChangeModeProvider>
