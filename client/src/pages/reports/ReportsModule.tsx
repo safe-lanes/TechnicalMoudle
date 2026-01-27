@@ -34,6 +34,8 @@ import AlertsApprovalsAdminReports from "./AlertsApprovalsAdminReports";
 import MaintenancePlanner from "./MaintenancePlanner";
 import GlobalFilters, { FilterValues } from "@/components/reports/GlobalFilters";
 
+const LIMIT_REPORTS = true;
+
 interface ReportCategory {
   id: string;
   title: string;
@@ -247,6 +249,54 @@ const ReportsModule = () => {
   }
 
   // TODO: Add other category components when implemented
+
+  const plannerCategory = reportCategories.find(cat => cat.id === "planner")!;
+  const PlannerIcon = plannerCategory.icon;
+
+  if (LIMIT_REPORTS) {
+    return (
+      <div className="space-y-6">
+        <div className="flex justify-between items-center">
+          <h1 className="text-2xl font-bold text-gray-800" data-testid="G1"><Marker id="G1" />Reports</h1>
+          <div className="flex gap-3">
+            <Button variant="outline" className="flex items-center gap-2" data-testid="G5">
+              <Marker id="G5" />
+              <Calendar className="h-4 w-4" />
+              Schedule Reports
+            </Button>
+            <Button variant="outline" className="flex items-center gap-2" data-testid="G6">
+              <Marker id="G6" />
+              <Download className="h-4 w-4" />
+              Export Queue
+            </Button>
+          </div>
+        </div>
+
+        <Card 
+          className={`cursor-pointer hover:shadow-md transition-shadow border-l-4 ${plannerCategory.color} max-w-md`}
+          onClick={() => handleCategoryClick(plannerCategory.id)}
+          data-testid="G21"
+        >
+          <CardContent className="p-4">
+            <div className="flex items-start justify-between mb-3">
+              <div className={`p-2 rounded-lg ${plannerCategory.iconBg} text-white`}>
+                <Marker id="G21" />
+                <PlannerIcon className="h-5 w-5" />
+              </div>
+              <Badge variant="secondary">{plannerCategory.reportCount} reports</Badge>
+            </div>
+            <h3 className="font-semibold text-gray-800 mb-2">{plannerCategory.title}</h3>
+            <p className="text-sm text-gray-600 mb-3">{plannerCategory.description}</p>
+            {plannerCategory.lastGenerated && (
+              <p className="text-xs text-gray-500">Last generated: {plannerCategory.lastGenerated}</p>
+            )}
+          </CardContent>
+        </Card>
+
+        <p className="text-lg font-semibold text-gray-800 dark:text-white">Other Reports Coming Soon...</p>
+      </div>
+    );
+  }
 
   return (
     <div className="flex flex-col" style={{ height: 'calc(100vh - 120px)' }}>
