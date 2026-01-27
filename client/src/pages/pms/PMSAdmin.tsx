@@ -9,21 +9,22 @@ import { useUIRole } from "@/contexts/UIRoleContext";
 import { cn } from "@/lib/utils";
 
 export default function PMSAdmin() {
-  const { isSailAdmin, isClientAdmin, isHeadOfDept } = useUIRole();
-  const showAllAdminTabs = isSailAdmin || isClientAdmin || isHeadOfDept;
-  const [activeTab, setActiveTab] = useState(showAllAdminTabs ? "bulk-data-imp" : "alerts");
+  const { isSailAdmin, isClientAdmin } = useUIRole();
+  const showBulkDataImp = isSailAdmin || isClientAdmin; // Not Head of Dept or Vessel
+  const showMasterData = isSailAdmin; // Only Sail Admin
+  const [activeTab, setActiveTab] = useState(showBulkDataImp ? "bulk-data-imp" : "alerts");
 
   // Reset to appropriate tab when switching roles (since hidden tabs shouldn't be active)
   useEffect(() => {
-    // Vessel users can't access bulk-data-imp or admin-4
-    if (!showAllAdminTabs && (activeTab === "bulk-data-imp" || activeTab === "admin-4")) {
+    // Users without bulk-data-imp access who are on that tab should be redirected
+    if (!showBulkDataImp && activeTab === "bulk-data-imp") {
       setActiveTab("alerts");
     }
-    // Non-Sail Admin users (Client Admin, Head of Dept) can't access admin-4
-    if (!isSailAdmin && activeTab === "admin-4") {
-      setActiveTab("bulk-data-imp");
+    // Non-Sail Admin users can't access admin-4
+    if (!showMasterData && activeTab === "admin-4") {
+      setActiveTab(showBulkDataImp ? "bulk-data-imp" : "alerts");
     }
-  }, [showAllAdminTabs, isSailAdmin, activeTab]);
+  }, [showBulkDataImp, showMasterData, activeTab]);
 
   const getPageTitle = () => {
     switch (activeTab) {
@@ -49,7 +50,7 @@ export default function PMSAdmin() {
           </h1>
           
           <TabsList className="bg-gray-100 absolute left-1/2 -translate-x-1/2">
-            {showAllAdminTabs && (
+            {showBulkDataImp && (
               <TabsTrigger 
                 value="bulk-data-imp" 
                 className={cn(
@@ -84,7 +85,7 @@ export default function PMSAdmin() {
               <Marker id="I4.QL.3.4" />
               Forms
             </TabsTrigger>
-            {isSailAdmin && (
+            {showMasterData && (
               <TabsTrigger 
                 value="admin-4" 
                 className={cn(
