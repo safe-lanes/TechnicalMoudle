@@ -13,12 +13,17 @@ export default function PMSAdmin() {
   const showAllAdminTabs = isSailAdmin || isClientAdmin || isHeadOfDept;
   const [activeTab, setActiveTab] = useState(showAllAdminTabs ? "bulk-data-imp" : "alerts");
 
-  // Reset to "alerts" tab when switching to Vessel role (since hidden tabs shouldn't be active)
+  // Reset to appropriate tab when switching roles (since hidden tabs shouldn't be active)
   useEffect(() => {
+    // Vessel users can't access bulk-data-imp or admin-4
     if (!showAllAdminTabs && (activeTab === "bulk-data-imp" || activeTab === "admin-4")) {
       setActiveTab("alerts");
     }
-  }, [showAllAdminTabs, activeTab]);
+    // Non-Sail Admin users (Client Admin, Head of Dept) can't access admin-4
+    if (!isSailAdmin && activeTab === "admin-4") {
+      setActiveTab("bulk-data-imp");
+    }
+  }, [showAllAdminTabs, isSailAdmin, activeTab]);
 
   const getPageTitle = () => {
     switch (activeTab) {
@@ -79,7 +84,7 @@ export default function PMSAdmin() {
               <Marker id="I4.QL.3.4" />
               Forms
             </TabsTrigger>
-            {showAllAdminTabs && (
+            {isSailAdmin && (
               <TabsTrigger 
                 value="admin-4" 
                 className={cn(
