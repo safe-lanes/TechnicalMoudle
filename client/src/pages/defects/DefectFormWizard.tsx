@@ -22,6 +22,7 @@ import RootCauseModal from "@/components/RootCauseModal";
 import AddActionModal from "@/components/AddActionModal";
 import { FileAttachmentDialog, FileAttachment } from "@/components/FileAttachmentDialog";
 import { useVessels } from "@/hooks/useVessels";
+import { useExternalUsers } from "@/hooks/useExternalMasterData";
 import { sireHardwareClasses, findHardwareClassById } from "@/data/sireHardwareClasses";
 import { defectSources, findSourceById } from "@/data/defectSources";
 import { SireHardwareClassCombobox } from "@/components/SireHardwareClassCombobox";
@@ -121,10 +122,23 @@ export default function DefectFormWizard({
     approverComments: ''
   });
   
-  // Fetch office users for approval dropdown
-  const { data: officeUsers = [] } = useQuery<{ id: number; fullName: string; role: string }[]>({
-    queryKey: ['/technical/api/users'],
-    select: (data) => data.filter(user => user.role === 'Office' || user.role === 'PMS Admin'),
+  // Fetch office users for approval dropdown from Admin > Masters > Users
+  const { data: externalUsersData = [] } = useExternalUsers();
+  
+  // Filter for Office users and map to display format (User Name - Designation)
+  const officeUsers = externalUsersData.filter((user: any) => {
+    const userType = user.user_type || user.userType || user.type || '';
+    return userType.toLowerCase() === 'office';
+  }).map((user: any) => {
+    const fullName = user.fullname || user.userName || user.name || user.username || user.full_name || '';
+    const designation = user.designation || user.position || user.title || user.job_title || '';
+    const uuid = user.uuid || user.id || user.userId || '';
+    return {
+      id: uuid,
+      fullName: fullName,
+      designation: designation,
+      displayName: designation ? `${fullName} - ${designation}` : fullName
+    };
   });
   
   // Section refs for scroll tracking
@@ -219,6 +233,19 @@ export default function DefectFormWizard({
       
       if (currentDefect.targetDateExtensions && Array.isArray(currentDefect.targetDateExtensions)) {
         setTargetDateExtensions(currentDefect.targetDateExtensions);
+        
+        // Restore currentExtension display fields from the last saved extension
+        if (currentDefect.targetDateExtensions.length > 0) {
+          const lastExt = currentDefect.targetDateExtensions[currentDefect.targetDateExtensions.length - 1];
+          setCurrentExtension({
+            newTargetDate: lastExt.newTargetDate || '',
+            reasonForExtension: lastExt.reasonForExtension || '',
+            submitForApprovalTo: lastExt.submitForApprovalTo || '',
+            approved: lastExt.approved,
+            approvalDate: lastExt.approvalDate || '',
+            approverComments: lastExt.approverComments || ''
+          });
+        }
       }
     }
   }, [currentDefect]);
@@ -1540,9 +1567,9 @@ export default function DefectFormWizard({
                                 <SelectValue placeholder="Select approver" />
                               </SelectTrigger>
                               <SelectContent>
-                                {officeUsers.map((user) => (
+                                {officeUsers.map((user: any) => (
                                   <SelectItem key={user.id} value={user.id.toString()}>
-                                    {user.fullName} ({user.role})
+                                    {user.displayName}
                                   </SelectItem>
                                 ))}
                               </SelectContent>
@@ -1620,7 +1647,7 @@ export default function DefectFormWizard({
                               type="button"
                               onClick={() => {
                                 const existingTargetDate = form.getValues('targetCloseDate') || '';
-                                const approverUser = officeUsers.find(u => u.id.toString() === currentExtension.submitForApprovalTo);
+                                const approverUser = officeUsers.find((u: any) => u.id.toString() === currentExtension.submitForApprovalTo);
                                 const newExtension = {
                                   id: `EXT-${Date.now()}`,
                                   existingTargetDate,
