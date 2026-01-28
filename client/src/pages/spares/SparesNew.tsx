@@ -2112,7 +2112,7 @@ const Spares: React.FC = () => {
                             )}
                           </div>
                         )}
-                        <div className="px-2 flex gap-1 justify-center">
+                        <div className="px-2 flex gap-0.5 justify-center">
                           <Button 
                             size="sm" 
                             variant="ghost"
