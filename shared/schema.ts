@@ -2537,10 +2537,12 @@ export const vesselSurveyData = pgTable("vessel_survey_data", {
   vesselId: text("vessel_id").notNull(), // External vessel ID from Vessel Master API
   vesselName: text("vessel_name").notNull(), // Vessel name for display
   masterId: text("master_id").notNull(), // References ship_surveys_master.master_id
-  lastSurveyDate: text("last_survey_date"), // Date of last survey
-  nextDueDate: text("next_due_date"), // Date next survey is due
-  surveyWindow: text("survey_window"), // Survey window period
-  status: text("status"), // Survey status
+  surveyDate: text("survey_date"), // Date of survey
+  dueDate: text("due_date"), // Due date for survey
+  firstRangeDate: text("first_range_date"), // 1st range date
+  secondRangeDate: text("second_range_date"), // 2nd range date
+  postponed: text("postponed"), // Postponed date
+  lastEditUpload: text("last_edit_upload"), // Last edit/upload date
   attachments: jsonb("attachments").$type<Array<{ name: string; size: number; key: string; uploadedAt: string }>>().default([]),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),

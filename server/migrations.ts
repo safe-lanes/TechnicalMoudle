@@ -391,6 +391,23 @@ const migrations: Migration[] = [
       CREATE INDEX IF NOT EXISTS idx_vessel_survey_data_vessel ON vessel_survey_data(vessel_id);
       CREATE INDEX IF NOT EXISTS idx_vessel_survey_data_master ON vessel_survey_data(master_id)
     `
+  },
+  {
+    id: '022_vessel_survey_data_columns_update',
+    name: 'Update vessel_survey_data columns for Surveys page',
+    description: 'Alters vessel_survey_data table to use correct date column names matching the Surveys page UI',
+    sql: `
+      ALTER TABLE vessel_survey_data DROP COLUMN IF EXISTS last_survey_date;
+      ALTER TABLE vessel_survey_data DROP COLUMN IF EXISTS next_due_date;
+      ALTER TABLE vessel_survey_data DROP COLUMN IF EXISTS survey_window;
+      ALTER TABLE vessel_survey_data DROP COLUMN IF EXISTS status;
+      ALTER TABLE vessel_survey_data ADD COLUMN IF NOT EXISTS survey_date TEXT;
+      ALTER TABLE vessel_survey_data ADD COLUMN IF NOT EXISTS due_date TEXT;
+      ALTER TABLE vessel_survey_data ADD COLUMN IF NOT EXISTS first_range_date TEXT;
+      ALTER TABLE vessel_survey_data ADD COLUMN IF NOT EXISTS second_range_date TEXT;
+      ALTER TABLE vessel_survey_data ADD COLUMN IF NOT EXISTS postponed TEXT;
+      ALTER TABLE vessel_survey_data ADD COLUMN IF NOT EXISTS last_edit_upload TEXT
+    `
   }
 ];
 
