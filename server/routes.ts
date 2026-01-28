@@ -4,7 +4,7 @@ import { storage } from "./storage";
 import { getPool } from "./db";
 import * as fs from "fs";
 import * as path from "path";
-import { insertRunningHoursAuditSchema, cascadeRunningHoursSchema, insertWorkOrderSchema, insertWorkOrderExecutionSchema, insertDefectSchema, insertDefectActionSchema, insertDefectAttachmentSchema, insertComponentSchema, insertSpareSchema, insertMakerSchema, insertMasterListSchema, insertComponentDocumentSchema, insertComponentClassRegulatorySchema, insertComponentRequisitionSchema, equipmentCategories, defectCategories, defectTypes, shipCertificatesMaster, insertShipCertificateMasterSchema, shipCertificatesLabelsConfig, vesselCertificateApplicability, insertVesselCertificateApplicabilitySchema, vesselCertificateData } from "@shared/schema";
+import { insertRunningHoursAuditSchema, cascadeRunningHoursSchema, insertWorkOrderSchema, insertWorkOrderExecutionSchema, insertDefectSchema, insertDefectActionSchema, insertDefectAttachmentSchema, insertComponentSchema, insertSpareSchema, insertMakerSchema, insertMasterListSchema, insertComponentDocumentSchema, insertComponentClassRegulatorySchema, insertComponentRequisitionSchema, equipmentCategories, defectCategories, defectTypes, shipCertificatesMaster, insertShipCertificateMasterSchema, shipCertificatesLabelsConfig, vesselCertificateApplicability, insertVesselCertificateApplicabilitySchema, vesselCertificateData, vessels } from "@shared/schema";
 import { getPostgresClient } from "./postgresClient";
 import { eq, and, asc, sql, inArray } from "drizzle-orm";
 import { computeWorkOrderStatus } from "@shared/workOrders/status";
@@ -9335,6 +9335,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       let insertedCount = 0;
       let updatedCount = 0;
+      const newlyInsertedMasterIds: string[] = []; // Track new certificates for applicability creation
+      
+      // Fetch all vessels once before the loop for efficiency
+      const allVessels = await db.select().from(vessels);
       
       for (const cert of certificates) {
         // Check if certificate already exists by masterId
@@ -9380,6 +9384,47 @@ export async function registerRoutes(app: Express): Promise<Server> {
             companySequence: cert.companySequence || null,
           });
           insertedCount++;
+          newlyInsertedMasterIds.push(cert.masterId);
+        }
+      }
+      
+      // Auto-create vessel_certificate_applicability records for all vessels
+      // for newly inserted certificates (with is_applicable = true by default)
+      if (newlyInsertedMasterIds.length > 0 && allVessels.length > 0) {
+        console.log(`🔗 Auto-creating applicability records for ${allVessels.length} vessels for ${newlyInsertedMasterIds.length} new certificate(s)`);
+        
+        // Get existing applicability records for these new master IDs to avoid duplicates
+        const existingApplicability = await db.select({
+          vesselId: vesselCertificateApplicability.vesselId,
+          masterId: vesselCertificateApplicability.masterId,
+        }).from(vesselCertificateApplicability)
+          .where(inArray(vesselCertificateApplicability.masterId, newlyInsertedMasterIds));
+        
+        // Create a Set of existing vessel-master combinations for O(1) lookup
+        const existingKeys = new Set(
+          existingApplicability.map(app => `${app.vesselId}-${app.masterId}`)
+        );
+        
+        // Prepare bulk insert values
+        const applicabilityToInsert = [];
+        for (const masterId of newlyInsertedMasterIds) {
+          for (const vessel of allVessels) {
+            const key = `${vessel.id}-${masterId}`;
+            if (!existingKeys.has(key)) {
+              applicabilityToInsert.push({
+                vesselId: vessel.id,
+                vesselName: vessel.name,
+                masterId: masterId,
+                isApplicable: true,
+              });
+            }
+          }
+        }
+        
+        // Bulk insert all applicability records at once
+        if (applicabilityToInsert.length > 0) {
+          await db.insert(vesselCertificateApplicability).values(applicabilityToInsert);
+          console.log(`✅ Created ${applicabilityToInsert.length} applicability records for new certificates`);
         }
       }
       
