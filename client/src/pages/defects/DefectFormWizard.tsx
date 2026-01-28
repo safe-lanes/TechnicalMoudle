@@ -97,6 +97,11 @@ export default function DefectFormWizard({
   const [partAAttachments, setPartAAttachments] = useState<FileAttachment[]>([]);
   const [isPartAAttachmentDialogOpen, setIsPartAAttachmentDialogOpen] = useState(false);
   
+  // Track created defect ID to prevent duplicate creation
+  const [createdDefectId, setCreatedDefectId] = useState<number | null>(null);
+  // Prevent duplicate saves from rapid clicks
+  const [isSaving, setIsSaving] = useState(false);
+  
   // B5 Target Date Extension state
   const [showExtensionForm, setShowExtensionForm] = useState(false);
   const [targetDateExtensions, setTargetDateExtensions] = useState<Array<{
@@ -294,6 +299,12 @@ export default function DefectFormWizard({
   };
 
   const saveDefect = async (data: DefectFormData, showToast = true, navigate = false, extensionsOverride?: typeof targetDateExtensions): Promise<boolean> => {
+    // Prevent duplicate saves from rapid clicks
+    if (isSaving) {
+      return false;
+    }
+    setIsSaving(true);
+    
     try {
       const submitData: any = {
         ...data,
@@ -304,14 +315,26 @@ export default function DefectFormWizard({
         targetDateExtensions: extensionsOverride ?? targetDateExtensions,
       };
       
-      if (currentDefect?.id) {
-        await apiRequest('PATCH', `/technical/api/defects/${currentDefect.id}`, submitData);
+      // Use createdDefectId if we already created this defect in this session
+      const existingId = currentDefect?.id || createdDefectId;
+      
+      if (existingId) {
+        await apiRequest('PATCH', `/technical/api/defects/${existingId}`, submitData);
         queryClient.invalidateQueries({ queryKey: ['defects'] });
         if (showToast) {
           toast({ title: "Defect updated successfully" });
         }
       } else {
-        await apiRequest('POST', '/technical/api/defects', submitData);
+        const response = await apiRequest('POST', '/technical/api/defects', submitData);
+        // Store the created defect ID to prevent duplicate creation on subsequent saves
+        try {
+          const createdDefect = await response.json();
+          if (createdDefect && createdDefect.id) {
+            setCreatedDefectId(createdDefect.id);
+          }
+        } catch (e) {
+          // Response might not be JSON, ignore
+        }
         queryClient.invalidateQueries({ queryKey: ['defects'] });
         if (showToast) {
           toast({ title: "Defect created successfully" });
@@ -327,6 +350,8 @@ export default function DefectFormWizard({
     } catch (error) {
       toast({ title: "Error saving defect", variant: "destructive" });
       return false;
+    } finally {
+      setIsSaving(false);
     }
   };
 
