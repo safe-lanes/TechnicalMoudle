@@ -315,7 +315,10 @@ export default function ShipsCertificatesAdmin() {
       });
       setHasUnsavedChanges(false);
       setHasSavedInSession(prev => ({ ...prev, [activeTab]: true }));
+      // Clear company-only certificates since they're now saved to master
+      setCompanyOnlyCerts([]);
       queryClient.invalidateQueries({ queryKey: ['/technical/api/admin/ship-certificates-master'] });
+      queryClient.invalidateQueries({ queryKey: ['/technical/api/admin/vessel-certificate-applicability'] });
     },
     onError: (error: any) => {
       toast({
@@ -349,9 +352,60 @@ export default function ShipsCertificatesAdmin() {
     },
   });
   
+  // Generate next CMP- prefixed Master ID for company-only certificates
+  const generateCompanyMasterId = (existingCmpIds: string[]): string => {
+    // Find the highest sequence number from existing CMP- IDs
+    let maxSeq = 0;
+    for (const id of existingCmpIds) {
+      const match = id.match(/^CMP-(\d+)$/);
+      if (match) {
+        const seq = parseInt(match[1], 10);
+        if (seq > maxSeq) maxSeq = seq;
+      }
+    }
+    // Return next sequence with zero-padded 3-digit format
+    return `CMP-${String(maxSeq + 1).padStart(3, '0')}`;
+  };
+
   // Handle save button click
   const handleSave = () => {
-    saveMutation.mutate(masterData);
+    // Collect existing CMP- IDs from masterData
+    const existingCmpIds = masterData
+      .filter(c => c.masterId.startsWith('CMP-'))
+      .map(c => c.masterId);
+    
+    // Convert company-only certificates to master format with generated IDs
+    const companyOnlyCertsWithIds: MasterCertificate[] = companyOnlyCerts.map((cert, idx) => {
+      // Generate a unique CMP- ID for this certificate
+      const cmpIds = [...existingCmpIds];
+      // Add previously generated IDs in this batch to avoid duplicates
+      for (let i = 0; i < idx; i++) {
+        const prevId = generateCompanyMasterId([...existingCmpIds, ...cmpIds.slice(existingCmpIds.length)]);
+        if (!cmpIds.includes(prevId)) cmpIds.push(prevId);
+      }
+      const newMasterId = generateCompanyMasterId(cmpIds);
+      
+      return {
+        id: cert.id,
+        sequence: masterData.length + idx + 1,
+        masterId: newMasterId,
+        certificateName: cert.certificateLabel, // Use label as name
+        category: 'Company', // Mark as company-added
+        group: cert.companyGroup || 'Company Specific',
+        requirementRef: cert.requirementRef || '',
+        applicableToCompany: true, // Always true for company-added certs
+        certificateLabel: cert.certificateLabel,
+        isActive: true,
+        // Company-specific fields
+        companyId: cert.companyId || newMasterId.replace('CMP-', 'CV'),
+        companyGroup: cert.companyGroup || '',
+        companySequence: masterData.length + idx + 1,
+      };
+    });
+    
+    // Combine masterData with company-only certificates
+    const allCertificates = [...masterData, ...companyOnlyCertsWithIds];
+    saveMutation.mutate(allCertificates);
   };
   
   // Load labels from database when available
