@@ -28,6 +28,7 @@ import { useToast } from '@/hooks/use-toast';
 import { Label } from '@/components/ui/label';
 import { ChangeRequestModal } from '@/components/modify/ChangeRequestModal';
 import { useVessel } from '@/contexts/VesselContext';
+import { useUIRole } from '@/contexts/UIRoleContext';
 
 interface ModifyOption {
   id: string;
@@ -96,6 +97,7 @@ export function ModifyPMS() {
   const [location, setLocation] = useLocation();
   const { toast } = useToast();
   const { vesselId } = useVessel();
+  const { isVessel, isHeadOfDept } = useUIRole();
 
   // Fetch change requests - filtered by selected vessel
   // Only fetch when vesselId is available to ensure vessel isolation
@@ -530,7 +532,7 @@ export function ModifyPMS() {
             </Button>
           )}
           
-          {viewingRequest && viewingRequest.status === 'submitted' && (
+          {viewingRequest && viewingRequest.status === 'submitted' && !isVessel && !isHeadOfDept && (
             <>
               <Button
                 variant="outline"
