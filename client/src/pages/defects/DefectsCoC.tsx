@@ -156,9 +156,9 @@ const getComputedStatus = (defect: any): { label: string; color: string } => {
     return { label: 'Overdue', color: 'text-red-600' };
   }
   
-  // 6. Extended (blue) - Target date extension approved
+  // 6. Extended (orange) - Target date extension approved
   if (isExtended) {
-    return { label: 'Extended', color: 'text-blue-600' };
+    return { label: 'Extended', color: 'text-orange-500' };
   }
   
   // 7. In Progress (blue) - Part B submitted (has at least 1 action)

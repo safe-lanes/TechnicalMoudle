@@ -166,7 +166,7 @@ export default function DefectsDashboard() {
   const statusData = [
     { name: 'Reported', value: defectsWithComputedStatus.filter(d => d.computedStatus.label === 'Reported').length, color: '#6b7280' },
     { name: 'In Progress', value: defectsWithComputedStatus.filter(d => d.computedStatus.label === 'In Progress').length, color: '#3b82f6' },
-    { name: 'Extended', value: defectsWithComputedStatus.filter(d => d.computedStatus.label === 'Extended').length, color: '#6366f1' },
+    { name: 'Extended', value: defectsWithComputedStatus.filter(d => d.computedStatus.label === 'Extended').length, color: '#f97316' },
     { name: 'Overdue', value: defectsWithComputedStatus.filter(d => d.computedStatus.label === 'Overdue').length, color: '#ff6961' },
     { name: 'Closed', value: defectsWithComputedStatus.filter(d => d.computedStatus.label === 'Closed').length, color: '#5dc86f' },
     { name: 'Verified', value: defectsWithComputedStatus.filter(d => d.computedStatus.label === 'Verified').length, color: '#00AF7B' },
@@ -498,7 +498,7 @@ export default function DefectsDashboard() {
                           defect.computedStatus.label === 'Reported' ? 'bg-gray-100 text-gray-800' :
                           defect.computedStatus.label === 'Verified' ? 'bg-green-100 text-green-800' :
                           defect.computedStatus.label === 'Closed' ? 'bg-green-100 text-green-800' :
-                          defect.computedStatus.label === 'Extended' ? 'bg-indigo-100 text-indigo-800' :
+                          defect.computedStatus.label === 'Extended' ? 'bg-orange-100 text-orange-800' :
                           ''
                         }
                       >
