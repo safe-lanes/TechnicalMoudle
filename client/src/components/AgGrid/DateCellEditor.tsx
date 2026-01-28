@@ -113,9 +113,18 @@ const DateCellEditor = forwardRef<DateCellEditorHandle, ICellEditorParams>((prop
   }, []);
   
   const handleBlur = useCallback(() => {
-    console.log('[DateCellEditor] handleBlur called, current value:', valueRef.current);
+    // Read directly from input to avoid timing issues with AG Grid's editing lifecycle
+    const currentInputValue = inputRef.current?.value || '';
+    console.log('[DateCellEditor] handleBlur called, input value:', currentInputValue, 'ref value:', valueRef.current);
+    
+    // Update refs with current input value if different
+    if (currentInputValue && currentInputValue !== valueRef.current) {
+      valueRef.current = currentInputValue;
+      hasChangedRef.current = currentInputValue !== initialValue;
+    }
+    
     commitAndSave(false);
-  }, [commitAndSave]);
+  }, [commitAndSave, initialValue]);
   
   const handleKeyDown = useCallback((e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Enter') {
