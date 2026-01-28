@@ -1936,12 +1936,14 @@ const Spares: React.FC = () => {
         </div>
 
         {/* Right Panel - Table */}
-        <div className="flex-1 bg-white border border-gray-200 rounded-lg overflow-hidden">
+        <div className="flex-1 bg-white border border-gray-200 rounded-lg overflow-hidden flex flex-col">
           {activeTab === 'inventory' ? (
             <>
-              {/* Inventory Table Header */}
-              <div className="px-4 py-3 border-b border-gray-200 bg-[#52baf3]">
-                <div className="grid gap-2 text-sm font-semibold text-[#ffffff]" style={{ gridTemplateColumns: FEATURES.IHM ? '90px 130px 150px 100px 80px 50px 50px 60px 100px 50px 140px' : '90px 130px 150px 100px 80px 50px 50px 60px 100px 140px' }}>
+              {/* Inventory Table with Horizontal Scroll */}
+              <div className="overflow-x-auto flex-1 flex flex-col">
+                {/* Inventory Table Header */}
+                <div className="px-4 py-3 border-b border-gray-200 bg-[#52baf3]">
+                  <div className="grid gap-2 text-sm font-semibold text-[#ffffff] min-w-max" style={{ gridTemplateColumns: FEATURES.IHM ? 'minmax(90px, auto) minmax(130px, 1fr) minmax(150px, 1.5fr) minmax(100px, auto) minmax(80px, auto) minmax(50px, auto) minmax(50px, auto) minmax(60px, auto) minmax(100px, auto) minmax(50px, auto) minmax(140px, auto)' : 'minmax(90px, auto) minmax(130px, 1fr) minmax(150px, 1.5fr) minmax(100px, auto) minmax(80px, auto) minmax(50px, auto) minmax(50px, auto) minmax(60px, auto) minmax(100px, auto) minmax(140px, auto)', minWidth: 'max-content' }}>
                   <div className="text-[#ffffff]" data-testid="E13"><Marker id="E13" />Part Code</div>
                   <div data-testid="E14"><Marker id="E14" />Part Name</div>
                   <div data-testid="E15"><Marker id="E15" />Component</div>
@@ -1974,7 +1976,7 @@ const Spares: React.FC = () => {
                     const isFirstRow = rowIndex === 0;
                     return (
                     <div key={spare.id} className="px-4 py-3 border-b border-gray-100 hover:bg-gray-50">
-                      <div className="grid gap-2 text-sm items-center" style={{ gridTemplateColumns: FEATURES.IHM ? '90px 130px 150px 100px 80px 50px 50px 60px 100px 50px 140px' : '90px 130px 150px 100px 80px 50px 50px 60px 100px 140px' }}>
+                      <div className="grid gap-2 text-sm items-center min-w-max" style={{ gridTemplateColumns: FEATURES.IHM ? 'minmax(90px, auto) minmax(130px, 1fr) minmax(150px, 1.5fr) minmax(100px, auto) minmax(80px, auto) minmax(50px, auto) minmax(50px, auto) minmax(60px, auto) minmax(100px, auto) minmax(50px, auto) minmax(140px, auto)' : 'minmax(90px, auto) minmax(130px, 1fr) minmax(150px, 1.5fr) minmax(100px, auto) minmax(80px, auto) minmax(50px, auto) minmax(50px, auto) minmax(60px, auto) minmax(100px, auto) minmax(140px, auto)', minWidth: 'max-content' }}>
                         <div className="text-gray-900" data-testid={isFirstRow ? "E24" : undefined}>{isFirstRow && <Marker id="E24" />}{spare.partCode}</div>
                         <div className="text-gray-700" data-testid={isFirstRow ? "E25" : undefined}>{isFirstRow && <Marker id="E25" />}{spare.partName}</div>
                         <div className="text-gray-700" data-testid={isFirstRow ? "E26" : undefined}>{isFirstRow && <Marker id="E26" />}{spare.componentName}</div>
@@ -2158,6 +2160,7 @@ const Spares: React.FC = () => {
                     );
                   })
                 )}
+              </div>
               </div>
               
               {/* Pagination Controls */}
