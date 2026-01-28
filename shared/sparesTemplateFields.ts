@@ -1,11 +1,11 @@
 /**
  * Single Source of Truth: Vessel_Spare Template Fields
  * 
- * This file defines the canonical 27-column specification for the Spares template.
+ * This file defines the canonical 28-column specification for the Spares template.
  * Both frontend (field mappings display) and backend (Excel template generation)
  * MUST use these definitions to ensure consistency.
  * 
- * Column Order: Part Code, Fleet Equipment Code, Fleet Equipment Name, Component Code,
+ * Column Order: Part Code, (Reserved), Fleet Equipment Code, Fleet Equipment Name, Component Code,
  * Component Name, Part Name, Part Number, UOM, Drawing Number, Position Number, Note,
  * Specification, Maker, Maker Code, Manual Name, Page Number, Criticality, Total ROB,
  * Location A, Location A - ROB, Location B, Location B - ROB, Minimum Stock, Is Active,
@@ -21,11 +21,13 @@ export interface SparesTemplateField {
 }
 
 /**
- * Canonical 27-column Vessel_Spare specification
+ * Canonical 28-column Vessel_Spare specification
  * DO NOT modify the order - this matches the exact template specification
+ * Note: Column B is reserved/empty to match the standard template format
  */
 export const SPARES_TEMPLATE_FIELDS: SparesTemplateField[] = [
   { header: 'Part Code', key: 'partCode', width: 18, required: false, description: 'Auto-generated PT-XXXXXX if not provided' },
+  { header: '', key: 'reserved', width: 5, required: false, description: 'Reserved column' },
   { header: 'Fleet Equipment Code', key: 'fleetEquipmentCode', width: 20, required: false, description: 'Links to fleet master equipment' },
   { header: 'Fleet Equipment Name', key: 'fleetEquipmentName', width: 28, required: false, description: 'Fleet equipment reference name' },
   { header: 'Component Code', key: 'componentCode', width: 18, required: true, description: 'Must exist in system' },
@@ -57,13 +59,16 @@ export const SPARES_TEMPLATE_FIELDS: SparesTemplateField[] = [
 /**
  * Helper to get field mappings for frontend display
  * Returns array with field names and descriptions for UI
+ * Note: Filters out the reserved empty column
  */
 export function getSparesFieldMappings() {
-  return SPARES_TEMPLATE_FIELDS.map(f => ({
-    field: f.header,
-    required: f.required,
-    description: f.description,
-  }));
+  return SPARES_TEMPLATE_FIELDS
+    .filter(f => f.key !== 'reserved')
+    .map(f => ({
+      field: f.header,
+      required: f.required,
+      description: f.description,
+    }));
 }
 
 /**

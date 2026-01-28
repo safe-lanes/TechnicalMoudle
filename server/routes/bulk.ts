@@ -1613,9 +1613,11 @@ async function generateSparesTemplate(vesselId: string): Promise<Buffer> {
   
   // Pre-fill the Spares sheet with component data - one row per component
   // User just needs to fill in Part Code, Part Name, and other part-specific details
+  // Note: Includes 'reserved' column to match exact 28-column template specification
   validComponents.forEach((component, index) => {
     sparesSheet.addRow({
       partCode: '',  // User fills this
+      reserved: '',  // Reserved empty column B
       fleetEquipmentCode: component.fleetEquipmentCode || '',
       fleetEquipmentName: component.fleetEquipmentName || '',
       componentCode: component.componentCode,
@@ -1693,30 +1695,31 @@ async function generateSparesTemplate(vesselId: string): Promise<Buffer> {
   listsSheet.getRow(1).font = { bold: true };
   
   // Add data validations to Spares sheet for 1000 rows
+  // Column indices adjusted for 28-column format (with reserved Column B)
   for (let row = 2; row <= 1000; row++) {
-    // Column H (UOM) - Column 8
-    sparesSheet.getCell(row, 8).dataValidation = {
+    // Column I (UOM) - Column 9
+    sparesSheet.getCell(row, 9).dataValidation = {
       type: 'list',
       allowBlank: true,
       formulae: ['=Lists!$A$2:$A$11']
     };
     
-    // Column Q (Criticality) - Column 17
-    sparesSheet.getCell(row, 17).dataValidation = {
+    // Column R (Criticality) - Column 18
+    sparesSheet.getCell(row, 18).dataValidation = {
       type: 'list',
       allowBlank: true,
       formulae: ['=Lists!$B$2:$B$3']
     };
     
-    // Column X (Is Active) - Column 24
-    sparesSheet.getCell(row, 24).dataValidation = {
-      type: 'list',
-      allowBlank: true,
-      formulae: ['=Lists!$B$2:$B$3']
-    };
-    
-    // Column Y (IHM) - Column 25
+    // Column Y (Is Active) - Column 25
     sparesSheet.getCell(row, 25).dataValidation = {
+      type: 'list',
+      allowBlank: true,
+      formulae: ['=Lists!$B$2:$B$3']
+    };
+    
+    // Column Z (IHM) - Column 26
+    sparesSheet.getCell(row, 26).dataValidation = {
       type: 'list',
       allowBlank: true,
       formulae: ['=Lists!$B$2:$B$3']
@@ -1792,8 +1795,8 @@ router.get('/template', async (req, res) => {
 
     case 'spares':
       headers = [
-        // Vessel_Spare - 27 columns (per specification)
-        'Part Code', 'Fleet Equipment Code', 'Fleet Equipment Name', 'Component Code', 'Component Name',
+        // Vessel_Spare - 28 columns (per specification, includes reserved Column B)
+        'Part Code', '', 'Fleet Equipment Code', 'Fleet Equipment Name', 'Component Code', 'Component Name',
         'Part Name', 'Part Number', 'UOM', 'Drawing Number', 'Position Number',
         'Note', 'Specification', 'Maker', 'Maker Code', 'Manual Name', 'Page Number',
         'Criticality', 'Total ROB', 'Location A', 'Location A - ROB',
@@ -1802,7 +1805,7 @@ router.get('/template', async (req, res) => {
       ];
 
       validValues = [
-        'Text (Part ID)', 'Text (Fleet ID)', 'Text (Fleet description)', 'Required (Must exist)', 'Text (Component name)',
+        'Text (Part ID)', '(Reserved)', 'Text (Fleet ID)', 'Text (Fleet description)', 'Required (Must exist)', 'Text (Component name)',
         'Required (Part name)', 'Text (P/N)', UOM_LIST.join('/').toUpperCase(), 'Text (Drawing ref)', 'Text (Position)',
         'Text (Notes)', 'Text (Specs)', 'Text (Manufacturer)', 'Text (Maker ID)', 'Text (Manual name)', 'Text (Page #)',
         'Yes/No', 'Number >= 0', 'Text (Location A)', 'Number >= 0',
