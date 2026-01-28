@@ -602,9 +602,11 @@ export default function UniformBulkUpload({
             <h1 className="text-2xl font-bold text-gray-900" data-testid={markers?.header || "bulk-upload-header"}>
               {title}
             </h1>
-            <p className="text-gray-600" data-testid={markers?.description || "bulk-upload-description"}>
-              {description}
-            </p>
+            {isSailAdmin && (
+              <p className="text-gray-600" data-testid={markers?.description || "bulk-upload-description"}>
+                {description}
+              </p>
+            )}
           </div>
         </div>
         <Button variant="outline" onClick={handleDownloadTemplate} data-testid={markers?.downloadTemplate || "button-download-template"}>
