@@ -560,12 +560,15 @@ export default function DefectsLogWithTabs() {
     {
       headerName: 'Component',
       field: 'componentHardwareLevel3',
-      flex: 0.8,
-      cellStyle: { fontSize: '13px', color: '#4f5863' },
+      flex: 0.88,
+      autoHeight: true,
+      wrapText: true,
+      cellStyle: { fontSize: '13px', color: '#4f5863', lineHeight: '1.4' },
       filter: 'agTextColumnFilter',
       sortable: true,
       resizable: true,
-      valueFormatter: (params) => params.value || '-'
+      valueFormatter: (params) => params.value || '-',
+      tooltipValueGetter: (params) => params.value || '-'
     },
     {
       headerName: 'Description',

@@ -354,7 +354,7 @@ export default function DefectsLog() {
       <div>
             {/* Table Header */}
             <div className="bg-sky-100 px-4 py-2 border-b overflow-x-auto rounded-t-lg">
-              <div className="grid gap-3 text-xs font-medium text-gray-700" style={{ gridTemplateColumns: 'minmax(90px,1fr) minmax(70px,1fr) minmax(70px,1fr) minmax(70px,1fr) minmax(80px,1fr) minmax(140px,2fr) minmax(110px,1.5fr) minmax(70px,1fr) minmax(70px,1fr) minmax(70px,1fr) minmax(60px,1fr) minmax(100px,1fr)' }}>
+              <div className="grid gap-3 text-xs font-medium text-gray-700" style={{ gridTemplateColumns: 'minmax(90px,1fr) minmax(70px,1fr) minmax(70px,1fr) minmax(70px,1fr) minmax(88px,1.1fr) minmax(140px,2fr) minmax(110px,1.5fr) minmax(70px,1fr) minmax(70px,1fr) minmax(70px,1fr) minmax(60px,1fr) minmax(100px,1fr)' }}>
                 <div>ID</div>
                 <div>Vessel</div>
                 <div>Issue Date</div>
@@ -384,7 +384,7 @@ export default function DefectsLog() {
                       "grid gap-3 px-4 py-3 text-xs hover:bg-gray-50",
                       index % 2 === 0 ? "bg-white" : "bg-gray-25"
                     )}
-                    style={{ gridTemplateColumns: 'minmax(90px,1fr) minmax(70px,1fr) minmax(70px,1fr) minmax(70px,1fr) minmax(80px,1fr) minmax(140px,2fr) minmax(110px,1.5fr) minmax(70px,1fr) minmax(70px,1fr) minmax(70px,1fr) minmax(60px,1fr) minmax(100px,1fr)' }}
+                    style={{ gridTemplateColumns: 'minmax(90px,1fr) minmax(70px,1fr) minmax(70px,1fr) minmax(70px,1fr) minmax(88px,1.1fr) minmax(140px,2fr) minmax(110px,1.5fr) minmax(70px,1fr) minmax(70px,1fr) minmax(70px,1fr) minmax(60px,1fr) minmax(100px,1fr)' }}
                   >
                     <div className="font-mono text-blue-600">{defect.id}</div>
                     <div className="text-gray-700">{defect.vesselName}</div>
@@ -394,9 +394,16 @@ export default function DefectsLog() {
                         {defect.category}
                       </Badge>
                     </div>
-                    <div className="text-gray-700 truncate" title={defect.componentHardwareLevel3 || ''}>
-                      {defect.componentHardwareLevel3 || '-'}
-                    </div>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <div className="text-gray-700 line-clamp-2 cursor-default" title={defect.componentHardwareLevel3 || ''}>
+                          {defect.componentHardwareLevel3 || '-'}
+                        </div>
+                      </TooltipTrigger>
+                      <TooltipContent side="top" className="max-w-xs">
+                        <p>{defect.componentHardwareLevel3 || '-'}</p>
+                      </TooltipContent>
+                    </Tooltip>
                     <div className="text-gray-700 truncate" title={defect.description}>
                       {defect.description}
                     </div>
