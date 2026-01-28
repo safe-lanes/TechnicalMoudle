@@ -463,6 +463,14 @@ export default function ShipsSurveysAdmin() {
                         <><Save className="w-4 h-4 mr-1" /> Save</>
                       )}
                     </Button>
+                    <Button 
+                      size="sm" 
+                      onClick={addNewRow}
+                      className="bg-[#16569e] hover:bg-[#124a87] text-white"
+                      data-testid="button-add-row"
+                    >
+                      <Plus className="w-4 h-4 mr-1" /> Add Survey
+                    </Button>
                   </>
                 )}
               </>
@@ -507,16 +515,6 @@ export default function ShipsSurveysAdmin() {
                     ))}
                   </SelectContent>
                 </Select>
-              {isEditMode && (
-                <Button 
-                  size="sm" 
-                  onClick={addNewRow}
-                  className="bg-[#5dc86f] hover:bg-[#4db85f] text-white"
-                  data-testid="button-add-row"
-                >
-                  <Plus className="w-4 h-4 mr-1" /> Add Survey
-                </Button>
-              )}
             </div>
             
             <div className="flex-1 overflow-auto bg-white rounded-lg border">
