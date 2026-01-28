@@ -216,6 +216,10 @@ export default function DefectFormWizard({
       if (currentDefect.attachments && Array.isArray(currentDefect.attachments)) {
         setFileAttachments(currentDefect.attachments);
       }
+      
+      if (currentDefect.targetDateExtensions && Array.isArray(currentDefect.targetDateExtensions)) {
+        setTargetDateExtensions(currentDefect.targetDateExtensions);
+      }
     }
   }, [currentDefect]);
 
@@ -269,6 +273,7 @@ export default function DefectFormWizard({
         reference: defectId,
         partAAttachments: partAAttachments,
         attachments: fileAttachments,
+        targetDateExtensions: targetDateExtensions,
       };
       
       if (currentDefect?.id) {

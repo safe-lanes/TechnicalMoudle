@@ -1192,6 +1192,21 @@ export const defects = pgTable("defects", {
     dateCompleted?: string;
     status: string;
   }>>(),
+  // B5 Target Date Extensions (stored inline for form wizard)
+  targetDateExtensions: json("target_date_extensions").$type<Array<{
+    id: string;
+    existingTargetDate: string;
+    newTargetDate: string;
+    reasonForExtension: string;
+    submitForApprovalTo: string;
+    submitForApprovalToName: string;
+    status: 'Requested' | 'Approved' | 'Rejected';
+    approved?: boolean;
+    approvalDate: string;
+    approverComments: string;
+    electronicConfirmation?: string;
+    requestedAt: string;
+  }>>().default([]),
   // Part A Attachments (stored inline for form wizard)
   partAAttachments: json("part_a_attachments").$type<Array<{
     id: string;

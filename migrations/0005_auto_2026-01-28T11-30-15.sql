@@ -1,0 +1,1 @@
+ALTER TABLE "defects" ADD COLUMN "target_date_extensions" json DEFAULT '[]'::json;
