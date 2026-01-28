@@ -1161,6 +1161,9 @@ export const defects = pgTable("defects", {
   // C1 Closeout fields
   closedOutByName: text("closed_out_by_name"), // Name of person who closed out
   closedOutByRank: text("closed_out_by_rank"), // Rank of person who closed out
+  confirmCompleted: boolean("confirm_completed").default(false), // Confirmation checkbox
+  closedByName: text("closed_by_name"), // Name of person who closed (form field)
+  closedByRank: text("closed_by_rank"), // Rank of person who closed (form field)
   
   // C2 Verification fields
   verified: boolean("verified").default(false), // Verification checkbox

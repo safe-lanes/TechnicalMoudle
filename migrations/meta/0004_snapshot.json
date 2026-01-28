@@ -1,6 +1,6 @@
 {
-  "id": "e196628e-be9c-474c-974d-a79dbd7f4d9a",
-  "prevId": "9562480c-cf3e-49a0-8197-c06c5d60bfda",
+  "id": "81351b21-e2f4-47c5-8fa2-3899ea2cc997",
+  "prevId": "9ddf0287-6636-4514-8889-dd8a4e49b507",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -4073,6 +4073,25 @@
           "primaryKey": false,
           "notNull": false
         },
+        "confirm_completed": {
+          "name": "confirm_completed",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": false,
+          "default": false
+        },
+        "closed_by_name": {
+          "name": "closed_by_name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "closed_by_rank": {
+          "name": "closed_by_rank",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
         "verified": {
           "name": "verified",
           "type": "boolean",
@@ -4117,11 +4136,19 @@
           "primaryKey": false,
           "notNull": false
         },
+        "part_a_attachments": {
+          "name": "part_a_attachments",
+          "type": "json",
+          "primaryKey": false,
+          "notNull": false,
+          "default": "'[]'::json"
+        },
         "attachments": {
           "name": "attachments",
           "type": "json",
           "primaryKey": false,
-          "notNull": false
+          "notNull": false,
+          "default": "'[]'::json"
         },
         "audit_trail": {
           "name": "audit_trail",
@@ -9280,20 +9307,6 @@
           "primaryKey": false,
           "notNull": false
         },
-        "ihm_presence": {
-          "name": "ihm_presence",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false,
-          "default": "'Unknown'"
-        },
-        "ihm_evidence_type": {
-          "name": "ihm_evidence_type",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false,
-          "default": "'None'"
-        },
         "remarks": {
           "name": "remarks",
           "type": "text",
@@ -11369,13 +11382,6 @@
           "type": "text",
           "primaryKey": false,
           "notNull": false
-        },
-        "was_rejected": {
-          "name": "was_rejected",
-          "type": "boolean",
-          "primaryKey": false,
-          "notNull": true,
-          "default": false
         },
         "driver_type": {
           "name": "driver_type",

@@ -414,6 +414,35 @@ export default function DefectFormWizard({
       setLocation("/defects/active");
     }
   };
+
+  // IntersectionObserver for scroll-based section highlighting
+  // IMPORTANT: This useEffect MUST be before any conditional returns to follow React's Rules of Hooks
+  useEffect(() => {
+    const observerOptions = {
+      root: scrollContainerRef.current,
+      rootMargin: '-20% 0px -60% 0px',
+      threshold: 0
+    };
+
+    const observerCallback = (entries: IntersectionObserverEntry[]) => {
+      entries.forEach((entry) => {
+        if (entry.isIntersecting) {
+          const sectionId = entry.target.getAttribute('data-section');
+          if (sectionId === 'A' || sectionId === 'B' || sectionId === 'C') {
+            setActiveSection(sectionId);
+          }
+        }
+      });
+    };
+
+    const observer = new IntersectionObserver(observerCallback, observerOptions);
+
+    if (partARef.current) observer.observe(partARef.current);
+    if (partBRef.current) observer.observe(partBRef.current);
+    if (partCRef.current) observer.observe(partCRef.current);
+
+    return () => observer.disconnect();
+  }, []);
   
   if (isLoadingDefect) {
     return (
@@ -455,34 +484,6 @@ export default function DefectFormWizard({
     { id: 2, label: 'B', name: 'Analysis & Actions', ref: partBRef },
     { id: 3, label: 'C', name: 'Closeout', ref: partCRef },
   ];
-
-  // IntersectionObserver for scroll-based section highlighting
-  useEffect(() => {
-    const observerOptions = {
-      root: scrollContainerRef.current,
-      rootMargin: '-20% 0px -60% 0px',
-      threshold: 0
-    };
-
-    const observerCallback = (entries: IntersectionObserverEntry[]) => {
-      entries.forEach((entry) => {
-        if (entry.isIntersecting) {
-          const sectionId = entry.target.getAttribute('data-section');
-          if (sectionId === 'A' || sectionId === 'B' || sectionId === 'C') {
-            setActiveSection(sectionId);
-          }
-        }
-      });
-    };
-
-    const observer = new IntersectionObserver(observerCallback, observerOptions);
-
-    if (partARef.current) observer.observe(partARef.current);
-    if (partBRef.current) observer.observe(partBRef.current);
-    if (partCRef.current) observer.observe(partCRef.current);
-
-    return () => observer.disconnect();
-  }, []);
 
   const scrollToSection = (ref: React.RefObject<HTMLDivElement>) => {
     ref.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
