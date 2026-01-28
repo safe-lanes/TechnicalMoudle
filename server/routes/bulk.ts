@@ -69,9 +69,24 @@ function checkTemplateVersion(worksheet: XLSX.WorkSheet): { valid: boolean; vers
   return { valid: true, version };
 }
 
-function addVersionInfoToSheet(sheet: ExcelJS.Worksheet): void {
-  sheet.getCell('AA1').value = `${TEMPLATE_VERSION_CELL}${TEMPLATE_VERSION}`;
-  sheet.getColumn('AA').hidden = true;
+function addVersionInfoToSheet(sheet: ExcelJS.Worksheet, columnOffset?: number): void {
+  // If columnOffset is provided, use it to determine the version column position
+  // Otherwise default to column AA (27) for backward compatibility
+  const versionColumnIndex = columnOffset || 27;
+  const versionColumnLetter = getColumnLetter(versionColumnIndex);
+  sheet.getCell(`${versionColumnLetter}1`).value = `${TEMPLATE_VERSION_CELL}${TEMPLATE_VERSION}`;
+}
+
+// Helper function to convert column number to Excel column letter (1=A, 26=Z, 27=AA, etc.)
+function getColumnLetter(columnNumber: number): string {
+  let result = '';
+  let num = columnNumber;
+  while (num > 0) {
+    num--; // Adjust for 0-based calculation
+    result = String.fromCharCode((num % 26) + 65) + result;
+    num = Math.floor(num / 26);
+  }
+  return result;
 }
 
 /**
@@ -1613,7 +1628,7 @@ async function generateSparesTemplate(vesselId: string): Promise<Buffer> {
   
   // Pre-fill the Spares sheet with component data - one row per component
   // User just needs to fill in Part Code, Part Name, and other part-specific details
-  // Note: Includes 'reserved' column to match exact 28-column template specification
+  // Note: Includes 'reserved' column to match exact 27-column template specification (no Vessel Code)
   validComponents.forEach((component, index) => {
     sparesSheet.addRow({
       partCode: '',  // User fills this
@@ -1642,8 +1657,7 @@ async function generateSparesTemplate(vesselId: string): Promise<Buffer> {
       minimumStock: '',
       isActive: 'Yes',  // Default to Yes
       ihm: 'No',  // Default to No
-      evidenceType: '',
-      vesselCode: vesselId
+      evidenceType: ''
     });
   });
   
@@ -1726,7 +1740,8 @@ async function generateSparesTemplate(vesselId: string): Promise<Buffer> {
     };
   }
   
-  addVersionInfoToSheet(sparesSheet);
+  // Spares template has 27 data columns (A through AA), version goes in column 28 (AB)
+  addVersionInfoToSheet(sparesSheet, 28);
   
   // Write to buffer and return
   const buffer = await workbook.xlsx.writeBuffer();
@@ -1795,13 +1810,13 @@ router.get('/template', async (req, res) => {
 
     case 'spares':
       headers = [
-        // Vessel_Spare - 28 columns (per specification, includes reserved Column B)
+        // Vessel_Spare - 27 columns (per specification, includes reserved Column B, no Vessel Code)
         'Part Code', '', 'Fleet Equipment Code', 'Fleet Equipment Name', 'Component Code', 'Component Name',
         'Part Name', 'Part Number', 'UOM', 'Drawing Number', 'Position Number',
         'Note', 'Specification', 'Maker', 'Maker Code', 'Manual Name', 'Page Number',
         'Criticality', 'Total ROB', 'Location A', 'Location A - ROB',
         'Location B', 'Location B - ROB', 'Minimum Stock', 'Is Active',
-        'IHM (Inventory of Hazardous Materials)', 'Evidence Type', 'Vessel Code'
+        'IHM (Inventory of Hazardous Materials)', 'Evidence Type'
       ];
 
       validValues = [
@@ -1810,7 +1825,7 @@ router.get('/template', async (req, res) => {
         'Text (Notes)', 'Text (Specs)', 'Text (Manufacturer)', 'Text (Maker ID)', 'Text (Manual name)', 'Text (Page #)',
         'Yes/No', 'Number >= 0', 'Text (Location A)', 'Number >= 0',
         'Text (Location B)', 'Number >= 0', 'Number >= 0', 'Yes/No',
-        'Yes/No', 'Text (Evidence type)', 'Text (e.g., V001)'
+        'Yes/No', 'Text (Evidence type)'
       ];
 
       example = [];
