@@ -454,7 +454,7 @@ export default function ShipsSurveysAdmin() {
                       size="sm"
                       onClick={handleSave}
                       disabled={saveMutation.isPending}
-                      className="bg-[#5dc86f] hover:bg-[#4db85f] text-white"
+                      className="bg-[#16569e] hover:bg-[#124a87] text-white"
                       data-testid="button-save"
                     >
                       {saveMutation.isPending ? (
@@ -466,7 +466,7 @@ export default function ShipsSurveysAdmin() {
                     <Button 
                       size="sm" 
                       onClick={addNewRow}
-                      className="bg-[#16569e] hover:bg-[#124a87] text-white"
+                      className="bg-[#5dc86f] hover:bg-[#4db85f] text-white"
                       data-testid="button-add-row"
                     >
                       <Plus className="w-4 h-4 mr-1" /> Add Survey
