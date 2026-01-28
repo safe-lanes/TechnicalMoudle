@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Marker } from "@/components/Marker";
+import { useUIRole } from "@/contexts/UIRoleContext";
 import {
   ClipboardList,
   Clock,
@@ -59,6 +60,7 @@ interface RecentReport {
 }
 
 const ReportsModule = () => {
+  const { isSailAdmin } = useUIRole();
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [globalFilters, setGlobalFilters] = useState<FilterValues>({
@@ -258,18 +260,20 @@ const ReportsModule = () => {
       <div className="space-y-6">
         <div className="flex justify-between items-center">
           <h1 className="text-2xl font-bold text-gray-800" data-testid="G1"><Marker id="G1" />Reports</h1>
-          <div className="flex gap-3">
-            <Button variant="outline" className="flex items-center gap-2" data-testid="G5">
-              <Marker id="G5" />
-              <Calendar className="h-4 w-4" />
-              Schedule Reports
-            </Button>
-            <Button variant="outline" className="flex items-center gap-2" data-testid="G6">
-              <Marker id="G6" />
-              <Download className="h-4 w-4" />
-              Export Queue
-            </Button>
-          </div>
+          {isSailAdmin && (
+            <div className="flex gap-3">
+              <Button variant="outline" className="flex items-center gap-2" data-testid="G5">
+                <Marker id="G5" />
+                <Calendar className="h-4 w-4" />
+                Schedule Reports
+              </Button>
+              <Button variant="outline" className="flex items-center gap-2" data-testid="G6">
+                <Marker id="G6" />
+                <Download className="h-4 w-4" />
+                Export Queue
+              </Button>
+            </div>
+          )}
         </div>
 
         <Card 
@@ -304,18 +308,20 @@ const ReportsModule = () => {
       <div className="flex-shrink-0 mb-6">
         <div className="flex justify-between items-center mb-4">
           <h1 className="text-2xl font-bold text-gray-800" data-testid="G1"><Marker id="G1" />Reports</h1>
-          <div className="flex gap-3">
-            <Button variant="outline" className="flex items-center gap-2" data-testid="G5">
-              <Marker id="G5" />
-              <Calendar className="h-4 w-4" />
-              Schedule Reports
-            </Button>
-            <Button variant="outline" className="flex items-center gap-2" data-testid="G6">
-              <Marker id="G6" />
-              <Download className="h-4 w-4" />
-              Export Queue
-            </Button>
-          </div>
+          {isSailAdmin && (
+            <div className="flex gap-3">
+              <Button variant="outline" className="flex items-center gap-2" data-testid="G5">
+                <Marker id="G5" />
+                <Calendar className="h-4 w-4" />
+                Schedule Reports
+              </Button>
+              <Button variant="outline" className="flex items-center gap-2" data-testid="G6">
+                <Marker id="G6" />
+                <Download className="h-4 w-4" />
+                Export Queue
+              </Button>
+            </div>
+          )}
         </div>
 
         {/* Search and Filter Bar */}
