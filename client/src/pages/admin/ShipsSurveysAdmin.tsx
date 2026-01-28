@@ -656,21 +656,11 @@ export default function ShipsSurveysAdmin() {
 
         {activeTab === "company" && (
           <div className="h-full flex flex-col">
-            <div className="flex-1 overflow-auto bg-white rounded-lg border">
-              <div className="flex items-center justify-center h-full text-gray-400 p-4">
-                Company surveys table will be displayed here
-              </div>
-            </div>
           </div>
         )}
 
         {activeTab === "vessel" && (
           <div className="h-full flex flex-col">
-            <div className="flex-1 overflow-auto bg-white rounded-lg border">
-              <div className="flex items-center justify-center h-full text-gray-400 p-4">
-                Vessel surveys table will be displayed here
-              </div>
-            </div>
           </div>
         )}
       </div>
