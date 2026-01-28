@@ -40,14 +40,23 @@ interface SurveyData {
   surveyName: string;
   type: string;
   vessel: string;
+  vesselId: string;
+  masterId: string;
   surveyDate: string;
   dueDate: string;
   firstRangeDate: string;
   secondRangeDate: string;
   postponed: string;
   lastEdit: string;
-  applicable: boolean;
   attachments?: FileAttachment[];
+}
+
+interface SurveysApiResponse {
+  surveys: SurveyData[];
+  total: number;
+  page: number;
+  limit: number;
+  totalPages: number;
 }
 
 const EDITABLE_DATE_FIELDS = ['surveyDate', 'dueDate', 'firstRangeDate', 'secondRangeDate', 'postponed'];
@@ -126,9 +135,11 @@ export default function SurveysPage() {
   const [selectedSurvey, setSelectedSurvey] = useState<SurveyData | null>(null);
   const { toast } = useToast();
 
-  const { data: surveys = [], isLoading } = useQuery<SurveyData[]>({
+  const { data: surveysResponse, isLoading } = useQuery<SurveysApiResponse>({
     queryKey: ['/technical/api/surveys'],
   });
+  
+  const surveys = surveysResponse?.surveys || [];
 
   const handleFilterChange = useCallback((result: VesselFleetGroupFilterResult) => {
     setFilterValue({
@@ -206,9 +217,6 @@ export default function SurveysPage() {
     },
   });
 
-  const handleToggleApplicable = useCallback((id: string, newValue: boolean) => {
-    updateSurveyMutation.mutate({ id, updates: { applicable: newValue } });
-  }, [updateSurveyMutation]);
 
   const handleOpenAttachments = useCallback((survey: SurveyData) => {
     setSelectedSurvey(survey);
@@ -216,9 +224,10 @@ export default function SurveysPage() {
   }, []);
 
   const handleAttachmentsChange = useCallback((attachments: FileAttachment[]) => {
-    if (selectedSurvey) {
+    if (selectedSurvey && selectedSurvey.vesselId && selectedSurvey.masterId) {
+      const compoundId = `${selectedSurvey.vesselId}-${selectedSurvey.masterId}`;
       updateSurveyMutation.mutate({
-        id: selectedSurvey.id,
+        id: compoundId,
         updates: { attachments },
       });
       setSelectedSurvey(prev => prev ? { ...prev, attachments } : null);
@@ -232,11 +241,13 @@ export default function SurveysPage() {
       field: colDef.field, 
       oldValue, 
       value, 
-      dataId: data?.id 
+      dataId: data?.id,
+      vesselId: data?.vesselId,
+      masterId: data?.masterId
     });
     
     const field = colDef.field;
-    if (!field || !data?.id) return;
+    if (!field || !data?.vesselId || !data?.masterId) return;
     
     if (value === oldValue) {
       console.log('[SurveysPage] Value not changed, skipping update');
@@ -244,51 +255,35 @@ export default function SurveysPage() {
     }
     
     if (EDITABLE_DATE_FIELDS.includes(field)) {
-      const today = new Date();
-      const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 
-                      'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-      const day = String(today.getDate()).padStart(2, '0');
-      const month = months[today.getMonth()];
-      const year = today.getFullYear();
-      const lastEdit = `${day} ${month} ${year}`;
+      // Use compound key: vesselId-masterId
+      const compoundId = `${data.vesselId}-${data.masterId}`;
       
-      console.log('[SurveysPage] Sending PATCH request for survey:', data.id, 'field:', field, 'value:', value);
+      console.log('[SurveysPage] Sending PATCH request for survey:', compoundId, 'field:', field, 'value:', value);
       
       updateSurveyMutation.mutate({
-        id: data.id,
+        id: compoundId,
         updates: {
           [field]: value,
-          lastEdit,
         },
       });
     }
   }, [updateSurveyMutation]);
 
-  const handleDateChange = useCallback((id: string, field: string, newValue: string) => {
-    console.log('[SurveysPage] handleDateChange called:', { id, field, newValue });
-    
-    const today = new Date();
-    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 
-                    'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-    const day = String(today.getDate()).padStart(2, '0');
-    const month = months[today.getMonth()];
-    const year = today.getFullYear();
-    const lastEdit = `${day} ${month} ${year}`;
+  const handleDateChange = useCallback((compoundId: string, field: string, newValue: string) => {
+    console.log('[SurveysPage] handleDateChange called:', { compoundId, field, newValue });
     
     updateSurveyMutation.mutate({
-      id,
+      id: compoundId,
       updates: {
         [field]: newValue,
-        lastEdit,
       },
     });
   }, [updateSurveyMutation]);
 
   const gridContext = useMemo(() => ({
-    onToggleApplicable: handleToggleApplicable,
     onOpenAttachments: handleOpenAttachments,
     onDateChange: handleDateChange,
-  }), [handleToggleApplicable, handleOpenAttachments, handleDateChange]);
+  }), [handleOpenAttachments, handleDateChange]);
 
   const columnDefs: ColDef[] = useMemo(() => [
     {

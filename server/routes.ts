@@ -4,7 +4,7 @@ import { storage } from "./storage";
 import { getPool } from "./db";
 import * as fs from "fs";
 import * as path from "path";
-import { insertRunningHoursAuditSchema, cascadeRunningHoursSchema, insertWorkOrderSchema, insertWorkOrderExecutionSchema, insertDefectSchema, insertDefectActionSchema, insertDefectAttachmentSchema, insertComponentSchema, insertSpareSchema, insertMakerSchema, insertMasterListSchema, insertComponentDocumentSchema, insertComponentClassRegulatorySchema, insertComponentRequisitionSchema, equipmentCategories, defectCategories, defectTypes, shipCertificatesMaster, insertShipCertificateMasterSchema, shipCertificatesLabelsConfig, vesselCertificateApplicability, insertVesselCertificateApplicabilitySchema, vesselCertificateData, vessels, shipSurveysMaster, shipSurveysLabelsConfig, vesselSurveyApplicability } from "@shared/schema";
+import { insertRunningHoursAuditSchema, cascadeRunningHoursSchema, insertWorkOrderSchema, insertWorkOrderExecutionSchema, insertDefectSchema, insertDefectActionSchema, insertDefectAttachmentSchema, insertComponentSchema, insertSpareSchema, insertMakerSchema, insertMasterListSchema, insertComponentDocumentSchema, insertComponentClassRegulatorySchema, insertComponentRequisitionSchema, equipmentCategories, defectCategories, defectTypes, shipCertificatesMaster, insertShipCertificateMasterSchema, shipCertificatesLabelsConfig, vesselCertificateApplicability, insertVesselCertificateApplicabilitySchema, vesselCertificateData, vessels, shipSurveysMaster, shipSurveysLabelsConfig, vesselSurveyApplicability, vesselSurveyData } from "@shared/schema";
 import { getPostgresClient } from "./postgresClient";
 import { eq, and, asc, sql, inArray } from "drizzle-orm";
 import { computeWorkOrderStatus } from "@shared/workOrders/status";
@@ -9241,11 +9241,184 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Initialize on startup (async)
   initializeSurveys();
   
-  // GET all surveys
+  // GET all surveys - uses three-table join (applicability + master + data)
+  // Returns only applicable surveys, ordered by companySequence
   app.get("/technical/api/surveys", async (req, res) => {
     try {
-      const surveys = await storage.getSurveys();
-      res.json(surveys);
+      const postgres = await getPostgresClient();
+      if (!postgres) {
+        return res.status(500).json({ error: "Database not available" });
+      }
+      const { db } = postgres;
+      
+      const vesselIdFilter = req.query.vesselId as string | undefined;
+      const vesselNameFilter = req.query.vesselName as string | undefined;
+      const page = parseInt(req.query.page as string) || 1;
+      const limit = parseInt(req.query.limit as string) || 100;
+      const offset = (page - 1) * limit;
+      const sortBy = req.query.sortBy as string | undefined;
+      const sortOrder = (req.query.sortOrder as string)?.toLowerCase() === 'desc' ? 'desc' : 'asc';
+      
+      // Step 1: Get applicable surveys for vessels from vesselSurveyApplicability
+      let applicabilityQuery = db.select().from(vesselSurveyApplicability)
+        .where(eq(vesselSurveyApplicability.isApplicable, true));
+      
+      const applicabilityRecords = await applicabilityQuery;
+      
+      if (applicabilityRecords.length === 0) {
+        return res.json({ surveys: [], total: 0, page, limit, totalPages: 0 });
+      }
+      
+      // Filter by vessel if specified
+      let filteredApplicability = applicabilityRecords;
+      if (vesselIdFilter) {
+        filteredApplicability = applicabilityRecords.filter(r => r.vesselId === vesselIdFilter);
+      } else if (vesselNameFilter) {
+        const normalizedFilter = vesselNameFilter.toLowerCase().trim();
+        filteredApplicability = applicabilityRecords.filter(r => 
+          r.vesselName.toLowerCase().trim() === normalizedFilter
+        );
+      }
+      
+      if (filteredApplicability.length === 0) {
+        return res.json({ surveys: [], total: 0, page, limit, totalPages: 0 });
+      }
+      
+      // Step 2: Get all master surveys referenced by applicability records
+      const masterIds = [...new Set(filteredApplicability.map(r => r.masterId))];
+      const masterRecords = await db.select().from(shipSurveysMaster)
+        .where(
+          and(
+            eq(shipSurveysMaster.applicableToCompany, true),
+            inArray(shipSurveysMaster.masterId, masterIds)
+          )
+        )
+        .orderBy(asc(shipSurveysMaster.companySequence));
+      
+      // Create a map for quick lookup
+      const masterMap = new Map(masterRecords.map(m => [m.masterId, m]));
+      
+      // Step 3: Get vessel survey data (dates, attachments) for these surveys
+      const surveyDataRecords = await db.select().from(vesselSurveyData);
+      
+      // Create a map for vessel-survey data lookup
+      const surveyDataMap = new Map<string, typeof surveyDataRecords[0]>();
+      for (const data of surveyDataRecords) {
+        const key = `${data.vesselId}-${data.masterId}`;
+        surveyDataMap.set(key, data);
+      }
+      
+      // Step 4: Build the survey list
+      const surveys: any[] = [];
+      
+      // Group by vessel to maintain order
+      const vesselGroups = new Map<string, typeof filteredApplicability>();
+      for (const app of filteredApplicability) {
+        if (!vesselGroups.has(app.vesselId)) {
+          vesselGroups.set(app.vesselId, []);
+        }
+        vesselGroups.get(app.vesselId)!.push(app);
+      }
+      
+      // Process each vessel's surveys in sequence order
+      for (const [vesselId, apps] of vesselGroups) {
+        // Sort by master survey sequence (use companySequence if set)
+        const sortedApps = apps.sort((a, b) => {
+          const masterA = masterMap.get(a.masterId);
+          const masterB = masterMap.get(b.masterId);
+          const seqA = masterA?.companySequence ?? masterA?.sequence ?? 9999;
+          const seqB = masterB?.companySequence ?? masterB?.sequence ?? 9999;
+          return seqA - seqB;
+        });
+        
+        for (const app of sortedApps) {
+          const master = masterMap.get(app.masterId);
+          if (!master) continue;
+          
+          const dataKey = `${app.vesselId}-${app.masterId}`;
+          const surveyData = surveyDataMap.get(dataKey);
+          
+          const effectiveSequence = master.companySequence ?? master.sequence ?? 9999;
+          
+          surveys.push({
+            id: master.companyId || master.masterId,
+            surveyName: master.surveyLabel || master.surveyName,
+            type: master.companyGroup || '',
+            vessel: app.vesselName,
+            vesselId: app.vesselId,
+            masterId: app.masterId,
+            companySequence: effectiveSequence,
+            surveyDate: surveyData?.surveyDate || '',
+            dueDate: surveyData?.dueDate || '',
+            firstRangeDate: surveyData?.firstRangeDate || '',
+            secondRangeDate: surveyData?.secondRangeDate || '',
+            postponed: surveyData?.postponed || '',
+            lastEdit: surveyData?.lastEditUpload || '',
+            attachments: surveyData?.attachments || [],
+          });
+        }
+      }
+      
+      // Apply server-side sorting before pagination
+      if (sortBy) {
+        surveys.sort((a, b) => {
+          let valA: any;
+          let valB: any;
+          
+          switch (sortBy) {
+            case 'id':
+            case 'companyId':
+              valA = a.id || '';
+              valB = b.id || '';
+              break;
+            case 'surveyName':
+            case 'name':
+              valA = a.surveyName || '';
+              valB = b.surveyName || '';
+              break;
+            case 'vessel':
+              valA = a.vessel || '';
+              valB = b.vessel || '';
+              break;
+            case 'type':
+            case 'companyGroup':
+              valA = a.type || '';
+              valB = b.type || '';
+              break;
+            case 'surveyDate':
+              valA = a.surveyDate || '';
+              valB = b.surveyDate || '';
+              break;
+            case 'dueDate':
+              valA = a.dueDate || '';
+              valB = b.dueDate || '';
+              break;
+            default:
+              valA = a.companySequence;
+              valB = b.companySequence;
+          }
+          
+          if (typeof valA === 'string' && typeof valB === 'string') {
+            return sortOrder === 'asc' 
+              ? valA.localeCompare(valB) 
+              : valB.localeCompare(valA);
+          }
+          return sortOrder === 'asc' ? valA - valB : valB - valA;
+        });
+      }
+      
+      // Apply pagination
+      const total = surveys.length;
+      const totalPages = Math.ceil(total / limit);
+      const paginatedSurveys = surveys.slice(offset, offset + limit);
+      
+      res.json({ 
+        surveys: paginatedSurveys, 
+        total, 
+        page, 
+        limit,
+        totalPages
+      });
     } catch (error) {
       console.error("Error fetching surveys:", error);
       res.status(500).json({ error: "Failed to fetch surveys" });
@@ -9266,15 +9439,101 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
   
-  // PATCH update survey (for toggling applicable status)
+  // PATCH update survey dates/attachments using vesselId-masterId compound key
+  // ID format: "vesselId-masterId"
   app.patch("/technical/api/surveys/:id", async (req, res) => {
     try {
-      const updatedSurvey = await storage.updateSurvey(req.params.id, req.body);
-      res.json(updatedSurvey);
-    } catch (error: any) {
-      if (error.message?.includes('not found')) {
-        return res.status(404).json({ error: "Survey not found" });
+      const postgres = await getPostgresClient();
+      if (!postgres) {
+        return res.status(500).json({ error: "Database not available" });
       }
+      const { db } = postgres;
+      
+      const compoundId = req.params.id;
+      const parts = compoundId.split('-');
+      
+      // Handle compound ID format: vesselId-masterId (masterId may contain dashes like "A1-001")
+      if (parts.length < 2) {
+        return res.status(400).json({ error: "Invalid ID format. Expected vesselId-masterId" });
+      }
+      
+      // First part is vesselId, rest is masterId (which may contain dashes)
+      const vesselId = parts[0];
+      const masterId = parts.slice(1).join('-');
+      
+      const { surveyDate, dueDate, firstRangeDate, secondRangeDate, postponed, attachments } = req.body;
+      
+      // Get vessel name from applicability record
+      const applicabilityRecord = await db.select().from(vesselSurveyApplicability)
+        .where(
+          and(
+            eq(vesselSurveyApplicability.vesselId, vesselId),
+            eq(vesselSurveyApplicability.masterId, masterId)
+          )
+        )
+        .limit(1);
+      
+      if (applicabilityRecord.length === 0) {
+        return res.status(404).json({ error: "Survey applicability record not found" });
+      }
+      
+      const vesselName = applicabilityRecord[0].vesselName;
+      
+      // Get current date for lastEditUpload
+      const now = new Date();
+      const lastEditUpload = `${now.getDate()} ${['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'][now.getMonth()]} ${now.getFullYear()}`;
+      
+      // Check if data record exists
+      const existingData = await db.select().from(vesselSurveyData)
+        .where(
+          and(
+            eq(vesselSurveyData.vesselId, vesselId),
+            eq(vesselSurveyData.masterId, masterId)
+          )
+        )
+        .limit(1);
+      
+      let result;
+      
+      if (existingData.length > 0) {
+        // Update existing record
+        const updateData: any = { updatedAt: new Date(), lastEditUpload };
+        if (surveyDate !== undefined) updateData.surveyDate = surveyDate;
+        if (dueDate !== undefined) updateData.dueDate = dueDate;
+        if (firstRangeDate !== undefined) updateData.firstRangeDate = firstRangeDate;
+        if (secondRangeDate !== undefined) updateData.secondRangeDate = secondRangeDate;
+        if (postponed !== undefined) updateData.postponed = postponed;
+        if (attachments !== undefined) updateData.attachments = attachments;
+        
+        result = await db.update(vesselSurveyData)
+          .set(updateData)
+          .where(
+            and(
+              eq(vesselSurveyData.vesselId, vesselId),
+              eq(vesselSurveyData.masterId, masterId)
+            )
+          )
+          .returning();
+      } else {
+        // Insert new record
+        result = await db.insert(vesselSurveyData)
+          .values({
+            vesselId,
+            vesselName,
+            masterId,
+            surveyDate: surveyDate || null,
+            dueDate: dueDate || null,
+            firstRangeDate: firstRangeDate || null,
+            secondRangeDate: secondRangeDate || null,
+            postponed: postponed || null,
+            lastEditUpload,
+            attachments: attachments || [],
+          })
+          .returning();
+      }
+      
+      res.json(result[0]);
+    } catch (error: any) {
       console.error("Error updating survey:", error);
       res.status(500).json({ error: "Failed to update survey" });
     }
