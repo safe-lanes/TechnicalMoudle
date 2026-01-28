@@ -9337,8 +9337,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
       let updatedCount = 0;
       const newlyInsertedMasterIds: string[] = []; // Track new certificates for applicability creation
       
-      // Fetch all vessels once before the loop for efficiency
-      const allVessels = await db.select().from(vessels);
+      // Fetch distinct vessels from existing applicability records
+      // (vessels come from external Vessel Master API, not the internal vessels table)
+      const distinctVessels = await db.selectDistinct({
+        vesselId: vesselCertificateApplicability.vesselId,
+        vesselName: vesselCertificateApplicability.vesselName,
+      }).from(vesselCertificateApplicability);
+      
+      // Map to the format expected by the logic below
+      const allVessels = distinctVessels.map(v => ({ id: v.vesselId, name: v.vesselName }));
       
       for (const cert of certificates) {
         // Check if certificate already exists by masterId
