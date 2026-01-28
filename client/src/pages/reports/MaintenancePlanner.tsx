@@ -66,6 +66,7 @@ import { addDays, addMonths } from "date-fns";
 import { useLocation } from "wouter";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { useUIRole } from "@/contexts/UIRoleContext";
 
 interface PlannerJob {
   jobId: string;
@@ -113,6 +114,7 @@ export default function MaintenancePlanner() {
   const { vesselId, setVesselId, vessels } = useVessel();
   const [, setLocation] = useLocation();
   const { toast } = useToast();
+  const { isSailAdmin } = useUIRole();
 
   // Filter state
   const [jobType, setJobType] = useState<string>("BOTH");
@@ -354,19 +356,21 @@ export default function MaintenancePlanner() {
             </div>
           </div>
           <div className="flex items-center gap-3">
-            {/* Vessel Selector */}
-            <Select value={vesselId} onValueChange={setVesselId}>
-              <SelectTrigger className="w-48" data-testid="select-vessel">
-                <SelectValue placeholder="Select Vessel" />
-              </SelectTrigger>
-              <SelectContent>
-                {vessels.map(vessel => (
-                  <SelectItem key={vessel.id} value={vessel.id}>
-                    {vessel.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            {/* Vessel Selector - Only visible for Sail Admin */}
+            {isSailAdmin && (
+              <Select value={vesselId} onValueChange={setVesselId}>
+                <SelectTrigger className="w-48" data-testid="select-vessel">
+                  <SelectValue placeholder="Select Vessel" />
+                </SelectTrigger>
+                <SelectContent>
+                  {vessels.map(vessel => (
+                    <SelectItem key={vessel.id} value={vessel.id}>
+                      {vessel.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
             <Button
               variant="outline"
               size="sm"
