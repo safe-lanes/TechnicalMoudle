@@ -9323,12 +9323,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       const { db } = postgres;
       const certificates = req.body.certificates;
+      // Optional: vessel-specific certificate master IDs and their target vessels
+      const vesselSpecificCerts: string[] = req.body.vesselSpecificCerts || [];
+      const targetVesselIds: string[] = req.body.targetVesselIds || [];
       
       if (!Array.isArray(certificates)) {
         return res.status(400).json({ error: "certificates must be an array" });
       }
       
       console.log(`💾 Saving ${certificates.length} ship certificates master entries...`);
+      if (vesselSpecificCerts.length > 0) {
+        console.log(`📋 Vessel-specific certificates: ${vesselSpecificCerts.join(', ')} for vessels: ${targetVesselIds.join(', ')}`);
+      }
       
       // Use a transaction to upsert all certificates
       const { sql } = await import('drizzle-orm');
@@ -9336,6 +9342,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       let insertedCount = 0;
       let updatedCount = 0;
       const newlyInsertedMasterIds: string[] = []; // Track new certificates for applicability creation
+      const vesselSpecificSet = new Set(vesselSpecificCerts); // For quick lookup
       
       // Fetch distinct vessels from existing applicability records
       // (vessels come from external Vessel Master API, not the internal vessels table)
@@ -9395,12 +9402,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
       
-      // Auto-create vessel_certificate_applicability records for all vessels
-      // for newly inserted certificates (with is_applicable = true by default)
-      if (newlyInsertedMasterIds.length > 0 && allVessels.length > 0) {
-        console.log(`🔗 Auto-creating applicability records for ${allVessels.length} vessels for ${newlyInsertedMasterIds.length} new certificate(s)`);
+      // Auto-create vessel_certificate_applicability records
+      // - For VES- certificates: only for target vessels
+      // - For CMP- and other certificates: for all vessels
+      if (newlyInsertedMasterIds.length > 0) {
+        // Separate vessel-specific and company-wide new certificates
+        const companyWideMasterIds = newlyInsertedMasterIds.filter(id => !vesselSpecificSet.has(id));
+        const vesselOnlyMasterIds = newlyInsertedMasterIds.filter(id => vesselSpecificSet.has(id));
         
-        // Get existing applicability records for these new master IDs to avoid duplicates
+        // Get existing applicability records to avoid duplicates
         const existingApplicability = await db.select({
           vesselId: vesselCertificateApplicability.vesselId,
           masterId: vesselCertificateApplicability.masterId,
@@ -9412,18 +9422,45 @@ export async function registerRoutes(app: Express): Promise<Server> {
           existingApplicability.map(app => `${app.vesselId}-${app.masterId}`)
         );
         
-        // Prepare bulk insert values
         const applicabilityToInsert = [];
-        for (const masterId of newlyInsertedMasterIds) {
-          for (const vessel of allVessels) {
-            const key = `${vessel.id}-${masterId}`;
-            if (!existingKeys.has(key)) {
-              applicabilityToInsert.push({
-                vesselId: vessel.id,
-                vesselName: vessel.name,
-                masterId: masterId,
-                isApplicable: true,
-              });
+        
+        // Create applicability for company-wide certificates (CMP-, category-based) - for ALL vessels
+        if (companyWideMasterIds.length > 0 && allVessels.length > 0) {
+          console.log(`🔗 Auto-creating applicability records for ${allVessels.length} vessels for ${companyWideMasterIds.length} company-wide certificate(s)`);
+          
+          for (const masterId of companyWideMasterIds) {
+            for (const vessel of allVessels) {
+              const key = `${vessel.id}-${masterId}`;
+              if (!existingKeys.has(key)) {
+                applicabilityToInsert.push({
+                  vesselId: vessel.id,
+                  vesselName: vessel.name,
+                  masterId: masterId,
+                  isApplicable: true,
+                });
+              }
+            }
+          }
+        }
+        
+        // Create applicability for vessel-specific certificates (VES-) - only for target vessels
+        if (vesselOnlyMasterIds.length > 0 && targetVesselIds.length > 0) {
+          console.log(`🚢 Auto-creating applicability records for ${targetVesselIds.length} target vessel(s) for ${vesselOnlyMasterIds.length} vessel-specific certificate(s)`);
+          
+          // Get vessel names for the target vessel IDs
+          const targetVessels = allVessels.filter(v => targetVesselIds.includes(v.id));
+          
+          for (const masterId of vesselOnlyMasterIds) {
+            for (const vessel of targetVessels) {
+              const key = `${vessel.id}-${masterId}`;
+              if (!existingKeys.has(key)) {
+                applicabilityToInsert.push({
+                  vesselId: vessel.id,
+                  vesselName: vessel.name,
+                  masterId: masterId,
+                  isApplicable: true,
+                });
+              }
             }
           }
         }

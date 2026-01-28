@@ -304,8 +304,12 @@ export default function ShipsCertificatesAdmin() {
   
   // Save certificates mutation
   const saveMutation = useMutation({
-    mutationFn: async (certificates: MasterCertificate[]) => {
-      const response = await apiRequest('POST', '/technical/api/admin/ship-certificates-master', { certificates });
+    mutationFn: async (payload: { 
+      certificates: MasterCertificate[]; 
+      vesselSpecificCerts?: string[];
+      targetVesselIds?: string[];
+    }) => {
+      const response = await apiRequest('POST', '/technical/api/admin/ship-certificates-master', payload);
       return response.json();
     },
     onSuccess: (data) => {
@@ -315,8 +319,9 @@ export default function ShipsCertificatesAdmin() {
       });
       setHasUnsavedChanges(false);
       setHasSavedInSession(prev => ({ ...prev, [activeTab]: true }));
-      // Clear company-only certificates since they're now saved to master
+      // Clear company-only and vessel-only certificates since they're now saved to master
       setCompanyOnlyCerts([]);
+      setVesselOnlyCerts([]);
       queryClient.invalidateQueries({ queryKey: ['/technical/api/admin/ship-certificates-master'] });
       queryClient.invalidateQueries({ queryKey: ['/technical/api/admin/vessel-certificate-applicability'] });
     },
@@ -356,19 +361,25 @@ export default function ShipsCertificatesAdmin() {
   const handleSave = () => {
     // Find the highest existing CMP- sequence number from masterData
     let maxCmpSeq = 0;
+    let maxVesSeq = 0;
     for (const cert of masterData) {
-      const match = cert.masterId.match(/^CMP-(\d+)$/);
-      if (match) {
-        const seq = parseInt(match[1], 10);
+      const cmpMatch = cert.masterId.match(/^CMP-(\d+)$/);
+      if (cmpMatch) {
+        const seq = parseInt(cmpMatch[1], 10);
         if (seq > maxCmpSeq) maxCmpSeq = seq;
+      }
+      const vesMatch = cert.masterId.match(/^VES-(\d+)$/);
+      if (vesMatch) {
+        const seq = parseInt(vesMatch[1], 10);
+        if (seq > maxVesSeq) maxVesSeq = seq;
       }
     }
     
     // Convert company-only certificates to master format with generated IDs
     // Use incremental counter starting from maxCmpSeq + 1
-    let nextSeq = maxCmpSeq + 1;
+    let nextCmpSeq = maxCmpSeq + 1;
     const companyOnlyCertsWithIds: MasterCertificate[] = companyOnlyCerts.map((cert, idx) => {
-      const newMasterId = `CMP-${String(nextSeq++).padStart(3, '0')}`;
+      const newMasterId = `CMP-${String(nextCmpSeq++).padStart(3, '0')}`;
       
       return {
         id: cert.id,
@@ -388,9 +399,44 @@ export default function ShipsCertificatesAdmin() {
       };
     });
     
-    // Combine masterData with company-only certificates
-    const allCertificates = [...masterData, ...companyOnlyCertsWithIds];
-    saveMutation.mutate(allCertificates);
+    // Convert vessel-only certificates to master format with VES- IDs
+    // Use incremental counter starting from maxVesSeq + 1
+    let nextVesSeq = maxVesSeq + 1;
+    const baseSequence = masterData.length + companyOnlyCertsWithIds.length;
+    const vesselOnlyCertsWithIds: MasterCertificate[] = vesselOnlyCerts.map((cert, idx) => {
+      const newMasterId = `VES-${String(nextVesSeq++).padStart(3, '0')}`;
+      
+      return {
+        id: cert.id,
+        sequence: baseSequence + idx + 1,
+        masterId: newMasterId,
+        certificateName: cert.certificateLabel, // Use label as name
+        category: 'Vessel', // Mark as vessel-added
+        group: cert.companyGroup || 'Vessel Specific',
+        requirementRef: cert.requirementRef || '',
+        applicableToCompany: false, // Vessel certs are not company-wide
+        certificateLabel: cert.certificateLabel,
+        isActive: true,
+        // Vessel certs use VES- prefix for company ID
+        companyId: cert.companyId || newMasterId.replace('VES-', 'VV'),
+        companyGroup: cert.companyGroup || '',
+        companySequence: baseSequence + idx + 1,
+      };
+    });
+    
+    // Combine masterData with company-only and vessel-only certificates
+    const allCertificates = [...masterData, ...companyOnlyCertsWithIds, ...vesselOnlyCertsWithIds];
+    
+    // Get selected vessel IDs for vessel-specific certificate applicability
+    const vesselIds = getSelectedVesselIds();
+    const vesselMasterIds = vesselOnlyCertsWithIds.map(c => c.masterId);
+    
+    // Pass vessel-specific info along with certificates
+    saveMutation.mutate({ 
+      certificates: allCertificates,
+      vesselSpecificCerts: vesselMasterIds,
+      targetVesselIds: vesselIds,
+    } as any);
   };
   
   // Load labels from database when available
