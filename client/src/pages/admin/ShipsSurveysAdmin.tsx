@@ -462,9 +462,8 @@ export default function ShipsSurveysAdmin() {
 
       <div className="flex-1 overflow-hidden">
         {activeTab === "master" && (
-          <div className="h-full flex flex-col bg-white rounded-lg border">
-            <div className="flex-shrink-0 p-4 border-b">
-              <div className="flex items-center gap-4">
+          <div className="h-full flex flex-col space-y-4">
+            <div className="flex items-center gap-3 flex-wrap">
                 <div className="relative flex-1 max-w-sm">
                   <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
                   <Input
@@ -497,20 +496,19 @@ export default function ShipsSurveysAdmin() {
                     ))}
                   </SelectContent>
                 </Select>
-                {isEditMode && (
-                  <Button 
-                    size="sm" 
-                    onClick={addNewRow}
-                    className="bg-[#5dc86f] hover:bg-[#4db85f] text-white"
-                    data-testid="button-add-row"
-                  >
-                    <Plus className="w-4 h-4 mr-1" /> Add Survey
-                  </Button>
-                )}
-              </div>
+              {isEditMode && (
+                <Button 
+                  size="sm" 
+                  onClick={addNewRow}
+                  className="bg-[#5dc86f] hover:bg-[#4db85f] text-white"
+                  data-testid="button-add-row"
+                >
+                  <Plus className="w-4 h-4 mr-1" /> Add Survey
+                </Button>
+              )}
             </div>
             
-            <div className="flex-1 overflow-auto">
+            <div className="flex-1 overflow-auto bg-white rounded-lg border">
               {isLoadingSurveys ? (
                 <div className="flex items-center justify-center h-full">
                   <Loader2 className="w-8 h-8 animate-spin text-gray-400" />
@@ -653,12 +651,12 @@ export default function ShipsSurveysAdmin() {
         )}
 
         {activeTab === "company" && (
-          <div className="h-full flex flex-col bg-white rounded-lg border">
-            <div className="flex-shrink-0 p-4 border-b">
+          <div className="h-full flex flex-col space-y-4">
+            <div className="flex items-center gap-3 flex-wrap">
               <p className="text-sm text-gray-500">Company surveys configuration - filters and actions will appear here</p>
             </div>
-            <div className="flex-1 overflow-auto p-4">
-              <div className="flex items-center justify-center h-full text-gray-400">
+            <div className="flex-1 overflow-auto bg-white rounded-lg border">
+              <div className="flex items-center justify-center h-full text-gray-400 p-4">
                 Company surveys table will be displayed here
               </div>
             </div>
@@ -666,12 +664,12 @@ export default function ShipsSurveysAdmin() {
         )}
 
         {activeTab === "vessel" && (
-          <div className="h-full flex flex-col bg-white rounded-lg border">
-            <div className="flex-shrink-0 p-4 border-b">
+          <div className="h-full flex flex-col space-y-4">
+            <div className="flex items-center gap-3 flex-wrap">
               <p className="text-sm text-gray-500">Vessel surveys configuration - vessel selector and filters will appear here</p>
             </div>
-            <div className="flex-1 overflow-auto p-4">
-              <div className="flex items-center justify-center h-full text-gray-400">
+            <div className="flex-1 overflow-auto bg-white rounded-lg border">
+              <div className="flex items-center justify-center h-full text-gray-400 p-4">
                 Vessel surveys table will be displayed here
               </div>
             </div>
