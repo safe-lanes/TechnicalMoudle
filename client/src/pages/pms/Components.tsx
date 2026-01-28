@@ -63,7 +63,7 @@ interface ComponentNode {
 const ComponentInformationSection: React.FC<{ isExpanded: boolean; selectedComponent: ComponentNode | null; isModifyMode?: boolean; onDataChange?: (data: any) => void; previewChanges?: any[]; isPreviewMode?: boolean }> = ({ isExpanded, selectedComponent, isModifyMode = false, onDataChange, previewChanges = [], isPreviewMode = false }) => {
   const { isChangeRequestMode } = useChangeRequest();
   const { collectDiff } = useChangeMode();
-  const { isSailAdmin, isClientAdmin } = useUIRole();
+  const { isSailAdmin } = useUIRole();
   const isChangeMode = isModifyMode;
 
   // Helper function to check if a field has changes in preview mode
@@ -242,7 +242,7 @@ const ComponentInformationSection: React.FC<{ isExpanded: boolean; selectedCompo
     <div className="space-y-4">
       {/* Auto-flowing grid for component fields - visible fields fill gaps automatically */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-        {(isSailAdmin || isClientAdmin) && (
+        {isSailAdmin && (
         <div>
           <label className={`text-xs font-medium ${isChangeRequestMode ? 'text-white' : 'text-gray-600'} block mb-1`} data-testid="B7.A.1"><Marker id="B7.A.1" /> Fleet Equipment Code</label>
           {isChangeMode ? (
@@ -262,7 +262,7 @@ const ComponentInformationSection: React.FC<{ isExpanded: boolean; selectedCompo
           )}
         </div>
         )}
-        {(isSailAdmin || isClientAdmin) && (
+        {isSailAdmin && (
         <div>
           <label className={`text-xs font-medium ${isChangeRequestMode ? 'text-white' : 'text-gray-600'} block mb-1`} data-testid="B7.A.3"><Marker id="B7.A.3" /> Fleet Equipment Name</label>
           {isChangeMode ? (
@@ -282,7 +282,7 @@ const ComponentInformationSection: React.FC<{ isExpanded: boolean; selectedCompo
           )}
         </div>
         )}
-        {(isSailAdmin || isClientAdmin) && (
+        {isSailAdmin && (
         <div>
           <label className={`text-xs font-medium ${isChangeRequestMode ? 'text-white' : 'text-gray-600'} block mb-1`} data-testid="B7.A.5"><Marker id="B7.A.5" /> Parent Component Code</label>
           {isChangeMode ? (
@@ -350,7 +350,7 @@ const ComponentInformationSection: React.FC<{ isExpanded: boolean; selectedCompo
             </div>
           )}
         </div>
-        {(isSailAdmin || isClientAdmin) && (
+        {isSailAdmin && (
         <div>
           <label className={`text-xs font-medium ${isChangeRequestMode ? 'text-white' : 'text-gray-600'} block mb-1`} data-testid="B7.A.15"><Marker id="B7.A.15" /> Maker Code</label>
           {isChangeMode ? (
@@ -388,7 +388,7 @@ const ComponentInformationSection: React.FC<{ isExpanded: boolean; selectedCompo
             </div>
           )}
         </div>
-        {(isSailAdmin || isClientAdmin) && (
+        {isSailAdmin && (
         <div>
           <label className={`text-xs font-medium ${isChangeRequestMode ? 'text-white' : 'text-gray-600'} block mb-1`} data-testid="B7.A.19"><Marker id="B7.A.19" /> Model Code</label>
           {isChangeMode ? (
@@ -642,7 +642,7 @@ const ComponentInformationSection: React.FC<{ isExpanded: boolean; selectedCompo
             </div>
           )}
         </div>
-        {(isSailAdmin || isClientAdmin) && (
+        {isSailAdmin && (
         <div>
           <label className={`text-xs font-medium ${isChangeRequestMode ? 'text-white' : 'text-gray-600'} block mb-1`} data-testid="B7.A.43"><Marker id="B7.A.43" /> Vessel Code</label>
           {isChangeMode ? (
@@ -662,7 +662,7 @@ const ComponentInformationSection: React.FC<{ isExpanded: boolean; selectedCompo
           )}
         </div>
         )}
-        {(isSailAdmin || isClientAdmin) && (
+        {isSailAdmin && (
         <div>
           <label className={`text-xs font-medium ${isChangeRequestMode ? 'text-white' : 'text-gray-600'} block mb-1`} data-testid="B7.A.45"><Marker id="B7.A.45" /> IS Parent</label>
           {isChangeMode ? (
@@ -947,7 +947,7 @@ const WorkOrdersSection: React.FC<{ componentCode: string; componentName: string
   const [, setLocation] = useLocation();
   const { toast } = useToast();
   const { vesselId } = useVessel();
-  const { isSailAdmin, isClientAdmin } = useUIRole();
+  const { isSailAdmin } = useUIRole();
   
   // Pagination state
   const [isTableExpanded, setIsTableExpanded] = useState(false);
@@ -1036,7 +1036,7 @@ const WorkOrdersSection: React.FC<{ componentCode: string; componentName: string
   return (
     <>
       <div className="overflow-x-auto">
-        {(isSailAdmin || isClientAdmin) && (
+        {isSailAdmin && (
         <div className="flex justify-end mb-3">
           <Button
             onClick={handleAddWorkOrder}
@@ -2243,7 +2243,7 @@ const Components: React.FC = () => {
   const { toast } = useToast();
   const { vesselId, setVesselId } = useVessel();
   const { data: vessels = [] } = useVessels();
-  const { isSailAdmin, isClientAdmin } = useUIRole();
+  const { isSailAdmin } = useUIRole();
   
   // Fetch components from API and build tree
   const { data: fetchedComponents = [], isLoading: isLoadingComponents } = useQuery<any[]>({
@@ -2969,7 +2969,7 @@ const Components: React.FC = () => {
               <Marker id="B1" /> Components {isChangeMode ? '- Edit Mode' : isChangeRequestMode ? '- Change Request Mode' : ''}
             </h1>
           </div>
-          {!isChangeRequestMode && !isChangeMode && (isSailAdmin || isClientAdmin) && (
+          {!isChangeRequestMode && !isChangeMode && isSailAdmin && (
             <Button 
               className="bg-[#5dc86f] hover:bg-[#4db85f] text-white"
               onClick={() => {
@@ -2986,7 +2986,7 @@ const Components: React.FC = () => {
         
         {/* Filters Row */}
         <div className="flex gap-4 mb-4">
-          {(isSailAdmin || isClientAdmin) && (
+          {isSailAdmin && (
           <div className="flex items-center gap-2" data-testid="B2">
             <Marker id="B2" />
             <span className={`text-sm font-medium ${isChangeRequestMode ? 'text-white' : 'text-gray-600'}`}>Vessel:</span>
@@ -3059,7 +3059,7 @@ const Components: React.FC = () => {
                   <h3 className="text-lg font-semibold text-[#15569e]" data-testid="B7.1">
                     <Marker id="B7.1" /> {selectedComponent.code} {selectedComponent.name}
                   </h3>
-                  {!isChangeRequestMode && !isChangeMode && (isSailAdmin || isClientAdmin) && (
+                  {!isChangeRequestMode && !isChangeMode && isSailAdmin && (
                     <Button
                       size="sm"
                       variant="outline"
