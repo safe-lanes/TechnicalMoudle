@@ -9341,7 +9341,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
           const effectiveSequence = master.companySequence ?? master.sequence ?? 9999;
           
           surveys.push({
-            id: master.companyId || master.masterId,
+            id: `${app.vesselId}-${app.masterId}`,
+            companyId: master.companyId || master.masterId,
             surveyName: master.surveyLabel || master.surveyName,
             type: master.companyGroup || '',
             vessel: app.vesselName,

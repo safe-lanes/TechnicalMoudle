@@ -36,6 +36,7 @@ const parseDisplayDate = (displayDate: string): string => {
 
 interface SurveyData {
   id: string;
+  companyId: string;
   surveyName: string;
   type: string;
   vessel: string;
@@ -222,23 +223,16 @@ export default function SurveysPage() {
     const field = colDef.field;
     if (!field || !data?.vesselId || !data?.masterId) return;
     
-    if (value === oldValue) {
-      console.log('[SurveysPage] Value not changed, skipping update');
+    // For date fields, the DateCellEditor's handleDateChange already handles the save
+    // Skip duplicate PATCH call here
+    if (EDITABLE_DATE_FIELDS.includes(field)) {
+      console.log('[SurveysPage] Skipping onCellEditingStopped for date field (handled by DateCellEditor)');
       return;
     }
     
-    if (EDITABLE_DATE_FIELDS.includes(field)) {
-      // Use compound key: vesselId-masterId
-      const compoundId = `${data.vesselId}-${data.masterId}`;
-      
-      console.log('[SurveysPage] Sending PATCH request for survey:', compoundId, 'field:', field, 'value:', value);
-      
-      updateSurveyMutation.mutate({
-        id: compoundId,
-        updates: {
-          [field]: value,
-        },
-      });
+    if (value === oldValue) {
+      console.log('[SurveysPage] Value not changed, skipping update');
+      return;
     }
   }, [updateSurveyMutation]);
 
@@ -261,7 +255,7 @@ export default function SurveysPage() {
   const columnDefs: ColDef[] = useMemo(() => [
     {
       headerName: 'Company ID',
-      field: 'id',
+      field: 'companyId',
       width: 90,
       cellStyle: { fontSize: '13px', color: '#4f5863' },
       filter: 'agTextColumnFilter',
