@@ -4,7 +4,7 @@ import { storage } from "./storage";
 import { getPool } from "./db";
 import * as fs from "fs";
 import * as path from "path";
-import { insertRunningHoursAuditSchema, cascadeRunningHoursSchema, insertWorkOrderSchema, insertWorkOrderExecutionSchema, insertDefectSchema, insertDefectActionSchema, insertDefectAttachmentSchema, insertComponentSchema, insertSpareSchema, insertMakerSchema, insertMasterListSchema, insertComponentDocumentSchema, insertComponentClassRegulatorySchema, insertComponentRequisitionSchema, equipmentCategories, defectCategories, defectTypes, shipCertificatesMaster, insertShipCertificateMasterSchema, shipCertificatesLabelsConfig, vesselCertificateApplicability, insertVesselCertificateApplicabilitySchema, vesselCertificateData, vessels } from "@shared/schema";
+import { insertRunningHoursAuditSchema, cascadeRunningHoursSchema, insertWorkOrderSchema, insertWorkOrderExecutionSchema, insertDefectSchema, insertDefectActionSchema, insertDefectAttachmentSchema, insertComponentSchema, insertSpareSchema, insertMakerSchema, insertMasterListSchema, insertComponentDocumentSchema, insertComponentClassRegulatorySchema, insertComponentRequisitionSchema, equipmentCategories, defectCategories, defectTypes, shipCertificatesMaster, insertShipCertificateMasterSchema, shipCertificatesLabelsConfig, vesselCertificateApplicability, insertVesselCertificateApplicabilitySchema, vesselCertificateData, vessels, shipSurveysMaster, shipSurveysLabelsConfig } from "@shared/schema";
 import { getPostgresClient } from "./postgresClient";
 import { eq, and, asc, sql, inArray } from "drizzle-orm";
 import { computeWorkOrderStatus } from "@shared/workOrders/status";
@@ -9778,6 +9778,202 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error: any) {
       console.error("Error bulk updating vessel certificate applicability:", error);
       res.status(500).json({ error: "Failed to bulk update vessel certificate applicability", details: error.message });
+    }
+  });
+
+  // ============================================================
+  // Ship Surveys Admin - Master Survey API Routes
+  // ============================================================
+  
+  // GET all ship surveys master entries
+  app.get("/technical/api/admin/ship-surveys-master", async (req, res) => {
+    try {
+      const postgres = await getPostgresClient();
+      if (!postgres) {
+        return res.status(503).json({ error: "Database not available" });
+      }
+      
+      const { db } = postgres;
+      const surveys = await db.select().from(shipSurveysMaster).orderBy(shipSurveysMaster.sequence);
+      
+      res.json(surveys);
+    } catch (error: any) {
+      console.error("Error fetching ship surveys master:", error);
+      res.status(500).json({ error: "Failed to fetch surveys" });
+    }
+  });
+  
+  // POST save all ship surveys master entries (bulk upsert)
+  app.post("/technical/api/admin/ship-surveys-master", async (req, res) => {
+    try {
+      const postgres = await getPostgresClient();
+      if (!postgres) {
+        return res.status(503).json({ error: "Database not available" });
+      }
+      
+      const { db } = postgres;
+      const surveys = req.body.surveys;
+      
+      if (!Array.isArray(surveys)) {
+        return res.status(400).json({ error: "surveys must be an array" });
+      }
+      
+      console.log(`💾 Saving ${surveys.length} ship surveys master entries...`);
+      
+      let insertedCount = 0;
+      let updatedCount = 0;
+      
+      for (const survey of surveys) {
+        // Check if survey already exists by masterId
+        const existing = await db.select().from(shipSurveysMaster)
+          .where(eq(shipSurveysMaster.masterId, survey.masterId))
+          .limit(1);
+        
+        if (existing.length > 0) {
+          // Update existing
+          await db.update(shipSurveysMaster)
+            .set({
+              sequence: survey.sequence,
+              surveyName: survey.surveyName,
+              category: survey.category,
+              group: survey.group,
+              requirementRef: survey.requirementRef || null,
+              applicableToCompany: survey.applicableToCompany || false,
+              surveyLabel: survey.surveyLabel || null,
+              isActive: survey.isActive !== false,
+              companyId: survey.companyId || null,
+              companyGroup: survey.companyGroup || null,
+              companySequence: survey.companySequence || null,
+              updatedAt: new Date(),
+            })
+            .where(eq(shipSurveysMaster.masterId, survey.masterId));
+          updatedCount++;
+        } else {
+          // Insert new
+          await db.insert(shipSurveysMaster).values({
+            sequence: survey.sequence,
+            masterId: survey.masterId,
+            surveyName: survey.surveyName,
+            category: survey.category,
+            group: survey.group,
+            requirementRef: survey.requirementRef || null,
+            applicableToCompany: survey.applicableToCompany || false,
+            surveyLabel: survey.surveyLabel || null,
+            isActive: survey.isActive !== false,
+            companyId: survey.companyId || null,
+            companyGroup: survey.companyGroup || null,
+            companySequence: survey.companySequence || null,
+          });
+          insertedCount++;
+        }
+      }
+      
+      console.log(`✅ Ship surveys master saved: ${insertedCount} inserted, ${updatedCount} updated`);
+      
+      res.json({ 
+        success: true, 
+        message: `Saved ${surveys.length} surveys`,
+        inserted: insertedCount,
+        updated: updatedCount
+      });
+    } catch (error: any) {
+      console.error("Error saving ship surveys master:", error);
+      res.status(500).json({ error: "Failed to save surveys", details: error.message });
+    }
+  });
+  
+  // DELETE a ship survey master entry by masterId
+  app.delete("/technical/api/admin/ship-surveys-master/:masterId", async (req, res) => {
+    try {
+      const postgres = await getPostgresClient();
+      if (!postgres) {
+        return res.status(503).json({ error: "Database not available" });
+      }
+      
+      const { db } = postgres;
+      const { masterId } = req.params;
+      
+      await db.delete(shipSurveysMaster)
+        .where(eq(shipSurveysMaster.masterId, masterId));
+      
+      console.log(`🗑️ Deleted ship survey master: ${masterId}`);
+      
+      res.json({ success: true, message: `Deleted survey ${masterId}` });
+    } catch (error: any) {
+      console.error("Error deleting ship survey master:", error);
+      res.status(500).json({ error: "Failed to delete survey" });
+    }
+  });
+  
+  // ============================================================
+  // Ship Surveys Admin - Labels Configuration API Routes
+  // ============================================================
+  
+  // GET all survey labels configuration
+  app.get("/technical/api/admin/ship-surveys-labels", async (req, res) => {
+    try {
+      const postgres = await getPostgresClient();
+      if (!postgres) {
+        return res.status(503).json({ error: "Database not available" });
+      }
+      
+      const { db } = postgres;
+      const labels = await db.select().from(shipSurveysLabelsConfig);
+      
+      // Transform to object grouped by configType
+      const result: Record<string, Array<{key: string, label: string}>> = {};
+      for (const item of labels) {
+        if (!result[item.configType]) {
+          result[item.configType] = [];
+        }
+        result[item.configType].push({ key: item.key, label: item.label });
+      }
+      
+      res.json(result);
+    } catch (error: any) {
+      console.error("Error fetching ship surveys labels config:", error);
+      res.status(500).json({ error: "Failed to fetch labels configuration" });
+    }
+  });
+  
+  // POST save survey labels configuration (bulk upsert)
+  app.post("/technical/api/admin/ship-surveys-labels", async (req, res) => {
+    try {
+      const postgres = await getPostgresClient();
+      if (!postgres) {
+        return res.status(503).json({ error: "Database not available" });
+      }
+      
+      const { db } = postgres;
+      const { configType, labels } = req.body;
+      
+      if (!configType || !Array.isArray(labels)) {
+        return res.status(400).json({ error: "Invalid request body: requires configType and labels array" });
+      }
+      
+      console.log(`💾 Saving ${labels.length} survey labels for config type: ${configType}...`);
+      
+      // Delete existing labels for this configType and re-insert
+      await db.delete(shipSurveysLabelsConfig)
+        .where(eq(shipSurveysLabelsConfig.configType, configType));
+      
+      // Insert new labels
+      if (labels.length > 0) {
+        const insertData = labels.map((item: {key: string, label: string}) => ({
+          configType,
+          key: item.key,
+          label: item.label || "",
+        }));
+        
+        await db.insert(shipSurveysLabelsConfig).values(insertData);
+      }
+      
+      console.log(`✅ Survey labels saved for ${configType}: ${labels.length} entries`);
+      
+      res.json({ success: true, message: `Saved ${labels.length} labels for ${configType}` });
+    } catch (error: any) {
+      console.error("Error saving ship surveys labels config:", error);
+      res.status(500).json({ error: "Failed to save labels configuration", details: error.message });
     }
   });
   
