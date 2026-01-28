@@ -1,6 +1,7 @@
 import React, { useState, useMemo, useEffect, useRef } from "react";
 import { useModifyMode } from "@/hooks/useModifyMode";
 import { useVessel } from "@/contexts/VesselContext";
+import { useUIRole } from "@/contexts/UIRoleContext";
 import { useLocation } from "wouter";
 import { Marker } from "@/components/Marker";
 import { Button } from "@/components/ui/button";
@@ -108,6 +109,9 @@ const Spares: React.FC = () => {
   
   // Modify mode state - use proper hook for reactivity
   const { isModifyMode } = useModifyMode();
+  
+  // UI Role context for role-based visibility
+  const { isVessel, isHeadOfDept, isSailAdmin, isClientAdmin } = useUIRole();
   const [showModifySubmitFooter, setShowModifySubmitFooter] = useState(false);
   const [originalSpareData, setOriginalSpareData] = useState<Spare | null>(null);
   const [modifiedSpareData, setModifiedSpareData] = useState<Partial<Spare>>({});
@@ -2116,16 +2120,18 @@ const Spares: React.FC = () => {
                             {isFirstRow && <Marker id="E34" />}
                             <Info className="h-4 w-4 text-blue-600" />
                           </Button>
-                          <Button 
-                            size="sm" 
-                            variant="ghost"
-                            onClick={() => openEditModal(spare)}
-                            title="Edit"
-                            data-testid={isFirstRow ? "E35" : `button-edit-${spare.id}`}
-                          >
-                            {isFirstRow && <Marker id="E35" />}
-                            <Edit2 className="h-4 w-4" />
-                          </Button>
+                          {(isSailAdmin || isClientAdmin) && (
+                            <Button 
+                              size="sm" 
+                              variant="ghost"
+                              onClick={() => openEditModal(spare)}
+                              title="Edit"
+                              data-testid={isFirstRow ? "E35" : `button-edit-${spare.id}`}
+                            >
+                              {isFirstRow && <Marker id="E35" />}
+                              <Edit2 className="h-4 w-4" />
+                            </Button>
+                          )}
                           <Button 
                             size="sm" 
                             variant="ghost"
@@ -2144,16 +2150,18 @@ const Spares: React.FC = () => {
                           >
                             <Settings2 className="h-4 w-4 text-orange-500" />
                           </Button>
-                          <Button 
-                            size="sm" 
-                            variant="ghost"
-                            onClick={() => handleDeleteSpare(spare.id)}
-                            title="Delete"
-                            data-testid={isFirstRow ? "E36" : `button-delete-${spare.id}`}
-                          >
-                            {isFirstRow && <Marker id="E36" />}
-                            <Trash2 className="h-4 w-4 text-red-500" />
-                          </Button>
+                          {(isSailAdmin || isClientAdmin) && (
+                            <Button 
+                              size="sm" 
+                              variant="ghost"
+                              onClick={() => handleDeleteSpare(spare.id)}
+                              title="Delete"
+                              data-testid={isFirstRow ? "E36" : `button-delete-${spare.id}`}
+                            >
+                              {isFirstRow && <Marker id="E36" />}
+                              <Trash2 className="h-4 w-4 text-red-500" />
+                            </Button>
+                          )}
                         </div>
                       </div>
                     </div>
