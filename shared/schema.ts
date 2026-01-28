@@ -1189,12 +1189,24 @@ export const defects = pgTable("defects", {
     dateCompleted?: string;
     status: string;
   }>>(),
-  // Attachments (stored inline for form wizard)
-  attachments: json("attachments").$type<Array<{
+  // Part A Attachments (stored inline for form wizard)
+  partAAttachments: json("part_a_attachments").$type<Array<{
+    id: string;
     name: string;
     size: number;
     type: string;
-  }>>(),
+    data: string;
+    uploadedAt: string;
+  }>>().default([]),
+  // Attachments (stored inline for form wizard)
+  attachments: json("attachments").$type<Array<{
+    id: string;
+    name: string;
+    size: number;
+    type: string;
+    data: string;
+    uploadedAt: string;
+  }>>().default([]),
   // Audit trail
   auditTrail: json("audit_trail").$type<Array<{
     action: string;

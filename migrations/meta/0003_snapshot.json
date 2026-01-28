@@ -1,5 +1,5 @@
 {
-  "id": "9562480c-cf3e-49a0-8197-c06c5d60bfda",
+  "id": "9ddf0287-6636-4514-8889-dd8a4e49b507",
   "prevId": "93f51e60-5d1d-4069-84b8-02d2fed472e6",
   "version": "7",
   "dialect": "postgresql",
@@ -4117,11 +4117,19 @@
           "primaryKey": false,
           "notNull": false
         },
+        "part_a_attachments": {
+          "name": "part_a_attachments",
+          "type": "json",
+          "primaryKey": false,
+          "notNull": false,
+          "default": "'[]'::json"
+        },
         "attachments": {
           "name": "attachments",
           "type": "json",
           "primaryKey": false,
-          "notNull": false
+          "notNull": false,
+          "default": "'[]'::json"
         },
         "audit_trail": {
           "name": "audit_trail",
@@ -9279,20 +9287,6 @@
           "type": "text",
           "primaryKey": false,
           "notNull": false
-        },
-        "ihm_presence": {
-          "name": "ihm_presence",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false,
-          "default": "'Unknown'"
-        },
-        "ihm_evidence_type": {
-          "name": "ihm_evidence_type",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false,
-          "default": "'None'"
         },
         "remarks": {
           "name": "remarks",
