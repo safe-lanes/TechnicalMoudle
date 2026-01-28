@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { useUIRole } from "@/contexts/UIRoleContext";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -152,6 +153,7 @@ export default function UniformBulkUpload({
   onRefreshData,
   markers
 }: UniformBulkUploadProps) {
+  const { isSailAdmin } = useUIRole();
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [importMode, setImportMode] = useState<'add' | 'update' | 'upsert'>('upsert');
   const [selectedStoreType, setSelectedStoreType] = useState<string>('');
@@ -612,13 +614,15 @@ export default function UniformBulkUpload({
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <TabsList className="grid w-full grid-cols-3">
+        <TabsList className={`grid w-full ${isSailAdmin ? 'grid-cols-3' : 'grid-cols-2'}`}>
           <TabsTrigger value="upload" data-testid={markers?.tabUpload || "tab-upload"}>
             Upload
           </TabsTrigger>
-          <TabsTrigger value="mapping" data-testid={markers?.tabMapping || "tab-mapping"}>
-            Field Mapping Guide
-          </TabsTrigger>
+          {isSailAdmin && (
+            <TabsTrigger value="mapping" data-testid={markers?.tabMapping || "tab-mapping"}>
+              Field Mapping Guide
+            </TabsTrigger>
+          )}
           <TabsTrigger value="history" data-testid={markers?.tabHistory || "tab-history"}>
             History
           </TabsTrigger>
@@ -1008,44 +1012,46 @@ export default function UniformBulkUpload({
           </Card>
         </TabsContent>
 
-        <TabsContent value="mapping" className="pt-4">
-          <Card>
-            <CardHeader>
-              <CardTitle>Field Mapping Guide</CardTitle>
-              <CardDescription>
-                Required and optional fields for {templateType} import
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="rounded-lg border overflow-hidden">
-                <Table>
-                  <TableHeader>
-                    <TableRow className="bg-gray-50">
-                      <TableHead>Field Name</TableHead>
-                      <TableHead className="w-24 text-center">Required</TableHead>
-                      <TableHead>Description</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {fieldMappings.map((field) => (
-                      <TableRow key={field.field}>
-                        <TableCell className="font-medium">{field.field}</TableCell>
-                        <TableCell className="text-center">
-                          {field.required ? (
-                            <Badge variant="destructive">Required</Badge>
-                          ) : (
-                            <Badge variant="outline">Optional</Badge>
-                          )}
-                        </TableCell>
-                        <TableCell className="text-gray-600">{field.description}</TableCell>
+        {isSailAdmin && (
+          <TabsContent value="mapping" className="pt-4">
+            <Card>
+              <CardHeader>
+                <CardTitle>Field Mapping Guide</CardTitle>
+                <CardDescription>
+                  Required and optional fields for {templateType} import
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="rounded-lg border overflow-hidden">
+                  <Table>
+                    <TableHeader>
+                      <TableRow className="bg-gray-50">
+                        <TableHead>Field Name</TableHead>
+                        <TableHead className="w-24 text-center">Required</TableHead>
+                        <TableHead>Description</TableHead>
                       </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
+                    </TableHeader>
+                    <TableBody>
+                      {fieldMappings.map((field) => (
+                        <TableRow key={field.field}>
+                          <TableCell className="font-medium">{field.field}</TableCell>
+                          <TableCell className="text-center">
+                            {field.required ? (
+                              <Badge variant="destructive">Required</Badge>
+                            ) : (
+                              <Badge variant="outline">Optional</Badge>
+                            )}
+                          </TableCell>
+                          <TableCell className="text-gray-600">{field.description}</TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+        )}
 
         <TabsContent value="history" className="pt-4">
           <Card>
