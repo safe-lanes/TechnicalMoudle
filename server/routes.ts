@@ -9341,7 +9341,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           const effectiveSequence = master.companySequence ?? master.sequence ?? 9999;
           
           surveys.push({
-            id: `${app.vesselId}-${app.masterId}`,
+            id: `${app.vesselId}::${app.masterId}`,
             companyId: master.companyId || master.masterId,
             surveyName: master.surveyLabel || master.surveyName,
             type: master.companyGroup || '',
@@ -9451,16 +9451,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { db } = postgres;
       
       const compoundId = req.params.id;
-      const parts = compoundId.split('-');
+      // Use :: as separator to avoid conflicts with dashes in vesselId (UUID format) and masterId
+      const parts = compoundId.split('::');
       
-      // Handle compound ID format: vesselId-masterId (masterId may contain dashes like "A1-001")
-      if (parts.length < 2) {
-        return res.status(400).json({ error: "Invalid ID format. Expected vesselId-masterId" });
+      if (parts.length !== 2) {
+        return res.status(400).json({ error: "Invalid ID format. Expected vesselId::masterId" });
       }
       
-      // First part is vesselId, rest is masterId (which may contain dashes)
       const vesselId = parts[0];
-      const masterId = parts.slice(1).join('-');
+      const masterId = parts[1];
       
       const { surveyDate, dueDate, firstRangeDate, secondRangeDate, postponed, attachments } = req.body;
       
