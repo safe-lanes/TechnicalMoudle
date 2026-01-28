@@ -121,6 +121,7 @@ export default function DefectFormWizard({
     approvalDate: '',
     approverComments: ''
   });
+  const [isSubmittingExtension, setIsSubmittingExtension] = useState(false);
   
   // Fetch office users for approval dropdown from Admin > Masters > Users
   const { data: externalUsersData = [] } = useExternalUsers();
@@ -292,7 +293,7 @@ export default function DefectFormWizard({
     setIsRootCauseModalOpen(false);
   };
 
-  const saveDefect = async (data: DefectFormData, showToast = true, navigate = false): Promise<boolean> => {
+  const saveDefect = async (data: DefectFormData, showToast = true, navigate = false, extensionsOverride?: typeof targetDateExtensions): Promise<boolean> => {
     try {
       const submitData: any = {
         ...data,
@@ -300,7 +301,7 @@ export default function DefectFormWizard({
         reference: defectId,
         partAAttachments: partAAttachments,
         attachments: fileAttachments,
-        targetDateExtensions: targetDateExtensions,
+        targetDateExtensions: extensionsOverride ?? targetDateExtensions,
       };
       
       if (currentDefect?.id) {
@@ -1645,48 +1646,66 @@ export default function DefectFormWizard({
                           <div className="flex justify-end pt-2">
                             <Button
                               type="button"
-                              onClick={() => {
-                                const existingTargetDate = form.getValues('targetCloseDate') || '';
-                                const approverUser = officeUsers.find((u: any) => u.id.toString() === currentExtension.submitForApprovalTo);
-                                const newExtension = {
-                                  id: `EXT-${Date.now()}`,
-                                  existingTargetDate,
-                                  newTargetDate: currentExtension.newTargetDate,
-                                  reasonForExtension: currentExtension.reasonForExtension,
-                                  submitForApprovalTo: currentExtension.submitForApprovalTo,
-                                  submitForApprovalToName: approverUser?.fullName || '',
-                                  status: (currentExtension.approved === true ? 'Approved' : currentExtension.approved === false ? 'Rejected' : 'Requested') as 'Requested' | 'Approved' | 'Rejected',
-                                  approved: currentExtension.approved,
-                                  approvalDate: currentExtension.approvalDate,
-                                  approverComments: currentExtension.approverComments,
-                                  electronicConfirmation: currentExtension.approved !== undefined 
-                                    ? `Approved by System User on ${new Date().toLocaleDateString()}` 
-                                    : undefined,
-                                  requestedAt: new Date().toISOString(),
-                                };
+                              onClick={async () => {
+                                // Prevent duplicate submissions
+                                if (isSubmittingExtension) return;
+                                setIsSubmittingExtension(true);
                                 
-                                setTargetDateExtensions(prev => [...prev, newExtension]);
-                                
-                                if (newExtension.status === 'Approved' && newExtension.newTargetDate) {
-                                  form.setValue('targetCloseDate', newExtension.newTargetDate);
+                                try {
+                                  // Validate form before saving
+                                  const isValid = await form.trigger();
+                                  if (!isValid) {
+                                    toast({ title: "Please fix form errors before submitting extension", variant: "destructive" });
+                                    return;
+                                  }
+                                  
+                                  const existingTargetDate = form.getValues('targetCloseDate') || '';
+                                  const approverUser = officeUsers.find((u: any) => u.id.toString() === currentExtension.submitForApprovalTo);
+                                  const newExtension = {
+                                    id: `EXT-${Date.now()}`,
+                                    existingTargetDate,
+                                    newTargetDate: currentExtension.newTargetDate,
+                                    reasonForExtension: currentExtension.reasonForExtension,
+                                    submitForApprovalTo: currentExtension.submitForApprovalTo,
+                                    submitForApprovalToName: approverUser?.fullName || '',
+                                    status: (currentExtension.approved === true ? 'Approved' : currentExtension.approved === false ? 'Rejected' : 'Requested') as 'Requested' | 'Approved' | 'Rejected',
+                                    approved: currentExtension.approved,
+                                    approvalDate: currentExtension.approvalDate,
+                                    approverComments: currentExtension.approverComments,
+                                    electronicConfirmation: currentExtension.approved !== undefined 
+                                      ? `Approved by System User on ${new Date().toLocaleDateString()}` 
+                                      : undefined,
+                                    requestedAt: new Date().toISOString(),
+                                  };
+                                  
+                                  // Update the extensions array
+                                  const updatedExtensions = [...targetDateExtensions, newExtension];
+                                  setTargetDateExtensions(updatedExtensions);
+                                  
+                                  if (newExtension.status === 'Approved' && newExtension.newTargetDate) {
+                                    form.setValue('targetCloseDate', newExtension.newTargetDate);
+                                  }
+                                  
+                                  // Don't clear currentExtension - keep the values visible in the form
+                                  
+                                  // Auto-save using the existing saveDefect function with the updated extensions
+                                  const formData = form.getValues();
+                                  const success = await saveDefect(formData, false, false, updatedExtensions);
+                                  
+                                  if (success) {
+                                    toast({ title: newExtension.status === 'Requested' ? "Extension request submitted and saved" : `Extension ${newExtension.status.toLowerCase()} and saved` });
+                                  } else {
+                                    toast({ title: "Extension added but save failed. Please click SAVE.", variant: "destructive" });
+                                  }
+                                } finally {
+                                  setIsSubmittingExtension(false);
                                 }
-                                
-                                setCurrentExtension({
-                                  newTargetDate: '',
-                                  reasonForExtension: '',
-                                  submitForApprovalTo: '',
-                                  approved: undefined,
-                                  approvalDate: '',
-                                  approverComments: ''
-                                });
-                                
-                                toast({ title: newExtension.status === 'Requested' ? "Extension request submitted" : `Extension ${newExtension.status.toLowerCase()}` });
                               }}
                               className="bg-blue-600 hover:bg-blue-700 text-white px-6"
                               data-testid="button-submit-extension"
-                              disabled={!currentExtension.newTargetDate || !currentExtension.reasonForExtension}
+                              disabled={!currentExtension.newTargetDate || !currentExtension.reasonForExtension || isSubmittingExtension}
                             >
-                              Submit
+                              {isSubmittingExtension ? 'Saving...' : 'Submit'}
                             </Button>
                           </div>
                         )}
