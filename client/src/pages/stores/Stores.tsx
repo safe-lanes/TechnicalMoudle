@@ -1,6 +1,7 @@
 import React, { useState, useMemo, useEffect, useRef } from "react";
 import { useModifyMode } from "@/hooks/useModifyMode";
 import { useVessel } from "@/contexts/VesselContext";
+import { useUIRole } from "@/contexts/UIRoleContext";
 import { Marker } from "@/components/Marker";
 import { useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
@@ -116,6 +117,7 @@ const Stores: React.FC = () => {
   const [, navigate] = useLocation();
   const { toast } = useToast();
   const { vesselId, setVesselId } = useVessel();
+  const { isVessel } = useUIRole();
   const { data: vessels = [] } = useVessels();
   const [activeTab, setActiveTab] = useState<"stores" | "lubes" | "chemicals" | "others">(() => {
     const savedTab = sessionStorage.getItem('storesActiveTab');
@@ -1473,18 +1475,20 @@ const Stores: React.FC = () => {
                   </div>
                 )}
                 <div className="flex gap-1 items-center justify-end pr-2 whitespace-nowrap">
-                  <Button 
-                    variant="ghost" 
-                    size="sm" 
-                    className="h-7 w-7 p-0 hover:bg-gray-100"
-                    onClick={() => openEditModal(item)}
-                    aria-label="Edit Item"
-                    title="Edit"
-                    data-testid={index === 0 ? getMarkerId(activeTab, "29") : `button-edit-${item.id}`}
-                  >
-                    {index === 0 && <Marker id={getMarkerId(activeTab, "29")} />}
-                    <Edit2 className="h-4 w-4" />
-                  </Button>
+                  {!isVessel && (
+                    <Button 
+                      variant="ghost" 
+                      size="sm" 
+                      className="h-7 w-7 p-0 hover:bg-gray-100"
+                      onClick={() => openEditModal(item)}
+                      aria-label="Edit Item"
+                      title="Edit"
+                      data-testid={index === 0 ? getMarkerId(activeTab, "29") : `button-edit-${item.id}`}
+                    >
+                      {index === 0 && <Marker id={getMarkerId(activeTab, "29")} />}
+                      <Edit2 className="h-4 w-4" />
+                    </Button>
+                  )}
                   <Button 
                     variant="ghost" 
                     size="sm" 
@@ -1497,18 +1501,20 @@ const Stores: React.FC = () => {
                     {index === 0 && <Marker id={getMarkerId(activeTab, "30")} />}
                     <PlusCircle className="h-4 w-4" />
                   </Button>
-                  <Button 
-                    variant="ghost" 
-                    size="sm" 
-                    className="h-7 w-7 p-0 hover:bg-gray-100"
-                    onClick={() => handleDelete(item)}
-                    aria-label="Delete Item"
-                    title="Delete"
-                    data-testid={index === 0 ? getMarkerId(activeTab, "31") : `button-delete-${item.id}`}
-                  >
-                    {index === 0 && <Marker id={getMarkerId(activeTab, "31")} />}
-                    <Trash2 className="h-4 w-4 text-red-500" />
-                  </Button>
+                  {!isVessel && (
+                    <Button 
+                      variant="ghost" 
+                      size="sm" 
+                      className="h-7 w-7 p-0 hover:bg-gray-100"
+                      onClick={() => handleDelete(item)}
+                      aria-label="Delete Item"
+                      title="Delete"
+                      data-testid={index === 0 ? getMarkerId(activeTab, "31") : `button-delete-${item.id}`}
+                    >
+                      {index === 0 && <Marker id={getMarkerId(activeTab, "31")} />}
+                      <Trash2 className="h-4 w-4 text-red-500" />
+                    </Button>
+                  )}
                 </div>
               </div>
             </div>
