@@ -135,14 +135,68 @@ export default function DefectsLog() {
     return result;
   }, [defects, selectedVesselNames]);
 
-  const getStatusBadge = (status: string, critical: boolean) => {
-    if (status === "Closed") {
-      return <CheckCircle className="h-4 w-4 text-green-600" />;
+  // Compute defect status based on data (matches DefectsCoC.tsx logic)
+  const getComputedStatus = (defect: Defect): { label: string; color: string } => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    
+    const parseDate = (dateStr: string | null | undefined): Date | null => {
+      if (!dateStr) return null;
+      const match = String(dateStr).match(/^(\d{4})-(\d{2})-(\d{2})/);
+      if (match) {
+        const [, year, month, day] = match;
+        const date = new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
+        date.setHours(0, 0, 0, 0);
+        return date;
+      }
+      const date = new Date(dateStr);
+      if (isNaN(date.getTime())) return null;
+      date.setHours(0, 0, 0, 0);
+      return date;
+    };
+    
+    const dateCompleted = parseDate(defect.dateCompleted);
+    const targetCloseDate = parseDate(defect.targetCloseDate);
+    const hasActions = defect.actions && Array.isArray(defect.actions) && defect.actions.length > 0;
+    const isExtended = defect.isDeferred === true;
+    
+    // 1. Verified (green) - Final state, always takes precedence
+    if (defect.verified === true) {
+      return { label: 'Verified', color: 'text-green-600' };
     }
-    if (critical) {
-      return <AlertTriangle className="h-4 w-4 text-red-600" />;
+    
+    // 2. Closed (green) - Completed on or before target date
+    if (dateCompleted && targetCloseDate && dateCompleted <= targetCloseDate) {
+      return { label: 'Closed', color: 'text-green-600' };
     }
-    return <Clock className="h-4 w-4 text-amber-600" />;
+    
+    // 3. Closed (orange) - Completed after target date
+    if (dateCompleted && targetCloseDate && dateCompleted > targetCloseDate) {
+      return { label: 'Closed', color: 'text-orange-500' };
+    }
+    
+    // 4. Closed (green) - Completed without target date comparison
+    if (dateCompleted) {
+      return { label: 'Closed', color: 'text-green-600' };
+    }
+    
+    // 5. Overdue (red) - Past target date without completion and not extended
+    if (!dateCompleted && targetCloseDate && today > targetCloseDate && !isExtended) {
+      return { label: 'Overdue', color: 'text-red-600' };
+    }
+    
+    // 6. Extended (orange) - Target date extension approved
+    if (isExtended) {
+      return { label: 'Extended', color: 'text-orange-500' };
+    }
+    
+    // 7. In Progress (blue) - Part B submitted (has at least 1 action)
+    if (hasActions) {
+      return { label: 'In Progress', color: 'text-blue-600' };
+    }
+    
+    // 8. Reported (dark grey) - Default state, only Part A submitted
+    return { label: 'Reported', color: 'text-gray-600' };
   };
 
   const handleFilterChange = (key: keyof DefectsFilters, value: any) => {
@@ -413,7 +467,9 @@ export default function DefectsLog() {
                     <div className="text-gray-700">{formatForDisplay(defect.targetCloseDate)}</div>
                     <div className="text-gray-700">{formatForDisplay(defect.dateCompleted)}</div>
                     <div className="flex items-center gap-1">
-                      {getStatusBadge(defect.status, defect.critical)}
+                      <span className={`text-xs font-medium ${getComputedStatus(defect).color}`}>
+                        {getComputedStatus(defect).label}
+                      </span>
                     </div>
                     <div className="flex items-center">
                       {defect.priority ? (
