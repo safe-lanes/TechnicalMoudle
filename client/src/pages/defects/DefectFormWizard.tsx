@@ -1485,7 +1485,7 @@ export default function DefectFormWizard({
                   {/* B5. Target Date Extension */}
                   <div className="space-y-4 pt-6">
                     <div className="flex items-center justify-center">
-                      {!showExtensionForm && (
+                      {!showExtensionForm && targetDateExtensions.length === 0 && (
                         <Button
                           type="button"
                           variant="outline"
@@ -1501,7 +1501,7 @@ export default function DefectFormWizard({
                       )}
                     </div>
 
-                    {showExtensionForm && (
+                    {(showExtensionForm || targetDateExtensions.length > 0) && (
                       <div className="border border-amber-300 rounded-lg p-6 bg-amber-50/30 space-y-6">
                         <div className="flex items-center justify-between">
                           <h3 className="text-sm font-semibold" style={{ color: '#16569e' }}>B5. Target Date Extension</h3>
