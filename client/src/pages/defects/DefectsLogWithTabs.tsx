@@ -305,6 +305,10 @@ export default function DefectsLogWithTabs() {
     defectId: null 
   });
   const [showFilters, setShowFilters] = useState(true);
+  const [deleteDialog, setDeleteDialog] = useState<{ open: boolean; defect: Defect | null }>({
+    open: false,
+    defect: null
+  });
   const [unverifyDialog, setUnverifyDialog] = useState<{ open: boolean; defect: Defect | null }>({
     open: false,
     defect: null
@@ -430,7 +434,33 @@ export default function DefectsLogWithTabs() {
   };
   
   const handleDeleteClick = (defect: Defect) => {
-    console.log('Delete clicked for defect:', defect.id);
+    setDeleteDialog({ open: true, defect });
+  };
+  
+  const deleteMutation = useMutation({
+    mutationFn: async (defectId: string) => {
+      await apiRequest('DELETE', `/technical/api/defects/${defectId}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['defects'] });
+      toast({
+        title: "Success",
+        description: "Defect has been deleted successfully."
+      });
+      setDeleteDialog({ open: false, defect: null });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to delete defect",
+        variant: "destructive"
+      });
+    }
+  });
+  
+  const handleConfirmDelete = () => {
+    if (!deleteDialog.defect) return;
+    deleteMutation.mutate(deleteDialog.defect.id);
   };
   
   const canVerify = () => {
@@ -828,6 +858,27 @@ export default function DefectsLogWithTabs() {
             <AlertDialogCancel disabled={verifyMutation.isPending}>No</AlertDialogCancel>
             <AlertDialogAction onClick={handleConfirmUnverify} disabled={verifyMutation.isPending}>
               {verifyMutation.isPending ? "Processing..." : "Yes"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+      
+      <AlertDialog open={deleteDialog.open} onOpenChange={(open) => !open && !deleteMutation.isPending && setDeleteDialog({ open: false, defect: null })}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Defect?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete defect {deleteDialog.defect?.id}? This action cannot be undone and will permanently remove all associated data.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deleteMutation.isPending}>Cancel</AlertDialogCancel>
+            <AlertDialogAction 
+              onClick={handleConfirmDelete} 
+              disabled={deleteMutation.isPending}
+              className="bg-red-600"
+            >
+              {deleteMutation.isPending ? "Deleting..." : "Delete"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
