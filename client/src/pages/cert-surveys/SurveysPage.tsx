@@ -7,7 +7,6 @@ import AgGridTableActions from '@/components/AgGrid/AgGridTableActions';
 import DateCellEditor from '@/components/AgGrid/DateCellEditor';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
-import { Checkbox } from '@/components/ui/checkbox';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { FiltersToggle } from '@/components/filters/VesselFilter';
 import { VesselFleetGroupFilter, VesselFleetGroupFilterValue, VesselFleetGroupFilterResult, createDefaultFilterValue } from '@/components/filters/VesselFleetGroupFilter';
@@ -61,35 +60,9 @@ interface SurveysApiResponse {
 
 const EDITABLE_DATE_FIELDS = ['surveyDate', 'dueDate', 'firstRangeDate', 'secondRangeDate', 'postponed'];
 
-interface ApplicableCellRendererProps extends ICellRendererParams {
-  onToggleApplicable?: (id: string, newValue: boolean) => void;
-}
-
-const ApplicableCellRenderer = (params: ApplicableCellRendererProps) => {
-  if (!params.colDef || !params.data) return null;
-  
-  const handleChange = (checked: boolean | 'indeterminate') => {
-    if (params.context?.onToggleApplicable) {
-      const boolValue = checked === true;
-      params.context.onToggleApplicable(params.data.id, boolValue);
-    }
-  };
-  
-  return (
-    <div className="flex items-center justify-center h-full">
-      <Checkbox 
-        checked={params.value} 
-        onCheckedChange={handleChange}
-        className="data-[state=checked]:bg-[#52baf3] data-[state=checked]:border-[#52baf3] cursor-pointer"
-        data-testid={`checkbox-applicable-${params.data.id}`}
-      />
-    </div>
-  );
-};
-
 interface SurveyGridContext {
   onOpenAttachments?: (survey: SurveyData) => void;
-  onToggleApplicable?: (id: string, newValue: boolean) => void;
+  onDateChange?: (compoundId: string, field: string, newValue: string) => void;
 }
 
 interface ActionsCellRendererProps extends ICellRendererParams {
