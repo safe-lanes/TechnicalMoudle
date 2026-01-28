@@ -2102,13 +2102,13 @@ const Spares: React.FC = () => {
                         {FEATURES.IHM && (
                           <div className="px-2 flex justify-center" data-testid={isFirstRow ? "E33" : undefined}>
                             {isFirstRow && <Marker id="E33" />}
-                            {/* Mock IHM status - in real implementation, would come from API */}
-                            {spare.partCode === 'SP-ME-001' ? (
-                              <AlertCircle className="h-4 w-4 text-red-500" />
-                            ) : spare.partCode === 'SP-ME-002' ? (
-                              <CheckCircle className="h-4 w-4 text-green-500" />
+                            {/* IHM status from spare.ihm field: Yes=Red (hazardous), No=Green (compliant), Empty=Gray (unknown) */}
+                            {spare.ihm?.toLowerCase() === 'yes' ? (
+                              <span title="IHM Present - Hazardous Materials"><AlertCircle className="h-4 w-4 text-red-500" /></span>
+                            ) : spare.ihm?.toLowerCase() === 'no' ? (
+                              <span title="No IHM - Compliant"><CheckCircle className="h-4 w-4 text-green-500" /></span>
                             ) : (
-                              <HelpCircle className="h-4 w-4 text-gray-400" />
+                              <span title="IHM Status Unknown"><HelpCircle className="h-4 w-4 text-gray-400" /></span>
                             )}
                           </div>
                         )}
