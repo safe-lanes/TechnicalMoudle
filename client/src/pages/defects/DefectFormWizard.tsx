@@ -1684,6 +1684,7 @@ export default function DefectFormWizard({
                                   
                                   if (newExtension.status === 'Approved' && newExtension.newTargetDate) {
                                     form.setValue('targetCloseDate', newExtension.newTargetDate);
+                                    form.setValue('isDeferred', true);
                                   }
                                   
                                   // Don't clear currentExtension - keep the values visible in the form
