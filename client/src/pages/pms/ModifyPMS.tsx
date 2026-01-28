@@ -55,6 +55,7 @@ import { useEffect } from "react";
 import { useChangeMode } from "@/contexts/ChangeModeContext";
 import { useToast } from "@/hooks/use-toast";
 import { useVessel } from "@/contexts/VesselContext";
+import { useUIRole } from "@/contexts/UIRoleContext";
 
 interface RevisionHistoryEntry {
   revisionNumber: number;
@@ -126,6 +127,7 @@ export default function ModifyPMS() {
   const { enterChangeMode } = useChangeMode();
   const { toast } = useToast();
   const { vesselId } = useVessel();
+  const { isVessel, isHeadOfDept } = useUIRole();
   const [categoryFilter, setCategoryFilter] = useState<string>('all');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState('');
@@ -1074,7 +1076,7 @@ export default function ModifyPMS() {
 
           <DialogFooter className="flex justify-between">
             <div className="flex gap-2">
-              {viewingRequest && viewingRequest.status === 'submitted' && (
+              {viewingRequest && viewingRequest.status === 'submitted' && !isVessel && !isHeadOfDept && (
                 <>
                   <Button 
                     variant="destructive"
