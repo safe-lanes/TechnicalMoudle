@@ -9325,15 +9325,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const certificates = req.body.certificates;
       // Optional: vessel-specific certificate master IDs and their target vessels
       const vesselSpecificCerts: string[] = req.body.vesselSpecificCerts || [];
-      const targetVesselIds: string[] = req.body.targetVesselIds || [];
+      const targetVessels: Array<{ id: string; name: string }> = req.body.targetVessels || [];
       
       if (!Array.isArray(certificates)) {
         return res.status(400).json({ error: "certificates must be an array" });
       }
       
       console.log(`💾 Saving ${certificates.length} ship certificates master entries...`);
+      
+      // Validate: if vessel-specific certs are provided, targetVessels must not be empty
+      if (vesselSpecificCerts.length > 0 && targetVessels.length === 0) {
+        return res.status(400).json({ 
+          error: "targetVessels is required when adding vessel-specific certificates",
+          message: "Please select at least one vessel before adding vessel-specific certificates"
+        });
+      }
+      
       if (vesselSpecificCerts.length > 0) {
-        console.log(`📋 Vessel-specific certificates: ${vesselSpecificCerts.join(', ')} for vessels: ${targetVesselIds.join(', ')}`);
+        console.log(`📋 Vessel-specific certificates: ${vesselSpecificCerts.join(', ')} for vessels: ${targetVessels.map(v => v.name).join(', ')}`);
       }
       
       // Use a transaction to upsert all certificates
@@ -9444,11 +9453,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
         
         // Create applicability for vessel-specific certificates (VES-) - only for target vessels
-        if (vesselOnlyMasterIds.length > 0 && targetVesselIds.length > 0) {
-          console.log(`🚢 Auto-creating applicability records for ${targetVesselIds.length} target vessel(s) for ${vesselOnlyMasterIds.length} vessel-specific certificate(s)`);
-          
-          // Get vessel names for the target vessel IDs
-          const targetVessels = allVessels.filter(v => targetVesselIds.includes(v.id));
+        // Use targetVessels directly (passed from frontend with both id and name)
+        if (vesselOnlyMasterIds.length > 0 && targetVessels.length > 0) {
+          console.log(`🚢 Auto-creating applicability records for ${targetVessels.length} target vessel(s) for ${vesselOnlyMasterIds.length} vessel-specific certificate(s)`);
           
           for (const masterId of vesselOnlyMasterIds) {
             for (const vessel of targetVessels) {

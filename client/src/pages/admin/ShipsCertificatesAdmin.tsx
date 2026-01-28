@@ -307,7 +307,7 @@ export default function ShipsCertificatesAdmin() {
     mutationFn: async (payload: { 
       certificates: MasterCertificate[]; 
       vesselSpecificCerts?: string[];
-      targetVesselIds?: string[];
+      targetVessels?: Array<{ id: string; name: string }>;
     }) => {
       const response = await apiRequest('POST', '/technical/api/admin/ship-certificates-master', payload);
       return response.json();
@@ -427,16 +427,18 @@ export default function ShipsCertificatesAdmin() {
     // Combine masterData with company-only and vessel-only certificates
     const allCertificates = [...masterData, ...companyOnlyCertsWithIds, ...vesselOnlyCertsWithIds];
     
-    // Get selected vessel IDs for vessel-specific certificate applicability
-    const vesselIds = getSelectedVesselIds();
+    // Get selected vessel info (ID and name) for vessel-specific certificate applicability
+    const targetVessels = vesselMasterData
+      .filter(v => selectedVessels.includes(v.name))
+      .map(v => ({ id: String(v.id), name: v.name }));
     const vesselMasterIds = vesselOnlyCertsWithIds.map(c => c.masterId);
     
     // Pass vessel-specific info along with certificates
     saveMutation.mutate({ 
       certificates: allCertificates,
       vesselSpecificCerts: vesselMasterIds,
-      targetVesselIds: vesselIds,
-    } as any);
+      targetVessels: targetVessels,
+    });
   };
   
   // Load labels from database when available
