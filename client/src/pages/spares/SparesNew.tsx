@@ -1943,18 +1943,18 @@ const Spares: React.FC = () => {
               <div className="overflow-x-auto flex-1 flex flex-col">
                 {/* Inventory Table Header */}
                 <div className="px-4 py-3 border-b border-gray-200 bg-[#52baf3]">
-                  <div className="grid gap-2 text-sm font-semibold text-[#ffffff] min-w-max" style={{ gridTemplateColumns: FEATURES.IHM ? 'minmax(90px, auto) minmax(130px, 1fr) minmax(150px, 1.5fr) minmax(100px, auto) minmax(80px, auto) minmax(50px, auto) minmax(50px, auto) minmax(60px, auto) minmax(100px, auto) minmax(50px, auto) minmax(140px, auto)' : 'minmax(90px, auto) minmax(130px, 1fr) minmax(150px, 1.5fr) minmax(100px, auto) minmax(80px, auto) minmax(50px, auto) minmax(50px, auto) minmax(60px, auto) minmax(100px, auto) minmax(140px, auto)', minWidth: 'max-content' }}>
-                  <div className="text-[#ffffff]" data-testid="E13"><Marker id="E13" />Part Code</div>
-                  <div data-testid="E14"><Marker id="E14" />Part Name</div>
-                  <div data-testid="E15"><Marker id="E15" />Component</div>
-                  <div data-testid="E16"><Marker id="E16" />Part Number</div>
-                  <div data-testid="E17"><Marker id="E17" />Criticality</div>
-                  <div className="text-center" data-testid="E18"><Marker id="E18" />ROB</div>
-                  <div className="text-center" data-testid="E19"><Marker id="E19" />Min</div>
-                  <div className="text-center" data-testid="E20"><Marker id="E20" />Stock</div>
-                  <div data-testid="E21"><Marker id="E21" />Location</div>
-                  {FEATURES.IHM && <div className="text-center" data-testid="E22"><Marker id="E22" />IHM</div>}
-                  <div className="text-center" data-testid="E23"><Marker id="E23" />Actions</div>
+                  <div className="grid text-sm font-semibold text-[#ffffff] min-w-max" style={{ gridTemplateColumns: FEATURES.IHM ? 'minmax(110px, auto) minmax(150px, 1fr) minmax(180px, 1.5fr) minmax(120px, auto) minmax(80px, auto) minmax(60px, auto) minmax(60px, auto) minmax(80px, auto) minmax(120px, auto) minmax(60px, auto) minmax(160px, auto)' : 'minmax(110px, auto) minmax(150px, 1fr) minmax(180px, 1.5fr) minmax(120px, auto) minmax(80px, auto) minmax(60px, auto) minmax(60px, auto) minmax(80px, auto) minmax(120px, auto) minmax(160px, auto)', minWidth: 'max-content', gap: '12px' }}>
+                  <div className="px-2 text-[#ffffff]" data-testid="E13"><Marker id="E13" />Part Code</div>
+                  <div className="px-2" data-testid="E14"><Marker id="E14" />Part Name</div>
+                  <div className="px-2" data-testid="E15"><Marker id="E15" />Component</div>
+                  <div className="px-2" data-testid="E16"><Marker id="E16" />Part Number</div>
+                  <div className="px-2" data-testid="E17"><Marker id="E17" />Criticality</div>
+                  <div className="px-2 text-center" data-testid="E18"><Marker id="E18" />ROB</div>
+                  <div className="px-2 text-center" data-testid="E19"><Marker id="E19" />Min</div>
+                  <div className="px-2 text-center" data-testid="E20"><Marker id="E20" />Stock</div>
+                  <div className="px-2" data-testid="E21"><Marker id="E21" />Location</div>
+                  {FEATURES.IHM && <div className="px-2 text-center" data-testid="E22"><Marker id="E22" />IHM</div>}
+                  <div className="px-2 text-center" data-testid="E23"><Marker id="E23" />Actions</div>
                 </div>
               </div>
 
@@ -1976,12 +1976,12 @@ const Spares: React.FC = () => {
                     const isFirstRow = rowIndex === 0;
                     return (
                     <div key={spare.id} className="px-4 py-3 border-b border-gray-100 hover:bg-gray-50">
-                      <div className="grid gap-2 text-sm items-center min-w-max" style={{ gridTemplateColumns: FEATURES.IHM ? 'minmax(90px, auto) minmax(130px, 1fr) minmax(150px, 1.5fr) minmax(100px, auto) minmax(80px, auto) minmax(50px, auto) minmax(50px, auto) minmax(60px, auto) minmax(100px, auto) minmax(50px, auto) minmax(140px, auto)' : 'minmax(90px, auto) minmax(130px, 1fr) minmax(150px, 1.5fr) minmax(100px, auto) minmax(80px, auto) minmax(50px, auto) minmax(50px, auto) minmax(60px, auto) minmax(100px, auto) minmax(140px, auto)', minWidth: 'max-content' }}>
-                        <div className="text-gray-900" data-testid={isFirstRow ? "E24" : undefined}>{isFirstRow && <Marker id="E24" />}{spare.partCode}</div>
-                        <div className="text-gray-700" data-testid={isFirstRow ? "E25" : undefined}>{isFirstRow && <Marker id="E25" />}{spare.partName}</div>
-                        <div className="text-gray-700" data-testid={isFirstRow ? "E26" : undefined}>{isFirstRow && <Marker id="E26" />}{spare.componentName}</div>
-                        <div className="text-blue-600 font-medium" data-testid={isFirstRow ? "E27" : undefined}>{isFirstRow && <Marker id="E27" />}{spare.partNumber || '-'}</div>
-                        <div data-testid={isFirstRow ? "E28" : undefined}>
+                      <div className="grid text-sm items-center min-w-max" style={{ gridTemplateColumns: FEATURES.IHM ? 'minmax(110px, auto) minmax(150px, 1fr) minmax(180px, 1.5fr) minmax(120px, auto) minmax(80px, auto) minmax(60px, auto) minmax(60px, auto) minmax(80px, auto) minmax(120px, auto) minmax(60px, auto) minmax(160px, auto)' : 'minmax(110px, auto) minmax(150px, 1fr) minmax(180px, 1.5fr) minmax(120px, auto) minmax(80px, auto) minmax(60px, auto) minmax(60px, auto) minmax(80px, auto) minmax(120px, auto) minmax(160px, auto)', minWidth: 'max-content', gap: '12px' }}>
+                        <div className="px-2 text-gray-900" data-testid={isFirstRow ? "E24" : undefined}>{isFirstRow && <Marker id="E24" />}{spare.partCode}</div>
+                        <div className="px-2 text-gray-700" data-testid={isFirstRow ? "E25" : undefined}>{isFirstRow && <Marker id="E25" />}{spare.partName}</div>
+                        <div className="px-2 text-gray-700" data-testid={isFirstRow ? "E26" : undefined}>{isFirstRow && <Marker id="E26" />}{spare.componentName}</div>
+                        <div className="px-2 text-blue-600 font-medium" data-testid={isFirstRow ? "E27" : undefined}>{isFirstRow && <Marker id="E27" />}{spare.partNumber || '-'}</div>
+                        <div className="px-2" data-testid={isFirstRow ? "E28" : undefined}>
                           {isFirstRow && <Marker id="E28" />}
                           <span className={`px-2 py-1 rounded text-xs ${
                             spare.critical === 'Critical' || spare.critical === 'Yes' 
@@ -1991,16 +1991,16 @@ const Spares: React.FC = () => {
                             {spare.critical}
                           </span>
                         </div>
-                        <div className="text-center" data-testid={isFirstRow ? "E29" : undefined}>{isFirstRow && <Marker id="E29" />}{spare.rob}</div>
-                        <div className="text-center" data-testid={isFirstRow ? "E30" : undefined}>{isFirstRow && <Marker id="E30" />}{spare.min}</div>
-                        <div className="text-center" data-testid={isFirstRow ? "E31" : undefined}>
+                        <div className="px-2 text-center" data-testid={isFirstRow ? "E29" : undefined}>{isFirstRow && <Marker id="E29" />}{spare.rob}</div>
+                        <div className="px-2 text-center" data-testid={isFirstRow ? "E30" : undefined}>{isFirstRow && <Marker id="E30" />}{spare.min}</div>
+                        <div className="px-2 text-center" data-testid={isFirstRow ? "E31" : undefined}>
                           {isFirstRow && <Marker id="E31" />}
                           <span className={`px-2 py-1 rounded text-xs ${stockStatus.color}`}>
                             {stockStatus.label}
                           </span>
                         </div>
                         {/* Location Dropdown */}
-                        <div className="relative" data-testid={isFirstRow ? "E32" : undefined}>
+                        <div className="px-2 relative" data-testid={isFirstRow ? "E32" : undefined}>
                           {isFirstRow && <Marker id="E32" />}
                           <button
                             onClick={(e) => handleOpenLocationDropdown(spare, e)}
@@ -2093,7 +2093,7 @@ const Spares: React.FC = () => {
                           )}
                         </div>
                         {FEATURES.IHM && (
-                          <div className="flex justify-center" data-testid={isFirstRow ? "E33" : undefined}>
+                          <div className="px-2 flex justify-center" data-testid={isFirstRow ? "E33" : undefined}>
                             {isFirstRow && <Marker id="E33" />}
                             {/* Mock IHM status - in real implementation, would come from API */}
                             {spare.partCode === 'SP-ME-001' ? (
@@ -2105,7 +2105,7 @@ const Spares: React.FC = () => {
                             )}
                           </div>
                         )}
-                        <div className="flex gap-1 justify-center">
+                        <div className="px-2 flex gap-1 justify-center">
                           <Button 
                             size="sm" 
                             variant="ghost"
