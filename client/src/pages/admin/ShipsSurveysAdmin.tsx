@@ -17,7 +17,7 @@ import {
   DialogTitle,
   DialogFooter,
 } from "@/components/ui/dialog";
-import { Plus, Pencil, Trash2, Search, Save, X, Loader2 } from "lucide-react";
+import { Plus, Pencil, Trash2, Search, Save, X, Loader2, Check } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
@@ -114,6 +114,15 @@ export default function ShipsSurveysAdmin() {
   const [editingGroupLabels, setEditingGroupLabels] = useState<LabelConfig[]>(INITIAL_GROUP_LABELS);
   const [categoryLabels, setCategoryLabels] = useState<LabelConfig[]>(INITIAL_CATEGORY_LABELS);
   const [groupLabels, setGroupLabels] = useState<LabelConfig[]>(INITIAL_GROUP_LABELS);
+  
+  const [companyGroupLabels, setCompanyGroupLabels] = useState<LabelConfig[]>(COMPANY_GROUP_LABELS);
+  const [editingCompanyGroupLabels, setEditingCompanyGroupLabels] = useState<LabelConfig[]>(COMPANY_GROUP_LABELS);
+  const [companyOnlySurveys, setCompanyOnlySurveys] = useState<MasterSurvey[]>([]);
+  const [newCompanySurvey, setNewCompanySurvey] = useState<Partial<MasterSurvey>>({});
+  const [isAddingNewCompany, setIsAddingNewCompany] = useState(false);
+  const [newCompanyEntryError, setNewCompanyEntryError] = useState("");
+  const [companyGroupDialogOpen, setCompanyGroupDialogOpen] = useState(false);
+  const [companySearchTerm, setCompanySearchTerm] = useState("");
 
   const currentViewMode = viewModes[activeTab];
   const isEditMode = currentViewMode === "edit";
@@ -165,6 +174,14 @@ export default function ShipsSurveysAdmin() {
         setGroupLabels(merged);
         setEditingGroupLabels(merged);
       }
+      if (savedLabels.company_group) {
+        const merged = COMPANY_GROUP_LABELS.map(def => {
+          const saved = savedLabels.company_group.find(s => s.key === def.key);
+          return saved ? { key: def.key, label: saved.label } : def;
+        });
+        setCompanyGroupLabels(merged);
+        setEditingCompanyGroupLabels(merged);
+      }
     }
   }, [savedLabels]);
 
@@ -180,6 +197,7 @@ export default function ShipsSurveysAdmin() {
       });
       setHasUnsavedChanges(false);
       setHasSavedInSession(prev => ({ ...prev, [activeTab]: true }));
+      setCompanyOnlySurveys([]); // Clear company-only surveys after save - they'll be in masterData on reload
       queryClient.invalidateQueries({ queryKey: ['/technical/api/admin/ship-surveys-master'] });
     },
     onError: (error: any) => {
@@ -231,8 +249,11 @@ export default function ShipsSurveysAdmin() {
     
     setDeletedMasterIds([]);
     
-    // Then save the remaining surveys
-    saveMutation.mutate({ surveys: masterData });
+    // Merge company-only surveys with masterData for saving
+    const allSurveys = [...masterData, ...companyOnlySurveys];
+    
+    // Then save all surveys
+    saveMutation.mutate({ surveys: allSurveys });
   };
 
   const toggleViewMode = () => {
@@ -368,6 +389,105 @@ export default function ShipsSurveysAdmin() {
     toast({ title: "Labels saved", description: "Category and group labels have been updated." });
   };
 
+  const getFormattedCompanyGroupLabel = (key: string) => {
+    const found = companyGroupLabels.find(g => g.key === key);
+    return found?.label ? `${key}. ${found.label}` : key;
+  };
+
+  const updateCompanyField = (surveyId: number, field: 'companyId' | 'companyGroup' | 'companySequence' | 'requirementRef', value: string | number) => {
+    setMasterData(prev => prev.map(s => 
+      s.id === surveyId 
+        ? { ...s, [field]: value }
+        : s
+    ));
+    setHasUnsavedChanges(true);
+  };
+
+  const updateCompanySequence = (surveyId: number, newSeq: number) => {
+    setMasterData(prevData => {
+      const currentSurvey = prevData.find(s => s.id === surveyId);
+      if (!currentSurvey) return prevData;
+      
+      const oldSequence = currentSurvey.companySequence ?? currentSurvey.sequence;
+      if (newSeq === oldSequence) return prevData;
+      
+      return prevData.map(s => {
+        if (s.id === surveyId) {
+          return { ...s, companySequence: newSeq };
+        }
+        return s;
+      });
+    });
+    setHasUnsavedChanges(true);
+  };
+
+  const handleAddNewCompanySurvey = () => {
+    setNewCompanySurvey({
+      companyId: "",
+      surveyLabel: "",
+      requirementRef: "",
+      companyGroup: "",
+    });
+    setNewCompanyEntryError("");
+    setIsAddingNewCompany(true);
+  };
+
+  const saveNewCompanySurvey = () => {
+    if (!newCompanySurvey.surveyLabel?.trim()) {
+      setNewCompanyEntryError("Survey Label is mandatory");
+      return;
+    }
+    
+    const existingCmpIds = companyOnlySurveys
+      .filter(s => s.masterId?.startsWith("CMP-"))
+      .map(s => {
+        const num = parseInt(s.masterId?.replace("CMP-", "") || "0", 10);
+        return isNaN(num) ? 0 : num;
+      });
+    const nextCmpNum = existingCmpIds.length > 0 ? Math.max(...existingCmpIds) + 1 : 1;
+    const newMasterId = `CMP-${String(nextCmpNum).padStart(3, '0')}`;
+    
+    const newId = Math.max(...companyOnlySurveys.map(s => s.id), ...masterData.map(s => s.id), 0) + 1000;
+    
+    const newSurvey: MasterSurvey = {
+      id: newId,
+      sequence: 0,
+      masterId: newMasterId,
+      surveyName: newCompanySurvey.surveyLabel?.trim() || "",
+      category: "",
+      group: "",
+      requirementRef: newCompanySurvey.requirementRef || "",
+      applicableToCompany: true,
+      surveyLabel: newCompanySurvey.surveyLabel?.trim() || "",
+      companyId: newCompanySurvey.companyId || newMasterId,
+      companyGroup: newCompanySurvey.companyGroup || "",
+      companySequence: undefined,
+    };
+    
+    setCompanyOnlySurveys(prev => [...prev, newSurvey]);
+    setIsAddingNewCompany(false);
+    setNewCompanyEntryError("");
+    setHasUnsavedChanges(true);
+  };
+
+  const cancelNewCompanySurvey = () => {
+    setIsAddingNewCompany(false);
+    setNewCompanySurvey({});
+    setNewCompanyEntryError("");
+  };
+
+  const openCompanyGroupDialog = () => {
+    setEditingCompanyGroupLabels([...companyGroupLabels]);
+    setCompanyGroupDialogOpen(true);
+  };
+
+  const saveCompanyGroupLabelsAndClose = () => {
+    setCompanyGroupLabels([...editingCompanyGroupLabels]);
+    saveLabelsMutation.mutate({ configType: "company_group", labels: editingCompanyGroupLabels });
+    setCompanyGroupDialogOpen(false);
+    toast({ title: "Labels saved", description: "Company group labels have been updated." });
+  };
+
   const filteredData = masterData.filter(survey => {
     const matchesSearch = searchTerm === "" || 
       survey.surveyName.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -468,6 +588,39 @@ export default function ShipsSurveysAdmin() {
                       onClick={addNewRow}
                       className="bg-[#5dc86f] hover:bg-[#4db85f] text-white"
                       data-testid="button-add-row"
+                    >
+                      <Plus className="w-4 h-4 mr-1" /> Add Survey
+                    </Button>
+                  </>
+                )}
+                {activeTab === "company" && (
+                  <>
+                    <Button 
+                      variant="outline" 
+                      size="sm"
+                      onClick={openCompanyGroupDialog}
+                      data-testid="button-configure-company-labels"
+                    >
+                      Configure Labels
+                    </Button>
+                    <Button 
+                      size="sm"
+                      onClick={handleSave}
+                      disabled={saveMutation.isPending}
+                      className="bg-[#16569e] hover:bg-[#124a87] text-white"
+                      data-testid="button-save-company"
+                    >
+                      {saveMutation.isPending ? (
+                        <><Loader2 className="w-4 h-4 mr-1 animate-spin" /> Saving...</>
+                      ) : (
+                        <><Save className="w-4 h-4 mr-1" /> Save</>
+                      )}
+                    </Button>
+                    <Button 
+                      size="sm" 
+                      onClick={handleAddNewCompanySurvey}
+                      className="bg-[#5dc86f] hover:bg-[#4db85f] text-white"
+                      data-testid="button-add-company-survey"
                     >
                       <Plus className="w-4 h-4 mr-1" /> Add Survey
                     </Button>
@@ -655,7 +808,280 @@ export default function ShipsSurveysAdmin() {
         )}
 
         {activeTab === "company" && (
-          <div className="h-full flex flex-col">
+          <div className="h-full flex flex-col space-y-4">
+            <div className="flex items-center gap-3">
+              <div className="relative flex-1 max-w-sm">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                <Input
+                  placeholder="Search surveys..."
+                  value={companySearchTerm}
+                  onChange={(e) => setCompanySearchTerm(e.target.value)}
+                  className="pl-9"
+                  data-testid="input-search-company"
+                />
+              </div>
+            </div>
+            
+            <div className="flex-1 overflow-auto bg-white rounded-lg border">
+              {(() => {
+                const companyDataFromMaster = masterData
+                  .filter((s) => s.applicableToCompany)
+                  .map((s) => ({
+                    id: s.id,
+                    masterId: s.masterId,
+                    surveyLabel: s.surveyLabel || s.surveyName,
+                    companyId: s.companyId || ("C" + s.masterId),
+                    requirementRef: s.requirementRef,
+                    companyGroup: s.companyGroup || "",
+                    sequence: s.companySequence ?? s.sequence,
+                    isCompanyOnly: false,
+                  }));
+
+                const filteredData = companyDataFromMaster.filter(s => {
+                  const matchesSearch = companySearchTerm === "" || 
+                    s.surveyLabel.toLowerCase().includes(companySearchTerm.toLowerCase()) ||
+                    s.masterId.toLowerCase().includes(companySearchTerm.toLowerCase());
+                  return matchesSearch;
+                });
+
+                return (
+                  <table className="w-full">
+                    <thead className="bg-[#52baf3] text-white text-sm sticky top-0">
+                      <tr>
+                        {viewModes.company === "edit" && <th className="px-3 py-3 text-center font-medium w-20">Sequence</th>}
+                        <th className="px-3 py-3 text-left font-medium w-12">#</th>
+                        <th className="px-3 py-3 text-left font-medium">Master ID</th>
+                        <th className="px-3 py-3 text-left font-medium">Company ID</th>
+                        <th className="px-3 py-3 text-left font-medium">Survey Label</th>
+                        <th className="px-3 py-3 text-left font-medium">Requirement/Ref</th>
+                        <th className="px-3 py-3 text-left font-medium">Company Group</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y text-sm">
+                      {filteredData.map((survey, idx) => (
+                        <tr key={survey.id} className="hover:bg-gray-50">
+                          {viewModes.company === "edit" && (
+                            <td className="px-3 py-2 text-center">
+                              <Input
+                                key={`seq-company-${survey.id}-${survey.sequence}`}
+                                type="number"
+                                defaultValue={survey.sequence}
+                                className="h-8 text-sm w-16 text-center"
+                                min={1}
+                                onBlur={(e) => {
+                                  const newSeq = parseInt(e.target.value, 10);
+                                  if (!isNaN(newSeq) && newSeq > 0) {
+                                    updateCompanySequence(survey.id, newSeq);
+                                  }
+                                }}
+                                data-testid={`input-sequence-company-${survey.id}`}
+                              />
+                            </td>
+                          )}
+                          <td className="px-3 py-2">{idx + 1}</td>
+                          <td className="px-3 py-2 font-medium text-blue-600">{survey.masterId}</td>
+                          <td className="px-3 py-2">
+                            {viewModes.company === "edit" ? (
+                              <Input 
+                                defaultValue={survey.companyId}
+                                className="h-8 text-sm"
+                                onBlur={(e) => updateCompanyField(survey.id, 'companyId', e.target.value)}
+                                data-testid={`input-companyid-${survey.id}`}
+                              />
+                            ) : (
+                              survey.companyId || "-"
+                            )}
+                          </td>
+                          <td className="px-3 py-2">{survey.surveyLabel}</td>
+                          <td className="px-3 py-2">
+                            {viewModes.company === "edit" ? (
+                              <Input 
+                                defaultValue={survey.requirementRef}
+                                className="h-8 text-sm"
+                                onBlur={(e) => updateCompanyField(survey.id, 'requirementRef', e.target.value)}
+                                data-testid={`input-requirement-company-${survey.id}`}
+                              />
+                            ) : (
+                              survey.requirementRef
+                            )}
+                          </td>
+                          <td className="px-3 py-2">
+                            {viewModes.company === "edit" ? (
+                              <Select 
+                                defaultValue={survey.companyGroup}
+                                onValueChange={(value) => updateCompanyField(survey.id, 'companyGroup', value)}
+                              >
+                                <SelectTrigger className="h-8 text-sm" data-testid={`select-companygroup-${survey.id}`}>
+                                  <SelectValue placeholder="Select Group" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  {companyGroupLabels.map((grp) => (
+                                    <SelectItem key={grp.key} value={grp.key}>
+                                      {getFormattedCompanyGroupLabel(grp.key)}
+                                    </SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                            ) : (
+                              survey.companyGroup ? getFormattedCompanyGroupLabel(survey.companyGroup) : "-"
+                            )}
+                          </td>
+                        </tr>
+                      ))}
+                      
+                      {companyOnlySurveys.map((survey, idx) => (
+                        <tr key={`company-only-${survey.id}`} className="hover:bg-gray-50 bg-green-50">
+                          {viewModes.company === "edit" && (
+                            <td className="px-3 py-2 text-center text-gray-400">-</td>
+                          )}
+                          <td className="px-3 py-2">{filteredData.length + idx + 1}</td>
+                          <td className="px-3 py-2 font-medium text-gray-400">{survey.masterId || "-"}</td>
+                          <td className="px-3 py-2">
+                            {viewModes.company === "edit" ? (
+                              <Input 
+                                defaultValue={survey.companyId}
+                                className="h-8 text-sm"
+                                onBlur={(e) => {
+                                  setCompanyOnlySurveys(prev => prev.map(s => 
+                                    s.id === survey.id ? { ...s, companyId: e.target.value } : s
+                                  ));
+                                }}
+                                data-testid={`input-companyid-only-${survey.id}`}
+                              />
+                            ) : (
+                              survey.companyId || "-"
+                            )}
+                          </td>
+                          <td className="px-3 py-2">
+                            {viewModes.company === "edit" ? (
+                              <Input 
+                                defaultValue={survey.surveyLabel}
+                                className="h-8 text-sm"
+                                onBlur={(e) => {
+                                  setCompanyOnlySurveys(prev => prev.map(s => 
+                                    s.id === survey.id ? { ...s, surveyLabel: e.target.value } : s
+                                  ));
+                                }}
+                                data-testid={`input-label-only-${survey.id}`}
+                              />
+                            ) : (
+                              survey.surveyLabel
+                            )}
+                          </td>
+                          <td className="px-3 py-2">
+                            {viewModes.company === "edit" ? (
+                              <Input 
+                                defaultValue={survey.requirementRef}
+                                className="h-8 text-sm"
+                                onBlur={(e) => {
+                                  setCompanyOnlySurveys(prev => prev.map(s => 
+                                    s.id === survey.id ? { ...s, requirementRef: e.target.value } : s
+                                  ));
+                                }}
+                                data-testid={`input-requirement-only-${survey.id}`}
+                              />
+                            ) : (
+                              survey.requirementRef
+                            )}
+                          </td>
+                          <td className="px-3 py-2">
+                            {viewModes.company === "edit" ? (
+                              <Select 
+                                defaultValue={survey.companyGroup}
+                                onValueChange={(value) => {
+                                  setCompanyOnlySurveys(prev => prev.map(s => 
+                                    s.id === survey.id ? { ...s, companyGroup: value } : s
+                                  ));
+                                }}
+                              >
+                                <SelectTrigger className="h-8 text-sm" data-testid={`select-companygroup-only-${survey.id}`}>
+                                  <SelectValue placeholder="Select Group" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  {companyGroupLabels.map((grp) => (
+                                    <SelectItem key={grp.key} value={grp.key}>
+                                      {getFormattedCompanyGroupLabel(grp.key)}
+                                    </SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                            ) : (
+                              survey.companyGroup ? getFormattedCompanyGroupLabel(survey.companyGroup) : "-"
+                            )}
+                          </td>
+                        </tr>
+                      ))}
+                      
+                      {viewModes.company === "edit" && isAddingNewCompany && (
+                        <tr className="bg-blue-50">
+                          <td className="px-3 py-2 text-center text-gray-400">-</td>
+                          <td className="px-3 py-2">New</td>
+                          <td className="px-3 py-2 font-medium text-gray-400">(Auto)</td>
+                          <td className="px-3 py-2">
+                            <Input 
+                              value={newCompanySurvey.companyId || ""}
+                              onChange={(e) => setNewCompanySurvey(prev => ({ ...prev, companyId: e.target.value }))}
+                              className="h-8 text-sm"
+                              placeholder="Company ID"
+                              data-testid="input-new-company-id"
+                            />
+                          </td>
+                          <td className="px-3 py-2">
+                            <Input 
+                              value={newCompanySurvey.surveyLabel || ""}
+                              onChange={(e) => setNewCompanySurvey(prev => ({ ...prev, surveyLabel: e.target.value }))}
+                              className="h-8 text-sm"
+                              placeholder="Survey Label *"
+                              data-testid="input-new-company-label"
+                            />
+                          </td>
+                          <td className="px-3 py-2">
+                            <Input 
+                              value={newCompanySurvey.requirementRef || ""}
+                              onChange={(e) => setNewCompanySurvey(prev => ({ ...prev, requirementRef: e.target.value }))}
+                              className="h-8 text-sm"
+                              placeholder="Requirement/Ref"
+                              data-testid="input-new-company-requirement"
+                            />
+                          </td>
+                          <td className="px-3 py-2">
+                            <div className="flex items-center gap-2">
+                              <Select 
+                                value={newCompanySurvey.companyGroup || ""}
+                                onValueChange={(value) => setNewCompanySurvey(prev => ({ ...prev, companyGroup: value }))}
+                              >
+                                <SelectTrigger className="h-8 text-sm flex-1" data-testid="select-new-company-group">
+                                  <SelectValue placeholder="Select Group" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  {companyGroupLabels.map((grp) => (
+                                    <SelectItem key={grp.key} value={grp.key}>
+                                      {getFormattedCompanyGroupLabel(grp.key)}
+                                    </SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                              <Button size="icon" variant="ghost" onClick={saveNewCompanySurvey} className="text-green-600" data-testid="button-save-new-company">
+                                <Check className="h-4 w-4" />
+                              </Button>
+                              <Button size="icon" variant="ghost" onClick={cancelNewCompanySurvey} className="text-red-600" data-testid="button-cancel-new-company">
+                                <X className="h-4 w-4" />
+                              </Button>
+                            </div>
+                          </td>
+                        </tr>
+                      )}
+                      
+                      {viewModes.company === "edit" && isAddingNewCompany && newCompanyEntryError && (
+                        <tr>
+                          <td colSpan={7} className="px-3 py-2 text-sm text-red-500">{newCompanyEntryError}</td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
+                );
+              })()}
+            </div>
           </div>
         )}
 
@@ -713,6 +1139,38 @@ export default function ShipsSurveysAdmin() {
           <DialogFooter>
             <Button variant="outline" onClick={() => setLabelsDialogOpen(false)}>Cancel</Button>
             <Button onClick={saveLabelsAndClose} className="bg-[#5dc86f] hover:bg-[#4db85f] text-white">
+              Save Labels
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={companyGroupDialogOpen} onOpenChange={setCompanyGroupDialogOpen}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Configure Company Group Labels</DialogTitle>
+          </DialogHeader>
+          <div className="mt-4 space-y-2 max-h-[300px] overflow-auto">
+            {editingCompanyGroupLabels.map((item, idx) => (
+              <div key={item.key} className="flex items-center gap-3">
+                <span className="w-8 font-medium text-gray-600">{item.key}.</span>
+                <Input 
+                  value={item.label} 
+                  onChange={(e) => {
+                    const updated = [...editingCompanyGroupLabels];
+                    updated[idx] = { ...item, label: e.target.value };
+                    setEditingCompanyGroupLabels(updated);
+                  }}
+                  placeholder="Enter label..."
+                  className="flex-1"
+                  data-testid={`input-company-group-label-${item.key}`}
+                />
+              </div>
+            ))}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setCompanyGroupDialogOpen(false)}>Cancel</Button>
+            <Button onClick={saveCompanyGroupLabelsAndClose} className="bg-[#5dc86f] hover:bg-[#4db85f] text-white">
               Save Labels
             </Button>
           </DialogFooter>
