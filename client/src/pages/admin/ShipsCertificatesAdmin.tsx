@@ -352,38 +352,23 @@ export default function ShipsCertificatesAdmin() {
     },
   });
   
-  // Generate next CMP- prefixed Master ID for company-only certificates
-  const generateCompanyMasterId = (existingCmpIds: string[]): string => {
-    // Find the highest sequence number from existing CMP- IDs
-    let maxSeq = 0;
-    for (const id of existingCmpIds) {
-      const match = id.match(/^CMP-(\d+)$/);
-      if (match) {
-        const seq = parseInt(match[1], 10);
-        if (seq > maxSeq) maxSeq = seq;
-      }
-    }
-    // Return next sequence with zero-padded 3-digit format
-    return `CMP-${String(maxSeq + 1).padStart(3, '0')}`;
-  };
-
   // Handle save button click
   const handleSave = () => {
-    // Collect existing CMP- IDs from masterData
-    const existingCmpIds = masterData
-      .filter(c => c.masterId.startsWith('CMP-'))
-      .map(c => c.masterId);
+    // Find the highest existing CMP- sequence number from masterData
+    let maxCmpSeq = 0;
+    for (const cert of masterData) {
+      const match = cert.masterId.match(/^CMP-(\d+)$/);
+      if (match) {
+        const seq = parseInt(match[1], 10);
+        if (seq > maxCmpSeq) maxCmpSeq = seq;
+      }
+    }
     
     // Convert company-only certificates to master format with generated IDs
+    // Use incremental counter starting from maxCmpSeq + 1
+    let nextSeq = maxCmpSeq + 1;
     const companyOnlyCertsWithIds: MasterCertificate[] = companyOnlyCerts.map((cert, idx) => {
-      // Generate a unique CMP- ID for this certificate
-      const cmpIds = [...existingCmpIds];
-      // Add previously generated IDs in this batch to avoid duplicates
-      for (let i = 0; i < idx; i++) {
-        const prevId = generateCompanyMasterId([...existingCmpIds, ...cmpIds.slice(existingCmpIds.length)]);
-        if (!cmpIds.includes(prevId)) cmpIds.push(prevId);
-      }
-      const newMasterId = generateCompanyMasterId(cmpIds);
+      const newMasterId = `CMP-${String(nextSeq++).padStart(3, '0')}`;
       
       return {
         id: cert.id,
@@ -396,7 +381,7 @@ export default function ShipsCertificatesAdmin() {
         applicableToCompany: true, // Always true for company-added certs
         certificateLabel: cert.certificateLabel,
         isActive: true,
-        // Company-specific fields
+        // Preserve user-entered company fields, default companyId from masterId if empty
         companyId: cert.companyId || newMasterId.replace('CMP-', 'CV'),
         companyGroup: cert.companyGroup || '',
         companySequence: masterData.length + idx + 1,
