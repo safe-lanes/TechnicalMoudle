@@ -60,6 +60,16 @@ const stripHtmlTags = (html: string | null | undefined): string => {
   return div.textContent || div.innerText || '';
 };
 
+const getDisplayActionText = (defect: Defect): string | null => {
+  if (defect.actions && Array.isArray(defect.actions) && defect.actions.length > 0) {
+    const firstAction = defect.actions[0] as { actionDescription?: string };
+    if (firstAction?.actionDescription) {
+      return firstAction.actionDescription;
+    }
+  }
+  return defect.actionTakenRequested || null;
+};
+
 const HtmlTextCellRenderer = (params: ICellRendererParams) => {
   if (!params.colDef) return null;
   
@@ -575,6 +585,7 @@ export default function DefectsCoC() {
       filter: 'agTextColumnFilter',
       sortable: true,
       resizable: true,
+      valueGetter: (params) => getDisplayActionText(params.data),
       tooltipValueGetter: (params) => stripHtmlTags(params.value)
     },
     {
