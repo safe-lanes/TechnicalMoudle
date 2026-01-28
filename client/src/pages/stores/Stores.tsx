@@ -117,7 +117,7 @@ const Stores: React.FC = () => {
   const [, navigate] = useLocation();
   const { toast } = useToast();
   const { vesselId, setVesselId } = useVessel();
-  const { isVessel } = useUIRole();
+  const { isVessel, isHeadOfDept, isSailAdmin, isClientAdmin } = useUIRole();
   const { data: vessels = [] } = useVessels();
   const [activeTab, setActiveTab] = useState<"stores" | "lubes" | "chemicals" | "others">(() => {
     const savedTab = sessionStorage.getItem('storesActiveTab');
@@ -1132,21 +1132,24 @@ const Stores: React.FC = () => {
       {/* Filters - Show different filters based on view mode */}
       {viewMode === "inventory" ? (
       <div className="flex gap-4 mb-6">
-        <div className="flex-1">
-          <Select value={vesselId} onValueChange={setVesselId}>
-            <SelectTrigger className="text-sm" data-testid={getMarkerId(activeTab, "4")}>
-              <Marker id={getMarkerId(activeTab, "4")} />
-              <SelectValue placeholder="Select Vessel" />
-            </SelectTrigger>
-            <SelectContent>
-              {vessels.map(vessel => (
-                <SelectItem key={vessel.id} value={vessel.id}>
-                  {vessel.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
+        {/* Vessel selector - hidden for Vessel and Head of Dept view modes */}
+        {(isSailAdmin || isClientAdmin) && (
+          <div className="flex-1">
+            <Select value={vesselId} onValueChange={setVesselId}>
+              <SelectTrigger className="text-sm" data-testid={getMarkerId(activeTab, "4")}>
+                <Marker id={getMarkerId(activeTab, "4")} />
+                <SelectValue placeholder="Select Vessel" />
+              </SelectTrigger>
+              <SelectContent>
+                {vessels.map(vessel => (
+                  <SelectItem key={vessel.id} value={vessel.id}>
+                    {vessel.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        )}
         <div className="flex-1 relative">
           <Marker id={getMarkerId(activeTab, "5")} />
           <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
