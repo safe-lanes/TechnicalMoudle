@@ -4,7 +4,7 @@ import { storage } from "./storage";
 import { getPool } from "./db";
 import * as fs from "fs";
 import * as path from "path";
-import { insertRunningHoursAuditSchema, cascadeRunningHoursSchema, insertWorkOrderSchema, insertWorkOrderExecutionSchema, insertDefectSchema, insertDefectActionSchema, insertDefectAttachmentSchema, insertComponentSchema, insertSpareSchema, insertMakerSchema, insertMasterListSchema, insertComponentDocumentSchema, insertComponentClassRegulatorySchema, insertComponentRequisitionSchema, equipmentCategories, defectCategories, defectTypes, shipCertificatesMaster, insertShipCertificateMasterSchema, shipCertificatesLabelsConfig, vesselCertificateApplicability, insertVesselCertificateApplicabilitySchema, vesselCertificateData, vessels, shipSurveysMaster, shipSurveysLabelsConfig } from "@shared/schema";
+import { insertRunningHoursAuditSchema, cascadeRunningHoursSchema, insertWorkOrderSchema, insertWorkOrderExecutionSchema, insertDefectSchema, insertDefectActionSchema, insertDefectAttachmentSchema, insertComponentSchema, insertSpareSchema, insertMakerSchema, insertMasterListSchema, insertComponentDocumentSchema, insertComponentClassRegulatorySchema, insertComponentRequisitionSchema, equipmentCategories, defectCategories, defectTypes, shipCertificatesMaster, insertShipCertificateMasterSchema, shipCertificatesLabelsConfig, vesselCertificateApplicability, insertVesselCertificateApplicabilitySchema, vesselCertificateData, vessels, shipSurveysMaster, shipSurveysLabelsConfig, vesselSurveyApplicability } from "@shared/schema";
 import { getPostgresClient } from "./postgresClient";
 import { eq, and, asc, sql, inArray } from "drizzle-orm";
 import { computeWorkOrderStatus } from "@shared/workOrders/status";
@@ -9813,6 +9813,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       const { db } = postgres;
       const surveys = req.body.surveys;
+      // Optional: vessel-specific survey master IDs and their target vessels
+      const vesselSpecificSurveys: string[] = req.body.vesselSpecificSurveys || [];
+      const targetVessels: Array<{ id: string; name: string }> = req.body.targetVessels || [];
       
       if (!Array.isArray(surveys)) {
         return res.status(400).json({ error: "surveys must be an array" });
@@ -9820,8 +9823,31 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       console.log(`💾 Saving ${surveys.length} ship surveys master entries...`);
       
+      // Validate: if vessel-specific surveys are provided, targetVessels must not be empty
+      if (vesselSpecificSurveys.length > 0 && targetVessels.length === 0) {
+        return res.status(400).json({ 
+          error: "targetVessels is required when adding vessel-specific surveys",
+          message: "Please select at least one vessel before adding vessel-specific surveys"
+        });
+      }
+      
+      if (vesselSpecificSurveys.length > 0) {
+        console.log(`📋 Vessel-specific surveys: ${vesselSpecificSurveys.join(', ')} for vessels: ${targetVessels.map(v => v.name).join(', ')}`);
+      }
+      
       let insertedCount = 0;
       let updatedCount = 0;
+      const newlyInsertedMasterIds: string[] = []; // Track new surveys for applicability creation
+      const vesselSpecificSet = new Set(vesselSpecificSurveys); // For quick lookup
+      
+      // Fetch distinct vessels from existing applicability records
+      const distinctVessels = await db.selectDistinct({
+        vesselId: vesselSurveyApplicability.vesselId,
+        vesselName: vesselSurveyApplicability.vesselName,
+      }).from(vesselSurveyApplicability);
+      
+      // Map to the format expected by the logic below
+      const allVessels = distinctVessels.map(v => ({ id: v.vesselId, name: v.vesselName }));
       
       for (const survey of surveys) {
         // Check if survey already exists by masterId
@@ -9865,6 +9891,70 @@ export async function registerRoutes(app: Express): Promise<Server> {
             companySequence: survey.companySequence || null,
           });
           insertedCount++;
+          newlyInsertedMasterIds.push(survey.masterId);
+        }
+      }
+      
+      // Auto-create applicability records for newly inserted surveys
+      if (newlyInsertedMasterIds.length > 0 && allVessels.length > 0) {
+        console.log(`📋 Auto-creating applicability records for ${allVessels.length} vessel(s) for ${newlyInsertedMasterIds.length} new survey(s)`);
+        
+        // Fetch existing applicability records to avoid duplicates
+        const existingApplicability = await db.select({
+          vesselId: vesselSurveyApplicability.vesselId,
+          masterId: vesselSurveyApplicability.masterId,
+        }).from(vesselSurveyApplicability);
+        
+        const existingKeys = new Set(existingApplicability.map(a => `${a.vesselId}-${a.masterId}`));
+        
+        const applicabilityToInsert: Array<{
+          vesselId: string;
+          vesselName: string;
+          masterId: string;
+          isApplicable: boolean;
+        }> = [];
+        
+        // Separate vessel-only (VES-) and non-vessel-only master IDs
+        const vesselOnlyMasterIds = newlyInsertedMasterIds.filter(id => vesselSpecificSet.has(id) || id.startsWith('VES-'));
+        const nonVesselMasterIds = newlyInsertedMasterIds.filter(id => !vesselSpecificSet.has(id) && !id.startsWith('VES-'));
+        
+        // Create applicability for non-vessel-specific surveys - for ALL vessels
+        for (const masterId of nonVesselMasterIds) {
+          for (const vessel of allVessels) {
+            const key = `${vessel.id}-${masterId}`;
+            if (!existingKeys.has(key)) {
+              applicabilityToInsert.push({
+                vesselId: vessel.id,
+                vesselName: vessel.name,
+                masterId: masterId,
+                isApplicable: true, // Default to applicable
+              });
+            }
+          }
+        }
+        
+        // Create applicability for vessel-specific surveys (VES-) - only for target vessels
+        if (vesselOnlyMasterIds.length > 0 && targetVessels.length > 0) {
+          console.log(`🚢 Auto-creating applicability records for ${targetVessels.length} target vessel(s) for ${vesselOnlyMasterIds.length} vessel-specific survey(s)`);
+          
+          for (const masterId of vesselOnlyMasterIds) {
+            for (const vessel of targetVessels) {
+              const key = `${vessel.id}-${masterId}`;
+              if (!existingKeys.has(key)) {
+                applicabilityToInsert.push({
+                  vesselId: vessel.id,
+                  vesselName: vessel.name,
+                  masterId: masterId,
+                  isApplicable: true, // Default to applicable
+                });
+              }
+            }
+          }
+        }
+        
+        if (applicabilityToInsert.length > 0) {
+          await db.insert(vesselSurveyApplicability).values(applicabilityToInsert);
+          console.log(`✅ Created ${applicabilityToInsert.length} survey applicability records`);
         }
       }
       
@@ -9974,6 +10064,148 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error: any) {
       console.error("Error saving ship surveys labels config:", error);
       res.status(500).json({ error: "Failed to save labels configuration", details: error.message });
+    }
+  });
+
+  // ============================================================
+  // Ship Surveys Admin - Vessel Survey Applicability API Routes
+  // ============================================================
+  
+  // GET vessel survey applicability for selected vessels
+  app.get("/technical/api/admin/vessel-survey-applicability", async (req, res) => {
+    try {
+      const postgres = await getPostgresClient();
+      if (!postgres) {
+        return res.status(503).json({ error: "Database not available" });
+      }
+      
+      const { db } = postgres;
+      const vesselIds = req.query.vesselIds;
+      
+      if (!vesselIds) {
+        return res.status(400).json({ error: "vesselIds query parameter required" });
+      }
+      
+      // Parse vessel IDs (comma-separated)
+      const vesselIdList = typeof vesselIds === 'string' ? vesselIds.split(',').filter(Boolean) : [];
+      
+      if (vesselIdList.length === 0) {
+        return res.json([]);
+      }
+      
+      // Get applicability records for selected vessels
+      const applicability = await db.select()
+        .from(vesselSurveyApplicability)
+        .where(inArray(vesselSurveyApplicability.vesselId, vesselIdList));
+      
+      res.json(applicability);
+    } catch (error: any) {
+      console.error("Error fetching vessel survey applicability:", error);
+      res.status(500).json({ error: "Failed to fetch vessel survey applicability", details: error.message });
+    }
+  });
+
+  // Initialize vessel survey applicability for a vessel
+  app.post("/technical/api/admin/vessel-survey-applicability/initialize", async (req, res) => {
+    try {
+      const postgres = await getPostgresClient();
+      if (!postgres) {
+        return res.status(503).json({ error: "Database not available" });
+      }
+      
+      const { db } = postgres;
+      const { vesselId, vesselName } = req.body;
+      
+      if (!vesselId || !vesselName) {
+        return res.status(400).json({ error: "vesselId and vesselName are required" });
+      }
+      
+      // Check if vessel already has records
+      const existingRecords = await db.select()
+        .from(vesselSurveyApplicability)
+        .where(eq(vesselSurveyApplicability.vesselId, vesselId));
+      
+      if (existingRecords.length > 0) {
+        return res.json({ success: true, message: "Vessel already initialized", records: existingRecords });
+      }
+      
+      // Get all company surveys (applicableToCompany = true)
+      const companySurveys = await db.select()
+        .from(shipSurveysMaster)
+        .where(eq(shipSurveysMaster.applicableToCompany, true));
+      
+      if (companySurveys.length === 0) {
+        return res.json({ success: true, message: "No company surveys to initialize", records: [] });
+      }
+      
+      // Create applicability records for all company surveys (all checked by default)
+      const insertData = companySurveys.map(survey => ({
+        vesselId,
+        vesselName,
+        masterId: survey.masterId,
+        isApplicable: true,
+      }));
+      
+      const insertedRecords = await db.insert(vesselSurveyApplicability)
+        .values(insertData)
+        .returning();
+      
+      console.log(`✅ Initialized ${insertedRecords.length} survey applicability records for vessel ${vesselName}`);
+      
+      res.json({ success: true, message: `Initialized ${insertedRecords.length} surveys for vessel`, records: insertedRecords });
+    } catch (error: any) {
+      console.error("Error initializing vessel survey applicability:", error);
+      res.status(500).json({ error: "Failed to initialize vessel survey applicability", details: error.message });
+    }
+  });
+
+  // Bulk update vessel survey applicability
+  app.post("/technical/api/admin/vessel-survey-applicability/bulk-update", async (req, res) => {
+    try {
+      const postgres = await getPostgresClient();
+      if (!postgres) {
+        return res.status(503).json({ error: "Database not available" });
+      }
+      
+      const { db } = postgres;
+      const { vessels, masterId, isApplicable } = req.body;
+      
+      if (!Array.isArray(vessels) || !masterId || typeof isApplicable !== 'boolean') {
+        return res.status(400).json({ error: "vessels array, masterId, and isApplicable are required" });
+      }
+      
+      const vesselIds = vessels.map((v: any) => v.id);
+      
+      // Update all matching records
+      const updatedRecords = await db.update(vesselSurveyApplicability)
+        .set({ isApplicable, updatedAt: new Date() })
+        .where(and(
+          inArray(vesselSurveyApplicability.vesselId, vesselIds),
+          eq(vesselSurveyApplicability.masterId, masterId)
+        ))
+        .returning();
+      
+      // For vessels without existing records, create them
+      const updatedVesselIds = new Set(updatedRecords.map((r: any) => r.vesselId));
+      const missingVessels = vessels.filter((v: any) => !updatedVesselIds.has(v.id));
+      
+      if (missingVessels.length > 0) {
+        const newRecords = await db.insert(vesselSurveyApplicability)
+          .values(missingVessels.map((v: any) => ({
+            vesselId: v.id,
+            vesselName: v.name,
+            masterId,
+            isApplicable,
+          })))
+          .returning();
+        
+        updatedRecords.push(...newRecords);
+      }
+      
+      res.json({ success: true, records: updatedRecords });
+    } catch (error: any) {
+      console.error("Error bulk updating vessel survey applicability:", error);
+      res.status(500).json({ error: "Failed to bulk update vessel survey applicability", details: error.message });
     }
   });
   

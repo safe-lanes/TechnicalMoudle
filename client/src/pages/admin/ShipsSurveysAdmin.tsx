@@ -17,11 +17,21 @@ import {
   DialogTitle,
   DialogFooter,
 } from "@/components/ui/dialog";
-import { Plus, Pencil, Trash2, Search, Save, X, Loader2, Check } from "lucide-react";
+import { Plus, Pencil, Trash2, Search, Save, X, Loader2, Check, ChevronsUpDown, Ship } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from "@/components/ui/command";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
+import { useVessels } from "@/hooks/useVessels";
 
 interface LabelConfig {
   key: string;
@@ -85,6 +95,16 @@ interface MasterSurvey {
   companySequence?: number;
 }
 
+interface VesselSurvey {
+  id: number;
+  masterId: string;
+  companyId: string;
+  surveyLabel: string;
+  requirementRef: string;
+  companyGroup: string;
+  applicable: boolean;
+}
+
 export default function ShipsSurveysAdmin() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -123,6 +143,18 @@ export default function ShipsSurveysAdmin() {
   const [newCompanyEntryError, setNewCompanyEntryError] = useState("");
   const [companyGroupDialogOpen, setCompanyGroupDialogOpen] = useState(false);
   const [companySearchTerm, setCompanySearchTerm] = useState("");
+  
+  // Vessel tab state
+  const [selectedVessels, setSelectedVessels] = useState<string[]>([]);
+  const [vesselPopoverOpen, setVesselPopoverOpen] = useState(false);
+  const [vesselOnlySurveys, setVesselOnlySurveys] = useState<VesselSurvey[]>([]);
+  const [isAddingNewVessel, setIsAddingNewVessel] = useState(false);
+  const [newVesselSurvey, setNewVesselSurvey] = useState<Partial<VesselSurvey>>({});
+  const [initializedVesselIds, setInitializedVesselIds] = useState<Set<string>>(new Set());
+  
+  // Vessel data from hook
+  const { data: vesselMasterData, isLoading: isLoadingVessels } = useVessels();
+  const vesselOptions = vesselMasterData?.map((v: any) => v.name) || [];
 
   const currentViewMode = viewModes[activeTab];
   const isEditMode = currentViewMode === "edit";
@@ -133,6 +165,22 @@ export default function ShipsSurveysAdmin() {
   
   const { data: savedLabels } = useQuery<Record<string, Array<{key: string, label: string}>>>({
     queryKey: ['/technical/api/admin/ship-surveys-labels'],
+  });
+  
+  // Query vessel survey applicability for selected vessels
+  const selectedVesselIds = selectedVessels.map(name => {
+    const vessel = vesselMasterData?.find((v: any) => v.name === name);
+    return vessel?.id || name;
+  }).join(',');
+  
+  const { data: vesselApplicabilityData, isLoading: isLoadingApplicability } = useQuery({
+    queryKey: ['/technical/api/admin/vessel-survey-applicability', selectedVesselIds],
+    queryFn: async () => {
+      if (!selectedVesselIds) return [];
+      const res = await fetch(`/technical/api/admin/vessel-survey-applicability?vesselIds=${selectedVesselIds}`);
+      return res.json();
+    },
+    enabled: selectedVessels.length > 0,
   });
 
   useEffect(() => {
@@ -186,7 +234,11 @@ export default function ShipsSurveysAdmin() {
   }, [savedLabels]);
 
   const saveMutation = useMutation({
-    mutationFn: async (payload: { surveys: MasterSurvey[] }) => {
+    mutationFn: async (payload: { 
+      surveys: MasterSurvey[]; 
+      vesselSpecificSurveys?: string[];
+      targetVessels?: { id: string; name: string }[];
+    }) => {
       const response = await apiRequest('POST', '/technical/api/admin/ship-surveys-master', payload);
       return response.json();
     },
@@ -198,7 +250,9 @@ export default function ShipsSurveysAdmin() {
       setHasUnsavedChanges(false);
       setHasSavedInSession(prev => ({ ...prev, [activeTab]: true }));
       setCompanyOnlySurveys([]); // Clear company-only surveys after save - they'll be in masterData on reload
+      setVesselOnlySurveys([]); // Clear vessel-only surveys after save - they'll be in masterData on reload
       queryClient.invalidateQueries({ queryKey: ['/technical/api/admin/ship-surveys-master'] });
+      queryClient.invalidateQueries({ queryKey: ['/technical/api/admin/vessel-survey-applicability', selectedVesselIds] });
     },
     onError: (error: any) => {
       toast({
@@ -249,11 +303,75 @@ export default function ShipsSurveysAdmin() {
     
     setDeletedMasterIds([]);
     
-    // Merge company-only surveys with masterData for saving
-    const allSurveys = [...masterData, ...companyOnlySurveys];
+    // Find max sequence numbers for CMP- and VES- IDs
+    let maxCmpSeq = 0;
+    let maxVesSeq = 0;
+    for (const survey of masterData) {
+      const cmpMatch = survey.masterId.match(/^CMP-(\d+)$/);
+      if (cmpMatch) {
+        const seq = parseInt(cmpMatch[1], 10);
+        if (seq > maxCmpSeq) maxCmpSeq = seq;
+      }
+      const vesMatch = survey.masterId.match(/^VES-(\d+)$/);
+      if (vesMatch) {
+        const seq = parseInt(vesMatch[1], 10);
+        if (seq > maxVesSeq) maxVesSeq = seq;
+      }
+    }
+    
+    // Convert company-only surveys to master format with generated IDs
+    let nextCmpSeq = maxCmpSeq + 1;
+    const companyOnlySurveysWithIds: MasterSurvey[] = companyOnlySurveys.map((survey, idx) => {
+      const newMasterId = survey.masterId.startsWith('CMP-') 
+        ? survey.masterId 
+        : `CMP-${String(nextCmpSeq++).padStart(3, '0')}`;
+      
+      return {
+        ...survey,
+        masterId: newMasterId,
+        sequence: masterData.length + idx + 1,
+      };
+    });
+    
+    // Convert vessel-only surveys to master format with VES- IDs
+    let nextVesSeq = maxVesSeq + 1;
+    const baseSequence = masterData.length + companyOnlySurveysWithIds.length;
+    const vesselOnlySurveysWithIds: MasterSurvey[] = vesselOnlySurveys.map((survey, idx) => {
+      const newMasterId = survey.masterId.startsWith('VES-') 
+        ? survey.masterId 
+        : `VES-${String(nextVesSeq++).padStart(3, '0')}`;
+      
+      return {
+        id: survey.id,
+        sequence: baseSequence + idx + 1,
+        masterId: newMasterId,
+        surveyName: survey.surveyLabel,
+        category: 'Vessel',
+        group: survey.companyGroup || 'Vessel Specific',
+        requirementRef: survey.requirementRef || '',
+        applicableToCompany: false,
+        surveyLabel: survey.surveyLabel,
+        companyId: survey.companyId || newMasterId.replace('VES-', 'VV'),
+        companyGroup: survey.companyGroup || '',
+        companySequence: baseSequence + idx + 1,
+      };
+    });
+    
+    // Merge all surveys for saving
+    const allSurveys = [...masterData, ...companyOnlySurveysWithIds, ...vesselOnlySurveysWithIds];
+    
+    // Get selected vessel info for vessel-specific survey applicability
+    const targetVessels = vesselMasterData
+      ?.filter((v: any) => selectedVessels.includes(v.name))
+      .map((v: any) => ({ id: String(v.id), name: v.name })) || [];
+    const vesselMasterIds = vesselOnlySurveysWithIds.map(s => s.masterId);
     
     // Then save all surveys
-    saveMutation.mutate({ surveys: allSurveys });
+    saveMutation.mutate({ 
+      surveys: allSurveys,
+      vesselSpecificSurveys: vesselMasterIds,
+      targetVessels: targetVessels,
+    });
   };
 
   const toggleViewMode = () => {
@@ -488,6 +606,171 @@ export default function ShipsSurveysAdmin() {
     toast({ title: "Labels saved", description: "Company group labels have been updated." });
   };
 
+  // ============================================================
+  // Vessel Tab Functions
+  // ============================================================
+  
+  const toggleVesselSelection = (vessel: string) => {
+    setSelectedVessels(prev => 
+      prev.includes(vessel) 
+        ? prev.filter(v => v !== vessel)
+        : [...prev, vessel]
+    );
+  };
+
+  const toggleAllVessels = () => {
+    if (selectedVessels.length === vesselOptions.length) {
+      setSelectedVessels([]);
+    } else {
+      setSelectedVessels([...vesselOptions]);
+    }
+  };
+
+  // Auto-initialize vessel applicability when vessels are selected
+  useEffect(() => {
+    if (selectedVessels.length > 0 && vesselMasterData && vesselMasterData.length > 0 && !isLoadingApplicability) {
+      // Initialize any vessels that haven't been initialized yet
+      const vesselsToInit = vesselMasterData
+        .filter((v: any) => selectedVessels.includes(v.name))
+        .filter((v: any) => !initializedVesselIds.has(v.id));
+      
+      vesselsToInit.forEach(async (vessel: any) => {
+        try {
+          await apiRequest('POST', '/technical/api/admin/vessel-survey-applicability/initialize', {
+            vesselId: vessel.id,
+            vesselName: vessel.name,
+          });
+          setInitializedVesselIds(prev => new Set(Array.from(prev).concat(vessel.id)));
+          queryClient.invalidateQueries({ queryKey: ['/technical/api/admin/vessel-survey-applicability', selectedVesselIds] });
+        } catch (err) {
+          console.error('Failed to initialize vessel survey applicability:', err);
+        }
+      });
+    }
+  }, [selectedVessels, vesselMasterData, vesselApplicabilityData, isLoadingApplicability, initializedVesselIds]);
+
+  // Detect applicability conflicts across selected vessels
+  const hasApplicabilityConflict = (): { hasConflict: boolean; conflictingMasterIds: string[] } => {
+    if (selectedVessels.length <= 1) return { hasConflict: false, conflictingMasterIds: [] };
+    if (!vesselApplicabilityData || !Array.isArray(vesselApplicabilityData)) return { hasConflict: false, conflictingMasterIds: [] };
+    
+    // Group applicability data by masterId
+    const applicabilityByMasterId: Record<string, boolean[]> = {};
+    for (const record of vesselApplicabilityData) {
+      if (!applicabilityByMasterId[record.masterId]) {
+        applicabilityByMasterId[record.masterId] = [];
+      }
+      applicabilityByMasterId[record.masterId].push(record.isApplicable);
+    }
+    
+    // Find masterIds where applicability values differ
+    const conflictingMasterIds = Object.entries(applicabilityByMasterId)
+      .filter(([_, values]) => values.length > 1 && new Set(values).size > 1)
+      .map(([masterId]) => masterId);
+    
+    return { 
+      hasConflict: conflictingMasterIds.length > 0, 
+      conflictingMasterIds 
+    };
+  };
+
+  const conflictCheck = hasApplicabilityConflict();
+
+  // Get applicability for a survey
+  const getSurveyApplicability = (masterId: string): boolean | 'mixed' => {
+    if (!vesselApplicabilityData || !Array.isArray(vesselApplicabilityData)) return true;
+    
+    const relevantRecords = vesselApplicabilityData.filter((r: any) => r.masterId === masterId);
+    if (relevantRecords.length === 0) return true; // Default to applicable
+    
+    const applicableValues = relevantRecords.map((r: any) => r.isApplicable);
+    const uniqueValues = new Set(applicableValues);
+    
+    if (uniqueValues.size > 1) return 'mixed';
+    return applicableValues[0];
+  };
+
+  // Handle applicability change
+  const handleApplicabilityChange = async (masterId: string, isApplicable: boolean) => {
+    if (!vesselMasterData) return;
+    
+    const vessels = selectedVessels.map(name => {
+      const vessel = vesselMasterData.find((v: any) => v.name === name);
+      return vessel ? { id: vessel.id, name: vessel.name } : null;
+    }).filter(Boolean);
+
+    try {
+      await apiRequest('POST', '/technical/api/admin/vessel-survey-applicability/bulk-update', {
+        vessels,
+        masterId,
+        isApplicable,
+      });
+      
+      // Refresh the data
+      queryClient.invalidateQueries({ queryKey: ['/technical/api/admin/vessel-survey-applicability', selectedVesselIds] });
+    } catch (err) {
+      console.error('Failed to update applicability:', err);
+      toast({
+        title: "Update failed",
+        description: "Failed to update survey applicability",
+        variant: "destructive",
+      });
+    }
+  };
+
+  // Get company surveys for vessel tab display
+  const companySurveys = masterData.filter(s => s.applicableToCompany);
+
+  // Handle adding new vessel-only survey
+  const handleAddNewVesselSurvey = () => {
+    setNewVesselSurvey({
+      surveyLabel: "",
+      requirementRef: "",
+      companyGroup: "",
+    });
+    setIsAddingNewVessel(true);
+  };
+
+  const cancelAddNewVessel = () => {
+    setIsAddingNewVessel(false);
+    setNewVesselSurvey({});
+  };
+
+  const saveNewVesselSurvey = async () => {
+    if (!newVesselSurvey.surveyLabel) {
+      toast({
+        title: "Survey Label required",
+        description: "Please enter a survey label",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // Generate VES-xxx ID
+    const existingVesIds = vesselOnlySurveys
+      .filter(s => s.masterId.startsWith('VES-'))
+      .map(s => parseInt(s.masterId.replace('VES-', '')) || 0);
+    const maxVesNum = existingVesIds.length > 0 ? Math.max(...existingVesIds) : 0;
+    const newMasterId = `VES-${String(maxVesNum + 1).padStart(3, '0')}`;
+
+    const newId = Math.max(...vesselOnlySurveys.map(s => s.id), 0) + 2000;
+    
+    const newSurvey: VesselSurvey = {
+      id: newId,
+      masterId: newMasterId,
+      companyId: "",
+      surveyLabel: newVesselSurvey.surveyLabel || "",
+      requirementRef: newVesselSurvey.requirementRef || "",
+      companyGroup: newVesselSurvey.companyGroup || "",
+      applicable: true,
+    };
+
+    setVesselOnlySurveys(prev => [...prev, newSurvey]);
+    setIsAddingNewVessel(false);
+    setNewVesselSurvey({});
+    setHasUnsavedChanges(true);
+  };
+
   const filteredData = masterData.filter(survey => {
     const matchesSearch = searchTerm === "" || 
       survey.surveyName.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -624,6 +907,34 @@ export default function ShipsSurveysAdmin() {
                     >
                       <Plus className="w-4 h-4 mr-1" /> Add Survey
                     </Button>
+                  </>
+                )}
+                {activeTab === "vessel" && (
+                  <>
+                    <Button 
+                      size="sm"
+                      onClick={handleSave}
+                      disabled={saveMutation.isPending}
+                      className="bg-[#16569e] hover:bg-[#124a87] text-white"
+                      data-testid="button-save-vessel"
+                    >
+                      {saveMutation.isPending ? (
+                        <Loader2 className="w-4 h-4 mr-1 animate-spin" />
+                      ) : (
+                        <Save className="w-4 h-4 mr-1" />
+                      )}
+                      Save
+                    </Button>
+                    {selectedVessels.length > 0 && (
+                      <Button 
+                        size="sm" 
+                        onClick={handleAddNewVesselSurvey}
+                        className="bg-[#5dc86f] hover:bg-[#4db85f] text-white"
+                        data-testid="button-add-vessel-survey"
+                      >
+                        <Plus className="w-4 h-4 mr-1" /> Add Survey
+                      </Button>
+                    )}
                   </>
                 )}
               </>
@@ -1086,7 +1397,362 @@ export default function ShipsSurveysAdmin() {
         )}
 
         {activeTab === "vessel" && (
-          <div className="h-full flex flex-col">
+          <div className="h-full flex flex-col space-y-4">
+            <div className="flex items-center gap-3 flex-wrap">
+              <Popover open={vesselPopoverOpen} onOpenChange={setVesselPopoverOpen}>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="outline"
+                    role="combobox"
+                    aria-expanded={vesselPopoverOpen}
+                    className="w-[220px] justify-between"
+                    data-testid="select-vessel"
+                  >
+                    <div className="flex items-center gap-2">
+                      <Ship className="h-4 w-4" />
+                      <span className="truncate">
+                        {selectedVessels.length === 0 
+                          ? "Select vessels..." 
+                          : selectedVessels.length === vesselOptions.length && vesselOptions.length > 0 
+                            ? "All Vessels" 
+                            : selectedVessels.length === 1 
+                              ? selectedVessels[0] 
+                              : `${selectedVessels.length} vessels selected`}
+                      </span>
+                    </div>
+                    <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-[220px] p-0" align="start">
+                  <Command>
+                    <CommandInput placeholder="Search vessels..." />
+                    <CommandList>
+                      <CommandEmpty>No vessels found.</CommandEmpty>
+                      <CommandGroup>
+                        <CommandItem
+                          value="all-vessels"
+                          onSelect={() => toggleAllVessels()}
+                          className="cursor-pointer"
+                        >
+                          <div className={cn(
+                            "mr-2 flex h-4 w-4 items-center justify-center rounded-sm border border-primary",
+                            selectedVessels.length === vesselOptions.length && vesselOptions.length > 0
+                              ? "bg-primary text-primary-foreground"
+                              : "opacity-50"
+                          )}>
+                            {selectedVessels.length === vesselOptions.length && vesselOptions.length > 0 && (
+                              <Check className="h-3 w-3" />
+                            )}
+                          </div>
+                          <span className="font-medium">All Vessels</span>
+                        </CommandItem>
+                        {isLoadingVessels ? (
+                          <CommandItem disabled>
+                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                            Loading vessels...
+                          </CommandItem>
+                        ) : (
+                          vesselOptions.map((vessel: string) => (
+                            <CommandItem
+                              key={vessel}
+                              value={vessel}
+                              onSelect={() => toggleVesselSelection(vessel)}
+                              className="cursor-pointer"
+                            >
+                              <div className={cn(
+                                "mr-2 flex h-4 w-4 items-center justify-center rounded-sm border border-primary",
+                                selectedVessels.includes(vessel)
+                                  ? "bg-primary text-primary-foreground"
+                                  : "opacity-50"
+                              )}>
+                                {selectedVessels.includes(vessel) && <Check className="h-3 w-3" />}
+                              </div>
+                              <Ship className="mr-2 h-4 w-4 text-muted-foreground" />
+                              {vessel}
+                            </CommandItem>
+                          ))
+                        )}
+                      </CommandGroup>
+                    </CommandList>
+                  </Command>
+                </PopoverContent>
+              </Popover>
+            </div>
+
+            {selectedVessels.length > 0 && conflictCheck.hasConflict && (
+              <div className="bg-amber-50 border border-amber-300 rounded-lg p-3">
+                <div className="flex items-center gap-2">
+                  <span className="text-amber-700 text-sm font-medium">
+                    Conflict detected: Selected vessels have different applicability settings for {conflictCheck.conflictingMasterIds.length} survey(s).
+                  </span>
+                  <span className="text-amber-600 text-sm">
+                    Please select vessels with matching configurations or select one vessel at a time to edit.
+                  </span>
+                </div>
+              </div>
+            )}
+
+            {selectedVessels.length > 0 && !conflictCheck.hasConflict && (
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+                <div className="flex items-center justify-between flex-wrap gap-2">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="text-sm font-medium text-blue-800">
+                      {selectedVessels.length === 1 ? `Configuring: ${selectedVessels[0]}` : `Configuring ${selectedVessels.length} vessels`}
+                    </span>
+                    {selectedVessels.length > 1 && selectedVessels.slice(0, 3).map((vessel) => (
+                      <div key={vessel} className="flex items-center gap-1">
+                        <Checkbox id={`vessel-edit-${vessel}`} defaultChecked disabled />
+                        <label htmlFor={`vessel-edit-${vessel}`} className="text-sm">{vessel}</label>
+                      </div>
+                    ))}
+                    {selectedVessels.length > 3 && (
+                      <span className="text-sm text-blue-600">+{selectedVessels.length - 3} more</span>
+                    )}
+                  </div>
+                  {selectedVessels.length > 1 && (
+                    <span className="text-sm text-blue-600">Changes apply to all selected vessels</span>
+                  )}
+                </div>
+              </div>
+            )}
+
+            <div className="bg-white rounded-lg border overflow-hidden flex-1">
+              <div className="overflow-x-auto h-full">
+                <table className="w-full">
+                  <thead className="bg-[#52baf3] text-white text-sm sticky top-0">
+                    <tr>
+                      <th className="px-3 py-3 text-center font-medium w-12">Applicable</th>
+                      <th className="px-3 py-3 text-left font-medium w-12">#</th>
+                      <th className="px-3 py-3 text-left font-medium">Master ID</th>
+                      <th className="px-3 py-3 text-left font-medium">Company ID</th>
+                      <th className="px-3 py-3 text-left font-medium">Survey Label</th>
+                      <th className="px-3 py-3 text-left font-medium">Requirement/Ref</th>
+                      <th className="px-3 py-3 text-left font-medium">Company Group</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y">
+                    {selectedVessels.length === 0 ? (
+                      <tr>
+                        <td colSpan={7} className="px-6 py-12 text-center">
+                          <div className="flex flex-col items-center gap-2">
+                            <Ship className="h-12 w-12 text-muted-foreground/50" />
+                            <p className="text-muted-foreground">Select at least one vessel to view survey configuration</p>
+                          </div>
+                        </td>
+                      </tr>
+                    ) : isLoadingApplicability ? (
+                      <tr>
+                        <td colSpan={7} className="px-6 py-12 text-center">
+                          <div className="flex flex-col items-center gap-2">
+                            <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+                            <p className="text-muted-foreground">Loading survey configuration...</p>
+                          </div>
+                        </td>
+                      </tr>
+                    ) : companySurveys.length === 0 ? (
+                      <tr>
+                        <td colSpan={7} className="px-6 py-12 text-center">
+                          <div className="flex flex-col items-center gap-2">
+                            <Ship className="h-12 w-12 text-muted-foreground/50" />
+                            <p className="text-muted-foreground">No surveys are marked as applicable to Company. Configure the Company tab first.</p>
+                          </div>
+                        </td>
+                      </tr>
+                    ) : companySurveys.map((survey, idx) => {
+                      const applicability = getSurveyApplicability(survey.masterId);
+                      const isMixed = applicability === 'mixed';
+                      const isChecked = applicability === true;
+                      const companyGroupLabel = companyGroupLabels.find(g => g.key === survey.companyGroup)?.label || "";
+                      const displayCompanyGroup = survey.companyGroup ? `${survey.companyGroup}. ${companyGroupLabel}` : "";
+                      
+                      return (
+                        <tr key={survey.id} className={cn("hover:bg-gray-50", isMixed && "bg-amber-50")}>
+                          <td className="px-3 py-3 text-center">
+                            <div className="flex flex-col items-center gap-1">
+                              <Checkbox 
+                                checked={isMixed ? false : isChecked}
+                                onCheckedChange={(checked) => {
+                                  if (!conflictCheck.hasConflict && viewModes.vessel === "edit") {
+                                    handleApplicabilityChange(survey.masterId, !!checked);
+                                  }
+                                }}
+                                disabled={conflictCheck.hasConflict || viewModes.vessel !== "edit"}
+                                className={cn(
+                                  "border-blue-500 data-[state=checked]:bg-blue-500",
+                                  isMixed && "border-amber-500 bg-amber-100"
+                                )}
+                                data-testid={`checkbox-vessel-applicable-${survey.id}`}
+                              />
+                              {isMixed && (
+                                <span className="text-xs text-amber-600">Mixed</span>
+                              )}
+                            </div>
+                          </td>
+                          <td className="px-3 py-3 text-sm">{idx + 1}</td>
+                          <td className="px-3 py-3 text-sm font-medium text-blue-600">{survey.masterId}</td>
+                          <td className="px-3 py-3 text-sm">{survey.companyId || "-"}</td>
+                          <td className="px-3 py-3 text-sm">{survey.surveyLabel || survey.surveyName}</td>
+                          <td className="px-3 py-3 text-sm">{survey.requirementRef}</td>
+                          <td className="px-3 py-3 text-sm">{displayCompanyGroup}</td>
+                        </tr>
+                      );
+                    })}
+                    
+                    {/* Vessel-only surveys (VES-) */}
+                    {selectedVessels.length > 0 && vesselOnlySurveys.map((survey, idx) => {
+                      const companyGroupLabel = companyGroupLabels.find(g => g.key === survey.companyGroup)?.label || "";
+                      const displayCompanyGroup = survey.companyGroup ? `${survey.companyGroup}. ${companyGroupLabel}` : "";
+                      
+                      return (
+                        <tr key={`vessel-only-${survey.id}`} className="hover:bg-gray-50 bg-green-50">
+                          <td className="px-3 py-3 text-center">
+                            <Checkbox 
+                              checked={survey.applicable}
+                              onCheckedChange={(checked) => {
+                                if (viewModes.vessel === "edit") {
+                                  setVesselOnlySurveys(prev => prev.map(s => 
+                                    s.id === survey.id ? { ...s, applicable: !!checked } : s
+                                  ));
+                                }
+                              }}
+                              disabled={viewModes.vessel !== "edit"}
+                              className="border-blue-500 data-[state=checked]:bg-blue-500"
+                              data-testid={`checkbox-vessel-only-applicable-${survey.id}`}
+                            />
+                          </td>
+                          <td className="px-3 py-3 text-sm">{companySurveys.length + idx + 1}</td>
+                          <td className="px-3 py-3 text-sm font-medium text-gray-400">{survey.masterId}</td>
+                          <td className="px-3 py-3 text-sm text-gray-400">-</td>
+                          <td className="px-3 py-3 text-sm">
+                            {viewModes.vessel === "edit" ? (
+                              <Input 
+                                defaultValue={survey.surveyLabel}
+                                className="h-8 text-sm"
+                                onBlur={(e) => {
+                                  setVesselOnlySurveys(prev => prev.map(s => 
+                                    s.id === survey.id ? { ...s, surveyLabel: e.target.value } : s
+                                  ));
+                                }}
+                                data-testid={`input-vessel-label-only-${survey.id}`}
+                              />
+                            ) : (
+                              survey.surveyLabel
+                            )}
+                          </td>
+                          <td className="px-3 py-3 text-sm">
+                            {viewModes.vessel === "edit" ? (
+                              <Input 
+                                defaultValue={survey.requirementRef}
+                                className="h-8 text-sm"
+                                onBlur={(e) => {
+                                  setVesselOnlySurveys(prev => prev.map(s => 
+                                    s.id === survey.id ? { ...s, requirementRef: e.target.value } : s
+                                  ));
+                                }}
+                                data-testid={`input-vessel-requirement-only-${survey.id}`}
+                              />
+                            ) : (
+                              survey.requirementRef
+                            )}
+                          </td>
+                          <td className="px-3 py-3 text-sm">
+                            {viewModes.vessel === "edit" ? (
+                              <Select 
+                                defaultValue={survey.companyGroup}
+                                onValueChange={(value) => {
+                                  setVesselOnlySurveys(prev => prev.map(s => 
+                                    s.id === survey.id ? { ...s, companyGroup: value } : s
+                                  ));
+                                }}
+                              >
+                                <SelectTrigger className="h-8 text-sm" data-testid={`select-vessel-companygroup-only-${survey.id}`}>
+                                  <SelectValue placeholder="Select group" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  {companyGroupLabels.map(grp => (
+                                    <SelectItem key={grp.key} value={grp.key}>
+                                      {grp.key}. {grp.label}
+                                    </SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                            ) : (
+                              displayCompanyGroup
+                            )}
+                          </td>
+                        </tr>
+                      );
+                    })}
+
+                    {/* New vessel survey entry row */}
+                    {viewModes.vessel === "edit" && isAddingNewVessel && selectedVessels.length > 0 && (
+                      <tr className="bg-blue-50">
+                        <td className="px-3 py-3 text-center">
+                          <Checkbox checked disabled className="border-blue-500 bg-blue-500" />
+                        </td>
+                        <td className="px-3 py-3 text-sm text-gray-400">New</td>
+                        <td className="px-3 py-3 text-sm text-gray-400">VES-xxx</td>
+                        <td className="px-3 py-3 text-sm text-gray-400">-</td>
+                        <td className="px-3 py-3">
+                          <Input 
+                            value={newVesselSurvey.surveyLabel || ""}
+                            onChange={(e) => setNewVesselSurvey(prev => ({ ...prev, surveyLabel: e.target.value }))}
+                            className="h-8 text-sm"
+                            placeholder="Survey Label"
+                            data-testid="input-new-vessel-label"
+                          />
+                        </td>
+                        <td className="px-3 py-3">
+                          <Input 
+                            value={newVesselSurvey.requirementRef || ""}
+                            onChange={(e) => setNewVesselSurvey(prev => ({ ...prev, requirementRef: e.target.value }))}
+                            className="h-8 text-sm"
+                            placeholder="Requirement/Ref"
+                            data-testid="input-new-vessel-requirement"
+                          />
+                        </td>
+                        <td className="px-3 py-3">
+                          <div className="flex items-center gap-2">
+                            <Select 
+                              value={newVesselSurvey.companyGroup || ""}
+                              onValueChange={(value) => setNewVesselSurvey(prev => ({ ...prev, companyGroup: value }))}
+                            >
+                              <SelectTrigger className="h-8 text-sm flex-1" data-testid="select-new-vessel-companygroup">
+                                <SelectValue placeholder="Select group" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {companyGroupLabels.map(grp => (
+                                  <SelectItem key={grp.key} value={grp.key}>
+                                    {grp.key}. {grp.label}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                            <Button 
+                              size="sm" 
+                              onClick={saveNewVesselSurvey}
+                              className="bg-green-600 hover:bg-green-700 h-8 px-2"
+                              data-testid="button-confirm-new-vessel"
+                            >
+                              <Check className="h-4 w-4" />
+                            </Button>
+                            <Button 
+                              size="sm" 
+                              variant="outline"
+                              onClick={cancelAddNewVessel}
+                              className="h-8 px-2"
+                              data-testid="button-cancel-new-vessel"
+                            >
+                              <X className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
           </div>
         )}
       </div>
