@@ -1858,21 +1858,24 @@ const Spares: React.FC = () => {
       </div>
       {/* Search and Filters */}
       <div className="flex gap-3 items-center mb-4">
-        <div className="relative" data-testid="E4">
-          <Marker id="E4" />
-          <Select value={vesselId} onValueChange={setVesselId}>
-            <SelectTrigger className="w-48">
-              <SelectValue placeholder="Select Vessel" />
-            </SelectTrigger>
-            <SelectContent>
-              {vessels.map(vessel => (
-                <SelectItem key={vessel.id} value={vessel.id}>
-                  {vessel.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
+        {/* Vessel selector - hidden for Vessel and Head of Dept view modes */}
+        {(isSailAdmin || isClientAdmin) && (
+          <div className="relative" data-testid="E4">
+            <Marker id="E4" />
+            <Select value={vesselId} onValueChange={setVesselId}>
+              <SelectTrigger className="w-48">
+                <SelectValue placeholder="Select Vessel" />
+              </SelectTrigger>
+              <SelectContent>
+                {vessels.map(vessel => (
+                  <SelectItem key={vessel.id} value={vessel.id}>
+                    {vessel.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        )}
 
         <div className="relative w-80" data-testid="E5">
           <Marker id="E5" />
