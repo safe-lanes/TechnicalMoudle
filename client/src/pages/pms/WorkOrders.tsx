@@ -86,7 +86,7 @@ const WorkOrders: React.FC = () => {
   const [location, setLocation] = useLocation();
   const { toast } = useToast();
   const { vesselId, setVesselId } = useVessel();
-  const { isSailAdmin } = useUIRole();
+  const { isSailAdmin, isClientAdmin, isVessel, isHeadOfDept } = useUIRole();
   const { data: vessels = [] } = useVessels();
   
   // Fetch work orders using React Query (includes computedStatus and lead time from backend)
@@ -517,19 +517,22 @@ const WorkOrders: React.FC = () => {
 
       {/* Filters */}
       <div className="flex items-center gap-3">
-        <Select value={vesselId} onValueChange={setVesselId}>
-          <SelectTrigger className="w-48" data-testid="C15">
-            <Marker id="C15" />
-            <SelectValue placeholder="Select Vessel" />
-          </SelectTrigger>
-          <SelectContent>
-            {vessels.map(vessel => (
-              <SelectItem key={vessel.id} value={vessel.id}>
-                {vessel.name}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+        {/* Vessel selector - hidden for Vessel and Head of Dept view modes */}
+        {(isSailAdmin || isClientAdmin) && (
+          <Select value={vesselId} onValueChange={setVesselId}>
+            <SelectTrigger className="w-48" data-testid="C15">
+              <Marker id="C15" />
+              <SelectValue placeholder="Select Vessel" />
+            </SelectTrigger>
+            <SelectContent>
+              {vessels.map(vessel => (
+                <SelectItem key={vessel.id} value={vessel.id}>
+                  {vessel.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        )}
 
         <div className="relative flex-1 max-w-sm" data-testid="C10">
           <Marker id="C10" />
