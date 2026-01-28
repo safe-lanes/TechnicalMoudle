@@ -303,6 +303,94 @@ const migrations: Migration[] = [
       CREATE INDEX IF NOT EXISTS idx_vessel_cert_data_vessel ON vessel_certificate_data(vessel_id);
       CREATE INDEX IF NOT EXISTS idx_vessel_cert_data_master ON vessel_certificate_data(master_id)
     `
+  },
+  {
+    id: '018_ship_surveys_master_table',
+    name: 'Create ship_surveys_master table for Admin configuration',
+    description: 'Creates the admin configuration table for master survey definitions used by Cert & Surveys module',
+    sql: `
+      CREATE TABLE IF NOT EXISTS ship_surveys_master (
+        id SERIAL PRIMARY KEY,
+        sequence INTEGER NOT NULL,
+        master_id TEXT NOT NULL UNIQUE,
+        survey_name TEXT NOT NULL,
+        category TEXT NOT NULL,
+        "group" TEXT NOT NULL,
+        requirement_ref TEXT,
+        applicable_to_company BOOLEAN NOT NULL DEFAULT false,
+        survey_label TEXT,
+        is_active BOOLEAN NOT NULL DEFAULT true,
+        company_id TEXT,
+        company_group TEXT,
+        company_sequence INTEGER,
+        created_at TIMESTAMP DEFAULT NOW(),
+        updated_at TIMESTAMP DEFAULT NOW()
+      );
+      CREATE INDEX IF NOT EXISTS idx_ship_survey_master_sequence ON ship_surveys_master (sequence);
+      CREATE INDEX IF NOT EXISTS idx_ship_survey_master_category ON ship_surveys_master (category);
+      CREATE INDEX IF NOT EXISTS idx_ship_survey_master_group ON ship_surveys_master ("group")
+    `
+  },
+  {
+    id: '019_ship_surveys_labels_config',
+    name: 'Create ship_surveys_labels_config table',
+    description: 'Stores category and group label configuration for Ship Surveys Admin module',
+    sql: `
+      CREATE TABLE IF NOT EXISTS ship_surveys_labels_config (
+        id SERIAL PRIMARY KEY,
+        config_type TEXT NOT NULL,
+        key TEXT NOT NULL,
+        label TEXT NOT NULL DEFAULT '',
+        created_at TIMESTAMP DEFAULT NOW(),
+        updated_at TIMESTAMP DEFAULT NOW(),
+        UNIQUE(config_type, key)
+      );
+      CREATE INDEX IF NOT EXISTS idx_ship_survey_labels_config_type ON ship_surveys_labels_config (config_type)
+    `
+  },
+  {
+    id: '020_vessel_survey_applicability_table',
+    name: 'Create vessel_survey_applicability table',
+    description: 'Creates table to track which surveys are applicable for each vessel',
+    sql: `
+      CREATE TABLE IF NOT EXISTS vessel_survey_applicability (
+        id SERIAL PRIMARY KEY,
+        vessel_id TEXT NOT NULL,
+        vessel_name TEXT NOT NULL,
+        master_id TEXT NOT NULL,
+        is_applicable BOOLEAN NOT NULL DEFAULT true,
+        created_at TIMESTAMP DEFAULT NOW(),
+        updated_at TIMESTAMP DEFAULT NOW(),
+        UNIQUE(vessel_id, master_id)
+      );
+      CREATE INDEX IF NOT EXISTS idx_vessel_survey_vessel_master ON vessel_survey_applicability(vessel_id, master_id);
+      CREATE INDEX IF NOT EXISTS idx_vessel_survey_vessel ON vessel_survey_applicability(vessel_id);
+      CREATE INDEX IF NOT EXISTS idx_vessel_survey_master ON vessel_survey_applicability(master_id)
+    `
+  },
+  {
+    id: '021_vessel_survey_data_table',
+    name: 'Create vessel_survey_data table',
+    description: 'Creates table to store vessel-specific survey data (dates, attachments) for Cert & Surveys module',
+    sql: `
+      CREATE TABLE IF NOT EXISTS vessel_survey_data (
+        id SERIAL PRIMARY KEY,
+        vessel_id TEXT NOT NULL,
+        vessel_name TEXT NOT NULL,
+        master_id TEXT NOT NULL,
+        last_survey_date TEXT,
+        next_due_date TEXT,
+        survey_window TEXT,
+        status TEXT,
+        attachments JSONB DEFAULT '[]',
+        created_at TIMESTAMP DEFAULT NOW(),
+        updated_at TIMESTAMP DEFAULT NOW(),
+        UNIQUE(vessel_id, master_id)
+      );
+      CREATE INDEX IF NOT EXISTS idx_vessel_survey_data_vessel_master ON vessel_survey_data(vessel_id, master_id);
+      CREATE INDEX IF NOT EXISTS idx_vessel_survey_data_vessel ON vessel_survey_data(vessel_id);
+      CREATE INDEX IF NOT EXISTS idx_vessel_survey_data_master ON vessel_survey_data(master_id)
+    `
   }
 ];
 

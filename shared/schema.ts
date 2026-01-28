@@ -2449,3 +2449,112 @@ export const insertVesselCertificateDataSchema = createInsertSchema(vesselCertif
 
 export type InsertVesselCertificateData = z.infer<typeof insertVesselCertificateDataSchema>;
 export type VesselCertificateData = typeof vesselCertificateData.$inferSelect;
+
+// ===========================
+// Ship Surveys Admin Tables
+// ===========================
+
+// Ship Surveys Admin - Master Survey Definitions
+// This is the admin configuration for what surveys exist and their properties
+export const shipSurveysMaster = pgTable("ship_surveys_master", {
+  id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
+  sequence: integer("sequence").notNull(),
+  masterId: text("master_id").notNull().unique(), // Format: CategoryLetter + GroupNumber + "-" + 3-digit sequence (e.g., A1-001)
+  surveyName: text("survey_name").notNull(),
+  category: text("category").notNull(), // A-F category key
+  group: text("group").notNull(), // 1-10 group key
+  requirementRef: text("requirement_ref"), // Regulatory reference
+  applicableToCompany: boolean("applicable_to_company").notNull().default(false),
+  surveyLabel: text("survey_label"), // Custom label when applicable to company
+  isActive: boolean("is_active").notNull().default(true),
+  // Company-specific fields (only used when applicableToCompany is true)
+  companyId: text("company_id"), // Default: "C" + masterId, but user-editable
+  companyGroup: text("company_group"), // A-I company group key
+  companySequence: integer("company_sequence"), // Sequence number for company tab ordering
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+}, (table) => ({
+  sequenceIdx: index("idx_ship_survey_master_sequence").on(table.sequence),
+  categoryIdx: index("idx_ship_survey_master_category").on(table.category),
+  groupIdx: index("idx_ship_survey_master_group").on(table.group),
+}));
+
+export const insertShipSurveyMasterSchema = createInsertSchema(shipSurveysMaster).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type InsertShipSurveyMaster = z.infer<typeof insertShipSurveyMasterSchema>;
+export type ShipSurveyMaster = typeof shipSurveysMaster.$inferSelect;
+
+// Ship Surveys Labels Configuration (for Master tab category/group labels)
+export const shipSurveysLabelsConfig = pgTable("ship_surveys_labels_config", {
+  id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
+  configType: text("config_type").notNull(), // 'master_category', 'master_group', 'company_group'
+  key: text("key").notNull(), // A, B, C for categories or 1, 2, 3 for groups
+  label: text("label").notNull().default(""),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow().$onUpdate(() => new Date()),
+});
+
+export const insertShipSurveysLabelsConfigSchema = createInsertSchema(shipSurveysLabelsConfig).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type InsertShipSurveysLabelsConfig = z.infer<typeof insertShipSurveysLabelsConfigSchema>;
+export type ShipSurveysLabelsConfig = typeof shipSurveysLabelsConfig.$inferSelect;
+
+// Vessel Survey Applicability - tracks which surveys are applicable for each vessel
+export const vesselSurveyApplicability = pgTable("vessel_survey_applicability", {
+  id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
+  vesselId: text("vessel_id").notNull(), // External vessel ID from Vessel Master API
+  vesselName: text("vessel_name").notNull(), // Vessel name for display
+  masterId: text("master_id").notNull(), // References ship_surveys_master.master_id
+  isApplicable: boolean("is_applicable").notNull().default(true), // Whether this survey is applicable to this vessel
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+}, (table) => ({
+  vesselMasterIdx: index("idx_vessel_survey_vessel_master").on(table.vesselId, table.masterId),
+  vesselIdx: index("idx_vessel_survey_vessel").on(table.vesselId),
+  masterIdx: index("idx_vessel_survey_master").on(table.masterId),
+}));
+
+export const insertVesselSurveyApplicabilitySchema = createInsertSchema(vesselSurveyApplicability).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type InsertVesselSurveyApplicability = z.infer<typeof insertVesselSurveyApplicabilitySchema>;
+export type VesselSurveyApplicability = typeof vesselSurveyApplicability.$inferSelect;
+
+// Vessel Survey Data - stores vessel-specific survey data (dates, attachments) for Cert & Surveys module
+export const vesselSurveyData = pgTable("vessel_survey_data", {
+  id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
+  vesselId: text("vessel_id").notNull(), // External vessel ID from Vessel Master API
+  vesselName: text("vessel_name").notNull(), // Vessel name for display
+  masterId: text("master_id").notNull(), // References ship_surveys_master.master_id
+  lastSurveyDate: text("last_survey_date"), // Date of last survey
+  nextDueDate: text("next_due_date"), // Date next survey is due
+  surveyWindow: text("survey_window"), // Survey window period
+  status: text("status"), // Survey status
+  attachments: jsonb("attachments").$type<Array<{ name: string; size: number; key: string; uploadedAt: string }>>().default([]),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+}, (table) => ({
+  vesselMasterIdx: index("idx_vessel_survey_data_vessel_master").on(table.vesselId, table.masterId),
+  vesselIdx: index("idx_vessel_survey_data_vessel").on(table.vesselId),
+  masterIdx: index("idx_vessel_survey_data_master").on(table.masterId),
+}));
+
+export const insertVesselSurveyDataSchema = createInsertSchema(vesselSurveyData).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type InsertVesselSurveyData = z.infer<typeof insertVesselSurveyDataSchema>;
+export type VesselSurveyData = typeof vesselSurveyData.$inferSelect;
