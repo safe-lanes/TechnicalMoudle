@@ -17,7 +17,7 @@ import {
   DialogTitle,
   DialogFooter,
 } from "@/components/ui/dialog";
-import { Plus, Pencil, Trash2, Search, Save, X, ChevronUp, ChevronDown, Loader2 } from "lucide-react";
+import { Plus, Pencil, Trash2, Search, Save, X, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
@@ -234,8 +234,6 @@ export default function ShipsSurveysAdmin() {
     // Then save the remaining surveys
     saveMutation.mutate({ surveys: masterData });
   };
-  
-  const filtersActive = searchTerm !== "" || selectedCategory !== "All Categories" || selectedGroup !== "All Groups";
 
   const toggleViewMode = () => {
     setViewModes(prev => ({
@@ -310,24 +308,37 @@ export default function ShipsSurveysAdmin() {
     setHasUnsavedChanges(true);
   };
 
-  const moveRowUp = (id: number) => {
-    setMasterData(prev => {
-      const idx = prev.findIndex(s => s.id === id);
-      if (idx <= 0) return prev;
-      const newData = [...prev];
-      [newData[idx - 1], newData[idx]] = [newData[idx], newData[idx - 1]];
-      return recomputeMasterIds(newData);
-    });
-    setHasUnsavedChanges(true);
-  };
-
-  const moveRowDown = (id: number) => {
-    setMasterData(prev => {
-      const idx = prev.findIndex(s => s.id === id);
-      if (idx < 0 || idx >= prev.length - 1) return prev;
-      const newData = [...prev];
-      [newData[idx], newData[idx + 1]] = [newData[idx + 1], newData[idx]];
-      return recomputeMasterIds(newData);
+  const updateSequence = (surveyId: number, newSequence: number) => {
+    setMasterData(prevData => {
+      const currentSurvey = prevData.find(s => s.id === surveyId);
+      if (!currentSurvey) return prevData;
+      
+      const oldSequence = currentSurvey.sequence;
+      if (newSequence === oldSequence) return prevData;
+      
+      const updatedData = prevData.map(s => {
+        if (s.id === surveyId) {
+          return { ...s, sequence: newSequence };
+        }
+        
+        // Moving up (e.g., 4 → 2): shift items in [newSequence, oldSequence-1] down by 1
+        if (newSequence < oldSequence) {
+          if (s.sequence >= newSequence && s.sequence < oldSequence) {
+            return { ...s, sequence: s.sequence + 1 };
+          }
+        }
+        
+        // Moving down (e.g., 2 → 4): shift items in [oldSequence+1, newSequence] up by 1
+        if (newSequence > oldSequence) {
+          if (s.sequence > oldSequence && s.sequence <= newSequence) {
+            return { ...s, sequence: s.sequence - 1 };
+          }
+        }
+        
+        return s;
+      });
+      
+      return recomputeMasterIds(updatedData);
     });
     setHasUnsavedChanges(true);
   };
@@ -522,20 +533,39 @@ export default function ShipsSurveysAdmin() {
                 <table className="w-full">
                   <thead className="bg-[#52baf3] text-white text-sm sticky top-0">
                     <tr>
-                      <th className="px-4 py-3 text-left font-medium w-16">Seq</th>
+                      {isEditMode && <th className="px-3 py-3 text-center font-medium w-20">Sequence</th>}
+                      <th className="px-4 py-3 text-left font-medium w-12">#</th>
                       <th className="px-4 py-3 text-left font-medium w-28">Master ID</th>
                       <th className="px-4 py-3 text-left font-medium">Survey Name</th>
                       <th className="px-4 py-3 text-left font-medium w-32">Category</th>
                       <th className="px-4 py-3 text-left font-medium w-32">Group</th>
                       <th className="px-4 py-3 text-left font-medium">Requirement Ref</th>
                       <th className="px-4 py-3 text-center font-medium w-24">Apply to Co.</th>
-                      {isEditMode && <th className="px-4 py-3 text-center font-medium w-32">Actions</th>}
+                      {isEditMode && <th className="px-4 py-3 text-center font-medium w-20">Actions</th>}
                     </tr>
                   </thead>
                   <tbody className="divide-y text-sm">
                     {filteredData.map((survey, idx) => (
                       <tr key={survey.id} className="hover:bg-gray-50">
-                        <td className="px-4 py-2 text-gray-500">{survey.sequence}</td>
+                        {isEditMode && (
+                          <td className="px-3 py-2 text-center">
+                            <Input
+                              key={`seq-${survey.id}-${survey.sequence}`}
+                              type="number"
+                              defaultValue={survey.sequence}
+                              className="h-8 text-sm w-16 text-center"
+                              min={1}
+                              onBlur={(e) => {
+                                const newSeq = parseInt(e.target.value, 10);
+                                if (!isNaN(newSeq) && newSeq > 0) {
+                                  updateSequence(survey.id, newSeq);
+                                }
+                              }}
+                              data-testid={`input-sequence-${survey.id}`}
+                            />
+                          </td>
+                        )}
+                        <td className="px-4 py-2 text-gray-500">{idx + 1}</td>
                         <td className="px-4 py-2 font-mono text-xs">{survey.masterId}</td>
                         <td className="px-4 py-2">
                           {isEditMode ? (
@@ -605,40 +635,16 @@ export default function ShipsSurveysAdmin() {
                           )}
                         </td>
                         {isEditMode && (
-                          <td className="px-4 py-2">
-                            <div className="flex items-center justify-center gap-1">
-                              <Button 
-                                variant="ghost" 
-                                size="icon" 
-                                className="h-7 w-7"
-                                onClick={() => moveRowUp(survey.id)}
-                                disabled={filtersActive || masterData.findIndex(s => s.id === survey.id) === 0}
-                                title={filtersActive ? "Clear filters to reorder" : undefined}
-                                data-testid={`button-move-up-${survey.id}`}
-                              >
-                                <ChevronUp className="w-4 h-4" />
-                              </Button>
-                              <Button 
-                                variant="ghost" 
-                                size="icon" 
-                                className="h-7 w-7"
-                                onClick={() => moveRowDown(survey.id)}
-                                disabled={filtersActive || masterData.findIndex(s => s.id === survey.id) === masterData.length - 1}
-                                title={filtersActive ? "Clear filters to reorder" : undefined}
-                                data-testid={`button-move-down-${survey.id}`}
-                              >
-                                <ChevronDown className="w-4 h-4" />
-                              </Button>
-                              <Button 
-                                variant="ghost" 
-                                size="icon" 
-                                className="h-7 w-7 text-red-500 hover:text-red-700 hover:bg-red-50"
-                                onClick={() => deleteRow(survey.id)}
-                                data-testid={`button-delete-${survey.id}`}
-                              >
-                                <Trash2 className="w-4 h-4" />
-                              </Button>
-                            </div>
+                          <td className="px-4 py-2 text-center">
+                            <Button 
+                              variant="ghost" 
+                              size="icon" 
+                              className="h-7 w-7 text-red-500 hover:text-red-700 hover:bg-red-50"
+                              onClick={() => deleteRow(survey.id)}
+                              data-testid={`button-delete-${survey.id}`}
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </Button>
                           </td>
                         )}
                       </tr>
