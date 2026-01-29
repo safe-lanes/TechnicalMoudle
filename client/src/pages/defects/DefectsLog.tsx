@@ -127,9 +127,11 @@ export default function DefectsLog() {
     let result = defects;
     
     if (selectedVesselNames.length > 0) {
-      result = result.filter((defect: Defect) => 
-        selectedVesselNames.includes(defect.vesselName || '')
-      );
+      const normalizedSelectedNames = selectedVesselNames.map(name => name.toLowerCase().trim());
+      result = result.filter((defect: Defect) => {
+        const defectVesselName = (defect.vesselName || '').toLowerCase().trim();
+        return normalizedSelectedNames.includes(defectVesselName);
+      });
     }
     
     return result;
@@ -209,6 +211,8 @@ export default function DefectsLog() {
 
   const handleClearFilters = () => {
     setFilters({ includeClosedDefects: false });
+    setVesselFilterValue(createDefaultFilterValue());
+    setSelectedVesselNames([]);
   };
 
   const getDisplayActionText = (defect: Defect): string | null => {
