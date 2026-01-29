@@ -2230,7 +2230,7 @@ const Components: React.FC = () => {
   const { toast } = useToast();
   const { vesselId, setVesselId } = useVessel();
   const { data: vessels = [] } = useVessels();
-  const { isSailAdmin } = useUIRole();
+  const { isSailAdmin, isClientAdmin } = useUIRole();
   
   // Fetch components from API and build tree
   const { data: fetchedComponents = [], isLoading: isLoadingComponents } = useQuery<any[]>({
@@ -3046,7 +3046,7 @@ const Components: React.FC = () => {
                   <h3 className="text-lg font-semibold text-[#15569e]" data-testid="B7.1">
                     <Marker id="B7.1" /> {selectedComponent.code} {selectedComponent.name}
                   </h3>
-                  {!isChangeRequestMode && !isChangeMode && isSailAdmin && (
+                  {!isChangeRequestMode && !isChangeMode && (isSailAdmin || isClientAdmin) && (
                     <Button
                       size="sm"
                       variant="outline"
