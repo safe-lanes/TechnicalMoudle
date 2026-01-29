@@ -30,6 +30,7 @@ import {
   isResolvedComputedStatus 
 } from "@/lib/defectStatusUtils";
 import { DefectsListModal } from "./DefectsListModal";
+import DefectModal from "./DefectModal";
 import {
   PieChart,
   Pie,
@@ -79,6 +80,10 @@ export default function DefectsDashboard() {
   const [dateRange, setDateRange] = useState("all");
   const [showFilters, setShowFilters] = useState(true);
   const [activeModal, setActiveModal] = useState<ModalType>(null);
+  const [viewModal, setViewModal] = useState<{ open: boolean; defectId: string | null }>({ 
+    open: false, 
+    defectId: null 
+  });
 
   const { data: defects = [], isLoading, refetch } = useQuery<Defect[]>({
     queryKey: ['/technical/api/defects?includeClosedDefects=true'],
@@ -459,7 +464,7 @@ export default function DefectsDashboard() {
               </TableHeader>
               <TableBody>
                 {recentDefects.map((defect) => (
-                  <TableRow key={defect.id} className="cursor-pointer hover:bg-gray-50" onClick={() => window.location.href = `/defects/view/${defect.id}`}>
+                  <TableRow key={defect.id} className="cursor-pointer hover:bg-gray-50" onClick={() => setViewModal({ open: true, defectId: defect.id })}>
                     <TableCell className="font-medium font-mono text-blue-600">{defect.id}</TableCell>
                     <TableCell>{defect.vesselName || defect.vesselId}</TableCell>
                     <TableCell className="max-w-xs truncate">
@@ -528,6 +533,15 @@ export default function DefectsDashboard() {
         title={getModalTitle()}
         defects={getModalDefects()}
       />
+
+      {viewModal.defectId && (
+        <DefectModal
+          open={viewModal.open}
+          onClose={() => setViewModal({ open: false, defectId: null })}
+          defectId={viewModal.defectId}
+          mode="view"
+        />
+      )}
     </div>
   );
 }
