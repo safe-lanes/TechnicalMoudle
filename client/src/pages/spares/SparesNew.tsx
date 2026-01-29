@@ -2085,7 +2085,7 @@ const Spares: React.FC = () => {
                               <div className="space-y-3">
                                 <div className="text-xs font-medium text-gray-500 mb-2">ROB by Location</div>
                                 <div>
-                                  <div className="text-[10px] font-semibold text-blue-600 mb-1" data-testid="label-dropdown-location-a">{locationColumnLabels.labelA}</div>
+                                  <div className="text-[10px] font-semibold text-blue-600 mb-1" data-testid="label-dropdown-location-a">Location A</div>
                                   <Input
                                     type="text"
                                     value={editingLocations[spare.id]?.nameA || spare.location || 'Location A'}
@@ -2111,7 +2111,7 @@ const Spares: React.FC = () => {
                                   />
                                 </div>
                                 <div>
-                                  <div className="text-[10px] font-semibold text-blue-600 mb-1" data-testid="label-dropdown-location-b">{locationColumnLabels.labelB}</div>
+                                  <div className="text-[10px] font-semibold text-blue-600 mb-1" data-testid="label-dropdown-location-b">Location B</div>
                                   <Input
                                     type="text"
                                     value={editingLocations[spare.id]?.nameB || spare.location2 || 'Location B'}
