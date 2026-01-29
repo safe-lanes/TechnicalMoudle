@@ -16,6 +16,7 @@ import { ModifyStickyFooter } from "@/components/modify/ModifyStickyFooter";
 import { useLocation } from "wouter";
 import { formatProfessionalDateTime } from "@/lib/dateUtils";
 import { useVessel } from "@/contexts/VesselContext";
+import { useUIRole } from "@/contexts/UIRoleContext";
 import { Marker } from "@/components/Marker";
 import ZeroRHConfirmationDialog from "@/components/ZeroRHConfirmationDialog";
 import MeterReplacedConfirmationDialog from "@/components/MeterReplacedConfirmationDialog";
@@ -106,6 +107,7 @@ const RunningHours = () => {
   
   const { toast } = useToast();
   const { vesselId } = useVessel(); // Get vessel ID from context
+  const { isSailAdmin } = useUIRole(); // Get role for visibility control
   
   // Fetch children RH data when popup is open
   const { data: childrenRHData, isLoading: isLoadingChildren } = useQuery<{
@@ -835,24 +837,26 @@ const RunningHours = () => {
               />
             </div>
 
-            {/* Meter Replaced Checkbox */}
-            <div className="flex items-center space-x-2">
-              <Checkbox 
-                id="meterReplaced"
-                checked={meterReplaced}
-                onCheckedChange={(checked) => handleMeterReplacedChange(checked as boolean)}
-                data-testid="checkbox-meter-replaced"
-              />
-              <Label htmlFor="meterReplaced" className="text-sm">Meter replaced?</Label>
-              {meterReplaced && meterReplacedConfirmation && (
-                <span className="text-xs text-green-600 ml-2">
-                  ({meterReplacedConfirmation.renewalActionType})
-                </span>
-              )}
-            </div>
+            {/* Meter Replaced Checkbox - Sail Admin only */}
+            {isSailAdmin && (
+              <div className="flex items-center space-x-2">
+                <Checkbox 
+                  id="meterReplaced"
+                  checked={meterReplaced}
+                  onCheckedChange={(checked) => handleMeterReplacedChange(checked as boolean)}
+                  data-testid="checkbox-meter-replaced"
+                />
+                <Label htmlFor="meterReplaced" className="text-sm">Meter replaced?</Label>
+                {meterReplaced && meterReplacedConfirmation && (
+                  <span className="text-xs text-green-600 ml-2">
+                    ({meterReplacedConfirmation.renewalActionType})
+                  </span>
+                )}
+              </div>
+            )}
 
-            {/* Meter Replacement Fields */}
-            {meterReplaced && (
+            {/* Meter Replacement Fields - Sail Admin only */}
+            {isSailAdmin && meterReplaced && (
               <div className="grid grid-cols-2 gap-4 p-3 bg-gray-50 rounded">
                 <div>
                   <Label className="text-sm text-gray-600">Old Meter Final *</Label>
