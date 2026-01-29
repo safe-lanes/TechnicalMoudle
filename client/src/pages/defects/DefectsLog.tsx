@@ -210,7 +210,7 @@ export default function DefectsLog() {
   };
 
   const handleClearFilters = () => {
-    setFilters({ includeClosedDefects: false, dueOverdue: 'all', period: 'all' });
+    setFilters({ includeClosedDefects: false });
     setVesselFilterValue(createDefaultFilterValue());
     setSelectedVesselNames([]);
   };
@@ -327,7 +327,7 @@ export default function DefectsLog() {
                 {/* Period */}
                 <div className="flex items-center gap-2">
                   <Clock className="h-4 w-4 text-gray-400" />
-                  <Select value={filters.period} onValueChange={(value) => handleFilterChange('period', value)}>
+                  <Select value={filters.period || ""} onValueChange={(value) => handleFilterChange('period', value)}>
                     <SelectTrigger className="w-24 h-8 text-xs">
                       <SelectValue placeholder="Period" />
                     </SelectTrigger>
@@ -349,7 +349,7 @@ export default function DefectsLog() {
                 />
 
                 {/* Due/Overdue */}
-                <Select value={filters.dueOverdue} onValueChange={(value) => handleFilterChange('dueOverdue', value)}>
+                <Select value={filters.dueOverdue || ""} onValueChange={(value) => handleFilterChange('dueOverdue', value)}>
                   <SelectTrigger className="w-28 h-8 text-xs">
                     <SelectValue placeholder="Due / Overdue" />
                   </SelectTrigger>
