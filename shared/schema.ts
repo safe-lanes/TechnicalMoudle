@@ -581,6 +581,8 @@ export const storesItems = pgTable("stores_items", {
   leadTime: text("lead_time"), // Procurement lead time
   ihm: boolean("ihm").notNull().default(false), // Inventory of Hazardous Materials flag
   ihmDetails: text("ihm_details"), // IHM related information
+  ihmPresence: text("ihm_presence").default("Unknown"), // Unknown | Present | Not Present
+  ihmEvidenceType: text("ihm_evidence_type").default("None"), // None | MD | SDoC | Test
   remarks: text("remarks"), // User notes
   deleted: boolean("deleted").notNull().default(false), // Soft delete flag
   isActive: boolean("is_active").notNull().default(true), // Active status
