@@ -31,6 +31,10 @@ import { useAuth } from "@/contexts/AuthContext";
 const defectFormSchema = insertDefectSchema.extend({
   critical: z.boolean().optional(),
   is_coc: z.boolean().optional(),
+  // Mandatory field validations
+  vesselId: z.string().min(1, "Vessel is required"),
+  issueDate: z.string().min(1, "Date Observed is required"),
+  description: z.string().min(1, "Description is required"),
 });
 
 type DefectFormData = z.infer<typeof defectFormSchema>;
@@ -303,6 +307,26 @@ export default function DefectFormWizard({
     if (isSaving) {
       return false;
     }
+    
+    // Validate mandatory fields: Vessel, Date Observed (issueDate), and Description
+    const vesselId = data.vesselId?.trim() || '';
+    const issueDate = data.issueDate?.trim() || '';
+    const description = data.description?.trim() || '';
+    
+    if (!vesselId || !issueDate || !description) {
+      const missingFields: string[] = [];
+      if (!vesselId) missingFields.push('Vessel');
+      if (!issueDate) missingFields.push('Date Observed');
+      if (!description) missingFields.push('Description');
+      
+      toast({ 
+        title: "Required fields missing", 
+        description: `Please fill in: ${missingFields.join(', ')}`,
+        variant: "destructive" 
+      });
+      return false;
+    }
+    
     setIsSaving(true);
     
     try {
