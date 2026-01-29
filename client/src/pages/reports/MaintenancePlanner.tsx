@@ -110,7 +110,11 @@ interface PlannerResponse {
 
 const DEPARTMENTS = ["Engine", "Deck", "Electrical", "Catering", "Safety"];
 
-export default function MaintenancePlanner() {
+interface MaintenancePlannerProps {
+  onBack?: () => void;
+}
+
+export default function MaintenancePlanner({ onBack }: MaintenancePlannerProps) {
   const { vesselId, setVesselId, vessels } = useVessel();
   const [, setLocation] = useLocation();
   const { toast } = useToast();
@@ -341,7 +345,7 @@ export default function MaintenancePlanner() {
             <Button
               variant="ghost"
               size="sm"
-              onClick={() => setLocation("/pms/reports")}
+              onClick={() => onBack?.()}
               data-testid="G21.3"
             >
               <Marker id="G21.3" />

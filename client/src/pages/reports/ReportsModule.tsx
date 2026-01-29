@@ -215,7 +215,7 @@ const ReportsModule = () => {
 
   // Render category-specific views
   if (selectedCategory === "planner") {
-    return <MaintenancePlanner />;
+    return <MaintenancePlanner onBack={handleBackToMain} />;
   }
 
   if (selectedCategory === "maintenance") {
