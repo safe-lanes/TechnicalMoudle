@@ -2988,6 +2988,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // REJECTION WORKFLOW: When status is being set to 'Rejected', clear completion data
       // This allows the work order to be reworked (Part B can be re-entered)
+      // Per business rule: Rejected WOs go back to 'Due' status with wasRejected=true for red font display
       const isBeingRejected = updateData.status?.toLowerCase() === 'rejected';
       if (isBeingRejected) {
         // Clear completion data so it doesn't appear in Date Completed column
@@ -2996,21 +2997,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
         updateData.dateOfCompletion = null;
         // Store rejection date for audit trail
         updateData.rejectionDate = new Date().toISOString();
-        console.log('📝 Work order rejected - clearing completion data for rework');
+        // Mark as previously rejected for UI display (red font)
+        updateData.wasRejected = true;
+        // Set status to 'Due' instead of 'Rejected' so it appears in Due section for rework
+        updateData.status = 'Due';
+        console.log('📝 Work order rejected - setting status to Due, wasRejected=true for rework');
       }
       
-      // REJECTED WO RESUBMISSION: When a rejected WO is saved with updates, 
-      // automatically transition to 'Pending Approval' for re-approval workflow
-      const isRejectedWO = existingWO.status?.toLowerCase() === 'rejected';
-      if (isRejectedWO && !hasExplicitStatus) {
+      // REJECTED WO RESUBMISSION: When a previously rejected WO (now in Due status with wasRejected=true) 
+      // is saved with completion updates, automatically transition to 'Pending Approval' for re-approval workflow
+      const isRejectedWO = existingWO.wasRejected === true;
+      if (isRejectedWO && hasCompletionData && !hasExplicitStatus) {
         updateData.status = 'Pending Approval';
-        // Clear previous rejection data
+        // Clear previous rejection data but keep wasRejected=true for audit
         updateData.rejectionComments = null;
         updateData.rejectionDate = null;
         updateData.approvalAction = null;
         // Update submittedDate for the new submission
         updateData.submittedDate = new Date().toISOString();
-        console.log('📝 Rejected WO resubmitted - transitioning to Pending Approval');
+        console.log('📝 Previously rejected WO resubmitted - transitioning to Pending Approval');
       }
       
       // AUDIT TRAIL: Capture submittedDate whenever status changes to 'Pending Approval'
@@ -3441,6 +3446,158 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ error: error.message });
       }
       res.status(500).json({ error: "Failed to update work order" });
+    }
+  });
+  
+  // Bulk approve work orders - for Head of Dept approval workflow
+  app.post("/technical/api/work-orders/bulk-approve", async (req, res) => {
+    try {
+      const { workOrderIds, approver, approverRemarks } = req.body;
+      
+      if (!Array.isArray(workOrderIds) || workOrderIds.length === 0) {
+        return res.status(400).json({ error: "workOrderIds array is required" });
+      }
+      
+      console.log(`📋 Bulk approving ${workOrderIds.length} work orders`);
+      
+      const results: { success: string[]; failed: { id: string; error: string }[] } = {
+        success: [],
+        failed: []
+      };
+      
+      for (const workOrderId of workOrderIds) {
+        try {
+          const existingWO = await storage.getWorkOrder(workOrderId);
+          if (!existingWO) {
+            results.failed.push({ id: workOrderId, error: "Work order not found" });
+            continue;
+          }
+          
+          // Only approve work orders in 'Pending Approval' status
+          if (existingWO.status !== 'Pending Approval' && 
+              (existingWO as any).computedStatus !== 'Pending Approval') {
+            results.failed.push({ id: workOrderId, error: `Work order is not pending approval (status: ${existingWO.status})` });
+            continue;
+          }
+          
+          // Calculate next due date/reading based on actual completion date
+          const actualCompletionDate = existingWO.completionDateTime || existingWO.dateCompleted;
+          let nextDueDate = undefined;
+          let nextDueReading = undefined;
+          
+          if (existingWO.maintenanceBasis === "Calendar" && actualCompletionDate) {
+            const completionDate = new Date(actualCompletionDate);
+            if (!isNaN(completionDate.getTime())) {
+              const freq = parseInt(existingWO.frequencyValue || "0");
+              if (existingWO.frequencyUnit === "Days") {
+                completionDate.setDate(completionDate.getDate() + freq);
+              } else if (existingWO.frequencyUnit === "Weeks") {
+                completionDate.setDate(completionDate.getDate() + (freq * 7));
+              } else if (existingWO.frequencyUnit === "Months") {
+                completionDate.setMonth(completionDate.getMonth() + freq);
+              } else if (existingWO.frequencyUnit === "Years") {
+                completionDate.setFullYear(completionDate.getFullYear() + freq);
+              }
+              nextDueDate = completionDate.toISOString().split('T')[0];
+            }
+          } else if (existingWO.maintenanceBasis === "Running Hours" && existingWO.currentReading) {
+            nextDueReading = (parseInt(existingWO.currentReading) + parseInt(existingWO.frequencyValue || "0")).toString();
+          }
+          
+          const updateData: Record<string, any> = {
+            status: "Completed",
+            approvalAction: "approved",
+            approver: approver || "Head of Dept",
+            approverRemarks: approverRemarks,
+            approvalDate: new Date().toISOString(),
+            nextDueDate,
+            nextDueReading,
+            // Clear wasRejected flag on successful approval
+            wasRejected: false
+          };
+          
+          if (actualCompletionDate) {
+            updateData.dateCompleted = actualCompletionDate;
+          }
+          
+          await storage.updateWorkOrder(workOrderId, updateData);
+          results.success.push(workOrderId);
+          console.log(`✅ Approved work order: ${workOrderId}`);
+        } catch (err: any) {
+          console.error(`❌ Failed to approve work order ${workOrderId}:`, err.message);
+          results.failed.push({ id: workOrderId, error: err.message });
+        }
+      }
+      
+      res.json({
+        message: `Bulk approval completed: ${results.success.length} approved, ${results.failed.length} failed`,
+        results
+      });
+    } catch (error: any) {
+      console.error("Bulk approve work orders error:", error);
+      res.status(500).json({ error: "Failed to bulk approve work orders" });
+    }
+  });
+  
+  // Bulk reject work orders - for Head of Dept rejection workflow
+  app.post("/technical/api/work-orders/bulk-reject", async (req, res) => {
+    try {
+      const { workOrderIds, approver, rejectionComments } = req.body;
+      
+      if (!Array.isArray(workOrderIds) || workOrderIds.length === 0) {
+        return res.status(400).json({ error: "workOrderIds array is required" });
+      }
+      
+      console.log(`📋 Bulk rejecting ${workOrderIds.length} work orders`);
+      
+      const results: { success: string[]; failed: { id: string; error: string }[] } = {
+        success: [],
+        failed: []
+      };
+      
+      for (const workOrderId of workOrderIds) {
+        try {
+          const existingWO = await storage.getWorkOrder(workOrderId);
+          if (!existingWO) {
+            results.failed.push({ id: workOrderId, error: "Work order not found" });
+            continue;
+          }
+          
+          // Only reject work orders in 'Pending Approval' status
+          if (existingWO.status !== 'Pending Approval' && 
+              (existingWO as any).computedStatus !== 'Pending Approval') {
+            results.failed.push({ id: workOrderId, error: `Work order is not pending approval (status: ${existingWO.status})` });
+            continue;
+          }
+          
+          const updateData = {
+            status: "Due", // Rejected WOs go back to Due
+            approvalAction: "rejected",
+            approver: approver || "Head of Dept",
+            rejectionComments: rejectionComments,
+            rejectionDate: new Date().toISOString(),
+            wasRejected: true, // Mark for red font display
+            // Clear completion data for rework
+            completionDateTime: null,
+            dateCompleted: null
+          };
+          
+          await storage.updateWorkOrder(workOrderId, updateData);
+          results.success.push(workOrderId);
+          console.log(`❌ Rejected work order: ${workOrderId}`);
+        } catch (err: any) {
+          console.error(`❌ Failed to reject work order ${workOrderId}:`, err.message);
+          results.failed.push({ id: workOrderId, error: err.message });
+        }
+      }
+      
+      res.json({
+        message: `Bulk rejection completed: ${results.success.length} rejected, ${results.failed.length} failed`,
+        results
+      });
+    } catch (error: any) {
+      console.error("Bulk reject work orders error:", error);
+      res.status(500).json({ error: "Failed to bulk reject work orders" });
     }
   });
   

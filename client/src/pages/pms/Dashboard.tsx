@@ -1,9 +1,11 @@
 import { useState, useMemo } from "react";
 import { useLocation } from "wouter";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { format } from "date-fns";
 import { useVessel } from "@/contexts/VesselContext";
 import { useUIRole } from "@/contexts/UIRoleContext";
+import { useToast } from "@/hooks/use-toast";
+import { apiRequest } from "@/lib/queryClient";
 import {
   RefreshCw,
   AlertTriangle,
@@ -18,7 +20,10 @@ import {
   FileText,
   ChevronRight,
   AlertCircle,
-  RotateCcw
+  RotateCcw,
+  CheckSquare,
+  XCircle,
+  Eye
 } from "lucide-react";
 import { AgCharts } from "ag-charts-react";
 import { AgChartOptions } from "ag-charts-community";
@@ -28,6 +33,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { WorkOrder } from "@shared/schema";
 import { useVessels } from "@/hooks/useVessels";
+import { BulkApproveModal } from "@/components/BulkApproveModal";
 
 interface Spare {
   id: number;
@@ -59,11 +65,16 @@ interface Component {
 const Dashboard = () => {
   const [, setLocation] = useLocation();
   const [lastUpdated, setLastUpdated] = useState(new Date());
+  const [bulkApproveModalOpen, setBulkApproveModalOpen] = useState(false);
   const { vesselId, setVesselId } = useVessel();
   const { data: vessels = [] } = useVessels();
-  const { isSailAdmin } = useUIRole();
+  const { isSailAdmin, isHeadOfDept } = useUIRole();
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
 
   const isAllVessels = vesselId === 'all';
+  
+  const currentVessel = vessels.find(v => v.id === vesselId);
 
   // Fetch real work orders data
   const { data: workOrdersData = [], isLoading: isWorkOrdersLoading } = useQuery<WorkOrder[]>({
@@ -199,10 +210,48 @@ const Dashboard = () => {
       dueList: due.slice(0, 5),
       pendingApproval: pendingApproval.length,
       pendingApprovalList: pendingApproval.slice(0, 5),
+      pendingApprovalFull: pendingApproval, // Full list for bulk approve modal
       completed: completed.length,
       active: planned.length  // Keep 'active' property name for backwards compatibility
     };
   }, [workOrdersData]);
+
+  // Approve single work order mutation (for Head of Dept quick actions)
+  const approveMutation = useMutation({
+    mutationFn: async (workOrderId: string) => {
+      const response = await apiRequest('POST', '/technical/api/work-orders/bulk-approve', {
+        workOrderIds: [workOrderId],
+        approver: "Head of Dept"
+      });
+      return response.json();
+    },
+    onSuccess: () => {
+      toast({ title: "Success", description: "Work order approved successfully" });
+      queryClient.invalidateQueries({ queryKey: ['/technical/api/work-orders', vesselId] });
+    },
+    onError: (error: any) => {
+      toast({ title: "Error", description: error.message || "Failed to approve work order", variant: "destructive" });
+    }
+  });
+
+  // Reject single work order mutation (for Head of Dept quick actions)
+  const rejectMutation = useMutation({
+    mutationFn: async ({ workOrderId, comments }: { workOrderId: string; comments: string }) => {
+      const response = await apiRequest('POST', '/technical/api/work-orders/bulk-reject', {
+        workOrderIds: [workOrderId],
+        approver: "Head of Dept",
+        rejectionComments: comments
+      });
+      return response.json();
+    },
+    onSuccess: () => {
+      toast({ title: "Rejected", description: "Work order rejected and sent back to Due" });
+      queryClient.invalidateQueries({ queryKey: ['/technical/api/work-orders', vesselId] });
+    },
+    onError: (error: any) => {
+      toast({ title: "Error", description: error.message || "Failed to reject work order", variant: "destructive" });
+    }
+  });
 
   // Spares KPIs
   const sparesKPIs = useMemo(() => {
@@ -668,6 +717,107 @@ const Dashboard = () => {
           </Card>
         </div>
 
+        {/* Head of Dept Approval Section - Only visible to Head of Dept */}
+        {isHeadOfDept && workOrderKPIs.pendingApproval > 0 && (
+          <Card data-testid="card-pending-approval-section" className="bg-white border-l-4 border-l-blue-500">
+            <CardHeader className="flex flex-row items-center justify-between">
+              <div>
+                <CardTitle className="flex items-center gap-2">
+                  <ClipboardList className="w-5 h-5 text-blue-500" />
+                  Work Orders Pending Your Approval
+                </CardTitle>
+                <CardDescription>
+                  {workOrderKPIs.pendingApproval} work orders from {currentVessel?.name || 'vessel'} require your review
+                </CardDescription>
+              </div>
+              <Button 
+                onClick={() => setBulkApproveModalOpen(true)}
+                className="bg-blue-600 hover:bg-blue-700"
+                data-testid="button-bulk-approve-open"
+              >
+                <CheckSquare className="w-4 h-4 mr-2" />
+                Bulk Approve ({workOrderKPIs.pendingApproval})
+              </Button>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-2">
+                {workOrderKPIs.pendingApprovalList.map((wo: any) => (
+                  <div 
+                    key={wo.id}
+                    className={`flex items-center justify-between p-3 rounded-lg border ${wo.wasRejected ? 'bg-red-50 border-red-200' : 'bg-blue-50 border-blue-200'}`}
+                    data-testid={`row-pending-approval-wo-${wo.id}`}
+                  >
+                    <div 
+                      className="flex-1 cursor-pointer"
+                      onClick={() => navigateToWorkOrder(wo.id)}
+                    >
+                      <div className={`font-medium text-sm ${wo.wasRejected ? 'text-red-700' : ''}`}>
+                        {wo.workOrderNo || `WO-${wo.id}`}
+                        {wo.wasRejected && (
+                          <Badge variant="destructive" className="ml-2 text-xs">Resubmitted</Badge>
+                        )}
+                      </div>
+                      <div className={`text-xs ${wo.wasRejected ? 'text-red-600' : 'text-gray-600'}`}>
+                        {wo.jobTitle || 'No description'} - {wo.component}
+                      </div>
+                      <div className="text-xs text-gray-500 mt-1">
+                        Assigned: {wo.assignedTo} | Submitted: {wo.submittedDate ? new Date(wo.submittedDate).toLocaleDateString() : 'N/A'}
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => navigateToWorkOrder(wo.id)}
+                        data-testid={`button-view-pending-wo-${wo.id}`}
+                      >
+                        <Eye className="w-4 h-4" />
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                          const reason = window.prompt("Enter rejection reason:");
+                          if (reason) {
+                            rejectMutation.mutate({ workOrderId: wo.id, comments: reason });
+                          }
+                        }}
+                        className="text-red-600 hover:bg-red-50"
+                        disabled={rejectMutation.isPending}
+                        data-testid={`button-reject-wo-${wo.id}`}
+                      >
+                        <XCircle className="w-4 h-4 mr-1" />
+                        Reject
+                      </Button>
+                      <Button
+                        size="sm"
+                        onClick={() => approveMutation.mutate(wo.id)}
+                        className="bg-green-600 hover:bg-green-700"
+                        disabled={approveMutation.isPending}
+                        data-testid={`button-approve-wo-${wo.id}`}
+                      >
+                        <CheckCircle className="w-4 h-4 mr-1" />
+                        Approve
+                      </Button>
+                    </div>
+                  </div>
+                ))}
+                {workOrderKPIs.pendingApproval > 5 && (
+                  <div className="text-center pt-2">
+                    <Button
+                      variant="link"
+                      onClick={() => setBulkApproveModalOpen(true)}
+                      className="text-blue-600"
+                    >
+                      View all {workOrderKPIs.pendingApproval} pending work orders
+                    </Button>
+                  </div>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
         {/* Actionable Tables Row */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           {/* Overdue Work Orders Table */}
@@ -919,6 +1069,15 @@ const Dashboard = () => {
 
 
       </div>
+
+      {/* Bulk Approve Modal for Head of Dept */}
+      <BulkApproveModal
+        open={bulkApproveModalOpen}
+        onOpenChange={setBulkApproveModalOpen}
+        workOrders={workOrderKPIs.pendingApprovalFull || []}
+        vesselId={vesselId}
+        vesselName={currentVessel?.name}
+      />
     </div>
   );
 };

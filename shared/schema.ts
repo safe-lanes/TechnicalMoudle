@@ -949,6 +949,7 @@ export const workOrders = pgTable("work_orders", {
   // Approval workflow fields
   rejectionComments: text("rejection_comments"), // Comments when work order is rejected by approver
   approvalAction: text("approval_action"), // 'approved' | 'rejected' - action taken by approver
+  wasRejected: boolean("was_rejected").notNull().default(false), // Tracks if WO was previously rejected (for red font display)
   
   // === WO Generation Cycle Snapshots (for duplicate protection and audit) ===
   // Driver type determines which cycle fields apply

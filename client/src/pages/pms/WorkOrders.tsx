@@ -612,30 +612,38 @@ const WorkOrders: React.FC = () => {
             </tr>
           </thead>
           <tbody>
-            {paginatedWorkOrders.map((workOrder, index) => (
+            {paginatedWorkOrders.map((workOrder, index) => {
+              const isRejectedWO = workOrder.wasRejected === true;
+              const textColorClass = isRejectedWO ? 'text-red-600' : 'text-gray-900';
+              
+              return (
               <tr 
                 key={workOrder.id} 
-                className={`${index % 2 === 0 ? "bg-gray-50" : "bg-white"} cursor-pointer hover:bg-gray-100`}
+                className={`${index % 2 === 0 ? "bg-gray-50" : "bg-white"} ${isRejectedWO ? "bg-red-50" : ""} cursor-pointer hover:bg-gray-100`}
                 onClick={() => handleWorkOrderClick(workOrder)}
+                data-testid={`row-work-order-${workOrder.id}`}
               >
-                <td className="py-3 px-4 text-gray-900" data-testid={index === 0 ? "C24" : undefined}>
+                <td className={`py-3 px-4 ${textColorClass}`} data-testid={index === 0 ? "C24" : undefined}>
                   {index === 0 && <Marker id="C24" />}
                   {workOrder.component}
+                  {isRejectedWO && activeTab === "Due" && (
+                    <span className="ml-2 px-2 py-0.5 bg-red-100 text-red-700 text-xs rounded">Previously Rejected</span>
+                  )}
                 </td>
-                <td className="py-3 px-4 text-blue-600 hover:text-blue-800" data-testid={index === 0 ? "C25" : undefined}>
+                <td className={`py-3 px-4 ${isRejectedWO ? 'text-red-600 hover:text-red-800' : 'text-blue-600 hover:text-blue-800'}`} data-testid={index === 0 ? "C25" : undefined}>
                   {index === 0 && <Marker id="C25" />}
                   {(activeTab === "Pending Approval" || activeTab === "Completed") && workOrder.executionId 
                     ? workOrder.executionId 
                     : workOrder.workOrderNo || workOrder.templateCode}
                 </td>
                 {activeTab === "Pending Approval" && (
-                  <td className="py-3 px-4 text-gray-900">{workOrder.templateCode}</td>
+                  <td className={`py-3 px-4 ${textColorClass}`}>{workOrder.templateCode}</td>
                 )}
-                <td className="py-3 px-4 text-gray-900" data-testid={index === 0 ? "C26" : undefined}>
+                <td className={`py-3 px-4 ${textColorClass}`} data-testid={index === 0 ? "C26" : undefined}>
                   {index === 0 && <Marker id="C26" />}
                   {workOrder.jobTitle}
                 </td>
-                <td className="py-3 px-4 text-gray-900" data-testid={index === 0 ? "C27" : undefined}>
+                <td className={`py-3 px-4 ${textColorClass}`} data-testid={index === 0 ? "C27" : undefined}>
                   {index === 0 && <Marker id="C27" />}
                   {workOrder.assignedTo}
                 </td>
@@ -759,7 +767,8 @@ const WorkOrders: React.FC = () => {
                   </div>
                 </td>
               </tr>
-            ))}
+              );
+            })}
             </tbody>
           </table>
       </div>
