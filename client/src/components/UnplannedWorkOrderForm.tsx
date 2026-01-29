@@ -227,28 +227,10 @@ const UnplannedWorkOrderForm: React.FC<UnplannedWorkOrderFormProps> = ({
         <DialogHeader className="pb-4 pr-12">
           <div className="flex items-center justify-between">
             <DialogTitle>Work Order Form - Unplanned Maintenance</DialogTitle>
-            <div className="flex items-center gap-2">
-              <Button 
-                size="sm" 
-                className="bg-[#22c55e] hover:bg-[#16a34a] text-white"
-                onClick={handleSubmit}
-                disabled={isSubmitting}
-                data-testid="button-save-unplanned-wo"
-              >
-                {isSubmitting ? (
-                  <>
-                    <Loader2 className="h-4 w-4 mr-1 animate-spin" />
-                    Saving...
-                  </>
-                ) : (
-                  'Save'
-                )}
-              </Button>
-              <Button variant="outline" size="sm" onClick={onClose}>
-                <ArrowLeft className="h-4 w-4 mr-1" />
-                Back
-              </Button>
-            </div>
+            <Button variant="outline" size="sm" onClick={onClose}>
+              <ArrowLeft className="h-4 w-4 mr-1" />
+              Back
+            </Button>
           </div>
         </DialogHeader>
 
