@@ -25,6 +25,7 @@ import { useVessels } from "@/hooks/useVessels";
 import { useExternalUsers } from "@/hooks/useExternalMasterData";
 import { sireHardwareClasses, findHardwareClassById } from "@/data/sireHardwareClasses";
 import { defectSources, findSourceById } from "@/data/defectSources";
+import { getSireReferencesByVersion } from "@/data/sireReferences";
 import { SireHardwareClassCombobox } from "@/components/SireHardwareClassCombobox";
 import { useAuth } from "@/contexts/AuthContext";
 
@@ -209,6 +210,9 @@ export default function DefectFormWizard({
   const dateCompletedValue = form.watch("dateCompleted");
   const vesselLocationType = form.watch("vesselLocationType");
   const dateRegisteredInSystemValue = form.watch("dateRegisteredInSystem");
+  const viqVersionValue = form.watch("viqVersion");
+  
+  const sireReferenceOptions = getSireReferencesByVersion(viqVersionValue || "");
   
   useEffect(() => {
     if (vesselLocationType === 'atPort') {
@@ -218,6 +222,12 @@ export default function DefectFormWizard({
       form.setValue('portName', '');
     }
   }, [vesselLocationType, form]);
+
+  useEffect(() => {
+    if (viqVersionValue && mode !== 'edit') {
+      form.setValue('viqRef', '');
+    }
+  }, [viqVersionValue, form, mode]);
 
   useEffect(() => {
     if (currentDefect) {
@@ -1340,22 +1350,14 @@ export default function DefectFormWizard({
                             render={({ field }) => (
                               <Select onValueChange={field.onChange} value={field.value || ""} disabled={isViewMode}>
                                 <SelectTrigger data-testid="select-viq-ref" className="h-10 text-sm border-gray-300">
-                                  <SelectValue />
+                                  <SelectValue placeholder="Select SIRE Reference" />
                                 </SelectTrigger>
                                 <SelectContent className="max-h-[300px]">
-                                  <SelectItem value="1.1">1.1 - Vessel Name</SelectItem>
-                                  <SelectItem value="1.2">1.2 - IMO Number</SelectItem>
-                                  <SelectItem value="1.3">1.3 - Inspection Date</SelectItem>
-                                  <SelectItem value="2.1">2.1 - Statutory Certificates Valid</SelectItem>
-                                  <SelectItem value="3.1">3.1 - Manning Level Adequate</SelectItem>
-                                  <SelectItem value="4.1">4.1 - Navigation Procedures</SelectItem>
-                                  <SelectItem value="5.1">5.1 - Risk Assessment Process</SelectItem>
-                                  <SelectItem value="6.1">6.1 - Shipboard Oil Pollution Emergency Plan</SelectItem>
-                                  <SelectItem value="7.1">7.1 - Ship Security Plan</SelectItem>
-                                  <SelectItem value="8.1">8.1 - Cargo System Knowledge</SelectItem>
-                                  <SelectItem value="9.1">9.1 - Mooring Equipment Inspection</SelectItem>
-                                  <SelectItem value="10.1">10.1 - Engine Room Procedures</SelectItem>
-                                  <SelectItem value="11.1">11.1 - Hull Condition</SelectItem>
+                                  {sireReferenceOptions.map((ref) => (
+                                    <SelectItem key={ref.value} value={ref.value}>
+                                      {ref.label}
+                                    </SelectItem>
+                                  ))}
                                 </SelectContent>
                               </Select>
                             )}
