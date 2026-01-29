@@ -2,6 +2,7 @@ import React, { useState, useMemo, useEffect, useRef } from "react";
 import { useModifyMode } from "@/hooks/useModifyMode";
 import { useVessel } from "@/contexts/VesselContext";
 import { useUIRole } from "@/contexts/UIRoleContext";
+import { useChangeMode } from "@/contexts/ChangeModeContext";
 import { Marker } from "@/components/Marker";
 import { useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
@@ -118,6 +119,7 @@ const Stores: React.FC = () => {
   const { toast } = useToast();
   const { vesselId, setVesselId } = useVessel();
   const { isVessel, isHeadOfDept, isSailAdmin, isClientAdmin } = useUIRole();
+  const { isChangeMode } = useChangeMode();
   const { data: vessels = [] } = useVessels();
   const [activeTab, setActiveTab] = useState<"stores" | "lubes" | "chemicals" | "others">(() => {
     const savedTab = sessionStorage.getItem('storesActiveTab');
@@ -1341,8 +1343,8 @@ const Stores: React.FC = () => {
       {/* Filters - Show different filters based on view mode */}
       {viewMode === "inventory" ? (
       <div className="flex gap-4 mb-6">
-        {/* Vessel selector - hidden for Vessel and Head of Dept view modes */}
-        {(isSailAdmin || isClientAdmin) && (
+        {/* Vessel selector - hidden for Vessel and Head of Dept view modes, but visible in change mode */}
+        {(isSailAdmin || isClientAdmin || isChangeMode) && (
           <div className="flex-1">
             <Select value={vesselId} onValueChange={setVesselId}>
               <SelectTrigger className="text-sm" data-testid={getMarkerId(activeTab, "4")}>

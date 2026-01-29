@@ -2,6 +2,7 @@ import React, { useState, useMemo, useEffect, useRef } from "react";
 import { useModifyMode } from "@/hooks/useModifyMode";
 import { useVessel } from "@/contexts/VesselContext";
 import { useUIRole } from "@/contexts/UIRoleContext";
+import { useChangeMode } from "@/contexts/ChangeModeContext";
 import { useLocation } from "wouter";
 import { Marker } from "@/components/Marker";
 import { Button } from "@/components/ui/button";
@@ -109,6 +110,7 @@ const Spares: React.FC = () => {
   
   // Modify mode state - use proper hook for reactivity
   const { isModifyMode } = useModifyMode();
+  const { isChangeMode } = useChangeMode();
   
   // UI Role context for role-based visibility
   const { isVessel, isHeadOfDept, isSailAdmin, isClientAdmin } = useUIRole();
@@ -1896,8 +1898,8 @@ const Spares: React.FC = () => {
             <FileSpreadsheet className="h-4 w-4 mr-1" />
             Export
           </Button>
-          {/* Add Spare button - hidden for Vessel and Head of Dept view modes */}
-          {(isSailAdmin || isClientAdmin) && (
+          {/* Add Spare button - hidden for Vessel and Head of Dept view modes, but visible in change mode */}
+          {(isSailAdmin || isClientAdmin || isChangeMode) && (
             <Button size="sm" className="bg-[#5dc86f] hover:bg-[#4db85f] text-white" onClick={() => setIsAddSpareModalOpen(true)} data-testid="E10">
               <Marker id="E10" />
               + Add Spare
@@ -1911,8 +1913,8 @@ const Spares: React.FC = () => {
       </div>
       {/* Search and Filters */}
       <div className="flex gap-3 items-center mb-4">
-        {/* Vessel selector - hidden for Vessel and Head of Dept view modes */}
-        {(isSailAdmin || isClientAdmin) && (
+        {/* Vessel selector - hidden for Vessel and Head of Dept view modes, but visible in change mode */}
+        {(isSailAdmin || isClientAdmin || isChangeMode) && (
           <div className="relative" data-testid="E4">
             <Marker id="E4" />
             <Select value={vesselId} onValueChange={setVesselId}>
@@ -2176,7 +2178,7 @@ const Spares: React.FC = () => {
                             {isFirstRow && <Marker id="E34" />}
                             <Info className="h-4 w-4 text-blue-600" />
                           </Button>
-                          {(isSailAdmin || isClientAdmin) && (
+                          {(isSailAdmin || isClientAdmin || isChangeMode) && (
                             <Button 
                               size="sm" 
                               variant="ghost"
@@ -2206,7 +2208,7 @@ const Spares: React.FC = () => {
                           >
                             <Settings2 className="h-4 w-4 text-orange-500" />
                           </Button>
-                          {(isSailAdmin || isClientAdmin) && (
+                          {(isSailAdmin || isClientAdmin || isChangeMode) && (
                             <Button 
                               size="sm" 
                               variant="ghost"
