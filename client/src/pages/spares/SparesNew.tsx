@@ -2088,7 +2088,7 @@ const Spares: React.FC = () => {
                                   <div className="text-[10px] font-semibold text-blue-600 mb-1" data-testid="label-dropdown-location-a">Location A</div>
                                   <Input
                                     type="text"
-                                    value={editingLocations[spare.id]?.nameA || spare.location || 'Location A'}
+                                    value={editingLocations[spare.id]?.nameA ?? spare.location ?? 'Location A'}
                                     onChange={(e) => setEditingLocations(prev => ({
                                       ...prev,
                                       [spare.id]: { ...prev[spare.id], nameA: e.target.value }
@@ -2114,7 +2114,7 @@ const Spares: React.FC = () => {
                                   <div className="text-[10px] font-semibold text-blue-600 mb-1" data-testid="label-dropdown-location-b">Location B</div>
                                   <Input
                                     type="text"
-                                    value={editingLocations[spare.id]?.nameB || spare.location2 || 'Location B'}
+                                    value={editingLocations[spare.id]?.nameB ?? spare.location2 ?? 'Location B'}
                                     onChange={(e) => setEditingLocations(prev => ({
                                       ...prev,
                                       [spare.id]: { ...prev[spare.id], nameB: e.target.value }
