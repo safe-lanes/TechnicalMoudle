@@ -204,6 +204,7 @@ export default function DefectFormWizard({
       riskLevel: "",
       vesselLocationType: "atPort",
       dateRegisteredInSystem: new Date().toISOString().split('T')[0],
+      viqVersion: "SIRE 2.0",
     },
   });
 
