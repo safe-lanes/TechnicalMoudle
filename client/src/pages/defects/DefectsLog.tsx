@@ -210,7 +210,7 @@ export default function DefectsLog() {
   };
 
   const handleClearFilters = () => {
-    setFilters({ includeClosedDefects: false });
+    setFilters({ includeClosedDefects: false, dueOverdue: 'all', period: 'all' });
     setVesselFilterValue(createDefaultFilterValue());
     setSelectedVesselNames([]);
   };
