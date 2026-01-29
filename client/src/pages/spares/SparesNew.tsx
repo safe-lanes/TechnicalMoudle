@@ -1846,10 +1846,13 @@ const Spares: React.FC = () => {
             <FileSpreadsheet className="h-4 w-4 mr-1" />
             Export
           </Button>
-          <Button size="sm" className="bg-[#5dc86f] hover:bg-[#4db85f] text-white" onClick={() => setIsAddSpareModalOpen(true)} data-testid="E10">
-            <Marker id="E10" />
-            + Add Spare
-          </Button>
+          {/* Add Spare button - hidden for Vessel and Head of Dept view modes */}
+          {(isSailAdmin || isClientAdmin) && (
+            <Button size="sm" className="bg-[#5dc86f] hover:bg-[#4db85f] text-white" onClick={() => setIsAddSpareModalOpen(true)} data-testid="E10">
+              <Marker id="E10" />
+              + Add Spare
+            </Button>
+          )}
           <Button size="sm" className="bg-[#5dc86f] hover:bg-[#4db85f] text-white" onClick={openBulkUpdateModal} data-testid="E11">
             <Marker id="E11" />
             Bulk Update Spares
