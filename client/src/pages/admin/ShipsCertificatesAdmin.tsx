@@ -2290,16 +2290,14 @@ export default function ShipsCertificatesAdmin() {
                     <Button 
                       size="sm"
                       className="bg-green-600 hover:bg-green-700 gap-1"
-                      onClick={() => {
-                        setHasSavedInSession(prev => ({ ...prev, vessel: true }));
-                        toast({
-                          title: "Saved",
-                          description: "Vessel certificate applicability has been saved",
-                        });
-                      }}
+                      onClick={handleSave}
+                      disabled={saveMutation.isPending}
                       data-testid="button-save-vessel"
                     >
-                      Save
+                      {saveMutation.isPending && (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      )}
+                      {saveMutation.isPending ? "Saving..." : "Save"}
                     </Button>
                   </>
                 )}
