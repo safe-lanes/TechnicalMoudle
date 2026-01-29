@@ -1274,41 +1274,91 @@ const Spares: React.FC = () => {
     setSelectedComponentId(null);
   };
 
-  // Export spares to Excel
+  // Export spares to Excel - supports both Inventory and History tabs
   const exportSparesToExcel = () => {
     const now = new Date();
     const timestamp = now.toISOString().replace(/[-:]/g, '').replace('T', '_').slice(0, 15);
-    const filename = `spares_inventory_${vesselId}_${timestamp}.xlsx`;
     
-    const data = filteredSpares.map((spare: Spare) => {
-      const stockStatus = getStockStatus(spare.rob, spare.min);
-      return {
-        'Part Code': spare.partCode,
-        'Part Name': spare.partName,
-        'Component': spare.componentName,
-        'Component Code': spare.componentCode || '-',
-        'Criticality': spare.critical,
-        'ROB': spare.rob,
-        'Min': spare.min,
-        'Stock Status': stockStatus.label,
-        'Location': spare.location || '-',
-        'Location 2': spare.location2 || '-',
-        'UOM': spare.uom || '-',
-        'Part Number': spare.partNumber || '-',
-        'Maker': spare.maker || '-',
-        'Remarks': spare.remarks || '-'
-      };
-    });
-    
-    const ws = XLSX.utils.json_to_sheet(data);
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, 'Spares Inventory');
-    XLSX.writeFile(wb, filename);
-    
-    toast({ 
-      title: "Export Successful", 
-      description: `Exported ${data.length} spares to ${filename}` 
-    });
+    if (activeTab === 'history') {
+      // Export history data
+      const filename = `spares_history_${vesselId}_${timestamp}.xlsx`;
+      
+      const data = historyData.map((history: SpareHistory) => {
+        let dateDisplay = '-';
+        try {
+          const isDateOnly = history.dateLocal && /^\d{4}-\d{2}-\d{2}$/.test(history.dateLocal.trim());
+          if (history.dateLocal) {
+            const dateStr = isDateOnly ? `${history.dateLocal.trim()}T00:00:00` : history.dateLocal;
+            const date = new Date(dateStr);
+            if (!isNaN(date.getTime())) {
+              dateDisplay = format(date, 'dd-MMM-yyyy');
+            }
+          } else if (history.timestampUTC) {
+            const date = new Date(history.timestampUTC);
+            if (!isNaN(date.getTime())) {
+              dateDisplay = format(date, 'dd-MMM-yyyy');
+            }
+          }
+        } catch {
+          dateDisplay = '-';
+        }
+        
+        return {
+          'Date': dateDisplay,
+          'Part Code': history.partCode,
+          'Part Name': history.partName,
+          'Component': history.componentName,
+          'Part Number': history.partNumber || '-',
+          'Event': history.eventType,
+          'Qty Change': history.qtyChange,
+          'ROB After': history.robAfter,
+          'Reference': history.reference || '-'
+        };
+      });
+      
+      const ws = XLSX.utils.json_to_sheet(data);
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, 'Spares History');
+      XLSX.writeFile(wb, filename);
+      
+      toast({ 
+        title: "Export Successful", 
+        description: `Exported ${data.length} history records to ${filename}` 
+      });
+    } else {
+      // Export inventory data
+      const filename = `spares_inventory_${vesselId}_${timestamp}.xlsx`;
+      
+      const data = filteredSpares.map((spare: Spare) => {
+        const stockStatus = getStockStatus(spare.rob, spare.min);
+        return {
+          'Part Code': spare.partCode,
+          'Part Name': spare.partName,
+          'Component': spare.componentName,
+          'Component Code': spare.componentCode || '-',
+          'Criticality': spare.critical,
+          'ROB': spare.rob,
+          'Min': spare.min,
+          'Stock Status': stockStatus.label,
+          'Location': spare.location || '-',
+          'Location 2': spare.location2 || '-',
+          'UOM': spare.uom || '-',
+          'Part Number': spare.partNumber || '-',
+          'Maker': spare.maker || '-',
+          'Remarks': spare.remarks || '-'
+        };
+      });
+      
+      const ws = XLSX.utils.json_to_sheet(data);
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, 'Spares Inventory');
+      XLSX.writeFile(wb, filename);
+      
+      toast({ 
+        title: "Export Successful", 
+        description: `Exported ${data.length} spares to ${filename}` 
+      });
+    }
   };
 
   // Open consume modal
