@@ -414,7 +414,7 @@ export default function ShipsCertificatesAdmin() {
         category: 'Vessel', // Mark as vessel-added
         group: cert.companyGroup || 'Vessel Specific',
         requirementRef: cert.requirementRef || '',
-        applicableToCompany: false, // Vessel certs are not company-wide
+        applicableToCompany: true, // Vessel certs show in Vessel tab (filtered by applicability records)
         certificateLabel: cert.certificateLabel,
         isActive: true,
         // Vessel certs use VES- prefix for company ID
