@@ -433,13 +433,6 @@ export default function SurveysPage() {
             isOpen={showFilters} 
             onToggle={() => setShowFilters(!showFilters)} 
           />
-          <Button
-            className="h-8 px-3 text-xs bg-[#5cc86f] hover:bg-[#0e7490] text-white"
-            data-testid="button-new-survey"
-          >
-            <Plus className="h-3 w-3 mr-1" />
-            New Survey
-          </Button>
         </div>
       </div>
 
