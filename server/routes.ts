@@ -4451,6 +4451,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         dateTo: req.query.dateTo as string,
         search: req.query.search as string,
         includeClosedDefects: req.query.includeClosedDefects === 'true',
+        dueOverdue: req.query.dueOverdue as string,
       };
       
       const defects = await storage.getDefects(filters);

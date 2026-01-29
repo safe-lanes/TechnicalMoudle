@@ -1,4 +1,4 @@
-import { eq, and, desc, sql, inArray, or, ilike, asc, gte, lte } from 'drizzle-orm';
+import { eq, and, desc, sql, inArray, or, ilike, asc, gte, lte, lt } from 'drizzle-orm';
 import { getDb } from './db';
 import {
   users,
@@ -3060,6 +3060,7 @@ export class PostgresStorage {
     priority?: string;
     page?: number;
     pageSize?: number;
+    dueOverdue?: string;
   }): Promise<Defect[]> {
     const db = await getDb();
     const conditions: any[] = [];
@@ -3093,6 +3094,19 @@ export class PostgresStorage {
     
     if (filters?.priority) {
       conditions.push(eq(defects.priority, filters.priority));
+    }
+    
+    if (filters?.dueOverdue === 'overdue') {
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const todayStr = today.toISOString().split('T')[0];
+      conditions.push(lt(defects.targetCloseDate, todayStr));
+      conditions.push(sql`(${defects.verified} IS NULL OR ${defects.verified} = false)`);
+    } else if (filters?.dueOverdue === 'due') {
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const todayStr = today.toISOString().split('T')[0];
+      conditions.push(gte(defects.targetCloseDate, todayStr));
     }
     
     let query = db.select().from(defects);
