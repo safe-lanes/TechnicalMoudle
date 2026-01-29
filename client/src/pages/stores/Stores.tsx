@@ -803,46 +803,75 @@ const Stores: React.FC = () => {
     navigate("/pms/modify-pms");
   };
   
-  const saveEditItem = () => {
+  const saveEditItem = async () => {
     if (!editingItem) return;
     
     const uom = editForm.uom === "Other" ? editForm.customUom : editForm.uom;
     
-    const updatedItems = items.map(item => {
-      if (item.id === editingItem.id) {
-        const updatedItem = {
-          ...item,
-          itemName: editForm.itemName,
-          uom: uom,
-          min: editForm.min,
-          location: editForm.location,
-          notes: editForm.notes
-        };
-        
-        // Recalculate stock status
-        const newStock = calculateStockStatus(item.rob, editForm.min);
-        
-        // Add to history if min changed
-        if (item.min !== editForm.min) {
-          addToHistory(
-            updatedItem,
-            'EDIT',
-            0,
-            item.rob,
-            '',
-            '',
-            `Min changed from ${item.min} to ${editForm.min}`
-          );
+    try {
+      // Build update payload for API
+      const updatePayload: Record<string, any> = {
+        itemName: editForm.itemName,
+        uom: uom,
+        min: editForm.min,
+        locationA: editForm.location, // Map location to locationA for storage
+        remarks: editForm.notes,
+        ihmPresence: editForm.ihmPresence || 'Unknown',
+        ihmEvidenceType: editForm.ihmEvidenceType || 'None'
+      };
+      
+      // Call API to persist changes
+      await apiRequest('PATCH', `/technical/api/stores/${vesselId}/${editingItem.id}`, updatePayload);
+      
+      // Invalidate cache to refetch updated data
+      queryClient.invalidateQueries({ queryKey: [`/technical/api/stores/${vesselId}`] });
+      
+      // Update local state optimistically
+      const updatedItems = items.map(item => {
+        if (item.id === editingItem.id) {
+          const updatedItem = {
+            ...item,
+            itemName: editForm.itemName,
+            uom: uom,
+            min: editForm.min,
+            location: editForm.location,
+            notes: editForm.notes,
+            ihmPresence: editForm.ihmPresence,
+            ihmEvidenceType: editForm.ihmEvidenceType
+          };
+          
+          // Recalculate stock status
+          const newStock = calculateStockStatus(item.rob, editForm.min);
+          
+          // Add to history if min changed
+          if (item.min !== editForm.min) {
+            addToHistory(
+              updatedItem,
+              'EDIT',
+              0,
+              item.rob,
+              '',
+              '',
+              `Min changed from ${item.min} to ${editForm.min}`
+            );
+          }
+          
+          return { ...updatedItem, stock: newStock };
         }
-        
-        return { ...updatedItem, stock: newStock };
-      }
-      return item;
-    });
-    
-    setItems(updatedItems);
-    setIsEditModalOpen(false);
-    toast({ title: "Success", description: "Item updated successfully" });
+        return item;
+      });
+      
+      setItems(updatedItems);
+      setIsEditModalOpen(false);
+      toast({ title: "Success", description: "Item updated successfully" });
+    } catch (error: any) {
+      console.error('Error saving stores item:', error);
+      toast({ 
+        title: "Error", 
+        description: error.message || "Failed to save item changes", 
+        variant: "destructive" 
+      });
+    }
   };
   
   // Open combined consume/receive selection modal (matches Spares workflow)
