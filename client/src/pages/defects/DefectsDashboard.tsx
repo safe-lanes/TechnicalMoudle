@@ -459,7 +459,7 @@ export default function DefectsDashboard() {
               </TableHeader>
               <TableBody>
                 {recentDefects.map((defect) => (
-                  <TableRow key={defect.id} className="cursor-pointer hover:bg-gray-50" onClick={() => window.location.href = `/defects/defect-form-wizard/view/${defect.id}`}>
+                  <TableRow key={defect.id} className="cursor-pointer hover:bg-gray-50" onClick={() => window.location.href = `/defects/view/${defect.id}`}>
                     <TableCell className="font-medium font-mono text-blue-600">{defect.id}</TableCell>
                     <TableCell>{defect.vesselName || defect.vesselId}</TableCell>
                     <TableCell className="max-w-xs truncate">
