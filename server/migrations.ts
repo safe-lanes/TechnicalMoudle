@@ -409,6 +409,40 @@ const migrations: Migration[] = [
       ALTER TABLE vessel_survey_data ADD COLUMN IF NOT EXISTS postponed TEXT;
       ALTER TABLE vessel_survey_data ADD COLUMN IF NOT EXISTS last_edit_upload TEXT
     `
+  },
+  {
+    id: '023_work_orders_was_rejected',
+    name: 'Add was_rejected column to work_orders',
+    description: 'Adds was_rejected boolean column to track if work order was previously rejected (for red font display)',
+    sql: `ALTER TABLE work_orders ADD COLUMN IF NOT EXISTS was_rejected BOOLEAN DEFAULT false NOT NULL`
+  },
+  {
+    id: '024_defects_verification_columns',
+    name: 'Add defect verification and closure columns',
+    description: 'Adds verification, closure, and target date extension columns to defects table',
+    sql: `
+      ALTER TABLE defects ADD COLUMN IF NOT EXISTS closed_out_by_name TEXT;
+      ALTER TABLE defects ADD COLUMN IF NOT EXISTS closed_out_by_rank TEXT;
+      ALTER TABLE defects ADD COLUMN IF NOT EXISTS verified BOOLEAN DEFAULT false;
+      ALTER TABLE defects ADD COLUMN IF NOT EXISTS date_verified TEXT;
+      ALTER TABLE defects ADD COLUMN IF NOT EXISTS verified_by_name TEXT;
+      ALTER TABLE defects ADD COLUMN IF NOT EXISTS verified_by_office_position TEXT;
+      ALTER TABLE defects ADD COLUMN IF NOT EXISTS part_a_attachments JSON DEFAULT '[]'::json;
+      ALTER TABLE defects ADD COLUMN IF NOT EXISTS confirm_completed BOOLEAN DEFAULT false;
+      ALTER TABLE defects ADD COLUMN IF NOT EXISTS closed_by_name TEXT;
+      ALTER TABLE defects ADD COLUMN IF NOT EXISTS closed_by_rank TEXT;
+      ALTER TABLE defects ADD COLUMN IF NOT EXISTS target_date_extensions JSON DEFAULT '[]'::json;
+      ALTER TABLE defects ADD COLUMN IF NOT EXISTS target_date_extended BOOLEAN DEFAULT false
+    `
+  },
+  {
+    id: '025_stores_ihm_columns',
+    name: 'Add IHM columns to stores_items',
+    description: 'Adds IHM presence and evidence type columns to stores_items table',
+    sql: `
+      ALTER TABLE stores_items ADD COLUMN IF NOT EXISTS ihm_presence TEXT DEFAULT 'Unknown';
+      ALTER TABLE stores_items ADD COLUMN IF NOT EXISTS ihm_evidence_type TEXT DEFAULT 'None'
+    `
   }
 ];
 
