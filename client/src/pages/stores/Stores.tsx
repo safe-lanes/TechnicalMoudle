@@ -569,6 +569,26 @@ const Stores: React.FC = () => {
   
   // Filter history items
   const filteredHistoryItems = useMemo(() => {
+    // Helper to parse DD-Mon-YYYY format (e.g., "27-Jan-2026") to Date object
+    const parseHistoryDate = (dateStr: string): Date | null => {
+      if (!dateStr) return null;
+      const months: Record<string, number> = {
+        'Jan': 0, 'Feb': 1, 'Mar': 2, 'Apr': 3, 'May': 4, 'Jun': 5,
+        'Jul': 6, 'Aug': 7, 'Sep': 8, 'Oct': 9, 'Nov': 10, 'Dec': 11
+      };
+      const parts = dateStr.split('-');
+      if (parts.length !== 3) return null;
+      const day = parseInt(parts[0], 10);
+      const month = months[parts[1]];
+      const year = parseInt(parts[2], 10);
+      if (isNaN(day) || month === undefined || isNaN(year)) return null;
+      return new Date(year, month, day);
+    };
+
+    // Parse date picker values (YYYY-MM-DD format)
+    const fromDate = historyDateFrom ? new Date(historyDateFrom + 'T00:00:00') : null;
+    const toDate = historyDateTo ? new Date(historyDateTo + 'T23:59:59') : null;
+
     return historyItems.filter(item => {
       // Filter by search
       if (historySearch && !item.itemName.toLowerCase().includes(historySearch.toLowerCase()) &&
@@ -581,8 +601,14 @@ const Stores: React.FC = () => {
         return false;
       }
       
-      // Filter by date range (would need proper date parsing for production)
-      // For now, we'll skip date filtering as it requires proper date handling
+      // Filter by date range
+      if (fromDate || toDate) {
+        const itemDate = parseHistoryDate(item.dateLocal);
+        if (!itemDate) return true; // Keep items with unparseable dates
+        
+        if (fromDate && itemDate < fromDate) return false;
+        if (toDate && itemDate > toDate) return false;
+      }
       
       return true;
     });
