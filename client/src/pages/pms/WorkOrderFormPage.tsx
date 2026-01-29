@@ -646,10 +646,26 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
   };
 
   const handleExecutionChange = (field: string, value: string) => {
-    setExecutionData(prev => ({
-      ...prev,
-      [field]: value
-    }));
+    setExecutionData(prev => {
+      const newData = {
+        ...prev,
+        [field]: value
+      };
+      
+      // Auto-calculate manhours when noOfPersons or totalTimeHours changes
+      if (field === 'noOfPersons' || field === 'totalTimeHours') {
+        const persons = field === 'noOfPersons' ? parseFloat(value) : parseFloat(prev.noOfPersons);
+        const hours = field === 'totalTimeHours' ? parseFloat(value) : parseFloat(prev.totalTimeHours);
+        
+        if (!isNaN(persons) && !isNaN(hours) && persons > 0 && hours > 0) {
+          newData.manhours = (persons * hours).toString();
+        } else {
+          newData.manhours = '';
+        }
+      }
+      
+      return newData;
+    });
   };
 
   const insertQuickText = (text: string) => {
@@ -2894,9 +2910,9 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                     <Input
                       type="number"
                       value={executionData.manhours}
-                      onChange={(e) => handleExecutionChange('manhours', e.target.value)}
-                      className="text-sm"
-                      placeholder="3.3"
+                      readOnly
+                      className="text-sm bg-gray-100"
+                      placeholder="Auto-calculated"
                       data-testid="WOF.B2.20"
                     />
                   </div>

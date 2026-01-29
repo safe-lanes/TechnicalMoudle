@@ -1341,7 +1341,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
 
       // Calculate summary metrics
-      const totalManHours = plannerItems.reduce((sum, item) => sum + item.estimatedManHours, 0);
+      // Sum actual manhours from completed/approved work orders for the vessel
+      const completedStatuses = ['Completed', 'completed', 'Approved', 'approved'];
+      const totalManHours = allWorkOrders
+        .filter(wo => completedStatuses.includes(wo.status || ''))
+        .reduce((sum, wo) => {
+          const manhours = parseFloat(wo.manhours || '0');
+          return sum + (isNaN(manhours) ? 0 : manhours);
+        }, 0);
       
       const byRank: Record<string, { jobs: number; manHours: number }> = {};
       for (const item of plannerItems) {
