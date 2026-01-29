@@ -427,6 +427,48 @@ const Stores: React.FC = () => {
     ihmEvidenceType: 'None' as 'None' | 'MD' | 'SDoC' | 'Test'
   });
   
+  // Add Store modal state
+  const [isAddStoreModalOpen, setIsAddStoreModalOpen] = useState(false);
+  const [isAddingStore, setIsAddingStore] = useState(false);
+  const [addStoreForm, setAddStoreForm] = useState({
+    itemCode: "",
+    itemName: "",
+    impaCode: "",
+    category: "",
+    specification: "",
+    uom: "",
+    customUom: "",
+    rob: 0,
+    robLocationA: 0,
+    robLocationB: 0,
+    locationA: "",
+    locationB: "",
+    min: 0,
+    max: 0,
+    unitCost: 0,
+    supplier: "",
+    lastOrderDate: "",
+    leadTime: "",
+    ihm: false,
+    ihmDetails: "",
+    ihmPresence: "Unknown" as "Unknown" | "Present" | "Not Present",
+    ihmEvidenceType: "None" as "None" | "MD" | "SDoC" | "Test",
+    remarks: ""
+  });
+  
+  // Store category options
+  const STORE_CATEGORY_OPTIONS = [
+    "General Stores",
+    "Electrical",
+    "Mechanical",
+    "Safety",
+    "Deck",
+    "Engine",
+    "Galley",
+    "Consumables",
+    "Other"
+  ];
+  
   // Combined consume/receive selection modal (matches Spares workflow)
   const [isConsumeReceiveModalOpen, setIsConsumeReceiveModalOpen] = useState(false);
   const [selectedItem, setSelectedItem] = useState<StoreItem | null>(null);
@@ -829,6 +871,107 @@ const Stores: React.FC = () => {
     navigate("/pms/modify-pms");
   };
   
+  // Open Add Store modal
+  const openAddStoreModal = () => {
+    setAddStoreForm({
+      itemCode: "",
+      itemName: "",
+      impaCode: "",
+      category: "",
+      specification: "",
+      uom: "",
+      customUom: "",
+      rob: 0,
+      robLocationA: 0,
+      robLocationB: 0,
+      locationA: "",
+      locationB: "",
+      min: 0,
+      max: 0,
+      unitCost: 0,
+      supplier: "",
+      lastOrderDate: "",
+      leadTime: "",
+      ihm: false,
+      ihmDetails: "",
+      ihmPresence: "Unknown",
+      ihmEvidenceType: "None",
+      remarks: ""
+    });
+    setIsAddStoreModalOpen(true);
+  };
+  
+  // Save new store item
+  const saveAddStore = async () => {
+    if (!vesselId) {
+      toast({ title: "Error", description: "Please select a vessel first", variant: "destructive" });
+      return;
+    }
+    
+    if (!addStoreForm.itemCode.trim()) {
+      toast({ title: "Validation Error", description: "Item Code is required", variant: "destructive" });
+      return;
+    }
+    
+    if (!addStoreForm.itemName.trim()) {
+      toast({ title: "Validation Error", description: "Item Name is required", variant: "destructive" });
+      return;
+    }
+    
+    setIsAddingStore(true);
+    
+    try {
+      const uom = addStoreForm.uom === "Other" ? addStoreForm.customUom : addStoreForm.uom;
+      
+      // Build payload matching storesItems schema
+      const payload = {
+        vesselId,
+        itemType: activeTab, // stores | lubes | chemicals | others
+        itemCode: addStoreForm.itemCode.trim(),
+        itemName: addStoreForm.itemName.trim(),
+        impaCode: addStoreForm.impaCode.trim() || null,
+        category: addStoreForm.category || null,
+        specification: addStoreForm.specification.trim() || null,
+        uom: uom || null,
+        rob: addStoreForm.rob,
+        robLocationA: addStoreForm.robLocationA,
+        robLocationB: addStoreForm.robLocationB,
+        locationA: addStoreForm.locationA.trim() || null,
+        locationB: addStoreForm.locationB.trim() || null,
+        min: addStoreForm.min,
+        max: addStoreForm.max || null,
+        unitCost: addStoreForm.unitCost || null,
+        supplier: addStoreForm.supplier.trim() || null,
+        lastOrderDate: addStoreForm.lastOrderDate || null,
+        leadTime: addStoreForm.leadTime.trim() || null,
+        ihm: addStoreForm.ihm,
+        ihmDetails: addStoreForm.ihmDetails.trim() || null,
+        ihmPresence: addStoreForm.ihmPresence,
+        ihmEvidenceType: addStoreForm.ihmEvidenceType,
+        remarks: addStoreForm.remarks.trim() || null,
+        isActive: true
+      };
+      
+      await apiRequest('POST', `/technical/api/stores/${vesselId}/create`, payload);
+      
+      // Invalidate queries to refetch updated data (both inventory and history since ledger entry may be created)
+      queryClient.invalidateQueries({ queryKey: [`/technical/api/stores/${vesselId}?itemType=${activeTab}`] });
+      queryClient.invalidateQueries({ queryKey: [`/technical/api/stores/${vesselId}/history`, activeTab] });
+      
+      setIsAddStoreModalOpen(false);
+      toast({ title: "Success", description: `Store item "${addStoreForm.itemName}" added successfully` });
+    } catch (error: any) {
+      console.error('Error adding store item:', error);
+      toast({ 
+        title: "Error", 
+        description: error.message || "Failed to add store item", 
+        variant: "destructive" 
+      });
+    } finally {
+      setIsAddingStore(false);
+    }
+  };
+  
   const saveEditItem = async () => {
     if (!editingItem) return;
     
@@ -1141,15 +1284,26 @@ const Stores: React.FC = () => {
           </button>
         </div>
         
-        <Button 
-          className="bg-[#5dc86f] hover:bg-[#4db85f] text-white" 
-          onClick={openBulkUpdateModal}
-          data-testid={viewMode === "inventory" ? getMarkerId(activeTab, "3") : getMarkerId(activeTab, "2.6")}
-        >
-          {viewMode === "inventory" && <Marker id={getMarkerId(activeTab, "3")} />}
-          {viewMode === "history" && <Marker id={getMarkerId(activeTab, "2.6")} />}
-          + Bulk Update {activeTab.charAt(0).toUpperCase() + activeTab.slice(1)}
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button 
+            className="bg-[#5dc86f] hover:bg-[#4db85f] text-white" 
+            onClick={openAddStoreModal}
+            data-testid={viewMode === "inventory" ? getMarkerId(activeTab, "3a") : getMarkerId(activeTab, "2.6a")}
+          >
+            {viewMode === "inventory" && <Marker id={getMarkerId(activeTab, "3a")} />}
+            {viewMode === "history" && <Marker id={getMarkerId(activeTab, "2.6a")} />}
+            + Add Store
+          </Button>
+          <Button 
+            className="bg-[#5dc86f] hover:bg-[#4db85f] text-white" 
+            onClick={openBulkUpdateModal}
+            data-testid={viewMode === "inventory" ? getMarkerId(activeTab, "3") : getMarkerId(activeTab, "2.6")}
+          >
+            {viewMode === "inventory" && <Marker id={getMarkerId(activeTab, "3")} />}
+            {viewMode === "history" && <Marker id={getMarkerId(activeTab, "2.6")} />}
+            + Bulk Update {activeTab.charAt(0).toUpperCase() + activeTab.slice(1)}
+          </Button>
+        </div>
       </div>
 
       {/* View Mode Tabs - Right aligned */}
@@ -1759,6 +1913,323 @@ const Stores: React.FC = () => {
             ) : (
               <Button onClick={saveEditItem}>Save Changes</Button>
             )}
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Add Store Modal */}
+      <Dialog open={isAddStoreModalOpen} onOpenChange={setIsAddStoreModalOpen}>
+        <DialogContent className="sm:max-w-[600px] max-h-[85vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Add New Store Item</DialogTitle>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            {/* Required Fields */}
+            <div className="grid grid-cols-2 gap-4">
+              <div className="grid gap-2">
+                <Label htmlFor="addItemCode">Item Code <span className="text-red-500">*</span></Label>
+                <Input
+                  id="addItemCode"
+                  value={addStoreForm.itemCode}
+                  onChange={(e) => setAddStoreForm({...addStoreForm, itemCode: e.target.value})}
+                  placeholder="e.g., IT-0001"
+                  data-testid="input-add-store-item-code"
+                />
+              </div>
+              <div className="grid gap-2">
+                <Label htmlFor="addImpaCode">IMPA Code</Label>
+                <Input
+                  id="addImpaCode"
+                  value={addStoreForm.impaCode}
+                  onChange={(e) => setAddStoreForm({...addStoreForm, impaCode: e.target.value})}
+                  placeholder="e.g., 123456"
+                  data-testid="input-add-store-impa-code"
+                />
+              </div>
+            </div>
+            
+            <div className="grid gap-2">
+              <Label htmlFor="addItemName">Item Name <span className="text-red-500">*</span></Label>
+              <Input
+                id="addItemName"
+                value={addStoreForm.itemName}
+                onChange={(e) => setAddStoreForm({...addStoreForm, itemName: e.target.value})}
+                placeholder="Enter item name"
+                data-testid="input-add-store-item-name"
+              />
+            </div>
+            
+            <div className="grid grid-cols-2 gap-4">
+              <div className="grid gap-2">
+                <Label htmlFor="addCategory">Stores Category</Label>
+                <Select 
+                  value={addStoreForm.category} 
+                  onValueChange={(value) => setAddStoreForm({...addStoreForm, category: value})}
+                >
+                  <SelectTrigger data-testid="select-add-store-category">
+                    <SelectValue placeholder="Select category" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {STORE_CATEGORY_OPTIONS.map(cat => (
+                      <SelectItem key={cat} value={cat}>{cat}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="grid gap-2">
+                <Label htmlFor="addUom">Unit of Measure</Label>
+                <Select 
+                  value={addStoreForm.uom} 
+                  onValueChange={(value) => setAddStoreForm({...addStoreForm, uom: value})}
+                >
+                  <SelectTrigger data-testid="select-add-store-uom">
+                    <SelectValue placeholder="Select UOM" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {UOM_OPTIONS.map(opt => (
+                      <SelectItem key={opt} value={opt}>{opt}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                {addStoreForm.uom === "Other" && (
+                  <Input
+                    placeholder="Enter custom UOM"
+                    value={addStoreForm.customUom}
+                    onChange={(e) => setAddStoreForm({...addStoreForm, customUom: e.target.value})}
+                    data-testid="input-add-store-custom-uom"
+                  />
+                )}
+              </div>
+            </div>
+            
+            <div className="grid gap-2">
+              <Label htmlFor="addSpecification">Specification</Label>
+              <Input
+                id="addSpecification"
+                value={addStoreForm.specification}
+                onChange={(e) => setAddStoreForm({...addStoreForm, specification: e.target.value})}
+                placeholder="Technical specs (size, dimensions, material)"
+                data-testid="input-add-store-specification"
+              />
+            </div>
+            
+            {/* Stock Levels */}
+            <div className="border-t pt-4">
+              <Label className="text-base font-semibold text-gray-700 mb-2 block">Stock Levels</Label>
+              <div className="grid grid-cols-3 gap-4">
+                <div className="grid gap-2">
+                  <Label htmlFor="addRob">ROB (Total)</Label>
+                  <Input
+                    id="addRob"
+                    type="number"
+                    min="0"
+                    value={addStoreForm.rob}
+                    onChange={(e) => setAddStoreForm({...addStoreForm, rob: parseFloat(e.target.value) || 0})}
+                    data-testid="input-add-store-rob"
+                  />
+                </div>
+                <div className="grid gap-2">
+                  <Label htmlFor="addMin">Min Stock</Label>
+                  <Input
+                    id="addMin"
+                    type="number"
+                    min="0"
+                    value={addStoreForm.min}
+                    onChange={(e) => setAddStoreForm({...addStoreForm, min: parseFloat(e.target.value) || 0})}
+                    data-testid="input-add-store-min"
+                  />
+                </div>
+                <div className="grid gap-2">
+                  <Label htmlFor="addMax">Max Stock</Label>
+                  <Input
+                    id="addMax"
+                    type="number"
+                    min="0"
+                    value={addStoreForm.max}
+                    onChange={(e) => setAddStoreForm({...addStoreForm, max: parseFloat(e.target.value) || 0})}
+                    data-testid="input-add-store-max"
+                  />
+                </div>
+              </div>
+            </div>
+            
+            {/* Locations */}
+            <div className="border-t pt-4">
+              <Label className="text-base font-semibold text-gray-700 mb-2 block">Location Details</Label>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="grid gap-2">
+                  <Label htmlFor="addLocationA">Location A Name</Label>
+                  <Input
+                    id="addLocationA"
+                    value={addStoreForm.locationA}
+                    onChange={(e) => setAddStoreForm({...addStoreForm, locationA: e.target.value})}
+                    placeholder="e.g., Engine Room Store"
+                    data-testid="input-add-store-location-a"
+                  />
+                </div>
+                <div className="grid gap-2">
+                  <Label htmlFor="addRobLocationA">ROB at Location A</Label>
+                  <Input
+                    id="addRobLocationA"
+                    type="number"
+                    min="0"
+                    value={addStoreForm.robLocationA}
+                    onChange={(e) => setAddStoreForm({...addStoreForm, robLocationA: parseFloat(e.target.value) || 0})}
+                    data-testid="input-add-store-rob-location-a"
+                  />
+                </div>
+                <div className="grid gap-2">
+                  <Label htmlFor="addLocationB">Location B Name</Label>
+                  <Input
+                    id="addLocationB"
+                    value={addStoreForm.locationB}
+                    onChange={(e) => setAddStoreForm({...addStoreForm, locationB: e.target.value})}
+                    placeholder="e.g., Deck Store"
+                    data-testid="input-add-store-location-b"
+                  />
+                </div>
+                <div className="grid gap-2">
+                  <Label htmlFor="addRobLocationB">ROB at Location B</Label>
+                  <Input
+                    id="addRobLocationB"
+                    type="number"
+                    min="0"
+                    value={addStoreForm.robLocationB}
+                    onChange={(e) => setAddStoreForm({...addStoreForm, robLocationB: parseFloat(e.target.value) || 0})}
+                    data-testid="input-add-store-rob-location-b"
+                  />
+                </div>
+              </div>
+            </div>
+            
+            {/* Supplier & Costing */}
+            <div className="border-t pt-4">
+              <Label className="text-base font-semibold text-gray-700 mb-2 block">Supplier & Costing</Label>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="grid gap-2">
+                  <Label htmlFor="addSupplier">Supplier</Label>
+                  <Input
+                    id="addSupplier"
+                    value={addStoreForm.supplier}
+                    onChange={(e) => setAddStoreForm({...addStoreForm, supplier: e.target.value})}
+                    placeholder="Supplier name"
+                    data-testid="input-add-store-supplier"
+                  />
+                </div>
+                <div className="grid gap-2">
+                  <Label htmlFor="addUnitCost">Unit Cost</Label>
+                  <Input
+                    id="addUnitCost"
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    value={addStoreForm.unitCost}
+                    onChange={(e) => setAddStoreForm({...addStoreForm, unitCost: parseFloat(e.target.value) || 0})}
+                    data-testid="input-add-store-unit-cost"
+                  />
+                </div>
+                <div className="grid gap-2">
+                  <Label htmlFor="addLastOrderDate">Last Order Date</Label>
+                  <Input
+                    id="addLastOrderDate"
+                    type="date"
+                    value={addStoreForm.lastOrderDate}
+                    onChange={(e) => setAddStoreForm({...addStoreForm, lastOrderDate: e.target.value})}
+                    data-testid="input-add-store-last-order-date"
+                  />
+                </div>
+                <div className="grid gap-2">
+                  <Label htmlFor="addLeadTime">Lead Time</Label>
+                  <Input
+                    id="addLeadTime"
+                    value={addStoreForm.leadTime}
+                    onChange={(e) => setAddStoreForm({...addStoreForm, leadTime: e.target.value})}
+                    placeholder="e.g., 2 weeks"
+                    data-testid="input-add-store-lead-time"
+                  />
+                </div>
+              </div>
+            </div>
+            
+            {/* IHM Fields */}
+            {FEATURES.IHM && (
+              <div className="border-t pt-4">
+                <Label className="text-base font-semibold text-gray-700 mb-2 block">IHM (Inventory of Hazardous Materials)</Label>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="grid gap-2">
+                    <Label htmlFor="addIhmPresence">IHM Presence</Label>
+                    <Select 
+                      value={addStoreForm.ihmPresence} 
+                      onValueChange={(value) => setAddStoreForm({...addStoreForm, ihmPresence: value as typeof IHM_PRESENCE[number]})}
+                    >
+                      <SelectTrigger data-testid="select-add-store-ihm-presence">
+                        <SelectValue placeholder="Select IHM presence" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {IHM_PRESENCE.map(status => (
+                          <SelectItem key={status} value={status}>{status}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="grid gap-2">
+                    <Label htmlFor="addIhmEvidenceType">IHM Evidence Type</Label>
+                    <Select 
+                      value={addStoreForm.ihmEvidenceType} 
+                      onValueChange={(value) => setAddStoreForm({...addStoreForm, ihmEvidenceType: value as typeof IHM_EVIDENCE_TYPES[number]})}
+                    >
+                      <SelectTrigger data-testid="select-add-store-ihm-evidence">
+                        <SelectValue placeholder="Select evidence type" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {IHM_EVIDENCE_TYPES.map(type => (
+                          <SelectItem key={type} value={type}>{type}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+                <div className="grid gap-2 mt-4">
+                  <Label htmlFor="addIhmDetails">IHM Details</Label>
+                  <Textarea
+                    id="addIhmDetails"
+                    value={addStoreForm.ihmDetails}
+                    onChange={(e) => setAddStoreForm({...addStoreForm, ihmDetails: e.target.value})}
+                    placeholder="IHM related information"
+                    rows={2}
+                    data-testid="textarea-add-store-ihm-details"
+                  />
+                </div>
+              </div>
+            )}
+            
+            {/* Remarks */}
+            <div className="border-t pt-4">
+              <div className="grid gap-2">
+                <Label htmlFor="addRemarks">Remarks</Label>
+                <Textarea
+                  id="addRemarks"
+                  value={addStoreForm.remarks}
+                  onChange={(e) => setAddStoreForm({...addStoreForm, remarks: e.target.value})}
+                  placeholder="Additional notes"
+                  rows={2}
+                  data-testid="textarea-add-store-remarks"
+                />
+              </div>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsAddStoreModalOpen(false)} data-testid="button-add-store-cancel">
+              Cancel
+            </Button>
+            <Button 
+              onClick={saveAddStore} 
+              disabled={isAddingStore}
+              className="bg-[#5dc86f] hover:bg-[#4db85f] text-white"
+              data-testid="button-add-store-save"
+            >
+              {isAddingStore ? "Saving..." : "Save Store Item"}
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
