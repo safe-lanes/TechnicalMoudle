@@ -1916,13 +1916,8 @@ const DrawingsAndManualsSection: React.FC<{ selectedComponent: ComponentNode | n
     return (
       <div className="text-center py-8">
         <div className="text-gray-400 text-sm">
-          No drawings or manuals available for this component
+          Feature coming soon
         </div>
-        <AdminOnly>
-          <p className="text-xs text-gray-500 mt-2">
-            Upload technical documents using object storage integration
-          </p>
-        </AdminOnly>
       </div>
     );
   }
@@ -2072,13 +2067,8 @@ const ClassificationRegulatorySection: React.FC<{ selectedComponent: ComponentNo
     return (
       <div className="text-center py-8">
         <div className="text-gray-400 text-sm">
-          No classification & regulatory data found for this component
+          Feature coming soon
         </div>
-        <AdminOnly>
-          <p className="text-xs text-gray-500 mt-2">
-            Add survey records to track classification society requirements
-          </p>
-        </AdminOnly>
       </div>
     );
   }
@@ -2155,11 +2145,8 @@ const RequisitionsSection: React.FC<{ selectedComponent: ComponentNode | null }>
     return (
       <div className="text-center py-8">
         <div className="text-gray-400 text-sm">
-          No requisitions found for this component
+          Feature coming soon
         </div>
-        <p className="text-xs text-gray-500 mt-2">
-          Requisitions for spares and services will appear here
-        </p>
       </div>
     );
   }
