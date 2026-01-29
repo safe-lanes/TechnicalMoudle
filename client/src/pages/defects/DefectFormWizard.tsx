@@ -590,7 +590,10 @@ export default function DefectFormWizard({
           )}
           {!isViewMode && (
             <Button
-              onClick={form.handleSubmit(onSubmit)}
+              onClick={async () => {
+                const data = form.getValues();
+                await saveDefect(data, true, false);
+              }}
               className="bg-blue-600 hover:bg-blue-700 text-white h-9 px-6 font-medium"
               data-testid="button-save"
             >
@@ -1935,7 +1938,10 @@ export default function DefectFormWizard({
                       <div className="flex justify-end pt-4">
                         <Button
                           type="button"
-                          onClick={form.handleSubmit(onSubmit)}
+                          onClick={async () => {
+                            const data = form.getValues();
+                            await saveDefect(data, true, false);
+                          }}
                           className="bg-blue-600 hover:bg-blue-700 text-white px-6"
                           data-testid="button-submit-c2"
                         >
