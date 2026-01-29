@@ -725,18 +725,21 @@ const WorkOrders: React.FC = () => {
                           {index === 0 && <Marker id="C31" />}
                           <Pen className="h-4 w-4 text-gray-600" />
                         </button>
-                        <button 
-                          className="p-1 hover:bg-gray-200 rounded"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleTimerClick(workOrder);
-                          }}
-                          title="Postpone Work Order"
-                          data-testid={index === 0 ? "C32" : `button-postpone-wo-${workOrder.id}`}
-                        >
-                          {index === 0 && <Marker id="C32" />}
-                          <Timer className="h-4 w-4 text-gray-600" />
-                        </button>
+                        {/* Hide postpone button for vessel view mode */}
+                        {!isVessel && (
+                          <button 
+                            className="p-1 hover:bg-gray-200 rounded"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleTimerClick(workOrder);
+                            }}
+                            title="Postpone Work Order"
+                            data-testid={index === 0 ? "C32" : `button-postpone-wo-${workOrder.id}`}
+                          >
+                            {index === 0 && <Marker id="C32" />}
+                            <Timer className="h-4 w-4 text-gray-600" />
+                          </button>
+                        )}
                       </>
                     )}
                     {/* View button - always available (clicking the row also opens view) */}
