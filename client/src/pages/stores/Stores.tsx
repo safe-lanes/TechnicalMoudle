@@ -1306,8 +1306,8 @@ const Stores: React.FC = () => {
         </div>
       </div>
 
-      {/* View Mode Tabs - Right aligned */}
-      <div className="flex justify-end">
+      {/* View Mode Tabs - Center aligned */}
+      <div className="flex justify-center">
         <div className="bg-gray-100 rounded-md p-1 flex items-center gap-1">
           <button
             onClick={() => setViewMode("inventory")}
