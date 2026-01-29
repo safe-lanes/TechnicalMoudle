@@ -202,6 +202,7 @@ export default function DefectFormWizard({
       rootCauseExplanation: "",
       riskLevel: "",
       vesselLocationType: "atPort",
+      dateRegisteredInSystem: new Date().toISOString().split('T')[0],
     },
   });
 
@@ -843,6 +844,7 @@ export default function DefectFormWizard({
                       <Input 
                         {...form.register("dateRegisteredInSystem")} 
                         type="date"
+                        max={new Date().toISOString().split('T')[0]}
                         data-testid="input-date-registered-system"
                         className="h-10 text-sm border-gray-300"
                         disabled={isViewMode}
