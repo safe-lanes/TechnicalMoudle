@@ -148,8 +148,42 @@ export default function DefectsLog() {
       });
     }
     
+    // Period filter based on Issue Date only
+    if (filters.period && filters.period !== 'all') {
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      
+      result = result.filter((defect: Defect) => {
+        if (!defect.issueDate) return false;
+        
+        // Parse issueDate string to Date
+        const issueDateMatch = String(defect.issueDate).match(/^(\d{4})-(\d{2})-(\d{2})/);
+        if (!issueDateMatch) return false;
+        
+        const [, year, month, day] = issueDateMatch;
+        const issueDate = new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
+        issueDate.setHours(0, 0, 0, 0);
+        
+        if (filters.period === 'today') {
+          return issueDate.getTime() === today.getTime();
+        } else if (filters.period === 'week') {
+          // Start of current week (Sunday)
+          const startOfWeek = new Date(today);
+          startOfWeek.setDate(today.getDate() - today.getDay());
+          startOfWeek.setHours(0, 0, 0, 0);
+          return issueDate >= startOfWeek && issueDate <= today;
+        } else if (filters.period === 'month') {
+          // Start of current month
+          const startOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
+          startOfMonth.setHours(0, 0, 0, 0);
+          return issueDate >= startOfMonth && issueDate <= today;
+        }
+        return true;
+      });
+    }
+    
     return result;
-  }, [defects, vesselFilterValue.selectedVessels, selectedVesselNames]);
+  }, [defects, vesselFilterValue.selectedVessels, selectedVesselNames, filters.period]);
 
   // Compute defect status based on data (matches DefectsCoC.tsx logic)
   const getComputedStatus = (defect: Defect): { label: string; color: string } => {
