@@ -725,6 +725,7 @@ export default function DefectFormWizard({
                       <Input 
                         {...form.register("issueDate")} 
                         type="date"
+                        max={new Date().toISOString().split('T')[0]}
                         data-testid="input-date-observed"
                         className="h-10 text-sm border-gray-300"
                         disabled={isViewMode}
@@ -784,6 +785,7 @@ export default function DefectFormWizard({
                       <Input 
                         {...form.register("dateReportedToOffice")} 
                         type="date"
+                        max={new Date().toISOString().split('T')[0]}
                         data-testid="input-date-reported-office"
                         className="h-10 text-sm border-gray-300"
                         disabled={isViewMode}
