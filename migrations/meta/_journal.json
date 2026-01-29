@@ -43,6 +43,13 @@
       "when": 1769599816477,
       "tag": "0005_auto_2026-01-28T11-30-15",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1769689791896,
+      "tag": "0006_auto_2026-01-29T12-29-50",
+      "breakpoints": true
     }
   ]
 }
