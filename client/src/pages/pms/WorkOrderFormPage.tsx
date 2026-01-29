@@ -43,6 +43,7 @@ import { useQuery } from "@tanstack/react-query";
 import WorkInstructionsDialog from "@/components/WorkInstructionsDialog";
 import { useToast } from "@/hooks/use-toast";
 import { useVessel } from "@/contexts/VesselContext";
+import { useUIRole } from "@/contexts/UIRoleContext";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useModifyMode } from "@/hooks/useModifyMode";
 import { ModifyFieldWrapper } from "@/components/modify/ModifyFieldWrapper";
@@ -76,6 +77,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
 }) => {
   const { toast } = useToast();
   const { vesselId: contextVesselId } = useVessel();
+  const { isVessel } = useUIRole();
   const [location, navigate] = useLocation();
   const [, params] = useRoute("/pms/work-order/:id");
   const [, newParams] = useRoute("/pms/work-order/new/:componentId");
@@ -3420,8 +3422,8 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
             </div>
           </SectionBlock>
 
-          {/* Approval Section - Only visible for Pending Approval work orders, hidden in embedded mode */}
-          {!embedded && currentWorkOrderStatus === 'Pending Approval' && (
+          {/* Approval Section - Only visible for Pending Approval work orders, hidden in embedded mode and vessel view */}
+          {!embedded && currentWorkOrderStatus === 'Pending Approval' && !isVessel && (
             <div className="bg-white rounded-lg border border-gray-200 shadow-sm p-6 mt-4" data-testid="WOF.B5.1"><Marker id="WOF.B5.1" />
               <div className="space-y-4">
                 {/* Rejection Comments */}
