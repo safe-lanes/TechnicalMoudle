@@ -767,31 +767,31 @@ const RunningHoursConditionSection: React.FC<{ selectedComponent: ComponentNode 
   
   return (
     <div className="space-y-4">
-      {/* Running Hours Table with Teal Header */}
+      {/* Running Hours Table */}
       <div className="overflow-x-auto">
-        <table className="w-full border-collapse" data-testid="table-running-hours">
+        <table className="w-full text-sm" data-testid="table-running-hours">
           <thead>
-            <tr className="bg-[#52baf3] text-white">
-              <th className="px-4 py-2 text-left text-xs font-semibold border border-[#3da8e0]" data-testid="B7.B.1"><Marker id="B7.B.1" /> RH Counter Type</th>
-              <th className="px-4 py-2 text-left text-xs font-semibold border border-[#3da8e0]" data-testid="B7.B.2"><Marker id="B7.B.2" /> RH Counter Source</th>
-              <th className="px-4 py-2 text-left text-xs font-semibold border border-[#3da8e0]" data-testid="B7.B.3"><Marker id="B7.B.3" /> Running Hours</th>
-              <th className="px-4 py-2 text-left text-xs font-semibold border border-[#3da8e0]" data-testid="B7.B.4"><Marker id="B7.B.4" /> Last Updated</th>
+            <tr className="border-b border-gray-200">
+              <th className="text-left py-2 px-3 font-medium text-gray-600" data-testid="B7.B.1"><Marker id="B7.B.1" /> RH Counter Type</th>
+              <th className="text-left py-2 px-3 font-medium text-gray-600" data-testid="B7.B.2"><Marker id="B7.B.2" /> RH Counter Source</th>
+              <th className="text-left py-2 px-3 font-medium text-gray-600" data-testid="B7.B.3"><Marker id="B7.B.3" /> Running Hours</th>
+              <th className="text-left py-2 px-3 font-medium text-gray-600" data-testid="B7.B.4"><Marker id="B7.B.4" /> Last Updated</th>
             </tr>
           </thead>
           <tbody>
-            <tr className="bg-white">
-              <td className="px-4 py-3 text-sm border border-gray-200" data-testid="B7.B.5">
+            <tr className="border-b border-gray-200">
+              <td className="py-2 px-3" data-testid="B7.B.5">
                 <Marker id="B7.B.5" /> {rhCounterType === 'MASTER' ? 'Master' :
                  rhCounterType === 'INHERITED' ? 'Inherited' :
                  'Not RH Driven'}
               </td>
-              <td className="px-4 py-3 text-sm border border-gray-200" data-testid="B7.B.6">
+              <td className="py-2 px-3" data-testid="B7.B.6">
                 <Marker id="B7.B.6" /> {getRHCounterSource(selectedComponent)}
               </td>
-              <td className="px-4 py-3 text-sm font-semibold border border-gray-200" data-testid="B7.B.7">
+              <td className="py-2 px-3 font-semibold" data-testid="B7.B.7">
                 <Marker id="B7.B.7" /> {getDisplayRH(selectedComponent)}
               </td>
-              <td className="px-4 py-3 text-sm border border-gray-200" data-testid="B7.B.8">
+              <td className="py-2 px-3" data-testid="B7.B.8">
                 <Marker id="B7.B.8" /> {getLastUpdated(selectedComponent)}
               </td>
             </tr>
