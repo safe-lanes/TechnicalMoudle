@@ -184,8 +184,8 @@ export default function DefectFormWizard({
   const form = useForm<DefectFormData>({
     resolver: zodResolver(defectFormSchema),
     defaultValues: {
-      vesselId: "V001",
-      vesselName: "MV SEAFARER",
+      vesselId: "",
+      vesselName: "",
       issueDate: new Date().toISOString().split('T')[0],
       category: "Defect",
       equipmentCategory: "",
