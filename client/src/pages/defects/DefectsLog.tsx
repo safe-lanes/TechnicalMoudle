@@ -126,16 +126,30 @@ export default function DefectsLog() {
   const filteredDefects = useMemo(() => {
     let result = defects;
     
-    if (selectedVesselNames.length > 0) {
+    // Use vesselId matching with fallback to vesselName matching for legacy data
+    const selectedVesselIds = vesselFilterValue.selectedVessels;
+    const hasVesselFilter = selectedVesselIds.length > 0 || selectedVesselNames.length > 0;
+    
+    if (hasVesselFilter) {
+      // Normalize vessel names for case-insensitive matching
       const normalizedSelectedNames = selectedVesselNames.map(name => name.toLowerCase().trim());
+      
       result = result.filter((defect: Defect) => {
-        const defectVesselName = (defect.vesselName || '').toLowerCase().trim();
-        return normalizedSelectedNames.includes(defectVesselName);
+        // Try ID match first (works for UUID-based vessel IDs)
+        if (selectedVesselIds.length > 0 && selectedVesselIds.includes(defect.vesselId)) {
+          return true;
+        }
+        // Fallback to name match (works for fleet/group modes and legacy data)
+        if (normalizedSelectedNames.length > 0) {
+          const defectVesselName = (defect.vesselName || '').toLowerCase().trim();
+          return normalizedSelectedNames.includes(defectVesselName);
+        }
+        return false;
       });
     }
     
     return result;
-  }, [defects, selectedVesselNames]);
+  }, [defects, vesselFilterValue.selectedVessels, selectedVesselNames]);
 
   // Compute defect status based on data (matches DefectsCoC.tsx logic)
   const getComputedStatus = (defect: Defect): { label: string; color: string } => {
