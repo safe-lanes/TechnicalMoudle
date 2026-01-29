@@ -718,8 +718,32 @@ export default function ShipsSurveysAdmin() {
     }
   };
 
+  // Get selected vessel IDs as array for filtering
+  const getSelectedVesselIdsArray = () => {
+    return (vesselMasterData || [])
+      .filter((v: any) => selectedVessels.includes(v.name))
+      .map((v: any) => String(v.id));
+  };
+
   // Get company surveys for vessel tab display
-  const companySurveys = masterData.filter(s => s.applicableToCompany);
+  // For VES-xxx surveys, only show if selected vessels have applicability records
+  const companySurveys = masterData.filter(survey => {
+    if (!survey.applicableToCompany) return false;
+    
+    // For vessel-specific surveys (VES-xxx), only show if at least one selected vessel has an applicability record
+    if (survey.masterId.startsWith('VES-')) {
+      const vesselIds = getSelectedVesselIdsArray();
+      if (vesselIds.length === 0) return false;
+      
+      // Check if any selected vessel has an applicability record for this VES- survey
+      return vesselIds.some(vesselId => 
+        vesselApplicabilityData?.some((a: any) => a.vesselId === vesselId && a.masterId === survey.masterId)
+      );
+    }
+    
+    // Non-VES surveys (CMP-, category-based Master surveys) show for all vessels
+    return true;
+  });
 
   // Handle adding new vessel-only survey
   const handleAddNewVesselSurvey = () => {
