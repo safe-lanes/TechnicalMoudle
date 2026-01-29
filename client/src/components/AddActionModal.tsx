@@ -218,14 +218,14 @@ export default function AddActionModal({ open, onOpenChange, onSave, initialData
                         className="w-full h-10 justify-start text-left font-normal border-gray-300"
                       >
                         <CalendarIcon className="mr-2 h-4 w-4" />
-                        {field.value ? format(new Date(field.value), "PPP") : <span className="text-gray-400">DUE DATE</span>}
+                        {field.value ? format(new Date(field.value + 'T00:00:00'), "PPP") : <span className="text-gray-400">DUE DATE</span>}
                       </Button>
                     </PopoverTrigger>
                     <PopoverContent className="w-auto p-0">
                       <Calendar
                         mode="single"
-                        selected={field.value ? new Date(field.value) : undefined}
-                        onSelect={(date) => field.onChange(date ? date.toISOString().split('T')[0] : "")}
+                        selected={field.value ? new Date(field.value + 'T00:00:00') : undefined}
+                        onSelect={(date) => field.onChange(date ? format(date, "yyyy-MM-dd") : "")}
                         initialFocus
                       />
                     </PopoverContent>
@@ -248,14 +248,14 @@ export default function AddActionModal({ open, onOpenChange, onSave, initialData
                         className="w-full h-10 justify-start text-left font-normal border-gray-300"
                       >
                         <CalendarIcon className="mr-2 h-4 w-4" />
-                        {field.value ? format(new Date(field.value), "PPP") : <span className="text-gray-400">DATE CLOSED</span>}
+                        {field.value ? format(new Date(field.value + 'T00:00:00'), "PPP") : <span className="text-gray-400">DATE CLOSED</span>}
                       </Button>
                     </PopoverTrigger>
                     <PopoverContent className="w-auto p-0">
                       <Calendar
                         mode="single"
-                        selected={field.value ? new Date(field.value) : undefined}
-                        onSelect={(date) => field.onChange(date ? date.toISOString().split('T')[0] : "")}
+                        selected={field.value ? new Date(field.value + 'T00:00:00') : undefined}
+                        onSelect={(date) => field.onChange(date ? format(date, "yyyy-MM-dd") : "")}
                         initialFocus
                       />
                     </PopoverContent>
