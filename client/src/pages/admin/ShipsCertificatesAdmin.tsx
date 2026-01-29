@@ -569,7 +569,24 @@ export default function ShipsCertificatesAdmin() {
   }, [selectedVessels, vesselMasterData, vesselApplicabilityData, isLoadingApplicability, initializedVesselIds]);
   
   // Get Company certificates (those with applicableToCompany = true)
-  const companyCertificates = masterData.filter(cert => cert.applicableToCompany);
+  // For VES-xxx certificates, only show if selected vessels have applicability records
+  const companyCertificates = masterData.filter(cert => {
+    if (!cert.applicableToCompany) return false;
+    
+    // For vessel-specific certificates (VES-xxx), only show if at least one selected vessel has an applicability record
+    if (cert.masterId.startsWith('VES-')) {
+      const vesselIds = getSelectedVesselIds();
+      if (vesselIds.length === 0) return false;
+      
+      // Check if any selected vessel has an applicability record for this VES- certificate
+      return vesselIds.some(vesselId => 
+        vesselApplicabilityData.some((a: any) => a.vesselId === vesselId && a.masterId === cert.masterId)
+      );
+    }
+    
+    // Non-VES certificates (CMP-, category-based Master certs) show for all vessels
+    return true;
+  });
   
   // Check for conflicts when multiple vessels are selected
   const hasApplicabilityConflict = (): { hasConflict: boolean, conflictingMasterIds: string[] } => {
