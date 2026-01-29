@@ -6649,7 +6649,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       // Handle non-ROB updates (itemName, uom, etc.) through regular update
-      const { robLocationA: _a, robLocationB: _b, rob: _r, remarks: _rm, place: _p, dateLocal: _d, tz: _t, ...otherUpdates } = req.body;
+      // Keep remarks in otherUpdates since it's a valid field for stores items
+      const { robLocationA: _a, robLocationB: _b, rob: _r, place: _p, dateLocal: _d, tz: _t, ...otherUpdates } = req.body;
       if (Object.keys(otherUpdates).length > 0) {
         const item = await storage.updateStoresItem(itemId, otherUpdates);
         return res.json(item);

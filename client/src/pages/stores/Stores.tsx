@@ -695,8 +695,8 @@ const Stores: React.FC = () => {
       min: item.min,
       location: item.location,
       notes: item.notes || "",
-      ihmPresence: 'Unknown',
-      ihmEvidenceType: 'None'
+      ihmPresence: item.ihmPresence || 'Unknown',
+      ihmEvidenceType: item.ihmEvidenceType || 'None'
     });
     
     // In modify mode, store original data for change tracking
