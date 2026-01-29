@@ -23,6 +23,7 @@ import { StatusPill } from "@/components/StatusPill";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useVessel } from "@/contexts/VesselContext";
+import { useUIRole } from "@/contexts/UIRoleContext";
 
 const ReadOnlyField: React.FC<{ label: string; value: string | undefined; labelMarker?: string; valueMarker?: string }> = ({ label, value, labelMarker, valueMarker }) => (
   <div className="space-y-1">
@@ -115,6 +116,7 @@ const JobsFormPage: React.FC = () => {
   const jobId = params?.id;
   const { toast } = useToast();
   const { vesselId } = useVessel();
+  const { isVessel, isHeadOfDept } = useUIRole();
   
   const [isWorkInstructionsOpen, setIsWorkInstructionsOpen] = useState(false);
   const [isMobileNavOpen, setIsMobileNavOpen] = useState(false);
@@ -532,7 +534,7 @@ const JobsFormPage: React.FC = () => {
                   Cancel
                 </Button>
               )}
-              {!isModifyMode && !isEditMode && (
+              {!isModifyMode && !isEditMode && !isVessel && !isHeadOfDept && (
                 <Button
                   variant="outline"
                   size="sm"
