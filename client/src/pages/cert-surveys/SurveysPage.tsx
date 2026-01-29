@@ -199,7 +199,7 @@ export default function SurveysPage() {
 
   const handleAttachmentsChange = useCallback((attachments: FileAttachment[]) => {
     if (selectedSurvey && selectedSurvey.vesselId && selectedSurvey.masterId) {
-      const compoundId = `${selectedSurvey.vesselId}-${selectedSurvey.masterId}`;
+      const compoundId = `${selectedSurvey.vesselId}::${selectedSurvey.masterId}`;
       updateSurveyMutation.mutate({
         id: compoundId,
         updates: { attachments },
