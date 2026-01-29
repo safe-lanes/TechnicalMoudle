@@ -208,6 +208,7 @@ export default function DefectFormWizard({
 
   const dateCompletedValue = form.watch("dateCompleted");
   const vesselLocationType = form.watch("vesselLocationType");
+  const dateRegisteredInSystemValue = form.watch("dateRegisteredInSystem");
   
   useEffect(() => {
     if (vesselLocationType === 'atPort') {
@@ -909,6 +910,7 @@ export default function DefectFormWizard({
                       <Input 
                         {...form.register("targetCloseDate")} 
                         type="date"
+                        min={dateRegisteredInSystemValue || ""}
                         data-testid="input-target-date"
                         className="h-10 text-sm border-gray-300"
                         disabled={isViewMode}
