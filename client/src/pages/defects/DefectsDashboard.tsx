@@ -432,9 +432,6 @@ export default function DefectsDashboard() {
               <FileText className="h-5 w-5" />
               <span>Recent Active Defects</span>
             </CardTitle>
-            <Button variant="outline" size="sm" onClick={() => navigateToDefectLog()} data-testid="button-view-all">
-              View All
-            </Button>
           </div>
         </CardHeader>
         <CardContent>
@@ -462,7 +459,7 @@ export default function DefectsDashboard() {
               </TableHeader>
               <TableBody>
                 {recentDefects.map((defect) => (
-                  <TableRow key={defect.id} className="cursor-pointer hover:bg-gray-50" onClick={() => navigateToDefectLog()}>
+                  <TableRow key={defect.id} className="cursor-pointer hover:bg-gray-50" onClick={() => window.location.href = `/defects/defect-form-wizard/view/${defect.id}`}>
                     <TableCell className="font-medium font-mono text-blue-600">{defect.id}</TableCell>
                     <TableCell>{defect.vesselName || defect.vesselId}</TableCell>
                     <TableCell className="max-w-xs truncate">
