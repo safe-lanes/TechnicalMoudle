@@ -79,7 +79,7 @@ export default function AddActionModal({ open, onOpenChange, onSave, initialData
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-[900px] p-0 gap-0">
+      <DialogContent className="max-w-[900px] p-0 gap-0 [&>button]:hidden">
         {/* Blue Header */}
         <div className="bg-[#1976d2] text-white px-6 py-4 flex items-center justify-between rounded-t-lg">
           <h2 className="text-xl font-semibold">{initialData ? 'Edit Action' : 'Add Action'}</h2>
