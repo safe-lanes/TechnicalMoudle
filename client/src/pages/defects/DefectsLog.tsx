@@ -199,15 +199,35 @@ export default function DefectsLog() {
     
     // Sort by issueDate descending (latest first)
     // Updates to existing defects do not affect position since we sort by issueDate only
+    // Records with null/empty issueDates are pushed to the bottom
+    // For identical dates, order is stable based on record ID
     result = [...result].sort((a: Defect, b: Defect) => {
-      const parseIssueDate = (dateStr: string | null | undefined): number => {
-        if (!dateStr) return 0;
+      const parseIssueDate = (dateStr: string | null | undefined): number | null => {
+        if (!dateStr) return null;
         const match = String(dateStr).match(/^(\d{4})-(\d{2})-(\d{2})/);
-        if (!match) return 0;
+        if (!match) return null;
         const [, year, month, day] = match;
         return new Date(parseInt(year), parseInt(month) - 1, parseInt(day)).getTime();
       };
-      return parseIssueDate(b.issueDate) - parseIssueDate(a.issueDate);
+      
+      const dateA = parseIssueDate(a.issueDate);
+      const dateB = parseIssueDate(b.issueDate);
+      
+      // Push null dates to bottom
+      if (dateA === null && dateB === null) {
+        // Both null - use ID for stable ordering
+        return (a.id || '').localeCompare(b.id || '');
+      }
+      if (dateA === null) return 1; // a goes to bottom
+      if (dateB === null) return -1; // b goes to bottom
+      
+      // Both have dates - sort descending (latest first)
+      if (dateB !== dateA) {
+        return dateB - dateA;
+      }
+      
+      // Same date - use ID for stable ordering
+      return (a.id || '').localeCompare(b.id || '');
     });
     
     return result;
