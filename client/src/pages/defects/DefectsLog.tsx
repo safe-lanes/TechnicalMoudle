@@ -596,7 +596,7 @@ export default function DefectsLog() {
                               <Eye className="h-3 w-3 text-gray-500" />
                             </Button>
                           </TooltipTrigger>
-                          <TooltipContent>
+                          <TooltipContent className="z-50">
                             <p>View</p>
                           </TooltipContent>
                         </Tooltip>
@@ -617,7 +617,7 @@ export default function DefectsLog() {
                               <Edit className="h-3 w-3 text-gray-500" />
                             </Button>
                           </TooltipTrigger>
-                          <TooltipContent>
+                          <TooltipContent className="z-50">
                             <p>{canEdit() ? "Edit" : "Edit (No Permission)"}</p>
                           </TooltipContent>
                         </Tooltip>
@@ -634,7 +634,7 @@ export default function DefectsLog() {
                               <Paperclip className="h-3 w-3 text-gray-500" />
                             </Button>
                           </TooltipTrigger>
-                          <TooltipContent>
+                          <TooltipContent className="z-50">
                             <p>Add Note</p>
                           </TooltipContent>
                         </Tooltip>
@@ -655,7 +655,7 @@ export default function DefectsLog() {
                               <Link className="h-3 w-3 text-gray-500" />
                             </Button>
                           </TooltipTrigger>
-                          <TooltipContent>
+                          <TooltipContent className="z-50">
                             <p>{canLink() ? "Link" : "Link (No Permission)"}</p>
                           </TooltipContent>
                         </Tooltip>
@@ -681,7 +681,7 @@ export default function DefectsLog() {
                               )} />
                             </Button>
                           </TooltipTrigger>
-                          <TooltipContent>
+                          <TooltipContent className="z-50">
                             <p>
                               {defect.status === 'Closed' 
                                 ? "Already Closed" 
