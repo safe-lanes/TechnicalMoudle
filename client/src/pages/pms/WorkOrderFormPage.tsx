@@ -1227,6 +1227,74 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
         }
       }
 
+      // Validate mandatory fields for work order form (Work Completion Record)
+      // Start Date is required
+      const startDate = executionData.startDateTime ? executionData.startDateTime.split('T')[0] : '';
+      if (!startDate) {
+        toast({
+          title: "Validation Error",
+          description: "Start Date is required.",
+          variant: "destructive",
+        });
+        return;
+      }
+      
+      // Completion Date is required
+      const completionDate = executionData.completionDateTime ? executionData.completionDateTime.split('T')[0] : (executionData.dateOfCompletion || '');
+      if (!completionDate) {
+        toast({
+          title: "Validation Error",
+          description: "Completion Date is required.",
+          variant: "destructive",
+        });
+        return;
+      }
+      
+      // Performed by is required
+      if (!executionData.performedBy || executionData.performedBy.trim() === '') {
+        toast({
+          title: "Validation Error",
+          description: "Performed by is required.",
+          variant: "destructive",
+        });
+        return;
+      }
+      
+      // Validate dates are not in the future (cannot be more than today's date)
+      const today = new Date();
+      today.setHours(23, 59, 59, 999); // End of today
+      
+      const startDateObj = new Date(startDate);
+      if (startDateObj > today) {
+        toast({
+          title: "Validation Error",
+          description: "Start Date cannot be in the future.",
+          variant: "destructive",
+        });
+        return;
+      }
+      
+      const completionDateObj = new Date(completionDate);
+      if (completionDateObj > today) {
+        toast({
+          title: "Validation Error",
+          description: "Completion Date cannot be in the future.",
+          variant: "destructive",
+        });
+        return;
+      }
+      
+      // If Maintenance basis is Running Hours, Current RH (currentReading) is also required
+      const currentRHValue = executionData.currentReading || executionData.runningHours;
+      if ((workOrderContext as any)?.maintenanceBasis === 'Running Hours' && !currentRHValue) {
+        toast({
+          title: "Validation Error",
+          description: "Current Reading is required for Running Hours based maintenance.",
+          variant: "destructive",
+        });
+        return;
+      }
+
       // PHASE 3A: Block submission if inventory data not loaded or failed and spares are being consumed
       const hasConsumedSpares = executionData.consumedSpareParts.some(
         spare => spare.partNo && spare.quantityConsumed && parseFloat(spare.quantityConsumed) > 0
@@ -2785,7 +2853,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                 <h4 className="text-sm font-medium text-gray-700 mb-4" data-testid="WOF.B2.4"><Marker id="WOF.B2.4" />B2.1 Work Duration:</h4>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   <div className="space-y-2">
-                    <Label className="text-sm text-[#8798ad]" data-testid="WOF.B2.5"><Marker id="WOF.B2.5" />Start Date</Label>
+                    <Label className="text-sm text-[#8798ad]" data-testid="WOF.B2.5"><Marker id="WOF.B2.5" />Start Date <span className="text-red-500">*</span></Label>
                     <Input
                       type="date"
                       value={executionData.startDateTime ? executionData.startDateTime.split('T')[0] : ''}
@@ -2815,7 +2883,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                   </div>
 
                   <div className="space-y-2">
-                    <Label className="text-sm text-[#8798ad]" data-testid="WOF.B2.9"><Marker id="WOF.B2.9" />Completion Date</Label>
+                    <Label className="text-sm text-[#8798ad]" data-testid="WOF.B2.9"><Marker id="WOF.B2.9" />Completion Date <span className="text-red-500">*</span></Label>
                     <div className="flex items-center gap-2">
                       <Input
                         type="date"
@@ -2867,7 +2935,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                   </div>
 
                   <div className="space-y-2">
-                    <Label className="text-sm text-[#8798ad]" data-testid="WOF.B2.13"><Marker id="WOF.B2.13" />Performed by</Label>
+                    <Label className="text-sm text-[#8798ad]" data-testid="WOF.B2.13"><Marker id="WOF.B2.13" />Performed by <span className="text-red-500">*</span></Label>
                     <Select
                       value={executionData.performedBy}
                       onValueChange={(value) => handleExecutionChange('performedBy', value)}
@@ -3067,7 +3135,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
               </div>
 
               <div className="space-y-2">
-                <Label className="text-sm text-[#8798ad]" data-testid="WOF.B3.5"><Marker id="WOF.B3.5" />Current Reading</Label>
+                <Label className="text-sm text-[#8798ad]" data-testid="WOF.B3.5"><Marker id="WOF.B3.5" />Current Reading{(workOrderContext as any)?.maintenanceBasis === 'Running Hours' && <span className="text-red-500"> *</span>}</Label>
                 <Input
                   type="number"
                   value={executionData.currentReading}
