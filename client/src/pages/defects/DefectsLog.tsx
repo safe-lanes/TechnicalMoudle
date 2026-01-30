@@ -197,6 +197,19 @@ export default function DefectsLog() {
       });
     }
     
+    // Sort by issueDate descending (latest first)
+    // Updates to existing defects do not affect position since we sort by issueDate only
+    result = [...result].sort((a: Defect, b: Defect) => {
+      const parseIssueDate = (dateStr: string | null | undefined): number => {
+        if (!dateStr) return 0;
+        const match = String(dateStr).match(/^(\d{4})-(\d{2})-(\d{2})/);
+        if (!match) return 0;
+        const [, year, month, day] = match;
+        return new Date(parseInt(year), parseInt(month) - 1, parseInt(day)).getTime();
+      };
+      return parseIssueDate(b.issueDate) - parseIssueDate(a.issueDate);
+    });
+    
     return result;
   }, [defects, vesselFilterValue.selectedVessels, selectedVesselNames, filters.period]);
 
