@@ -215,7 +215,16 @@ export default function DefectFormExact({ onClose, defect, mode = 'new' }: Defec
         title: "Success", 
         description: mode === 'edit' ? "Defect updated successfully" : "Defect created successfully" 
       });
-      queryClient.invalidateQueries({ queryKey: ['/technical/api/defects'] });
+      // Invalidate all defect-related queries including filtered ones (CoC, Active, etc.)
+      queryClient.invalidateQueries({ 
+        predicate: (query) => {
+          const key = query.queryKey;
+          return Array.isArray(key) && (
+            (typeof key[0] === 'string' && key[0].includes('/technical/api/defects')) ||
+            key[0] === 'defects'
+          );
+        }
+      });
       onClose();
     },
     onError: (error: any) => {
