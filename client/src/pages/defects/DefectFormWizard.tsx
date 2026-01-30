@@ -340,6 +340,58 @@ export default function DefectFormWizard({
       return false;
     }
     
+    // Part C (C1. Closeout) validation: if any field is filled, all must be filled
+    const partCFields = {
+      confirmCompleted: data.confirmCompleted || false,
+      dateCompleted: data.dateCompleted?.trim() || '',
+      closedByName: data.closedByName?.trim() || '',
+      closedByRank: data.closedByRank?.trim() || '',
+    };
+    
+    const partCFilled = Object.values(partCFields).some(val => 
+      typeof val === 'boolean' ? val : val !== ''
+    );
+    const partCComplete = partCFields.confirmCompleted && 
+      partCFields.dateCompleted !== '' && 
+      partCFields.closedByName !== '' && 
+      partCFields.closedByRank !== '';
+    
+    if (partCFilled && !partCComplete) {
+      const missingPartC: string[] = [];
+      if (!partCFields.confirmCompleted) missingPartC.push('Confirm Completed');
+      if (!partCFields.dateCompleted) missingPartC.push('Date Completed');
+      if (!partCFields.closedByName) missingPartC.push('Closed By (Name)');
+      if (!partCFields.closedByRank) missingPartC.push('Closed By (Rank)');
+      
+      toast({
+        title: "Part C incomplete",
+        description: `Once started, all Part C fields are required: ${missingPartC.join(', ')}`,
+        variant: "destructive"
+      });
+      return false;
+    }
+    
+    // Part D (C2. Verification) validation: can only be filled if Part C is complete
+    const partDFields = {
+      verified: data.verified || false,
+      dateVerified: data.dateVerified?.trim() || '',
+      verifiedByName: data.verifiedByName?.trim() || '',
+      verifiedByOfficePosition: data.verifiedByOfficePosition?.trim() || '',
+    };
+    
+    const partDFilled = Object.values(partDFields).some(val => 
+      typeof val === 'boolean' ? val : val !== ''
+    );
+    
+    if (partDFilled && !partCComplete) {
+      toast({
+        title: "Part D cannot be saved",
+        description: "Part C (Closeout) must be fully completed before filling Part D (Verification)",
+        variant: "destructive"
+      });
+      return false;
+    }
+    
     setIsSaving(true);
     
     try {
