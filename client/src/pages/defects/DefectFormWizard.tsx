@@ -1938,6 +1938,7 @@ export default function DefectFormWizard({
                           data-testid="input-date-completed"
                           className="h-10 text-sm border-gray-300"
                           disabled={isViewMode}
+                          min={dateRegisteredInSystemValue || ""}
                         />
                       </div>
                     </div>
