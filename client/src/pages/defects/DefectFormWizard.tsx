@@ -1598,7 +1598,22 @@ export default function DefectFormWizard({
                             <Input 
                               type="date"
                               value={currentExtension.newTargetDate}
-                              onChange={(e) => setCurrentExtension(prev => ({ ...prev, newTargetDate: e.target.value }))}
+                              min={(() => {
+                                const existingDate = form.watch('targetCloseDate');
+                                if (!existingDate) return undefined;
+                                const [year, month, day] = existingDate.split('-').map(Number);
+                                const nextDay = new Date(year, month - 1, day + 1);
+                                return `${nextDay.getFullYear()}-${String(nextDay.getMonth() + 1).padStart(2, '0')}-${String(nextDay.getDate()).padStart(2, '0')}`;
+                              })()}
+                              onChange={(e) => {
+                                const newDate = e.target.value;
+                                const existingDate = form.watch('targetCloseDate') || '';
+                                if (newDate && existingDate && newDate <= existingDate) {
+                                  toast({ title: "New Target Date must be later than the existing Target Date", variant: "destructive" });
+                                  return;
+                                }
+                                setCurrentExtension(prev => ({ ...prev, newTargetDate: newDate }));
+                              }}
                               disabled={isViewMode}
                               data-testid="input-new-target-date"
                               className="h-10 text-sm border-gray-300"
@@ -1674,7 +1689,20 @@ export default function DefectFormWizard({
                             <Input 
                               type="date"
                               value={currentExtension.approvalDate}
-                              onChange={(e) => setCurrentExtension(prev => ({ ...prev, approvalDate: e.target.value }))}
+                              max={(() => {
+                                const today = new Date();
+                                return `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+                              })()}
+                              onChange={(e) => {
+                                const selectedDate = e.target.value;
+                                const today = new Date();
+                                const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+                                if (selectedDate && selectedDate > todayStr) {
+                                  toast({ title: "Approval Date cannot be in the future", variant: "destructive" });
+                                  return;
+                                }
+                                setCurrentExtension(prev => ({ ...prev, approvalDate: selectedDate }));
+                              }}
                               disabled={isViewMode}
                               data-testid="input-approval-date"
                               className="h-10 text-sm border-gray-300"
@@ -1721,6 +1749,20 @@ export default function DefectFormWizard({
                                   }
                                   
                                   const existingTargetDate = form.getValues('targetCloseDate') || '';
+                                  
+                                  // Validate New Target Date must be strictly later than existing Target Date
+                                  if (currentExtension.newTargetDate && existingTargetDate && currentExtension.newTargetDate <= existingTargetDate) {
+                                    toast({ title: "New Target Date must be later than the existing Target Date", variant: "destructive" });
+                                    return;
+                                  }
+                                  
+                                  // Validate Approval Date cannot be in the future
+                                  const todayLocal = new Date();
+                                  const todayStr = `${todayLocal.getFullYear()}-${String(todayLocal.getMonth() + 1).padStart(2, '0')}-${String(todayLocal.getDate()).padStart(2, '0')}`;
+                                  if (currentExtension.approvalDate && currentExtension.approvalDate > todayStr) {
+                                    toast({ title: "Approval Date cannot be in the future", variant: "destructive" });
+                                    return;
+                                  }
                                   const approverUser = officeUsers.find((u: any) => u.id.toString() === currentExtension.submitForApprovalTo);
                                   const newExtension = {
                                     id: `EXT-${Date.now()}`,
