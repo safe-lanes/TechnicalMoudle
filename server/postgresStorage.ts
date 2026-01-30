@@ -6997,6 +6997,7 @@ export class PostgresStorage {
   // RECONCILIATION: Resync normalized spare_location_stock from legacy ROB fields
   // This should be run to fix any data drift caused by previous sync failures
   async reconcileSpareLocationStock(vesselId: string, userId: string = 'System'): Promise<{ synced: number; errors: number }> {
+    const db = await getDb();
     const sparesInVessel = await this.getSpares(vesselId);
     let synced = 0;
     let errors = 0;
@@ -7008,12 +7009,16 @@ export class PostgresStorage {
         const locationAName = spare.location || 'Location A';
         const locationBName = spare.location2 || 'Location B';
 
+        // CRITICAL: Delete all existing spare_location_stock entries for this spare first
+        // This ensures we don't accumulate stale entries from old location names
+        await db.delete(spareLocationStock).where(eq(spareLocationStock.spareId, spare.id));
+
         const locationAObj = await this.findOrCreateLocation(vesselId, locationAName, userId);
         const locationBObj = await this.findOrCreateLocation(vesselId, locationBName, userId);
 
-        // Always upsert both locations to ensure consistent presence
-        await this.upsertSpareLocationStock({ vesselId, spareId: spare.id, locationId: locationAObj.id, qty: robA });
-        await this.upsertSpareLocationStock({ vesselId, spareId: spare.id, locationId: locationBObj.id, qty: robB });
+        // Insert fresh entries with correct quantities
+        await db.insert(spareLocationStock).values({ vesselId, spareId: spare.id, locationId: locationAObj.id, qty: robA });
+        await db.insert(spareLocationStock).values({ vesselId, spareId: spare.id, locationId: locationBObj.id, qty: robB });
         synced++;
       } catch (err: any) {
         console.warn(`[reconcileSpareLocationStock] Failed to sync spare ${spare.id}: ${err.message}`);
