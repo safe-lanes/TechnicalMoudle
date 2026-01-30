@@ -12,6 +12,12 @@ import { cn } from "@/lib/utils";
 import sailLogoPath from "@assets/SAIL logo Transparent_1753957135582.png";
 import { SyncStatusIndicator } from "./SyncStatusIndicator";
 import { RoleSwitcher } from "./RoleSwitcher";
+import {
+  DropdownMenu,
+  DropdownMenuTrigger,
+  DropdownMenuContent,
+  DropdownMenuItem,
+} from "@/components/ui/dropdown-menu";
 
 interface TopMenuBarProps {
   selectedSubModule: string;
@@ -76,32 +82,70 @@ export const TopMenuBar: React.FC<TopMenuBarProps> = ({
           const Icon = item.icon;
           const isSelected = item.id === selectedSubModule;
           
+          if (item.isModule) {
+            const protocol = window.location.protocol;
+            const hostname = window.location.hostname;
+            let portNumber = window.location.port;
+            portNumber = portNumber ? `:${portNumber}` : '';
+            const fullUrl = `${protocol}//${hostname}${portNumber}`;
+            
+            return (
+              <DropdownMenu key={item.id}>
+                <DropdownMenuTrigger asChild>
+                  <div
+                    className={cn(
+                      "flex flex-col items-center justify-center w-[110px] transition-all duration-200 relative cursor-pointer select-none",
+                      "hover:bg-gray-50",
+                      "bg-[#f5f5f5] border-r border-gray-200"
+                    )}
+                    data-testid="dropdown-technical-module"
+                  >
+                    <Icon className="h-5 w-5 mb-1 text-gray-600" />
+                    <span className="text-xs font-medium text-gray-600">
+                      {item.label}
+                    </span>
+                  </div>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="start" className="w-40">
+                  <DropdownMenuItem
+                    onClick={() => {
+                      localStorage.setItem("selected_module", "U2FsdGVkX19gp34OrOluh/gJ6eeByT19nc8eMBUBsVE=");
+                      window.location.assign(`${fullUrl}/audit/dashboard/summary`);
+                    }}
+                    className="cursor-pointer"
+                    data-testid="menu-item-audit"
+                  >
+                    Audit
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            );
+          }
+          
           return (
             <button
               key={item.id}
-              onClick={() => !item.isModule && onSubModuleChange(item.id)}
+              onClick={() => onSubModuleChange(item.id)}
               className={cn(
                 "flex flex-col items-center justify-center w-[110px] transition-all duration-200 relative",
                 "hover:bg-gray-50",
-                item.isModule && "bg-[#f5f5f5] border-r border-gray-200",
-                isSelected && !item.isModule && "bg-[#52baf3] text-white hover:bg-[#52baf3]",
-                !isSelected && !item.isModule && "text-gray-600 hover:text-gray-900"
+                isSelected && "bg-[#52baf3] text-white hover:bg-[#52baf3]",
+                !isSelected && "text-gray-600 hover:text-gray-900"
               )}
-              disabled={item.isModule}
             >
               <Icon className={cn(
                 "h-5 w-5 mb-1",
-                isSelected && !item.isModule && "text-white",
-                !isSelected && !item.isModule && "text-gray-600"
+                isSelected && "text-white",
+                !isSelected && "text-gray-600"
               )} />
               <span className={cn(
                 "text-xs font-medium",
-                isSelected && !item.isModule && "text-white",
-                !isSelected && !item.isModule && "text-gray-600"
+                isSelected && "text-white",
+                !isSelected && "text-gray-600"
               )}>
                 {item.label}
               </span>
-              {isSelected && !item.isModule && (
+              {isSelected && (
                 <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-white" />
               )}
             </button>
