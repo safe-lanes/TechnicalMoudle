@@ -280,16 +280,16 @@ const ActionsCellRenderer = (params: ICellRendererParams & { context: ActionsCel
                 <Button 
                   size="icon" 
                   variant="ghost" 
-                  className={cn("h-6 w-6", (!canVerify() || isVerifying) && "opacity-50 cursor-not-allowed")}
+                  className={cn("h-6 w-6", (!canVerify() || isVerifying || defect.status !== 'Closed') && "opacity-50 cursor-not-allowed")}
                   onClick={() => handleVerifyClick(defect)}
-                  disabled={!canVerify() || isVerifying}
+                  disabled={!canVerify() || isVerifying || defect.status !== 'Closed'}
                   data-testid={`button-verified-coc-${defect.id}`}
                 >
                   <CheckCircle className={cn("h-4 w-4", isVerified ? "text-green-600" : "text-gray-400")} />
                 </Button>
               </TooltipTrigger>
-              <TooltipContent>
-                <p>{isVerifying ? "Processing..." : !canVerify() ? "Verify (No Permission)" : isVerified ? "Verified - Click to remove" : "Click to verify"}</p>
+              <TooltipContent className="z-50">
+                <p>{isVerifying ? "Processing..." : defect.status !== 'Closed' ? "Close defect first (Part C)" : !canVerify() ? "Verify (No Permission)" : isVerified ? "Verified - Click to remove" : "Click to verify"}</p>
               </TooltipContent>
             </Tooltip>
             
