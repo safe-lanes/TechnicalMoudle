@@ -517,8 +517,8 @@ const WorkOrders: React.FC = () => {
 
       {/* Filters */}
       <div className="flex items-center gap-3">
-        {/* Vessel selector - hidden for Vessel and Head of Dept view modes */}
-        {(isSailAdmin || isClientAdmin) && (
+        {/* Vessel selector - visible only for Client Admin view mode */}
+        {isClientAdmin && (
           <Select value={vesselId} onValueChange={setVesselId}>
             <SelectTrigger className="w-48" data-testid="C15">
               <Marker id="C15" />

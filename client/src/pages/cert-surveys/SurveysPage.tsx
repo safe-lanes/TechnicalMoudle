@@ -10,6 +10,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { FiltersToggle } from '@/components/filters/VesselFilter';
 import { VesselFleetGroupFilter, VesselFleetGroupFilterValue, VesselFleetGroupFilterResult, createDefaultFilterValue } from '@/components/filters/VesselFleetGroupFilter';
+import { useUIRole } from "@/contexts/UIRoleContext";
 import { apiRequest, queryClient } from '@/lib/queryClient';
 import { useToast } from '@/hooks/use-toast';
 import { FileAttachmentDialog, FileAttachment } from '@/components/FileAttachmentDialog';
@@ -100,6 +101,7 @@ const ActionsCellRenderer = (params: ActionsCellRendererProps) => {
 };
 
 export default function SurveysPage() {
+  const { isClientAdmin } = useUIRole();
   const [showFilters, setShowFilters] = useState(true);
   const [filterValue, setFilterValue] = useState<VesselFleetGroupFilterValue>(createDefaultFilterValue());
   const [selectedVesselNames, setSelectedVesselNames] = useState<string[]>([]);
@@ -438,10 +440,12 @@ export default function SurveysPage() {
 
       {showFilters && (
         <div className="flex items-center gap-4 px-6 flex-shrink-0">
-          <VesselFleetGroupFilter
-            value={filterValue}
-            onChange={handleFilterChange}
-          />
+          {isClientAdmin && (
+            <VesselFleetGroupFilter
+              value={filterValue}
+              onChange={handleFilterChange}
+            />
+          )}
           <div className="flex items-center gap-2">
             <Calendar className="h-4 w-4 text-gray-500" />
             <Select value={dueInFilter} onValueChange={(value: DueInFilter) => setDueInFilter(value)}>

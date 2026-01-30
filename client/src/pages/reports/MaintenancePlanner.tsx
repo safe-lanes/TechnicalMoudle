@@ -118,7 +118,7 @@ export default function MaintenancePlanner({ onBack }: MaintenancePlannerProps) 
   const { vesselId, setVesselId, vessels } = useVessel();
   const [, setLocation] = useLocation();
   const { toast } = useToast();
-  const { isSailAdmin } = useUIRole();
+  const { isSailAdmin, isClientAdmin } = useUIRole();
 
   // Filter state
   const [jobType, setJobType] = useState<string>("BOTH");
@@ -360,8 +360,8 @@ export default function MaintenancePlanner({ onBack }: MaintenancePlannerProps) 
             </div>
           </div>
           <div className="flex items-center gap-3">
-            {/* Vessel Selector - Only visible for Sail Admin */}
-            {isSailAdmin && (
+            {/* Vessel Selector - Only visible for Client Admin */}
+            {isClientAdmin && (
               <Select value={vesselId} onValueChange={setVesselId}>
                 <SelectTrigger className="w-48" data-testid="select-vessel">
                   <SelectValue placeholder="Select Vessel" />

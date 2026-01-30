@@ -44,6 +44,7 @@ import AgGridTable from "@/components/AgGrid/AgGridTable";
 import AgGridTableActions from "@/components/AgGrid/AgGridTableActions";
 import { ICellRendererParams, GridReadyEvent, GridApi, ColDef } from "ag-grid-community";
 import { VesselFleetGroupFilter, VesselFleetGroupFilterValue, VesselFleetGroupFilterResult, createDefaultFilterValue } from "@/components/filters/VesselFleetGroupFilter";
+import { useUIRole } from "@/contexts/UIRoleContext";
 
 interface DefectsFilters {
   period?: string;
@@ -285,6 +286,7 @@ export default function DefectsLogWithTabs() {
   const [, setLocation] = useLocation();
   const { currentUser } = useAuth();
   const { toast } = useToast();
+  const { isClientAdmin } = useUIRole();
   const [filters, setFilters] = useState<DefectsFilters>({});
   const [vesselFilterValue, setVesselFilterValue] = useState<VesselFleetGroupFilterValue>(createDefaultFilterValue());
   const [selectedVesselNames, setSelectedVesselNames] = useState<string[]>([]);
@@ -729,11 +731,13 @@ export default function DefectsLogWithTabs() {
               />
             </div>
 
-            <VesselFleetGroupFilter 
-              value={vesselFilterValue}
-              onChange={handleVesselFilterChange}
-              showClearButton={false}
-            />
+            {isClientAdmin && (
+              <VesselFleetGroupFilter 
+                value={vesselFilterValue}
+                onChange={handleVesselFilterChange}
+                showClearButton={false}
+              />
+            )}
 
             <Select value={filters.dueOverdue} onValueChange={(value) => handleFilterChange('dueOverdue', value)}>
               <SelectTrigger className="w-[130px] h-8 text-xs border-gray-300 bg-transparent text-gray-700">

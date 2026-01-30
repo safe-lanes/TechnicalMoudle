@@ -1343,8 +1343,8 @@ const Stores: React.FC = () => {
       {/* Filters - Show different filters based on view mode */}
       {viewMode === "inventory" ? (
       <div className="flex gap-4 mb-6">
-        {/* Vessel selector - hidden for Vessel and Head of Dept view modes, but visible in change mode */}
-        {(isSailAdmin || isClientAdmin || isChangeMode) && (
+        {/* Vessel selector - visible only for Client Admin view mode, or in change mode */}
+        {(isClientAdmin || isChangeMode) && (
           <div className="flex-1">
             <Select value={vesselId} onValueChange={setVesselId}>
               <SelectTrigger className="text-sm" data-testid={getMarkerId(activeTab, "4")}>

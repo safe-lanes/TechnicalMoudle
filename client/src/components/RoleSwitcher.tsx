@@ -10,7 +10,7 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { useUIRole } from "@/contexts/UIRoleContext";
-import { UI_ROLES, UI_ROLE_LABELS } from "@shared/uiRoles";
+import { VISIBLE_UI_ROLES, UI_ROLE_LABELS } from "@shared/uiRoles";
 import type { UIRole } from "@shared/uiRoles";
 import { User, Check } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -38,7 +38,7 @@ export function RoleSwitcher() {
         </TooltipContent>
       </Tooltip>
       <DropdownMenuContent align="end" className="w-40">
-        {UI_ROLES.map((role) => (
+        {VISIBLE_UI_ROLES.map((role) => (
           <DropdownMenuItem
             key={role}
             onClick={() => setUIRole(role)}

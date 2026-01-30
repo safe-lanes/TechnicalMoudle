@@ -40,6 +40,7 @@ import LinkDefectsModal from "./LinkDefectsModal";
 import { cn } from "@/lib/utils";
 import { VesselFleetGroupFilter, type VesselFleetGroupFilterValue } from "@/components/filters/VesselFleetGroupFilter";
 import { useToast } from "@/hooks/use-toast";
+import { useUIRole } from "@/contexts/UIRoleContext";
 import type { Defect } from "@shared/schema";
 import AgGridTable from "@/components/AgGrid/AgGridTable";
 import { ICellRendererParams, GridReadyEvent, GridApi, ColDef } from "ag-grid-community";
@@ -301,6 +302,7 @@ const ActionsCellRenderer = (params: ICellRendererParams & { context: ActionsCel
 
 export default function DefectsCoC() {
   const { toast } = useToast();
+  const { isClientAdmin } = useUIRole();
   const { currentUser } = useAuth();
   const [filters, setFilters] = useState<DefectsFilters>({ status: 'active' });
   const [showFilters, setShowFilters] = useState(true);
@@ -698,11 +700,13 @@ export default function DefectsCoC() {
               />
             </div>
 
-            <VesselFleetGroupFilter 
-              value={vesselFilterValue}
-              onChange={handleVesselFilterChange}
-              showClearButton={false}
-            />
+            {isClientAdmin && (
+              <VesselFleetGroupFilter 
+                value={vesselFilterValue}
+                onChange={handleVesselFilterChange}
+                showClearButton={false}
+              />
+            )}
 
             <Select value={filters.status || 'active'} onValueChange={(value) => handleFilterChange('status', value)}>
               <SelectTrigger className="w-[100px] h-8 text-xs border-gray-300 bg-transparent text-gray-700">

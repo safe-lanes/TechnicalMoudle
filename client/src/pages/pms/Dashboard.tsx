@@ -68,7 +68,7 @@ const Dashboard = () => {
   const [bulkApproveModalOpen, setBulkApproveModalOpen] = useState(false);
   const { vesselId, setVesselId } = useVessel();
   const { data: vessels = [] } = useVessels();
-  const { isSailAdmin, isHeadOfDept } = useUIRole();
+  const { isSailAdmin, isClientAdmin, isHeadOfDept } = useUIRole();
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
@@ -457,8 +457,8 @@ const Dashboard = () => {
           <h1 className="text-2xl font-bold text-gray-900" data-testid="text-dashboard-title">PMS Dashboard</h1>
         </div>
 
-        {/* Vessel Selector - Only visible for Sail_Admin */}
-        {isSailAdmin && (
+        {/* Vessel Selector - Only visible for Client Admin */}
+        {isClientAdmin && (
           <div className="flex items-center gap-4 mt-4">
             <div className="flex items-center gap-2">
               <Ship className="w-4 h-4 text-gray-500" />

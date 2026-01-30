@@ -2980,7 +2980,7 @@ const Components: React.FC = () => {
         
         {/* Filters Row */}
         <div className="flex gap-4 mb-4">
-          {(isSailAdmin || isChangeMode || isChangeRequestMode) && (
+          {(isClientAdmin || isChangeMode || isChangeRequestMode) && (
           <div className="flex items-center gap-2" data-testid="B2">
             <Marker id="B2" />
             <span className={`text-sm font-medium ${isChangeRequestMode ? 'text-white' : 'text-gray-600'}`}>Vessel:</span>

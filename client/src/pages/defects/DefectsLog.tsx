@@ -35,6 +35,7 @@ import DefectFormWizard from "./DefectFormWizard";
 import { cn } from "@/lib/utils";
 import { formatForDisplay } from "@/lib/dateUtils";
 import { VesselFleetGroupFilter, VesselFleetGroupFilterValue, createDefaultFilterValue } from "@/components/filters/VesselFleetGroupFilter";
+import { useUIRole } from "@/contexts/UIRoleContext";
 import type { Defect } from "@shared/schema";
 
 interface VesselFleetGroupFilterResult {
@@ -62,6 +63,7 @@ interface DefectsFilters {
 const CURRENT_USER_ROLE = "Admin"; // Can be: "Viewer", "Master", "Chief Engineer", "Superintendent", "Admin"
 
 export default function DefectsLog() {
+  const { isClientAdmin } = useUIRole();
   const [filters, setFilters] = useState<DefectsFilters>({
     includeClosedDefects: false,
   });
@@ -372,11 +374,13 @@ export default function DefectsLog() {
       {/* Filter Controls */}
       {showFilters && (
         <div className="mb-4">
-          <VesselFleetGroupFilter
-            value={vesselFilterValue}
-            onChange={handleVesselFilterChange}
-            showClearButton={true}
-          />
+          {isClientAdmin && (
+            <VesselFleetGroupFilter
+              value={vesselFilterValue}
+              onChange={handleVesselFilterChange}
+              showClearButton={true}
+            />
+          )}
           
           <div className="pb-4">
             <div className="flex items-center justify-between gap-4">
