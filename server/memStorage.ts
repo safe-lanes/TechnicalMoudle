@@ -1159,6 +1159,11 @@ class MemStorage {
     return [];
   }
   
+  async reconcileSpareLocationStock(vesselId: string, userId?: string): Promise<{ synced: number; errors: number }> {
+    console.log('[MemStorage] reconcileSpareLocationStock called - stub in file mode');
+    return { synced: 0, errors: 0 };
+  }
+  
   async createInventoryTransaction(txn: any): Promise<any> {
     console.log('[MemStorage] createInventoryTransaction called - stub in file mode');
     return { ...txn, id: Date.now(), txnDatetime: new Date() };

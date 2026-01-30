@@ -6384,6 +6384,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // ============= INVENTORY MANAGEMENT: RECONCILIATION =============
+  
+  app.post("/technical/api/inventory/reconcile/:vesselId", requirePMSAdmin, async (req: AuthenticatedRequest, res) => {
+    try {
+      const userId = req.user?.id || 'System';
+      const result = await storage.reconcileSpareLocationStock(req.params.vesselId, userId);
+      res.json({ success: true, data: result });
+    } catch (error: any) {
+      console.error("Error reconciling spare location stock:", error);
+      res.status(500).json({ success: false, error: error.message });
+    }
+  });
+
   // ============= INVENTORY MANAGEMENT: SPARE-COMPONENT LINKS =============
   
   app.get("/technical/api/inventory/spare-links/:vesselId", async (req, res) => {
