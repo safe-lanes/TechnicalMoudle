@@ -144,7 +144,7 @@ export const sireHardwareClasses: SireHardwareClass[] = [
   { id: "SHC136", level1: "CONSUMABLES", level2: "CONSUMABLES", level3: "Chemicals" },
   { id: "SHC137", level1: "CONSUMABLES", level2: "CONSUMABLES", level3: "Medicine" },
   { id: "SHC138", level1: "CONSUMABLES", level2: "CONSUMABLES", level3: "Safety" },
-  { id: "SHC139", level1: "CONSUMABLES", level2: "LOOSE LIFTING EQUIPEMENT", level3: "LOOSE LIFTING EQUIPEMENT" },
+  { id: "SHC139", level1: "CONSUMABLES", level2: "Loose Lifting Equipment", level3: "Loose Lifting Equipment" },
 ];
 
 export function findHardwareClassById(id: string): SireHardwareClass | undefined {
