@@ -112,6 +112,7 @@ export interface AgGridTableProps {
   suppressRowClickSelection?: boolean;
   singleClickEdit?: boolean;
   stopEditingWhenCellsLoseFocus?: boolean;
+  getRowId?: (params: { data: any }) => string;
 }
 
 export const AgGridTable: React.FC<AgGridTableProps> = ({
@@ -146,6 +147,7 @@ export const AgGridTable: React.FC<AgGridTableProps> = ({
   suppressRowClickSelection = false,
   singleClickEdit = false,
   stopEditingWhenCellsLoseFocus = false,
+  getRowId,
 }) => {
   const viewport = useViewport();
   const viewportConfig = getViewportConfig(viewport);
@@ -452,6 +454,8 @@ export const AgGridTable: React.FC<AgGridTableProps> = ({
         onSortChanged={onSortChanged}
         singleClickEdit={singleClickEdit}
         stopEditingWhenCellsLoseFocus={stopEditingWhenCellsLoseFocus}
+        getRowId={getRowId}
+        reactiveCustomComponents={true}
       />
     </div>
   );

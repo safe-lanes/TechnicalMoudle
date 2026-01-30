@@ -528,6 +528,14 @@ export default function DefectsCoC() {
     return () => window.removeEventListener('resize', handleResize);
   }, [gridApi]);
 
+  // Force refresh of custom cell renderers when defects data changes
+  // This ensures the Verified icon's disabled state updates dynamically
+  useEffect(() => {
+    if (!gridApi || gridApi.isDestroyed()) return;
+    // Refresh cells to pick up latest row data (e.g., status changes)
+    gridApi.refreshCells({ force: true });
+  }, [gridApi, defects]);
+
   const columnDefs: ColDef[] = [
     {
       headerName: 'ID',
@@ -758,6 +766,7 @@ export default function DefectsCoC() {
               enableStatusBar={true}
               enableRowGrouping={true}
               height="100%"
+              getRowId={(params) => params.data?.id || ''}
               gridOptions={{
                 domLayout: 'normal'
               }}
