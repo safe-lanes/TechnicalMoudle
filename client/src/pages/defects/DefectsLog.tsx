@@ -98,9 +98,22 @@ export default function DefectsLog() {
     defectId: null,
     linkedDefects: []
   });
-  const [closeModal, setCloseModal] = useState<{ open: boolean; defect: Defect | null }>({ 
+  const [closeModal, setCloseModal] = useState<{ open: boolean; defectId: string | null }>({ 
     open: false, 
-    defect: null 
+    defectId: null 
+  });
+  
+  const { data: closeModalDefect, isLoading: isLoadingCloseModalDefect } = useQuery({
+    queryKey: ['/technical/api/defects', closeModal.defectId, 'closeModal'],
+    queryFn: async () => {
+      if (!closeModal.defectId) return null;
+      const response = await fetch(`/technical/api/defects/${closeModal.defectId}`);
+      if (!response.ok) throw new Error('Failed to fetch defect');
+      return response.json();
+    },
+    enabled: !!closeModal.defectId && closeModal.open,
+    staleTime: 0,
+    refetchOnMount: 'always',
   });
 
   const { data: defects = [], isLoading } = useQuery({
@@ -318,11 +331,7 @@ export default function DefectsLog() {
     if (!canClose()) {
       return; // Could show a toast here for insufficient permissions
     }
-    // Find the defect in the current list
-    const defect = defects.find((d: Defect) => d.id === defectId);
-    if (defect) {
-      setCloseModal({ open: true, defect });
-    }
+    setCloseModal({ open: true, defectId });
   };
 
   return (
@@ -705,26 +714,32 @@ export default function DefectsLog() {
         />
       )}
       
-      {closeModal.defect && (
+      {closeModal.defectId && (
         <Dialog 
           open={closeModal.open} 
           onOpenChange={(open) => {
             if (!open) {
-              setCloseModal({ open: false, defect: null });
+              setCloseModal({ open: false, defectId: null });
             }
           }}
         >
           <DialogContent className="max-w-6xl max-h-[90vh] overflow-y-auto p-0">
-            <DefectFormWizard
-              defect={closeModal.defect}
-              mode="edit"
-              initialStep={3}
-              onCompleted={() => {
-                setCloseModal({ open: false, defect: null });
-                // Invalidate queries to refresh the defects list
-                queryClient.invalidateQueries({ queryKey: ['/technical/api/defects'] });
-              }}
-            />
+            {isLoadingCloseModalDefect ? (
+              <div className="flex items-center justify-center h-64">
+                <div className="text-muted-foreground">Loading defect data...</div>
+              </div>
+            ) : closeModalDefect ? (
+              <DefectFormWizard
+                defect={closeModalDefect}
+                mode="edit"
+                initialStep={3}
+                onCompleted={() => {
+                  setCloseModal({ open: false, defectId: null });
+                  // Invalidate queries to refresh the defects list
+                  queryClient.invalidateQueries({ queryKey: ['/technical/api/defects'] });
+                }}
+              />
+            ) : null}
           </DialogContent>
         </Dialog>
       )}

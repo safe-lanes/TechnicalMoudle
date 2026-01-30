@@ -35,6 +35,8 @@ export default function DefectModal({
       return response.json();
     },
     enabled: !!defectId && open && mode !== "new",
+    staleTime: 0,
+    refetchOnMount: 'always',
   });
 
   const handleCompleted = () => {

@@ -36,6 +36,20 @@ export default function DefectsActive() {
   const [addNoteModal, setAddNoteModal] = useState<{ open: boolean; defectId: string | null }>({ open: false, defectId: null });
   const [linkModal, setLinkModal] = useState<{ open: boolean; defectId: string | null; linkedDefects: string[] }>({ open: false, defectId: null, linkedDefects: [] });
 
+  // Fresh data fetch for view/edit modal - ensures form always displays latest data
+  const { data: freshDefect, isLoading: isLoadingFreshDefect } = useQuery({
+    queryKey: ['/technical/api/defects', selectedDefect?.id, 'formModal'],
+    queryFn: async () => {
+      if (!selectedDefect?.id) return null;
+      const response = await fetch(`/technical/api/defects/${selectedDefect.id}`);
+      if (!response.ok) throw new Error('Failed to fetch defect');
+      return response.json();
+    },
+    enabled: !!selectedDefect?.id && showNewDefectForm && defectFormMode !== 'new',
+    staleTime: 0,
+    refetchOnMount: 'always',
+  });
+
   // Get all defects to calculate counts and filter
   const { data: allDefects = [], isLoading } = useQuery({
     queryKey: ['/technical/api/defects', filters],
@@ -196,29 +210,15 @@ export default function DefectsActive() {
                   Filters
                 </div>
               </Button>
-              <Dialog open={showNewDefectForm} onOpenChange={setShowNewDefectForm}>
-                <DialogTrigger asChild>
-                  <Button 
-                    className="bg-green-600 hover:bg-green-700 text-white" 
-                    size="sm" 
-                    data-testid="button-new-defect"
-                    onClick={handleNewDefect}
-                  >
-                    <Plus className="h-4 w-4 mr-1" />
-                    New Defect
-                  </Button>
-                </DialogTrigger>
-                <DialogContent className="max-w-6xl max-h-[90vh] overflow-y-auto p-0">
-                  <DefectFormExact 
-                    onClose={() => {
-                      setShowNewDefectForm(false);
-                      setSelectedDefect(null);
-                    }}
-                    defect={selectedDefect}
-                    mode={defectFormMode}
-                  />
-                </DialogContent>
-              </Dialog>
+              <Button 
+                className="bg-green-600 hover:bg-green-700 text-white" 
+                size="sm" 
+                data-testid="button-new-defect"
+                onClick={handleNewDefect}
+              >
+                <Plus className="h-4 w-4 mr-1" />
+                New Defect
+              </Button>
             </div>
           </div>
         </div>
@@ -550,6 +550,26 @@ export default function DefectsActive() {
           currentLinkedDefects={linkModal.linkedDefects}
         />
       )}
+
+      {/* Defect Form Dialog */}
+      <Dialog open={showNewDefectForm} onOpenChange={setShowNewDefectForm}>
+        <DialogContent className="max-w-6xl max-h-[90vh] overflow-y-auto p-0">
+          {defectFormMode !== 'new' && isLoadingFreshDefect ? (
+            <div className="flex items-center justify-center h-64">
+              <div className="text-muted-foreground">Loading defect data...</div>
+            </div>
+          ) : (
+            <DefectFormExact 
+              onClose={() => {
+                setShowNewDefectForm(false);
+                setSelectedDefect(null);
+              }}
+              defect={defectFormMode === 'new' ? undefined : freshDefect}
+              mode={defectFormMode}
+            />
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
