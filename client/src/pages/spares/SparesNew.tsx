@@ -1932,7 +1932,7 @@ const Spares: React.FC = () => {
           </div>
         )}
 
-        <div className="relative w-80" data-testid="E5">
+        <div className="relative w-64" data-testid="E5">
           <Marker id="E5" />
           <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
           <Input
@@ -1987,7 +1987,7 @@ const Spares: React.FC = () => {
       {/* Main Content - Scrollable */}
       <div className="flex-1 overflow-y-auto flex gap-4 min-h-0">
         {/* Left Panel - Component Tree */}
-        <div className="w-80 bg-white border border-gray-200 rounded-lg overflow-hidden" data-testid="E12">
+        <div className="w-64 bg-white border border-gray-200 rounded-lg overflow-hidden" data-testid="E12">
           <div className="text-white px-4 py-2 font-semibold bg-[#52baf3]">
             <Marker id="E12" />
             COMPONENT SEARCH
