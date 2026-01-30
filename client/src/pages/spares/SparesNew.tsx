@@ -2005,7 +2005,7 @@ const Spares: React.FC = () => {
               <div className="overflow-x-auto flex-1 flex flex-col">
                 {/* Inventory Table Header */}
                 <div className="px-4 py-3 border-b border-gray-200 bg-[#52baf3]">
-                  <div className="grid text-sm font-semibold text-[#ffffff] min-w-max" style={{ gridTemplateColumns: FEATURES.IHM ? '90px 140px 160px 100px 70px 50px 50px 60px 80px 35px 120px' : '90px 140px 160px 100px 70px 50px 50px 60px 80px 120px', minWidth: 'max-content', gap: '8px' }}>
+                  <div className="grid text-sm font-semibold text-[#ffffff]" style={{ gridTemplateColumns: FEATURES.IHM ? '85px 130px 150px 95px 65px 45px 45px 55px 70px 30px 100px' : '85px 130px 150px 95px 65px 45px 45px 55px 70px 100px', gap: '6px' }}>
                   <div className="px-2 text-[#ffffff]" data-testid="E13"><Marker id="E13" />Part Code</div>
                   <div className="px-2" data-testid="E14"><Marker id="E14" />Part Name</div>
                   <div className="px-2" data-testid="E15"><Marker id="E15" />Component</div>
@@ -2038,7 +2038,7 @@ const Spares: React.FC = () => {
                     const isFirstRow = rowIndex === 0;
                     return (
                     <div key={spare.id} className="px-4 py-3 border-b border-gray-100 hover:bg-gray-50">
-                      <div className="grid text-sm items-center min-w-max" style={{ gridTemplateColumns: FEATURES.IHM ? '90px 140px 160px 100px 70px 50px 50px 60px 80px 35px 120px' : '90px 140px 160px 100px 70px 50px 50px 60px 80px 120px', minWidth: 'max-content', gap: '8px' }}>
+                      <div className="grid text-sm items-center" style={{ gridTemplateColumns: FEATURES.IHM ? '85px 130px 150px 95px 65px 45px 45px 55px 70px 30px 100px' : '85px 130px 150px 95px 65px 45px 45px 55px 70px 100px', gap: '6px' }}>
                         <div className="px-2 text-gray-900" data-testid={isFirstRow ? "E24" : undefined}>{isFirstRow && <Marker id="E24" />}{spare.partCode}</div>
                         <div className="px-2 text-gray-700" data-testid={isFirstRow ? "E25" : undefined}>{isFirstRow && <Marker id="E25" />}{spare.partName}</div>
                         <div className="px-2 text-gray-700" data-testid={isFirstRow ? "E26" : undefined}>{isFirstRow && <Marker id="E26" />}{spare.componentName}</div>
