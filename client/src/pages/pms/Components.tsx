@@ -1367,17 +1367,18 @@ const SparesSection: React.FC<{ selectedComponent: ComponentNode | null }> = ({ 
   };
   
   const selectedActualId = selectedComponent ? getActualComponentId(selectedComponent.code) : undefined;
+  const selectedComponentCode = selectedComponent?.code;
   
   const { data: sparesWithInventory = [], isLoading: sparesLoading } = useQuery<SpareWithInventoryData[]>({
-    queryKey: ['/technical/api/inventory/spares-by-component', selectedActualId],
+    queryKey: ['/technical/api/inventory/spares-by-component-code', vesselId, selectedComponentCode],
     queryFn: async () => {
-      if (!selectedActualId) return [];
-      const res = await fetch(`/technical/api/inventory/spares-by-component/${selectedActualId}`);
+      if (!vesselId || !selectedComponentCode) return [];
+      const res = await fetch(`/technical/api/inventory/spares-by-component-code/${vesselId}/${encodeURIComponent(selectedComponentCode)}`);
       if (!res.ok) throw new Error('Failed to fetch spares');
       const json = await res.json();
       return json.data || [];
     },
-    enabled: !!selectedActualId,
+    enabled: !!vesselId && !!selectedComponentCode,
   });
   
   const { data: locationNames = { locationAName: 'Location A', locationBName: 'Location B' } } = useQuery<{
