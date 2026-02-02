@@ -178,15 +178,16 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
   const vesselId = workOrderContext ? (workOrderContext as any).templateData?.vesselId || (workOrderContext as any).workOrder?.vesselId : null;
   
   // Fetch spares inventory for location auto-selection in Part B4
+  // IMPORTANT: Uses location/location2 and robLocationA/robLocationB from Spares table per spec
   const { data: sparesInventory = [] } = useQuery<Array<{
     id: number;
     partCode: string;
     partName: string;
-    rob: string;
-    robLocationA: string;
-    robLocationB: string;
-    locationA: string | null;
-    locationB: string | null;
+    rob: number;
+    robLocationA: number;
+    robLocationB: number;
+    location: string | null;   // Primary location name from Spares table
+    location2: string | null;  // Secondary location name from Spares table
   }>>({
     queryKey: ['/technical/api/spares', vesselId],
     enabled: !!vesselId
@@ -219,28 +220,51 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
     return loc?.qty || 0;
   };
 
-  // Helper function to get available locations for a spare part
-  const getAvailableLocationsForSpare = (partNo: string): Array<'Location A' | 'Location B'> => {
-    const spare = sparesInventory.find(s => s.partCode === partNo);
-    if (!spare) return ['Location A', 'Location B']; // Default if not found
+  // Helper function to get available locations for a spare part using Spares table mapping
+  // Uses: location -> rob_location_a, location_2 -> rob_location_b (per spec)
+  const getAvailableLocationsForSpare = (partCode: string): Array<{ name: string; robValue: number; field: 'location' | 'location2' }> => {
+    const spare = sparesInventory.find(s => s.partCode === partCode);
+    if (!spare) return []; // No spare found
     
-    const locations: Array<'Location A' | 'Location B'> = [];
-    const robA = parseFloat(spare.robLocationA || '0');
-    const robB = parseFloat(spare.robLocationB || '0');
+    const locations: Array<{ name: string; robValue: number; field: 'location' | 'location2' }> = [];
+    const robA = spare.robLocationA ?? 0;
+    const robB = spare.robLocationB ?? 0;
     
-    if (robA > 0) locations.push('Location A');
-    if (robB > 0) locations.push('Location B');
-    
-    // If no stock anywhere, allow both locations for manual entry
-    if (locations.length === 0) return ['Location A', 'Location B'];
+    // location -> rob_location_a mapping
+    if (spare.location) {
+      locations.push({ name: spare.location, robValue: robA, field: 'location' });
+    }
+    // location_2 -> rob_location_b mapping
+    if (spare.location2) {
+      locations.push({ name: spare.location2, robValue: robB, field: 'location2' });
+    }
     
     return locations;
   };
+  
+  // Get ROB for a specific location field
+  const getRobForLocation = (partCode: string, locationField: 'location' | 'location2'): number => {
+    const spare = sparesInventory.find(s => s.partCode === partCode);
+    if (!spare) return 0;
+    return locationField === 'location' ? (spare.robLocationA ?? 0) : (spare.robLocationB ?? 0);
+  };
+  
+  // Get location name for a specific location field
+  const getLocationName = (partCode: string, locationField: 'location' | 'location2'): string | null => {
+    const spare = sparesInventory.find(s => s.partCode === partCode);
+    if (!spare) return null;
+    return locationField === 'location' ? spare.location : spare.location2;
+  };
 
   // Helper to check if auto-selection should be applied
-  const getAutoSelectedLocation = (partNo: string): 'Location A' | 'Location B' | null => {
-    const locations = getAvailableLocationsForSpare(partNo);
-    if (locations.length === 1) return locations[0];
+  // Returns the location field ('location' or 'location2') if only one location has stock
+  const getAutoSelectedLocationField = (partCode: string): 'location' | 'location2' | null => {
+    const locations = getAvailableLocationsForSpare(partCode);
+    // Auto-select only if exactly one location exists with stock > 0
+    const locationsWithStock = locations.filter(l => l.robValue > 0);
+    if (locationsWithStock.length === 1) return locationsWithStock[0].field;
+    // If only one location exists (regardless of stock), auto-select it
+    if (locations.length === 1) return locations[0].field;
     return null;
   };
   
@@ -292,6 +316,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
     selected: boolean;
     consumeQty: string;
     selectedLocationId: number | null;
+    selectedLocation: string; // Location name from Spares table (location or location_2)
     comments: string;
   }>>([]);
   const [isLoadingSpares, setIsLoadingSpares] = useState(false);
@@ -375,7 +400,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
     previousReading: "",
     currentReading: "",
     uploadedDocuments: [] as Array<{type: string, fileName: string, fileKey: string, uploadedAt: string, uploadedBy: string}>,
-    consumedSpareParts: [] as Array<{partNo: string, partCode?: string, description: string, quantityConsumed: string, location: 'Location A' | 'Location B' | '', locationId: number | null, comments: string}>,
+    consumedSpareParts: [] as Array<{partNo: string, partCode?: string, description: string, quantityConsumed: string, location: string, locationId: number | null, comments: string}>,
     ihmUpdate: {
       enabled: false,
       action: "",
@@ -766,6 +791,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
           selected: false,
           consumeQty: '',
           selectedLocationId: null,
+          selectedLocation: '', // Location name from Spares table (location or location_2)
           comments: ''
         }));
         setLinkedSpares(sparesWithState);
@@ -803,12 +829,12 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
       return;
     }
     
-    // Validate location selection and quantities
+    // Validate location selection and quantities using Spares table locations (NO inventory location IDs)
     for (const spare of selectedSpares) {
       const qty = parseInt(spare.consumeQty);
       
-      // Require location selection
-      if (!spare.selectedLocationId) {
+      // Require location selection (using Spares table location name, not inventory locationId)
+      if (!spare.selectedLocation) {
         toast({
           title: "Location Required",
           description: `Please select a location for ${spare.spare.partCode || spare.spare.partName}.`,
@@ -817,31 +843,36 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
         return;
       }
       
-      // Validate quantity doesn't exceed stock at selected location
-      const selectedLocation = spare.locations.find((l: any) => l.locationId === spare.selectedLocationId);
-      const availableQty = selectedLocation ? selectedLocation.qty : 0;
+      // Validate quantity against per-location ROB from Spares table (NO summation or cross-mapping)
+      // location -> rob_location_a, location_2 -> rob_location_b
+      const locationA = spare.spare.location || '';
+      const locationB = spare.spare.location2 || '';
+      const robLocationA = spare.spare.robLocationA ?? 0;
+      const robLocationB = spare.spare.robLocationB ?? 0;
+      
+      // Get available qty based on selected Spares table location name
+      const availableQty = spare.selectedLocation === locationA ? robLocationA : 
+                           spare.selectedLocation === locationB ? robLocationB : 0;
       
       if (qty > availableQty) {
         toast({
           title: "Quantity Exceeds Stock",
-          description: `Consumption quantity for ${spare.spare.partCode} (${qty}) exceeds available stock at ${selectedLocation?.locationName || 'selected location'} (${availableQty}).`,
+          description: `Consumption quantity for ${spare.spare.partCode} (${qty}) exceeds available stock at ${spare.selectedLocation} (${availableQty}).`,
           variant: "destructive"
         });
         return;
       }
     }
     
-    // Add selected spares to consumedSpareParts
+    // Add selected spares to consumedSpareParts using Spares table location name
     const newConsumedParts = selectedSpares.map(s => {
-      const selectedLocation = s.locations.find((l: any) => l.locationId === s.selectedLocationId);
-      const locationName = selectedLocation?.locationName || '';
       return {
         partNo: s.spare.partCode || s.spare.partNumber || '',
         partCode: s.spare.partCode || '',
         description: s.spare.partName || '',
         quantityConsumed: s.consumeQty,
-        location: (locationName === 'Location A' || locationName === 'Location B' ? locationName : '') as 'Location A' | 'Location B' | '',
-        locationId: s.selectedLocationId,
+        location: s.selectedLocation, // Store the actual Spares table location name (location or location_2)
+        locationId: null, // No inventory location ID, use Spares table location name only
         comments: s.comments
       };
     });
@@ -2195,15 +2226,15 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                 </Button>
               </div>
               
-              {/* Editable Spare Parts Table */}
+              {/* Editable Spare Parts Table - Updated to show location-wise ROB per spec */}
               <div className="overflow-x-auto">
                 <table className="w-full text-sm border border-gray-200">
                   <thead>
                     <tr className="bg-gray-50 border-b border-gray-200">
-                      <th className="text-left p-2 font-medium text-gray-700 w-[20%]" data-testid="WOF.A2.3"><Marker id="WOF.A2.3" />PART NO.</th>
-                      <th className="text-left p-2 font-medium text-gray-700 w-[40%]" data-testid="WOF.A2.4"><Marker id="WOF.A2.4" />DESCRIPTION</th>
-                      <th className="text-left p-2 font-medium text-gray-700 w-[15%]" data-testid="WOF.A2.5"><Marker id="WOF.A2.5" />QTY REQUIRED</th>
-                      <th className="text-left p-2 font-medium text-gray-700 w-[10%]" data-testid="WOF.A2.6"><Marker id="WOF.A2.6" />ROB</th>
+                      <th className="text-left p-2 font-medium text-gray-700 w-[15%]" data-testid="WOF.A2.3"><Marker id="WOF.A2.3" />PART NO.</th>
+                      <th className="text-left p-2 font-medium text-gray-700 w-[25%]" data-testid="WOF.A2.4"><Marker id="WOF.A2.4" />DESCRIPTION</th>
+                      <th className="text-left p-2 font-medium text-gray-700 w-[10%]" data-testid="WOF.A2.5"><Marker id="WOF.A2.5" />QTY REQ</th>
+                      <th className="text-left p-2 font-medium text-gray-700 w-[20%]" data-testid="WOF.A2.6"><Marker id="WOF.A2.6" />LOCATION / ROB</th>
                       <th className="text-left p-2 font-medium text-gray-700 w-[15%]" data-testid="WOF.A2.7"><Marker id="WOF.A2.7" />STATUS</th>
                       {!isReadOnly && <th className="text-center p-2 font-medium text-gray-700 w-[100px]" data-testid="WOF.A2.8"><Marker id="WOF.A2.8" />ACTIONS</th>}
                     </tr>
@@ -2217,15 +2248,27 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                       </tr>
                     ) : (
                       (templateData.requiredSpareParts || []).map((part: any, index) => {
-                        // ROB lookup: Use partCode for inventory lookup (not partNo)
-                        // partCode is the reliable identifier for spare inventory matching
+                        // ROB lookup using Spares table mapping per spec:
+                        // location -> rob_location_a, location_2 -> rob_location_b
                         const lookupKey = part.partCode || '';
-                        const inventoryMatch = lookupKey ? sparesWithInventory.find(s => s.spare.partCode === lookupKey) : null;
-                        const robValue = inventoryMatch ? inventoryMatch.robTotal : (part.rob !== null && part.rob !== undefined ? part.rob : null);
+                        const spareData = lookupKey ? sparesInventory.find(s => s.partCode === lookupKey) : null;
+                        const locations = lookupKey ? getAvailableLocationsForSpare(lookupKey) : [];
+                        
+                        // Location-specific ROB values (NO summation per spec)
+                        const robLocationA = spareData?.robLocationA ?? 0;
+                        const robLocationB = spareData?.robLocationB ?? 0;
+                        
+                        // Stock status based on per-location availability (no summation)
+                        // Available = at least one location can fulfill the required qty
+                        // Low = some stock exists at any location but no single location has enough
+                        // Unavailable = no stock at any location
                         const qtyRequired = parseInt(part.quantityRequired) || 0;
-                        const isAvailable = robValue !== null && robValue >= qtyRequired;
-                        const isLowStock = robValue !== null && robValue > 0 && robValue < qtyRequired;
-                        const stockStatus = robValue === null ? 'unknown' : isAvailable ? 'available' : isLowStock ? 'low' : 'unavailable';
+                        const locationACanFulfill = robLocationA >= qtyRequired;
+                        const locationBCanFulfill = robLocationB >= qtyRequired;
+                        const hasAnyStock = robLocationA > 0 || robLocationB > 0;
+                        const isAvailable = locationACanFulfill || locationBCanFulfill;
+                        const isLowStock = hasAnyStock && !isAvailable;
+                        const stockStatus = !spareData ? 'unknown' : isAvailable ? 'available' : isLowStock ? 'low' : 'unavailable';
                         
                         return (
                           <tr key={index} className="border-b border-gray-200 hover:bg-gray-50">
@@ -2258,7 +2301,18 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                                     data-testid={`input-spare-quantity-${index}`}
                                   />
                                 </td>
-                                <td className="p-2 text-center text-gray-500">{robValue !== null ? robValue : '-'}</td>
+                                <td className="p-2 text-xs">
+                                  {locations.length > 0 ? (
+                                    <div className="space-y-1">
+                                      {locations.map((loc, locIdx) => (
+                                        <div key={locIdx} className="flex justify-between">
+                                          <span className="text-gray-600">{loc.name}:</span>
+                                          <span className="font-medium">{loc.robValue}</span>
+                                        </div>
+                                      ))}
+                                    </div>
+                                  ) : '-'}
+                                </td>
                                 <td className="p-2">
                                   <StatusPill status={stockStatus} />
                                 </td>
@@ -2290,7 +2344,18 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                                 <td className="p-2" data-testid={`text-spare-part-no-${index}`}>{part.partNo || '-'}</td>
                                 <td className="p-2" data-testid={`text-spare-description-${index}`}>{part.description || '-'}</td>
                                 <td className="p-2" data-testid={`text-spare-quantity-${index}`}>{part.quantityRequired || '-'}</td>
-                                <td className="p-2 text-center" data-testid={`text-spare-rob-${index}`}>{robValue !== null ? robValue : '-'}</td>
+                                <td className="p-2 text-xs" data-testid={`text-spare-rob-${index}`}>
+                                  {locations.length > 0 ? (
+                                    <div className="space-y-1">
+                                      {locations.map((loc, locIdx) => (
+                                        <div key={locIdx} className="flex justify-between">
+                                          <span className="text-gray-600">{loc.name}:</span>
+                                          <span className="font-medium">{loc.robValue}</span>
+                                        </div>
+                                      ))}
+                                    </div>
+                                  ) : '-'}
+                                </td>
                                 <td className="p-2">
                                   <span data-testid={`status-spare-${index}`}>
                                     <StatusPill status={stockStatus} />
@@ -3192,10 +3257,10 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                         (!sparePartCode && spare.partNo && c.partNo === spare.partNo)
                       );
                       const consumedData = consumedIndex >= 0 ? executionData.consumedSpareParts[consumedIndex] : null;
-                      const autoSelectedLocation = getAutoSelectedLocation(sparePartCode || spare.partNo);
                       
-                      // Use partCode for inventory lookup (partNo is just display value)
-                      const stockInfo = sparePartCode ? sparesWithInventory.find(s => s.spare.partCode === sparePartCode) : null;
+                      // Get locations from Spares table per spec: location -> rob_location_a, location_2 -> rob_location_b
+                      const spareLocations = getAvailableLocationsForSpare(sparePartCode || spare.partNo);
+                      const autoSelectedLocationField = getAutoSelectedLocationField(sparePartCode || spare.partNo);
                       
                       return (
                         <tr key={`preloaded-${index}`} className="border-b border-gray-100">
@@ -3207,13 +3272,15 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                               value={consumedData?.quantityConsumed || ''}
                               onChange={(e) => {
                                 const newValue = e.target.value;
+                                // Auto-select location if only one available
+                                const autoLoc = autoSelectedLocationField ? getLocationName(sparePartCode, autoSelectedLocationField) : null;
                                 setExecutionData(prev => {
                                   const consumed = [...prev.consumedSpareParts];
                                   if (consumedIndex >= 0) {
                                     consumed[consumedIndex] = {
                                       ...consumed[consumedIndex],
                                       quantityConsumed: newValue,
-                                      location: consumed[consumedIndex].location || autoSelectedLocation || ''
+                                      location: consumed[consumedIndex].location || autoLoc || ''
                                     };
                                   } else {
                                     consumed.push({
@@ -3221,7 +3288,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                                       partCode: sparePartCode,
                                       description: spare.description,
                                       quantityConsumed: newValue,
-                                      location: autoSelectedLocation || '',
+                                      location: autoLoc || '',
                                       locationId: null,
                                       comments: ''
                                     });
@@ -3234,18 +3301,19 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                             />
                           </td>
                           <td className="py-3">
+                            {/* Location dropdown using Spares table: location -> rob_location_a, location_2 -> rob_location_b */}
                             <Select
-                              value={consumedData?.locationId?.toString() || ''}
-                              onValueChange={(value) => {
-                                const locationId = parseInt(value);
-                                const location = vesselLocations.find(l => l.id === locationId);
+                              value={consumedData?.location || ''}
+                              onValueChange={(locationName) => {
+                                // Find which field this location corresponds to
+                                const selectedLoc = spareLocations.find(l => l.name === locationName);
                                 setExecutionData(prev => {
                                   const consumed = [...prev.consumedSpareParts];
                                   if (consumedIndex >= 0) {
                                     consumed[consumedIndex] = {
                                       ...consumed[consumedIndex],
-                                      locationId: locationId,
-                                      location: location?.locationName as any || ''
+                                      location: locationName as any,
+                                      locationId: null // No longer using inventory_locations IDs
                                     };
                                   } else {
                                     consumed.push({
@@ -3253,8 +3321,8 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                                       partCode: sparePartCode,
                                       description: spare.description,
                                       quantityConsumed: '',
-                                      location: location?.locationName as any || '',
-                                      locationId: locationId,
+                                      location: locationName as any,
+                                      locationId: null,
                                       comments: ''
                                     });
                                   }
@@ -3266,17 +3334,14 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                                 <SelectValue placeholder="Select location" />
                               </SelectTrigger>
                               <SelectContent>
-                                {vesselLocations.length > 0 ? (
-                                  vesselLocations.map((loc) => {
-                                    const stockAtLoc = stockInfo?.locations.find(l => l.locationId === loc.id)?.qty || 0;
-                                    return (
-                                      <SelectItem key={loc.id} value={loc.id.toString()}>
-                                        {loc.locationName} ({stockAtLoc} avail)
-                                      </SelectItem>
-                                    );
-                                  })
+                                {spareLocations.length > 0 ? (
+                                  spareLocations.map((loc, locIdx) => (
+                                    <SelectItem key={locIdx} value={loc.name}>
+                                      {loc.name} ({loc.robValue} avail)
+                                    </SelectItem>
+                                  ))
                                 ) : (
-                                  <SelectItem value="none" disabled>No locations found</SelectItem>
+                                  <SelectItem value="none" disabled>No locations configured</SelectItem>
                                 )}
                               </SelectContent>
                             </Select>
@@ -3377,33 +3442,41 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                                   />
                                 </td>
                                 <td className="py-3">
-                                  <Select
-                                    value={consumed.locationId?.toString() || ''}
-                                    onValueChange={(value) => {
-                                      const locationId = parseInt(value);
-                                      const location = vesselLocations.find(l => l.id === locationId);
-                                      setExecutionData(prev => {
-                                        const updated = [...prev.consumedSpareParts];
-                                        updated[actualIndex] = { 
-                                          ...updated[actualIndex], 
-                                          locationId: locationId,
-                                          location: location?.locationName as any || ''
-                                        };
-                                        return { ...prev, consumedSpareParts: updated };
-                                      });
-                                    }}
-                                  >
-                                    <SelectTrigger className="h-8 text-xs">
-                                      <SelectValue placeholder="Select" />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                      {vesselLocations.map((loc) => (
-                                        <SelectItem key={loc.id} value={loc.id.toString()}>
-                                          {loc.locationName}
-                                        </SelectItem>
-                                      ))}
-                                    </SelectContent>
-                                  </Select>
+                                  {/* Manual entry editing: Get locations from Spares table by partCode */}
+                                  {(() => {
+                                    const manualSpareLocations = consumed.partCode ? getAvailableLocationsForSpare(consumed.partCode) : [];
+                                    return (
+                                      <Select
+                                        value={consumed.location || ''}
+                                        onValueChange={(locationName) => {
+                                          setExecutionData(prev => {
+                                            const updated = [...prev.consumedSpareParts];
+                                            updated[actualIndex] = { 
+                                              ...updated[actualIndex], 
+                                              location: locationName,
+                                              locationId: null
+                                            };
+                                            return { ...prev, consumedSpareParts: updated };
+                                          });
+                                        }}
+                                      >
+                                        <SelectTrigger className="h-8 text-xs">
+                                          <SelectValue placeholder="Select" />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                          {manualSpareLocations.length > 0 ? (
+                                            manualSpareLocations.map((loc, idx) => (
+                                              <SelectItem key={idx} value={loc.name}>
+                                                {loc.name} ({loc.robValue} avail)
+                                              </SelectItem>
+                                            ))
+                                          ) : (
+                                            <SelectItem value="none" disabled>No locations configured</SelectItem>
+                                          )}
+                                        </SelectContent>
+                                      </Select>
+                                    );
+                                  })()}
                                 </td>
                                 <td className="py-3">
                                   <Input
@@ -3438,33 +3511,41 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                                   />
                                 </td>
                                 <td className="py-3">
-                                  <Select
-                                    value={consumed.locationId?.toString() || ''}
-                                    onValueChange={(value) => {
-                                      const locationId = parseInt(value);
-                                      const location = vesselLocations.find(l => l.id === locationId);
-                                      setExecutionData(prev => {
-                                        const updated = [...prev.consumedSpareParts];
-                                        updated[actualIndex] = { 
-                                          ...updated[actualIndex], 
-                                          locationId: locationId,
-                                          location: location?.locationName as any || ''
-                                        };
-                                        return { ...prev, consumedSpareParts: updated };
-                                      });
-                                    }}
-                                  >
-                                    <SelectTrigger className="h-8 text-xs">
-                                      <SelectValue placeholder="Select" />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                      {vesselLocations.map((loc) => (
-                                        <SelectItem key={loc.id} value={loc.id.toString()}>
-                                          {loc.locationName}
-                                        </SelectItem>
-                                      ))}
-                                    </SelectContent>
-                                  </Select>
+                                  {/* Non-editing view: Get locations from Spares table by partCode */}
+                                  {(() => {
+                                    const viewSpareLocations = consumed.partCode ? getAvailableLocationsForSpare(consumed.partCode) : [];
+                                    return (
+                                      <Select
+                                        value={consumed.location || ''}
+                                        onValueChange={(locationName) => {
+                                          setExecutionData(prev => {
+                                            const updated = [...prev.consumedSpareParts];
+                                            updated[actualIndex] = { 
+                                              ...updated[actualIndex], 
+                                              location: locationName,
+                                              locationId: null
+                                            };
+                                            return { ...prev, consumedSpareParts: updated };
+                                          });
+                                        }}
+                                      >
+                                        <SelectTrigger className="h-8 text-xs">
+                                          <SelectValue placeholder="Select" />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                          {viewSpareLocations.length > 0 ? (
+                                            viewSpareLocations.map((loc, idx) => (
+                                              <SelectItem key={idx} value={loc.name}>
+                                                {loc.name} ({loc.robValue} avail)
+                                              </SelectItem>
+                                            ))
+                                          ) : (
+                                            <SelectItem value="none" disabled>No locations configured</SelectItem>
+                                          )}
+                                        </SelectContent>
+                                      </Select>
+                                    );
+                                  })()}
                                 </td>
                                 <td className="py-3">
                                   <Input
@@ -3643,9 +3724,8 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                     <th className="text-left py-2 px-2 font-medium w-12">Select</th>
                     <th className="text-left py-2 px-2 font-medium">Part Code</th>
                     <th className="text-left py-2 px-2 font-medium">Description</th>
-                    <th className="text-center py-2 px-2 font-medium">ROB Loc A</th>
-                    <th className="text-center py-2 px-2 font-medium">ROB Loc B</th>
-                    <th className="text-center py-2 px-2 font-medium">Total ROB</th>
+                    <th className="text-center py-2 px-2 font-medium">ROB (Loc A)</th>
+                    <th className="text-center py-2 px-2 font-medium">ROB (Loc B)</th>
                     <th className="text-left py-2 px-2 font-medium w-24">Qty to Use</th>
                     <th className="text-left py-2 px-2 font-medium w-32">From Location</th>
                     <th className="text-left py-2 px-2 font-medium">Comments</th>
@@ -3653,8 +3733,16 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                 </thead>
                 <tbody>
                   {linkedSpares.map((item, index) => {
-                    const locA = item.locations.find(l => l.locationName === 'Location A')?.qty || item.spare.robLocationA || 0;
-                    const locB = item.locations.find(l => l.locationName === 'Location B')?.qty || item.spare.robLocationB || 0;
+                    // Use Spares table mapping: location -> rob_location_a, location_2 -> rob_location_b (NO summation)
+                    const robLocationA = item.spare.robLocationA ?? 0;
+                    const robLocationB = item.spare.robLocationB ?? 0;
+                    const locationA = item.spare.location || '';
+                    const locationB = item.spare.location2 || '';
+                    
+                    // Get the max qty based on selected location (no summation)
+                    const selectedLocRob = item.selectedLocation === locationA ? robLocationA : 
+                                          item.selectedLocation === locationB ? robLocationB : 
+                                          Math.max(robLocationA, robLocationB); // Default to max single location
                     
                     return (
                       <tr key={item.spare.id || index} className="border-b hover:bg-gray-50 dark:hover:bg-gray-800">
@@ -3671,14 +3759,13 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                         </td>
                         <td className="py-2 px-2 font-mono text-xs">{item.spare.partCode || item.spare.partNumber || '-'}</td>
                         <td className="py-2 px-2">{item.spare.partName || '-'}</td>
-                        <td className="py-2 px-2 text-center font-medium">{locA}</td>
-                        <td className="py-2 px-2 text-center font-medium">{locB}</td>
-                        <td className="py-2 px-2 text-center font-semibold">{item.robTotal}</td>
+                        <td className="py-2 px-2 text-center font-medium">{locationA ? `${locationA}: ${robLocationA}` : '-'}</td>
+                        <td className="py-2 px-2 text-center font-medium">{locationB ? `${locationB}: ${robLocationB}` : '-'}</td>
                         <td className="py-2 px-2">
                           <Input
                             type="number"
                             min="0"
-                            max={item.robTotal}
+                            max={selectedLocRob}
                             value={item.consumeQty}
                             onChange={(e) => {
                               setLinkedSpares(prev => prev.map((s, i) => 
@@ -3691,25 +3778,35 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                           />
                         </td>
                         <td className="py-2 px-2">
-                          <Select
-                            value={item.selectedLocationId?.toString() || ''}
-                            onValueChange={(value) => {
-                              setLinkedSpares(prev => prev.map((s, i) => 
-                                i === index ? { ...s, selectedLocationId: parseInt(value) } : s
-                              ));
-                            }}
-                          >
-                            <SelectTrigger className="h-8 w-28" data-testid={`spare-location-${index}`}>
-                              <SelectValue placeholder="Select" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              {vesselLocations.map((loc: any) => (
-                                <SelectItem key={loc.id} value={loc.id.toString()}>
-                                  {loc.locationName}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
+                          {/* Use Spares table locations: location -> rob_location_a, location_2 -> rob_location_b */}
+                          {(() => {
+                            const spareLocations = item.spare.partCode ? getAvailableLocationsForSpare(item.spare.partCode) : [];
+                            return (
+                              <Select
+                                value={item.selectedLocation || ''}
+                                onValueChange={(locationName) => {
+                                  setLinkedSpares(prev => prev.map((s, i) => 
+                                    i === index ? { ...s, selectedLocation: locationName, selectedLocationId: null } : s
+                                  ));
+                                }}
+                              >
+                                <SelectTrigger className="h-8 w-28" data-testid={`spare-location-${index}`}>
+                                  <SelectValue placeholder="Select" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  {spareLocations.length > 0 ? (
+                                    spareLocations.map((loc, idx) => (
+                                      <SelectItem key={idx} value={loc.name}>
+                                        {loc.name} ({loc.robValue})
+                                      </SelectItem>
+                                    ))
+                                  ) : (
+                                    <SelectItem value="none" disabled>No locations</SelectItem>
+                                  )}
+                                </SelectContent>
+                              </Select>
+                            );
+                          })()}
                         </td>
                         <td className="py-2 px-2">
                           <Input
