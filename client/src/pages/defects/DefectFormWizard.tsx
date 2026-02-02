@@ -2022,7 +2022,7 @@ export default function DefectFormWizard({
                           data-testid="input-verified-by-name"
                           className="h-10 text-sm border-gray-300"
                           placeholder="Enter name"
-                          disabled={isViewMode}
+                          disabled={true}
                         />
                       </div>
                       <div className="flex flex-col">
@@ -2032,7 +2032,7 @@ export default function DefectFormWizard({
                           data-testid="input-verified-by-office-position"
                           className="h-10 text-sm border-gray-300"
                           placeholder="Enter office position"
-                          disabled={isViewMode}
+                          disabled={true}
                         />
                       </div>
                     </div>
