@@ -1,7 +1,7 @@
 import { Check, Clock, AlertCircle, PackageX } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 
-export type StatusType = 'available' | 'reserved' | 'order-required' | 'completed' | 'postponed' | 'active' | 'overdue' | 'low' | 'unknown' | 'unavailable';
+export type StatusType = 'available' | 'reserved' | 'order-required' | 'completed' | 'postponed' | 'active' | 'overdue' | 'low' | 'insufficient' | 'unknown' | 'unavailable';
 
 interface StatusPillProps {
   status: StatusType;
@@ -52,6 +52,11 @@ const statusConfig: Record<StatusType, {
   },
   'low': {
     label: 'Low Stock',
+    className: 'bg-amber-500 text-white hover:bg-amber-500',
+    icon: AlertCircle
+  },
+  'insufficient': {
+    label: 'Insufficient',
     className: 'bg-amber-500 text-white hover:bg-amber-500',
     icon: AlertCircle
   },

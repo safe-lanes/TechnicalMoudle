@@ -255,6 +255,17 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
     if (!spare) return null;
     return locationField === 'location' ? spare.location : spare.location2;
   };
+  
+  // Get ROB by location name for a specific spare part
+  // Used for validation to ensure consumption doesn't exceed available stock
+  const getRobByLocationName = (partCode: string, locationName: string): number => {
+    const spare = sparesInventory.find(s => s.partCode === partCode);
+    if (!spare || !locationName) return 0;
+    // Match location name to determine which ROB field to use
+    if (spare.location === locationName) return spare.robLocationA ?? 0;
+    if (spare.location2 === locationName) return spare.robLocationB ?? 0;
+    return 0;
+  };
 
   // Helper to check if auto-selection should be applied
   // Returns the location field ('location' or 'location2') if only one location has stock
@@ -1374,30 +1385,34 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
         return;
       }
 
-      // PHASE 3A: Validate stock availability at selected locations (only for inventory-tracked items)
-      // Use partCode for inventory matching (not partNo - they are separate fields)
+      // PHASE 3A: Validate stock availability at selected locations
+      // Use location names from Spares table (location -> robLocationA, location2 -> robLocationB)
       const sparesWithInsufficientStock = executionData.consumedSpareParts.filter(spare => {
         const qty = parseFloat(spare.quantityConsumed);
-        if (!qty || qty <= 0 || !spare.locationId) return false;
+        if (!qty || qty <= 0 || !spare.location) return false;
         
-        // Only validate stock for items in inventory using partCode (primary) or partNo (fallback)
+        // Use partCode for inventory lookup (primary) or partNo (fallback for legacy data)
         const lookupKey = spare.partCode || spare.partNo;
-        const isInInventory = lookupKey && sparesWithInventory.some(s => s.spare.partCode === lookupKey);
-        if (!isInInventory) return false;
+        if (!lookupKey) return false;
         
-        const stockAtLocation = getStockAtLocation(lookupKey, spare.locationId);
+        // Check if spare exists in inventory
+        const spareInInventory = sparesInventory.find(s => s.partCode === lookupKey);
+        if (!spareInInventory) return false;
+        
+        // Get ROB at the selected location using location name mapping
+        const stockAtLocation = getRobByLocationName(lookupKey, spare.location);
         return qty > stockAtLocation;
       });
 
       if (sparesWithInsufficientStock.length > 0) {
         const insufficientParts = sparesWithInsufficientStock.map(s => {
           const lookupKey = s.partCode || s.partNo;
-          const stockAtLoc = getStockAtLocation(lookupKey, s.locationId!);
-          return `${s.partNo || s.partCode} (need ${s.quantityConsumed}, have ${stockAtLoc})`;
+          const stockAtLoc = getRobByLocationName(lookupKey, s.location);
+          return `${s.partNo || s.partCode} (need ${s.quantityConsumed}, have ${stockAtLoc} at ${s.location})`;
         }).join(', ');
         toast({
           title: "Insufficient Stock",
-          description: `Not enough stock at selected locations: ${insufficientParts}`,
+          description: `Consumption cannot exceed available ROB: ${insufficientParts}`,
           variant: "destructive",
         });
         return;
@@ -2260,15 +2275,15 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                         
                         // Stock status based on per-location availability (no summation)
                         // Available = at least one location can fulfill the required qty
-                        // Low = some stock exists at any location but no single location has enough
+                        // Insufficient = some stock exists at any location but no single location has enough
                         // Unavailable = no stock at any location
                         const qtyRequired = parseInt(part.quantityRequired) || 0;
                         const locationACanFulfill = robLocationA >= qtyRequired;
                         const locationBCanFulfill = robLocationB >= qtyRequired;
                         const hasAnyStock = robLocationA > 0 || robLocationB > 0;
                         const isAvailable = locationACanFulfill || locationBCanFulfill;
-                        const isLowStock = hasAnyStock && !isAvailable;
-                        const stockStatus = !spareData ? 'unknown' : isAvailable ? 'available' : isLowStock ? 'low' : 'unavailable';
+                        const isInsufficientStock = hasAnyStock && !isAvailable;
+                        const stockStatus = !spareData ? 'unknown' : isAvailable ? 'available' : isInsufficientStock ? 'insufficient' : 'unavailable';
                         
                         return (
                           <tr key={index} className="border-b border-gray-200 hover:bg-gray-50">
@@ -3262,43 +3277,58 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                       const spareLocations = getAvailableLocationsForSpare(sparePartCode || spare.partNo);
                       const autoSelectedLocationField = getAutoSelectedLocationField(sparePartCode || spare.partNo);
                       
+                      // Calculate if current quantity exceeds ROB at selected location
+                      const currentQty = parseFloat(consumedData?.quantityConsumed || '0') || 0;
+                      const selectedLocation = consumedData?.location || '';
+                      const availableRob = selectedLocation && sparePartCode 
+                        ? getRobByLocationName(sparePartCode, selectedLocation) 
+                        : 0;
+                      const exceedsRob = currentQty > 0 && selectedLocation && currentQty > availableRob;
+                      
                       return (
                         <tr key={`preloaded-${index}`} className="border-b border-gray-100">
                           <td className="py-3 text-gray-900">{spare.partNo || '-'}</td>
                           <td className="py-3 text-gray-700">{spare.description}</td>
                           <td className="py-3">
-                            <Input
-                              type="number"
-                              value={consumedData?.quantityConsumed || ''}
-                              onChange={(e) => {
-                                const newValue = e.target.value;
-                                // Auto-select location if only one available
-                                const autoLoc = autoSelectedLocationField ? getLocationName(sparePartCode, autoSelectedLocationField) : null;
-                                setExecutionData(prev => {
-                                  const consumed = [...prev.consumedSpareParts];
-                                  if (consumedIndex >= 0) {
-                                    consumed[consumedIndex] = {
-                                      ...consumed[consumedIndex],
-                                      quantityConsumed: newValue,
-                                      location: consumed[consumedIndex].location || autoLoc || ''
-                                    };
-                                  } else {
-                                    consumed.push({
-                                      partNo: spare.partNo,
-                                      partCode: sparePartCode,
-                                      description: spare.description,
-                                      quantityConsumed: newValue,
-                                      location: autoLoc || '',
-                                      locationId: null,
-                                      comments: ''
-                                    });
-                                  }
-                                  return { ...prev, consumedSpareParts: consumed };
-                                });
-                              }}
-                              className="text-sm h-8 w-20"
-                              data-testid={`input-consumed-qty-${sparePartCode || spare.partNo || index}`}
-                            />
+                            <div className="flex flex-col gap-1">
+                              <Input
+                                type="number"
+                                min="0"
+                                max={selectedLocation ? availableRob : undefined}
+                                value={consumedData?.quantityConsumed || ''}
+                                onChange={(e) => {
+                                  const newValue = e.target.value;
+                                  // Auto-select location if only one available
+                                  const autoLoc = autoSelectedLocationField ? getLocationName(sparePartCode, autoSelectedLocationField) : null;
+                                  setExecutionData(prev => {
+                                    const consumed = [...prev.consumedSpareParts];
+                                    if (consumedIndex >= 0) {
+                                      consumed[consumedIndex] = {
+                                        ...consumed[consumedIndex],
+                                        quantityConsumed: newValue,
+                                        location: consumed[consumedIndex].location || autoLoc || ''
+                                      };
+                                    } else {
+                                      consumed.push({
+                                        partNo: spare.partNo,
+                                        partCode: sparePartCode,
+                                        description: spare.description,
+                                        quantityConsumed: newValue,
+                                        location: autoLoc || '',
+                                        locationId: null,
+                                        comments: ''
+                                      });
+                                    }
+                                    return { ...prev, consumedSpareParts: consumed };
+                                  });
+                                }}
+                                className={`text-sm h-8 w-20 ${exceedsRob ? 'border-red-500 focus:border-red-500 focus:ring-red-500' : ''}`}
+                                data-testid={`input-consumed-qty-${sparePartCode || spare.partNo || index}`}
+                              />
+                              {exceedsRob && (
+                                <span className="text-xs text-red-500">Max: {availableRob}</span>
+                              )}
+                            </div>
                           </td>
                           <td className="py-3">
                             {/* Location dropdown using Spares table: location -> rob_location_a, location_2 -> rob_location_b */}
@@ -3393,6 +3423,15 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                         const actualIndex = executionData.consumedSpareParts.findIndex(c => c === consumed);
                         const isEditing = editingConsumedSparePart === actualIndex;
                         
+                        // Calculate if current quantity exceeds ROB at selected location
+                        const manualCurrentQty = parseFloat(consumed.quantityConsumed || '0') || 0;
+                        const manualSelectedLocation = consumed.location || '';
+                        const manualPartCode = consumed.partCode || '';
+                        const manualAvailableRob = manualSelectedLocation && manualPartCode 
+                          ? getRobByLocationName(manualPartCode, manualSelectedLocation) 
+                          : 0;
+                        const manualExceedsRob = manualCurrentQty > 0 && manualSelectedLocation && manualCurrentQty > manualAvailableRob;
+                        
                         return (
                           <tr key={`manual-${actualIndex}`} className="border-b border-gray-100">
                             {isEditing ? (
@@ -3427,19 +3466,26 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                                   />
                                 </td>
                                 <td className="py-3">
-                                  <Input
-                                    type="number"
-                                    value={consumed.quantityConsumed}
-                                    onChange={(e) => {
-                                      setExecutionData(prev => {
-                                        const updated = [...prev.consumedSpareParts];
-                                        updated[actualIndex] = { ...updated[actualIndex], quantityConsumed: e.target.value };
-                                        return { ...prev, consumedSpareParts: updated };
-                                      });
-                                    }}
-                                    className="text-sm h-8 w-20"
-                                    onBlur={() => setEditingConsumedSparePart(null)}
-                                  />
+                                  <div className="flex flex-col gap-1">
+                                    <Input
+                                      type="number"
+                                      min="0"
+                                      max={manualSelectedLocation ? manualAvailableRob : undefined}
+                                      value={consumed.quantityConsumed}
+                                      onChange={(e) => {
+                                        setExecutionData(prev => {
+                                          const updated = [...prev.consumedSpareParts];
+                                          updated[actualIndex] = { ...updated[actualIndex], quantityConsumed: e.target.value };
+                                          return { ...prev, consumedSpareParts: updated };
+                                        });
+                                      }}
+                                      className={`text-sm h-8 w-20 ${manualExceedsRob ? 'border-red-500 focus:border-red-500 focus:ring-red-500' : ''}`}
+                                      onBlur={() => setEditingConsumedSparePart(null)}
+                                    />
+                                    {manualExceedsRob && (
+                                      <span className="text-xs text-red-500">Max: {manualAvailableRob}</span>
+                                    )}
+                                  </div>
                                 </td>
                                 <td className="py-3">
                                   {/* Manual entry editing: Get locations from Spares table by partCode */}
@@ -3497,18 +3543,25 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                                 <td className="py-3 text-gray-900">{consumed.partNo || '-'}</td>
                                 <td className="py-3 text-gray-700">{consumed.description || '-'}</td>
                                 <td className="py-3">
-                                  <Input
-                                    type="number"
-                                    value={consumed.quantityConsumed}
-                                    onChange={(e) => {
-                                      setExecutionData(prev => {
-                                        const updated = [...prev.consumedSpareParts];
-                                        updated[actualIndex] = { ...updated[actualIndex], quantityConsumed: e.target.value };
-                                        return { ...prev, consumedSpareParts: updated };
-                                      });
-                                    }}
-                                    className="text-sm h-8 w-20"
-                                  />
+                                  <div className="flex flex-col gap-1">
+                                    <Input
+                                      type="number"
+                                      min="0"
+                                      max={manualSelectedLocation ? manualAvailableRob : undefined}
+                                      value={consumed.quantityConsumed}
+                                      onChange={(e) => {
+                                        setExecutionData(prev => {
+                                          const updated = [...prev.consumedSpareParts];
+                                          updated[actualIndex] = { ...updated[actualIndex], quantityConsumed: e.target.value };
+                                          return { ...prev, consumedSpareParts: updated };
+                                        });
+                                      }}
+                                      className={`text-sm h-8 w-20 ${manualExceedsRob ? 'border-red-500 focus:border-red-500 focus:ring-red-500' : ''}`}
+                                    />
+                                    {manualExceedsRob && (
+                                      <span className="text-xs text-red-500">Max: {manualAvailableRob}</span>
+                                    )}
+                                  </div>
                                 </td>
                                 <td className="py-3">
                                   {/* Non-editing view: Get locations from Spares table by partCode */}
