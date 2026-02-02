@@ -179,6 +179,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
   
   // Fetch spares inventory for location auto-selection in Part B4
   // IMPORTANT: Uses location/location2 and robLocationA/robLocationB from Spares table per spec
+  // Query uses vesselId in path to get vessel-specific spares with live ROB data
   const { data: sparesInventory = [] } = useQuery<Array<{
     id: number;
     partCode: string;
@@ -189,8 +190,10 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
     location: string | null;   // Primary location name from Spares table
     location2: string | null;  // Secondary location name from Spares table
   }>>({
-    queryKey: ['/technical/api/spares', vesselId],
-    enabled: !!vesselId
+    queryKey: [`/technical/api/spares/${vesselId}`],
+    enabled: !!vesselId,
+    staleTime: 0, // Always fetch fresh data for live ROB
+    refetchOnMount: 'always'
   });
 
   // Fetch vessel locations for location selection in B4
