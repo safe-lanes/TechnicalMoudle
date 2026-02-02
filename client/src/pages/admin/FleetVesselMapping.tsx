@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
+import { useVessels } from "@/hooks/useVessels";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -109,9 +110,7 @@ export default function FleetVesselMapping() {
     enabled: !!selectedVessel,
   });
 
-  const { data: vessels = [] } = useQuery<Array<{id: string, name: string, code: string}>>({
-    queryKey: ['/technical/api/vessels'],
-  });
+  const { data: vessels = [] } = useVessels();
 
   const { data: vesselMappings = [], isLoading: isLoadingMappings } = useQuery<VesselMapping[]>({
     queryKey: ['/technical/api/fleet/vessel-mappings'],

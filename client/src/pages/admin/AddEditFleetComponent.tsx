@@ -1,5 +1,6 @@
 import { useState, useMemo } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
+import { useVessels } from "@/hooks/useVessels";
 import { useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -225,9 +226,7 @@ export default function AddEditFleetComponent() {
     queryKey: ["/technical/api/fleet-admin/master-data?limit=1000"],
   });
 
-  const { data: vessels = [] } = useQuery<{ id: string; code?: string; name: string }[]>({
-    queryKey: ["/technical/api/vessels"],
-  });
+  const { data: vessels = [] } = useVessels();
 
   const { data: makers = [] } = useQuery<Maker[]>({
     queryKey: ["/technical/api/fleet/makers"],

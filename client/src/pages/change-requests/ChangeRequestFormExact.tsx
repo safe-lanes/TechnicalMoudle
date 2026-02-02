@@ -17,6 +17,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useVessel } from "@/contexts/VesselContext";
+import { useVessels } from "@/hooks/useVessels";
 import { type FieldDefinition } from "@shared/changeRequestFields";
 
 interface TargetEntityData {
@@ -72,14 +73,7 @@ export default function ChangeRequestFormExact({ onClose, changeRequest, mode = 
   const [targetEntityError, setTargetEntityError] = useState<string | null>(null);
   const [isLoadingTarget, setIsLoadingTarget] = useState(false);
 
-  const { data: vessels = [] } = useQuery({
-    queryKey: ['/technical/api/vessels'],
-    queryFn: async () => {
-      const response = await fetch('/technical/api/vessels');
-      if (!response.ok) throw new Error('Failed to fetch vessels');
-      return response.json();
-    }
-  });
+  const { data: vessels = [] } = useVessels();
 
   const defaultVesselId = changeRequest?.vesselId || selectedVessel;
 

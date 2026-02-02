@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { useVessels } from "@/hooks/useVessels";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Building2, List, ArrowRight, ArrowLeft, Box, Wrench, Package, Ship, Clock, FileCode2, FolderTree, Anchor, Database, Layers } from "lucide-react";
@@ -56,9 +57,7 @@ export default function Admin4Dashboard() {
     queryKey: ['/technical/api/pms-vessel-settings'],
   });
 
-  const { data: vesselsData, isLoading: isVesselsLoading } = useQuery<{id: string; name: string}[]>({
-    queryKey: ['/technical/api/vessels'],
-  });
+  const { data: vesselsData, isLoading: isVesselsLoading } = useVessels();
 
   const { data: fleetsData, isLoading: isFleetsLoading } = useQuery<Fleet[]>({
     queryKey: ['/technical/api/fleets'],

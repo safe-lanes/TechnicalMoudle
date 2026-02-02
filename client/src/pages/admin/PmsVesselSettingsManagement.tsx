@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
+import { useVessels } from "@/hooks/useVessels";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -34,9 +35,7 @@ export default function PmsVesselSettingsManagement() {
     rhGraceHours: 168,
   });
 
-  const { data: vessels = [], isLoading: isVesselsLoading } = useQuery<Vessel[]>({
-    queryKey: ['/technical/api/vessels'],
-  });
+  const { data: vessels = [], isLoading: isVesselsLoading } = useVessels();
 
   const { data: allSettings = [], isLoading: isSettingsLoading } = useQuery<PmsVesselSettings[]>({
     queryKey: ['/technical/api/pms-vessel-settings'],

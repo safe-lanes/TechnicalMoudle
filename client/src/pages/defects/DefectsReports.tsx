@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
+import { useVessels } from "@/hooks/useVessels";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -90,15 +91,7 @@ export default function DefectsReports() {
   const [filters, setFilters] = useState<ReportFilter>({});
   const [reportData, setReportData] = useState<any>(null);
 
-  const { data: vessels = [] } = useQuery({
-    queryKey: ['/technical/api/vessels'],
-    queryFn: async () => {
-      const response = await fetch('/technical/api/vessels');
-      if (!response.ok) throw new Error('Failed to fetch vessels');
-      return response.json();
-    },
-    enabled: !COMING_SOON
-  });
+  const { data: vessels = [] } = useVessels();
 
   const runReportMutation = useMutation({
     mutationFn: async (reportId: string) => {

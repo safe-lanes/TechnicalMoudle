@@ -1,5 +1,5 @@
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { useLocalVessels } from '@/hooks/useExternalMasterData';
+import { useVessels } from '@/hooks/useVessels';
 
 interface Vessel {
   id: string;
@@ -21,9 +21,9 @@ export const VesselProvider = ({ children }: { children: ReactNode }) => {
     return localStorage.getItem('selectedVesselId') || '';
   });
 
-  const { data: vesselEntries = [], isLoading } = useLocalVessels();
+  const { data: vesselData = [], isLoading } = useVessels();
   
-  const vessels: Vessel[] = vesselEntries
+  const vessels: Vessel[] = vesselData
     .filter((entry: any) => entry.id)
     .map((entry: any) => ({
       id: String(entry.id),

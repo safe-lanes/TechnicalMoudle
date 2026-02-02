@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
+import { useVessels } from "@/hooks/useVessels";
 import { useToast } from "@/hooks/use-toast";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
@@ -36,14 +37,7 @@ export default function EditChangeRequestModal({ open, onClose, requestId }: Edi
   const [showChangeModal, setShowChangeModal] = useState(false);
   const [editingChange, setEditingChange] = useState<ProposedChange | null>(null);
 
-  const { data: vessels = [] } = useQuery({
-    queryKey: ['/technical/api/vessels'],
-    queryFn: async () => {
-      const response = await fetch('/technical/api/vessels');
-      if (!response.ok) throw new Error('Failed to fetch vessels');
-      return response.json();
-    }
-  });
+  const { data: vessels = [] } = useVessels();
 
   const { data: changeRequest, isLoading } = useQuery<ChangeRequest>({
     queryKey: ['/technical/api/change-requests', requestId],

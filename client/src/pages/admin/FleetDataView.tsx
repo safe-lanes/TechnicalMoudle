@@ -1,5 +1,6 @@
 import { useState, useMemo, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
+import { useVessels } from "@/hooks/useVessels";
 import { useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -314,9 +315,7 @@ export default function FleetDataView() {
     queryKey: ["/technical/api/fleet/spares"],
   });
 
-  const { data: vessels } = useQuery<{ id: string; code?: string; name: string }[]>({
-    queryKey: ["/technical/api/vessels"],
-  });
+  const { data: vessels } = useVessels();
 
   const { data: componentVesselMappings } = useQuery<ComponentVesselMapping[]>({
     queryKey: ["/technical/api/fleet-admin/component-vessel-mappings"],
