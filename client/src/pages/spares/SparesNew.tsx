@@ -1917,9 +1917,9 @@ const Spares: React.FC = () => {
         {(isClientAdmin || isChangeMode) && (
           <div className="relative" data-testid="E4">
             <Marker id="E4" />
-            <Select value={vesselId} onValueChange={setVesselId}>
+            <Select value={vesselId === 'all' ? '' : vesselId} onValueChange={setVesselId}>
               <SelectTrigger className="w-48">
-                <SelectValue placeholder="Select Vessel" />
+                <SelectValue placeholder="Choose vessel" />
               </SelectTrigger>
               <SelectContent>
                 {vessels.map(vessel => (

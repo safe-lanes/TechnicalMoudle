@@ -1346,10 +1346,10 @@ const Stores: React.FC = () => {
         {/* Vessel selector - visible only for Client Admin view mode, or in change mode */}
         {(isClientAdmin || isChangeMode) && (
           <div className="flex-1">
-            <Select value={vesselId} onValueChange={setVesselId}>
+            <Select value={vesselId === 'all' ? '' : vesselId} onValueChange={setVesselId}>
               <SelectTrigger className="text-sm" data-testid={getMarkerId(activeTab, "4")}>
                 <Marker id={getMarkerId(activeTab, "4")} />
-                <SelectValue placeholder="Select Vessel" />
+                <SelectValue placeholder="Choose vessel" />
               </SelectTrigger>
               <SelectContent>
                 {vessels.map(vessel => (

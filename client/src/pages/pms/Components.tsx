@@ -2984,7 +2984,7 @@ const Components: React.FC = () => {
           <div className="flex items-center gap-2" data-testid="B2">
             <Marker id="B2" />
             <span className={`text-sm font-medium ${isChangeRequestMode ? 'text-white' : 'text-gray-600'}`}>Vessel:</span>
-            <Select value={vesselId} onValueChange={setVesselId}>
+            <Select value={vesselId === 'all' ? '' : vesselId} onValueChange={setVesselId}>
               <SelectTrigger className={`w-[200px] ${isChangeRequestMode ? 'border-white bg-white/10 text-white' : ''}`}>
                 <SelectValue placeholder="Choose vessel" />
               </SelectTrigger>

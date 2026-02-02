@@ -519,7 +519,7 @@ const WorkOrders: React.FC = () => {
       <div className="flex items-center gap-3">
         {/* Vessel selector - visible only for Client Admin view mode */}
         {isClientAdmin && (
-          <Select value={vesselId} onValueChange={setVesselId}>
+          <Select value={vesselId === 'all' ? '' : vesselId} onValueChange={setVesselId}>
             <SelectTrigger className="w-48" data-testid="C15">
               <Marker id="C15" />
               <SelectValue placeholder="Choose vessel" />
