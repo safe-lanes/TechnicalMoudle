@@ -362,9 +362,9 @@ export default function MaintenancePlanner({ onBack }: MaintenancePlannerProps) 
           <div className="flex items-center gap-3">
             {/* Vessel Selector - Only visible for Client Admin */}
             {isClientAdmin && (
-              <Select value={vesselId} onValueChange={setVesselId}>
+              <Select value={vesselId === 'all' ? '' : vesselId} onValueChange={setVesselId}>
                 <SelectTrigger className="w-48" data-testid="select-vessel">
-                  <SelectValue placeholder="Select Vessel" />
+                  <SelectValue placeholder="Choose vessel" />
                 </SelectTrigger>
                 <SelectContent>
                   {vessels.map(vessel => (
