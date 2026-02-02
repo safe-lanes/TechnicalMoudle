@@ -178,9 +178,6 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
   const vesselId = workOrderContext ? (workOrderContext as any).templateData?.vesselId || (workOrderContext as any).workOrder?.vesselId : null;
   
   // Fetch spares inventory for location auto-selection in Part B4
-  // IMPORTANT: Location and ROB mapping:
-  // - location (primary) pairs with rob_location_a (robLocationA)
-  // - location_2 (secondary) pairs with rob_location_b (robLocationB)
   const { data: sparesInventory = [] } = useQuery<Array<{
     id: number;
     partCode: string;
@@ -188,8 +185,8 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
     rob: string;
     robLocationA: string;
     robLocationB: string;
-    location: string | null;
-    location2: string | null;
+    locationA: string | null;
+    locationB: string | null;
   }>>({
     queryKey: ['/technical/api/spares', vesselId],
     enabled: !!vesselId
@@ -223,55 +220,25 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
   };
 
   // Helper function to get available locations for a spare part
-  // Returns actual location names from spare.location and spare.location2
-  // Maps: location (primary) -> rob_location_a, location_2 (secondary) -> rob_location_b
-  const getAvailableLocationsForSpare = (partNo: string): Array<string> => {
+  const getAvailableLocationsForSpare = (partNo: string): Array<'Location A' | 'Location B'> => {
     const spare = sparesInventory.find(s => s.partCode === partNo);
-    if (!spare) return []; // Return empty if spare not found
+    if (!spare) return ['Location A', 'Location B']; // Default if not found
     
-    const locations: Array<string> = [];
+    const locations: Array<'Location A' | 'Location B'> = [];
     const robA = parseFloat(spare.robLocationA || '0');
     const robB = parseFloat(spare.robLocationB || '0');
     
-    // Only add location if it has stock (rob_location_a pairs with location)
-    if (robA > 0 && spare.location) {
-      locations.push(spare.location);
-    }
-    // Only add location_2 if it has stock (rob_location_b pairs with location_2)
-    if (robB > 0 && spare.location2) {
-      locations.push(spare.location2);
-    }
+    if (robA > 0) locations.push('Location A');
+    if (robB > 0) locations.push('Location B');
+    
+    // If no stock anywhere, allow both locations for manual entry
+    if (locations.length === 0) return ['Location A', 'Location B'];
     
     return locations;
   };
 
-  // Helper to get the actual location names for a spare (regardless of ROB)
-  const getSpareLocationNames = (partNo: string): { primary: string | null; secondary: string | null } => {
-    const spare = sparesInventory.find(s => s.partCode === partNo);
-    if (!spare) return { primary: null, secondary: null };
-    return { 
-      primary: spare.location || null, 
-      secondary: spare.location2 || null 
-    };
-  };
-
-  // Helper to get ROB for a specific location name
-  const getRobForLocation = (partNo: string, locationName: string): number => {
-    const spare = sparesInventory.find(s => s.partCode === partNo);
-    if (!spare) return 0;
-    
-    // Match location name to the correct ROB value
-    if (spare.location && spare.location.toLowerCase() === locationName.toLowerCase()) {
-      return parseFloat(spare.robLocationA || '0');
-    }
-    if (spare.location2 && spare.location2.toLowerCase() === locationName.toLowerCase()) {
-      return parseFloat(spare.robLocationB || '0');
-    }
-    return 0;
-  };
-
   // Helper to check if auto-selection should be applied
-  const getAutoSelectedLocation = (partNo: string): string | null => {
+  const getAutoSelectedLocation = (partNo: string): 'Location A' | 'Location B' | null => {
     const locations = getAvailableLocationsForSpare(partNo);
     if (locations.length === 1) return locations[0];
     return null;
@@ -408,7 +375,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
     previousReading: "",
     currentReading: "",
     uploadedDocuments: [] as Array<{type: string, fileName: string, fileKey: string, uploadedAt: string, uploadedBy: string}>,
-    consumedSpareParts: [] as Array<{partNo: string, partCode?: string, description: string, quantityConsumed: string, location: string, locationId: number | null, comments: string}>,
+    consumedSpareParts: [] as Array<{partNo: string, partCode?: string, description: string, quantityConsumed: string, location: 'Location A' | 'Location B' | '', locationId: number | null, comments: string}>,
     ihmUpdate: {
       enabled: false,
       action: "",
@@ -865,7 +832,6 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
     }
     
     // Add selected spares to consumedSpareParts
-    // Use the actual location name from the selected location (not hardcoded 'Location A'/'Location B')
     const newConsumedParts = selectedSpares.map(s => {
       const selectedLocation = s.locations.find((l: any) => l.locationId === s.selectedLocationId);
       const locationName = selectedLocation?.locationName || '';
@@ -874,7 +840,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
         partCode: s.spare.partCode || '',
         description: s.spare.partName || '',
         quantityConsumed: s.consumeQty,
-        location: locationName,
+        location: (locationName === 'Location A' || locationName === 'Location B' ? locationName : '') as 'Location A' | 'Location B' | '',
         locationId: s.selectedLocationId,
         comments: s.comments
       };
@@ -3677,8 +3643,8 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                     <th className="text-left py-2 px-2 font-medium w-12">Select</th>
                     <th className="text-left py-2 px-2 font-medium">Part Code</th>
                     <th className="text-left py-2 px-2 font-medium">Description</th>
-                    <th className="text-center py-2 px-2 font-medium">Location</th>
-                    <th className="text-center py-2 px-2 font-medium">ROB</th>
+                    <th className="text-center py-2 px-2 font-medium">ROB Loc A</th>
+                    <th className="text-center py-2 px-2 font-medium">ROB Loc B</th>
                     <th className="text-center py-2 px-2 font-medium">Total ROB</th>
                     <th className="text-left py-2 px-2 font-medium w-24">Qty to Use</th>
                     <th className="text-left py-2 px-2 font-medium w-32">From Location</th>
@@ -3687,24 +3653,8 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                 </thead>
                 <tbody>
                   {linkedSpares.map((item, index) => {
-                    // Location and ROB mapping:
-                    // - location (primary) pairs with rob_location_a (robLocationA)
-                    // - location_2 (secondary) pairs with rob_location_b (robLocationB)
-                    const primaryLocationName = item.spare.location || 'Primary';
-                    const secondaryLocationName = item.spare.location2 || null;
-                    
-                    // Get ROB for each location using the correct mapping
-                    const primaryRob = item.spare.robLocationA || 0;
-                    const secondaryRob = item.spare.robLocationB || 0;
-                    
-                    // Build location display showing each location with its ROB
-                    const locationDetails: Array<{name: string, rob: number}> = [];
-                    if (primaryLocationName) {
-                      locationDetails.push({ name: primaryLocationName, rob: Number(primaryRob) });
-                    }
-                    if (secondaryLocationName && secondaryRob > 0) {
-                      locationDetails.push({ name: secondaryLocationName, rob: Number(secondaryRob) });
-                    }
+                    const locA = item.locations.find(l => l.locationName === 'Location A')?.qty || item.spare.robLocationA || 0;
+                    const locB = item.locations.find(l => l.locationName === 'Location B')?.qty || item.spare.robLocationB || 0;
                     
                     return (
                       <tr key={item.spare.id || index} className="border-b hover:bg-gray-50 dark:hover:bg-gray-800">
@@ -3721,16 +3671,8 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                         </td>
                         <td className="py-2 px-2 font-mono text-xs">{item.spare.partCode || item.spare.partNumber || '-'}</td>
                         <td className="py-2 px-2">{item.spare.partName || '-'}</td>
-                        <td className="py-2 px-2 text-center font-medium text-xs">
-                          {locationDetails.map((loc, i) => (
-                            <div key={i}>{loc.name}</div>
-                          ))}
-                        </td>
-                        <td className="py-2 px-2 text-center font-medium">
-                          {locationDetails.map((loc, i) => (
-                            <div key={i}>{loc.rob}</div>
-                          ))}
-                        </td>
+                        <td className="py-2 px-2 text-center font-medium">{locA}</td>
+                        <td className="py-2 px-2 text-center font-medium">{locB}</td>
                         <td className="py-2 px-2 text-center font-semibold">{item.robTotal}</td>
                         <td className="py-2 px-2">
                           <Input
