@@ -67,6 +67,7 @@ export default function LinkDefectsModal({ open, onClose, defectId, currentLinke
       });
       queryClient.invalidateQueries({ queryKey: ['/technical/api/defects'] });
       queryClient.invalidateQueries({ queryKey: ['/technical/api/defects', defectId] });
+      queryClient.invalidateQueries({ queryKey: ['/technical/api/defects?includeClosedDefects=true'] });
       handleClose();
     },
     onError: (error: any) => {

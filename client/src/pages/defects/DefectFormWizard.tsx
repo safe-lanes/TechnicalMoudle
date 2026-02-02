@@ -410,6 +410,7 @@ export default function DefectFormWizard({
       if (existingId) {
         await apiRequest('PATCH', `/technical/api/defects/${existingId}`, submitData);
         queryClient.invalidateQueries({ queryKey: ['defects'] });
+        queryClient.invalidateQueries({ queryKey: ['/technical/api/defects?includeClosedDefects=true'] });
         if (showToast) {
           toast({ title: "Defect updated successfully" });
         }
@@ -425,6 +426,7 @@ export default function DefectFormWizard({
           // Response might not be JSON, ignore
         }
         queryClient.invalidateQueries({ queryKey: ['defects'] });
+        queryClient.invalidateQueries({ queryKey: ['/technical/api/defects?includeClosedDefects=true'] });
         if (showToast) {
           toast({ title: "Defect created successfully" });
         }
