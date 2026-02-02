@@ -39,7 +39,7 @@ import LinkDefectsModal from "./LinkDefectsModal";
 import DefectModal from "./DefectModal";
 import { cn } from "@/lib/utils";
 import type { Defect } from "@shared/schema";
-import { getComputedStatus } from "@/lib/defectStatusUtils";
+import { getComputedStatus, isActiveComputedStatus } from "@/lib/defectStatusUtils";
 import AgGridTable from "@/components/AgGrid/AgGridTable";
 import AgGridTableActions from "@/components/AgGrid/AgGridTableActions";
 import { ICellRendererParams, GridReadyEvent, GridApi, ColDef } from "ag-grid-community";
@@ -327,20 +327,9 @@ export default function DefectsLogWithTabs() {
   }, []);
 
   const { data: defects = [], isLoading } = useQuery({
-    queryKey: ['defects', 'active', filters],
+    queryKey: ['/technical/api/defects?includeClosedDefects=true'],
     queryFn: async () => {
-      const params = new URLSearchParams();
-      params.append('statusScope', 'active');
-      
-      if (filters.vesselId) params.append('vesselId', filters.vesselId);
-      if (filters.type) params.append('category', filters.type);
-      if (filters.search) params.append('search', filters.search);
-      if (filters.period) params.append('period', filters.period);
-      if (filters.fleet) params.append('fleet', filters.fleet);
-      if (filters.addGroup) params.append('group', filters.addGroup);
-      if (filters.dueOverdue) params.append('dueOverdue', filters.dueOverdue);
-      
-      const response = await fetch(`/technical/api/defects?${params}`);
+      const response = await fetch(`/technical/api/defects?includeClosedDefects=true`);
       if (!response.ok) throw new Error('Failed to fetch defects');
       const data = await response.json();
       
@@ -367,7 +356,12 @@ export default function DefectsLogWithTabs() {
   };
 
   const filteredDefects = useMemo(() => {
-    let result = defects;
+    // First, filter to only ACTIVE defects using computed status logic
+    // This ensures consistency with Dashboard which also uses computed status
+    let result = defects.filter((defect: Defect) => {
+      const computedStatus = getComputedStatus(defect);
+      return isActiveComputedStatus(computedStatus.label);
+    });
     
     // Vessel filter
     if (selectedVesselNames.length > 0) {
@@ -377,6 +371,29 @@ export default function DefectsLogWithTabs() {
         return normalizedFilterNames.some(filterName => 
           filterName === defectVessel || defectVessel.includes(filterName) || filterName.includes(defectVessel)
         );
+      });
+    }
+    
+    // Category/Type filter (client-side)
+    if (filters.type && filters.type !== 'all') {
+      result = result.filter((defect: Defect) => 
+        defect.category?.toLowerCase() === filters.type?.toLowerCase()
+      );
+    }
+    
+    // Search filter (client-side)
+    if (filters.search && filters.search.trim()) {
+      const searchLower = filters.search.toLowerCase().trim();
+      result = result.filter((defect: Defect) => {
+        const searchFields = [
+          defect.id,
+          defect.description,
+          defect.equipmentMake,
+          defect.actionTakenRequested,
+          defect.vesselId,
+          defect.vesselName,
+        ].filter(Boolean).map(f => String(f).toLowerCase());
+        return searchFields.some(field => field.includes(searchLower));
       });
     }
     
@@ -409,7 +426,7 @@ export default function DefectsLogWithTabs() {
     }
     
     return result;
-  }, [defects, selectedVesselNames, filters.dueOverdue]);
+  }, [defects, selectedVesselNames, filters]);
   
   const canEdit = () => {
     const role = currentUser?.role || '';
