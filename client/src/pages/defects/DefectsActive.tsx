@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient } from "@/lib/queryClient";
+import { getComputedStatus, isActiveComputedStatus, isResolvedComputedStatus } from "@/lib/defectStatusUtils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -70,22 +71,25 @@ export default function DefectsActive() {
     },
   });
 
-  // Filter defects based on active tab
+  // Filter defects based on active tab using COMPUTED status (matches Dashboard logic)
   const defects = allDefects.filter((defect: Defect) => {
+    const computedStatus = getComputedStatus(defect);
     if (activeTab === "Active") {
-      return ['Open', 'Pending', 'In-Progress', 'Awaiting Parts', 'Deferred'].includes(defect.status);
+      return isActiveComputedStatus(computedStatus.label);
     } else {
-      return ['Closed', 'Cancelled'].includes(defect.status);
+      return isResolvedComputedStatus(computedStatus.label);
     }
   });
 
-  // Calculate counts for tabs
-  const activeCount = allDefects.filter((d: Defect) => 
-    ['Open', 'Pending', 'In-Progress', 'Awaiting Parts', 'Deferred'].includes(d.status)
-  ).length;
-  const resolvedCount = allDefects.filter((d: Defect) => 
-    ['Closed', 'Cancelled'].includes(d.status)
-  ).length;
+  // Calculate counts for tabs using COMPUTED status (matches Dashboard logic)
+  const activeCount = allDefects.filter((d: Defect) => {
+    const computedStatus = getComputedStatus(d);
+    return isActiveComputedStatus(computedStatus.label);
+  }).length;
+  const resolvedCount = allDefects.filter((d: Defect) => {
+    const computedStatus = getComputedStatus(d);
+    return isResolvedComputedStatus(computedStatus.label);
+  }).length;
 
   const getStatusBadge = (status: string, critical: boolean) => {
     const statusColors: Record<string, string> = {

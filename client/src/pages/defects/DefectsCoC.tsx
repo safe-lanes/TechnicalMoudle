@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useMemo } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useAuth } from "@/contexts/AuthContext";
+import { getComputedStatus, isActiveComputedStatus, isResolvedComputedStatus } from "@/lib/defectStatusUtils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -116,71 +117,6 @@ const TwoLineDateCellRenderer = (params: ICellRendererParams) => {
   }
 };
 
-// Helper function to calculate computed status based on defect data
-const getComputedStatus = (defect: any): { label: string; color: string } => {
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  
-  // Parse date string to local midnight (handles ISO format YYYY-MM-DD)
-  const parseDate = (dateStr: string | null | undefined): Date | null => {
-    if (!dateStr) return null;
-    const match = String(dateStr).match(/^(\d{4})-(\d{2})-(\d{2})/);
-    if (match) {
-      const [, year, month, day] = match;
-      const date = new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
-      date.setHours(0, 0, 0, 0);
-      return date;
-    }
-    const date = new Date(dateStr);
-    if (isNaN(date.getTime())) return null;
-    date.setHours(0, 0, 0, 0);
-    return date;
-  };
-  
-  const dateCompleted = parseDate(defect.dateCompleted);
-  const targetCloseDate = parseDate(defect.targetCloseDate);
-  const hasActions = defect.actions && Array.isArray(defect.actions) && defect.actions.length > 0;
-  const isExtended = defect.isDeferred === true;
-  
-  // 1. Verified (green) - Final state, always takes precedence
-  if (defect.verified === true) {
-    return { label: 'Verified', color: 'text-green-600' };
-  }
-  
-  // 2. Closed (green) - Completed on or before target date
-  if (dateCompleted && targetCloseDate && dateCompleted <= targetCloseDate) {
-    return { label: 'Closed', color: 'text-green-600' };
-  }
-  
-  // 3. Closed (orange) - Completed after target date
-  if (dateCompleted && targetCloseDate && dateCompleted > targetCloseDate) {
-    return { label: 'Closed', color: 'text-orange-500' };
-  }
-  
-  // 4. Closed (green) - Completed without target date comparison
-  if (dateCompleted) {
-    return { label: 'Closed', color: 'text-green-600' };
-  }
-  
-  // 5. Overdue (red) - Past target date without completion and not extended
-  if (!dateCompleted && targetCloseDate && today > targetCloseDate && !isExtended) {
-    return { label: 'Overdue', color: 'text-red-600' };
-  }
-  
-  // 6. Extended (orange) - Target date extension approved
-  if (isExtended) {
-    return { label: 'Extended', color: 'text-orange-500' };
-  }
-  
-  // 7. In Progress (blue) - Part B submitted (has at least 1 action)
-  if (hasActions) {
-    return { label: 'In Progress', color: 'text-blue-600' };
-  }
-  
-  // 8. Reported (dark grey) - Default state, only Part A submitted
-  return { label: 'Reported', color: 'text-gray-600' };
-};
-
 const StatusCellRenderer = (params: ICellRendererParams) => {
   if (!params.colDef || !params.data) return null;
   
@@ -221,7 +157,9 @@ const ActionsCellRenderer = (params: ICellRendererParams & { context: ActionsCel
   if (!params.colDef || !params.data) return null;
   
   const defect = params.data as Defect;
-  const isActiveDefect = ['Open', 'Pending', 'In-Progress', 'Awaiting Parts', 'Deferred'].includes(defect.status);
+  // Use computed status to match Dashboard logic
+  const computedStatus = getComputedStatus(defect);
+  const isActiveDefect = isActiveComputedStatus(computedStatus.label);
   const isVerified = defect.verified === true;
   const { handleViewClick, handleEditClick, handleLinkClick, handleVerifyClick, canVerify, isVerifying } = params.context;
   
@@ -358,15 +296,17 @@ export default function DefectsCoC() {
   });
 
   // Filter defects based on status filter and Due/Overdue filter
+  // Uses COMPUTED status (matching Dashboard logic) instead of raw database status
   const defects = useMemo(() => {
     let result = allDefects;
     
-    // Status filter
+    // Status filter using computed status (matches Dashboard logic)
     result = result.filter((defect: Defect) => {
+      const computedStatus = getComputedStatus(defect);
       if (!filters.status || filters.status === 'active') {
-        return ['Open', 'Pending', 'In-Progress', 'Awaiting Parts', 'Deferred'].includes(defect.status);
+        return isActiveComputedStatus(computedStatus.label);
       } else if (filters.status === 'resolved') {
-        return ['Closed', 'Cancelled'].includes(defect.status);
+        return isResolvedComputedStatus(computedStatus.label);
       }
       return true;
     });
