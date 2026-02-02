@@ -20,7 +20,7 @@ interface UIRoleProviderProps {
 const UI_ROLE_STORAGE_KEY = "sail_ui_role";
 
 export function UIRoleProvider({ children }: UIRoleProviderProps) {
-  const [uiRole, setUIRoleState] = useState<UIRole>("Sail_Admin");
+  const [uiRole, setUIRoleState] = useState<UIRole>("Client_Admin");
 
   useEffect(() => {
     const storedRole = localStorage.getItem(UI_ROLE_STORAGE_KEY);
