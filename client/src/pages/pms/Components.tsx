@@ -2986,7 +2986,7 @@ const Components: React.FC = () => {
             <span className={`text-sm font-medium ${isChangeRequestMode ? 'text-white' : 'text-gray-600'}`}>Vessel:</span>
             <Select value={vesselId} onValueChange={setVesselId}>
               <SelectTrigger className={`w-[200px] ${isChangeRequestMode ? 'border-white bg-white/10 text-white' : ''}`}>
-                <SelectValue placeholder="Select vessel" />
+                <SelectValue placeholder="Choose vessel" />
               </SelectTrigger>
               <SelectContent>
                 {vessels.map(vessel => (

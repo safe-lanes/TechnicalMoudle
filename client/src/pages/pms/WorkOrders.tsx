@@ -522,7 +522,7 @@ const WorkOrders: React.FC = () => {
           <Select value={vesselId} onValueChange={setVesselId}>
             <SelectTrigger className="w-48" data-testid="C15">
               <Marker id="C15" />
-              <SelectValue placeholder="Select Vessel" />
+              <SelectValue placeholder="Choose vessel" />
             </SelectTrigger>
             <SelectContent>
               {vessels.map(vessel => (
