@@ -1,2 +1,0 @@
-ALTER TABLE "running_hours_audit" ADD COLUMN "uuid" text DEFAULT gen_random_uuid() NOT NULL;--> statement-breakpoint
-ALTER TABLE "running_hours_audit" ADD COLUMN "created_at" timestamp DEFAULT now() NOT NULL;

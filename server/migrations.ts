@@ -600,11 +600,52 @@ export async function runMigrations(): Promise<{ applied: number; skipped: numbe
 export async function generateDrizzleMigrations(): Promise<boolean> {
   console.log('🔄 Checking for schema changes and generating migrations...');
   
-  // Skip automatic migration generation - drizzle-kit generate requires interactive input
-  // for rename vs create decisions. Run migrations manually when needed.
-  // Schema is kept in sync via direct SQL migrations in migrations/add_mandatory_columns.sql
-  console.log('⏭️  Skipping automatic migration generation - use manual migrations when needed');
-  return false;
+  if (isFileStorageForced()) {
+    console.log('⏭️  Skipping migration generation - file-based storage is active');
+    return false;
+  }
+  
+  if (!process.env.DATABASE_URL) {
+    console.log('⏭️  Skipping migration generation - DATABASE_URL not configured');
+    return false;
+  }
+  
+  const migrationsFolder = path.join(process.cwd(), 'migrations');
+  if (!fs.existsSync(migrationsFolder)) {
+    fs.mkdirSync(migrationsFolder, { recursive: true });
+  }
+  
+  try {
+    const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+    const migrationName = `auto_${timestamp}`;
+    
+    const { stdout, stderr } = await execAsync(
+      `npx drizzle-kit generate --name ${migrationName}`,
+      { timeout: 60000 }
+    );
+    
+    if (stdout.includes('No schema changes')) {
+      console.log('✅ No schema changes detected - no new migrations needed');
+      return false;
+    }
+    
+    if (stdout.includes('migrations generated') || stdout.includes('migration files')) {
+      console.log('✅ New migration file(s) generated automatically');
+      console.log(stdout.trim());
+      return true;
+    }
+    
+    console.log('✅ Migration generation complete');
+    if (stdout.trim()) console.log(stdout.trim());
+    return true;
+  } catch (error: any) {
+    if (error.stdout?.includes('No schema changes') || error.stderr?.includes('No schema changes')) {
+      console.log('✅ No schema changes detected - no new migrations needed');
+      return false;
+    }
+    console.error('⚠️  Migration generation warning:', error.message);
+    return false;
+  }
 }
 
 export async function runDrizzleMigrations(): Promise<void> {

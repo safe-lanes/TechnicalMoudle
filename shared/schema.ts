@@ -1,6 +1,5 @@
 
-import { pgTable, text, integer, boolean, timestamp, decimal, index, json, jsonb, numeric, primaryKey, unique, pgEnum, uuid as pgUuid } from "drizzle-orm/pg-core";
-import { sql } from "drizzle-orm";
+import { pgTable, text, integer, boolean, timestamp, decimal, index, json, jsonb, numeric, primaryKey, unique, pgEnum } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
@@ -9,7 +8,6 @@ export const userRoleEnum = pgEnum("user_role", ["Ship", "Office", "PMS Admin"])
 
 export const users = pgTable("users", {
   id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
-  uuid: text("uuid").notNull().default(sql`gen_random_uuid()`),
   username: text("username").notNull().unique(),
   password: text("password").notNull(),
   fullName: text("full_name").notNull(),
@@ -18,16 +16,12 @@ export const users = pgTable("users", {
   vesselId: text("vessel_id"), // Required for Ship role, null for Office/PMS Admin
   department: text("department"), // Rule #19: User's department for approver validation (e.g., 'Deck', 'Engine', 'Electrical')
   isActive: boolean("is_active").notNull().default(true),
-  isDeleted: boolean("is_deleted").notNull().default(false),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
-  updatedBy: text("updated_by"),
 });
 
 export const insertUserSchema = createInsertSchema(users).omit({
   id: true,
-  uuid: true,
-  isDeleted: true,
   createdAt: true,
   updatedAt: true,
 });
@@ -43,20 +37,15 @@ export type PublicUser = Omit<User, "password"> & {
 // Fleets Table - Fleet registry for grouping vessels
 export const fleets = pgTable("fleets", {
   id: text("id").primaryKey(), // Fleet code like FLT001, FLT002
-  uuid: text("uuid").notNull().default(sql`gen_random_uuid()`),
   code: text("code").notNull().unique(), // Unique fleet code
   name: text("name").notNull(), // Fleet display name
   description: text("description"), // Optional description
   isActive: boolean("is_active").notNull().default(true),
-  isDeleted: boolean("is_deleted").notNull().default(false),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
-  updatedBy: text("updated_by"),
 });
 
 export const insertFleetSchema = createInsertSchema(fleets).omit({
-  uuid: true,
-  isDeleted: true,
   createdAt: true,
   updatedAt: true,
 });
@@ -67,7 +56,6 @@ export type Fleet = typeof fleets.$inferSelect;
 // Vessels Table - Core vessel registry
 export const vessels = pgTable("vessels", {
   id: text("id").primaryKey(), // Vessel code like V001, V002
-  uuid: text("uuid").notNull().default(sql`gen_random_uuid()`),
   name: text("name").notNull(), // Vessel display name
   code: text("code").notNull(), // Same as id for compatibility
   fleetId: text("fleet_id"), // Optional reference to fleet
@@ -76,15 +64,11 @@ export const vessels = pgTable("vessels", {
   flag: text("flag"), // Flag state
   vesselSequence: integer("vessel_sequence"), // Numeric sequence for vessel (1, 2, 3... for defect IDs)
   isActive: boolean("is_active").notNull().default(true),
-  isDeleted: boolean("is_deleted").notNull().default(false),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
-  updatedBy: text("updated_by"),
 });
 
 export const insertVesselSchema = createInsertSchema(vessels).omit({
-  uuid: true,
-  isDeleted: true,
   createdAt: true,
   updatedAt: true,
 });
@@ -95,33 +79,23 @@ export type Vessel = typeof vessels.$inferSelect;
 // Defect Sequences Table - Tracks defect ID counters per vessel per year
 export const defectSequences = pgTable("defect_sequences", {
   id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
-  uuid: text("uuid").notNull().default(sql`gen_random_uuid()`),
   vesselId: text("vessel_id").notNull(),
   year: integer("year").notNull(), // 2-digit year stored as 4-digit (e.g., 2026)
   lastSequence: integer("last_sequence").notNull().default(0), // Last used sequence number
-  isDeleted: boolean("is_deleted").notNull().default(false),
-  createdAt: timestamp("created_at").notNull().defaultNow(),
-  updatedAt: timestamp("updated_at").notNull().defaultNow(),
-  updatedBy: text("updated_by"),
 }, (table) => ({
   uniqueVesselYear: index("idx_defect_seq_vessel_year").on(table.vesselId, table.year),
 }));
 
 export const insertDefectSequenceSchema = createInsertSchema(defectSequences).omit({
   id: true,
-  uuid: true,
-  isDeleted: true,
-  createdAt: true,
-  updatedAt: true,
 });
 
 export type InsertDefectSequence = z.infer<typeof insertDefectSequenceSchema>;
 export type DefectSequence = typeof defectSequences.$inferSelect;
 
-// Running Hours Audit Table (IMMUTABLE - no is_deleted or updated_at by design)
+// Running Hours Audit Table
 export const runningHoursAudit = pgTable("running_hours_audit", {
   id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
-  uuid: text("uuid").notNull().default(sql`gen_random_uuid()`),
   vesselId: text("vessel_id").notNull(),
   componentId: text("component_id").notNull(),
   previousRH: decimal("previous_rh", { precision: 10, scale: 2 }).notNull(),
@@ -145,7 +119,6 @@ export const runningHoursAudit = pgTable("running_hours_audit", {
   renewalEvidenceUrls: json("renewal_evidence_urls"), // Optional array of uploaded file URLs
   componentCode: text("component_code"), // Component code for reporting
   componentName: text("component_name"), // Component name for reporting
-  createdAt: timestamp("created_at").notNull().defaultNow(),
 }, (table) => ({
   componentIdIdx: index("idx_component_entered").on(table.componentId, table.enteredAtUTC),
   componentDateIdx: index("idx_component_date").on(table.componentId, table.dateUpdatedLocal),
@@ -154,8 +127,6 @@ export const runningHoursAudit = pgTable("running_hours_audit", {
 
 export const insertRunningHoursAuditSchema = createInsertSchema(runningHoursAudit).omit({
   id: true,
-  uuid: true,
-  createdAt: true,
 });
 
 export type InsertRunningHoursAudit = z.infer<typeof insertRunningHoursAuditSchema>;
@@ -317,11 +288,8 @@ export const components = pgTable("components", {
   rhCurrentInheritedCached: decimal("rh_current_inherited_cached", { precision: 10, scale: 2 }),
   rhInheritedUpdatedAt: timestamp("rh_inherited_updated_at"),
   
-  uuid: text("uuid").notNull().default(sql`gen_random_uuid()`),
-  isDeleted: boolean("is_deleted").notNull().default(false),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
-  updatedBy: text("updated_by"),
 }, (table) => ({
   dataScopeIdx: index("idx_comp_data_scope").on(table.dataScope),
   fleetTreeIdx: index("idx_comp_fleet_tree").on(table.dataScope, table.parentFleetEquipmentCode),
@@ -334,8 +302,6 @@ export const components = pgTable("components", {
 
 export const insertComponentSchema = createInsertSchema(components).omit({
   id: true, // Auto-generated
-  uuid: true,
-  isDeleted: true,
   createdAt: true,
   updatedAt: true,
 });
@@ -346,21 +312,12 @@ export type Component = typeof components.$inferSelect;
 // Form Definitions Table
 export const formDefinitions = pgTable("form_definitions", {
   id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
-  uuid: text("uuid").notNull().default(sql`gen_random_uuid()`),
   name: text("name").notNull().unique(), // ADD_COMPONENT, WO_PLANNED, WO_UNPLANNED
   subgroup: text("subgroup"),
-  isDeleted: boolean("is_deleted").notNull().default(false),
-  createdAt: timestamp("created_at").notNull().defaultNow(),
-  updatedAt: timestamp("updated_at").notNull().defaultNow(),
-  updatedBy: text("updated_by"),
 });
 
 export const insertFormDefinitionSchema = createInsertSchema(formDefinitions).omit({
   id: true,
-  uuid: true,
-  isDeleted: true,
-  createdAt: true,
-  updatedAt: true,
 });
 
 export type InsertFormDefinition = z.infer<typeof insertFormDefinitionSchema>;
@@ -369,7 +326,6 @@ export type FormDefinition = typeof formDefinitions.$inferSelect;
 // Form Versions Table
 export const formVersions = pgTable("form_versions", {
   id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
-  uuid: text("uuid").notNull().default(sql`gen_random_uuid()`),
   formId: integer("form_id").notNull(),
   versionNo: integer("version_no").notNull(),
   versionDate: timestamp("version_date").notNull(),
@@ -377,10 +333,6 @@ export const formVersions = pgTable("form_versions", {
   authorUserId: text("author_user_id").notNull(),
   changelog: text("changelog"),
   schemaJson: text("schema_json").notNull(), // JSON string
-  isDeleted: boolean("is_deleted").notNull().default(false),
-  createdAt: timestamp("created_at").notNull().defaultNow(),
-  updatedAt: timestamp("updated_at").notNull().defaultNow(),
-  updatedBy: text("updated_by"),
 }, (table) => ({
   formIdIdx: index("idx_form_id").on(table.formId),
   statusIdx: index("idx_form_version_status").on(table.status),
@@ -388,10 +340,6 @@ export const formVersions = pgTable("form_versions", {
 
 export const insertFormVersionSchema = createInsertSchema(formVersions).omit({
   id: true,
-  uuid: true,
-  isDeleted: true,
-  createdAt: true,
-  updatedAt: true,
 });
 
 export type InsertFormVersion = z.infer<typeof insertFormVersionSchema>;
@@ -400,22 +348,13 @@ export type FormVersion = typeof formVersions.$inferSelect;
 // Form Version Usage Table (Audit)
 export const formVersionUsage = pgTable("form_version_usage", {
   id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
-  uuid: text("uuid").notNull().default(sql`gen_random_uuid()`),
   formVersionId: integer("form_version_id").notNull(),
   usedInModule: text("used_in_module").notNull(),
   usedAt: timestamp("used_at").notNull(),
-  isDeleted: boolean("is_deleted").notNull().default(false),
-  createdAt: timestamp("created_at").notNull().defaultNow(),
-  updatedAt: timestamp("updated_at").notNull().defaultNow(),
-  updatedBy: text("updated_by"),
 });
 
 export const insertFormVersionUsageSchema = createInsertSchema(formVersionUsage).omit({
   id: true,
-  uuid: true,
-  isDeleted: true,
-  createdAt: true,
-  updatedAt: true,
 });
 
 export type InsertFormVersionUsage = z.infer<typeof insertFormVersionUsageSchema>;
@@ -424,7 +363,6 @@ export type FormVersionUsage = typeof formVersionUsage.$inferSelect;
 // IHM (Inventory of Hazardous Materials) Tables
 export const ihmItems = pgTable("ihm_items", {
   id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
-  uuid: text("uuid").notNull().default(sql`gen_random_uuid()`),
   componentId: text("component_id").notNull(),
   spareId: text("spare_id"),
   presence: text("presence").notNull(), // Unknown | Present | Not Present
@@ -435,10 +373,8 @@ export const ihmItems = pgTable("ihm_items", {
   supplier: text("supplier"),
   remarks: text("remarks"),
   vesselId: text("vessel_id").notNull().default("V001"),
-  isDeleted: boolean("is_deleted").notNull().default(false),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
-  updatedBy: text("updated_by"),
 }, (table) => ({
   componentIdIdx: index("idx_ihm_component_id").on(table.componentId),
   spareIdIdx: index("idx_ihm_spare_id").on(table.spareId),
@@ -446,8 +382,6 @@ export const ihmItems = pgTable("ihm_items", {
 
 export const insertIhmItemSchema = createInsertSchema(ihmItems).omit({
   id: true,
-  uuid: true,
-  isDeleted: true,
   createdAt: true,
   updatedAt: true,
 });
@@ -458,7 +392,6 @@ export type IhmItem = typeof ihmItems.$inferSelect;
 // IHM Maintenance Log Table
 export const ihmMaintenanceLog = pgTable("ihm_maintenance_log", {
   id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
-  uuid: text("uuid").notNull().default(sql`gen_random_uuid()`),
   workOrderId: text("work_order_id").notNull(),
   action: text("action").notNull(), // Installed | Removed | Replaced
   targetComponent: text("target_component"),
@@ -468,10 +401,7 @@ export const ihmMaintenanceLog = pgTable("ihm_maintenance_log", {
   materials: text("materials").array(),
   remarks: text("remarks"),
   vesselId: text("vessel_id").notNull().default("V001"),
-  isDeleted: boolean("is_deleted").notNull().default(false),
   createdAt: timestamp("created_at").notNull().defaultNow(),
-  updatedAt: timestamp("updated_at").notNull().defaultNow(),
-  updatedBy: text("updated_by"),
   userId: text("user_id").notNull(),
 }, (table) => ({
   workOrderIdIdx: index("idx_ihm_log_wo_id").on(table.workOrderId),
@@ -480,10 +410,7 @@ export const ihmMaintenanceLog = pgTable("ihm_maintenance_log", {
 
 export const insertIhmMaintenanceLogSchema = createInsertSchema(ihmMaintenanceLog).omit({
   id: true,
-  uuid: true,
-  isDeleted: true,
   createdAt: true,
-  updatedAt: true,
 });
 
 export type InsertIhmMaintenanceLog = z.infer<typeof insertIhmMaintenanceLogSchema>;
@@ -492,7 +419,6 @@ export type IhmMaintenanceLog = typeof ihmMaintenanceLog.$inferSelect;
 // Spares Table
 export const spares = pgTable("spares", {
   id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
-  uuid: text("uuid").notNull().default(sql`gen_random_uuid()`),
   partCode: text("part_code").notNull(),
   partName: text("part_name").notNull(),
   componentId: text("component_id"), // Nullable for fleet spares
@@ -512,7 +438,7 @@ export const spares = pgTable("spares", {
   lastOrderDate: text("last_order_date"), // Last procurement date (DD-MMM-YYYY format)
   location: text("location"),
   vesselId: text("vessel_id"), // Nullable - only required when dataScope='vessel'
-  isDeleted: boolean("is_deleted").notNull().default(false),
+  deleted: boolean("deleted").notNull().default(false),
   // Fleet-specific fields (when dataScope='fleet')
   dataScope: text("data_scope").notNull().default("vessel"), // 'fleet' | 'vessel'
   fleetEquipmentCode: text("fleet_equipment_code"), // Link to fleet component
@@ -550,14 +476,12 @@ export const spares = pgTable("spares", {
   componentSpareCodeIdx: index("idx_spare_code").on(table.vesselId, table.componentSpareCode),
   dataScopeIdx: index("idx_spare_data_scope").on(table.dataScope),
   fleetEquipmentCodeIdx: index("idx_spare_fleet_equipment").on(table.dataScope, table.fleetEquipmentCode),
-  isDeletedIdx: index("idx_spare_is_deleted").on(table.isDeleted),
   fleetPartCodeUniqueIdx: unique("unique_fleet_part_code_vessel").on(table.fleetPartCode, table.dataScope, table.vesselId),
 }));
 
 export const insertSpareSchema = createInsertSchema(spares).omit({
   id: true,
-  uuid: true,
-  isDeleted: true,
+  deleted: true,
   createdAt: true,
   updatedAt: true,
 });
@@ -565,10 +489,9 @@ export const insertSpareSchema = createInsertSchema(spares).omit({
 export type InsertSpare = z.infer<typeof insertSpareSchema>;
 export type Spare = typeof spares.$inferSelect;
 
-// Spares History Table (IMMUTABLE audit log - no is_deleted or updated_at)
+// Spares History Table
 export const sparesHistory = pgTable("spares_history", {
   id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
-  uuid: text("uuid").notNull().default(sql`gen_random_uuid()`),
   timestampUTC: timestamp("timestamp_utc").notNull(),
   vesselId: text("vessel_id").notNull(),
   spareId: integer("spare_id").notNull(),
@@ -587,7 +510,6 @@ export const sparesHistory = pgTable("spares_history", {
   dateLocal: text("date_local"), // Local date of transaction
   tz: text("tz"), // Timezone
   place: text("place"), // Port/Location for receive/consume
-  createdAt: timestamp("created_at").notNull().defaultNow(),
 }, (table) => ({
   timestampIdx: index("idx_history_timestamp").on(table.timestampUTC),
   spareIdIdx: index("idx_history_spare").on(table.spareId),
@@ -596,17 +518,14 @@ export const sparesHistory = pgTable("spares_history", {
 
 export const insertSpareHistorySchema = createInsertSchema(sparesHistory).omit({
   id: true,
-  uuid: true,
-  createdAt: true,
 });
 
 export type InsertSpareHistory = z.infer<typeof insertSpareHistorySchema>;
 export type SpareHistory = typeof sparesHistory.$inferSelect;
 
-// Stores Ledger Table (for Stores module history - IMMUTABLE audit log)
+// Stores Ledger Table (for Stores module history)
 export const storesLedger = pgTable("stores_ledger", {
   id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
-  uuid: text("uuid").notNull().default(sql`gen_random_uuid()`),
   vesselId: text("vessel_id").notNull(),
   section: text("section").notNull(), // 'stores' | 'lubes' | 'chemicals' | 'others'
   itemId: integer("item_id").notNull(),
@@ -625,7 +544,6 @@ export const storesLedger = pgTable("stores_ledger", {
   ref: text("ref"), // PO/WO reference
   userId: text("user_id").notNull(),
   remarks: text("remarks"),
-  createdAt: timestamp("created_at").notNull().defaultNow(),
 }, (table) => ({
   vesselSectionDateIdx: index("idx_vessel_section_date").on(table.vesselId, table.section, table.dateLocal),
   itemDateIdx: index("idx_item_date").on(table.itemId, table.dateLocal),
@@ -633,8 +551,6 @@ export const storesLedger = pgTable("stores_ledger", {
 
 export const insertStoresLedgerSchema = createInsertSchema(storesLedger).omit({
   id: true,
-  uuid: true,
-  createdAt: true,
 });
 
 export type InsertStoresLedger = z.infer<typeof insertStoresLedgerSchema>;
@@ -644,7 +560,6 @@ export type StoresLedger = typeof storesLedger.$inferSelect;
 // Stores module is completely isolated from Components/Jobs/Work Orders per Global Business Rule Section 7.2
 export const storesItems = pgTable("stores_items", {
   id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
-  uuid: text("uuid").notNull().default(sql`gen_random_uuid()`),
   vesselId: text("vessel_id").notNull(),
   itemType: text("item_type").notNull(), // 'stores' | 'lubricants' | 'chemicals' | 'others'
   itemCode: text("item_code").notNull(), // Unique item identifier (Part Code)
@@ -669,23 +584,21 @@ export const storesItems = pgTable("stores_items", {
   ihmPresence: text("ihm_presence").default("Unknown"), // Unknown | Present | Not Present
   ihmEvidenceType: text("ihm_evidence_type").default("None"), // None | MD | SDoC | Test
   remarks: text("remarks"), // User notes
-  isDeleted: boolean("is_deleted").notNull().default(false), // Soft delete flag (renamed from deleted)
+  deleted: boolean("deleted").notNull().default(false), // Soft delete flag
   isActive: boolean("is_active").notNull().default(true), // Active status
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
-  updatedBy: text("updated_by"),
 }, (table) => ({
   vesselIdIdx: index("idx_stores_vessel").on(table.vesselId),
   itemTypeIdx: index("idx_stores_item_type").on(table.itemType),
   itemCodeIdx: index("idx_stores_item_code").on(table.vesselId, table.itemCode),
   impaCodeIdx: index("idx_stores_impa_code").on(table.impaCode),
-  isDeletedIdx: index("idx_stores_is_deleted").on(table.isDeleted),
+  deletedIdx: index("idx_stores_deleted").on(table.deleted),
 }));
 
 export const insertStoresItemSchema = createInsertSchema(storesItems).omit({
   id: true,
-  uuid: true,
-  isDeleted: true,
+  deleted: true,
   createdAt: true,
   updatedAt: true,
 });
@@ -696,7 +609,6 @@ export type StoresItem = typeof storesItems.$inferSelect;
 // Change Request Tables for Modify PMS module
 export const changeRequest = pgTable("change_request", {
   id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
-  uuid: text("uuid").notNull().default(sql`gen_random_uuid()`),
   vesselId: text("vessel_id").notNull(),
   category: text("category").notNull(), // 'components' | 'work_orders' | 'spares' | 'stores'
   title: text("title").notNull(), // max 120 chars enforced in application
@@ -725,10 +637,8 @@ export const changeRequest = pgTable("change_request", {
     appliedFieldCount?: number;
     appliedError?: string;
   }>>().default([]), // History of all revisions
-  isDeleted: boolean("is_deleted").notNull().default(false),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow().$onUpdateFn(() => new Date()),
-  updatedBy: text("updated_by"),
 }, (table) => ({
   vesselCategoryIdx: index("idx_vessel_category").on(table.vesselId, table.category),
   statusIdx: index("idx_change_request_status").on(table.status),
@@ -736,8 +646,6 @@ export const changeRequest = pgTable("change_request", {
 
 export const insertChangeRequestSchema = createInsertSchema(changeRequest).omit({
   id: true,
-  uuid: true,
-  isDeleted: true,
   createdAt: true,
   updatedAt: true,
 });
@@ -748,27 +656,18 @@ export type ChangeRequest = typeof changeRequest.$inferSelect;
 // Change Request Attachments
 export const changeRequestAttachment = pgTable("change_request_attachment", {
   id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
-  uuid: text("uuid").notNull().default(sql`gen_random_uuid()`),
   changeRequestId: integer("change_request_id").notNull(),
   filename: text("filename").notNull(),
   url: text("url").notNull(),
   uploadedByUserId: text("uploaded_by_user_id").notNull(),
   uploadedAt: timestamp("uploaded_at").notNull().defaultNow(),
-  isDeleted: boolean("is_deleted").notNull().default(false),
-  createdAt: timestamp("created_at").notNull().defaultNow(),
-  updatedAt: timestamp("updated_at").notNull().defaultNow(),
-  updatedBy: text("updated_by"),
 }, (table) => ({
   changeRequestIdx: index("idx_change_request").on(table.changeRequestId),
 }));
 
 export const insertChangeRequestAttachmentSchema = createInsertSchema(changeRequestAttachment).omit({
   id: true,
-  uuid: true,
-  isDeleted: true,
   uploadedAt: true,
-  createdAt: true,
-  updatedAt: true,
 });
 
 export type InsertChangeRequestAttachment = z.infer<typeof insertChangeRequestAttachmentSchema>;
@@ -777,24 +676,17 @@ export type ChangeRequestAttachment = typeof changeRequestAttachment.$inferSelec
 // Change Request Comments
 export const changeRequestComment = pgTable("change_request_comment", {
   id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
-  uuid: text("uuid").notNull().default(sql`gen_random_uuid()`),
   changeRequestId: integer("change_request_id").notNull(),
   userId: text("user_id").notNull(),
   message: text("message").notNull(),
-  isDeleted: boolean("is_deleted").notNull().default(false),
   createdAt: timestamp("created_at").notNull().defaultNow(),
-  updatedAt: timestamp("updated_at").notNull().defaultNow(),
-  updatedBy: text("updated_by"),
 }, (table) => ({
   changeRequestIdx: index("idx_change_request_comment").on(table.changeRequestId),
 }));
 
 export const insertChangeRequestCommentSchema = createInsertSchema(changeRequestComment).omit({
   id: true,
-  uuid: true,
-  isDeleted: true,
   createdAt: true,
-  updatedAt: true,
 });
 
 export type InsertChangeRequestComment = z.infer<typeof insertChangeRequestCommentSchema>;
@@ -803,7 +695,6 @@ export type ChangeRequestComment = typeof changeRequestComment.$inferSelect;
 // Alert Policy Table
 export const alertPolicies = pgTable("alert_policies", {
   id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
-  uuid: text("uuid").notNull().default(sql`gen_random_uuid()`),
   alertType: text("alert_type").notNull(), // 'maintenance_due' | 'running_hours' | 'critical_inventory' | 'certificate_expiration' | 'system_backup'
   enabled: boolean("enabled").notNull().default(true),
   priority: text("priority").notNull().default("medium"), // 'low' | 'medium' | 'high'
@@ -812,7 +703,6 @@ export const alertPolicies = pgTable("alert_policies", {
   thresholds: text("thresholds").notNull().default("{}"), // JSON string for type-specific thresholds
   scopeFilters: text("scope_filters").notNull().default("{}"), // JSON string for filters
   recipients: text("recipients").notNull().default("{}"), // JSON string for recipient configuration
-  isDeleted: boolean("is_deleted").notNull().default(false),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
   createdBy: text("created_by").notNull(),
@@ -821,8 +711,6 @@ export const alertPolicies = pgTable("alert_policies", {
 
 export const insertAlertPolicySchema = createInsertSchema(alertPolicies).omit({
   id: true,
-  uuid: true,
-  isDeleted: true,
   createdAt: true,
   updatedAt: true,
 });
@@ -830,10 +718,9 @@ export const insertAlertPolicySchema = createInsertSchema(alertPolicies).omit({
 export type InsertAlertPolicy = z.infer<typeof insertAlertPolicySchema>;
 export type AlertPolicy = typeof alertPolicies.$inferSelect;
 
-// Alert Events Table (Event log - immutable by nature)
+// Alert Events Table
 export const alertEvents = pgTable("alert_events", {
   id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
-  uuid: text("uuid").notNull().default(sql`gen_random_uuid()`),
   policyId: integer("policy_id").notNull(),
   alertType: text("alert_type").notNull(),
   priority: text("priority").notNull(),
@@ -845,10 +732,7 @@ export const alertEvents = pgTable("alert_events", {
   payload: text("payload").notNull(), // JSON string with all event details
   ackBy: text("ack_by"),
   ackAt: timestamp("ack_at"),
-  isDeleted: boolean("is_deleted").notNull().default(false),
   createdAt: timestamp("created_at").notNull().defaultNow(),
-  updatedAt: timestamp("updated_at").notNull().defaultNow(),
-  updatedBy: text("updated_by"),
 }, (table) => ({
   dedupeKeyIdx: index("idx_dedupe_key").on(table.dedupeKey, table.createdAt),
   policyIdx: index("idx_policy_events").on(table.policyId, table.createdAt),
@@ -856,10 +740,7 @@ export const alertEvents = pgTable("alert_events", {
 
 export const insertAlertEventSchema = createInsertSchema(alertEvents).omit({
   id: true,
-  uuid: true,
-  isDeleted: true,
   createdAt: true,
-  updatedAt: true,
 });
 
 export type InsertAlertEvent = z.infer<typeof insertAlertEventSchema>;
@@ -868,7 +749,6 @@ export type AlertEvent = typeof alertEvents.$inferSelect;
 // Alert Deliveries Table
 export const alertDeliveries = pgTable("alert_deliveries", {
   id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
-  uuid: text("uuid").notNull().default(sql`gen_random_uuid()`),
   eventId: integer("event_id").notNull(),
   channel: text("channel").notNull(), // 'email' | 'in_app' | 'sms' | 'slack'
   recipient: text("recipient").notNull(), // email address, user ID, phone number, etc
@@ -876,10 +756,7 @@ export const alertDeliveries = pgTable("alert_deliveries", {
   errorMessage: text("error_message"),
   sentAt: timestamp("sent_at"),
   acknowledgedAt: timestamp("acknowledged_at"),
-  isDeleted: boolean("is_deleted").notNull().default(false),
   createdAt: timestamp("created_at").notNull().defaultNow(),
-  updatedAt: timestamp("updated_at").notNull().defaultNow(),
-  updatedBy: text("updated_by"),
 }, (table) => ({
   eventIdx: index("idx_event_deliveries").on(table.eventId, table.channel),
   recipientIdx: index("idx_recipient_deliveries").on(table.recipient, table.status),
@@ -887,10 +764,7 @@ export const alertDeliveries = pgTable("alert_deliveries", {
 
 export const insertAlertDeliverySchema = createInsertSchema(alertDeliveries).omit({
   id: true,
-  uuid: true,
-  isDeleted: true,
   createdAt: true,
-  updatedAt: true,
 });
 
 export type InsertAlertDelivery = z.infer<typeof insertAlertDeliverySchema>;
@@ -899,7 +773,6 @@ export type AlertDelivery = typeof alertDeliveries.$inferSelect;
 // Alert Configuration Table (for quiet hours and escalation)
 export const alertConfig = pgTable("alert_config", {
   id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
-  uuid: text("uuid").notNull().default(sql`gen_random_uuid()`),
   vesselId: text("vessel_id").notNull(),
   quietHoursEnabled: boolean("quiet_hours_enabled").notNull().default(false),
   quietHoursStart: text("quiet_hours_start"), // HH:mm format
@@ -907,7 +780,6 @@ export const alertConfig = pgTable("alert_config", {
   escalationEnabled: boolean("escalation_enabled").notNull().default(false),
   escalationHours: integer("escalation_hours").notNull().default(4),
   escalationRecipients: text("escalation_recipients").notNull().default("[]"), // JSON array of recipients
-  isDeleted: boolean("is_deleted").notNull().default(false),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
   updatedBy: text("updated_by").notNull(),
@@ -915,8 +787,6 @@ export const alertConfig = pgTable("alert_config", {
 
 export const insertAlertConfigSchema = createInsertSchema(alertConfig).omit({
   id: true,
-  uuid: true,
-  isDeleted: true,
   createdAt: true,
   updatedAt: true,
 });
@@ -928,7 +798,6 @@ export type AlertConfig = typeof alertConfig.$inferSelect;
 // NOTE: componentId/componentCode/componentName are DEPRECATED - use jobComponentLinks table for many-to-many relationships
 export const jobs = pgTable("jobs", {
   id: text("id").primaryKey(),
-  uuid: text("uuid").notNull().default(sql`gen_random_uuid()`),
   vesselId: text("vessel_id"),
   componentId: text("component_id"), // DEPRECATED: Use jobComponentLinks for many-to-many. Nullable for backward compatibility
   componentCode: text("component_code"), // DEPRECATED: Use jobComponentLinks for many-to-many
@@ -970,7 +839,6 @@ export const jobs = pgTable("jobs", {
   isActive: boolean("is_active").default(true),
   estimatedManHours: decimal("estimated_man_hours", { precision: 6, scale: 2 }), // Estimated man-hours for workload planning
   
-  isDeleted: boolean("is_deleted").notNull().default(false),
   createdBy: text("created_by"), // User who created the job
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedBy: text("updated_by"), // User who last updated the job
@@ -985,8 +853,6 @@ export const jobs = pgTable("jobs", {
 
 export const insertJobSchema = createInsertSchema(jobs).omit({
   id: true,
-  uuid: true,
-  isDeleted: true,
   createdAt: true,
   updatedAt: true,
 });
@@ -997,7 +863,6 @@ export type Job = typeof jobs.$inferSelect;
 // Work Orders Table
 export const workOrders = pgTable("work_orders", {
   id: text("id").primaryKey(),
-  uuid: text("uuid").notNull().default(sql`gen_random_uuid()`),
   vesselId: text("vessel_id"), // Nullable - only required when dataScope='vessel'
   component: text("component").notNull(),
   componentCode: text("component_code"),
@@ -1103,10 +968,8 @@ export const workOrders = pgTable("work_orders", {
   dueDateSnapshot: text("due_date_snapshot"), // DUE_DATE (duplicated for clarity)
   lastDoneDateSnapshot: text("last_done_date_snapshot"), // last_done_date stored at WO creation
   
-  isDeleted: boolean("is_deleted").notNull().default(false),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
-  updatedBy: text("updated_by"),
 }, (table) => ({
   vesselIdIdx: index("idx_wo_vessel").on(table.vesselId),
   statusIdx: index("idx_wo_status").on(table.status),
@@ -1123,8 +986,6 @@ export const workOrders = pgTable("work_orders", {
 
 export const insertWorkOrderSchema = createInsertSchema(workOrders).omit({
   id: true,
-  uuid: true,
-  isDeleted: true,
   createdAt: true,
   updatedAt: true,
 }).extend({
@@ -1145,7 +1006,6 @@ export type WorkOrderWithLeadTime = WorkOrder & {
 // Work Order Executions Table - for tracking historical maintenance records
 export const workOrderExecutions = pgTable("work_order_executions", {
   id: text("id").primaryKey(),
-  uuid: text("uuid").notNull().default(sql`gen_random_uuid()`),
   templateId: text("template_id").notNull(), // Reference to work_orders (template)
   componentId: text("component_id").notNull(), // Component this execution belongs to
   vesselId: text("vessel_id").notNull(), // Vessel identifier
@@ -1166,10 +1026,8 @@ export const workOrderExecutions = pgTable("work_order_executions", {
   workDescription: text("work_description"), // What was actually done
   remarks: text("remarks"), // Any additional notes
   
-  isDeleted: boolean("is_deleted").notNull().default(false),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
-  updatedBy: text("updated_by"),
 }, (table) => ({
   templateIdIdx: index("idx_exec_template").on(table.templateId),
   componentIdIdx: index("idx_exec_component").on(table.componentId),
@@ -1180,8 +1038,6 @@ export const workOrderExecutions = pgTable("work_order_executions", {
 
 export const insertWorkOrderExecutionSchema = createInsertSchema(workOrderExecutions).omit({
   id: true,
-  uuid: true,
-  isDeleted: true,
   createdAt: true,
   updatedAt: true,
 });
@@ -1192,7 +1048,6 @@ export type WorkOrderExecution = typeof workOrderExecutions.$inferSelect;
 // Defects Table for maritime defect tracking
 export const defects = pgTable("defects", {
   id: text("id").primaryKey(),
-  uuid: text("uuid").notNull().default(sql`gen_random_uuid()`),
   vesselId: text("vessel_id").notNull(),
   vesselName: text("vessel_name").notNull(),
   issueDate: text("issue_date").notNull(), // ISO format YYYY-MM-DD
@@ -1378,10 +1233,8 @@ export const defects = pgTable("defects", {
     timestamp: string;
     details?: any;
   }>>().default([]),
-  isDeleted: boolean("is_deleted").notNull().default(false),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow().$onUpdateFn(() => new Date()),
-  updatedBy: text("updated_by"),
 }, (table) => ({
   vesselIdIdx: index("idx_defect_vessel").on(table.vesselId),
   statusIdx: index("idx_defect_status").on(table.status),
@@ -1393,8 +1246,6 @@ export const defects = pgTable("defects", {
 
 export const insertDefectSchema = createInsertSchema(defects).omit({
   id: true,
-  uuid: true,
-  isDeleted: true,
   createdAt: true,
   updatedAt: true,
 });
@@ -1405,7 +1256,6 @@ export type Defect = typeof defects.$inferSelect;
 // Defect Actions Table for corrective/preventive actions
 export const defectActions = pgTable("defect_actions", {
   id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
-  uuid: text("uuid").notNull().default(sql`gen_random_uuid()`),
   defectId: text("defect_id").notNull(),
   actionType: text("action_type").notNull(), // 'Corrective' | 'Preventive' | 'Containment' | 'Long-term fix'
   actionDescription: text("action_description").notNull(),
@@ -1416,10 +1266,8 @@ export const defectActions = pgTable("defect_actions", {
   status: text("status").notNull().default("Open"), // 'Open' | 'In Progress' | 'Closed'
   justification: text("justification"), // Required if due date is pushed after overdue
   attachmentUrls: text("attachment_urls").array(), // Evidence attachments
-  isDeleted: boolean("is_deleted").notNull().default(false),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow().$onUpdateFn(() => new Date()),
-  updatedBy: text("updated_by"),
 }, (table) => ({
   defectIdIdx: index("idx_action_defect").on(table.defectId),
   statusIdx: index("idx_action_status").on(table.status),
@@ -1429,8 +1277,6 @@ export const defectActions = pgTable("defect_actions", {
 
 export const insertDefectActionSchema = createInsertSchema(defectActions).omit({
   id: true,
-  uuid: true,
-  isDeleted: true,
   createdAt: true,
   updatedAt: true,
 });
@@ -1441,17 +1287,12 @@ export type DefectAction = typeof defectActions.$inferSelect;
 // Defect Attachments Table for photos and documents
 export const defectAttachments = pgTable("defect_attachments", {
   id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
-  uuid: text("uuid").notNull().default(sql`gen_random_uuid()`),
   defectId: text("defect_id").notNull(),
   filename: text("filename").notNull(),
   url: text("url").notNull(),
   attachmentType: text("attachment_type").notNull(), // 'photo' | 'document' | 'evidence'
   uploadedBy: text("uploaded_by").notNull(),
   uploadedAt: timestamp("uploaded_at").notNull().defaultNow(),
-  isDeleted: boolean("is_deleted").notNull().default(false),
-  createdAt: timestamp("created_at").notNull().defaultNow(),
-  updatedAt: timestamp("updated_at").notNull().defaultNow(),
-  updatedBy: text("updated_by"),
 }, (table) => ({
   defectIdIdx: index("idx_attachment_defect").on(table.defectId),
   typeIdx: index("idx_attachment_type").on(table.attachmentType),
@@ -1459,11 +1300,7 @@ export const defectAttachments = pgTable("defect_attachments", {
 
 export const insertDefectAttachmentSchema = createInsertSchema(defectAttachments).omit({
   id: true,
-  uuid: true,
-  isDeleted: true,
   uploadedAt: true,
-  createdAt: true,
-  updatedAt: true,
 });
 
 export type InsertDefectAttachment = z.infer<typeof insertDefectAttachmentSchema>;
@@ -1472,7 +1309,6 @@ export type DefectAttachment = typeof defectAttachments.$inferSelect;
 // Recurring Defects Tables
 export const recurringDefects = pgTable("recurring_defects", {
   id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
-  uuid: text("uuid").notNull().default(sql`gen_random_uuid()`),
   equipmentKey: text("equipment_key").notNull(),
   windowMonths: integer("window_months").notNull().default(12),
   occurrenceCount: integer("occurrence_count").notNull(),
@@ -1481,10 +1317,7 @@ export const recurringDefects = pgTable("recurring_defects", {
   lastOccurrenceDate: text("last_occurrence_date").notNull(), // DD-MM-YYYY format
   hasCoc: boolean("has_coc").notNull().default(false),
   mtbfDays: numeric("mtbf_days"), // Average days between occurrences
-  isDeleted: boolean("is_deleted").notNull().default(false),
-  createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow().$onUpdateFn(() => new Date()),
-  updatedBy: text("updated_by"),
 }, (table) => ({
   equipmentKeyWindowIdx: index("idx_recurring_key_window").on(table.equipmentKey, table.windowMonths),
   updatedAtIdx: index("idx_recurring_updated").on(table.updatedAt),
@@ -1492,9 +1325,6 @@ export const recurringDefects = pgTable("recurring_defects", {
 
 export const insertRecurringDefectSchema = createInsertSchema(recurringDefects).omit({
   id: true,
-  uuid: true,
-  isDeleted: true,
-  createdAt: true,
   updatedAt: true,
 });
 
@@ -1505,23 +1335,13 @@ export type RecurringDefect = typeof recurringDefects.$inferSelect;
 export const recurringDefectLinks = pgTable("recurring_defect_links", {
   recurringId: integer("recurring_id").notNull().references(() => recurringDefects.id, { onDelete: "cascade" }),
   defectId: text("defect_id").notNull().references(() => defects.id, { onDelete: "cascade" }),
-  uuid: text("uuid").notNull().default(sql`gen_random_uuid()`),
-  isDeleted: boolean("is_deleted").notNull().default(false),
-  createdAt: timestamp("created_at").notNull().defaultNow(),
-  updatedAt: timestamp("updated_at").notNull().defaultNow(),
-  updatedBy: text("updated_by"),
 }, (table) => ({
   pk: primaryKey({ columns: [table.recurringId, table.defectId] }),
   recurringIdx: index("idx_link_recurring").on(table.recurringId),
   defectIdx: index("idx_link_defect").on(table.defectId),
 }));
 
-export const insertRecurringDefectLinkSchema = createInsertSchema(recurringDefectLinks).omit({
-  uuid: true,
-  isDeleted: true,
-  createdAt: true,
-  updatedAt: true,
-});
+export const insertRecurringDefectLinkSchema = createInsertSchema(recurringDefectLinks);
 
 export type InsertRecurringDefectLink = z.infer<typeof insertRecurringDefectLinkSchema>;
 export type RecurringDefectLink = typeof recurringDefectLinks.$inferSelect;
@@ -1529,7 +1349,6 @@ export type RecurringDefectLink = typeof recurringDefectLinks.$inferSelect;
 // Import History Table
 export const importHistory = pgTable("import_history", {
   id: text("id").primaryKey(),
-  uuid: text("uuid").notNull().default(sql`gen_random_uuid()`),
   type: text("type").notNull(), // 'components' | 'spares' | 'stores' | 'jobs'
   mode: text("mode").notNull(), // 'add' | 'update' | 'upsert'
   archiveMissing: boolean("archive_missing").notNull().default(false),
@@ -1547,20 +1366,15 @@ export const importHistory = pgTable("import_history", {
   storedFilePath: text("stored_file_path"), // Object storage path to the uploaded file
   undoneAt: timestamp("undone_at"), // Timestamp when import was undone
   errorMessage: text("error_message"), // Error message if import or undo failed
-  isDeleted: boolean("is_deleted").notNull().default(false),
-  createdAt: timestamp("created_at").notNull().defaultNow(),
-  updatedAt: timestamp("updated_at").notNull().defaultNow(),
-  updatedBy: text("updated_by"),
 }, (table) => ({
   typeIdx: index("idx_import_history_type").on(table.type),
   startedAtIdx: index("idx_import_history_started").on(table.startedAt),
   vesselIdx: index("idx_import_history_vessel").on(table.vesselId),
 }));
 
-// Import Change Log Table - tracks individual record changes for undo functionality (IMMUTABLE audit)
+// Import Change Log Table - tracks individual record changes for undo functionality
 export const importChangeLog = pgTable("import_change_log", {
   id: text("id").primaryKey(),
-  uuid: text("uuid").notNull().default(sql`gen_random_uuid()`),
   importHistoryId: text("import_history_id").notNull().references(() => importHistory.id, { onDelete: "cascade" }),
   entityType: text("entity_type").notNull(), // 'component' | 'job' | 'spare' | 'store'
   entityId: text("entity_id").notNull(), // ID of the affected record
@@ -1575,18 +1389,13 @@ export const importChangeLog = pgTable("import_change_log", {
 }));
 
 export const insertImportHistorySchema = createInsertSchema(importHistory).omit({
-  uuid: true,
-  isDeleted: true,
   startedAt: true,
-  createdAt: true,
-  updatedAt: true,
 });
 
 export type InsertImportHistory = z.infer<typeof insertImportHistorySchema>;
 export type ImportHistory = typeof importHistory.$inferSelect;
 
 export const insertImportChangeLogSchema = createInsertSchema(importChangeLog).omit({
-  uuid: true,
   createdAt: true,
 });
 
@@ -1596,7 +1405,6 @@ export type ImportChangeLog = typeof importChangeLog.$inferSelect;
 // Makers Table (Fleet Admin - Equipment Manufacturers)
 export const makers = pgTable("makers", {
   id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
-  uuid: text("uuid").notNull().default(sql`gen_random_uuid()`),
   makerCode: text("maker_code").notNull().unique(), // Auto-generated: MKR-000001
   makerName: text("maker_name").notNull(),
   address: text("address"),
@@ -1604,10 +1412,8 @@ export const makers = pgTable("makers", {
   contactPerson: text("contact_person"),
   email: text("email"),
   phone: text("phone"),
-  isDeleted: boolean("is_deleted").notNull().default(false),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
-  updatedBy: text("updated_by"),
 }, (table) => ({
   makerCodeIdx: index("idx_maker_code").on(table.makerCode),
   makerNameIdx: index("idx_maker_name").on(table.makerName),
@@ -1615,8 +1421,6 @@ export const makers = pgTable("makers", {
 
 export const insertMakerSchema = createInsertSchema(makers).omit({
   id: true,
-  uuid: true,
-  isDeleted: true,
   createdAt: true,
   updatedAt: true,
 }).extend({
@@ -1629,16 +1433,12 @@ export type Maker = typeof makers.$inferSelect;
 // Master Lists Table (Fleet Admin - Dropdown Options Management)
 export const masterLists = pgTable("master_lists", {
   id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
-  uuid: text("uuid").notNull().default(sql`gen_random_uuid()`),
   listType: text("list_type").notNull(), // 'department', 'rank', 'intervalUnit', etc.
   listKey: text("list_key").notNull(), // Unique key for the value
   listValue: text("list_value").notNull(), // Display value
   displayOrder: integer("display_order").notNull().default(0),
   isActive: boolean("is_active").notNull().default(true),
-  isDeleted: boolean("is_deleted").notNull().default(false),
   createdAt: timestamp("created_at").notNull().defaultNow(),
-  updatedAt: timestamp("updated_at").notNull().defaultNow(),
-  updatedBy: text("updated_by"),
 }, (table) => [
   index("idx_master_list_type").on(table.listType),
   unique("unique_list_type_key").on(table.listType, table.listKey),
@@ -1646,10 +1446,7 @@ export const masterLists = pgTable("master_lists", {
 
 export const insertMasterListSchema = createInsertSchema(masterLists).omit({
   id: true,
-  uuid: true,
-  isDeleted: true,
   createdAt: true,
-  updatedAt: true,
 });
 
 export type InsertMasterList = z.infer<typeof insertMasterListSchema>;
@@ -1658,7 +1455,6 @@ export type MasterList = typeof masterLists.$inferSelect;
 // Fleet Equipment Master Table - Normalized master data for fleet equipment
 export const fleetEquipmentMaster = pgTable("fleet_equipment_master", {
   id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
-  uuid: text("uuid").notNull().default(sql`gen_random_uuid()`),
   fleetEquipmentCode: text("fleet_equipment_code").notNull().unique(), // Unique identifier (XXX.XXX.XX format)
   fleetEquipmentName: text("fleet_equipment_name").notNull(), // General name from SFI booklet
   maker: text("maker"), // Manufacturer name
@@ -1667,7 +1463,6 @@ export const fleetEquipmentMaster = pgTable("fleet_equipment_master", {
   modelCode: text("model_code"), // Combination of Maker Code + Model
   description: text("description"), // Additional description
   isActive: boolean("is_active").notNull().default(true),
-  isDeleted: boolean("is_deleted").notNull().default(false),
   createdBy: text("created_by").notNull(),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedBy: text("updated_by"),
@@ -1680,8 +1475,6 @@ export const fleetEquipmentMaster = pgTable("fleet_equipment_master", {
 
 export const insertFleetEquipmentMasterSchema = createInsertSchema(fleetEquipmentMaster).omit({
   id: true,
-  uuid: true,
-  isDeleted: true,
   createdAt: true,
   updatedAt: true,
 });
@@ -1689,10 +1482,9 @@ export const insertFleetEquipmentMasterSchema = createInsertSchema(fleetEquipmen
 export type InsertFleetEquipmentMaster = z.infer<typeof insertFleetEquipmentMasterSchema>;
 export type FleetEquipmentMaster = typeof fleetEquipmentMaster.$inferSelect;
 
-// Component Running Hours Log - Detailed audit trail for all running hours updates (IMMUTABLE audit)
+// Component Running Hours Log - Detailed audit trail for all running hours updates
 export const componentRunningHoursLog = pgTable("component_running_hours_log", {
   id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
-  uuid: text("uuid").notNull().default(sql`gen_random_uuid()`),
   vesselCode: text("vessel_code").notNull(),
   componentCode: text("component_code").notNull(),
   componentId: text("component_id").notNull(),
@@ -1713,7 +1505,6 @@ export const componentRunningHoursLog = pgTable("component_running_hours_log", {
 
 export const insertComponentRunningHoursLogSchema = createInsertSchema(componentRunningHoursLog).omit({
   id: true,
-  uuid: true,
   createdAt: true,
   updatedAt: true,
 });
@@ -1721,10 +1512,9 @@ export const insertComponentRunningHoursLogSchema = createInsertSchema(component
 export type InsertComponentRunningHoursLog = z.infer<typeof insertComponentRunningHoursLogSchema>;
 export type ComponentRunningHoursLog = typeof componentRunningHoursLog.$inferSelect;
 
-// Audit Log - System-wide audit trail for all data changes (IMMUTABLE - no is_deleted or updated_at)
+// Audit Log - System-wide audit trail for all data changes
 export const auditLog = pgTable("audit_log", {
   id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
-  uuid: text("uuid").notNull().default(sql`gen_random_uuid()`),
   timestamp: timestamp("timestamp").notNull().defaultNow(),
   userId: text("user_id").notNull(), // User who made the change
   vesselCode: text("vessel_code"), // Vessel context (nullable for fleet-level changes)
@@ -1737,7 +1527,6 @@ export const auditLog = pgTable("audit_log", {
   newValue: text("new_value"), // New value (JSON string for complex objects)
   source: text("source").notNull(), // 'web_ui' | 'api' | 'bulk_import' | 'system' | 'modify_pms'
   payload: json("payload"), // Additional context (e.g., full snapshot, metadata)
-  createdAt: timestamp("created_at").notNull().defaultNow(),
 }, (table) => ({
   timestampIdx: index("idx_audit_timestamp").on(table.timestamp),
   userIdIdx: index("idx_audit_user_id").on(table.userId),
@@ -1749,9 +1538,7 @@ export const auditLog = pgTable("audit_log", {
 
 export const insertAuditLogSchema = createInsertSchema(auditLog).omit({
   id: true,
-  uuid: true,
   timestamp: true,
-  createdAt: true,
 });
 
 export type InsertAuditLog = z.infer<typeof insertAuditLogSchema>;
@@ -1760,7 +1547,6 @@ export type AuditLog = typeof auditLog.$inferSelect;
 // Component Documents Table - Drawings, manuals, and technical documents
 export const componentDocuments = pgTable("component_documents", {
   id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
-  uuid: text("uuid").notNull().default(sql`gen_random_uuid()`),
   componentId: text("component_id").notNull(),
   componentCode: text("component_code").notNull(),
   vesselCode: text("vessel_code").notNull(),
@@ -1777,10 +1563,6 @@ export const componentDocuments = pgTable("component_documents", {
   isActive: boolean("is_active").notNull().default(true),
   notes: text("notes"), // Additional notes about the document
   storageBackend: text("storage_backend").default("object"), // 'object' for cloud storage, 'local' for filesystem
-  isDeleted: boolean("is_deleted").notNull().default(false),
-  createdAt: timestamp("created_at").notNull().defaultNow(),
-  updatedAt: timestamp("updated_at").notNull().defaultNow(),
-  updatedBy: text("updated_by"),
 }, (table) => ({
   componentIdIdx: index("idx_doc_component_id").on(table.componentId),
   componentCodeIdx: index("idx_doc_component_code").on(table.componentCode),
@@ -1791,11 +1573,7 @@ export const componentDocuments = pgTable("component_documents", {
 
 export const insertComponentDocumentSchema = createInsertSchema(componentDocuments).omit({
   id: true,
-  uuid: true,
-  isDeleted: true,
   uploadedAt: true,
-  createdAt: true,
-  updatedAt: true,
 });
 
 export type InsertComponentDocument = z.infer<typeof insertComponentDocumentSchema>;
@@ -1804,7 +1582,6 @@ export type ComponentDocument = typeof componentDocuments.$inferSelect;
 // Component Class Regulatory Table - Classification and regulatory survey data (multiple rows per component)
 export const componentClassRegulatory = pgTable("component_class_regulatory", {
   id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
-  uuid: text("uuid").notNull().default(sql`gen_random_uuid()`),
   componentId: text("component_id").notNull(),
   componentCode: text("component_code").notNull(),
   vesselCode: text("vessel_code").notNull(),
@@ -1818,7 +1595,6 @@ export const componentClassRegulatory = pgTable("component_class_regulatory", {
   classRequirements: text("class_requirements"), // Text description of requirements
   surveyStatus: text("survey_status").notNull().default("Active"), // 'Active' | 'Expired' | 'Pending' | 'Cancelled'
   remarks: text("remarks"),
-  isDeleted: boolean("is_deleted").notNull().default(false),
   createdBy: text("created_by").notNull(),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedBy: text("updated_by"),
@@ -1833,8 +1609,6 @@ export const componentClassRegulatory = pgTable("component_class_regulatory", {
 
 export const insertComponentClassRegulatorySchema = createInsertSchema(componentClassRegulatory).omit({
   id: true,
-  uuid: true,
-  isDeleted: true,
   createdAt: true,
   updatedAt: true,
 });
@@ -1842,10 +1616,9 @@ export const insertComponentClassRegulatorySchema = createInsertSchema(component
 export type InsertComponentClassRegulatory = z.infer<typeof insertComponentClassRegulatorySchema>;
 export type ComponentClassRegulatory = typeof componentClassRegulatory.$inferSelect;
 
-// Component Maintenance History Table - Immutable maintenance records (NO EDITS/DELETES ALLOWED - IMMUTABLE audit)
+// Component Maintenance History Table - Immutable maintenance records (NO EDITS/DELETES ALLOWED)
 export const componentMaintenanceHistory = pgTable("component_maintenance_history", {
   id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
-  uuid: text("uuid").notNull().default(sql`gen_random_uuid()`),
   componentId: text("component_id").notNull(),
   componentCode: text("component_code").notNull(),
   vesselCode: text("vessel_code").notNull(),
@@ -1878,7 +1651,6 @@ export const componentMaintenanceHistory = pgTable("component_maintenance_histor
 
 export const insertComponentMaintenanceHistorySchema = createInsertSchema(componentMaintenanceHistory).omit({
   id: true,
-  uuid: true,
   createdAt: true,
 });
 
@@ -1888,7 +1660,6 @@ export type ComponentMaintenanceHistory = typeof componentMaintenanceHistory.$in
 // Component Requisitions Table - Purchase/service requisitions linked to components and spares
 export const componentRequisitions = pgTable("component_requisitions", {
   id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
-  uuid: text("uuid").notNull().default(sql`gen_random_uuid()`),
   requisitionNo: text("requisition_no").notNull().unique(), // REQ-V001-2024-001 format
   componentId: text("component_id").notNull(),
   componentCode: text("component_code").notNull(),
@@ -1911,10 +1682,8 @@ export const componentRequisitions = pgTable("component_requisitions", {
   estimatedCost: decimal("estimated_cost", { precision: 10, scale: 2 }),
   actualCost: decimal("actual_cost", { precision: 10, scale: 2 }),
   remarks: text("remarks"),
-  isDeleted: boolean("is_deleted").notNull().default(false),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
-  updatedBy: text("updated_by"),
 }, (table) => ({
   componentIdIdx: index("idx_req_component_id").on(table.componentId),
   componentCodeIdx: index("idx_req_component_code").on(table.componentCode),
@@ -1925,8 +1694,6 @@ export const componentRequisitions = pgTable("component_requisitions", {
 
 export const insertComponentRequisitionSchema = createInsertSchema(componentRequisitions).omit({
   id: true,
-  uuid: true,
-  isDeleted: true,
   createdAt: true,
   updatedAt: true,
 });
@@ -1938,7 +1705,6 @@ export type ComponentRequisition = typeof componentRequisitions.$inferSelect;
 // Controls WO auto-generation timing and status transitions
 export const pmsVesselSettings = pgTable("pms_vessel_settings", {
   id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
-  uuid: text("uuid").notNull().default(sql`gen_random_uuid()`),
   vesselId: text("vessel_id").notNull().unique(), // Unique per vessel
 
   // Calendar-based jobs settings
@@ -1957,18 +1723,15 @@ export const pmsVesselSettings = pgTable("pms_vessel_settings", {
   locationBName: text("location_b_name").notNull().default("Location B"), // Custom name for Location B
 
   // Audit fields
-  isDeleted: boolean("is_deleted").notNull().default(false),
+  updatedBy: text("updated_by").notNull(),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
-  updatedBy: text("updated_by").notNull(),
 }, (table) => ({
   vesselIdIdx: index("idx_pms_settings_vessel_id").on(table.vesselId),
 }));
 
 export const insertPmsVesselSettingsSchema = createInsertSchema(pmsVesselSettings).omit({
   id: true,
-  uuid: true,
-  isDeleted: true,
   createdAt: true,
   updatedAt: true,
 });
@@ -1982,16 +1745,13 @@ export type PmsVesselSettings = typeof pmsVesselSettings.$inferSelect;
 // =====================================================
 export const makerList = pgTable("maker_list", {
   id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
-  uuid: text("uuid").notNull().default(sql`gen_random_uuid()`),
   makerCode: text("maker_code").notNull().unique(), // Unique identifier for maker
   makerName: text("maker_name").notNull(), // Full manufacturer name
   address: text("address"), // Manufacturer address
   addressId: text("address_id"), // Address reference ID
   isActive: boolean("is_active").notNull().default(true),
-  isDeleted: boolean("is_deleted").notNull().default(false),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
-  updatedBy: text("updated_by"),
 }, (table) => ({
   makerCodeIdx: index("idx_maker_list_code").on(table.makerCode),
   makerNameIdx: index("idx_maker_list_name").on(table.makerName),
@@ -1999,8 +1759,6 @@ export const makerList = pgTable("maker_list", {
 
 export const insertMakerListSchema = createInsertSchema(makerList).omit({
   id: true,
-  uuid: true,
-  isDeleted: true,
   createdAt: true,
   updatedAt: true,
 });
@@ -2014,23 +1772,18 @@ export type MakerList = typeof makerList.$inferSelect;
 // =====================================================
 export const sfiDetails = pgTable("sfi_details", {
   id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
-  uuid: text("uuid").notNull().default(sql`gen_random_uuid()`),
   componentCode: text("component_code").notNull().unique(), // SFI component code (e.g., 711.001)
   componentName: text("component_name").notNull(), // Standard SFI name
   description: text("description"), // Additional description
   isActive: boolean("is_active").notNull().default(true),
-  isDeleted: boolean("is_deleted").notNull().default(false),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
-  updatedBy: text("updated_by"),
 }, (table) => ({
   sfiCodeIdx: index("idx_sfi_component_code").on(table.componentCode),
 }));
 
 export const insertSfiDetailsSchema = createInsertSchema(sfiDetails).omit({
   id: true,
-  uuid: true,
-  isDeleted: true,
   createdAt: true,
   updatedAt: true,
 });
@@ -2044,7 +1797,6 @@ export type SfiDetails = typeof sfiDetails.$inferSelect;
 // =====================================================
 export const masterData = pgTable("master_data", {
   id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
-  uuid: text("uuid").notNull().default(sql`gen_random_uuid()`),
   slNo: integer("sl_no"), // Serial number for tracking
   makerName: text("maker_name").notNull(), // Manufacturer name from Maker List
   makerCode: text("maker_code").notNull(), // Unique code from Maker List
@@ -2059,10 +1811,8 @@ export const masterData = pgTable("master_data", {
   vesselCode: text("vessel_code"), // Vessel code
   equipmentName: text("equipment_name").notNull(), // Descriptive name of equipment
   isActive: boolean("is_active").notNull().default(true),
-  isDeleted: boolean("is_deleted").notNull().default(false),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
-  updatedBy: text("updated_by"),
 }, (table) => ({
   fleetEquipmentCodeIdx: index("idx_master_data_fleet_code").on(table.fleetEquipmentCode),
   sfiCodeIdx: index("idx_master_data_sfi").on(table.sfiCode),
@@ -2072,8 +1822,6 @@ export const masterData = pgTable("master_data", {
 
 export const insertMasterDataSchema = createInsertSchema(masterData).omit({
   id: true,
-  uuid: true,
-  isDeleted: true,
   createdAt: true,
   updatedAt: true,
 });
@@ -2088,17 +1836,12 @@ export type MasterData = typeof masterData.$inferSelect;
 // =====================================================
 export const fleetVesselMapping = pgTable("fleet_vessel_mapping", {
   id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
-  uuid: text("uuid").notNull().default(sql`gen_random_uuid()`),
   fleetEquipmentCode: text("fleet_equipment_code").notNull(), // From masterData or components
   vesselCode: text("vessel_code").notNull(), // Vessel identifier
   vesselName: text("vessel_name"), // Vessel display name
   mappedBy: text("mapped_by").notNull(), // User who created mapping
   mappedAt: timestamp("mapped_at").notNull().defaultNow(),
   isActive: boolean("is_active").notNull().default(true),
-  isDeleted: boolean("is_deleted").notNull().default(false),
-  createdAt: timestamp("created_at").notNull().defaultNow(),
-  updatedAt: timestamp("updated_at").notNull().defaultNow(),
-  updatedBy: text("updated_by"),
 }, (table) => ({
   fleetCodeIdx: index("idx_fleet_vessel_mapping_fleet").on(table.fleetEquipmentCode),
   vesselCodeIdx: index("idx_fleet_vessel_mapping_vessel").on(table.vesselCode),
@@ -2107,11 +1850,7 @@ export const fleetVesselMapping = pgTable("fleet_vessel_mapping", {
 
 export const insertFleetVesselMappingSchema = createInsertSchema(fleetVesselMapping).omit({
   id: true,
-  uuid: true,
-  isDeleted: true,
   mappedAt: true,
-  createdAt: true,
-  updatedAt: true,
 });
 
 export type InsertFleetVesselMapping = z.infer<typeof insertFleetVesselMappingSchema>;
@@ -2123,7 +1862,6 @@ export type FleetVesselMapping = typeof fleetVesselMapping.$inferSelect;
 // =====================================================
 export const fleetComponentMapping = pgTable("fleet_component_mapping", {
   id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
-  uuid: text("uuid").notNull().default(sql`gen_random_uuid()`),
   fleetEquipmentCode: text("fleet_equipment_code").notNull(), // Fleet equipment identifier
   vesselCode: text("vessel_code").notNull(), // Vessel identifier
   componentCode: text("component_code").notNull(), // Vessel-specific component code
@@ -2132,10 +1870,6 @@ export const fleetComponentMapping = pgTable("fleet_component_mapping", {
   mappedBy: text("mapped_by").notNull(), // User who created mapping
   mappedAt: timestamp("mapped_at").notNull().defaultNow(),
   isActive: boolean("is_active").notNull().default(true),
-  isDeleted: boolean("is_deleted").notNull().default(false),
-  createdAt: timestamp("created_at").notNull().defaultNow(),
-  updatedAt: timestamp("updated_at").notNull().defaultNow(),
-  updatedBy: text("updated_by"),
 }, (table) => ({
   fleetCodeIdx: index("idx_fleet_comp_mapping_fleet").on(table.fleetEquipmentCode),
   vesselCodeIdx: index("idx_fleet_comp_mapping_vessel").on(table.vesselCode),
@@ -2145,11 +1879,7 @@ export const fleetComponentMapping = pgTable("fleet_component_mapping", {
 
 export const insertFleetComponentMappingSchema = createInsertSchema(fleetComponentMapping).omit({
   id: true,
-  uuid: true,
-  isDeleted: true,
   mappedAt: true,
-  createdAt: true,
-  updatedAt: true,
 });
 
 export type InsertFleetComponentMapping = z.infer<typeof insertFleetComponentMappingSchema>;
@@ -2161,7 +1891,6 @@ export type FleetComponentMapping = typeof fleetComponentMapping.$inferSelect;
 // =====================================================
 export const fleetJobVesselMapping = pgTable("fleet_job_vessel_mapping", {
   id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
-  uuid: text("uuid").notNull().default(sql`gen_random_uuid()`),
   fleetEquipmentCode: text("fleet_equipment_code").notNull(), // Equipment the job belongs to
   jobCode: text("job_code").notNull(), // Fleet job code
   jobId: text("job_id"), // Reference to jobs table
@@ -2170,10 +1899,6 @@ export const fleetJobVesselMapping = pgTable("fleet_job_vessel_mapping", {
   mappedBy: text("mapped_by").notNull(), // User who created mapping
   mappedAt: timestamp("mapped_at").notNull().defaultNow(),
   isActive: boolean("is_active").notNull().default(true),
-  isDeleted: boolean("is_deleted").notNull().default(false),
-  createdAt: timestamp("created_at").notNull().defaultNow(),
-  updatedAt: timestamp("updated_at").notNull().defaultNow(),
-  updatedBy: text("updated_by"),
 }, (table) => ({
   fleetCodeIdx: index("idx_fleet_job_mapping_fleet").on(table.fleetEquipmentCode),
   jobCodeIdx: index("idx_fleet_job_mapping_job").on(table.jobCode),
@@ -2183,11 +1908,7 @@ export const fleetJobVesselMapping = pgTable("fleet_job_vessel_mapping", {
 
 export const insertFleetJobVesselMappingSchema = createInsertSchema(fleetJobVesselMapping).omit({
   id: true,
-  uuid: true,
-  isDeleted: true,
   mappedAt: true,
-  createdAt: true,
-  updatedAt: true,
 });
 
 export type InsertFleetJobVesselMapping = z.infer<typeof insertFleetJobVesselMappingSchema>;
@@ -2199,7 +1920,6 @@ export type FleetJobVesselMapping = typeof fleetJobVesselMapping.$inferSelect;
 // =====================================================
 export const fleetSpareVesselMapping = pgTable("fleet_spare_vessel_mapping", {
   id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
-  uuid: text("uuid").notNull().default(sql`gen_random_uuid()`),
   fleetEquipmentCode: text("fleet_equipment_code").notNull(), // Equipment the spare belongs to
   partCode: text("part_code").notNull(), // Fleet spare part code
   spareId: text("spare_id"), // Reference to spares table
@@ -2208,10 +1928,6 @@ export const fleetSpareVesselMapping = pgTable("fleet_spare_vessel_mapping", {
   mappedBy: text("mapped_by").notNull(), // User who created mapping
   mappedAt: timestamp("mapped_at").notNull().defaultNow(),
   isActive: boolean("is_active").notNull().default(true),
-  isDeleted: boolean("is_deleted").notNull().default(false),
-  createdAt: timestamp("created_at").notNull().defaultNow(),
-  updatedAt: timestamp("updated_at").notNull().defaultNow(),
-  updatedBy: text("updated_by"),
 }, (table) => ({
   fleetCodeIdx: index("idx_fleet_spare_mapping_fleet").on(table.fleetEquipmentCode),
   partCodeIdx: index("idx_fleet_spare_mapping_part").on(table.partCode),
@@ -2221,11 +1937,7 @@ export const fleetSpareVesselMapping = pgTable("fleet_spare_vessel_mapping", {
 
 export const insertFleetSpareVesselMappingSchema = createInsertSchema(fleetSpareVesselMapping).omit({
   id: true,
-  uuid: true,
-  isDeleted: true,
   mappedAt: true,
-  createdAt: true,
-  updatedAt: true,
 });
 
 export type InsertFleetSpareVesselMapping = z.infer<typeof insertFleetSpareVesselMappingSchema>;
@@ -2237,7 +1949,6 @@ export type FleetSpareVesselMapping = typeof fleetSpareVesselMapping.$inferSelec
 // =====================================================
 export const bulkImportHistory = pgTable("bulk_import_history", {
   id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
-  uuid: text("uuid").notNull().default(sql`gen_random_uuid()`),
   vesselCode: text("vessel_code"), // Null for fleet-level imports
   vesselName: text("vessel_name"),
   moduleType: text("module_type").notNull(), // 'Machinery' | 'Jobs' | 'Spares' | 'Stores' | 'Fleet_Component' | 'Fleet_Job' | 'Fleet_Spare'
@@ -2256,10 +1967,6 @@ export const bulkImportHistory = pgTable("bulk_import_history", {
   isFleetImport: boolean("is_fleet_import").notNull().default(false), // True if Fleet Data Import mode
   templateVersion: text("template_version"), // Version of template used
   processingTimeMs: integer("processing_time_ms"), // How long import took
-  isDeleted: boolean("is_deleted").notNull().default(false),
-  createdAt: timestamp("created_at").notNull().defaultNow(),
-  updatedAt: timestamp("updated_at").notNull().defaultNow(),
-  updatedBy: text("updated_by"),
 }, (table) => ({
   vesselCodeIdx: index("idx_bulk_import_vessel").on(table.vesselCode),
   moduleTypeIdx: index("idx_bulk_import_module").on(table.moduleType),
@@ -2269,23 +1976,18 @@ export const bulkImportHistory = pgTable("bulk_import_history", {
 
 export const insertBulkImportHistorySchema = createInsertSchema(bulkImportHistory).omit({
   id: true,
-  uuid: true,
-  isDeleted: true,
   uploadedAt: true,
-  createdAt: true,
-  updatedAt: true,
 });
 
 export type InsertBulkImportHistory = z.infer<typeof insertBulkImportHistorySchema>;
 export type BulkImportHistory = typeof bulkImportHistory.$inferSelect;
 
 // =====================================================
-// BULK IMPORT ERRORS - Detailed error log for bulk imports (IMMUTABLE audit)
+// BULK IMPORT ERRORS - Detailed error log for bulk imports
 // Tracks each row-level error with recommended fixes
 // =====================================================
 export const bulkImportErrors = pgTable("bulk_import_errors", {
   id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
-  uuid: text("uuid").notNull().default(sql`gen_random_uuid()`),
   importId: integer("import_id").notNull(), // Reference to bulkImportHistory
   rowNumber: integer("row_number").notNull(), // Row number in Excel (1-indexed)
   fieldName: text("field_name"), // Which field had the error
@@ -2304,7 +2006,6 @@ export const bulkImportErrors = pgTable("bulk_import_errors", {
 
 export const insertBulkImportErrorSchema = createInsertSchema(bulkImportErrors).omit({
   id: true,
-  uuid: true,
   createdAt: true,
 });
 
@@ -2316,7 +2017,6 @@ export type BulkImportError = typeof bulkImportErrors.$inferSelect;
 // =====================================================
 export const certificates = pgTable("certificates", {
   id: text("id").primaryKey(), // Certificate ID like C1, C2, etc.
-  uuid: text("uuid").notNull().default(sql`gen_random_uuid()`),
   certificateName: text("certificate_name").notNull(),
   type: text("type").notNull(), // 'Flag' | 'Class' | 'Statutory'
   vessel: text("vessel").notNull(), // Vessel name
@@ -2331,10 +2031,8 @@ export const certificates = pgTable("certificates", {
   attachments: json("attachments").$type<any[]>().default([]), // Array of file attachments
   notes: text("notes"),
   isActive: boolean("is_active").notNull().default(true),
-  isDeleted: boolean("is_deleted").notNull().default(false),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
-  updatedBy: text("updated_by"),
 }, (table) => ({
   vesselIdx: index("idx_certificates_vessel").on(table.vessel),
   typeIdx: index("idx_certificates_type").on(table.type),
@@ -2342,8 +2040,6 @@ export const certificates = pgTable("certificates", {
 }));
 
 export const insertCertificateSchema = createInsertSchema(certificates).omit({
-  uuid: true,
-  isDeleted: true,
   createdAt: true,
   updatedAt: true,
 });
@@ -2356,7 +2052,6 @@ export type Certificate = typeof certificates.$inferSelect;
 // =====================================================
 export const surveys = pgTable("surveys", {
   id: text("id").primaryKey(), // Survey ID like S1, S2, etc.
-  uuid: text("uuid").notNull().default(sql`gen_random_uuid()`),
   surveyName: text("survey_name").notNull(),
   type: text("type").notNull(), // 'Annual' | 'Int' (Intermediate) | 'Special' | 'Renewal'
   vessel: text("vessel").notNull(), // Vessel name
@@ -2371,10 +2066,8 @@ export const surveys = pgTable("surveys", {
   attachments: json("attachments").$type<any[]>().default([]), // Array of file attachments
   notes: text("notes"),
   isActive: boolean("is_active").notNull().default(true),
-  isDeleted: boolean("is_deleted").notNull().default(false),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
-  updatedBy: text("updated_by"),
 }, (table) => ({
   vesselIdx: index("idx_surveys_vessel").on(table.vessel),
   typeIdx: index("idx_surveys_type").on(table.type),
@@ -2382,8 +2075,6 @@ export const surveys = pgTable("surveys", {
 }));
 
 export const insertSurveySchema = createInsertSchema(surveys).omit({
-  uuid: true,
-  isDeleted: true,
   createdAt: true,
   updatedAt: true,
 });
@@ -2396,7 +2087,6 @@ export type Survey = typeof surveys.$inferSelect;
 // =====================================================
 export const workOrderExecutionDetails = pgTable("work_order_execution_details", {
   id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
-  uuid: text("uuid").notNull().default(sql`gen_random_uuid()`),
   workOrderId: text("work_order_id").notNull(), // Reference to work_orders
   vesselId: text("vessel_id").notNull(),
   executedBy: text("executed_by"), // User who performed the work
@@ -2412,10 +2102,8 @@ export const workOrderExecutionDetails = pgTable("work_order_execution_details",
   qualityCheckDate: text("quality_check_date"),
   qualityCheckNotes: text("quality_check_notes"),
   attachments: json("attachments").$type<any[]>().default([]),
-  isDeleted: boolean("is_deleted").notNull().default(false),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
-  updatedBy: text("updated_by"),
 }, (table) => ({
   workOrderIdx: index("idx_exec_details_wo").on(table.workOrderId),
   vesselIdx: index("idx_exec_details_vessel").on(table.vesselId),
@@ -2424,8 +2112,6 @@ export const workOrderExecutionDetails = pgTable("work_order_execution_details",
 
 export const insertWorkOrderExecutionDetailsSchema = createInsertSchema(workOrderExecutionDetails).omit({
   id: true,
-  uuid: true,
-  isDeleted: true,
   createdAt: true,
   updatedAt: true,
 });
@@ -2461,15 +2147,11 @@ export const ihmEvidenceTypeEnum = pgEnum("ihm_evidence_type", ["NONE", "DOC", "
 // B4) LOCATIONS - Location registry for SIRE mapping
 export const locations = pgTable("locations", {
   id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
-  uuid: text("uuid").notNull().default(sql`gen_random_uuid()`),
   vesselId: text("vessel_id").notNull(),
   locationName: text("location_name").notNull(), // Unique per vessel, trimmed + case-normalized
   locationType: text("location_type"), // STORE/LOCKER/BOX/etc.
-  isDeleted: boolean("is_deleted").notNull().default(false),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   createdBy: text("created_by").notNull(),
-  updatedAt: timestamp("updated_at").notNull().defaultNow(),
-  updatedBy: text("updated_by"),
 }, (table) => ({
   vesselLocationIdx: index("idx_location_vessel").on(table.vesselId),
   uniqueVesselLocation: unique("unique_vessel_location").on(table.vesselId, table.locationName),
@@ -2477,10 +2159,7 @@ export const locations = pgTable("locations", {
 
 export const insertLocationSchema = createInsertSchema(locations).omit({
   id: true,
-  uuid: true,
-  isDeleted: true,
   createdAt: true,
-  updatedAt: true,
 });
 
 export type InsertLocation = z.infer<typeof insertLocationSchema>;
@@ -2489,16 +2168,11 @@ export type Location = typeof locations.$inferSelect;
 // B3) SPARE_COMPONENT_LINKS - Many-to-many linking between spares and components
 export const spareComponentLinks = pgTable("spare_component_links", {
   id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
-  uuid: text("uuid").notNull().default(sql`gen_random_uuid()`),
   vesselId: text("vessel_id").notNull(),
   spareId: integer("spare_id").notNull(), // FK → spares.id
   componentId: text("component_id").notNull(), // FK → components.id
   linkedBy: text("linked_by").notNull(),
   linkedAt: timestamp("linked_at").notNull().defaultNow(),
-  isDeleted: boolean("is_deleted").notNull().default(false),
-  createdAt: timestamp("created_at").notNull().defaultNow(),
-  updatedAt: timestamp("updated_at").notNull().defaultNow(),
-  updatedBy: text("updated_by"),
 }, (table) => ({
   spareIdIdx: index("idx_spare_component_link_spare").on(table.spareId),
   componentIdIdx: index("idx_spare_component_link_component").on(table.componentId),
@@ -2508,11 +2182,7 @@ export const spareComponentLinks = pgTable("spare_component_links", {
 
 export const insertSpareComponentLinkSchema = createInsertSchema(spareComponentLinks).omit({
   id: true,
-  uuid: true,
-  isDeleted: true,
   linkedAt: true,
-  createdAt: true,
-  updatedAt: true,
 });
 
 export type InsertSpareComponentLink = z.infer<typeof insertSpareComponentLinkSchema>;
@@ -2521,15 +2191,10 @@ export type SpareComponentLink = typeof spareComponentLinks.$inferSelect;
 // B5) SPARE_LOCATION_STOCK - Current stock per spare per location
 export const spareLocationStock = pgTable("spare_location_stock", {
   id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
-  uuid: text("uuid").notNull().default(sql`gen_random_uuid()`),
   vesselId: text("vessel_id").notNull(),
   spareId: integer("spare_id").notNull(), // FK → spares.id
   locationId: integer("location_id").notNull(), // FK → locations.id
   qty: integer("qty").notNull().default(0), // Must never go negative
-  isDeleted: boolean("is_deleted").notNull().default(false),
-  createdAt: timestamp("created_at").notNull().defaultNow(),
-  updatedAt: timestamp("updated_at").notNull().defaultNow(),
-  updatedBy: text("updated_by"),
 }, (table) => ({
   spareIdIdx: index("idx_spare_location_stock_spare").on(table.spareId),
   locationIdIdx: index("idx_spare_location_stock_location").on(table.locationId),
@@ -2539,19 +2204,14 @@ export const spareLocationStock = pgTable("spare_location_stock", {
 
 export const insertSpareLocationStockSchema = createInsertSchema(spareLocationStock).omit({
   id: true,
-  uuid: true,
-  isDeleted: true,
-  createdAt: true,
-  updatedAt: true,
 });
 
 export type InsertSpareLocationStock = z.infer<typeof insertSpareLocationStockSchema>;
 export type SpareLocationStock = typeof spareLocationStock.$inferSelect;
 
-// B6) INVENTORY_TRANSACTIONS - Single source of truth for history (IMMUTABLE audit)
+// B6) INVENTORY_TRANSACTIONS - Single source of truth for history
 export const inventoryTransactions = pgTable("inventory_transactions", {
   id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
-  uuid: text("uuid").notNull().default(sql`gen_random_uuid()`),
   vesselId: text("vessel_id").notNull(),
   txnDatetime: timestamp("txn_datetime").notNull().defaultNow(),
   spareId: integer("spare_id").notNull(), // FK → spares.id
@@ -2566,7 +2226,6 @@ export const inventoryTransactions = pgTable("inventory_transactions", {
   referenceId: text("reference_id"), // WO number, import batch id, etc.
   referenceNote: text("reference_note"), // Free text
   userId: text("user_id").notNull(),
-  createdAt: timestamp("created_at").notNull().defaultNow(),
 }, (table) => ({
   vesselIdIdx: index("idx_inventory_txn_vessel").on(table.vesselId),
   spareIdIdx: index("idx_inventory_txn_spare").on(table.spareId),
@@ -2578,9 +2237,7 @@ export const inventoryTransactions = pgTable("inventory_transactions", {
 
 export const insertInventoryTransactionSchema = createInsertSchema(inventoryTransactions).omit({
   id: true,
-  uuid: true,
   txnDatetime: true,
-  createdAt: true,
 });
 
 export type InsertInventoryTransaction = z.infer<typeof insertInventoryTransactionSchema>;
@@ -2634,7 +2291,6 @@ export type SpareWithInventory = {
 // IMPORTANT: Contains component-specific tracking fields to prevent data mixing between components
 export const jobComponentLinks = pgTable("job_component_links", {
   id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
-  uuid: text("uuid").notNull().default(sql`gen_random_uuid()`),
   vesselId: text("vessel_id").notNull(),
   jobId: text("job_id").notNull(), // FK → jobs.id (UUID)
   componentId: text("component_id").notNull(), // FK → components.id (UUID)
@@ -2646,10 +2302,7 @@ export const jobComponentLinks = pgTable("job_component_links", {
   nextDueDate: text("next_due_date"), // Calculated next due date for THIS component
   lastDoneRH: text("last_done_rh"), // Last completion running hours for THIS component
   nextDueRH: text("next_due_rh"), // Calculated next due RH for THIS component
-  isDeleted: boolean("is_deleted").notNull().default(false),
-  createdAt: timestamp("created_at").notNull().defaultNow(),
-  updatedAt: timestamp("updated_at").notNull().defaultNow(),
-  updatedBy: text("updated_by"),
+  updatedAt: timestamp("updated_at"),
 }, (table) => ({
   jobIdIdx: index("idx_job_component_link_job").on(table.jobId),
   componentIdIdx: index("idx_job_component_link_component").on(table.componentId),
@@ -2659,10 +2312,7 @@ export const jobComponentLinks = pgTable("job_component_links", {
 
 export const insertJobComponentLinkSchema = createInsertSchema(jobComponentLinks).omit({
   id: true,
-  uuid: true,
-  isDeleted: true,
   linkedAt: true,
-  createdAt: true,
   updatedAt: true,
 });
 
@@ -2672,20 +2322,15 @@ export type JobComponentLink = typeof jobComponentLinks.$inferSelect;
 // Equipment Categories - Customizable master data for defect equipment classification
 export const equipmentCategories = pgTable("equipment_categories", {
   id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
-  uuid: text("uuid").notNull().default(sql`gen_random_uuid()`),
   name: text("name").notNull().unique(),
   sortOrder: integer("sort_order").notNull().default(0),
   isActive: boolean("is_active").notNull().default(true),
-  isDeleted: boolean("is_deleted").notNull().default(false),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
-  updatedBy: text("updated_by"),
 });
 
 export const insertEquipmentCategorySchema = createInsertSchema(equipmentCategories).omit({
   id: true,
-  uuid: true,
-  isDeleted: true,
   createdAt: true,
   updatedAt: true,
 });
@@ -2696,20 +2341,15 @@ export type EquipmentCategory = typeof equipmentCategories.$inferSelect;
 // Defect Categories - Customizable master data for defect classification (type of defect)
 export const defectCategories = pgTable("defect_categories", {
   id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
-  uuid: text("uuid").notNull().default(sql`gen_random_uuid()`),
   name: text("name").notNull().unique(),
   sortOrder: integer("sort_order").notNull().default(0),
   isActive: boolean("is_active").notNull().default(true),
-  isDeleted: boolean("is_deleted").notNull().default(false),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
-  updatedBy: text("updated_by"),
 });
 
 export const insertDefectCategorySchema = createInsertSchema(defectCategories).omit({
   id: true,
-  uuid: true,
-  isDeleted: true,
   createdAt: true,
   updatedAt: true,
 });
@@ -2720,20 +2360,15 @@ export type DefectCategory = typeof defectCategories.$inferSelect;
 // Defect Types - Customizable master data for specific defect type classification
 export const defectTypes = pgTable("defect_types", {
   id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
-  uuid: text("uuid").notNull().default(sql`gen_random_uuid()`),
   name: text("name").notNull().unique(),
   sortOrder: integer("sort_order").notNull().default(0),
   isActive: boolean("is_active").notNull().default(true),
-  isDeleted: boolean("is_deleted").notNull().default(false),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
-  updatedBy: text("updated_by"),
 });
 
 export const insertDefectTypeSchema = createInsertSchema(defectTypes).omit({
   id: true,
-  uuid: true,
-  isDeleted: true,
   createdAt: true,
   updatedAt: true,
 });
@@ -2745,7 +2380,6 @@ export type DefectType = typeof defectTypes.$inferSelect;
 // This is the admin configuration for what certificates exist and their properties
 export const shipCertificatesMaster = pgTable("ship_certificates_master", {
   id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
-  uuid: text("uuid").notNull().default(sql`gen_random_uuid()`),
   sequence: integer("sequence").notNull(),
   masterId: text("master_id").notNull().unique(), // Format: CategoryLetter + GroupNumber + "-" + 3-digit sequence (e.g., A1-001)
   certificateName: text("certificate_name").notNull(),
@@ -2759,10 +2393,8 @@ export const shipCertificatesMaster = pgTable("ship_certificates_master", {
   companyId: text("company_id"), // Default: "C" + masterId, but user-editable
   companyGroup: text("company_group"), // A-I company group key
   companySequence: integer("company_sequence"), // Sequence number for company tab ordering
-  isDeleted: boolean("is_deleted").notNull().default(false),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
-  updatedBy: text("updated_by"),
 }, (table) => ({
   sequenceIdx: index("idx_ship_cert_master_sequence").on(table.sequence),
   categoryIdx: index("idx_ship_cert_master_category").on(table.category),
@@ -2771,8 +2403,6 @@ export const shipCertificatesMaster = pgTable("ship_certificates_master", {
 
 export const insertShipCertificateMasterSchema = createInsertSchema(shipCertificatesMaster).omit({
   id: true,
-  uuid: true,
-  isDeleted: true,
   createdAt: true,
   updatedAt: true,
 });
@@ -2783,20 +2413,15 @@ export type ShipCertificateMaster = typeof shipCertificatesMaster.$inferSelect;
 // Ship Certificates Labels Configuration (for Master tab category/group labels)
 export const shipCertificatesLabelsConfig = pgTable("ship_certificates_labels_config", {
   id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
-  uuid: text("uuid").notNull().default(sql`gen_random_uuid()`),
   configType: text("config_type").notNull(), // 'master_category', 'master_group', 'company_group'
   key: text("key").notNull(), // A, B, C for categories or 1, 2, 3 for groups
   label: text("label").notNull().default(""),
-  isDeleted: boolean("is_deleted").notNull().default(false),
-  createdAt: timestamp("created_at").notNull().defaultNow(),
-  updatedAt: timestamp("updated_at").notNull().defaultNow(),
-  updatedBy: text("updated_by"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow().$onUpdate(() => new Date()),
 });
 
 export const insertShipCertificatesLabelsConfigSchema = createInsertSchema(shipCertificatesLabelsConfig).omit({
   id: true,
-  uuid: true,
-  isDeleted: true,
   createdAt: true,
   updatedAt: true,
 });
@@ -2807,15 +2432,12 @@ export type ShipCertificatesLabelsConfig = typeof shipCertificatesLabelsConfig.$
 // Vessel Certificate Applicability - tracks which certificates are applicable for each vessel
 export const vesselCertificateApplicability = pgTable("vessel_certificate_applicability", {
   id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
-  uuid: text("uuid").notNull().default(sql`gen_random_uuid()`),
   vesselId: text("vessel_id").notNull(), // External vessel ID from Vessel Master API
   vesselName: text("vessel_name").notNull(), // Vessel name for display
   masterId: text("master_id").notNull(), // References ship_certificates_master.master_id
   isApplicable: boolean("is_applicable").notNull().default(true), // Whether this certificate is applicable to this vessel
-  isDeleted: boolean("is_deleted").notNull().default(false),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
-  updatedBy: text("updated_by"),
 }, (table) => ({
   vesselMasterIdx: index("idx_vessel_cert_vessel_master").on(table.vesselId, table.masterId),
   vesselIdx: index("idx_vessel_cert_vessel").on(table.vesselId),
@@ -2824,8 +2446,6 @@ export const vesselCertificateApplicability = pgTable("vessel_certificate_applic
 
 export const insertVesselCertificateApplicabilitySchema = createInsertSchema(vesselCertificateApplicability).omit({
   id: true,
-  uuid: true,
-  isDeleted: true,
   createdAt: true,
   updatedAt: true,
 });
@@ -2836,7 +2456,6 @@ export type VesselCertificateApplicability = typeof vesselCertificateApplicabili
 // Vessel Certificate Data - stores vessel-specific certificate data (dates, attachments) for Cert & Surveys module
 export const vesselCertificateData = pgTable("vessel_certificate_data", {
   id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
-  uuid: text("uuid").notNull().default(sql`gen_random_uuid()`),
   vesselId: text("vessel_id").notNull(), // External vessel ID from Vessel Master API
   vesselName: text("vessel_name").notNull(), // Vessel name for display
   masterId: text("master_id").notNull(), // References ship_certificates_master.master_id
@@ -2847,10 +2466,8 @@ export const vesselCertificateData = pgTable("vessel_certificate_data", {
   endorsementDate: text("endorsement_date"), // Date of endorsement
   lastEditUpload: text("last_edit_upload"), // Date of last edit or file upload
   attachments: jsonb("attachments").$type<Array<{ name: string; size: number; key: string; uploadedAt: string }>>().default([]),
-  isDeleted: boolean("is_deleted").notNull().default(false),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
-  updatedBy: text("updated_by"),
 }, (table) => ({
   vesselMasterIdx: index("idx_vessel_cert_data_vessel_master").on(table.vesselId, table.masterId),
   vesselIdx: index("idx_vessel_cert_data_vessel").on(table.vesselId),
@@ -2859,8 +2476,6 @@ export const vesselCertificateData = pgTable("vessel_certificate_data", {
 
 export const insertVesselCertificateDataSchema = createInsertSchema(vesselCertificateData).omit({
   id: true,
-  uuid: true,
-  isDeleted: true,
   createdAt: true,
   updatedAt: true,
 });
@@ -2876,7 +2491,6 @@ export type VesselCertificateData = typeof vesselCertificateData.$inferSelect;
 // This is the admin configuration for what surveys exist and their properties
 export const shipSurveysMaster = pgTable("ship_surveys_master", {
   id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
-  uuid: text("uuid").notNull().default(sql`gen_random_uuid()`),
   sequence: integer("sequence").notNull(),
   masterId: text("master_id").notNull().unique(), // Format: CategoryLetter + GroupNumber + "-" + 3-digit sequence (e.g., A1-001)
   surveyName: text("survey_name").notNull(),
@@ -2890,10 +2504,8 @@ export const shipSurveysMaster = pgTable("ship_surveys_master", {
   companyId: text("company_id"), // Default: "C" + masterId, but user-editable
   companyGroup: text("company_group"), // A-I company group key
   companySequence: integer("company_sequence"), // Sequence number for company tab ordering
-  isDeleted: boolean("is_deleted").notNull().default(false),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
-  updatedBy: text("updated_by"),
 }, (table) => ({
   sequenceIdx: index("idx_ship_survey_master_sequence").on(table.sequence),
   categoryIdx: index("idx_ship_survey_master_category").on(table.category),
@@ -2902,8 +2514,6 @@ export const shipSurveysMaster = pgTable("ship_surveys_master", {
 
 export const insertShipSurveyMasterSchema = createInsertSchema(shipSurveysMaster).omit({
   id: true,
-  uuid: true,
-  isDeleted: true,
   createdAt: true,
   updatedAt: true,
 });
@@ -2914,20 +2524,15 @@ export type ShipSurveyMaster = typeof shipSurveysMaster.$inferSelect;
 // Ship Surveys Labels Configuration (for Master tab category/group labels)
 export const shipSurveysLabelsConfig = pgTable("ship_surveys_labels_config", {
   id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
-  uuid: text("uuid").notNull().default(sql`gen_random_uuid()`),
   configType: text("config_type").notNull(), // 'master_category', 'master_group', 'company_group'
   key: text("key").notNull(), // A, B, C for categories or 1, 2, 3 for groups
   label: text("label").notNull().default(""),
-  isDeleted: boolean("is_deleted").notNull().default(false),
-  createdAt: timestamp("created_at").notNull().defaultNow(),
-  updatedAt: timestamp("updated_at").notNull().defaultNow(),
-  updatedBy: text("updated_by"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow().$onUpdate(() => new Date()),
 });
 
 export const insertShipSurveysLabelsConfigSchema = createInsertSchema(shipSurveysLabelsConfig).omit({
   id: true,
-  uuid: true,
-  isDeleted: true,
   createdAt: true,
   updatedAt: true,
 });
@@ -2938,15 +2543,12 @@ export type ShipSurveysLabelsConfig = typeof shipSurveysLabelsConfig.$inferSelec
 // Vessel Survey Applicability - tracks which surveys are applicable for each vessel
 export const vesselSurveyApplicability = pgTable("vessel_survey_applicability", {
   id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
-  uuid: text("uuid").notNull().default(sql`gen_random_uuid()`),
   vesselId: text("vessel_id").notNull(), // External vessel ID from Vessel Master API
   vesselName: text("vessel_name").notNull(), // Vessel name for display
   masterId: text("master_id").notNull(), // References ship_surveys_master.master_id
   isApplicable: boolean("is_applicable").notNull().default(true), // Whether this survey is applicable to this vessel
-  isDeleted: boolean("is_deleted").notNull().default(false),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
-  updatedBy: text("updated_by"),
 }, (table) => ({
   vesselMasterIdx: index("idx_vessel_survey_vessel_master").on(table.vesselId, table.masterId),
   vesselIdx: index("idx_vessel_survey_vessel").on(table.vesselId),
@@ -2955,8 +2557,6 @@ export const vesselSurveyApplicability = pgTable("vessel_survey_applicability", 
 
 export const insertVesselSurveyApplicabilitySchema = createInsertSchema(vesselSurveyApplicability).omit({
   id: true,
-  uuid: true,
-  isDeleted: true,
   createdAt: true,
   updatedAt: true,
 });
@@ -2967,7 +2567,6 @@ export type VesselSurveyApplicability = typeof vesselSurveyApplicability.$inferS
 // Vessel Survey Data - stores vessel-specific survey data (dates, attachments) for Cert & Surveys module
 export const vesselSurveyData = pgTable("vessel_survey_data", {
   id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
-  uuid: text("uuid").notNull().default(sql`gen_random_uuid()`),
   vesselId: text("vessel_id").notNull(), // External vessel ID from Vessel Master API
   vesselName: text("vessel_name").notNull(), // Vessel name for display
   masterId: text("master_id").notNull(), // References ship_surveys_master.master_id
@@ -2978,10 +2577,8 @@ export const vesselSurveyData = pgTable("vessel_survey_data", {
   postponed: text("postponed"), // Postponed date
   lastEditUpload: text("last_edit_upload"), // Last edit/upload date
   attachments: jsonb("attachments").$type<Array<{ name: string; size: number; key: string; uploadedAt: string }>>().default([]),
-  isDeleted: boolean("is_deleted").notNull().default(false),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
-  updatedBy: text("updated_by"),
 }, (table) => ({
   vesselMasterIdx: index("idx_vessel_survey_data_vessel_master").on(table.vesselId, table.masterId),
   vesselIdx: index("idx_vessel_survey_data_vessel").on(table.vesselId),
@@ -2990,8 +2587,6 @@ export const vesselSurveyData = pgTable("vessel_survey_data", {
 
 export const insertVesselSurveyDataSchema = createInsertSchema(vesselSurveyData).omit({
   id: true,
-  uuid: true,
-  isDeleted: true,
   createdAt: true,
   updatedAt: true,
 });
