@@ -5318,7 +5318,7 @@ export class PostgresStorage {
     renewalEvidenceUrls?: string[];
   }): Promise<{ updatedComponents: number; auditsCreated: number; workOrdersGenerated: number; workOrders: any[] }> {
     const db = await getDb();
-    const { parentComponentId, mode, value, dateUpdated, comments, isRenewalReset, renewalActionType, renewalReason, renewalReference, renewalEvidenceUrls } = params;
+    const { parentComponentId, mode, value, dateUpdated, comments, meterReplaced, oldMeterFinal, newMeterStart, isRenewalReset, renewalActionType, renewalReason, renewalReference, renewalEvidenceUrls } = params;
     const now = new Date();
     
     // Get all child components (by parentId - structural hierarchy)
@@ -5376,7 +5376,19 @@ export class PostgresStorage {
         throw new Error('Running Hours cannot be set to 0 without confirming renewal/replacement.');
       }
       
-      newRH = mode === 'addDelta' ? currentRH + value : value;
+      // Handle meter replacement logic
+      // When meter is replaced, store the current cumulative total in meterReplacedLastRh
+      // The new meter reading starts fresh, but Total = meterReplacedLastRh + new reading
+      let previousTotalForReplacement = 0;
+      if (meterReplaced) {
+        // Calculate the previous total (existing meterReplacedLastRh + current reading)
+        const existingMeterReplacedLastRh = parseFloat(parent.meterReplacedLastRh || '0');
+        previousTotalForReplacement = existingMeterReplacedLastRh + currentRH;
+        // The new meter starts at the provided value (usually 0 or initial reading of new meter)
+        newRH = value;
+      } else {
+        newRH = mode === 'addDelta' ? currentRH + value : value;
+      }
       
       // Build update object - always update currentCumulativeRH
       const updateData: any = { 
@@ -5384,6 +5396,12 @@ export class PostgresStorage {
         lastUpdated: dateUpdated,
         updatedAt: now
       };
+      
+      // If meter was replaced, update the meter replacement tracking fields
+      if (meterReplaced) {
+        updateData.meterReplacedLastRh = previousTotalForReplacement.toString();
+        updateData.meterReplacedDate = now;
+      }
       
       // If this component is a MASTER type, also update rhCurrentMaster
       if (parent.rhCounterType === 'MASTER') {
@@ -5397,18 +5415,26 @@ export class PostgresStorage {
         .where(eq(components.id, parentComponentId));
       
       // Log audit for parent
+      // Calculate the total cumulative RH (includes meter replacement history)
+      const totalCumulativeRH = meterReplaced 
+        ? previousTotalForReplacement + newRH 
+        : (parseFloat(parent.meterReplacedLastRh || '0') + newRH);
+      
       await db.insert(runningHoursAudit).values({
         vesselId: parent.vesselId || 'unknown',
         componentId: parentComponentId,
         previousRH: currentRH.toString(),
         newRH: newRH.toString(),
-        cumulativeRH: newRH.toString(),
+        cumulativeRH: totalCumulativeRH.toString(),
         dateUpdatedLocal: dateUpdated,
         dateUpdatedTZ: 'UTC',
         enteredAtUTC: now,
         userId: 'system',
         source: 'cascade',
-        notes: comments,
+        notes: meterReplaced 
+          ? `Meter replaced. Old meter final: ${oldMeterFinal || currentRH}. New meter start: ${newMeterStart || value}. ${comments || ''}`
+          : comments,
+        meterReplaced: meterReplaced || false,
         isRenewalReset: isRenewalReset || false,
         renewalActionType: renewalActionType || null,
         renewalReason: renewalReason || null,
