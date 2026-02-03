@@ -3758,7 +3758,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
 
       {/* Spare Parts Selection Modal for Section B4 */}
       <Dialog open={isSparePartsModalOpen} onOpenChange={setIsSparePartsModalOpen}>
-        <DialogContent className="max-w-4xl max-h-[80vh] overflow-hidden flex flex-col">
+        <DialogContent className="max-w-[85vw] max-h-[80vh] overflow-hidden flex flex-col">
           <DialogHeader>
             <DialogTitle>Select Spare Parts for Component: {templateData.componentCode}</DialogTitle>
             <DialogDescription>
