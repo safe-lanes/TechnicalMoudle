@@ -178,6 +178,18 @@ const ReportsModule = () => {
     });
   };
 
+  const handleClearAll = () => {
+    setSearchQuery("");
+    handleFiltersReset();
+  };
+
+  const hasActiveFilters = () => {
+    return searchQuery !== "" || 
+           (globalFilters.vessel && globalFilters.vessel !== "all") ||
+           globalFilters.dateRange.from !== null ||
+           globalFilters.dateRange.to !== null;
+  };
+
   // Render category-specific views
   if (selectedCategory === "planner") {
     return <MaintenancePlanner onBack={handleBackToMain} />;
@@ -307,6 +319,17 @@ const ReportsModule = () => {
             onReset={handleFiltersReset}
             className="border-0 shadow-none bg-transparent p-0 mb-0 flex-1"
           />
+          {hasActiveFilters() && (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={handleClearAll}
+              className="text-gray-600"
+              data-testid="button-clear-all-filters"
+            >
+              Clear
+            </Button>
+          )}
         </div>
       </div>
 
