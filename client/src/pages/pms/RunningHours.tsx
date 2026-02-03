@@ -41,6 +41,9 @@ interface RunningHoursData {
   lastUpdated: string;
   utilizationRate?: number | null;
   inheritedCount?: number;
+  meterReplacedLastRh?: string | null;
+  meterReplacedDate?: string | null;
+  currentMeterRH?: string;
 }
 
 const RunningHours = () => {
@@ -149,7 +152,10 @@ const RunningHours = () => {
     runningHours: `${parseFloat(parent.currentCumulativeRH || '0').toLocaleString()} hrs`,
     lastUpdated: formatProfessionalDateTime(parent.latestUpdate || parent.lastUpdated),
     utilizationRate: null,
-    inheritedCount: parent.inheritedCount || 0
+    inheritedCount: parent.inheritedCount || 0,
+    meterReplacedLastRh: parent.meterReplacedLastRh || null,
+    meterReplacedDate: parent.meterReplacedDate || null,
+    currentMeterRH: parent.currentMeterRH || '0'
   })) : [];
 
   // Cascade update mutation
@@ -342,8 +348,18 @@ const RunningHours = () => {
 
   const openUpdateDialog = (component: RunningHoursData) => {
     setSelectedComponent(component);
+    
+    // Check if component has had meter replacement
+    const hasMeterReplacement = component.meterReplacedLastRh && parseFloat(component.meterReplacedLastRh) > 0;
+    
+    // For components with meter replacement, show the current meter reading (not the total)
+    // Old value = current meter reading on the NEW meter
+    const oldValueToShow = hasMeterReplacement 
+      ? (component.currentMeterRH || '0')
+      : component.runningHours.replace(" hrs", "").replace(/,/g, "");
+    
     setUpdateForm({
-      oldValue: component.runningHours.replace(" hrs", "").replace(/,/g, ""),
+      oldValue: oldValueToShow,
       newValue: "",
       dateUpdated: "",
       comments: "",
@@ -398,6 +414,19 @@ const RunningHours = () => {
       });
       setIsMeterReplacedDialogOpen(true);
       return;
+    }
+    
+    // Validate mandatory fields for meter replacement (per requirements)
+    if (meterReplaced) {
+      if (!updateForm.oldMeterFinal || updateForm.oldMeterFinal.trim() === "") {
+        toast({
+          title: "Error",
+          description: "Old Meter Final reading is required for meter replacement.",
+          variant: "destructive",
+        });
+        return;
+      }
+      // Date is already validated above, but it's also mandatory for meter replacement
     }
     
     // Format date in vessel local time
@@ -786,6 +815,26 @@ const RunningHours = () => {
             </DialogTitle>
           </DialogHeader>
           <div className="space-y-4 py-4">
+            {/* Meter Replacement History Info - shown if component has had meter replaced */}
+            {selectedComponent?.meterReplacedLastRh && parseFloat(selectedComponent.meterReplacedLastRh) > 0 && (
+              <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                <p className="text-sm text-blue-800 font-medium mb-2">Meter Replacement History</p>
+                <div className="grid grid-cols-2 gap-2 text-sm">
+                  <div>
+                    <span className="text-gray-600">Previous Total (before replacement):</span>
+                    <span className="ml-2 font-medium">{parseFloat(selectedComponent.meterReplacedLastRh).toLocaleString()} hrs</span>
+                  </div>
+                  <div>
+                    <span className="text-gray-600">Current Meter Reading:</span>
+                    <span className="ml-2 font-medium">{parseFloat(selectedComponent.currentMeterRH || '0').toLocaleString()} hrs</span>
+                  </div>
+                </div>
+                <div className="mt-1 text-xs text-blue-600">
+                  Total Running Hours = {parseFloat(selectedComponent.meterReplacedLastRh).toLocaleString()} + {parseFloat(selectedComponent.currentMeterRH || '0').toLocaleString()} = {(parseFloat(selectedComponent.meterReplacedLastRh) + parseFloat(selectedComponent.currentMeterRH || '0')).toLocaleString()} hrs
+                </div>
+              </div>
+            )}
+
             {/* Mode Toggle */}
             <div>
               <Label className="text-sm text-gray-600">Mode</Label>
@@ -805,11 +854,16 @@ const RunningHours = () => {
 
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <Label className="text-sm text-gray-600">Old Value</Label>
+                <Label className="text-sm text-gray-600">
+                  {selectedComponent?.meterReplacedLastRh && parseFloat(selectedComponent.meterReplacedLastRh) > 0 
+                    ? "Current Meter Reading" 
+                    : "Old Value"}
+                </Label>
                 <Input 
                   value={updateForm.oldValue}
                   readOnly
                   className="mt-1 bg-gray-100"
+                  data-testid="input-old-value"
                 />
               </div>
               <div>
@@ -822,6 +876,7 @@ const RunningHours = () => {
                   onChange={(e) => handleUpdateFormChange('newValue', e.target.value)}
                   className="mt-1"
                   placeholder={updateMode === "addDelta" ? "100" : "20000"}
+                  data-testid="input-new-value"
                 />
               </div>
             </div>
