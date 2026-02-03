@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from "react";
-import { Search, Plus, Pen, Timer, AlertTriangle, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Eye } from "lucide-react";
+import { Search, Plus, Pen, Timer, AlertTriangle, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Eye, X } from "lucide-react";
 import { useLocation } from "wouter";
 import { useVessel } from "@/contexts/VesselContext";
 import { useQuery, useMutation } from "@tanstack/react-query";
@@ -586,6 +586,20 @@ const WorkOrders: React.FC = () => {
             <SelectItem value="non-critical">Non-Critical</SelectItem>
           </SelectContent>
         </Select>
+
+        <Button
+          variant="outline"
+          onClick={() => {
+            setSearchTerm("");
+            setSelectedPeriod("");
+            setSelectedRank("");
+            setSelectedCriticality("");
+          }}
+          data-testid="button-clear-filters"
+        >
+          <X className="h-4 w-4 mr-1" />
+          Clear
+        </Button>
       </div>
 
       {/* Work Orders Table */}
