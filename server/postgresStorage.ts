@@ -6696,6 +6696,50 @@ export class PostgresStorage {
       userId: input.userId,
     });
     
+    // ========== CREATE SPARES HISTORY RECORD ==========
+    // This ensures Work Order consumption (and all inventory transactions) appear in Spares History
+    try {
+      // For reference field: prefer the referenceNote (contains WO number) over referenceId (internal ID)
+      // referenceNote format: "WO Approval: WO-2024-001 - comments" or "Consumed during work approval"
+      // Extract work order number from referenceNote if available, otherwise use referenceId
+      let historyReference = input.referenceId ?? null;
+      if (input.referenceNote) {
+        // Extract WO number from note like "WO Approval: WO-2024-001 - ..."
+        const woMatch = input.referenceNote.match(/WO[- ]?\d+[-/]?\d*/i);
+        if (woMatch) {
+          historyReference = woMatch[0]; // Use extracted WO number
+        } else if (input.referenceType === 'WORK_ORDER') {
+          historyReference = input.referenceNote; // Use the full note as reference
+        }
+      }
+      
+      await this.createSpareHistory({
+        timestampUTC: new Date(),
+        vesselId: input.vesselId,
+        spareId: input.spareId,
+        partCode: spare.partCode ?? spare.componentSpareCode ?? `SP-${spare.id}`,
+        partName: spare.partName,
+        componentId: spare.componentId || '',
+        componentCode: spare.componentCode ?? null,
+        componentName: spare.componentName,
+        componentSpareCode: spare.componentSpareCode ?? null,
+        eventType: input.eventType, // 'CONSUME', 'RECEIVE', 'ADJUST', etc.
+        qtyChange: input.qtyChange,
+        robAfter: newTotalRob,
+        userId: input.userId,
+        remarks: input.referenceNote ?? null, // Full note with details
+        reference: historyReference, // Work Order number for display
+        dateLocal: new Date().toISOString().split('T')[0], // YYYY-MM-DD format
+        tz: null,
+        place: location.locationName ?? null, // Storage location name
+      });
+      console.log(`[performInventoryTransaction] Created spares_history entry for spare ${input.spareId}, event: ${input.eventType}, qty: ${input.qtyChange}, ref: ${historyReference || 'N/A'}`);
+    } catch (historyError) {
+      // Log but don't fail the transaction if history creation fails
+      console.error(`[performInventoryTransaction] Failed to create spares_history entry:`, historyError);
+    }
+    // ========== END SPARES HISTORY RECORD ==========
+    
     // Update legacy ROB fields on spare table for backwards compatibility
     // IMPORTANT: Must update both location-specific ROB and total ROB to maintain data integrity
     // 
