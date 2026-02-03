@@ -35,7 +35,7 @@ import AlertsApprovalsAdminReports from "./AlertsApprovalsAdminReports";
 import MaintenancePlanner from "./MaintenancePlanner";
 import GlobalFilters, { FilterValues } from "@/components/reports/GlobalFilters";
 
-const LIMIT_REPORTS = true;
+const LIMIT_REPORTS = false;
 
 interface ReportCategory {
   id: string;
