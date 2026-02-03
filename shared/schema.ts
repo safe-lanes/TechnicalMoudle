@@ -171,6 +171,15 @@ export const cascadeRunningHoursSchema = z.object({
 }, {
   message: "When setting RH to 0, renewal confirmation with action type and reason is required",
   path: ["renewalReason"]
+}).refine(data => {
+  // When meterReplaced is true, oldMeterFinal is mandatory
+  if (data.meterReplaced === true) {
+    return !!data.oldMeterFinal && data.oldMeterFinal.trim().length > 0;
+  }
+  return true;
+}, {
+  message: "Old Meter Final reading is required when meter is replaced",
+  path: ["oldMeterFinal"]
 });
 
 export type CascadeRunningHoursRequest = z.infer<typeof cascadeRunningHoursSchema>;
