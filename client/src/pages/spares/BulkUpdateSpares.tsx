@@ -188,11 +188,11 @@ export default function BulkUpdateSpares() {
             <Button 
               variant="ghost" 
               size="sm" 
-              onClick={() => setLocation("/spares")}
+              onClick={() => window.history.back()}
               data-testid="button-back"
             >
               <ArrowLeft className="h-4 w-4 mr-2" />
-              Back to Spares
+              Back
             </Button>
             <h1 className="text-xl font-semibold text-gray-800 dark:text-gray-100">Bulk Update Spares</h1>
           </div>
@@ -492,7 +492,7 @@ export default function BulkUpdateSpares() {
         <div className="w-full flex justify-end gap-3">
           <Button 
             variant="outline" 
-            onClick={() => setLocation("/spares")}
+            onClick={() => window.history.back()}
             data-testid="button-cancel"
           >
             Cancel

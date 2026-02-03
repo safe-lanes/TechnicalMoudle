@@ -1769,7 +1769,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
     if (embedded && onClose) {
       onClose();
     } else {
-      navigate("/pms/work-orders");
+      window.history.back();
     }
   };
 

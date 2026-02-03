@@ -287,16 +287,7 @@ const JobsFormPage: React.FC = () => {
   };
 
   const handleBack = () => {
-    if (isModifyMode) {
-      navigate("/pms/modify-pms/jobs");
-    } else {
-      // Preserve component context when navigating back if activeComponentCode was provided
-      if (activeComponentCode) {
-        navigate(`/pms/components?scrollTo=${encodeURIComponent(activeComponentCode)}`);
-      } else {
-        navigate("/pms/components");
-      }
-    }
+    window.history.back();
   };
 
   const handleCancelModify = () => {

@@ -1215,7 +1215,7 @@ const WorkOrderForm: React.FC<WorkOrderFormProps> = ({
                 <Button
                   variant="outline"
                   size="sm"
-                  onClick={() => setLocation('/pms/modify-pms')}
+                  onClick={() => window.history.back()}
                   className="text-blue-700 border-blue-300 text-xs px-2 py-1 h-7"
                 >
                   <ArrowLeft className="w-3 h-3 mr-1" />

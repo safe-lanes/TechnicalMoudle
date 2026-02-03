@@ -150,13 +150,7 @@ const MaintenanceRecords: React.FC = () => {
               <Button
                 variant="ghost"
                 size="sm"
-                onClick={() => {
-                  if (sourceWorkOrderId) {
-                    setLocation(`/pms/components?openWorkOrderId=${sourceWorkOrderId}`);
-                  } else {
-                    setLocation('/pms/components');
-                  }
-                }}
+                onClick={() => window.history.back()}
                 className="text-gray-600"
                 data-testid="button-back-to-components"
               >

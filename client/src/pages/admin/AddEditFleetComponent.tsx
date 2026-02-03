@@ -436,7 +436,7 @@ export default function AddEditFleetComponent() {
             </Button>
             <Button
               variant="outline"
-              onClick={() => setLocation("/admin/master-data")}
+              onClick={() => window.history.back()}
               data-testid="btn-back"
             >
               <ArrowLeft className="h-4 w-4 mr-1" />

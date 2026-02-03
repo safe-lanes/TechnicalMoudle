@@ -2646,12 +2646,12 @@ const Components: React.FC = () => {
   const handleBackToModifyPMS = () => {
     exitChangeRequestMode();
     reset();
-    setLocation("/pms/modify-pms");
+    window.history.back();
   };
   
   const handleCancelChangeMode = () => {
     reset();
-    setLocation("/pms/modify-pms");
+    window.history.back();
   };
 
   const toggleNode = (nodeId: string) => {

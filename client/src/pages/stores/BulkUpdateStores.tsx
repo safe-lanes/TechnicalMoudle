@@ -243,11 +243,11 @@ export default function BulkUpdateStores() {
             <Button 
               variant="ghost" 
               size="sm" 
-              onClick={() => setLocation("/stores")}
+              onClick={() => window.history.back()}
               data-testid="button-back"
             >
               <ArrowLeft className="h-4 w-4 mr-2" />
-              Back to Stores
+              Back
             </Button>
             <h1 className="text-xl font-semibold text-gray-800 dark:text-gray-100">Bulk Update {getTabLabel()}</h1>
           </div>
@@ -535,7 +535,7 @@ export default function BulkUpdateStores() {
         <div className="w-full flex justify-end gap-3">
           <Button 
             variant="outline" 
-            onClick={() => setLocation("/stores")}
+            onClick={() => window.history.back()}
             data-testid="button-cancel"
           >
             Cancel
