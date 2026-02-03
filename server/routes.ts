@@ -3392,16 +3392,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 }
                 
                 if (spare) {
-                  // Check if locationId is provided for new location-based tracking
-                  const locationId = consumedSpare.locationId ? parseInt(String(consumedSpare.locationId)) : null;
+                  // Resolve locationId: try direct locationId first, then resolve from location name
+                  let resolvedLocationId = consumedSpare.locationId ? parseInt(String(consumedSpare.locationId)) : null;
                   
-                  if (locationId && !isNaN(locationId)) {
+                  // If no locationId but location name is provided, resolve it (auto-create if doesn't exist)
+                  if ((!resolvedLocationId || isNaN(resolvedLocationId)) && consumedSpare.location) {
+                    const locationObj = await storage.findOrCreateLocation(vesselId, consumedSpare.location, workOrder.approver || 'system');
+                    if (locationObj) {
+                      resolvedLocationId = locationObj.id;
+                      console.log(`📍 [PATCH Approval] Resolved location name "${consumedSpare.location}" to ID ${resolvedLocationId}`);
+                    }
+                  }
+                  
+                  if (resolvedLocationId && !isNaN(resolvedLocationId)) {
                     // Use new inventory transaction system with location tracking
                     try {
                       await storage.performInventoryTransaction({
                         vesselId: vesselId,
                         spareId: spare.id,
-                        locationId: locationId,
+                        locationId: resolvedLocationId,
                         eventType: 'CONSUME',
                         qtyChange: -Math.abs(qtyConsumed), // Negative for consumption
                         referenceType: 'WORK_ORDER',
@@ -3409,25 +3418,39 @@ export async function registerRoutes(app: Express): Promise<Server> {
                         referenceNote: `WO Approval: ${workOrder.workOrderNo} - ${consumedSpare.comments || 'Consumed during work approval'}`,
                         userId: workOrder.approver || 'system'
                       });
-                      console.log(`✅ [PATCH Approval] Consumed ${qtyConsumed} units of ${consumedSpare.partCode || consumedSpare.partNo} from location ${locationId} (WO: ${workOrder.workOrderNo})`);
+                      console.log(`✅ [PATCH Approval] Consumed ${qtyConsumed} units of ${consumedSpare.partCode || consumedSpare.partNo} from location ${resolvedLocationId} (WO: ${workOrder.workOrderNo})`);
                     } catch (txnError: any) {
                       if (txnError.message?.includes('INSUFFICIENT_STOCK') || txnError.message?.includes('NEGATIVE_STOCK_PREVENTED')) {
-                        console.warn(`⚠️ [PATCH Approval] Insufficient stock for ${consumedSpare.partCode || consumedSpare.partNo} at location ${locationId}: ${txnError.message}`);
-                        // Log warning but don't fail the approval - spare was already consumed via other means or stock discrepancy
+                        // Propagate stock errors to fail the approval
+                        throw new Error(`INSUFFICIENT_STOCK: Cannot consume ${qtyConsumed} units of ${consumedSpare.partCode || consumedSpare.partNo}. ${txnError.message}`);
                       } else {
                         console.error(`❌ [PATCH Approval] Transaction error for ${consumedSpare.partCode || consumedSpare.partNo}:`, txnError);
+                        throw txnError;
                       }
                     }
                   } else {
-                    // PHASE 3B: locationId is REQUIRED for inventory-tracked spares
-                    console.warn(`⚠️ [PATCH Approval] Missing locationId for ${consumedSpare.partCode || consumedSpare.partNo} - skipping deduction. Ensure location is selected in work order form.`);
+                    // PHASE 3B: locationId is REQUIRED for inventory-tracked spares - REJECT approval
+                    const errorMsg = `LOCATION_REQUIRED: Spare part ${consumedSpare.partCode || consumedSpare.partNo} requires a storage location for inventory tracking. Please select a location in the work order form.`;
+                    console.error(`❌ [PATCH Approval] ${errorMsg}`);
+                    throw new Error(errorMsg);
                   }
                 } else {
-                  console.warn(`⚠️ [PATCH Approval] Spare NOT FOUND - skipping deduction. Searched: partCode="${consumedSpare.partCode}", partNo="${consumedSpare.partNo}". Vessel ${vesselId} has ${allSpares.length} spares.`);
+                  // Spare not found in inventory - REJECT approval with clear error
+                  const errorMsg = `SPARE_NOT_FOUND: Spare part ${consumedSpare.partCode || consumedSpare.partNo} was not found in inventory. Searched: partCode="${consumedSpare.partCode}", partNo="${consumedSpare.partNo}". Please verify the spare exists in the inventory.`;
+                  console.error(`❌ [PATCH Approval] ${errorMsg}`);
+                  throw new Error(errorMsg);
                 }
               } catch (spareError: any) {
+                // PHASE 3B: Propagate enforcement errors to fail the approval
+                if (spareError.message?.includes('LOCATION_REQUIRED') || 
+                    spareError.message?.includes('SPARE_NOT_FOUND') ||
+                    spareError.message?.includes('INSUFFICIENT_STOCK') ||
+                    spareError.message?.includes('NEGATIVE_STOCK_PREVENTED')) {
+                  console.error(`❌ [PATCH Approval] Enforcement error: ${spareError.message}`);
+                  throw spareError; // Rethrow to fail the work order approval
+                }
                 console.error(`❌ [PATCH Approval] Failed to process spare ${consumedSpare.partCode || consumedSpare.partNo}:`, spareError);
-                // Don't fail the approval for spare processing errors - log and continue
+                // Don't fail the approval for other types of spare processing errors - log and continue
               }
             }
           }
@@ -3444,6 +3467,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       if (error.message?.includes('not found')) {
         return res.status(404).json({ error: error.message });
+      }
+      // Return 400 for inventory enforcement errors (LOCATION_REQUIRED, SPARE_NOT_FOUND, INSUFFICIENT_STOCK)
+      if (error.message?.includes('LOCATION_REQUIRED') || 
+          error.message?.includes('SPARE_NOT_FOUND') ||
+          error.message?.includes('INSUFFICIENT_STOCK') ||
+          error.message?.includes('NEGATIVE_STOCK_PREVENTED')) {
+        return res.status(400).json({ error: error.message });
       }
       res.status(500).json({ error: "Failed to update work order" });
     }
@@ -4028,29 +4058,39 @@ export async function registerRoutes(app: Express): Promise<Server> {
               }
               
               if (spare) {
+                const vesselId = workOrder.vesselId || 'V001';
                 
-                // Check if locationId is provided for new location-based tracking
-                // Coerce to number in case frontend sends string
-                const locationId = consumedSpare.locationId ? parseInt(String(consumedSpare.locationId)) : null;
-                if (locationId && !isNaN(locationId)) {
+                // Resolve locationId: try direct locationId first, then resolve from location name
+                let resolvedLocationId = consumedSpare.locationId ? parseInt(String(consumedSpare.locationId)) : null;
+                
+                // If no locationId but location name is provided, resolve it (auto-create if doesn't exist)
+                if ((!resolvedLocationId || isNaN(resolvedLocationId)) && consumedSpare.location) {
+                  const locationObj = await storage.findOrCreateLocation(vesselId, consumedSpare.location, 'system');
+                  if (locationObj) {
+                    resolvedLocationId = locationObj.id;
+                    console.log(`📍 [POST Complete] Resolved location name "${consumedSpare.location}" to ID ${resolvedLocationId}`);
+                  }
+                }
+                
+                if (resolvedLocationId && !isNaN(resolvedLocationId)) {
                   // Use new inventory transaction system with location tracking
                   try {
                     await storage.performInventoryTransaction({
-                      vesselId: workOrder.vesselId || 'V001',
+                      vesselId: vesselId,
                       spareId: spare.id,
-                      locationId: locationId,
+                      locationId: resolvedLocationId,
                       eventType: 'CONSUME',
                       qtyChange: -Math.abs(qtyConsumed), // Negative for consumption
                       referenceType: 'WORK_ORDER',
                       referenceId: workOrder.id,
                       referenceNote: `WO: ${workOrder.workOrderNo} - ${consumedSpare.comments || 'Consumed during work completion'}`
                     });
-                    console.log(`✅ [Inventory Transaction] Consumed ${qtyConsumed} units of ${consumedSpare.partNo} from location ${locationId} (WO: ${workOrder.workOrderNo})`);
+                    console.log(`✅ [Inventory Transaction] Consumed ${qtyConsumed} units of ${consumedSpare.partNo} from location ${resolvedLocationId} (WO: ${workOrder.workOrderNo})`);
                   } catch (txnError: any) {
                     if (txnError.message?.includes('INSUFFICIENT_STOCK') || txnError.message?.includes('NEGATIVE_STOCK_PREVENTED')) {
-                      console.warn(`⚠️ Insufficient stock for ${consumedSpare.partNo} at location ${locationId}: ${txnError.message}`);
+                      console.warn(`⚠️ Insufficient stock for ${consumedSpare.partNo} at location ${resolvedLocationId}: ${txnError.message}`);
                       // PHASE 3B: Do NOT fall back to legacy ROB - reject the transaction
-                      throw new Error(`INSUFFICIENT_STOCK: Cannot consume ${qtyConsumed} units of ${consumedSpare.partNo} from location ${locationId}. Insufficient stock.`);
+                      throw new Error(`INSUFFICIENT_STOCK: Cannot consume ${qtyConsumed} units of ${consumedSpare.partNo} from location ${resolvedLocationId}. Insufficient stock.`);
                     } else {
                       throw txnError;
                     }
@@ -4062,11 +4102,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
                   throw new Error(`LOCATION_REQUIRED: Spare part ${consumedSpare.partNo} requires a storage location for inventory tracking. Please select a location in the work order form.`);
                 }
               } else {
-                console.warn(`⚠️ [B4 Spare Consumption] Spare NOT FOUND in inventory - skipping deduction. Searched with: partCode="${consumedSpare.partCode}", partNo="${consumedSpare.partNo}". Total spares in vessel: ${spares.length}`);
+                // PHASE 3B: Spare not found in inventory - REJECT completion with clear error
+                const errorMsg = `SPARE_NOT_FOUND: Spare part ${consumedSpare.partCode || consumedSpare.partNo} was not found in inventory. Searched: partCode="${consumedSpare.partCode}", partNo="${consumedSpare.partNo}". Please verify the spare exists in the inventory.`;
+                console.error(`❌ [POST Complete] ${errorMsg}`);
+                throw new Error(errorMsg);
               }
             } catch (spareError: any) {
-              // PHASE 3B: Propagate LOCATION_REQUIRED and INSUFFICIENT_STOCK errors to fail the request
+              // PHASE 3B: Propagate enforcement errors to fail the request
               if (spareError.message?.includes('LOCATION_REQUIRED') || 
+                  spareError.message?.includes('SPARE_NOT_FOUND') ||
                   spareError.message?.includes('INSUFFICIENT_STOCK') ||
                   spareError.message?.includes('NEGATIVE_STOCK_PREVENTED')) {
                 console.error(`❌ [Inventory Enforcement] ${spareError.message}`);
@@ -4091,6 +4135,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       // PHASE 3B: Return 400 for inventory enforcement errors
       if (error.message?.includes('LOCATION_REQUIRED') || 
+          error.message?.includes('SPARE_NOT_FOUND') ||
           error.message?.includes('INSUFFICIENT_STOCK') ||
           error.message?.includes('NEGATIVE_STOCK_PREVENTED')) {
         return res.status(400).json({ error: error.message });
