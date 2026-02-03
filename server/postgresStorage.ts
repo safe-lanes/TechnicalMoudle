@@ -6725,7 +6725,7 @@ export class PostgresStorage {
         componentSpareCode: spare.componentSpareCode ?? null,
         eventType: input.eventType, // 'CONSUME', 'RECEIVE', 'ADJUST', etc.
         qtyChange: input.qtyChange,
-        robAfter: newTotalRob,
+        robAfter: newLocationQty, // Location-specific ROB after transaction (not aggregated total)
         userId: input.userId,
         remarks: input.referenceNote ?? null, // Full note with details
         reference: historyReference, // Work Order number for display
