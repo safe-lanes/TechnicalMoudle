@@ -1986,16 +1986,18 @@ const Spares: React.FC = () => {
 
       {/* Main Content - Scrollable */}
       <div className="flex-1 overflow-y-auto flex gap-4 min-h-0">
-        {/* Left Panel - Component Tree */}
-        <div className="w-80 bg-white border border-gray-200 rounded-lg overflow-hidden" data-testid="E12">
-          <div className="text-white px-4 py-2 font-semibold bg-[#52baf3]">
-            <Marker id="E12" />
-            COMPONENT SEARCH
+        {/* Left Panel - Component Tree (only shown in inventory tab) */}
+        {activeTab === 'inventory' && (
+          <div className="w-80 bg-white border border-gray-200 rounded-lg overflow-hidden" data-testid="E12">
+            <div className="text-white px-4 py-2 font-semibold bg-[#52baf3]">
+              <Marker id="E12" />
+              COMPONENT SEARCH
+            </div>
+            <div className="overflow-y-auto h-[calc(100%-40px)]">
+              {renderComponentTree(componentTree)}
+            </div>
           </div>
-          <div className="overflow-y-auto h-[calc(100%-40px)]">
-            {renderComponentTree(componentTree)}
-          </div>
-        </div>
+        )}
 
         {/* Right Panel - Table */}
         <div className="flex-1 bg-white border border-gray-200 rounded-lg overflow-hidden flex flex-col">
