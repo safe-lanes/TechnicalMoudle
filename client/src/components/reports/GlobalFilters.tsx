@@ -22,7 +22,6 @@ import {
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
 import { useVessels } from "@/hooks/useVessels";
-import { useDepartments } from "@/hooks/useDepartments";
 
 export interface FilterValues {
   vessel: string;
@@ -48,30 +47,9 @@ const GlobalFilters: React.FC<GlobalFiltersProps> = ({
   className
 }) => {
   const { data: vessels = [] } = useVessels();
-  const { data: departmentsList = [] } = useDepartments();
-  
-  const departments = departmentsList.map(d => ({
-    id: d.listKey,
-    name: d.listValue,
-    icon: ""
-  }));
-
-  const priorities = [
-    { id: "high", name: "High Priority", color: "bg-red-100 text-red-800" },
-    { id: "medium", name: "Medium Priority", color: "bg-yellow-100 text-yellow-800" },
-    { id: "low", name: "Low Priority", color: "bg-green-100 text-green-800" }
-  ];
 
   const handleVesselChange = (value: string) => {
     onFiltersChange({ ...filters, vessel: value });
-  };
-
-  const handleDepartmentChange = (value: string) => {
-    onFiltersChange({ ...filters, department: value });
-  };
-
-  const handlePriorityChange = (value: string) => {
-    onFiltersChange({ ...filters, priority: value });
   };
 
   const handleDateRangeChange = (from: Date | null, to: Date | null) => {
@@ -84,8 +62,6 @@ const GlobalFilters: React.FC<GlobalFiltersProps> = ({
   const getActiveFiltersCount = () => {
     let count = 0;
     if (filters.vessel && filters.vessel !== "all") count++;
-    if (filters.department && filters.department !== "all") count++;
-    if (filters.priority && filters.priority !== "all") count++;
     if (filters.dateRange.from || filters.dateRange.to) count++;
     return count;
   };
@@ -97,16 +73,6 @@ const GlobalFilters: React.FC<GlobalFiltersProps> = ({
   const getSelectedVessel = () => {
     const vessel = vessels.find(v => v.id === filters.vessel);
     return vessel ? vessel.name : "All Vessels";
-  };
-
-  const getSelectedDepartment = () => {
-    const dept = departments.find(d => d.id === filters.department);
-    return dept ? dept.name : "All Departments";
-  };
-
-  const getSelectedPriority = () => {
-    const priority = priorities.find(p => p.id === filters.priority);
-    return priority ? priority.name : "All Priorities";
   };
 
   const formatDateRange = () => {
@@ -122,8 +88,6 @@ const GlobalFilters: React.FC<GlobalFiltersProps> = ({
     }
     return "Select date range";
   };
-
-  const isInline = className?.includes('bg-transparent');
 
   return (
     <div className={cn("mb-4", className)} data-testid="G7">
@@ -142,49 +106,6 @@ const GlobalFilters: React.FC<GlobalFiltersProps> = ({
               {vessels.map((vessel) => (
                 <SelectItem key={vessel.id} value={vessel.id}>
                   {vessel.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-
-        {/* Department Selection */}
-        <div className="flex-1 min-w-[140px]">
-          <Label className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-1 block" data-testid="G10">
-            Department
-          </Label>
-          <Select value={filters.department} onValueChange={handleDepartmentChange}>
-            <SelectTrigger data-testid="G11" className="h-9">
-              <SelectValue placeholder="All Departments" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Departments</SelectItem>
-              {departments.map((dept) => (
-                <SelectItem key={dept.id} value={dept.id}>
-                  {dept.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-
-        {/* Priority Selection */}
-        <div className="flex-1 min-w-[140px]">
-          <Label className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-1 block" data-testid="G12">
-            Priority
-          </Label>
-          <Select value={filters.priority} onValueChange={handlePriorityChange}>
-            <SelectTrigger data-testid="G13" className="h-9">
-              <SelectValue placeholder="All Priorities" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Priorities</SelectItem>
-              {priorities.map((priority) => (
-                <SelectItem key={priority.id} value={priority.id}>
-                  <div className="flex items-center gap-2">
-                    <div className={cn("w-2 h-2 rounded-full", priority.color.split(' ')[0])} />
-                    <span>{priority.name}</span>
-                  </div>
                 </SelectItem>
               ))}
             </SelectContent>
@@ -269,32 +190,6 @@ const GlobalFilters: React.FC<GlobalFiltersProps> = ({
                 size="sm"
                 onClick={() => handleVesselChange("all")}
                 data-testid="button-clear-vessel-filter"
-              >
-                <X className="h-3 w-3" />
-              </Button>
-            </Badge>
-          )}
-          {filters.department && filters.department !== "all" && (
-            <Badge variant="secondary" className="flex items-center gap-1 text-xs">
-              {getSelectedDepartment()}
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => handleDepartmentChange("all")}
-                data-testid="button-clear-department-filter"
-              >
-                <X className="h-3 w-3" />
-              </Button>
-            </Badge>
-          )}
-          {filters.priority && filters.priority !== "all" && (
-            <Badge variant="secondary" className="flex items-center gap-1 text-xs">
-              {getSelectedPriority()}
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => handlePriorityChange("all")}
-                data-testid="button-clear-priority-filter"
               >
                 <X className="h-3 w-3" />
               </Button>
