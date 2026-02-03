@@ -1363,7 +1363,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
         }
       }
 
-      // PHASE 3A: Validate spare parts consumed - locationId must be selected for inventory-tracked items
+      // PHASE 3A: Validate spare parts consumed - location must be selected for inventory-tracked items
       // Use partCode for inventory matching (not partNo - they are separate fields)
       const sparesWithMissingLocation = executionData.consumedSpareParts.filter(spare => {
         const hasQuantity = spare.quantityConsumed && parseFloat(spare.quantityConsumed) > 0;
@@ -1374,8 +1374,10 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
         const isInInventory = lookupKey && sparesWithInventory.some(s => s.spare.partCode === lookupKey);
         if (!isInInventory) return false; // Skip validation for manual entries not in inventory
         
+        // Check for either locationId (numeric) OR location name (string) - both are valid
         const hasLocationId = spare.locationId != null && spare.locationId > 0;
-        return !hasLocationId;
+        const hasLocationName = spare.location && typeof spare.location === 'string' && spare.location.trim().length > 0;
+        return !hasLocationId && !hasLocationName;
       });
 
       if (sparesWithMissingLocation.length > 0) {
