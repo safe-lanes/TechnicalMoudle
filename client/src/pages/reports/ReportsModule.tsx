@@ -319,17 +319,15 @@ const ReportsModule = () => {
             onReset={handleFiltersReset}
             className="border-0 shadow-none bg-transparent p-0 mb-0 flex-1"
           />
-          {hasActiveFilters() && (
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={handleClearAll}
-              className="text-gray-600"
-              data-testid="button-clear-all-filters"
-            >
-              Clear
-            </Button>
-          )}
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={handleClearAll}
+            className="text-gray-600"
+            data-testid="button-clear-all-filters"
+          >
+            Clear
+          </Button>
         </div>
       </div>
 
