@@ -288,6 +288,12 @@ export const components = pgTable("components", {
   rhCurrentInheritedCached: decimal("rh_current_inherited_cached", { precision: 10, scale: 2 }),
   rhInheritedUpdatedAt: timestamp("rh_inherited_updated_at"),
   
+  // === Meter Replacement Tracking ===
+  // When meter is replaced, stores the cumulative total RH at time of replacement
+  // Total RH = meterReplacedLastRh + currentCumulativeRH (new meter reading)
+  meterReplacedDate: timestamp("meter_replaced_date"),
+  meterReplacedLastRh: decimal("meter_replaced_last_rh", { precision: 10, scale: 2 }),
+  
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 }, (table) => ({
