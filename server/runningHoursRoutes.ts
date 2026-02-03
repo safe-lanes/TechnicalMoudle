@@ -41,11 +41,20 @@ export function registerRunningHoursRoutes(app: Express) {
           // Use storage layer method which handles all ID formats (composite, code, uuid)
           const inheritedComponents = await storage.getInheritedComponents(component.id, vesselId);
           
+          // Calculate total cumulative RH (includes meter replacement history)
+          // Total = meterReplacedLastRh + current meter reading
+          const meterReplacedLastRh = parseFloat(component.meterReplacedLastRh || '0');
+          const currentMeterRH = parseFloat(component.rhCurrentMaster || component.currentCumulativeRH || '0');
+          const totalCumulativeRH = meterReplacedLastRh + currentMeterRH;
+          
           return {
             ...component,
             sfiCode: component.componentCode || '',
             latestUpdate: component.lastUpdated || component.rhMasterUpdatedAt || component.updatedAt || new Date().toISOString(),
-            currentCumulativeRH: component.rhCurrentMaster || component.currentCumulativeRH || '0.00',
+            currentCumulativeRH: totalCumulativeRH.toFixed(2),
+            currentMeterRH: currentMeterRH.toFixed(2),
+            meterReplacedLastRh: meterReplacedLastRh > 0 ? meterReplacedLastRh.toFixed(2) : null,
+            meterReplacedDate: component.meterReplacedDate || null,
             inheritedCount: inheritedComponents.length
           };
         })
