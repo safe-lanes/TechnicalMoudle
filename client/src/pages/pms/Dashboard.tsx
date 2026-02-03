@@ -457,8 +457,8 @@ const Dashboard = () => {
           <h1 className="text-2xl font-bold text-gray-900" data-testid="text-dashboard-title">PMS Dashboard</h1>
         </div>
 
-        {/* Vessel Selector - Only visible for Client Admin */}
-        {isClientAdmin && (
+        {/* Vessel Selector - Visible for Sail Admin and Client Admin */}
+        {(isSailAdmin || isClientAdmin) && (
           <div className="flex items-center gap-4 mt-4">
             <div className="flex items-center gap-2">
               <Ship className="w-4 h-4 text-gray-500" />

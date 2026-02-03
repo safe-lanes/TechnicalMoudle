@@ -1913,8 +1913,8 @@ const Spares: React.FC = () => {
       </div>
       {/* Search and Filters */}
       <div className="flex gap-3 items-center mb-4">
-        {/* Vessel selector - visible only for Client Admin view mode, or in change mode */}
-        {(isClientAdmin || isChangeMode) && (
+        {/* Vessel selector - visible for Sail Admin, Client Admin, or in change mode */}
+        {(isSailAdmin || isClientAdmin || isChangeMode) && (
           <div className="relative" data-testid="E4">
             <Marker id="E4" />
             <Select value={vesselId === 'all' ? '' : vesselId} onValueChange={setVesselId}>
