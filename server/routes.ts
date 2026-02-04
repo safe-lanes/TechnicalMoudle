@@ -11005,10 +11005,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const preparedData: WorkOrderRowData[] = dueJobs.map((job, index) => {
         const isCritical = job.critical === 'Yes';
         const isCalendarBased = job.maintenanceBasis === 'Calendar';
-        const isOverdue = job.isOverdue === true;
+        const woStatus = job.woStatus || 'Active';
         
         // Determine row status for color highlighting
+        // "Due (Grace P)" should use same orange color as "Due" status
+        const isGracePeriod = woStatus === 'Due (Grace P)' || woStatus.includes('Grace');
+        const isDueStatus = woStatus === 'Due' || isGracePeriod;
+        const isOverdue = job.isOverdue === true && !isDueStatus;
         const rowStatus: WorkOrderStatus = isOverdue ? 'overdue' : 'due';
+        
+        // Calculate daysOverdue safely - only when we have a valid number
+        const daysRemainingValue = job.daysRemaining;
+        const hasDaysRemaining = typeof daysRemainingValue === 'number' && !isNaN(daysRemainingValue);
+        const daysOverdueValue = isOverdue && hasDaysRemaining ? Math.abs(daysRemainingValue) : '-';
         
         return {
           sno: index + 1,
@@ -11019,11 +11028,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
           componentName: job.componentName,
           department: job.department,
           priority: job.priority,
-          status: job.woStatus || 'Active',
+          status: woStatus,
           dueDate: job.dueDate,
           lastDoneDate: job.lastDoneDate,
-          daysLeft: isOverdue ? '-' : (job.daysRemaining ?? '-'),
-          daysOverdue: isOverdue && job.daysRemaining !== null ? Math.abs(job.daysRemaining) : '-',
+          daysLeft: isOverdue ? '-' : (hasDaysRemaining ? daysRemainingValue : '-'),
+          daysOverdue: daysOverdueValue,
           nextDueRH: isCalendarBased ? '-' : (job.nextDueReading ?? '-'),
           currentRH: isCalendarBased ? '-' : (job.currentReading ?? '-'),
           rhRemaining: isCalendarBased ? '-' : (job.hoursRemaining ?? '-'),
