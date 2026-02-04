@@ -507,40 +507,142 @@ const MaintenanceReports: React.FC<MaintenanceReportsProps> = ({ onBack, globalF
       }
 
       case 'monthly-summary': {
-        const thisMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+        // Parse DD-MMM-YYYY date format
+        const parseDate = (dateStr: string | null | undefined): Date | null => {
+          if (!dateStr) return null;
+          const ddMmmYyyy = dateStr.match(/^(\d{1,2})-([A-Za-z]{3})-(\d{4})$/);
+          if (ddMmmYyyy) {
+            const months: Record<string, number> = {
+              'Jan': 0, 'Feb': 1, 'Mar': 2, 'Apr': 3, 'May': 4, 'Jun': 5,
+              'Jul': 6, 'Aug': 7, 'Sep': 8, 'Oct': 9, 'Nov': 10, 'Dec': 11
+            };
+            const day = parseInt(ddMmmYyyy[1], 10);
+            const month = months[ddMmmYyyy[2]];
+            const year = parseInt(ddMmmYyyy[3], 10);
+            if (month !== undefined) return new Date(year, month, day);
+          }
+          const d = new Date(dateStr);
+          return isNaN(d.getTime()) ? null : d;
+        };
+        
+        // Use date range from global filters or default to current month
+        let periodStart: Date;
+        let periodEnd: Date;
+        if (globalFilters?.dateRange?.from && globalFilters?.dateRange?.to) {
+          periodStart = globalFilters.dateRange.from;
+          periodEnd = new Date(globalFilters.dateRange.to);
+        } else {
+          periodStart = new Date(now.getFullYear(), now.getMonth(), 1);
+          periodEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+        }
+        periodEnd.setHours(23, 59, 59, 999);
+        
+        // Monthly WOs = jobs due in period OR completed in period
         const monthlyWOs = vesselWorkOrders.filter((wo: any) => {
-          const woDate = new Date(wo.dueDate || wo.createdAt);
-          return woDate >= thisMonth;
+          const dueDate = parseDate(wo.dueDate);
+          const completionDate = wo.completionDateTime ? new Date(wo.completionDateTime) : null;
+          const isDueInMonth = dueDate && dueDate >= periodStart && dueDate <= periodEnd;
+          const isCompletedInMonth = wo.status === 'Completed' 
+            && completionDate 
+            && completionDate >= periodStart 
+            && completionDate <= periodEnd;
+          return isDueInMonth || isCompletedInMonth;
         });
-
-        const completed = monthlyWOs.filter((wo: any) => wo.status === 'Completed').length;
-        const total = monthlyWOs.length;
-        const overdue = monthlyWOs.filter((wo: any) => {
+        
+        // Completed jobs from monthlyWOs scope
+        const completedWOs = monthlyWOs.filter((wo: any) => wo.status === 'Completed');
+        
+        // CUMULATIVE overdue: ALL work orders with dueDate < periodEnd AND status != Completed
+        const cumulativeOverdue = vesselWorkOrders.filter((wo: any) => {
           if (!wo.dueDate || wo.status === 'Completed') return false;
-          return new Date(wo.dueDate) < now;
-        }).length;
-
+          const dueDate = parseDate(wo.dueDate);
+          return dueDate && dueDate < periodEnd;
+        });
+        
+        const totalInScope = monthlyWOs.length;
+        const totalCompleted = completedWOs.length;
+        const totalOverdue = cumulativeOverdue.length;
+        const completionRate = totalInScope > 0 ? Math.round((totalCompleted / totalInScope) * 100) : 0;
+        
+        // Department breakdown
+        const deptStats: Record<string, { planned: number; completed: number; overdue: number }> = {};
+        monthlyWOs.forEach((wo: any) => {
+          const dept = wo.department || wo.assignedDepartment || 'Unassigned';
+          if (!deptStats[dept]) deptStats[dept] = { planned: 0, completed: 0, overdue: 0 };
+          deptStats[dept].planned++;
+          if (wo.status === 'Completed') deptStats[dept].completed++;
+        });
+        cumulativeOverdue.forEach((wo: any) => {
+          const dept = wo.department || wo.assignedDepartment || 'Unassigned';
+          if (!deptStats[dept]) deptStats[dept] = { planned: 0, completed: 0, overdue: 0 };
+          deptStats[dept].overdue++;
+        });
+        
+        // Priority breakdown
+        const priorityStats: Record<string, { total: number; completed: number; overdue: number }> = {
+          'High': { total: 0, completed: 0, overdue: 0 },
+          'Medium': { total: 0, completed: 0, overdue: 0 },
+          'Low': { total: 0, completed: 0, overdue: 0 },
+          'Normal': { total: 0, completed: 0, overdue: 0 }
+        };
+        monthlyWOs.forEach((wo: any) => {
+          const priority = wo.priority || 'Normal';
+          if (!priorityStats[priority]) priorityStats[priority] = { total: 0, completed: 0, overdue: 0 };
+          priorityStats[priority].total++;
+          if (wo.status === 'Completed') priorityStats[priority].completed++;
+        });
+        cumulativeOverdue.forEach((wo: any) => {
+          const priority = wo.priority || 'Normal';
+          if (!priorityStats[priority]) priorityStats[priority] = { total: 0, completed: 0, overdue: 0 };
+          priorityStats[priority].overdue++;
+        });
+        
+        // Man-hours calculation
+        let totalManHours = 0;
+        completedWOs.forEach((wo: any) => {
+          totalManHours += Number(wo.manhours || wo.totalTimeHours || wo.actualHours || 0);
+        });
+        
+        const periodLabel = periodStart.toLocaleString('default', { month: 'long', year: 'numeric' });
+        
         const columns = [
           { header: 'Metric', field: 'metric', width: 60 },
           { header: 'Value', field: 'value', width: 40 },
           { header: 'Percentage', field: 'percentage', width: 40 }
         ];
 
+        // Build comprehensive data sections
         const data = [
-          { metric: 'Total Work Orders', value: total, percentage: '100%' },
-          { metric: 'Completed', value: completed, percentage: total > 0 ? `${Math.round(completed/total*100)}%` : '0%' },
-          { metric: 'In Progress', value: total - completed - overdue, percentage: total > 0 ? `${Math.round((total - completed - overdue)/total*100)}%` : '0%' },
-          { metric: 'Overdue', value: overdue, percentage: total > 0 ? `${Math.round(overdue/total*100)}%` : '0%' }
+          { metric: '--- EXECUTIVE SUMMARY ---', value: '', percentage: '' },
+          { metric: 'Jobs In Scope (Due/Completed in Period)', value: totalInScope, percentage: '100%' },
+          { metric: 'Completed', value: totalCompleted, percentage: totalInScope > 0 ? `${completionRate}%` : '0%' },
+          { metric: 'Active (In Progress)', value: totalInScope - totalCompleted, percentage: totalInScope > 0 ? `${Math.round((totalInScope - totalCompleted) / totalInScope * 100)}%` : '0%' },
+          { metric: 'Cumulative Overdue', value: totalOverdue, percentage: '-' },
+          { metric: 'Total Man-Hours', value: totalManHours.toFixed(1), percentage: '-' },
+          { metric: '', value: '', percentage: '' },
+          { metric: '--- PRIORITY BREAKDOWN ---', value: '', percentage: '' },
+          ...Object.entries(priorityStats).filter(([_, s]) => s.total > 0 || s.overdue > 0).map(([priority, stats]) => ({
+            metric: `${priority} Priority`, 
+            value: `${stats.total} jobs (${stats.completed} done, ${stats.overdue} overdue)`, 
+            percentage: stats.total > 0 ? `${Math.round(stats.completed / stats.total * 100)}%` : '-'
+          })),
+          { metric: '', value: '', percentage: '' },
+          { metric: '--- DEPARTMENT BREAKDOWN ---', value: '', percentage: '' },
+          ...Object.entries(deptStats).filter(([_, s]) => s.planned > 0 || s.overdue > 0).map(([dept, stats]) => ({
+            metric: dept, 
+            value: `${stats.planned} jobs (${stats.completed} done, ${stats.overdue} overdue)`, 
+            percentage: stats.planned > 0 ? `${Math.round(stats.completed / stats.planned * 100)}%` : '-'
+          }))
         ];
 
         const summary = [
-          { label: 'Completion Rate', value: total > 0 ? `${Math.round(completed/total*100)}%` : 'N/A' },
-          { label: 'Total WOs', value: total },
-          { label: 'Overdue', value: overdue }
+          { label: 'Completion Rate', value: totalInScope > 0 ? `${completionRate}%` : 'N/A' },
+          { label: 'Jobs In Scope', value: totalInScope },
+          { label: 'Cumulative Overdue', value: totalOverdue }
         ];
 
         pdfReportGenerator.generateReport(
-          { title: 'Monthly Maintenance Summary', subtitle: `Performance metrics for ${now.toLocaleString('default', { month: 'long', year: 'numeric' })}`, vessel: vesselName },
+          { title: 'Monthly Maintenance Summary', subtitle: `Performance metrics for ${periodLabel}`, vessel: vesselName },
           columns,
           data,
           summary

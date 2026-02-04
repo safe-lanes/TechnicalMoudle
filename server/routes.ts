@@ -11994,27 +11994,65 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const jobsMap = new Map(jobs.map(job => [job.id, job]));
       const componentsByCodeMap = new Map(components.map(comp => [comp.componentCode, comp]));
       
+      // Helper to parse DD-MMM-YYYY or ISO date strings
+      const parseDate = (dateStr: string | null | undefined): Date | null => {
+        if (!dateStr) return null;
+        // Try DD-MMM-YYYY format (e.g., "16-Dec-2025")
+        const ddMmmYyyy = dateStr.match(/^(\d{1,2})-([A-Za-z]{3})-(\d{4})$/);
+        if (ddMmmYyyy) {
+          const months: Record<string, number> = {
+            'Jan': 0, 'Feb': 1, 'Mar': 2, 'Apr': 3, 'May': 4, 'Jun': 5,
+            'Jul': 6, 'Aug': 7, 'Sep': 8, 'Oct': 9, 'Nov': 10, 'Dec': 11
+          };
+          const day = parseInt(ddMmmYyyy[1], 10);
+          const month = months[ddMmmYyyy[2]];
+          const year = parseInt(ddMmmYyyy[3], 10);
+          if (month !== undefined) return new Date(year, month, day);
+        }
+        // Fallback to standard Date parsing (ISO format)
+        const d = new Date(dateStr);
+        return isNaN(d.getTime()) ? null : d;
+      };
+      
+      // Monthly WOs = jobs due in period OR completed in period
       const monthlyWOs = workOrders.filter((wo: any) => {
-        const woDate = new Date(wo.dueDate || wo.createdAt);
-        return woDate >= periodStart && woDate <= periodEnd;
+        const dueDate = parseDate(wo.dueDate);
+        const completionDate = parseDate(wo.completionDateTime);
+        
+        // Include if due date falls in selected month
+        const isDueInMonth = dueDate && dueDate >= periodStart && dueDate <= periodEnd;
+        
+        // OR completed in selected month
+        const isCompletedInMonth = wo.status === 'Completed' 
+          && completionDate 
+          && completionDate >= periodStart 
+          && completionDate <= periodEnd;
+        
+        return isDueInMonth || isCompletedInMonth;
       });
       
+      // Completed jobs from monthlyWOs scope
       const completedWOs = monthlyWOs.filter((wo: any) => wo.status === 'Completed');
       
-      const overdueWOs = monthlyWOs.filter((wo: any) => {
+      // CUMULATIVE overdue: ALL work orders with dueDate < periodEnd AND status != Completed
+      const cumulativeOverdueWOs = workOrders.filter((wo: any) => {
         if (!wo.dueDate || wo.status === 'Completed') return false;
-        return new Date(wo.dueDate) < periodEnd;
+        const dueDate = parseDate(wo.dueDate);
+        return dueDate && dueDate < periodEnd;
       });
       
+      // On-time completions from completed WOs in scope
       const onTimeCompletions = completedWOs.filter((wo: any) => {
-        if (!wo.dueDate || !wo.completedDate) return true;
-        return new Date(wo.completedDate) <= new Date(wo.dueDate);
+        const dueDate = parseDate(wo.dueDate);
+        const completionDate = parseDate(wo.completionDateTime);
+        if (!dueDate || !completionDate) return true;
+        return completionDate <= dueDate;
       });
       
-      const totalPlanned = monthlyWOs.length;
+      const totalInScope = monthlyWOs.length;
       const totalCompleted = completedWOs.length;
-      const totalOverdue = overdueWOs.length;
-      const completionRate = totalPlanned > 0 ? Math.round((totalCompleted / totalPlanned) * 100) : 0;
+      const totalOverdue = cumulativeOverdueWOs.length;
+      const completionRate = totalInScope > 0 ? Math.round((totalCompleted / totalInScope) * 100) : 0;
       const onTimeRate = totalCompleted > 0 ? Math.round((onTimeCompletions.length / totalCompleted) * 100) : 0;
       
       const criticalWOs = monthlyWOs.filter((wo: any) => {
@@ -12025,13 +12063,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       let totalManHours = 0;
       completedWOs.forEach((wo: any) => {
-        totalManHours += Number(wo.actualHours || wo.hoursSpent || wo.manHours || 0);
+        totalManHours += Number(wo.manhours || wo.totalTimeHours || wo.actualHours || 0);
       });
       
       const activeJobs = monthlyWOs.filter((wo: any) => 
         wo.status !== 'Completed' && wo.status !== 'Postponed'
       ).length;
       
+      // Priority stats from monthlyWOs scope (due OR completed in month)
       const priorityStats: Record<string, { total: number; completed: number; overdue: number }> = {
         'High': { total: 0, completed: 0, overdue: 0 },
         'Medium': { total: 0, completed: 0, overdue: 0 },
@@ -12044,20 +12083,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
         if (!priorityStats[priority]) priorityStats[priority] = { total: 0, completed: 0, overdue: 0 };
         priorityStats[priority].total++;
         if (wo.status === 'Completed') priorityStats[priority].completed++;
-        if (wo.dueDate && new Date(wo.dueDate) < periodEnd && wo.status !== 'Completed') {
-          priorityStats[priority].overdue++;
-        }
       });
       
+      // Add cumulative overdue by priority (from ALL work orders)
+      cumulativeOverdueWOs.forEach((wo: any) => {
+        const priority = wo.priority || 'Normal';
+        if (!priorityStats[priority]) priorityStats[priority] = { total: 0, completed: 0, overdue: 0 };
+        priorityStats[priority].overdue++;
+      });
+      
+      // Department stats from monthlyWOs scope
       const deptStats: Record<string, { planned: number; completed: number; overdue: number }> = {};
       monthlyWOs.forEach((wo: any) => {
         const dept = wo.department || wo.assignedDepartment || 'Unassigned';
         if (!deptStats[dept]) deptStats[dept] = { planned: 0, completed: 0, overdue: 0 };
         deptStats[dept].planned++;
         if (wo.status === 'Completed') deptStats[dept].completed++;
-        if (wo.dueDate && new Date(wo.dueDate) < periodEnd && wo.status !== 'Completed') {
-          deptStats[dept].overdue++;
-        }
+      });
+      
+      // Add cumulative overdue by department (from ALL work orders)
+      cumulativeOverdueWOs.forEach((wo: any) => {
+        const dept = wo.department || wo.assignedDepartment || 'Unassigned';
+        if (!deptStats[dept]) deptStats[dept] = { planned: 0, completed: 0, overdue: 0 };
+        deptStats[dept].overdue++;
       });
       
       const freqStats: Record<string, { count: number; completed: number }> = {
@@ -12087,39 +12135,49 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const manHoursByDept: Record<string, number> = {};
       completedWOs.forEach((wo: any) => {
         const dept = wo.department || wo.assignedDepartment || 'Unassigned';
-        const hours = Number(wo.actualHours || wo.hoursSpent || wo.manHours || 0);
+        const hours = Number(wo.manhours || wo.totalTimeHours || wo.actualHours || 0);
         manHoursByDept[dept] = (manHoursByDept[dept] || 0) + hours;
       });
       
+      // Critical equipment stats from monthlyWOs scope (in-scope jobs)
       const criticalEquipStats = {
         solas: { total: 0, completed: 0, overdue: 0 },
         classCritical: { total: 0, completed: 0, overdue: 0 },
         highPriority: { total: 0, completed: 0, overdue: 0 }
       };
       
+      // Count total and completed from monthlyWOs
       monthlyWOs.forEach((wo: any) => {
         const comp = componentsByCodeMap.get(wo.componentCode || '');
         const isClassRelated = comp?.classRelated === 'Yes' || comp?.classRelated === true;
         const isSolas = comp?.solasCritical === 'Yes' || comp?.solasCritical === true;
         const isHighPriority = wo.priority === 'Critical' || wo.priority === 'High';
-        const isOverdue = wo.dueDate && new Date(wo.dueDate) < periodEnd && wo.status !== 'Completed';
         const isCompleted = wo.status === 'Completed';
         
         if (isSolas) {
           criticalEquipStats.solas.total++;
           if (isCompleted) criticalEquipStats.solas.completed++;
-          if (isOverdue) criticalEquipStats.solas.overdue++;
         }
         if (isClassRelated) {
           criticalEquipStats.classCritical.total++;
           if (isCompleted) criticalEquipStats.classCritical.completed++;
-          if (isOverdue) criticalEquipStats.classCritical.overdue++;
         }
         if (isHighPriority) {
           criticalEquipStats.highPriority.total++;
           if (isCompleted) criticalEquipStats.highPriority.completed++;
-          if (isOverdue) criticalEquipStats.highPriority.overdue++;
         }
+      });
+      
+      // Add cumulative overdue from ALL work orders for critical equipment
+      cumulativeOverdueWOs.forEach((wo: any) => {
+        const comp = componentsByCodeMap.get(wo.componentCode || '');
+        const isClassRelated = comp?.classRelated === 'Yes' || comp?.classRelated === true;
+        const isSolas = comp?.solasCritical === 'Yes' || comp?.solasCritical === true;
+        const isHighPriority = wo.priority === 'Critical' || wo.priority === 'High';
+        
+        if (isSolas) criticalEquipStats.solas.overdue++;
+        if (isClassRelated) criticalEquipStats.classCritical.overdue++;
+        if (isHighPriority) criticalEquipStats.highPriority.overdue++;
       });
       
       const workbook = new ExcelJS.Workbook();
@@ -12190,7 +12248,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       const kpiRow1 = currentRow;
       const kpis1 = [
-        { label: 'Total Planned', value: totalPlanned, color: 'FFE0F2FE' },
+        { label: 'Jobs In Scope', value: totalInScope, color: 'FFE0F2FE' },
         { label: 'Total Completed', value: totalCompleted, color: 'FFD1FAE5' },
         { label: 'Total Overdue', value: totalOverdue, color: 'FFFEE2E2' },
         { label: 'Completion Rate', value: `${completionRate}%`, color: 'FFEDE9FE' }
@@ -12300,7 +12358,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       worksheet.getRow(currentRow).height = 22;
       currentRow++;
       
-      const allWOStats = { total: totalPlanned, completed: totalCompleted, overdue: totalOverdue };
+      const allWOStats = { total: totalInScope, completed: totalCompleted, overdue: totalOverdue };
       const woStatsData = [
         { category: 'All Work Orders', ...allWOStats },
         { category: 'High Priority', ...priorityStats['High'] },
