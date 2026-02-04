@@ -32,6 +32,33 @@ export const COLORS = {
   borderMedium: 'FF1E5A8E', // Deep blue for emphasis
 };
 
+// ═══════════════════════════════════════════════════════════════
+// MAINTENANCE WORK ORDER REPORT - STATUS-BASED COLOR PALETTE
+// Full-row highlighting based on Status + Critical Equipment
+// ═══════════════════════════════════════════════════════════════
+
+export const STATUS_COLORS = {
+  // Due Jobs (Orange variants)
+  dueLight: 'FFFFE4B5',        // Light Orange #FFE4B5 - Due Jobs (non-critical)
+  dueDark: 'FFFF8C00',         // Dark Orange #FF8C00 - Due Jobs (critical equipment)
+  
+  // Overdue Jobs (Red variants)
+  overdueLight: 'FFFFB6C1',    // Light Red #FFB6C1 - Overdue Jobs (non-critical)
+  overdueDark: 'FFDC143C',     // Dark Red (Crimson) #DC143C - Overdue Jobs (critical equipment)
+  
+  // Completed Jobs (Green variants)
+  completedLight: 'FF90EE90',  // Light Green #90EE90 - Completed Jobs (non-critical)
+  completedDark: 'FF228B22',   // Dark Green (Forest Green) #228B22 - Completed Jobs (critical equipment)
+  
+  // Special Status Colors
+  unplanned: 'FFFFFF00',       // Yellow #FFFF00 - Unplanned/Breakdown Jobs
+  postponed: 'FF87CEEB',       // Sky Blue #87CEEB - Postponed Jobs
+  
+  // Text colors for dark backgrounds (need white text)
+  textOnDark: 'FFFFFFFF',      // White text for dark backgrounds
+  textOnLight: 'FF2C3E50',     // Dark text for light backgrounds
+};
+
 // Report-specific accent colors (only used for summary section emphasis)
 export const REPORT_ACCENTS = {
   dueJobs: COLORS.secondary,     // Blue accent
@@ -39,6 +66,47 @@ export const REPORT_ACCENTS = {
   completedJobs: COLORS.success, // Green accent
   default: COLORS.secondary,     // Blue accent
 };
+
+// ═══════════════════════════════════════════════════════════════
+// STANDARD 18-COLUMN DEFINITION FOR MAINTENANCE WORK ORDER REPORTS
+// Used by ALL Maintenance & Work Order reports (except Man-Hours & Workload)
+// ═══════════════════════════════════════════════════════════════
+
+export const STANDARD_WORK_ORDER_COLUMNS: ColumnDef[] = [
+  { key: 'sno', header: 'S.No', width: 6, type: 'number', align: 'center' },
+  { key: 'workOrderNo', header: 'Work Order No', width: 18, type: 'text' },
+  { key: 'jobCode', header: 'Job Code', width: 14, type: 'text' },
+  { key: 'jobTitle', header: 'Job Title', width: 35, type: 'text' },
+  { key: 'componentCode', header: 'Comp Code', width: 14, type: 'text' },
+  { key: 'componentName', header: 'Component Name', width: 28, type: 'text' },
+  { key: 'department', header: 'Dept', width: 10, type: 'text', align: 'center' },
+  { key: 'priority', header: 'Priority', width: 10, type: 'text', align: 'center' },
+  { key: 'status', header: 'Status', width: 12, type: 'text', align: 'center' },
+  { key: 'dueDate', header: 'Due Date', width: 12, type: 'date', align: 'center' },
+  { key: 'lastDoneDate', header: 'Last Done', width: 12, type: 'date', align: 'center' },
+  { key: 'daysLeft', header: 'Days Left', width: 10, type: 'number', align: 'right' },
+  { key: 'daysOverdue', header: 'Days Overdue', width: 12, type: 'number', align: 'right' },
+  { key: 'nextDueRH', header: 'Next Due RH', width: 12, type: 'number', align: 'right' },
+  { key: 'currentRH', header: 'Current RH', width: 12, type: 'number', align: 'right' },
+  { key: 'rhRemaining', header: 'RH Remaining', width: 12, type: 'number', align: 'right' },
+  { key: 'assignedTo', header: 'Assigned To', width: 16, type: 'text' },
+  { key: 'criticalEquipment', header: 'Critical Equip', width: 12, type: 'text', align: 'center' },
+];
+
+// Work Order Status Types for row highlighting
+export type WorkOrderStatus = 
+  | 'due'           // Due within threshold (Light Orange / Dark Orange if critical)
+  | 'overdue'       // Past due date (Light Red / Dark Red if critical)
+  | 'completed'     // Completed (Light Green / Dark Green if critical)
+  | 'unplanned'     // Unplanned/Breakdown (Yellow)
+  | 'postponed'     // Postponed (Sky Blue)
+  | 'active';       // Normal active (alternating white/gray)
+
+export interface WorkOrderRowData {
+  _rowStatus: WorkOrderStatus;  // Internal field for row highlighting (underscore prefix)
+  isCriticalEquipment: boolean;
+  [key: string]: any;
+}
 
 export interface ReportConfig {
   sheetName: string;
@@ -440,4 +508,199 @@ export function getLastColumnLetter(columnCount: number): string {
   const first = Math.floor((columnCount - 1) / 26);
   const second = (columnCount - 1) % 26;
   return String.fromCharCode('A'.charCodeAt(0) + first - 1) + String.fromCharCode('A'.charCodeAt(0) + second);
+}
+
+// ═══════════════════════════════════════════════════════════════
+// SECTION 6: STATUS-BASED ROW HIGHLIGHTING FOR WORK ORDER REPORTS
+// Full-row color based on Status + Critical Equipment combination
+// ═══════════════════════════════════════════════════════════════
+
+export function getStatusRowColors(status: WorkOrderStatus, isCriticalEquipment: boolean): {
+  bgColor: string;
+  textColor: string;
+} {
+  switch (status) {
+    case 'due':
+      return {
+        bgColor: isCriticalEquipment ? STATUS_COLORS.dueDark : STATUS_COLORS.dueLight,
+        textColor: isCriticalEquipment ? STATUS_COLORS.textOnDark : STATUS_COLORS.textOnLight
+      };
+    case 'overdue':
+      return {
+        bgColor: isCriticalEquipment ? STATUS_COLORS.overdueDark : STATUS_COLORS.overdueLight,
+        textColor: isCriticalEquipment ? STATUS_COLORS.textOnDark : STATUS_COLORS.textOnLight
+      };
+    case 'completed':
+      return {
+        bgColor: isCriticalEquipment ? STATUS_COLORS.completedDark : STATUS_COLORS.completedLight,
+        textColor: isCriticalEquipment ? STATUS_COLORS.textOnDark : STATUS_COLORS.textOnLight
+      };
+    case 'unplanned':
+      return {
+        bgColor: STATUS_COLORS.unplanned,
+        textColor: STATUS_COLORS.textOnLight
+      };
+    case 'postponed':
+      return {
+        bgColor: STATUS_COLORS.postponed,
+        textColor: STATUS_COLORS.textOnLight
+      };
+    case 'active':
+    default:
+      return {
+        bgColor: COLORS.bgWhite,
+        textColor: COLORS.textDark
+      };
+  }
+}
+
+export function applyWorkOrderDataRows(
+  worksheet: ExcelJS.Worksheet,
+  data: WorkOrderRowData[],
+  columns: ColumnDef[],
+  dataStartRow: number = 8
+): void {
+  if (data.length === 0) {
+    const emptyRow = worksheet.getRow(dataStartRow);
+    emptyRow.getCell(1).value = 'No records found';
+    worksheet.mergeCells(dataStartRow, 1, dataStartRow, columns.length);
+    emptyRow.getCell(1).alignment = { horizontal: 'center', vertical: 'middle' };
+    emptyRow.getCell(1).font = { italic: true, color: { argb: COLORS.textLight }, size: 11, name: 'Arial' };
+    emptyRow.height = 30;
+    return;
+  }
+
+  data.forEach((record, index) => {
+    const rowNum = dataStartRow + index;
+    const row = worksheet.getRow(rowNum);
+    
+    // Set cell values
+    columns.forEach((col, colIdx) => {
+      const cellValue = record[col.key];
+      row.getCell(colIdx + 1).value = cellValue !== undefined && cellValue !== null ? cellValue : '-';
+    });
+
+    row.height = 20;
+
+    // Get status-based colors using _rowStatus field
+    const { bgColor, textColor } = getStatusRowColors(record._rowStatus, record.isCriticalEquipment);
+
+    // Apply styling to each cell in the row
+    row.eachCell((cell, colNum) => {
+      if (colNum > columns.length) return;
+
+      const colDef = columns[colNum - 1];
+      
+      // Apply background color
+      cell.fill = {
+        type: 'pattern',
+        pattern: 'solid',
+        fgColor: { argb: bgColor }
+      };
+
+      // Apply text color and font
+      cell.font = { 
+        color: { argb: textColor }, 
+        size: 9, 
+        name: 'Arial',
+        bold: record.status === 'overdue' || record.isCriticalEquipment
+      };
+
+      // Apply border
+      cell.border = {
+        top: { style: 'thin', color: { argb: COLORS.border } },
+        left: { style: 'thin', color: { argb: COLORS.border } },
+        bottom: { style: 'thin', color: { argb: COLORS.border } },
+        right: { style: 'thin', color: { argb: COLORS.border } }
+      };
+
+      // Alignment based on column type
+      if (colDef.type === 'number' || colDef.align === 'right') {
+        cell.alignment = { horizontal: 'right', vertical: 'middle' };
+      } else if (colDef.type === 'date' || colDef.align === 'center') {
+        cell.alignment = { horizontal: 'center', vertical: 'middle' };
+      } else {
+        cell.alignment = { horizontal: 'left', vertical: 'middle' };
+      }
+    });
+  });
+}
+
+// ═══════════════════════════════════════════════════════════════
+// UTILITY: Prepare standard work order data for Excel export
+// Maps raw work order data to the standard 18-column format
+// ═══════════════════════════════════════════════════════════════
+
+export interface RawWorkOrderData {
+  workOrderNo: string;
+  jobCode?: string;
+  jobTitle: string;
+  componentCode?: string;
+  componentName?: string;
+  department?: string;
+  priority?: string;
+  woStatus?: string;
+  dueDate?: string | Date | null;
+  lastDoneDate?: string | Date | null;
+  daysRemaining?: number | null;
+  daysOverdue?: number | null;
+  nextDueRH?: number | string | null;
+  currentRH?: number | string | null;
+  rhRemaining?: number | null;
+  assignedTo?: string;
+  isCriticalEquipment?: boolean;
+  maintenanceBasis?: string;
+  isUnplanned?: boolean;
+  isPostponed?: boolean;
+}
+
+export function prepareStandardWorkOrderData(
+  rawData: RawWorkOrderData[],
+  reportType: 'due' | 'overdue' | 'completed' | 'unplanned' | 'postponed' | 'active'
+): WorkOrderRowData[] {
+  return rawData.map((item, index) => {
+    const isCritical = item.isCriticalEquipment === true;
+    const isCalendarBased = item.maintenanceBasis === 'Calendar';
+    
+    // Determine status for row highlighting
+    let status: WorkOrderStatus = reportType;
+    if (item.isUnplanned) status = 'unplanned';
+    if (item.isPostponed) status = 'postponed';
+    
+    // Days Left vs Days Overdue are mutually exclusive
+    const daysLeft = (item.daysRemaining !== null && item.daysRemaining !== undefined && item.daysRemaining >= 0) 
+      ? item.daysRemaining 
+      : '-';
+    const daysOverdue = (item.daysOverdue !== null && item.daysOverdue !== undefined && item.daysOverdue > 0)
+      ? item.daysOverdue
+      : '-';
+    
+    // Running Hours columns show "-" for Calendar-based jobs
+    const nextDueRH = isCalendarBased ? '-' : (item.nextDueRH ?? '-');
+    const currentRH = isCalendarBased ? '-' : (item.currentRH ?? '-');
+    const rhRemaining = isCalendarBased ? '-' : (item.rhRemaining ?? '-');
+    
+    return {
+      sno: index + 1,
+      workOrderNo: item.workOrderNo || '-',
+      jobCode: item.jobCode || '-',
+      jobTitle: item.jobTitle || '-',
+      componentCode: item.componentCode || '-',
+      componentName: item.componentName || '-',
+      department: item.department || '-',
+      priority: item.priority || '-',
+      status: item.woStatus || '-',
+      dueDate: item.dueDate || '-',
+      lastDoneDate: item.lastDoneDate || '-',
+      daysLeft,
+      daysOverdue,
+      nextDueRH,
+      currentRH,
+      rhRemaining,
+      assignedTo: item.assignedTo || '-',
+      criticalEquipment: isCritical ? 'YES' : 'No',
+      isCriticalEquipment: isCritical,
+      _rowStatus: status
+    } as WorkOrderRowData;
+  });
 }

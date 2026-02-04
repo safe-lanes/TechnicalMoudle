@@ -15,7 +15,7 @@ import multer from "multer";
 import Papa from "papaparse";
 import * as XLSX from "xlsx";
 import ExcelJS from "exceljs";
-import { COLORS, applyStandardHeader, applyStandardTableHeader, applyStandardDataRows, applyStandardSummary, applyStandardPageSetup, generateFilename, getLastColumnLetter, type ColumnDef, type ConditionalStyle, type SummaryItem } from "./lib/excelReportStyles";
+import { COLORS, STATUS_COLORS, STANDARD_WORK_ORDER_COLUMNS, applyStandardHeader, applyStandardTableHeader, applyStandardDataRows, applyWorkOrderDataRows, applyStandardSummary, applyStandardPageSetup, generateFilename, getLastColumnLetter, getStatusRowColors, type ColumnDef, type ConditionalStyle, type SummaryItem, type WorkOrderStatus, type WorkOrderRowData } from "./lib/excelReportStyles";
 import bulkRouter from "./routes/bulk";
 import alertRouter from "./routes/alerts";
 import formRouter from "./routes/forms";
@@ -10966,7 +10966,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const urgentCnt = dueJobs.filter(j => j.statusIndicator === 'URGENT').length;
       
       // ═══════════════════════════════════════════════════════════════
-      // CREATE PROFESSIONAL EXCEL REPORT - STANDARDIZED MARITIME THEME
+      // CREATE PROFESSIONAL EXCEL REPORT - STANDARDIZED 18-COLUMN FORMAT
+      // Uses standard column definition and status-based row highlighting
       // ═══════════════════════════════════════════════════════════════
       
       const workbook = new ExcelJS.Workbook();
@@ -10977,27 +10978,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         views: [{ state: 'frozen', ySplit: 7, xSplit: 3 }]
       });
       
-      // Define columns with professional maritime standard
-      const columns: ColumnDef[] = [
-        { key: 'sno', header: 'S.No', width: 6, type: 'number', align: 'center' },
-        { key: 'priority', header: 'Priority', width: 10, type: 'text', align: 'center' },
-        { key: 'statusIndicator', header: 'Indicator', width: 10, type: 'text', align: 'center' },
-        { key: 'woStatus', header: 'Status', width: 12, type: 'text', align: 'center' },
-        { key: 'workOrderNo', header: 'Work Order No', width: 22, type: 'text' },
-        { key: 'jobTitle', header: 'Job Title', width: 35, type: 'text' },
-        { key: 'componentCode', header: 'Comp Code', width: 14, type: 'text' },
-        { key: 'componentName', header: 'Component Name', width: 28, type: 'text' },
-        { key: 'department', header: 'Dept', width: 10, type: 'text', align: 'center' },
-        { key: 'dueDate', header: 'Due Date', width: 14, type: 'date', align: 'center' },
-        { key: 'lastDoneDate', header: 'Last Done', width: 14, type: 'date', align: 'center' },
-        { key: 'daysRemaining', header: 'Days Left', width: 10, type: 'number', align: 'right' },
-        { key: 'nextDueReading', header: 'Next Due RH', width: 12, type: 'number', align: 'right' },
-        { key: 'currentReading', header: 'Current RH', width: 12, type: 'number', align: 'right' },
-        { key: 'hoursRemaining', header: 'RH Left', width: 10, type: 'number', align: 'right' },
-        { key: 'assignedTo', header: 'Assigned To', width: 18, type: 'text' },
-        { key: 'criticality', header: 'Criticality', width: 10, type: 'text', align: 'center' },
-        { key: 'critical', header: 'Critical', width: 10, type: 'text', align: 'center' }
-      ];
+      // Use STANDARD 18-column definition for all Maintenance Work Order reports
+      const columns = STANDARD_WORK_ORDER_COLUMNS;
       
       const totalColumns = columns.length;
       const lastColLetter = getLastColumnLetter(totalColumns);
@@ -11017,44 +10999,43 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Apply standardized table header (Row 7)
       applyStandardTableHeader(worksheet, columns, headerRowNum);
       
-      // Prepare data with S.No and warning symbols
-      const preparedData = dueJobs.map((job, index) => ({
-        sno: index + 1,
-        priority: job.priority,
-        statusIndicator: job.statusIndicator,
-        woStatus: job.woStatus,
-        workOrderNo: job.workOrderNo,
-        jobTitle: job.isOverdue ? `⚠ ${job.jobTitle}` : job.jobTitle,
-        componentCode: job.componentCode,
-        componentName: job.componentName,
-        department: job.department,
-        dueDate: job.dueDate,
-        lastDoneDate: job.lastDoneDate,
-        daysRemaining: job.daysRemaining,
-        nextDueReading: job.nextDueReading,
-        currentReading: job.currentReading,
-        hoursRemaining: job.hoursRemaining,
-        assignedTo: job.assignedTo,
-        criticality: job.criticality,
-        critical: job.critical === 'Yes' ? '⚠ YES' : 'No',
-        _isOverdue: job.isOverdue,
-        _isUrgent: job.statusIndicator === 'URGENT'
-      }));
+      // Prepare data in STANDARD 18-column format with status-based highlighting
+      // Days Left vs Days Overdue are mutually exclusive (show "-" for the other)
+      // Running Hours columns show "-" for Calendar-based jobs
+      const preparedData: WorkOrderRowData[] = dueJobs.map((job, index) => {
+        const isCritical = job.critical === 'Yes';
+        const isCalendarBased = job.maintenanceBasis === 'Calendar';
+        const isOverdue = job.isOverdue === true;
+        
+        // Determine row status for color highlighting
+        const rowStatus: WorkOrderStatus = isOverdue ? 'overdue' : 'due';
+        
+        return {
+          sno: index + 1,
+          workOrderNo: job.workOrderNo,
+          jobCode: job.templateCode || '-',
+          jobTitle: job.jobTitle,
+          componentCode: job.componentCode,
+          componentName: job.componentName,
+          department: job.department,
+          priority: job.priority,
+          status: job.woStatus || 'Active',
+          dueDate: job.dueDate,
+          lastDoneDate: job.lastDoneDate,
+          daysLeft: isOverdue ? '-' : (job.daysRemaining ?? '-'),
+          daysOverdue: isOverdue && job.daysRemaining !== null ? Math.abs(job.daysRemaining) : '-',
+          nextDueRH: isCalendarBased ? '-' : (job.nextDueReading ?? '-'),
+          currentRH: isCalendarBased ? '-' : (job.currentReading ?? '-'),
+          rhRemaining: isCalendarBased ? '-' : (job.hoursRemaining ?? '-'),
+          assignedTo: job.assignedTo,
+          criticalEquipment: isCritical ? 'YES' : 'No',
+          _rowStatus: rowStatus,
+          isCriticalEquipment: isCritical
+        };
+      });
       
-      // Define conditional styles (subtle backgrounds per maritime standard)
-      const conditionalStyles: ConditionalStyle[] = [
-        { 
-          condition: (row) => row._isOverdue === true,
-          style: 'danger'  // Light red background (#FFF1F0)
-        },
-        { 
-          condition: (row) => row._isUrgent === true,
-          style: 'warning' // Light amber background (#FFFBE6)
-        }
-      ];
-      
-      // Apply standardized data rows
-      applyStandardDataRows(worksheet, preparedData, columns, dataStartRow, conditionalStyles);
+      // Apply status-based row highlighting (Light/Dark Orange for due, Light/Dark Red for overdue)
+      applyWorkOrderDataRows(worksheet, preparedData, columns, dataStartRow);
       
       // Calculate summary row position
       const lastDataRowNum = dataStartRow + Math.max(dueJobs.length - 1, 0);
@@ -11337,9 +11318,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         : 0;
       
       // ═══════════════════════════════════════════════════════════════
-      // CREATE PROFESSIONAL EXCEL REPORT - STANDARDIZED MARITIME THEME
-      // FIXED: Removed Severity and Priority columns (not in database)
-      // 15 columns only, simpler formatting, matches UI count exactly
+      // CREATE PROFESSIONAL EXCEL REPORT - STANDARDIZED 18-COLUMN FORMAT
+      // Uses standard column definition and status-based row highlighting
+      // Light Red for overdue, Dark Red for critical equipment overdue
       // ═══════════════════════════════════════════════════════════════
       
       const workbook = new ExcelJS.Workbook();
@@ -11350,26 +11331,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         views: [{ state: 'frozen', ySplit: 7, xSplit: 2 }]
       });
       
-      // Define 15 columns - REMOVED Severity and Priority (not real database fields)
-      // Order: S.No, WO#, Job Title, Comp Code, Comp Name, Dept, Due Date, Days Overdue,
-      //        Next Due RH, Current RH, RH Overdue, Assigned To, Last Done, Critical, Overdue Type
-      const columns: ColumnDef[] = [
-        { key: 'sno', header: 'S.No', width: 6, type: 'number', align: 'center' },
-        { key: 'workOrderNo', header: 'Work Order No', width: 24, type: 'text' },
-        { key: 'jobTitle', header: 'Job Title', width: 45, type: 'text' },
-        { key: 'componentCode', header: 'Comp Code', width: 16, type: 'text' },
-        { key: 'componentName', header: 'Component Name', width: 32, type: 'text' },
-        { key: 'department', header: 'Dept', width: 12, type: 'text', align: 'center' },
-        { key: 'dueDate', header: 'Due Date', width: 14, type: 'date', align: 'center' },
-        { key: 'daysPastDue', header: 'Days Overdue', width: 12, type: 'number', align: 'right' },
-        { key: 'nextDueReading', header: 'Next Due RH', width: 14, type: 'number', align: 'right' },
-        { key: 'currentReading', header: 'Current RH', width: 14, type: 'number', align: 'right' },
-        { key: 'hoursPastDue', header: 'RH Overdue', width: 12, type: 'number', align: 'right' },
-        { key: 'assignedTo', header: 'Assigned To', width: 20, type: 'text' },
-        { key: 'lastDoneDate', header: 'Last Done', width: 14, type: 'date', align: 'center' },
-        { key: 'critical', header: 'Critical Equip', width: 12, type: 'text', align: 'center' },
-        { key: 'overdueType', header: 'Overdue Type', width: 12, type: 'text', align: 'center' }
-      ];
+      // Use STANDARD 18-column definition for all Maintenance Work Order reports
+      const columns = STANDARD_WORK_ORDER_COLUMNS;
       
       const totalColumns = columns.length;
       const lastColLetter = getLastColumnLetter(totalColumns);
@@ -11386,77 +11349,42 @@ export async function registerRoutes(app: Express): Promise<Server> {
         lastColLetter
       );
       
-      // Apply standardized table header (Row 7) - Light blue, NOT red
+      // Apply standardized table header (Row 7) - Light blue header
       applyStandardTableHeader(worksheet, columns, headerRowNum);
       
-      // Prepare data with S.No - simplified, no severity field
-      // Critical equipment gets warning prefix on job title
-      const preparedData = overdueJobs.map((job, index) => {
-        // Add warning prefix for critical equipment only (not fake severity)
-        const jobTitleDisplay = job.critical === 'YES' 
-          ? `[!] ${job.jobTitle}` 
-          : job.jobTitle;
+      // Prepare data in STANDARD 18-column format with status-based highlighting
+      // Days Left shows "-" for overdue, Days Overdue shows actual value
+      // Running Hours columns show "-" for Calendar-based jobs
+      const preparedData: WorkOrderRowData[] = overdueJobs.map((job, index) => {
+        const isCritical = job.critical === 'YES';
+        const isCalendarBased = job.overdueType === 'Calendar';
         
         return {
           sno: index + 1,
           workOrderNo: job.workOrderNo,
-          jobTitle: jobTitleDisplay,
+          jobCode: '-',
+          jobTitle: job.jobTitle,
           componentCode: job.componentCode,
           componentName: job.componentName,
           department: job.department,
+          priority: '-',
+          status: 'Overdue',
           dueDate: job.dueDate,
-          daysPastDue: job.daysPastDue,
-          nextDueReading: job.nextDueReading,
-          currentReading: job.currentReading,
-          hoursPastDue: job.hoursPastDue,
-          assignedTo: job.assignedTo,
           lastDoneDate: job.lastDoneDate,
-          critical: job.critical,
-          overdueType: job.overdueType,
-          _isCriticalEquipment: job.critical === 'YES',
-          _daysOverdue: job.daysPastDue
+          daysLeft: '-',
+          daysOverdue: job.daysPastDue || '-',
+          nextDueRH: isCalendarBased ? '-' : (job.nextDueReading ?? '-'),
+          currentRH: isCalendarBased ? '-' : (job.currentReading ?? '-'),
+          rhRemaining: isCalendarBased ? '-' : (job.hoursPastDue ? `-${job.hoursPastDue}` : '-'),
+          assignedTo: job.assignedTo,
+          criticalEquipment: isCritical ? 'YES' : 'No',
+          _rowStatus: 'overdue' as WorkOrderStatus,
+          isCriticalEquipment: isCritical
         };
       });
       
-      // SIMPLIFIED conditional styles per user request:
-      // - Critical Equipment rows: light red background (#FFF1F0)
-      // - Very Overdue (>30 days): Bold red text on Days Overdue column only (handled per-cell)
-      // - Overdue (7-30 days): Bold orange text on Days Overdue column only (handled per-cell)
-      // - All other rows: Default alternating white/#F7F9FC
-      const conditionalStyles: ConditionalStyle[] = [
-        { 
-          condition: (row) => row._isCriticalEquipment === true,
-          style: 'danger'  // Light red background (#FFF1F0) for critical equipment only
-        }
-        // No more severity-based row coloring - keep it simple
-      ];
-      
-      // Apply standardized data rows with subtle formatting
-      applyStandardDataRows(worksheet, preparedData, columns, dataStartRow, conditionalStyles);
-      
-      // Apply special formatting for Days Overdue column (column H = column 8)
-      // Uses palette constants from COLORS - never hardcoded RGB values
-      const daysOverdueColIndex = 8; // Days Overdue is column H (8th column)
-      const criticalColIndex = 14; // Critical Equip is column N (14th column)
-      
-      for (let i = 0; i < preparedData.length; i++) {
-        const rowNum = dataStartRow + i;
-        const row = preparedData[i];
-        
-        // Format Days Overdue column based on value - uses COLORS palette
-        const daysCell = worksheet.getCell(rowNum, daysOverdueColIndex);
-        if (row._daysOverdue > 30) {
-          daysCell.font = { bold: true, color: { argb: COLORS.danger } }; // Red from palette
-        } else if (row._daysOverdue > 7) {
-          daysCell.font = { bold: true, color: { argb: COLORS.warning } }; // Orange from palette
-        }
-        
-        // Format Critical Equipment column - bold red if YES (uses palette)
-        if (row._isCriticalEquipment) {
-          const critCell = worksheet.getCell(rowNum, criticalColIndex);
-          critCell.font = { bold: true, color: { argb: COLORS.danger } };
-        }
-      }
+      // Apply status-based row highlighting (Light Red / Dark Red for overdue)
+      applyWorkOrderDataRows(worksheet, preparedData, columns, dataStartRow);
       
       // Calculate summary row position
       const lastDataRowNum = dataStartRow + Math.max(overdueJobs.length - 1, 0);
