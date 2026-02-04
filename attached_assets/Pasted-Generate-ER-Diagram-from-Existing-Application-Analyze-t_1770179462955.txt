@@ -1,0 +1,86 @@
+Generate ER Diagram from Existing Application
+
+Analyze the entire application codebase and identify all data entities and relationships that are currently in use.
+
+Scope of Analysis
+
+Business logic flows
+
+PostgreSQL schema definitions
+
+ORM usage and query patterns
+
+Storage layer methods
+
+Implicit relationships inferred from identifiers and filters
+
+Relationships enforced by logic rather than database constraints
+
+Cross-cutting data usage across different functional areas of the application
+
+Do not assume or invent any relationships.
+Only include relationships that are actually inferred from code, schema, and runtime usage.
+
+ER Diagram Output Requirements
+
+Produce a clear, readable ER diagram
+
+Use diagram format (Mermaid ER diagram or PlantUML)
+
+Focus on visual clarity and correctness
+
+Show:
+
+Primary identifiers
+
+Referenced identifiers
+
+Cardinality (one-to-one, one-to-many, many-to-many)
+
+Composite or conditional relationships where logic depends on multiple identifiers
+
+Clearly indicate implicit relationships that exist only through application logic
+
+Relationship Discovery Rules
+
+Derive entities and relationships dynamically from:
+
+Storage layer access patterns
+
+ORM queries and filters
+
+Business rules that bind data across multiple entities
+
+Identify where:
+
+Same data behaves differently based on contextual identifiers
+
+Data is shared across scopes but stored independently
+
+Relationships rely on combined identifiers rather than explicit keys
+
+Logical Grouping Requirement
+
+After the diagram, provide a grouped explanation of relationships based on functional responsibility, not technical structure.
+
+For each group:
+
+Describe how entities interact
+
+Explain dependency direction
+
+Clarify how identifiers flow across different functional areas
+
+Constraints
+
+❌ Do not refactor or redesign anything
+
+❌ Do not rename or normalize entities
+
+❌ Do not introduce new constraints
+
+❌ Do not propose fixes or improvements
+
+This task is strictly to analyze and document the current system state as implemented.
+
+Generate the ER diagram and grouped relationship explanation after completing the full analysis.
