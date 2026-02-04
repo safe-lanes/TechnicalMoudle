@@ -370,14 +370,6 @@ const MaintenanceReports: React.FC<MaintenanceReportsProps> = ({ onBack, globalF
           return false;
         });
 
-        // Calculate severity for each job
-        const calculateSeverity = (daysPastDue: number, hoursPastDue: number, isCriticalEquip: boolean): string => {
-          if (isCriticalEquip || daysPastDue > 30 || hoursPastDue > 720) return 'CRITICAL';
-          if (daysPastDue > 14 || hoursPastDue > 336) return 'SEVERE';
-          if (daysPastDue > 7 || hoursPastDue > 168) return 'MODERATE';
-          return 'MINOR';
-        };
-
         // Calculate overdue type
         const getOverdueType = (daysPastDue: number, hoursPastDue: number): string => {
           const calendarOverdue = daysPastDue > GRACE_PERIOD_DAYS;
@@ -387,11 +379,9 @@ const MaintenanceReports: React.FC<MaintenanceReportsProps> = ({ onBack, globalF
           return 'Calendar';
         };
 
-        // 17 columns matching the Excel report format
+        // 15 columns - REMOVED Severity and Priority (not real database fields)
         const columns = [
           { header: 'S.No', field: 'sNo', width: 8 },
-          { header: 'Severity', field: 'severity', width: 14 },
-          { header: 'Priority', field: 'priority', width: 14 },
           { header: 'Work Order No', field: 'workOrderNumber', width: 30 },
           { header: 'Job Title', field: 'jobTitle', width: 40 },
           { header: 'Comp Code', field: 'componentCode', width: 18 },
@@ -418,8 +408,6 @@ const MaintenanceReports: React.FC<MaintenanceReportsProps> = ({ onBack, globalF
 
           return {
             sNo: index + 1,
-            severity: calculateSeverity(daysPastDue, hoursPastDue, isCriticalEquip),
-            priority: wo.priority || wo.jobPriority || 'Normal',
             workOrderNumber: wo.workOrderNumber || wo.workOrderNo || wo.id,
             jobTitle: wo.title || wo.jobTitle || '-',
             componentCode: wo.componentCode || wo.componentNumber || '-',
@@ -427,33 +415,33 @@ const MaintenanceReports: React.FC<MaintenanceReportsProps> = ({ onBack, globalF
             department: wo.department || wo.assignedDepartment || '-',
             formattedDueDate: formatDate(wo.dueDate || wo.dueDateSnapshot),
             daysOverdue: daysPastDue > 0 ? daysPastDue : '-',
+            daysPastDue: daysPastDue,
             nextDueRH: wo.nextDueReading ? wo.nextDueReading.toLocaleString() : '-',
             currentRH: wo.currentCumulativeRH ? wo.currentCumulativeRH.toLocaleString() : '-',
             rhOverdue: hoursPastDue > 0 ? hoursPastDue : '-',
             overdueType: getOverdueType(daysPastDue, hoursPastDue),
             assignedTo: wo.assignedTo || wo.assignee || wo.responsibleRank || '-',
             lastDoneDate: formatDate(wo.lastDoneDate || wo.lastDoneDateSnapshot) || 'N/A',
-            criticalEquip: isCriticalEquip ? 'YES' : 'NO'
+            criticalEquip: isCriticalEquip ? 'YES' : 'NO',
+            critical: isCriticalEquip ? 'YES' : 'NO'
           };
         });
 
-        // Sort by severity (CRITICAL first) then by days overdue (descending)
-        const severityOrder: Record<string, number> = { 'CRITICAL': 0, 'SEVERE': 1, 'MODERATE': 2, 'MINOR': 3 };
+        // Sort by Critical Equipment first, then by days overdue (descending), then component name
         data.sort((a, b) => {
-          const severityDiff = severityOrder[a.severity] - severityOrder[b.severity];
-          if (severityDiff !== 0) return severityDiff;
+          if (a.criticalEquip !== b.criticalEquip) {
+            return a.criticalEquip === 'YES' ? -1 : 1;
+          }
           const daysA = typeof a.daysOverdue === 'number' ? a.daysOverdue : 0;
           const daysB = typeof b.daysOverdue === 'number' ? b.daysOverdue : 0;
-          return daysB - daysA;
+          if (daysA !== daysB) return daysB - daysA;
+          return (a.componentName || '').localeCompare(b.componentName || '');
         });
 
         // Re-number after sorting
         data.forEach((item, idx) => { item.sNo = idx + 1; });
 
-        // Calculate summary statistics
-        const criticalCount = data.filter(d => d.severity === 'CRITICAL').length;
-        const severeCount = data.filter(d => d.severity === 'SEVERE').length;
-        const moderateCount = data.filter(d => d.severity === 'MODERATE').length;
+        // Calculate summary statistics - ONLY real database-backed metrics
         const criticalEquipCount = data.filter(d => d.criticalEquip === 'YES').length;
         const daysOverdueArr = data.filter(d => typeof d.daysOverdue === 'number').map(d => d.daysOverdue as number);
         const avgDaysOverdue = daysOverdueArr.length > 0 
@@ -463,14 +451,12 @@ const MaintenanceReports: React.FC<MaintenanceReportsProps> = ({ onBack, globalF
         const calendarOverdueCount = data.filter(d => d.overdueType === 'Calendar' || d.overdueType === 'Both').length;
         const rhOverdueCount = data.filter(d => d.overdueType === 'RH' || d.overdueType === 'Both').length;
 
+        // REMOVED fake severity counts - only show real database metrics
         const summary = [
-          { label: 'Total Overdue', value: data.length, color: 'critical' },
-          { label: 'Critical Severity', value: criticalCount, color: 'critical' },
-          { label: 'Severe', value: severeCount, color: 'severe' },
-          { label: 'Moderate', value: moderateCount, color: 'moderate' },
-          { label: 'Critical Equip', value: criticalEquipCount, color: 'critical' },
+          { label: 'Total Overdue', value: data.length },
+          { label: 'Critical Equip', value: criticalEquipCount, color: 'highlight' },
           { label: 'Avg Days Overdue', value: avgDaysOverdue },
-          { label: 'Max Days Overdue', value: `${maxDaysOverdue}d`, color: 'critical' },
+          { label: 'Max Days Overdue', value: `${maxDaysOverdue}d` },
           { label: 'Calendar/RH', value: `${calendarOverdueCount}/${rhOverdueCount}` }
         ];
 

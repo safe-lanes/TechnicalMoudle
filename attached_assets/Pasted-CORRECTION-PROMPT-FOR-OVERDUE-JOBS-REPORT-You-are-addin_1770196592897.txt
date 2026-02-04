@@ -1,0 +1,78 @@
+CORRECTION PROMPT FOR OVERDUE JOBS REPORT:
+
+You are adding incorrect columns to the Overdue Jobs Report. Please make the following critical corrections:
+
+REMOVE these columns completely:
+
+❌ "Severity" - This field DOES NOT EXIST in the work_orders table. There is no severity field anywhere in the system.
+
+❌ "Priority" - You should NOT display this column in the report output.
+
+KEEP these columns in the correct order:
+
+S.No
+
+Work Order No (work_orders.job_code)
+
+Job Title (work_orders.job_title)
+
+Component Code (components.code)
+
+Component Name (components.name)
+
+Department (work_orders.department)
+
+Due Date (work_orders.next_due_date)
+
+Days Overdue (calculated: CURRENT_DATE - next_due_date)
+
+Next Due RH (if applicable, otherwise show "-")
+
+Current RH (if applicable, otherwise show "-")
+
+RH Overdue (if applicable, otherwise show "-")
+
+Type (work_orders.maintenance_basis: "Calendar" or "Running Hours")
+
+Assigned To (work_orders.assigned_to_rank)
+
+Last Done (work_orders.last_done_date OR from work_completion table if available)
+
+Critical Equipment (work_orders.class_related: "YES" if class_related = 'Yes', otherwise "NO")
+
+SUMMARY Section corrections:
+
+Remove "Critical Severity", "Severe", "Moderate" breakdown (severity doesn't exist)
+
+Keep: Total Overdue, Critical Equipment count, Avg Days Overdue, Max Days Overdue
+
+Query Logic:
+
+sql
+SELECT 
+  work_orders.job_code,
+  work_orders.job_title,
+  components.code as component_code,
+  components.name as component_name,
+  work_orders.department,
+  work_orders.next_due_date,
+  (CURRENT_DATE - work_orders.next_due_date) as days_overdue,
+  work_orders.maintenance_basis as type,
+  work_orders.assigned_to_rank,
+  work_orders.class_related
+FROM work_orders
+JOIN components ON work_orders.component_id = components.id
+WHERE work_orders.status = 'Planned'
+  AND work_orders.next_due_date < CURRENT_DATE
+ORDER BY days_overdue DESC
+IMPORTANT:
+
+The work_orders table ONLY has "job_priority" field (High/Medium/Low), NOT "severity"
+
+Do NOT create or display any "Severity" column
+
+Do NOT display "Priority" column in the report output
+
+Focus ONLY on fields that actually exist in the database schema
+
+Please regenerate the Overdue Jobs Report with these corrections immediately.
