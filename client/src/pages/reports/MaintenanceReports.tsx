@@ -139,7 +139,7 @@ const MaintenanceReports: React.FC<MaintenanceReportsProps> = ({ onBack, globalF
       frequency: "Monthly",
       fields: ["Planned vs Completed", "On-time %", "Avg Days Late", "Breakdown by Dept/System/Criticality", "Trend vs last 3 months"],
       filters: ["Vessel", "Dept", "Period"],
-      outputs: ["PDF", "Dashboard"],
+      outputs: ["PDF", "Excel", "Dashboard"],
       icon: TrendingUp,
       priority: "medium",
       lastGenerated: "3 days ago",
@@ -780,6 +780,7 @@ const MaintenanceReports: React.FC<MaintenanceReportsProps> = ({ onBack, globalF
       'completed-jobs': '/technical/api/reports/completed-jobs',
       'unplanned-jobs': '/technical/api/reports/unplanned-jobs',
       'postponement-log': '/technical/api/reports/postponement-log',
+      'monthly-summary': '/technical/api/reports/maintenance/monthly-summary/excel',
     };
 
     const endpoint = reportEndpoints[reportId];
@@ -791,12 +792,30 @@ const MaintenanceReports: React.FC<MaintenanceReportsProps> = ({ onBack, globalF
       return;
     }
 
+    let requestBody: any = { vesselId: effectiveVesselId };
+    
+    if (reportId === 'monthly-summary') {
+      let startDate: Date;
+      let endDate: Date;
+      
+      if (globalFilters?.dateRange?.from && globalFilters?.dateRange?.to) {
+        startDate = globalFilters.dateRange.from;
+        endDate = globalFilters.dateRange.to;
+      } else {
+        const now = new Date();
+        startDate = new Date(now.getFullYear(), now.getMonth(), 1);
+        endDate = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+      }
+      requestBody.startDate = startDate.toISOString().split('T')[0];
+      requestBody.endDate = endDate.toISOString().split('T')[0];
+    }
+
     const response = await fetch(endpoint, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({ vesselId: effectiveVesselId }),
+      body: JSON.stringify(requestBody),
     });
 
     if (!response.ok) {

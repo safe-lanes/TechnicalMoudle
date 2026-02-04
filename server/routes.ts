@@ -11961,6 +11961,603 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // ═══════════════════════════════════════════════════════════════════════════
+  // MONTHLY MAINTENANCE SUMMARY EXCEL REPORT
+  // KPI/Dashboard report with aggregated statistics - NOT a job list report
+  // Multi-section layout: Executive Summary, Statistics, Department, Frequency, Man-Hours, Critical
+  // ═══════════════════════════════════════════════════════════════════════════
+  app.post("/technical/api/reports/maintenance/monthly-summary/excel", async (req, res) => {
+    try {
+      const { vesselId, startDate, endDate } = req.body;
+      
+      if (!vesselId) {
+        return res.status(400).json({ error: "Please select a vessel" });
+      }
+      
+      if (!startDate || !endDate) {
+        return res.status(400).json({ error: "Please provide start and end dates for the report period" });
+      }
+      
+      const periodStart = new Date(startDate);
+      const periodEnd = new Date(endDate);
+      periodEnd.setHours(23, 59, 59, 999);
+      const now = new Date();
+      
+      const allVessels = await storage.getVessels();
+      const vessel = allVessels.find(v => v.id === vesselId);
+      const vesselName = vessel?.name || vesselId;
+      
+      const workOrders = await storage.getWorkOrders(vesselId);
+      const jobs = await storage.getJobs(vesselId);
+      const components = await storage.getComponents(vesselId);
+      
+      const jobsMap = new Map(jobs.map(job => [job.id, job]));
+      const componentsByCodeMap = new Map(components.map(comp => [comp.componentCode, comp]));
+      
+      const monthlyWOs = workOrders.filter((wo: any) => {
+        const woDate = new Date(wo.dueDate || wo.createdAt);
+        return woDate >= periodStart && woDate <= periodEnd;
+      });
+      
+      const completedWOs = monthlyWOs.filter((wo: any) => wo.status === 'Completed');
+      
+      const overdueWOs = monthlyWOs.filter((wo: any) => {
+        if (!wo.dueDate || wo.status === 'Completed') return false;
+        return new Date(wo.dueDate) < periodEnd;
+      });
+      
+      const onTimeCompletions = completedWOs.filter((wo: any) => {
+        if (!wo.dueDate || !wo.completedDate) return true;
+        return new Date(wo.completedDate) <= new Date(wo.dueDate);
+      });
+      
+      const totalPlanned = monthlyWOs.length;
+      const totalCompleted = completedWOs.length;
+      const totalOverdue = overdueWOs.length;
+      const completionRate = totalPlanned > 0 ? Math.round((totalCompleted / totalPlanned) * 100) : 0;
+      const onTimeRate = totalCompleted > 0 ? Math.round((onTimeCompletions.length / totalCompleted) * 100) : 0;
+      
+      const criticalWOs = monthlyWOs.filter((wo: any) => {
+        const comp = componentsByCodeMap.get(wo.componentCode || '');
+        return comp?.classRelated === 'Yes' || comp?.classRelated === true || 
+               wo.priority === 'Critical' || wo.priority === 'High';
+      });
+      
+      let totalManHours = 0;
+      completedWOs.forEach((wo: any) => {
+        totalManHours += Number(wo.actualHours || wo.hoursSpent || wo.manHours || 0);
+      });
+      
+      const activeJobs = monthlyWOs.filter((wo: any) => 
+        wo.status !== 'Completed' && wo.status !== 'Postponed'
+      ).length;
+      
+      const priorityStats: Record<string, { total: number; completed: number; overdue: number }> = {
+        'High': { total: 0, completed: 0, overdue: 0 },
+        'Medium': { total: 0, completed: 0, overdue: 0 },
+        'Low': { total: 0, completed: 0, overdue: 0 },
+        'Normal': { total: 0, completed: 0, overdue: 0 }
+      };
+      
+      monthlyWOs.forEach((wo: any) => {
+        const priority = wo.priority || 'Normal';
+        if (!priorityStats[priority]) priorityStats[priority] = { total: 0, completed: 0, overdue: 0 };
+        priorityStats[priority].total++;
+        if (wo.status === 'Completed') priorityStats[priority].completed++;
+        if (wo.dueDate && new Date(wo.dueDate) < periodEnd && wo.status !== 'Completed') {
+          priorityStats[priority].overdue++;
+        }
+      });
+      
+      const deptStats: Record<string, { planned: number; completed: number; overdue: number }> = {};
+      monthlyWOs.forEach((wo: any) => {
+        const dept = wo.department || wo.assignedDepartment || 'Unassigned';
+        if (!deptStats[dept]) deptStats[dept] = { planned: 0, completed: 0, overdue: 0 };
+        deptStats[dept].planned++;
+        if (wo.status === 'Completed') deptStats[dept].completed++;
+        if (wo.dueDate && new Date(wo.dueDate) < periodEnd && wo.status !== 'Completed') {
+          deptStats[dept].overdue++;
+        }
+      });
+      
+      const freqStats: Record<string, { count: number; completed: number }> = {
+        'Daily': { count: 0, completed: 0 },
+        'Weekly': { count: 0, completed: 0 },
+        'Monthly': { count: 0, completed: 0 },
+        'Quarterly': { count: 0, completed: 0 },
+        'Yearly': { count: 0, completed: 0 },
+        'Other': { count: 0, completed: 0 }
+      };
+      
+      monthlyWOs.forEach((wo: any) => {
+        const job = jobsMap.get(wo.jobId || '');
+        let freqUnit = job?.frequencyUnit || 'Other';
+        if (freqUnit === 'Months' && job?.frequencyValue === 3) freqUnit = 'Quarterly';
+        else if (freqUnit === 'Months' && job?.frequencyValue === 12) freqUnit = 'Yearly';
+        else if (freqUnit === 'Months') freqUnit = 'Monthly';
+        else if (freqUnit === 'Weeks') freqUnit = 'Weekly';
+        else if (freqUnit === 'Days') freqUnit = 'Daily';
+        else if (freqUnit === 'Years') freqUnit = 'Yearly';
+        
+        if (!freqStats[freqUnit]) freqStats[freqUnit] = { count: 0, completed: 0 };
+        freqStats[freqUnit].count++;
+        if (wo.status === 'Completed') freqStats[freqUnit].completed++;
+      });
+      
+      const manHoursByDept: Record<string, number> = {};
+      completedWOs.forEach((wo: any) => {
+        const dept = wo.department || wo.assignedDepartment || 'Unassigned';
+        const hours = Number(wo.actualHours || wo.hoursSpent || wo.manHours || 0);
+        manHoursByDept[dept] = (manHoursByDept[dept] || 0) + hours;
+      });
+      
+      const criticalEquipStats = {
+        solas: { total: 0, completed: 0, overdue: 0 },
+        classCritical: { total: 0, completed: 0, overdue: 0 },
+        highPriority: { total: 0, completed: 0, overdue: 0 }
+      };
+      
+      monthlyWOs.forEach((wo: any) => {
+        const comp = componentsByCodeMap.get(wo.componentCode || '');
+        const isClassRelated = comp?.classRelated === 'Yes' || comp?.classRelated === true;
+        const isSolas = comp?.solasCritical === 'Yes' || comp?.solasCritical === true;
+        const isHighPriority = wo.priority === 'Critical' || wo.priority === 'High';
+        const isOverdue = wo.dueDate && new Date(wo.dueDate) < periodEnd && wo.status !== 'Completed';
+        const isCompleted = wo.status === 'Completed';
+        
+        if (isSolas) {
+          criticalEquipStats.solas.total++;
+          if (isCompleted) criticalEquipStats.solas.completed++;
+          if (isOverdue) criticalEquipStats.solas.overdue++;
+        }
+        if (isClassRelated) {
+          criticalEquipStats.classCritical.total++;
+          if (isCompleted) criticalEquipStats.classCritical.completed++;
+          if (isOverdue) criticalEquipStats.classCritical.overdue++;
+        }
+        if (isHighPriority) {
+          criticalEquipStats.highPriority.total++;
+          if (isCompleted) criticalEquipStats.highPriority.completed++;
+          if (isOverdue) criticalEquipStats.highPriority.overdue++;
+        }
+      });
+      
+      const workbook = new ExcelJS.Workbook();
+      workbook.creator = 'PMS System';
+      workbook.created = new Date();
+      
+      const worksheet = workbook.addWorksheet('Monthly Summary', {
+        views: [{ state: 'frozen', ySplit: 6, xSplit: 0 }]
+      });
+      
+      const totalColumns = 8;
+      const lastColLetter = 'H';
+      
+      for (let i = 1; i <= totalColumns; i++) {
+        worksheet.getColumn(i).width = 18;
+      }
+      
+      worksheet.mergeCells('A1:H1');
+      const titleCell = worksheet.getCell('A1');
+      titleCell.value = 'SEAFARER TECHNICAL MANAGEMENT SYSTEM';
+      titleCell.font = { size: 14, bold: true, color: { argb: 'FFFFFFFF' }, name: 'Arial' };
+      titleCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1E3A8A' } };
+      titleCell.alignment = { horizontal: 'center', vertical: 'middle' };
+      worksheet.getRow(1).height = 30;
+      
+      worksheet.mergeCells('A2:H2');
+      const subtitleCell = worksheet.getCell('A2');
+      subtitleCell.value = 'MONTHLY MAINTENANCE SUMMARY';
+      subtitleCell.font = { size: 12, bold: true, color: { argb: 'FF1E3A8A' }, name: 'Arial' };
+      subtitleCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFDBEAFE' } };
+      subtitleCell.alignment = { horizontal: 'center', vertical: 'middle' };
+      worksheet.getRow(2).height = 25;
+      
+      worksheet.getRow(3).height = 8;
+      
+      const monthNames = ['January', 'February', 'March', 'April', 'May', 'June', 
+                          'July', 'August', 'September', 'October', 'November', 'December'];
+      const reportPeriod = `${monthNames[periodStart.getMonth()]} ${periodStart.getFullYear()}`;
+      
+      worksheet.getCell('A4').value = `Vessel: ${vesselName}`;
+      worksheet.getCell('A4').font = { bold: true, size: 10, name: 'Arial' };
+      worksheet.mergeCells('E4:H4');
+      worksheet.getCell('E4').value = `Report Period: ${reportPeriod}`;
+      worksheet.getCell('E4').font = { size: 10, name: 'Arial' };
+      worksheet.getCell('E4').alignment = { horizontal: 'right' };
+      
+      const genDate = new Date();
+      const genDateStr = `${genDate.getDate().toString().padStart(2, '0')}-${monthNames[genDate.getMonth()].slice(0,3)}-${genDate.getFullYear()} ${genDate.getHours().toString().padStart(2,'0')}:${genDate.getMinutes().toString().padStart(2,'0')}`;
+      worksheet.getCell('A5').value = `Generated: ${genDateStr}`;
+      worksheet.getCell('A5').font = { size: 9, color: { argb: 'FF666666' }, name: 'Arial' };
+      worksheet.mergeCells('E5:H5');
+      worksheet.getCell('E5').value = 'Generated By: PMS System';
+      worksheet.getCell('E5').font = { size: 9, color: { argb: 'FF666666' }, name: 'Arial' };
+      worksheet.getCell('E5').alignment = { horizontal: 'right' };
+      
+      worksheet.getRow(6).height = 10;
+      
+      let currentRow = 8;
+      
+      worksheet.mergeCells(`A${currentRow}:H${currentRow}`);
+      const execHeader = worksheet.getCell(`A${currentRow}`);
+      execHeader.value = 'EXECUTIVE SUMMARY';
+      execHeader.font = { bold: true, size: 11, color: { argb: 'FF1E3A8A' }, name: 'Arial' };
+      execHeader.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFDBEAFE' } };
+      execHeader.border = { bottom: { style: 'medium', color: { argb: 'FF1E3A8A' } } };
+      worksheet.getRow(currentRow).height = 22;
+      currentRow++;
+      
+      const kpiRow1 = currentRow;
+      const kpis1 = [
+        { label: 'Total Planned', value: totalPlanned, color: 'FFE0F2FE' },
+        { label: 'Total Completed', value: totalCompleted, color: 'FFD1FAE5' },
+        { label: 'Total Overdue', value: totalOverdue, color: 'FFFEE2E2' },
+        { label: 'Completion Rate', value: `${completionRate}%`, color: 'FFEDE9FE' }
+      ];
+      
+      kpis1.forEach((kpi, idx) => {
+        const col = (idx * 2) + 1;
+        worksheet.mergeCells(kpiRow1, col, kpiRow1, col + 1);
+        const cell = worksheet.getCell(kpiRow1, col);
+        cell.value = kpi.label;
+        cell.font = { size: 9, color: { argb: 'FF666666' }, name: 'Arial' };
+        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: kpi.color } };
+        cell.alignment = { horizontal: 'center', vertical: 'middle' };
+        cell.border = { 
+          top: { style: 'thin', color: { argb: 'FFE1E8ED' } },
+          left: { style: 'thin', color: { argb: 'FFE1E8ED' } },
+          right: { style: 'thin', color: { argb: 'FFE1E8ED' } }
+        };
+      });
+      currentRow++;
+      
+      const kpiRow2 = currentRow;
+      kpis1.forEach((kpi, idx) => {
+        const col = (idx * 2) + 1;
+        worksheet.mergeCells(kpiRow2, col, kpiRow2, col + 1);
+        const cell = worksheet.getCell(kpiRow2, col);
+        cell.value = kpi.value;
+        cell.font = { bold: true, size: 16, color: { argb: kpi.label === 'Total Overdue' && totalOverdue > 0 ? 'FFDC2626' : 'FF1E3A8A' }, name: 'Arial' };
+        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: kpi.color } };
+        cell.alignment = { horizontal: 'center', vertical: 'middle' };
+        cell.border = { 
+          bottom: { style: 'thin', color: { argb: 'FFE1E8ED' } },
+          left: { style: 'thin', color: { argb: 'FFE1E8ED' } },
+          right: { style: 'thin', color: { argb: 'FFE1E8ED' } }
+        };
+      });
+      worksheet.getRow(kpiRow2).height = 35;
+      currentRow++;
+      
+      currentRow++;
+      
+      const kpiRow3 = currentRow;
+      const kpis2 = [
+        { label: 'On-Time %', value: `${onTimeRate}%`, color: 'FFE0F2FE' },
+        { label: 'Critical Jobs', value: criticalWOs.length, color: 'FFFEE2E2' },
+        { label: 'Total Man-Hours', value: totalManHours.toFixed(1), color: 'FFFFFBEB' },
+        { label: 'Active Jobs', value: activeJobs, color: 'FFEDE9FE' }
+      ];
+      
+      kpis2.forEach((kpi, idx) => {
+        const col = (idx * 2) + 1;
+        worksheet.mergeCells(kpiRow3, col, kpiRow3, col + 1);
+        const cell = worksheet.getCell(kpiRow3, col);
+        cell.value = kpi.label;
+        cell.font = { size: 9, color: { argb: 'FF666666' }, name: 'Arial' };
+        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: kpi.color } };
+        cell.alignment = { horizontal: 'center', vertical: 'middle' };
+        cell.border = { 
+          top: { style: 'thin', color: { argb: 'FFE1E8ED' } },
+          left: { style: 'thin', color: { argb: 'FFE1E8ED' } },
+          right: { style: 'thin', color: { argb: 'FFE1E8ED' } }
+        };
+      });
+      currentRow++;
+      
+      const kpiRow4 = currentRow;
+      kpis2.forEach((kpi, idx) => {
+        const col = (idx * 2) + 1;
+        worksheet.mergeCells(kpiRow4, col, kpiRow4, col + 1);
+        const cell = worksheet.getCell(kpiRow4, col);
+        cell.value = kpi.value;
+        cell.font = { bold: true, size: 16, color: { argb: 'FF1E3A8A' }, name: 'Arial' };
+        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: kpi.color } };
+        cell.alignment = { horizontal: 'center', vertical: 'middle' };
+        cell.border = { 
+          bottom: { style: 'thin', color: { argb: 'FFE1E8ED' } },
+          left: { style: 'thin', color: { argb: 'FFE1E8ED' } },
+          right: { style: 'thin', color: { argb: 'FFE1E8ED' } }
+        };
+      });
+      worksheet.getRow(kpiRow4).height = 35;
+      currentRow += 3;
+      
+      worksheet.mergeCells(`A${currentRow}:E${currentRow}`);
+      const woStatsHeader = worksheet.getCell(`A${currentRow}`);
+      woStatsHeader.value = 'WORK ORDER STATISTICS';
+      woStatsHeader.font = { bold: true, size: 11, color: { argb: 'FF1E3A8A' }, name: 'Arial' };
+      woStatsHeader.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFDBEAFE' } };
+      woStatsHeader.border = { bottom: { style: 'medium', color: { argb: 'FF1E3A8A' } } };
+      worksheet.getRow(currentRow).height = 22;
+      currentRow++;
+      
+      const woTableHeaders = ['Category', 'Total', 'Completed', 'Overdue', 'Rate %'];
+      woTableHeaders.forEach((header, idx) => {
+        const cell = worksheet.getCell(currentRow, idx + 1);
+        cell.value = header;
+        cell.font = { bold: true, size: 10, color: { argb: 'FFFFFFFF' }, name: 'Arial' };
+        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF93C5FD' } };
+        cell.alignment = { horizontal: 'center', vertical: 'middle' };
+        cell.border = { 
+          top: { style: 'thin', color: { argb: 'FFFFFFFF' } },
+          left: { style: 'thin', color: { argb: 'FFFFFFFF' } },
+          bottom: { style: 'thin', color: { argb: 'FFFFFFFF' } },
+          right: { style: 'thin', color: { argb: 'FFFFFFFF' } }
+        };
+      });
+      worksheet.getRow(currentRow).height = 22;
+      currentRow++;
+      
+      const allWOStats = { total: totalPlanned, completed: totalCompleted, overdue: totalOverdue };
+      const woStatsData = [
+        { category: 'All Work Orders', ...allWOStats },
+        { category: 'High Priority', ...priorityStats['High'] },
+        { category: 'Medium Priority', ...priorityStats['Medium'] },
+        { category: 'Low Priority', ...priorityStats['Low'] }
+      ];
+      
+      woStatsData.forEach((row, idx) => {
+        const rate = row.total > 0 ? Math.round((row.completed / row.total) * 100) : 0;
+        const bgColor = idx % 2 === 0 ? 'FFFFFFFF' : 'FFF9FAFB';
+        const rateColor = rate >= 90 ? 'FF16A34A' : rate >= 70 ? 'FF9A3412' : rate >= 50 ? 'FFDC2626' : 'FFDC2626';
+        const rateBgColor = rate >= 90 ? 'FFD1FAE5' : rate >= 70 ? 'FFFEF9C3' : rate >= 50 ? 'FFFED7AA' : 'FFFEE2E2';
+        
+        [row.category, row.total, row.completed, row.overdue, `${rate}%`].forEach((val, colIdx) => {
+          const cell = worksheet.getCell(currentRow, colIdx + 1);
+          cell.value = val;
+          cell.font = { size: 10, name: 'Arial', color: { argb: colIdx === 4 ? rateColor : (colIdx === 3 && row.overdue > 10 ? 'FFDC2626' : 'FF2C3E50') }, bold: colIdx === 3 && row.overdue > 10 };
+          cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: colIdx === 4 ? rateBgColor : bgColor } };
+          cell.alignment = { horizontal: colIdx === 0 ? 'left' : 'center', vertical: 'middle' };
+          cell.border = { 
+            top: { style: 'thin', color: { argb: 'FFE1E8ED' } },
+            left: { style: 'thin', color: { argb: 'FFE1E8ED' } },
+            bottom: { style: 'thin', color: { argb: 'FFE1E8ED' } },
+            right: { style: 'thin', color: { argb: 'FFE1E8ED' } }
+          };
+        });
+        currentRow++;
+      });
+      currentRow += 2;
+      
+      worksheet.mergeCells(`A${currentRow}:E${currentRow}`);
+      const deptHeader = worksheet.getCell(`A${currentRow}`);
+      deptHeader.value = 'DEPARTMENT-WISE BREAKDOWN';
+      deptHeader.font = { bold: true, size: 11, color: { argb: 'FF1E3A8A' }, name: 'Arial' };
+      deptHeader.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFDBEAFE' } };
+      deptHeader.border = { bottom: { style: 'medium', color: { argb: 'FF1E3A8A' } } };
+      worksheet.getRow(currentRow).height = 22;
+      currentRow++;
+      
+      const deptTableHeaders = ['Department', 'Planned', 'Completed', 'Overdue', 'Rate %'];
+      deptTableHeaders.forEach((header, idx) => {
+        const cell = worksheet.getCell(currentRow, idx + 1);
+        cell.value = header;
+        cell.font = { bold: true, size: 10, color: { argb: 'FFFFFFFF' }, name: 'Arial' };
+        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF93C5FD' } };
+        cell.alignment = { horizontal: 'center', vertical: 'middle' };
+        cell.border = { 
+          top: { style: 'thin', color: { argb: 'FFFFFFFF' } },
+          left: { style: 'thin', color: { argb: 'FFFFFFFF' } },
+          bottom: { style: 'thin', color: { argb: 'FFFFFFFF' } },
+          right: { style: 'thin', color: { argb: 'FFFFFFFF' } }
+        };
+      });
+      worksheet.getRow(currentRow).height = 22;
+      currentRow++;
+      
+      Object.entries(deptStats).sort((a, b) => b[1].planned - a[1].planned).forEach(([dept, stats], idx) => {
+        const rate = stats.planned > 0 ? Math.round((stats.completed / stats.planned) * 100) : 0;
+        const bgColor = idx % 2 === 0 ? 'FFFFFFFF' : 'FFF9FAFB';
+        const rateColor = rate >= 90 ? 'FF16A34A' : rate >= 70 ? 'FF9A3412' : rate >= 50 ? 'FFDC2626' : 'FFDC2626';
+        const rateBgColor = rate >= 90 ? 'FFD1FAE5' : rate >= 70 ? 'FFFEF9C3' : rate >= 50 ? 'FFFED7AA' : 'FFFEE2E2';
+        
+        [dept, stats.planned, stats.completed, stats.overdue, `${rate}%`].forEach((val, colIdx) => {
+          const cell = worksheet.getCell(currentRow, colIdx + 1);
+          cell.value = val;
+          cell.font = { size: 10, name: 'Arial', color: { argb: colIdx === 4 ? rateColor : (colIdx === 3 && stats.overdue > 10 ? 'FFDC2626' : 'FF2C3E50') }, bold: colIdx === 3 && stats.overdue > 10 };
+          cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: colIdx === 4 ? rateBgColor : bgColor } };
+          cell.alignment = { horizontal: colIdx === 0 ? 'left' : 'center', vertical: 'middle' };
+          cell.border = { 
+            top: { style: 'thin', color: { argb: 'FFE1E8ED' } },
+            left: { style: 'thin', color: { argb: 'FFE1E8ED' } },
+            bottom: { style: 'thin', color: { argb: 'FFE1E8ED' } },
+            right: { style: 'thin', color: { argb: 'FFE1E8ED' } }
+          };
+        });
+        currentRow++;
+      });
+      currentRow += 2;
+      
+      worksheet.mergeCells(`A${currentRow}:D${currentRow}`);
+      const freqHeader = worksheet.getCell(`A${currentRow}`);
+      freqHeader.value = 'FREQUENCY ANALYSIS';
+      freqHeader.font = { bold: true, size: 11, color: { argb: 'FF1E3A8A' }, name: 'Arial' };
+      freqHeader.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFDBEAFE' } };
+      freqHeader.border = { bottom: { style: 'medium', color: { argb: 'FF1E3A8A' } } };
+      worksheet.getRow(currentRow).height = 22;
+      currentRow++;
+      
+      const freqTableHeaders = ['Frequency', 'Count', 'Completed', 'Completion %'];
+      freqTableHeaders.forEach((header, idx) => {
+        const cell = worksheet.getCell(currentRow, idx + 1);
+        cell.value = header;
+        cell.font = { bold: true, size: 10, color: { argb: 'FFFFFFFF' }, name: 'Arial' };
+        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF93C5FD' } };
+        cell.alignment = { horizontal: 'center', vertical: 'middle' };
+        cell.border = { 
+          top: { style: 'thin', color: { argb: 'FFFFFFFF' } },
+          left: { style: 'thin', color: { argb: 'FFFFFFFF' } },
+          bottom: { style: 'thin', color: { argb: 'FFFFFFFF' } },
+          right: { style: 'thin', color: { argb: 'FFFFFFFF' } }
+        };
+      });
+      worksheet.getRow(currentRow).height = 22;
+      currentRow++;
+      
+      Object.entries(freqStats).filter(([_, stats]) => stats.count > 0).forEach(([freq, stats], idx) => {
+        const rate = stats.count > 0 ? Math.round((stats.completed / stats.count) * 100) : 0;
+        const bgColor = idx % 2 === 0 ? 'FFFFFFFF' : 'FFF9FAFB';
+        const rateColor = rate >= 90 ? 'FF16A34A' : rate >= 70 ? 'FF9A3412' : rate >= 50 ? 'FFDC2626' : 'FFDC2626';
+        const rateBgColor = rate >= 90 ? 'FFD1FAE5' : rate >= 70 ? 'FFFEF9C3' : rate >= 50 ? 'FFFED7AA' : 'FFFEE2E2';
+        
+        [freq, stats.count, stats.completed, `${rate}%`].forEach((val, colIdx) => {
+          const cell = worksheet.getCell(currentRow, colIdx + 1);
+          cell.value = val;
+          cell.font = { size: 10, name: 'Arial', color: { argb: colIdx === 3 ? rateColor : 'FF2C3E50' } };
+          cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: colIdx === 3 ? rateBgColor : bgColor } };
+          cell.alignment = { horizontal: colIdx === 0 ? 'left' : 'center', vertical: 'middle' };
+          cell.border = { 
+            top: { style: 'thin', color: { argb: 'FFE1E8ED' } },
+            left: { style: 'thin', color: { argb: 'FFE1E8ED' } },
+            bottom: { style: 'thin', color: { argb: 'FFE1E8ED' } },
+            right: { style: 'thin', color: { argb: 'FFE1E8ED' } }
+          };
+        });
+        currentRow++;
+      });
+      currentRow += 2;
+      
+      worksheet.mergeCells(`A${currentRow}:B${currentRow}`);
+      const mhHeader = worksheet.getCell(`A${currentRow}`);
+      mhHeader.value = 'MAN-HOURS SUMMARY';
+      mhHeader.font = { bold: true, size: 11, color: { argb: 'FF1E3A8A' }, name: 'Arial' };
+      mhHeader.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFDBEAFE' } };
+      mhHeader.border = { bottom: { style: 'medium', color: { argb: 'FF1E3A8A' } } };
+      worksheet.getRow(currentRow).height = 22;
+      currentRow++;
+      
+      ['Metric', 'Value'].forEach((header, idx) => {
+        const cell = worksheet.getCell(currentRow, idx + 1);
+        cell.value = header;
+        cell.font = { bold: true, size: 10, color: { argb: 'FFFFFFFF' }, name: 'Arial' };
+        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF93C5FD' } };
+        cell.alignment = { horizontal: 'center', vertical: 'middle' };
+        cell.border = { 
+          top: { style: 'thin', color: { argb: 'FFFFFFFF' } },
+          left: { style: 'thin', color: { argb: 'FFFFFFFF' } },
+          bottom: { style: 'thin', color: { argb: 'FFFFFFFF' } },
+          right: { style: 'thin', color: { argb: 'FFFFFFFF' } }
+        };
+      });
+      worksheet.getRow(currentRow).height = 22;
+      currentRow++;
+      
+      const avgHoursPerJob = totalCompleted > 0 ? (totalManHours / totalCompleted).toFixed(1) : '0';
+      const mhData = [
+        { metric: 'Total Man-Hours Used', value: totalManHours.toFixed(1) },
+        { metric: 'Average per Job', value: avgHoursPerJob },
+        ...Object.entries(manHoursByDept).map(([dept, hours]) => ({ metric: `By ${dept}`, value: hours.toFixed(1) }))
+      ];
+      
+      mhData.forEach((row, idx) => {
+        const bgColor = idx % 2 === 0 ? 'FFFFFFFF' : 'FFF9FAFB';
+        [row.metric, row.value].forEach((val, colIdx) => {
+          const cell = worksheet.getCell(currentRow, colIdx + 1);
+          cell.value = val;
+          cell.font = { size: 10, name: 'Arial', color: { argb: 'FF2C3E50' } };
+          cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: bgColor } };
+          cell.alignment = { horizontal: colIdx === 0 ? 'left' : 'center', vertical: 'middle' };
+          cell.border = { 
+            top: { style: 'thin', color: { argb: 'FFE1E8ED' } },
+            left: { style: 'thin', color: { argb: 'FFE1E8ED' } },
+            bottom: { style: 'thin', color: { argb: 'FFE1E8ED' } },
+            right: { style: 'thin', color: { argb: 'FFE1E8ED' } }
+          };
+        });
+        currentRow++;
+      });
+      currentRow += 2;
+      
+      worksheet.mergeCells(`A${currentRow}:D${currentRow}`);
+      const critHeader = worksheet.getCell(`A${currentRow}`);
+      critHeader.value = 'CRITICAL EQUIPMENT STATUS';
+      critHeader.font = { bold: true, size: 11, color: { argb: 'FF1E3A8A' }, name: 'Arial' };
+      critHeader.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFDBEAFE' } };
+      critHeader.border = { bottom: { style: 'medium', color: { argb: 'FF1E3A8A' } } };
+      worksheet.getRow(currentRow).height = 22;
+      currentRow++;
+      
+      ['Type', 'Total', 'Completed', 'Overdue'].forEach((header, idx) => {
+        const cell = worksheet.getCell(currentRow, idx + 1);
+        cell.value = header;
+        cell.font = { bold: true, size: 10, color: { argb: 'FFFFFFFF' }, name: 'Arial' };
+        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF93C5FD' } };
+        cell.alignment = { horizontal: 'center', vertical: 'middle' };
+        cell.border = { 
+          top: { style: 'thin', color: { argb: 'FFFFFFFF' } },
+          left: { style: 'thin', color: { argb: 'FFFFFFFF' } },
+          bottom: { style: 'thin', color: { argb: 'FFFFFFFF' } },
+          right: { style: 'thin', color: { argb: 'FFFFFFFF' } }
+        };
+      });
+      worksheet.getRow(currentRow).height = 22;
+      currentRow++;
+      
+      const critData = [
+        { type: 'SOLAS Critical', ...criticalEquipStats.solas },
+        { type: 'Class Critical', ...criticalEquipStats.classCritical },
+        { type: 'High Priority', ...criticalEquipStats.highPriority }
+      ];
+      
+      critData.forEach((row, idx) => {
+        const bgColor = idx % 2 === 0 ? 'FFFFFFFF' : 'FFF9FAFB';
+        [row.type, row.total, row.completed, row.overdue].forEach((val, colIdx) => {
+          const cell = worksheet.getCell(currentRow, colIdx + 1);
+          cell.value = val;
+          cell.font = { size: 10, name: 'Arial', color: { argb: colIdx === 3 && row.overdue > 0 ? 'FFDC2626' : 'FF2C3E50' }, bold: colIdx === 3 && row.overdue > 0 };
+          cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: bgColor } };
+          cell.alignment = { horizontal: colIdx === 0 ? 'left' : 'center', vertical: 'middle' };
+          cell.border = { 
+            top: { style: 'thin', color: { argb: 'FFE1E8ED' } },
+            left: { style: 'thin', color: { argb: 'FFE1E8ED' } },
+            bottom: { style: 'thin', color: { argb: 'FFE1E8ED' } },
+            right: { style: 'thin', color: { argb: 'FFE1E8ED' } }
+          };
+        });
+        currentRow++;
+      });
+      
+      worksheet.pageSetup = {
+        orientation: 'portrait',
+        paperSize: 9,
+        fitToPage: true,
+        fitToWidth: 1,
+        fitToHeight: 0,
+        margins: { left: 0.5, right: 0.5, top: 0.5, bottom: 0.5, header: 0.3, footer: 0.3 }
+      };
+      
+      worksheet.headerFooter = {
+        oddFooter: `&L&8&"Arial"Confidential - ${vesselName}&C&8&"Arial"Page &P of &N&R&8&"Arial"Generated: &D &T`
+      };
+      
+      const buffer = await workbook.xlsx.writeBuffer();
+      const safeVesselName = vesselName.replace(/[^a-zA-Z0-9]/g, '_');
+      const filename = `PMS_MonthlySummary_${safeVesselName}_${periodStart.getFullYear()}${(periodStart.getMonth()+1).toString().padStart(2,'0')}.xlsx`;
+      
+      console.log(`[MONTHLY SUMMARY REPORT] Generated: ${filename} (Period: ${reportPeriod})`);
+      
+      res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+      res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+      res.send(buffer);
+      
+    } catch (error: any) {
+      console.error("Error generating Monthly Maintenance Summary report:", error);
+      res.status(500).json({ error: "Failed to generate report: " + error.message });
+    }
+  });
+
   const httpServer = createServer(app);
   
   // Recalculate recurring defects on startup (don't await - let it run in background)
