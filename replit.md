@@ -72,6 +72,7 @@ The application employs a modern full-stack architecture with a mobile-first, re
 - **Database Migration Strategy**: Exclusively uses Drizzle file-based SQL migrations.
 - **Vessel Data Source Strategy**: Employs a unified `useVessels()` hook prioritizing local PMS data with fallback to an external master-data API.
 - **ROB Location Stock Synchronization**: Implemented dual-write synchronization between legacy ROB fields and the normalized `spare_location_stock` table for consistent inventory.
+- **Excel Report Standardization**: All Maintenance & Work Order Excel exports use a standardized 18-column template (`STANDARD_WORK_ORDER_COLUMNS` in `server/lib/excelReportStyles.ts`) with status-based full-row highlighting. Color scheme: Light/Dark Orange (due), Light/Dark Red (overdue), Light/Dark Green (completed), Light/Dark Yellow (unplanned), Light/Dark Blue (postponed). Critical Equipment rows use darker color variants. Key rules: Days Left vs Days Overdue are mutually exclusive (show "-" for the other); Running Hours columns show "-" for Calendar-based jobs.
 
 ## External Dependencies
 *   **Frontend**: `@radix-ui/*`, `@tanstack/react-query`, `wouter`, `tailwindcss`, `lucide-react`

@@ -50,9 +50,13 @@ export const STATUS_COLORS = {
   completedLight: 'FF90EE90',  // Light Green #90EE90 - Completed Jobs (non-critical)
   completedDark: 'FF228B22',   // Dark Green (Forest Green) #228B22 - Completed Jobs (critical equipment)
   
-  // Special Status Colors
-  unplanned: 'FFFFFF00',       // Yellow #FFFF00 - Unplanned/Breakdown Jobs
-  postponed: 'FF87CEEB',       // Sky Blue #87CEEB - Postponed Jobs
+  // Unplanned/Breakdown Jobs (Yellow variants)
+  unplannedLight: 'FFFFFFB3',  // Light Yellow #FFFFB3 - Unplanned Jobs (non-critical)
+  unplannedDark: 'FFFFD700',   // Gold Yellow #FFD700 - Unplanned Jobs (critical equipment)
+  
+  // Postponed Jobs (Sky Blue variants)
+  postponedLight: 'FFB0E0E6',  // Powder Blue #B0E0E6 - Postponed Jobs (non-critical)
+  postponedDark: 'FF4682B4',   // Steel Blue #4682B4 - Postponed Jobs (critical equipment)
   
   // Text colors for dark backgrounds (need white text)
   textOnDark: 'FFFFFFFF',      // White text for dark backgrounds
@@ -537,13 +541,13 @@ export function getStatusRowColors(status: WorkOrderStatus, isCriticalEquipment:
       };
     case 'unplanned':
       return {
-        bgColor: STATUS_COLORS.unplanned,
-        textColor: STATUS_COLORS.textOnLight
+        bgColor: isCriticalEquipment ? STATUS_COLORS.unplannedDark : STATUS_COLORS.unplannedLight,
+        textColor: isCriticalEquipment ? STATUS_COLORS.textOnDark : STATUS_COLORS.textOnLight
       };
     case 'postponed':
       return {
-        bgColor: STATUS_COLORS.postponed,
-        textColor: STATUS_COLORS.textOnLight
+        bgColor: isCriticalEquipment ? STATUS_COLORS.postponedDark : STATUS_COLORS.postponedLight,
+        textColor: isCriticalEquipment ? STATUS_COLORS.textOnDark : STATUS_COLORS.textOnLight
       };
     case 'active':
     default:
