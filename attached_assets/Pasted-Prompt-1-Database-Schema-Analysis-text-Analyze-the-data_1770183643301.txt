@@ -1,0 +1,58 @@
+Prompt 1 - Database Schema Analysis:
+
+text
+Analyze the database schema for the PMS (Planned Maintenance System) module. I need to understand:
+
+1. All database tables/collections related to work orders, components, and maintenance tracking
+2. Complete field list for each table with data types
+3. Relationships between tables (foreign keys, references)
+4. Any fields related to dates, status, priorities, criticality, postponements, breakdowns/unplanned jobs
+
+Focus on tables for:
+- Work Orders
+- Components/Equipment
+- Running Hours
+- Work completion records
+- Job history/audit trails
+- Crew/personnel assignments
+
+Please provide the complete schema structure without modifying any code.
+Prompt 2 - Work Order Data Model:
+
+text
+Show me the complete data model/interface/type definition for Work Orders. I need to see:
+
+1. All fields in the work order object
+2. Status values (planned, due, overdue, completed, pending approval, etc.)
+3. Priority levels
+4. Task types
+5. Any fields for tracking:
+   - Due dates and next due dates
+   - Postponement information (reason, approver, new date)
+   - Breakdown/unplanned job indicators
+   - Completion dates and actual vs planned hours
+   - Critical equipment flags
+
+Do not modify any code, just show me the existing structure.
+Prompt 3 - Reports Requirements:
+
+text
+For the 10 maintenance reports defined in the system:
+1. Due Jobs (7 days)
+2. Overdue Jobs
+3. Completed Jobs Register
+4. Monthly Maintenance Summary
+5. Critical Equipment Status
+6. Unplanned/Breakdown Jobs
+7. Job Postponement Log
+8. Work Priority Performance
+9. Man-Hours Planned vs Actual
+10. Crew Workload Distribution
+
+For each report, tell me:
+- What database queries/filters would be needed
+- Which fields from work orders, components, and related tables are required
+- Any aggregations or calculations needed (counts, sums, averages)
+- Date range filtering requirements
+
+Do not write any code, just analyze what data each report would need.
