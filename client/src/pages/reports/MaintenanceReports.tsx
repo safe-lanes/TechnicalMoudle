@@ -61,8 +61,6 @@ const MaintenanceReports: React.FC<MaintenanceReportsProps> = ({ onBack, globalF
     vessel: globalFilters?.vessel || "all",
     dateRange: globalFilters?.dateRange || { from: null, to: null }
   });
-  const [selectedFrequency, setSelectedFrequency] = useState<string>("all");
-  const [selectedPriority, setSelectedPriority] = useState<string>("all");
   const [generatingReports, setGeneratingReports] = useState<Set<string>>(new Set());
   const { toast } = useToast();
   const { data: vessels = [] } = useVessels();
@@ -239,12 +237,7 @@ const MaintenanceReports: React.FC<MaintenanceReportsProps> = ({ onBack, globalF
                          report.description.toLowerCase().includes(categoryFilters.searchQuery.toLowerCase()) ||
                          report.purpose.toLowerCase().includes(categoryFilters.searchQuery.toLowerCase());
     
-    const matchesFrequency = selectedFrequency === "all" || 
-                           report.frequency.toLowerCase().includes(selectedFrequency.toLowerCase());
-    
-    const matchesPriority = selectedPriority === "all" || report.priority === selectedPriority;
-    
-    return matchesSearch && matchesFrequency && matchesPriority;
+    return matchesSearch;
   });
 
   const getPriorityColor = (priority: string) => {
@@ -1028,31 +1021,6 @@ const MaintenanceReports: React.FC<MaintenanceReportsProps> = ({ onBack, globalF
           searchPlaceholder="Search maintenance reports..."
         />
 
-        <div className="flex gap-4 items-center mt-3">
-          <Select value={selectedFrequency} onValueChange={setSelectedFrequency}>
-            <SelectTrigger className="w-48" data-testid="select-frequency-filter">
-              <SelectValue placeholder="Filter by frequency" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Frequencies</SelectItem>
-              <SelectItem value="daily">Daily</SelectItem>
-              <SelectItem value="weekly">Weekly</SelectItem>
-              <SelectItem value="monthly">Monthly</SelectItem>
-            </SelectContent>
-          </Select>
-
-          <Select value={selectedPriority} onValueChange={setSelectedPriority}>
-            <SelectTrigger className="w-48" data-testid="select-priority-filter">
-              <SelectValue placeholder="Filter by priority" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Priorities</SelectItem>
-              <SelectItem value="high">High Priority</SelectItem>
-              <SelectItem value="medium">Medium Priority</SelectItem>
-              <SelectItem value="low">Low Priority</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">

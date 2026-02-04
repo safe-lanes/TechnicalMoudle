@@ -57,7 +57,6 @@ const ComplianceReports: React.FC<ComplianceReportsProps> = ({ onBack, globalFil
     vessel: globalFilters?.vessel || "all",
     dateRange: globalFilters?.dateRange || { from: null, to: null }
   });
-  const [selectedPriority, setSelectedPriority] = useState<string>("all");
   const [generatingReports, setGeneratingReports] = useState<Set<string>>(new Set());
   const { toast } = useToast();
   const { data: vessels = [] } = useVessels();
@@ -143,8 +142,7 @@ const ComplianceReports: React.FC<ComplianceReportsProps> = ({ onBack, globalFil
   const filteredReports = reports.filter(report => {
     const matchesSearch = report.name.toLowerCase().includes(categoryFilters.searchQuery.toLowerCase()) ||
                          report.description.toLowerCase().includes(categoryFilters.searchQuery.toLowerCase());
-    const matchesPriority = selectedPriority === "all" || report.priority === selectedPriority;
-    return matchesSearch && matchesPriority;
+    return matchesSearch;
   });
 
   const getPriorityColor = (priority: string) => {
@@ -423,20 +421,6 @@ const ComplianceReports: React.FC<ComplianceReportsProps> = ({ onBack, globalFil
           onFiltersChange={setCategoryFilters}
           searchPlaceholder="Search compliance reports..."
         />
-
-        <div className="flex gap-4 items-center mt-3">
-          <Select value={selectedPriority} onValueChange={setSelectedPriority}>
-            <SelectTrigger className="w-48" data-testid="select-priority-filter">
-              <SelectValue placeholder="Filter by priority" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Priorities</SelectItem>
-              <SelectItem value="high">High Priority</SelectItem>
-              <SelectItem value="medium">Medium Priority</SelectItem>
-              <SelectItem value="low">Low Priority</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">

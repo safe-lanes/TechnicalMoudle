@@ -62,7 +62,6 @@ const AlertsApprovalsAdminReports: React.FC<AlertsApprovalsAdminReportsProps> = 
     vessel: globalFilters?.vessel || "all",
     dateRange: globalFilters?.dateRange || { from: null, to: null }
   });
-  const [selectedType, setSelectedType] = useState<string>("all");
   const [generatingReports, setGeneratingReports] = useState<Set<string>>(new Set());
   const { toast } = useToast();
   const { data: vessels = [] } = useVessels();
@@ -165,8 +164,7 @@ const AlertsApprovalsAdminReports: React.FC<AlertsApprovalsAdminReportsProps> = 
   const filteredReports = reports.filter(report => {
     const matchesSearch = report.name.toLowerCase().includes(categoryFilters.searchQuery.toLowerCase()) ||
                          report.description.toLowerCase().includes(categoryFilters.searchQuery.toLowerCase());
-    const matchesType = selectedType === "all" || report.reportType === selectedType;
-    return matchesSearch && matchesType;
+    return matchesSearch;
   });
 
   const getPriorityColor = (priority: string) => {
@@ -389,20 +387,6 @@ const AlertsApprovalsAdminReports: React.FC<AlertsApprovalsAdminReportsProps> = 
           onFiltersChange={setCategoryFilters}
           searchPlaceholder="Search admin reports..."
         />
-
-        <div className="flex gap-4 items-center mt-3">
-          <Select value={selectedType} onValueChange={setSelectedType}>
-            <SelectTrigger className="w-48" data-testid="select-type-filter">
-              <SelectValue placeholder="Filter by type" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Types</SelectItem>
-              <SelectItem value="alerts">Alerts</SelectItem>
-              <SelectItem value="approvals">Approvals</SelectItem>
-              <SelectItem value="admin">Admin</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">

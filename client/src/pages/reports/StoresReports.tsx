@@ -58,7 +58,6 @@ const StoresReports: React.FC<StoresReportsProps> = ({ onBack, globalFilters }) 
     vessel: globalFilters?.vessel || "all",
     dateRange: globalFilters?.dateRange || { from: null, to: null }
   });
-  const [selectedCategory, setSelectedCategory] = useState<string>("all");
   const [generatingReports, setGeneratingReports] = useState<Set<string>>(new Set());
   const { toast } = useToast();
   const { data: vessels = [] } = useVessels();
@@ -144,8 +143,7 @@ const StoresReports: React.FC<StoresReportsProps> = ({ onBack, globalFilters }) 
   const filteredReports = reports.filter(report => {
     const matchesSearch = report.name.toLowerCase().includes(categoryFilters.searchQuery.toLowerCase()) ||
                          report.description.toLowerCase().includes(categoryFilters.searchQuery.toLowerCase());
-    const matchesCategory = selectedCategory === "all" || report.category === selectedCategory;
-    return matchesSearch && matchesCategory;
+    return matchesSearch;
   });
 
   const getPriorityColor = (priority: string) => {
@@ -403,20 +401,6 @@ const StoresReports: React.FC<StoresReportsProps> = ({ onBack, globalFilters }) 
           onFiltersChange={setCategoryFilters}
           searchPlaceholder="Search stores reports..."
         />
-
-        <div className="flex gap-4 items-center mt-3">
-          <Select value={selectedCategory} onValueChange={setSelectedCategory}>
-            <SelectTrigger className="w-48" data-testid="select-category-filter">
-              <SelectValue placeholder="Filter by category" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Categories</SelectItem>
-              <SelectItem value="stores">Stores</SelectItem>
-              <SelectItem value="lubes">Lubricants</SelectItem>
-              <SelectItem value="chemicals">Chemicals</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
