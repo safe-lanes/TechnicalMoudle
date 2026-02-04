@@ -11399,8 +11399,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       applyStandardDataRows(worksheet, preparedData, columns, dataStartRow, conditionalStyles);
       
       // Apply special formatting for Days Overdue column (column H = column 8)
-      // >30 days: Bold red text (#F5222D)
-      // 7-30 days: Bold orange text (#FAAD14)
+      // Uses palette constants from COLORS - never hardcoded RGB values
       const daysOverdueColIndex = 8; // Days Overdue is column H (8th column)
       const criticalColIndex = 14; // Critical Equip is column N (14th column)
       
@@ -11408,18 +11407,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const rowNum = dataStartRow + i;
         const row = preparedData[i];
         
-        // Format Days Overdue column based on value
+        // Format Days Overdue column based on value - uses COLORS palette
         const daysCell = worksheet.getCell(rowNum, daysOverdueColIndex);
         if (row._daysOverdue > 30) {
-          daysCell.font = { bold: true, color: { argb: 'FFF5222D' } }; // Red
+          daysCell.font = { bold: true, color: { argb: COLORS.danger } }; // Red from palette
         } else if (row._daysOverdue > 7) {
-          daysCell.font = { bold: true, color: { argb: 'FFFAAD14' } }; // Orange
+          daysCell.font = { bold: true, color: { argb: COLORS.warning } }; // Orange from palette
         }
         
-        // Format Critical Equipment column - bold red if YES
+        // Format Critical Equipment column - bold red if YES (uses palette)
         if (row._isCriticalEquipment) {
           const critCell = worksheet.getCell(rowNum, criticalColIndex);
-          critCell.font = { bold: true, color: { argb: 'FFF5222D' } };
+          critCell.font = { bold: true, color: { argb: COLORS.danger } };
         }
       }
       
