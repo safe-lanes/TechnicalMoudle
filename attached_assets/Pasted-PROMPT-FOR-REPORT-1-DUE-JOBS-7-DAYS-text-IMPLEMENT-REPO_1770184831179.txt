@@ -1,0 +1,130 @@
+PROMPT FOR REPORT #1: DUE JOBS (7 DAYS)
+text
+IMPLEMENT REPORT: Due Jobs (7 Days) - Excel Export
+
+REPORT PURPOSE:
+Generate an Excel report showing all work orders that are due within the next 7 days. This report is used for weekly planning and toolbox meetings.
+
+STEP 1 - CREATE BACKEND API ENDPOINT:
+
+Location: Create or update the reports API endpoint
+Route: POST /api/pms/reports/due-jobs-7-days
+Request Body: {
+  vesselId: string,
+  dateRange?: { start: Date, end: Date }  // Optional, default to next 7 days
+}
+
+STEP 2 - DATABASE QUERY LOGIC:
+
+Query the following tables with JOINS:
+1. work_orders (main table)
+2. components (JOIN on work_orders.componentCode = components.componentCode)
+3. jobs (JOIN on work_orders.jobId = jobs.id)
+4. users (JOIN on work_orders.assignedTo = users.id)
+
+FILTERING CRITERIA (Include work orders that meet ANY of these):
+A. Calendar-based due: 
+   - work_orders.maintenanceBasis = 'Calendar' OR 'Calendar+RH'
+   - work_orders.dueDate <= (TODAY + 7 days)
+   - work_orders.dueDate >= TODAY
+   - work_orders.status NOT IN ('Completed', 'Postponed')
+
+B. Running Hours-based due:
+   - work_orders.maintenanceBasis = 'Running Hours' OR 'Calendar+RH'
+   - (jobs.nextDueReading - components.currentCumulativeRH) <= 168 hours
+   - (jobs.nextDueReading - components.currentCumulativeRH) >= 0
+   - work_orders.status NOT IN ('Completed', 'Postponed')
+
+STEP 3 - CALCULATE DERIVED FIELDS:
+
+For each work order, calculate:
+1. daysRemaining = Math.ceil((work_orders.dueDate - TODAY) / (1000 * 60 * 60 * 24))
+2. hoursRemaining = jobs.nextDueReading - components.currentCumulativeRH
+3. urgencyScore = (for sorting: lower = more urgent)
+   - If calendar: daysRemaining
+   - If RH: hoursRemaining / 24
+   - If both: MIN(daysRemaining, hoursRemaining/24)
+
+STEP 4 - EXCEL FILE STRUCTURE:
+
+Use a library like 'exceljs' to create the Excel file.
+
+SHEET 1 - "Due Jobs (7 Days)":
+
+HEADER ROW (Row 1 - Bold, Background Color: #4472C4, White Text):
+| A: S.No | B: Work Order No | C: Job Title | D: Component Code | E: Component Name | F: Due Date | G: Days Remaining | H: Next Due Reading (RH) | I: Current Reading (RH) | J: RH Remaining | K: Maintenance Basis | L: Frequency | M: Assigned To | N: Priority | O: Department | P: Critical |
+
+DATA ROWS (Starting Row 2):
+For each work order in results:
+- Column A: Row number (1, 2, 3...)
+- Column B: work_orders.workOrderNo
+- Column C: work_orders.jobTitle
+- Column D: work_orders.componentCode
+- Column E: components.name
+- Column F: work_orders.dueDate (Format: DD-MMM-YYYY, e.g., "11-Feb-2026")
+- Column G: daysRemaining (Number, e.g., 5)
+- Column H: jobs.nextDueReading (Number, e.g., 5000)
+- Column I: components.currentCumulativeRH (Number, e.g., 4800)
+- Column J: hoursRemaining (Number, e.g., 200)
+- Column K: work_orders.maintenanceBasis (Text: "Calendar" or "Running Hours" or "Calendar+RH")
+- Column L: jobs.frequencyValue + " " + jobs.frequencyUnit (e.g., "3 Months" or "500 Hours")
+- Column M: users.fullName (or work_orders.assignedTo if user not found)
+- Column N: work_orders.jobPriority (Text: "Low", "Medium", "High", "Critical")
+- Column O: work_orders.department (Text: "Engine", "Deck", etc.)
+- Column P: "Yes" if components.critical = true, else "No"
+
+CONDITIONAL FORMATTING:
+- If daysRemaining <= 2: Highlight entire row with light red background (#FFE6E6)
+- If priority = "Critical": Make Column N bold and red text (#FF0000)
+- If critical = "Yes": Make Column P bold and red text (#FF0000)
+
+SUMMARY ROW (After all data, skip 1 row):
+- Column A: "TOTAL JOBS:"
+- Column B: Count of all jobs
+- Column C: Leave blank
+- Make this row bold
+
+COLUMN WIDTHS:
+A: 8, B: 20, C: 35, D: 15, E: 30, F: 15, G: 12, H: 18, I: 16, J: 12, K: 18, L: 15, M: 20, N: 12, O: 15, P: 10
+
+SORTING:
+Sort data by urgencyScore ASC (most urgent first), then by priority DESC (Critical > High > Medium > Low)
+
+STEP 5 - RESPONSE:
+
+Return the Excel file as a downloadable attachment:
+- Content-Type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+- Filename: `Due_Jobs_7_Days_${vesselName}_${YYYYMMDD}.xlsx`
+- Set appropriate headers for download
+
+STEP 6 - CONNECT TO FRONTEND:
+
+The report download should trigger when user clicks the download icon on the Reports page for "Due Jobs (7 days)" report.
+
+Hook into the existing download button action with the report ID or name.
+
+ERROR HANDLING:
+- If no vessel selected: Return error "Please select a vessel"
+- If no data found: Create Excel with headers only and add a row saying "No jobs due in the next 7 days"
+- If database error: Return 500 with error message
+
+TESTING CHECKLIST:
+□ API endpoint returns 200 status
+□ Excel file downloads correctly
+□ All columns populated with correct data
+□ Date formatting is correct (DD-MMM-YYYY)
+□ Conditional formatting works (red highlights)
+□ Sorting is correct (urgent jobs first)
+□ Summary row shows correct count
+□ Filename includes vessel name and date
+□ Works with empty data (no jobs due)
+□ Calendar-based jobs included correctly
+□ Running hours-based jobs included correctly
+
+DO NOT:
+- Do not modify any existing work order data in the database
+- Do not alter the database schema
+- Do not change the UI components yet (only backend for now)
+- Do not include completed or postponed jobs
+
+Please implement this report generation endpoint now.
