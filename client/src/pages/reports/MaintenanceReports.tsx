@@ -293,11 +293,12 @@ const MaintenanceReports: React.FC<MaintenanceReportsProps> = ({ onBack, globalF
         const columns = [
           { header: 'Priority', field: 'priority', width: 22 },
           { header: 'Status', field: 'statusIndicator', width: 22 },
-          { header: 'WO Number', field: 'workOrderNumber', width: 50 },
-          { header: 'Title', field: 'title', width: 80 },
-          { header: 'Component', field: 'component', width: 55 },
-          { header: 'Due Date', field: 'formattedDueDate', width: 28 },
-          { header: 'Days Left', field: 'daysRemaining', width: 22 }
+          { header: 'WO Number', field: 'workOrderNumber', width: 45 },
+          { header: 'Title', field: 'title', width: 70 },
+          { header: 'Component', field: 'component', width: 50 },
+          { header: 'Due Date', field: 'formattedDueDate', width: 26 },
+          { header: 'Days Left', field: 'daysRemaining', width: 20 },
+          { header: 'Assigned To', field: 'assignedTo', width: 35 }
         ];
 
         // Sort by days remaining (most urgent first)
@@ -317,7 +318,8 @@ const MaintenanceReports: React.FC<MaintenanceReportsProps> = ({ onBack, globalF
             priority: wo.priority || wo.jobPriority || 'Normal',
             formattedDueDate: formatDate(wo.dueDate),
             statusIndicator: calculateStatus(dueDate),
-            daysRemaining: days
+            daysRemaining: days,
+            assignedTo: wo.assignedTo || wo.assignee || wo.responsibleRank || '-'
           };
         });
 
