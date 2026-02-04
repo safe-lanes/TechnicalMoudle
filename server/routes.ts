@@ -10746,30 +10746,45 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.log(`📊 [DUE JOBS REPORT] Total Components Fetched: ${components.length}`);
       
       // Helper to parse dates - supports multiple formats
-      const parseDate = (dateStr: string | null | undefined): Date | null => {
-        if (!dateStr) return null;
-        const MONTH_NAMES: { [key: string]: number } = {
-          'Jan': 0, 'Feb': 1, 'Mar': 2, 'Apr': 3, 'May': 4, 'Jun': 5,
-          'Jul': 6, 'Aug': 7, 'Sep': 8, 'Oct': 9, 'Nov': 10, 'Dec': 11
-        };
+      // CRITICAL: Must handle ISO format (YYYY-MM-DD) before DD-MM-YYYY to avoid misinterpretation
+      const MONTH_NAMES: { [key: string]: number } = {
+        'Jan': 0, 'Feb': 1, 'Mar': 2, 'Apr': 3, 'May': 4, 'Jun': 5,
+        'Jul': 6, 'Aug': 7, 'Sep': 8, 'Oct': 9, 'Nov': 10, 'Dec': 11
+      };
+      
+      const parseDate = (dateInput: string | Date | null | undefined): Date | null => {
+        if (!dateInput) return null;
+        
+        // Handle Date objects directly
+        if (dateInput instanceof Date) {
+          return isNaN(dateInput.getTime()) ? null : dateInput;
+        }
+        
+        const dateStr = String(dateInput);
+        
+        // Check for ISO format FIRST: YYYY-MM-DD (e.g., "2026-01-10")
+        const isoMatch = dateStr.match(/^(\d{4})-(\d{2})-(\d{2})/);
+        if (isoMatch) {
+          const year = parseInt(isoMatch[1], 10);
+          const month = parseInt(isoMatch[2], 10) - 1;
+          const day = parseInt(isoMatch[3], 10);
+          return new Date(year, month, day);
+        }
+        
         // Try DD-MMM-YYYY format (e.g., "15-Feb-2026")
         const parts = dateStr.split('-');
         if (parts.length === 3) {
           const day = parseInt(parts[0], 10);
           const month = MONTH_NAMES[parts[1]];
           const year = parseInt(parts[2], 10);
-          if (!isNaN(day) && month !== undefined && !isNaN(year)) {
+          if (!isNaN(day) && month !== undefined && !isNaN(year) && year > 1900) {
             return new Date(year, month, day);
           }
-          // Try DD-MM-YYYY format
-          const monthNum = parseInt(parts[1], 10) - 1;
-          if (!isNaN(day) && !isNaN(monthNum) && !isNaN(year)) {
-            return new Date(year, monthNum, day);
-          }
         }
-        // Try ISO format
-        const isoDate = new Date(dateStr);
-        return isNaN(isoDate.getTime()) ? null : isoDate;
+        
+        // Fallback: try native Date parsing
+        const parsed = new Date(dateStr);
+        return isNaN(parsed.getTime()) ? null : parsed;
       };
       
       // Helper to parse RH values
@@ -11125,28 +11140,49 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.log(`[OVERDUE JOBS REPORT] Using computeWorkOrderStatus() for consistent filtering`);
       
       // Helper to parse dates for calculating days past due
+      // CRITICAL: Must handle multiple date formats:
+      // 1. Date objects from database
+      // 2. ISO format: "2026-01-10" (YYYY-MM-DD)
+      // 3. DD-MMM-YYYY format: "10-Jan-2026"
       const MONTH_NAMES: { [key: string]: number } = {
         'Jan': 0, 'Feb': 1, 'Mar': 2, 'Apr': 3, 'May': 4, 'Jun': 5,
         'Jul': 6, 'Aug': 7, 'Sep': 8, 'Oct': 9, 'Nov': 10, 'Dec': 11
       };
       
-      const parseDate = (dateStr: string | null | undefined): Date | null => {
-        if (!dateStr) return null;
+      const parseDate = (dateInput: string | Date | null | undefined): Date | null => {
+        if (!dateInput) return null;
+        
+        // Handle Date objects directly
+        if (dateInput instanceof Date) {
+          return isNaN(dateInput.getTime()) ? null : dateInput;
+        }
+        
+        const dateStr = String(dateInput);
+        
+        // Check for ISO format FIRST: YYYY-MM-DD (e.g., "2026-01-10")
+        // ISO format has 4-digit year at the start
+        const isoMatch = dateStr.match(/^(\d{4})-(\d{2})-(\d{2})/);
+        if (isoMatch) {
+          const year = parseInt(isoMatch[1], 10);
+          const month = parseInt(isoMatch[2], 10) - 1; // months are 0-indexed
+          const day = parseInt(isoMatch[3], 10);
+          return new Date(year, month, day);
+        }
+        
+        // Try DD-MMM-YYYY format (e.g., "10-Jan-2026")
         const parts = dateStr.split('-');
         if (parts.length === 3) {
           const day = parseInt(parts[0], 10);
           const month = MONTH_NAMES[parts[1]];
           const year = parseInt(parts[2], 10);
-          if (!isNaN(day) && month !== undefined && !isNaN(year)) {
+          if (!isNaN(day) && month !== undefined && !isNaN(year) && year > 1900) {
             return new Date(year, month, day);
           }
-          const monthNum = parseInt(parts[1], 10) - 1;
-          if (!isNaN(day) && !isNaN(monthNum) && !isNaN(year)) {
-            return new Date(year, monthNum, day);
-          }
         }
-        const isoDate = new Date(dateStr);
-        return isNaN(isoDate.getTime()) ? null : isoDate;
+        
+        // Fallback: try native Date parsing
+        const parsed = new Date(dateStr);
+        return isNaN(parsed.getTime()) ? null : parsed;
       };
       
       // Helper to parse RH values
