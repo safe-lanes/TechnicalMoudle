@@ -515,6 +515,280 @@ class PDFReportGenerator {
     const filename = this.generateFilename(config.title, config.vessel);
     this.doc.save(filename);
   }
+
+  // Comprehensive Completed Jobs Register Report
+  // All 25 fields as per specification with summary statistics
+  generateCompletedJobsRegisterReport(
+    config: PDFReportConfig & {
+      dateFrom?: string;
+      dateTo?: string;
+      totalJobs?: number;
+      totalManHours?: number;
+    },
+    data: any[],
+    summaryStats?: {
+      byDepartment: { department: string; count: number; manHours: number }[];
+      byPriority: { priority: string; count: number }[];
+      byJobType: { jobType: string; count: number }[];
+      avgCompletionTime?: number;
+    }
+  ): void {
+    this.doc = new jsPDF({
+      orientation: 'landscape',
+      unit: 'mm',
+      format: 'a3'
+    });
+
+    const pageWidth = this.doc.internal.pageSize.getWidth();
+    const pageHeight = this.doc.internal.pageSize.getHeight();
+    const margin = 8;
+
+    // Header Section
+    this.doc.setFillColor(...PDF_COLORS.primary);
+    this.doc.rect(0, 0, pageWidth, 40, 'F');
+
+    this.doc.setTextColor(...PDF_COLORS.textWhite);
+    this.doc.setFontSize(22);
+    this.doc.setFont('helvetica', 'bold');
+    this.doc.text('COMPLETED JOBS REGISTER', margin, 15);
+
+    this.doc.setFontSize(11);
+    this.doc.setFont('helvetica', 'normal');
+    const periodText = config.dateFrom && config.dateTo 
+      ? `Report Period: ${config.dateFrom} to ${config.dateTo}`
+      : 'Report Period: All Time';
+    this.doc.text(periodText, margin, 24);
+
+    this.doc.setFontSize(10);
+    const vesselText = `Vessel: ${config.vessel || 'All Vessels'}`;
+    this.doc.text(vesselText, margin, 32);
+
+    // Right side info
+    this.doc.setFontSize(9);
+    const rightInfo = [
+      `Generated: ${format(new Date(), 'dd-MMM-yyyy HH:mm')}`,
+      `Total Jobs: ${config.totalJobs || data.length}`,
+      `Total Man-Hours: ${config.totalManHours?.toFixed(1) || '—'}`
+    ];
+    
+    let yPos = 12;
+    rightInfo.forEach(info => {
+      this.doc!.text(info, pageWidth - margin, yPos, { align: 'right' });
+      yPos += 6;
+    });
+
+    let startY = 48;
+
+    // Define all 25 columns (condensed widths for A3 landscape)
+    const columns: TableColumn[] = [
+      { header: 'S.No', field: 'sNo', width: 8 },
+      { header: 'Work Order No', field: 'workOrderNo', width: 28 },
+      { header: 'Component', field: 'componentName', width: 25 },
+      { header: 'Comp Code', field: 'componentCode', width: 18 },
+      { header: 'Job Title', field: 'jobTitle', width: 30 },
+      { header: 'Type', field: 'jobType', width: 14 },
+      { header: 'Basis', field: 'maintenanceBasis', width: 12 },
+      { header: 'Dept', field: 'department', width: 12 },
+      { header: 'Priority', field: 'priority', width: 12 },
+      { header: 'Critical', field: 'criticality', width: 10 },
+      { header: 'Class', field: 'classRelated', width: 10 },
+      { header: 'Assigned To', field: 'assignedTo', width: 18 },
+      { header: 'Approver', field: 'approver', width: 16 },
+      { header: 'Submitted', field: 'submittedDate', width: 18 },
+      { header: 'Start Date', field: 'startDate', width: 18 },
+      { header: 'Start Time', field: 'startTime', width: 12 },
+      { header: 'Completed', field: 'completionDate', width: 18 },
+      { header: 'End Time', field: 'completionTime', width: 12 },
+      { header: 'Duration', field: 'workDuration', width: 12 },
+      { header: 'Persons', field: 'noOfPersons', width: 10 },
+      { header: 'Man-Hrs', field: 'manHours', width: 12 },
+      { header: 'Description', field: 'briefDescription', width: 35 },
+      { header: 'Risk Assmt', field: 'riskAssessment', width: 12 },
+      { header: 'Safety Chk', field: 'safetyChecklists', width: 12 },
+      { header: 'Ops Forms', field: 'operationalForms', width: 12 }
+    ];
+
+    const headers = columns.map(col => col.header);
+    const body = data.map(row => 
+      columns.map(col => {
+        const value = row[col.field];
+        if (value === null || value === undefined || value === '') return '—';
+        return String(value);
+      })
+    );
+
+    autoTable(this.doc, {
+      head: [headers],
+      body: body,
+      startY: startY,
+      margin: { left: margin, right: margin },
+      styles: {
+        fontSize: 6,
+        cellPadding: 1.5,
+        overflow: 'linebreak',
+        lineColor: PDF_COLORS.border,
+        lineWidth: 0.1,
+        valign: 'middle',
+      },
+      headStyles: {
+        fillColor: PDF_COLORS.secondary,
+        textColor: PDF_COLORS.textWhite,
+        fontStyle: 'bold',
+        halign: 'center',
+        fontSize: 6,
+      },
+      alternateRowStyles: {
+        fillColor: PDF_COLORS.bgLight,
+      },
+      columnStyles: columns.reduce((acc, col, index) => {
+        if (col.width) {
+          acc[index] = { cellWidth: col.width };
+        }
+        return acc;
+      }, {} as Record<number, { cellWidth: number }>),
+      didParseCell: (hookData) => {
+        if (hookData.section !== 'body') return;
+        const rowData = data[hookData.row.index];
+        if (!rowData) return;
+
+        // Highlight critical equipment rows
+        if (rowData.criticality === 'Yes' || rowData.criticality === 'Critical') {
+          hookData.cell.styles.fillColor = PDF_COLORS.bgSuccess;
+        }
+      },
+      didDrawPage: (hookData) => {
+        // Add "Confidential" watermark
+        this.doc!.setTextColor(230, 230, 230);
+        this.doc!.setFontSize(60);
+        this.doc!.setFont('helvetica', 'bold');
+        this.doc!.text('CONFIDENTIAL', pageWidth / 2, pageHeight / 2, {
+          align: 'center',
+          angle: 45
+        });
+
+        // Page number
+        const pageCount = this.doc!.getNumberOfPages();
+        const currentPage = hookData.pageNumber;
+        this.doc!.setFontSize(8);
+        this.doc!.setTextColor(...PDF_COLORS.textLight);
+        this.doc!.text(
+          `Page ${currentPage} of ${pageCount}`,
+          pageWidth / 2,
+          pageHeight - 8,
+          { align: 'center' }
+        );
+      },
+    });
+
+    // Summary Section after table
+    if (summaryStats) {
+      const finalY = (this.doc as any).lastAutoTable?.finalY || startY + 100;
+      let summaryY = finalY + 10;
+
+      // Check if we need a new page for summary
+      if (summaryY > pageHeight - 60) {
+        this.doc.addPage();
+        summaryY = 20;
+      }
+
+      this.doc.setTextColor(...PDF_COLORS.primary);
+      this.doc.setFontSize(14);
+      this.doc.setFont('helvetica', 'bold');
+      this.doc.text('SUMMARY STATISTICS', margin, summaryY);
+      summaryY += 10;
+
+      // Summary boxes layout
+      const boxWidth = 70;
+      const boxHeight = 35;
+      const gap = 5;
+      let boxX = margin;
+
+      // Department Summary
+      if (summaryStats.byDepartment && summaryStats.byDepartment.length > 0) {
+        this.doc.setFillColor(...PDF_COLORS.bgLight);
+        this.doc.roundedRect(boxX, summaryY, boxWidth, boxHeight, 2, 2, 'F');
+        
+        this.doc.setFontSize(8);
+        this.doc.setFont('helvetica', 'bold');
+        this.doc.setTextColor(...PDF_COLORS.primary);
+        this.doc.text('Jobs by Department', boxX + 3, summaryY + 6);
+        
+        this.doc.setFont('helvetica', 'normal');
+        this.doc.setTextColor(...PDF_COLORS.textDark);
+        this.doc.setFontSize(7);
+        let lineY = summaryY + 12;
+        summaryStats.byDepartment.slice(0, 4).forEach(dept => {
+          this.doc!.text(`${dept.department}: ${dept.count} (${dept.manHours.toFixed(1)} hrs)`, boxX + 3, lineY);
+          lineY += 5;
+        });
+        boxX += boxWidth + gap;
+      }
+
+      // Priority Summary
+      if (summaryStats.byPriority && summaryStats.byPriority.length > 0) {
+        this.doc.setFillColor(...PDF_COLORS.bgLight);
+        this.doc.roundedRect(boxX, summaryY, boxWidth, boxHeight, 2, 2, 'F');
+        
+        this.doc.setFontSize(8);
+        this.doc.setFont('helvetica', 'bold');
+        this.doc.setTextColor(...PDF_COLORS.primary);
+        this.doc.text('Jobs by Priority', boxX + 3, summaryY + 6);
+        
+        this.doc.setFont('helvetica', 'normal');
+        this.doc.setTextColor(...PDF_COLORS.textDark);
+        this.doc.setFontSize(7);
+        let lineY = summaryY + 12;
+        summaryStats.byPriority.forEach(p => {
+          this.doc!.text(`${p.priority}: ${p.count}`, boxX + 3, lineY);
+          lineY += 5;
+        });
+        boxX += boxWidth + gap;
+      }
+
+      // Job Type Summary
+      if (summaryStats.byJobType && summaryStats.byJobType.length > 0) {
+        this.doc.setFillColor(...PDF_COLORS.bgLight);
+        this.doc.roundedRect(boxX, summaryY, boxWidth, boxHeight, 2, 2, 'F');
+        
+        this.doc.setFontSize(8);
+        this.doc.setFont('helvetica', 'bold');
+        this.doc.setTextColor(...PDF_COLORS.primary);
+        this.doc.text('Jobs by Type', boxX + 3, summaryY + 6);
+        
+        this.doc.setFont('helvetica', 'normal');
+        this.doc.setTextColor(...PDF_COLORS.textDark);
+        this.doc.setFontSize(7);
+        let lineY = summaryY + 12;
+        summaryStats.byJobType.slice(0, 4).forEach(jt => {
+          this.doc!.text(`${jt.jobType}: ${jt.count}`, boxX + 3, lineY);
+          lineY += 5;
+        });
+        boxX += boxWidth + gap;
+      }
+
+      // Average Completion Time
+      if (summaryStats.avgCompletionTime !== undefined) {
+        this.doc.setFillColor(...PDF_COLORS.bgSuccess);
+        this.doc.roundedRect(boxX, summaryY, boxWidth, boxHeight, 2, 2, 'F');
+        
+        this.doc.setFontSize(8);
+        this.doc.setFont('helvetica', 'bold');
+        this.doc.setTextColor(...PDF_COLORS.primary);
+        this.doc.text('Avg Completion Time', boxX + 3, summaryY + 6);
+        
+        this.doc.setFontSize(14);
+        this.doc.setFont('helvetica', 'bold');
+        this.doc.setTextColor(...PDF_COLORS.textDark);
+        this.doc.text(`${summaryStats.avgCompletionTime.toFixed(1)} hrs`, boxX + 3, summaryY + 22);
+      }
+    }
+
+    // Footer
+    this.addFooter(pageWidth, pageHeight, margin);
+
+    const filename = this.generateFilename(config.title, config.vessel);
+    this.doc.save(filename);
+  }
 }
 
 export const pdfReportGenerator = new PDFReportGenerator();

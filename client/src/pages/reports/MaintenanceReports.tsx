@@ -471,33 +471,170 @@ const MaintenanceReports: React.FC<MaintenanceReportsProps> = ({ onBack, globalF
       }
 
       case 'completed-jobs': {
-        const completedJobs = vesselWorkOrders.filter((wo: any) => wo.status === 'Completed');
+        // Helper to format date as DD-MMM-YYYY
+        const formatDateDDMMMYYYY = (dateStr: string | null | undefined): string => {
+          if (!dateStr) return '—';
+          try {
+            const d = new Date(dateStr);
+            if (isNaN(d.getTime())) return '—';
+            const day = d.getDate().toString().padStart(2, '0');
+            const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+            const month = months[d.getMonth()];
+            const year = d.getFullYear();
+            return `${day}-${month}-${year}`;
+          } catch {
+            return '—';
+          }
+        };
 
-        const columns = [
-          { header: 'WO Number', field: 'workOrderNumber', width: 40 },
-          { header: 'Title', field: 'title', width: 60 },
-          { header: 'Component', field: 'component', width: 50 },
-          { header: 'Completed Date', field: 'formattedCompletedDate', width: 30 },
-          { header: 'Performed By', field: 'performedBy', width: 40 }
-        ];
+        // Helper to format time as HH:MM
+        const formatTimeHHMM = (dateStr: string | null | undefined): string => {
+          if (!dateStr) return '—';
+          try {
+            const d = new Date(dateStr);
+            if (isNaN(d.getTime())) return '—';
+            const hours = d.getHours().toString().padStart(2, '0');
+            const minutes = d.getMinutes().toString().padStart(2, '0');
+            return `${hours}:${minutes}`;
+          } catch {
+            return '—';
+          }
+        };
 
-        const data = completedJobs.map((wo: any) => ({
-          workOrderNumber: wo.workOrderNumber || wo.id,
-          title: wo.title || wo.jobTitle || '-',
-          component: wo.component || wo.componentName || '-',
-          formattedCompletedDate: formatDate(wo.completedDate || wo.updatedAt),
-          performedBy: wo.performedBy || wo.assignee || '-'
-        }));
+        // Helper to calculate duration in hours
+        const calculateDuration = (startStr: string | null | undefined, endStr: string | null | undefined): number => {
+          if (!startStr || !endStr) return 0;
+          try {
+            const start = new Date(startStr);
+            const end = new Date(endStr);
+            if (isNaN(start.getTime()) || isNaN(end.getTime())) return 0;
+            return Math.max(0, (end.getTime() - start.getTime()) / (1000 * 60 * 60));
+          } catch {
+            return 0;
+          }
+        };
 
-        const summary = [
-          { label: 'Total Completed', value: data.length }
-        ];
+        // Get date range from filters
+        const dateFrom = categoryFilters.dateRange?.from;
+        const dateTo = categoryFilters.dateRange?.to;
 
-        pdfReportGenerator.generateReport(
-          { title: 'Completed Jobs Register', subtitle: 'All completed maintenance work', vessel: vesselName },
-          columns,
+        // Filter completed jobs by date_completed field
+        let completedJobs = vesselWorkOrders.filter((wo: any) => wo.status === 'Completed');
+        
+        if (dateFrom || dateTo) {
+          completedJobs = completedJobs.filter((wo: any) => {
+            const completedDate = wo.dateCompleted || wo.completionDateTime;
+            if (!completedDate) return true;
+            const date = new Date(completedDate);
+            if (isNaN(date.getTime())) return true;
+            if (dateFrom && date < dateFrom) return false;
+            if (dateTo) {
+              const endOfDay = new Date(dateTo);
+              endOfDay.setHours(23, 59, 59, 999);
+              if (date > endOfDay) return false;
+            }
+            return true;
+          });
+        }
+
+        // Sort by date_completed DESC, then work_order_no ASC
+        completedJobs.sort((a: any, b: any) => {
+          const dateA = new Date(a.dateCompleted || a.completionDateTime || 0).getTime();
+          const dateB = new Date(b.dateCompleted || b.completionDateTime || 0).getTime();
+          if (dateB !== dateA) return dateB - dateA;
+          const woA = a.workOrderNo || a.id || '';
+          const woB = b.workOrderNo || b.id || '';
+          return woA.localeCompare(woB);
+        });
+
+        // Transform data with all 25 fields
+        let totalManHours = 0;
+        const data = completedJobs.map((wo: any, index: number) => {
+          const duration = parseFloat(wo.totalTimeHours) || calculateDuration(wo.startDateTime, wo.completionDateTime);
+          const persons = parseInt(wo.noOfPersons) || 1;
+          const manHours = parseFloat(wo.manhours) || (duration * persons);
+          totalManHours += manHours;
+
+          return {
+            sNo: index + 1,
+            workOrderNo: wo.workOrderNo || wo.id || '—',
+            componentName: wo.component || wo.componentName || '—',
+            componentCode: wo.componentCode || '—',
+            jobTitle: wo.jobTitle || wo.title || '—',
+            jobType: wo.taskType || wo.maintenanceType || '—',
+            maintenanceBasis: wo.maintenanceBasis || '—',
+            department: wo.department || '—',
+            priority: wo.jobPriority || wo.priority || '—',
+            criticality: wo.criticality || 'No',
+            classRelated: wo.classRelated || 'No',
+            assignedTo: wo.performedBy || wo.assignedTo || '—',
+            approver: wo.approver || '—',
+            submittedDate: formatDateDDMMMYYYY(wo.submittedDate || wo.createdAt),
+            startDate: formatDateDDMMMYYYY(wo.startDateTime),
+            startTime: formatTimeHHMM(wo.startDateTime),
+            completionDate: formatDateDDMMMYYYY(wo.dateCompleted || wo.completionDateTime),
+            completionTime: formatTimeHHMM(wo.completionDateTime),
+            workDuration: duration > 0 ? duration.toFixed(1) : '—',
+            noOfPersons: wo.noOfPersons || '1',
+            manHours: manHours > 0 ? manHours.toFixed(1) : '—',
+            briefDescription: wo.briefWorkDescription || wo.workCarriedOut || '—',
+            riskAssessment: wo.riskAssessmentStatus || 'N/A',
+            safetyChecklists: wo.safetyChecklistsStatus || 'N/A',
+            operationalForms: wo.operationalFormsStatus || 'N/A'
+          };
+        });
+
+        // Calculate summary statistics
+        const deptStats: Record<string, { count: number; manHours: number }> = {};
+        const priorityStats: Record<string, number> = {};
+        const jobTypeStats: Record<string, number> = {};
+        let totalDuration = 0;
+
+        completedJobs.forEach((wo: any) => {
+          const dept = wo.department || 'Unassigned';
+          const priority = wo.jobPriority || wo.priority || 'Normal';
+          const jobType = wo.taskType || wo.maintenanceType || 'Other';
+          const duration = parseFloat(wo.totalTimeHours) || calculateDuration(wo.startDateTime, wo.completionDateTime);
+          const persons = parseInt(wo.noOfPersons) || 1;
+          const manHours = parseFloat(wo.manhours) || (duration * persons);
+
+          if (!deptStats[dept]) deptStats[dept] = { count: 0, manHours: 0 };
+          deptStats[dept].count++;
+          deptStats[dept].manHours += manHours;
+
+          priorityStats[priority] = (priorityStats[priority] || 0) + 1;
+          jobTypeStats[jobType] = (jobTypeStats[jobType] || 0) + 1;
+          totalDuration += duration;
+        });
+
+        const summaryStats = {
+          byDepartment: Object.entries(deptStats).map(([department, stats]) => ({
+            department,
+            count: stats.count,
+            manHours: stats.manHours
+          })),
+          byPriority: Object.entries(priorityStats).map(([priority, count]) => ({
+            priority,
+            count
+          })),
+          byJobType: Object.entries(jobTypeStats).map(([jobType, count]) => ({
+            jobType,
+            count
+          })),
+          avgCompletionTime: completedJobs.length > 0 ? totalDuration / completedJobs.length : 0
+        };
+
+        pdfReportGenerator.generateCompletedJobsRegisterReport(
+          { 
+            title: 'COMPLETED JOBS REGISTER', 
+            vessel: vesselName,
+            dateFrom: dateFrom ? formatDateDDMMMYYYY(dateFrom.toISOString()) : undefined,
+            dateTo: dateTo ? formatDateDDMMMYYYY(dateTo.toISOString()) : undefined,
+            totalJobs: data.length,
+            totalManHours: totalManHours
+          },
           data,
-          summary
+          summaryStats
         );
         break;
       }
@@ -892,20 +1029,35 @@ const MaintenanceReports: React.FC<MaintenanceReportsProps> = ({ onBack, globalF
 
     let requestBody: any = { vesselId: effectiveVesselId };
     
-    if (reportId === 'monthly-summary') {
-      let startDate: Date;
-      let endDate: Date;
+    // Add date range for reports that support it
+    if (reportId === 'monthly-summary' || reportId === 'completed-jobs') {
+      // Use category filters date range for completed-jobs
+      const dateFrom = categoryFilters.dateRange?.from;
+      const dateTo = categoryFilters.dateRange?.to;
       
-      if (globalFilters?.dateRange?.from && globalFilters?.dateRange?.to) {
-        startDate = globalFilters.dateRange.from;
-        endDate = globalFilters.dateRange.to;
-      } else {
-        const now = new Date();
-        startDate = new Date(now.getFullYear(), now.getMonth(), 1);
-        endDate = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+      if (dateFrom) {
+        requestBody.dateFrom = dateFrom.toISOString().split('T')[0];
       }
-      requestBody.startDate = startDate.toISOString().split('T')[0];
-      requestBody.endDate = endDate.toISOString().split('T')[0];
+      if (dateTo) {
+        requestBody.dateTo = dateTo.toISOString().split('T')[0];
+      }
+      
+      // Also support startDate/endDate for monthly-summary
+      if (reportId === 'monthly-summary') {
+        let startDate: Date;
+        let endDate: Date;
+        
+        if (globalFilters?.dateRange?.from && globalFilters?.dateRange?.to) {
+          startDate = globalFilters.dateRange.from;
+          endDate = globalFilters.dateRange.to;
+        } else {
+          const now = new Date();
+          startDate = new Date(now.getFullYear(), now.getMonth(), 1);
+          endDate = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+        }
+        requestBody.startDate = startDate.toISOString().split('T')[0];
+        requestBody.endDate = endDate.toISOString().split('T')[0];
+      }
     }
 
     const response = await fetch(endpoint, {

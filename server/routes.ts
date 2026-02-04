@@ -11444,8 +11444,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // ═══════════════════════════════════════════════════════════════════════════
-  // COMPLETED JOBS REGISTER EXCEL REPORT
-  // Uses STANDARD 18-column format with Light/Dark Green highlighting
+  // COMPLETED JOBS REGISTER EXCEL REPORT - COMPREHENSIVE 25-COLUMN VERSION
+  // All fields as per specification with summary statistics
   // ═══════════════════════════════════════════════════════════════════════════
   app.post("/technical/api/reports/completed-jobs", async (req, res) => {
     try {
@@ -11454,6 +11454,47 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!vesselId) {
         return res.status(400).json({ error: "Please select a vessel" });
       }
+      
+      // Helper functions for date/time formatting
+      const formatDateDDMMMYYYY = (dateStr: string | Date | null | undefined): string => {
+        if (!dateStr) return '—';
+        try {
+          const d = typeof dateStr === 'string' ? new Date(dateStr) : dateStr;
+          if (isNaN(d.getTime())) return '—';
+          const day = d.getDate().toString().padStart(2, '0');
+          const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+          const month = months[d.getMonth()];
+          const year = d.getFullYear();
+          return `${day}-${month}-${year}`;
+        } catch {
+          return '—';
+        }
+      };
+
+      const formatTimeHHMM = (dateStr: string | null | undefined): string => {
+        if (!dateStr) return '—';
+        try {
+          const d = new Date(dateStr);
+          if (isNaN(d.getTime())) return '—';
+          const hours = d.getHours().toString().padStart(2, '0');
+          const minutes = d.getMinutes().toString().padStart(2, '0');
+          return `${hours}:${minutes}`;
+        } catch {
+          return '—';
+        }
+      };
+
+      const calculateDuration = (startStr: string | null | undefined, endStr: string | null | undefined): number => {
+        if (!startStr || !endStr) return 0;
+        try {
+          const start = new Date(startStr);
+          const end = new Date(endStr);
+          if (isNaN(start.getTime()) || isNaN(end.getTime())) return 0;
+          return Math.max(0, (end.getTime() - start.getTime()) / (1000 * 60 * 60));
+        } catch {
+          return 0;
+        }
+      };
       
       // Fetch all required data
       const workOrders = await storage.getWorkOrders(vesselId);
@@ -11467,51 +11508,91 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const jobsMap = new Map(jobs.map(job => [job.id, job]));
       const componentsByCodeMap = new Map(components.map(comp => [comp.componentCode, comp]));
       
-      // Filter for completed jobs
+      // Filter for completed jobs using dateCompleted field
       const completedWorkOrders = workOrders.filter(wo => wo.status === 'Completed');
       
-      // Optional date range filtering
+      // Date range filtering using dateCompleted field
       let filteredJobs = completedWorkOrders;
       if (dateFrom || dateTo) {
         filteredJobs = completedWorkOrders.filter(wo => {
-          const completedDate = wo.completedDate || wo.updatedAt;
+          const completedDate = wo.dateCompleted || (wo as any).completionDateTime;
           if (!completedDate) return true;
           const date = new Date(completedDate);
+          if (isNaN(date.getTime())) return true;
           if (dateFrom && date < new Date(dateFrom)) return false;
-          if (dateTo && date > new Date(dateTo)) return false;
+          if (dateTo) {
+            const endDate = new Date(dateTo);
+            endDate.setHours(23, 59, 59, 999);
+            if (date > endDate) return false;
+          }
           return true;
         });
       }
       
-      // Transform to standard format
-      const completedJobs = filteredJobs.map(wo => {
-        const job = jobsMap.get(wo.jobId || '');
-        const comp = componentsByCodeMap.get(wo.componentCode || '');
-        const isCritical = comp?.criticalEquipment === true || comp?.criticalEquipment === 'Yes';
-        
-        return {
-          workOrderNo: wo.workOrderNumber || wo.id,
-          templateCode: job?.templateCode || '-',
-          jobTitle: wo.title || wo.jobTitle || '-',
-          componentCode: wo.componentCode || '-',
-          componentName: wo.component || wo.componentName || comp?.componentName || '-',
-          department: wo.department || wo.assignedDepartment || '-',
-          priority: wo.priority || '-',
-          woStatus: 'Completed',
-          dueDate: wo.dueDate ? formatDateForExcel(wo.dueDate) : '-',
-          lastDoneDate: wo.completedDate ? formatDateForExcel(wo.completedDate) : formatDateForExcel(wo.updatedAt),
-          completedDate: wo.completedDate || wo.updatedAt,
-          assignedTo: wo.assignedTo || wo.performedBy || '-',
-          maintenanceBasis: job?.maintenanceBasis || 'Calendar',
-          critical: isCritical ? 'Yes' : 'No'
-        };
+      // Sort by dateCompleted DESC, then workOrderNo ASC
+      filteredJobs.sort((a, b) => {
+        const dateA = new Date(a.dateCompleted || (a as any).completionDateTime || 0).getTime();
+        const dateB = new Date(b.dateCompleted || (b as any).completionDateTime || 0).getTime();
+        if (dateB !== dateA) return dateB - dateA;
+        const woA = a.workOrderNo || a.id || '';
+        const woB = b.workOrderNo || b.id || '';
+        return woA.localeCompare(woB);
       });
       
-      // Sort by completed date (most recent first)
-      completedJobs.sort((a, b) => {
-        const dateA = a.completedDate ? new Date(a.completedDate).getTime() : 0;
-        const dateB = b.completedDate ? new Date(b.completedDate).getTime() : 0;
-        return dateB - dateA;
+      // Transform to comprehensive 25-field format
+      let totalManHours = 0;
+      const deptStats: Record<string, { count: number; manHours: number }> = {};
+      const priorityStats: Record<string, number> = {};
+      const jobTypeStats: Record<string, number> = {};
+      
+      const completedJobs = filteredJobs.map((wo, index) => {
+        const job = jobsMap.get(wo.jobId || '');
+        const comp = componentsByCodeMap.get(wo.componentCode || '');
+        const isCritical = comp?.criticalEquipment === true || (comp?.criticalEquipment as any) === 'Yes';
+        
+        const duration = parseFloat(wo.totalTimeHours || '0') || calculateDuration(wo.startDateTime, (wo as any).completionDateTime);
+        const persons = parseInt(wo.noOfPersons || '1') || 1;
+        const manHours = parseFloat(wo.manhours || '0') || (duration * persons);
+        totalManHours += manHours;
+        
+        const dept = wo.department || 'Unassigned';
+        const priority = wo.jobPriority || 'Normal';
+        const jobType = wo.taskType || wo.maintenanceType || 'Other';
+        
+        // Aggregate stats
+        if (!deptStats[dept]) deptStats[dept] = { count: 0, manHours: 0 };
+        deptStats[dept].count++;
+        deptStats[dept].manHours += manHours;
+        priorityStats[priority] = (priorityStats[priority] || 0) + 1;
+        jobTypeStats[jobType] = (jobTypeStats[jobType] || 0) + 1;
+        
+        return {
+          sNo: index + 1,
+          workOrderNo: wo.workOrderNo || wo.id || '—',
+          componentName: wo.component || comp?.name || '—',
+          componentCode: wo.componentCode || '—',
+          jobTitle: wo.jobTitle || '—',
+          jobType: wo.taskType || wo.maintenanceType || '—',
+          maintenanceBasis: wo.maintenanceBasis || job?.maintenanceBasis || '—',
+          department: dept,
+          priority: priority,
+          criticality: isCritical ? 'Yes' : 'No',
+          classRelated: wo.classRelated || 'No',
+          assignedTo: wo.performedBy || wo.assignedTo || '—',
+          approver: wo.approver || '—',
+          submittedDate: formatDateDDMMMYYYY(wo.submittedDate || wo.createdAt),
+          startDate: formatDateDDMMMYYYY(wo.startDateTime),
+          startTime: formatTimeHHMM(wo.startDateTime),
+          completionDate: formatDateDDMMMYYYY(wo.dateCompleted || (wo as any).completionDateTime),
+          completionTime: formatTimeHHMM((wo as any).completionDateTime),
+          workDuration: duration > 0 ? duration.toFixed(1) : '—',
+          noOfPersons: wo.noOfPersons || '1',
+          manHours: manHours > 0 ? manHours.toFixed(1) : '—',
+          briefDescription: wo.briefWorkDescription || wo.workCarriedOut || '—',
+          riskAssessment: wo.riskAssessmentStatus || 'N/A',
+          safetyChecklists: wo.safetyChecklistsStatus || 'N/A',
+          operationalForms: wo.operationalFormsStatus || 'N/A'
+        };
       });
       
       // Create workbook
@@ -11519,92 +11600,206 @@ export async function registerRoutes(app: Express): Promise<Server> {
       workbook.creator = 'PMS System';
       workbook.created = new Date();
       
-      const worksheet = workbook.addWorksheet('Completed Jobs', {
-        views: [{ state: 'frozen', ySplit: 7, xSplit: 2 }]
+      const worksheet = workbook.addWorksheet('Completed Jobs Register', {
+        views: [{ state: 'frozen', ySplit: 8, xSplit: 2 }]
       });
       
-      // Use STANDARD 18-column definition
-      const columns = STANDARD_WORK_ORDER_COLUMNS;
-      const totalColumns = columns.length;
-      const lastColLetter = getLastColumnLetter(totalColumns);
-      const headerRowNum = 7;
-      const dataStartRow = 8;
-      
-      // Apply standardized header
-      applyStandardHeader(
-        worksheet,
-        'COMPLETED JOBS REGISTER',
-        'Work orders successfully completed',
-        vesselName,
-        completedJobs.length,
-        lastColLetter
-      );
-      
-      applyStandardTableHeader(worksheet, columns, headerRowNum);
-      
-      // Prepare data in standard format with GREEN highlighting
-      const preparedData: WorkOrderRowData[] = completedJobs.map((job, index) => {
-        const isCritical = job.critical === 'Yes';
-        const isCalendarBased = job.maintenanceBasis === 'Calendar';
-        
-        return {
-          sno: index + 1,
-          workOrderNo: job.workOrderNo,
-          jobCode: job.templateCode || '-',
-          jobTitle: job.jobTitle,
-          componentCode: job.componentCode,
-          componentName: job.componentName,
-          department: job.department,
-          priority: job.priority,
-          status: 'Completed',
-          dueDate: job.dueDate,
-          lastDoneDate: job.lastDoneDate,
-          daysLeft: '-',
-          daysOverdue: '-',
-          nextDueRH: isCalendarBased ? '-' : '-',
-          currentRH: isCalendarBased ? '-' : '-',
-          rhRemaining: isCalendarBased ? '-' : '-',
-          assignedTo: job.assignedTo,
-          criticalEquipment: isCritical ? 'YES' : 'No',
-          _rowStatus: 'completed' as WorkOrderStatus,
-          isCriticalEquipment: isCritical
-        };
-      });
-      
-      // Apply status-based row highlighting (Light Green / Dark Green)
-      applyWorkOrderDataRows(worksheet, preparedData, columns, dataStartRow);
-      
-      // Summary section
-      const lastDataRowNum = dataStartRow + Math.max(completedJobs.length - 1, 0);
-      const summaryStartRow = lastDataRowNum + 3;
-      
-      const criticalEquipmentCount = completedJobs.filter(j => j.critical === 'Yes').length;
-      
-      const summary: SummaryItem[] = [
-        { label: 'Total Completed Jobs:', value: completedJobs.length },
-        { label: 'Critical Equipment Jobs:', value: criticalEquipmentCount }
+      // Define all 25 columns
+      const columns: ColumnDef[] = [
+        { header: 'S.No', key: 'sNo', width: 6 },
+        { header: 'Work Order No', key: 'workOrderNo', width: 22 },
+        { header: 'Component', key: 'componentName', width: 20 },
+        { header: 'Comp Code', key: 'componentCode', width: 14 },
+        { header: 'Job Title', key: 'jobTitle', width: 25 },
+        { header: 'Job Type', key: 'jobType', width: 12 },
+        { header: 'Basis', key: 'maintenanceBasis', width: 10 },
+        { header: 'Dept', key: 'department', width: 10 },
+        { header: 'Priority', key: 'priority', width: 10 },
+        { header: 'Critical', key: 'criticality', width: 8 },
+        { header: 'Class', key: 'classRelated', width: 7 },
+        { header: 'Assigned To', key: 'assignedTo', width: 14 },
+        { header: 'Approver', key: 'approver', width: 14 },
+        { header: 'Submitted', key: 'submittedDate', width: 14 },
+        { header: 'Start Date', key: 'startDate', width: 14 },
+        { header: 'Start Time', key: 'startTime', width: 10 },
+        { header: 'Completed', key: 'completionDate', width: 14 },
+        { header: 'End Time', key: 'completionTime', width: 10 },
+        { header: 'Duration (Hrs)', key: 'workDuration', width: 12 },
+        { header: 'Persons', key: 'noOfPersons', width: 8 },
+        { header: 'Man-Hours', key: 'manHours', width: 10 },
+        { header: 'Description', key: 'briefDescription', width: 30 },
+        { header: 'Risk Assmt', key: 'riskAssessment', width: 10 },
+        { header: 'Safety Chk', key: 'safetyChecklists', width: 10 },
+        { header: 'Ops Forms', key: 'operationalForms', width: 10 }
       ];
       
-      const lastSummaryRow = applyStandardSummary(worksheet, summary, summaryStartRow, totalColumns);
+      const totalColumns = columns.length;
+      const lastColLetter = getLastColumnLetter(totalColumns);
+      const headerRowNum = 8;
+      const dataStartRow = 9;
       
+      // Header section (rows 1-7)
+      worksheet.mergeCells(`A1:${lastColLetter}1`);
+      const titleCell = worksheet.getCell('A1');
+      titleCell.value = 'COMPLETED JOBS REGISTER';
+      titleCell.font = { bold: true, size: 16, color: { argb: 'FFFFFFFF' } };
+      titleCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1E5A8E' } };
+      titleCell.alignment = { horizontal: 'center', vertical: 'middle' };
+      worksheet.getRow(1).height = 28;
+      
+      worksheet.mergeCells(`A2:${lastColLetter}2`);
+      const subtitleCell = worksheet.getCell('A2');
+      subtitleCell.value = 'Comprehensive register of all completed maintenance work orders';
+      subtitleCell.font = { size: 11, color: { argb: 'FFFFFFFF' } };
+      subtitleCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1E5A8E' } };
+      subtitleCell.alignment = { horizontal: 'center', vertical: 'middle' };
+      
+      // Info rows
+      worksheet.getCell('A3').value = `Vessel: ${vesselName}`;
+      worksheet.getCell('A3').font = { bold: true };
+      worksheet.mergeCells(`A3:E3`);
+      
+      const periodText = dateFrom && dateTo 
+        ? `Report Period: ${formatDateDDMMMYYYY(dateFrom)} to ${formatDateDDMMMYYYY(dateTo)}`
+        : 'Report Period: All Time';
+      worksheet.getCell('F3').value = periodText;
+      worksheet.mergeCells(`F3:L3`);
+      
+      worksheet.getCell('M3').value = `Generated: ${formatDateDDMMMYYYY(new Date())}`;
+      worksheet.mergeCells(`M3:Q3`);
+      
+      worksheet.getCell('A4').value = `Total Jobs Completed: ${completedJobs.length}`;
+      worksheet.getCell('A4').font = { bold: true };
+      worksheet.mergeCells(`A4:E4`);
+      
+      worksheet.getCell('F4').value = `Total Man-Hours: ${totalManHours.toFixed(1)}`;
+      worksheet.getCell('F4').font = { bold: true };
+      worksheet.mergeCells(`F4:L4`);
+      
+      // Empty rows before header
+      worksheet.getRow(5).height = 5;
+      worksheet.getRow(6).height = 5;
+      worksheet.getRow(7).height = 5;
+      
+      // Column headers
+      const headerRow = worksheet.getRow(headerRowNum);
+      columns.forEach((col, idx) => {
+        const cell = headerRow.getCell(idx + 1);
+        cell.value = col.header;
+        cell.font = { bold: true, color: { argb: 'FFFFFFFF' }, size: 9 };
+        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF5DADE2' } };
+        cell.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };
+        cell.border = {
+          top: { style: 'thin', color: { argb: 'FFE1E8ED' } },
+          bottom: { style: 'thin', color: { argb: 'FFE1E8ED' } },
+          left: { style: 'thin', color: { argb: 'FFE1E8ED' } },
+          right: { style: 'thin', color: { argb: 'FFE1E8ED' } }
+        };
+        worksheet.getColumn(idx + 1).width = col.width;
+      });
+      headerRow.height = 22;
+      
+      // Data rows
+      completedJobs.forEach((job, rowIdx) => {
+        const row = worksheet.getRow(dataStartRow + rowIdx);
+        columns.forEach((col, colIdx) => {
+          const cell = row.getCell(colIdx + 1);
+          cell.value = (job as any)[col.key] || '—';
+          cell.font = { size: 9 };
+          cell.alignment = { vertical: 'middle', wrapText: col.key === 'briefDescription' };
+          cell.border = {
+            top: { style: 'thin', color: { argb: 'FFE1E8ED' } },
+            bottom: { style: 'thin', color: { argb: 'FFE1E8ED' } },
+            left: { style: 'thin', color: { argb: 'FFE1E8ED' } },
+            right: { style: 'thin', color: { argb: 'FFE1E8ED' } }
+          };
+          // Alternating row colors
+          if (rowIdx % 2 === 1) {
+            cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF7F9FC' } };
+          }
+          // Highlight critical equipment
+          if (job.criticality === 'Yes') {
+            cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF6FFED' } };
+          }
+        });
+        row.height = 18;
+      });
+      
+      // Summary section
+      const summaryStartRow = dataStartRow + completedJobs.length + 2;
+      
+      worksheet.mergeCells(`A${summaryStartRow}:${lastColLetter}${summaryStartRow}`);
+      const summaryTitle = worksheet.getCell(`A${summaryStartRow}`);
+      summaryTitle.value = 'SUMMARY STATISTICS';
+      summaryTitle.font = { bold: true, size: 12, color: { argb: 'FF1E5A8E' } };
+      
+      // Department summary
+      let currentRow = summaryStartRow + 2;
+      worksheet.getCell(`A${currentRow}`).value = 'Jobs by Department:';
+      worksheet.getCell(`A${currentRow}`).font = { bold: true };
+      currentRow++;
+      Object.entries(deptStats).forEach(([dept, stats]) => {
+        worksheet.getCell(`A${currentRow}`).value = `  ${dept}:`;
+        worksheet.getCell(`B${currentRow}`).value = stats.count;
+        worksheet.getCell(`C${currentRow}`).value = `(${stats.manHours.toFixed(1)} man-hrs)`;
+        currentRow++;
+      });
+      
+      // Priority summary
+      currentRow++;
+      worksheet.getCell(`A${currentRow}`).value = 'Jobs by Priority:';
+      worksheet.getCell(`A${currentRow}`).font = { bold: true };
+      currentRow++;
+      Object.entries(priorityStats).forEach(([priority, count]) => {
+        worksheet.getCell(`A${currentRow}`).value = `  ${priority}:`;
+        worksheet.getCell(`B${currentRow}`).value = count;
+        currentRow++;
+      });
+      
+      // Job type summary
+      currentRow++;
+      worksheet.getCell(`A${currentRow}`).value = 'Jobs by Type:';
+      worksheet.getCell(`A${currentRow}`).font = { bold: true };
+      currentRow++;
+      Object.entries(jobTypeStats).forEach(([jobType, count]) => {
+        worksheet.getCell(`A${currentRow}`).value = `  ${jobType}:`;
+        worksheet.getCell(`B${currentRow}`).value = count;
+        currentRow++;
+      });
+      
+      // Totals
+      currentRow++;
+      worksheet.getCell(`A${currentRow}`).value = 'Total Man-Hours:';
+      worksheet.getCell(`A${currentRow}`).font = { bold: true };
+      worksheet.getCell(`B${currentRow}`).value = totalManHours.toFixed(1);
+      worksheet.getCell(`B${currentRow}`).font = { bold: true };
+      
+      // Auto filter
       worksheet.autoFilter = {
         from: { row: headerRowNum, column: 1 },
         to: { row: headerRowNum, column: totalColumns }
       };
       
-      applyStandardPageSetup(worksheet, headerRowNum, totalColumns, lastSummaryRow, vesselName);
+      // Page setup
+      worksheet.pageSetup = {
+        orientation: 'landscape',
+        paperSize: 8, // A3
+        fitToPage: true,
+        fitToWidth: 1,
+        printTitlesRow: `${headerRowNum}:${headerRowNum}`
+      };
       
       const buffer = await workbook.xlsx.writeBuffer();
-      const filename = generateFilename('CompletedJobs', vesselName);
+      const filename = generateFilename('CompletedJobsRegister', vesselName);
       
-      console.log(`[COMPLETED JOBS REPORT] Generated: ${filename} (${completedJobs.length} jobs)`);
+      console.log(`[COMPLETED JOBS REGISTER] Generated: ${filename} (${completedJobs.length} jobs, ${totalManHours.toFixed(1)} man-hours)`);
       
       res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
       res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
       res.send(buffer);
       
     } catch (error: any) {
-      console.error("Error generating Completed Jobs report:", error);
+      console.error("Error generating Completed Jobs Register report:", error);
       res.status(500).json({ error: "Failed to generate report: " + error.message });
     }
   });
