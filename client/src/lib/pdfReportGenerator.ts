@@ -602,7 +602,6 @@ class PDFReportGenerator {
       { header: 'Duration', field: 'workDuration', width: 12 },
       { header: 'Persons', field: 'noOfPersons', width: 10 },
       { header: 'Man-Hrs', field: 'manHours', width: 12 },
-      { header: 'Description', field: 'briefDescription', width: 35 },
       { header: 'Risk Assmt', field: 'riskAssessment', width: 12 },
       { header: 'Safety Chk', field: 'safetyChecklists', width: 12 },
       { header: 'Ops Forms', field: 'operationalForms', width: 12 }

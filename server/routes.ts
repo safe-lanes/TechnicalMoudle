@@ -11588,7 +11588,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
           workDuration: duration > 0 ? duration.toFixed(1) : '—',
           noOfPersons: wo.noOfPersons || '1',
           manHours: manHours > 0 ? manHours.toFixed(1) : '—',
-          briefDescription: wo.briefWorkDescription || wo.workCarriedOut || '—',
           riskAssessment: wo.riskAssessmentStatus || 'N/A',
           safetyChecklists: wo.safetyChecklistsStatus || 'N/A',
           operationalForms: wo.operationalFormsStatus || 'N/A'
@@ -11627,7 +11626,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
         { header: 'Duration (Hrs)', key: 'workDuration', width: 12 },
         { header: 'Persons', key: 'noOfPersons', width: 8 },
         { header: 'Man-Hours', key: 'manHours', width: 10 },
-        { header: 'Description', key: 'briefDescription', width: 30 },
         { header: 'Risk Assmt', key: 'riskAssessment', width: 10 },
         { header: 'Safety Chk', key: 'safetyChecklists', width: 10 },
         { header: 'Ops Forms', key: 'operationalForms', width: 10 }
@@ -11706,7 +11704,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           const cell = row.getCell(colIdx + 1);
           cell.value = (job as any)[col.key] || '—';
           cell.font = { size: 9 };
-          cell.alignment = { vertical: 'middle', wrapText: col.key === 'briefDescription' };
+          cell.alignment = { vertical: 'middle' };
           cell.border = {
             top: { style: 'thin', color: { argb: 'FFE1E8ED' } },
             bottom: { style: 'thin', color: { argb: 'FFE1E8ED' } },

@@ -577,7 +577,6 @@ const MaintenanceReports: React.FC<MaintenanceReportsProps> = ({ onBack, globalF
             workDuration: duration > 0 ? duration.toFixed(1) : '—',
             noOfPersons: wo.noOfPersons || '1',
             manHours: manHours > 0 ? manHours.toFixed(1) : '—',
-            briefDescription: wo.briefWorkDescription || wo.workCarriedOut || '—',
             riskAssessment: wo.riskAssessmentStatus || 'N/A',
             safetyChecklists: wo.safetyChecklistsStatus || 'N/A',
             operationalForms: wo.operationalFormsStatus || 'N/A'
