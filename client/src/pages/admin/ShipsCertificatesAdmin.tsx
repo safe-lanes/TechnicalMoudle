@@ -1199,28 +1199,36 @@ export default function ShipsCertificatesAdmin() {
             />
           </div>
           <Select value={selectedCategory} onValueChange={setSelectedCategory}>
-            <SelectTrigger className="w-[160px]" data-testid="select-category">
+            <SelectTrigger className="w-[180px]" data-testid="select-category">
               <SelectValue placeholder="All Categories" />
             </SelectTrigger>
             <SelectContent>
-              {categories.map((cat) => (
-                <SelectItem key={cat} value={cat}>{cat}</SelectItem>
+              <SelectItem value="All Categories">All Categories</SelectItem>
+              {MASTER_CATEGORY_OPTIONS.map((cat) => (
+                <SelectItem key={cat} value={cat}>{getFormattedMasterCategoryLabel(cat)}</SelectItem>
               ))}
             </SelectContent>
           </Select>
           <Select value={selectedGroup} onValueChange={setSelectedGroup}>
-            <SelectTrigger className="w-[140px]" data-testid="select-group">
+            <SelectTrigger className="w-[180px]" data-testid="select-group">
               <SelectValue placeholder="All Groups" />
             </SelectTrigger>
             <SelectContent>
-              {groups.map((grp) => (
-                <SelectItem key={grp} value={grp}>{grp}</SelectItem>
+              <SelectItem value="All Groups">All Groups</SelectItem>
+              {MASTER_GROUP_OPTIONS.map((grp) => (
+                <SelectItem key={grp} value={grp}>{getFormattedMasterGroupLabel(grp)}</SelectItem>
               ))}
             </SelectContent>
           </Select>
         </div>
 
-        <div className="bg-white rounded-lg border overflow-hidden">
+        <div className="bg-white rounded-lg border overflow-hidden flex-1">
+          {filteredData.length === 0 && !isAddingNew ? (
+            <div className="flex flex-col items-center justify-center h-full min-h-[200px] text-gray-400">
+              <p className="text-lg mb-2">No Certificates Configured</p>
+              <p className="text-sm">Click "Edit" and then "+ New" to add your first certificate</p>
+            </div>
+          ) : (
           <div className="overflow-x-auto">
             <table className="w-full">
               <thead className="bg-[#52baf3] text-white text-sm">
@@ -1507,6 +1515,7 @@ export default function ShipsCertificatesAdmin() {
               </tbody>
             </table>
           </div>
+          )}
         </div>
       </div>
     );
