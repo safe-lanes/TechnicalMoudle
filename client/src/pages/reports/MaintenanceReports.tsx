@@ -315,7 +315,7 @@ const MaintenanceReports: React.FC<MaintenanceReportsProps> = ({ onBack, globalF
             workOrderNumber: wo.workOrderNumber || wo.workOrderNo || wo.id,
             title: wo.title || wo.jobTitle || '-',
             component: wo.component || wo.componentName || '-',
-            priority: wo.priority || wo.jobPriority || 'Normal',
+            priority: wo.jobPriority || 'Normal',
             formattedDueDate: formatDate(wo.dueDate),
             statusIndicator: calculateStatus(dueDate),
             daysRemaining: days,
@@ -578,7 +578,7 @@ const MaintenanceReports: React.FC<MaintenanceReportsProps> = ({ onBack, globalF
           deptStats[dept].overdue++;
         });
         
-        // Priority breakdown
+        // Priority breakdown (using jobPriority field from database)
         const priorityStats: Record<string, { total: number; completed: number; overdue: number }> = {
           'High': { total: 0, completed: 0, overdue: 0 },
           'Medium': { total: 0, completed: 0, overdue: 0 },
@@ -586,13 +586,13 @@ const MaintenanceReports: React.FC<MaintenanceReportsProps> = ({ onBack, globalF
           'Normal': { total: 0, completed: 0, overdue: 0 }
         };
         monthlyWOs.forEach((wo: any) => {
-          const priority = wo.priority || 'Normal';
+          const priority = wo.jobPriority || 'Normal';
           if (!priorityStats[priority]) priorityStats[priority] = { total: 0, completed: 0, overdue: 0 };
           priorityStats[priority].total++;
           if (wo.status === 'Completed') priorityStats[priority].completed++;
         });
         cumulativeOverdue.forEach((wo: any) => {
-          const priority = wo.priority || 'Normal';
+          const priority = wo.jobPriority || 'Normal';
           if (!priorityStats[priority]) priorityStats[priority] = { total: 0, completed: 0, overdue: 0 };
           priorityStats[priority].overdue++;
         });
@@ -755,7 +755,7 @@ const MaintenanceReports: React.FC<MaintenanceReportsProps> = ({ onBack, globalF
         const priorityGroups: Record<string, { total: number; completed: number; overdue: number }> = {};
         
         vesselWorkOrders.forEach((wo: any) => {
-          const priority = wo.priority || 'Normal';
+          const priority = wo.jobPriority || 'Normal';
           if (!priorityGroups[priority]) {
             priorityGroups[priority] = { total: 0, completed: 0, overdue: 0 };
           }
