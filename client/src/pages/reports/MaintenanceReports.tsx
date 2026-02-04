@@ -638,6 +638,62 @@ const MaintenanceReports: React.FC<MaintenanceReportsProps> = ({ onBack, globalF
     }
   };
 
+  const generateExcelReport = async (reportId: string) => {
+    if (!effectiveVesselId || effectiveVesselId === 'all') {
+      toast({
+        title: "Vessel Required",
+        description: "Please select a specific vessel to generate the report.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const reportEndpoints: Record<string, string> = {
+      'due-jobs-7': '/technical/api/reports/due-jobs-7-days',
+    };
+
+    const endpoint = reportEndpoints[reportId];
+    if (!endpoint) {
+      toast({
+        title: "Excel Export",
+        description: "Excel export for this report is coming soon. PDF is currently available.",
+      });
+      return;
+    }
+
+    const response = await fetch(endpoint, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ vesselId: effectiveVesselId }),
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.error || 'Failed to generate report');
+    }
+
+    const blob = await response.blob();
+    const contentDisposition = response.headers.get('Content-Disposition');
+    let filename = `report_${reportId}.xlsx`;
+    if (contentDisposition) {
+      const match = contentDisposition.match(/filename="?([^"]+)"?/);
+      if (match) {
+        filename = match[1];
+      }
+    }
+
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    window.URL.revokeObjectURL(url);
+    document.body.removeChild(a);
+  };
+
   const handleGenerateReport = async (reportId: string, format: 'PDF' | 'Excel' | 'CSV') => {
     const reportKey = `${reportId}-${format}`;
     
@@ -655,10 +711,12 @@ const MaintenanceReports: React.FC<MaintenanceReportsProps> = ({ onBack, globalF
 
       if (format === 'PDF') {
         await generateMaintenancePDF(reportId);
+      } else if (format === 'Excel') {
+        await generateExcelReport(reportId);
       } else {
         toast({
-          title: "Excel Export",
-          description: "Excel export coming soon. PDF is currently available.",
+          title: "CSV Export",
+          description: "CSV export coming soon.",
         });
         return;
       }
@@ -668,11 +726,11 @@ const MaintenanceReports: React.FC<MaintenanceReportsProps> = ({ onBack, globalF
         description: `${format} report downloaded successfully!`,
       });
       
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error generating report:', error);
       toast({
         title: "Generation Failed",
-        description: `Failed to generate ${format} report. Please try again.`,
+        description: error.message || `Failed to generate ${format} report. Please try again.`,
         variant: "destructive",
       });
     } finally {
