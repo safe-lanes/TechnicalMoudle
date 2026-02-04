@@ -1,0 +1,118 @@
+COMPLETED JOBS REGISTER REPORT
+text
+CREATE COMPLETED JOBS REGISTER REPORT
+
+REPORT NAME: Completed Jobs Register
+DESCRIPTION: Comprehensive register of all completed maintenance work orders with full details for audit and compliance purposes
+FREQUENCY: Weekly/Monthly
+PRIORITY: Medium
+ESTIMATED TIME: 2-3 minutes
+
+PURPOSE:
+A detailed tabular report listing all completed work orders within the selected date range, providing a complete audit trail of maintenance activities performed on the vessel.
+
+DATA SOURCE:
+Query the work_orders table with the following filters:
+- vessel_id: From vessel filter (default: current vessel, e.g., Vessel 4)
+- status: 'Completed'
+- date_completed: Within the selected date range (from Date Range picker)
+- Sort by: date_completed DESC (most recent first)
+
+REQUIRED FIELDS IN REPORT:
+The report should include the following columns for each completed work order:
+
+1. **S.No** - Serial number (auto-increment)
+2. **Work Order No** - Full work order number (e.g., UWO-712.011.02-2026-001)
+3. **Component** - Component name (e.g., "LO Separators No.02")
+4. **Component Code** - Component code (e.g., "712.011.02")
+5. **Job Title** - Job description (e.g., "broken foundation")
+6. **Job Type** - Task type classification
+7. **Maintenance Basis** - Calendar / Running Hours
+8. **Department** - Engine / Deck / Other
+9. **Priority** - High / Medium / Low
+10. **Criticality** - Critical / Non-Critical
+11. **Class Related** - Yes / No
+12. **Assigned To** - Rank who performed the work (e.g., "2nd Engineer")
+13. **Approver** - Rank who approved (e.g., "Chief Engineer")
+14. **Submitted Date** - Date when work order was created (DD-MMM-YYYY format)
+15. **Start Date** - Actual work start date (from Part B)
+16. **Start Time** - Work start time (from Part B)
+17. **Completion Date** - Date when work was completed (DD-MMM-YYYY format)
+18. **Completion Time** - Work completion time (from Part B)
+19. **Work Duration (Hours)** - Calculated duration from start to completion
+20. **No. of Persons** - Team size (from Part B)
+21. **Man-Hours** - Work Duration × No. of Persons
+22. **Brief Description** - Brief work description (from Part A)
+23. **Risk Assessment** - Yes/No/NA (from Part B)
+24. **Safety Checklists** - Yes/No/NA (from Part B)
+25. **Operational Forms** - Yes/No/NA (from Part B)
+
+REPORT FORMAT:
+- **Header Section**:
+  - Report Title: "COMPLETED JOBS REGISTER"
+  - Vessel Name
+  - Report Period: [Start Date] to [End Date]
+  - Generated Date & Time
+  - Total Jobs Completed: [Count]
+  - Total Man-Hours: [Sum]
+
+- **Table Section**:
+  - All fields listed above in tabular format
+  - Alternating row colors for readability
+  - Bold headers
+  - Page breaks every 30-40 rows for printing
+
+- **Summary Section** (at end):
+  - Total Jobs by Department (Engine/Deck/Other)
+  - Total Jobs by Priority (High/Medium/Low)
+  - Total Jobs by Job Type
+  - Total Man-Hours by Department
+  - Average completion time per job
+
+OUTPUT FORMATS:
+1. **PDF** - Primary format for official records and printing
+2. **Excel/CSV** - For further data analysis and filtering
+
+SPECIAL REQUIREMENTS:
+1. Handle null/empty values gracefully (show "—" or "N/A")
+2. Date format consistency: DD-MMM-YYYY (e.g., "15-Jan-2026")
+3. Time format: HH:MM (24-hour format)
+4. Calculate work duration even if completion time is not filled (assume end of day)
+5. Group by month if date range spans multiple months
+6. Include page numbers: "Page X of Y"
+7. Include "Confidential" watermark
+8. Sort primarily by completion date (DESC), secondarily by work order number
+
+API ENDPOINT:
+GET /api/reports/completed-jobs-register
+Query Parameters:
+- vesselId: string (required)
+- startDate: string (YYYY-MM-DD format)
+- endDate: string (YYYY-MM-DD format)
+- format: 'pdf' | 'excel' | 'csv' (default: 'pdf')
+
+EXAMPLE QUERY:
+```sql
+SELECT 
+    wo.*,
+    c.name as component_name,
+    c.code as component_code,
+    wo.date_completed,
+    wo.start_date,
+    wo.start_time,
+    wo.completion_time,
+    wo.performed_by,
+    wo.no_of_persons,
+    wo.work_duration_hours,
+    (wo.work_duration_hours * wo.no_of_persons) as man_hours,
+    wo.risk_assessment_completed,
+    wo.safety_checklists_completed,
+    wo.operational_forms_completed
+FROM work_orders wo
+LEFT JOIN components c ON wo.component_id = c.id
+WHERE wo.vessel_id = ?
+  AND wo.status = 'Completed'
+  AND wo.date_completed >= ?
+  AND wo.date_completed <= ?
+ORDER BY wo.date_completed DESC, wo.work_order_no ASC
+NOTE: The report MUST respect the vessel and date range filters set by the user before generation. Do not use hardcoded values.
