@@ -1,0 +1,377 @@
+text
+🚨 CRITICAL BUG FIX REQUIRED - Monthly Maintenance Summary Report
+
+PROBLEM IDENTIFIED:
+Both the PDF and Excel Monthly Summary reports are showing INCORRECT and INCOMPLETE data.
+
+Current Issues:
+1. Only counting "Planned" status jobs (4 jobs) - WRONG
+2. Missing 171+ total work orders in the system
+3. Not including Overdue (139 jobs) or Completed (17 jobs) in the summary
+4. PDF report is extremely basic with only 4 metrics
+5. No department/priority/frequency breakdown despite data existing
+
+ROOT CAUSE:
+The query is filtering ONLY status = 'Planned' instead of ALL work orders.
+
+─────────────────────────────────────────────────────────
+CORRECT DATA LOGIC - MONTHLY MAINTENANCE SUMMARY
+─────────────────────────────────────────────────────────
+
+WHAT THE REPORT SHOULD SHOW:
+A comprehensive summary of ALL maintenance activities for a selected month,
+including planned, overdue, completed, and in-progress work orders.
+
+CORRECT QUERY LOGIC:
+
+1. TOTAL WORK ORDERS (for the month)
+```sql
+SELECT COUNT(*) FROM work_orders
+WHERE vessel_id = @vesselId
+  AND (
+    (next_due_date BETWEEN @startDate AND @endDate) OR  -- Due in this month
+    (status = 'Completed' AND completion_date BETWEEN @startDate AND @endDate) -- Completed in this month
+  )
+Count: Should be ~30-50 jobs per month typically
+
+TOTAL PLANNED JOBS
+
+sql
+SELECT COUNT(*) FROM work_orders
+WHERE vessel_id = @vesselId
+  AND status = 'Planned'
+  AND next_due_date BETWEEN @startDate AND @endDate
+TOTAL COMPLETED JOBS (in the selected month)
+
+sql
+SELECT COUNT(*) FROM work_orders
+WHERE vessel_id = @vesselId
+  AND status = 'Completed'
+  AND completion_date BETWEEN @startDate AND @endDate
+TOTAL OVERDUE JOBS (at the end of selected month)
+
+sql
+SELECT COUNT(*) FROM work_orders
+WHERE vessel_id = @vesselId
+  AND status = 'Planned'
+  AND next_due_date < @endDate
+IN PROGRESS / ACTIVE JOBS
+
+sql
+SELECT COUNT(*) FROM work_orders
+WHERE vessel_id = @vesselId
+  AND status IN ('Planned', 'In Progress')
+  AND next_due_date BETWEEN @startDate AND @endDate
+COMPLETION RATE
+
+text
+Completion Rate = (Completed / (Completed + Planned due in month)) * 100
+ON-TIME COMPLETION %
+
+sql
+SELECT 
+  COUNT(*) as on_time
+FROM work_orders
+WHERE vessel_id = @vesselId
+  AND status = 'Completed'
+  AND completion_date BETWEEN @startDate AND @endDate
+  AND completion_date <= next_due_date
+text
+On-Time % = (on_time / total_completed_in_month) * 100
+─────────────────────────────────────────────────────────
+DEPARTMENT-WISE BREAKDOWN
+─────────────────────────────────────────────────────────
+
+sql
+SELECT 
+  department,
+  COUNT(*) FILTER (WHERE status = 'Planned' AND next_due_date BETWEEN @startDate AND @endDate) as planned,
+  COUNT(*) FILTER (WHERE status = 'Completed' AND completion_date BETWEEN @startDate AND @endDate) as completed,
+  COUNT(*) FILTER (WHERE status = 'Planned' AND next_due_date < @endDate) as overdue
+FROM work_orders
+WHERE vessel_id = @vesselId
+  AND (
+    (next_due_date BETWEEN @startDate AND @endDate) OR
+    (status = 'Completed' AND completion_date BETWEEN @startDate AND @endDate)
+  )
+GROUP BY department
+Expected output for Vessel 4:
+
+Engine: 120+ jobs
+
+Deck: 30+ jobs
+
+Electrical: 10+ jobs
+
+Galley: 5+ jobs
+
+─────────────────────────────────────────────────────────
+PRIORITY BREAKDOWN
+─────────────────────────────────────────────────────────
+
+sql
+SELECT 
+  job_priority,
+  COUNT(*) FILTER (WHERE status = 'Planned' AND next_due_date BETWEEN @startDate AND @endDate) as planned,
+  COUNT(*) FILTER (WHERE status = 'Completed' AND completion_date BETWEEN @startDate AND @endDate) as completed,
+  COUNT(*) FILTER (WHERE status = 'Planned' AND next_due_date < @endDate) as overdue
+FROM work_orders
+WHERE vessel_id = @vesselId
+  AND (
+    (next_due_date BETWEEN @startDate AND @endDate) OR
+    (status = 'Completed' AND completion_date BETWEEN @startDate AND @endDate)
+  )
+GROUP BY job_priority
+Expected output:
+
+High Priority: 50+ jobs
+
+Medium Priority: 80+ jobs
+
+Low Priority: 40+ jobs
+
+─────────────────────────────────────────────────────────
+FREQUENCY ANALYSIS
+─────────────────────────────────────────────────────────
+
+sql
+SELECT 
+  frequency_unit,
+  COUNT(*) as total_count,
+  COUNT(*) FILTER (WHERE status = 'Completed' AND completion_date BETWEEN @startDate AND @endDate) as completed
+FROM work_orders
+WHERE vessel_id = @vesselId
+  AND (
+    (next_due_date BETWEEN @startDate AND @endDate) OR
+    (status = 'Completed' AND completion_date BETWEEN @startDate AND @endDate)
+  )
+GROUP BY frequency_unit
+Expected output:
+
+Daily: 2 jobs
+
+Weekly: 30+ jobs
+
+Monthly: 80+ jobs
+
+Yearly: 50+ jobs
+
+─────────────────────────────────────────────────────────
+MAN-HOURS SUMMARY
+─────────────────────────────────────────────────────────
+
+sql
+SELECT 
+  SUM(manhours) as total_manhours,
+  AVG(manhours) as avg_per_job,
+  SUM(CASE WHEN department = 'Engine' THEN manhours ELSE 0 END) as engine_hours,
+  SUM(CASE WHEN department = 'Deck' THEN manhours ELSE 0 END) as deck_hours,
+  SUM(CASE WHEN department = 'Electrical' THEN manhours ELSE 0 END) as electrical_hours
+FROM work_orders wo
+JOIN work_completion wc ON wo.id = wc.work_order_id
+WHERE wo.vessel_id = @vesselId
+  AND wc.completion_date BETWEEN @startDate AND @endDate
+Expected output:
+
+Total Man-Hours: 200-500 hours per month
+
+Average per Job: 3-8 hours
+
+By Department: Proportional to job count
+
+─────────────────────────────────────────────────────────
+CRITICAL EQUIPMENT STATUS
+─────────────────────────────────────────────────────────
+
+sql
+SELECT 
+  CASE 
+    WHEN class_related = 'Yes' THEN 'Class Critical'
+    WHEN job_priority = 'High' THEN 'High Priority'
+    ELSE 'SOLAS Critical'
+  END as equipment_type,
+  COUNT(*) as total,
+  COUNT(*) FILTER (WHERE status = 'Completed' AND completion_date BETWEEN @startDate AND @endDate) as completed,
+  COUNT(*) FILTER (WHERE status = 'Planned' AND next_due_date < @endDate) as overdue
+FROM work_orders
+WHERE vessel_id = @vesselId
+  AND (class_related = 'Yes' OR job_priority = 'High')
+  AND (
+    (next_due_date BETWEEN @startDate AND @endDate) OR
+    (status = 'Completed' AND completion_date BETWEEN @startDate AND @endDate)
+  )
+GROUP BY equipment_type
+Expected output:
+
+Class Critical: 53 jobs
+
+High Priority: 50+ jobs
+
+─────────────────────────────────────────────────────────
+RECTIFICATION STEPS
+─────────────────────────────────────────────────────────
+
+STEP 1: FIX PDF REPORT FIRST
+Location: server/routes.ts (PDF generation endpoint)
+
+Current Problem: Only querying status = 'Planned'
+Fix Required: Update ALL queries to use the logic above
+
+STEP 2: FIX EXCEL REPORT
+Location: server/routes.ts (Excel generation endpoint)
+
+Current Problem: Using same broken query as PDF
+Fix Required: Apply the same corrected query logic
+
+STEP 3: ADD MISSING SECTIONS TO PDF
+Current PDF only has 4 metrics - pathetically basic.
+Add all 7 sections:
+
+Executive Summary (8 KPI cards)
+
+Work Order Statistics by Priority
+
+Department-wise Breakdown
+
+Frequency Analysis
+
+Man-Hours Summary
+
+Critical Equipment Status
+
+Monthly Trend (if historical data available)
+
+STEP 4: VERIFY DATA ACCURACY
+After fixing, the report should show approximately:
+
+Total Work Orders: 30-50 per month
+
+Planned (due this month): 10-20
+
+Completed (this month): 5-15
+
+Overdue: 100-150 (cumulative)
+
+Multiple departments with realistic distribution
+
+Man-hours > 0
+
+─────────────────────────────────────────────────────────
+TEST CASES
+─────────────────────────────────────────────────────────
+
+Test 1: Generate report for January 2026
+Expected:
+
+Should show jobs due in January
+
+Should show jobs completed in January
+
+Should include overdue jobs as of Jan 31
+
+Test 2: Generate report for February 2026 (current month)
+Expected:
+
+Should show jobs due in February
+
+Should show jobs completed so far in February
+
+Should include current overdue count
+
+Test 3: Verify against Work Orders page
+
+Total counts should match the WO page tabs
+
+Department breakdown should match filtering by dept
+
+Completed count should match Completed tab
+
+─────────────────────────────────────────────────────────
+IMMEDIATE ACTION REQUIRED
+─────────────────────────────────────────────────────────
+
+ANALYZE CURRENT CODE
+
+Find the PDF generation query for Monthly Summary
+
+Identify why it's only showing 3-4 jobs
+
+Check if it's filtering by status = 'Planned' only
+
+PROVIDE ROOT CAUSE
+
+Explain exactly which query is wrong
+
+Show the current broken query
+
+Explain why the data is incorrect
+
+CREATE FIX PLAN
+
+Show updated queries for each section
+
+Explain how the new logic works
+
+Provide test data expectations
+
+GET APPROVAL
+
+Wait for confirmation before making changes
+
+Confirm understanding of correct data logic
+
+DO NOT IMPLEMENT YET - ANALYZE AND REPORT BACK FIRST
+
+text
+
+***
+
+## **📋 PASTE THIS TO REPLIT**
+
+Tell Replit:
+
+STOP - CRITICAL DATA BUG IN MONTHLY SUMMARY REPORT
+
+The Monthly Summary reports (both PDF and Excel) are showing completely wrong data.
+
+PROBLEMS:
+
+Only showing 3-4 jobs instead of 150+ total jobs
+
+Not including overdue jobs (139)
+
+Not including completed jobs properly (17)
+
+Department breakdown is empty/wrong
+
+Man-hours showing 0 when data exists
+
+REQUIRED ACTION:
+
+PHASE 1: ANALYSIS (DO THIS FIRST)
+
+Find the current PDF query for Monthly Summary in server/routes.ts
+
+Show me the exact query being used
+
+Explain WHY it's only returning 3-4 jobs
+
+Is it filtering by status = 'Planned' only?
+
+PHASE 2: PROVIDE CORRECT QUERY LOGIC
+Use the detailed query specifications I've attached above.
+The report should include:
+
+ALL jobs due in the selected month (not just "Planned")
+
+ALL jobs completed in the selected month
+
+Current overdue count as of month-end
+
+Proper department/priority/frequency breakdowns
+
+PHASE 3: GET APPROVAL BEFORE FIXING
+Show me the proposed query changes and wait for confirmation.
+
+Start with Phase 1 - analyze the current code and report back.
+DO NOT make changes yet.
