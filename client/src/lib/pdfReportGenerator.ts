@@ -2,6 +2,37 @@ import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { format } from 'date-fns';
 
+// ═══════════════════════════════════════════════════════════════
+// PROFESSIONAL MARITIME THEME - STANDARD COLOR PALETTE
+// Matches the PMS application UI theme and Excel reports
+// ═══════════════════════════════════════════════════════════════
+export const PDF_COLORS = {
+  // Primary colors (match app sidebar/headers)
+  primary: [30, 90, 142] as [number, number, number],      // Deep blue #1E5A8E
+  secondary: [93, 173, 226] as [number, number, number],   // Light blue #5DADE2
+  
+  // Status colors
+  success: [82, 196, 26] as [number, number, number],      // Green #52C41A
+  warning: [250, 173, 20] as [number, number, number],     // Amber #FAAD14
+  danger: [245, 34, 45] as [number, number, number],       // Red #F5222D
+  
+  // Text colors
+  textDark: [44, 62, 80] as [number, number, number],      // Dark blue-gray #2C3E50
+  textLight: [90, 108, 125] as [number, number, number],   // Medium gray #5A6C7D
+  textWhite: [255, 255, 255] as [number, number, number],  // White
+  textDarkRed: [156, 0, 6] as [number, number, number],    // Dark red for overdue text
+  textDarkOrange: [156, 101, 0] as [number, number, number], // Dark orange for warning text
+  
+  // Background colors (subtle)
+  bgLight: [247, 249, 252] as [number, number, number],    // Very light blue-gray #F7F9FC
+  bgSuccess: [246, 255, 237] as [number, number, number],  // Very light green #F6FFED
+  bgWarning: [255, 251, 230] as [number, number, number],  // Very light amber #FFFBE6
+  bgDanger: [255, 241, 240] as [number, number, number],   // Very light red #FFF1F0
+  
+  // Border colors
+  border: [225, 232, 237] as [number, number, number],     // Light gray #E1E8ED
+};
+
 export interface PDFReportConfig {
   title: string;
   subtitle?: string;
@@ -57,12 +88,12 @@ class PDFReportGenerator {
   private addHeader(config: PDFReportConfig, pageWidth: number, margin: number): void {
     if (!this.doc) return;
 
-    // Use custom header color or default blue
-    const headerColor = config.headerColor || [82, 186, 243];
+    // Use standardized maritime deep blue (#1E5A8E) for all reports
+    const headerColor = config.headerColor || PDF_COLORS.primary;
     this.doc.setFillColor(headerColor[0], headerColor[1], headerColor[2]);
     this.doc.rect(0, 0, pageWidth, 35, 'F');
 
-    this.doc.setTextColor(255, 255, 255);
+    this.doc.setTextColor(...PDF_COLORS.textWhite);
     this.doc.setFontSize(18);
     this.doc.setFont('helvetica', 'bold');
     this.doc.text(config.title, margin, 15);
@@ -95,7 +126,7 @@ class PDFReportGenerator {
   ): number {
     if (!this.doc) return startY;
 
-    this.doc.setTextColor(0, 0, 0);
+    this.doc.setTextColor(...PDF_COLORS.textDark);
     this.doc.setFontSize(12);
     this.doc.setFont('helvetica', 'bold');
     this.doc.text('Summary', margin, startY);
@@ -109,17 +140,17 @@ class PDFReportGenerator {
       const x = margin + (index % 5) * (boxWidth + gap);
       const y = startY + Math.floor(index / 5) * (boxHeight + gap);
 
-      this.doc!.setFillColor(245, 247, 250);
+      this.doc!.setFillColor(...PDF_COLORS.bgLight);
       this.doc!.roundedRect(x, y, boxWidth, boxHeight, 2, 2, 'F');
 
       this.doc!.setFontSize(8);
       this.doc!.setFont('helvetica', 'normal');
-      this.doc!.setTextColor(100, 100, 100);
+      this.doc!.setTextColor(...PDF_COLORS.textLight);
       this.doc!.text(item.label, x + 5, y + 7);
 
       this.doc!.setFontSize(14);
       this.doc!.setFont('helvetica', 'bold');
-      this.doc!.setTextColor(0, 0, 0);
+      this.doc!.setTextColor(...PDF_COLORS.textDark);
       this.doc!.text(String(item.value), x + 5, y + 15);
     });
 
@@ -160,17 +191,17 @@ class PDFReportGenerator {
         fontSize: 9,
         cellPadding: 3,
         overflow: 'linebreak',
-        lineColor: [200, 200, 200],
+        lineColor: PDF_COLORS.border,
         lineWidth: 0.1,
       },
       headStyles: {
-        fillColor: [31, 78, 120], // Dark blue #1F4E78
-        textColor: [255, 255, 255],
+        fillColor: PDF_COLORS.secondary, // Light blue #5DADE2 - matches app table headers
+        textColor: PDF_COLORS.textWhite,
         fontStyle: 'bold',
         halign: 'left',
       },
       alternateRowStyles: {
-        fillColor: [242, 242, 242], // Light gray for alternating rows
+        fillColor: PDF_COLORS.bgLight, // Very light blue-gray #F7F9FC
       },
       columnStyles: columns.reduce((acc, col, index) => {
         if (col.width) {
@@ -185,31 +216,34 @@ class PDFReportGenerator {
         const rowData = data[hookData.row.index];
         if (!rowData) return;
         
+        // STANDARDIZED: Conditional formatting using PDF_COLORS palette
+        // Use subtle backgrounds with dark text - no bright colors
+        
         // Conditional formatting for Status column
         if (hookData.column.index === statusColIndex && statusColIndex !== -1) {
           const status = rowData.statusIndicator;
           if (status === 'OVERDUE') {
-            hookData.cell.styles.fillColor = [255, 199, 206]; // Light red
-            hookData.cell.styles.textColor = [156, 0, 6]; // Dark red
+            hookData.cell.styles.fillColor = PDF_COLORS.bgDanger; // Light red bg
+            hookData.cell.styles.textColor = PDF_COLORS.textDark;
             hookData.cell.styles.fontStyle = 'bold';
           } else if (status === 'URGENT') {
-            hookData.cell.styles.fillColor = [255, 244, 206]; // Light yellow
-            hookData.cell.styles.textColor = [156, 101, 0]; // Dark orange
+            hookData.cell.styles.fillColor = PDF_COLORS.bgWarning; // Light amber bg
+            hookData.cell.styles.textColor = PDF_COLORS.textDark;
             hookData.cell.styles.fontStyle = 'bold';
           } else if (status === 'DUE') {
-            hookData.cell.styles.textColor = [0, 102, 204]; // Blue
+            hookData.cell.styles.textColor = PDF_COLORS.primary; // Deep blue
             hookData.cell.styles.fontStyle = 'bold';
           }
         }
         
-        // Conditional formatting for Priority column
+        // Conditional formatting for Priority column - dark text only, no bright colors
         if (hookData.column.index === priorityColIndex && priorityColIndex !== -1) {
           const priority = rowData.priority;
           if (priority === 'Critical') {
-            hookData.cell.styles.textColor = [255, 0, 0]; // Red
+            hookData.cell.styles.textColor = PDF_COLORS.textDark;
             hookData.cell.styles.fontStyle = 'bold';
           } else if (priority === 'High') {
-            hookData.cell.styles.textColor = [255, 102, 0]; // Orange
+            hookData.cell.styles.textColor = PDF_COLORS.textDark;
             hookData.cell.styles.fontStyle = 'bold';
           }
         }
@@ -218,15 +252,15 @@ class PDFReportGenerator {
         if (hookData.column.index === daysColIndex && daysColIndex !== -1) {
           const days = rowData.daysRemaining || rowData.daysOverdue;
           if (typeof days === 'number' && days < 0) {
-            hookData.cell.styles.textColor = [156, 0, 6]; // Dark red
+            hookData.cell.styles.textColor = PDF_COLORS.textDark;
             hookData.cell.styles.fontStyle = 'bold';
           }
         }
         
-        // Row-level formatting for overdue rows
+        // Row-level formatting for overdue rows - subtle background
         if (rowData.statusIndicator === 'OVERDUE') {
           if (hookData.column.index !== statusColIndex) {
-            hookData.cell.styles.fillColor = [255, 230, 230]; // Very light red for whole row
+            hookData.cell.styles.fillColor = PDF_COLORS.bgDanger; // Subtle light red
           }
         }
       },
@@ -235,7 +269,7 @@ class PDFReportGenerator {
         const currentPage = hookData.pageNumber;
         
         this.doc!.setFontSize(8);
-        this.doc!.setTextColor(128, 128, 128);
+        this.doc!.setTextColor(...PDF_COLORS.textLight);
         this.doc!.text(
           `Page ${currentPage} of ${pageCount}`,
           this.doc!.internal.pageSize.getWidth() / 2,
@@ -253,11 +287,11 @@ class PDFReportGenerator {
     for (let i = 1; i <= totalPages; i++) {
       this.doc.setPage(i);
       
-      this.doc.setDrawColor(200, 200, 200);
+      this.doc.setDrawColor(...PDF_COLORS.border);
       this.doc.line(margin, pageHeight - 15, pageWidth - margin, pageHeight - 15);
       
       this.doc.setFontSize(8);
-      this.doc.setTextColor(128, 128, 128);
+      this.doc.setTextColor(...PDF_COLORS.textLight);
       this.doc.text(
         'Seafarer Technical Management System - Confidential',
         margin,
@@ -279,7 +313,8 @@ class PDFReportGenerator {
     return `${vesselPrefix}${cleanTitle}_${timestamp}.pdf`;
   }
 
-  // Specialized method for Overdue Jobs Report with severity-based formatting
+  // Specialized method for Overdue Jobs Report with STANDARDIZED MARITIME THEME
+  // Uses same blue theme as all other reports - with subtle amber/red highlights for severity
   generateOverdueJobsReport(
     config: PDFReportConfig,
     columns: TableColumn[],
@@ -297,11 +332,11 @@ class PDFReportGenerator {
     const pageHeight = this.doc.internal.pageSize.getHeight();
     const margin = 10;
 
-    // Red header for overdue report
-    this.doc.setFillColor(192, 0, 0); // Dark red #C00000
+    // STANDARDIZED: Use deep blue header (#1E5A8E) - same as all reports
+    this.doc.setFillColor(...PDF_COLORS.primary);
     this.doc.rect(0, 0, pageWidth, 35, 'F');
 
-    this.doc.setTextColor(255, 255, 255);
+    this.doc.setTextColor(...PDF_COLORS.textWhite);
     this.doc.setFontSize(20);
     this.doc.setFont('helvetica', 'bold');
     this.doc.text(config.title, margin, 15);
@@ -328,12 +363,12 @@ class PDFReportGenerator {
 
     let startY = 42;
 
-    // Enhanced summary section with color-coded boxes
+    // Summary section with subtle color-coded boxes
     if (summaryData && summaryData.length > 0) {
-      this.doc.setTextColor(192, 0, 0);
+      this.doc.setTextColor(...PDF_COLORS.primary); // Deep blue for heading
       this.doc.setFontSize(14);
       this.doc.setFont('helvetica', 'bold');
-      this.doc.text('OVERDUE SUMMARY', margin, startY);
+      this.doc.text('SUMMARY', margin, startY);
 
       startY += 8;
       const boxWidth = 45;
@@ -344,19 +379,16 @@ class PDFReportGenerator {
         const x = margin + (index % 8) * (boxWidth + gap);
         const y = startY + Math.floor(index / 8) * (boxHeight + gap);
 
-        // Color-coded boxes based on severity
+        // SUBTLE color-coded boxes - light backgrounds, dark text
         if (item.color === 'critical') {
-          this.doc!.setFillColor(255, 0, 0);
-          this.doc!.setTextColor(255, 255, 255);
-        } else if (item.color === 'severe') {
-          this.doc!.setFillColor(255, 199, 206);
-          this.doc!.setTextColor(156, 0, 6);
-        } else if (item.color === 'moderate') {
-          this.doc!.setFillColor(255, 244, 206);
-          this.doc!.setTextColor(156, 101, 0);
+          this.doc!.setFillColor(...PDF_COLORS.bgDanger); // Light red bg
+          this.doc!.setTextColor(...PDF_COLORS.textDarkRed);
+        } else if (item.color === 'severe' || item.color === 'moderate') {
+          this.doc!.setFillColor(...PDF_COLORS.bgWarning); // Light amber bg
+          this.doc!.setTextColor(...PDF_COLORS.textDarkOrange);
         } else {
-          this.doc!.setFillColor(245, 247, 250);
-          this.doc!.setTextColor(0, 0, 0);
+          this.doc!.setFillColor(...PDF_COLORS.bgLight); // Light gray bg
+          this.doc!.setTextColor(...PDF_COLORS.textDark);
         }
 
         this.doc!.roundedRect(x, y, boxWidth, boxHeight, 2, 2, 'F');
@@ -398,15 +430,18 @@ class PDFReportGenerator {
         fontSize: 7,
         cellPadding: 2,
         overflow: 'linebreak',
-        lineColor: [200, 200, 200],
+        lineColor: PDF_COLORS.border,
         lineWidth: 0.1,
       },
       headStyles: {
-        fillColor: [192, 0, 0], // Dark red #C00000
-        textColor: [255, 255, 255],
+        fillColor: PDF_COLORS.secondary, // Light blue #5DADE2 - SAME as all reports
+        textColor: PDF_COLORS.textWhite,
         fontStyle: 'bold',
         halign: 'center',
         fontSize: 7,
+      },
+      alternateRowStyles: {
+        fillColor: PDF_COLORS.bgLight, // Very light blue-gray for alternating rows
       },
       columnStyles: columns.reduce((acc, col, index) => {
         if (col.width) {
@@ -420,33 +455,29 @@ class PDFReportGenerator {
         const rowData = data[hookData.row.index];
         if (!rowData) return;
 
-        // Severity-based row coloring
+        // SUBTLE severity-based row coloring - light backgrounds only
         const severity = rowData.severity;
         
         if (severity === 'CRITICAL') {
-          hookData.cell.styles.fillColor = [255, 0, 0]; // Bright red
-          hookData.cell.styles.textColor = [255, 255, 255]; // White text
+          hookData.cell.styles.fillColor = PDF_COLORS.bgDanger; // Light red bg
+          hookData.cell.styles.textColor = PDF_COLORS.textDarkRed;
           hookData.cell.styles.fontStyle = 'bold';
         } else if (severity === 'SEVERE') {
-          hookData.cell.styles.fillColor = [255, 199, 206]; // Light red
-          hookData.cell.styles.textColor = [156, 0, 6]; // Dark red text
+          hookData.cell.styles.fillColor = PDF_COLORS.bgWarning; // Light amber bg
+          hookData.cell.styles.textColor = PDF_COLORS.textDarkOrange;
           hookData.cell.styles.fontStyle = 'bold';
         } else if (severity === 'MODERATE') {
-          hookData.cell.styles.fillColor = [255, 244, 206]; // Light yellow
-          hookData.cell.styles.textColor = [156, 101, 0]; // Dark orange text
-        } else {
-          // MINOR - alternate rows
-          if (hookData.row.index % 2 === 1) {
-            hookData.cell.styles.fillColor = [242, 242, 242];
-          }
+          hookData.cell.styles.fillColor = PDF_COLORS.bgWarning; // Light amber bg
+          hookData.cell.styles.textColor = PDF_COLORS.textDarkOrange;
         }
+        // MINOR uses default alternating rows
       },
       didDrawPage: (hookData) => {
         const pageCount = this.doc!.getNumberOfPages();
         const currentPage = hookData.pageNumber;
         
         this.doc!.setFontSize(8);
-        this.doc!.setTextColor(128, 128, 128);
+        this.doc!.setTextColor(...PDF_COLORS.textLight);
         this.doc!.text(
           `Page ${currentPage} of ${pageCount}`,
           this.doc!.internal.pageSize.getWidth() / 2,
@@ -456,11 +487,11 @@ class PDFReportGenerator {
       },
     });
 
-    // Add action required notice after table
+    // Add action required notice after table - subtle amber background
     const finalY = (this.doc as any).lastAutoTable?.finalY || startY + 50;
-    this.doc.setFillColor(255, 230, 230);
+    this.doc.setFillColor(...PDF_COLORS.bgWarning); // Light amber - not bright red
     this.doc.roundedRect(margin, finalY + 5, pageWidth - (margin * 2), 12, 2, 2, 'F');
-    this.doc.setTextColor(192, 0, 0);
+    this.doc.setTextColor(...PDF_COLORS.textDarkOrange);
     this.doc.setFontSize(10);
     this.doc.setFont('helvetica', 'bold');
     this.doc.text(
