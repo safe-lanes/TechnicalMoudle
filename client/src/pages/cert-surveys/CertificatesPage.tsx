@@ -297,9 +297,12 @@ export default function CertificatesPage() {
     params.set('page', currentPage.toString());
     params.set('limit', pageSize.toString());
     
-    // Pass vessel name filter to API if a single vessel is selected
+    // Pass vessel name filter to API
     if (selectedVesselNames.length === 1) {
       params.set('vesselName', selectedVesselNames[0]);
+    } else if (selectedVesselNames.length > 1) {
+      // Pass multiple vessel names as comma-separated string
+      params.set('vesselNames', selectedVesselNames.join(','));
     }
     
     // Add server-side sorting parameters

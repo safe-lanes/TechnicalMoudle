@@ -9007,6 +9007,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       const vesselIdFilter = req.query.vesselId as string | undefined;
       const vesselNameFilter = req.query.vesselName as string | undefined;
+      const vesselNamesFilter = req.query.vesselNames as string | undefined;
       const page = parseInt(req.query.page as string) || 1;
       const limit = parseInt(req.query.limit as string) || 100;
       const offset = (page - 1) * limit;
@@ -9032,6 +9033,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const normalizedFilter = vesselNameFilter.toLowerCase().trim();
         filteredApplicability = applicabilityRecords.filter(r => 
           r.vesselName.toLowerCase().trim() === normalizedFilter
+        );
+      } else if (vesselNamesFilter) {
+        // Handle multiple vessel names (comma-separated)
+        const vesselNamesList = vesselNamesFilter.split(',').map(n => n.toLowerCase().trim());
+        filteredApplicability = applicabilityRecords.filter(r => 
+          vesselNamesList.includes(r.vesselName.toLowerCase().trim())
         );
       }
       
