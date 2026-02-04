@@ -1,0 +1,77 @@
+FEATURE REQUEST: ADD VESSEL AND DATE RANGE FILTERS TO ALL REPORT CATEGORY PAGES
+
+CURRENT SITUATION:
+The main Reports page (/pms/reports) has the following filters:
+1. Search box ("Search reports...")
+2. Vessel dropdown ("All Vessels")
+3. Date Range picker ("Select date range")
+4. Clear button
+
+However, when users click into any report category (e.g., "Maintenance & Work Orders", "Maintenance Planner", "Running Hours & Condition", etc.), these pages are missing the critical filters:
+- MISSING: Vessel dropdown filter
+- MISSING: Date Range picker
+- MISSING: Clear button
+
+The category pages only have:
+- Search box (for searching within that category)
+- Category-specific filters (like "All Frequencies", "All Priorities")
+
+PROBLEM:
+Users cannot select the vessel or date range before generating reports. The system appears to use default values (current vessel and current month), which leads to:
+- Reports showing wrong data (e.g., Monthly Maintenance Summary showing 0 completed jobs because date range isn't set properly)
+- Users cannot generate reports for different vessels
+- Users cannot generate reports for specific date ranges
+
+REQUIRED IMPLEMENTATION:
+Add the following filters to ALL report category pages (all 8 tiles):
+1. **Maintenance Planner** (1 report)
+2. **Maintenance & Work Orders** (10 reports)
+3. **Running Hours & Condition** (4 reports)
+4. **Inventory - Spares** (7 reports)
+5. **Inventory - Stores/Lubes/Chemicals** (5 reports)
+6. **Compliance, Class & Certificates** (5 reports)
+7. **IHM (Inventory of Hazardous Materials)** (2 reports)
+8. **Modify PMS (Change Requests)** (2 reports)
+9. **Alerts, Approvals & Admin** (6 reports)
+
+FILTER LAYOUT:
+Position the filters below the page title and above the report cards/statistics, in this order:
+
+[Search Box] [Vessel Dropdown] [Date Range Picker] [Clear Button]
+[Any existing category-specific filters like Frequency/Priority]
+
+text
+
+FILTER SPECIFICATIONS:
+
+1. **Search Box**: 
+   - Already exists, keep it
+   - Placeholder: "Search maintenance reports..." (or appropriate text for each category)
+
+2. **Vessel Dropdown**:
+   - Label: "Vessel"
+   - Default: Current vessel (e.g., "Vessel 4")
+   - Options: All vessels available to the user
+   - Should filter all reports in that category by selected vessel
+
+3. **Date Range Picker**:
+   - Label: "Date Range"
+   - Default: Current month (e.g., January 2026 if current date is Feb 04, 2026)
+   - Should allow selecting custom date ranges
+   - Format: Month/Year or Start Date - End Date
+
+4. **Clear Button**:
+   - Text: "Clear"
+   - Should reset all filters to defaults
+
+BEHAVIOR:
+- When user clicks on preview/export icons, the report should use the selected vessel and date range filters
+- Filters should persist while navigating within the category
+- Filter values should be passed to the report generation API endpoints
+
+FILES TO UPDATE:
+Please identify and update all report category page components to include these filters. Likely files:
+- Report category page components (e.g., MaintenanceWorkOrdersReports.tsx or similar)
+- Report generation API calls to include vessel and date range parameters
+
+Please implement this across all 8 report category pages for consistency.
