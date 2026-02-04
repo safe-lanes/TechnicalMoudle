@@ -266,38 +266,75 @@ const MaintenanceReports: React.FC<MaintenanceReportsProps> = ({ onBack, globalF
 
     switch (reportId) {
       case 'due-jobs-7': {
+        // CRITICAL: Include OVERDUE jobs (dueDate < now) AND jobs due within 7 days
+        // Previous bug: `dueDate >= now` was excluding all overdue jobs!
         const dueJobs = vesselWorkOrders.filter((wo: any) => {
           if (!wo.dueDate) return false;
+          if (wo.status === 'Completed' || wo.status === 'Postponed') return false;
           const dueDate = new Date(wo.dueDate);
-          return wo.status !== 'Completed' && dueDate <= sevenDaysFromNow && dueDate >= now;
+          // Include: overdue (dueDate < now) OR due within 7 days (dueDate <= sevenDaysFromNow)
+          return dueDate <= sevenDaysFromNow;
         });
 
+        // Calculate status indicator for each job
+        const calculateStatus = (dueDate: Date): string => {
+          const days = Math.ceil((dueDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+          if (days < 0) return 'OVERDUE';
+          if (days <= 2) return 'URGENT';
+          if (days <= 7) return 'DUE';
+          return 'ACTIVE';
+        };
+
+        const calculateDaysRemaining = (dueDate: Date): number => {
+          return Math.ceil((dueDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+        };
+
+        // Enhanced columns to match Excel report
         const columns = [
-          { header: 'WO Number', field: 'workOrderNumber', width: 40 },
-          { header: 'Title', field: 'title', width: 60 },
-          { header: 'Component', field: 'component', width: 50 },
-          { header: 'Priority', field: 'priority', width: 25 },
-          { header: 'Due Date', field: 'formattedDueDate', width: 30 },
-          { header: 'Status', field: 'status', width: 25 }
+          { header: 'Priority', field: 'priority', width: 22 },
+          { header: 'Status', field: 'statusIndicator', width: 22 },
+          { header: 'WO Number', field: 'workOrderNumber', width: 50 },
+          { header: 'Title', field: 'title', width: 80 },
+          { header: 'Component', field: 'component', width: 55 },
+          { header: 'Due Date', field: 'formattedDueDate', width: 28 },
+          { header: 'Days Left', field: 'daysRemaining', width: 22 }
         ];
 
-        const data = dueJobs.map((wo: any) => ({
-          workOrderNumber: wo.workOrderNumber || wo.id,
-          title: wo.title || wo.jobTitle || '-',
-          component: wo.component || wo.componentName || '-',
-          priority: wo.priority || 'Normal',
-          formattedDueDate: formatDate(wo.dueDate),
-          status: wo.status || 'Open'
-        }));
+        // Sort by days remaining (most urgent first)
+        const sortedJobs = [...dueJobs].sort((a: any, b: any) => {
+          const daysA = calculateDaysRemaining(new Date(a.dueDate));
+          const daysB = calculateDaysRemaining(new Date(b.dueDate));
+          return daysA - daysB;
+        });
+
+        const data = sortedJobs.map((wo: any) => {
+          const dueDate = new Date(wo.dueDate);
+          const days = calculateDaysRemaining(dueDate);
+          return {
+            workOrderNumber: wo.workOrderNumber || wo.workOrderNo || wo.id,
+            title: wo.title || wo.jobTitle || '-',
+            component: wo.component || wo.componentName || '-',
+            priority: wo.priority || wo.jobPriority || 'Normal',
+            formattedDueDate: formatDate(wo.dueDate),
+            statusIndicator: calculateStatus(dueDate),
+            daysRemaining: days
+          };
+        });
+
+        // Calculate summary counts
+        const overdueCount = data.filter((d: any) => d.statusIndicator === 'OVERDUE').length;
+        const urgentCount = data.filter((d: any) => d.statusIndicator === 'URGENT').length;
+        const criticalPriorityCount = data.filter((d: any) => d.priority === 'Critical').length;
 
         const summary = [
           { label: 'Total Due', value: data.length },
-          { label: 'High Priority', value: data.filter((d: any) => d.priority === 'High' || d.priority === 'Critical').length },
-          { label: 'This Week', value: data.length }
+          { label: 'Overdue', value: overdueCount },
+          { label: 'Urgent (≤2d)', value: urgentCount },
+          { label: 'Critical Priority', value: criticalPriorityCount }
         ];
 
         pdfReportGenerator.generateReport(
-          { title: 'Due Jobs (7 Days)', subtitle: 'Work orders due in the next 7 days', vessel: vesselName },
+          { title: 'Due Jobs (7 Days)', subtitle: 'Work orders due in the next 7 days (including overdue)', vessel: vesselName },
           columns,
           data,
           summary

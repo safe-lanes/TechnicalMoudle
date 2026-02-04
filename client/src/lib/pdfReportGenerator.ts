@@ -142,6 +142,11 @@ class PDFReportGenerator {
       })
     );
 
+    // Find indexes of special columns for conditional formatting
+    const statusColIndex = columns.findIndex(col => col.field === 'statusIndicator');
+    const priorityColIndex = columns.findIndex(col => col.field === 'priority');
+    const daysColIndex = columns.findIndex(col => col.field === 'daysRemaining' || col.field === 'daysOverdue');
+
     autoTable(this.doc, {
       head: [headers],
       body: body,
@@ -155,13 +160,13 @@ class PDFReportGenerator {
         lineWidth: 0.1,
       },
       headStyles: {
-        fillColor: [82, 186, 243],
+        fillColor: [31, 78, 120], // Dark blue #1F4E78
         textColor: [255, 255, 255],
         fontStyle: 'bold',
         halign: 'left',
       },
       alternateRowStyles: {
-        fillColor: [248, 250, 252],
+        fillColor: [242, 242, 242], // Light gray for alternating rows
       },
       columnStyles: columns.reduce((acc, col, index) => {
         if (col.width) {
@@ -169,9 +174,61 @@ class PDFReportGenerator {
         }
         return acc;
       }, {} as Record<number, { cellWidth: number }>),
-      didDrawPage: (data) => {
+      didParseCell: (hookData) => {
+        // Skip header row
+        if (hookData.section !== 'body') return;
+        
+        const rowData = data[hookData.row.index];
+        if (!rowData) return;
+        
+        // Conditional formatting for Status column
+        if (hookData.column.index === statusColIndex && statusColIndex !== -1) {
+          const status = rowData.statusIndicator;
+          if (status === 'OVERDUE') {
+            hookData.cell.styles.fillColor = [255, 199, 206]; // Light red
+            hookData.cell.styles.textColor = [156, 0, 6]; // Dark red
+            hookData.cell.styles.fontStyle = 'bold';
+          } else if (status === 'URGENT') {
+            hookData.cell.styles.fillColor = [255, 244, 206]; // Light yellow
+            hookData.cell.styles.textColor = [156, 101, 0]; // Dark orange
+            hookData.cell.styles.fontStyle = 'bold';
+          } else if (status === 'DUE') {
+            hookData.cell.styles.textColor = [0, 102, 204]; // Blue
+            hookData.cell.styles.fontStyle = 'bold';
+          }
+        }
+        
+        // Conditional formatting for Priority column
+        if (hookData.column.index === priorityColIndex && priorityColIndex !== -1) {
+          const priority = rowData.priority;
+          if (priority === 'Critical') {
+            hookData.cell.styles.textColor = [255, 0, 0]; // Red
+            hookData.cell.styles.fontStyle = 'bold';
+          } else if (priority === 'High') {
+            hookData.cell.styles.textColor = [255, 102, 0]; // Orange
+            hookData.cell.styles.fontStyle = 'bold';
+          }
+        }
+        
+        // Conditional formatting for Days Remaining column (negative = overdue)
+        if (hookData.column.index === daysColIndex && daysColIndex !== -1) {
+          const days = rowData.daysRemaining || rowData.daysOverdue;
+          if (typeof days === 'number' && days < 0) {
+            hookData.cell.styles.textColor = [156, 0, 6]; // Dark red
+            hookData.cell.styles.fontStyle = 'bold';
+          }
+        }
+        
+        // Row-level formatting for overdue rows
+        if (rowData.statusIndicator === 'OVERDUE') {
+          if (hookData.column.index !== statusColIndex) {
+            hookData.cell.styles.fillColor = [255, 230, 230]; // Very light red for whole row
+          }
+        }
+      },
+      didDrawPage: (hookData) => {
         const pageCount = this.doc!.getNumberOfPages();
-        const currentPage = data.pageNumber;
+        const currentPage = hookData.pageNumber;
         
         this.doc!.setFontSize(8);
         this.doc!.setTextColor(128, 128, 128);
