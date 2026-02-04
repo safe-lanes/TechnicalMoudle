@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -22,7 +22,8 @@ import {
   Users,
   Settings,
   Eye,
-  Loader2
+  Loader2,
+  Download
 } from "lucide-react";
 import { pdfReportGenerator, fetchReportData, formatDate } from "@/lib/pdfReportGenerator";
 import { useToast } from "@/hooks/use-toast";
@@ -232,7 +233,7 @@ const MaintenanceReports: React.FC<MaintenanceReportsProps> = ({ onBack, globalF
     switch (priority) {
       case 'high': return 'bg-red-100 text-red-800';
       case 'medium': return 'bg-yellow-100 text-yellow-800';
-      case 'low': return 'bg-green-100 text-green-800';
+      case 'low': return 'bg-gray-100 text-gray-800';
       default: return 'bg-gray-100 text-gray-800';
     }
   };
@@ -406,29 +407,28 @@ const MaintenanceReports: React.FC<MaintenanceReportsProps> = ({ onBack, globalF
 
       case 'critical-equipment': {
         const criticalWOs = vesselWorkOrders.filter((wo: any) => 
-          wo.priority === 'Critical' || wo.priority === 'High'
+          wo.criticality === 'Yes' || wo.criticality === 'Critical' || wo.critical === true
         );
 
         const columns = [
-          { header: 'Component', field: 'component', width: 60 },
-          { header: 'Priority', field: 'priority', width: 30 },
-          { header: 'Status', field: 'status', width: 30 },
-          { header: 'Due Date', field: 'formattedDueDate', width: 35 },
-          { header: 'WO Number', field: 'workOrderNumber', width: 40 }
+          { header: 'WO Number', field: 'workOrderNumber', width: 40 },
+          { header: 'Title', field: 'title', width: 60 },
+          { header: 'Component', field: 'component', width: 50 },
+          { header: 'Due Date', field: 'formattedDueDate', width: 30 },
+          { header: 'Status', field: 'status', width: 30 }
         ];
 
         const data = criticalWOs.map((wo: any) => ({
+          workOrderNumber: wo.workOrderNumber || wo.id,
+          title: wo.title || wo.jobTitle || '-',
           component: wo.component || wo.componentName || '-',
-          priority: wo.priority || 'High',
-          status: wo.status || 'Open',
           formattedDueDate: formatDate(wo.dueDate),
-          workOrderNumber: wo.workOrderNumber || wo.id
+          status: wo.status || 'Open'
         }));
 
         const summary = [
-          { label: 'Critical Items', value: data.filter((d: any) => d.priority === 'Critical').length },
-          { label: 'High Priority', value: data.filter((d: any) => d.priority === 'High').length },
-          { label: 'Total', value: data.length }
+          { label: 'Critical WOs', value: data.length },
+          { label: 'Overdue', value: data.filter((d: any) => d.status === 'Overdue').length }
         ];
 
         pdfReportGenerator.generateReport(
@@ -442,22 +442,22 @@ const MaintenanceReports: React.FC<MaintenanceReportsProps> = ({ onBack, globalF
 
       case 'unplanned-jobs': {
         const unplannedWOs = vesselWorkOrders.filter((wo: any) => 
-          wo.type === 'Unplanned' || wo.type === 'Breakdown' || wo.workOrderNumber?.startsWith('UWO')
+          wo.type === 'Unplanned' || wo.workOrderNumber?.startsWith('UWO')
         );
 
         const columns = [
           { header: 'WO Number', field: 'workOrderNumber', width: 40 },
           { header: 'Title', field: 'title', width: 60 },
           { header: 'Component', field: 'component', width: 50 },
-          { header: 'Type', field: 'type', width: 30 },
-          { header: 'Status', field: 'status', width: 25 }
+          { header: 'Date', field: 'formattedDate', width: 30 },
+          { header: 'Status', field: 'status', width: 30 }
         ];
 
         const data = unplannedWOs.map((wo: any) => ({
           workOrderNumber: wo.workOrderNumber || wo.id,
           title: wo.title || wo.jobTitle || '-',
           component: wo.component || wo.componentName || '-',
-          type: wo.type || 'Unplanned',
+          formattedDate: formatDate(wo.createdAt || wo.dueDate),
           status: wo.status || 'Open'
         }));
 
@@ -466,7 +466,7 @@ const MaintenanceReports: React.FC<MaintenanceReportsProps> = ({ onBack, globalF
         ];
 
         pdfReportGenerator.generateReport(
-          { title: 'Unplanned/Breakdown Jobs', subtitle: 'Analysis of breakdown maintenance', vessel: vesselName },
+          { title: 'Unplanned/Breakdown Jobs', subtitle: 'Breakdown maintenance and unplanned work', vessel: vesselName },
           columns,
           data,
           summary
@@ -475,9 +475,7 @@ const MaintenanceReports: React.FC<MaintenanceReportsProps> = ({ onBack, globalF
       }
 
       case 'postponement-log': {
-        const postponedWOs = vesselWorkOrders.filter((wo: any) => 
-          wo.status === 'Postponed' || wo.postponedDate
-        );
+        const postponedWOs = vesselWorkOrders.filter((wo: any) => wo.status === 'Postponed');
 
         const columns = [
           { header: 'WO Number', field: 'workOrderNumber', width: 40 },
@@ -491,8 +489,8 @@ const MaintenanceReports: React.FC<MaintenanceReportsProps> = ({ onBack, globalF
           workOrderNumber: wo.workOrderNumber || wo.id,
           title: wo.title || wo.jobTitle || '-',
           originalDue: formatDate(wo.originalDueDate || wo.dueDate),
-          newDue: formatDate(wo.postponedDate || wo.newDueDate),
-          reason: wo.postponementReason || wo.remarks || '-'
+          newDue: formatDate(wo.newDueDate || wo.dueDate),
+          reason: wo.postponementReason || '-'
         }));
 
         const summary = [
@@ -673,12 +671,15 @@ const MaintenanceReports: React.FC<MaintenanceReportsProps> = ({ onBack, globalF
     handleGenerateReport(reportId, 'PDF');
   };
 
+  const highPriorityCount = reports.filter(r => r.priority === 'high').length;
+  const dailyReportsCount = reports.filter(r => r.frequency.toLowerCase().includes('daily')).length;
+
   return (
-    <div className="p-6 bg-[#fafafa] min-h-screen">
+    <div className="p-6 bg-white min-h-screen">
       <div className="mb-6">
-        <div className="flex items-center gap-4 mb-4">
+        <div className="flex items-center gap-4 mb-6">
           <Button 
-            variant="outline" 
+            variant="ghost" 
             onClick={onBack}
             className="flex items-center gap-2"
             data-testid="button-back-to-reports"
@@ -686,15 +687,9 @@ const MaintenanceReports: React.FC<MaintenanceReportsProps> = ({ onBack, globalF
             <ArrowLeft className="h-4 w-4" />
             Back to Reports
           </Button>
-          <div className="h-6 border-l border-gray-300" />
           <div>
-            <h1 className="text-2xl font-bold text-gray-800 flex items-center gap-3">
-              <div className="p-2 rounded-lg bg-blue-500 text-white">
-                <FileText className="h-5 w-5" />
-              </div>
-              Maintenance & Work Orders
-            </h1>
-            <p className="text-gray-600">10 comprehensive reports for maintenance planning and tracking</p>
+            <h1 className="text-2xl font-bold text-gray-900">Maintenance & Work Orders</h1>
+            <p className="text-sm text-gray-500">10 reports for maintenance tracking</p>
           </div>
         </div>
 
@@ -737,176 +732,125 @@ const MaintenanceReports: React.FC<MaintenanceReportsProps> = ({ onBack, globalF
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-gray-600">Total Reports</p>
-                <p className="text-2xl font-bold text-gray-800" data-testid="text-maintenance-total-reports">10</p>
-              </div>
-              <FileText className="h-8 w-8 text-blue-500" />
-            </div>
-          </CardContent>
+        <Card className="border-l-4 border-l-blue-500 bg-white">
+          <CardHeader className="pb-2">
+            <CardDescription className="flex items-center gap-1">
+              <FileText className="w-4 h-4 text-blue-500" />
+              Total Reports
+            </CardDescription>
+            <CardTitle className="text-3xl" data-testid="text-maintenance-total-reports">10</CardTitle>
+          </CardHeader>
         </Card>
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-gray-600">High Priority</p>
-                <p className="text-2xl font-bold text-red-600" data-testid="text-maintenance-high-priority">3</p>
-              </div>
-              <AlertTriangle className="h-8 w-8 text-red-500" />
-            </div>
-          </CardContent>
+        <Card className="border-l-4 border-l-red-500 bg-white">
+          <CardHeader className="pb-2">
+            <CardDescription className="flex items-center gap-1">
+              <AlertTriangle className="w-4 h-4 text-red-500" />
+              High Priority
+            </CardDescription>
+            <CardTitle className="text-3xl text-red-600" data-testid="text-maintenance-high-priority">{highPriorityCount}</CardTitle>
+          </CardHeader>
         </Card>
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-gray-600">Daily Reports</p>
-                <p className="text-2xl font-bold text-green-600" data-testid="text-maintenance-daily-reports">2</p>
-              </div>
-              <Calendar className="h-8 w-8 text-green-500" />
-            </div>
-          </CardContent>
+        <Card className="border-l-4 border-l-green-500 bg-white">
+          <CardHeader className="pb-2">
+            <CardDescription className="flex items-center gap-1">
+              <Calendar className="w-4 h-4 text-green-500" />
+              Daily Reports
+            </CardDescription>
+            <CardTitle className="text-3xl text-green-600" data-testid="text-maintenance-daily-reports">{dailyReportsCount}</CardTitle>
+          </CardHeader>
         </Card>
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-gray-600">Work Orders</p>
-                <p className="text-2xl font-bold text-blue-600" data-testid="text-maintenance-work-orders">{workOrders.length}</p>
-              </div>
-              <TrendingUp className="h-8 w-8 text-blue-500" />
-            </div>
-          </CardContent>
+        <Card className="border-l-4 border-l-purple-500 bg-white">
+          <CardHeader className="pb-2">
+            <CardDescription className="flex items-center gap-1">
+              <TrendingUp className="w-4 h-4 text-purple-500" />
+              Work Orders
+            </CardDescription>
+            <CardTitle className="text-3xl text-purple-600" data-testid="text-maintenance-work-orders">{workOrders.length}</CardTitle>
+          </CardHeader>
         </Card>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {filteredReports.map((report) => {
-          const Icon = report.icon;
-          return (
-            <Card key={report.id} className="hover:shadow-lg transition-shadow" data-testid={`maintenance-report-card-${report.id}`}>
-              <CardHeader className="pb-3">
-                <div className="flex items-start justify-between">
-                  <div className="flex items-center gap-3">
-                    <div className="p-2 rounded-lg bg-blue-100 text-blue-600">
-                      <Icon className="h-5 w-5" />
-                    </div>
-                    <div>
-                      <CardTitle className="text-lg">{report.name}</CardTitle>
-                      <Badge className={getPriorityColor(report.priority)} variant="secondary">
-                        {report.priority.toUpperCase()}
-                      </Badge>
-                    </div>
-                  </div>
-                  <div className="text-right text-sm text-gray-500">
-                    <p>{report.frequency}</p>
-                    <p>{report.estimatedTime}</p>
-                  </div>
-                </div>
-              </CardHeader>
-              
-              <CardContent className="space-y-4">
-                <div>
-                  <p className="text-gray-700 text-sm mb-2">{report.description}</p>
-                  <p className="text-xs text-gray-500"><strong>Purpose:</strong> {report.purpose}</p>
-                </div>
-
-                <div className="space-y-2">
+      <div className="rounded-lg border border-gray-200 overflow-hidden bg-white">
+        <table className="w-full">
+          <thead>
+            <tr className="bg-gray-50 border-b border-gray-200">
+              <th className="text-left py-3 px-4 font-semibold text-sm text-gray-700">Report Name</th>
+              <th className="text-left py-3 px-4 font-semibold text-sm text-gray-700">Frequency</th>
+              <th className="text-left py-3 px-4 font-semibold text-sm text-gray-700">Priority</th>
+              <th className="text-left py-3 px-4 font-semibold text-sm text-gray-700">Est. Time</th>
+              <th className="text-left py-3 px-4 font-semibold text-sm text-gray-700">Actions</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-gray-200">
+            {filteredReports.map((report) => (
+              <tr 
+                key={report.id} 
+                className="hover:bg-gray-50 cursor-pointer"
+                data-testid={`maintenance-report-row-${report.id}`}
+              >
+                <td className="py-3 px-4">
                   <div>
-                    <p className="text-xs font-medium text-gray-700 mb-1">Key Fields:</p>
-                    <div className="flex flex-wrap gap-1">
-                      {report.fields.slice(0, 3).map((field, index) => (
-                        <Badge key={index} variant="outline" className="text-xs">
-                          {field}
-                        </Badge>
-                      ))}
-                      {report.fields.length > 3 && (
-                        <Badge variant="outline" className="text-xs">
-                          +{report.fields.length - 3} more
-                        </Badge>
+                    <div className="font-medium text-gray-900">{report.name}</div>
+                    <div className="text-sm text-gray-500">{report.description}</div>
+                  </div>
+                </td>
+                <td className="py-3 px-4">
+                  <Badge variant="outline">{report.frequency}</Badge>
+                </td>
+                <td className="py-3 px-4">
+                  <Badge className={getPriorityColor(report.priority)}>
+                    {report.priority.toUpperCase()}
+                  </Badge>
+                </td>
+                <td className="py-3 px-4">
+                  <span className="text-xs text-gray-500">{report.estimatedTime}</span>
+                </td>
+                <td className="py-3 px-4">
+                  <div className="flex items-center gap-1">
+                    <Button 
+                      size="icon" 
+                      variant="ghost" 
+                      title="Preview"
+                      onClick={() => handlePreviewReport(report.id)}
+                      disabled={generatingReports.has(`${report.id}-PDF`)}
+                      data-testid={`button-preview-${report.id}`}
+                    >
+                      {generatingReports.has(`${report.id}-PDF`) ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
+                        <Eye className="h-4 w-4" />
                       )}
-                    </div>
-                  </div>
-
-                  <div>
-                    <p className="text-xs font-medium text-gray-700 mb-1">Outputs:</p>
-                    <div className="flex gap-1">
-                      {report.outputs.map((output, index) => (
-                        <Badge key={index} className="text-xs bg-green-100 text-green-700">
-                          {output}
-                        </Badge>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-
-                <div className="flex gap-2 pt-3 border-t">
-                  <Button 
-                    size="sm" 
-                    variant="outline" 
-                    onClick={() => handlePreviewReport(report.id)}
-                    className="flex items-center gap-2"
-                    data-testid={`button-preview-${report.id}`}
-                  >
-                    <Eye className="h-4 w-4" />
-                    Preview
-                  </Button>
-                  
-                  <div className="flex gap-1">
+                    </Button>
                     {report.outputs.includes('PDF') && (
                       <Button 
-                        size="sm" 
+                        size="icon" 
+                        variant="ghost" 
+                        title="Download PDF"
                         onClick={() => handleGenerateReport(report.id, 'PDF')}
-                        className="bg-red-600 hover:bg-red-700 text-white px-3"
                         disabled={generatingReports.has(`${report.id}-PDF`)}
                         data-testid={`button-pdf-${report.id}`}
                       >
-                        {generatingReports.has(`${report.id}-PDF`) ? (
-                          <Loader2 className="h-4 w-4 animate-spin" />
-                        ) : (
-                          'PDF'
-                        )}
+                        <FileText className="h-4 w-4" />
                       </Button>
                     )}
                     {report.outputs.includes('Excel') && (
                       <Button 
-                        size="sm" 
+                        size="icon" 
+                        variant="ghost" 
+                        title="Download Excel"
                         onClick={() => handleGenerateReport(report.id, 'Excel')}
-                        className="bg-green-600 hover:bg-green-700 text-white px-3"
                         disabled={generatingReports.has(`${report.id}-Excel`)}
                         data-testid={`button-excel-${report.id}`}
                       >
-                        {generatingReports.has(`${report.id}-Excel`) ? (
-                          <Loader2 className="h-4 w-4 animate-spin" />
-                        ) : (
-                          'Excel'
-                        )}
-                      </Button>
-                    )}
-                    {report.outputs.includes('Dashboard') && (
-                      <Button 
-                        size="sm" 
-                        onClick={() => {
-                          toast({
-                            title: "Dashboard View",
-                            description: "Dashboard view will be implemented in the next phase",
-                          });
-                        }}
-                        className="bg-blue-600 hover:bg-blue-700 text-white px-3"
-                        data-testid={`button-dashboard-${report.id}`}
-                      >
-                        View
+                        <Download className="h-4 w-4" />
                       </Button>
                     )}
                   </div>
-                </div>
-              </CardContent>
-            </Card>
-          );
-        })}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
       </div>
 
       {filteredReports.length === 0 && (

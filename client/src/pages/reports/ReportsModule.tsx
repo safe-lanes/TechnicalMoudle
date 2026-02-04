@@ -200,31 +200,31 @@ const ReportsModule = () => {
   }
 
   if (selectedCategory === "running-hours") {
-    return <RunningHoursReports onBack={handleBackToMain} globalFilters={globalFilters} />;
+    return <RunningHoursReports onBack={handleBackToMain} />;
   }
 
   if (selectedCategory === "spares") {
-    return <SparesReports onBack={handleBackToMain} globalFilters={globalFilters} />;
+    return <SparesReports onBack={handleBackToMain} />;
   }
 
   if (selectedCategory === "stores") {
-    return <StoresReports onBack={handleBackToMain} globalFilters={globalFilters} />;
+    return <StoresReports onBack={handleBackToMain} />;
   }
 
   if (selectedCategory === "compliance") {
-    return <ComplianceReports onBack={handleBackToMain} globalFilters={globalFilters} />;
+    return <ComplianceReports onBack={handleBackToMain} />;
   }
 
   if (selectedCategory === "ihm") {
-    return <IhmReports onBack={handleBackToMain} globalFilters={globalFilters} />;
+    return <IhmReports onBack={handleBackToMain} />;
   }
 
   if (selectedCategory === "change-requests") {
-    return <ChangeRequestReports onBack={handleBackToMain} globalFilters={globalFilters} />;
+    return <ChangeRequestReports onBack={handleBackToMain} />;
   }
 
   if (selectedCategory === "alerts-admin") {
-    return <AlertsApprovalsAdminReports onBack={handleBackToMain} globalFilters={globalFilters} />;
+    return <AlertsApprovalsAdminReports onBack={handleBackToMain} />;
   }
 
   // TODO: Add other category components when implemented
