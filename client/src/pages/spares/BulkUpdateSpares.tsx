@@ -4,6 +4,7 @@ import { useVessel } from "@/contexts/VesselContext";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Search, X, ArrowLeft, ChevronLeft, ChevronRight } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useQuery, useMutation } from "@tanstack/react-query";
@@ -22,6 +23,8 @@ interface Spare {
   location2?: string;
 }
 
+type TransactionMode = "consume" | "receive" | "";
+
 const ITEMS_PER_PAGE_OPTIONS = [10, 25, 50, 100];
 
 export default function BulkUpdateSpares() {
@@ -29,6 +32,7 @@ export default function BulkUpdateSpares() {
   const { vesselId } = useVessel();
   const { toast } = useToast();
   
+  const [transactionMode, setTransactionMode] = useState<TransactionMode>("");
   const [bulkSearchQuery, setBulkSearchQuery] = useState("");
   const [bulkUpdateData, setBulkUpdateData] = useState<{[key: number]: {consumedA: number, consumedB: number, receivedA: number, receivedB: number, receivedDate?: string, receivedPlace?: string, comments?: string}}>({});
   
@@ -124,16 +128,27 @@ export default function BulkUpdateSpares() {
   });
 
   const handleSaveBulkUpdates = async () => {
+    if (!transactionMode) {
+      toast({ title: "Error", description: "Please select a transaction mode", variant: "destructive" });
+      return;
+    }
+
     const sparesArray = Array.isArray(sparesData) ? sparesData : [];
     const hasErrors = Object.entries(bulkUpdateData).some(([id, data]) => {
       const spare = sparesArray.find((s: Spare) => s.id === Number(id));
       if (!spare) return false;
       const robA = spare.robLocationA ?? 0;
       const robB = spare.robLocationB ?? 0;
-      const totalReceived = (data.receivedA || 0) + (data.receivedB || 0);
-      const totalConsumed = (data.consumedA || 0) + (data.consumedB || 0);
-      const hasAnyTransaction = totalReceived > 0 || totalConsumed > 0;
-      return (data.consumedA > robA) || (data.consumedB > robB) || (hasAnyTransaction && !data.receivedDate);
+      
+      if (transactionMode === "consume") {
+        const totalConsumed = (data.consumedA || 0) + (data.consumedB || 0);
+        const hasAnyTransaction = totalConsumed > 0;
+        return (data.consumedA > robA) || (data.consumedB > robB) || (hasAnyTransaction && !data.receivedDate);
+      } else {
+        const totalReceived = (data.receivedA || 0) + (data.receivedB || 0);
+        const hasAnyTransaction = totalReceived > 0;
+        return hasAnyTransaction && !data.receivedDate;
+      }
     });
 
     if (hasErrors) {
@@ -142,17 +157,23 @@ export default function BulkUpdateSpares() {
     }
 
     const rows = Object.entries(bulkUpdateData)
-      .filter(([_, data]) => data.consumedA > 0 || data.consumedB > 0 || data.receivedA > 0 || data.receivedB > 0)
+      .filter(([_, data]) => {
+        if (transactionMode === "consume") {
+          return data.consumedA > 0 || data.consumedB > 0;
+        } else {
+          return data.receivedA > 0 || data.receivedB > 0;
+        }
+      })
       .map(([id, data]) => {
         const spare = (sparesData as Spare[]).find(s => s.id === Number(id));
         return {
           componentSpareId: Number(id),
           spareId: spare?.id,
           partCode: spare?.partCode,
-          consumedA: data.consumedA || 0,
-          consumedB: data.consumedB || 0,
-          receivedA: data.receivedA || 0,
-          receivedB: data.receivedB || 0,
+          consumedA: transactionMode === "consume" ? (data.consumedA || 0) : 0,
+          consumedB: transactionMode === "consume" ? (data.consumedB || 0) : 0,
+          receivedA: transactionMode === "receive" ? (data.receivedA || 0) : 0,
+          receivedB: transactionMode === "receive" ? (data.receivedB || 0) : 0,
           receivedDate: data.receivedDate,
           receivedPlace: data.receivedPlace,
           remarks: data.comments,
@@ -168,9 +189,16 @@ export default function BulkUpdateSpares() {
     bulkUpdateMutation.mutate({ vesselId, tz: Intl.DateTimeFormat().resolvedOptions().timeZone, rows });
   };
 
-  const hasAnyChanges = Object.values(bulkUpdateData).some(data => 
-    data.consumedA > 0 || data.consumedB > 0 || data.receivedA > 0 || data.receivedB > 0
-  );
+  const hasAnyChanges = Object.values(bulkUpdateData).some(data => {
+    if (transactionMode === "consume") {
+      return data.consumedA > 0 || data.consumedB > 0;
+    } else if (transactionMode === "receive") {
+      return data.receivedA > 0 || data.receivedB > 0;
+    }
+    return false;
+  });
+
+  const transactionLabel = transactionMode === "consume" ? "Consumed" : "Received";
 
   if (isLoading) {
     return (
@@ -204,6 +232,37 @@ export default function BulkUpdateSpares() {
 
       <div className="flex-1 overflow-hidden px-6 py-4 flex flex-col">
         <div className="w-full flex flex-col flex-1 min-h-0 space-y-4">
+          <div className="p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800">
+            <div className="flex items-center gap-4">
+              <div className="w-64">
+                <Label htmlFor="transaction-mode" className="text-sm font-medium text-gray-700 dark:text-gray-300">Mode of Transaction</Label>
+                <Select
+                  value={transactionMode}
+                  onValueChange={(value: TransactionMode) => setTransactionMode(value)}
+                >
+                  <SelectTrigger 
+                    id="transaction-mode"
+                    className="mt-1"
+                    data-testid="select-transaction-mode"
+                  >
+                    <SelectValue placeholder="Select mode..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="consume">Consume</SelectItem>
+                    <SelectItem value="receive">Receive</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              {transactionMode && (
+                <div className="flex items-center mt-5">
+                  <span className={`text-sm font-medium px-3 py-1 rounded ${transactionMode === "consume" ? "bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400" : "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400"}`}>
+                    {transactionMode === "consume" ? "Consume Mode" : "Receive Mode"}
+                  </span>
+                </div>
+              )}
+            </div>
+          </div>
+
           <div className="flex items-center justify-between gap-4">
             <div className="flex-1 max-w-md">
               <div className="relative">
@@ -214,6 +273,7 @@ export default function BulkUpdateSpares() {
                   value={bulkSearchQuery}
                   onChange={(e) => setBulkSearchQuery(e.target.value)}
                   className="pl-10"
+                  disabled={!transactionMode}
                   data-testid="input-bulk-search"
                 />
                 {bulkSearchQuery && (
@@ -228,6 +288,7 @@ export default function BulkUpdateSpares() {
             </div>
           </div>
           
+          {transactionMode && (
           <div className="grid grid-cols-3 gap-4 p-4 bg-gray-50 dark:bg-gray-800 rounded-lg">
             <div>
               <Label htmlFor="bulk-received-date">Transaction Date (Apply to all)</Label>
@@ -286,7 +347,16 @@ export default function BulkUpdateSpares() {
               />
             </div>
           </div>
+          )}
 
+          {!transactionMode ? (
+            <div className="border rounded-lg overflow-hidden bg-white dark:bg-gray-800 flex flex-col flex-1 min-h-0 items-center justify-center">
+              <div className="text-center p-8">
+                <div className="text-gray-400 dark:text-gray-500 text-lg mb-2">Please select a Mode of Transaction</div>
+                <div className="text-gray-500 dark:text-gray-400 text-sm">Choose either Consume or Receive to view and update spares</div>
+              </div>
+            </div>
+          ) : (
           <div className="border rounded-lg overflow-hidden bg-white dark:bg-gray-800 flex flex-col flex-1 min-h-0">
             <div className="overflow-auto flex-1">
               <table className="w-full">
@@ -295,24 +365,19 @@ export default function BulkUpdateSpares() {
                     <th className="px-3 py-2 text-left text-xs font-medium">Part Code</th>
                     <th className="px-3 py-2 text-left text-xs font-medium">Part Name</th>
                     <th className="px-2 py-2 text-center text-xs font-medium" colSpan={2}>
-                      <div className="text-center">ROB</div>
+                      <div className="text-center">Current Stock (ROB)</div>
                       <div className="flex justify-center gap-4 text-[10px] mt-1">
-                        <span className="font-semibold text-blue-600" data-testid="label-rob-location-a">{locationNames.locationA}</span>
-                        <span className="font-semibold text-blue-600" data-testid="label-rob-location-b">{locationNames.locationB}</span>
+                        <span className="font-semibold text-blue-600" data-testid="label-rob-location-a">{locationNames.locationA} - ROB</span>
+                        <span className="font-semibold text-blue-600" data-testid="label-rob-location-b">{locationNames.locationB} - ROB</span>
                       </div>
                     </th>
                     <th className="px-2 py-2 text-center text-xs font-medium border-l" colSpan={2}>
-                      <div className="text-center text-orange-600">Consumed</div>
-                      <div className="flex justify-center gap-4 text-[10px] mt-1">
-                        <span className="font-semibold text-blue-600" data-testid="label-consumed-location-a">{locationNames.locationA}</span>
-                        <span className="font-semibold text-blue-600" data-testid="label-consumed-location-b">{locationNames.locationB}</span>
+                      <div className={`text-center ${transactionMode === "consume" ? "text-orange-600" : "text-green-600"}`} data-testid="label-transaction-header">
+                        {transactionLabel}
                       </div>
-                    </th>
-                    <th className="px-2 py-2 text-center text-xs font-medium border-l" colSpan={2}>
-                      <div className="text-center text-green-600">Received</div>
                       <div className="flex justify-center gap-4 text-[10px] mt-1">
-                        <span className="font-semibold text-blue-600" data-testid="label-received-location-a">{locationNames.locationA}</span>
-                        <span className="font-semibold text-blue-600" data-testid="label-received-location-b">{locationNames.locationB}</span>
+                        <span className="font-semibold text-blue-600" data-testid="label-transaction-location-a">{transactionLabel} - {locationNames.locationA} / ROB</span>
+                        <span className="font-semibold text-blue-600" data-testid="label-transaction-location-b">{transactionLabel} - {locationNames.locationB} / ROB</span>
                       </div>
                     </th>
                     <th className="px-2 py-2 text-center text-xs font-medium border-l">New ROB</th>
@@ -326,14 +391,22 @@ export default function BulkUpdateSpares() {
                     const receivedB = bulkUpdateData[spare.id]?.receivedB || 0;
                     const robA = spare.robLocationA ?? 0;
                     const robB = spare.robLocationB ?? 0;
-                    const newRobA = robA - consumedA + receivedA;
-                    const newRobB = robB - consumedB + receivedB;
+                    
+                    const effectiveConsumedA = transactionMode === "consume" ? consumedA : 0;
+                    const effectiveConsumedB = transactionMode === "consume" ? consumedB : 0;
+                    const effectiveReceivedA = transactionMode === "receive" ? receivedA : 0;
+                    const effectiveReceivedB = transactionMode === "receive" ? receivedB : 0;
+                    
+                    const newRobA = robA - effectiveConsumedA + effectiveReceivedA;
+                    const newRobB = robB - effectiveConsumedB + effectiveReceivedB;
                     const newROB = newRobA + newRobB;
-                    const hasInsufficientStockA = consumedA > robA;
-                    const hasInsufficientStockB = consumedB > robB;
-                    const totalReceived = receivedA + receivedB;
-                    const totalConsumed = consumedA + consumedB;
-                    const hasAnyTransaction = totalReceived > 0 || totalConsumed > 0;
+                    
+                    const hasInsufficientStockA = transactionMode === "consume" && consumedA > robA;
+                    const hasInsufficientStockB = transactionMode === "consume" && consumedB > robB;
+                    
+                    const transactionQtyA = transactionMode === "consume" ? consumedA : receivedA;
+                    const transactionQtyB = transactionMode === "consume" ? consumedB : receivedB;
+                    const hasAnyTransaction = transactionQtyA > 0 || transactionQtyB > 0;
                     const needsTransactionDate = hasAnyTransaction && !bulkUpdateData[spare.id]?.receivedDate;
                     const hasError = hasInsufficientStockA || hasInsufficientStockB || needsTransactionDate;
                     
@@ -352,52 +425,59 @@ export default function BulkUpdateSpares() {
                           <div className="text-[9px] text-gray-500 truncate max-w-[60px]" title={spareLocB}>{spareLocB}</div>
                           <div className="text-xs text-gray-600 font-medium">{robB}</div>
                         </td>
-                        <td className="px-1 py-2 border-l">
-                          <div className="text-[9px] text-gray-500 truncate max-w-[56px] text-center" title={spareLocA}>{spareLocA}</div>
-                          <Input
-                            type="number"
-                            min="0"
-                            max={robA}
-                            value={bulkUpdateData[spare.id]?.consumedA || ""}
-                            onChange={(e) => handleBulkUpdateChange(spare.id, 'consumedA', e.target.value)}
-                            className={`w-14 h-7 text-sm text-center ${hasInsufficientStockA ? 'border-red-500' : ''}`}
-                            data-testid={`input-consume-a-${spare.id}`}
-                          />
-                        </td>
-                        <td className="px-1 py-2">
-                          <div className="text-[9px] text-gray-500 truncate max-w-[56px] text-center" title={spareLocB}>{spareLocB}</div>
-                          <Input
-                            type="number"
-                            min="0"
-                            max={robB}
-                            value={bulkUpdateData[spare.id]?.consumedB || ""}
-                            onChange={(e) => handleBulkUpdateChange(spare.id, 'consumedB', e.target.value)}
-                            className={`w-14 h-7 text-sm text-center ${hasInsufficientStockB ? 'border-red-500' : ''}`}
-                            data-testid={`input-consume-b-${spare.id}`}
-                          />
-                        </td>
-                        <td className="px-1 py-2 border-l">
-                          <div className="text-[9px] text-gray-500 truncate max-w-[56px] text-center" title={spareLocA}>{spareLocA}</div>
-                          <Input
-                            type="number"
-                            min="0"
-                            value={bulkUpdateData[spare.id]?.receivedA || ""}
-                            onChange={(e) => handleBulkUpdateChange(spare.id, 'receivedA', e.target.value)}
-                            className="w-14 h-7 text-sm text-center"
-                            data-testid={`input-receive-a-${spare.id}`}
-                          />
-                        </td>
-                        <td className="px-1 py-2">
-                          <div className="text-[9px] text-gray-500 truncate max-w-[56px] text-center" title={spareLocB}>{spareLocB}</div>
-                          <Input
-                            type="number"
-                            min="0"
-                            value={bulkUpdateData[spare.id]?.receivedB || ""}
-                            onChange={(e) => handleBulkUpdateChange(spare.id, 'receivedB', e.target.value)}
-                            className="w-14 h-7 text-sm text-center"
-                            data-testid={`input-receive-b-${spare.id}`}
-                          />
-                        </td>
+                        {transactionMode === "consume" ? (
+                          <>
+                            <td className="px-1 py-2 border-l">
+                              <div className="text-[9px] text-gray-500 truncate max-w-[56px] text-center" title={spareLocA}>{spareLocA}</div>
+                              <Input
+                                type="number"
+                                min="0"
+                                max={robA}
+                                value={bulkUpdateData[spare.id]?.consumedA || ""}
+                                onChange={(e) => handleBulkUpdateChange(spare.id, 'consumedA', e.target.value)}
+                                className={`w-14 h-7 text-sm text-center ${hasInsufficientStockA ? 'border-red-500' : ''}`}
+                                data-testid={`input-consume-a-${spare.id}`}
+                              />
+                            </td>
+                            <td className="px-1 py-2">
+                              <div className="text-[9px] text-gray-500 truncate max-w-[56px] text-center" title={spareLocB}>{spareLocB}</div>
+                              <Input
+                                type="number"
+                                min="0"
+                                max={robB}
+                                value={bulkUpdateData[spare.id]?.consumedB || ""}
+                                onChange={(e) => handleBulkUpdateChange(spare.id, 'consumedB', e.target.value)}
+                                className={`w-14 h-7 text-sm text-center ${hasInsufficientStockB ? 'border-red-500' : ''}`}
+                                data-testid={`input-consume-b-${spare.id}`}
+                              />
+                            </td>
+                          </>
+                        ) : (
+                          <>
+                            <td className="px-1 py-2 border-l">
+                              <div className="text-[9px] text-gray-500 truncate max-w-[56px] text-center" title={spareLocA}>{spareLocA}</div>
+                              <Input
+                                type="number"
+                                min="0"
+                                value={bulkUpdateData[spare.id]?.receivedA || ""}
+                                onChange={(e) => handleBulkUpdateChange(spare.id, 'receivedA', e.target.value)}
+                                className="w-14 h-7 text-sm text-center"
+                                data-testid={`input-receive-a-${spare.id}`}
+                              />
+                            </td>
+                            <td className="px-1 py-2">
+                              <div className="text-[9px] text-gray-500 truncate max-w-[56px] text-center" title={spareLocB}>{spareLocB}</div>
+                              <Input
+                                type="number"
+                                min="0"
+                                value={bulkUpdateData[spare.id]?.receivedB || ""}
+                                onChange={(e) => handleBulkUpdateChange(spare.id, 'receivedB', e.target.value)}
+                                className="w-14 h-7 text-sm text-center"
+                                data-testid={`input-receive-b-${spare.id}`}
+                              />
+                            </td>
+                          </>
+                        )}
                         <td className="px-2 py-2 text-center border-l">
                           <div className={`text-sm font-medium ${hasError ? 'text-red-600' : ''}`}>
                             {newROB}
@@ -485,6 +565,7 @@ export default function BulkUpdateSpares() {
               </div>
             </div>
           </div>
+          )}
         </div>
       </div>
 
@@ -499,8 +580,7 @@ export default function BulkUpdateSpares() {
           </Button>
           <Button 
             onClick={handleSaveBulkUpdates}
-            disabled={!hasAnyChanges || bulkUpdateMutation.isPending}
-            className="bg-green-600 hover:bg-green-700 text-white"
+            disabled={!transactionMode || !hasAnyChanges || bulkUpdateMutation.isPending}
             data-testid="button-save-updates"
           >
             {bulkUpdateMutation.isPending ? "Saving..." : "Save Updates"}
