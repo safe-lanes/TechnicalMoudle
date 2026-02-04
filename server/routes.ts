@@ -11117,24 +11117,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const now = new Date();
       now.setHours(0, 0, 0, 0);
       
-      // Grace periods
-      const CALENDAR_GRACE_DAYS = 7;
-      const RH_GRACE_HOURS = 168;
-      
       // DEBUG: Log report generation parameters
-      console.log('📊 [OVERDUE JOBS REPORT] ═══════════════════════════════════════════');
-      console.log(`📊 [OVERDUE JOBS REPORT] Vessel: ${vesselName} (${vesselId})`);
-      console.log(`📊 [OVERDUE JOBS REPORT] Today: ${now.toISOString().split('T')[0]}`);
-      console.log(`📊 [OVERDUE JOBS REPORT] Grace Period: ${CALENDAR_GRACE_DAYS} days / ${RH_GRACE_HOURS} RH`);
-      console.log(`📊 [OVERDUE JOBS REPORT] Total Work Orders Fetched: ${workOrders.length}`);
+      console.log('[OVERDUE JOBS REPORT] =============================================');
+      console.log(`[OVERDUE JOBS REPORT] Vessel: ${vesselName} (${vesselId})`);
+      console.log(`[OVERDUE JOBS REPORT] Today: ${now.toISOString().split('T')[0]}`);
+      console.log(`[OVERDUE JOBS REPORT] Total Work Orders Fetched: ${workOrders.length}`);
+      console.log(`[OVERDUE JOBS REPORT] Using computeWorkOrderStatus() for consistent filtering`);
       
-      // Helper to parse dates
+      // Helper to parse dates for calculating days past due
+      const MONTH_NAMES: { [key: string]: number } = {
+        'Jan': 0, 'Feb': 1, 'Mar': 2, 'Apr': 3, 'May': 4, 'Jun': 5,
+        'Jul': 6, 'Aug': 7, 'Sep': 8, 'Oct': 9, 'Nov': 10, 'Dec': 11
+      };
+      
       const parseDate = (dateStr: string | null | undefined): Date | null => {
         if (!dateStr) return null;
-        const MONTH_NAMES: { [key: string]: number } = {
-          'Jan': 0, 'Feb': 1, 'Mar': 2, 'Apr': 3, 'May': 4, 'Jun': 5,
-          'Jul': 6, 'Aug': 7, 'Sep': 8, 'Oct': 9, 'Nov': 10, 'Dec': 11
-        };
         const parts = dateStr.split('-');
         if (parts.length === 3) {
           const day = parseInt(parts[0], 10);
@@ -11159,22 +11156,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return isNaN(num) ? null : num;
       };
       
-      // Filter work orders that are PAST grace period (truly overdue)
+      // Filter work orders using the SAME computeWorkOrderStatus() function as the UI
+      // This ensures the report count matches the Work Orders page badge count exactly
       const overdueJobs: any[] = [];
       let debugStats = {
         total: workOrders.length,
         skippedCompleted: 0,
         skippedPostponed: 0,
+        skippedExecution: 0,
         calendarOverdue: 0,
         rhOverdue: 0,
-        criticalSeverity: 0,
-        severeSeverity: 0,
-        moderateSeverity: 0,
-        minorSeverity: 0,
         criticalEquipment: 0
       };
       
       for (const wo of workOrders) {
+        // Skip execution records (same as UI filter: !wo.isExecution)
+        if (wo.isExecution) {
+          debugStats.skippedExecution++;
+          continue;
+        }
+        
         // Skip completed jobs
         if (wo.status === 'Completed') {
           debugStats.skippedCompleted++;
@@ -11192,67 +11193,54 @@ export async function registerRoutes(app: Express): Promise<Server> {
           : (wo.component ? componentsMap.get(wo.component) : null);
         
         const maintenanceBasis = wo.maintenanceBasis || job?.maintenanceBasis || 'Calendar';
-        let isOverdue = false;
-        let daysPastDue = 0;
-        let hoursPastDue = 0;
-        let overdueType = '';
+        const dueDate = wo.dueDateSnapshot || wo.dueDate || null;
+        const dueRH = parseRH(job?.nextDueRH) ?? parseRH(wo.nextDueReading);
+        const currentRH = parseRH(component?.currentCumulativeRH) ?? parseRH(wo.currentReading);
         
-        // Check Calendar-based overdue (PAST grace period: daysRemaining < -7)
-        if (maintenanceBasis === 'Calendar' || maintenanceBasis === 'Calendar+RH') {
-          const dueDate = parseDate(wo.dueDateSnapshot || wo.dueDate);
-          if (dueDate) {
-            dueDate.setHours(0, 0, 0, 0);
-            const daysRemaining = Math.ceil((dueDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
-            
-            // OVERDUE = past due date AND past grace period
-            // daysRemaining < -CALENDAR_GRACE_DAYS means: dueDate < (TODAY - 7 days)
-            if (daysRemaining < -CALENDAR_GRACE_DAYS) {
-              isOverdue = true;
-              daysPastDue = Math.abs(daysRemaining) - CALENDAR_GRACE_DAYS;
-              overdueType = maintenanceBasis === 'Calendar+RH' ? 'Both' : 'Calendar';
-              debugStats.calendarOverdue++;
+        // Use the SAME computeWorkOrderStatus function as the UI to determine overdue status
+        // This ensures perfect alignment between report count and UI badge count
+        const computedStatus = computeWorkOrderStatus({
+          dueDate: dueDate,
+          dueRH: dueRH,
+          currentRH: currentRH,
+          isExecution: wo.isExecution,
+          status: wo.status,
+          completionDateTime: wo.completionDateTime,
+          maintenanceBasis: maintenanceBasis
+        });
+        
+        // Only include work orders with 'Overdue' computed status
+        if (computedStatus === 'Overdue') {
+          const isCriticalEquipment = component?.critical === true || component?.critical === 'true';
+          
+          // Calculate days past due for display
+          let daysPastDue = 0;
+          let hoursPastDue = 0;
+          let overdueType = '';
+          
+          if (maintenanceBasis === 'Calendar' || maintenanceBasis === 'Calendar+RH') {
+            const dueDateParsed = parseDate(dueDate);
+            if (dueDateParsed) {
+              dueDateParsed.setHours(0, 0, 0, 0);
+              const diffDays = Math.ceil((now.getTime() - dueDateParsed.getTime()) / (1000 * 60 * 60 * 24));
+              if (diffDays > 0) {
+                daysPastDue = diffDays;
+                overdueType = 'Calendar';
+                debugStats.calendarOverdue++;
+              }
             }
           }
-        }
-        
-        // Check Running Hours-based overdue (PAST grace period: hoursRemaining < -168)
-        if (maintenanceBasis === 'Running Hours' || maintenanceBasis === 'Calendar+RH') {
-          const dueRH = parseRH(job?.nextDueRH) ?? parseRH(wo.nextDueReading);
-          const currentRH = parseRH(component?.currentCumulativeRH) ?? parseRH(wo.currentReading);
           
-          if (dueRH != null && currentRH != null) {
-            const hoursRemaining = dueRH - currentRH;
-            
-            // OVERDUE = currentRH > nextDueRH + grace period
-            // hoursRemaining < -RH_GRACE_HOURS
-            if (hoursRemaining < -RH_GRACE_HOURS) {
-              isOverdue = true;
-              hoursPastDue = Math.abs(hoursRemaining) - RH_GRACE_HOURS;
+          if (maintenanceBasis === 'Running Hours' || maintenanceBasis === 'Calendar+RH') {
+            if (dueRH != null && currentRH != null && currentRH > dueRH) {
+              hoursPastDue = Math.round(currentRH - dueRH);
               if (overdueType === '') {
-                overdueType = maintenanceBasis === 'Calendar+RH' ? 'Both' : 'RH';
+                overdueType = 'RH';
+              } else {
+                overdueType = 'Both';
               }
               debugStats.rhOverdue++;
             }
-          }
-        }
-        
-        if (isOverdue) {
-          const isCriticalEquipment = component?.critical === true || component?.critical === 'true';
-          
-          // Calculate severity level
-          let overdueSeverity: string;
-          if (isCriticalEquipment || daysPastDue > 30 || hoursPastDue > 720) {
-            overdueSeverity = 'CRITICAL';
-            debugStats.criticalSeverity++;
-          } else if (daysPastDue > 14 || hoursPastDue > 336) {
-            overdueSeverity = 'SEVERE';
-            debugStats.severeSeverity++;
-          } else if (daysPastDue > 7 || hoursPastDue > 168) {
-            overdueSeverity = 'MODERATE';
-            debugStats.moderateSeverity++;
-          } else {
-            overdueSeverity = 'MINOR';
-            debugStats.minorSeverity++;
           }
           
           if (isCriticalEquipment) {
@@ -11265,52 +11253,43 @@ export async function registerRoutes(app: Express): Promise<Server> {
             componentCode: wo.componentCode || '-',
             componentName: component?.name || wo.component || '-',
             department: wo.department || job?.department || '-',
-            dueDate: wo.dueDateSnapshot || wo.dueDate || '-',
+            dueDate: dueDate || '-',
             daysPastDue: daysPastDue,
             nextDueReading: job?.nextDueRH || wo.nextDueReading || '-',
             currentReading: component?.currentCumulativeRH || wo.currentReading || '-',
-            hoursPastDue: Math.round(hoursPastDue),
+            hoursPastDue: hoursPastDue,
             overdueType: overdueType,
             assignedTo: wo.assignedTo || job?.assignedTo || '-',
             lastDoneDate: wo.lastDoneDateSnapshot || '-',
-            priority: wo.jobPriority || job?.jobPriority || 'Medium',
-            critical: isCriticalEquipment ? 'YES' : 'No',
-            overdueSeverity: overdueSeverity,
-            severityOrder: overdueSeverity === 'CRITICAL' ? 0 : 
-                          overdueSeverity === 'SEVERE' ? 1 : 
-                          overdueSeverity === 'MODERATE' ? 2 : 3
+            critical: isCriticalEquipment ? 'YES' : 'No'
           });
         }
       }
       
       // DEBUG: Log filtering stats
-      console.log(`📊 [OVERDUE JOBS REPORT] ─────────────────────────────────────────────`);
-      console.log(`📊 [OVERDUE JOBS REPORT] FILTERING STATS:`);
-      console.log(`📊 [OVERDUE JOBS REPORT]   Skipped Completed: ${debugStats.skippedCompleted}`);
-      console.log(`📊 [OVERDUE JOBS REPORT]   Skipped Postponed: ${debugStats.skippedPostponed}`);
-      console.log(`📊 [OVERDUE JOBS REPORT]   Calendar Overdue (past ${CALENDAR_GRACE_DAYS}d grace): ${debugStats.calendarOverdue}`);
-      console.log(`📊 [OVERDUE JOBS REPORT]   RH Overdue (past ${RH_GRACE_HOURS}h grace): ${debugStats.rhOverdue}`);
-      console.log(`📊 [OVERDUE JOBS REPORT] SEVERITY BREAKDOWN:`);
-      console.log(`📊 [OVERDUE JOBS REPORT]   CRITICAL: ${debugStats.criticalSeverity}`);
-      console.log(`📊 [OVERDUE JOBS REPORT]   SEVERE: ${debugStats.severeSeverity}`);
-      console.log(`📊 [OVERDUE JOBS REPORT]   MODERATE: ${debugStats.moderateSeverity}`);
-      console.log(`📊 [OVERDUE JOBS REPORT]   MINOR: ${debugStats.minorSeverity}`);
-      console.log(`📊 [OVERDUE JOBS REPORT]   Critical Equipment Overdue: ${debugStats.criticalEquipment}`);
-      console.log(`📊 [OVERDUE JOBS REPORT]   TOTAL OVERDUE JOBS: ${overdueJobs.length}`);
-      console.log(`📊 [OVERDUE JOBS REPORT] ═══════════════════════════════════════════`);
+      console.log(`[OVERDUE JOBS REPORT] ---------------------------------------------`);
+      console.log(`[OVERDUE JOBS REPORT] FILTERING STATS:`);
+      console.log(`[OVERDUE JOBS REPORT]   Skipped Completed: ${debugStats.skippedCompleted}`);
+      console.log(`[OVERDUE JOBS REPORT]   Skipped Postponed: ${debugStats.skippedPostponed}`);
+      console.log(`[OVERDUE JOBS REPORT]   Skipped Execution Records: ${debugStats.skippedExecution}`);
+      console.log(`[OVERDUE JOBS REPORT]   Calendar Overdue: ${debugStats.calendarOverdue}`);
+      console.log(`[OVERDUE JOBS REPORT]   RH Overdue: ${debugStats.rhOverdue}`);
+      console.log(`[OVERDUE JOBS REPORT]   Critical Equipment Overdue: ${debugStats.criticalEquipment}`);
+      console.log(`[OVERDUE JOBS REPORT]   TOTAL OVERDUE JOBS: ${overdueJobs.length}`);
+      console.log(`[OVERDUE JOBS REPORT] =============================================`);
       
-      // Sort: Severity (CRITICAL first), then daysPastDue DESC, then critical equipment first
+      // Sort: Critical Equipment first, then Days Overdue DESC, then Component Name ASC
       overdueJobs.sort((a, b) => {
-        if (a.severityOrder !== b.severityOrder) {
-          return a.severityOrder - b.severityOrder;
-        }
-        if (a.daysPastDue !== b.daysPastDue) {
-          return b.daysPastDue - a.daysPastDue; // Most overdue first
-        }
+        // Critical equipment first
         if (a.critical !== b.critical) {
           return a.critical === 'YES' ? -1 : 1;
         }
-        return 0;
+        // Then by days overdue (most overdue first)
+        if (a.daysPastDue !== b.daysPastDue) {
+          return b.daysPastDue - a.daysPastDue;
+        }
+        // Then alphabetically by component name
+        return (a.componentName || '').localeCompare(b.componentName || '');
       });
       
       // Calculate summary stats
@@ -11323,7 +11302,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // ═══════════════════════════════════════════════════════════════
       // CREATE PROFESSIONAL EXCEL REPORT - STANDARDIZED MARITIME THEME
-      // Uses AMBER accent (not red) per user feedback - professional look
+      // FIXED: Removed Severity and Priority columns (not in database)
+      // 15 columns only, simpler formatting, matches UI count exactly
       // ═══════════════════════════════════════════════════════════════
       
       const workbook = new ExcelJS.Workbook();
@@ -11331,28 +11311,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
       workbook.created = new Date();
       
       const worksheet = workbook.addWorksheet('Overdue Jobs', {
-        views: [{ state: 'frozen', ySplit: 7, xSplit: 3 }]
+        views: [{ state: 'frozen', ySplit: 7, xSplit: 2 }]
       });
       
-      // Define columns with professional maritime standard
+      // Define 15 columns - REMOVED Severity and Priority (not real database fields)
+      // Order: S.No, WO#, Job Title, Comp Code, Comp Name, Dept, Due Date, Days Overdue,
+      //        Next Due RH, Current RH, RH Overdue, Assigned To, Last Done, Critical, Overdue Type
       const columns: ColumnDef[] = [
         { key: 'sno', header: 'S.No', width: 6, type: 'number', align: 'center' },
-        { key: 'severity', header: 'Severity', width: 10, type: 'text', align: 'center' },
-        { key: 'priority', header: 'Priority', width: 10, type: 'text', align: 'center' },
-        { key: 'workOrderNo', header: 'Work Order No', width: 22, type: 'text' },
-        { key: 'jobTitle', header: 'Job Title', width: 40, type: 'text' },
-        { key: 'componentCode', header: 'Comp Code', width: 15, type: 'text' },
-        { key: 'componentName', header: 'Component Name', width: 30, type: 'text' },
+        { key: 'workOrderNo', header: 'Work Order No', width: 24, type: 'text' },
+        { key: 'jobTitle', header: 'Job Title', width: 45, type: 'text' },
+        { key: 'componentCode', header: 'Comp Code', width: 16, type: 'text' },
+        { key: 'componentName', header: 'Component Name', width: 32, type: 'text' },
         { key: 'department', header: 'Dept', width: 12, type: 'text', align: 'center' },
-        { key: 'dueDate', header: 'Due Date', width: 15, type: 'date', align: 'center' },
+        { key: 'dueDate', header: 'Due Date', width: 14, type: 'date', align: 'center' },
         { key: 'daysPastDue', header: 'Days Overdue', width: 12, type: 'number', align: 'right' },
         { key: 'nextDueReading', header: 'Next Due RH', width: 14, type: 'number', align: 'right' },
         { key: 'currentReading', header: 'Current RH', width: 14, type: 'number', align: 'right' },
         { key: 'hoursPastDue', header: 'RH Overdue', width: 12, type: 'number', align: 'right' },
-        { key: 'overdueType', header: 'Overdue Type', width: 12, type: 'text', align: 'center' },
         { key: 'assignedTo', header: 'Assigned To', width: 20, type: 'text' },
-        { key: 'lastDoneDate', header: 'Last Done', width: 15, type: 'date', align: 'center' },
-        { key: 'critical', header: 'Critical Equip', width: 10, type: 'text', align: 'center' }
+        { key: 'lastDoneDate', header: 'Last Done', width: 14, type: 'date', align: 'center' },
+        { key: 'critical', header: 'Critical Equip', width: 12, type: 'text', align: 'center' },
+        { key: 'overdueType', header: 'Overdue Type', width: 12, type: 'text', align: 'center' }
       ];
       
       const totalColumns = columns.length;
@@ -11373,19 +11353,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Apply standardized table header (Row 7) - Light blue, NOT red
       applyStandardTableHeader(worksheet, columns, headerRowNum);
       
-      // Prepare data with S.No and warning symbols
+      // Prepare data with S.No - simplified, no severity field
+      // Critical equipment gets warning prefix on job title
       const preparedData = overdueJobs.map((job, index) => {
-        let jobTitleDisplay = job.jobTitle;
-        if (job.overdueSeverity === 'CRITICAL') {
-          jobTitleDisplay = `⚠⚠ ${job.jobTitle}`;
-        } else if (job.overdueSeverity === 'SEVERE') {
-          jobTitleDisplay = `⚠ ${job.jobTitle}`;
-        }
+        // Add warning prefix for critical equipment only (not fake severity)
+        const jobTitleDisplay = job.critical === 'YES' 
+          ? `[!] ${job.jobTitle}` 
+          : job.jobTitle;
         
         return {
           sno: index + 1,
-          severity: job.overdueSeverity,
-          priority: job.priority,
           workOrderNo: job.workOrderNo,
           jobTitle: jobTitleDisplay,
           componentCode: job.componentCode,
@@ -11396,47 +11373,69 @@ export async function registerRoutes(app: Express): Promise<Server> {
           nextDueReading: job.nextDueReading,
           currentReading: job.currentReading,
           hoursPastDue: job.hoursPastDue,
-          overdueType: job.overdueType,
           assignedTo: job.assignedTo,
           lastDoneDate: job.lastDoneDate,
-          critical: job.critical === 'YES' ? '⚠ YES' : 'No',
-          _severity: job.overdueSeverity
+          critical: job.critical,
+          overdueType: job.overdueType,
+          _isCriticalEquipment: job.critical === 'YES',
+          _daysOverdue: job.daysPastDue
         };
       });
       
-      // Define SUBTLE conditional styles per maritime standard
-      // Only CRITICAL items get light red background - not entire rows of bright red
+      // SIMPLIFIED conditional styles per user request:
+      // - Critical Equipment rows: light red background (#FFF1F0)
+      // - Very Overdue (>30 days): Bold red text on Days Overdue column only (handled per-cell)
+      // - Overdue (7-30 days): Bold orange text on Days Overdue column only (handled per-cell)
+      // - All other rows: Default alternating white/#F7F9FC
       const conditionalStyles: ConditionalStyle[] = [
         { 
-          condition: (row) => row._severity === 'CRITICAL',
-          style: 'danger'  // Light red background (#FFF1F0) - NOT bright red
-        },
-        { 
-          condition: (row) => row._severity === 'SEVERE',
-          style: 'warning' // Light amber background (#FFFBE6)
-        },
-        { 
-          condition: (row) => row._severity === 'MODERATE',
-          style: 'warning' // Light amber background
+          condition: (row) => row._isCriticalEquipment === true,
+          style: 'danger'  // Light red background (#FFF1F0) for critical equipment only
         }
-        // MINOR: uses default alternating rows (white/#F7F9FC)
+        // No more severity-based row coloring - keep it simple
       ];
       
       // Apply standardized data rows with subtle formatting
       applyStandardDataRows(worksheet, preparedData, columns, dataStartRow, conditionalStyles);
       
+      // Apply special formatting for Days Overdue column (column H = column 8)
+      // >30 days: Bold red text (#F5222D)
+      // 7-30 days: Bold orange text (#FAAD14)
+      const daysOverdueColIndex = 8; // Days Overdue is column H (8th column)
+      const criticalColIndex = 14; // Critical Equip is column N (14th column)
+      
+      for (let i = 0; i < preparedData.length; i++) {
+        const rowNum = dataStartRow + i;
+        const row = preparedData[i];
+        
+        // Format Days Overdue column based on value
+        const daysCell = worksheet.getCell(rowNum, daysOverdueColIndex);
+        if (row._daysOverdue > 30) {
+          daysCell.font = { bold: true, color: { argb: 'FFF5222D' } }; // Red
+        } else if (row._daysOverdue > 7) {
+          daysCell.font = { bold: true, color: { argb: 'FFFAAD14' } }; // Orange
+        }
+        
+        // Format Critical Equipment column - bold red if YES
+        if (row._isCriticalEquipment) {
+          const critCell = worksheet.getCell(rowNum, criticalColIndex);
+          critCell.font = { bold: true, color: { argb: 'FFF5222D' } };
+        }
+      }
+      
       // Calculate summary row position
       const lastDataRowNum = dataStartRow + Math.max(overdueJobs.length - 1, 0);
       const summaryStartRow = lastDataRowNum + 3;
       
-      // Apply standardized summary section
+      // Apply standardized summary section - REMOVED fake severity counts
+      // Only show real database-backed metrics
       const summary: SummaryItem[] = [
         { label: 'Total Overdue Jobs:', value: overdueJobs.length, highlight: true },
-        { label: 'Critical Severity:', value: debugStats.criticalSeverity, highlight: true },
-        { label: 'Severe Overdue:', value: debugStats.severeSeverity },
-        { label: 'Overdue Critical Equipment:', value: debugStats.criticalEquipment, highlight: true },
+        { label: 'Critical Equipment Overdue:', value: debugStats.criticalEquipment, highlight: true },
         { label: 'Average Days Overdue:', value: avgDaysPastDue },
-        { label: 'Longest Overdue:', value: `${maxDaysPastDue} days`, highlight: true }
+        { label: 'Longest Overdue:', value: `${maxDaysPastDue} days`, highlight: true },
+        { label: 'Calendar Overdue:', value: debugStats.calendarOverdue },
+        { label: 'RH Overdue:', value: debugStats.rhOverdue }
       ];
       
       const lastSummaryRow = applyStandardSummary(
@@ -11460,7 +11459,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const buffer = await workbook.xlsx.writeBuffer();
       const filename = generateFilename('OverdueJobs', vesselName);
       
-      console.log(`📊 [OVERDUE JOBS REPORT] Generated: ${filename} (${overdueJobs.length} jobs)`);
+      console.log(`[OVERDUE JOBS REPORT] Generated: ${filename} (${overdueJobs.length} jobs)`);
       
       res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
       res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
