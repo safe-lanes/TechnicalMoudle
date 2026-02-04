@@ -1,0 +1,72 @@
+URGENT: The Overdue Jobs report format is COMPLETELY WRONG and unprofessional.
+
+CURRENT ISSUES:
+❌ Only 6 columns (should be 17 columns!)
+❌ Missing Job Title column (critical information!)
+❌ Missing Severity column (CRITICAL/SEVERE/MODERATE classification)
+❌ Missing Department column
+❌ Missing all Running Hours columns (Next Due RH, Current RH, RH Overdue)
+❌ Missing Overdue Type column (Calendar/RH/Both)
+❌ Missing Assigned To column
+❌ Missing Last Done Date column
+❌ Missing Critical Equipment column
+❌ Missing Component Code column (only showing Component Name)
+❌ Header section is completely different from Report #1
+❌ Summary section is minimal (only 3 metrics instead of 8)
+❌ No professional formatting like Report #1
+
+REQUIRED FIX:
+
+You MUST use the EXACT SAME professional format as Report #1 (Due Jobs 7 Days), just with:
+1. Red color scheme instead of blue
+2. Different columns (17 columns as specified)
+3. Severity-based sorting and highlighting
+
+STEP-BY-STEP FIX INSTRUCTIONS:
+
+1. COPY THE ENTIRE Excel generation code from Report #1
+   - Find the code for "Due Jobs 7 Days" report
+   - Copy the ENTIRE function that creates the workbook, headers, data rows, summary
+   - This ensures consistent professional formatting
+
+2. MODIFY ONLY THE FOLLOWING:
+
+A. HEADER SECTION (Rows 1-6):
+   Row 1: Change "DUE JOBS REPORT (NEXT 7 DAYS)" to "OVERDUE JOBS REPORT"
+   Row 2: Make it RED text (#C00000) with emphasis
+   Row 5: Change "Total Due" to "Total Overdue"
+   Keep everything else EXACTLY the same
+
+B. HEADER ROW (Row 7):
+   Change background from #1F4E78 (blue) to #C00000 (dark red)
+   Keep white text, bold, centered - exactly like Report #1
+
+C. COLUMN LAYOUT (17 columns - MATCH THIS EXACTLY):
+   
+   | Col | Header | Width | Data | Format |
+   |-----|--------|-------|------|--------|
+   | A | S.No | 6 | Row number | Number |
+   | B | Severity | 10 | CRITICAL/SEVERE/MODERATE/MINOR | Text, Bold |
+   | C | Priority | 10 | jobPriority | Text |
+   | D | Work Order No | 22 | workOrderNo | Text |
+   | E | Job Title | 40 | jobTitle | Text |
+   | F | Component Code | 15 | componentCode | Text |
+   | G | Component Name | 30 | componentName | Text |
+   | H | Department | 12 | department | Text |
+   | I | Due Date | 15 | dueDate | DD-MMM-YYYY |
+   | J | Days Overdue | 12 | daysPastDue | Number |
+   | K | Next Due RH | 14 | nextDueReading | Number with comma |
+   | L | Current RH | 14 | currentCumulativeRH | Number with comma |
+   | M | RH Overdue | 12 | hoursPastDue | Number |
+   | N | Overdue Type | 12 | "Calendar"/"RH"/"Both" | Text |
+   | O | Assigned To | 20 | assignedTo name | Text |
+   | P | Last Done | 15 | lastDoneDate or "N/A" | DD-MMM-YYYY |
+   | Q | Critical Equip | 10 | "YES"/"NO" | Text |
+
+D. CALCULATE SEVERITY FOR EACH ROW:
+   ```javascript
+   const severity = 
+     (critical === true || daysPastDue > 30 || hoursPastDue > 720) ? "CRITICAL" :
+     (daysPastDue > 14 || hoursPastDue > 336) ? "SEVERE" :
+     (daysPastDue > 7 || hoursPastDue > 168) ? "MODERATE" :
+     "MINOR";
