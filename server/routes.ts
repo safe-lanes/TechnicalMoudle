@@ -12014,6 +12014,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return isNaN(d.getTime()) ? null : d;
       };
       
+      // DEBUG: Log completed work orders for verification
+      const completedInPeriod = workOrders.filter((wo: any) => wo.status === 'Completed');
+      console.log(`[MONTHLY SUMMARY DEBUG] Total Completed WOs in vessel: ${completedInPeriod.length}`);
+      completedInPeriod.slice(0, 5).forEach((wo: any) => {
+        const completionDate = parseDate(wo.completionDateTime);
+        const inRange = completionDate && completionDate >= periodStart && completionDate <= periodEnd;
+        console.log(`  WO: ${wo.workOrderNo || wo.id}, Status: ${wo.status}, completionDateTime: ${wo.completionDateTime}, Parsed: ${completionDate?.toISOString() || 'null'}, InRange: ${inRange}`);
+      });
+      
       // Monthly WOs = jobs due in period OR completed in period
       const monthlyWOs = workOrders.filter((wo: any) => {
         const dueDate = parseDate(wo.dueDate);
@@ -12030,6 +12039,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         
         return isDueInMonth || isCompletedInMonth;
       });
+      
+      console.log(`[MONTHLY SUMMARY DEBUG] Period: ${periodStart.toISOString()} to ${periodEnd.toISOString()}`);
+      console.log(`[MONTHLY SUMMARY DEBUG] monthlyWOs: ${monthlyWOs.length}, CompletedInScope: ${monthlyWOs.filter((wo: any) => wo.status === 'Completed').length}`);
       
       // Completed jobs from monthlyWOs scope
       const completedWOs = monthlyWOs.filter((wo: any) => wo.status === 'Completed');
@@ -12058,7 +12070,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const criticalWOs = monthlyWOs.filter((wo: any) => {
         const comp = componentsByCodeMap.get(wo.componentCode || '');
         return comp?.classRelated === 'Yes' || comp?.classRelated === true || 
-               wo.priority === 'Critical' || wo.priority === 'High';
+               wo.classRelated === 'Yes' || wo.criticality === 'Yes' || wo.jobPriority === 'High';
       });
       
       let totalManHours = 0;
@@ -12079,7 +12091,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       };
       
       monthlyWOs.forEach((wo: any) => {
-        const priority = wo.priority || 'Normal';
+        const priority = wo.jobPriority || 'Normal';
         if (!priorityStats[priority]) priorityStats[priority] = { total: 0, completed: 0, overdue: 0 };
         priorityStats[priority].total++;
         if (wo.status === 'Completed') priorityStats[priority].completed++;
@@ -12087,7 +12099,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // Add cumulative overdue by priority (from ALL work orders)
       cumulativeOverdueWOs.forEach((wo: any) => {
-        const priority = wo.priority || 'Normal';
+        const priority = wo.jobPriority || 'Normal';
         if (!priorityStats[priority]) priorityStats[priority] = { total: 0, completed: 0, overdue: 0 };
         priorityStats[priority].overdue++;
       });
@@ -12119,13 +12131,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       monthlyWOs.forEach((wo: any) => {
         const job = jobsMap.get(wo.jobId || '');
-        let freqUnit = job?.frequencyUnit || 'Other';
-        if (freqUnit === 'Months' && job?.frequencyValue === 3) freqUnit = 'Quarterly';
-        else if (freqUnit === 'Months' && job?.frequencyValue === 12) freqUnit = 'Yearly';
+        // Use WO's frequencyUnit, fallback to job's frequencyUnit
+        let freqUnit = wo.frequencyUnit || job?.frequencyUnit || 'Other';
+        const freqValue = Number(wo.frequencyValue || job?.frequencyValue || 0);
+        if (freqUnit === 'Months' && freqValue === 3) freqUnit = 'Quarterly';
+        else if (freqUnit === 'Months' && freqValue === 12) freqUnit = 'Yearly';
         else if (freqUnit === 'Months') freqUnit = 'Monthly';
         else if (freqUnit === 'Weeks') freqUnit = 'Weekly';
         else if (freqUnit === 'Days') freqUnit = 'Daily';
         else if (freqUnit === 'Years') freqUnit = 'Yearly';
+        else if (freqUnit === 'Hours') freqUnit = 'Hours-Based';
         
         if (!freqStats[freqUnit]) freqStats[freqUnit] = { count: 0, completed: 0 };
         freqStats[freqUnit].count++;
@@ -12151,7 +12166,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const comp = componentsByCodeMap.get(wo.componentCode || '');
         const isClassRelated = comp?.classRelated === 'Yes' || comp?.classRelated === true;
         const isSolas = comp?.solasCritical === 'Yes' || comp?.solasCritical === true;
-        const isHighPriority = wo.priority === 'Critical' || wo.priority === 'High';
+        const isHighPriority = wo.criticality === 'Yes' || wo.jobPriority === 'High';
         const isCompleted = wo.status === 'Completed';
         
         if (isSolas) {
@@ -12173,7 +12188,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const comp = componentsByCodeMap.get(wo.componentCode || '');
         const isClassRelated = comp?.classRelated === 'Yes' || comp?.classRelated === true;
         const isSolas = comp?.solasCritical === 'Yes' || comp?.solasCritical === true;
-        const isHighPriority = wo.priority === 'Critical' || wo.priority === 'High';
+        const isHighPriority = wo.criticality === 'Yes' || wo.jobPriority === 'High';
         
         if (isSolas) criticalEquipStats.solas.overdue++;
         if (isClassRelated) criticalEquipStats.classCritical.overdue++;
