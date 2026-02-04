@@ -1,0 +1,219 @@
+🚨 STOP - DATA MISMATCH ANALYSIS REQUIRED
+
+I've reviewed the generated reports and they still contain CRITICAL DATA ERRORS.
+Before making any further changes, provide detailed analysis of these discrepancies.
+
+─────────────────────────────────────────────────────────
+ISSUE 1: COMPLETED JOBS SHOWING 0 (INCORRECT)
+─────────────────────────────────────────────────────────
+
+ACTUAL DATA IN SYSTEM (Work Orders → Completed Tab):
+- Total Completed Jobs: 17
+- Completion dates visible:
+  * LO Separators No.02: Completed 15-Jan-2026
+  * ME Turbochargers: Completed 14-Jan-2026
+  * ME Cylinder Covers No.03: Completed 08-Jan-2026
+  * ME Cylinder Liners No.01: Completed (date shown)
+  * ME Hp Fuel Pumps No.06: Completed 08-Jan-2026
+  * (and 12 more completed jobs)
+
+YOUR REPORTS SHOW:
+- Excel (January 2026): Total Completed = 0
+- PDF (February 2026): Completed = 0
+
+QUESTIONS FOR ANALYSIS:
+
+1. FIELD NAME VERIFICATION:
+   You said the field is `completionDateTime` (completion_date_time).
+   - What is the EXACT field name in the database schema?
+   - What is the EXACT field name returned by the API?
+   - Show me a sample completed work order object from the API response
+
+2. STATUS FIELD VERIFICATION:
+   - What values exist in the status field? ('Completed', 'Complete', 'COMPLETED'?)
+   - Is the status check case-sensitive?
+   - Show me the exact status values from the database
+
+3. COMPLETION DATE FORMAT:
+   - What format is completionDateTime stored in? (ISO string, Unix timestamp, Date object?)
+   - Show me an example of the actual completion date value
+   - Is the date comparison working correctly?
+
+4. FILTER LOGIC VERIFICATION:
+   Show me the EXACT filter code currently running in:
+   - Excel endpoint (routes.ts line number)
+   - PDF generation (MaintenanceReports.tsx line number)
+   
+   Include the actual code, not just description.
+
+─────────────────────────────────────────────────────────
+ISSUE 2: EXCEL vs PDF DATA MISMATCH
+─────────────────────────────────────────────────────────
+
+EXCEL REPORT (January 2026):
+- Jobs In Scope: 4
+- Total Completed: 0
+- Total Overdue: 139
+- Department → Engine: 4 planned, 0 completed, 135 overdue
+- Department → Deck: 0 planned, 0 completed, 4 overdue
+
+PDF REPORT (February 2026):
+- Jobs In Scope: 3
+- Completed: 0
+- Cumulative Overdue: 139
+- Department → Engine: 3 jobs, 0 done, 135 overdue
+- Department → Deck: 0 jobs, 0 done, 4 overdue
+
+PROBLEMS IDENTIFIED:
+1. Different "Jobs In Scope" counts (4 vs 3) for different months - OK
+2. Overdue count SAME for both reports (139) - Should change monthly
+3. Department overdue split is IDENTICAL (135 Engine, 4 Deck) - Suspicious
+4. BOTH showing 0 completed despite 17 completed jobs in system
+
+QUESTIONS FOR ANALYSIS:
+
+5. DATA SOURCE CONSISTENCY:
+   - Are both reports using the SAME data source (API endpoint)?
+   - Or does PDF use frontend state and Excel use backend query?
+   - Show me the data flow for each report type
+
+6. DATE RANGE FILTERING:
+   - January report: Should show jobs completed 01-Jan to 31-Jan-2026
+   - February report: Should show jobs completed 01-Feb to 28-Feb-2026
+   - Is the date range filter actually working?
+   - Show me the actual periodStart and periodEnd values being used
+
+─────────────────────────────────────────────────────────
+ISSUE 3: PRIORITY/FREQUENCY BREAKDOWNS SHOWING WRONG DATA
+─────────────────────────────────────────────────────────
+
+YOUR REPORTS SHOW:
+Priority Breakdown:
+- High Priority: 0 (but Work Orders tab shows "High Priority: 3")
+- Medium Priority: 0
+- Low Priority: 0
+- All showing as "Normal Priority" in PDF
+
+Frequency Breakdown:
+- Only "Monthly: 4" shown
+- But Due Jobs report shows "Daily/Weekly" jobs exist
+
+QUESTIONS FOR ANALYSIS:
+
+7. PRIORITY FIELD MAPPING:
+   - What is the priority field name? (job_priority, priority, jobPriority?)
+   - What are the actual priority values in the database?
+   - Show me the priority breakdown code
+
+8. FREQUENCY FIELD MAPPING:
+   - What is the frequency field name? (frequency_unit, frequency, frequencyUnit?)
+   - Show me actual frequency values from the database
+   - Show me the frequency breakdown code
+
+─────────────────────────────────────────────────────────
+ISSUE 4: CRITICAL EQUIPMENT ALWAYS SHOWING 0
+─────────────────────────────────────────────────────────
+
+YOUR REPORTS SHOW:
+- SOLAS Critical: 0
+- Class Critical: 0
+- High Priority: 0
+
+BUT EARLIER OVERDUE JOBS REPORT SHOWED:
+- 53 jobs marked as Critical Equipment ("YES" in Critical column)
+
+QUESTIONS FOR ANALYSIS:
+
+9. CRITICAL EQUIPMENT LOGIC:
+   - What field determines "SOLAS Critical"? (class_related = 'Yes'?)
+   - What field determines "Class Critical"?
+   - Show me the actual field names and values
+   - Show me the critical equipment filtering code
+
+─────────────────────────────────────────────────────────
+REQUIRED DELIVERABLES
+─────────────────────────────────────────────────────────
+
+DO NOT MAKE ANY CODE CHANGES YET.
+
+Instead, provide:
+
+1. DATABASE SCHEMA VERIFICATION
+   - Show me the actual work_orders table schema (field names and types)
+   - Show me a sample work order object from the API (completed job with all fields)
+   - Show me the actual field values for status, priority, frequency, critical equipment
+
+2. CURRENT CODE REVIEW
+   - Show me the EXACT current filter logic in Excel endpoint
+   - Show me the EXACT current filter logic in PDF generation
+   - Show me the field name mappings being used
+   - Highlight any discrepancies between Excel and PDF code
+
+3. DATA FLOW ANALYSIS
+   - Trace data from database → API → Report generation
+   - Identify where the completed jobs are being filtered out
+   - Identify why priority/frequency/critical breakdowns show 0
+
+4. ROOT CAUSE IDENTIFICATION
+   - For each issue (completed=0, priority=0, critical=0), explain:
+     * Which part of the code is wrong
+     * Why the current logic fails
+     * What the actual values look like vs expected
+
+5. PROPOSED FIX PLAN (with proof)
+   - Show me the specific lines of code that need to change
+   - Show me the BEFORE and AFTER code
+   - Explain why the fix will work based on actual schema
+
+─────────────────────────────────────────────────────────
+CRITICAL: VERIFY FIELD NAMES FIRST
+─────────────────────────────────────────────────────────
+
+The most likely issue is field name mismatch. You might be using:
+- `completionDateTime` but actual field is `completedDate`
+- `job_priority` but actual field is `priority`
+- `frequency_unit` but actual field is `frequency`
+
+Before fixing anything, PROVE what the actual field names are by:
+1. Querying the database directly OR
+2. Logging an API response with a completed work order OR
+3. Showing me the Prisma schema / database migrations
+
+START YOUR ANALYSIS NOW.
+DO NOT CODE - ONLY ANALYZE AND REPORT BACK.
+📋 PASTE THIS TO REPLIT:
+text
+🚨 STOP ALL IMPLEMENTATION - CRITICAL DATA ANALYSIS REQUIRED
+
+The reports are still showing WRONG data even after your fixes.
+
+ROOT ISSUE SUSPECTS:
+1. Completed jobs showing 0 (but system has 17 completed jobs in Jan 2026)
+2. Priority breakdown all showing 0
+3. Critical equipment all showing 0
+4. Excel and PDF using different data or field names
+
+REQUIRED ANALYSIS (NO CODING):
+
+Answer these 9 questions with ACTUAL code evidence:
+
+1. What is the EXACT completion date field name in your API response?
+2. What is the EXACT status field value for completed jobs? (case-sensitive)
+3. Show me a sample completed work order object from the API
+4. Show me the current Excel filter code (exact lines)
+5. Show me the current PDF filter code (exact lines)
+6. What are the actual priority field values in the database?
+7. What are the actual frequency field values in the database?
+8. What field determines "Critical Equipment"?
+9. Trace why completed jobs are being filtered out (line-by-line)
+
+DELIVERABLES:
+- Database schema or Prisma model for work_orders
+- Sample API response with a completed job (full object)
+- Current filter code from both Excel and PDF
+- Root cause explanation for each 0 value
+- Field name mapping table (your code vs actual schema)
+
+DO NOT MAKE CHANGES - ONLY ANALYZE AND REPORT.
+
+I need PROOF of what the actual data structure is before proceeding.
