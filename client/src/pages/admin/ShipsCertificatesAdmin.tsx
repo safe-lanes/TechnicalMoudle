@@ -1371,9 +1371,6 @@ export default function ShipsCertificatesAdmin() {
                     {viewModes.master === "edit" && (
                       <td className="px-3 py-3">
                         <div className="flex items-center justify-center gap-1">
-                          <Button size="icon" variant="ghost" className="h-8 w-8" data-testid={`button-edit-${cert.id}`}>
-                            <Pencil className="h-4 w-4" />
-                          </Button>
                           <Button size="icon" variant="ghost" className="h-8 w-8 text-destructive" data-testid={`button-delete-${cert.id}`}>
                             <Trash2 className="h-4 w-4" />
                           </Button>
