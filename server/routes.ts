@@ -10705,7 +10705,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // =====================================================
   
   // Due Jobs (7 Days) - Excel Export
-  // Returns an Excel file with all work orders due within the next 7 days
+  // Returns an Excel file with all work orders due within the next 7 days (including overdue)
   app.post("/technical/api/reports/due-jobs-7-days", async (req, res) => {
     try {
       const { vesselId } = req.body;
@@ -10735,14 +10735,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // RH threshold: 168 hours (7 days equivalent)
       const RH_THRESHOLD_HOURS = 168;
       
-      // Helper to parse dates
+      // DEBUG: Log report generation parameters
+      console.log('📊 [DUE JOBS REPORT] ═══════════════════════════════════════════');
+      console.log(`📊 [DUE JOBS REPORT] Vessel: ${vesselName} (${vesselId})`);
+      console.log(`📊 [DUE JOBS REPORT] Today: ${now.toISOString().split('T')[0]}`);
+      console.log(`📊 [DUE JOBS REPORT] 7 Days From Now: ${sevenDaysFromNow.toISOString().split('T')[0]}`);
+      console.log(`📊 [DUE JOBS REPORT] Total Work Orders Fetched: ${workOrders.length}`);
+      console.log(`📊 [DUE JOBS REPORT] Total Jobs Fetched: ${jobs.length}`);
+      console.log(`📊 [DUE JOBS REPORT] Total Components Fetched: ${components.length}`);
+      
+      // Helper to parse dates - supports multiple formats
       const parseDate = (dateStr: string | null | undefined): Date | null => {
         if (!dateStr) return null;
         const MONTH_NAMES: { [key: string]: number } = {
           'Jan': 0, 'Feb': 1, 'Mar': 2, 'Apr': 3, 'May': 4, 'Jun': 5,
           'Jul': 6, 'Aug': 7, 'Sep': 8, 'Oct': 9, 'Nov': 10, 'Dec': 11
         };
-        // Try DD-MMM-YYYY format
+        // Try DD-MMM-YYYY format (e.g., "15-Feb-2026")
         const parts = dateStr.split('-');
         if (parts.length === 3) {
           const day = parseInt(parts[0], 10);
@@ -10769,12 +10778,34 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return isNaN(num) ? null : num;
       };
       
-      // Filter work orders that are due within 7 days (including overdue)
+      // Filter work orders that are due within 7 days OR are overdue
       const dueJobs: any[] = [];
+      let debugStats = {
+        total: workOrders.length,
+        skippedCompleted: 0,
+        skippedPostponed: 0,
+        calendarBased: 0,
+        rhBased: 0,
+        calendarOverdue: 0,
+        rhOverdue: 0,
+        calendarDueSoon: 0,
+        rhDueSoon: 0,
+        noDueDate: 0,
+        noRhData: 0,
+        futureDue: 0
+      };
       
       for (const wo of workOrders) {
-        // Skip completed and postponed jobs
-        if (wo.status === 'Completed' || wo.status === 'Postponed') continue;
+        // Skip completed jobs
+        if (wo.status === 'Completed') {
+          debugStats.skippedCompleted++;
+          continue;
+        }
+        // Skip postponed jobs
+        if (wo.status === 'Postponed') {
+          debugStats.skippedPostponed++;
+          continue;
+        }
         
         const job = wo.jobId ? jobsMap.get(wo.jobId) : jobs.find(j => j.jobNo === wo.templateCode);
         const component = wo.componentCode 
@@ -10787,41 +10818,74 @@ export async function registerRoutes(app: Express): Promise<Server> {
         let hoursRemaining: number | null = null;
         let urgencyScore: number = 999;
         let isOverdue = false;
+        let statusIndicator = 'ACTIVE';
         
-        // Check Calendar-based due (include overdue and due within 7 days)
+        // Check Calendar-based due (include overdue AND due within 7 days)
         if (maintenanceBasis === 'Calendar' || maintenanceBasis === 'Calendar+RH') {
+          debugStats.calendarBased++;
           const dueDate = parseDate(wo.dueDate);
           if (dueDate) {
             dueDate.setHours(0, 0, 0, 0);
             daysRemaining = Math.ceil((dueDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
-            // Include overdue (daysRemaining < 0) and due within 7 days
-            if (daysRemaining <= 7) {
+            
+            // CRITICAL: Include OVERDUE jobs (daysRemaining < 0)
+            if (daysRemaining < 0) {
               isDue = true;
-              if (daysRemaining < 0) isOverdue = true;
-              urgencyScore = daysRemaining; // Negative for overdue (most urgent)
+              isOverdue = true;
+              statusIndicator = 'OVERDUE';
+              urgencyScore = daysRemaining; // Most negative = most urgent
+              debugStats.calendarOverdue++;
             }
+            // Include jobs due within 7 days
+            else if (daysRemaining <= 7) {
+              isDue = true;
+              if (daysRemaining <= 2) {
+                statusIndicator = 'URGENT';
+              } else {
+                statusIndicator = 'DUE';
+              }
+              urgencyScore = daysRemaining;
+              debugStats.calendarDueSoon++;
+            } else {
+              debugStats.futureDue++;
+            }
+          } else {
+            debugStats.noDueDate++;
           }
         }
         
-        // Check Running Hours-based due (include overdue and due within 168 hours)
+        // Check Running Hours-based due (include overdue AND due within 168 hours)
         if (maintenanceBasis === 'Running Hours' || maintenanceBasis === 'Calendar+RH') {
+          if (maintenanceBasis === 'Running Hours') debugStats.rhBased++;
           const dueRH = parseRH(job?.nextDueRH) ?? parseRH(wo.nextDueReading);
           const currentRH = parseRH(component?.currentCumulativeRH) ?? parseRH(wo.currentReading);
           
           if (dueRH != null && currentRH != null) {
             hoursRemaining = dueRH - currentRH;
-            // Include overdue (hoursRemaining < 0) and due within 168 hours
-            if (hoursRemaining <= RH_THRESHOLD_HOURS) {
+            
+            // CRITICAL: Include OVERDUE jobs (hoursRemaining < 0 means currentRH exceeded nextDueRH)
+            if (hoursRemaining < 0) {
               isDue = true;
-              if (hoursRemaining < 0) isOverdue = true;
+              isOverdue = true;
+              statusIndicator = 'OVERDUE';
               const rhUrgency = hoursRemaining / 24;
-              // For Calendar+RH, use the most urgent (lowest) value
-              if (maintenanceBasis === 'Calendar+RH' && daysRemaining != null) {
-                urgencyScore = Math.min(urgencyScore, rhUrgency);
-              } else if (maintenanceBasis === 'Running Hours') {
-                urgencyScore = rhUrgency;
-              }
+              urgencyScore = Math.min(urgencyScore, rhUrgency);
+              debugStats.rhOverdue++;
             }
+            // Include jobs due within 168 hours
+            else if (hoursRemaining <= RH_THRESHOLD_HOURS) {
+              isDue = true;
+              if (hoursRemaining <= 48) {
+                if (statusIndicator !== 'OVERDUE') statusIndicator = 'URGENT';
+              } else {
+                if (statusIndicator !== 'OVERDUE' && statusIndicator !== 'URGENT') statusIndicator = 'DUE';
+              }
+              const rhUrgency = hoursRemaining / 24;
+              urgencyScore = Math.min(urgencyScore, rhUrgency);
+              debugStats.rhDueSoon++;
+            }
+          } else {
+            if (maintenanceBasis === 'Running Hours') debugStats.noRhData++;
           }
         }
         
@@ -10843,12 +10907,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
             department: wo.department || job?.department || '-',
             critical: component?.critical ? 'Yes' : 'No',
             isOverdue,
+            statusIndicator,
             urgencyScore
           });
         }
       }
       
-      // Sort by urgencyScore ASC (most urgent first), then by priority DESC
+      // DEBUG: Log filtering stats
+      console.log(`📊 [DUE JOBS REPORT] ─────────────────────────────────────────────`);
+      console.log(`📊 [DUE JOBS REPORT] FILTERING STATS:`);
+      console.log(`📊 [DUE JOBS REPORT]   Skipped Completed: ${debugStats.skippedCompleted}`);
+      console.log(`📊 [DUE JOBS REPORT]   Skipped Postponed: ${debugStats.skippedPostponed}`);
+      console.log(`📊 [DUE JOBS REPORT]   Calendar-Based Jobs: ${debugStats.calendarBased}`);
+      console.log(`📊 [DUE JOBS REPORT]   RH-Based Jobs: ${debugStats.rhBased}`);
+      console.log(`📊 [DUE JOBS REPORT]   Calendar Overdue: ${debugStats.calendarOverdue}`);
+      console.log(`📊 [DUE JOBS REPORT]   Calendar Due Soon (≤7d): ${debugStats.calendarDueSoon}`);
+      console.log(`📊 [DUE JOBS REPORT]   RH Overdue: ${debugStats.rhOverdue}`);
+      console.log(`📊 [DUE JOBS REPORT]   RH Due Soon (≤168h): ${debugStats.rhDueSoon}`);
+      console.log(`📊 [DUE JOBS REPORT]   No Due Date: ${debugStats.noDueDate}`);
+      console.log(`📊 [DUE JOBS REPORT]   No RH Data: ${debugStats.noRhData}`);
+      console.log(`📊 [DUE JOBS REPORT]   Future Due (>7d): ${debugStats.futureDue}`);
+      console.log(`📊 [DUE JOBS REPORT]   TOTAL JOBS INCLUDED: ${dueJobs.length}`);
+      console.log(`📊 [DUE JOBS REPORT] ═══════════════════════════════════════════`);
+      
+      // Sort by urgencyScore ASC (most urgent/negative first), then by priority DESC
       const priorityOrder: Record<string, number> = { 'Critical': 4, 'High': 3, 'Medium': 2, 'Low': 1 };
       dueJobs.sort((a, b) => {
         if (a.urgencyScore !== b.urgencyScore) {
@@ -10857,158 +10939,340 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return (priorityOrder[b.priority] || 0) - (priorityOrder[a.priority] || 0);
       });
       
+      // Calculate summary counts
+      const overdueCnt = dueJobs.filter(j => j.isOverdue).length;
+      const criticalPriorityCnt = dueJobs.filter(j => j.priority === 'Critical').length;
+      const criticalEquipmentCnt = dueJobs.filter(j => j.critical === 'Yes').length;
+      const urgentCnt = dueJobs.filter(j => j.statusIndicator === 'URGENT').length;
+      
       // Create Excel workbook using ExcelJS
       const workbook = new ExcelJS.Workbook();
       workbook.creator = 'PMS System';
       workbook.created = new Date();
       
-      const worksheet = workbook.addWorksheet('Due Jobs (7 Days)');
+      const worksheet = workbook.addWorksheet('Due Jobs (7 Days)', {
+        views: [{ state: 'frozen', ySplit: 7, xSplit: 3 }] // Freeze header row and first 3 columns
+      });
       
-      // Define columns with widths
-      worksheet.columns = [
-        { header: 'S.No', key: 'sno', width: 8 },
-        { header: 'Work Order No', key: 'workOrderNo', width: 20 },
-        { header: 'Job Title', key: 'jobTitle', width: 35 },
-        { header: 'Component Code', key: 'componentCode', width: 15 },
-        { header: 'Component Name', key: 'componentName', width: 30 },
-        { header: 'Due Date', key: 'dueDate', width: 15 },
-        { header: 'Days Remaining', key: 'daysRemaining', width: 12 },
-        { header: 'Next Due Reading (RH)', key: 'nextDueReading', width: 18 },
-        { header: 'Current Reading (RH)', key: 'currentReading', width: 16 },
-        { header: 'RH Remaining', key: 'hoursRemaining', width: 12 },
-        { header: 'Maintenance Basis', key: 'maintenanceBasis', width: 18 },
-        { header: 'Frequency', key: 'frequency', width: 15 },
-        { header: 'Assigned To', key: 'assignedTo', width: 20 },
-        { header: 'Priority', key: 'priority', width: 12 },
-        { header: 'Department', key: 'department', width: 15 },
-        { header: 'Critical', key: 'critical', width: 10 }
+      // ═══════════════════════════════════════════════════════════════
+      // PROFESSIONAL HEADER SECTION (Rows 1-6)
+      // ═══════════════════════════════════════════════════════════════
+      
+      // Row 1: Main Title
+      worksheet.mergeCells('A1:P1');
+      const titleCell = worksheet.getCell('A1');
+      titleCell.value = 'PLANNED MAINTENANCE SYSTEM';
+      titleCell.font = { size: 18, bold: true, color: { argb: 'FF1F4E78' } };
+      titleCell.alignment = { horizontal: 'center', vertical: 'middle' };
+      worksheet.getRow(1).height = 28;
+      
+      // Row 2: Report Subtitle
+      worksheet.mergeCells('A2:P2');
+      const subtitleCell = worksheet.getCell('A2');
+      subtitleCell.value = 'DUE JOBS REPORT (NEXT 7 DAYS)';
+      subtitleCell.font = { size: 14, bold: true, color: { argb: 'FF1F4E78' } };
+      subtitleCell.alignment = { horizontal: 'center', vertical: 'middle' };
+      worksheet.getRow(2).height = 22;
+      
+      // Row 3: Empty
+      worksheet.getRow(3).height = 10;
+      
+      // Row 4: Vessel Name and Report Date
+      const reportDate = new Date();
+      const formatDate = (d: Date) => {
+        const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+        return `${d.getDate().toString().padStart(2, '0')}-${months[d.getMonth()]}-${d.getFullYear()} ${d.getHours().toString().padStart(2, '0')}:${d.getMinutes().toString().padStart(2, '0')}`;
+      };
+      worksheet.getCell('A4').value = `Vessel: ${vesselName}`;
+      worksheet.getCell('A4').font = { bold: true, size: 11 };
+      worksheet.mergeCells('N4:P4');
+      worksheet.getCell('N4').value = `Report Date: ${formatDate(reportDate)}`;
+      worksheet.getCell('N4').font = { bold: true, size: 11 };
+      worksheet.getCell('N4').alignment = { horizontal: 'right' };
+      worksheet.getRow(4).height = 18;
+      
+      // Row 5: Generated By and Total Jobs
+      worksheet.getCell('A5').value = 'Generated By: PMS System';
+      worksheet.getCell('A5').font = { size: 10, color: { argb: 'FF666666' } };
+      worksheet.mergeCells('N5:P5');
+      worksheet.getCell('N5').value = `Total Jobs: ${dueJobs.length}`;
+      worksheet.getCell('N5').font = { bold: true, size: 11 };
+      worksheet.getCell('N5').alignment = { horizontal: 'right' };
+      worksheet.getRow(5).height = 18;
+      
+      // Row 6: Empty (spacer before table)
+      worksheet.getRow(6).height = 10;
+      
+      // ═══════════════════════════════════════════════════════════════
+      // TABLE HEADER ROW (Row 7) - Professional Dark Blue
+      // ═══════════════════════════════════════════════════════════════
+      
+      // Define columns with new order (Priority and Status up front)
+      const columns = [
+        { key: 'sno', header: 'S.No', width: 6 },
+        { key: 'priority', header: 'Priority', width: 10 },
+        { key: 'statusIndicator', header: 'Status', width: 10 },
+        { key: 'workOrderNo', header: 'Work Order No', width: 22 },
+        { key: 'jobTitle', header: 'Job Title', width: 40 },
+        { key: 'componentCode', header: 'Comp Code', width: 15 },
+        { key: 'componentName', header: 'Component Name', width: 30 },
+        { key: 'department', header: 'Dept', width: 12 },
+        { key: 'dueDate', header: 'Due Date', width: 15 },
+        { key: 'daysRemaining', header: 'Days Left', width: 10 },
+        { key: 'nextDueReading', header: 'Next Due RH', width: 14 },
+        { key: 'currentReading', header: 'Current RH', width: 14 },
+        { key: 'hoursRemaining', header: 'RH Left', width: 10 },
+        { key: 'frequency', header: 'Frequency', width: 18 },
+        { key: 'assignedTo', header: 'Assigned To', width: 20 },
+        { key: 'critical', header: 'Critical', width: 10 }
       ];
       
-      // Style header row
-      const headerRow = worksheet.getRow(1);
+      // Set column widths
+      columns.forEach((col, idx) => {
+        worksheet.getColumn(idx + 1).width = col.width;
+      });
+      
+      // Add header row at Row 7
+      const headerRowNum = 7;
+      const headerRow = worksheet.getRow(headerRowNum);
+      columns.forEach((col, idx) => {
+        headerRow.getCell(idx + 1).value = col.header;
+      });
+      
+      // Style header row - Dark Blue (#1F4E78)
       headerRow.eachCell((cell) => {
         cell.fill = {
           type: 'pattern',
           pattern: 'solid',
-          fgColor: { argb: 'FF4472C4' }
+          fgColor: { argb: 'FF1F4E78' } // Dark blue
         };
-        cell.font = { bold: true, color: { argb: 'FFFFFFFF' } };
-        cell.alignment = { vertical: 'middle', horizontal: 'center' };
+        cell.font = { bold: true, color: { argb: 'FFFFFFFF' }, size: 11 };
+        cell.alignment = { vertical: 'middle', horizontal: 'center', wrapText: true };
         cell.border = {
-          top: { style: 'thin' },
-          left: { style: 'thin' },
-          bottom: { style: 'thin' },
-          right: { style: 'thin' }
+          top: { style: 'thin', color: { argb: 'FFFFFFFF' } },
+          left: { style: 'thin', color: { argb: 'FFFFFFFF' } },
+          bottom: { style: 'thin', color: { argb: 'FFFFFFFF' } },
+          right: { style: 'thin', color: { argb: 'FFFFFFFF' } }
         };
       });
       headerRow.height = 25;
       
-      // Add data rows
+      // ═══════════════════════════════════════════════════════════════
+      // DATA ROWS (Starting Row 8) - With alternate row colors
+      // ═══════════════════════════════════════════════════════════════
+      
+      const dataStartRow = 8;
+      
       if (dueJobs.length === 0) {
-        const emptyRow = worksheet.addRow({
-          sno: '',
-          workOrderNo: 'No jobs due in the next 7 days',
-          jobTitle: '',
-          componentCode: '',
-          componentName: '',
-          dueDate: '',
-          daysRemaining: '',
-          nextDueReading: '',
-          currentReading: '',
-          hoursRemaining: '',
-          maintenanceBasis: '',
-          frequency: '',
-          assignedTo: '',
-          priority: '',
-          department: '',
-          critical: ''
-        });
-        worksheet.mergeCells(emptyRow.number, 1, emptyRow.number, 16);
-        emptyRow.getCell(1).alignment = { horizontal: 'center' };
-        emptyRow.getCell(1).font = { italic: true, color: { argb: 'FF666666' } };
+        const emptyRow = worksheet.getRow(dataStartRow);
+        emptyRow.getCell(1).value = 'No jobs due in the next 7 days (including overdue)';
+        worksheet.mergeCells(dataStartRow, 1, dataStartRow, 16);
+        emptyRow.getCell(1).alignment = { horizontal: 'center', vertical: 'middle' };
+        emptyRow.getCell(1).font = { italic: true, color: { argb: 'FF666666' }, size: 11 };
+        emptyRow.height = 30;
       } else {
         dueJobs.forEach((job, index) => {
-          const row = worksheet.addRow({
-            sno: index + 1,
-            workOrderNo: job.workOrderNo,
-            jobTitle: job.jobTitle,
-            componentCode: job.componentCode,
-            componentName: job.componentName,
-            dueDate: job.dueDate,
-            daysRemaining: job.daysRemaining,
-            nextDueReading: job.nextDueReading,
-            currentReading: job.currentReading,
-            hoursRemaining: job.hoursRemaining,
-            maintenanceBasis: job.maintenanceBasis,
-            frequency: job.frequency,
-            assignedTo: job.assignedTo,
-            priority: job.priority,
-            department: job.department,
-            critical: job.critical
+          const rowNum = dataStartRow + index;
+          const row = worksheet.getRow(rowNum);
+          
+          // Add warning symbol for overdue jobs
+          const jobTitleDisplay = job.isOverdue ? `\u26A0 ${job.jobTitle}` : job.jobTitle;
+          const criticalDisplay = job.critical === 'Yes' ? '\u26A0 YES' : 'No';
+          
+          // Set cell values in new column order
+          row.getCell(1).value = index + 1; // S.No
+          row.getCell(2).value = job.priority; // Priority
+          row.getCell(3).value = job.statusIndicator; // Status
+          row.getCell(4).value = job.workOrderNo; // Work Order No
+          row.getCell(5).value = jobTitleDisplay; // Job Title
+          row.getCell(6).value = job.componentCode; // Component Code
+          row.getCell(7).value = job.componentName; // Component Name
+          row.getCell(8).value = job.department; // Department
+          row.getCell(9).value = job.dueDate; // Due Date
+          row.getCell(10).value = job.daysRemaining; // Days Remaining
+          row.getCell(11).value = job.nextDueReading; // Next Due RH
+          row.getCell(12).value = job.currentReading; // Current RH
+          row.getCell(13).value = job.hoursRemaining; // RH Remaining
+          row.getCell(14).value = job.frequency; // Frequency
+          row.getCell(15).value = job.assignedTo; // Assigned To
+          row.getCell(16).value = criticalDisplay; // Critical
+          
+          row.height = 20;
+          
+          // Alternate row coloring (white and light gray)
+          const isEvenRow = index % 2 === 1;
+          const baseColor = isEvenRow ? 'FFF2F2F2' : 'FFFFFFFF'; // Light gray or white
+          
+          // Apply base styling first
+          row.eachCell((cell, colNum) => {
+            cell.fill = {
+              type: 'pattern',
+              pattern: 'solid',
+              fgColor: { argb: baseColor }
+            };
+            cell.border = {
+              top: { style: 'thin', color: { argb: 'FFD3D3D3' } },
+              left: { style: 'thin', color: { argb: 'FFD3D3D3' } },
+              bottom: { style: 'thin', color: { argb: 'FFD3D3D3' } },
+              right: { style: 'thin', color: { argb: 'FFD3D3D3' } }
+            };
+            // Alignment based on column type
+            if (colNum === 1 || colNum === 10 || colNum === 11 || colNum === 12 || colNum === 13) {
+              cell.alignment = { horizontal: 'right', vertical: 'middle' }; // Numbers right-aligned
+            } else if (colNum === 9) {
+              cell.alignment = { horizontal: 'center', vertical: 'middle' }; // Dates centered
+            } else {
+              cell.alignment = { horizontal: 'left', vertical: 'middle' }; // Text left-aligned
+            }
           });
           
-          // Conditional formatting based on urgency
+          // ───────────────────────────────────────────────────────────
+          // CONDITIONAL FORMATTING
+          // ───────────────────────────────────────────────────────────
+          
           const days = typeof job.daysRemaining === 'number' ? job.daysRemaining : 999;
           const hours = typeof job.hoursRemaining === 'number' ? job.hoursRemaining : 999;
-          const isUrgent = days <= 2 || hours <= 48; // Within 2 days or 48 RH
+          const isUrgent = (days <= 2 && days >= 0) || (hours <= 48 && hours >= 0);
           
-          // Red background for overdue, light red for urgent
+          // OVERDUE: Red background (#FFC7CE), Dark red text (#9C0006), Bold
           if (job.isOverdue) {
             row.eachCell((cell) => {
               cell.fill = {
                 type: 'pattern',
                 pattern: 'solid',
-                fgColor: { argb: 'FFFFC7CE' } // Light red for overdue
+                fgColor: { argb: 'FFFFC7CE' }
               };
-              cell.font = { ...cell.font, color: { argb: 'FF9C0006' } }; // Dark red text
+              cell.font = { bold: true, color: { argb: 'FF9C0006' } };
             });
-          } else if (isUrgent) {
+          }
+          // URGENT: Yellow background (#FFF4CE), Dark orange text (#9C6500), Bold
+          else if (isUrgent) {
             row.eachCell((cell) => {
               cell.fill = {
                 type: 'pattern',
                 pattern: 'solid',
-                fgColor: { argb: 'FFFFE6E6' } // Very light red for urgent
+                fgColor: { argb: 'FFFFF4CE' }
               };
+              cell.font = { bold: true, color: { argb: 'FF9C6500' } };
             });
           }
           
-          // Red text for Critical priority
+          // Priority column: Red text for Critical
           if (job.priority === 'Critical') {
-            row.getCell('priority').font = { bold: true, color: { argb: 'FFFF0000' } };
+            row.getCell(2).font = { bold: true, color: { argb: 'FFFF0000' } };
           }
           
-          // Red text for Critical equipment
+          // Critical column: Red text and warning symbol
           if (job.critical === 'Yes') {
-            row.getCell('critical').font = { bold: true, color: { argb: 'FFFF0000' } };
+            row.getCell(16).font = { bold: true, color: { argb: 'FFFF0000' } };
           }
           
-          // Add borders to all cells
-          row.eachCell((cell) => {
-            cell.border = {
-              top: { style: 'thin', color: { argb: 'FFD0D0D0' } },
-              left: { style: 'thin', color: { argb: 'FFD0D0D0' } },
-              bottom: { style: 'thin', color: { argb: 'FFD0D0D0' } },
-              right: { style: 'thin', color: { argb: 'FFD0D0D0' } }
-            };
-          });
+          // Status column styling based on status
+          const statusCell = row.getCell(3);
+          if (job.statusIndicator === 'OVERDUE') {
+            statusCell.font = { bold: true, color: { argb: 'FFFF0000' } };
+          } else if (job.statusIndicator === 'URGENT') {
+            statusCell.font = { bold: true, color: { argb: 'FFFF6600' } };
+          } else if (job.statusIndicator === 'DUE') {
+            statusCell.font = { bold: true, color: { argb: 'FF0066CC' } };
+          }
         });
       }
       
-      // Add summary row
-      const lastDataRow = worksheet.lastRow?.number || 1;
-      worksheet.addRow([]); // Empty row
-      const summaryRow = worksheet.addRow({
-        sno: 'TOTAL JOBS:',
-        workOrderNo: dueJobs.length
-      });
-      summaryRow.font = { bold: true };
+      // ═══════════════════════════════════════════════════════════════
+      // SUMMARY SECTION (After data, skip 2 rows)
+      // ═══════════════════════════════════════════════════════════════
       
+      const lastDataRowNum = dataStartRow + Math.max(dueJobs.length - 1, 0);
+      const summaryStartRow = lastDataRowNum + 3;
+      
+      // Add thick border line above summary
+      for (let col = 1; col <= 16; col++) {
+        const borderCell = worksheet.getRow(summaryStartRow - 1).getCell(col);
+        borderCell.border = {
+          bottom: { style: 'medium', color: { argb: 'FF000000' } }
+        };
+      }
+      
+      // Summary Header
+      worksheet.getCell(`A${summaryStartRow}`).value = 'SUMMARY:';
+      worksheet.getCell(`A${summaryStartRow}`).font = { bold: true, size: 12 };
+      
+      // Total Jobs Due
+      worksheet.getCell(`A${summaryStartRow + 1}`).value = 'Total Jobs Due:';
+      worksheet.getCell(`B${summaryStartRow + 1}`).value = dueJobs.length;
+      worksheet.getCell(`B${summaryStartRow + 1}`).font = { bold: true };
+      
+      // Overdue Jobs
+      worksheet.getCell(`A${summaryStartRow + 2}`).value = 'Overdue Jobs:';
+      worksheet.getCell(`B${summaryStartRow + 2}`).value = overdueCnt;
+      worksheet.getCell(`B${summaryStartRow + 2}`).font = { 
+        bold: true, 
+        color: overdueCnt > 0 ? { argb: 'FFFF0000' } : { argb: 'FF000000' } 
+      };
+      
+      // Critical Priority Jobs
+      worksheet.getCell(`A${summaryStartRow + 3}`).value = 'Critical Priority Jobs:';
+      worksheet.getCell(`B${summaryStartRow + 3}`).value = criticalPriorityCnt;
+      worksheet.getCell(`B${summaryStartRow + 3}`).font = { bold: true };
+      
+      // Critical Equipment Jobs
+      worksheet.getCell(`A${summaryStartRow + 4}`).value = 'Critical Equipment Jobs:';
+      worksheet.getCell(`B${summaryStartRow + 4}`).value = criticalEquipmentCnt;
+      worksheet.getCell(`B${summaryStartRow + 4}`).font = { bold: true };
+      
+      // Urgent Jobs (new)
+      worksheet.getCell(`A${summaryStartRow + 5}`).value = 'Urgent Jobs (≤2 days/48 RH):';
+      worksheet.getCell(`B${summaryStartRow + 5}`).value = urgentCnt;
+      worksheet.getCell(`B${summaryStartRow + 5}`).font = { bold: true };
+      
+      // ═══════════════════════════════════════════════════════════════
+      // AUTO-FILTER on header row
+      // ═══════════════════════════════════════════════════════════════
+      
+      worksheet.autoFilter = {
+        from: { row: headerRowNum, column: 1 },
+        to: { row: headerRowNum, column: 16 }
+      };
+      
+      // ═══════════════════════════════════════════════════════════════
+      // PAGE SETUP for printing
+      // ═══════════════════════════════════════════════════════════════
+      
+      worksheet.pageSetup = {
+        orientation: 'landscape',
+        paperSize: 9, // A4
+        fitToPage: true,
+        fitToWidth: 1,
+        fitToHeight: 0,
+        printArea: `A1:P${summaryStartRow + 5}`,
+        margins: {
+          left: 0.25,
+          right: 0.25,
+          top: 0.5,
+          bottom: 0.5,
+          header: 0.3,
+          footer: 0.3
+        }
+      };
+      
+      // Print title rows (repeat header on each page)
+      worksheet.pageSetup.printTitlesRow = `${headerRowNum}:${headerRowNum}`;
+      
+      // ═══════════════════════════════════════════════════════════════
       // Generate buffer and send response
+      // ═══════════════════════════════════════════════════════════════
+      
       const buffer = await workbook.xlsx.writeBuffer();
       
-      const dateStr = new Date().toISOString().split('T')[0].replace(/-/g, '');
+      // Professional filename: PMS_DueJobs7Days_[VESSELNAME]_[YYYYMMDD]_[HHMM].xlsx
+      const now2 = new Date();
+      const dateStr = `${now2.getFullYear()}${(now2.getMonth()+1).toString().padStart(2,'0')}${now2.getDate().toString().padStart(2,'0')}`;
+      const timeStr = `${now2.getHours().toString().padStart(2,'0')}${now2.getMinutes().toString().padStart(2,'0')}`;
       const safeVesselName = vesselName.replace(/[^a-zA-Z0-9]/g, '_');
-      const filename = `Due_Jobs_7_Days_${safeVesselName}_${dateStr}.xlsx`;
+      const filename = `PMS_DueJobs7Days_${safeVesselName}_${dateStr}_${timeStr}.xlsx`;
+      
+      console.log(`📊 [DUE JOBS REPORT] Generated: ${filename} (${dueJobs.length} jobs)`);
       
       res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
       res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
