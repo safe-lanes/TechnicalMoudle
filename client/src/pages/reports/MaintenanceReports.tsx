@@ -63,14 +63,29 @@ const MaintenanceReports: React.FC<MaintenanceReportsProps> = ({ onBack, globalF
   const [generatingReports, setGeneratingReports] = useState<Set<string>>(new Set());
   const { toast } = useToast();
   const { data: vessels = [] } = useVessels();
-  const { vesselId } = useVessel();
+  const { vesselId: contextVesselId } = useVessel();
+  
+  // Use globalFilters.vessel if provided, otherwise fall back to context vesselId
+  const effectiveVesselId = (globalFilters?.vessel && globalFilters.vessel !== 'all') 
+    ? globalFilters.vessel 
+    : contextVesselId;
 
   const { data: workOrders = [] } = useQuery<any[]>({
-    queryKey: ['/technical/api/work-orders'],
+    queryKey: ['/technical/api/work-orders', effectiveVesselId],
+    queryFn: async () => {
+      const params = new URLSearchParams();
+      if (effectiveVesselId && effectiveVesselId !== 'all') {
+        params.set('vesselId', effectiveVesselId);
+      }
+      const url = `/technical/api/work-orders${params.toString() ? `?${params}` : ''}`;
+      const response = await fetch(url);
+      if (!response.ok) throw new Error('Failed to fetch work orders');
+      return response.json();
+    },
   });
 
   const { data: jobs = [] } = useQuery<any[]>({
-    queryKey: ['/technical/api/jobs', vesselId],
+    queryKey: ['/technical/api/jobs', effectiveVesselId],
   });
 
   const reports: MaintenanceReport[] = [
@@ -239,12 +254,14 @@ const MaintenanceReports: React.FC<MaintenanceReportsProps> = ({ onBack, globalF
   };
 
   const generateMaintenancePDF = async (reportId: string) => {
-    const vesselName = vessels.find(v => v.id === vesselId)?.name || vesselId || 'All Vessels';
+    const vesselName = vessels.find(v => v.id === effectiveVesselId)?.name || effectiveVesselId || 'All Vessels';
     const now = new Date();
     const sevenDaysFromNow = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
     
-    const vesselWorkOrders = vesselId && vesselId !== 'all' 
-      ? workOrders.filter((wo: any) => wo.vesselId === vesselId)
+    // Work orders are already filtered by vessel from the API query
+    // This secondary filter is kept for safety but should already be vessel-specific
+    const vesselWorkOrders = effectiveVesselId && effectiveVesselId !== 'all' 
+      ? workOrders.filter((wo: any) => wo.vesselId === effectiveVesselId)
       : workOrders;
 
     switch (reportId) {
