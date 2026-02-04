@@ -345,41 +345,142 @@ const MaintenanceReports: React.FC<MaintenanceReportsProps> = ({ onBack, globalF
       }
 
       case 'overdue-jobs': {
+        // Grace period: 7 days for calendar, 168 hours for RH
+        const GRACE_PERIOD_DAYS = 7;
+        const GRACE_PERIOD_RH = 168;
+        const gracePeriodDate = new Date(now);
+        gracePeriodDate.setDate(gracePeriodDate.getDate() - GRACE_PERIOD_DAYS);
+        
+        // Filter: Past grace period (dueDate < today - 7 days) or RH overdue > 168
         const overdueJobs = vesselWorkOrders.filter((wo: any) => {
-          if (!wo.dueDate || wo.status === 'Completed') return false;
-          return new Date(wo.dueDate) < now;
+          if (wo.status === 'Completed' || wo.status === 'Postponed') return false;
+          
+          // Calendar-based overdue (past grace period)
+          if (wo.dueDate) {
+            const dueDate = new Date(wo.dueDate);
+            if (dueDate < gracePeriodDate) return true;
+          }
+          
+          // RH-based overdue (past grace period of 168 RH)
+          if (wo.nextDueReading && wo.currentCumulativeRH) {
+            const rhOverdue = wo.currentCumulativeRH - wo.nextDueReading;
+            if (rhOverdue > GRACE_PERIOD_RH) return true;
+          }
+          
+          return false;
         });
 
+        // Calculate severity for each job
+        const calculateSeverity = (daysPastDue: number, hoursPastDue: number, isCriticalEquip: boolean): string => {
+          if (isCriticalEquip || daysPastDue > 30 || hoursPastDue > 720) return 'CRITICAL';
+          if (daysPastDue > 14 || hoursPastDue > 336) return 'SEVERE';
+          if (daysPastDue > 7 || hoursPastDue > 168) return 'MODERATE';
+          return 'MINOR';
+        };
+
+        // Calculate overdue type
+        const getOverdueType = (daysPastDue: number, hoursPastDue: number): string => {
+          const calendarOverdue = daysPastDue > GRACE_PERIOD_DAYS;
+          const rhOverdue = hoursPastDue > GRACE_PERIOD_RH;
+          if (calendarOverdue && rhOverdue) return 'Both';
+          if (rhOverdue) return 'RH';
+          return 'Calendar';
+        };
+
+        // 17 columns matching the Excel report format
         const columns = [
-          { header: 'WO Number', field: 'workOrderNumber', width: 40 },
-          { header: 'Component', field: 'component', width: 50 },
-          { header: 'Days Overdue', field: 'daysOverdue', width: 30 },
-          { header: 'Priority', field: 'priority', width: 25 },
-          { header: 'Original Due', field: 'formattedDueDate', width: 30 },
-          { header: 'Status', field: 'status', width: 25 }
+          { header: 'S.No', field: 'sNo', width: 8 },
+          { header: 'Severity', field: 'severity', width: 14 },
+          { header: 'Priority', field: 'priority', width: 14 },
+          { header: 'Work Order No', field: 'workOrderNumber', width: 30 },
+          { header: 'Job Title', field: 'jobTitle', width: 40 },
+          { header: 'Comp Code', field: 'componentCode', width: 18 },
+          { header: 'Component Name', field: 'componentName', width: 32 },
+          { header: 'Dept', field: 'department', width: 14 },
+          { header: 'Due Date', field: 'formattedDueDate', width: 18 },
+          { header: 'Days Overdue', field: 'daysOverdue', width: 16 },
+          { header: 'Next Due RH', field: 'nextDueRH', width: 16 },
+          { header: 'Current RH', field: 'currentRH', width: 16 },
+          { header: 'RH Overdue', field: 'rhOverdue', width: 14 },
+          { header: 'Type', field: 'overdueType', width: 14 },
+          { header: 'Assigned To', field: 'assignedTo', width: 20 },
+          { header: 'Last Done', field: 'lastDoneDate', width: 18 },
+          { header: 'Critical', field: 'criticalEquip', width: 12 }
         ];
 
-        const data = overdueJobs.map((wo: any) => {
-          const dueDate = new Date(wo.dueDate);
-          const daysOverdue = Math.floor((now.getTime() - dueDate.getTime()) / (1000 * 60 * 60 * 24));
+        const data = overdueJobs.map((wo: any, index: number) => {
+          const dueDate = wo.dueDate ? new Date(wo.dueDate) : null;
+          const daysPastDue = dueDate ? Math.floor((now.getTime() - dueDate.getTime()) / (1000 * 60 * 60 * 24)) : 0;
+          const hoursPastDue = (wo.nextDueReading && wo.currentCumulativeRH) 
+            ? Math.max(0, wo.currentCumulativeRH - wo.nextDueReading) 
+            : 0;
+          const isCriticalEquip = wo.criticality === 'Yes' || wo.criticality === 'Critical' || wo.critical === true;
+
           return {
-            workOrderNumber: wo.workOrderNumber || wo.id,
-            component: wo.component || wo.componentName || '-',
-            daysOverdue: daysOverdue,
-            priority: wo.priority || 'Normal',
-            formattedDueDate: formatDate(wo.dueDate),
-            status: wo.status || 'Overdue'
+            sNo: index + 1,
+            severity: calculateSeverity(daysPastDue, hoursPastDue, isCriticalEquip),
+            priority: wo.priority || wo.jobPriority || 'Normal',
+            workOrderNumber: wo.workOrderNumber || wo.workOrderNo || wo.id,
+            jobTitle: wo.title || wo.jobTitle || '-',
+            componentCode: wo.componentCode || wo.componentNumber || '-',
+            componentName: wo.component || wo.componentName || '-',
+            department: wo.department || wo.assignedDepartment || '-',
+            formattedDueDate: formatDate(wo.dueDate || wo.dueDateSnapshot),
+            daysOverdue: daysPastDue > 0 ? daysPastDue : '-',
+            nextDueRH: wo.nextDueReading ? wo.nextDueReading.toLocaleString() : '-',
+            currentRH: wo.currentCumulativeRH ? wo.currentCumulativeRH.toLocaleString() : '-',
+            rhOverdue: hoursPastDue > 0 ? hoursPastDue : '-',
+            overdueType: getOverdueType(daysPastDue, hoursPastDue),
+            assignedTo: wo.assignedTo || wo.assignee || wo.responsibleRank || '-',
+            lastDoneDate: formatDate(wo.lastDoneDate || wo.lastDoneDateSnapshot) || 'N/A',
+            criticalEquip: isCriticalEquip ? 'YES' : 'NO'
           };
         });
 
+        // Sort by severity (CRITICAL first) then by days overdue (descending)
+        const severityOrder: Record<string, number> = { 'CRITICAL': 0, 'SEVERE': 1, 'MODERATE': 2, 'MINOR': 3 };
+        data.sort((a, b) => {
+          const severityDiff = severityOrder[a.severity] - severityOrder[b.severity];
+          if (severityDiff !== 0) return severityDiff;
+          const daysA = typeof a.daysOverdue === 'number' ? a.daysOverdue : 0;
+          const daysB = typeof b.daysOverdue === 'number' ? b.daysOverdue : 0;
+          return daysB - daysA;
+        });
+
+        // Re-number after sorting
+        data.forEach((item, idx) => { item.sNo = idx + 1; });
+
+        // Calculate summary statistics
+        const criticalCount = data.filter(d => d.severity === 'CRITICAL').length;
+        const severeCount = data.filter(d => d.severity === 'SEVERE').length;
+        const moderateCount = data.filter(d => d.severity === 'MODERATE').length;
+        const criticalEquipCount = data.filter(d => d.criticalEquip === 'YES').length;
+        const daysOverdueArr = data.filter(d => typeof d.daysOverdue === 'number').map(d => d.daysOverdue as number);
+        const avgDaysOverdue = daysOverdueArr.length > 0 
+          ? Math.round(daysOverdueArr.reduce((a, b) => a + b, 0) / daysOverdueArr.length) 
+          : 0;
+        const maxDaysOverdue = daysOverdueArr.length > 0 ? Math.max(...daysOverdueArr) : 0;
+        const calendarOverdueCount = data.filter(d => d.overdueType === 'Calendar' || d.overdueType === 'Both').length;
+        const rhOverdueCount = data.filter(d => d.overdueType === 'RH' || d.overdueType === 'Both').length;
+
         const summary = [
-          { label: 'Total Overdue', value: data.length },
-          { label: 'Critical', value: data.filter((d: any) => d.priority === 'Critical').length },
-          { label: 'Avg Days Late', value: data.length > 0 ? Math.round(data.reduce((a: number, b: any) => a + b.daysOverdue, 0) / data.length) : 0 }
+          { label: 'Total Overdue', value: data.length, color: 'critical' },
+          { label: 'Critical Severity', value: criticalCount, color: 'critical' },
+          { label: 'Severe', value: severeCount, color: 'severe' },
+          { label: 'Moderate', value: moderateCount, color: 'moderate' },
+          { label: 'Critical Equip', value: criticalEquipCount, color: 'critical' },
+          { label: 'Avg Days Overdue', value: avgDaysOverdue },
+          { label: 'Max Days Overdue', value: `${maxDaysOverdue}d`, color: 'critical' },
+          { label: 'Calendar/RH', value: `${calendarOverdueCount}/${rhOverdueCount}` }
         ];
 
-        pdfReportGenerator.generateReport(
-          { title: 'Overdue Jobs Report', subtitle: 'Work orders past their due dates', vessel: vesselName },
+        // Use specialized overdue report generator
+        pdfReportGenerator.generateOverdueJobsReport(
+          { 
+            title: 'OVERDUE JOBS REPORT', 
+            subtitle: 'Work orders past grace period (7 days calendar / 168 RH overdue)', 
+            vessel: vesselName 
+          },
           columns,
           data,
           summary
