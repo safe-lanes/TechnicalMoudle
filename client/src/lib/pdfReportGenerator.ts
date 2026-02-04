@@ -314,18 +314,19 @@ class PDFReportGenerator {
   }
 
   // Specialized method for Overdue Jobs Report with STANDARDIZED MARITIME THEME
-  // Uses same blue theme as all other reports - with subtle amber/red highlights for severity
+  // UPDATED: Removed severity column, simplified to 15 columns, matches Excel report
+  // Uses same blue theme as all other reports - with subtle highlights for critical equipment only
   generateOverdueJobsReport(
     config: PDFReportConfig,
     columns: TableColumn[],
     data: any[],
     summaryData?: { label: string; value: string | number; color?: string }[]
   ): void {
-    // Force landscape and A3 for better column visibility
+    // Force landscape and A3 for better column visibility (15 columns)
     this.doc = new jsPDF({
       orientation: 'landscape',
       unit: 'mm',
-      format: 'a3' // Use A3 for 17 columns
+      format: 'a3' // Use A3 for 15 columns
     });
 
     const pageWidth = this.doc.internal.pageSize.getWidth();
@@ -363,7 +364,8 @@ class PDFReportGenerator {
 
     let startY = 42;
 
-    // Summary section with subtle color-coded boxes
+    // Summary section - simplified, no severity-based colors
+    // Only highlight critical equipment count
     if (summaryData && summaryData.length > 0) {
       this.doc.setTextColor(...PDF_COLORS.primary); // Deep blue for heading
       this.doc.setFontSize(14);
@@ -371,21 +373,18 @@ class PDFReportGenerator {
       this.doc.text('SUMMARY', margin, startY);
 
       startY += 8;
-      const boxWidth = 45;
+      const boxWidth = 50;
       const boxHeight = 22;
       const gap = 4;
       
       summaryData.forEach((item, index) => {
-        const x = margin + (index % 8) * (boxWidth + gap);
-        const y = startY + Math.floor(index / 8) * (boxHeight + gap);
+        const x = margin + (index % 6) * (boxWidth + gap);
+        const y = startY + Math.floor(index / 6) * (boxHeight + gap);
 
-        // SUBTLE color-coded boxes - light backgrounds, dark text
-        if (item.color === 'critical') {
-          this.doc!.setFillColor(...PDF_COLORS.bgDanger); // Light red bg
+        // SIMPLIFIED color coding - only highlight critical equipment
+        if (item.color === 'highlight' || item.label.toLowerCase().includes('critical')) {
+          this.doc!.setFillColor(...PDF_COLORS.bgDanger); // Light red bg for critical
           this.doc!.setTextColor(...PDF_COLORS.textDarkRed);
-        } else if (item.color === 'severe' || item.color === 'moderate') {
-          this.doc!.setFillColor(...PDF_COLORS.bgWarning); // Light amber bg
-          this.doc!.setTextColor(...PDF_COLORS.textDarkOrange);
         } else {
           this.doc!.setFillColor(...PDF_COLORS.bgLight); // Light gray bg
           this.doc!.setTextColor(...PDF_COLORS.textDark);
@@ -402,7 +401,7 @@ class PDFReportGenerator {
         this.doc!.text(String(item.value), x + 3, y + 17);
       });
 
-      const rows = Math.ceil(summaryData.length / 8);
+      const rows = Math.ceil(summaryData.length / 6);
       startY = startY + rows * (boxHeight + gap) + 8;
     }
 
@@ -418,8 +417,9 @@ class PDFReportGenerator {
       })
     );
 
-    // Find severity column index
-    const severityColIndex = columns.findIndex(col => col.field === 'severity');
+    // Find column indices for conditional formatting
+    const daysOverdueColIndex = columns.findIndex(col => col.field === 'daysPastDue' || col.field === 'daysOverdue');
+    const criticalColIndex = columns.findIndex(col => col.field === 'critical');
 
     autoTable(this.doc, {
       head: [headers],
@@ -455,22 +455,30 @@ class PDFReportGenerator {
         const rowData = data[hookData.row.index];
         if (!rowData) return;
 
-        // SUBTLE severity-based row coloring - light backgrounds only
-        const severity = rowData.severity;
+        // SIMPLIFIED: Only highlight critical equipment rows with light red background
+        const isCriticalEquipment = rowData.critical === 'YES' || rowData.critical === true;
         
-        if (severity === 'CRITICAL') {
+        if (isCriticalEquipment) {
           hookData.cell.styles.fillColor = PDF_COLORS.bgDanger; // Light red bg
+        }
+        
+        // Format Days Overdue column based on value
+        if (hookData.column.index === daysOverdueColIndex) {
+          const daysOverdue = Number(rowData.daysPastDue || rowData.daysOverdue || 0);
+          if (daysOverdue > 30) {
+            hookData.cell.styles.textColor = PDF_COLORS.textDarkRed;
+            hookData.cell.styles.fontStyle = 'bold';
+          } else if (daysOverdue > 7) {
+            hookData.cell.styles.textColor = PDF_COLORS.textDarkOrange;
+            hookData.cell.styles.fontStyle = 'bold';
+          }
+        }
+        
+        // Format Critical Equipment column - bold red if YES
+        if (hookData.column.index === criticalColIndex && isCriticalEquipment) {
           hookData.cell.styles.textColor = PDF_COLORS.textDarkRed;
           hookData.cell.styles.fontStyle = 'bold';
-        } else if (severity === 'SEVERE') {
-          hookData.cell.styles.fillColor = PDF_COLORS.bgWarning; // Light amber bg
-          hookData.cell.styles.textColor = PDF_COLORS.textDarkOrange;
-          hookData.cell.styles.fontStyle = 'bold';
-        } else if (severity === 'MODERATE') {
-          hookData.cell.styles.fillColor = PDF_COLORS.bgWarning; // Light amber bg
-          hookData.cell.styles.textColor = PDF_COLORS.textDarkOrange;
         }
-        // MINOR uses default alternating rows
       },
       didDrawPage: (hookData) => {
         const pageCount = this.doc!.getNumberOfPages();
