@@ -11434,6 +11434,524 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // ═══════════════════════════════════════════════════════════════════════════
+  // COMPLETED JOBS REGISTER EXCEL REPORT
+  // Uses STANDARD 18-column format with Light/Dark Green highlighting
+  // ═══════════════════════════════════════════════════════════════════════════
+  app.post("/technical/api/reports/completed-jobs", async (req, res) => {
+    try {
+      const { vesselId, dateFrom, dateTo } = req.body;
+      
+      if (!vesselId) {
+        return res.status(400).json({ error: "Please select a vessel" });
+      }
+      
+      // Fetch all required data
+      const workOrders = await storage.getWorkOrders(vesselId);
+      const jobs = await storage.getJobs(vesselId);
+      const components = await storage.getComponents(vesselId);
+      const allVessels = await storage.getVessels();
+      const vessel = allVessels.find(v => v.id === vesselId);
+      const vesselName = vessel?.name || vesselId;
+      
+      // Create lookup maps
+      const jobsMap = new Map(jobs.map(job => [job.id, job]));
+      const componentsByCodeMap = new Map(components.map(comp => [comp.componentCode, comp]));
+      
+      // Filter for completed jobs
+      const completedWorkOrders = workOrders.filter(wo => wo.status === 'Completed');
+      
+      // Optional date range filtering
+      let filteredJobs = completedWorkOrders;
+      if (dateFrom || dateTo) {
+        filteredJobs = completedWorkOrders.filter(wo => {
+          const completedDate = wo.completedDate || wo.updatedAt;
+          if (!completedDate) return true;
+          const date = new Date(completedDate);
+          if (dateFrom && date < new Date(dateFrom)) return false;
+          if (dateTo && date > new Date(dateTo)) return false;
+          return true;
+        });
+      }
+      
+      // Transform to standard format
+      const completedJobs = filteredJobs.map(wo => {
+        const job = jobsMap.get(wo.jobId || '');
+        const comp = componentsByCodeMap.get(wo.componentCode || '');
+        const isCritical = comp?.criticalEquipment === true || comp?.criticalEquipment === 'Yes';
+        
+        return {
+          workOrderNo: wo.workOrderNumber || wo.id,
+          templateCode: job?.templateCode || '-',
+          jobTitle: wo.title || wo.jobTitle || '-',
+          componentCode: wo.componentCode || '-',
+          componentName: wo.component || wo.componentName || comp?.componentName || '-',
+          department: wo.department || wo.assignedDepartment || '-',
+          priority: wo.priority || '-',
+          woStatus: 'Completed',
+          dueDate: wo.dueDate ? formatDateForExcel(wo.dueDate) : '-',
+          lastDoneDate: wo.completedDate ? formatDateForExcel(wo.completedDate) : formatDateForExcel(wo.updatedAt),
+          completedDate: wo.completedDate || wo.updatedAt,
+          assignedTo: wo.assignedTo || wo.performedBy || '-',
+          maintenanceBasis: job?.maintenanceBasis || 'Calendar',
+          critical: isCritical ? 'Yes' : 'No'
+        };
+      });
+      
+      // Sort by completed date (most recent first)
+      completedJobs.sort((a, b) => {
+        const dateA = a.completedDate ? new Date(a.completedDate).getTime() : 0;
+        const dateB = b.completedDate ? new Date(b.completedDate).getTime() : 0;
+        return dateB - dateA;
+      });
+      
+      // Create workbook
+      const workbook = new ExcelJS.Workbook();
+      workbook.creator = 'PMS System';
+      workbook.created = new Date();
+      
+      const worksheet = workbook.addWorksheet('Completed Jobs', {
+        views: [{ state: 'frozen', ySplit: 7, xSplit: 2 }]
+      });
+      
+      // Use STANDARD 18-column definition
+      const columns = STANDARD_WORK_ORDER_COLUMNS;
+      const totalColumns = columns.length;
+      const lastColLetter = getLastColumnLetter(totalColumns);
+      const headerRowNum = 7;
+      const dataStartRow = 8;
+      
+      // Apply standardized header
+      applyStandardHeader(
+        worksheet,
+        'COMPLETED JOBS REGISTER',
+        'Work orders successfully completed',
+        vesselName,
+        completedJobs.length,
+        lastColLetter
+      );
+      
+      applyStandardTableHeader(worksheet, columns, headerRowNum);
+      
+      // Prepare data in standard format with GREEN highlighting
+      const preparedData: WorkOrderRowData[] = completedJobs.map((job, index) => {
+        const isCritical = job.critical === 'Yes';
+        const isCalendarBased = job.maintenanceBasis === 'Calendar';
+        
+        return {
+          sno: index + 1,
+          workOrderNo: job.workOrderNo,
+          jobCode: job.templateCode || '-',
+          jobTitle: job.jobTitle,
+          componentCode: job.componentCode,
+          componentName: job.componentName,
+          department: job.department,
+          priority: job.priority,
+          status: 'Completed',
+          dueDate: job.dueDate,
+          lastDoneDate: job.lastDoneDate,
+          daysLeft: '-',
+          daysOverdue: '-',
+          nextDueRH: isCalendarBased ? '-' : '-',
+          currentRH: isCalendarBased ? '-' : '-',
+          rhRemaining: isCalendarBased ? '-' : '-',
+          assignedTo: job.assignedTo,
+          criticalEquipment: isCritical ? 'YES' : 'No',
+          _rowStatus: 'completed' as WorkOrderStatus,
+          isCriticalEquipment: isCritical
+        };
+      });
+      
+      // Apply status-based row highlighting (Light Green / Dark Green)
+      applyWorkOrderDataRows(worksheet, preparedData, columns, dataStartRow);
+      
+      // Summary section
+      const lastDataRowNum = dataStartRow + Math.max(completedJobs.length - 1, 0);
+      const summaryStartRow = lastDataRowNum + 3;
+      
+      const criticalEquipmentCount = completedJobs.filter(j => j.critical === 'Yes').length;
+      
+      const summary: SummaryItem[] = [
+        { label: 'Total Completed Jobs:', value: completedJobs.length },
+        { label: 'Critical Equipment Jobs:', value: criticalEquipmentCount }
+      ];
+      
+      const lastSummaryRow = applyStandardSummary(worksheet, summary, summaryStartRow, totalColumns);
+      
+      worksheet.autoFilter = {
+        from: { row: headerRowNum, column: 1 },
+        to: { row: headerRowNum, column: totalColumns }
+      };
+      
+      applyStandardPageSetup(worksheet, headerRowNum, totalColumns, lastSummaryRow, vesselName);
+      
+      const buffer = await workbook.xlsx.writeBuffer();
+      const filename = generateFilename('CompletedJobs', vesselName);
+      
+      console.log(`[COMPLETED JOBS REPORT] Generated: ${filename} (${completedJobs.length} jobs)`);
+      
+      res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+      res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+      res.send(buffer);
+      
+    } catch (error: any) {
+      console.error("Error generating Completed Jobs report:", error);
+      res.status(500).json({ error: "Failed to generate report: " + error.message });
+    }
+  });
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // UNPLANNED/BREAKDOWN JOBS EXCEL REPORT
+  // Uses STANDARD 18-column format with Yellow highlighting
+  // ═══════════════════════════════════════════════════════════════════════════
+  app.post("/technical/api/reports/unplanned-jobs", async (req, res) => {
+    try {
+      const { vesselId, dateFrom, dateTo } = req.body;
+      
+      if (!vesselId) {
+        return res.status(400).json({ error: "Please select a vessel" });
+      }
+      
+      // Fetch all required data
+      const workOrders = await storage.getWorkOrders(vesselId);
+      const jobs = await storage.getJobs(vesselId);
+      const components = await storage.getComponents(vesselId);
+      const allVessels = await storage.getVessels();
+      const vessel = allVessels.find(v => v.id === vesselId);
+      const vesselName = vessel?.name || vesselId;
+      
+      // Create lookup maps
+      const jobsMap = new Map(jobs.map(job => [job.id, job]));
+      const componentsByCodeMap = new Map(components.map(comp => [comp.componentCode, comp]));
+      
+      // Filter for unplanned/breakdown jobs (workOrderType = 'Unplanned' or starts with 'UWO')
+      const unplannedWorkOrders = workOrders.filter(wo => 
+        wo.workOrderType === 'Unplanned' || 
+        wo.type === 'Unplanned' ||
+        (wo.workOrderNumber && wo.workOrderNumber.startsWith('UWO'))
+      );
+      
+      // Optional date range filtering
+      let filteredJobs = unplannedWorkOrders;
+      if (dateFrom || dateTo) {
+        filteredJobs = unplannedWorkOrders.filter(wo => {
+          const createdDate = wo.createdAt || wo.dueDate;
+          if (!createdDate) return true;
+          const date = new Date(createdDate);
+          if (dateFrom && date < new Date(dateFrom)) return false;
+          if (dateTo && date > new Date(dateTo)) return false;
+          return true;
+        });
+      }
+      
+      // Transform to standard format
+      const unplannedJobs = filteredJobs.map(wo => {
+        const job = jobsMap.get(wo.jobId || '');
+        const comp = componentsByCodeMap.get(wo.componentCode || '');
+        const isCritical = comp?.criticalEquipment === true || comp?.criticalEquipment === 'Yes';
+        
+        return {
+          workOrderNo: wo.workOrderNumber || wo.id,
+          templateCode: job?.templateCode || '-',
+          jobTitle: wo.title || wo.jobTitle || '-',
+          componentCode: wo.componentCode || '-',
+          componentName: wo.component || wo.componentName || comp?.componentName || '-',
+          department: wo.department || wo.assignedDepartment || '-',
+          priority: wo.priority || 'High',
+          woStatus: wo.status || 'Active',
+          dueDate: wo.dueDate ? formatDateForExcel(wo.dueDate) : '-',
+          createdDate: wo.createdAt,
+          lastDoneDate: wo.completedDate ? formatDateForExcel(wo.completedDate) : '-',
+          assignedTo: wo.assignedTo || '-',
+          maintenanceBasis: 'Unplanned',
+          critical: isCritical ? 'Yes' : 'No'
+        };
+      });
+      
+      // Sort by created date (most recent first)
+      unplannedJobs.sort((a, b) => {
+        const dateA = a.createdDate ? new Date(a.createdDate).getTime() : 0;
+        const dateB = b.createdDate ? new Date(b.createdDate).getTime() : 0;
+        return dateB - dateA;
+      });
+      
+      // Create workbook
+      const workbook = new ExcelJS.Workbook();
+      workbook.creator = 'PMS System';
+      workbook.created = new Date();
+      
+      const worksheet = workbook.addWorksheet('Unplanned Jobs', {
+        views: [{ state: 'frozen', ySplit: 7, xSplit: 2 }]
+      });
+      
+      // Use STANDARD 18-column definition
+      const columns = STANDARD_WORK_ORDER_COLUMNS;
+      const totalColumns = columns.length;
+      const lastColLetter = getLastColumnLetter(totalColumns);
+      const headerRowNum = 7;
+      const dataStartRow = 8;
+      
+      // Apply standardized header
+      applyStandardHeader(
+        worksheet,
+        'UNPLANNED/BREAKDOWN JOBS REPORT',
+        'Breakdown maintenance and unplanned work',
+        vesselName,
+        unplannedJobs.length,
+        lastColLetter
+      );
+      
+      applyStandardTableHeader(worksheet, columns, headerRowNum);
+      
+      // Prepare data in standard format with YELLOW highlighting
+      const preparedData: WorkOrderRowData[] = unplannedJobs.map((job, index) => {
+        const isCritical = job.critical === 'Yes';
+        
+        return {
+          sno: index + 1,
+          workOrderNo: job.workOrderNo,
+          jobCode: 'UNPLANNED',
+          jobTitle: job.jobTitle,
+          componentCode: job.componentCode,
+          componentName: job.componentName,
+          department: job.department,
+          priority: job.priority,
+          status: job.woStatus,
+          dueDate: job.dueDate,
+          lastDoneDate: job.lastDoneDate,
+          daysLeft: '-',
+          daysOverdue: '-',
+          nextDueRH: '-',
+          currentRH: '-',
+          rhRemaining: '-',
+          assignedTo: job.assignedTo,
+          criticalEquipment: isCritical ? 'YES' : 'No',
+          _rowStatus: 'unplanned' as WorkOrderStatus,
+          isCriticalEquipment: isCritical
+        };
+      });
+      
+      // Apply status-based row highlighting (Yellow)
+      applyWorkOrderDataRows(worksheet, preparedData, columns, dataStartRow);
+      
+      // Summary section
+      const lastDataRowNum = dataStartRow + Math.max(unplannedJobs.length - 1, 0);
+      const summaryStartRow = lastDataRowNum + 3;
+      
+      const criticalEquipmentCount = unplannedJobs.filter(j => j.critical === 'Yes').length;
+      const completedCount = unplannedJobs.filter(j => j.woStatus === 'Completed').length;
+      const activeCount = unplannedJobs.filter(j => j.woStatus !== 'Completed').length;
+      
+      const summary: SummaryItem[] = [
+        { label: 'Total Unplanned Jobs:', value: unplannedJobs.length },
+        { label: 'Active:', value: activeCount },
+        { label: 'Completed:', value: completedCount },
+        { label: 'Critical Equipment:', value: criticalEquipmentCount }
+      ];
+      
+      const lastSummaryRow = applyStandardSummary(
+        worksheet, 
+        summary, 
+        summaryStartRow, 
+        totalColumns,
+        "NOTE: Breakdown jobs require root cause analysis and corrective actions"
+      );
+      
+      worksheet.autoFilter = {
+        from: { row: headerRowNum, column: 1 },
+        to: { row: headerRowNum, column: totalColumns }
+      };
+      
+      applyStandardPageSetup(worksheet, headerRowNum, totalColumns, lastSummaryRow, vesselName);
+      
+      const buffer = await workbook.xlsx.writeBuffer();
+      const filename = generateFilename('UnplannedJobs', vesselName);
+      
+      console.log(`[UNPLANNED JOBS REPORT] Generated: ${filename} (${unplannedJobs.length} jobs)`);
+      
+      res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+      res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+      res.send(buffer);
+      
+    } catch (error: any) {
+      console.error("Error generating Unplanned Jobs report:", error);
+      res.status(500).json({ error: "Failed to generate report: " + error.message });
+    }
+  });
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // JOB POSTPONEMENT LOG EXCEL REPORT
+  // Uses STANDARD 18-column format with Sky Blue highlighting
+  // ═══════════════════════════════════════════════════════════════════════════
+  app.post("/technical/api/reports/postponement-log", async (req, res) => {
+    try {
+      const { vesselId, dateFrom, dateTo } = req.body;
+      
+      if (!vesselId) {
+        return res.status(400).json({ error: "Please select a vessel" });
+      }
+      
+      // Fetch all required data
+      const workOrders = await storage.getWorkOrders(vesselId);
+      const jobs = await storage.getJobs(vesselId);
+      const components = await storage.getComponents(vesselId);
+      const allVessels = await storage.getVessels();
+      const vessel = allVessels.find(v => v.id === vesselId);
+      const vesselName = vessel?.name || vesselId;
+      
+      // Create lookup maps
+      const jobsMap = new Map(jobs.map(job => [job.id, job]));
+      const componentsByCodeMap = new Map(components.map(comp => [comp.componentCode, comp]));
+      
+      // Filter for postponed jobs
+      const postponedWorkOrders = workOrders.filter(wo => wo.status === 'Postponed');
+      
+      // Optional date range filtering
+      let filteredJobs = postponedWorkOrders;
+      if (dateFrom || dateTo) {
+        filteredJobs = postponedWorkOrders.filter(wo => {
+          const postponedDate = wo.updatedAt;
+          if (!postponedDate) return true;
+          const date = new Date(postponedDate);
+          if (dateFrom && date < new Date(dateFrom)) return false;
+          if (dateTo && date > new Date(dateTo)) return false;
+          return true;
+        });
+      }
+      
+      // Transform to standard format
+      const postponedJobs = filteredJobs.map(wo => {
+        const job = jobsMap.get(wo.jobId || '');
+        const comp = componentsByCodeMap.get(wo.componentCode || '');
+        const isCritical = comp?.criticalEquipment === true || comp?.criticalEquipment === 'Yes';
+        
+        return {
+          workOrderNo: wo.workOrderNumber || wo.id,
+          templateCode: job?.templateCode || '-',
+          jobTitle: wo.title || wo.jobTitle || '-',
+          componentCode: wo.componentCode || '-',
+          componentName: wo.component || wo.componentName || comp?.componentName || '-',
+          department: wo.department || wo.assignedDepartment || '-',
+          priority: wo.priority || '-',
+          woStatus: 'Postponed',
+          originalDueDate: wo.dueDate ? formatDateForExcel(wo.dueDate) : '-',
+          newDueDate: wo.postponedToDate ? formatDateForExcel(wo.postponedToDate) : '-',
+          postponedDate: wo.updatedAt,
+          postponementReason: wo.postponementReason || wo.remarks || '-',
+          assignedTo: wo.assignedTo || '-',
+          maintenanceBasis: job?.maintenanceBasis || 'Calendar',
+          critical: isCritical ? 'Yes' : 'No'
+        };
+      });
+      
+      // Sort by postponed date (most recent first)
+      postponedJobs.sort((a, b) => {
+        const dateA = a.postponedDate ? new Date(a.postponedDate).getTime() : 0;
+        const dateB = b.postponedDate ? new Date(b.postponedDate).getTime() : 0;
+        return dateB - dateA;
+      });
+      
+      // Create workbook
+      const workbook = new ExcelJS.Workbook();
+      workbook.creator = 'PMS System';
+      workbook.created = new Date();
+      
+      const worksheet = workbook.addWorksheet('Postponement Log', {
+        views: [{ state: 'frozen', ySplit: 7, xSplit: 2 }]
+      });
+      
+      // Use STANDARD 18-column definition
+      const columns = STANDARD_WORK_ORDER_COLUMNS;
+      const totalColumns = columns.length;
+      const lastColLetter = getLastColumnLetter(totalColumns);
+      const headerRowNum = 7;
+      const dataStartRow = 8;
+      
+      // Apply standardized header
+      applyStandardHeader(
+        worksheet,
+        'JOB POSTPONEMENT LOG',
+        'Audit trail of all postponed jobs',
+        vesselName,
+        postponedJobs.length,
+        lastColLetter
+      );
+      
+      applyStandardTableHeader(worksheet, columns, headerRowNum);
+      
+      // Prepare data in standard format with SKY BLUE highlighting
+      const preparedData: WorkOrderRowData[] = postponedJobs.map((job, index) => {
+        const isCritical = job.critical === 'Yes';
+        const isCalendarBased = job.maintenanceBasis === 'Calendar';
+        
+        return {
+          sno: index + 1,
+          workOrderNo: job.workOrderNo,
+          jobCode: job.templateCode || '-',
+          jobTitle: job.jobTitle,
+          componentCode: job.componentCode,
+          componentName: job.componentName,
+          department: job.department,
+          priority: job.priority,
+          status: 'Postponed',
+          dueDate: job.originalDueDate,
+          lastDoneDate: job.newDueDate,  // Using lastDoneDate column for "New Due Date"
+          daysLeft: '-',
+          daysOverdue: '-',
+          nextDueRH: isCalendarBased ? '-' : '-',
+          currentRH: isCalendarBased ? '-' : '-',
+          rhRemaining: isCalendarBased ? '-' : '-',
+          assignedTo: job.assignedTo,
+          criticalEquipment: isCritical ? 'YES' : 'No',
+          _rowStatus: 'postponed' as WorkOrderStatus,
+          isCriticalEquipment: isCritical
+        };
+      });
+      
+      // Apply status-based row highlighting (Sky Blue)
+      applyWorkOrderDataRows(worksheet, preparedData, columns, dataStartRow);
+      
+      // Summary section
+      const lastDataRowNum = dataStartRow + Math.max(postponedJobs.length - 1, 0);
+      const summaryStartRow = lastDataRowNum + 3;
+      
+      const criticalEquipmentCount = postponedJobs.filter(j => j.critical === 'Yes').length;
+      
+      const summary: SummaryItem[] = [
+        { label: 'Total Postponed Jobs:', value: postponedJobs.length },
+        { label: 'Critical Equipment Postponed:', value: criticalEquipmentCount, highlight: true }
+      ];
+      
+      const lastSummaryRow = applyStandardSummary(
+        worksheet, 
+        summary, 
+        summaryStartRow, 
+        totalColumns,
+        "NOTE: All postponements require Master's approval and documented justification"
+      );
+      
+      worksheet.autoFilter = {
+        from: { row: headerRowNum, column: 1 },
+        to: { row: headerRowNum, column: totalColumns }
+      };
+      
+      applyStandardPageSetup(worksheet, headerRowNum, totalColumns, lastSummaryRow, vesselName);
+      
+      const buffer = await workbook.xlsx.writeBuffer();
+      const filename = generateFilename('PostponementLog', vesselName);
+      
+      console.log(`[POSTPONEMENT LOG REPORT] Generated: ${filename} (${postponedJobs.length} jobs)`);
+      
+      res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+      res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+      res.send(buffer);
+      
+    } catch (error: any) {
+      console.error("Error generating Postponement Log report:", error);
+      res.status(500).json({ error: "Failed to generate report: " + error.message });
+    }
+  });
+
   const httpServer = createServer(app);
   
   // Recalculate recurring defects on startup (don't await - let it run in background)

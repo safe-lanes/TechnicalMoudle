@@ -777,6 +777,9 @@ const MaintenanceReports: React.FC<MaintenanceReportsProps> = ({ onBack, globalF
     const reportEndpoints: Record<string, string> = {
       'due-jobs-7': '/technical/api/reports/due-jobs-7-days',
       'overdue-jobs': '/technical/api/reports/overdue-jobs',
+      'completed-jobs': '/technical/api/reports/completed-jobs',
+      'unplanned-jobs': '/technical/api/reports/unplanned-jobs',
+      'postponement-log': '/technical/api/reports/postponement-log',
     };
 
     const endpoint = reportEndpoints[reportId];
