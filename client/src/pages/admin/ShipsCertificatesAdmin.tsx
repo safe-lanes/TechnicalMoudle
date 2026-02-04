@@ -199,8 +199,27 @@ const mockCompanyData: CompanyCertificate[] = [
   { id: 4, masterId: "MA003", companyId: "L0004", certificateLabel: "Fitness Cert.", requirementRef: "SOLAS XXX", companyGroup: "A. Statutory", ranking: "-" },
 ];
 
-const categories = ["All Categories", "Statutory", "Trading", "Class"];
-const groups = ["All Groups", "Safety", "Environment", "Cargo", "Navigation"];
+// Build category options from INITIAL_MASTER_CATEGORY_LABELS - only include categories with labels
+const getCategoryOptions = () => {
+  const options: { key: string; label: string }[] = [{ key: "all", label: "All Categories" }];
+  INITIAL_MASTER_CATEGORY_LABELS.forEach(cat => {
+    if (cat.label.trim()) {
+      options.push({ key: cat.key, label: `${cat.key}. ${cat.label}` });
+    }
+  });
+  return options;
+};
+
+// Build group options from INITIAL_MASTER_GROUP_LABELS - only include groups with labels
+const getGroupOptions = () => {
+  const options: { key: string; label: string }[] = [{ key: "all", label: "All Groups" }];
+  INITIAL_MASTER_GROUP_LABELS.forEach(grp => {
+    if (grp.label.trim()) {
+      options.push({ key: grp.key, label: `${grp.key}. ${grp.label}` });
+    }
+  });
+  return options;
+};
 const companyGroups = ["A. Statutory", "B. Trading", "C. Class", "D. Other"];
 
 // TODO: Replace these dropdown options with actual values from backend/configuration
@@ -226,8 +245,8 @@ export default function ShipsCertificatesAdmin() {
     vessel: "view"
   });
   const [searchTerm, setSearchTerm] = useState("");
-  const [selectedCategory, setSelectedCategory] = useState("All Categories");
-  const [selectedGroup, setSelectedGroup] = useState("All Groups");
+  const [selectedCategory, setSelectedCategory] = useState("all");
+  const [selectedGroup, setSelectedGroup] = useState("all");
   const [selectedVessels, setSelectedVessels] = useState<string[]>([]);
   const [vesselPopoverOpen, setVesselPopoverOpen] = useState(false);
   
@@ -1180,8 +1199,8 @@ export default function ShipsCertificatesAdmin() {
     const filteredData = sortedMasterData.filter(cert => {
       const matchesSearch = cert.certificateName.toLowerCase().includes(searchTerm.toLowerCase()) ||
                            cert.masterId.toLowerCase().includes(searchTerm.toLowerCase());
-      const matchesCategory = selectedCategory === "All Categories" || cert.category === selectedCategory;
-      const matchesGroup = selectedGroup === "All Groups" || cert.group === selectedGroup;
+      const matchesCategory = selectedCategory === "all" || cert.category === selectedCategory;
+      const matchesGroup = selectedGroup === "all" || cert.group === selectedGroup;
       return matchesSearch && matchesCategory && matchesGroup;
     });
 
@@ -1199,29 +1218,35 @@ export default function ShipsCertificatesAdmin() {
             />
           </div>
           <Select value={selectedCategory} onValueChange={setSelectedCategory}>
-            <SelectTrigger className="w-[160px]" data-testid="select-category">
+            <SelectTrigger className="w-[180px]" data-testid="select-category">
               <SelectValue placeholder="All Categories" />
             </SelectTrigger>
             <SelectContent>
-              {categories.map((cat) => (
-                <SelectItem key={cat} value={cat}>{cat}</SelectItem>
+              {getCategoryOptions().map((cat) => (
+                <SelectItem key={cat.key} value={cat.key}>{cat.label}</SelectItem>
               ))}
             </SelectContent>
           </Select>
           <Select value={selectedGroup} onValueChange={setSelectedGroup}>
-            <SelectTrigger className="w-[140px]" data-testid="select-group">
+            <SelectTrigger className="w-[160px]" data-testid="select-group">
               <SelectValue placeholder="All Groups" />
             </SelectTrigger>
             <SelectContent>
-              {groups.map((grp) => (
-                <SelectItem key={grp} value={grp}>{grp}</SelectItem>
+              {getGroupOptions().map((grp) => (
+                <SelectItem key={grp.key} value={grp.key}>{grp.label}</SelectItem>
               ))}
             </SelectContent>
           </Select>
         </div>
 
         <div className="bg-white rounded-lg border overflow-hidden">
-          <div className="overflow-x-auto">
+          <div className="overflow-x-auto min-h-[200px]">
+            {filteredData.length === 0 && !isAddingNew ? (
+              <div className="flex flex-col items-center justify-center h-[200px] text-gray-400">
+                <p className="text-lg mb-2">No Certificates Configured</p>
+                <p className="text-sm">Click "Edit" and then "+ New" to add your first certificate</p>
+              </div>
+            ) : (
             <table className="w-full">
               <thead className="bg-[#52baf3] text-white text-sm">
                 <tr>
@@ -1506,6 +1531,7 @@ export default function ShipsCertificatesAdmin() {
                 )}
               </tbody>
             </table>
+            )}
           </div>
         </div>
       </div>
