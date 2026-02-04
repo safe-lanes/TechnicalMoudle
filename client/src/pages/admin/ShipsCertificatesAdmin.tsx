@@ -1528,6 +1528,58 @@ export default function ShipsCertificatesAdmin() {
     setHasUnsavedChanges(true);
   };
 
+  // Handler for Company tab sequence reordering - mirrors updateMasterSequence logic
+  const updateCompanySequence = (certId: number, newSequence: number) => {
+    setMasterData(prevData => {
+      // Get only certificates applicable to Company tab
+      const companyCerts = prevData.filter(c => c.applicableToCompany);
+      const currentCert = companyCerts.find(c => c.id === certId);
+      if (!currentCert) return prevData;
+
+      const oldSequence = currentCert.companySequence ?? currentCert.sequence;
+      if (newSequence === oldSequence) return prevData;
+
+      // Get IDs of certificates in Company tab
+      const companyIds = new Set(companyCerts.map(c => c.id));
+
+      // First, ensure all company certs have companySequence initialized
+      // Then apply the reordering logic
+      return prevData.map(c => {
+        // Only affect Company-applicable certificates
+        if (!companyIds.has(c.id)) return c;
+
+        // Get the effective sequence for this cert
+        const certOldSeq = c.companySequence ?? c.sequence;
+
+        if (c.id === certId) {
+          return { ...c, companySequence: newSequence };
+        }
+
+        // Moving up (e.g., 4 → 2): shift items in [newSequence, oldSequence-1] down by 1
+        if (newSequence < oldSequence) {
+          if (certOldSeq >= newSequence && certOldSeq < oldSequence) {
+            return { ...c, companySequence: certOldSeq + 1 };
+          }
+        }
+        // Moving down (e.g., 1 → 4): shift items in [oldSequence+1, newSequence] up by 1
+        else {
+          if (certOldSeq > oldSequence && certOldSeq <= newSequence) {
+            return { ...c, companySequence: certOldSeq - 1 };
+          }
+        }
+
+        // If not in the shift range, still initialize companySequence to its current effective value
+        // to ensure consistency for future reordering operations
+        if (c.companySequence === undefined) {
+          return { ...c, companySequence: certOldSeq };
+        }
+
+        return c;
+      });
+    });
+    setHasUnsavedChanges(true);
+  };
+
   const renderCompanyTab = () => {
     // Derive company data from Master tab - only certificates with applicableToCompany checked
     const companyDataFromMaster = masterData
@@ -1596,7 +1648,7 @@ export default function ShipsCertificatesAdmin() {
                           onBlur={(e) => {
                             const newSeq = parseInt(e.target.value, 10);
                             if (!isNaN(newSeq) && newSeq > 0) {
-                              updateCompanyField(cert.id, 'companySequence', newSeq);
+                              updateCompanySequence(cert.id, newSeq);
                             }
                           }}
                           data-testid={`input-sequence-company-${cert.id}`}
