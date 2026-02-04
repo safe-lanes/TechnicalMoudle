@@ -1,7 +1,6 @@
 import { useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import {
   Select,
@@ -12,7 +11,6 @@ import {
 } from "@/components/ui/select";
 import {
   ArrowLeft,
-  Search,
   Shield,
   FileCheck,
   AlertTriangle,
@@ -28,6 +26,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useVessels } from "@/hooks/useVessels";
 import { useVessel } from "@/contexts/VesselContext";
 import { useQuery } from "@tanstack/react-query";
+import CategoryFilters, { CategoryFilterValues } from "@/components/reports/CategoryFilters";
 
 interface ComplianceReport {
   id: string;
@@ -52,22 +51,30 @@ interface ComplianceReportsProps {
   };
 }
 
-const ComplianceReports: React.FC<ComplianceReportsProps> = ({ onBack }) => {
-  const [searchQuery, setSearchQuery] = useState("");
+const ComplianceReports: React.FC<ComplianceReportsProps> = ({ onBack, globalFilters }) => {
+  const [categoryFilters, setCategoryFilters] = useState<CategoryFilterValues>({
+    searchQuery: "",
+    vessel: globalFilters?.vessel || "all",
+    dateRange: globalFilters?.dateRange || { from: null, to: null }
+  });
   const [selectedPriority, setSelectedPriority] = useState<string>("all");
   const [generatingReports, setGeneratingReports] = useState<Set<string>>(new Set());
   const { toast } = useToast();
   const { data: vessels = [] } = useVessels();
-  const { vesselId } = useVessel();
+  const { vesselId: contextVesselId } = useVessel();
+
+  const effectiveVesselId = (categoryFilters.vessel && categoryFilters.vessel !== 'all') 
+    ? categoryFilters.vessel 
+    : contextVesselId;
 
   const { data: certificates = [] } = useQuery<any[]>({
-    queryKey: ['/technical/api/certificates', vesselId],
-    enabled: !!vesselId && vesselId !== 'all',
+    queryKey: ['/technical/api/certificates', effectiveVesselId],
+    enabled: !!effectiveVesselId && effectiveVesselId !== 'all',
   });
 
   const { data: surveys = [] } = useQuery<any[]>({
-    queryKey: ['/technical/api/surveys', vesselId],
-    enabled: !!vesselId && vesselId !== 'all',
+    queryKey: ['/technical/api/surveys', effectiveVesselId],
+    enabled: !!effectiveVesselId && effectiveVesselId !== 'all',
   });
 
   const reports: ComplianceReport[] = [
@@ -134,8 +141,8 @@ const ComplianceReports: React.FC<ComplianceReportsProps> = ({ onBack }) => {
   ];
 
   const filteredReports = reports.filter(report => {
-    const matchesSearch = report.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                         report.description.toLowerCase().includes(searchQuery.toLowerCase());
+    const matchesSearch = report.name.toLowerCase().includes(categoryFilters.searchQuery.toLowerCase()) ||
+                         report.description.toLowerCase().includes(categoryFilters.searchQuery.toLowerCase());
     const matchesPriority = selectedPriority === "all" || report.priority === selectedPriority;
     return matchesSearch && matchesPriority;
   });
@@ -164,7 +171,7 @@ const ComplianceReports: React.FC<ComplianceReportsProps> = ({ onBack }) => {
   };
 
   const generateCompliancePDF = async (reportId: string) => {
-    const vesselName = vessels.find(v => v.id === vesselId)?.name || vesselId || 'All Vessels';
+    const vesselName = vessels.find(v => v.id === effectiveVesselId)?.name || effectiveVesselId || 'All Vessels';
 
     switch (reportId) {
       case 'certificates-status': {
@@ -411,18 +418,13 @@ const ComplianceReports: React.FC<ComplianceReportsProps> = ({ onBack }) => {
           </div>
         </div>
 
-        <div className="flex gap-4 items-center">
-          <div className="relative flex-1 max-w-md">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
-            <Input
-              placeholder="Search compliance reports..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-10"
-              data-testid="input-search-compliance-reports"
-            />
-          </div>
+        <CategoryFilters
+          filters={categoryFilters}
+          onFiltersChange={setCategoryFilters}
+          searchPlaceholder="Search compliance reports..."
+        />
 
+        <div className="flex gap-4 items-center mt-3">
           <Select value={selectedPriority} onValueChange={setSelectedPriority}>
             <SelectTrigger className="w-48" data-testid="select-priority-filter">
               <SelectValue placeholder="Filter by priority" />

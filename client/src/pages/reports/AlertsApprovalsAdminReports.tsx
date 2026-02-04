@@ -1,7 +1,6 @@
 import { useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import {
   Select,
@@ -12,7 +11,6 @@ import {
 } from "@/components/ui/select";
 import {
   ArrowLeft,
-  Search,
   Bell,
   Shield,
   Settings,
@@ -32,6 +30,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useVessels } from "@/hooks/useVessels";
 import { useVessel } from "@/contexts/VesselContext";
 import { useQuery } from "@tanstack/react-query";
+import CategoryFilters, { CategoryFilterValues } from "@/components/reports/CategoryFilters";
 
 interface AdminReport {
   id: string;
@@ -49,23 +48,37 @@ interface AdminReport {
 
 interface AlertsApprovalsAdminReportsProps {
   onBack: () => void;
+  globalFilters?: {
+    vessel: string;
+    department: string;
+    dateRange: { from: Date | null; to: Date | null };
+    priority: string;
+  };
 }
 
-const AlertsApprovalsAdminReports: React.FC<AlertsApprovalsAdminReportsProps> = ({ onBack }) => {
-  const [searchQuery, setSearchQuery] = useState("");
+const AlertsApprovalsAdminReports: React.FC<AlertsApprovalsAdminReportsProps> = ({ onBack, globalFilters }) => {
+  const [categoryFilters, setCategoryFilters] = useState<CategoryFilterValues>({
+    searchQuery: "",
+    vessel: globalFilters?.vessel || "all",
+    dateRange: globalFilters?.dateRange || { from: null, to: null }
+  });
   const [selectedType, setSelectedType] = useState<string>("all");
   const [generatingReports, setGeneratingReports] = useState<Set<string>>(new Set());
   const { toast } = useToast();
   const { data: vessels = [] } = useVessels();
-  const { vesselId } = useVessel();
+  const { vesselId: contextVesselId } = useVessel();
+
+  const effectiveVesselId = (categoryFilters.vessel && categoryFilters.vessel !== 'all') 
+    ? categoryFilters.vessel 
+    : contextVesselId;
 
   const { data: workOrders = [] } = useQuery<any[]>({
-    queryKey: ['/technical/api/work-orders'],
+    queryKey: ['/technical/api/work-orders', effectiveVesselId],
   });
 
   const { data: defects = [] } = useQuery<any[]>({
-    queryKey: ['/technical/api/defects', vesselId],
-    enabled: !!vesselId && vesselId !== 'all',
+    queryKey: ['/technical/api/defects', effectiveVesselId],
+    enabled: !!effectiveVesselId && effectiveVesselId !== 'all',
   });
 
   const reports: AdminReport[] = [
@@ -150,8 +163,8 @@ const AlertsApprovalsAdminReports: React.FC<AlertsApprovalsAdminReportsProps> = 
   ];
 
   const filteredReports = reports.filter(report => {
-    const matchesSearch = report.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                         report.description.toLowerCase().includes(searchQuery.toLowerCase());
+    const matchesSearch = report.name.toLowerCase().includes(categoryFilters.searchQuery.toLowerCase()) ||
+                         report.description.toLowerCase().includes(categoryFilters.searchQuery.toLowerCase());
     const matchesType = selectedType === "all" || report.reportType === selectedType;
     return matchesSearch && matchesType;
   });
@@ -166,7 +179,7 @@ const AlertsApprovalsAdminReports: React.FC<AlertsApprovalsAdminReportsProps> = 
   };
 
   const generateAlertsPDF = async (reportId: string) => {
-    const vesselName = vessels.find(v => v.id === vesselId)?.name || vesselId || 'All Vessels';
+    const vesselName = vessels.find(v => v.id === effectiveVesselId)?.name || effectiveVesselId || 'All Vessels';
     const now = new Date();
 
     switch (reportId) {
@@ -371,18 +384,13 @@ const AlertsApprovalsAdminReports: React.FC<AlertsApprovalsAdminReportsProps> = 
           </div>
         </div>
 
-        <div className="flex gap-4 items-center">
-          <div className="relative flex-1 max-w-md">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
-            <Input
-              placeholder="Search admin reports..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-10"
-              data-testid="input-search-admin-reports"
-            />
-          </div>
+        <CategoryFilters
+          filters={categoryFilters}
+          onFiltersChange={setCategoryFilters}
+          searchPlaceholder="Search admin reports..."
+        />
 
+        <div className="flex gap-4 items-center mt-3">
           <Select value={selectedType} onValueChange={setSelectedType}>
             <SelectTrigger className="w-48" data-testid="select-type-filter">
               <SelectValue placeholder="Filter by type" />

@@ -1,7 +1,6 @@
 import { useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import {
   Select,
@@ -12,7 +11,6 @@ import {
 } from "@/components/ui/select";
 import {
   ArrowLeft,
-  Search,
   Package,
   AlertTriangle,
   TrendingDown,
@@ -29,6 +27,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useVessels } from "@/hooks/useVessels";
 import { useVessel } from "@/contexts/VesselContext";
 import { useQuery } from "@tanstack/react-query";
+import CategoryFilters, { CategoryFilterValues } from "@/components/reports/CategoryFilters";
 
 interface SparesReport {
   id: string;
@@ -47,25 +46,39 @@ interface SparesReport {
 
 interface SparesReportsProps {
   onBack: () => void;
+  globalFilters?: {
+    vessel: string;
+    department: string;
+    dateRange: { from: Date | null; to: Date | null };
+    priority: string;
+  };
 }
 
-const SparesReports: React.FC<SparesReportsProps> = ({ onBack }) => {
-  const [searchQuery, setSearchQuery] = useState("");
+const SparesReports: React.FC<SparesReportsProps> = ({ onBack, globalFilters }) => {
+  const [categoryFilters, setCategoryFilters] = useState<CategoryFilterValues>({
+    searchQuery: "",
+    vessel: globalFilters?.vessel || "all",
+    dateRange: globalFilters?.dateRange || { from: null, to: null }
+  });
   const [selectedFrequency, setSelectedFrequency] = useState<string>("all");
   const [selectedPriority, setSelectedPriority] = useState<string>("all");
   const [generatingReports, setGeneratingReports] = useState<Set<string>>(new Set());
   const { toast } = useToast();
   const { data: vessels = [] } = useVessels();
-  const { vesselId } = useVessel();
+  const { vesselId: contextVesselId } = useVessel();
+
+  const effectiveVesselId = (categoryFilters.vessel && categoryFilters.vessel !== 'all') 
+    ? categoryFilters.vessel 
+    : contextVesselId;
 
   const { data: spares = [] } = useQuery<any[]>({
-    queryKey: ['/technical/api/spares', vesselId],
-    enabled: !!vesselId && vesselId !== 'all',
+    queryKey: ['/technical/api/spares', effectiveVesselId],
+    enabled: !!effectiveVesselId && effectiveVesselId !== 'all',
   });
 
   const { data: spareHistory = [] } = useQuery<any[]>({
-    queryKey: ['/technical/api/spares', vesselId, 'history'],
-    enabled: !!vesselId && vesselId !== 'all',
+    queryKey: ['/technical/api/spares', effectiveVesselId, 'history'],
+    enabled: !!effectiveVesselId && effectiveVesselId !== 'all',
   });
 
   const reports: SparesReport[] = [
@@ -170,8 +183,8 @@ const SparesReports: React.FC<SparesReportsProps> = ({ onBack }) => {
   ];
 
   const filteredReports = reports.filter(report => {
-    const matchesSearch = report.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                         report.description.toLowerCase().includes(searchQuery.toLowerCase());
+    const matchesSearch = report.name.toLowerCase().includes(categoryFilters.searchQuery.toLowerCase()) ||
+                         report.description.toLowerCase().includes(categoryFilters.searchQuery.toLowerCase());
     const matchesFrequency = selectedFrequency === "all" || 
                            report.frequency.toLowerCase().includes(selectedFrequency.toLowerCase());
     const matchesPriority = selectedPriority === "all" || report.priority === selectedPriority;
@@ -194,7 +207,7 @@ const SparesReports: React.FC<SparesReportsProps> = ({ onBack }) => {
   };
 
   const generateSparesPDF = async (reportId: string) => {
-    const vesselName = vessels.find(v => v.id === vesselId)?.name || vesselId || 'All Vessels';
+    const vesselName = vessels.find(v => v.id === effectiveVesselId)?.name || effectiveVesselId || 'All Vessels';
 
     switch (reportId) {
       case 'spares-low-stock': {
@@ -469,18 +482,13 @@ const SparesReports: React.FC<SparesReportsProps> = ({ onBack }) => {
           </div>
         </div>
 
-        <div className="flex gap-4 items-center">
-          <div className="relative flex-1 max-w-md">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
-            <Input
-              placeholder="Search spares reports..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-10"
-              data-testid="input-search-spares-reports"
-            />
-          </div>
-          
+        <CategoryFilters
+          filters={categoryFilters}
+          onFiltersChange={setCategoryFilters}
+          searchPlaceholder="Search spares reports..."
+        />
+
+        <div className="flex gap-4 items-center mt-3">
           <Select value={selectedFrequency} onValueChange={setSelectedFrequency}>
             <SelectTrigger className="w-48" data-testid="select-frequency-filter">
               <SelectValue placeholder="Filter by frequency" />

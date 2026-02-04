@@ -1,11 +1,9 @@
 import { useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { 
   ArrowLeft,
-  Search,
   FileText,
   AlertCircle,
   CheckCircle,
@@ -20,6 +18,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useVessels } from "@/hooks/useVessels";
 import { useVessel } from "@/contexts/VesselContext";
 import { useQuery } from "@tanstack/react-query";
+import CategoryFilters, { CategoryFilterValues } from "@/components/reports/CategoryFilters";
 
 interface IhmReport {
   id: string;
@@ -36,18 +35,32 @@ interface IhmReport {
 
 interface IhmReportsProps {
   onBack: () => void;
+  globalFilters?: {
+    vessel: string;
+    department: string;
+    dateRange: { from: Date | null; to: Date | null };
+    priority: string;
+  };
 }
 
-const IhmReports: React.FC<IhmReportsProps> = ({ onBack }) => {
-  const [searchQuery, setSearchQuery] = useState("");
+const IhmReports: React.FC<IhmReportsProps> = ({ onBack, globalFilters }) => {
+  const [categoryFilters, setCategoryFilters] = useState<CategoryFilterValues>({
+    searchQuery: "",
+    vessel: globalFilters?.vessel || "all",
+    dateRange: globalFilters?.dateRange || { from: null, to: null }
+  });
   const [generatingReports, setGeneratingReports] = useState<Set<string>>(new Set());
   const { toast } = useToast();
   const { data: vessels = [] } = useVessels();
-  const { vesselId } = useVessel();
+  const { vesselId: contextVesselId } = useVessel();
+
+  const effectiveVesselId = (categoryFilters.vessel && categoryFilters.vessel !== 'all') 
+    ? categoryFilters.vessel 
+    : contextVesselId;
 
   const { data: spares = [] } = useQuery<any[]>({
-    queryKey: ['/technical/api/spares', vesselId],
-    enabled: !!vesselId && vesselId !== 'all',
+    queryKey: ['/technical/api/spares', effectiveVesselId],
+    enabled: !!effectiveVesselId && effectiveVesselId !== 'all',
   });
 
   const reports: IhmReport[] = [
@@ -78,8 +91,8 @@ const IhmReports: React.FC<IhmReportsProps> = ({ onBack }) => {
   ];
 
   const filteredReports = reports.filter(report => {
-    return report.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-           report.description.toLowerCase().includes(searchQuery.toLowerCase());
+    return report.name.toLowerCase().includes(categoryFilters.searchQuery.toLowerCase()) ||
+           report.description.toLowerCase().includes(categoryFilters.searchQuery.toLowerCase());
   });
 
   const getPriorityColor = (priority: string) => {
@@ -92,7 +105,7 @@ const IhmReports: React.FC<IhmReportsProps> = ({ onBack }) => {
   };
 
   const generateIhmPDF = async (reportId: string) => {
-    const vesselName = vessels.find(v => v.id === vesselId)?.name || vesselId || 'All Vessels';
+    const vesselName = vessels.find(v => v.id === effectiveVesselId)?.name || effectiveVesselId || 'All Vessels';
 
     const ihmSpares = spares.filter((s: any) => s.ihm && s.ihm !== 'Unknown');
 
@@ -228,18 +241,11 @@ const IhmReports: React.FC<IhmReportsProps> = ({ onBack }) => {
           </div>
         </div>
 
-        <div className="flex gap-4 items-center">
-          <div className="relative flex-1 max-w-md">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
-            <Input
-              placeholder="Search IHM reports..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-10"
-              data-testid="input-search-ihm-reports"
-            />
-          </div>
-        </div>
+        <CategoryFilters
+          filters={categoryFilters}
+          onFiltersChange={setCategoryFilters}
+          searchPlaceholder="Search IHM reports..."
+        />
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">

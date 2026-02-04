@@ -1,7 +1,6 @@
 import { useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import {
   Select,
@@ -13,7 +12,6 @@ import {
 import {
   ArrowLeft,
   Calendar,
-  Search,
   AlertTriangle,
   Clock,
   CheckCircle,
@@ -30,6 +28,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useVessels } from "@/hooks/useVessels";
 import { useVessel } from "@/contexts/VesselContext";
 import { useQuery } from "@tanstack/react-query";
+import CategoryFilters, { CategoryFilterValues } from "@/components/reports/CategoryFilters";
 
 interface MaintenanceReport {
   id: string;
@@ -57,7 +56,11 @@ interface MaintenanceReportsProps {
 }
 
 const MaintenanceReports: React.FC<MaintenanceReportsProps> = ({ onBack, globalFilters }) => {
-  const [searchQuery, setSearchQuery] = useState("");
+  const [categoryFilters, setCategoryFilters] = useState<CategoryFilterValues>({
+    searchQuery: "",
+    vessel: globalFilters?.vessel || "all",
+    dateRange: globalFilters?.dateRange || { from: null, to: null }
+  });
   const [selectedFrequency, setSelectedFrequency] = useState<string>("all");
   const [selectedPriority, setSelectedPriority] = useState<string>("all");
   const [generatingReports, setGeneratingReports] = useState<Set<string>>(new Set());
@@ -65,9 +68,9 @@ const MaintenanceReports: React.FC<MaintenanceReportsProps> = ({ onBack, globalF
   const { data: vessels = [] } = useVessels();
   const { vesselId: contextVesselId } = useVessel();
   
-  // Use globalFilters.vessel if provided, otherwise fall back to context vesselId
-  const effectiveVesselId = (globalFilters?.vessel && globalFilters.vessel !== 'all') 
-    ? globalFilters.vessel 
+  // Use category filters vessel if provided, otherwise fall back to context vesselId
+  const effectiveVesselId = (categoryFilters.vessel && categoryFilters.vessel !== 'all') 
+    ? categoryFilters.vessel 
     : contextVesselId;
 
   const { data: workOrders = [] } = useQuery<any[]>({
@@ -232,9 +235,9 @@ const MaintenanceReports: React.FC<MaintenanceReportsProps> = ({ onBack, globalF
   ];
 
   const filteredReports = reports.filter(report => {
-    const matchesSearch = report.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                         report.description.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                         report.purpose.toLowerCase().includes(searchQuery.toLowerCase());
+    const matchesSearch = report.name.toLowerCase().includes(categoryFilters.searchQuery.toLowerCase()) ||
+                         report.description.toLowerCase().includes(categoryFilters.searchQuery.toLowerCase()) ||
+                         report.purpose.toLowerCase().includes(categoryFilters.searchQuery.toLowerCase());
     
     const matchesFrequency = selectedFrequency === "all" || 
                            report.frequency.toLowerCase().includes(selectedFrequency.toLowerCase());
@@ -1019,18 +1022,13 @@ const MaintenanceReports: React.FC<MaintenanceReportsProps> = ({ onBack, globalF
           </div>
         </div>
 
-        <div className="flex gap-4 items-center">
-          <div className="relative flex-1 max-w-md">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
-            <Input
-              placeholder="Search maintenance reports..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-10"
-              data-testid="input-search-maintenance-reports"
-            />
-          </div>
-          
+        <CategoryFilters
+          filters={categoryFilters}
+          onFiltersChange={setCategoryFilters}
+          searchPlaceholder="Search maintenance reports..."
+        />
+
+        <div className="flex gap-4 items-center mt-3">
           <Select value={selectedFrequency} onValueChange={setSelectedFrequency}>
             <SelectTrigger className="w-48" data-testid="select-frequency-filter">
               <SelectValue placeholder="Filter by frequency" />

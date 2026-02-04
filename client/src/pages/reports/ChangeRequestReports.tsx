@@ -1,11 +1,9 @@
 import { useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import {
   ArrowLeft,
-  Search,
   GitPullRequest,
   ClipboardList,
   TrendingUp,
@@ -21,6 +19,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useVessels } from "@/hooks/useVessels";
 import { useVessel } from "@/contexts/VesselContext";
 import { useQuery } from "@tanstack/react-query";
+import CategoryFilters, { CategoryFilterValues } from "@/components/reports/CategoryFilters";
 
 interface ChangeRequestReport {
   id: string;
@@ -37,21 +36,35 @@ interface ChangeRequestReport {
 
 interface ChangeRequestReportsProps {
   onBack: () => void;
+  globalFilters?: {
+    vessel: string;
+    department: string;
+    dateRange: { from: Date | null; to: Date | null };
+    priority: string;
+  };
 }
 
-const ChangeRequestReports: React.FC<ChangeRequestReportsProps> = ({ onBack }) => {
-  const [searchQuery, setSearchQuery] = useState("");
+const ChangeRequestReports: React.FC<ChangeRequestReportsProps> = ({ onBack, globalFilters }) => {
+  const [categoryFilters, setCategoryFilters] = useState<CategoryFilterValues>({
+    searchQuery: "",
+    vessel: globalFilters?.vessel || "all",
+    dateRange: globalFilters?.dateRange || { from: null, to: null }
+  });
   const [generatingReports, setGeneratingReports] = useState<Set<string>>(new Set());
   const { toast } = useToast();
   const { data: vessels = [] } = useVessels();
-  const { vesselId } = useVessel();
+  const { vesselId: contextVesselId } = useVessel();
+
+  const effectiveVesselId = (categoryFilters.vessel && categoryFilters.vessel !== 'all') 
+    ? categoryFilters.vessel 
+    : contextVesselId;
 
   const { data: workOrders = [] } = useQuery<any[]>({
-    queryKey: ['/technical/api/work-orders'],
+    queryKey: ['/technical/api/work-orders', effectiveVesselId],
   });
 
   const { data: jobs = [] } = useQuery<any[]>({
-    queryKey: ['/technical/api/jobs', vesselId],
+    queryKey: ['/technical/api/jobs', effectiveVesselId],
   });
 
   const reports: ChangeRequestReport[] = [
@@ -82,8 +95,8 @@ const ChangeRequestReports: React.FC<ChangeRequestReportsProps> = ({ onBack }) =
   ];
 
   const filteredReports = reports.filter(report => {
-    return report.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-           report.description.toLowerCase().includes(searchQuery.toLowerCase());
+    return report.name.toLowerCase().includes(categoryFilters.searchQuery.toLowerCase()) ||
+           report.description.toLowerCase().includes(categoryFilters.searchQuery.toLowerCase());
   });
 
   const getPriorityColor = (priority: string) => {
@@ -96,7 +109,7 @@ const ChangeRequestReports: React.FC<ChangeRequestReportsProps> = ({ onBack }) =
   };
 
   const generateChangeRequestPDF = async (reportId: string) => {
-    const vesselName = vessels.find(v => v.id === vesselId)?.name || vesselId || 'All Vessels';
+    const vesselName = vessels.find(v => v.id === effectiveVesselId)?.name || effectiveVesselId || 'All Vessels';
 
     switch (reportId) {
       case 'change-requests-status': {
@@ -229,18 +242,11 @@ const ChangeRequestReports: React.FC<ChangeRequestReportsProps> = ({ onBack }) =
           </div>
         </div>
 
-        <div className="flex gap-4 items-center">
-          <div className="relative flex-1 max-w-md">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
-            <Input
-              placeholder="Search change request reports..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-10"
-              data-testid="input-search-change-reports"
-            />
-          </div>
-        </div>
+        <CategoryFilters
+          filters={categoryFilters}
+          onFiltersChange={setCategoryFilters}
+          searchPlaceholder="Search change request reports..."
+        />
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">

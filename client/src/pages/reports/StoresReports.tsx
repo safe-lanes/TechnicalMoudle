@@ -1,7 +1,6 @@
 import { useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import {
   Select,
@@ -12,7 +11,6 @@ import {
 } from "@/components/ui/select";
 import {
   ArrowLeft,
-  Search,
   Store,
   Droplets,
   Beaker,
@@ -28,6 +26,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useVessels } from "@/hooks/useVessels";
 import { useVessel } from "@/contexts/VesselContext";
 import { useQuery } from "@tanstack/react-query";
+import CategoryFilters, { CategoryFilterValues } from "@/components/reports/CategoryFilters";
 
 interface StoresReport {
   id: string;
@@ -45,19 +44,33 @@ interface StoresReport {
 
 interface StoresReportsProps {
   onBack: () => void;
+  globalFilters?: {
+    vessel: string;
+    department: string;
+    dateRange: { from: Date | null; to: Date | null };
+    priority: string;
+  };
 }
 
-const StoresReports: React.FC<StoresReportsProps> = ({ onBack }) => {
-  const [searchQuery, setSearchQuery] = useState("");
+const StoresReports: React.FC<StoresReportsProps> = ({ onBack, globalFilters }) => {
+  const [categoryFilters, setCategoryFilters] = useState<CategoryFilterValues>({
+    searchQuery: "",
+    vessel: globalFilters?.vessel || "all",
+    dateRange: globalFilters?.dateRange || { from: null, to: null }
+  });
   const [selectedCategory, setSelectedCategory] = useState<string>("all");
   const [generatingReports, setGeneratingReports] = useState<Set<string>>(new Set());
   const { toast } = useToast();
   const { data: vessels = [] } = useVessels();
-  const { vesselId } = useVessel();
+  const { vesselId: contextVesselId } = useVessel();
+
+  const effectiveVesselId = (categoryFilters.vessel && categoryFilters.vessel !== 'all') 
+    ? categoryFilters.vessel 
+    : contextVesselId;
 
   const { data: storesItems = [] } = useQuery<any[]>({
-    queryKey: ['/technical/api/stores', vesselId],
-    enabled: !!vesselId && vesselId !== 'all',
+    queryKey: ['/technical/api/stores', effectiveVesselId],
+    enabled: !!effectiveVesselId && effectiveVesselId !== 'all',
   });
 
   const reports: StoresReport[] = [
@@ -129,8 +142,8 @@ const StoresReports: React.FC<StoresReportsProps> = ({ onBack }) => {
   ];
 
   const filteredReports = reports.filter(report => {
-    const matchesSearch = report.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                         report.description.toLowerCase().includes(searchQuery.toLowerCase());
+    const matchesSearch = report.name.toLowerCase().includes(categoryFilters.searchQuery.toLowerCase()) ||
+                         report.description.toLowerCase().includes(categoryFilters.searchQuery.toLowerCase());
     const matchesCategory = selectedCategory === "all" || report.category === selectedCategory;
     return matchesSearch && matchesCategory;
   });
@@ -151,7 +164,7 @@ const StoresReports: React.FC<StoresReportsProps> = ({ onBack }) => {
   };
 
   const generateStoresPDF = async (reportId: string) => {
-    const vesselName = vessels.find(v => v.id === vesselId)?.name || vesselId || 'All Vessels';
+    const vesselName = vessels.find(v => v.id === effectiveVesselId)?.name || effectiveVesselId || 'All Vessels';
 
     switch (reportId) {
       case 'stores-inventory-status': {
@@ -385,18 +398,13 @@ const StoresReports: React.FC<StoresReportsProps> = ({ onBack }) => {
           </div>
         </div>
 
-        <div className="flex gap-4 items-center">
-          <div className="relative flex-1 max-w-md">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
-            <Input
-              placeholder="Search stores reports..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-10"
-              data-testid="input-search-stores-reports"
-            />
-          </div>
+        <CategoryFilters
+          filters={categoryFilters}
+          onFiltersChange={setCategoryFilters}
+          searchPlaceholder="Search stores reports..."
+        />
 
+        <div className="flex gap-4 items-center mt-3">
           <Select value={selectedCategory} onValueChange={setSelectedCategory}>
             <SelectTrigger className="w-48" data-testid="select-category-filter">
               <SelectValue placeholder="Filter by category" />
