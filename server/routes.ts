@@ -12953,6 +12953,93 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // ═══════════════════════════════════════════════════════════════════════════
+  // POPULATE POSTPONEMENT HISTORY FROM EXISTING WORK ORDERS (Admin Migration)
+  // One-time endpoint to seed the work_order_postponements table from existing data
+  // ═══════════════════════════════════════════════════════════════════════════
+  app.post("/technical/api/admin/populate-postponement-history", async (req, res) => {
+    try {
+      const { vesselId } = req.body;
+      
+      const allVessels = await storage.getVessels();
+      const targetVessels = vesselId && vesselId !== 'all' 
+        ? allVessels.filter(v => v.id === vesselId) 
+        : allVessels;
+      
+      let created = 0;
+      let skipped = 0;
+      const errors: string[] = [];
+      
+      for (const vessel of targetVessels) {
+        const workOrders = await storage.getWorkOrders(vessel.id);
+        const postponedWOs = workOrders.filter(wo => 
+          wo.status === 'Postponed' && 
+          (wo.postponementEndDate || wo.postponementReason)
+        );
+        
+        for (const wo of postponedWOs) {
+          try {
+            const existingPostponements = await storage.getWorkOrderPostponements({
+              workOrderId: wo.id,
+              vesselId: vessel.id
+            });
+            
+            if (existingPostponements.length > 0) {
+              skipped++;
+              continue;
+            }
+            
+            const postponementId = `pp-${wo.id}-${Date.now()}`;
+            const postponementData = {
+              id: postponementId,
+              workOrderId: wo.id,
+              vesselId: vessel.id,
+              postponementNumber: 1,
+              originalDueDate: wo.dueDate || null,
+              newDueDate: wo.postponementEndDate || null,
+              postponementReason: wo.postponementReason || 'Migrated from existing work order',
+              authorizedBy: wo.postponementAuthorizedBy || null,
+              approvalRemarks: null,
+              durationDays: null,
+              submittedDate: wo.submittedDate || null,
+              approvedDate: null,
+              approvedBy: null,
+              status: 'Approved',
+              informOffice: false
+            };
+            
+            if (postponementData.originalDueDate && postponementData.newDueDate) {
+              const origDate = new Date(postponementData.originalDueDate);
+              const newDate = new Date(postponementData.newDueDate);
+              if (!isNaN(origDate.getTime()) && !isNaN(newDate.getTime())) {
+                postponementData.durationDays = Math.ceil((newDate.getTime() - origDate.getTime()) / (1000 * 60 * 60 * 24));
+              }
+            }
+            
+            await storage.createWorkOrderPostponement(postponementData);
+            created++;
+          } catch (err: any) {
+            errors.push(`WO ${wo.workOrderNo || wo.id}: ${err.message}`);
+          }
+        }
+      }
+      
+      console.log(`[POSTPONEMENT MIGRATION] Populated: ${created} created, ${skipped} skipped, ${errors.length} errors`);
+      
+      res.json({
+        success: true,
+        created,
+        skipped,
+        errors: errors.slice(0, 10),
+        message: `Created ${created} postponement history records (${skipped} skipped, ${errors.length} errors)`
+      });
+      
+    } catch (error: any) {
+      console.error("Error populating postponement history:", error);
+      res.status(500).json({ error: "Failed to populate postponement history: " + error.message });
+    }
+  });
+
+  // ═══════════════════════════════════════════════════════════════════════════
   // MONTHLY MAINTENANCE SUMMARY EXCEL REPORT
   // KPI/Dashboard report with aggregated statistics - NOT a job list report
   // Multi-section layout: Executive Summary, Statistics, Department, Frequency, Man-Hours, Critical
