@@ -4,7 +4,11 @@ import { storage } from "./storage";
 import { getPool } from "./db";
 import * as fs from "fs";
 import * as path from "path";
+//shruit work /remote code
 import { insertRunningHoursAuditSchema, cascadeRunningHoursSchema, insertWorkOrderSchema, insertWorkOrderExecutionSchema, insertDefectSchema, insertDefectActionSchema, insertDefectAttachmentSchema, insertComponentSchema, insertSpareSchema, insertMakerSchema, insertMakerListSchema, insertMasterListSchema, insertComponentDocumentSchema, insertComponentClassRegulatorySchema, insertComponentRequisitionSchema, equipmentCategories, defectCategories, defectTypes, shipCertificatesMaster, insertShipCertificateMasterSchema, shipCertificatesLabelsConfig, vesselCertificateApplicability, insertVesselCertificateApplicabilitySchema, vesselCertificateData, vessels, shipSurveysMaster, shipSurveysLabelsConfig, vesselSurveyApplicability, vesselSurveyData } from "@shared/schema";
+//
+import { insertRunningHoursAuditSchema, cascadeRunningHoursSchema, insertWorkOrderSchema, insertWorkOrderExecutionSchema, insertDefectSchema, insertDefectActionSchema, insertDefectAttachmentSchema, insertComponentSchema, insertSpareSchema, insertMakerSchema, insertMasterListSchema, insertComponentDocumentSchema, insertComponentClassRegulatorySchema, insertComponentRequisitionSchema, equipmentCategories, defectCategories, defectTypes, shipCertificatesMaster, insertShipCertificateMasterSchema, shipCertificatesLabelsConfig, vesselCertificateApplicability, insertVesselCertificateApplicabilitySchema, vesselCertificateData, vessels, shipSurveysMaster, shipSurveysLabelsConfig, vesselSurveyApplicability, vesselSurveyData, componentRunningHoursLog } from "@shared/schema";
+// rahut local work
 import { getPostgresClient } from "./postgresClient";
 import { eq, and, asc, sql, inArray } from "drizzle-orm";
 import { computeWorkOrderStatus } from "@shared/workOrders/status";
@@ -14290,6 +14294,437 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
     } catch (error: any) {
       console.error("Error generating Crew Workload Distribution Excel report:", error);
+      res.status(500).json({ error: "Failed to generate report: " + error.message });
+    }
+  });
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // REPORT 1.9: EQUIPMENT UTILIZATION SUMMARY
+  // Analyzes running hours to calculate equipment utilization metrics
+  // ═══════════════════════════════════════════════════════════════════════════
+  app.get("/technical/api/reports/equipment-utilization-summary", async (req, res) => {
+    try {
+      const vesselId = req.query.vesselId as string;
+      const startDate = req.query.startDate as string;
+      const endDate = req.query.endDate as string;
+      const category = req.query.category as string;
+      const department = req.query.department as string;
+      
+      if (!vesselId) {
+        return res.status(400).json({ error: "vesselId is required" });
+      }
+      
+      // Get vessel name
+      const vessels = await storage.getVessels();
+      const vessel = vessels.find(v => v.id === vesselId || v.vesselCode === vesselId);
+      const vesselName = vessel?.name || vessel?.vesselName || vesselId;
+      
+      // Get all components for the vessel that have running hours tracking
+      const allComponents = await storage.getComponents(vesselId);
+      // Filter components that have RH tracking (allow zero hours, just check RH type)
+      let rhComponents = allComponents.filter(c => 
+        c.isActive !== false && 
+        c.rhCounterType && 
+        c.rhCounterType !== 'Not RH Driven' &&
+        c.rhCounterType !== 'NOT_RH_DRIVEN'
+      );
+      
+      // Apply category filter
+      if (category && category !== 'All' && category !== 'all') {
+        rhComponents = rhComponents.filter(c => 
+          c.componentCategory === category || c.category === category
+        );
+      }
+      
+      // Apply department filter
+      if (department && department !== 'All' && department !== 'all') {
+        rhComponents = rhComponents.filter(c => 
+          c.department === department || c.eqptSystemDept === department
+        );
+      }
+      
+      // Get vessel code for querying logs (may be different from vesselId)
+      const vesselCode = vessel?.vesselCode || vesselId;
+      
+      // Get running hours log for the period - query by both vesselId and vesselCode
+      const rhLogs = await db.select().from(componentRunningHoursLog)
+        .where(sql`${componentRunningHoursLog.vesselCode} IN (${vesselId}, ${vesselCode})`);
+      
+      // Parse dates
+      const parseDate = (dateVal: string | Date | null | undefined): Date | null => {
+        if (!dateVal) return null;
+        try {
+          const d = new Date(dateVal instanceof Date ? dateVal : dateVal);
+          return isNaN(d.getTime()) ? null : d;
+        } catch {
+          return null;
+        }
+      };
+      
+      const now = new Date();
+      const defaultStartDate = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000); // 30 days ago
+      const periodStart = startDate ? parseDate(startDate) : defaultStartDate;
+      const periodEnd = endDate ? parseDate(endDate) : now;
+      
+      if (!periodStart || !periodEnd) {
+        return res.status(400).json({ error: "Invalid date format" });
+      }
+      
+      const daysInPeriod = Math.max(1, Math.ceil((periodEnd.getTime() - periodStart.getTime()) / (1000 * 60 * 60 * 24)));
+      
+      // Build utilization data for each component
+      const utilizationData = rhComponents.map((component, index) => {
+        // Get RH logs for this component in the period
+        const componentLogs = rhLogs.filter(log => 
+          (log.componentCode === component.componentCode || log.componentId === component.id) &&
+          log.updatedAt && 
+          new Date(log.updatedAt) >= periodStart &&
+          new Date(log.updatedAt) <= periodEnd
+        ).sort((a, b) => new Date(a.updatedAt!).getTime() - new Date(b.updatedAt!).getTime());
+        
+        // Calculate period hours from delta accumulation or first/last reading
+        let periodHours = 0;
+        
+        if (componentLogs.length > 0) {
+          // Sum up all delta changes in the period
+          periodHours = componentLogs.reduce((sum, log) => {
+            const delta = Number(log.deltaRh) || 0;
+            return sum + Math.max(0, delta); // Only positive deltas (ignore corrections)
+          }, 0);
+        }
+        
+        const currentHours = Number(component.currentCumulativeRH) || Number(component.runningHours) || 0;
+        const avgDailyHours = periodHours / daysInPeriod;
+        
+        // Determine utilization band
+        let utilizationBand: 'High' | 'Normal' | 'Low';
+        if (avgDailyHours > 20) {
+          utilizationBand = 'High';
+        } else if (avgDailyHours >= 10) {
+          utilizationBand = 'Normal';
+        } else {
+          utilizationBand = 'Low';
+        }
+        
+        // Calculate utilization percentage (assuming 24 hrs/day max)
+        const ratedHoursPerDay = 24;
+        const utilizationPercent = (avgDailyHours / ratedHoursPerDay) * 100;
+        
+        return {
+          sNo: index + 1,
+          componentCode: component.componentCode || component.id,
+          componentName: component.name || component.fleetEquipmentName || 'Unnamed',
+          category: component.componentCategory || component.category || '-',
+          location: component.location || '-',
+          department: component.department || component.eqptSystemDept || '-',
+          currentHours: Math.round(currentHours * 100) / 100,
+          periodHours: Math.round(periodHours * 100) / 100,
+          avgDailyHours: Math.round(avgDailyHours * 100) / 100,
+          utilizationBand,
+          utilizationPercent: Math.round(utilizationPercent * 10) / 10,
+          lastUpdated: component.lastUpdated || null,
+          readingsCount: componentLogs.length
+        };
+      });
+      
+      // Sort by utilization (High first, then by avgDailyHours descending)
+      utilizationData.sort((a, b) => {
+        const bandOrder = { 'High': 0, 'Normal': 1, 'Low': 2 };
+        if (bandOrder[a.utilizationBand] !== bandOrder[b.utilizationBand]) {
+          return bandOrder[a.utilizationBand] - bandOrder[b.utilizationBand];
+        }
+        return b.avgDailyHours - a.avgDailyHours;
+      });
+      
+      // Re-number after sorting
+      utilizationData.forEach((item, idx) => { item.sNo = idx + 1; });
+      
+      // Calculate summary
+      const summary = {
+        totalEquipment: utilizationData.length,
+        highUtilization: utilizationData.filter(d => d.utilizationBand === 'High').length,
+        normalUtilization: utilizationData.filter(d => d.utilizationBand === 'Normal').length,
+        lowUtilization: utilizationData.filter(d => d.utilizationBand === 'Low').length,
+        avgUtilization: utilizationData.length > 0 
+          ? Math.round((utilizationData.reduce((sum, d) => sum + d.utilizationPercent, 0) / utilizationData.length) * 10) / 10
+          : 0,
+        totalPeriodHours: Math.round(utilizationData.reduce((sum, d) => sum + d.periodHours, 0) * 100) / 100,
+        periodDays: daysInPeriod,
+        periodStart: periodStart.toISOString().split('T')[0],
+        periodEnd: periodEnd.toISOString().split('T')[0]
+      };
+      
+      res.json({
+        success: true,
+        data: utilizationData,
+        summary,
+        vesselName,
+        totalRecords: utilizationData.length
+      });
+      
+    } catch (error: any) {
+      console.error("Error fetching equipment utilization summary:", error);
+      res.status(500).json({ error: "Failed to fetch equipment utilization summary: " + error.message });
+    }
+  });
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // REPORT 1.9: EQUIPMENT UTILIZATION SUMMARY - EXCEL EXPORT
+  // Professional Excel export with utilization metrics
+  // ═══════════════════════════════════════════════════════════════════════════
+  app.post("/technical/api/reports/equipment-utilization-summary/excel", async (req, res) => {
+    try {
+      const { vesselId, startDate, endDate, category, department } = req.body;
+      
+      if (!vesselId) {
+        return res.status(400).json({ error: "Please select a vessel" });
+      }
+      
+      // Get vessel name
+      const vessels = await storage.getVessels();
+      const vessel = vessels.find(v => v.id === vesselId || v.vesselCode === vesselId);
+      const vesselName = vessel?.name || vessel?.vesselName || vesselId;
+      
+      // Get all components for the vessel that have running hours tracking
+      const allComponents = await storage.getComponents(vesselId);
+      // Filter components that have RH tracking (allow zero hours, just check RH type)
+      let rhComponents = allComponents.filter(c => 
+        c.isActive !== false && 
+        c.rhCounterType && 
+        c.rhCounterType !== 'Not RH Driven' &&
+        c.rhCounterType !== 'NOT_RH_DRIVEN'
+      );
+      
+      // Apply category filter
+      if (category && category !== 'All' && category !== 'all') {
+        rhComponents = rhComponents.filter(c => 
+          c.componentCategory === category || c.category === category
+        );
+      }
+      
+      // Apply department filter
+      if (department && department !== 'All' && department !== 'all') {
+        rhComponents = rhComponents.filter(c => 
+          c.department === department || c.eqptSystemDept === department
+        );
+      }
+      
+      // Get vessel code for querying logs (may be different from vesselId)
+      const vesselCode = vessel?.vesselCode || vesselId;
+      
+      // Get running hours log for the period - query by both vesselId and vesselCode
+      const rhLogs = await db.select().from(componentRunningHoursLog)
+        .where(sql`${componentRunningHoursLog.vesselCode} IN (${vesselId}, ${vesselCode})`);
+      
+      // Parse dates
+      const parseDate = (dateVal: string | Date | null | undefined): Date | null => {
+        if (!dateVal) return null;
+        try {
+          const d = new Date(dateVal instanceof Date ? dateVal : dateVal);
+          return isNaN(d.getTime()) ? null : d;
+        } catch {
+          return null;
+        }
+      };
+      
+      const formatDateDisplay = (dateVal: string | Date | null | undefined): string => {
+        if (!dateVal) return '-';
+        try {
+          const dateStr = dateVal instanceof Date ? dateVal.toISOString() : String(dateVal);
+          const d = new Date(dateStr);
+          if (isNaN(d.getTime())) return '-';
+          const day = d.getDate().toString().padStart(2, '0');
+          const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+          return `${day}-${months[d.getMonth()]}-${d.getFullYear()}`;
+        } catch {
+          return '-';
+        }
+      };
+      
+      const now = new Date();
+      const defaultStartDate = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+      const periodStart = startDate ? parseDate(startDate) : defaultStartDate;
+      const periodEnd = endDate ? parseDate(endDate) : now;
+      
+      if (!periodStart || !periodEnd) {
+        return res.status(400).json({ error: "Invalid date format" });
+      }
+      
+      const daysInPeriod = Math.max(1, Math.ceil((periodEnd.getTime() - periodStart.getTime()) / (1000 * 60 * 60 * 24)));
+      
+      // Build utilization data
+      const utilizationData = rhComponents.map((component, index) => {
+        const componentLogs = rhLogs.filter(log => 
+          (log.componentCode === component.componentCode || log.componentId === component.id) &&
+          log.updatedAt && 
+          new Date(log.updatedAt) >= periodStart &&
+          new Date(log.updatedAt) <= periodEnd
+        ).sort((a, b) => new Date(a.updatedAt!).getTime() - new Date(b.updatedAt!).getTime());
+        
+        let periodHours = 0;
+        if (componentLogs.length > 0) {
+          periodHours = componentLogs.reduce((sum, log) => {
+            const delta = Number(log.deltaRh) || 0;
+            return sum + Math.max(0, delta);
+          }, 0);
+        }
+        
+        const currentHours = Number(component.currentCumulativeRH) || Number(component.runningHours) || 0;
+        const avgDailyHours = periodHours / daysInPeriod;
+        
+        let utilizationBand: 'High' | 'Normal' | 'Low';
+        if (avgDailyHours > 20) {
+          utilizationBand = 'High';
+        } else if (avgDailyHours >= 10) {
+          utilizationBand = 'Normal';
+        } else {
+          utilizationBand = 'Low';
+        }
+        
+        const utilizationPercent = (avgDailyHours / 24) * 100;
+        
+        return {
+          componentCode: component.componentCode || component.id,
+          componentName: component.name || component.fleetEquipmentName || 'Unnamed',
+          category: component.componentCategory || component.category || '-',
+          location: component.location || '-',
+          department: component.department || component.eqptSystemDept || '-',
+          currentHours: Math.round(currentHours * 100) / 100,
+          periodHours: Math.round(periodHours * 100) / 100,
+          avgDailyHours: Math.round(avgDailyHours * 100) / 100,
+          utilizationBand,
+          utilizationPercent: Math.round(utilizationPercent * 10) / 10,
+          lastUpdated: formatDateDisplay(component.lastUpdated),
+          readingsCount: componentLogs.length
+        };
+      });
+      
+      // Sort by utilization band and avgDailyHours
+      utilizationData.sort((a, b) => {
+        const bandOrder = { 'High': 0, 'Normal': 1, 'Low': 2 };
+        if (bandOrder[a.utilizationBand] !== bandOrder[b.utilizationBand]) {
+          return bandOrder[a.utilizationBand] - bandOrder[b.utilizationBand];
+        }
+        return b.avgDailyHours - a.avgDailyHours;
+      });
+      
+      // Create Excel workbook
+      const workbook = new ExcelJS.Workbook();
+      workbook.creator = 'PMS System';
+      workbook.created = new Date();
+      
+      const worksheet = workbook.addWorksheet('Equipment Utilization', {
+        views: [{ state: 'frozen', ySplit: 7, xSplit: 0 }]
+      });
+      
+      // Define columns
+      const columns: ColumnDef[] = [
+        { key: 'sNo', header: 'S.No', width: 6, type: 'number', align: 'center' },
+        { key: 'componentCode', header: 'Comp Code', width: 14, type: 'text' },
+        { key: 'componentName', header: 'Component Name', width: 30, type: 'text' },
+        { key: 'category', header: 'Category', width: 18, type: 'text' },
+        { key: 'location', header: 'Location', width: 15, type: 'text' },
+        { key: 'department', header: 'Dept', width: 12, type: 'text', align: 'center' },
+        { key: 'currentHours', header: 'Current Hrs', width: 12, type: 'number', align: 'right' },
+        { key: 'periodHours', header: 'Period Hrs', width: 12, type: 'number', align: 'right' },
+        { key: 'avgDailyHours', header: 'Avg Daily Hrs', width: 12, type: 'number', align: 'right' },
+        { key: 'utilizationBand', header: 'Utilization', width: 12, type: 'text', align: 'center' },
+        { key: 'utilizationPercent', header: 'Util %', width: 10, type: 'number', align: 'right' },
+        { key: 'lastUpdated', header: 'Last Updated', width: 14, type: 'date', align: 'center' }
+      ];
+      
+      const lastColLetter = getLastColumnLetter(columns.length);
+      
+      const periodStr = `${formatDateDisplay(periodStart)} to ${formatDateDisplay(periodEnd)}`;
+      
+      // Apply standard header
+      applyStandardHeader(
+        worksheet,
+        'EQUIPMENT UTILIZATION SUMMARY REPORT',
+        `Running hours analysis for ${daysInPeriod} days (${periodStr})`,
+        vesselName,
+        utilizationData.length,
+        lastColLetter
+      );
+      
+      // Apply table header at row 7
+      applyStandardTableHeader(worksheet, columns, 7);
+      
+      // Build report data with sNo
+      const reportData = utilizationData.map((item, index) => ({
+        sNo: index + 1,
+        ...item
+      }));
+      
+      // Apply data rows
+      applyStandardDataRows(worksheet, reportData, columns, 8);
+      
+      // Apply color coding for utilization bands
+      for (let i = 0; i < reportData.length; i++) {
+        const rowNum = 8 + i;
+        const row = reportData[i];
+        const bandCell = worksheet.getCell(`J${rowNum}`);
+        
+        if (row.utilizationBand === 'High') {
+          bandCell.fill = {
+            type: 'pattern',
+            pattern: 'solid',
+            fgColor: { argb: 'FFFEE2E2' } // Light red
+          };
+          bandCell.font = { color: { argb: 'FFDC2626' }, bold: true };
+        } else if (row.utilizationBand === 'Normal') {
+          bandCell.fill = {
+            type: 'pattern',
+            pattern: 'solid',
+            fgColor: { argb: 'FFDCFCE7' } // Light green
+          };
+          bandCell.font = { color: { argb: 'FF16A34A' }, bold: true };
+        } else {
+          bandCell.fill = {
+            type: 'pattern',
+            pattern: 'solid',
+            fgColor: { argb: 'FFFEF3C7' } // Light yellow
+          };
+          bandCell.font = { color: { argb: 'FFD97706' }, bold: true };
+        }
+      }
+      
+      // Add summary row
+      const summaryRow = 8 + reportData.length + 1;
+      const highCount = reportData.filter(r => r.utilizationBand === 'High').length;
+      const normalCount = reportData.filter(r => r.utilizationBand === 'Normal').length;
+      const lowCount = reportData.filter(r => r.utilizationBand === 'Low').length;
+      const avgUtil = reportData.length > 0 
+        ? (reportData.reduce((sum, r) => sum + r.utilizationPercent, 0) / reportData.length).toFixed(1)
+        : '0';
+      
+      worksheet.mergeCells(`A${summaryRow}:${lastColLetter}${summaryRow}`);
+      worksheet.getCell(`A${summaryRow}`).value = 
+        `Summary: Total ${reportData.length} equipment | High: ${highCount} | Normal: ${normalCount} | Low: ${lowCount} | Avg Utilization: ${avgUtil}%`;
+      worksheet.getCell(`A${summaryRow}`).font = { bold: true, size: 10 };
+      worksheet.getCell(`A${summaryRow}`).fill = {
+        type: 'pattern',
+        pattern: 'solid',
+        fgColor: { argb: 'FFF3F4F6' }
+      };
+      
+      // Apply page setup
+      applyStandardPageSetup(worksheet, 7, columns.length, summaryRow, vesselName);
+      worksheet.pageSetup.orientation = 'landscape';
+      
+      // Generate buffer and send
+      const buffer = await workbook.xlsx.writeBuffer();
+      const dateStr = new Date().toISOString().split('T')[0].replace(/-/g, '');
+      const filename = `Equipment_Utilization_Summary_${vesselName.replace(/[^a-z0-9]/gi, '_')}_${dateStr}.xlsx`;
+      
+      console.log(`[EQUIPMENT UTILIZATION REPORT] Generated: ${filename}`);
+      
+      res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+      res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+      res.send(buffer);
+      
+    } catch (error: any) {
+      console.error("Error generating Equipment Utilization Excel report:", error);
       res.status(500).json({ error: "Failed to generate report: " + error.message });
     }
   });

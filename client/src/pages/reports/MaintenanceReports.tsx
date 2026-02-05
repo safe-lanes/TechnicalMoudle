@@ -21,7 +21,8 @@ import {
   Settings,
   Eye,
   Loader2,
-  Download
+  Download,
+  Activity
 } from "lucide-react";
 import { pdfReportGenerator, fetchReportData, formatDate } from "@/lib/pdfReportGenerator";
 import { useToast } from "@/hooks/use-toast";
@@ -230,6 +231,20 @@ const MaintenanceReports: React.FC<MaintenanceReportsProps> = ({ onBack, globalF
       icon: Users,
       priority: "low",
       lastGenerated: "1 week ago",
+      estimatedTime: "2-3 min"
+    },
+    {
+      id: "equipment-utilization",
+      name: "Equipment Utilization Summary",
+      description: "Running hours analysis showing equipment utilization rates and bands",
+      purpose: "Identify equipment operating patterns and utilization levels",
+      frequency: "Weekly/Monthly",
+      fields: ["Current Hours", "Period Hours", "Avg Daily Hours", "Utilization Band", "Utilization %"],
+      filters: ["Vessel", "Category", "Department", "Date Range"],
+      outputs: ["PDF", "Excel"],
+      icon: Activity,
+      priority: "high",
+      lastGenerated: "Never",
       estimatedTime: "2-3 min"
     }
   ];
@@ -1146,6 +1161,69 @@ const MaintenanceReports: React.FC<MaintenanceReportsProps> = ({ onBack, globalF
         break;
       }
 
+      case 'equipment-utilization': {
+        // Fetch equipment utilization data from API
+        try {
+          const params = new URLSearchParams({ vesselId: effectiveVesselId || '' });
+          
+          // Add date range if available
+          if (categoryFilters.dateRange?.from) {
+            params.append('startDate', categoryFilters.dateRange.from.toISOString().split('T')[0]);
+          }
+          if (categoryFilters.dateRange?.to) {
+            params.append('endDate', categoryFilters.dateRange.to.toISOString().split('T')[0]);
+          }
+          
+          const response = await fetch(`/technical/api/reports/equipment-utilization-summary?${params}`);
+          const result = await response.json();
+          
+          if (!result.success || !result.data) {
+            throw new Error(result.error || 'Failed to fetch equipment utilization data');
+          }
+          
+          const utilizationData = result.data;
+          const summary = result.summary;
+          
+          const columns = [
+            { header: 'S.No', field: 'sNo', width: 15 },
+            { header: 'Code', field: 'componentCode', width: 35 },
+            { header: 'Component Name', field: 'componentName', width: 60 },
+            { header: 'Category', field: 'category', width: 40 },
+            { header: 'Current Hrs', field: 'currentHours', width: 30 },
+            { header: 'Period Hrs', field: 'periodHours', width: 30 },
+            { header: 'Avg Daily', field: 'avgDailyHours', width: 28 },
+            { header: 'Utilization', field: 'utilizationBand', width: 28 },
+            { header: 'Util %', field: 'utilizationPercent', width: 22 }
+          ];
+          
+          const summaryItems = [
+            { label: 'Total Equipment', value: summary.totalEquipment },
+            { label: 'High Utilization', value: summary.highUtilization },
+            { label: 'Normal Utilization', value: summary.normalUtilization },
+            { label: 'Low Utilization', value: summary.lowUtilization },
+            { label: 'Avg Utilization', value: `${summary.avgUtilization}%` }
+          ];
+          
+          pdfReportGenerator.generateReport(
+            { 
+              title: 'Equipment Utilization Summary', 
+              subtitle: `Running hours analysis for ${summary.periodDays} days (${summary.periodStart} to ${summary.periodEnd})`, 
+              vessel: vesselName 
+            },
+            columns,
+            utilizationData,
+            summaryItems
+          );
+        } catch (error: any) {
+          toast({
+            title: "Error",
+            description: error.message || "Failed to generate equipment utilization report",
+            variant: "destructive"
+          });
+        }
+        break;
+      }
+
       default:
         toast({
           title: "Report Not Available",
@@ -1174,6 +1252,7 @@ const MaintenanceReports: React.FC<MaintenanceReportsProps> = ({ onBack, globalF
       'monthly-summary': '/technical/api/reports/maintenance/monthly-summary/excel',
       'critical-equipment': '/technical/api/reports/critical-equipment-status/excel',
       'workload-distribution': '/technical/api/reports/crew-workload-distribution/excel',
+      'equipment-utilization': '/technical/api/reports/equipment-utilization-summary/excel',
     };
 
     const endpoint = reportEndpoints[reportId];
@@ -1188,7 +1267,7 @@ const MaintenanceReports: React.FC<MaintenanceReportsProps> = ({ onBack, globalF
     let requestBody: any = { vesselId: effectiveVesselId };
     
     // Add date range for reports that support it
-    if (reportId === 'monthly-summary' || reportId === 'completed-jobs' || reportId === 'unplanned-jobs' || reportId === 'workload-distribution') {
+    if (reportId === 'monthly-summary' || reportId === 'completed-jobs' || reportId === 'unplanned-jobs' || reportId === 'workload-distribution' || reportId === 'equipment-utilization') {
       // Use category filters date range for completed-jobs, unplanned-jobs, and workload-distribution
       const dateFrom = categoryFilters.dateRange?.from;
       const dateTo = categoryFilters.dateRange?.to;
@@ -1200,8 +1279,8 @@ const MaintenanceReports: React.FC<MaintenanceReportsProps> = ({ onBack, globalF
         requestBody.dateTo = dateTo.toISOString().split('T')[0];
       }
       
-      // Also support startDate/endDate for monthly-summary, unplanned-jobs, and workload-distribution
-      if (reportId === 'monthly-summary' || reportId === 'unplanned-jobs' || reportId === 'workload-distribution') {
+      // Also support startDate/endDate for monthly-summary, unplanned-jobs, workload-distribution, and equipment-utilization
+      if (reportId === 'monthly-summary' || reportId === 'unplanned-jobs' || reportId === 'workload-distribution' || reportId === 'equipment-utilization') {
         let startDate: Date;
         let endDate: Date;
         
