@@ -200,7 +200,8 @@ const MaintenanceReports: React.FC<MaintenanceReportsProps> = ({ onBack, globalF
       icon: TrendingUp,
       priority: "low",
       lastGenerated: "5 days ago",
-      estimatedTime: "2-3 min"
+      estimatedTime: "2-3 min",
+      hidden: true
     },
     {
       id: "manhours-analysis",
@@ -214,7 +215,8 @@ const MaintenanceReports: React.FC<MaintenanceReportsProps> = ({ onBack, globalF
       icon: Users,
       priority: "medium",
       lastGenerated: "1 week ago",
-      estimatedTime: "3-4 min"
+      estimatedTime: "3-4 min",
+      hidden: true
     },
     {
       id: "workload-distribution",
@@ -233,6 +235,8 @@ const MaintenanceReports: React.FC<MaintenanceReportsProps> = ({ onBack, globalF
   ];
 
   const filteredReports = reports.filter(report => {
+    if ((report as any).hidden) return false;
+    
     const matchesSearch = report.name.toLowerCase().includes(categoryFilters.searchQuery.toLowerCase()) ||
                          report.description.toLowerCase().includes(categoryFilters.searchQuery.toLowerCase()) ||
                          report.purpose.toLowerCase().includes(categoryFilters.searchQuery.toLowerCase());
