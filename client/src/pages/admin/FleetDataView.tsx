@@ -114,94 +114,48 @@ function buildTree(components: FleetComponent[]): TreeNode[] {
   const nodeMap = new Map<string, TreeNode>();
   const rootNodes: TreeNode[] = [];
 
-  const sfiCategories = [
-    { code: "1", name: "Ship General" },
-    { code: "2", name: "Hull" },
-    { code: "3", name: "Equipment for Cargo" },
-    { code: "4", name: "Ship's Equipment" },
-    { code: "5", name: "Equipment for Crew & Passengers" },
-    { code: "6", name: "Machinery Main Components" },
-    { code: "7", name: "Systems for Machinery Main Components" },
-    { code: "8", name: "Ship Common Systems" },
-  ];
-
-  sfiCategories.forEach((cat) => {
+  components.forEach((comp) => {
+    const code = comp.fleetEquipmentCode || comp.componentCode || String(comp.id);
+    if (!code) return;
+    
     const node: TreeNode = {
-      code: cat.code,
-      name: cat.name,
+      code: code,
+      name: comp.fleetEquipmentName || comp.name || "Unknown",
       children: [],
+      data: comp,
       isExpanded: false,
     };
-    nodeMap.set(cat.code, node);
-    rootNodes.push(node);
+    nodeMap.set(code, node);
   });
 
-  const groupedByPrefix = new Map<string, FleetComponent[]>();
   components.forEach((comp) => {
-    const code = String(comp.fleetEquipmentCode || comp.componentCode || comp.id);
+    const code = comp.fleetEquipmentCode || comp.componentCode || String(comp.id);
     if (!code) return;
-    const prefix = code.charAt(0);
-    if (!groupedByPrefix.has(prefix)) {
-      groupedByPrefix.set(prefix, []);
-    }
-    groupedByPrefix.get(prefix)!.push(comp);
-  });
-
-  groupedByPrefix.forEach((items, prefix) => {
-    const parentNode = nodeMap.get(prefix);
-    if (parentNode) {
-      const subGroups = new Map<string, FleetComponent[]>();
-      items.forEach((item) => {
-        const code = String(item.fleetEquipmentCode || item.componentCode || item.id);
-        if (!code) return;
-        const parts = code.split(".");
-        const subPrefix = parts.length > 0 ? parts[0] : code;
-        if (!subGroups.has(subPrefix)) {
-          subGroups.set(subPrefix, []);
-        }
-        subGroups.get(subPrefix)!.push(item);
-      });
-
-      subGroups.forEach((subItems, subCode) => {
-        if (subItems.length === 1 && subCode.length <= 2) {
-          const item = subItems[0];
-          const childNode: TreeNode = {
-            code: String(item.fleetEquipmentCode || item.componentCode || item.id),
-            name: item.fleetEquipmentName || item.name || "Unknown",
-            children: [],
-            data: item,
-          };
-          parentNode.children.push(childNode);
-        } else {
-          const firstItem = subItems[0];
-          const subNode: TreeNode = {
-            code: subCode,
-            name: firstItem?.fleetEquipmentName || firstItem?.name || `Group ${subCode}`,
-            children: [],
-            isExpanded: false,
-          };
-
-          subItems.forEach((item) => {
-            const leafNode: TreeNode = {
-              code: String(item.fleetEquipmentCode || item.componentCode || item.id),
-              name: item.fleetEquipmentName || item.name || "Unknown",
-              children: [],
-              data: item,
-            };
-            subNode.children.push(leafNode);
-          });
-
-          if (subNode.children.length === 1) {
-            parentNode.children.push(subNode.children[0]);
-          } else {
-            parentNode.children.push(subNode);
-          }
-        }
-      });
+    
+    const node = nodeMap.get(code);
+    if (!node) return;
+    
+    const parentCode = comp.parentFleetEquipmentCode;
+    
+    if (parentCode && nodeMap.has(parentCode)) {
+      const parentNode = nodeMap.get(parentCode)!;
+      parentNode.children.push(node);
+    } else {
+      rootNodes.push(node);
     }
   });
 
-  return rootNodes;
+  const sortNodes = (nodes: TreeNode[]): TreeNode[] => {
+    nodes.sort((a, b) => a.code.localeCompare(b.code, undefined, { numeric: true }));
+    nodes.forEach((node) => {
+      if (node.children.length > 0) {
+        sortNodes(node.children);
+      }
+    });
+    return nodes;
+  };
+
+  return sortNodes(rootNodes);
 }
 
 function TreeItem({
