@@ -1870,16 +1870,13 @@ router.get('/template', async (req, res) => {
       
     case 'makers':
       headers = [
-        // Maker List template
-        'Maker Code', 'Maker Name', 'Address', 'Contact Person', 'Email', 
-        'Phone', 'Website', 'Country', 'Notes', 'Is Active'
+        // Maker List template - matches maker_list database schema
+        'Maker Code', 'Maker Name', 'Address', 'Is Active'
       ];
 
       validValues = [
         'Required (Unique identifier, e.g., MAN, CAT, ABB)', 'Required (Full manufacturer name)', 
-        'Text (Manufacturer address)', 'Text (Primary contact name)', 'Text (Email address)',
-        'Text (Phone number)', 'Text (Website URL)', 'Text (Country of origin)', 
-        'Text (Additional notes)', 'Yes/No (defaults to Yes)'
+        'Text (Manufacturer address)', 'Yes/No (defaults to Yes)'
       ];
 
       example = [];
@@ -3484,11 +3481,11 @@ async function validateData(type: string, data: any[], mode: string, vesselId?: 
         }
       });
     } else if (type === 'makers') {
-      // Validate makers (3-column format: Maker Code, Maker Name, Address)
+      // Validate makers - matches maker_list database schema (makerCode, makerName, address, isActive)
       
       // Maker Code - required and unique
       const makerCode = row['Maker Code'];
-      if (!makerCode || String(makerCode).trim() === '') {
+      if (makerCode === undefined || makerCode === null || String(makerCode).trim() === '') {
         errors.push(`Row ${rowNum}: Maker Code is required`);
       } else {
         normalized['Maker Code'] = String(makerCode).trim();
@@ -3496,53 +3493,21 @@ async function validateData(type: string, data: any[], mode: string, vesselId?: 
       
       // Maker Name - required
       const makerName = row['Maker Name'];
-      if (!makerName || String(makerName).trim() === '') {
+      if (makerName === undefined || makerName === null || String(makerName).trim() === '') {
         errors.push(`Row ${rowNum}: Maker Name is required`);
       } else {
         normalized['Maker Name'] = String(makerName).trim();
       }
       
       // Address - optional
-      if (row['Address']) {
+      if (row['Address'] !== undefined && row['Address'] !== null && String(row['Address']).trim() !== '') {
         normalized['Address'] = String(row['Address']).trim();
+      } else {
+        normalized['Address'] = null;
       }
       
-      // Contact Person - optional
-      if (row['Contact Person']) {
-        normalized['Contact Person'] = String(row['Contact Person']).trim();
-      }
-      
-      // Email - optional with basic validation
-      if (row['Email']) {
-        const email = String(row['Email']).trim();
-        if (email && !email.includes('@')) {
-          warnings.push(`Row ${rowNum}: Email format may be invalid`);
-        }
-        normalized['Email'] = email;
-      }
-      
-      // Phone - optional
-      if (row['Phone']) {
-        normalized['Phone'] = String(row['Phone']).trim();
-      }
-      
-      // Website - optional
-      if (row['Website']) {
-        normalized['Website'] = String(row['Website']).trim();
-      }
-      
-      // Country - optional
-      if (row['Country']) {
-        normalized['Country'] = String(row['Country']).trim();
-      }
-      
-      // Notes - optional
-      if (row['Notes']) {
-        normalized['Notes'] = String(row['Notes']).trim();
-      }
-      
-      // Is Active - optional yes/no (defaults to Yes)
-      if (row['Is Active']) {
+      // Is Active - optional yes/no (defaults to Yes), case-insensitive parsing
+      if (row['Is Active'] !== undefined && row['Is Active'] !== null && String(row['Is Active']).trim() !== '') {
         const value = String(row['Is Active']).toLowerCase().trim();
         if (!['yes', 'no', 'y', 'n', 'true', 'false', '1', '0'].includes(value)) {
           errors.push(`Row ${rowNum}: Is Active must be Yes or No`);
@@ -5114,12 +5079,30 @@ async function performImport(
     const makersByCode = new Map(existingMakers.map(m => [m.makerCode, m]));
     console.log(`📦 Prefetched ${existingMakers.length} existing makers`);
     
-    // Step 2: Process each row
+    // Step 2: Process each row - using validated/normalized data from dry-run
     for (const row of data) {
-      const makerCode = String(row['Maker Code']).trim();
-      const makerName = String(row['Maker Name']).trim();
-      const address = row['Address'] ? String(row['Address']).trim() : null;
-      const isActive = row['Is Active'] !== false && row['Is Active'] !== 'no';
+      // Use normalized values from dry-run validation (already trimmed and validated)
+      const makerCode = row['Maker Code'];
+      const makerName = row['Maker Name'];
+      const address = row['Address'] || null;
+      
+      // Parse isActive properly - handle boolean, string, and edge cases
+      let isActive = true; // Default to active
+      if (row['Is Active'] !== undefined && row['Is Active'] !== null) {
+        if (typeof row['Is Active'] === 'boolean') {
+          isActive = row['Is Active'];
+        } else {
+          const value = String(row['Is Active']).toLowerCase().trim();
+          isActive = ['yes', 'y', 'true', '1'].includes(value);
+        }
+      }
+      
+      // Skip rows with missing required fields (should not happen after validation)
+      if (!makerCode || !makerName) {
+        console.warn(`⚠️ Skipping row with missing required fields: code=${makerCode}, name=${makerName}`);
+        result.skipped++;
+        continue;
+      }
       
       const existingMaker = makersByCode.get(makerCode);
       
