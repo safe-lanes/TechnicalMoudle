@@ -792,48 +792,44 @@ const MaintenanceReports: React.FC<MaintenanceReportsProps> = ({ onBack, globalF
         }
         const { data: criticalData, metadata } = await response.json();
 
-        // Define columns for the report (14 columns for A3 landscape)
+        // Define columns matching specification (12 columns)
         const columns = [
           { header: 'S.No', field: 'sNo', width: 8 },
-          { header: 'Code', field: 'componentCode', width: 18 },
-          { header: 'Component Name', field: 'componentName', width: 40 },
-          { header: 'Critical Type', field: 'criticalType', width: 22 },
+          { header: 'Comp. Code', field: 'componentCode', width: 18 },
+          { header: 'Component Name', field: 'componentName', width: 38 },
+          { header: 'Critical', field: 'isCritical', width: 12 },
+          { header: 'Class Item', field: 'isClassItem', width: 12 },
           { header: 'Dept', field: 'department', width: 15 },
-          { header: 'Location', field: 'location', width: 18 },
+          { header: 'Location', field: 'location', width: 15 },
           { header: 'Total WOs', field: 'totalWorkOrders', width: 12 },
           { header: 'Overdue', field: 'overdueJobs', width: 12 },
           { header: 'Due Soon', field: 'dueSoonJobs', width: 12 },
           { header: 'Next Due', field: 'nextDueDate', width: 18 },
-          { header: 'Days', field: 'daysUntilDue', width: 10 },
-          { header: 'Last Done', field: 'lastDoneDate', width: 18 },
-          { header: 'Risk Level', field: 'riskLevel', width: 16 },
-          { header: 'RH', field: 'runningHours', width: 12 }
+          { header: 'Days', field: 'daysUntilDue', width: 10 }
         ];
 
         // Transform data for display
         const data = criticalData.map((row: any) => ({
           ...row,
-          nextDueDate: row.nextDueDate ? formatDate(row.nextDueDate) : 'N/A',
-          lastDoneDate: row.lastDoneDate ? formatDate(row.lastDoneDate) : 'N/A',
-          daysUntilDue: row.daysUntilDue !== null ? row.daysUntilDue : 'N/A',
-          runningHours: row.runningHours ? parseFloat(row.runningHours).toLocaleString() : '0'
+          nextDueDate: row.nextDueDate ? formatDate(row.nextDueDate) : '-',
+          daysUntilDue: row.daysUntilDue !== null ? row.daysUntilDue : '-'
         }));
 
-        // Build summary with metadata
+        // Build summary matching specification
         const summary = [
-          { label: 'Total Critical Equip', value: metadata.totalCriticalEquipment },
-          { label: 'SOLAS Critical', value: metadata.solasCritical },
-          { label: 'Class Critical', value: metadata.classCritical },
-          { label: 'Both (SOLAS+Class)', value: metadata.bothSolasAndClass },
-          { label: 'High Risk', value: metadata.highRisk, color: 'highlight' },
-          { label: 'Medium Risk', value: metadata.mediumRisk }
+          { label: 'Total Critical Equipment', value: metadata.totalCriticalEquipment },
+          { label: 'Critical Only', value: metadata.criticalOnly },
+          { label: 'Class Item Only', value: metadata.classItemOnly },
+          { label: 'Both Critical & Class', value: metadata.bothCriticalAndClass },
+          { label: 'With Overdue Jobs', value: metadata.equipmentWithOverdue, color: 'highlight' },
+          { label: 'Due Soon (7 days)', value: metadata.equipmentDueSoon }
         ];
 
         // Use specialized critical equipment report generator
         pdfReportGenerator.generateCriticalEquipmentReport(
           { 
             title: 'CRITICAL EQUIPMENT STATUS REPORT', 
-            subtitle: 'SOLAS-critical and class-critical systems status', 
+            subtitle: 'SOLAS-critical and class-critical equipment', 
             vessel: vesselName 
           },
           columns,

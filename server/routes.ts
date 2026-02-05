@@ -4556,69 +4556,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
           ? Math.ceil((nextDueDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24))
           : null;
 
-        // Determine critical type
-        let criticalType = 'N/A';
-        if (component.critical && component.classItem) {
-          criticalType = 'SOLAS + Class';
-        } else if (component.critical) {
-          criticalType = 'SOLAS Critical';
-        } else if (component.classItem) {
-          criticalType = 'Class Critical';
-        }
-
-        // Determine risk level
-        let riskLevel = 'No Active Jobs';
-        if (overdueCount > 0) {
-          riskLevel = 'High Risk';
-        } else if (dueSoonCount > 0) {
-          riskLevel = 'Medium Risk';
-        } else if (totalActiveWOs > 0) {
-          riskLevel = 'Low Risk';
-        }
-
-        // Get job titles (limited to first 3)
-        const jobTitles = activeWOs
-          .slice(0, 3)
-          .map(wo => wo.jobTitle)
-          .filter(Boolean)
-          .join(' | ');
-
-        // Get priorities
-        const priorities = [...new Set(activeWOs.map(wo => wo.jobPriority).filter(Boolean))].join(', ');
-
         return {
           sNo: index + 1,
-          componentId: component.id,
           componentCode: component.componentCode || component.id,
           componentName: component.name || 'Unnamed Component',
-          componentCategory: component.componentCategory || component.category || '-',
+          isCritical: component.critical ? 'Yes' : 'No',
+          isClassItem: component.classItem ? 'Yes' : 'No',
           department: component.department || component.eqptSystemDept || '-',
           location: component.location || '-',
-          critical: component.critical,
-          classItem: component.classItem,
-          criticalType,
           totalWorkOrders: totalActiveWOs,
           overdueJobs: overdueCount,
           dueSoonJobs: dueSoonCount,
           nextDueDate: nextDueDate ? nextDueDate.toISOString().split('T')[0] : null,
-          daysUntilDue,
-          lastDoneDate: lastDoneDate ? lastDoneDate.toISOString().split('T')[0] : null,
-          riskLevel,
-          runningHours: component.currentCumulativeRh || component.runningHours || '0',
-          conditionBased: component.conditionBased,
-          jobPriorities: priorities,
-          jobTitles
+          daysUntilDue
         };
       });
 
-      // Sort by risk level (High > Medium > Low > No Jobs), then by days until due
+      // Sort by overdue count DESC, then next_due_date ASC (nulls last)
       reportData.sort((a, b) => {
-        const riskOrder: Record<string, number> = { 'High Risk': 1, 'Medium Risk': 2, 'Low Risk': 3, 'No Active Jobs': 4 };
-        const riskA = riskOrder[a.riskLevel] || 4;
-        const riskB = riskOrder[b.riskLevel] || 4;
-        if (riskA !== riskB) return riskA - riskB;
+        // First by overdue count (descending)
+        if (a.overdueJobs !== b.overdueJobs) {
+          return b.overdueJobs - a.overdueJobs;
+        }
         
-        // Then by days until due (nulls last)
+        // Then by next due date (ascending, nulls last)
         if (a.daysUntilDue === null && b.daysUntilDue === null) return 0;
         if (a.daysUntilDue === null) return 1;
         if (b.daysUntilDue === null) return -1;
@@ -4628,17 +4589,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Re-number after sorting
       reportData.forEach((item, idx) => { item.sNo = idx + 1; });
 
-      // Calculate metadata
+      // Calculate metadata matching specification
       const metadata = {
         totalCriticalEquipment: reportData.length,
-        solasCritical: reportData.filter(r => r.critical).length,
-        classCritical: reportData.filter(r => r.classItem).length,
-        bothSolasAndClass: reportData.filter(r => r.critical && r.classItem).length,
-        highRisk: reportData.filter(r => r.riskLevel === 'High Risk').length,
-        mediumRisk: reportData.filter(r => r.riskLevel === 'Medium Risk').length,
-        lowRisk: reportData.filter(r => r.riskLevel === 'Low Risk').length,
+        criticalOnly: reportData.filter(r => r.isCritical === 'Yes' && r.isClassItem === 'No').length,
+        classItemOnly: reportData.filter(r => r.isClassItem === 'Yes' && r.isCritical === 'No').length,
+        bothCriticalAndClass: reportData.filter(r => r.isCritical === 'Yes' && r.isClassItem === 'Yes').length,
+        equipmentWithOverdue: reportData.filter(r => r.overdueJobs > 0).length,
+        equipmentDueSoon: reportData.filter(r => r.dueSoonJobs > 0 && r.overdueJobs === 0).length,
         totalOverdueJobs: reportData.reduce((sum, r) => sum + r.overdueJobs, 0),
-        totalDueSoonJobs: reportData.reduce((sum, r) => sum + r.dueSoonJobs, 0),
+        totalTrackedWorkOrders: reportData.reduce((sum, r) => sum + r.totalWorkOrders, 0),
         reportDate: new Date().toISOString()
       };
 
@@ -4720,100 +4680,68 @@ export async function registerRoutes(app: Express): Promise<Server> {
           .sort((a, b) => a.getTime() - b.getTime());
         const nextDueDate = dueDates.length > 0 ? dueDates[0] : null;
 
-        const completedWOs = componentWOs.filter(wo => wo.status === 'Completed');
-        const completionDates = completedWOs
-          .map(wo => parseDate(wo.dateCompleted))
-          .filter((d): d is Date => d !== null)
-          .sort((a, b) => b.getTime() - a.getTime());
-        const lastDoneDate = completionDates.length > 0 ? completionDates[0] : null;
-
         const daysUntilDue = nextDueDate 
           ? Math.ceil((nextDueDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24))
           : null;
-
-        let criticalType = 'N/A';
-        if (component.critical && component.classItem) {
-          criticalType = 'SOLAS + Class';
-        } else if (component.critical) {
-          criticalType = 'SOLAS Critical';
-        } else if (component.classItem) {
-          criticalType = 'Class Critical';
-        }
-
-        let riskLevel = 'No Active Jobs';
-        if (overdueCount > 0) {
-          riskLevel = 'High Risk';
-        } else if (dueSoonCount > 0) {
-          riskLevel = 'Medium Risk';
-        } else if (totalActiveWOs > 0) {
-          riskLevel = 'Low Risk';
-        }
 
         return {
           sNo: index + 1,
           componentCode: component.componentCode || component.id,
           componentName: component.name || 'Unnamed Component',
-          componentCategory: component.componentCategory || component.category || '-',
+          isCritical: component.critical ? 'Yes' : 'No',
+          isClassItem: component.classItem ? 'Yes' : 'No',
           department: component.department || component.eqptSystemDept || '-',
           location: component.location || '-',
-          criticalType,
           totalWorkOrders: totalActiveWOs,
           overdueJobs: overdueCount,
           dueSoonJobs: dueSoonCount,
-          nextDueDate: nextDueDate ? nextDueDate.toISOString().split('T')[0] : 'N/A',
-          daysUntilDue: daysUntilDue !== null ? daysUntilDue : 'N/A',
-          lastDoneDate: lastDoneDate ? lastDoneDate.toISOString().split('T')[0] : 'N/A',
-          riskLevel,
-          runningHours: component.currentCumulativeRh || component.runningHours || '0'
+          nextDueDate: nextDueDate ? nextDueDate.toISOString().split('T')[0] : '-',
+          daysUntilDue: daysUntilDue !== null ? daysUntilDue : '-'
         };
       });
 
-      // Sort by risk level then days until due
+      // Sort by overdue count DESC, then next_due_date ASC (nulls last)
       reportData.sort((a, b) => {
-        const riskOrder: Record<string, number> = { 'High Risk': 1, 'Medium Risk': 2, 'Low Risk': 3, 'No Active Jobs': 4 };
-        const riskA = riskOrder[a.riskLevel] || 4;
-        const riskB = riskOrder[b.riskLevel] || 4;
-        if (riskA !== riskB) return riskA - riskB;
-        
-        const daysA = a.daysUntilDue === 'N/A' ? 9999 : a.daysUntilDue;
-        const daysB = b.daysUntilDue === 'N/A' ? 9999 : b.daysUntilDue;
+        if (a.overdueJobs !== b.overdueJobs) {
+          return b.overdueJobs - a.overdueJobs;
+        }
+        const daysA = a.daysUntilDue === '-' ? 9999 : (a.daysUntilDue as number);
+        const daysB = b.daysUntilDue === '-' ? 9999 : (b.daysUntilDue as number);
         return daysA - daysB;
       });
 
       reportData.forEach((item, idx) => { item.sNo = idx + 1; });
 
-      // Calculate summary
+      // Calculate summary matching specification
       const metadata = {
         totalCriticalEquipment: reportData.length,
-        solasCritical: reportData.filter(r => r.criticalType.includes('SOLAS')).length,
-        classCritical: reportData.filter(r => r.criticalType.includes('Class')).length,
-        highRisk: reportData.filter(r => r.riskLevel === 'High Risk').length,
-        mediumRisk: reportData.filter(r => r.riskLevel === 'Medium Risk').length,
-        lowRisk: reportData.filter(r => r.riskLevel === 'Low Risk').length,
+        criticalOnly: reportData.filter(r => r.isCritical === 'Yes' && r.isClassItem === 'No').length,
+        classItemOnly: reportData.filter(r => r.isClassItem === 'Yes' && r.isCritical === 'No').length,
+        bothCriticalAndClass: reportData.filter(r => r.isCritical === 'Yes' && r.isClassItem === 'Yes').length,
+        equipmentWithOverdue: reportData.filter(r => r.overdueJobs > 0).length,
+        equipmentDueSoon: reportData.filter(r => r.dueSoonJobs > 0 && r.overdueJobs === 0).length,
         totalOverdueJobs: reportData.reduce((sum, r) => sum + r.overdueJobs, 0),
-        totalDueSoonJobs: reportData.reduce((sum, r) => sum + r.dueSoonJobs, 0)
+        totalTrackedWorkOrders: reportData.reduce((sum, r) => sum + r.totalWorkOrders, 0)
       };
 
       // Generate Excel workbook
       const workbook = new ExcelJS.Workbook();
       const worksheet = workbook.addWorksheet('Critical Equipment Status');
 
-      // Define columns for the report
+      // Define columns matching specification (12 columns)
       const columns: ColumnDef[] = [
         { header: 'S.No', key: 'sNo', width: 6 },
-        { header: 'Component Code', key: 'componentCode', width: 15 },
+        { header: 'Comp. Code', key: 'componentCode', width: 15 },
         { header: 'Component Name', key: 'componentName', width: 30 },
-        { header: 'Critical Type', key: 'criticalType', width: 15 },
+        { header: 'Critical', key: 'isCritical', width: 10 },
+        { header: 'Class Item', key: 'isClassItem', width: 10 },
         { header: 'Dept', key: 'department', width: 12 },
         { header: 'Location', key: 'location', width: 15 },
         { header: 'Total WOs', key: 'totalWorkOrders', width: 10 },
         { header: 'Overdue', key: 'overdueJobs', width: 10 },
         { header: 'Due Soon', key: 'dueSoonJobs', width: 10 },
         { header: 'Next Due', key: 'nextDueDate', width: 12 },
-        { header: 'Days', key: 'daysUntilDue', width: 8 },
-        { header: 'Last Done', key: 'lastDoneDate', width: 12 },
-        { header: 'Risk Level', key: 'riskLevel', width: 14 },
-        { header: 'Running Hours', key: 'runningHours', width: 12 }
+        { header: 'Days', key: 'daysUntilDue', width: 8 }
       ];
 
       const lastCol = getLastColumnLetter(columns.length);
@@ -4822,7 +4750,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       applyStandardHeader(
         worksheet,
         'CRITICAL EQUIPMENT STATUS REPORT',
-        'SOLAS-critical and class-critical systems status',
+        'SOLAS-critical and class-critical equipment',
         vesselName,
         reportData.length,
         lastCol
@@ -4831,32 +4759,38 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Apply table headers at row 7
       applyStandardTableHeader(worksheet, columns, 7);
 
-      // Data rows with conditional formatting for risk levels
+      // Data rows with conditional formatting based on overdue/due soon status
       reportData.forEach((row, index) => {
         const dataRow = worksheet.getRow(8 + index);
         const rowData = [
           row.sNo,
           row.componentCode,
           row.componentName,
-          row.criticalType,
+          row.isCritical,
+          row.isClassItem,
           row.department,
           row.location,
           row.totalWorkOrders,
           row.overdueJobs,
           row.dueSoonJobs,
           row.nextDueDate,
-          row.daysUntilDue,
-          row.lastDoneDate,
-          row.riskLevel,
-          row.runningHours
+          row.daysUntilDue
         ];
 
         rowData.forEach((value, colIdx) => {
           dataRow.getCell(colIdx + 1).value = value;
         });
 
-        // Alternating row colors
-        const fillColor = index % 2 === 0 ? COLORS.bgWhite : COLORS.bgLight;
+        // Determine row background color based on status
+        let fillColor: string;
+        if (row.overdueJobs > 0) {
+          fillColor = COLORS.bgDanger; // RED for overdue
+        } else if (row.dueSoonJobs > 0) {
+          fillColor = COLORS.bgWarning; // YELLOW/ORANGE for due soon
+        } else {
+          fillColor = index % 2 === 0 ? COLORS.bgWhite : COLORS.bgLight;
+        }
+
         dataRow.eachCell((cell, colNumber) => {
           if (colNumber <= columns.length) {
             cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: fillColor } };
@@ -4869,16 +4803,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
           }
         });
 
-        // Apply risk-level coloring to Risk Level column (column 13)
-        const riskCell = dataRow.getCell(13);
-        if (row.riskLevel === 'High Risk') {
-          riskCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: COLORS.bgDanger } };
-          riskCell.font = { color: { argb: COLORS.danger }, bold: true };
-          // Also highlight the overdue column (column 8)
-          dataRow.getCell(8).font = { color: { argb: COLORS.danger }, bold: true };
-        } else if (row.riskLevel === 'Medium Risk') {
-          riskCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: COLORS.bgWarning } };
-          riskCell.font = { color: { argb: COLORS.warning }, bold: true };
+        // Apply conditional formatting to Overdue column (column 9)
+        if (row.overdueJobs > 0) {
+          dataRow.getCell(9).font = { color: { argb: COLORS.danger }, bold: true };
+        }
+
+        // Apply conditional formatting to Days column (column 12)
+        const daysValue = row.daysUntilDue;
+        if (typeof daysValue === 'number') {
+          if (daysValue < 0) {
+            dataRow.getCell(12).font = { color: { argb: COLORS.danger }, bold: true };
+          } else if (daysValue <= 7) {
+            dataRow.getCell(12).font = { color: { argb: COLORS.warning }, bold: true };
+          }
         }
       });
 

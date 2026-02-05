@@ -800,17 +800,16 @@ class PDFReportGenerator {
     summaryData?: { label: string; value: string | number; color?: string }[],
     metadata?: {
       totalCriticalEquipment: number;
-      solasCritical: number;
-      classCritical: number;
-      bothSolasAndClass: number;
-      highRisk: number;
-      mediumRisk: number;
-      lowRisk: number;
+      criticalOnly: number;
+      classItemOnly: number;
+      bothCriticalAndClass: number;
+      equipmentWithOverdue: number;
+      equipmentDueSoon: number;
       totalOverdueJobs: number;
-      totalDueSoonJobs: number;
+      totalTrackedWorkOrders: number;
     }
   ): void {
-    // Force landscape and A4 for 14 columns
+    // Force landscape and A4 for 12 columns
     this.doc = new jsPDF({
       orientation: 'landscape',
       unit: 'mm',
@@ -869,11 +868,11 @@ class PDFReportGenerator {
         const x = margin + (index % 6) * (boxWidth + gap);
         const y = startY + Math.floor(index / 6) * (boxHeight + gap);
 
-        // Color coding for risk items
-        if (item.color === 'highlight' || item.label.toLowerCase().includes('high risk')) {
+        // Color coding for overdue items
+        if (item.color === 'highlight' || item.label.toLowerCase().includes('overdue')) {
           this.doc!.setFillColor(...PDF_COLORS.bgDanger);
           this.doc!.setTextColor(...PDF_COLORS.textDarkRed);
-        } else if (item.label.toLowerCase().includes('medium risk')) {
+        } else if (item.label.toLowerCase().includes('due soon')) {
           this.doc!.setFillColor(...PDF_COLORS.bgWarning);
           this.doc!.setTextColor(...PDF_COLORS.textDarkOrange);
         } else {
@@ -910,8 +909,8 @@ class PDFReportGenerator {
 
     // Find column indices for conditional formatting
     const overdueColIndex = columns.findIndex(col => col.field === 'overdueJobs');
+    const dueSoonColIndex = columns.findIndex(col => col.field === 'dueSoonJobs');
     const daysColIndex = columns.findIndex(col => col.field === 'daysUntilDue');
-    const riskColIndex = columns.findIndex(col => col.field === 'riskLevel');
 
     autoTable(this.doc, {
       head: [headers],
@@ -956,6 +955,15 @@ class PDFReportGenerator {
           }
         }
 
+        // Format Due Soon column - orange if > 0
+        if (hookData.column.index === dueSoonColIndex) {
+          const dueSoonCount = parseInt(hookData.cell.text[0]) || 0;
+          if (dueSoonCount > 0) {
+            hookData.cell.styles.textColor = PDF_COLORS.textDarkOrange;
+            hookData.cell.styles.fontStyle = 'bold';
+          }
+        }
+
         // Format Days Until Due column
         if (hookData.column.index === daysColIndex) {
           const days = parseInt(hookData.cell.text[0]);
@@ -970,25 +978,13 @@ class PDFReportGenerator {
           }
         }
 
-        // Format Risk Level column
-        if (hookData.column.index === riskColIndex) {
-          const riskLevel = hookData.cell.text[0];
-          if (riskLevel === 'High Risk') {
-            hookData.cell.styles.fillColor = PDF_COLORS.bgDanger;
-            hookData.cell.styles.textColor = PDF_COLORS.textDarkRed;
-            hookData.cell.styles.fontStyle = 'bold';
-          } else if (riskLevel === 'Medium Risk') {
-            hookData.cell.styles.fillColor = PDF_COLORS.bgWarning;
-            hookData.cell.styles.textColor = PDF_COLORS.textDarkOrange;
-            hookData.cell.styles.fontStyle = 'bold';
-          }
-        }
-
-        // Highlight entire row for High Risk items
-        if (rowData.riskLevel === 'High Risk') {
-          if (hookData.column.index !== riskColIndex) {
-            hookData.cell.styles.fillColor = PDF_COLORS.bgDanger;
-          }
+        // Highlight entire row based on overdue/due soon status
+        if (rowData.overdueJobs > 0) {
+          // RED background for rows with overdue jobs
+          hookData.cell.styles.fillColor = PDF_COLORS.bgDanger;
+        } else if (rowData.dueSoonJobs > 0) {
+          // YELLOW/ORANGE background for rows with due soon but no overdue
+          hookData.cell.styles.fillColor = PDF_COLORS.bgWarning;
         }
       },
       didDrawPage: (hookData) => {
@@ -1006,8 +1002,8 @@ class PDFReportGenerator {
       },
     });
 
-    // Action notice if there are high risk items
-    if (metadata && metadata.highRisk > 0) {
+    // Action notice if there are equipment with overdue jobs
+    if (metadata && metadata.equipmentWithOverdue > 0) {
       const finalY = (this.doc as any).lastAutoTable?.finalY || startY + 50;
       this.doc.setFillColor(...PDF_COLORS.bgDanger);
       this.doc.roundedRect(margin, finalY + 5, pageWidth - (margin * 2), 12, 2, 2, 'F');
@@ -1015,7 +1011,7 @@ class PDFReportGenerator {
       this.doc.setFontSize(10);
       this.doc.setFont('helvetica', 'bold');
       this.doc.text(
-        `ACTION REQUIRED: ${metadata.highRisk} critical equipment with HIGH RISK status requires immediate attention`,
+        `ACTION REQUIRED: ${metadata.equipmentWithOverdue} critical equipment have overdue work orders (${metadata.totalOverdueJobs} total overdue WOs)`,
         pageWidth / 2,
         finalY + 12,
         { align: 'center' }
