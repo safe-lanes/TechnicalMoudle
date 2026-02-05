@@ -241,19 +241,26 @@ const RunningHoursReports: React.FC<RunningHoursReportsProps> = ({ onBack, globa
           throw new Error(result.error || `Failed to fetch data (status ${response.status})`);
         }
         
-        const anomalies = result.anomalies || [];
+        if (!result.success) {
+          throw new Error('Failed to fetch anomaly data');
+        }
+        
+        // API returns 'data' array, not 'anomalies'
+        const anomalies = result.data || [];
         const summaryData = result.summary || {};
         
         const columns = [
-          { header: 'Component Code', field: 'componentCode', width: 35 },
-          { header: 'Component Name', field: 'componentName', width: 55 },
-          { header: 'Category', field: 'category', width: 35 },
-          { header: 'Previous RH', field: 'previousRh', width: 28 },
-          { header: 'New RH', field: 'newRh', width: 25 },
-          { header: 'Delta', field: 'deltaRh', width: 22 },
-          { header: 'Anomaly Type', field: 'anomalyType', width: 35 },
-          { header: 'Severity', field: 'severity', width: 25 },
-          { header: 'Description', field: 'description', width: 70 }
+          { header: 'S.No', field: 'sNo', width: 12 },
+          { header: 'Component Code', field: 'componentCode', width: 30 },
+          { header: 'Component Name', field: 'componentName', width: 50 },
+          { header: 'Prev RH', field: 'previousRh', width: 22 },
+          { header: 'New RH', field: 'newRh', width: 22 },
+          { header: 'Delta', field: 'delta', width: 20 },
+          { header: 'Days Between', field: 'daysBetween', width: 25 },
+          { header: 'Avg Daily', field: 'avgDailyHours', width: 22 },
+          { header: 'Type', field: 'anomalyType', width: 30 },
+          { header: 'Severity', field: 'severity', width: 22 },
+          { header: 'Description', field: 'description', width: 60 }
         ];
         
         const summaryItems = [
@@ -261,14 +268,23 @@ const RunningHoursReports: React.FC<RunningHoursReportsProps> = ({ onBack, globa
           { label: 'Critical', value: summaryData.criticalCount || 0 },
           { label: 'Warning', value: summaryData.warningCount || 0 },
           { label: 'Info', value: summaryData.infoCount || 0 },
-          { label: 'Logs Analyzed', value: summaryData.totalLogsAnalyzed || 0 }
+          { label: 'Logs Analyzed', value: summaryData.totalLogsAnalyzed || 0 },
+          { label: 'Components', value: summaryData.componentsAnalyzed || 0 }
         ];
         
+        // Format data for PDF - field names from API are already correct
         const formattedData = anomalies.map((a: any) => ({
-          ...a,
+          sNo: a.sNo,
+          componentCode: a.componentCode,
+          componentName: a.componentName,
           previousRh: Number(a.previousRh).toFixed(1),
           newRh: Number(a.newRh).toFixed(1),
-          deltaRh: Number(a.deltaRh).toFixed(1)
+          delta: Number(a.delta).toFixed(1),
+          daysBetween: Number(a.daysBetween).toFixed(1),
+          avgDailyHours: Number(a.avgDailyHours).toFixed(2),
+          anomalyType: a.anomalyType,
+          severity: a.severity,
+          description: a.description
         }));
         
         console.log('[PDF] Generating anomaly detection PDF with', formattedData.length, 'anomalies');
@@ -277,7 +293,7 @@ const RunningHoursReports: React.FC<RunningHoursReportsProps> = ({ onBack, globa
           pdfReportGenerator.generateReport(
             { 
               title: 'Running Hours Anomaly Detection', 
-              subtitle: `Anomalies detected from ${summaryData.periodStart?.split('T')[0] || 'N/A'} to ${summaryData.periodEnd?.split('T')[0] || 'N/A'}`, 
+              subtitle: `Period: ${summaryData.periodStart || 'N/A'} to ${summaryData.periodEnd || 'N/A'}`, 
               vessel: vesselName 
             },
             columns,

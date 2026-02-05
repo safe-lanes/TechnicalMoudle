@@ -4,11 +4,8 @@ import { storage } from "./storage";
 import { getPool, getDb } from "./db";
 import * as fs from "fs";
 import * as path from "path";
-//shruit work /remote code
-import { insertRunningHoursAuditSchema, cascadeRunningHoursSchema, insertWorkOrderSchema, insertWorkOrderExecutionSchema, insertDefectSchema, insertDefectActionSchema, insertDefectAttachmentSchema, insertComponentSchema, insertSpareSchema, insertMakerSchema, insertMakerListSchema, insertMasterListSchema, insertComponentDocumentSchema, insertComponentClassRegulatorySchema, insertComponentRequisitionSchema, equipmentCategories, defectCategories, defectTypes, shipCertificatesMaster, insertShipCertificateMasterSchema, shipCertificatesLabelsConfig, vesselCertificateApplicability, insertVesselCertificateApplicabilitySchema, vesselCertificateData, vessels, shipSurveysMaster, shipSurveysLabelsConfig, vesselSurveyApplicability, vesselSurveyData } from "@shared/schema";
-//
-import { insertRunningHoursAuditSchema, cascadeRunningHoursSchema, insertWorkOrderSchema, insertWorkOrderExecutionSchema, insertDefectSchema, insertDefectActionSchema, insertDefectAttachmentSchema, insertComponentSchema, insertSpareSchema, insertMakerSchema, insertMasterListSchema, insertComponentDocumentSchema, insertComponentClassRegulatorySchema, insertComponentRequisitionSchema, equipmentCategories, defectCategories, defectTypes, shipCertificatesMaster, insertShipCertificateMasterSchema, shipCertificatesLabelsConfig, vesselCertificateApplicability, insertVesselCertificateApplicabilitySchema, vesselCertificateData, vessels, shipSurveysMaster, shipSurveysLabelsConfig, vesselSurveyApplicability, vesselSurveyData, componentRunningHoursLog } from "@shared/schema";
-// rahut local work
+import { insertRunningHoursAuditSchema, cascadeRunningHoursSchema, insertWorkOrderSchema, insertWorkOrderExecutionSchema, insertDefectSchema, insertDefectActionSchema, insertDefectAttachmentSchema, insertComponentSchema, insertSpareSchema, insertMakerSchema, insertMasterListSchema, insertComponentDocumentSchema, insertComponentClassRegulatorySchema, insertComponentRequisitionSchema, equipmentCategories, defectCategories, defectTypes, shipCertificatesMaster, insertShipCertificateMasterSchema, shipCertificatesLabelsConfig, vesselCertificateApplicability, insertVesselCertificateApplicabilitySchema, vesselCertificateData, vessels, shipSurveysMaster, shipSurveysLabelsConfig, vesselSurveyApplicability, vesselSurveyData, componentRunningHoursLog, runningHoursAudit } from "@shared/schema";
+
 import { getPostgresClient } from "./postgresClient";
 import { eq, and, asc, sql, inArray } from "drizzle-orm";
 import { computeWorkOrderStatus } from "@shared/workOrders/status";
@@ -14864,12 +14861,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // ============================
-  // Report 1.10: Running Hours Anomaly Detection
-  // ============================
+  // ═══════════════════════════════════════════════════════════════════════════
+  // REPORT 1.10: RUNNING HOURS ANOMALY DETECTION
+  // Identifies equipment with unusual running patterns or potential meter issues
+  // Uses running_hours_audit table (1,146 records across 5 vessels)
+  // ═══════════════════════════════════════════════════════════════════════════
   app.get("/technical/api/reports/running-hours-anomaly-detection", async (req: Request, res: Response) => {
     try {
-      const { vesselId, startDate, endDate, anomalyType } = req.query;
+      const { vesselId, startDate, endDate, anomalyType, severity: severityFilter } = req.query;
       
       if (!vesselId) {
         return res.status(400).json({ error: "Please select a vessel" });
@@ -14878,15 +14877,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Get vessel name
       const vessels = await storage.getVessels();
       const vessel = vessels.find(v => v.id === vesselId || v.vesselCode === vesselId);
-      const vesselName = vessel?.name || vessel?.vesselName || vesselId;
-      const vesselCode = vessel?.vesselCode || vesselId;
+      const vesselName = vessel?.name || vessel?.vesselName || String(vesselId);
       
       // Get database instance
       const db = await getDb();
       
-      // Get all running hours log entries for the vessel
-      const allLogs = await db.select().from(componentRunningHoursLog)
-        .where(sql`${componentRunningHoursLog.vesselCode} IN (${vesselId}, ${vesselCode})`);
+      // Query running_hours_audit table (this has the actual data - 1,146 records)
+      const allAuditLogs = await db.select().from(runningHoursAudit)
+        .where(sql`${runningHoursAudit.vesselId} = ${vesselId}`);
+      
+      console.log(`[ANOMALY] Vessel: ${vesselId}, Audit logs found: ${allAuditLogs.length}`);
+      
+      // Debug: Check first log entry to understand date format
+      if (allAuditLogs.length > 0) {
+        const firstLog = allAuditLogs[0];
+        console.log(`[ANOMALY DEBUG] First log enteredAtUtc: ${firstLog.enteredAtUTC}, type: ${typeof firstLog.enteredAtUTC}`);
+      }
       
       // Parse dates
       const parseDate = (dateVal: string | Date | null | undefined): Date | null => {
@@ -14900,7 +14906,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       };
       
       const now = new Date();
-      const defaultStartDate = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000); // 30 days ago
+      const defaultStartDate = new Date(now.getTime() - 90 * 24 * 60 * 60 * 1000); // 90 days for better analysis
       const periodStart = startDate ? parseDate(startDate as string) : defaultStartDate;
       const periodEnd = endDate ? parseDate(endDate as string) : now;
       
@@ -14908,87 +14914,160 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: "Invalid date format" });
       }
       
-      // Filter logs within the date range
-      const logsInPeriod = allLogs.filter(log => 
-        log.updatedAt && 
-        new Date(log.updatedAt) >= periodStart &&
-        new Date(log.updatedAt) <= periodEnd
-      ).sort((a, b) => new Date(b.updatedAt!).getTime() - new Date(a.updatedAt!).getTime());
+      // Filter logs within the date range - handle both Date objects and strings from Drizzle
+      const logsInPeriod = allAuditLogs.filter(log => {
+        if (!log.enteredAtUTC) return false;
+        const logDate = log.enteredAtUTC instanceof Date ? log.enteredAtUTC : new Date(log.enteredAtUTC);
+        return logDate >= periodStart && logDate <= periodEnd;
+      });
+      
+      console.log(`[ANOMALY] Logs in period: ${logsInPeriod.length}, Period: ${periodStart.toISOString()} to ${periodEnd.toISOString()}`);
+      
+      // Group logs by component to analyze patterns
+      const componentLogs = new Map<string, typeof logsInPeriod>();
+      for (const log of logsInPeriod) {
+        const key = log.componentId || log.componentCode || 'unknown';
+        if (!componentLogs.has(key)) {
+          componentLogs.set(key, []);
+        }
+        componentLogs.get(key)!.push(log);
+      }
       
       // Get components for reference
       const allComponents = await storage.getComponents(vesselId as string);
-      const componentMap = new Map(allComponents.map(c => [c.componentCode || c.id, c]));
-      
-      // Define anomaly detection thresholds
-      const SPIKE_THRESHOLD = 100; // hours - unusually high single update
-      const HIGH_DELTA_THRESHOLD = 50; // hours - above average single update
-      const ZERO_THRESHOLD = 0; // Exactly 0 delta (possible stalled equipment)
+      const componentMap = new Map(allComponents.map(c => [c.id, c]));
+      const componentCodeMap = new Map(allComponents.map(c => [c.componentCode, c]));
       
       // Detect anomalies
       const anomalies: any[] = [];
+      let sNo = 0;
       
-      for (const log of logsInPeriod) {
-        const delta = Number(log.deltaRh) || 0;
-        const component = componentMap.get(log.componentCode) || componentMap.get(log.componentId);
-        const componentName = component?.name || component?.fleetEquipmentName || log.componentCode;
+      for (const [componentKey, logs] of componentLogs.entries()) {
+        // Sort logs by timestamp to analyze consecutive readings
+        const sortedLogs = logs.sort((a, b) => 
+          new Date(a.enteredAtUtc!).getTime() - new Date(b.enteredAtUtc!).getTime()
+        );
         
-        let anomalyDetected = false;
-        let anomalyTypeValue = '';
-        let severity: 'Critical' | 'Warning' | 'Info' = 'Info';
-        let description = '';
+        // Calculate average delta for this component (for irregular pattern detection)
+        const deltas = sortedLogs.map(log => {
+          const prev = Number(log.previousRH) || 0;
+          const curr = Number(log.newRH) || 0;
+          return curr - prev;
+        }).filter(d => d > 0);
+        const avgDelta = deltas.length > 0 ? deltas.reduce((a, b) => a + b, 0) / deltas.length : 0;
         
-        // Check for negative delta (meter reset/correction)
-        if (delta < 0) {
-          anomalyDetected = true;
-          anomalyTypeValue = 'Negative Delta';
-          severity = 'Warning';
-          description = `Running hours decreased by ${Math.abs(delta).toFixed(1)} hours. Possible meter reset or correction.`;
-        }
-        // Check for large spike
-        else if (delta > SPIKE_THRESHOLD) {
-          anomalyDetected = true;
-          anomalyTypeValue = 'Large Spike';
-          severity = 'Critical';
-          description = `Unusually high reading: ${delta.toFixed(1)} hours in one update (threshold: ${SPIKE_THRESHOLD} hrs).`;
-        }
-        // Check for high delta (above average)
-        else if (delta > HIGH_DELTA_THRESHOLD) {
-          anomalyDetected = true;
-          anomalyTypeValue = 'High Delta';
-          severity = 'Warning';
-          description = `Above-average reading: ${delta.toFixed(1)} hours in one update.`;
-        }
-        // Check for zero delta with existing hours (possibly stalled)
-        else if (delta === 0 && Number(log.previousRh) > 0 && log.updateSource === 'manual') {
-          anomalyDetected = true;
-          anomalyTypeValue = 'Zero Change';
-          severity = 'Info';
-          description = `No change recorded for equipment with ${Number(log.previousRh).toFixed(1)} existing hours.`;
-        }
-        
-        // Apply filter if anomalyType is specified
-        if (anomalyDetected) {
-          if (!anomalyType || anomalyType === 'All' || anomalyType === anomalyTypeValue) {
-            anomalies.push({
-              id: log.id,
-              componentCode: log.componentCode,
-              componentName,
-              category: component?.componentCategory || component?.category || '-',
-              department: component?.department || component?.eqptSystemDept || '-',
-              previousRh: Number(log.previousRh) || 0,
-              newRh: Number(log.newRh) || 0,
-              deltaRh: delta,
-              anomalyType: anomalyTypeValue,
-              severity,
-              description,
-              updatedBy: log.updatedBy || '-',
-              updatedAt: log.updatedAt,
-              updateSource: log.updateSource || '-',
-              notes: log.notes || '-'
-            });
+        for (let i = 0; i < sortedLogs.length; i++) {
+          const log = sortedLogs[i];
+          const prevLog = i > 0 ? sortedLogs[i - 1] : null;
+          
+          const previousRh = Number(log.previousRH) || 0;
+          const newRh = Number(log.newRH) || 0;
+          const delta = newRh - previousRh;
+          const meterReplaced = log.meterReplaced === true;
+          
+          // Calculate days between readings (for avg daily hours)
+          let daysBetween = 1;
+          let avgDailyHours = 0;
+          if (prevLog?.enteredAtUtc && log.enteredAtUTC) {
+            const prevTime = new Date(prevLog.enteredAtUtc).getTime();
+            const currTime = new Date(log.enteredAtUTC).getTime();
+            daysBetween = Math.max(1, (currTime - prevTime) / (1000 * 60 * 60 * 24));
+            avgDailyHours = delta / daysBetween;
+          } else if (log.enteredAtUTC) {
+            // First reading - estimate from delta
+            avgDailyHours = delta > 0 ? Math.min(delta, 24) : 0;
+          }
+          
+          // Get component info
+          const component = componentMap.get(log.componentId || '') || componentCodeMap.get(log.componentCode || '');
+          const componentName = log.componentName || component?.name || component?.fleetEquipmentName || log.componentCode || 'Unknown';
+          
+          let anomalyDetected = false;
+          let anomalyTypeValue = '';
+          let severity: 'Critical' | 'Warning' | 'Info' = 'Info';
+          let description = '';
+          
+          // RULE 1: HIGH INCREMENT - avgDailyHours > 24 (physically impossible)
+          if (avgDailyHours > 24 && !meterReplaced) {
+            anomalyDetected = true;
+            anomalyTypeValue = 'High Increment';
+            severity = 'Critical';
+            description = `Impossible: ${avgDailyHours.toFixed(1)} hrs/day (max 24). Delta: ${delta.toFixed(0)} hrs over ${daysBetween.toFixed(1)} days.`;
+          }
+          // RULE 2: NEGATIVE - delta < 0 without meter replacement
+          else if (delta < 0 && !meterReplaced) {
+            anomalyDetected = true;
+            anomalyTypeValue = 'Negative Delta';
+            severity = 'Critical';
+            description = `RH decreased by ${Math.abs(delta).toFixed(1)} hrs without meter replacement. Possible data entry error or stuck meter.`;
+          }
+          // RULE 3: ZERO - delta = 0 AND daysBetween > 7 (stuck meter)
+          else if (delta === 0 && daysBetween > 7 && previousRh > 0) {
+            anomalyDetected = true;
+            anomalyTypeValue = 'Zero Change';
+            severity = 'Warning';
+            description = `No RH change for ${daysBetween.toFixed(0)} days on equipment with ${previousRh.toFixed(0)} hrs. Possible stuck meter.`;
+          }
+          // RULE 4: IRREGULAR - Sudden spike compared to component's historical average
+          else if (avgDelta > 0 && delta > avgDelta * 3 && delta > 50) {
+            anomalyDetected = true;
+            anomalyTypeValue = 'Irregular Pattern';
+            severity = 'Warning';
+            description = `Spike: ${delta.toFixed(0)} hrs is 3x above avg (${avgDelta.toFixed(1)} hrs). May indicate catch-up entry or data issue.`;
+          }
+          // RULE 5: Meter replacement flagged - Info only
+          else if (meterReplaced) {
+            anomalyDetected = true;
+            anomalyTypeValue = 'Meter Replaced';
+            severity = 'Info';
+            const oldMeter = log.oldMeterFinal ? Number(log.oldMeterFinal).toFixed(0) : 'N/A';
+            const newMeter = log.newMeterStart ? Number(log.newMeterStart).toFixed(0) : '0';
+            description = `Meter replaced. Old final: ${oldMeter} hrs, New start: ${newMeter} hrs.`;
+          }
+          
+          // Apply filters
+          if (anomalyDetected) {
+            const passesTypeFilter = !anomalyType || anomalyType === 'All' || anomalyType === anomalyTypeValue;
+            const passesSeverityFilter = !severityFilter || severityFilter === 'All' || severityFilter === severity;
+            
+            if (passesTypeFilter && passesSeverityFilter) {
+              sNo++;
+              anomalies.push({
+                sNo,
+                componentCode: log.componentCode || '-',
+                componentName,
+                category: component?.componentCategory || component?.category || '-',
+                department: component?.department || component?.eqptSystemDept || '-',
+                previousRh: Math.round(previousRh * 100) / 100,
+                newRh: Math.round(newRh * 100) / 100,
+                delta: Math.round(delta * 100) / 100,
+                daysBetween: Math.round(daysBetween * 10) / 10,
+                avgDailyHours: Math.round(avgDailyHours * 100) / 100,
+                anomalyType: anomalyTypeValue,
+                severity,
+                description,
+                meterReplaced,
+                updatedBy: log.userId || '-',
+                updatedAt: log.enteredAtUTC,
+                source: log.source || '-',
+                notes: log.notes || '-'
+              });
+            }
           }
         }
       }
+      
+      // Sort by severity (Critical first), then by avgDailyHours descending
+      anomalies.sort((a, b) => {
+        const severityOrder = { 'Critical': 0, 'Warning': 1, 'Info': 2 };
+        if (severityOrder[a.severity as keyof typeof severityOrder] !== severityOrder[b.severity as keyof typeof severityOrder]) {
+          return severityOrder[a.severity as keyof typeof severityOrder] - severityOrder[b.severity as keyof typeof severityOrder];
+        }
+        return Math.abs(b.avgDailyHours) - Math.abs(a.avgDailyHours);
+      });
+      
+      // Re-number after sorting
+      anomalies.forEach((item, idx) => { item.sNo = idx + 1; });
       
       // Calculate summary
       const summary = {
@@ -14997,26 +15076,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
         warningCount: anomalies.filter(a => a.severity === 'Warning').length,
         infoCount: anomalies.filter(a => a.severity === 'Info').length,
         byType: {
+          highIncrement: anomalies.filter(a => a.anomalyType === 'High Increment').length,
           negativeDelta: anomalies.filter(a => a.anomalyType === 'Negative Delta').length,
-          largeSpike: anomalies.filter(a => a.anomalyType === 'Large Spike').length,
-          highDelta: anomalies.filter(a => a.anomalyType === 'High Delta').length,
-          zeroChange: anomalies.filter(a => a.anomalyType === 'Zero Change').length
+          zeroChange: anomalies.filter(a => a.anomalyType === 'Zero Change').length,
+          irregularPattern: anomalies.filter(a => a.anomalyType === 'Irregular Pattern').length,
+          meterReplaced: anomalies.filter(a => a.anomalyType === 'Meter Replaced').length
         },
-        periodStart: periodStart.toISOString(),
-        periodEnd: periodEnd.toISOString(),
-        totalLogsAnalyzed: logsInPeriod.length
+        periodStart: periodStart.toISOString().split('T')[0],
+        periodEnd: periodEnd.toISOString().split('T')[0],
+        totalLogsAnalyzed: logsInPeriod.length,
+        componentsAnalyzed: componentLogs.size
       };
       
       res.json({
+        success: true,
         vesselId,
         vesselName,
         reportDate: new Date().toISOString(),
         period: {
-          startDate: periodStart.toISOString(),
-          endDate: periodEnd.toISOString()
+          startDate: periodStart.toISOString().split('T')[0],
+          endDate: periodEnd.toISOString().split('T')[0]
         },
         summary,
-        anomalies
+        data: anomalies,
+        totalRecords: anomalies.length
       });
       
     } catch (error: any) {
@@ -15025,10 +15108,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Running Hours Anomaly Detection - Excel Export
+  // ═══════════════════════════════════════════════════════════════════════════
+  // REPORT 1.10: RUNNING HOURS ANOMALY DETECTION - EXCEL EXPORT
+  // Professional Excel export with severity-based row coloring
+  // ═══════════════════════════════════════════════════════════════════════════
   app.post("/technical/api/reports/running-hours-anomaly-detection/excel", async (req: Request, res: Response) => {
     try {
-      const { vesselId, startDate, endDate, anomalyType } = req.body;
+      const { vesselId, startDate, endDate, anomalyType, severity: severityFilter } = req.body;
       
       if (!vesselId) {
         return res.status(400).json({ error: "Please select a vessel" });
@@ -15037,15 +15123,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Get vessel name
       const vessels = await storage.getVessels();
       const vessel = vessels.find(v => v.id === vesselId || v.vesselCode === vesselId);
-      const vesselName = vessel?.name || vessel?.vesselName || vesselId;
-      const vesselCode = vessel?.vesselCode || vesselId;
+      const vesselName = vessel?.name || vessel?.vesselName || String(vesselId);
       
       // Get database instance
       const db = await getDb();
       
-      // Get all running hours log entries for the vessel
-      const allLogs = await db.select().from(componentRunningHoursLog)
-        .where(sql`${componentRunningHoursLog.vesselCode} IN (${vesselId}, ${vesselCode})`);
+      // Query running_hours_audit table (has actual data)
+      const allAuditLogs = await db.select().from(runningHoursAudit)
+        .where(sql`${runningHoursAudit.vesselId} = ${vesselId}`);
       
       // Parse dates
       const parseDate = (dateVal: string | Date | null | undefined): Date | null => {
@@ -15073,7 +15158,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       };
       
       const now = new Date();
-      const defaultStartDate = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+      const defaultStartDate = new Date(now.getTime() - 90 * 24 * 60 * 60 * 1000);
       const periodStart = startDate ? parseDate(startDate) : defaultStartDate;
       const periodEnd = endDate ? parseDate(endDate) : now;
       
@@ -15081,83 +15166,140 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: "Invalid date format" });
       }
       
-      // Filter logs within the date range
-      const logsInPeriod = allLogs.filter(log => 
-        log.updatedAt && 
-        new Date(log.updatedAt) >= periodStart &&
-        new Date(log.updatedAt) <= periodEnd
-      ).sort((a, b) => new Date(b.updatedAt!).getTime() - new Date(a.updatedAt!).getTime());
+      // Filter logs within the date range - handle both Date objects and strings from Drizzle
+      const logsInPeriod = allAuditLogs.filter(log => {
+        if (!log.enteredAtUTC) return false;
+        const logDate = log.enteredAtUTC instanceof Date ? log.enteredAtUTC : new Date(log.enteredAtUTC);
+        return logDate >= periodStart && logDate <= periodEnd;
+      });
+      
+      // Group logs by component
+      const componentLogs = new Map<string, typeof logsInPeriod>();
+      for (const log of logsInPeriod) {
+        const key = log.componentId || log.componentCode || 'unknown';
+        if (!componentLogs.has(key)) {
+          componentLogs.set(key, []);
+        }
+        componentLogs.get(key)!.push(log);
+      }
       
       // Get components for reference
       const allComponents = await storage.getComponents(vesselId);
-      const componentMap = new Map(allComponents.map(c => [c.componentCode || c.id, c]));
+      const componentMap = new Map(allComponents.map(c => [c.id, c]));
+      const componentCodeMap = new Map(allComponents.map(c => [c.componentCode, c]));
       
-      // Anomaly thresholds
-      const SPIKE_THRESHOLD = 100;
-      const HIGH_DELTA_THRESHOLD = 50;
-      
-      // Detect anomalies
+      // Detect anomalies (same logic as GET endpoint)
       const anomalies: any[] = [];
       
-      for (const log of logsInPeriod) {
-        const delta = Number(log.deltaRh) || 0;
-        const component = componentMap.get(log.componentCode) || componentMap.get(log.componentId);
-        const componentName = component?.name || component?.fleetEquipmentName || log.componentCode;
+      for (const [componentKey, logs] of componentLogs.entries()) {
+        const sortedLogs = logs.sort((a, b) => 
+          new Date(a.enteredAtUtc!).getTime() - new Date(b.enteredAtUtc!).getTime()
+        );
         
-        let anomalyDetected = false;
-        let anomalyTypeValue = '';
-        let severity: 'Critical' | 'Warning' | 'Info' = 'Info';
-        let description = '';
+        const deltas = sortedLogs.map(log => {
+          const prev = Number(log.previousRH) || 0;
+          const curr = Number(log.newRH) || 0;
+          return curr - prev;
+        }).filter(d => d > 0);
+        const avgDelta = deltas.length > 0 ? deltas.reduce((a, b) => a + b, 0) / deltas.length : 0;
         
-        if (delta < 0) {
-          anomalyDetected = true;
-          anomalyTypeValue = 'Negative Delta';
-          severity = 'Warning';
-          description = `RH decreased by ${Math.abs(delta).toFixed(1)} hrs - meter reset or correction`;
-        } else if (delta > SPIKE_THRESHOLD) {
-          anomalyDetected = true;
-          anomalyTypeValue = 'Large Spike';
-          severity = 'Critical';
-          description = `Unusually high: ${delta.toFixed(1)} hrs (threshold: ${SPIKE_THRESHOLD})`;
-        } else if (delta > HIGH_DELTA_THRESHOLD) {
-          anomalyDetected = true;
-          anomalyTypeValue = 'High Delta';
-          severity = 'Warning';
-          description = `Above-average: ${delta.toFixed(1)} hrs in one update`;
-        } else if (delta === 0 && Number(log.previousRh) > 0 && log.updateSource === 'manual') {
-          anomalyDetected = true;
-          anomalyTypeValue = 'Zero Change';
-          severity = 'Info';
-          description = `No change recorded (existing: ${Number(log.previousRh).toFixed(1)} hrs)`;
-        }
-        
-        if (anomalyDetected) {
-          if (!anomalyType || anomalyType === 'All' || anomalyType === anomalyTypeValue) {
-            anomalies.push({
-              componentCode: log.componentCode,
-              componentName,
-              category: component?.componentCategory || component?.category || '-',
-              department: component?.department || component?.eqptSystemDept || '-',
-              previousRh: Number(log.previousRh) || 0,
-              newRh: Number(log.newRh) || 0,
-              deltaRh: delta,
-              anomalyType: anomalyTypeValue,
-              severity,
-              description,
-              updatedBy: log.updatedBy || '-',
-              updatedAt: log.updatedAt,
-              updateSource: log.updateSource || '-'
-            });
+        for (let i = 0; i < sortedLogs.length; i++) {
+          const log = sortedLogs[i];
+          const prevLog = i > 0 ? sortedLogs[i - 1] : null;
+          
+          const previousRh = Number(log.previousRH) || 0;
+          const newRh = Number(log.newRH) || 0;
+          const delta = newRh - previousRh;
+          const meterReplaced = log.meterReplaced === true;
+          
+          let daysBetween = 1;
+          let avgDailyHours = 0;
+          if (prevLog?.enteredAtUtc && log.enteredAtUTC) {
+            const prevTime = new Date(prevLog.enteredAtUtc).getTime();
+            const currTime = new Date(log.enteredAtUTC).getTime();
+            daysBetween = Math.max(1, (currTime - prevTime) / (1000 * 60 * 60 * 24));
+            avgDailyHours = delta / daysBetween;
+          } else if (log.enteredAtUTC) {
+            avgDailyHours = delta > 0 ? Math.min(delta, 24) : 0;
+          }
+          
+          const component = componentMap.get(log.componentId || '') || componentCodeMap.get(log.componentCode || '');
+          const componentName = log.componentName || component?.name || component?.fleetEquipmentName || log.componentCode || 'Unknown';
+          
+          let anomalyDetected = false;
+          let anomalyTypeValue = '';
+          let severity: 'Critical' | 'Warning' | 'Info' = 'Info';
+          let description = '';
+          
+          if (avgDailyHours > 24 && !meterReplaced) {
+            anomalyDetected = true;
+            anomalyTypeValue = 'High Increment';
+            severity = 'Critical';
+            description = `Impossible: ${avgDailyHours.toFixed(1)} hrs/day. Delta: ${delta.toFixed(0)} hrs over ${daysBetween.toFixed(1)} days.`;
+          } else if (delta < 0 && !meterReplaced) {
+            anomalyDetected = true;
+            anomalyTypeValue = 'Negative Delta';
+            severity = 'Critical';
+            description = `RH decreased by ${Math.abs(delta).toFixed(1)} hrs without meter replacement.`;
+          } else if (delta === 0 && daysBetween > 7 && previousRh > 0) {
+            anomalyDetected = true;
+            anomalyTypeValue = 'Zero Change';
+            severity = 'Warning';
+            description = `No RH change for ${daysBetween.toFixed(0)} days. Possible stuck meter.`;
+          } else if (avgDelta > 0 && delta > avgDelta * 3 && delta > 50) {
+            anomalyDetected = true;
+            anomalyTypeValue = 'Irregular Pattern';
+            severity = 'Warning';
+            description = `Spike: ${delta.toFixed(0)} hrs is 3x above avg (${avgDelta.toFixed(1)} hrs).`;
+          } else if (meterReplaced) {
+            anomalyDetected = true;
+            anomalyTypeValue = 'Meter Replaced';
+            severity = 'Info';
+            description = `Meter replaced. Old: ${log.oldMeterFinal || 'N/A'}, New: ${log.newMeterStart || '0'}`;
+          }
+          
+          if (anomalyDetected) {
+            const passesTypeFilter = !anomalyType || anomalyType === 'All' || anomalyType === anomalyTypeValue;
+            const passesSeverityFilter = !severityFilter || severityFilter === 'All' || severityFilter === severity;
+            
+            if (passesTypeFilter && passesSeverityFilter) {
+              anomalies.push({
+                componentCode: log.componentCode || '-',
+                componentName,
+                category: component?.componentCategory || component?.category || '-',
+                department: component?.department || component?.eqptSystemDept || '-',
+                previousRh: Math.round(previousRh * 100) / 100,
+                newRh: Math.round(newRh * 100) / 100,
+                delta: Math.round(delta * 100) / 100,
+                daysBetween: Math.round(daysBetween * 10) / 10,
+                avgDailyHours: Math.round(avgDailyHours * 100) / 100,
+                anomalyType: anomalyTypeValue,
+                severity,
+                description,
+                meterReplaced,
+                updatedBy: log.userId || '-',
+                updatedAt: log.enteredAtUTC,
+                source: log.source || '-'
+              });
+            }
           }
         }
       }
       
-      // Create workbook
-      const ExcelJS = await import('exceljs');
+      // Sort by severity
+      anomalies.sort((a, b) => {
+        const severityOrder = { 'Critical': 0, 'Warning': 1, 'Info': 2 };
+        if (severityOrder[a.severity as keyof typeof severityOrder] !== severityOrder[b.severity as keyof typeof severityOrder]) {
+          return severityOrder[a.severity as keyof typeof severityOrder] - severityOrder[b.severity as keyof typeof severityOrder];
+        }
+        return Math.abs(b.avgDailyHours) - Math.abs(a.avgDailyHours);
+      });
+      
+      // Create workbook - use static import at top of file
       const workbook = new ExcelJS.Workbook();
       const worksheet = workbook.addWorksheet('RH Anomaly Detection');
       
-      // Define columns
+      // Define columns with enhanced data
       const columns = [
         { header: 'S.No', key: 'sNo', width: 6 },
         { header: 'Component Code', key: 'componentCode', width: 15 },
@@ -15166,28 +15308,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
         { header: 'Department', key: 'department', width: 12 },
         { header: 'Previous RH', key: 'previousRh', width: 12 },
         { header: 'New RH', key: 'newRh', width: 12 },
-        { header: 'Delta', key: 'deltaRh', width: 10 },
+        { header: 'Delta', key: 'delta', width: 10 },
+        { header: 'Days Between', key: 'daysBetween', width: 12 },
+        { header: 'Avg Daily Hrs', key: 'avgDailyHours', width: 12 },
         { header: 'Anomaly Type', key: 'anomalyType', width: 15 },
         { header: 'Severity', key: 'severity', width: 10 },
-        { header: 'Description', key: 'description', width: 40 },
+        { header: 'Description', key: 'description', width: 45 },
         { header: 'Updated By', key: 'updatedBy', width: 15 },
         { header: 'Date', key: 'updatedAt', width: 12 },
-        { header: 'Source', key: 'updateSource', width: 12 }
+        { header: 'Source', key: 'source', width: 12 }
       ];
       
       worksheet.columns = columns;
-      const lastColLetter = String.fromCharCode(64 + columns.length);
+      const lastColLetter = getLastColumnLetter(columns.length);
       
-      // Apply header (rows 1-6)
+      // Apply header
       const reportTitle = 'Running Hours Anomaly Detection Report';
       const criticalCount = anomalies.filter(a => a.severity === 'Critical').length;
       const warningCount = anomalies.filter(a => a.severity === 'Warning').length;
       const infoCount = anomalies.filter(a => a.severity === 'Info').length;
-      const subtitle = `Critical: ${criticalCount} | Warning: ${warningCount} | Info: ${infoCount} | Total: ${anomalies.length}`;
-      applyStandardHeader(worksheet, reportTitle, vesselName, columns.length, `${formatDateDisplay(periodStart)} to ${formatDateDisplay(periodEnd)}`, subtitle);
+      const subtitle = `Critical: ${criticalCount} | Warning: ${warningCount} | Info: ${infoCount} | Period: ${formatDateDisplay(periodStart)} to ${formatDateDisplay(periodEnd)}`;
+      applyStandardHeader(worksheet, reportTitle, subtitle, vesselName, anomalies.length, lastColLetter);
       
-      // Apply table header (row 7)
-      applyStandardTableHeader(worksheet, columns.map(c => c.header), 7, columns.length);
+      // Apply table header
+      applyStandardTableHeader(worksheet, columns, 7);
       
       // Prepare report data
       const reportData = anomalies.map((a, idx) => ({
@@ -15198,51 +15342,50 @@ export async function registerRoutes(app: Express): Promise<Server> {
         department: a.department,
         previousRh: a.previousRh.toFixed(1),
         newRh: a.newRh.toFixed(1),
-        deltaRh: a.deltaRh.toFixed(1),
+        delta: a.delta.toFixed(1),
+        daysBetween: a.daysBetween.toFixed(1),
+        avgDailyHours: a.avgDailyHours.toFixed(2),
         anomalyType: a.anomalyType,
         severity: a.severity,
         description: a.description,
         updatedBy: a.updatedBy,
         updatedAt: formatDateDisplay(a.updatedAt),
-        updateSource: a.updateSource
+        source: a.source
       }));
       
       // Apply data rows
-      applyStandardDataRows(worksheet, reportData, 8, columns.length);
+      applyStandardDataRows(worksheet, reportData, columns, 8);
       
       // Apply severity-based coloring
       for (let i = 0; i < reportData.length; i++) {
         const rowNum = 8 + i;
         const severity = anomalies[i].severity;
-        const severityCell = worksheet.getCell(`J${rowNum}`);
+        const severityCell = worksheet.getCell(rowNum, 12); // Column L = Severity
         
         if (severity === 'Critical') {
-          // Red background for critical
           for (let col = 1; col <= columns.length; col++) {
             worksheet.getCell(rowNum, col).fill = {
               type: 'pattern',
               pattern: 'solid',
-              fgColor: { argb: 'FFFECACA' } // Light red
+              fgColor: { argb: 'FFFECACA' }
             };
           }
           severityCell.font = { color: { argb: 'FFDC2626' }, bold: true };
         } else if (severity === 'Warning') {
-          // Orange background for warning
           for (let col = 1; col <= columns.length; col++) {
             worksheet.getCell(rowNum, col).fill = {
               type: 'pattern',
               pattern: 'solid',
-              fgColor: { argb: 'FFFEF3C7' } // Light yellow/orange
+              fgColor: { argb: 'FFFEF3C7' }
             };
           }
           severityCell.font = { color: { argb: 'FFD97706' }, bold: true };
         } else {
-          // Light blue for info
           for (let col = 1; col <= columns.length; col++) {
             worksheet.getCell(rowNum, col).fill = {
               type: 'pattern',
               pattern: 'solid',
-              fgColor: { argb: 'FFDBEAFE' } // Light blue
+              fgColor: { argb: 'FFDBEAFE' }
             };
           }
           severityCell.font = { color: { argb: 'FF2563EB' }, bold: true };
@@ -15253,7 +15396,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const summaryRow = 8 + reportData.length + 1;
       worksheet.mergeCells(`A${summaryRow}:${lastColLetter}${summaryRow}`);
       worksheet.getCell(`A${summaryRow}`).value = 
-        `Summary: ${anomalies.length} anomalies detected | Critical: ${criticalCount} | Warning: ${warningCount} | Info: ${infoCount} | Logs analyzed: ${logsInPeriod.length}`;
+        `Summary: ${anomalies.length} anomalies detected | Critical: ${criticalCount} | Warning: ${warningCount} | Info: ${infoCount} | Components analyzed: ${componentLogs.size} | Logs analyzed: ${logsInPeriod.length}`;
       worksheet.getCell(`A${summaryRow}`).font = { bold: true, size: 10 };
       worksheet.getCell(`A${summaryRow}`).fill = {
         type: 'pattern',
@@ -15270,7 +15413,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const dateStr = new Date().toISOString().split('T')[0].replace(/-/g, '');
       const filename = `RH_Anomaly_Detection_${vesselName.replace(/[^a-z0-9]/gi, '_')}_${dateStr}.xlsx`;
       
-      console.log(`[RH ANOMALY DETECTION REPORT] Generated: ${filename}`);
+      console.log(`[RH ANOMALY EXCEL] Generated: ${filename}, Anomalies: ${anomalies.length}`);
       
       res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
       res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
