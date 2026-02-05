@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import React, { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -122,6 +122,7 @@ export default function ShipsSurveysAdmin() {
   const [masterData, setMasterData] = useState<MasterSurvey[]>([]);
   const [deletedMasterIds, setDeletedMasterIds] = useState<string[]>([]);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+  const [validationErrorIds, setValidationErrorIds] = useState<Set<number>>(new Set());
   const [hasSavedInSession, setHasSavedInSession] = useState<Record<string, boolean>>({
     master: false,
     company: false,
@@ -287,13 +288,13 @@ export default function ShipsSurveysAdmin() {
     );
     
     if (invalidSurveys.length > 0) {
-      toast({
-        title: "Mandatory fields missing",
-        description: "Survey Name, Category, and Group are required for all surveys.",
-        variant: "destructive",
-      });
+      // Set validation errors for inline display instead of toast
+      setValidationErrorIds(new Set(invalidSurveys.map(s => s.id)));
       return;
     }
+    
+    // Clear any previous validation errors
+    setValidationErrorIds(new Set());
     
     // First, delete any surveys that were removed
     let deleteErrors = 0;
@@ -453,6 +454,14 @@ export default function ShipsSurveysAdmin() {
           const cat = field === "category" ? value : s.category;
           const grp = field === "group" ? value : s.group;
           updated.masterId = `${cat}${grp}-${String(s.sequence).padStart(3, '0')}`;
+        }
+        // Clear validation error if all mandatory fields are now filled
+        if (updated.surveyName?.trim() && updated.category?.trim() && updated.group?.trim()) {
+          setValidationErrorIds(prev => {
+            const newSet = new Set(prev);
+            newSet.delete(id);
+            return newSet;
+          });
         }
         return updated;
       }
@@ -1045,8 +1054,14 @@ export default function ShipsSurveysAdmin() {
                     </tr>
                   </thead>
                   <tbody className="divide-y text-sm">
-                    {filteredData.map((survey, idx) => (
-                      <tr key={survey.id} className="hover:bg-gray-50">
+                    {filteredData.map((survey, idx) => {
+                      const hasError = validationErrorIds.has(survey.id);
+                      const isSurveyNameEmpty = !survey.surveyName?.trim();
+                      const isCategoryEmpty = !survey.category?.trim();
+                      const isGroupEmpty = !survey.group?.trim();
+                      return (
+                      <React.Fragment key={survey.id}>
+                      <tr className="hover:bg-gray-50">
                         {isEditMode && (
                           <td className="px-3 py-2 text-center">
                             <Input
@@ -1072,7 +1087,7 @@ export default function ShipsSurveysAdmin() {
                             <Input 
                               value={survey.surveyName} 
                               onChange={(e) => updateField(survey.id, "surveyName", e.target.value)}
-                              className="h-8"
+                              className={`h-8 ${hasError && isSurveyNameEmpty ? 'border-red-500 border-2' : ''}`}
                               data-testid={`input-survey-name-${survey.id}`}
                             />
                           ) : (
@@ -1082,7 +1097,7 @@ export default function ShipsSurveysAdmin() {
                         <td className="px-4 py-2">
                           {isEditMode ? (
                             <Select value={survey.category} onValueChange={(v) => updateField(survey.id, "category", v)}>
-                              <SelectTrigger className="h-8" data-testid={`select-category-${survey.id}`}>
+                              <SelectTrigger className={`h-8 ${hasError && isCategoryEmpty ? 'border-red-500 border-2' : ''}`} data-testid={`select-category-${survey.id}`}>
                                 <SelectValue />
                               </SelectTrigger>
                               <SelectContent>
@@ -1098,7 +1113,7 @@ export default function ShipsSurveysAdmin() {
                         <td className="px-4 py-2">
                           {isEditMode ? (
                             <Select value={survey.group} onValueChange={(v) => updateField(survey.id, "group", v)}>
-                              <SelectTrigger className="h-8" data-testid={`select-group-${survey.id}`}>
+                              <SelectTrigger className={`h-8 ${hasError && isGroupEmpty ? 'border-red-500 border-2'  : ''}`} data-testid={`select-group-${survey.id}`}>
                                 <SelectValue />
                               </SelectTrigger>
                               <SelectContent>
@@ -1148,7 +1163,15 @@ export default function ShipsSurveysAdmin() {
                           </td>
                         )}
                       </tr>
-                    ))}
+                      {hasError && isEditMode && (
+                        <tr>
+                          <td colSpan={isEditMode ? 9 : 8} className="px-4 py-1 bg-red-50">
+                            <span className="text-red-600 text-xs">Survey Name, Category, Group are Mandatory</span>
+                          </td>
+                        </tr>
+                      )}
+                      </React.Fragment>
+                    ); })}
                   </tbody>
                 </table>
               )}
