@@ -5119,11 +5119,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
         lastColLetter
       );
 
-      // Summary info at row 5
-      worksheet.getRow(5).getCell(1).value = `Total Jobs: ${reportData.length} | Total Manhours: ${totalManhours.toFixed(1)} | Avg Time: ${avgTimeTaken} hrs`;
-      worksheet.getRow(5).getCell(1).font = { size: 10, italic: true };
-      worksheet.mergeCells(`A5:${lastColLetter}5`);
-
       // Apply table headers at row 7
       applyStandardTableHeader(worksheet, columns, 7);
 
