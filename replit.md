@@ -77,6 +77,9 @@ All future Fleet-related tables MUST include these mandatory columns with exact 
     -   Tables that manage fleet-wide master data shared across vessels
     -   Tables referenced by the Fleet Admin module
 
+6.  **Tables Updated to Match Fleet Schema Contract**:
+    -   `maker_list` - Updated Feb 2026 with all mandatory columns (maker_list_uuid, sortOrder, createdByUuid, updatedByUuid, isDeleted, isSync)
+
 ## System Architecture
 The application employs a modern full-stack architecture with a mobile-first, responsive design. The frontend is developed using React (TypeScript, Vite, Tailwind CSS, shadcn/ui, TanStack Query, Wouter), while the backend is powered by Express.js (TypeScript). PostgreSQL serves as the primary data store.
 
