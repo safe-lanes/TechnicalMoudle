@@ -159,8 +159,12 @@ const RunningHoursReports: React.FC<RunningHoursReportsProps> = ({ onBack, globa
         const response = await fetch(`/technical/api/reports/equipment-utilization-summary?${params}`);
         const result = await response.json();
         
+        if (!response.ok || result.error) {
+          throw new Error(result.error || `Failed to fetch data (status ${response.status})`);
+        }
+        
         if (!result.success || !result.data) {
-          throw new Error(result.error || 'Failed to fetch equipment utilization data');
+          throw new Error('No equipment utilization data returned. Please ensure the vessel has components with running hours.');
         }
         
         const utilizationData = result.data;
@@ -335,10 +339,16 @@ const RunningHoursReports: React.FC<RunningHoursReportsProps> = ({ onBack, globa
     if (generatingReports.has(reportKey)) return;
 
     // Require vessel selection for these reports
-    if (!effectiveVesselId || effectiveVesselId === 'all') {
+    // Check for various "all vessels" representations
+    const isAllVessels = !effectiveVesselId || 
+                         effectiveVesselId === 'all' || 
+                         effectiveVesselId === 'all-vessels' ||
+                         effectiveVesselId.toLowerCase().includes('all');
+    
+    if (isAllVessels) {
       toast({ 
         title: "Vessel Required", 
-        description: "Please select a specific vessel to generate this report.",
+        description: "Please select a specific vessel from the dropdown to generate this report.",
         variant: "destructive" 
       });
       return;
