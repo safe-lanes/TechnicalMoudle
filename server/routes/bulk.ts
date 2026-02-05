@@ -737,7 +737,12 @@ async function generateFleetMasterTemplate(): Promise<Buffer> {
   makerSheet.columns = [
     { header: 'Maker Code', key: 'makerCode', width: 15 },
     { header: 'Maker Name', key: 'makerName', width: 35 },
-    { header: 'Address', key: 'address', width: 50 }
+    { header: 'Address', key: 'address', width: 50 },
+    { header: 'Address ID', key: 'addressId', width: 15 },
+    { header: 'Contact Person', key: 'contactPerson', width: 25 },
+    { header: 'Email', key: 'email', width: 30 },
+    { header: 'Phone', key: 'phone', width: 20 },
+    { header: 'IS Active', key: 'isActive', width: 12 }
   ];
   
   // Headers only - no sample data
@@ -1871,12 +1876,13 @@ router.get('/template', async (req, res) => {
     case 'makers':
       headers = [
         // Maker List template - matches maker_list database schema
-        'Maker Code', 'Maker Name', 'Address', 'Is Active'
+        'Maker Code', 'Maker Name', 'Address', 'Address ID', 'Contact Person', 'Email', 'Phone', 'IS Active'
       ];
 
       validValues = [
-        'Required (Unique identifier, e.g., MAN, CAT, ABB)', 'Required (Full manufacturer name)', 
-        'Text (Manufacturer address)', 'Yes/No (defaults to Yes)'
+        'Required (Unique identifier, e.g., MKR-000001)', 'Required (Full manufacturer name)', 
+        'Text (Manufacturer address)', 'Text (Address reference ID)', 'Text (Contact person name)',
+        'Text (Contact email)', 'Text (Contact phone)', 'Yes/No (defaults to Yes)'
       ];
 
       example = [];
@@ -6078,6 +6084,14 @@ router.post('/makers/import', upload.single('file'), async (req, res) => {
       const makerCode = row['Maker Code'];
       const makerName = row['Maker Name'];
       const address = row['Address'] || null;
+      const addressId = row['Address ID'] || null;
+      const contactPerson = row['Contact Person'] || null;
+      const email = row['Email'] || null;
+      const phone = row['Phone'] || null;
+      const isActiveRaw = row['IS Active'];
+      const isActive = isActiveRaw === undefined || isActiveRaw === null || isActiveRaw === '' 
+        ? true 
+        : String(isActiveRaw).toLowerCase() === 'yes' || String(isActiveRaw).toLowerCase() === 'true' || isActiveRaw === true;
       
       if (!makerCode || !makerName) {
         results.errors.push(`Row ${rowNum}: Missing Maker Code or Maker Name`);
@@ -6090,14 +6104,24 @@ router.post('/makers/import', upload.single('file'), async (req, res) => {
         if (existing) {
           await storage.updateMakerListItem(existing.id, {
             makerName: String(makerName).trim(),
-            address: address ? String(address).trim() : null
+            address: address ? String(address).trim() : null,
+            addressId: addressId ? String(addressId).trim() : null,
+            contactPerson: contactPerson ? String(contactPerson).trim() : null,
+            email: email ? String(email).trim() : null,
+            phone: phone ? String(phone).trim() : null,
+            isActive
           });
           results.updated++;
         } else {
           await storage.createMakerListItem({
             makerCode: String(makerCode).trim(),
             makerName: String(makerName).trim(),
-            address: address ? String(address).trim() : null
+            address: address ? String(address).trim() : null,
+            addressId: addressId ? String(addressId).trim() : null,
+            contactPerson: contactPerson ? String(contactPerson).trim() : null,
+            email: email ? String(email).trim() : null,
+            phone: phone ? String(phone).trim() : null,
+            isActive
           });
           results.created++;
         }
