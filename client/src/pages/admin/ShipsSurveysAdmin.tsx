@@ -281,20 +281,6 @@ export default function ShipsSurveysAdmin() {
   });
 
   const handleSave = async () => {
-    // Validate mandatory fields for Master tab surveys
-    const invalidSurveys = masterData.filter(
-      s => !s.surveyName?.trim() || !s.category?.trim() || !s.group?.trim()
-    );
-    
-    if (invalidSurveys.length > 0) {
-      toast({
-        title: "Mandatory fields missing",
-        description: "Survey Name, Category, and Group are required for all surveys.",
-        variant: "destructive",
-      });
-      return;
-    }
-    
     // First, delete any surveys that were removed
     let deleteErrors = 0;
     for (const masterId of deletedMasterIds) {
