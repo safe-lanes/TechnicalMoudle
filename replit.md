@@ -39,6 +39,44 @@ All future database schema changes MUST follow this policy without exception:
 
 Note: Existing migrations 001-016 in `server/migrations.ts` remain functional for backward compatibility but no new code-based migrations should be added.
 
+**Critical Development Rule - Fleet Table Schema Contract (Permanent)**:
+All future Fleet-related tables MUST include these mandatory columns with exact naming and behavior:
+
+1.  **Mandatory Column Set (Required for ALL Fleet Tables)**:
+    ```typescript
+    {table_name}_uuid: text("{table_name}_uuid").default(sql`gen_random_uuid()`),
+    sortOrder: integer("sort_order").default(0),
+    createdAt: timestamp("created_at").defaultNow(),
+    updatedAt: timestamp("updated_at").defaultNow(),
+    createdByUuid: text("created_by_uuid"),   // FK → master_users.user_uuid
+    updatedByUuid: text("updated_by_uuid"),   // FK → master_users.user_uuid
+    isDeleted: boolean("is_deleted").default(false),
+    isSync: boolean("is_sync").default(false),
+    ```
+
+2.  **Identifier & Relationship Rules**:
+    -   `{table_name}_uuid` must be a UUID value with default generator
+    -   This UUID column is the primary relational key for Fleet table relationships
+    -   All Fleet table relationships must reference UUID columns ONLY
+    -   Do NOT use numeric IDs, codes, or names for relations between Fleet tables
+
+3.  **Consistency Enforcement**:
+    -   Column names must not change from the defined pattern
+    -   Data types and default behavior must remain consistent
+    -   These columns must exist even if not immediately used by business logic
+    -   Any Fleet table omitting or renaming these columns is considered invalid
+
+4.  **Scope & Safety**:
+    -   This rule applies ONLY to future Fleet tables
+    -   Do NOT modify or migrate existing tables to match this pattern
+    -   Do NOT alter existing business logic or queries
+    -   This is a schema standardization guideline, not a refactor task
+
+5.  **Fleet Table Identification**:
+    -   Tables prefixed with `fleet_` (e.g., `fleet_vessel_mapping`, `fleet_component_mapping`)
+    -   Tables that manage fleet-wide master data shared across vessels
+    -   Tables referenced by the Fleet Admin module
+
 ## System Architecture
 The application employs a modern full-stack architecture with a mobile-first, responsive design. The frontend is developed using React (TypeScript, Vite, Tailwind CSS, shadcn/ui, TanStack Query, Wouter), while the backend is powered by Express.js (TypeScript). PostgreSQL serves as the primary data store.
 
