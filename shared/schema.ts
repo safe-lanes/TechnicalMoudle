@@ -1794,6 +1794,53 @@ export type InsertMakerList = z.infer<typeof insertMakerListSchema>;
 export type MakerList = typeof makerList.$inferSelect;
 
 // =====================================================
+// FLEET COMPONENTS - Fleet Equipment Master Data
+// Stores fleet-level component hierarchy for bulk import
+// Excel Headers: Parent Fleet Equipment Code, Fleet Equipment Code, Fleet Equipment Name,
+// Component Category, Maker Name, Maker Code, Model, Model Code, Location, Rating,
+// Eqpt / System Department, Notes, IS Active
+// =====================================================
+export const fleetComponents = pgTable("fleet_components", {
+  id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
+  fleetComponentsUuid: text("fleet_components_uuid").default(sql`gen_random_uuid()`),
+  parentFleetEquipmentCode: text("parent_fleet_equipment_code"),
+  fleetEquipmentCode: text("fleet_equipment_code").notNull().unique(),
+  fleetEquipmentName: text("fleet_equipment_name").notNull(),
+  componentCategory: text("component_category"),
+  makerName: text("maker_name"),
+  makerCode: text("maker_code"),
+  model: text("model"),
+  modelCode: text("model_code"),
+  location: text("location"),
+  rating: text("rating"),
+  eqptSystemDept: text("eqpt_system_dept"),
+  notes: text("notes"),
+  isActive: boolean("is_active").notNull().default(true),
+  sortOrder: integer("sort_order").default(0),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  createdByUuid: text("created_by_uuid"),
+  updatedByUuid: text("updated_by_uuid"),
+  isDeleted: boolean("is_deleted").default(false),
+  isSync: boolean("is_sync").default(false),
+}, (table) => ({
+  fleetEquipmentCodeIdx: index("idx_fleet_components_code").on(table.fleetEquipmentCode),
+  parentCodeIdx: index("idx_fleet_components_parent").on(table.parentFleetEquipmentCode),
+  fleetComponentsUuidIdx: index("idx_fleet_components_uuid").on(table.fleetComponentsUuid),
+  makerCodeIdx: index("idx_fleet_components_maker").on(table.makerCode),
+}));
+
+export const insertFleetComponentsSchema = createInsertSchema(fleetComponents).omit({
+  id: true,
+  fleetComponentsUuid: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type InsertFleetComponents = z.infer<typeof insertFleetComponentsSchema>;
+export type FleetComponents = typeof fleetComponents.$inferSelect;
+
+// =====================================================
 // SFI DETAILS - SFI Code lookup table
 // Used for standardizing component codes across fleet
 // =====================================================
