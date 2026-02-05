@@ -109,13 +109,41 @@ export default function SurveysPage() {
   const [gridApi, setGridApi] = useState<GridApi | null>(null);
   const [attachmentSheetOpen, setAttachmentSheetOpen] = useState(false);
   const [selectedSurvey, setSelectedSurvey] = useState<SurveyData | null>(null);
+  const [currentPage, setCurrentPage] = useState(1);
+  const pageSize = 100;
   const { toast } = useToast();
 
+  // Build API URL with vessel filter and pagination
+  const apiUrl = useMemo(() => {
+    const params = new URLSearchParams();
+    params.set('page', currentPage.toString());
+    params.set('limit', pageSize.toString());
+    
+    // Pass vessel name filter to API
+    if (selectedVesselNames.length === 1) {
+      params.set('vesselName', selectedVesselNames[0]);
+    } else if (selectedVesselNames.length > 1) {
+      // Pass multiple vessel names as comma-separated string
+      params.set('vesselNames', selectedVesselNames.join(','));
+    }
+    
+    return `/technical/api/surveys?${params.toString()}`;
+  }, [currentPage, selectedVesselNames]);
+
   const { data: surveysResponse, isLoading } = useQuery<SurveysApiResponse>({
-    queryKey: ['/technical/api/surveys'],
+    queryKey: ['/technical/api/surveys', currentPage, selectedVesselNames],
+    queryFn: async () => {
+      const response = await fetch(apiUrl);
+      if (!response.ok) {
+        throw new Error('Failed to fetch surveys');
+      }
+      return response.json();
+    },
   });
   
   const surveys = surveysResponse?.surveys || [];
+  const totalSurveys = surveysResponse?.total || 0;
+  const totalPages = surveysResponse?.totalPages || 1;
 
   const handleFilterChange = useCallback((result: VesselFleetGroupFilterResult) => {
     setFilterValue({
@@ -125,6 +153,7 @@ export default function SurveysPage() {
       selectedGroups: result.selectedGroups,
     });
     setSelectedVesselNames(result.selectedVesselNames);
+    setCurrentPage(1); // Reset to page 1 when filters change
   }, []);
 
   const filteredSurveys = useMemo(() => {
@@ -503,8 +532,42 @@ export default function SurveysPage() {
             
             <div className="bg-white border-t border-gray-200 px-4 py-3 flex justify-between items-center flex-shrink-0" style={{ marginTop: '-1px' }}>
               <div className="text-xs font-normal font-['Mulish',Helvetica] text-black">
-                Rows: {filteredSurveys.length}
+                {totalSurveys > 0 ? (
+                  <>
+                    Showing {((currentPage - 1) * pageSize) + 1}-{Math.min(currentPage * pageSize, totalSurveys)} of {totalSurveys}
+                  </>
+                ) : (
+                  <>Rows: {filteredSurveys.length}</>
+                )}
               </div>
+              
+              {/* Pagination Controls */}
+              {totalPages > 1 && (
+                <div className="flex items-center gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                    disabled={currentPage === 1}
+                    data-testid="button-prev-page"
+                  >
+                    Previous
+                  </Button>
+                  <span className="text-xs text-gray-600">
+                    Page {currentPage} of {totalPages}
+                  </span>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                    disabled={currentPage === totalPages}
+                    data-testid="button-next-page"
+                  >
+                    Next
+                  </Button>
+                </div>
+              )}
+              
               <div>
                 <AgGridTableActions 
                   gridApi={gridApi}
