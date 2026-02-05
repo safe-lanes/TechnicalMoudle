@@ -156,30 +156,35 @@ const RunningHoursReports: React.FC<RunningHoursReportsProps> = ({ onBack, globa
           params.append('endDate', categoryFilters.dateRange.to.toISOString().split('T')[0]);
         }
         
+        console.log('[PDF] Fetching equipment utilization data for vessel:', effectiveVesselId);
         const response = await fetch(`/technical/api/reports/equipment-utilization-summary?${params}`);
         const result = await response.json();
         
         if (!response.ok || result.error) {
+          console.error('[PDF] API error:', result.error);
           throw new Error(result.error || `Failed to fetch data (status ${response.status})`);
         }
         
         if (!result.success || !result.data) {
+          console.error('[PDF] No data in response:', result);
           throw new Error('No equipment utilization data returned. Please ensure the vessel has components with running hours.');
         }
         
         const utilizationData = result.data;
         const summary = result.summary;
+        console.log('[PDF] Generating PDF with', utilizationData.length, 'equipment items');
         
         const columns = [
-          { header: 'S.No', field: 'sNo', width: 15 },
-          { header: 'Code', field: 'componentCode', width: 35 },
-          { header: 'Component Name', field: 'componentName', width: 60 },
-          { header: 'Category', field: 'category', width: 40 },
-          { header: 'Current Hrs', field: 'currentHours', width: 30 },
-          { header: 'Period Hrs', field: 'periodHours', width: 30 },
-          { header: 'Avg Daily', field: 'avgDailyHours', width: 28 },
-          { header: 'Utilization', field: 'utilizationBand', width: 28 },
-          { header: 'Util %', field: 'utilizationPercent', width: 22 }
+          { header: 'S.No', field: 'sNo', width: 12 },
+          { header: 'Code', field: 'componentCode', width: 30 },
+          { header: 'Component Name', field: 'componentName', width: 55 },
+          { header: 'Category', field: 'category', width: 35 },
+          { header: 'Current Hrs', field: 'currentHours', width: 25 },
+          { header: 'Period Hrs', field: 'periodHours', width: 25 },
+          { header: 'Avg Daily', field: 'avgDailyHours', width: 22 },
+          { header: 'Utilization', field: 'utilizationBand', width: 25 },
+          { header: 'Util %', field: 'utilizationPercent', width: 20 },
+          { header: 'Data Source', field: 'dataSource', width: 30 }
         ];
         
         const summaryItems = [
@@ -187,19 +192,28 @@ const RunningHoursReports: React.FC<RunningHoursReportsProps> = ({ onBack, globa
           { label: 'High Utilization', value: summary.highUtilization },
           { label: 'Normal Utilization', value: summary.normalUtilization },
           { label: 'Low Utilization', value: summary.lowUtilization },
-          { label: 'Avg Utilization', value: `${summary.avgUtilization}%` }
+          { label: 'Avg Utilization', value: `${summary.avgUtilization}%` },
+          { label: 'Actual Data', value: summary.actualData || 0 },
+          { label: 'Estimated', value: (summary.estimatedData || 0) + (summary.estimatedCapped || 0) },
+          { label: 'No Data', value: summary.noData || 0 }
         ];
         
-        pdfReportGenerator.generateReport(
-          { 
-            title: 'Equipment Utilization Summary', 
-            subtitle: `Running hours analysis for ${summary.periodDays} days (${summary.periodStart} to ${summary.periodEnd})`, 
-            vessel: vesselName 
-          },
-          columns,
-          utilizationData,
-          summaryItems
-        );
+        try {
+          pdfReportGenerator.generateReport(
+            { 
+              title: 'Equipment Utilization Summary', 
+              subtitle: `Running hours analysis for ${summary.periodDays} days (${summary.periodStart} to ${summary.periodEnd})`, 
+              vessel: vesselName 
+            },
+            columns,
+            utilizationData,
+            summaryItems
+          );
+          console.log('[PDF] PDF generated successfully');
+        } catch (pdfError) {
+          console.error('[PDF] Error generating PDF:', pdfError);
+          throw pdfError;
+        }
         break;
       }
 
@@ -213,11 +227,13 @@ const RunningHoursReports: React.FC<RunningHoursReportsProps> = ({ onBack, globa
           params.append('endDate', categoryFilters.dateRange.to.toISOString().split('T')[0]);
         }
         
+        console.log('[PDF] Fetching anomaly detection data for vessel:', effectiveVesselId);
         const response = await fetch(`/technical/api/reports/running-hours-anomaly-detection?${params}`);
         const result = await response.json();
         
-        if (result.error) {
-          throw new Error(result.error);
+        if (!response.ok || result.error) {
+          console.error('[PDF] API error:', result.error);
+          throw new Error(result.error || `Failed to fetch data (status ${response.status})`);
         }
         
         const anomalies = result.anomalies || [];
@@ -250,16 +266,24 @@ const RunningHoursReports: React.FC<RunningHoursReportsProps> = ({ onBack, globa
           deltaRh: Number(a.deltaRh).toFixed(1)
         }));
         
-        pdfReportGenerator.generateReport(
-          { 
-            title: 'Running Hours Anomaly Detection', 
-            subtitle: `Anomalies detected from ${summaryData.periodStart?.split('T')[0] || 'N/A'} to ${summaryData.periodEnd?.split('T')[0] || 'N/A'}`, 
-            vessel: vesselName 
-          },
-          columns,
-          formattedData,
-          summaryItems
-        );
+        console.log('[PDF] Generating anomaly detection PDF with', formattedData.length, 'anomalies');
+        
+        try {
+          pdfReportGenerator.generateReport(
+            { 
+              title: 'Running Hours Anomaly Detection', 
+              subtitle: `Anomalies detected from ${summaryData.periodStart?.split('T')[0] || 'N/A'} to ${summaryData.periodEnd?.split('T')[0] || 'N/A'}`, 
+              vessel: vesselName 
+            },
+            columns,
+            formattedData,
+            summaryItems
+          );
+          console.log('[PDF] Anomaly detection PDF generated successfully');
+        } catch (pdfError) {
+          console.error('[PDF] Error generating anomaly PDF:', pdfError);
+          throw pdfError;
+        }
         break;
       }
 

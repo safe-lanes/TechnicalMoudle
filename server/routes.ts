@@ -14401,9 +14401,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const displayCurrentHours = currentCumulativeReading ?? baselineHours ?? 0;
         
         // Calculate period hours from delta accumulation or from component data
-        // Priority: 1) Log data 2) Baseline delta 3) Estimate from current cumulative
+        // Priority: 1) Log data 2) Baseline delta 3) Estimate from current cumulative (capped)
         let periodHours = 0;
-        let dataSource: 'Actual' | 'Estimated' | 'No Data' = 'No Data';
+        let dataSource: 'Actual' | 'Estimated' | 'Estimated (capped)' | 'No Data' = 'No Data';
+        
+        // Maximum possible hours in the period (physical limit: 24 hrs/day)
+        const maxPossibleHours = daysInPeriod * 24;
+        // Reasonable cap for estimation: 80% utilization (typical for continuously running equipment)
+        const cappedEstimateHours = Math.floor(maxPossibleHours * 0.80);
         
         if (componentLogs.length > 0) {
           // Use log data if available - sum up all delta changes in the period
@@ -14421,10 +14426,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
           periodHours = 0;
           dataSource = 'Actual';
         } else if (baselineHours === null && currentCumulativeReading !== null && currentCumulativeReading > 0) {
-          // No baseline but have a current reading - use as estimate
-          // This is clearly marked as "Estimated" so users know it's not accurate
-          periodHours = currentCumulativeReading;
-          dataSource = 'Estimated';
+          // No baseline but have a current reading - use as estimate with cap
+          // Current hours is total cumulative since installation, NOT period hours
+          // If it exceeds max possible for the period, cap at 80% utilization
+          if (currentCumulativeReading <= maxPossibleHours) {
+            // Current hours fits within period - use as-is (reasonable estimate)
+            periodHours = currentCumulativeReading;
+            dataSource = 'Estimated';
+          } else {
+            // Current hours exceeds period max - cap at 80% utilization
+            periodHours = cappedEstimateHours;
+            dataSource = 'Estimated (capped)';
+          }
         } else if (baselineHours !== null && currentCumulativeReading === null) {
           // Have baseline but no current reading - cannot calculate period hours
           periodHours = 0;
@@ -14495,6 +14508,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         // Data source breakdown
         actualData: utilizationData.filter(d => d.dataSource === 'Actual').length,
         estimatedData: utilizationData.filter(d => d.dataSource === 'Estimated').length,
+        estimatedCapped: utilizationData.filter(d => d.dataSource === 'Estimated (capped)').length,
         noData: utilizationData.filter(d => d.dataSource === 'No Data').length
       };
       
@@ -14624,9 +14638,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const displayCurrentHours = currentCumulativeReading ?? baselineHours ?? 0;
         
         // Calculate period hours from delta accumulation or from component data
-        // Priority: 1) Log data 2) Baseline delta 3) Estimate from current cumulative
+        // Priority: 1) Log data 2) Baseline delta 3) Estimate from current cumulative (capped)
         let periodHours = 0;
-        let dataSource: 'Actual' | 'Estimated' | 'No Data' = 'No Data';
+        let dataSource: 'Actual' | 'Estimated' | 'Estimated (capped)' | 'No Data' = 'No Data';
+        
+        // Maximum possible hours in the period (physical limit: 24 hrs/day)
+        const maxPossibleHours = daysInPeriod * 24;
+        // Reasonable cap for estimation: 80% utilization (typical for continuously running equipment)
+        const cappedEstimateHours = Math.floor(maxPossibleHours * 0.80);
         
         if (componentLogs.length > 0) {
           periodHours = componentLogs.reduce((sum, log) => {
@@ -14643,9 +14662,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
           periodHours = 0;
           dataSource = 'Actual';
         } else if (baselineHours === null && currentCumulativeReading !== null && currentCumulativeReading > 0) {
-          // No baseline but have a current reading - use as estimate
-          periodHours = currentCumulativeReading;
-          dataSource = 'Estimated';
+          // No baseline but have a current reading - use as estimate with cap
+          // Current hours is total cumulative since installation, NOT period hours
+          // If it exceeds max possible for the period, cap at 80% utilization
+          if (currentCumulativeReading <= maxPossibleHours) {
+            // Current hours fits within period - use as-is (reasonable estimate)
+            periodHours = currentCumulativeReading;
+            dataSource = 'Estimated';
+          } else {
+            // Current hours exceeds period max - cap at 80% utilization
+            periodHours = cappedEstimateHours;
+            dataSource = 'Estimated (capped)';
+          }
         } else if (baselineHours !== null && currentCumulativeReading === null) {
           // Have baseline but no current reading - cannot calculate period hours
           periodHours = 0;
@@ -14788,11 +14816,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Count data sources
       const actualCount = reportData.filter(r => r.dataSource === 'Actual').length;
       const estimatedCount = reportData.filter(r => r.dataSource === 'Estimated').length;
+      const estimatedCappedCount = reportData.filter(r => r.dataSource === 'Estimated (capped)').length;
       const noDataCount = reportData.filter(r => r.dataSource === 'No Data').length;
       
       worksheet.mergeCells(`A${summaryRow}:${lastColLetter}${summaryRow}`);
       worksheet.getCell(`A${summaryRow}`).value = 
-        `Summary: Total ${reportData.length} equipment | High: ${highCount} | Normal: ${normalCount} | Low: ${lowCount} | Avg Utilization: ${avgUtil}% | Data: ${actualCount} Actual, ${estimatedCount} Estimated, ${noDataCount} No Data`;
+        `Summary: Total ${reportData.length} equipment | High: ${highCount} | Normal: ${normalCount} | Low: ${lowCount} | Avg Utilization: ${avgUtil}% | Data: ${actualCount} Actual, ${estimatedCount} Estimated, ${estimatedCappedCount} Capped, ${noDataCount} No Data`;
       worksheet.getCell(`A${summaryRow}`).font = { bold: true, size: 10 };
       worksheet.getCell(`A${summaryRow}`).fill = {
         type: 'pattern',
