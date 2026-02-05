@@ -5088,7 +5088,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
         : '0';
 
       // Create Excel workbook
-      const ExcelJS = require('exceljs');
       const workbook = new ExcelJS.Workbook();
       const worksheet = workbook.addWorksheet('Unplanned Breakdown Jobs');
 
