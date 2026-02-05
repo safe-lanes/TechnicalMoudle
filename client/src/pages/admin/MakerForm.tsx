@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { insertMakerListSchema, type MakerList } from "@shared/schema";
@@ -97,6 +98,22 @@ export default function MakerForm({ open, onOpenChange, maker }: MakerFormProps)
   };
 
   const isPending = createMutation.isPending || updateMutation.isPending;
+
+  // Reset form when maker prop changes (for Edit mode) or when dialog opens
+  useEffect(() => {
+    if (open) {
+      form.reset({
+        makerName: maker?.makerName || "",
+        makerCode: maker?.makerCode || "",
+        address: maker?.address || "",
+        addressId: maker?.addressId || "",
+        contactPerson: maker?.contactPerson || "",
+        email: maker?.email || "",
+        phone: maker?.phone || "",
+        isActive: maker?.isActive ?? true,
+      });
+    }
+  }, [open, maker, form]);
 
   // Reset form when dialog opens/closes or maker changes
   const handleOpenChange = (newOpen: boolean) => {
