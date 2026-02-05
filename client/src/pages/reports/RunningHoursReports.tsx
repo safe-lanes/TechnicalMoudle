@@ -143,12 +143,17 @@ const RunningHoursReports: React.FC<RunningHoursReportsProps> = ({ onBack, globa
   };
 
   const generateRunningHoursPDF = async (reportId: string) => {
-    const vesselName = vessels.find(v => v.id === effectiveVesselId)?.name || effectiveVesselId || 'All Vessels';
+    // Check if a vessel is selected
+    if (!effectiveVesselId || effectiveVesselId === 'all') {
+      throw new Error('Please select a specific vessel to generate the PDF report. "All Vessels" is not supported for PDF exports.');
+    }
+    
+    const vesselName = vessels.find(v => v.id === effectiveVesselId)?.name || effectiveVesselId || 'Unknown Vessel';
 
     switch (reportId) {
       case 'rh-utilization-summary': {
         // Fetch from API
-        const params = new URLSearchParams({ vesselId: effectiveVesselId || '' });
+        const params = new URLSearchParams({ vesselId: effectiveVesselId });
         if (categoryFilters.dateRange?.from) {
           params.append('startDate', categoryFilters.dateRange.from.toISOString().split('T')[0]);
         }
@@ -403,6 +408,11 @@ const RunningHoursReports: React.FC<RunningHoursReportsProps> = ({ onBack, globa
   };
 
   const generateRunningHoursExcel = async (reportId: string) => {
+    // Check if a vessel is selected
+    if (!effectiveVesselId || effectiveVesselId === 'all') {
+      throw new Error('Please select a specific vessel to generate the Excel report. "All Vessels" is not supported for exports.');
+    }
+    
     const reportEndpoints: Record<string, string> = {
       'rh-utilization-summary': '/technical/api/reports/equipment-utilization-summary/excel',
       'rh-anomaly-detection': '/technical/api/reports/running-hours-anomaly-detection/excel',
