@@ -1,0 +1,183 @@
+✅ CORRECTED IMPLEMENTATION PROMPT FOR REPLIT
+text
+IMPLEMENT REPORT 1.6: UNPLANNED/BREAKDOWN JOBS
+
+Your implementation plan is correct. Proceed with the following CONFIRMED schema information from the database:
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+CONFIRMED DATABASE SCHEMA (Already verified)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+work_orders table contains:
+✅ id (primary key)
+✅ vessel_id
+✅ work_order_no
+✅ work_order_type ('Planned' | 'Unplanned')
+✅ task_type (TEXT - may contain 'Unplanned Maintenance', 'Breakdown', etc.)
+✅ job_title
+✅ component (component name)
+✅ component_code
+✅ brief_work_description
+✅ assigned_to
+✅ job_priority
+✅ department
+✅ created_at (TIMESTAMP)
+✅ date_completed (TEXT)
+✅ submitted_date
+✅ status
+
+work_completion table contains:
+✅ id (primary key)
+✅ work_order_id (foreign key to work_orders.id)
+✅ start_date
+✅ completion_date
+✅ performed_by_rank
+✅ no_of_persons
+✅ total_time_taken_hours
+✅ manhours (auto-calculated)
+✅ work_carried_out
+
+JOIN CONDITION:
+work_orders.id = work_completion.work_order_id
+
+FILTER CONDITION for Unplanned/Breakdown:
+work_order_type = 'Unplanned' 
+OR task_type ILIKE '%Unplanned%' 
+OR task_type ILIKE '%Breakdown%'
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+IMPLEMENTATION REQUIREMENTS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+1. BACKEND API ENDPOINT:
+   Location: server/routes.ts
+   Endpoint: /technical/api/reports/unplanned-breakdown-jobs
+   
+   Query Parameters:
+   - vesselId (required)
+   - startDate (required)
+   - endDate (required)
+   
+   SQL Query Structure:
+   ```sql
+   SELECT 
+     wo.work_order_no,
+     wo.component_code,
+     wo.component AS component_name,
+     wo.job_title,
+     wo.brief_work_description,
+     wo.created_at,
+     wo.date_completed,
+     wo.department,
+     wo.job_priority,
+     wc.performed_by_rank,
+     wc.total_time_taken_hours,
+     wc.manhours,
+     wc.work_carried_out
+   FROM work_orders wo
+   LEFT JOIN work_completion wc ON wo.id = wc.work_order_id
+   WHERE wo.vessel_id = $1
+     AND (
+       wo.work_order_type = 'Unplanned'
+       OR wo.task_type ILIKE '%Unplanned%'
+       OR wo.task_type ILIKE '%Breakdown%'
+     )
+     AND wo.status = 'Completed'
+     AND DATE(wo.created_at) BETWEEN $2 AND $3
+   ORDER BY wo.created_at DESC;
+Return Format:
+
+json
+{
+  "success": true,
+  "data": [...],
+  "metadata": {
+    "total_unplanned_jobs": number,
+    "total_manhours": number,
+    "avg_time_taken": number,
+    "report_date": ISO string,
+    "date_range": { start, end }
+  }
+}
+FRONTEND UPDATE:
+Location: client/src/pages/reports/MaintenanceReports.tsx
+Update Case: Line ~843 ("unplanned-breakdown-jobs")
+
+Required Changes:
+
+Update onGenerate to call the new API endpoint
+
+Call generateUnplannedBreakdownReport(data, metadata, filters) for PDF
+
+Add onExport for Excel generation
+
+PDF GENERATOR:
+Location: client/src/lib/pdfReportGenerator.ts
+Function Name: generateUnplannedBreakdownReport
+
+Styling: EXACT SAME as generateCriticalEquipmentReport
+
+Header: Blue background (#4472C4), white text, report title
+
+Summary: 4-5 lines showing totals, date range
+
+Table: 11 columns (not 12 - we don't need Work Carried Out in table)
+
+Table Columns (in order):
+
+S.No
+
+WO Number
+
+Comp. Code
+
+Component Name
+
+Job Title
+
+Description (brief_work_description)
+
+Created Date
+
+Completed Date
+
+Performed By
+
+Hours (total_time_taken_hours)
+
+Manhours
+
+Department
+
+EXCEL GENERATOR:
+Same structure as PDF
+Same 11 columns
+Same blue header styling (#4472C4)
+Alternating row colors
+Same summary section
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+WHAT NOT TO DO
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+❌ Do NOT look for fields that don't exist in the schema
+❌ Do NOT add extra columns beyond the 11 specified
+❌ Do NOT try to find "task_type" values - use the ILIKE pattern matching
+❌ Do NOT add complexity - keep it simple like Report 1.5
+❌ Do NOT add breakdown by component - this is work order list, not component-centric
+❌ Do NOT add "Work Carried Out" column in table (too long - only in Excel as separate column if needed)
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+TESTING CHECKLIST
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Before marking complete:
+✅ API returns correct data filtered by unplanned/breakdown
+✅ PDF generates with correct 11-column table
+✅ Excel generates with same structure
+✅ Summary shows correct totals
+✅ Styling matches Report 1.5 exactly
+✅ Date range filter works correctly
+✅ Report downloads with proper filename
+
+PROCEED WITH IMPLEMENTATION NOW.
