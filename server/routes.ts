@@ -12714,13 +12714,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       };
       
-      // Fetch postponement history from dedicated audit table
-      const postponements = await storage.getWorkOrderPostponements(vesselId, {
-        status: status || 'All',
-        dateFrom: dateFrom,
-        dateTo: dateTo
-      });
-      
       // Fetch related data for lookups
       const workOrders = await storage.getWorkOrders(vesselId);
       const components = await storage.getComponents(vesselId);
@@ -12731,6 +12724,44 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Create lookup maps
       const workOrdersMap = new Map(workOrders.map(wo => [wo.id, wo]));
       const componentsByCodeMap = new Map(components.map(comp => [comp.componentCode, comp]));
+      
+      // Try fetching from history table first
+      let postponements = await storage.getWorkOrderPostponements(vesselId, {
+        status: status || 'All',
+        dateFrom: dateFrom,
+        dateTo: dateTo
+      });
+      
+      // Fallback: if no history records, generate from postponed work orders directly
+      if (postponements.length === 0) {
+        const postponedWOs = workOrders.filter(wo => 
+          wo.status === 'Postponed' && 
+          (wo.postponementEndDate || wo.postponementReason)
+        );
+        
+        // Convert work orders to postponement format for consistent processing
+        postponements = postponedWOs.map(wo => ({
+          id: `temp-${wo.id}`,
+          workOrderId: wo.id,
+          vesselId: vesselId,
+          postponementNumber: 1,
+          originalDueDate: wo.dueDate,
+          newDueDate: wo.postponementEndDate,
+          postponementReason: wo.postponementReason,
+          authorizedBy: wo.postponementAuthorizedBy,
+          approvalRemarks: null,
+          durationDays: null,
+          submittedDate: wo.submittedDate,
+          approvedDate: null,
+          approvedBy: null,
+          status: 'Approved',
+          informOffice: false,
+          createdAt: new Date(),
+          updatedAt: new Date()
+        }));
+        
+        console.log(`[POSTPONEMENT LOG REPORT] Fallback: generated ${postponements.length} records from work orders`);
+      }
       
       // Transform postponement records to report format
       const postponedJobs = postponements.map((p: any) => {
@@ -12743,7 +12774,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         if (!durationDays && p.originalDueDate && p.newDueDate) {
           const origDate = new Date(p.originalDueDate);
           const newDate = new Date(p.newDueDate);
-          durationDays = Math.ceil((newDate.getTime() - origDate.getTime()) / (1000 * 60 * 60 * 24));
+          if (!isNaN(origDate.getTime()) && !isNaN(newDate.getTime())) {
+            durationDays = Math.ceil((newDate.getTime() - origDate.getTime()) / (1000 * 60 * 60 * 24));
+          }
         }
         
         return {
