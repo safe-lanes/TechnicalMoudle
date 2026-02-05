@@ -12689,75 +12689,92 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // ═══════════════════════════════════════════════════════════════════════════
-  // JOB POSTPONEMENT LOG EXCEL REPORT
-  // Uses STANDARD 18-column format with Sky Blue highlighting
+  // REPORT 1.7: JOB POSTPONEMENT LOG EXCEL REPORT
+  // Uses work_order_postponements HISTORY/AUDIT table
+  // Custom 19-column format with Sky Blue highlighting for postponed jobs
+  // Tracks all postponements as audit trail with original/new dates, reasons, approvals
   // ═══════════════════════════════════════════════════════════════════════════
   app.post("/technical/api/reports/postponement-log", async (req, res) => {
     try {
-      const { vesselId, dateFrom, dateTo } = req.body;
+      const { vesselId, dateFrom, dateTo, status } = req.body;
       
       if (!vesselId) {
         return res.status(400).json({ error: "Please select a vessel" });
       }
       
-      // Fetch all required data
+      // Date formatting helper for Excel display
+      const formatDateDisplay = (dateVal: string | Date | null | undefined): string => {
+        if (!dateVal) return '-';
+        try {
+          const date = typeof dateVal === 'string' ? new Date(dateVal) : dateVal;
+          if (isNaN(date.getTime())) return '-';
+          return date.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+        } catch {
+          return '-';
+        }
+      };
+      
+      // Fetch postponement history from dedicated audit table
+      const postponements = await storage.getWorkOrderPostponements(vesselId, {
+        status: status || 'All',
+        dateFrom: dateFrom,
+        dateTo: dateTo
+      });
+      
+      // Fetch related data for lookups
       const workOrders = await storage.getWorkOrders(vesselId);
-      const jobs = await storage.getJobs(vesselId);
       const components = await storage.getComponents(vesselId);
       const allVessels = await storage.getVessels();
       const vessel = allVessels.find(v => v.id === vesselId);
       const vesselName = vessel?.name || vesselId;
       
       // Create lookup maps
-      const jobsMap = new Map(jobs.map(job => [job.id, job]));
+      const workOrdersMap = new Map(workOrders.map(wo => [wo.id, wo]));
       const componentsByCodeMap = new Map(components.map(comp => [comp.componentCode, comp]));
       
-      // Filter for postponed jobs
-      const postponedWorkOrders = workOrders.filter(wo => wo.status === 'Postponed');
-      
-      // Optional date range filtering
-      let filteredJobs = postponedWorkOrders;
-      if (dateFrom || dateTo) {
-        filteredJobs = postponedWorkOrders.filter(wo => {
-          const postponedDate = wo.updatedAt;
-          if (!postponedDate) return true;
-          const date = new Date(postponedDate);
-          if (dateFrom && date < new Date(dateFrom)) return false;
-          if (dateTo && date > new Date(dateTo)) return false;
-          return true;
-        });
-      }
-      
-      // Transform to standard format
-      const postponedJobs = filteredJobs.map(wo => {
-        const job = jobsMap.get(wo.jobId || '');
-        const comp = componentsByCodeMap.get(wo.componentCode || '');
-        const isCritical = comp?.criticalEquipment === true || comp?.criticalEquipment === 'Yes';
+      // Transform postponement records to report format
+      const postponedJobs = postponements.map((p: any) => {
+        const wo = workOrdersMap.get(p.workOrderId);
+        const comp = wo?.componentCode ? componentsByCodeMap.get(wo.componentCode) : undefined;
+        const isCritical = (comp as any)?.critical === true;
+        
+        // Calculate duration in days between original and new due date
+        let durationDays = p.durationDays || 0;
+        if (!durationDays && p.originalDueDate && p.newDueDate) {
+          const origDate = new Date(p.originalDueDate);
+          const newDate = new Date(p.newDueDate);
+          durationDays = Math.ceil((newDate.getTime() - origDate.getTime()) / (1000 * 60 * 60 * 24));
+        }
         
         return {
-          workOrderNo: wo.workOrderNumber || wo.id,
-          templateCode: job?.templateCode || '-',
-          jobTitle: wo.title || wo.jobTitle || '-',
-          componentCode: wo.componentCode || '-',
-          componentName: wo.component || wo.componentName || comp?.componentName || '-',
-          department: wo.department || wo.assignedDepartment || '-',
-          priority: wo.priority || '-',
-          woStatus: 'Postponed',
-          originalDueDate: wo.dueDate ? formatDateForExcel(wo.dueDate) : '-',
-          newDueDate: wo.postponedToDate ? formatDateForExcel(wo.postponedToDate) : '-',
-          postponedDate: wo.updatedAt,
-          postponementReason: wo.postponementReason || wo.remarks || '-',
-          assignedTo: wo.assignedTo || '-',
-          maintenanceBasis: job?.maintenanceBasis || 'Calendar',
+          postponementNumber: p.postponementNumber || 1,
+          workOrderNo: wo?.workOrderNo || p.workOrderId,
+          jobTitle: wo?.jobTitle || '-',
+          componentCode: wo?.componentCode || '-',
+          componentName: wo?.component || (comp as any)?.componentName || '-',
+          department: wo?.department || '-',
+          originalDueDate: formatDateDisplay(p.originalDueDate),
+          newDueDate: formatDateDisplay(p.newDueDate),
+          durationDays: durationDays,
+          postponementReason: p.postponementReason || '-',
+          authorizedBy: p.authorizedBy || '-',
+          submittedDate: formatDateDisplay(p.submittedDate),
+          status: p.status || 'Pending',
+          approvedDate: formatDateDisplay(p.approvedDate),
+          approvedBy: p.approvedBy || '-',
+          approvalRemarks: p.approvalRemarks || '-',
+          informOffice: p.informOffice ? 'Yes' : 'No',
           critical: isCritical ? 'Yes' : 'No'
         };
       });
       
-      // Sort by postponed date (most recent first)
-      postponedJobs.sort((a, b) => {
-        const dateA = a.postponedDate ? new Date(a.postponedDate).getTime() : 0;
-        const dateB = b.postponedDate ? new Date(b.postponedDate).getTime() : 0;
-        return dateB - dateA;
+      // Sort by submitted date (most recent first), then by postponement number
+      postponedJobs.sort((a: any, b: any) => {
+        // First sort by work order, then by postponement number (descending)
+        if (a.workOrderNo !== b.workOrderNo) {
+          return a.workOrderNo.localeCompare(b.workOrderNo);
+        }
+        return b.postponementNumber - a.postponementNumber;
       });
       
       // Create workbook
@@ -12766,12 +12783,33 @@ export async function registerRoutes(app: Express): Promise<Server> {
       workbook.created = new Date();
       
       const worksheet = workbook.addWorksheet('Postponement Log', {
-        views: [{ state: 'frozen', ySplit: 7, xSplit: 2 }]
+        views: [{ state: 'frozen', ySplit: 7, xSplit: 3 }]
       });
       
-      // Use STANDARD 18-column definition
-      const columns = STANDARD_WORK_ORDER_COLUMNS;
-      const totalColumns = columns.length;
+      // Custom 19-column definition for Postponement Log Report
+      const postponementColumns: ColumnDef[] = [
+        { key: 'sno', header: 'S.No', width: 6, type: 'number', align: 'center' },
+        { key: 'postponementNo', header: 'Post. #', width: 8, type: 'number', align: 'center' },
+        { key: 'workOrderNo', header: 'WO Number', width: 16, type: 'text', align: 'left' },
+        { key: 'jobTitle', header: 'Job Title', width: 35, type: 'text', align: 'left' },
+        { key: 'componentCode', header: 'Comp. Code', width: 14, type: 'text', align: 'center' },
+        { key: 'componentName', header: 'Component Name', width: 30, type: 'text', align: 'left' },
+        { key: 'department', header: 'Dept', width: 12, type: 'text', align: 'center' },
+        { key: 'originalDueDate', header: 'Original Due', width: 14, type: 'date', align: 'center' },
+        { key: 'newDueDate', header: 'New Due Date', width: 14, type: 'date', align: 'center' },
+        { key: 'durationDays', header: 'Days Extended', width: 12, type: 'number', align: 'center' },
+        { key: 'postponementReason', header: 'Postponement Reason', width: 40, type: 'text', align: 'left' },
+        { key: 'authorizedBy', header: 'Authorized By', width: 18, type: 'text', align: 'left' },
+        { key: 'submittedDate', header: 'Submitted', width: 14, type: 'date', align: 'center' },
+        { key: 'status', header: 'Status', width: 12, type: 'text', align: 'center' },
+        { key: 'approvedDate', header: 'Approved On', width: 14, type: 'date', align: 'center' },
+        { key: 'approvedBy', header: 'Approved By', width: 18, type: 'text', align: 'left' },
+        { key: 'approvalRemarks', header: 'Approval Remarks', width: 30, type: 'text', align: 'left' },
+        { key: 'informOffice', header: 'Office Notified', width: 12, type: 'text', align: 'center' },
+        { key: 'critical', header: 'Critical Equip.', width: 12, type: 'text', align: 'center' }
+      ];
+      
+      const totalColumns = postponementColumns.length;
       const lastColLetter = getLastColumnLetter(totalColumns);
       const headerRowNum = 7;
       const dataStartRow = 8;
@@ -12779,56 +12817,109 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Apply standardized header
       applyStandardHeader(
         worksheet,
-        'JOB POSTPONEMENT LOG',
-        'Audit trail of all postponed jobs',
+        'JOB POSTPONEMENT LOG REPORT',
+        'Audit trail of all postponed jobs with approvals and justifications',
         vesselName,
         postponedJobs.length,
         lastColLetter
       );
       
-      applyStandardTableHeader(worksheet, columns, headerRowNum);
+      applyStandardTableHeader(worksheet, postponementColumns, headerRowNum);
       
-      // Prepare data in standard format with SKY BLUE highlighting
-      const preparedData: WorkOrderRowData[] = postponedJobs.map((job, index) => {
-        const isCritical = job.critical === 'Yes';
-        const isCalendarBased = job.maintenanceBasis === 'Calendar';
-        
-        return {
-          sno: index + 1,
-          workOrderNo: job.workOrderNo,
-          jobCode: job.templateCode || '-',
-          jobTitle: job.jobTitle,
-          componentCode: job.componentCode,
-          componentName: job.componentName,
-          department: job.department,
-          priority: job.priority,
-          status: 'Postponed',
-          dueDate: job.originalDueDate,
-          lastDoneDate: job.newDueDate,  // Using lastDoneDate column for "New Due Date"
-          daysLeft: '-',
-          daysOverdue: '-',
-          nextDueRH: isCalendarBased ? '-' : '-',
-          currentRH: isCalendarBased ? '-' : '-',
-          rhRemaining: isCalendarBased ? '-' : '-',
-          assignedTo: job.assignedTo,
-          criticalEquipment: isCritical ? 'YES' : 'No',
-          _rowStatus: 'postponed' as WorkOrderStatus,
-          isCriticalEquipment: isCritical
-        };
-      });
+      // Prepare data rows
+      const preparedData = postponedJobs.map((job: any, index: number) => ({
+        sno: index + 1,
+        postponementNo: job.postponementNumber,
+        workOrderNo: job.workOrderNo,
+        jobTitle: job.jobTitle,
+        componentCode: job.componentCode,
+        componentName: job.componentName,
+        department: job.department,
+        originalDueDate: job.originalDueDate,
+        newDueDate: job.newDueDate,
+        durationDays: job.durationDays > 0 ? job.durationDays : '-',
+        postponementReason: job.postponementReason,
+        authorizedBy: job.authorizedBy,
+        submittedDate: job.submittedDate,
+        status: job.status,
+        approvedDate: job.approvedDate,
+        approvedBy: job.approvedBy,
+        approvalRemarks: job.approvalRemarks,
+        informOffice: job.informOffice,
+        critical: job.critical
+      }));
       
-      // Apply status-based row highlighting (Sky Blue)
-      applyWorkOrderDataRows(worksheet, preparedData, columns, dataStartRow);
+      // Apply data rows with Sky Blue highlighting for postponed jobs
+      if (preparedData.length === 0) {
+        const emptyRow = worksheet.getRow(dataStartRow);
+        emptyRow.getCell(1).value = 'No postponement records found';
+        worksheet.mergeCells(dataStartRow, 1, dataStartRow, totalColumns);
+        emptyRow.getCell(1).alignment = { horizontal: 'center', vertical: 'middle' };
+        emptyRow.getCell(1).font = { italic: true, color: { argb: COLORS.textLight }, size: 11, name: 'Arial' };
+        emptyRow.height = 30;
+      } else {
+        preparedData.forEach((record: any, index: number) => {
+          const rowNum = dataStartRow + index;
+          const row = worksheet.getRow(rowNum);
+          
+          // Set cell values
+          postponementColumns.forEach((col: ColumnDef, colIdx: number) => {
+            const cellValue = record[col.key];
+            row.getCell(colIdx + 1).value = cellValue !== undefined && cellValue !== null ? cellValue : '-';
+          });
+          
+          row.height = 20;
+          
+          // Apply Sky Blue highlighting for postponed jobs
+          const isEvenRow = index % 2 === 1;
+          const isCritical = record.critical === 'Yes';
+          const bgColor = isCritical ? STATUS_COLORS.postponedDark : (isEvenRow ? STATUS_COLORS.postponedLight : 'FFE0F2F7');
+          const textColor = isCritical ? STATUS_COLORS.textOnDark : STATUS_COLORS.textOnLight;
+          
+          row.eachCell((cell: ExcelJS.Cell, colNumber: number) => {
+            if (colNumber <= totalColumns) {
+              cell.fill = {
+                type: 'pattern',
+                pattern: 'solid',
+                fgColor: { argb: bgColor }
+              };
+              cell.font = { 
+                color: { argb: textColor }, 
+                size: 10, 
+                name: 'Arial',
+                bold: isCritical 
+              };
+              cell.alignment = { 
+                vertical: 'middle', 
+                horizontal: postponementColumns[colNumber - 1]?.align || 'left',
+                wrapText: true 
+              };
+              cell.border = {
+                top: { style: 'thin', color: { argb: COLORS.border } },
+                left: { style: 'thin', color: { argb: COLORS.border } },
+                bottom: { style: 'thin', color: { argb: COLORS.border } },
+                right: { style: 'thin', color: { argb: COLORS.border } }
+              };
+            }
+          });
+        });
+      }
       
       // Summary section
       const lastDataRowNum = dataStartRow + Math.max(postponedJobs.length - 1, 0);
       const summaryStartRow = lastDataRowNum + 3;
       
-      const criticalEquipmentCount = postponedJobs.filter(j => j.critical === 'Yes').length;
+      const criticalCount = postponedJobs.filter((j: any) => j.critical === 'Yes').length;
+      const pendingCount = postponedJobs.filter((j: any) => j.status === 'Pending' || j.status === 'Submitted').length;
+      const approvedCount = postponedJobs.filter((j: any) => j.status === 'Approved').length;
+      const rejectedCount = postponedJobs.filter((j: any) => j.status === 'Rejected').length;
       
       const summary: SummaryItem[] = [
-        { label: 'Total Postponed Jobs:', value: postponedJobs.length },
-        { label: 'Critical Equipment Postponed:', value: criticalEquipmentCount, highlight: true }
+        { label: 'Total Postponement Records:', value: postponedJobs.length },
+        { label: 'Pending Approval:', value: pendingCount },
+        { label: 'Approved:', value: approvedCount },
+        { label: 'Rejected:', value: rejectedCount },
+        { label: 'Critical Equipment Postponed:', value: criticalCount, highlight: true }
       ];
       
       const lastSummaryRow = applyStandardSummary(
@@ -12836,7 +12927,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         summary, 
         summaryStartRow, 
         totalColumns,
-        "NOTE: All postponements require Master's approval and documented justification"
+        "NOTE: All postponements require Master's approval and documented justification. Multiple postponements of the same work order are tracked separately."
       );
       
       worksheet.autoFilter = {
@@ -12849,7 +12940,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const buffer = await workbook.xlsx.writeBuffer();
       const filename = generateFilename('PostponementLog', vesselName);
       
-      console.log(`[POSTPONEMENT LOG REPORT] Generated: ${filename} (${postponedJobs.length} jobs)`);
+      console.log(`[POSTPONEMENT LOG REPORT] Generated: ${filename} (${postponedJobs.length} records)`);
       
       res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
       res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);

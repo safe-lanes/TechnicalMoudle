@@ -899,27 +899,56 @@ const MaintenanceReports: React.FC<MaintenanceReportsProps> = ({ onBack, globalF
         const postponedWOs = vesselWorkOrders.filter((wo: any) => wo.status === 'Postponed');
 
         const columns = [
-          { header: 'WO Number', field: 'workOrderNumber', width: 40 },
-          { header: 'Title', field: 'title', width: 60 },
-          { header: 'Original Due', field: 'originalDue', width: 30 },
-          { header: 'New Due', field: 'newDue', width: 30 },
-          { header: 'Reason', field: 'reason', width: 50 }
+          { header: 'S.No', field: 'sno', width: 12 },
+          { header: 'WO Number', field: 'workOrderNumber', width: 35 },
+          { header: 'Job Title', field: 'title', width: 55 },
+          { header: 'Component', field: 'componentName', width: 45 },
+          { header: 'Dept', field: 'department', width: 20 },
+          { header: 'Original Due', field: 'originalDue', width: 25 },
+          { header: 'New Due', field: 'newDue', width: 25 },
+          { header: 'Days Extended', field: 'daysExtended', width: 22 },
+          { header: 'Reason', field: 'reason', width: 50 },
+          { header: 'Status', field: 'status', width: 22 }
         ];
 
-        const data = postponedWOs.map((wo: any) => ({
-          workOrderNumber: wo.workOrderNumber || wo.id,
-          title: wo.title || wo.jobTitle || '-',
-          originalDue: formatDate(wo.originalDueDate || wo.dueDate),
-          newDue: formatDate(wo.newDueDate || wo.dueDate),
-          reason: wo.postponementReason || '-'
-        }));
+        const data = postponedWOs.map((wo: any, idx: number) => {
+          let daysExtended = '-';
+          const origDateStr = wo.originalDueDate || wo.dueDate;
+          const newDateStr = wo.newDueDate || wo.postponedToDate;
+          if (origDateStr && newDateStr) {
+            const origDate = new Date(origDateStr);
+            const newDate = new Date(newDateStr);
+            if (!isNaN(origDate.getTime()) && !isNaN(newDate.getTime())) {
+              const days = Math.ceil((newDate.getTime() - origDate.getTime()) / (1000 * 60 * 60 * 24));
+              daysExtended = days > 0 ? String(days) : '-';
+            }
+          }
+          
+          return {
+            sno: idx + 1,
+            workOrderNumber: wo.workOrderNo || wo.workOrderNumber || wo.id,
+            title: wo.title || wo.jobTitle || '-',
+            componentName: wo.component || wo.componentName || '-',
+            department: wo.department || wo.assignedDepartment || '-',
+            originalDue: formatDate(wo.originalDueDate || wo.dueDate),
+            newDue: formatDate(wo.newDueDate || wo.postponedToDate || wo.dueDate),
+            daysExtended: daysExtended,
+            reason: wo.postponementReason || wo.remarks || '-',
+            status: 'Postponed'
+          };
+        });
 
         const summary = [
-          { label: 'Total Postponed', value: data.length }
+          { label: 'Total Postponed Jobs', value: data.length }
         ];
 
         pdfReportGenerator.generateReport(
-          { title: 'Job Postponement Log', subtitle: 'Audit trail of postponed jobs', vessel: vesselName },
+          { 
+            title: 'Job Postponement Log Report', 
+            subtitle: 'Audit trail of all postponed jobs with approvals and justifications', 
+            vessel: vesselName,
+            orientation: 'landscape'
+          },
           columns,
           data,
           summary
