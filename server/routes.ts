@@ -13742,6 +13742,551 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // ═══════════════════════════════════════════════════════════════════════════
+  // REPORT 1.8: CREW WORKLOAD DISTRIBUTION
+  // Analysis of task distribution across crew ranks and assignments
+  // Two view modes: summary (aggregated by rank) and detailed (job-level)
+  // ═══════════════════════════════════════════════════════════════════════════
+  app.get("/technical/api/reports/crew-workload-distribution", async (req, res) => {
+    try {
+      const { vesselId, startDate, endDate, rank, department, viewType } = req.query;
+      
+      if (!vesselId) {
+        return res.status(400).json({ error: "Please select a vessel" });
+      }
+
+      const allVessels = await storage.getVessels();
+      const vessel = allVessels.find(v => v.id === vesselId);
+      const vesselName = vessel?.name || String(vesselId);
+      
+      const workOrders = await storage.getWorkOrders(String(vesselId));
+      const components = await storage.getComponents(String(vesselId));
+      const componentsMap = new Map(components.map(c => [c.id, c]));
+      
+      // Parse date helper
+      const parseDate = (dateStr: string | null | undefined): Date | null => {
+        if (!dateStr) return null;
+        try {
+          const d = new Date(dateStr);
+          return isNaN(d.getTime()) ? null : d;
+        } catch {
+          return null;
+        }
+      };
+      
+      const startDateObj = startDate ? new Date(String(startDate)) : null;
+      const endDateObj = endDate ? new Date(String(endDate)) : null;
+      if (startDateObj) startDateObj.setHours(0, 0, 0, 0);
+      if (endDateObj) endDateObj.setHours(23, 59, 59, 999);
+      
+      // Filter work orders
+      let filteredWOs = workOrders.filter((wo: any) => {
+        // Date range filter using createdAt
+        if (startDateObj || endDateObj) {
+          const createdDate = parseDate(wo.createdAt);
+          if (createdDate) {
+            if (startDateObj && createdDate < startDateObj) return false;
+            if (endDateObj && createdDate > endDateObj) return false;
+          }
+        }
+        
+        // Rank filter
+        if (rank && rank !== 'All Ranks' && rank !== 'all') {
+          if (wo.assignedTo !== rank && wo.performedBy !== rank) return false;
+        }
+        
+        // Department filter
+        if (department && department !== 'All' && department !== 'all') {
+          if (wo.department !== department) return false;
+        }
+        
+        return true;
+      });
+      
+      if (viewType === 'detailed') {
+        // Detailed view - job-level details
+        const detailedData = filteredWOs.map((wo: any) => {
+          const comp = componentsMap.get(wo.componentId);
+          const isCritical = wo.criticality === 'Yes' || wo.criticality === 'Critical' || wo.critical === true;
+          const isClassRelated = wo.classRelated === 'Yes' || comp?.classRelated === 'Yes';
+          
+          return {
+            id: wo.id,
+            workOrderNo: wo.workOrderNo || wo.id,
+            jobTitle: wo.jobTitle || '-',
+            componentName: wo.component || comp?.name || '-',
+            componentCode: wo.componentCode || comp?.componentCode || '-',
+            assignedTo: wo.assignedTo || 'Unassigned',
+            performedBy: wo.performedBy || '-',
+            department: wo.department || '-',
+            jobPriority: wo.jobPriority || 'Normal',
+            status: wo.status || '-',
+            taskType: wo.taskType || wo.workOrderType || '-',
+            dueDate: wo.dueDate || null,
+            completionDate: wo.dateCompleted || wo.completionDateTime || null,
+            teamSize: wo.noOfPersonsInTeam ? Number(wo.noOfPersonsInTeam) : null,
+            timeTakenHours: wo.totalTimeHours ? Number(wo.totalTimeHours) : null,
+            manhours: wo.manhours ? Number(wo.manhours) : null,
+            critical: isCritical,
+            classRelated: isClassRelated
+          };
+        });
+        
+        res.json({
+          success: true,
+          data: detailedData,
+          view: 'detailed',
+          vesselName,
+          totalRecords: detailedData.length
+        });
+        
+      } else {
+        // Summary view - aggregated by rank (assignedTo only)
+        const rankStats: Record<string, {
+          rank: string;
+          departments: Set<string>;
+          totalJobsAssigned: number;
+          jobsCompleted: number;
+          jobsPending: number;
+          jobsOverdue: number;
+          criticalJobs: number;
+          highPriorityJobs: number;
+          totalManhours: number;
+          totalTimeTaken: number;
+          jobsWithTime: number;
+        }> = {};
+        
+        const now = new Date();
+        
+        filteredWOs.forEach((wo: any) => {
+          const assignee = wo.assignedTo || 'Unassigned';
+          const dept = wo.department || 'N/A';
+          
+          if (!rankStats[assignee]) {
+            rankStats[assignee] = {
+              rank: assignee,
+              departments: new Set(),
+              totalJobsAssigned: 0,
+              jobsCompleted: 0,
+              jobsPending: 0,
+              jobsOverdue: 0,
+              criticalJobs: 0,
+              highPriorityJobs: 0,
+              totalManhours: 0,
+              totalTimeTaken: 0,
+              jobsWithTime: 0
+            };
+          }
+          
+          rankStats[assignee].departments.add(dept);
+          const stats = rankStats[assignee];
+          stats.totalJobsAssigned++;
+          
+          if (wo.status === 'Completed') {
+            stats.jobsCompleted++;
+          } else if (wo.status === 'Overdue' || (wo.dueDate && parseDate(wo.dueDate)! < now && wo.status !== 'Completed')) {
+            stats.jobsOverdue++;
+          } else if (['Planned', 'Active', 'In Progress'].includes(wo.status)) {
+            stats.jobsPending++;
+          }
+          
+          if (wo.criticality === 'Yes' || wo.criticality === 'Critical' || wo.critical === true) {
+            stats.criticalJobs++;
+          }
+          
+          if (wo.jobPriority === 'High') {
+            stats.highPriorityJobs++;
+          }
+          
+          if (wo.manhours) {
+            stats.totalManhours += Number(wo.manhours) || 0;
+          }
+          
+          if (wo.totalTimeHours) {
+            stats.totalTimeTaken += Number(wo.totalTimeHours) || 0;
+            stats.jobsWithTime++;
+          }
+        });
+        
+        // Calculate totals for workload percentage
+        const totalManhours = Object.values(rankStats).reduce((sum, s) => sum + s.totalManhours, 0);
+        
+        const summaryData = Object.values(rankStats).map(stats => ({
+          rank: stats.rank,
+          department: Array.from(stats.departments).join(', '),
+          totalJobsAssigned: stats.totalJobsAssigned,
+          jobsCompleted: stats.jobsCompleted,
+          jobsPending: stats.jobsPending,
+          jobsOverdue: stats.jobsOverdue,
+          criticalJobs: stats.criticalJobs,
+          highPriorityJobs: stats.highPriorityJobs,
+          totalManhours: Math.round(stats.totalManhours * 100) / 100,
+          avgTimePerJob: stats.jobsWithTime > 0 
+            ? Math.round((stats.totalTimeTaken / stats.jobsWithTime) * 100) / 100 
+            : 0,
+          completionRate: stats.totalJobsAssigned > 0 
+            ? Math.round((stats.jobsCompleted / stats.totalJobsAssigned) * 100 * 100) / 100 
+            : 0,
+          workloadPercentage: totalManhours > 0 
+            ? Math.round((stats.totalManhours / totalManhours) * 100 * 100) / 100 
+            : 0
+        }));
+        
+        // Sort by total manhours descending
+        summaryData.sort((a, b) => b.totalManhours - a.totalManhours);
+        
+        res.json({
+          success: true,
+          data: summaryData,
+          view: 'summary',
+          vesselName,
+          totalRecords: summaryData.length,
+          totalManhours: Math.round(totalManhours * 100) / 100
+        });
+      }
+      
+    } catch (error: any) {
+      console.error("Error fetching crew workload distribution:", error);
+      res.status(500).json({ error: "Failed to fetch crew workload distribution: " + error.message });
+    }
+  });
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // REPORT 1.8: CREW WORKLOAD DISTRIBUTION - EXCEL EXPORT
+  // Professional Excel export with both summary and detailed views
+  // ═══════════════════════════════════════════════════════════════════════════
+  app.post("/technical/api/reports/crew-workload-distribution/excel", async (req, res) => {
+    try {
+      const { vesselId, startDate, endDate, rank, department, viewType = 'summary' } = req.body;
+      
+      if (!vesselId) {
+        return res.status(400).json({ error: "Please select a vessel" });
+      }
+
+      const allVessels = await storage.getVessels();
+      const vessel = allVessels.find(v => v.id === vesselId);
+      const vesselName = vessel?.name || vesselId;
+      
+      const workOrders = await storage.getWorkOrders(vesselId);
+      const components = await storage.getComponents(vesselId);
+      const componentsMap = new Map(components.map(c => [c.id, c]));
+      
+      // Parse date helper
+      const parseDate = (dateStr: string | null | undefined): Date | null => {
+        if (!dateStr) return null;
+        try {
+          const d = new Date(dateStr);
+          return isNaN(d.getTime()) ? null : d;
+        } catch {
+          return null;
+        }
+      };
+      
+      const formatDateDisplay = (dateVal: string | Date | null | undefined): string => {
+        if (!dateVal) return '-';
+        try {
+          const dateStr = dateVal instanceof Date ? dateVal.toISOString() : String(dateVal);
+          const d = new Date(dateStr);
+          if (isNaN(d.getTime())) return '-';
+          const day = d.getDate().toString().padStart(2, '0');
+          const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+          return `${day}-${months[d.getMonth()]}-${d.getFullYear()}`;
+        } catch {
+          return '-';
+        }
+      };
+      
+      const startDateObj = startDate ? new Date(startDate) : null;
+      const endDateObj = endDate ? new Date(endDate) : null;
+      if (startDateObj) startDateObj.setHours(0, 0, 0, 0);
+      if (endDateObj) endDateObj.setHours(23, 59, 59, 999);
+      
+      // Filter work orders
+      let filteredWOs = workOrders.filter((wo: any) => {
+        if (startDateObj || endDateObj) {
+          const createdDate = parseDate(wo.createdAt);
+          if (createdDate) {
+            if (startDateObj && createdDate < startDateObj) return false;
+            if (endDateObj && createdDate > endDateObj) return false;
+          }
+        }
+        
+        if (rank && rank !== 'All Ranks' && rank !== 'all') {
+          if (wo.assignedTo !== rank && wo.performedBy !== rank) return false;
+        }
+        
+        if (department && department !== 'All' && department !== 'all') {
+          if (wo.department !== department) return false;
+        }
+        
+        return true;
+      });
+      
+      // Create Excel workbook
+      const workbook = new ExcelJS.Workbook();
+      workbook.creator = 'PMS System';
+      workbook.created = new Date();
+      
+      const isDetailedView = viewType === 'detailed';
+      const sheetName = isDetailedView ? 'Crew Workload Detailed' : 'Crew Workload Summary';
+      const worksheet = workbook.addWorksheet(sheetName, {
+        views: [{ state: 'frozen', ySplit: 7, xSplit: 0 }]
+      });
+      
+      const periodStr = startDate && endDate 
+        ? `${formatDateDisplay(startDate)} to ${formatDateDisplay(endDate)}`
+        : 'All Time';
+      
+      if (isDetailedView) {
+        // Detailed view columns (18 columns - landscape)
+        const columns: ColumnDef[] = [
+          { key: 'sNo', header: 'S.No', width: 6, type: 'number', align: 'center' },
+          { key: 'workOrderNo', header: 'Work Order No', width: 16, type: 'text' },
+          { key: 'componentCode', header: 'Comp Code', width: 12, type: 'text' },
+          { key: 'componentName', header: 'Component Name', width: 25, type: 'text' },
+          { key: 'jobTitle', header: 'Job Title', width: 30, type: 'text' },
+          { key: 'assignedTo', header: 'Assigned To', width: 15, type: 'text' },
+          { key: 'performedBy', header: 'Performed By', width: 15, type: 'text' },
+          { key: 'department', header: 'Dept', width: 10, type: 'text', align: 'center' },
+          { key: 'taskType', header: 'Task Type', width: 12, type: 'text' },
+          { key: 'teamSize', header: 'Team Size', width: 10, type: 'number', align: 'center' },
+          { key: 'timeTakenHours', header: 'Time (hrs)', width: 10, type: 'number', align: 'right' },
+          { key: 'manhours', header: 'Manhours', width: 10, type: 'number', align: 'right' },
+          { key: 'status', header: 'Status', width: 12, type: 'text', align: 'center' },
+          { key: 'jobPriority', header: 'Priority', width: 10, type: 'text', align: 'center' },
+          { key: 'dueDate', header: 'Due Date', width: 12, type: 'date', align: 'center' },
+          { key: 'completionDate', header: 'Completion Date', width: 12, type: 'date', align: 'center' },
+          { key: 'critical', header: 'Critical', width: 8, type: 'text', align: 'center' },
+          { key: 'classRelated', header: 'Class Related', width: 10, type: 'text', align: 'center' }
+        ];
+        
+        const lastColLetter = getLastColumnLetter(columns.length);
+        
+        // Apply header
+        applyStandardHeader(
+          worksheet,
+          'CREW WORKLOAD DISTRIBUTION REPORT - DETAILED VIEW',
+          `Analysis of task distribution across crew ranks (${periodStr})`,
+          vesselName,
+          filteredWOs.length,
+          lastColLetter
+        );
+        
+        // Apply table header at row 7
+        applyStandardTableHeader(worksheet, columns, 7);
+        
+        // Build data rows
+        const reportData = filteredWOs.map((wo: any, index: number) => {
+          const comp = componentsMap.get(wo.componentId);
+          const isCritical = wo.criticality === 'Yes' || wo.criticality === 'Critical' || wo.critical === true;
+          const isClassRelated = wo.classRelated === 'Yes' || comp?.classRelated === 'Yes';
+          
+          return {
+            sNo: index + 1,
+            workOrderNo: wo.workOrderNo || wo.id || '-',
+            componentCode: wo.componentCode || comp?.componentCode || '-',
+            componentName: wo.component || comp?.name || '-',
+            jobTitle: wo.jobTitle || '-',
+            assignedTo: wo.assignedTo || 'Unassigned',
+            performedBy: wo.performedBy || '-',
+            department: wo.department || '-',
+            taskType: wo.taskType || wo.workOrderType || '-',
+            teamSize: wo.noOfPersonsInTeam ? Number(wo.noOfPersonsInTeam) : '-',
+            timeTakenHours: wo.totalTimeHours ? Number(wo.totalTimeHours).toFixed(1) : '-',
+            manhours: wo.manhours ? Number(wo.manhours).toFixed(1) : '-',
+            status: wo.status || '-',
+            jobPriority: wo.jobPriority || 'Normal',
+            dueDate: formatDateDisplay(wo.dueDate),
+            completionDate: formatDateDisplay(wo.dateCompleted || wo.completionDateTime),
+            critical: isCritical ? 'Yes' : 'No',
+            classRelated: isClassRelated ? 'Yes' : 'No'
+          };
+        });
+        
+        // Apply data rows
+        applyStandardDataRows(worksheet, reportData, columns, 8);
+        
+        // Apply page setup
+        applyStandardPageSetup(worksheet, 7, columns.length, 8 + reportData.length, vesselName);
+        
+        // Set landscape for detailed view
+        worksheet.pageSetup.orientation = 'landscape';
+        
+      } else {
+        // Summary view columns (13 columns - portrait)
+        const columns: ColumnDef[] = [
+          { key: 'sNo', header: 'S.No', width: 6, type: 'number', align: 'center' },
+          { key: 'rank', header: 'Rank', width: 18, type: 'text' },
+          { key: 'department', header: 'Dept', width: 10, type: 'text', align: 'center' },
+          { key: 'totalJobsAssigned', header: 'Total Jobs', width: 10, type: 'number', align: 'center' },
+          { key: 'jobsCompleted', header: 'Completed', width: 10, type: 'number', align: 'center' },
+          { key: 'jobsPending', header: 'Pending', width: 10, type: 'number', align: 'center' },
+          { key: 'jobsOverdue', header: 'Overdue', width: 10, type: 'number', align: 'center' },
+          { key: 'criticalJobs', header: 'Critical', width: 10, type: 'number', align: 'center' },
+          { key: 'highPriorityJobs', header: 'High Priority', width: 10, type: 'number', align: 'center' },
+          { key: 'totalManhours', header: 'Manhours', width: 12, type: 'number', align: 'right' },
+          { key: 'avgTimePerJob', header: 'Avg Time', width: 10, type: 'number', align: 'right' },
+          { key: 'completionRate', header: 'Completion %', width: 12, type: 'number', align: 'right' },
+          { key: 'workloadPercentage', header: 'Workload %', width: 12, type: 'number', align: 'right' }
+        ];
+        
+        const lastColLetter = getLastColumnLetter(columns.length);
+        
+        // Build summary data - aggregated by rank (assignedTo only)
+        const now = new Date();
+        const rankStats: Record<string, {
+          rank: string;
+          departments: Set<string>;
+          totalJobsAssigned: number;
+          jobsCompleted: number;
+          jobsPending: number;
+          jobsOverdue: number;
+          criticalJobs: number;
+          highPriorityJobs: number;
+          totalManhours: number;
+          totalTimeTaken: number;
+          jobsWithTime: number;
+        }> = {};
+        
+        filteredWOs.forEach((wo: any) => {
+          const assignee = wo.assignedTo || 'Unassigned';
+          const dept = wo.department || 'N/A';
+          
+          if (!rankStats[assignee]) {
+            rankStats[assignee] = {
+              rank: assignee,
+              departments: new Set(),
+              totalJobsAssigned: 0,
+              jobsCompleted: 0,
+              jobsPending: 0,
+              jobsOverdue: 0,
+              criticalJobs: 0,
+              highPriorityJobs: 0,
+              totalManhours: 0,
+              totalTimeTaken: 0,
+              jobsWithTime: 0
+            };
+          }
+          
+          rankStats[assignee].departments.add(dept);
+          const stats = rankStats[assignee];
+          stats.totalJobsAssigned++;
+          
+          if (wo.status === 'Completed') {
+            stats.jobsCompleted++;
+          } else if (wo.status === 'Overdue' || (wo.dueDate && parseDate(wo.dueDate)! < now && wo.status !== 'Completed')) {
+            stats.jobsOverdue++;
+          } else if (['Planned', 'Active', 'In Progress'].includes(wo.status)) {
+            stats.jobsPending++;
+          }
+          
+          if (wo.criticality === 'Yes' || wo.criticality === 'Critical' || wo.critical === true) {
+            stats.criticalJobs++;
+          }
+          
+          if (wo.jobPriority === 'High') {
+            stats.highPriorityJobs++;
+          }
+          
+          if (wo.manhours) {
+            stats.totalManhours += Number(wo.manhours) || 0;
+          }
+          
+          if (wo.totalTimeHours) {
+            stats.totalTimeTaken += Number(wo.totalTimeHours) || 0;
+            stats.jobsWithTime++;
+          }
+        });
+        
+        const totalManhours = Object.values(rankStats).reduce((sum, s) => sum + s.totalManhours, 0);
+        
+        const summaryData = Object.values(rankStats).map((stats, index) => ({
+          sNo: index + 1,
+          rank: stats.rank,
+          department: Array.from(stats.departments).join(', '),
+          totalJobsAssigned: stats.totalJobsAssigned,
+          jobsCompleted: stats.jobsCompleted,
+          jobsPending: stats.jobsPending,
+          jobsOverdue: stats.jobsOverdue,
+          criticalJobs: stats.criticalJobs,
+          highPriorityJobs: stats.highPriorityJobs,
+          totalManhours: stats.totalManhours.toFixed(1),
+          avgTimePerJob: stats.jobsWithTime > 0 
+            ? (stats.totalTimeTaken / stats.jobsWithTime).toFixed(1) 
+            : '0.0',
+          completionRate: stats.totalJobsAssigned > 0 
+            ? ((stats.jobsCompleted / stats.totalJobsAssigned) * 100).toFixed(1) + '%'
+            : '0.0%',
+          workloadPercentage: totalManhours > 0 
+            ? ((stats.totalManhours / totalManhours) * 100).toFixed(1) + '%'
+            : '0.0%'
+        }));
+        
+        // Sort by manhours descending
+        summaryData.sort((a, b) => parseFloat(b.totalManhours) - parseFloat(a.totalManhours));
+        
+        // Re-number after sorting
+        summaryData.forEach((row, idx) => { row.sNo = idx + 1; });
+        
+        // Apply header
+        applyStandardHeader(
+          worksheet,
+          'CREW WORKLOAD DISTRIBUTION REPORT - SUMMARY VIEW',
+          `Analysis of task distribution by rank (${periodStr})`,
+          vesselName,
+          summaryData.length,
+          lastColLetter
+        );
+        
+        // Apply table header at row 7
+        applyStandardTableHeader(worksheet, columns, 7);
+        
+        // Apply data rows
+        applyStandardDataRows(worksheet, summaryData, columns, 8);
+        
+        // Add totals row
+        const totalsRow = 8 + summaryData.length;
+        const totalJobs = Object.values(rankStats).reduce((sum, s) => sum + s.totalJobsAssigned, 0);
+        const totalCompleted = Object.values(rankStats).reduce((sum, s) => sum + s.jobsCompleted, 0);
+        const totalOverdue = Object.values(rankStats).reduce((sum, s) => sum + s.jobsOverdue, 0);
+        
+        worksheet.getCell(`A${totalsRow}`).value = '';
+        worksheet.getCell(`B${totalsRow}`).value = 'TOTALS:';
+        worksheet.getCell(`B${totalsRow}`).font = { bold: true, size: 10 };
+        worksheet.getCell(`D${totalsRow}`).value = totalJobs;
+        worksheet.getCell(`D${totalsRow}`).font = { bold: true };
+        worksheet.getCell(`E${totalsRow}`).value = totalCompleted;
+        worksheet.getCell(`E${totalsRow}`).font = { bold: true };
+        worksheet.getCell(`G${totalsRow}`).value = totalOverdue;
+        worksheet.getCell(`G${totalsRow}`).font = { bold: true, color: { argb: 'FFDC2626' } };
+        worksheet.getCell(`J${totalsRow}`).value = totalManhours.toFixed(1);
+        worksheet.getCell(`J${totalsRow}`).font = { bold: true };
+        
+        // Apply page setup
+        applyStandardPageSetup(worksheet, 7, columns.length, totalsRow, vesselName);
+        
+        // Portrait for summary view
+        worksheet.pageSetup.orientation = 'portrait';
+      }
+      
+      // Generate buffer and send
+      const buffer = await workbook.xlsx.writeBuffer();
+      const dateStr = new Date().toISOString().split('T')[0].replace(/-/g, '');
+      const viewSuffix = isDetailedView ? 'Detailed' : 'Summary';
+      const filename = `Crew_Workload_Distribution_${viewSuffix}_${vesselName.replace(/[^a-z0-9]/gi, '_')}_${dateStr}.xlsx`;
+      
+      console.log(`[CREW WORKLOAD REPORT] Generated: ${filename} (View: ${viewType})`);
+      
+      res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+      res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+      res.send(buffer);
+      
+    } catch (error: any) {
+      console.error("Error generating Crew Workload Distribution Excel report:", error);
+      res.status(500).json({ error: "Failed to generate report: " + error.message });
+    }
+  });
+
   const httpServer = createServer(app);
   
   // Recalculate recurring defects on startup (don't await - let it run in background)

@@ -1031,37 +1031,117 @@ const MaintenanceReports: React.FC<MaintenanceReportsProps> = ({ onBack, globalF
       }
 
       case 'workload-distribution': {
-        const assigneeGroups: Record<string, { count: number; completed: number }> = {};
+        // Enhanced workload distribution with more metrics
+        const rankStats: Record<string, { 
+          count: number; 
+          completed: number; 
+          pending: number;
+          overdue: number;
+          critical: number;
+          highPriority: number;
+          manhours: number;
+          timeTaken: number;
+          jobsWithTime: number;
+          department: string;
+        }> = {};
         
         vesselWorkOrders.forEach((wo: any) => {
-          const assignee = wo.assignee || wo.performedBy || wo.responsibleRank || 'Unassigned';
-          if (!assigneeGroups[assignee]) {
-            assigneeGroups[assignee] = { count: 0, completed: 0 };
+          const assignee = wo.assignedTo || wo.assignee || wo.performedBy || wo.responsibleRank || 'Unassigned';
+          const dept = wo.department || 'N/A';
+          
+          if (!rankStats[assignee]) {
+            rankStats[assignee] = { 
+              count: 0, 
+              completed: 0, 
+              pending: 0,
+              overdue: 0,
+              critical: 0,
+              highPriority: 0,
+              manhours: 0,
+              timeTaken: 0,
+              jobsWithTime: 0,
+              department: dept
+            };
           }
-          assigneeGroups[assignee].count++;
-          if (wo.status === 'Completed') assigneeGroups[assignee].completed++;
+          
+          const stats = rankStats[assignee];
+          stats.count++;
+          
+          if (wo.status === 'Completed') {
+            stats.completed++;
+          } else if (wo.status === 'Overdue' || (wo.dueDate && new Date(wo.dueDate) < now && wo.status !== 'Completed')) {
+            stats.overdue++;
+          } else {
+            stats.pending++;
+          }
+          
+          if (wo.criticality === 'Yes' || wo.criticality === 'Critical' || wo.critical === true) {
+            stats.critical++;
+          }
+          
+          if (wo.jobPriority === 'High') {
+            stats.highPriority++;
+          }
+          
+          if (wo.manhours) {
+            stats.manhours += Number(wo.manhours) || 0;
+          }
+          
+          if (wo.totalTimeHours) {
+            stats.timeTaken += Number(wo.totalTimeHours) || 0;
+            stats.jobsWithTime++;
+          }
         });
 
+        // Calculate total manhours for workload percentage
+        const totalManhours = Object.values(rankStats).reduce((sum, s) => sum + s.manhours, 0);
+
         const columns = [
-          { header: 'Assignee/Rank', field: 'assignee', width: 50 },
-          { header: 'Total Assigned', field: 'total', width: 35 },
-          { header: 'Completed', field: 'completed', width: 35 },
-          { header: 'Pending', field: 'pending', width: 35 },
-          { header: 'Completion %', field: 'completionPercent', width: 35 }
+          { header: 'Rank', field: 'rank', width: 45 },
+          { header: 'Dept', field: 'department', width: 25 },
+          { header: 'Total', field: 'total', width: 22 },
+          { header: 'Done', field: 'completed', width: 22 },
+          { header: 'Pending', field: 'pending', width: 22 },
+          { header: 'Overdue', field: 'overdue', width: 22 },
+          { header: 'Manhours', field: 'manhours', width: 28 },
+          { header: 'Avg Time', field: 'avgTime', width: 25 },
+          { header: 'Rate %', field: 'completionPercent', width: 25 },
+          { header: 'Load %', field: 'workloadPercent', width: 25 }
         ];
 
-        const data = Object.entries(assigneeGroups).map(([assignee, stats]) => ({
-          assignee,
-          total: stats.count,
-          completed: stats.completed,
-          pending: stats.count - stats.completed,
-          completionPercent: stats.count > 0 ? `${Math.round((stats.completed / stats.count) * 100)}%` : '0%'
-        }));
+        const data = Object.entries(rankStats)
+          .map(([rank, stats]) => ({
+            rank,
+            department: stats.department,
+            total: stats.count,
+            completed: stats.completed,
+            pending: stats.pending,
+            overdue: stats.overdue,
+            manhours: stats.manhours.toFixed(1),
+            avgTime: stats.jobsWithTime > 0 ? (stats.timeTaken / stats.jobsWithTime).toFixed(1) : '-',
+            completionPercent: stats.count > 0 ? `${Math.round((stats.completed / stats.count) * 100)}%` : '0%',
+            workloadPercent: totalManhours > 0 ? `${Math.round((stats.manhours / totalManhours) * 100)}%` : '0%'
+          }))
+          .sort((a, b) => parseFloat(b.manhours) - parseFloat(a.manhours)); // Sort by manhours desc
+
+        // Calculate summary stats
+        const totalJobs = Object.values(rankStats).reduce((sum, s) => sum + s.count, 0);
+        const totalCompleted = Object.values(rankStats).reduce((sum, s) => sum + s.completed, 0);
+        const totalOverdue = Object.values(rankStats).reduce((sum, s) => sum + s.overdue, 0);
+        
+        const summary = [
+          { label: 'Total Crew Members', value: Object.keys(rankStats).length },
+          { label: 'Total Jobs', value: totalJobs },
+          { label: 'Total Completed', value: totalCompleted },
+          { label: 'Total Overdue', value: totalOverdue },
+          { label: 'Total Manhours', value: totalManhours.toFixed(1) }
+        ];
 
         pdfReportGenerator.generateReport(
-          { title: 'Crew Workload Distribution', subtitle: 'Task distribution across ranks', vessel: vesselName },
+          { title: 'Crew Workload Distribution', subtitle: 'Task distribution across crew ranks and assignments', vessel: vesselName },
           columns,
-          data
+          data,
+          summary
         );
         break;
       }
@@ -1093,6 +1173,7 @@ const MaintenanceReports: React.FC<MaintenanceReportsProps> = ({ onBack, globalF
       'postponement-log': '/technical/api/reports/postponement-log',
       'monthly-summary': '/technical/api/reports/maintenance/monthly-summary/excel',
       'critical-equipment': '/technical/api/reports/critical-equipment-status/excel',
+      'workload-distribution': '/technical/api/reports/crew-workload-distribution/excel',
     };
 
     const endpoint = reportEndpoints[reportId];
@@ -1107,8 +1188,8 @@ const MaintenanceReports: React.FC<MaintenanceReportsProps> = ({ onBack, globalF
     let requestBody: any = { vesselId: effectiveVesselId };
     
     // Add date range for reports that support it
-    if (reportId === 'monthly-summary' || reportId === 'completed-jobs' || reportId === 'unplanned-jobs') {
-      // Use category filters date range for completed-jobs and unplanned-jobs
+    if (reportId === 'monthly-summary' || reportId === 'completed-jobs' || reportId === 'unplanned-jobs' || reportId === 'workload-distribution') {
+      // Use category filters date range for completed-jobs, unplanned-jobs, and workload-distribution
       const dateFrom = categoryFilters.dateRange?.from;
       const dateTo = categoryFilters.dateRange?.to;
       
@@ -1119,14 +1200,17 @@ const MaintenanceReports: React.FC<MaintenanceReportsProps> = ({ onBack, globalF
         requestBody.dateTo = dateTo.toISOString().split('T')[0];
       }
       
-      // Also support startDate/endDate for monthly-summary and unplanned-jobs
-      if (reportId === 'monthly-summary' || reportId === 'unplanned-jobs') {
+      // Also support startDate/endDate for monthly-summary, unplanned-jobs, and workload-distribution
+      if (reportId === 'monthly-summary' || reportId === 'unplanned-jobs' || reportId === 'workload-distribution') {
         let startDate: Date;
         let endDate: Date;
         
         if (globalFilters?.dateRange?.from && globalFilters?.dateRange?.to) {
           startDate = globalFilters.dateRange.from;
           endDate = globalFilters.dateRange.to;
+        } else if (categoryFilters.dateRange?.from && categoryFilters.dateRange?.to) {
+          startDate = categoryFilters.dateRange.from;
+          endDate = categoryFilters.dateRange.to;
         } else {
           const now = new Date();
           startDate = new Date(now.getFullYear(), now.getMonth(), 1);
@@ -1134,6 +1218,11 @@ const MaintenanceReports: React.FC<MaintenanceReportsProps> = ({ onBack, globalF
         }
         requestBody.startDate = startDate.toISOString().split('T')[0];
         requestBody.endDate = endDate.toISOString().split('T')[0];
+      }
+      
+      // Add viewType for workload-distribution (default to summary view)
+      if (reportId === 'workload-distribution') {
+        requestBody.viewType = 'summary'; // Default to summary view for Excel export
       }
     }
 
