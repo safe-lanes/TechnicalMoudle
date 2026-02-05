@@ -762,22 +762,25 @@ async function generateFleetMasterTemplate(): Promise<Buffer> {
   
   // =====================================================
   // SHEET 4: Fleet_Component (13 columns - EXACT HEADERS)
+  // A: Parent Fleet Equipment Code, B: Fleet Equipment Code, C: Fleet Equipment Name,
+  // D: Component Category, E: Maker Name, F: Maker Code, G: Model, H: Model Code,
+  // I: Location, J: Rating, K: Eqpt / System Department, L: Notes, M: IS Active
   // =====================================================
   const fleetComponentSheet = workbook.addWorksheet('Fleet_Component');
   fleetComponentSheet.columns = [
-    { header: 'Fleet Equipment Code', key: 'fleetEquipmentCode', width: 20 },
-    { header: 'Fleet Equipment Name', key: 'fleetEquipmentName', width: 35 },
     { header: 'Parent Fleet Equipment Code', key: 'parentFleetEquipmentCode', width: 25 },
-    { header: 'SFI System', key: 'sfiSystem', width: 15 },
-    { header: 'Criticality', key: 'criticality', width: 15 },
-    { header: 'Condition Based', key: 'conditionBased', width: 20 },
+    { header: 'Fleet Equipment Code', key: 'fleetEquipmentCode', width: 22 },
+    { header: 'Fleet Equipment Name', key: 'fleetEquipmentName', width: 35 },
+    { header: 'Component Category', key: 'componentCategory', width: 25 },
+    { header: 'Maker Name', key: 'makerName', width: 25 },
+    { header: 'Maker Code', key: 'makerCode', width: 15 },
+    { header: 'Model', key: 'model', width: 20 },
+    { header: 'Model Code', key: 'modelCode', width: 15 },
     { header: 'Location', key: 'location', width: 20 },
     { header: 'Rating', key: 'rating', width: 20 },
-    { header: 'Equipment / System Department', key: 'equipmentDepartment', width: 28 },
+    { header: 'Eqpt / System Department', key: 'eqptSystemDept', width: 25 },
     { header: 'Notes', key: 'notes', width: 40 },
-    { header: 'IS Parent', key: 'isParent', width: 15 },
-    { header: 'IS Active', key: 'isActive', width: 12 },
-    { header: 'Maker Code', key: 'makerCode', width: 15 }
+    { header: 'IS Active', key: 'isActive', width: 12 }
   ];
   
   // Headers only - no sample data
@@ -989,34 +992,11 @@ async function generateFleetMasterTemplate(): Promise<Buffer> {
   // Add Data Validations to sheets
   // =====================================================
   
-  // Fleet_Component validations
+  // Fleet_Component validations - 13 columns: A-M
+  // Column M (13): IS Active - Yes/No dropdown
   for (let row = 2; row <= 1000; row++) {
-    // Critical Yes/No (col 5)
-    fleetComponentSheet.getCell(row, 5).dataValidation = {
-      type: 'list',
-      allowBlank: true,
-      formulae: ["'Master Data'!$G$2:$G$3"]
-    };
-    // Condition Based Yes/No (col 6)
-    fleetComponentSheet.getCell(row, 6).dataValidation = {
-      type: 'list',
-      allowBlank: true,
-      formulae: ["'Master Data'!$G$2:$G$3"]
-    };
-    // Department (col 9)
-    fleetComponentSheet.getCell(row, 9).dataValidation = {
-      type: 'list',
-      allowBlank: true,
-      formulae: ["'Master Data'!$A$2:$A$4"]
-    };
-    // IS Parent Yes/No (col 11)
-    fleetComponentSheet.getCell(row, 11).dataValidation = {
-      type: 'list',
-      allowBlank: true,
-      formulae: ["'Master Data'!$G$2:$G$3"]
-    };
-    // IS Active (col 12)
-    fleetComponentSheet.getCell(row, 12).dataValidation = {
+    // IS Active Yes/No (col 13)
+    fleetComponentSheet.getCell(row, 13).dataValidation = {
       type: 'list',
       allowBlank: true,
       formulae: ["'Master Data'!$G$2:$G$3"]
@@ -1773,8 +1753,8 @@ router.get('/template', async (req, res) => {
     }
   }
   
-  if (!['components', 'spares', 'stores', 'work-orders', 'jobs', 'makers'].includes(type as string)) {
-    return res.status(400).json({ error: 'Invalid template type. Valid types: components, spares, stores, work-orders, jobs, makers, fleet-master-data' });
+  if (!['components', 'spares', 'stores', 'work-orders', 'jobs', 'makers', 'fleet-components'].includes(type as string)) {
+    return res.status(400).json({ error: 'Invalid template type. Valid types: components, spares, stores, work-orders, jobs, makers, fleet-components, fleet-master-data' });
   }
   
   // Default to V001 if no vesselId provided
@@ -2277,7 +2257,8 @@ router.post('/sheets', upload.single('file'), async (req, res) => {
 function getTypeFromSheetName(sheetName: string): string | null {
   const normalizedName = sheetName.toLowerCase().trim();
   
-  // Direct matches
+  // Direct matches - Fleet_Component must come BEFORE generic 'component' check
+  if (normalizedName === 'fleet_component' || normalizedName === 'fleet component') return 'fleet-components';
   if (normalizedName === 'spares' || normalizedName.includes('spare')) return 'spares';
   if (normalizedName === 'components' || normalizedName.includes('component') || normalizedName.includes('machinery')) return 'components';
   if (normalizedName === 'jobs' || normalizedName.includes('job')) return 'jobs';
@@ -2304,7 +2285,7 @@ router.post('/dry-run', upload.single('file'), async (req, res) => {
     
     console.log(`📋 Type determination: requested='${requestedType}', sheetName='${sheetName}', sheetBasedType='${sheetBasedType}', effective='${type}'`);
 
-    if (!['components', 'spares', 'stores', 'work-orders', 'jobs', 'makers'].includes(type)) {
+    if (!['components', 'spares', 'stores', 'work-orders', 'jobs', 'makers', 'fleet-components'].includes(type)) {
       return res.status(400).json({ error: 'Invalid type' });
     }
 
@@ -2696,6 +2677,9 @@ async function validateData(type: string, data: any[], mode: string, vesselId?: 
         break;
       case 'makers':
         primaryField = 'Maker Code';
+        break;
+      case 'fleet-components':
+        primaryField = 'Fleet Equipment Code';
         break;
       default:
         primaryField = 'Component Code';
@@ -3522,6 +3506,109 @@ async function validateData(type: string, data: any[], mode: string, vesselId?: 
         }
       } else {
         normalized['Is Active'] = true; // Default to active
+      }
+    } else if (type === 'fleet-components') {
+      // Validate fleet-components - matches fleet_components database schema
+      // 13 columns: Parent Fleet Equipment Code, Fleet Equipment Code, Fleet Equipment Name,
+      // Component Category, Maker Name, Maker Code, Model, Model Code, Location, Rating,
+      // Eqpt / System Department, Notes, IS Active
+      
+      // Fleet Equipment Code - required and unique
+      const fleetEquipmentCode = row['Fleet Equipment Code'];
+      if (fleetEquipmentCode === undefined || fleetEquipmentCode === null || String(fleetEquipmentCode).trim() === '') {
+        errors.push(`Row ${rowNum}: Fleet Equipment Code is required`);
+      } else {
+        normalized['Fleet Equipment Code'] = String(fleetEquipmentCode).trim();
+      }
+      
+      // Fleet Equipment Name - required
+      const fleetEquipmentName = row['Fleet Equipment Name'];
+      if (fleetEquipmentName === undefined || fleetEquipmentName === null || String(fleetEquipmentName).trim() === '') {
+        errors.push(`Row ${rowNum}: Fleet Equipment Name is required`);
+      } else {
+        normalized['Fleet Equipment Name'] = String(fleetEquipmentName).trim();
+      }
+      
+      // Parent Fleet Equipment Code - optional
+      if (row['Parent Fleet Equipment Code'] !== undefined && row['Parent Fleet Equipment Code'] !== null && String(row['Parent Fleet Equipment Code']).trim() !== '') {
+        normalized['Parent Fleet Equipment Code'] = String(row['Parent Fleet Equipment Code']).trim();
+      } else {
+        normalized['Parent Fleet Equipment Code'] = null;
+      }
+      
+      // Component Category - optional
+      if (row['Component Category'] !== undefined && row['Component Category'] !== null && String(row['Component Category']).trim() !== '') {
+        normalized['Component Category'] = String(row['Component Category']).trim();
+      } else {
+        normalized['Component Category'] = null;
+      }
+      
+      // Maker Name - optional
+      if (row['Maker Name'] !== undefined && row['Maker Name'] !== null && String(row['Maker Name']).trim() !== '') {
+        normalized['Maker Name'] = String(row['Maker Name']).trim();
+      } else {
+        normalized['Maker Name'] = null;
+      }
+      
+      // Maker Code - optional
+      if (row['Maker Code'] !== undefined && row['Maker Code'] !== null && String(row['Maker Code']).trim() !== '') {
+        normalized['Maker Code'] = String(row['Maker Code']).trim();
+      } else {
+        normalized['Maker Code'] = null;
+      }
+      
+      // Model - optional
+      if (row['Model'] !== undefined && row['Model'] !== null && String(row['Model']).trim() !== '') {
+        normalized['Model'] = String(row['Model']).trim();
+      } else {
+        normalized['Model'] = null;
+      }
+      
+      // Model Code - optional
+      if (row['Model Code'] !== undefined && row['Model Code'] !== null && String(row['Model Code']).trim() !== '') {
+        normalized['Model Code'] = String(row['Model Code']).trim();
+      } else {
+        normalized['Model Code'] = null;
+      }
+      
+      // Location - optional
+      if (row['Location'] !== undefined && row['Location'] !== null && String(row['Location']).trim() !== '') {
+        normalized['Location'] = String(row['Location']).trim();
+      } else {
+        normalized['Location'] = null;
+      }
+      
+      // Rating - optional
+      if (row['Rating'] !== undefined && row['Rating'] !== null && String(row['Rating']).trim() !== '') {
+        normalized['Rating'] = String(row['Rating']).trim();
+      } else {
+        normalized['Rating'] = null;
+      }
+      
+      // Eqpt / System Department - optional
+      if (row['Eqpt / System Department'] !== undefined && row['Eqpt / System Department'] !== null && String(row['Eqpt / System Department']).trim() !== '') {
+        normalized['Eqpt / System Department'] = String(row['Eqpt / System Department']).trim();
+      } else {
+        normalized['Eqpt / System Department'] = null;
+      }
+      
+      // Notes - optional
+      if (row['Notes'] !== undefined && row['Notes'] !== null && String(row['Notes']).trim() !== '') {
+        normalized['Notes'] = String(row['Notes']).trim();
+      } else {
+        normalized['Notes'] = null;
+      }
+      
+      // IS Active - optional yes/no (defaults to Yes), case-insensitive parsing
+      if (row['IS Active'] !== undefined && row['IS Active'] !== null && String(row['IS Active']).trim() !== '') {
+        const value = String(row['IS Active']).toLowerCase().trim();
+        if (!['yes', 'no', 'y', 'n', 'true', 'false', '1', '0'].includes(value)) {
+          errors.push(`Row ${rowNum}: IS Active must be Yes or No`);
+        } else {
+          normalized['IS Active'] = ['yes', 'y', 'true', '1'].includes(value);
+        }
+      } else {
+        normalized['IS Active'] = true; // Default to active
       }
     }
 
@@ -5168,6 +5255,143 @@ async function performImport(
     }
     
     console.log(`✅ Makers import complete: ${result.created} created, ${result.updated} updated, ${result.skipped} skipped`);
+  } else if (type === 'fleet-components') {
+    // Import fleet components to fleet_components table
+    console.log(`🚀 Starting fleet-components import: ${data.length} rows, mode: ${mode}`);
+    
+    // Step 1: Prefetch all existing fleet components for duplicate checking
+    const existingFleetComponents = await storage.getFleetComponents();
+    const fleetComponentsByCode = new Map(existingFleetComponents.map(fc => [fc.fleetEquipmentCode, fc]));
+    console.log(`📦 Prefetched ${existingFleetComponents.length} existing fleet components`);
+    
+    // Step 2: Process each row - using validated/normalized data from dry-run
+    for (const row of data) {
+      // Use normalized values from dry-run validation (already trimmed and validated)
+      const fleetEquipmentCode = row['Fleet Equipment Code'];
+      const fleetEquipmentName = row['Fleet Equipment Name'];
+      const parentFleetEquipmentCode = row['Parent Fleet Equipment Code'] || null;
+      const componentCategory = row['Component Category'] || null;
+      const makerName = row['Maker Name'] || null;
+      const makerCode = row['Maker Code'] || null;
+      const model = row['Model'] || null;
+      const modelCode = row['Model Code'] || null;
+      const location = row['Location'] || null;
+      const rating = row['Rating'] || null;
+      const eqptSystemDept = row['Eqpt / System Department'] || null;
+      const notes = row['Notes'] || null;
+      
+      // Parse isActive properly - handle boolean, string, and edge cases
+      let isActive = true; // Default to active
+      if (row['IS Active'] !== undefined && row['IS Active'] !== null) {
+        if (typeof row['IS Active'] === 'boolean') {
+          isActive = row['IS Active'];
+        } else {
+          const value = String(row['IS Active']).toLowerCase().trim();
+          isActive = ['yes', 'y', 'true', '1'].includes(value);
+        }
+      }
+      
+      // Skip rows with missing required fields (should not happen after validation)
+      if (!fleetEquipmentCode || !fleetEquipmentName) {
+        console.warn(`⚠️ Skipping row with missing required fields: code=${fleetEquipmentCode}, name=${fleetEquipmentName}`);
+        result.skipped++;
+        continue;
+      }
+      
+      const existingFleetComponent = fleetComponentsByCode.get(fleetEquipmentCode);
+      
+      if (mode === 'add') {
+        if (existingFleetComponent) {
+          console.log(`⏭️ Skipping existing fleet component: ${fleetEquipmentCode}`);
+          result.skipped++;
+        } else {
+          // Create new fleet component
+          const newFleetComponent = await storage.createFleetComponent({
+            fleetEquipmentCode,
+            fleetEquipmentName,
+            parentFleetEquipmentCode,
+            componentCategory,
+            makerName,
+            makerCode,
+            model,
+            modelCode,
+            location,
+            rating,
+            eqptSystemDept,
+            notes,
+            isActive
+          });
+          fleetComponentsByCode.set(fleetEquipmentCode, newFleetComponent);
+          result.created++;
+          console.log(`✅ Created fleet component: ${fleetEquipmentCode} - ${fleetEquipmentName}`);
+        }
+      } else if (mode === 'update') {
+        if (existingFleetComponent) {
+          // Update existing fleet component
+          await storage.updateFleetComponent(existingFleetComponent.id, {
+            fleetEquipmentName,
+            parentFleetEquipmentCode,
+            componentCategory,
+            makerName,
+            makerCode,
+            model,
+            modelCode,
+            location,
+            rating,
+            eqptSystemDept,
+            notes,
+            isActive
+          });
+          result.updated++;
+          console.log(`🔄 Updated fleet component: ${fleetEquipmentCode} - ${fleetEquipmentName}`);
+        } else {
+          console.log(`⏭️ Skipping non-existent fleet component (update mode): ${fleetEquipmentCode}`);
+          result.skipped++;
+        }
+      } else if (mode === 'upsert') {
+        if (existingFleetComponent) {
+          // Update existing fleet component
+          await storage.updateFleetComponent(existingFleetComponent.id, {
+            fleetEquipmentName,
+            parentFleetEquipmentCode,
+            componentCategory,
+            makerName,
+            makerCode,
+            model,
+            modelCode,
+            location,
+            rating,
+            eqptSystemDept,
+            notes,
+            isActive
+          });
+          result.updated++;
+          console.log(`🔄 Updated fleet component: ${fleetEquipmentCode} - ${fleetEquipmentName}`);
+        } else {
+          // Create new fleet component
+          const newFleetComponent = await storage.createFleetComponent({
+            fleetEquipmentCode,
+            fleetEquipmentName,
+            parentFleetEquipmentCode,
+            componentCategory,
+            makerName,
+            makerCode,
+            model,
+            modelCode,
+            location,
+            rating,
+            eqptSystemDept,
+            notes,
+            isActive
+          });
+          fleetComponentsByCode.set(fleetEquipmentCode, newFleetComponent);
+          result.created++;
+          console.log(`✅ Created fleet component: ${fleetEquipmentCode} - ${fleetEquipmentName}`);
+        }
+      }
+    }
+    
+    console.log(`✅ Fleet components import complete: ${result.created} created, ${result.updated} updated, ${result.skipped} skipped`);
   }
 
   return result;
