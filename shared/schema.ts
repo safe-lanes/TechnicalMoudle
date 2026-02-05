@@ -2608,3 +2608,37 @@ export const insertVesselSurveyDataSchema = createInsertSchema(vesselSurveyData)
 
 export type InsertVesselSurveyData = z.infer<typeof insertVesselSurveyDataSchema>;
 export type VesselSurveyData = typeof vesselSurveyData.$inferSelect;
+
+// Work Order Postponements - History/Audit table to track multiple postponements over time
+export const workOrderPostponements = pgTable("work_order_postponements", {
+  id: text("id").primaryKey(),
+  workOrderId: text("work_order_id").notNull(), // References work_orders.id
+  vesselId: text("vessel_id").notNull(), // References vessels.id
+  postponementNumber: integer("postponement_number").notNull().default(1), // 1st, 2nd, 3rd postponement, etc.
+  originalDueDate: text("original_due_date"), // Original due date before postponement
+  newDueDate: text("new_due_date"), // New due date after postponement
+  postponementReason: text("postponement_reason"), // Reason for postponement
+  authorizedBy: text("authorized_by"), // Who authorized the postponement
+  approvalRemarks: text("approval_remarks"), // Remarks from approver
+  durationDays: integer("duration_days"), // Number of days postponed
+  submittedDate: text("submitted_date"), // When postponement was submitted
+  approvedDate: text("approved_date"), // When postponement was approved
+  approvedBy: text("approved_by"), // Who approved the postponement
+  status: text("status").notNull().default("Pending"), // 'Pending' | 'Approved' | 'Rejected'
+  informOffice: boolean("inform_office").notNull().default(false), // Whether office was informed
+  attachmentPath: text("attachment_path"), // Path to any attached documents
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+}, (table) => ({
+  workOrderIdx: index("idx_postponement_work_order").on(table.workOrderId),
+  vesselIdx: index("idx_postponement_vessel").on(table.vesselId),
+  statusIdx: index("idx_postponement_status").on(table.status),
+}));
+
+export const insertWorkOrderPostponementSchema = createInsertSchema(workOrderPostponements).omit({
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type InsertWorkOrderPostponement = z.infer<typeof insertWorkOrderPostponementSchema>;
+export type WorkOrderPostponement = typeof workOrderPostponements.$inferSelect;
