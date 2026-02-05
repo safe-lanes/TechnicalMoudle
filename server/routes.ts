@@ -14351,7 +14351,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // Get running hours log for the period - query by both vesselId and vesselCode
       const rhLogs = await db.select().from(componentRunningHoursLog)
-        .where(sql`${componentRunningHoursLog.vesselCode} IN (${vesselId}, ${vesselCode})`);
+        .where(sql`${componentRunningHoursLog.vesselCode} = ${vesselCode} OR ${componentRunningHoursLog.vesselCode} = ${vesselId}`);
+      
+      console.log(`[UTILIZATION] Vessel: ${vesselId}, VesselCode: ${vesselCode}, Components: ${rhComponents.length}, RH Logs found: ${rhLogs.length}`);
       
       // Parse dates
       const parseDate = (dateVal: string | Date | null | undefined): Date | null => {
@@ -14385,25 +14387,51 @@ export async function registerRoutes(app: Express): Promise<Server> {
           new Date(log.updatedAt) <= periodEnd
         ).sort((a, b) => new Date(a.updatedAt!).getTime() - new Date(b.updatedAt!).getTime());
         
-        // Calculate period hours from delta accumulation or first/last reading
+        // Get current and baseline running hours
+        const currentHours = Number(component.currentCumulativeRH) || Number(component.runningHours) || 0;
+        const baselineHours = Number(component.runningHours) || 0;
+        
+        // Calculate period hours from delta accumulation or from component data
         let periodHours = 0;
+        let dataSource = 'none';
         
         if (componentLogs.length > 0) {
-          // Sum up all delta changes in the period
+          // Use log data if available - sum up all delta changes in the period
           periodHours = componentLogs.reduce((sum, log) => {
             const delta = Number(log.deltaRh) || 0;
             return sum + Math.max(0, delta); // Only positive deltas (ignore corrections)
           }, 0);
+          dataSource = 'logs';
+        } else if (currentHours > baselineHours) {
+          // No logs - calculate from component data (current - baseline)
+          // This represents total accumulated hours since baseline was set
+          const totalAccumulated = currentHours - baselineHours;
+          
+          // Calculate days since last update to estimate avg daily usage
+          const lastUpdatedDate = component.lastUpdated ? new Date(component.lastUpdated) : null;
+          if (lastUpdatedDate && !isNaN(lastUpdatedDate.getTime())) {
+            // Calculate how many days in the period overlap with when data was updated
+            const effectiveStart = new Date(Math.max(periodStart.getTime(), lastUpdatedDate.getTime() - 30 * 24 * 60 * 60 * 1000));
+            const effectiveEnd = new Date(Math.min(periodEnd.getTime(), lastUpdatedDate.getTime()));
+            const effectiveDays = Math.max(1, Math.ceil((effectiveEnd.getTime() - effectiveStart.getTime()) / (1000 * 60 * 60 * 24)));
+            
+            // Estimate period hours proportionally
+            periodHours = totalAccumulated * Math.min(1, daysInPeriod / 30);
+          } else {
+            // Default: proportional estimate based on total accumulated
+            periodHours = totalAccumulated * Math.min(1, daysInPeriod / 30);
+          }
+          dataSource = 'estimated';
         }
         
-        const currentHours = Number(component.currentCumulativeRH) || Number(component.runningHours) || 0;
         const avgDailyHours = periodHours / daysInPeriod;
         
-        // Determine utilization band
+        // Determine utilization band (adjusted thresholds for equipment)
+        // High: >8 hrs/day (heavy use), Normal: 2-8 hrs/day, Low: <2 hrs/day
         let utilizationBand: 'High' | 'Normal' | 'Low';
-        if (avgDailyHours > 20) {
+        if (avgDailyHours > 8) {
           utilizationBand = 'High';
-        } else if (avgDailyHours >= 10) {
+        } else if (avgDailyHours >= 2) {
           utilizationBand = 'Normal';
         } else {
           utilizationBand = 'Low';
@@ -14426,7 +14454,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
           utilizationBand,
           utilizationPercent: Math.round(utilizationPercent * 10) / 10,
           lastUpdated: component.lastUpdated || null,
-          readingsCount: componentLogs.length
+          readingsCount: componentLogs.length,
+          dataSource
         };
       });
       
@@ -14520,7 +14549,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // Get running hours log for the period - query by both vesselId and vesselCode
       const rhLogs = await db.select().from(componentRunningHoursLog)
-        .where(sql`${componentRunningHoursLog.vesselCode} IN (${vesselId}, ${vesselCode})`);
+        .where(sql`${componentRunningHoursLog.vesselCode} = ${vesselCode} OR ${componentRunningHoursLog.vesselCode} = ${vesselId}`);
+      
+      console.log(`[UTILIZATION EXCEL] Vessel: ${vesselId}, VesselCode: ${vesselCode}, Components: ${rhComponents.length}, RH Logs found: ${rhLogs.length}`);
       
       // Parse dates
       const parseDate = (dateVal: string | Date | null | undefined): Date | null => {
@@ -14567,21 +14598,34 @@ export async function registerRoutes(app: Express): Promise<Server> {
           new Date(log.updatedAt) <= periodEnd
         ).sort((a, b) => new Date(a.updatedAt!).getTime() - new Date(b.updatedAt!).getTime());
         
+        // Get current and baseline running hours
+        const currentHours = Number(component.currentCumulativeRH) || Number(component.runningHours) || 0;
+        const baselineHours = Number(component.runningHours) || 0;
+        
+        // Calculate period hours from delta accumulation or from component data
         let periodHours = 0;
+        let dataSource = 'none';
+        
         if (componentLogs.length > 0) {
           periodHours = componentLogs.reduce((sum, log) => {
             const delta = Number(log.deltaRh) || 0;
             return sum + Math.max(0, delta);
           }, 0);
+          dataSource = 'logs';
+        } else if (currentHours > baselineHours) {
+          // No logs - calculate from component data (current - baseline)
+          const totalAccumulated = currentHours - baselineHours;
+          periodHours = totalAccumulated * Math.min(1, daysInPeriod / 30);
+          dataSource = 'estimated';
         }
         
-        const currentHours = Number(component.currentCumulativeRH) || Number(component.runningHours) || 0;
         const avgDailyHours = periodHours / daysInPeriod;
         
+        // Determine utilization band (adjusted thresholds)
         let utilizationBand: 'High' | 'Normal' | 'Low';
-        if (avgDailyHours > 20) {
+        if (avgDailyHours > 8) {
           utilizationBand = 'High';
-        } else if (avgDailyHours >= 10) {
+        } else if (avgDailyHours >= 2) {
           utilizationBand = 'Normal';
         } else {
           utilizationBand = 'Low';
@@ -14601,7 +14645,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
           utilizationBand,
           utilizationPercent: Math.round(utilizationPercent * 10) / 10,
           lastUpdated: formatDateDisplay(component.lastUpdated),
-          readingsCount: componentLogs.length
+          readingsCount: componentLogs.length,
+          dataSource
         };
       });
       

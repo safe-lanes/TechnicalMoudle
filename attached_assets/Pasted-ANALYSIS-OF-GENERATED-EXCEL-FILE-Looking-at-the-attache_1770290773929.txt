@@ -1,0 +1,396 @@
+ANALYSIS OF GENERATED EXCEL FILE
+Looking at the attached Excel file Equipment_Utilization_Summary_Vessel_4_20260205.xlsx, I can identify several critical issues:
+​
+
+ISSUE 1: All Calculations Show ZERO ❌
+Problem Found:
+
+text
+Current Hrs | Period Hrs | Avg Daily Hrs | Utilization | Util %
+    0       |     0      |      0        |    Low      |   0
+   20       |     0      |      0        |    Low      |   0
+  100       |     0      |      0        |    Low      |   0
+ 4020       |     0      |      0        |    Low      |   0
+Root Cause:
+
+Period Hrs column is always 0
+
+This means the calculation Current Reading - Reading at Start of Period is not working
+
+The report is showing current running hours but not calculating the delta for the selected period
+
+ISSUE 2: Missing Date Range Filter ❌
+Evidence from Excel:
+
+Header shows: Report Date: 05-Feb-2026 11:21
+
+But there's NO mention of the period (e.g., "Last 7 Days", "Last 30 Days", "Custom Range")
+
+Without a start date, the system cannot calculate Period Running Hours
+
+ISSUE 3: Summary Statistics Are Wrong ❌
+Current Summary (from Excel):
+
+text
+Total: 201 equipment
+High: 0
+Normal: 0  
+Low: 201
+Avg Utilization: 0.0%
+This is wrong because:
+
+All equipment show "Low" utilization
+
+But some components have significant running hours (4020, 9520, 6020, etc.)
+
+The system is not calculating utilization bands properly
+
+ISSUE 4: Last Updated Column Shows Mixed Data ⚠️
+Some components show dates (21-Jan-2026, 25-Jan-2026), but many show - (dash), indicating:
+
+Running hours data exists but last_updated timestamp is NULL
+
+Or the query is not fetching the last_updated field properly
+
+CORRECTION PROMPT FOR REPLIT
+Here's the complete correction prompt to fix both Excel calculations and PDF generation:
+
+🔧 CORRECTION REQUIRED: Equipment Utilization Summary Report
+CRITICAL BUGS TO FIX
+BUG 1: Period Running Hours Calculation is ALWAYS ZERO ❌
+Current Behavior:
+
+Excel shows all "Period Hrs" = 0
+
+Excel shows all "Avg Daily Hrs" = 0
+
+Excel shows all utilization = "Low" with 0%
+
+Root Cause:
+The backend is NOT calculating the delta between current reading and reading at start of period.
+
+Fix Required:
+
+javascript
+// CURRENT CODE (BROKEN):
+periodHours: rh.running_hours || 0,  // ❌ This just returns current hours, not delta
+
+// CORRECTED CODE:
+periodHours: (rh.running_hours || 0) - (startPeriodReading || 0),  // ✅ Calculate delta
+Implementation Steps:
+
+Add date range parameters to API:
+
+javascript
+GET /api/reports/equipment-utilization-summary
+Query params:
+  - vessel_id (required)
+  - start_date (required) - format: YYYY-MM-DD
+  - end_date (required) - format: YYYY-MM-DD
+  - category (optional)
+  - department (optional)
+Create historical running hours lookup:
+
+javascript
+// For each component, get TWO readings:
+// 1. Current reading (at end_date)
+// 2. Start period reading (at start_date)
+
+const getHistoricalReading = async (componentId, date) => {
+  // Query running_hours_log or running_hours table
+  const reading = await db.get(
+    `SELECT running_hours 
+     FROM running_hours_log 
+     WHERE component_id = ? 
+       AND date <= ? 
+     ORDER BY date DESC 
+     LIMIT 1`,
+    [componentId, date]
+  );
+  return reading?.running_hours || 0;
+};
+
+// For each component:
+const currentReading = await getHistoricalReading(componentId, endDate);
+const startReading = await getHistoricalReading(componentId, startDate);
+const periodHours = currentReading - startReading;
+const daysInPeriod = (new Date(endDate) - new Date(startDate)) / (1000 * 60 * 60 * 24);
+const avgDailyHours = daysInPeriod > 0 ? periodHours / daysInPeriod : 0;
+Fix utilization band calculation:
+
+javascript
+// CORRECT LOGIC:
+const getUtilizationBand = (avgDailyHours) => {
+  if (avgDailyHours > 20) return 'High';
+  if (avgDailyHours >= 10) return 'Normal';
+  return 'Low';
+};
+
+const getUtilizationPercent = (avgDailyHours, ratedHours = 24) => {
+  return ((avgDailyHours / ratedHours) * 100).toFixed(1);
+};
+BUG 2: PDF Generation Not Working ❌
+Current Behavior:
+
+Clicking "Download PDF" button does nothing
+
+No error shown to user
+
+No PDF file downloaded
+
+Likely Causes:
+
+Missing PDF route:
+
+javascript
+// ADD THIS ROUTE:
+router.get('/equipment-utilization-summary/pdf', async (req, res) => {
+  // Generate PDF using PDFKit or similar
+});
+Missing PDFKit library:
+
+bash
+npm install pdfkit
+Frontend not calling correct endpoint:
+
+javascript
+// CORRECT FRONTEND CODE:
+const handleDownloadPDF = async () => {
+  const params = new URLSearchParams({
+    vessel_id: vesselId,
+    start_date: startDate,
+    end_date: endDate
+  });
+  
+  window.open(
+    `/api/reports/equipment-utilization-summary/pdf?${params}`,
+    '_blank'
+  );
+};
+Fix Implementation:
+
+javascript
+// backend/routes/reports.js
+
+router.get('/equipment-utilization-summary/pdf', async (req, res) => {
+  try {
+    const { vessel_id, start_date, end_date, category, department } = req.query;
+    
+    // Validate required params
+    if (!vessel_id || !start_date || !end_date) {
+      return res.status(400).json({ error: 'Missing required parameters' });
+    }
+    
+    // Get data (same logic as Excel endpoint)
+    const data = await getEquipmentUtilizationData(vessel_id, start_date, end_date, category, department);
+    
+    // Generate PDF
+    const PDFDocument = require('pdfkit');
+    const doc = new PDFDocument({ size: 'A4', layout: 'landscape', margin: 30 });
+    
+    // Set response headers
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename="Equipment_Utilization_Summary_${vessel_id}_${new Date().toISOString().split('T')[0]}.pdf"`);
+    
+    // Pipe PDF to response
+    doc.pipe(res);
+    
+    // Add content
+    doc.fontSize(16).text('EQUIPMENT UTILIZATION SUMMARY REPORT', { align: 'center' });
+    doc.moveDown();
+    doc.fontSize(10).text(`Vessel: ${data.vesselName}`, { continued: true });
+    doc.text(`    Period: ${start_date} to ${end_date}`, { align: 'right' });
+    doc.moveDown();
+    
+    // Create table
+    const tableTop = 120;
+    const colWidths = [40, 80, 150, 80, 80, 70, 70, 70, 70, 80];
+    
+    // Headers with light blue background (#4A90E2)
+    doc.rect(30, tableTop, 770, 25).fill('#4A90E2');
+    doc.fillColor('#FFFFFF').fontSize(9);
+    const headers = ['S.No', 'Code', 'Component Name', 'Category', 'Location', 'Current', 'Period', 'Avg Daily', 'Util', 'Last Updated'];
+    let xPos = 30;
+    headers.forEach((header, i) => {
+      doc.text(header, xPos + 5, tableTop + 8, { width: colWidths[i], align: 'left' });
+      xPos += colWidths[i];
+    });
+    
+    // Data rows with alternating colors
+    let yPos = tableTop + 25;
+    data.components.forEach((row, index) => {
+      // Alternate row background
+      if (index % 2 === 0) {
+        doc.rect(30, yPos, 770, 20).fill('#F5F5F5');
+      } else {
+        doc.rect(30, yPos, 770, 20).fill('#FFFFFF');
+      }
+      
+      // Row data
+      doc.fillColor('#000000').fontSize(8);
+      xPos = 30;
+      const rowData = [
+        index + 1,
+        row.componentCode,
+        row.componentName,
+        row.category,
+        row.location,
+        row.currentHours,
+        row.periodHours.toFixed(1),
+        row.avgDailyHours.toFixed(1),
+        row.utilizationBand,
+        row.lastUpdated || '-'
+      ];
+      
+      rowData.forEach((cell, i) => {
+        doc.text(cell, xPos + 5, yPos + 5, { width: colWidths[i], align: i >= 5 ? 'right' : 'left' });
+        xPos += colWidths[i];
+      });
+      
+      yPos += 20;
+      
+      // Add new page if needed
+      if (yPos > 550) {
+        doc.addPage();
+        yPos = 50;
+      }
+    });
+    
+    // Finalize PDF
+    doc.end();
+    
+  } catch (error) {
+    console.error('PDF generation error:', error);
+    res.status(500).json({ error: 'Failed to generate PDF' });
+  }
+});
+BUG 3: Missing Date Range Picker Integration ⚠️
+Current Behavior:
+
+User cannot select date range
+
+Report shows data but with no period context
+
+Fix Required:
+
+javascript
+// Add date range state in frontend
+const [dateRange, setDateRange] = useState({
+  start: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000), // Default: 7 days ago
+  end: new Date() // Default: today
+});
+
+// When downloading Excel/PDF:
+const params = new URLSearchParams({
+  vessel_id: vesselId,
+  start_date: dateRange.start.toISOString().split('T')[0],
+  end_date: dateRange.end.toISOString().split('T')[0]
+});
+BUG 4: Last Updated Column Shows Dashes ⚠️
+Fix:
+
+javascript
+// Ensure last_updated is fetched and formatted
+lastUpdated: rh.last_updated 
+  ? new Date(rh.last_updated).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })
+  : '-'
+COMPLETE CORRECTED FLOW
+1. Database Query (Backend)
+javascript
+const getEquipmentUtilizationData = async (vesselId, startDate, endDate, category = null, department = null) => {
+  // Step 1: Get all components with RH tracking
+  let query = `
+    SELECT 
+      c.id,
+      c.component_code,
+      c.component_name,
+      c.component_category,
+      c.location,
+      c.department,
+      rh.running_hours AS current_hours,
+      rh.last_updated
+    FROM components c
+    LEFT JOIN running_hours rh ON c.id = rh.component_id
+    WHERE c.vessel_id = ?
+      AND c.is_active = 1
+      AND rh.rh_counter_type != 'Not RH Driven'
+  `;
+  
+  const params = [vesselId];
+  
+  if (category) {
+    query += ` AND c.component_category = ?`;
+    params.push(category);
+  }
+  
+  if (department) {
+    query += ` AND c.department = ?`;
+    params.push(department);
+  }
+  
+  query += ` ORDER BY c.component_code`;
+  
+  const components = await db.all(query, params);
+  
+  // Step 2: Calculate period hours for each component
+  const daysInPeriod = (new Date(endDate) - new Date(startDate)) / (1000 * 60 * 60 * 24);
+  
+  const enrichedComponents = await Promise.all(
+    components.map(async (comp) => {
+      // Get start period reading
+      const startReading = await db.get(
+        `SELECT running_hours 
+         FROM running_hours_log 
+         WHERE component_id = ? AND date <= ?
+         ORDER BY date DESC LIMIT 1`,
+        [comp.id, startDate]
+      );
+      
+      const startHours = startReading?.running_hours || 0;
+      const currentHours = comp.current_hours || 0;
+      const periodHours = currentHours - startHours;
+      const avgDailyHours = daysInPeriod > 0 ? periodHours / daysInPeriod : 0;
+      
+      // Calculate utilization
+      const utilizationBand = 
+        avgDailyHours > 20 ? 'High' :
+        avgDailyHours >= 10 ? 'Normal' : 'Low';
+      
+      const utilizationPercent = ((avgDailyHours / 24) * 100).toFixed(1);
+      
+      return {
+        ...comp,
+        currentHours,
+        periodHours,
+        avgDailyHours: avgDailyHours.toFixed(2),
+        utilizationBand,
+        utilizationPercent,
+        lastUpdated: comp.last_updated || null
+      };
+    })
+  );
+  
+  // Step 3: Calculate summary statistics
+  const summary = {
+    total: enrichedComponents.length,
+    high: enrichedComponents.filter(c => c.utilizationBand === 'High').length,
+    normal: enrichedComponents.filter(c => c.utilizationBand === 'Normal').length,
+    low: enrichedComponents.filter(c => c.utilizationBand === 'Low').length,
+    avgUtilization: (enrichedComponents.reduce((sum, c) => sum + parseFloat(c.utilizationPercent), 0) / enrichedComponents.length).toFixed(1)
+  };
+  
+  return {
+    components: enrichedComponents,
+    summary,
+    vesselName: `Vessel ${vesselId}`,
+    startDate,
+    endDate,
+    daysInPeriod
+  };
+};
+TESTING CHECKLIST
+After implementing fixes, test:
+
+✅ Date range selection works (select last 7 days, last 30 days, custom)
+
+✅ Period Hrs column shows NON-ZERO values
