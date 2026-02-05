@@ -1,0 +1,19 @@
+{
+  "id": "bd42cc1b-3ab3-43b8-b1e8-4731a1eebf12",
+  "type": "fleet-components",
+  "mode": "upsert",
+  "vesselId": "",
+  "userId": 1,
+  "startedAt": "2026-02-05T11:29:55.716Z",
+  "completedAt": "2026-02-05T11:29:55.874Z",
+  "status": "complete",
+  "created": 9,
+  "updated": 0,
+  "skipped": 0,
+  "archived": 0,
+  "originalName": "Fleet_Component Sheet.xlsx",
+  "storedFilePath": "local:/home/runner/workspace/uploads/bulk-imports/fleet-components/1770290995873_Fleet_Component_Sheet.xlsx",
+  "errorReport": null,
+  "jobComponentLinksCreated": 0,
+  "spareComponentLinksCreated": 0
+}
