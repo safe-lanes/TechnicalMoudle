@@ -2718,6 +2718,38 @@ async function validateData(type: string, data: any[], mode: string, vesselId?: 
   const componentCodeOccurrences = new Map<string, number[]>(); // Key: uppercase code, Value: row numbers
   const existingDbComponentCodes = new Set<string>(); // Uppercase codes from database
   
+  // Track duplicate Fleet Equipment Codes (case-insensitive)
+  // Also fetch existing fleet equipment codes from database for validation
+  const fleetEquipmentCodeOccurrences = new Map<string, number[]>(); // Key: uppercase code, Value: row numbers
+  const existingDbFleetEquipmentCodes = new Set<string>(); // Uppercase codes from database
+  
+  if (type === 'fleet-components') {
+    // Fetch existing fleet equipment codes from the database
+    try {
+      const existingFleetComponents = await storage.getFleetComponents();
+      existingFleetComponents.forEach(fc => {
+        if (fc.fleetEquipmentCode) {
+          existingDbFleetEquipmentCodes.add(fc.fleetEquipmentCode.toUpperCase());
+        }
+      });
+      console.log(`📋 Loaded ${existingDbFleetEquipmentCodes.size} existing fleet equipment codes from database`);
+    } catch (err) {
+      console.error(`Failed to fetch existing fleet components:`, err);
+    }
+    
+    // Track occurrences within the uploaded file (case-insensitive)
+    filteredData.forEach((row, index) => {
+      const fleetEquipmentCode = row['Fleet Equipment Code'];
+      if (fleetEquipmentCode) {
+        const code = String(fleetEquipmentCode).trim().toUpperCase(); // Case-insensitive
+        if (!fleetEquipmentCodeOccurrences.has(code)) {
+          fleetEquipmentCodeOccurrences.set(code, []);
+        }
+        fleetEquipmentCodeOccurrences.get(code)!.push(index + 2); // Row number (Excel is 1-indexed + header)
+      }
+    });
+  }
+  
   if (type === 'components') {
     // Fetch existing component codes for the vessel from the database
     if (vesselId) {
@@ -3518,7 +3550,34 @@ async function validateData(type: string, data: any[], mode: string, vesselId?: 
       if (fleetEquipmentCode === undefined || fleetEquipmentCode === null || String(fleetEquipmentCode).trim() === '') {
         errors.push(`Row ${rowNum}: Fleet Equipment Code is required`);
       } else {
-        normalized['Fleet Equipment Code'] = String(fleetEquipmentCode).trim();
+        const codeStr = String(fleetEquipmentCode).trim();
+        normalized['Fleet Equipment Code'] = codeStr;
+        const codeUpperCase = codeStr.toUpperCase();
+        
+        // Check for duplicate Fleet Equipment Codes within the uploaded file (case-insensitive)
+        // Only flag rows that are NOT the first occurrence - the first occurrence is valid
+        const occurrences = fleetEquipmentCodeOccurrences.get(codeUpperCase);
+        if (occurrences && occurrences.length > 1) {
+          const firstOccurrence = occurrences[0];
+          if (rowNum !== firstOccurrence) {
+            // This is a duplicate occurrence (not the first one)
+            errors.push(`Row ${rowNum}: Duplicate Fleet Equipment Code '${codeStr}' - this code already appears in row ${firstOccurrence}. Each Fleet Equipment Code must be unique.`);
+          }
+        }
+        
+        // Check for duplicate Fleet Equipment Codes against existing database records (mode-specific)
+        // 'add' mode: existing code = error (cannot create duplicate)
+        // 'update' mode: missing code = error (must exist to update)
+        // 'upsert' mode: no error (will create or update as needed)
+        if (existingDbFleetEquipmentCodes.has(codeUpperCase)) {
+          if (mode === 'add') {
+            errors.push(`Row ${rowNum}: Fleet Equipment Code '${codeStr}' already exists in database. Use 'Update' or 'Upsert' mode to modify existing records.`);
+          }
+        } else {
+          if (mode === 'update') {
+            errors.push(`Row ${rowNum}: Fleet Equipment Code '${codeStr}' does not exist in database. Use 'Add' or 'Upsert' mode to create new records.`);
+          }
+        }
       }
       
       // Fleet Equipment Name - required
