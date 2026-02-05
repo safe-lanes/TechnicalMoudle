@@ -1,5 +1,6 @@
 
 import { pgTable, text, integer, boolean, timestamp, decimal, index, json, jsonb, numeric, primaryKey, unique, pgEnum } from "drizzle-orm/pg-core";
+import { sql } from "drizzle-orm";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
@@ -1760,23 +1761,31 @@ export type PmsVesselSettings = typeof pmsVesselSettings.$inferSelect;
 // =====================================================
 export const makerList = pgTable("maker_list", {
   id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
-  makerCode: text("maker_code").notNull().unique(), // Unique identifier for maker
-  makerName: text("maker_name").notNull(), // Full manufacturer name
-  address: text("address"), // Manufacturer address
-  addressId: text("address_id"), // Address reference ID
-  contactPerson: text("contact_person"), // Contact person name
-  email: text("email"), // Contact email
-  phone: text("phone"), // Contact phone number
+  makerListUuid: text("maker_list_uuid").default(sql`gen_random_uuid()`),
+  makerCode: text("maker_code").notNull().unique(),
+  makerName: text("maker_name").notNull(),
+  address: text("address"),
+  addressId: text("address_id"),
+  contactPerson: text("contact_person"),
+  email: text("email"),
+  phone: text("phone"),
   isActive: boolean("is_active").notNull().default(true),
+  sortOrder: integer("sort_order").default(0),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  createdByUuid: text("created_by_uuid"),
+  updatedByUuid: text("updated_by_uuid"),
+  isDeleted: boolean("is_deleted").default(false),
+  isSync: boolean("is_sync").default(false),
 }, (table) => ({
   makerCodeIdx: index("idx_maker_list_code").on(table.makerCode),
   makerNameIdx: index("idx_maker_list_name").on(table.makerName),
+  makerListUuidIdx: index("idx_maker_list_uuid").on(table.makerListUuid),
 }));
 
 export const insertMakerListSchema = createInsertSchema(makerList).omit({
   id: true,
+  makerListUuid: true,
   createdAt: true,
   updatedAt: true,
 });
