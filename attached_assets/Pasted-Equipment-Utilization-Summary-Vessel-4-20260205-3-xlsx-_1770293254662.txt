@@ -1,0 +1,242 @@
+Equipment_Utilization_Summary_Vessel_4_20260205-3.xlsx
+Good news! The latest report is MUCH BETTER, but still has the SAME FUNDAMENTAL PROBLEM as version 1. Let me provide a detailed analysis:
+
+📊 WHAT'S IMPROVED
+✅ 1. Data Source Column Added
+The report now shows a "Data Source" column with three categories:
+
+"Actual" - 3 components (with real historical data)
+
+"Estimated" - 88 components (using current hours as estimate)
+
+"No Data" - 110 components (equipment with 0 hours)
+
+This is excellent transparency! Users can now see which data is reliable vs estimated.
+
+✅ 2. Summary Shows Data Source Breakdown
+text
+Summary:
+Total: 201 equipment
+High: 51, Normal: 0, Low: 150
+Avg Utilization: 146.5%
+Data: 3 Actual, 88 Estimated, 110 No Data
+Great addition! This clearly shows the data quality issue.
+
+❌ CRITICAL PROBLEM REMAINS
+THE SAME CORE ISSUE: Period Hrs = Current Hrs for "Estimated" Components
+Components marked as "Estimated" (88 total) show:
+
+text
+Current Hrs = Period Hrs (IDENTICAL VALUES!)
+This is the EXACT SAME PROBLEM as the first report!
+
+Examples:
+
+Row 1: Compressors W/Drive Unit No.02
+
+text
+Current Hrs: 15010
+Period Hrs: 15010  ❌ (Same value!)
+Avg Daily: 500.33  ❌ (15010 ÷ 30)
+Util %: 2084.7%    ❌ (IMPOSSIBLE!)
+Data Source: Estimated
+Row 2-48: ALL Main Engine Components
+
+text
+Current Hrs: 4020
+Period Hrs: 4020   ❌ (Same value!)
+Avg Daily: 134     ❌ (4020 ÷ 30)
+Util %: 558.3%     ❌ (IMPOSSIBLE!)
+Data Source: Estimated
+🔍 DETAILED VERIFICATION
+Category 1: "Actual" Data (3 components) - ✅ CORRECT
+Row 49: ME Cylinder Liners No.01
+
+text
+Current: 9520
+Period: 3520  ✅ (Proper delta)
+Avg Daily: 117.33  ✅
+Util %: 488.9%  ✅ (Shows actual value, not capped)
+Data Source: Actual
+Row 55: ME Cylinder Liners No.02
+
+text
+Current: 6020
+Period: 20  ✅
+Avg Daily: 0.67  ✅
+Util %: 2.8%  ✅
+Data Source: Actual
+Row 56: ME Pistons, Piston Rods No.03
+
+text
+Current: 40
+Period: 20  ✅
+Avg Daily: 0.67  ✅
+Util %: 2.8%  ✅
+Data Source: Actual
+Verdict for "Actual" rows: ✅ PERFECT - These 3 rows have correct calculations!
+
+Category 2: "Estimated" Data (88 components) - ❌ COMPLETELY WRONG
+The "Estimated" logic is using:
+
+javascript
+periodHours = currentHours  // ❌ WRONG!
+This means ALL 88 "Estimated" components show impossible utilization percentages:
+
+High Utilization (>20 hrs/day):
+
+Row 1: 500 hrs/day, 2084% util ❌
+
+Row 2-48: 134 hrs/day, 558% util ❌
+
+Row 50: 67 hrs/day, 280% util ❌
+
+Row 51: 50 hrs/day, 208% util ❌
+
+Low Utilization (<10 hrs/day):
+
+Row 52: 8 hrs/day, 33% util ✅ (reasonable)
+
+Row 53: 3.33 hrs/day, 14% util ✅ (reasonable)
+
+Row 54, 57-91: 0.67 hrs/day, 2.8% util ✅ (reasonable)
+
+Verdict for "Estimated" rows: ❌ WRONG CALCULATION LOGIC
+
+Category 3: "No Data" (110 components) - ✅ CORRECT
+All show:
+
+text
+Current Hrs: 0
+Period Hrs: 0
+Avg Daily: 0
+Util %: 0%
+Data Source: No Data
+Verdict for "No Data" rows: ✅ CORRECT - Properly handles zero-hour equipment
+
+📉 SUMMARY STATISTICS VERIFICATION
+Summary shows:
+
+text
+Total: 201
+High: 51
+Normal: 0
+Low: 150
+Avg Utilization: 146.5%
+Let's verify "Avg Utilization: 146.5%":
+
+This is calculated as:
+
+text
+Sum of all Util % ÷ 201 = 146.5%
+Why is this >100%?
+Because rows 1-51 show utilization percentages ranging from 2.8% to 2084.7%, with many exceeding 100%.
+
+Breakdown:
+
+3 rows with util 200-2084% (Actual data with >20 hrs/day)
+
+48 rows with util 558% (Main Engine components - WRONG estimation)
+
+150 rows with util 0-33% (Low utilization or no data)
+
+Verdict: ❌ 146.5% avg is INVALID - Caused by wrong period hours calculation for "Estimated" data
+
+🚨 THE ROOT CAUSE (STILL UNFIXED)
+The code is doing this for "Estimated" components:
+
+javascript
+// CURRENT WRONG LOGIC:
+if (!startReading) {
+  periodHours = component.running_hours;  // ❌ Using total cumulative hours
+  dataSource = 'Estimated';
+}
+This produces:
+
+Compressor: Period = 15010 hrs in 30 days = 500 hrs/day ❌
+
+Main Engine: Period = 4020 hrs in 30 days = 134 hrs/day ❌
+
+Both are IMPOSSIBLE (max possible is 24 hrs/day × 30 days = 720 hrs total)
+
+✅ WHAT NEEDS TO BE FIXED
+CORRECT Logic for "Estimated" Components:
+Option A: Use Last Updated Date (RECOMMENDED)
+
+javascript
+if (!startReading && component.running_hours > 0) {
+  const lastUpdatedDate = new Date(component.last_updated);
+  const daysAgo = Math.min(30, (today - lastUpdatedDate) / (1000*60*60*24));
+  
+  if (daysAgo > 0 && daysAgo <= 30) {
+    // Estimate: Equipment accumulated current hours over 'daysAgo' days
+    // Extrapolate to 30-day period
+    const avgDailyRate = component.running_hours / daysAgo;
+    periodHours = avgDailyRate * 30;  // Extrapolated to 30 days
+    dataSource = 'Estimated (extrapolated from ' + Math.round(daysAgo) + ' days)';
+  } else {
+    // Last update too old - can't estimate reliably
+    periodHours = 0;
+    dataSource = 'Estimated (insufficient data)';
+  }
+}
+Example for Main Engine (4020 hrs, updated 8 days ago):
+
+text
+Last Updated: 28-Jan-2026 (8 days ago)
+Current Hrs: 4020 total
+Estimated daily rate: 4020 ÷ 8 = 502.5 hrs/day ❌ (STILL WRONG!)
+
+This reveals the REAL problem: 
+The equipment has 4020 TOTAL cumulative hours since installation,
+NOT 4020 hours accumulated in the last 8 days!
+Option B: Cap Estimated Period Hours (PRACTICAL FIX)
+
+javascript
+if (!startReading && component.running_hours > 0) {
+  // For equipment without historical data:
+  // Assume max reasonable utilization (24 hrs/day)
+  const maxPossibleHours = 30 * 24; // 720 hours max in 30 days
+  
+  if (component.running_hours <= maxPossibleHours) {
+    // Current hours fit within 30-day period - use as-is
+    periodHours = component.running_hours;
+  } else {
+    // Current hours exceed 30-day max - cap at reasonable estimate
+    // Assume 80% utilization for continuously running equipment
+    periodHours = maxPossibleHours * 0.8; // 576 hours (~19 hrs/day)
+  }
+  
+  dataSource = 'Estimated (no historical data)';
+}
+This would give:
+
+Compressor (15010 hrs): Period = 576 hrs, Avg = 19.2 hrs/day, Util = 80% ✅
+
+Main Engine (4020 hrs): Period = 576 hrs, Avg = 19.2 hrs/day, Util = 80% ✅
+
+Small equipment (20 hrs): Period = 20 hrs, Avg = 0.67 hrs/day, Util = 2.8% ✅
+
+🎯 FINAL VERDICT
+Report Status: ⚠️ PARTIALLY CORRECT
+What's Working: ✅
+
+3 components with "Actual" data show perfect calculations
+
+110 components with "No Data" are handled correctly
+
+Data Source transparency is excellent
+
+Summary breakdown is helpful
+
+What's Broken: ❌
+
+88 components with "Estimated" data use Current Hrs = Period Hrs
+
+This produces impossible utilization values (>100%, up to 2084%!)
+
+Average utilization of 146.5% is meaningless
+
+Report is misleading for any equipment marked "Estimated"
+
+🔧 FINAL CORRECTION PROMPT FOR REPLIT
