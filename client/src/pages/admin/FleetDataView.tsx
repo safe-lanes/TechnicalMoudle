@@ -226,31 +226,34 @@ function TreeItem({
   return (
     <div>
       <div
-        className={`flex items-center py-2 px-2 cursor-pointer hover:bg-gray-100 ${
-          isSelected ? "bg-blue-100 text-blue-800" : ""
+        className={`flex items-center px-3 py-2 cursor-pointer hover:bg-gray-50 border-b border-gray-100 ${
+          isSelected ? "bg-blue-50" : ""
         }`}
-        style={{ paddingLeft: `${level * 16 + 8}px` }}
-        onClick={() => {
-          if (hasChildren) {
-            onToggle(node.code);
-          }
-          onSelect(node);
-        }}
+        style={{ paddingLeft: `${level * 20 + 12}px` }}
+        onClick={() => onSelect(node)}
         data-testid={`tree-node-${node.code}`}
       >
-        {hasChildren ? (
-          <span className="mr-2">
-            {isExpanded ? (
-              <ChevronDown className="h-4 w-4 text-gray-500" />
+        <button
+          className="mr-2 flex-shrink-0"
+          onClick={(e) => {
+            e.stopPropagation();
+            if (hasChildren) {
+              onToggle(node.code);
+            }
+          }}
+        >
+          {hasChildren ? (
+            isExpanded ? (
+              <ChevronDown className="h-4 w-4 text-gray-600" />
             ) : (
-              <ChevronRight className="h-4 w-4 text-gray-500" />
-            )}
-          </span>
-        ) : (
-          <span className="mr-2 w-4" />
-        )}
-        <span className={`text-sm ${level === 0 ? "font-medium" : ""}`}>
-          {node.code}. {node.name}
+              <ChevronRight className="h-4 w-4 text-gray-600" />
+            )
+          ) : (
+            <ChevronRight className="h-4 w-4 text-gray-400" />
+          )}
+        </button>
+        <span className="text-sm text-gray-700">
+          {node.code} {node.name}
         </span>
       </div>
       {isExpanded &&
