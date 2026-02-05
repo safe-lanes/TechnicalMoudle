@@ -1,7 +1,7 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
-import { getPool } from "./db";
+import { getPool, getDb } from "./db";
 import * as fs from "fs";
 import * as path from "path";
 //shruit work /remote code
@@ -14346,6 +14346,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Get vessel code for querying logs (may be different from vesselId)
       const vesselCode = vessel?.vesselCode || vesselId;
       
+      // Get database instance
+      const db = await getDb();
+      
       // Get running hours log for the period - query by both vesselId and vesselCode
       const rhLogs = await db.select().from(componentRunningHoursLog)
         .where(sql`${componentRunningHoursLog.vesselCode} IN (${vesselId}, ${vesselCode})`);
@@ -14511,6 +14514,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // Get vessel code for querying logs (may be different from vesselId)
       const vesselCode = vessel?.vesselCode || vesselId;
+      
+      // Get database instance
+      const db = await getDb();
       
       // Get running hours log for the period - query by both vesselId and vesselCode
       const rhLogs = await db.select().from(componentRunningHoursLog)
@@ -14746,6 +14752,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const vesselName = vessel?.name || vessel?.vesselName || vesselId;
       const vesselCode = vessel?.vesselCode || vesselId;
       
+      // Get database instance
+      const db = await getDb();
+      
       // Get all running hours log entries for the vessel
       const allLogs = await db.select().from(componentRunningHoursLog)
         .where(sql`${componentRunningHoursLog.vesselCode} IN (${vesselId}, ${vesselCode})`);
@@ -14901,6 +14910,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const vessel = vessels.find(v => v.id === vesselId || v.vesselCode === vesselId);
       const vesselName = vessel?.name || vessel?.vesselName || vesselId;
       const vesselCode = vessel?.vesselCode || vesselId;
+      
+      // Get database instance
+      const db = await getDb();
       
       // Get all running hours log entries for the vessel
       const allLogs = await db.select().from(componentRunningHoursLog)
