@@ -1,0 +1,373 @@
+JOB POSTPONEMENT LOG REPORT (Report 1.7)
+TASK: Implement Job Postponement Log Report with PDF and Excel Export
+DO NOT CHANGE ANY EXISTING CODE. Only add new functionality for this report.
+
+1. DATABASE REQUIREMENTS
+Check if work_order_postponements table exists. If not, create it:
+
+sql
+CREATE TABLE IF NOT EXISTS work_order_postponements (
+  id TEXT PRIMARY KEY,
+  work_order_id TEXT NOT NULL,
+  original_due_date TEXT,
+  new_due_date TEXT,
+  postponement_reason TEXT,
+  authorized_by TEXT,
+  approval_remarks TEXT,
+  duration_days INTEGER,
+  submitted_date TEXT,
+  approved_date TEXT,
+  approved_by TEXT,
+  status TEXT DEFAULT 'Pending', -- Pending, Approved, Rejected
+  inform_office BOOLEAN DEFAULT 0,
+  attachment_path TEXT,
+  created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+  vessel_id TEXT,
+  FOREIGN KEY (work_order_id) REFERENCES work_orders(id),
+  FOREIGN KEY (vessel_id) REFERENCES vessels(id)
+);
+2. BACKEND API ENDPOINTS
+File: server/routes/reports.js (or appropriate routes file)
+
+Add new endpoint:
+
+javascript
+// GET /api/reports/job-postponement-log
+router.get('/job-postponement-log', async (req, res) => {
+  try {
+    const { vessel_id, start_date, end_date, status } = req.query;
+    
+    let query = `
+      SELECT 
+        p.id,
+        p.work_order_id,
+        wo.work_order_no,
+        wo.job_title,
+        c.component_name,
+        c.component_code,
+        wo.department,
+        wo.job_priority,
+        wo.class_related,
+        wo.critical,
+        p.original_due_date,
+        p.new_due_date,
+        p.duration_days,
+        p.postponement_reason,
+        p.authorized_by,
+        p.approval_remarks,
+        p.submitted_date,
+        p.approved_date,
+        p.approved_by,
+        p.status,
+        p.inform_office,
+        wo.assigned_to,
+        (SELECT COUNT(*) FROM work_order_postponements 
+         WHERE work_order_id = p.work_order_id) as postponement_count
+      FROM work_order_postponements p
+      LEFT JOIN work_orders wo ON p.work_order_id = wo.id
+      LEFT JOIN components c ON wo.component_id = c.id
+      WHERE p.vessel_id = ?
+    `;
+    
+    const params = [vessel_id];
+    
+    if (start_date) {
+      query += ` AND p.submitted_date >= ?`;
+      params.push(start_date);
+    }
+    
+    if (end_date) {
+      query += ` AND p.submitted_date <= ?`;
+      params.push(end_date);
+    }
+    
+    if (status && status !== 'All') {
+      query += ` AND p.status = ?`;
+      params.push(status);
+    }
+    
+    query += ` ORDER BY p.submitted_date DESC`;
+    
+    const postponements = db.prepare(query).all(...params);
+    
+    res.json({ success: true, data: postponements });
+  } catch (error) {
+    console.error('Error fetching job postponement log:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+3. PDF GENERATION
+File: server/utils/pdfGenerator.js (or create new file server/reports/jobPostponementLogPDF.js)
+
+Add function matching the professional format of previous reports:
+
+javascript
+async function generateJobPostponementLogPDF(data, filters) {
+  const doc = new PDFDocument({ margin: 30, size: 'A4', layout: 'landscape' });
+  const chunks = [];
+  
+  doc.on('data', chunk => chunks.push(chunk));
+  
+  // Header
+  doc.fontSize(18).font('Helvetica-Bold').text('JOB POSTPONEMENT LOG', { align: 'center' });
+  doc.moveDown(0.5);
+  doc.fontSize(10).font('Helvetica').text(`Vessel: ${filters.vessel_name || 'All Vessels'}`, { align: 'center' });
+  doc.text(`Period: ${filters.start_date || 'All'} to ${filters.end_date || 'All'}`, { align: 'center' });
+  doc.text(`Status: ${filters.status || 'All'}`, { align: 'center' });
+  doc.text(`Generated: ${new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })}`, { align: 'center' });
+  doc.moveDown(1);
+  
+  // Table headers
+  const headers = [
+    'S.No',
+    'Work Order No',
+    'Component',
+    'Job Title',
+    'Original Due',
+    'New Due',
+    'Days Postponed',
+    'Reason',
+    'Authorized By',
+    'Status',
+    'Submitted Date',
+    'Count'
+  ];
+  
+  const colWidths = [30, 80, 80, 80, 60, 60, 50, 100, 70, 60, 60, 40];
+  let xPos = 30;
+  const yStart = doc.y;
+  
+  // Draw header row with light blue background
+  doc.rect(30, yStart, 770, 20).fillAndStroke('#4A90E2', '#000');
+  doc.fillColor('#FFF').fontSize(8).font('Helvetica-Bold');
+  
+  headers.forEach((header, i) => {
+    doc.text(header, xPos + 2, yStart + 5, { width: colWidths[i], align: 'center' });
+    xPos += colWidths[i];
+  });
+  
+  doc.moveDown(1.5);
+  
+  // Table rows
+  doc.font('Helvetica').fontSize(7).fillColor('#000');
+  
+  data.forEach((row, index) => {
+    const yPos = doc.y;
+    
+    // Alternate row colors
+    if (index % 2 === 0) {
+      doc.rect(30, yPos, 770, 18).fill('#F5F5F5');
+    }
+    
+    xPos = 30;
+    const rowData = [
+      (index + 1).toString(),
+      row.work_order_no || 'N/A',
+      row.component_name || 'N/A',
+      row.job_title || 'N/A',
+      row.original_due_date ? new Date(row.original_due_date).toLocaleDateString('en-GB') : 'N/A',
+      row.new_due_date ? new Date(row.new_due_date).toLocaleDateString('en-GB') : 'N/A',
+      row.duration_days || 'N/A',
+      row.postponement_reason?.substring(0, 30) || 'N/A',
+      row.authorized_by || 'N/A',
+      row.status || 'Pending',
+      row.submitted_date ? new Date(row.submitted_date).toLocaleDateString('en-GB') : 'N/A',
+      row.postponement_count || '1'
+    ];
+    
+    rowData.forEach((cell, i) => {
+      doc.fillColor('#000').text(cell, xPos + 2, yPos + 4, { 
+        width: colWidths[i] - 4, 
+        align: i === 0 ? 'center' : 'left',
+        ellipsis: true
+      });
+      xPos += colWidths[i];
+    });
+    
+    doc.moveDown(1.2);
+    
+    // Page break check
+    if (doc.y > 500) {
+      doc.addPage({ margin: 30, size: 'A4', layout: 'landscape' });
+      doc.moveDown(1);
+    }
+  });
+  
+  // Footer
+  doc.fontSize(8).fillColor('#666').text(
+    `Total Postponements: ${data.length}`,
+    30,
+    doc.page.height - 40,
+    { align: 'left' }
+  );
+  
+  doc.end();
+  
+  return new Promise((resolve) => {
+    doc.on('end', () => resolve(Buffer.concat(chunks)));
+  });
+}
+Add PDF route:
+
+javascript
+router.get('/job-postponement-log/pdf', async (req, res) => {
+  try {
+    const data = await fetchPostponementData(req.query);
+    const pdfBuffer = await generateJobPostponementLogPDF(data, req.query);
+    
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', 'attachment; filename=Job_Postponement_Log.pdf');
+    res.send(pdfBuffer);
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+4. EXCEL GENERATION
+File: server/utils/excelGenerator.js
+
+javascript
+async function generateJobPostponementLogExcel(data, filters) {
+  const workbook = new ExcelJS.Workbook();
+  const worksheet = workbook.addWorksheet('Job Postponement Log');
+  
+  // Title
+  worksheet.mergeCells('A1:L1');
+  worksheet.getCell('A1').value = 'JOB POSTPONEMENT LOG';
+  worksheet.getCell('A1').font = { size: 16, bold: true };
+  worksheet.getCell('A1').alignment = { horizontal: 'center' };
+  
+  // Filter info
+  worksheet.mergeCells('A2:L2');
+  worksheet.getCell('A2').value = `Vessel: ${filters.vessel_name || 'All'} | Period: ${filters.start_date || 'All'} to ${filters.end_date || 'All'} | Status: ${filters.status || 'All'}`;
+  worksheet.getCell('A2').alignment = { horizontal: 'center' };
+  
+  worksheet.addRow([]);
+  
+  // Headers
+  const headerRow = worksheet.addRow([
+    'S.No',
+    'Work Order No',
+    'Component Code',
+    'Component Name',
+    'Job Title',
+    'Original Due Date',
+    'New Due Date',
+    'Days Postponed',
+    'Reason for Postponement',
+    'Authorized By',
+    'Status',
+    'Submitted Date',
+    'Approved Date',
+    'Approved By',
+    'Postponement Count',
+    'Department',
+    'Priority',
+    'Critical',
+    'Class Related'
+  ]);
+  
+  headerRow.font = { bold: true };
+  headerRow.fill = {
+    type: 'pattern',
+    pattern: 'solid',
+    fgColor: { argb: 'FF4A90E2' }
+  };
+  headerRow.font = { color: { argb: 'FFFFFFFF' }, bold: true };
+  headerRow.alignment = { horizontal: 'center', vertical: 'middle' };
+  
+  // Data rows
+  data.forEach((row, index) => {
+    worksheet.addRow([
+      index + 1,
+      row.work_order_no,
+      row.component_code,
+      row.component_name,
+      row.job_title,
+      row.original_due_date ? new Date(row.original_due_date).toLocaleDateString('en-GB') : '',
+      row.new_due_date ? new Date(row.new_due_date).toLocaleDateString('en-GB') : '',
+      row.duration_days,
+      row.postponement_reason,
+      row.authorized_by,
+      row.status,
+      row.submitted_date ? new Date(row.submitted_date).toLocaleDateString('en-GB') : '',
+      row.approved_date ? new Date(row.approved_date).toLocaleDateString('en-GB') : '',
+      row.approved_by,
+      row.postponement_count,
+      row.department,
+      row.job_priority,
+      row.critical ? 'Yes' : 'No',
+      row.class_related ? 'Yes' : 'No'
+    ]);
+  });
+  
+  // Auto-fit columns
+  worksheet.columns.forEach(column => {
+    column.width = 15;
+  });
+  
+  // Borders
+  worksheet.eachRow((row, rowNumber) => {
+    if (rowNumber > 3) {
+      row.eachCell(cell => {
+        cell.border = {
+          top: { style: 'thin' },
+          left: { style: 'thin' },
+          bottom: { style: 'thin' },
+          right: { style: 'thin' }
+        };
+      });
+    }
+  });
+  
+  return await workbook.xlsx.writeBuffer();
+}
+Add Excel route:
+
+javascript
+router.get('/job-postponement-log/excel', async (req, res) => {
+  try {
+    const data = await fetchPostponementData(req.query);
+    const excelBuffer = await generateJobPostponementLogExcel(data, req.query);
+    
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.setHeader('Content-Disposition', 'attachment; filename=Job_Postponement_Log.xlsx');
+    res.send(excelBuffer);
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+5. FRONTEND IMPLEMENTATION
+Add to Reports page UI (same format as previous reports):
+
+jsx
+// In the reports list, add:
+{
+  id: '1.7',
+  title: 'Job Postponement Log',
+  description: 'Track all work order postponements with reasons and approval status',
+  filters: [
+    { type: 'date-range', label: 'Period' },
+    { type: 'dropdown', label: 'Status', options: ['All', 'Pending', 'Approved', 'Rejected'] }
+  ],
+  endpoint: '/api/reports/job-postponement-log'
+}
+KEY REQUIREMENTS:
+✅ Use ONLY fields that exist in the PMS database
+
+✅ Match the professional PDF/Excel format of previously created reports (Critical Equipment Status, Unplanned Jobs)
+
+✅ Use light blue header (#4A90E2) with white text
+
+✅ Alternate row colors in PDF (#F5F5F5)
+
+✅ Landscape orientation for PDF
+
+✅ Auto-fit columns in Excel
+
+✅ Show postponement count per work order
+
+✅ Include date filters and status filters
+
+✅ DO NOT invent fields - use only: work_order_no, component_name, component_code, job_title, original_due_date, new_due_date, duration_days, postponement_reason, authorized_by, status, submitted_date, approved_date, approved_by, postponement_count, department, job_priority, critical, class_related
+
+✅ Ensure query uses correct table joins (work_order_postponements → work_orders → components)
