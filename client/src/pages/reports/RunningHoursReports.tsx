@@ -145,66 +145,126 @@ const RunningHoursReports: React.FC<RunningHoursReportsProps> = ({ onBack, globa
   const generateRunningHoursPDF = async (reportId: string) => {
     const vesselName = vessels.find(v => v.id === effectiveVesselId)?.name || effectiveVesselId || 'All Vessels';
 
-    const componentsWithRH = components.filter((c: any) => 
-      c.runningHours !== undefined && c.runningHours !== null
-    );
-
     switch (reportId) {
       case 'rh-utilization-summary': {
+        // Fetch from API
+        const params = new URLSearchParams({ vesselId: effectiveVesselId || '' });
+        if (categoryFilters.dateRange?.from) {
+          params.append('startDate', categoryFilters.dateRange.from.toISOString().split('T')[0]);
+        }
+        if (categoryFilters.dateRange?.to) {
+          params.append('endDate', categoryFilters.dateRange.to.toISOString().split('T')[0]);
+        }
+        
+        const response = await fetch(`/technical/api/reports/equipment-utilization-summary?${params}`);
+        const result = await response.json();
+        
+        if (!result.success || !result.data) {
+          throw new Error(result.error || 'Failed to fetch equipment utilization data');
+        }
+        
+        const utilizationData = result.data;
+        const summary = result.summary;
+        
         const columns = [
-          { header: 'Code', field: 'code', width: 30 },
-          { header: 'Component Name', field: 'name', width: 60 },
-          { header: 'Running Hours', field: 'runningHours', width: 35 },
-          { header: 'Last Updated', field: 'lastUpdated', width: 35 },
-          { header: 'Status', field: 'status', width: 30 }
+          { header: 'S.No', field: 'sNo', width: 15 },
+          { header: 'Code', field: 'componentCode', width: 35 },
+          { header: 'Component Name', field: 'componentName', width: 60 },
+          { header: 'Category', field: 'category', width: 40 },
+          { header: 'Current Hrs', field: 'currentHours', width: 30 },
+          { header: 'Period Hrs', field: 'periodHours', width: 30 },
+          { header: 'Avg Daily', field: 'avgDailyHours', width: 28 },
+          { header: 'Utilization', field: 'utilizationBand', width: 28 },
+          { header: 'Util %', field: 'utilizationPercent', width: 22 }
         ];
-
-        const data = componentsWithRH.map((c: any) => ({
-          code: c.componentCode || c.code || '-',
-          name: c.name || '-',
-          runningHours: c.runningHours || 0,
-          lastUpdated: c.rhLastUpdated || 'N/A',
-          status: c.runningHours > 0 ? 'Active' : 'Inactive'
-        }));
-
-        const summary = [
-          { label: 'Total Components', value: data.length },
-          { label: 'Active', value: data.filter((d: any) => d.status === 'Active').length }
+        
+        const summaryItems = [
+          { label: 'Total Equipment', value: summary.totalEquipment },
+          { label: 'High Utilization', value: summary.highUtilization },
+          { label: 'Normal Utilization', value: summary.normalUtilization },
+          { label: 'Low Utilization', value: summary.lowUtilization },
+          { label: 'Avg Utilization', value: `${summary.avgUtilization}%` }
         ];
-
+        
         pdfReportGenerator.generateReport(
-          { title: 'Equipment Utilization Summary', subtitle: 'Running hours overview', vessel: vesselName },
+          { 
+            title: 'Equipment Utilization Summary', 
+            subtitle: `Running hours analysis for ${summary.periodDays} days (${summary.periodStart} to ${summary.periodEnd})`, 
+            vessel: vesselName 
+          },
           columns,
-          data,
-          summary
+          utilizationData,
+          summaryItems
         );
         break;
       }
 
       case 'rh-anomaly-detection': {
+        // Fetch from API
+        const params = new URLSearchParams({ vesselId: effectiveVesselId || '' });
+        if (categoryFilters.dateRange?.from) {
+          params.append('startDate', categoryFilters.dateRange.from.toISOString().split('T')[0]);
+        }
+        if (categoryFilters.dateRange?.to) {
+          params.append('endDate', categoryFilters.dateRange.to.toISOString().split('T')[0]);
+        }
+        
+        const response = await fetch(`/technical/api/reports/running-hours-anomaly-detection?${params}`);
+        const result = await response.json();
+        
+        if (result.error) {
+          throw new Error(result.error);
+        }
+        
+        const anomalies = result.anomalies || [];
+        const summaryData = result.summary || {};
+        
         const columns = [
-          { header: 'Code', field: 'code', width: 30 },
-          { header: 'Component', field: 'name', width: 55 },
-          { header: 'Current RH', field: 'runningHours', width: 30 },
-          { header: 'Status', field: 'status', width: 30 }
+          { header: 'Component Code', field: 'componentCode', width: 35 },
+          { header: 'Component Name', field: 'componentName', width: 55 },
+          { header: 'Category', field: 'category', width: 35 },
+          { header: 'Previous RH', field: 'previousRh', width: 28 },
+          { header: 'New RH', field: 'newRh', width: 25 },
+          { header: 'Delta', field: 'deltaRh', width: 22 },
+          { header: 'Anomaly Type', field: 'anomalyType', width: 35 },
+          { header: 'Severity', field: 'severity', width: 25 },
+          { header: 'Description', field: 'description', width: 70 }
         ];
-
-        const data = componentsWithRH.map((c: any) => ({
-          code: c.componentCode || c.code || '-',
-          name: c.name || '-',
-          runningHours: c.runningHours || 0,
-          status: 'Normal'
+        
+        const summaryItems = [
+          { label: 'Total Anomalies', value: summaryData.totalAnomalies || 0 },
+          { label: 'Critical', value: summaryData.criticalCount || 0 },
+          { label: 'Warning', value: summaryData.warningCount || 0 },
+          { label: 'Info', value: summaryData.infoCount || 0 },
+          { label: 'Logs Analyzed', value: summaryData.totalLogsAnalyzed || 0 }
+        ];
+        
+        const formattedData = anomalies.map((a: any) => ({
+          ...a,
+          previousRh: Number(a.previousRh).toFixed(1),
+          newRh: Number(a.newRh).toFixed(1),
+          deltaRh: Number(a.deltaRh).toFixed(1)
         }));
-
+        
         pdfReportGenerator.generateReport(
-          { title: 'Running Hours Anomaly Detection', subtitle: 'Equipment monitoring report', vessel: vesselName },
+          { 
+            title: 'Running Hours Anomaly Detection', 
+            subtitle: `Anomalies detected from ${summaryData.periodStart?.split('T')[0] || 'N/A'} to ${summaryData.periodEnd?.split('T')[0] || 'N/A'}`, 
+            vessel: vesselName 
+          },
           columns,
-          data
+          formattedData,
+          summaryItems
         );
         break;
       }
 
       case 'rh-maintenance-triggers': {
+        // Use local component data for this report (API not yet implemented)
+        const rhComponents = components.filter((c: any) => 
+          c.runningHours !== undefined && c.runningHours !== null
+        );
+        
         const columns = [
           { header: 'Code', field: 'code', width: 30 },
           { header: 'Component', field: 'name', width: 55 },
@@ -212,7 +272,7 @@ const RunningHoursReports: React.FC<RunningHoursReportsProps> = ({ onBack, globa
           { header: 'Status', field: 'status', width: 30 }
         ];
 
-        const data = componentsWithRH.map((c: any) => ({
+        const data = rhComponents.map((c: any) => ({
           code: c.componentCode || c.code || '-',
           name: c.name || '-',
           runningHours: c.runningHours || 0,
@@ -233,6 +293,11 @@ const RunningHoursReports: React.FC<RunningHoursReportsProps> = ({ onBack, globa
       }
 
       case 'rh-condition-monitoring': {
+        // Use local component data for this report (API not yet implemented)
+        const rhComponents = components.filter((c: any) => 
+          c.runningHours !== undefined && c.runningHours !== null
+        );
+        
         const columns = [
           { header: 'Code', field: 'code', width: 30 },
           { header: 'Component', field: 'name', width: 60 },
@@ -240,7 +305,7 @@ const RunningHoursReports: React.FC<RunningHoursReportsProps> = ({ onBack, globa
           { header: 'Condition', field: 'condition', width: 30 }
         ];
 
-        const data = componentsWithRH.map((c: any) => ({
+        const data = rhComponents.map((c: any) => ({
           code: c.componentCode || c.code || '-',
           name: c.name || '-',
           runningHours: c.runningHours || 0,
@@ -269,14 +334,11 @@ const RunningHoursReports: React.FC<RunningHoursReportsProps> = ({ onBack, globa
     
     if (generatingReports.has(reportKey)) return;
 
-    const componentsWithRH = components.filter((c: any) => 
-      c.runningHours !== undefined && c.runningHours !== null
-    );
-
-    if (componentsWithRH.length === 0) {
+    // Require vessel selection for these reports
+    if (!effectiveVesselId || effectiveVesselId === 'all') {
       toast({ 
-        title: "No Data Available", 
-        description: "No components with running hours data found. Please ensure equipment has running hours recorded.",
+        title: "Vessel Required", 
+        description: "Please select a specific vessel to generate this report.",
         variant: "destructive" 
       });
       return;
@@ -289,13 +351,14 @@ const RunningHoursReports: React.FC<RunningHoursReportsProps> = ({ onBack, globa
       if (format === 'PDF') {
         await generateRunningHoursPDF(reportId);
         toast({ title: "Report Generated", description: `${format} report downloaded successfully!` });
-      } else {
-        toast({ title: "Excel Export", description: "Excel export coming soon." });
+      } else if (format === 'Excel') {
+        await generateRunningHoursExcel(reportId);
+        toast({ title: "Report Generated", description: `${format} report downloaded successfully!` });
       }
       
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error generating report:', error);
-      toast({ title: "Generation Failed", description: "Failed to generate report.", variant: "destructive" });
+      toast({ title: "Generation Failed", description: error.message || "Failed to generate report.", variant: "destructive" });
     } finally {
       setGeneratingReports(prev => {
         const newSet = new Set(prev);
@@ -303,6 +366,52 @@ const RunningHoursReports: React.FC<RunningHoursReportsProps> = ({ onBack, globa
         return newSet;
       });
     }
+  };
+
+  const generateRunningHoursExcel = async (reportId: string) => {
+    const reportEndpoints: Record<string, string> = {
+      'rh-utilization-summary': '/technical/api/reports/equipment-utilization-summary/excel',
+      'rh-anomaly-detection': '/technical/api/reports/running-hours-anomaly-detection/excel',
+    };
+
+    const endpoint = reportEndpoints[reportId];
+    if (!endpoint) {
+      toast({ title: "Excel Export", description: "Excel export for this report is coming soon." });
+      return;
+    }
+
+    let requestBody: any = { vesselId: effectiveVesselId };
+    
+    // Add date range if available
+    if (categoryFilters.dateRange?.from) {
+      requestBody.startDate = categoryFilters.dateRange.from.toISOString().split('T')[0];
+    }
+    if (categoryFilters.dateRange?.to) {
+      requestBody.endDate = categoryFilters.dateRange.to.toISOString().split('T')[0];
+    }
+
+    const response = await fetch(endpoint, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(requestBody),
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.error || 'Failed to generate Excel report');
+    }
+
+    const blob = await response.blob();
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    const contentDisposition = response.headers.get('content-disposition');
+    const filename = contentDisposition?.split('filename=')[1]?.replace(/"/g, '') || `${reportId}_report.xlsx`;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    window.URL.revokeObjectURL(url);
+    document.body.removeChild(a);
   };
 
   const componentsWithRH = components.filter((c: any) => c.runningHours !== undefined && c.runningHours !== null);
