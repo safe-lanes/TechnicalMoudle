@@ -1056,7 +1056,7 @@ const MaintenanceReports: React.FC<MaintenanceReportsProps> = ({ onBack, globalF
       'due-jobs-7': '/technical/api/reports/due-jobs-7-days',
       'overdue-jobs': '/technical/api/reports/overdue-jobs',
       'completed-jobs': '/technical/api/reports/completed-jobs',
-      'unplanned-jobs': '/technical/api/reports/unplanned-jobs',
+      'unplanned-jobs': '/technical/api/reports/unplanned-breakdown-jobs/excel',
       'postponement-log': '/technical/api/reports/postponement-log',
       'monthly-summary': '/technical/api/reports/maintenance/monthly-summary/excel',
       'critical-equipment': '/technical/api/reports/critical-equipment-status/excel',
@@ -1074,8 +1074,8 @@ const MaintenanceReports: React.FC<MaintenanceReportsProps> = ({ onBack, globalF
     let requestBody: any = { vesselId: effectiveVesselId };
     
     // Add date range for reports that support it
-    if (reportId === 'monthly-summary' || reportId === 'completed-jobs') {
-      // Use category filters date range for completed-jobs
+    if (reportId === 'monthly-summary' || reportId === 'completed-jobs' || reportId === 'unplanned-jobs') {
+      // Use category filters date range for completed-jobs and unplanned-jobs
       const dateFrom = categoryFilters.dateRange?.from;
       const dateTo = categoryFilters.dateRange?.to;
       
@@ -1086,8 +1086,8 @@ const MaintenanceReports: React.FC<MaintenanceReportsProps> = ({ onBack, globalF
         requestBody.dateTo = dateTo.toISOString().split('T')[0];
       }
       
-      // Also support startDate/endDate for monthly-summary
-      if (reportId === 'monthly-summary') {
+      // Also support startDate/endDate for monthly-summary and unplanned-jobs
+      if (reportId === 'monthly-summary' || reportId === 'unplanned-jobs') {
         let startDate: Date;
         let endDate: Date;
         
