@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { type Maker } from "@shared/schema";
+import { type MakerList } from "@shared/schema";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -16,12 +16,12 @@ export default function MakerManagement() {
   const { toast } = useToast();
   const [searchQuery, setSearchQuery] = useState("");
   const [isFormOpen, setIsFormOpen] = useState(false);
-  const [selectedMaker, setSelectedMaker] = useState<Maker | null>(null);
+  const [selectedMaker, setSelectedMaker] = useState<MakerList | null>(null);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
-  const [makerToDelete, setMakerToDelete] = useState<Maker | null>(null);
+  const [makerToDelete, setMakerToDelete] = useState<MakerList | null>(null);
 
   // Fetch makers
-  const { data: makers, isLoading, error } = useQuery<Maker[]>({
+  const { data: makers, isLoading, error } = useQuery<MakerList[]>({
     queryKey: ['/technical/api/fleet/makers'],
   });
 
@@ -64,12 +64,12 @@ export default function MakerManagement() {
     setIsFormOpen(true);
   };
 
-  const handleEdit = (maker: Maker) => {
+  const handleEdit = (maker: MakerList) => {
     setSelectedMaker(maker);
     setIsFormOpen(true);
   };
 
-  const handleDeleteClick = (maker: Maker) => {
+  const handleDeleteClick = (maker: MakerList) => {
     setMakerToDelete(maker);
     setDeleteDialogOpen(true);
   };
@@ -147,6 +147,7 @@ export default function MakerManagement() {
                       <TableHead className="text-white font-medium" data-testid="I4.QL.1.15"><Marker id="I4.QL.1.15" />Maker Name</TableHead>
                       <TableHead className="text-white font-medium" data-testid="I4.QL.1.16"><Marker id="I4.QL.1.16" />Address</TableHead>
                       <TableHead className="text-white font-medium" data-testid="I4.QL.1.17"><Marker id="I4.QL.1.17" />Address ID</TableHead>
+                      <TableHead className="text-white font-medium">Status</TableHead>
                       <TableHead className="text-white font-medium text-right" data-testid="I4.QL.1.18"><Marker id="I4.QL.1.18" />Actions</TableHead>
                     </TableRow>
                   </TableHeader>
@@ -172,6 +173,15 @@ export default function MakerManagement() {
                         <TableCell data-testid={index === 0 ? "I4.QL.1.23" : undefined}>
                           {index === 0 && <Marker id="I4.QL.1.23" />}
                           {maker.addressId || "-"}
+                        </TableCell>
+                        <TableCell>
+                          <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                            maker.isActive !== false
+                              ? 'bg-green-100 text-green-800'
+                              : 'bg-gray-100 text-gray-600'
+                          }`}>
+                            {maker.isActive !== false ? 'Active' : 'Inactive'}
+                          </span>
                         </TableCell>
                         <TableCell className="text-right">
                           <div className="flex justify-end gap-2">

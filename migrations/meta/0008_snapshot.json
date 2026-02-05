@@ -1,5 +1,5 @@
 {
-  "id": "549d5929-9465-4899-a95b-a6e8a380b1d9",
+  "id": "7dc89404-110b-46f8-9105-e1dd27492b01",
   "prevId": "8f6cc7f6-a87d-43d5-aeeb-7b24504c8012",
   "version": "7",
   "dialect": "postgresql",
@@ -6690,6 +6690,24 @@
           "primaryKey": false,
           "notNull": false
         },
+        "contact_person": {
+          "name": "contact_person",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "email": {
+          "name": "email",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "phone": {
+          "name": "phone",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
         "is_active": {
           "name": "is_active",
           "type": "boolean",
@@ -10936,178 +10954,6 @@
           ]
         }
       },
-      "policies": {},
-      "checkConstraints": {},
-      "isRLSEnabled": false
-    },
-    "public.work_order_postponements": {
-      "name": "work_order_postponements",
-      "schema": "",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "text",
-          "primaryKey": true,
-          "notNull": true
-        },
-        "work_order_id": {
-          "name": "work_order_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "vessel_id": {
-          "name": "vessel_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "postponement_number": {
-          "name": "postponement_number",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "default": 1
-        },
-        "original_due_date": {
-          "name": "original_due_date",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "new_due_date": {
-          "name": "new_due_date",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "postponement_reason": {
-          "name": "postponement_reason",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "authorized_by": {
-          "name": "authorized_by",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "approval_remarks": {
-          "name": "approval_remarks",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "duration_days": {
-          "name": "duration_days",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "submitted_date": {
-          "name": "submitted_date",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "approved_date": {
-          "name": "approved_date",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "approved_by": {
-          "name": "approved_by",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "status": {
-          "name": "status",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "'Pending'"
-        },
-        "inform_office": {
-          "name": "inform_office",
-          "type": "boolean",
-          "primaryKey": false,
-          "notNull": true,
-          "default": false
-        },
-        "attachment_path": {
-          "name": "attachment_path",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "created_at": {
-          "name": "created_at",
-          "type": "timestamp",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        },
-        "updated_at": {
-          "name": "updated_at",
-          "type": "timestamp",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        }
-      },
-      "indexes": {
-        "idx_postponement_work_order": {
-          "name": "idx_postponement_work_order",
-          "columns": [
-            {
-              "expression": "work_order_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "idx_postponement_vessel": {
-          "name": "idx_postponement_vessel",
-          "columns": [
-            {
-              "expression": "vessel_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "idx_postponement_status": {
-          "name": "idx_postponement_status",
-          "columns": [
-            {
-              "expression": "status",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        }
-      },
-      "foreignKeys": {},
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
       "policies": {},
       "checkConstraints": {},
       "isRLSEnabled": false

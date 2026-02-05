@@ -1,6 +1,6 @@
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { insertMakerSchema, type Maker } from "@shared/schema";
+import { insertMakerListSchema, type MakerList } from "@shared/schema";
 import { z } from "zod";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
@@ -15,11 +15,11 @@ import { Marker } from "@/components/Marker";
 interface MakerFormProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  maker?: Maker | null;
+  maker?: MakerList | null;
 }
 
 // Extend schema for email validation
-const makerFormSchema = insertMakerSchema.extend({
+const makerFormSchema = insertMakerListSchema.extend({
   email: z.string().email("Invalid email address").optional().or(z.literal("")),
 });
 
@@ -39,6 +39,7 @@ export default function MakerForm({ open, onOpenChange, maker }: MakerFormProps)
       contactPerson: maker?.contactPerson || "",
       email: maker?.email || "",
       phone: maker?.phone || "",
+      isActive: maker?.isActive ?? true,
     },
   });
 
@@ -110,6 +111,7 @@ export default function MakerForm({ open, onOpenChange, maker }: MakerFormProps)
         contactPerson: maker.contactPerson || "",
         email: maker.email || "",
         phone: maker.phone || "",
+        isActive: maker.isActive ?? true,
       });
     }
     onOpenChange(newOpen);

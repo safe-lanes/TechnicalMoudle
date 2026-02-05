@@ -1764,6 +1764,9 @@ export const makerList = pgTable("maker_list", {
   makerName: text("maker_name").notNull(), // Full manufacturer name
   address: text("address"), // Manufacturer address
   addressId: text("address_id"), // Address reference ID
+  contactPerson: text("contact_person"), // Contact person name
+  email: text("email"), // Contact email
+  phone: text("phone"), // Contact phone number
   isActive: boolean("is_active").notNull().default(true),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),

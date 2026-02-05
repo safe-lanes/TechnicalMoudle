@@ -371,50 +371,50 @@ export class PostgresStorage {
     await db.delete(pmsVesselSettings).where(eq(pmsVesselSettings.id, id));
   }
 
-  // ============= MODULE 2: MAKERS =============
+  // ============= MODULE 2: MAKERS (using maker_list table) =============
 
-  async getMakers(search?: string): Promise<Maker[]> {
+  async getMakers(search?: string): Promise<MakerList[]> {
     const db = await getDb();
     if (search) {
       const searchPattern = `%${search}%`;
-      const result = await db.select().from(makers)
+      const result = await db.select().from(makerList)
         .where(or(
-          ilike(makers.makerName, searchPattern),
-          ilike(makers.makerCode, searchPattern)
+          ilike(makerList.makerName, searchPattern),
+          ilike(makerList.makerCode, searchPattern)
         ))
-        .orderBy(asc(makers.makerName));
+        .orderBy(asc(makerList.makerName));
       return result;
     }
-    return await db.select().from(makers).orderBy(asc(makers.makerName));
+    return await db.select().from(makerList).orderBy(asc(makerList.makerName));
   }
 
-  async getMakerById(id: number): Promise<Maker | undefined> {
+  async getMakerById(id: number): Promise<MakerList | undefined> {
     const db = await getDb();
-    const result = await db.select().from(makers).where(eq(makers.id, id));
+    const result = await db.select().from(makerList).where(eq(makerList.id, id));
     return result[0];
   }
 
-  async createMaker(maker: InsertMaker): Promise<Maker> {
+  async createMaker(maker: InsertMakerList): Promise<MakerList> {
     const db = await getDb();
     // Generate makerCode if not provided
     let makerCode = maker.makerCode;
     if (!makerCode) {
-      const allMakers = await db.select({ id: makers.id }).from(makers);
+      const allMakers = await db.select({ id: makerList.id }).from(makerList);
       const nextId = allMakers.length > 0 ? Math.max(...allMakers.map(m => m.id)) + 1 : 1;
       makerCode = `MKR-${String(nextId).padStart(6, '0')}`;
     }
-    const result = await db.insert(makers).values({
+    const result = await db.insert(makerList).values({
       ...maker,
       makerCode,
     }).returning();
     return result[0];
   }
 
-  async updateMaker(id: number, data: Partial<InsertMaker>): Promise<Maker> {
+  async updateMaker(id: number, data: Partial<InsertMakerList>): Promise<MakerList> {
     const db = await getDb();
-    const result = await db.update(makers)
+    const result = await db.update(makerList)
       .set({ ...data, updatedAt: new Date() })
-      .where(eq(makers.id, id))
+      .where(eq(makerList.id, id))
       .returning();
     if (!result[0]) {
       throw new Error(`Maker with id ${id} not found`);
@@ -424,7 +424,7 @@ export class PostgresStorage {
 
   async deleteMaker(id: number): Promise<void> {
     const db = await getDb();
-    await db.delete(makers).where(eq(makers.id, id));
+    await db.delete(makerList).where(eq(makerList.id, id));
   }
 
   // ============= MODULE 2: MASTER LISTS =============

@@ -602,11 +602,11 @@ export interface IStorage {
   getImportChangeLogs(importHistoryId: string): Promise<ImportChangeLog[]>;
   deleteImportChangeLogs(importHistoryId: string): Promise<void>;
   
-  // Fleet Admin - Makers methods
-  getMakers(search?: string): Promise<Maker[]>;
-  getMakerById(id: number): Promise<Maker | undefined>;
-  createMaker(maker: InsertMaker): Promise<Maker>;
-  updateMaker(id: number, data: Partial<InsertMaker>): Promise<Maker>;
+  // Fleet Admin - Makers methods (uses maker_list table)
+  getMakers(search?: string): Promise<MakerList[]>;
+  getMakerById(id: number): Promise<MakerList | undefined>;
+  createMaker(maker: InsertMakerList): Promise<MakerList>;
+  updateMaker(id: number, data: Partial<InsertMakerList>): Promise<MakerList>;
   deleteMaker(id: number): Promise<void>;
   
   // Fleet Admin - Master Lists methods

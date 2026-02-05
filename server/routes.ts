@@ -4,7 +4,7 @@ import { storage } from "./storage";
 import { getPool } from "./db";
 import * as fs from "fs";
 import * as path from "path";
-import { insertRunningHoursAuditSchema, cascadeRunningHoursSchema, insertWorkOrderSchema, insertWorkOrderExecutionSchema, insertDefectSchema, insertDefectActionSchema, insertDefectAttachmentSchema, insertComponentSchema, insertSpareSchema, insertMakerSchema, insertMasterListSchema, insertComponentDocumentSchema, insertComponentClassRegulatorySchema, insertComponentRequisitionSchema, equipmentCategories, defectCategories, defectTypes, shipCertificatesMaster, insertShipCertificateMasterSchema, shipCertificatesLabelsConfig, vesselCertificateApplicability, insertVesselCertificateApplicabilitySchema, vesselCertificateData, vessels, shipSurveysMaster, shipSurveysLabelsConfig, vesselSurveyApplicability, vesselSurveyData } from "@shared/schema";
+import { insertRunningHoursAuditSchema, cascadeRunningHoursSchema, insertWorkOrderSchema, insertWorkOrderExecutionSchema, insertDefectSchema, insertDefectActionSchema, insertDefectAttachmentSchema, insertComponentSchema, insertSpareSchema, insertMakerSchema, insertMakerListSchema, insertMasterListSchema, insertComponentDocumentSchema, insertComponentClassRegulatorySchema, insertComponentRequisitionSchema, equipmentCategories, defectCategories, defectTypes, shipCertificatesMaster, insertShipCertificateMasterSchema, shipCertificatesLabelsConfig, vesselCertificateApplicability, insertVesselCertificateApplicabilitySchema, vesselCertificateData, vessels, shipSurveysMaster, shipSurveysLabelsConfig, vesselSurveyApplicability, vesselSurveyData } from "@shared/schema";
 import { getPostgresClient } from "./postgresClient";
 import { eq, and, asc, sql, inArray } from "drizzle-orm";
 import { computeWorkOrderStatus } from "@shared/workOrders/status";
@@ -8296,7 +8296,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Create new maker
   app.post("/technical/api/fleet/makers", async (req, res) => {
     try {
-      const validatedData = insertMakerSchema.parse(req.body);
+      const validatedData = insertMakerListSchema.parse(req.body);
       
       // Auto-generate makerCode if not provided or empty
       let makerCode = validatedData.makerCode;
@@ -8327,7 +8327,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Update existing maker
   app.put("/technical/api/fleet/makers/:id", async (req, res) => {
     try {
-      const partialMakerSchema = insertMakerSchema.partial();
+      const partialMakerSchema = insertMakerListSchema.partial();
       const validatedData = partialMakerSchema.parse(req.body);
       
       // Prevent clearing makerCode - remove it from update if empty
