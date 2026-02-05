@@ -14387,16 +14387,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
           new Date(log.updatedAt) <= periodEnd
         ).sort((a, b) => new Date(a.updatedAt!).getTime() - new Date(b.updatedAt!).getTime());
         
-        // Get current and baseline running hours
-        // Note: running_hours is the baseline (initial reading), current_cumulative_rh is current total
-        const currentHours = Number(component.currentCumulativeRH) || Number(component.runningHours) || 0;
+        // Get current and baseline running hours separately
+        // running_hours is the baseline (initial reading)
+        // current_cumulative_rh is the true current meter reading
+        const currentCumulativeReading = component.currentCumulativeRH !== null && component.currentCumulativeRH !== undefined
+          ? Number(component.currentCumulativeRH)
+          : null;
         const baselineHours = component.runningHours !== null && component.runningHours !== undefined 
           ? Number(component.runningHours) 
-          : null; // null means no baseline was set
+          : null;
+        
+        // For display purposes, show the best available current reading
+        const displayCurrentHours = currentCumulativeReading ?? baselineHours ?? 0;
         
         // Calculate period hours from delta accumulation or from component data
+        // Priority: 1) Log data 2) Baseline delta 3) Estimate from current cumulative
         let periodHours = 0;
-        let dataSource = 'none';
+        let dataSource: 'Actual' | 'Estimated' | 'No Data' = 'No Data';
         
         if (componentLogs.length > 0) {
           // Use log data if available - sum up all delta changes in the period
@@ -14404,21 +14411,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
             const delta = Number(log.deltaRh) || 0;
             return sum + Math.max(0, delta); // Only positive deltas (ignore corrections)
           }, 0);
-          dataSource = 'logs';
-        } else if (baselineHours !== null && currentHours > baselineHours) {
-          // We have a valid baseline - calculate actual delta
-          const totalAccumulated = currentHours - baselineHours;
-          // This is the actual hours accumulated since baseline was set
-          // For period calculation, we estimate based on days in period vs total time
-          // Since we don't know when baseline was set, assume it was set recently
-          periodHours = totalAccumulated;
-          dataSource = 'delta';
-        } else if (baselineHours === null && currentHours > 0) {
-          // No baseline set - we cannot calculate period hours accurately
-          // Set to 0 to avoid misleading data
+          dataSource = 'Actual';
+        } else if (baselineHours !== null && currentCumulativeReading !== null && currentCumulativeReading > baselineHours) {
+          // We have BOTH baseline AND current reading - calculate actual delta
+          periodHours = currentCumulativeReading - baselineHours;
+          dataSource = 'Actual';
+        } else if (baselineHours !== null && currentCumulativeReading !== null && currentCumulativeReading === baselineHours) {
+          // Baseline equals current - no usage in this period
           periodHours = 0;
-          dataSource = 'no_baseline';
+          dataSource = 'Actual';
+        } else if (baselineHours === null && currentCumulativeReading !== null && currentCumulativeReading > 0) {
+          // No baseline but have a current reading - use as estimate
+          // This is clearly marked as "Estimated" so users know it's not accurate
+          periodHours = currentCumulativeReading;
+          dataSource = 'Estimated';
+        } else if (baselineHours !== null && currentCumulativeReading === null) {
+          // Have baseline but no current reading - cannot calculate period hours
+          periodHours = 0;
+          dataSource = 'No Data';
         }
+        // else: No data at all, periodHours stays 0 and dataSource stays 'No Data'
         
         const avgDailyHours = periodHours / daysInPeriod;
         
@@ -14432,9 +14444,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
           utilizationBand = 'Low';
         }
         
-        // Calculate utilization percentage (assuming 24 hrs/day max), capped at 100%
+        // Calculate utilization percentage (assuming 24 hrs/day max)
+        // DO NOT cap at 100% - show actual values to expose data anomalies
         const ratedHoursPerDay = 24;
-        const utilizationPercent = Math.min(100, (avgDailyHours / ratedHoursPerDay) * 100);
+        const utilizationPercent = (avgDailyHours / ratedHoursPerDay) * 100;
         
         return {
           sNo: index + 1,
@@ -14443,7 +14456,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           category: component.componentCategory || component.category || '-',
           location: component.location || '-',
           department: component.department || component.eqptSystemDept || '-',
-          currentHours: Math.round(currentHours * 100) / 100,
+          currentHours: Math.round(displayCurrentHours * 100) / 100,
           periodHours: Math.round(periodHours * 100) / 100,
           avgDailyHours: Math.round(avgDailyHours * 100) / 100,
           utilizationBand,
@@ -14466,7 +14479,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Re-number after sorting
       utilizationData.forEach((item, idx) => { item.sNo = idx + 1; });
       
-      // Calculate summary
+      // Calculate summary with data source counts
       const summary = {
         totalEquipment: utilizationData.length,
         highUtilization: utilizationData.filter(d => d.utilizationBand === 'High').length,
@@ -14478,7 +14491,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         totalPeriodHours: Math.round(utilizationData.reduce((sum, d) => sum + d.periodHours, 0) * 100) / 100,
         periodDays: daysInPeriod,
         periodStart: periodStart.toISOString().split('T')[0],
-        periodEnd: periodEnd.toISOString().split('T')[0]
+        periodEnd: periodEnd.toISOString().split('T')[0],
+        // Data source breakdown
+        actualData: utilizationData.filter(d => d.dataSource === 'Actual').length,
+        estimatedData: utilizationData.filter(d => d.dataSource === 'Estimated').length,
+        noData: utilizationData.filter(d => d.dataSource === 'No Data').length
       };
       
       res.json({
@@ -14593,33 +14610,48 @@ export async function registerRoutes(app: Express): Promise<Server> {
           new Date(log.updatedAt) <= periodEnd
         ).sort((a, b) => new Date(a.updatedAt!).getTime() - new Date(b.updatedAt!).getTime());
         
-        // Get current and baseline running hours
-        // Note: running_hours is the baseline (initial reading), current_cumulative_rh is current total
-        const currentHours = Number(component.currentCumulativeRH) || Number(component.runningHours) || 0;
+        // Get current and baseline running hours separately
+        // running_hours is the baseline (initial reading)
+        // current_cumulative_rh is the true current meter reading
+        const currentCumulativeReading = component.currentCumulativeRH !== null && component.currentCumulativeRH !== undefined
+          ? Number(component.currentCumulativeRH)
+          : null;
         const baselineHours = component.runningHours !== null && component.runningHours !== undefined 
           ? Number(component.runningHours) 
-          : null; // null means no baseline was set
+          : null;
+        
+        // For display purposes, show the best available current reading
+        const displayCurrentHours = currentCumulativeReading ?? baselineHours ?? 0;
         
         // Calculate period hours from delta accumulation or from component data
+        // Priority: 1) Log data 2) Baseline delta 3) Estimate from current cumulative
         let periodHours = 0;
-        let dataSource = 'none';
+        let dataSource: 'Actual' | 'Estimated' | 'No Data' = 'No Data';
         
         if (componentLogs.length > 0) {
           periodHours = componentLogs.reduce((sum, log) => {
             const delta = Number(log.deltaRh) || 0;
             return sum + Math.max(0, delta);
           }, 0);
-          dataSource = 'logs';
-        } else if (baselineHours !== null && currentHours > baselineHours) {
-          // We have a valid baseline - calculate actual delta
-          const totalAccumulated = currentHours - baselineHours;
-          periodHours = totalAccumulated;
-          dataSource = 'delta';
-        } else if (baselineHours === null && currentHours > 0) {
-          // No baseline set - we cannot calculate period hours accurately
+          dataSource = 'Actual';
+        } else if (baselineHours !== null && currentCumulativeReading !== null && currentCumulativeReading > baselineHours) {
+          // We have BOTH baseline AND current reading - calculate actual delta
+          periodHours = currentCumulativeReading - baselineHours;
+          dataSource = 'Actual';
+        } else if (baselineHours !== null && currentCumulativeReading !== null && currentCumulativeReading === baselineHours) {
+          // Baseline equals current - no usage in this period
           periodHours = 0;
-          dataSource = 'no_baseline';
+          dataSource = 'Actual';
+        } else if (baselineHours === null && currentCumulativeReading !== null && currentCumulativeReading > 0) {
+          // No baseline but have a current reading - use as estimate
+          periodHours = currentCumulativeReading;
+          dataSource = 'Estimated';
+        } else if (baselineHours !== null && currentCumulativeReading === null) {
+          // Have baseline but no current reading - cannot calculate period hours
+          periodHours = 0;
+          dataSource = 'No Data';
         }
+        // else: No data at all, periodHours stays 0 and dataSource stays 'No Data'
         
         const avgDailyHours = periodHours / daysInPeriod;
         
@@ -14633,7 +14665,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
           utilizationBand = 'Low';
         }
         
-        const utilizationPercent = Math.min(100, (avgDailyHours / 24) * 100); // Cap at 100%
+        // DO NOT cap at 100% - show actual values to expose data anomalies
+        const utilizationPercent = (avgDailyHours / 24) * 100;
         
         return {
           componentCode: component.componentCode || component.id,
@@ -14641,7 +14674,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           category: component.componentCategory || component.category || '-',
           location: component.location || '-',
           department: component.department || component.eqptSystemDept || '-',
-          currentHours: Math.round(currentHours * 100) / 100,
+          currentHours: Math.round(displayCurrentHours * 100) / 100,
           periodHours: Math.round(periodHours * 100) / 100,
           avgDailyHours: Math.round(avgDailyHours * 100) / 100,
           utilizationBand,
@@ -14670,7 +14703,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         views: [{ state: 'frozen', ySplit: 7, xSplit: 0 }]
       });
       
-      // Define columns
+      // Define columns - includes Data Source to show calculation method
       const columns: ColumnDef[] = [
         { key: 'sNo', header: 'S.No', width: 6, type: 'number', align: 'center' },
         { key: 'componentCode', header: 'Comp Code', width: 14, type: 'text' },
@@ -14683,6 +14716,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         { key: 'avgDailyHours', header: 'Avg Daily Hrs', width: 12, type: 'number', align: 'right' },
         { key: 'utilizationBand', header: 'Utilization', width: 12, type: 'text', align: 'center' },
         { key: 'utilizationPercent', header: 'Util %', width: 10, type: 'number', align: 'right' },
+        { key: 'dataSource', header: 'Data Source', width: 12, type: 'text', align: 'center' },
         { key: 'lastUpdated', header: 'Last Updated', width: 14, type: 'date', align: 'center' }
       ];
       
@@ -14751,9 +14785,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
         ? (reportData.reduce((sum, r) => sum + r.utilizationPercent, 0) / reportData.length).toFixed(1)
         : '0';
       
+      // Count data sources
+      const actualCount = reportData.filter(r => r.dataSource === 'Actual').length;
+      const estimatedCount = reportData.filter(r => r.dataSource === 'Estimated').length;
+      const noDataCount = reportData.filter(r => r.dataSource === 'No Data').length;
+      
       worksheet.mergeCells(`A${summaryRow}:${lastColLetter}${summaryRow}`);
       worksheet.getCell(`A${summaryRow}`).value = 
-        `Summary: Total ${reportData.length} equipment | High: ${highCount} | Normal: ${normalCount} | Low: ${lowCount} | Avg Utilization: ${avgUtil}%`;
+        `Summary: Total ${reportData.length} equipment | High: ${highCount} | Normal: ${normalCount} | Low: ${lowCount} | Avg Utilization: ${avgUtil}% | Data: ${actualCount} Actual, ${estimatedCount} Estimated, ${noDataCount} No Data`;
       worksheet.getCell(`A${summaryRow}`).font = { bold: true, size: 10 };
       worksheet.getCell(`A${summaryRow}`).fill = {
         type: 'pattern',
