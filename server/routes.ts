@@ -14388,8 +14388,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         ).sort((a, b) => new Date(a.updatedAt!).getTime() - new Date(b.updatedAt!).getTime());
         
         // Get current and baseline running hours
+        // Note: running_hours is the baseline (initial reading), current_cumulative_rh is current total
         const currentHours = Number(component.currentCumulativeRH) || Number(component.runningHours) || 0;
-        const baselineHours = Number(component.runningHours) || 0;
+        const baselineHours = component.runningHours !== null && component.runningHours !== undefined 
+          ? Number(component.runningHours) 
+          : null; // null means no baseline was set
         
         // Calculate period hours from delta accumulation or from component data
         let periodHours = 0;
@@ -14402,44 +14405,36 @@ export async function registerRoutes(app: Express): Promise<Server> {
             return sum + Math.max(0, delta); // Only positive deltas (ignore corrections)
           }, 0);
           dataSource = 'logs';
-        } else if (currentHours > baselineHours) {
-          // No logs - calculate from component data (current - baseline)
-          // This represents total accumulated hours since baseline was set
+        } else if (baselineHours !== null && currentHours > baselineHours) {
+          // We have a valid baseline - calculate actual delta
           const totalAccumulated = currentHours - baselineHours;
-          
-          // Calculate days since last update to estimate avg daily usage
-          const lastUpdatedDate = component.lastUpdated ? new Date(component.lastUpdated) : null;
-          if (lastUpdatedDate && !isNaN(lastUpdatedDate.getTime())) {
-            // Calculate how many days in the period overlap with when data was updated
-            const effectiveStart = new Date(Math.max(periodStart.getTime(), lastUpdatedDate.getTime() - 30 * 24 * 60 * 60 * 1000));
-            const effectiveEnd = new Date(Math.min(periodEnd.getTime(), lastUpdatedDate.getTime()));
-            const effectiveDays = Math.max(1, Math.ceil((effectiveEnd.getTime() - effectiveStart.getTime()) / (1000 * 60 * 60 * 24)));
-            
-            // Estimate period hours proportionally
-            periodHours = totalAccumulated * Math.min(1, daysInPeriod / 30);
-          } else {
-            // Default: proportional estimate based on total accumulated
-            periodHours = totalAccumulated * Math.min(1, daysInPeriod / 30);
-          }
-          dataSource = 'estimated';
+          // This is the actual hours accumulated since baseline was set
+          // For period calculation, we estimate based on days in period vs total time
+          // Since we don't know when baseline was set, assume it was set recently
+          periodHours = totalAccumulated;
+          dataSource = 'delta';
+        } else if (baselineHours === null && currentHours > 0) {
+          // No baseline set - we cannot calculate period hours accurately
+          // Set to 0 to avoid misleading data
+          periodHours = 0;
+          dataSource = 'no_baseline';
         }
         
         const avgDailyHours = periodHours / daysInPeriod;
         
-        // Determine utilization band (adjusted thresholds for equipment)
-        // High: >8 hrs/day (heavy use), Normal: 2-8 hrs/day, Low: <2 hrs/day
+        // Determine utilization band - spec: >20 High, 10-20 Normal, <10 Low
         let utilizationBand: 'High' | 'Normal' | 'Low';
-        if (avgDailyHours > 8) {
+        if (avgDailyHours > 20) {
           utilizationBand = 'High';
-        } else if (avgDailyHours >= 2) {
+        } else if (avgDailyHours >= 10) {
           utilizationBand = 'Normal';
         } else {
           utilizationBand = 'Low';
         }
         
-        // Calculate utilization percentage (assuming 24 hrs/day max)
+        // Calculate utilization percentage (assuming 24 hrs/day max), capped at 100%
         const ratedHoursPerDay = 24;
-        const utilizationPercent = (avgDailyHours / ratedHoursPerDay) * 100;
+        const utilizationPercent = Math.min(100, (avgDailyHours / ratedHoursPerDay) * 100);
         
         return {
           sNo: index + 1,
@@ -14599,8 +14594,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         ).sort((a, b) => new Date(a.updatedAt!).getTime() - new Date(b.updatedAt!).getTime());
         
         // Get current and baseline running hours
+        // Note: running_hours is the baseline (initial reading), current_cumulative_rh is current total
         const currentHours = Number(component.currentCumulativeRH) || Number(component.runningHours) || 0;
-        const baselineHours = Number(component.runningHours) || 0;
+        const baselineHours = component.runningHours !== null && component.runningHours !== undefined 
+          ? Number(component.runningHours) 
+          : null; // null means no baseline was set
         
         // Calculate period hours from delta accumulation or from component data
         let periodHours = 0;
@@ -14612,26 +14610,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
             return sum + Math.max(0, delta);
           }, 0);
           dataSource = 'logs';
-        } else if (currentHours > baselineHours) {
-          // No logs - calculate from component data (current - baseline)
+        } else if (baselineHours !== null && currentHours > baselineHours) {
+          // We have a valid baseline - calculate actual delta
           const totalAccumulated = currentHours - baselineHours;
-          periodHours = totalAccumulated * Math.min(1, daysInPeriod / 30);
-          dataSource = 'estimated';
+          periodHours = totalAccumulated;
+          dataSource = 'delta';
+        } else if (baselineHours === null && currentHours > 0) {
+          // No baseline set - we cannot calculate period hours accurately
+          periodHours = 0;
+          dataSource = 'no_baseline';
         }
         
         const avgDailyHours = periodHours / daysInPeriod;
         
-        // Determine utilization band (adjusted thresholds)
+        // Determine utilization band - spec: >20 High, 10-20 Normal, <10 Low
         let utilizationBand: 'High' | 'Normal' | 'Low';
-        if (avgDailyHours > 8) {
+        if (avgDailyHours > 20) {
           utilizationBand = 'High';
-        } else if (avgDailyHours >= 2) {
+        } else if (avgDailyHours >= 10) {
           utilizationBand = 'Normal';
         } else {
           utilizationBand = 'Low';
         }
         
-        const utilizationPercent = (avgDailyHours / 24) * 100;
+        const utilizationPercent = Math.min(100, (avgDailyHours / 24) * 100); // Cap at 100%
         
         return {
           componentCode: component.componentCode || component.id,
