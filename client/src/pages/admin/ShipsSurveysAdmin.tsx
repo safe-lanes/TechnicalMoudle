@@ -122,6 +122,8 @@ export default function ShipsSurveysAdmin() {
   const [masterData, setMasterData] = useState<MasterSurvey[]>([]);
   const [deletedMasterIds, setDeletedMasterIds] = useState<string[]>([]);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+  const [masterValidationError, setMasterValidationError] = useState("");
+  const [invalidSurveyIds, setInvalidSurveyIds] = useState<Set<number>>(new Set());
   const [hasSavedInSession, setHasSavedInSession] = useState<Record<string, boolean>>({
     master: false,
     company: false,
@@ -281,6 +283,21 @@ export default function ShipsSurveysAdmin() {
   });
 
   const handleSave = async () => {
+    // Validate mandatory fields for all surveys in masterData
+    const invalidSurveys = masterData.filter(s => 
+      !s.surveyName?.trim() || !s.category?.trim() || !s.group?.trim()
+    );
+    
+    if (invalidSurveys.length > 0) {
+      setInvalidSurveyIds(new Set(invalidSurveys.map(s => s.id)));
+      setMasterValidationError("Survey Name, Category, Group are Mandatory");
+      return;
+    }
+    
+    // Clear validation errors
+    setMasterValidationError("");
+    setInvalidSurveyIds(new Set());
+    
     // First, delete any surveys that were removed
     let deleteErrors = 0;
     for (const masterId of deletedMasterIds) {
@@ -382,6 +399,15 @@ export default function ShipsSurveysAdmin() {
   };
 
   const exitEditMode = () => {
+    // Remove incomplete/blank entries from masterData before exiting
+    setMasterData(prev => prev.filter(s => 
+      s.surveyName?.trim() && s.category?.trim() && s.group?.trim()
+    ));
+    
+    // Clear validation errors
+    setMasterValidationError("");
+    setInvalidSurveyIds(new Set());
+    
     if (hasUnsavedChanges) {
       queryClient.invalidateQueries({ queryKey: ['/technical/api/admin/ship-surveys-master'] });
       setDeletedMasterIds([]);
@@ -445,6 +471,32 @@ export default function ShipsSurveysAdmin() {
       return s;
     }));
     setHasUnsavedChanges(true);
+    
+    // Clear validation error for this survey if field now has a valid value
+    if ((field === "surveyName" || field === "category" || field === "group") && value?.trim()) {
+      setInvalidSurveyIds(prev => {
+        const updated = new Set(prev);
+        // Check if this survey now has all required fields filled
+        const survey = masterData.find(s => s.id === id);
+        if (survey) {
+          const updatedSurvey = { ...survey, [field]: value };
+          if (updatedSurvey.surveyName?.trim() && updatedSurvey.category?.trim() && updatedSurvey.group?.trim()) {
+            updated.delete(id);
+          }
+        }
+        return updated;
+      });
+      // Clear error message if no more invalid surveys
+      if (invalidSurveyIds.size <= 1) {
+        const survey = masterData.find(s => s.id === id);
+        if (survey) {
+          const updatedSurvey = { ...survey, [field]: value };
+          if (updatedSurvey.surveyName?.trim() && updatedSurvey.category?.trim() && updatedSurvey.group?.trim()) {
+            setMasterValidationError("");
+          }
+        }
+      }
+    }
   };
 
   const updateSequence = (surveyId: number, newSequence: number) => {
@@ -1058,7 +1110,7 @@ export default function ShipsSurveysAdmin() {
                             <Input 
                               value={survey.surveyName} 
                               onChange={(e) => updateField(survey.id, "surveyName", e.target.value)}
-                              className="h-8"
+                              className={`h-8 ${invalidSurveyIds.has(survey.id) && !survey.surveyName?.trim() ? 'border-red-500 focus:border-red-500' : ''}`}
                               data-testid={`input-survey-name-${survey.id}`}
                             />
                           ) : (
@@ -1068,7 +1120,7 @@ export default function ShipsSurveysAdmin() {
                         <td className="px-4 py-2">
                           {isEditMode ? (
                             <Select value={survey.category} onValueChange={(v) => updateField(survey.id, "category", v)}>
-                              <SelectTrigger className="h-8" data-testid={`select-category-${survey.id}`}>
+                              <SelectTrigger className={`h-8 ${invalidSurveyIds.has(survey.id) && !survey.category?.trim() ? 'border-red-500 focus:border-red-500' : ''}`} data-testid={`select-category-${survey.id}`}>
                                 <SelectValue />
                               </SelectTrigger>
                               <SelectContent>
@@ -1084,7 +1136,7 @@ export default function ShipsSurveysAdmin() {
                         <td className="px-4 py-2">
                           {isEditMode ? (
                             <Select value={survey.group} onValueChange={(v) => updateField(survey.id, "group", v)}>
-                              <SelectTrigger className="h-8" data-testid={`select-group-${survey.id}`}>
+                              <SelectTrigger className={`h-8 ${invalidSurveyIds.has(survey.id) && !survey.group?.trim() ? 'border-red-500 focus:border-red-500' : ''}`} data-testid={`select-group-${survey.id}`}>
                                 <SelectValue />
                               </SelectTrigger>
                               <SelectContent>
@@ -1135,6 +1187,14 @@ export default function ShipsSurveysAdmin() {
                         )}
                       </tr>
                     ))}
+                    {/* Show error message if validation fails */}
+                    {isEditMode && masterValidationError && (
+                      <tr>
+                        <td colSpan={10} className="px-3 py-2 text-sm text-red-600 bg-red-50">
+                          {masterValidationError}
+                        </td>
+                      </tr>
+                    )}
                   </tbody>
                 </table>
               )}
