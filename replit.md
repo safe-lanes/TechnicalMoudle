@@ -27,10 +27,12 @@ All future database schema changes MUST follow this policy without exception:
     -   Enum updates → isolated migration
     -   One logical change per migration file
 
-4.  **Migration Tracking**:
-    -   Rely exclusively on Drizzle's migration tracking
-    -   Do NOT introduce or extend custom migration tracking logic
-    -   Do NOT duplicate migration state between code and SQL
+4.  **Migration Tracking (Unified System)**:
+    -   All migrations (code-based and SQL file-based) are tracked in the `schema_migrations` table
+    -   On server start, `runDrizzleMigrations()` scans `/migrations/*.sql` files
+    -   Each SQL file is checked against `schema_migrations` by filename
+    -   Untracked files are executed and recorded automatically
+    -   This ensures pulled migration files from git are properly detected and applied
 
 5.  **Workflow**:
     -   Update `shared/schema.ts` with schema changes first

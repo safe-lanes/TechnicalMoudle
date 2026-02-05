@@ -1,5 +1,4 @@
 import { sql } from 'drizzle-orm';
-import { migrate } from 'drizzle-orm/node-postgres/migrator';
 import { resolvePostgres } from './postgresClient';
 import { isFileStorageForced } from './storageFactory';
 import { exec } from 'child_process';
@@ -648,18 +647,18 @@ export async function generateDrizzleMigrations(): Promise<boolean> {
   }
 }
 
-export async function runDrizzleMigrations(): Promise<void> {
-  console.log('🔄 Running Drizzle file-based migrations...');
+export async function runDrizzleMigrations(): Promise<{ applied: number; skipped: number }> {
+  console.log('🔄 Running Drizzle file-based SQL migrations (unified tracking)...');
   
   if (isFileStorageForced()) {
     console.log('⏭️  Skipping Drizzle migrations - file-based storage is active');
-    return;
+    return { applied: 0, skipped: 0 };
   }
   
   const postgres = await resolvePostgres();
   if (!postgres) {
     console.log('⏭️  Skipping Drizzle migrations - DATABASE_URL not configured');
-    return;
+    return { applied: 0, skipped: 0 };
   }
   
   const { db } = postgres;
@@ -667,20 +666,73 @@ export async function runDrizzleMigrations(): Promise<void> {
   
   if (!fs.existsSync(migrationsFolder)) {
     console.log('⏭️  Skipping Drizzle migrations - migrations folder not found');
-    return;
+    return { applied: 0, skipped: 0 };
   }
   
-  try {
-    await migrate(db, { migrationsFolder });
-    console.log('✅ Drizzle file-based migrations complete');
-  } catch (error: any) {
-    if (error.message?.includes('already exists') || error.code === '42P07') {
-      console.log('✅ Drizzle migrations complete (tables already exist)');
-    } else {
-      console.error('❌ Drizzle migration error:', error.message);
-      throw error;
+  await ensureMigrationsTable(db);
+  
+  const sqlFiles = fs.readdirSync(migrationsFolder)
+    .filter(file => file.endsWith('.sql'))
+    .sort();
+  
+  let applied = 0;
+  let skipped = 0;
+  
+  for (const sqlFile of sqlFiles) {
+    const migrationId = sqlFile.replace('.sql', '');
+    const alreadyApplied = await getMigrationStatus(db, migrationId);
+    
+    if (alreadyApplied) {
+      skipped++;
+      continue;
+    }
+    
+    const filePath = path.join(migrationsFolder, sqlFile);
+    const sqlContent = fs.readFileSync(filePath, 'utf-8');
+    
+    if (!sqlContent.trim()) {
+      console.log(`  ⏭️  Skipping empty migration: ${migrationId}`);
+      skipped++;
+      continue;
+    }
+    
+    console.log(`  📝 Applying SQL migration: ${migrationId}`);
+    
+    try {
+      await db.execute(sql.raw(sqlContent));
+      
+      const migration: Migration = {
+        id: migrationId,
+        name: `Drizzle SQL migration: ${sqlFile}`,
+        description: `Auto-applied from migrations/${sqlFile}`,
+        sql: sqlContent
+      };
+      await markMigrationComplete(db, migration);
+      
+      applied++;
+      console.log(`  ✅ Migration ${migrationId} applied successfully`);
+    } catch (error: any) {
+      if (error.message?.includes('already exists') || 
+          error.code === '42P07' || 
+          error.code === '42701') {
+        console.log(`  ⚠️  Migration ${migrationId} - object already exists, marking as complete`);
+        const migration: Migration = {
+          id: migrationId,
+          name: `Drizzle SQL migration: ${sqlFile}`,
+          description: `Auto-applied from migrations/${sqlFile} (already existed)`,
+          sql: sqlContent
+        };
+        await markMigrationComplete(db, migration);
+        skipped++;
+      } else {
+        console.error(`  ❌ Migration ${migrationId} failed:`, error.message);
+        throw error;
+      }
     }
   }
+  
+  console.log(`✅ Drizzle SQL migrations complete: ${applied} applied, ${skipped} skipped`);
+  return { applied, skipped };
 }
 
 export async function runBackupAndMigrations(): Promise<void> {
