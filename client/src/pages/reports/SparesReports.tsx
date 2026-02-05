@@ -151,20 +151,6 @@ const SparesReports: React.FC<SparesReportsProps> = ({ onBack, globalFilters }) 
       estimatedTime: "3-5 min"
     },
     {
-      id: "spares-inventory-snapshot",
-      name: "Current Inventory Snapshot",
-      description: "Complete inventory listing with stock levels and locations",
-      purpose: "Stock visibility & audit (All stakeholders)",
-      frequency: "Weekly",
-      fields: ["Part Code", "Part Name", "Component", "ROB", "Min", "Max", "Location", "Status"],
-      filters: ["Vessel", "Component", "Stock Status", "Location"],
-      outputs: ["PDF", "Excel"],
-      icon: Package,
-      priority: "medium",
-      lastGenerated: "1 day ago",
-      estimatedTime: "1-2 min"
-    },
-    {
       id: "spares-critical-parts",
       name: "Critical Spares Report",
       description: "Status of critical and essential spare parts inventory",
