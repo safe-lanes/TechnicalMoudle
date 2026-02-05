@@ -1,0 +1,382 @@
+COMPLETE SPECIFICATIONS FOR ALL 4 REPORTS
+REPORT 3: RH-Based Maintenance Triggers
+Report Specifications
+Frequency: Daily/Weekly
+
+Priority: HIGH
+
+Est. Time: 1-2 min
+
+Outputs: Preview, PDF (no Excel button visible)
+
+Purpose
+Show all components approaching or exceeding their running-hour maintenance thresholds to help plan upcoming RH-based maintenance work.
+
+Calculation Logic
+javascript
+// For each component with RH-based maintenance
+Hours Since Last Maintenance = Current Running Hours - Last Maintenance Hours
+Hours to Next Maintenance = Threshold Hours - Hours Since Last Maintenance
+Hours Overdue = Hours Since Last Maintenance - Threshold Hours (if negative, it's overdue)
+
+// Alert Bands
+Status = 
+  Hours to Next < 0 ? "OVERDUE" :
+  Hours to Next < (Threshold Hours × 0.10) ? "NEAR DUE" : // Within 10% of interval
+  "OK"
+
+// Example:
+// Component: Main Engine
+// Threshold: 500 hours
+// Last Maintenance at: 2500 hours
+// Current Reading: 2980 hours
+// Hours Since Last: 2980 - 2500 = 480 hours
+// Hours to Next: 500 - 480 = 20 hours
+// Status: NEAR DUE (20 is < 50, which is 10% of 500)
+Data Requirements
+Tables Needed:
+
+components table
+
+running_hours table
+
+work_orders table (for RH-based jobs)
+
+maintenance_rules table (or embedded in work_orders)
+
+Required Fields (ALL EXIST ✅):
+
+sql
+SELECT 
+    c.component_name,
+    c.component_code,
+    c.component_category,
+    c.location,
+    c.department,
+    wo.job_code,
+    wo.job_title,
+    wo.maintenance_basis,
+    wo.frequency_value AS threshold_hours,
+    rh.running_hours AS current_hours,
+    -- Need to track last maintenance hours (from completion records)
+    (SELECT current_rh_reading 
+     FROM work_orders_completion 
+     WHERE component_id = c.id 
+       AND job_code = wo.job_code 
+       AND status = 'Completed'
+     ORDER BY completion_date DESC LIMIT 1) AS last_maintenance_hours
+FROM components c
+INNER JOIN running_hours rh ON c.id = rh.component_id
+INNER JOIN work_orders wo ON c.id = wo.component_id
+WHERE wo.maintenance_basis IN ('Running Hours', 'Mixed')
+  AND c.vessel_id = ?
+  AND c.is_active = true
+  AND wo.is_active = true
+API Endpoint Structure
+javascript
+GET /api/reports/rh-based-maintenance-triggers
+Query params:
+  - vessel_id
+  - status (optional: overdue|near_due|ok)
+  - component_category (optional filter)
+  - department (optional filter)
+
+Response:
+{
+  summary: {
+    totalRHComponents: 35,
+    overdue: 5,
+    nearDue: 8,
+    ok: 22
+  },
+  data: [
+    {
+      componentName: "Main Engine No.1",
+      componentCode: "601.001",
+      category: "Diesel Engines",
+      location: "Engine Room",
+      jobCode: "ME-OVH-500H",
+      jobTitle: "Main Engine 500H Overhaul",
+      thresholdHours: 500,
+      currentHours: 2980,
+      lastMaintenanceHours: 2500,
+      hoursSinceLast: 480,
+      hoursToNext: 20,
+      status: "NEAR DUE",
+      duePercentage: 96, // (480/500)*100
+      alertLevel: "Warning"
+    },
+    ...
+  ]
+}
+PDF Structure
+Orientation: Landscape
+
+Columns: Component | Code | Location | Job Title | Threshold (hrs) | Current (hrs) | Last Maint (hrs) | Hours Since | Hours to Next | Status
+
+Color coding:
+
+Red background: OVERDUE
+
+Yellow background: NEAR DUE
+
+Green background: OK
+
+Sorting: Status (Overdue first) → Hours to Next (ascending)
+
+FEASIBILITY: ✅ 95% FEASIBLE
+All fields exist in work_orders and running_hours
+
+Need to track last_maintenance_hours from completion records (exists in work order completion form as "Previous RH reading" and "Current Reading")
+
+Simple threshold comparison logic
+
+REPORT 4: Condition Monitoring Trends
+Report Specifications
+Frequency: Monthly
+
+Priority: MEDIUM
+
+Est. Time: 3-5 min
+
+Outputs: Preview, PDF, Excel
+
+Purpose
+Track equipment condition parameters (vibration, temperature, pressure, lube oil analysis, etc.) over time to identify deteriorating equipment before failure.
+
+Calculation Logic
+javascript
+// For each component with condition monitoring
+const calculateTrends = (readings) => {
+    // Time series analysis
+    const values = readings.map(r => r.value);
+    const dates = readings.map(r => new Date(r.date));
+    
+    // Statistical metrics
+    const min = Math.min(...values);
+    const max = Math.max(...values);
+    const avg = values.reduce((a, b) => a + b, 0) / values.length;
+    const stdDev = Math.sqrt(
+        values.reduce((sum, val) => sum + Math.pow(val - avg, 2), 0) / values.length
+    );
+    
+    // Trend direction (linear regression slope)
+    const n = values.length;
+    const sumX = dates.reduce((sum, d, i) => sum + i, 0);
+    const sumY = values.reduce((a, b) => a + b, 0);
+    const sumXY = values.reduce((sum, val, i) => sum + (i * val), 0);
+    const sumX2 = dates.reduce((sum, d, i) => sum + (i * i), 0);
+    
+    const slope = (n * sumXY - sumX * sumY) / (n * sumX2 - sumX * sumX);
+    
+    const trend = 
+        slope > 0.1 ? "Worsening" :
+        slope < -0.1 ? "Improving" :
+        "Stable";
+    
+    // Rate of change (per week/month)
+    const timeSpan = (dates[n-1] - dates[0]) / (1000 * 60 * 60 * 24); // days
+    const changeRate = (values[n-1] - values[0]) / (timeSpan / 30); // per month
+    
+    // Threshold crossings
+    const alertCrossings = readings.filter(r => r.status_band === 'Alert').length;
+    const alarmCrossings = readings.filter(r => r.status_band === 'Alarm').length;
+    
+    return {
+        min, max, avg, stdDev,
+        trend,
+        changeRate,
+        latestValue: values[n-1],
+        latestStatus: readings[n-1].status_band,
+        alertCount: alertCrossings,
+        alarmCount: alarmCrossings
+    };
+};
+Data Requirements
+Tables Needed:
+
+components table
+
+condition_readings table ⚠️ MAY NEED TO CREATE
+
+condition_readings Table Schema:
+
+sql
+CREATE TABLE IF NOT EXISTS condition_readings (
+  id TEXT PRIMARY KEY,
+  component_id TEXT NOT NULL,
+  date TIMESTAMP NOT NULL,
+  parameter_name TEXT NOT NULL, -- 'vibration', 'temperature', 'pressure', 'oil_analysis', etc.
+  value REAL NOT NULL,
+  unit TEXT,
+  status_band TEXT DEFAULT 'Normal', -- 'Normal', 'Alert', 'Alarm'
+  threshold_alert REAL,
+  threshold_alarm REAL,
+  source TEXT DEFAULT 'manual', -- 'manual', 'sensor', 'lab'
+  recorded_by TEXT,
+  vessel_id TEXT,
+  notes TEXT,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (component_id) REFERENCES components(id)
+);
+
+CREATE INDEX idx_condition_readings_component ON condition_readings(component_id);
+CREATE INDEX idx_condition_readings_date ON condition_readings(date);
+CREATE INDEX idx_condition_readings_parameter ON condition_readings(parameter_name);
+Query Example:
+
+sql
+SELECT 
+    c.component_name,
+    c.component_code,
+    c.component_category,
+    c.location,
+    cr.parameter_name,
+    cr.value,
+    cr.unit,
+    cr.status_band,
+    cr.date,
+    cr.source
+FROM components c
+INNER JOIN condition_readings cr ON c.id = cr.component_id
+WHERE c.vessel_id = ?
+  AND c.condition_based = true
+  AND cr.date BETWEEN ? AND ?
+ORDER BY c.component_name, cr.parameter_name, cr.date
+API Endpoint Structure
+javascript
+GET /api/reports/condition-monitoring-trends
+Query params:
+  - vessel_id
+  - start_date (default: 3 months ago)
+  - end_date (default: today)
+  - component_category (optional)
+  - parameter_name (optional: vibration|temperature|pressure|oil_analysis)
+  - status_band (optional: Normal|Alert|Alarm)
+
+Response:
+{
+  summary: {
+    totalComponents: 25,
+    totalParameters: 78,
+    worseningTrends: 5,
+    stableTrends: 68,
+    improvingTrends: 5,
+    currentAlarms: 2
+  },
+  data: [
+    {
+      componentName: "Main Engine No.1",
+      componentCode: "601.001",
+      category: "Diesel Engines",
+      location: "Engine Room",
+      parameterName: "Bearing Temperature",
+      unit: "°C",
+      minValue: 45.2,
+      maxValue: 78.5,
+      avgValue: 62.3,
+      stdDev: 8.4,
+      latestValue: 75.2,
+      latestStatus: "Alert",
+      trend: "Worsening",
+      changeRatePerMonth: 2.5,
+      alertCount: 3,
+      alarmCount: 0,
+      readingsCount: 45,
+      periodDays: 90
+    },
+    ...
+  ]
+}
+PDF Structure
+Orientation: Landscape
+
+Columns: Component | Code | Parameter | Unit | Min | Avg | Max | Latest | Trend | Status | Alert Count
+
+Color coding:
+
+Red text: Worsening trend
+
+Green text: Improving trend
+
+Black text: Stable trend
+
+Grouping: By component, then by parameter
+
+Excel Structure
+Additional columns:
+
+Standard Deviation
+
+Change Rate (per month)
+
+Threshold Alert Value
+
+Threshold Alarm Value
+
+All raw readings (separate sheet)
+
+Trend chart data
+
+FEASIBILITY: ⚠️ 80% FEASIBLE
+REQUIRES creating condition_readings table
+
+Components already have condition_based boolean field
+
+All calculation logic is straightforward
+
+Action Required: Database migration to add condition_readings table
+
+IMPLEMENTATION STATUS SUMMARY
+Report	Database Ready	Calculations	Feasibility	Action Needed
+1. Equipment Utilization Summary	✅ YES	✅ Simple	✅ 100%	Implement API + PDF/Excel
+2. Running Hours Anomaly Detection	✅ YES	✅ Statistical	✅ 100%	Implement API + PDF/Excel
+3. RH-Based Maintenance Triggers	✅ YES	✅ Simple	✅ 95%	Implement API + PDF
+4. Condition Monitoring Trends	⚠️ PARTIAL	✅ Statistical	⚠️ 80%	Create condition_readings table first, then implement
+IMPLEMENTATION RECOMMENDATION
+Phase 1: Immediate Implementation (Reports 1-3)
+Since Reports 1, 2, and 3 require NO database changes, implement them immediately:
+
+✅ Equipment Utilization Summary → Full implementation
+
+✅ Running Hours Anomaly Detection → Full implementation
+
+✅ RH-Based Maintenance Triggers → Full implementation
+
+Phase 2: Conditional Implementation (Report 4)
+Report 4 requires a new table:
+
+⚠️ Condition Monitoring Trends → Implement AFTER creating condition_readings table
+
+Alternative for Report 4: If you don't want to add condition monitoring yet, you could:
+
+Mark it as "Coming Soon" in the UI
+
+Or implement a basic version using only running hours as a "condition" indicator
+
+Or defer until condition monitoring sensors are integrated
+
+NEXT STEPS
+Would you like me to proceed with implementation of Reports 1, 2, and 3 now?
+
+I can create:
+
+✅ Backend API endpoints (/api/reports/equipment-utilization-summary, etc.)
+
+✅ PDF generation logic (landscape format, matching your existing style)
+
+✅ Excel export logic (with proper formatting)
+
+✅ Frontend integration (Preview, PDF, Excel buttons)
+
+✅ Filters (vessel, date range, category, department)
+
+Estimated Implementation Time:
+
+Report 1: ~45 minutes
+
+Report 2: ~60 minutes (more complex statistical logic)
+
+Report 3: ~40 minutes
+
+Total: ~2.5 hours for all 3 reports
