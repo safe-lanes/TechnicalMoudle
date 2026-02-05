@@ -277,7 +277,7 @@ const ActionsCellRenderer = (params: ActionsCellRendererProps) => {
 };
 
 export default function CertificatesPage() {
-  const { isClientAdmin } = useUIRole();
+  const { isClientAdmin, isSailAdmin } = useUIRole();
   const [showFilters, setShowFilters] = useState(true);
   const [filterValue, setFilterValue] = useState<VesselFleetGroupFilterValue>(createDefaultFilterValue());
   const [selectedVesselNames, setSelectedVesselNames] = useState<string[]>([]);
@@ -788,7 +788,7 @@ export default function CertificatesPage() {
 
       {showFilters && (
         <div className="flex items-center gap-4 px-6 flex-shrink-0">
-          {isClientAdmin && (
+          {(isClientAdmin || isSailAdmin) && (
             <VesselFleetGroupFilter
               value={filterValue}
               onChange={handleFilterChange}
