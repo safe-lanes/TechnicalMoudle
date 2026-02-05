@@ -198,6 +198,37 @@ export default function SurveysPage() {
       });
     }
     
+    // Sort by priority: Overdue (red) first, Due within 60 days (amber) second, Normal last
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const sixtyDaysFromNow = new Date(today);
+    sixtyDaysFromNow.setDate(sixtyDaysFromNow.getDate() + 60);
+    
+    const getPriority = (survey: SurveyData): number => {
+      if (!survey.dueDate) return 3; // No date = lowest priority
+      
+      const dueDateStr = parseDisplayDate(survey.dueDate);
+      if (!dueDateStr) return 3;
+      
+      const dueDate = new Date(dueDateStr);
+      dueDate.setHours(0, 0, 0, 0);
+      
+      if (dueDate < today) return 0; // Overdue (red) - highest priority
+      if (dueDate <= sixtyDaysFromNow) return 1; // Due within 60 days (amber)
+      return 2; // Normal
+    };
+    
+    result = [...result].sort((a, b) => {
+      const priorityA = getPriority(a);
+      const priorityB = getPriority(b);
+      if (priorityA !== priorityB) return priorityA - priorityB;
+      
+      // Within same priority, sort by due date (earliest first)
+      const dateA = parseDisplayDate(a.dueDate || '') || '';
+      const dateB = parseDisplayDate(b.dueDate || '') || '';
+      return new Date(dateA).getTime() - new Date(dateB).getTime();
+    });
+    
     return result;
   }, [surveys, selectedVesselNames, dueInFilter]);
 
