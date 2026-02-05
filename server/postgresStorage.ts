@@ -173,6 +173,9 @@ import {
   type SpareWithInventory,
   type JobComponentLink,
   type InsertJobComponentLink,
+  workOrderPostponements,
+  type WorkOrderPostponement,
+  type InsertWorkOrderPostponement,
 } from '@shared/schema';
 
 /**
@@ -5267,6 +5270,77 @@ export class PostgresStorage {
       .returning();
     if (result.length === 0) {
       throw new Error(`WorkOrderExecutionDetail not found: ${id}`);
+    }
+    return result[0];
+  }
+
+  // ============= WORK ORDER POSTPONEMENTS (History/Audit Table) =============
+
+  async getWorkOrderPostponements(vesselId: string, filters?: { 
+    workOrderId?: string; 
+    status?: string; 
+    dateFrom?: string; 
+    dateTo?: string;
+  }): Promise<WorkOrderPostponement[]> {
+    const db = await getDb();
+    
+    const conditions: any[] = [eq(workOrderPostponements.vesselId, vesselId)];
+    
+    if (filters?.workOrderId) {
+      conditions.push(eq(workOrderPostponements.workOrderId, filters.workOrderId));
+    }
+    if (filters?.status && filters.status !== 'All') {
+      conditions.push(eq(workOrderPostponements.status, filters.status));
+    }
+    if (filters?.dateFrom) {
+      conditions.push(gte(workOrderPostponements.submittedDate, filters.dateFrom));
+    }
+    if (filters?.dateTo) {
+      conditions.push(lte(workOrderPostponements.submittedDate, filters.dateTo));
+    }
+    
+    return await db.select().from(workOrderPostponements)
+      .where(and(...conditions))
+      .orderBy(desc(workOrderPostponements.submittedDate));
+  }
+
+  async getWorkOrderPostponementById(id: string): Promise<WorkOrderPostponement | undefined> {
+    const db = await getDb();
+    const result = await db.select().from(workOrderPostponements)
+      .where(eq(workOrderPostponements.id, id));
+    return result[0];
+  }
+
+  async getWorkOrderPostponementsByWorkOrderId(workOrderId: string): Promise<WorkOrderPostponement[]> {
+    const db = await getDb();
+    return await db.select().from(workOrderPostponements)
+      .where(eq(workOrderPostponements.workOrderId, workOrderId))
+      .orderBy(desc(workOrderPostponements.postponementNumber));
+  }
+
+  async getWorkOrderPostponementCount(workOrderId: string): Promise<number> {
+    const db = await getDb();
+    const result = await db.select({ count: sql<number>`count(*)` })
+      .from(workOrderPostponements)
+      .where(eq(workOrderPostponements.workOrderId, workOrderId));
+    return Number(result[0]?.count || 0);
+  }
+
+  async createWorkOrderPostponement(postponement: InsertWorkOrderPostponement): Promise<WorkOrderPostponement> {
+    const db = await getDb();
+    const result = await db.insert(workOrderPostponements).values(postponement).returning();
+    return result[0];
+  }
+
+  async updateWorkOrderPostponement(id: string, updates: Partial<InsertWorkOrderPostponement>): Promise<WorkOrderPostponement> {
+    const db = await getDb();
+    const { id: _, ...updateData } = updates as any;
+    const result = await db.update(workOrderPostponements)
+      .set({ ...updateData, updatedAt: new Date() })
+      .where(eq(workOrderPostponements.id, id))
+      .returning();
+    if (result.length === 0) {
+      throw new Error(`WorkOrderPostponement not found: ${id}`);
     }
     return result[0];
   }

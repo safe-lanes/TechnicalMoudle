@@ -159,6 +159,9 @@ import {
   type InventoryEventType,
   type InventoryReferenceType,
   type SpareWithInventory,
+  workOrderPostponements,
+  type WorkOrderPostponement,
+  type InsertWorkOrderPostponement,
 } from "@shared/schema";
 
 export function sortObjectKeys(obj: any): any {
@@ -774,6 +777,19 @@ export interface IStorage {
   getWorkOrderExecutionDetailById(id: number): Promise<WorkOrderExecutionDetails | undefined>;
   createWorkOrderExecutionDetail(detail: InsertWorkOrderExecutionDetails): Promise<WorkOrderExecutionDetails>;
   updateWorkOrderExecutionDetail(id: number, data: Partial<WorkOrderExecutionDetails>): Promise<WorkOrderExecutionDetails>;
+  
+  // Work Order Postponements (History/Audit Table)
+  getWorkOrderPostponements(vesselId: string, filters?: { 
+    workOrderId?: string; 
+    status?: string; 
+    dateFrom?: string; 
+    dateTo?: string;
+  }): Promise<WorkOrderPostponement[]>;
+  getWorkOrderPostponementById(id: string): Promise<WorkOrderPostponement | undefined>;
+  getWorkOrderPostponementsByWorkOrderId(workOrderId: string): Promise<WorkOrderPostponement[]>;
+  getWorkOrderPostponementCount(workOrderId: string): Promise<number>;
+  createWorkOrderPostponement(postponement: InsertWorkOrderPostponement): Promise<WorkOrderPostponement>;
+  updateWorkOrderPostponement(id: string, updates: Partial<InsertWorkOrderPostponement>): Promise<WorkOrderPostponement>;
   
   // ============= INVENTORY MANAGEMENT =============
   
