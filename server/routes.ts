@@ -4846,6 +4846,352 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // ═══════════════════════════════════════════════════════════════
+  // REPORT 1.6: UNPLANNED/BREAKDOWN JOBS API
+  // Returns completed unplanned/breakdown work orders with manhours data
+  // ═══════════════════════════════════════════════════════════════
+  app.get("/technical/api/reports/unplanned-breakdown-jobs", async (req, res) => {
+    try {
+      const vesselId = req.query.vesselId as string;
+      const startDate = req.query.startDate as string;
+      const endDate = req.query.endDate as string;
+
+      if (!vesselId) {
+        return res.status(400).json({ error: "vesselId is required" });
+      }
+      if (!startDate || !endDate) {
+        return res.status(400).json({ error: "startDate and endDate are required" });
+      }
+
+      // Get all work orders for the vessel
+      const allWorkOrders = await storage.getWorkOrders(vesselId);
+
+      // Parse date helper
+      const parseDate = (dateStr: string | null | undefined): Date | null => {
+        if (!dateStr) return null;
+        try {
+          const d = new Date(dateStr);
+          return isNaN(d.getTime()) ? null : d;
+        } catch {
+          return null;
+        }
+      };
+
+      const startDateObj = new Date(startDate);
+      startDateObj.setHours(0, 0, 0, 0);
+      const endDateObj = new Date(endDate);
+      endDateObj.setHours(23, 59, 59, 999);
+
+      // Filter for unplanned/breakdown jobs that are completed
+      const unplannedBreakdownJobs = allWorkOrders.filter(wo => {
+        // Check if it's an unplanned or breakdown job
+        const isUnplanned = 
+          wo.workOrderType === 'Unplanned' ||
+          (wo.taskType && (
+            wo.taskType.toLowerCase().includes('unplanned') ||
+            wo.taskType.toLowerCase().includes('breakdown')
+          )) ||
+          (wo.workOrderNo && wo.workOrderNo.startsWith('UWO'));
+
+        if (!isUnplanned) return false;
+
+        // Check if completed
+        if (wo.status !== 'Completed') return false;
+
+        // Filter by dateCompleted for completed jobs report
+        const completedDateStr = wo.dateCompleted ? (wo.dateCompleted instanceof Date ? wo.dateCompleted.toISOString() : String(wo.dateCompleted)) : null;
+        const completedDate = parseDate(completedDateStr);
+        if (!completedDate) return true; // Include jobs without completion date
+
+        return completedDate >= startDateObj && completedDate <= endDateObj;
+      });
+
+      // Format date for display
+      const formatDateDisplay = (dateVal: string | Date | null | undefined): string => {
+        if (!dateVal) return '-';
+        try {
+          const dateStr = dateVal instanceof Date ? dateVal.toISOString() : String(dateVal);
+          const d = new Date(dateStr);
+          if (isNaN(d.getTime())) return '-';
+          return d.toISOString().split('T')[0];
+        } catch {
+          return '-';
+        }
+      };
+
+      // Build report data
+      const reportData = unplannedBreakdownJobs.map((wo, index) => ({
+        sNo: index + 1,
+        workOrderNo: wo.workOrderNo || wo.id || '-',
+        componentCode: wo.componentCode || '-',
+        componentName: wo.component || '-',
+        jobTitle: wo.jobTitle || '-',
+        briefDescription: wo.briefWorkDescription || '-',
+        createdDate: formatDateDisplay(wo.createdAt),
+        completedDate: formatDateDisplay(wo.dateCompleted),
+        performedBy: wo.performedBy || wo.assignedTo || '-',
+        totalHours: wo.totalTimeHours ? parseFloat(wo.totalTimeHours).toFixed(1) : '0',
+        manhours: wo.manhours ? parseFloat(wo.manhours).toFixed(1) : '0',
+        department: wo.department || '-'
+      }));
+
+      // Calculate metadata
+      const totalManhours = unplannedBreakdownJobs.reduce((sum, wo) => {
+        return sum + (parseFloat(wo.manhours || '0') || 0);
+      }, 0);
+
+      const totalHours = unplannedBreakdownJobs.reduce((sum, wo) => {
+        return sum + (parseFloat(wo.totalTimeHours || '0') || 0);
+      }, 0);
+
+      const avgTimeTaken = unplannedBreakdownJobs.length > 0
+        ? (totalHours / unplannedBreakdownJobs.length).toFixed(2)
+        : '0';
+
+      // Group by department
+      const byDepartment: Record<string, number> = {};
+      unplannedBreakdownJobs.forEach(wo => {
+        const dept = wo.department || 'Not Specified';
+        byDepartment[dept] = (byDepartment[dept] || 0) + 1;
+      });
+
+      // Group by priority
+      const byPriority: Record<string, number> = {};
+      unplannedBreakdownJobs.forEach(wo => {
+        const priority = wo.jobPriority || 'Not Specified';
+        byPriority[priority] = (byPriority[priority] || 0) + 1;
+      });
+
+      const metadata = {
+        totalUnplannedJobs: reportData.length,
+        totalManhours: totalManhours.toFixed(1),
+        avgTimeTaken,
+        byDepartment,
+        byPriority,
+        reportDate: new Date().toISOString(),
+        dateRange: { start: startDate, end: endDate }
+      };
+
+      res.json({
+        success: true,
+        data: reportData,
+        metadata
+      });
+
+    } catch (error: any) {
+      console.error('Error generating unplanned/breakdown jobs report:', error);
+      res.status(500).json({ 
+        success: false, 
+        error: error.message || 'Failed to generate unplanned/breakdown jobs report'
+      });
+    }
+  });
+
+  // ═══════════════════════════════════════════════════════════════
+  // REPORT 1.6: UNPLANNED/BREAKDOWN JOBS EXCEL EXPORT
+  // Generates Excel file with unplanned/breakdown jobs data
+  // ═══════════════════════════════════════════════════════════════
+  app.post("/technical/api/reports/unplanned-breakdown-jobs/excel", async (req, res) => {
+    try {
+      const { vesselId, startDate, endDate } = req.body;
+      
+      if (!vesselId) {
+        return res.status(400).json({ error: "Please select a vessel" });
+      }
+      if (!startDate || !endDate) {
+        return res.status(400).json({ error: "Please select a date range" });
+      }
+
+      // Get all work orders for the vessel
+      const allWorkOrders = await storage.getWorkOrders(vesselId);
+      const allVessels = await storage.getVessels();
+      const vessel = allVessels.find(v => v.id === vesselId);
+      const vesselName = vessel?.name || vesselId;
+
+      // Parse date helper
+      const parseDate = (dateStr: string | null | undefined): Date | null => {
+        if (!dateStr) return null;
+        try {
+          const d = new Date(dateStr);
+          return isNaN(d.getTime()) ? null : d;
+        } catch {
+          return null;
+        }
+      };
+
+      const startDateObj = new Date(startDate);
+      startDateObj.setHours(0, 0, 0, 0);
+      const endDateObj = new Date(endDate);
+      endDateObj.setHours(23, 59, 59, 999);
+
+      // Filter for unplanned/breakdown jobs that are completed
+      const unplannedBreakdownJobs = allWorkOrders.filter(wo => {
+        const isUnplanned = 
+          wo.workOrderType === 'Unplanned' ||
+          (wo.taskType && (
+            wo.taskType.toLowerCase().includes('unplanned') ||
+            wo.taskType.toLowerCase().includes('breakdown')
+          )) ||
+          (wo.workOrderNo && wo.workOrderNo.startsWith('UWO'));
+
+        if (!isUnplanned) return false;
+        if (wo.status !== 'Completed') return false;
+
+        // Filter by dateCompleted for completed jobs report
+        const completedDateStr = wo.dateCompleted ? (wo.dateCompleted instanceof Date ? wo.dateCompleted.toISOString() : String(wo.dateCompleted)) : null;
+        const completedDate = parseDate(completedDateStr);
+        if (!completedDate) return true; // Include jobs without completion date
+
+        return completedDate >= startDateObj && completedDate <= endDateObj;
+      });
+
+      // Format date for display
+      const formatDateDisplay = (dateVal: string | Date | null | undefined): string => {
+        if (!dateVal) return '-';
+        try {
+          const dateStr = dateVal instanceof Date ? dateVal.toISOString() : String(dateVal);
+          const d = new Date(dateStr);
+          if (isNaN(d.getTime())) return '-';
+          return d.toISOString().split('T')[0];
+        } catch {
+          return '-';
+        }
+      };
+
+      // Build report data
+      const reportData = unplannedBreakdownJobs.map((wo, index) => ({
+        sNo: index + 1,
+        workOrderNo: wo.workOrderNo || wo.id || '-',
+        componentCode: wo.componentCode || '-',
+        componentName: wo.component || '-',
+        jobTitle: wo.jobTitle || '-',
+        briefDescription: wo.briefWorkDescription || '-',
+        createdDate: formatDateDisplay(wo.createdAt),
+        completedDate: formatDateDisplay(wo.dateCompleted),
+        performedBy: wo.performedBy || wo.assignedTo || '-',
+        totalHours: wo.totalTimeHours ? parseFloat(wo.totalTimeHours).toFixed(1) : '0',
+        manhours: wo.manhours ? parseFloat(wo.manhours).toFixed(1) : '0',
+        department: wo.department || '-'
+      }));
+
+      // Calculate metadata
+      const totalManhours = unplannedBreakdownJobs.reduce((sum, wo) => {
+        return sum + (parseFloat(wo.manhours || '0') || 0);
+      }, 0);
+
+      const totalHours = unplannedBreakdownJobs.reduce((sum, wo) => {
+        return sum + (parseFloat(wo.totalTimeHours || '0') || 0);
+      }, 0);
+
+      const avgTimeTaken = unplannedBreakdownJobs.length > 0
+        ? (totalHours / unplannedBreakdownJobs.length).toFixed(2)
+        : '0';
+
+      // Create Excel workbook
+      const ExcelJS = require('exceljs');
+      const workbook = new ExcelJS.Workbook();
+      const worksheet = workbook.addWorksheet('Unplanned Breakdown Jobs');
+
+      // Define columns (11 columns as specified)
+      const columns = [
+        { header: 'S.No', key: 'sNo', width: 8 },
+        { header: 'WO Number', key: 'workOrderNo', width: 18 },
+        { header: 'Comp. Code', key: 'componentCode', width: 15 },
+        { header: 'Component Name', key: 'componentName', width: 30 },
+        { header: 'Job Title', key: 'jobTitle', width: 25 },
+        { header: 'Description', key: 'briefDescription', width: 35 },
+        { header: 'Created Date', key: 'createdDate', width: 14 },
+        { header: 'Completed Date', key: 'completedDate', width: 14 },
+        { header: 'Performed By', key: 'performedBy', width: 18 },
+        { header: 'Hours', key: 'totalHours', width: 10 },
+        { header: 'Manhours', key: 'manhours', width: 12 }
+      ];
+
+      worksheet.columns = columns;
+      const lastColLetter = getLastColumnLetter(columns.length);
+
+      // Apply standard header using helper from excelReportStyles
+      applyStandardHeader(
+        worksheet,
+        'UNPLANNED/BREAKDOWN JOBS REPORT',
+        `Analysis of breakdown maintenance and unplanned work (${startDate} to ${endDate})`,
+        vesselName,
+        reportData.length,
+        lastColLetter
+      );
+
+      // Summary info at row 5
+      worksheet.getRow(5).getCell(1).value = `Total Jobs: ${reportData.length} | Total Manhours: ${totalManhours.toFixed(1)} | Avg Time: ${avgTimeTaken} hrs`;
+      worksheet.getRow(5).getCell(1).font = { size: 10, italic: true };
+      worksheet.mergeCells(`A5:${lastColLetter}5`);
+
+      // Apply table headers at row 7
+      applyStandardTableHeader(worksheet, columns, 7);
+
+      // Data rows
+      reportData.forEach((row, index) => {
+        const dataRow = worksheet.getRow(8 + index);
+        const rowData = [
+          row.sNo,
+          row.workOrderNo,
+          row.componentCode,
+          row.componentName,
+          row.jobTitle,
+          row.briefDescription,
+          row.createdDate,
+          row.completedDate,
+          row.performedBy,
+          row.totalHours,
+          row.manhours
+        ];
+
+        rowData.forEach((value, colIdx) => {
+          dataRow.getCell(colIdx + 1).value = value;
+        });
+
+        // Alternating row colors
+        const fillColor = index % 2 === 0 ? COLORS.bgWhite : COLORS.bgLight;
+
+        dataRow.eachCell((cell: any, colNumber: number) => {
+          if (colNumber <= columns.length) {
+            cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: fillColor } };
+            cell.border = {
+              top: { style: 'thin', color: { argb: COLORS.border } },
+              left: { style: 'thin', color: { argb: COLORS.border } },
+              bottom: { style: 'thin', color: { argb: COLORS.border } },
+              right: { style: 'thin', color: { argb: COLORS.border } }
+            };
+          }
+        });
+      });
+
+      // Apply auto-filter
+      worksheet.autoFilter = {
+        from: { row: 7, column: 1 },
+        to: { row: 7 + reportData.length, column: columns.length }
+      };
+
+      // Apply standard page setup
+      applyStandardPageSetup(worksheet);
+
+      // Generate buffer and send
+      const buffer = await workbook.xlsx.writeBuffer();
+      const dateStr = new Date().toISOString().split('T')[0].replace(/-/g, '');
+      const filename = `Unplanned_Breakdown_Jobs_${vesselName.replace(/[^a-z0-9]/gi, '_')}_${dateStr}.xlsx`;
+
+      res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+      res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+      res.send(buffer);
+
+    } catch (error: any) {
+      console.error('Error generating unplanned/breakdown jobs Excel report:', error);
+      res.status(500).json({ 
+        success: false, 
+        error: error.message || 'Failed to generate unplanned/breakdown jobs Excel report'
+      });
+    }
+  });
+
   
   // Defects API routes
   

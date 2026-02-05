@@ -1024,6 +1024,161 @@ class PDFReportGenerator {
     const filename = this.generateFilename(config.title, config.vessel);
     this.doc.save(filename);
   }
+
+  // ═══════════════════════════════════════════════════════════════
+  // REPORT 1.6: UNPLANNED/BREAKDOWN JOBS PDF GENERATOR
+  // Same styling as Critical Equipment Report (Report 1.5)
+  // ═══════════════════════════════════════════════════════════════
+  generateUnplannedBreakdownReport(
+    config: PDFReportConfig,
+    columns: TableColumn[],
+    data: any[],
+    summaryData?: { label: string; value: string | number }[],
+    metadata?: {
+      totalUnplannedJobs: number;
+      totalManhours: string;
+      avgTimeTaken: string;
+      dateRange: { start: string; end: string };
+    }
+  ): void {
+    // Force landscape and A4 for 11 columns
+    this.doc = new jsPDF({
+      orientation: 'landscape',
+      unit: 'mm',
+      format: 'a4'
+    });
+
+    const pageWidth = this.doc.internal.pageSize.getWidth();
+    const pageHeight = this.doc.internal.pageSize.getHeight();
+    const margin = 10;
+
+    // HEADER - Deep blue (#1E5A8E) - Same as Report 1.5
+    this.doc.setFillColor(...PDF_COLORS.primary);
+    this.doc.rect(0, 0, pageWidth, 30, 'F');
+
+    this.doc.setTextColor(...PDF_COLORS.textWhite);
+    this.doc.setFontSize(18);
+    this.doc.setFont('helvetica', 'bold');
+    this.doc.text(config.title, margin, 12);
+
+    if (config.subtitle) {
+      this.doc.setFontSize(10);
+      this.doc.setFont('helvetica', 'normal');
+      this.doc.text(config.subtitle, margin, 20);
+    }
+
+    // Right side info
+    this.doc.setFontSize(9);
+    this.doc.setFont('helvetica', 'normal');
+    const rightInfo = [
+      `Vessel: ${config.vessel || 'All Vessels'}`,
+      `Generated: ${format(new Date(), 'dd MMM yyyy HH:mm')}`,
+      `By: ${config.generatedBy || 'System'}`
+    ];
+    
+    let yPos = 10;
+    rightInfo.forEach(info => {
+      this.doc!.text(info, pageWidth - margin, yPos, { align: 'right' });
+      yPos += 5;
+    });
+
+    let startY = 38;
+
+    // SUMMARY SECTION
+    if (summaryData && summaryData.length > 0) {
+      this.doc.setTextColor(...PDF_COLORS.primary);
+      this.doc.setFontSize(12);
+      this.doc.setFont('helvetica', 'bold');
+      this.doc.text('SUMMARY', margin, startY);
+
+      startY += 6;
+      const boxWidth = 50;
+      const boxHeight = 18;
+      const gap = 4;
+      
+      summaryData.forEach((item, index) => {
+        const x = margin + (index % 5) * (boxWidth + gap);
+        const y = startY + Math.floor(index / 5) * (boxHeight + gap);
+
+        this.doc!.setFillColor(...PDF_COLORS.bgLight);
+        this.doc!.setTextColor(...PDF_COLORS.textDark);
+
+        this.doc!.roundedRect(x, y, boxWidth, boxHeight, 2, 2, 'F');
+
+        this.doc!.setFontSize(7);
+        this.doc!.setFont('helvetica', 'normal');
+        this.doc!.text(item.label, x + 3, y + 6);
+
+        this.doc!.setFontSize(12);
+        this.doc!.setFont('helvetica', 'bold');
+        this.doc!.text(String(item.value), x + 3, y + 14);
+      });
+
+      const rows = Math.ceil(summaryData.length / 5);
+      startY = startY + rows * (boxHeight + gap) + 6;
+    }
+
+    // Build table data
+    const headers = columns.map(col => col.header);
+    const body = data.map(row => 
+      columns.map(col => {
+        const value = row[col.field];
+        if (value === null || value === undefined) return '-';
+        if (value instanceof Date) return format(value, 'dd MMM yyyy');
+        if (typeof value === 'object') return JSON.stringify(value);
+        return String(value);
+      })
+    );
+
+    autoTable(this.doc, {
+      head: [headers],
+      body: body,
+      startY: startY,
+      margin: { left: margin, right: margin },
+      styles: {
+        fontSize: 7,
+        cellPadding: 2,
+        overflow: 'linebreak',
+        lineColor: PDF_COLORS.border,
+        lineWidth: 0.1,
+      },
+      headStyles: {
+        fillColor: PDF_COLORS.secondary,
+        textColor: PDF_COLORS.textWhite,
+        fontStyle: 'bold',
+        halign: 'center',
+        fontSize: 7,
+      },
+      alternateRowStyles: {
+        fillColor: PDF_COLORS.bgLight,
+      },
+      columnStyles: columns.reduce((acc, col, index) => {
+        if (col.width) {
+          acc[index] = { cellWidth: col.width };
+        }
+        return acc;
+      }, {} as Record<number, { cellWidth: number }>),
+      didDrawPage: (hookData) => {
+        const pageCount = this.doc!.getNumberOfPages();
+        const currentPage = hookData.pageNumber;
+        
+        this.doc!.setFontSize(8);
+        this.doc!.setTextColor(...PDF_COLORS.textLight);
+        this.doc!.text(
+          `Page ${currentPage} of ${pageCount}`,
+          this.doc!.internal.pageSize.getWidth() / 2,
+          this.doc!.internal.pageSize.getHeight() - 10,
+          { align: 'center' }
+        );
+      },
+    });
+
+    // Footer
+    this.addFooter(pageWidth, pageHeight, margin);
+
+    const filename = this.generateFilename(config.title, config.vessel);
+    this.doc.save(filename);
+  }
 }
 
 export const pdfReportGenerator = new PDFReportGenerator();

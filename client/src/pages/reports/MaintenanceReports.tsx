@@ -841,35 +841,56 @@ const MaintenanceReports: React.FC<MaintenanceReportsProps> = ({ onBack, globalF
       }
 
       case 'unplanned-jobs': {
-        const unplannedWOs = vesselWorkOrders.filter((wo: any) => 
-          wo.type === 'Unplanned' || wo.workOrderNumber?.startsWith('UWO')
+        // Use date range from global filters or default to current month
+        const dateFrom = globalFilters?.dateRange?.from || new Date(now.getFullYear(), now.getMonth(), 1);
+        const dateTo = globalFilters?.dateRange?.to || new Date(now.getFullYear(), now.getMonth() + 1, 0);
+        
+        const startDate = dateFrom.toISOString().split('T')[0];
+        const endDate = dateTo.toISOString().split('T')[0];
+
+        // Fetch data from the API endpoint
+        const response = await fetch(
+          `/technical/api/reports/unplanned-breakdown-jobs?vesselId=${effectiveVesselId}&startDate=${startDate}&endDate=${endDate}`
         );
+        if (!response.ok) {
+          throw new Error('Failed to fetch unplanned/breakdown jobs data');
+        }
+        const { data: unplannedData, metadata } = await response.json();
 
+        // Define columns matching specification (11 columns)
         const columns = [
-          { header: 'WO Number', field: 'workOrderNumber', width: 40 },
-          { header: 'Title', field: 'title', width: 60 },
-          { header: 'Component', field: 'component', width: 50 },
-          { header: 'Date', field: 'formattedDate', width: 30 },
-          { header: 'Status', field: 'status', width: 30 }
+          { header: 'S.No', field: 'sNo', width: 8 },
+          { header: 'WO Number', field: 'workOrderNo', width: 20 },
+          { header: 'Comp. Code', field: 'componentCode', width: 15 },
+          { header: 'Component Name', field: 'componentName', width: 30 },
+          { header: 'Job Title', field: 'jobTitle', width: 25 },
+          { header: 'Description', field: 'briefDescription', width: 35 },
+          { header: 'Created Date', field: 'createdDate', width: 16 },
+          { header: 'Completed Date', field: 'completedDate', width: 16 },
+          { header: 'Performed By', field: 'performedBy', width: 18 },
+          { header: 'Hours', field: 'totalHours', width: 10 },
+          { header: 'Manhours', field: 'manhours', width: 12 }
         ];
 
-        const data = unplannedWOs.map((wo: any) => ({
-          workOrderNumber: wo.workOrderNumber || wo.id,
-          title: wo.title || wo.jobTitle || '-',
-          component: wo.component || wo.componentName || '-',
-          formattedDate: formatDate(wo.createdAt || wo.dueDate),
-          status: wo.status || 'Open'
-        }));
-
+        // Build summary matching specification
         const summary = [
-          { label: 'Total Unplanned', value: data.length }
+          { label: 'Total Unplanned Jobs', value: metadata.totalUnplannedJobs },
+          { label: 'Total Manhours', value: metadata.totalManhours },
+          { label: 'Avg Time Taken (hrs)', value: metadata.avgTimeTaken },
+          { label: 'Date Range', value: `${startDate} to ${endDate}` }
         ];
 
-        pdfReportGenerator.generateReport(
-          { title: 'Unplanned/Breakdown Jobs', subtitle: 'Breakdown maintenance and unplanned work', vessel: vesselName },
+        // Use specialized unplanned breakdown report generator (same styling as Report 1.5)
+        pdfReportGenerator.generateUnplannedBreakdownReport(
+          { 
+            title: 'UNPLANNED/BREAKDOWN JOBS REPORT', 
+            subtitle: 'Analysis of breakdown maintenance and unplanned work', 
+            vessel: vesselName 
+          },
           columns,
-          data,
-          summary
+          unplannedData,
+          summary,
+          metadata
         );
         break;
       }
