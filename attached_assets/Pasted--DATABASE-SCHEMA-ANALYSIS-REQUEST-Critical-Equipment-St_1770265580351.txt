@@ -1,0 +1,380 @@
+📊 DATABASE SCHEMA ANALYSIS REQUEST - Critical Equipment Status Report
+
+I need you to analyze the database schema and provide the exact table structures and relationships needed for implementing Report 1.5: Critical Equipment Status.
+
+REQUIRED INFORMATION:
+
+1. COMPONENTS TABLE SCHEMA:
+   - List all columns in the 'components' table
+   - Specify data types for each column
+   - Confirm existence of these critical fields:
+     * criticality (boolean or varchar?)
+     * class_item (boolean or varchar?)
+     * is_active (boolean or varchar?)
+     * running_hours (numeric?)
+     * condition_based (boolean?)
+     * department (varchar?)
+   - Provide sample data for 2-3 critical equipment records
+
+2. WORK_ORDERS TABLE SCHEMA:
+   - List all columns in the 'work_orders' table
+   - Confirm relationship: component_code (FK to components.code)
+   - Specify data types for:
+     * job_title
+     * next_due_date
+     * job_priority
+     * status
+     * class_related
+     * frequency_value
+     * frequency_unit
+   - Provide sample data showing work orders linked to critical components
+
+3. TABLE RELATIONSHIPS:
+   - Confirm the JOIN condition between components and work_orders
+   - Are there any intermediate tables?
+   - Is it one-to-many (one component -> multiple work orders)?
+
+4. EXISTING REPORT STRUCTURE (from yesterday's report):
+   - Show me the exact file structure for reports in the codebase
+   - Where are report backend routes defined? (e.g., /server/routes/reports.js)
+   - Where are report frontend pages? (e.g., /client/src/pages/reports/)
+   - Show me one existing report implementation as reference
+
+5. PDF/EXCEL GENERATION:
+   - Which libraries are currently used? (jsPDF? ExcelJS? pdfkit?)
+   - Show me the utility functions for PDF generation
+   - Show me the utility functions for Excel generation
+   - Where are these located in the codebase?
+
+EXPECTED OUTPUT FORMAT:
+```sql
+-- Components table structure
+CREATE TABLE components (
+  code VARCHAR(50) PRIMARY KEY,
+  name VARCHAR(255),
+  -- ... rest of columns
+);
+
+-- Work orders table structure  
+CREATE TABLE work_orders (
+  -- ... columns
+);
+javascript
+// Sample existing report code reference
+// File: /server/routes/reports.js (or similar)
+This information will allow me to implement the Critical Equipment Status report following the existing patterns in your codebase.
+
+text
+
+***
+
+# OPTION 2: DIRECT IMPLEMENTATION PROMPT FOR REPLIT (Ready to Code)
+
+🚀 IMPLEMENT REPORT 1.5: CRITICAL EQUIPMENT STATUS
+
+Create a new report implementation following the exact structure and UI/UX patterns from yesterday's completed reports.
+
+REPORT SPECIFICATIONS:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+📋 Report Name: Critical Equipment Status
+📊 Report Code: Report_1.5
+🎯 Purpose: Status report for SOLAS-critical and class-critical systems
+⏱️ Frequency: Weekly
+🔴 Priority: HIGH
+📅 Est. Time: 1-2 min
+
+BACKEND IMPLEMENTATION:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+File: /server/routes/reports.js (or equivalent)
+
+Add new endpoint:
+
+javascript
+router.get('/critical-equipment-status', async (req, res) => {
+  try {
+    const { vessel_id, date_range } = req.query;
+    
+    const query = `
+      SELECT 
+        c.code AS component_code,
+        c.name AS component_name,
+        c.category AS component_category,
+        c.criticality,
+        c.class_item,
+        c.location,
+        c.department,
+        c.running_hours,
+        c.condition_based,
+        c.is_active,
+        wo.job_code AS work_order_no,
+        wo.job_title,
+        wo.next_due_date,
+        CAST((wo.next_due_date - CURRENT_DATE) AS INTEGER) AS days_until_due,
+        wo.job_priority,
+        wo.status,
+        wo.class_related,
+        wo.frequency_value,
+        wo.frequency_unit,
+        wo.assigned_to_rank
+      FROM components c
+      LEFT JOIN work_orders wo ON c.code = wo.component_code
+      WHERE (c.criticality = 'Yes' OR c.class_item = 'Yes')
+        AND c.is_active = 'Yes'
+        AND wo.status = 'Planned'
+      ORDER BY wo.next_due_date ASC NULLS LAST, c.code ASC
+    `;
+    
+    const results = await db.query(query, [vessel_id]);
+    
+    res.json({
+      success: true,
+      data: results.rows,
+      metadata: {
+        total_critical_equipment: results.rows.length,
+        solas_critical: results.rows.filter(r => r.criticality === 'Yes').length,
+        class_critical: results.rows.filter(r => r.class_item === 'Yes').length
+      }
+    });
+    
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+FRONTEND IMPLEMENTATION:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+File: /client/src/pages/reports/CriticalEquipmentStatus.jsx (or equivalent)
+
+Copy the structure from yesterday's report and modify:
+
+Table Columns Configuration:
+
+javascript
+const columns = [
+  { header: 'S.No', field: 'serial', width: '50px' },
+  { header: 'Component Code', field: 'component_code', width: '120px' },
+  { header: 'Component Name', field: 'component_name', width: '200px' },
+  { header: 'Category', field: 'component_category', width: '150px' },
+  { header: 'Critical Type', field: 'critical_type', width: '120px' }, // Derived
+  { header: 'Location', field: 'location', width: '120px' },
+  { header: 'Department', field: 'department', width: '120px' },
+  { header: 'Job Title', field: 'job_title', width: '200px' },
+  { header: 'Next Due Date', field: 'next_due_date', width: '120px', format: 'date' },
+  { header: 'Days Until Due', field: 'days_until_due', width: '100px', 
+    conditional: {
+      overdue: { condition: '< 0', color: 'red', bold: true },
+      warning: { condition: '<= 7', color: 'orange' }
+    }
+  },
+  { header: 'Priority', field: 'job_priority', width: '100px' },
+  { header: 'Status', field: 'status', width: '100px' },
+  { header: 'Running Hours', field: 'running_hours', width: '120px', format: 'number' }
+];
+Derived Fields Logic:
+
+javascript
+const processData = (data) => {
+  return data.map((row, index) => ({
+    ...row,
+    serial: index + 1,
+    critical_type: getCriticalType(row.criticality, row.class_item),
+    next_due_date_formatted: formatDate(row.next_due_date),
+    days_until_due_display: formatDaysUntilDue(row.days_until_due)
+  }));
+};
+
+const getCriticalType = (criticality, classItem) => {
+  if (criticality === 'Yes' && classItem === 'Yes') return 'SOLAS + Class';
+  if (criticality === 'Yes') return 'SOLAS';
+  if (classItem === 'Yes') return 'Class';
+  return 'N/A';
+};
+PDF GENERATION:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+File: /server/utils/pdfGenerator.js (or equivalent)
+
+Use the SAME styling as yesterday's report:
+
+javascript
+const generateCriticalEquipmentStatusPDF = (data, metadata) => {
+  const doc = new PDFDocument({ margin: 30, size: 'A4', layout: 'landscape' });
+  
+  // HEADER - Same style as yesterday
+  doc.fontSize(18).font('Helvetica-Bold')
+     .text('CRITICAL EQUIPMENT STATUS REPORT', { align: 'center' });
+  
+  doc.fontSize(10).font('Helvetica')
+     .text(`Generated: ${new Date().toLocaleDateString()}`, { align: 'center' });
+  
+  // SUMMARY SECTION - Same card style as yesterday
+  doc.moveDown();
+  doc.fontSize(12).font('Helvetica-Bold').text('Summary:');
+  doc.fontSize(10).font('Helvetica')
+     .text(`Total Critical Equipment: ${metadata.total_critical_equipment}`)
+     .text(`SOLAS-Critical: ${metadata.solas_critical}`)
+     .text(`Class-Critical: ${metadata.class_critical}`);
+  
+  // TABLE - Same alternating row colors as yesterday
+  drawTable(doc, data, columns);
+  
+  // FOOTER - Same style as yesterday
+  addPageNumbers(doc);
+  
+  return doc;
+};
+EXCEL GENERATION:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+File: /server/utils/excelGenerator.js (or equivalent)
+
+Use the SAME styling as yesterday's report:
+
+javascript
+const generateCriticalEquipmentStatusExcel = (data, metadata) => {
+  const workbook = new ExcelJS.Workbook();
+  const worksheet = workbook.addWorksheet('Critical Equipment Status');
+  
+  // HEADER STYLING - Same as yesterday
+  worksheet.mergeCells('A1:M1');
+  worksheet.getCell('A1').value = 'CRITICAL EQUIPMENT STATUS REPORT';
+  worksheet.getCell('A1').font = { size: 16, bold: true, color: { argb: 'FFFFFF' } };
+  worksheet.getCell('A1').fill = {
+    type: 'pattern',
+    pattern: 'solid',
+    fgColor: { argb: '4472C4' } // Same blue as yesterday
+  };
+  worksheet.getCell('A1').alignment = { horizontal: 'center', vertical: 'middle' };
+  worksheet.getRow(1).height = 30;
+  
+  // SUMMARY SECTION - Row 3
+  worksheet.getCell('A3').value = 'Summary:';
+  worksheet.getCell('A3').font = { bold: true };
+  worksheet.getCell('A4').value = `Total: ${metadata.total_critical_equipment} | SOLAS: ${metadata.solas_critical} | Class: ${metadata.class_critical}`;
+  
+  // COLUMN HEADERS - Row 6
+  const headers = columns.map(col => col.header);
+  worksheet.getRow(6).values = headers;
+  worksheet.getRow(6).font = { bold: true, color: { argb: 'FFFFFF' } };
+  worksheet.getRow(6).fill = {
+    type: 'pattern',
+    pattern: 'solid',
+    fgColor: { argb: '4472C4' }
+  };
+  worksheet.getRow(6).alignment = { horizontal: 'center', vertical: 'middle' };
+  
+  // DATA ROWS - Starting from row 7
+  data.forEach((row, index) => {
+    const rowIndex = 7 + index;
+    worksheet.addRow([
+      index + 1,
+      row.component_code,
+      row.component_name,
+      row.component_category,
+      getCriticalType(row.criticality, row.class_item),
+      row.location,
+      row.department,
+      row.job_title,
+      row.next_due_date,
+      row.days_until_due,
+      row.job_priority,
+      row.status,
+      row.running_hours
+    ]);
+    
+    // CONDITIONAL FORMATTING - Same as yesterday
+    const daysCell = worksheet.getCell(`J${rowIndex}`);
+    if (row.days_until_due < 0) {
+      daysCell.font = { color: { argb: 'FF0000' }, bold: true };
+    } else if (row.days_until_due <= 7) {
+      daysCell.font = { color: { argb: 'FFA500' } };
+    }
+    
+    // Alternating row colors - Same as yesterday
+    if (index % 2 === 0) {
+      worksheet.getRow(rowIndex).fill = {
+        type: 'pattern',
+        pattern: 'solid',
+        fgColor: { argb: 'F2F2F2' }
+      };
+    }
+  });
+  
+  // COLUMN WIDTHS - Same proportions as yesterday
+  columns.forEach((col, index) => {
+    worksheet.getColumn(index + 1).width = parseInt(col.width) / 7;
+  });
+  
+  // BORDERS - Same style as yesterday
+  worksheet.eachRow((row, rowNumber) => {
+    if (rowNumber >= 6) {
+      row.eachCell((cell) => {
+        cell.border = {
+          top: { style: 'thin' },
+          left: { style: 'thin' },
+          bottom: { style: 'thin' },
+          right: { style: 'thin' }
+        };
+      });
+    }
+  });
+  
+  return workbook;
+};
+UI/UX REQUIREMENTS:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Filter Section (Same as yesterday):
+
+Vessel dropdown
+
+Date range picker
+
+"Critical Type" filter: All | SOLAS Only | Class Only | Both
+
+Action Buttons (Same as yesterday):
+
+👁️ View Report
+
+📄 Export PDF
+
+📊 Export Excel
+
+Summary Cards (Above table, same style as yesterday):
+
+Total Critical Equipment (blue card)
+
+SOLAS-Critical (orange card)
+
+Class-Critical (green card)
+
+Table Features (Same as yesterday):
+
+Sortable columns
+
+Search/filter
+
+Pagination (25 rows per page)
+
+Row highlighting for overdue items
+
+Color Scheme (MUST match yesterday):
+
+Header: #4472C4 (blue)
+
+Overdue: #FF0000 (red)
+
+Warning (<7 days): #FFA500 (orange)
+
+Alternating rows: #FFFFFF and #F2F2F2
+
+VALIDATION & TESTING:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Before marking complete, ensure:
+✅ Query returns data correctly
+✅ PDF matches yesterday's styling exactly
+✅ Excel matches yesterday's styling exactly
+✅ Conditional formatting works (red for
