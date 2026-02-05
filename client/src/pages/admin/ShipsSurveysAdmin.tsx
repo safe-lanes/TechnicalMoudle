@@ -399,19 +399,14 @@ export default function ShipsSurveysAdmin() {
   };
 
   const exitEditMode = () => {
-    // Remove incomplete/blank entries from masterData before exiting
-    setMasterData(prev => prev.filter(s => 
-      s.surveyName?.trim() && s.category?.trim() && s.group?.trim()
-    ));
-    
     // Clear validation errors
     setMasterValidationError("");
     setInvalidSurveyIds(new Set());
     
-    if (hasUnsavedChanges) {
-      queryClient.invalidateQueries({ queryKey: ['/technical/api/admin/ship-surveys-master'] });
-      setDeletedMasterIds([]);
-    }
+    // Always reload from server to discard any unsaved/incomplete entries
+    queryClient.invalidateQueries({ queryKey: ['/technical/api/admin/ship-surveys-master'] });
+    setDeletedMasterIds([]);
+    
     setViewModes(prev => ({ ...prev, [activeTab]: "view" }));
     setHasUnsavedChanges(false);
   };
@@ -458,45 +453,36 @@ export default function ShipsSurveysAdmin() {
   };
 
   const updateField = (id: number, field: keyof MasterSurvey, value: any) => {
-    setMasterData(prev => prev.map(s => {
-      if (s.id === id) {
-        const updated = { ...s, [field]: value };
-        if (field === "category" || field === "group") {
-          const cat = field === "category" ? value : s.category;
-          const grp = field === "group" ? value : s.group;
-          updated.masterId = `${cat}${grp}-${String(s.sequence).padStart(3, '0')}`;
-        }
-        return updated;
-      }
-      return s;
-    }));
-    setHasUnsavedChanges(true);
-    
-    // Clear validation error for this survey if field now has a valid value
-    if ((field === "surveyName" || field === "category" || field === "group") && value?.trim()) {
-      setInvalidSurveyIds(prev => {
-        const updated = new Set(prev);
-        // Check if this survey now has all required fields filled
-        const survey = masterData.find(s => s.id === id);
-        if (survey) {
-          const updatedSurvey = { ...survey, [field]: value };
-          if (updatedSurvey.surveyName?.trim() && updatedSurvey.category?.trim() && updatedSurvey.group?.trim()) {
-            updated.delete(id);
+    setMasterData(prev => {
+      const updatedData = prev.map(s => {
+        if (s.id === id) {
+          const updated = { ...s, [field]: value };
+          if (field === "category" || field === "group") {
+            const cat = field === "category" ? value : s.category;
+            const grp = field === "group" ? value : s.group;
+            updated.masterId = `${cat}${grp}-${String(s.sequence).padStart(3, '0')}`;
           }
+          return updated;
         }
-        return updated;
+        return s;
       });
-      // Clear error message if no more invalid surveys
-      if (invalidSurveyIds.size <= 1) {
-        const survey = masterData.find(s => s.id === id);
-        if (survey) {
-          const updatedSurvey = { ...survey, [field]: value };
-          if (updatedSurvey.surveyName?.trim() && updatedSurvey.category?.trim() && updatedSurvey.group?.trim()) {
-            setMasterValidationError("");
-          }
+      
+      // Clear validation errors when editing - revalidate based on updated data
+      if (field === "surveyName" || field === "category" || field === "group") {
+        const invalidSurveys = updatedData.filter(s => 
+          !s.surveyName?.trim() || !s.category?.trim() || !s.group?.trim()
+        );
+        if (invalidSurveys.length === 0) {
+          setMasterValidationError("");
+          setInvalidSurveyIds(new Set());
+        } else {
+          setInvalidSurveyIds(new Set(invalidSurveys.map(s => s.id)));
         }
       }
-    }
+      
+      return updatedData;
+    });
+    setHasUnsavedChanges(true);
   };
 
   const updateSequence = (surveyId: number, newSequence: number) => {
