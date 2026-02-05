@@ -1,0 +1,325 @@
+❌ NEW CRITICAL ISSUE: OPPOSITE PROBLEM NOW!
+ISSUE: Period Hours Now Shows 0 for MOST Equipment ❌
+Previous Version Problem:
+
+text
+Period Hrs = Current Hrs (4020 = 4020) ❌
+Current Version Problem:
+
+text
+Period Hrs = 0 for almost ALL equipment ❌
+DETAILED ANALYSIS OF LATEST REPORT
+Only 3 Components Have NON-ZERO Period Hours:
+Row 1: ME Cylinder Liners No.01 ✅ (CORRECT)
+
+text
+Current Hrs: 9520
+Period Hrs: 3520
+Avg Daily: 117.33
+Utilization: High
+Util %: 100%
+
+Calculation Check:
+- 3520 ÷ 30 = 117.33 ✅
+- BUT: (117.33 ÷ 24) × 100 = 488.9%, not 100% ❌
+- Util % is capped at 100% (wrong - should show actual value)
+Row 2: ME Cylinder Liners No.02 ✅ (CORRECT)
+
+text
+Current Hrs: 6020
+Period Hrs: 20
+Avg Daily: 0.67
+Utilization: Low
+Util %: 2.8%
+
+Calculation Check:
+- 20 ÷ 30 = 0.67 ✅
+- (0.67 ÷ 24) × 100 = 2.79% ≈ 2.8% ✅
+Row 3: ME Pistons, Piston Rods No.03 ✅ (CORRECT)
+
+text
+Current Hrs: 40
+Period Hrs: 20
+Avg Daily: 0.67
+Utilization: Low
+Util %: 2.8%
+
+Calculation Check:
+- 20 ÷ 30 = 0.67 ✅
+- (0.67 ÷ 24) × 100 = 2.79% ≈ 2.8% ✅
+❌ THE REMAINING 198 COMPONENTS ALL SHOW:
+text
+Current Hrs: 20, 100, 240, 4020, 15010, 2015, 1501, etc. (various values)
+Period Hrs: 0 ❌ (ALL ZERO!)
+Avg Daily: 0 ❌
+Utilization: Low
+Util %: 0% ❌
+Examples of WRONG data:
+
+Row 20: X-Band Radar
+
+text
+Current Hrs: 20
+Period Hrs: 0 ❌ (Should have some delta)
+Last Updated: 15-Jan-2026 (21 days ago!)
+If this equipment was updated 21 days ago, it should have accumulated SOME hours in the 30-day period!
+
+Row 21: S-Band Radar
+
+text
+Current Hrs: 100
+Period Hrs: 0 ❌
+Last Updated: 25-Jan-2026 (11 days ago!)
+Row 25: Compressors W/Drive Unit No.02
+
+text
+Current Hrs: 15010 (Massive cumulative hours!)
+Period Hrs: 0 ❌ (IMPOSSIBLE!)
+Last Updated: 11-Jan-2026 (25 days ago!)
+With 15,010 cumulative hours, this equipment HAS been running, but Period Hrs = 0 suggests NO historical data was found.
+
+Row 28-76: ALL Main Engine Components (4020 hrs)
+
+text
+Current Hrs: 4020
+Period Hrs: 0 ❌ (ALL show zero!)
+Last Updated: 28-Jan-2026 (8 days ago)
+🔍 ROOT CAUSE ANALYSIS
+Why Only 3 Components Show Correct Period Hours?
+The pattern reveals:
+
+Components WITH period data (rows 1-3):
+
+ME Cylinder Liners No.01: 9520 → period 3520
+
+ME Cylinder Liners No.02: 6020 → period 20
+
+ME Pistons, Piston Rods No.03: 40 → period 20
+
+Components WITHOUT period data (rows 4-201):
+
+All other equipment: period = 0
+
+This suggests:
+
+Historical data EXISTS ONLY for 3 components
+
+These 3 components have entries in running_hours_log table
+
+All other components do NOT have historical log entries
+
+The query is working correctly, but data is missing
+
+javascript
+// This query works fine:
+const startReading = await db.get(
+  `SELECT running_hours FROM running_hours_log 
+   WHERE component_id = ? AND date <= ?
+   ORDER BY date DESC LIMIT 1`,
+  [componentId, startDate]
+);
+
+// But returns NULL for 198 components because:
+// - running_hours_log table is EMPTY for them
+// - OR only has recent data (not 30 days old)
+Fallback logic is setting period to 0
+
+javascript
+// WRONG FALLBACK:
+const periodHours = currentReading - (startReading?.running_hours || 0);
+// If no historical data, startReading = null
+// Then: periodHours = 4020 - 0 = 4020 (wrong!)
+
+// CURRENT CODE (after fix attempt):
+const periodHours = startReading ? currentReading - startReading.running_hours : 0;
+// If no historical data → periodHours = 0 (also wrong!)
+🚨 THE REAL PROBLEM: MISSING HISTORICAL DATA
+Database Issue:
+The running_hours_log table likely has:
+
+Very few entries (only 3 components have logs)
+
+Recent entries only (not covering 30-day period)
+
+No backfill when running hours are first entered
+
+Evidence:
+
+text
+Row 1: Current=9520, Historical=6000 → Has log from 30 days ago ✅
+Row 2: Current=6020, Historical=6000 → Has log from 30 days ago ✅
+Row 3: Current=40, Historical=20 → Has log from 30 days ago ✅
+
+Row 28: Current=4020, Historical=NULL → No log from 30 days ago ❌
+Row 25: Current=15010, Historical=NULL → No log from 30 days ago ❌
+❌ ADDITIONAL BUG: Utilization % Capped at 100%
+Row 1 shows:
+
+text
+Avg Daily: 117.33 hrs/day
+Util %: 100% (shown in Excel)
+
+Expected Util %: (117.33 ÷ 24) × 100 = 488.9%
+The system is CAPPING the percentage at 100%, which is hiding the calculation error!
+
+This is WRONG because:
+
+If equipment is running 117 hrs/day (impossible, but that's what the data says)
+
+The report should SHOW 488.9% to alert users to the data problem
+
+Capping at 100% hides the underlying issue
+
+📋 COMPLETE LIST OF ISSUES IN LATEST REPORT
+#	Issue	Severity	Status	Impact
+1	Period Hrs = 0 for 198/201 components	CRITICAL	NEW BUG	Report is useless - no period data!
+2	Missing historical running hours data in DB	CRITICAL	ROOT CAUSE	Can't calculate period hours without history
+3	Utilization % capped at 100%	HIGH	NEW BUG	Hides underlying calculation errors
+4	Fallback logic returns 0 instead of estimate	HIGH	LOGIC ERROR	Should use different approach when no history
+5	Summary shows only 1 High, 200 Low	MEDIUM	CONSEQUENCE	Reflects the wrong period data
+6	Avg Utilization = 0.5%	MEDIUM	CONSEQUENCE	Wrong because of missing period data
+🔧 COMPREHENSIVE FIX REQUIRED
+ISSUE #1: No Historical Data in running_hours_log Table
+Problem:
+The running_hours_log table doesn't have entries going back 30+ days for most components.
+
+Solution A: Backfill Historical Data (Recommended)
+
+sql
+-- For each component with current running hours,
+-- create a historical baseline entry 30 days ago
+
+INSERT INTO running_hours_log (id, component_id, date, reading, source, vessel_id)
+SELECT 
+  'BACKFILL-' || c.id || '-' || date('now', '-30 days'),
+  c.id,
+  date('now', '-30 days'),
+  CASE 
+    WHEN rh.running_hours > 3000 THEN rh.running_hours - 120  -- Assume 4 hrs/day for high-hour equipment
+    WHEN rh.running_hours > 100 THEN rh.running_hours - 20    -- Assume 0.67 hrs/day
+    WHEN rh.running_hours > 0 THEN rh.running_hours - 5       -- Assume minimal usage
+    ELSE 0
+  END as historical_reading,
+  'system_estimate',
+  c.vessel_id
+FROM components c
+JOIN running_hours rh ON c.id = rh.component_id
+WHERE NOT EXISTS (
+  SELECT 1 FROM running_hours_log rhl 
+  WHERE rhl.component_id = c.id 
+    AND rhl.date <= date('now', '-30 days')
+)
+AND rh.running_hours > 0;
+Solution B: Use Current Hours as Period (If No History)
+
+javascript
+// Fallback when no historical data exists
+if (!startReading) {
+  // Estimate: Use current hours with a warning flag
+  // Assume equipment ran at steady rate since last_updated date
+  const lastUpdatedDate = new Date(component.last_updated || Date.now());
+  const daysSinceUpdate = (new Date() - lastUpdatedDate) / (1000 * 60 * 60 * 24);
+  
+  if (daysSinceUpdate > 0 && daysSinceUpdate <= 30) {
+    // Use current hours as period hours (best guess)
+    periodHours = component.running_hours;
+    isEstimated = true;  // Flag for report
+  } else {
+    // Too old or no update date - use 0
+    periodHours = 0;
+  }
+} else {
+  periodHours = component.running_hours - startReading.running_hours;
+  isEstimated = false;
+}
+ISSUE #2: Utilization % Capped at 100%
+Current Code (WRONG):
+
+javascript
+utilizationPercent: Math.min(((avgDailyHours / 24) * 100), 100).toFixed(1)
+// The Math.min() caps it at 100%
+Correct Code:
+
+javascript
+utilizationPercent: ((avgDailyHours / 24) * 100).toFixed(1)
+// Remove the cap - show actual percentage
+// If it exceeds 100%, it indicates a data problem
+ISSUE #3: Better Fallback Logic When No Historical Data
+Current Logic (WRONG):
+
+javascript
+const periodHours = startReading 
+  ? currentReading - startReading.running_hours 
+  : 0;  // ❌ Setting to 0 makes report useless
+Improved Logic:
+
+javascript
+let periodHours;
+let calculationNote = '';
+
+if (startReading && startReading.running_hours !== null) {
+  // Historical data exists - use it
+  periodHours = Math.max(0, currentReading - startReading.running_hours);
+  calculationNote = 'Actual';
+  
+} else if (currentReading > 0) {
+  // No historical data, but equipment has hours
+  // OPTION A: Use last_updated to estimate
+  const lastUpdatedDate = new Date(component.last_updated);
+  const reportEndDate = new Date(endDate);
+  const daysBetween = (reportEndDate - lastUpdatedDate) / (1000 * 60 * 60 * 24);
+  
+  if (daysBetween > 0 && daysBetween <= daysInPeriod) {
+    // Last updated is within the period - use current hours as estimate
+    periodHours = currentReading;
+    calculationNote = 'Estimated (no history)';
+  } else {
+    // Last updated is too old or in the future
+    periodHours = 0;
+    calculationNote = 'No data';
+  }
+  
+} else {
+  // Equipment has 0 hours
+  periodHours = 0;
+  calculationNote = 'Not in use';
+}
+🔧 REPLIT CORRECTION PROMPT
+CRITICAL: Equipment Utilization Report Still Broken
+Problem Summary
+After the previous fix, the report now shows Period Hrs = 0 for 198 out of 201 components. This makes the report completely useless.
+
+Root Cause
+The running_hours_log table does NOT have historical data going back 30 days for most components. Only 3 components have historical entries.
+
+Required Fixes
+FIX #1: Add Historical Data Backfill (IMMEDIATE)
+Run this SQL to create baseline historical entries for all components:
+
+sql
+-- Create historical baseline entries for components that don't have them
+INSERT INTO running_hours_log (id, component_id, date, reading, source, vessel_id, created_at)
+SELECT 
+  'HIST-' || c.id || '-' || strftime('%Y%m%d', date('now', '-30 days')) as id,
+  c.id as component_id,
+  date('now', '-30 days') as date,
+  CASE 
+    -- For equipment with high cumulative hours, estimate historical reading
+    WHEN rh.running_hours >= 10000 THEN rh.running_hours - (rh.running_hours * 0.10)  -- 10% reduction
+    WHEN rh.running_hours >= 1000 THEN rh.running_hours - (rh.running_hours * 0.05)   -- 5% reduction
+    WHEN rh.running_hours >= 100 THEN GREATEST(0, rh.running_hours - 20)              -- -20 hours
+    WHEN rh.running_hours > 0 THEN GREATEST(0, rh.running_hours - 5)                  -- -5 hours
+    ELSE 0
+  END as reading,
+  'system_baseline' as source,
+  c.vessel_id,
+  datetime('now') as created_at
+FROM components c
+INNER JOIN running_hours rh ON c.id = rh.component_id
+WHERE c.is_active = 1
+  AND rh.rh_counter_type != 'Not RH Driven'
+  AND NOT EXISTS (
+    SELECT 1 FROM running_hours_log rhl 
+    WHERE rhl.component_id = c.id 
+      AND rhl.date <= date('now', '-30 days')
+  );
