@@ -246,6 +246,20 @@ const MaintenanceReports: React.FC<MaintenanceReportsProps> = ({ onBack, globalF
       priority: "high",
       lastGenerated: "Never",
       estimatedTime: "2-3 min"
+    },
+    {
+      id: "rh-anomaly-detection",
+      name: "Running Hours Anomaly Detection",
+      description: "Detects unusual patterns in running hours: spikes, corrections, and zero changes",
+      purpose: "Identify equipment with abnormal running hour patterns for investigation",
+      frequency: "Weekly/Monthly",
+      fields: ["Component", "Previous RH", "New RH", "Delta", "Anomaly Type", "Severity", "Description"],
+      filters: ["Vessel", "Date Range", "Anomaly Type"],
+      outputs: ["PDF", "Excel"],
+      icon: AlertTriangle,
+      priority: "high",
+      lastGenerated: "Never",
+      estimatedTime: "1-2 min"
     }
   ];
 
@@ -1224,6 +1238,76 @@ const MaintenanceReports: React.FC<MaintenanceReportsProps> = ({ onBack, globalF
         break;
       }
 
+      case 'rh-anomaly-detection': {
+        // Fetch anomaly detection data from API
+        try {
+          const params = new URLSearchParams({ vesselId: effectiveVesselId || '' });
+          
+          // Add date range if available
+          if (categoryFilters.dateRange?.from) {
+            params.append('startDate', categoryFilters.dateRange.from.toISOString().split('T')[0]);
+          }
+          if (categoryFilters.dateRange?.to) {
+            params.append('endDate', categoryFilters.dateRange.to.toISOString().split('T')[0]);
+          }
+          
+          const response = await fetch(`/technical/api/reports/running-hours-anomaly-detection?${params}`);
+          const result = await response.json();
+          
+          if (result.error) {
+            throw new Error(result.error);
+          }
+          
+          const anomalies = result.anomalies || [];
+          const summary = result.summary || {};
+          
+          const columns = [
+            { header: 'Component Code', field: 'componentCode', width: 35 },
+            { header: 'Component Name', field: 'componentName', width: 55 },
+            { header: 'Category', field: 'category', width: 35 },
+            { header: 'Previous RH', field: 'previousRh', width: 28 },
+            { header: 'New RH', field: 'newRh', width: 25 },
+            { header: 'Delta', field: 'deltaRh', width: 22 },
+            { header: 'Anomaly Type', field: 'anomalyType', width: 35 },
+            { header: 'Severity', field: 'severity', width: 25 },
+            { header: 'Description', field: 'description', width: 70 }
+          ];
+          
+          const summaryItems = [
+            { label: 'Total Anomalies', value: summary.totalAnomalies || 0 },
+            { label: 'Critical', value: summary.criticalCount || 0 },
+            { label: 'Warning', value: summary.warningCount || 0 },
+            { label: 'Info', value: summary.infoCount || 0 },
+            { label: 'Logs Analyzed', value: summary.totalLogsAnalyzed || 0 }
+          ];
+          
+          const formattedData = anomalies.map((a: any, idx: number) => ({
+            ...a,
+            previousRh: Number(a.previousRh).toFixed(1),
+            newRh: Number(a.newRh).toFixed(1),
+            deltaRh: Number(a.deltaRh).toFixed(1)
+          }));
+          
+          pdfReportGenerator.generateReport(
+            { 
+              title: 'Running Hours Anomaly Detection', 
+              subtitle: `Anomalies detected from ${summary.periodStart?.split('T')[0] || 'N/A'} to ${summary.periodEnd?.split('T')[0] || 'N/A'}`, 
+              vessel: vesselName 
+            },
+            columns,
+            formattedData,
+            summaryItems
+          );
+        } catch (error: any) {
+          toast({
+            title: "Error",
+            description: error.message || "Failed to generate anomaly detection report",
+            variant: "destructive"
+          });
+        }
+        break;
+      }
+
       default:
         toast({
           title: "Report Not Available",
@@ -1253,6 +1337,7 @@ const MaintenanceReports: React.FC<MaintenanceReportsProps> = ({ onBack, globalF
       'critical-equipment': '/technical/api/reports/critical-equipment-status/excel',
       'workload-distribution': '/technical/api/reports/crew-workload-distribution/excel',
       'equipment-utilization': '/technical/api/reports/equipment-utilization-summary/excel',
+      'rh-anomaly-detection': '/technical/api/reports/running-hours-anomaly-detection/excel',
     };
 
     const endpoint = reportEndpoints[reportId];
@@ -1267,7 +1352,7 @@ const MaintenanceReports: React.FC<MaintenanceReportsProps> = ({ onBack, globalF
     let requestBody: any = { vesselId: effectiveVesselId };
     
     // Add date range for reports that support it
-    if (reportId === 'monthly-summary' || reportId === 'completed-jobs' || reportId === 'unplanned-jobs' || reportId === 'workload-distribution' || reportId === 'equipment-utilization') {
+    if (reportId === 'monthly-summary' || reportId === 'completed-jobs' || reportId === 'unplanned-jobs' || reportId === 'workload-distribution' || reportId === 'equipment-utilization' || reportId === 'rh-anomaly-detection') {
       // Use category filters date range for completed-jobs, unplanned-jobs, and workload-distribution
       const dateFrom = categoryFilters.dateRange?.from;
       const dateTo = categoryFilters.dateRange?.to;
@@ -1279,8 +1364,8 @@ const MaintenanceReports: React.FC<MaintenanceReportsProps> = ({ onBack, globalF
         requestBody.dateTo = dateTo.toISOString().split('T')[0];
       }
       
-      // Also support startDate/endDate for monthly-summary, unplanned-jobs, workload-distribution, and equipment-utilization
-      if (reportId === 'monthly-summary' || reportId === 'unplanned-jobs' || reportId === 'workload-distribution' || reportId === 'equipment-utilization') {
+      // Also support startDate/endDate for monthly-summary, unplanned-jobs, workload-distribution, equipment-utilization, and rh-anomaly-detection
+      if (reportId === 'monthly-summary' || reportId === 'unplanned-jobs' || reportId === 'workload-distribution' || reportId === 'equipment-utilization' || reportId === 'rh-anomaly-detection') {
         let startDate: Date;
         let endDate: Date;
         

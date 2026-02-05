@@ -14729,6 +14729,418 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // ============================
+  // Report 1.10: Running Hours Anomaly Detection
+  // ============================
+  app.get("/technical/api/reports/running-hours-anomaly-detection", async (req: Request, res: Response) => {
+    try {
+      const { vesselId, startDate, endDate, anomalyType } = req.query;
+      
+      if (!vesselId) {
+        return res.status(400).json({ error: "Please select a vessel" });
+      }
+      
+      // Get vessel name
+      const vessels = await storage.getVessels();
+      const vessel = vessels.find(v => v.id === vesselId || v.vesselCode === vesselId);
+      const vesselName = vessel?.name || vessel?.vesselName || vesselId;
+      const vesselCode = vessel?.vesselCode || vesselId;
+      
+      // Get all running hours log entries for the vessel
+      const allLogs = await db.select().from(componentRunningHoursLog)
+        .where(sql`${componentRunningHoursLog.vesselCode} IN (${vesselId}, ${vesselCode})`);
+      
+      // Parse dates
+      const parseDate = (dateVal: string | Date | null | undefined): Date | null => {
+        if (!dateVal) return null;
+        try {
+          const d = new Date(dateVal instanceof Date ? dateVal : dateVal);
+          return isNaN(d.getTime()) ? null : d;
+        } catch {
+          return null;
+        }
+      };
+      
+      const now = new Date();
+      const defaultStartDate = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000); // 30 days ago
+      const periodStart = startDate ? parseDate(startDate as string) : defaultStartDate;
+      const periodEnd = endDate ? parseDate(endDate as string) : now;
+      
+      if (!periodStart || !periodEnd) {
+        return res.status(400).json({ error: "Invalid date format" });
+      }
+      
+      // Filter logs within the date range
+      const logsInPeriod = allLogs.filter(log => 
+        log.updatedAt && 
+        new Date(log.updatedAt) >= periodStart &&
+        new Date(log.updatedAt) <= periodEnd
+      ).sort((a, b) => new Date(b.updatedAt!).getTime() - new Date(a.updatedAt!).getTime());
+      
+      // Get components for reference
+      const allComponents = await storage.getComponents(vesselId as string);
+      const componentMap = new Map(allComponents.map(c => [c.componentCode || c.id, c]));
+      
+      // Define anomaly detection thresholds
+      const SPIKE_THRESHOLD = 100; // hours - unusually high single update
+      const HIGH_DELTA_THRESHOLD = 50; // hours - above average single update
+      const ZERO_THRESHOLD = 0; // Exactly 0 delta (possible stalled equipment)
+      
+      // Detect anomalies
+      const anomalies: any[] = [];
+      
+      for (const log of logsInPeriod) {
+        const delta = Number(log.deltaRh) || 0;
+        const component = componentMap.get(log.componentCode) || componentMap.get(log.componentId);
+        const componentName = component?.name || component?.fleetEquipmentName || log.componentCode;
+        
+        let anomalyDetected = false;
+        let anomalyTypeValue = '';
+        let severity: 'Critical' | 'Warning' | 'Info' = 'Info';
+        let description = '';
+        
+        // Check for negative delta (meter reset/correction)
+        if (delta < 0) {
+          anomalyDetected = true;
+          anomalyTypeValue = 'Negative Delta';
+          severity = 'Warning';
+          description = `Running hours decreased by ${Math.abs(delta).toFixed(1)} hours. Possible meter reset or correction.`;
+        }
+        // Check for large spike
+        else if (delta > SPIKE_THRESHOLD) {
+          anomalyDetected = true;
+          anomalyTypeValue = 'Large Spike';
+          severity = 'Critical';
+          description = `Unusually high reading: ${delta.toFixed(1)} hours in one update (threshold: ${SPIKE_THRESHOLD} hrs).`;
+        }
+        // Check for high delta (above average)
+        else if (delta > HIGH_DELTA_THRESHOLD) {
+          anomalyDetected = true;
+          anomalyTypeValue = 'High Delta';
+          severity = 'Warning';
+          description = `Above-average reading: ${delta.toFixed(1)} hours in one update.`;
+        }
+        // Check for zero delta with existing hours (possibly stalled)
+        else if (delta === 0 && Number(log.previousRh) > 0 && log.updateSource === 'manual') {
+          anomalyDetected = true;
+          anomalyTypeValue = 'Zero Change';
+          severity = 'Info';
+          description = `No change recorded for equipment with ${Number(log.previousRh).toFixed(1)} existing hours.`;
+        }
+        
+        // Apply filter if anomalyType is specified
+        if (anomalyDetected) {
+          if (!anomalyType || anomalyType === 'All' || anomalyType === anomalyTypeValue) {
+            anomalies.push({
+              id: log.id,
+              componentCode: log.componentCode,
+              componentName,
+              category: component?.componentCategory || component?.category || '-',
+              department: component?.department || component?.eqptSystemDept || '-',
+              previousRh: Number(log.previousRh) || 0,
+              newRh: Number(log.newRh) || 0,
+              deltaRh: delta,
+              anomalyType: anomalyTypeValue,
+              severity,
+              description,
+              updatedBy: log.updatedBy || '-',
+              updatedAt: log.updatedAt,
+              updateSource: log.updateSource || '-',
+              notes: log.notes || '-'
+            });
+          }
+        }
+      }
+      
+      // Calculate summary
+      const summary = {
+        totalAnomalies: anomalies.length,
+        criticalCount: anomalies.filter(a => a.severity === 'Critical').length,
+        warningCount: anomalies.filter(a => a.severity === 'Warning').length,
+        infoCount: anomalies.filter(a => a.severity === 'Info').length,
+        byType: {
+          negativeDelta: anomalies.filter(a => a.anomalyType === 'Negative Delta').length,
+          largeSpike: anomalies.filter(a => a.anomalyType === 'Large Spike').length,
+          highDelta: anomalies.filter(a => a.anomalyType === 'High Delta').length,
+          zeroChange: anomalies.filter(a => a.anomalyType === 'Zero Change').length
+        },
+        periodStart: periodStart.toISOString(),
+        periodEnd: periodEnd.toISOString(),
+        totalLogsAnalyzed: logsInPeriod.length
+      };
+      
+      res.json({
+        vesselId,
+        vesselName,
+        reportDate: new Date().toISOString(),
+        period: {
+          startDate: periodStart.toISOString(),
+          endDate: periodEnd.toISOString()
+        },
+        summary,
+        anomalies
+      });
+      
+    } catch (error: any) {
+      console.error("Error generating Running Hours Anomaly Detection report:", error);
+      res.status(500).json({ error: "Failed to generate report: " + error.message });
+    }
+  });
+
+  // Running Hours Anomaly Detection - Excel Export
+  app.post("/technical/api/reports/running-hours-anomaly-detection/excel", async (req: Request, res: Response) => {
+    try {
+      const { vesselId, startDate, endDate, anomalyType } = req.body;
+      
+      if (!vesselId) {
+        return res.status(400).json({ error: "Please select a vessel" });
+      }
+      
+      // Get vessel name
+      const vessels = await storage.getVessels();
+      const vessel = vessels.find(v => v.id === vesselId || v.vesselCode === vesselId);
+      const vesselName = vessel?.name || vessel?.vesselName || vesselId;
+      const vesselCode = vessel?.vesselCode || vesselId;
+      
+      // Get all running hours log entries for the vessel
+      const allLogs = await db.select().from(componentRunningHoursLog)
+        .where(sql`${componentRunningHoursLog.vesselCode} IN (${vesselId}, ${vesselCode})`);
+      
+      // Parse dates
+      const parseDate = (dateVal: string | Date | null | undefined): Date | null => {
+        if (!dateVal) return null;
+        try {
+          const d = new Date(dateVal instanceof Date ? dateVal : dateVal);
+          return isNaN(d.getTime()) ? null : d;
+        } catch {
+          return null;
+        }
+      };
+      
+      const formatDateDisplay = (dateVal: string | Date | null | undefined): string => {
+        if (!dateVal) return '-';
+        try {
+          const dateStr = dateVal instanceof Date ? dateVal.toISOString() : String(dateVal);
+          const d = new Date(dateStr);
+          if (isNaN(d.getTime())) return '-';
+          const day = d.getDate().toString().padStart(2, '0');
+          const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+          return `${day}-${months[d.getMonth()]}-${d.getFullYear()}`;
+        } catch {
+          return '-';
+        }
+      };
+      
+      const now = new Date();
+      const defaultStartDate = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+      const periodStart = startDate ? parseDate(startDate) : defaultStartDate;
+      const periodEnd = endDate ? parseDate(endDate) : now;
+      
+      if (!periodStart || !periodEnd) {
+        return res.status(400).json({ error: "Invalid date format" });
+      }
+      
+      // Filter logs within the date range
+      const logsInPeriod = allLogs.filter(log => 
+        log.updatedAt && 
+        new Date(log.updatedAt) >= periodStart &&
+        new Date(log.updatedAt) <= periodEnd
+      ).sort((a, b) => new Date(b.updatedAt!).getTime() - new Date(a.updatedAt!).getTime());
+      
+      // Get components for reference
+      const allComponents = await storage.getComponents(vesselId);
+      const componentMap = new Map(allComponents.map(c => [c.componentCode || c.id, c]));
+      
+      // Anomaly thresholds
+      const SPIKE_THRESHOLD = 100;
+      const HIGH_DELTA_THRESHOLD = 50;
+      
+      // Detect anomalies
+      const anomalies: any[] = [];
+      
+      for (const log of logsInPeriod) {
+        const delta = Number(log.deltaRh) || 0;
+        const component = componentMap.get(log.componentCode) || componentMap.get(log.componentId);
+        const componentName = component?.name || component?.fleetEquipmentName || log.componentCode;
+        
+        let anomalyDetected = false;
+        let anomalyTypeValue = '';
+        let severity: 'Critical' | 'Warning' | 'Info' = 'Info';
+        let description = '';
+        
+        if (delta < 0) {
+          anomalyDetected = true;
+          anomalyTypeValue = 'Negative Delta';
+          severity = 'Warning';
+          description = `RH decreased by ${Math.abs(delta).toFixed(1)} hrs - meter reset or correction`;
+        } else if (delta > SPIKE_THRESHOLD) {
+          anomalyDetected = true;
+          anomalyTypeValue = 'Large Spike';
+          severity = 'Critical';
+          description = `Unusually high: ${delta.toFixed(1)} hrs (threshold: ${SPIKE_THRESHOLD})`;
+        } else if (delta > HIGH_DELTA_THRESHOLD) {
+          anomalyDetected = true;
+          anomalyTypeValue = 'High Delta';
+          severity = 'Warning';
+          description = `Above-average: ${delta.toFixed(1)} hrs in one update`;
+        } else if (delta === 0 && Number(log.previousRh) > 0 && log.updateSource === 'manual') {
+          anomalyDetected = true;
+          anomalyTypeValue = 'Zero Change';
+          severity = 'Info';
+          description = `No change recorded (existing: ${Number(log.previousRh).toFixed(1)} hrs)`;
+        }
+        
+        if (anomalyDetected) {
+          if (!anomalyType || anomalyType === 'All' || anomalyType === anomalyTypeValue) {
+            anomalies.push({
+              componentCode: log.componentCode,
+              componentName,
+              category: component?.componentCategory || component?.category || '-',
+              department: component?.department || component?.eqptSystemDept || '-',
+              previousRh: Number(log.previousRh) || 0,
+              newRh: Number(log.newRh) || 0,
+              deltaRh: delta,
+              anomalyType: anomalyTypeValue,
+              severity,
+              description,
+              updatedBy: log.updatedBy || '-',
+              updatedAt: log.updatedAt,
+              updateSource: log.updateSource || '-'
+            });
+          }
+        }
+      }
+      
+      // Create workbook
+      const ExcelJS = await import('exceljs');
+      const workbook = new ExcelJS.Workbook();
+      const worksheet = workbook.addWorksheet('RH Anomaly Detection');
+      
+      // Define columns
+      const columns = [
+        { header: 'S.No', key: 'sNo', width: 6 },
+        { header: 'Component Code', key: 'componentCode', width: 15 },
+        { header: 'Component Name', key: 'componentName', width: 30 },
+        { header: 'Category', key: 'category', width: 15 },
+        { header: 'Department', key: 'department', width: 12 },
+        { header: 'Previous RH', key: 'previousRh', width: 12 },
+        { header: 'New RH', key: 'newRh', width: 12 },
+        { header: 'Delta', key: 'deltaRh', width: 10 },
+        { header: 'Anomaly Type', key: 'anomalyType', width: 15 },
+        { header: 'Severity', key: 'severity', width: 10 },
+        { header: 'Description', key: 'description', width: 40 },
+        { header: 'Updated By', key: 'updatedBy', width: 15 },
+        { header: 'Date', key: 'updatedAt', width: 12 },
+        { header: 'Source', key: 'updateSource', width: 12 }
+      ];
+      
+      worksheet.columns = columns;
+      const lastColLetter = String.fromCharCode(64 + columns.length);
+      
+      // Apply header (rows 1-6)
+      const reportTitle = 'Running Hours Anomaly Detection Report';
+      const criticalCount = anomalies.filter(a => a.severity === 'Critical').length;
+      const warningCount = anomalies.filter(a => a.severity === 'Warning').length;
+      const infoCount = anomalies.filter(a => a.severity === 'Info').length;
+      const subtitle = `Critical: ${criticalCount} | Warning: ${warningCount} | Info: ${infoCount} | Total: ${anomalies.length}`;
+      applyStandardHeader(worksheet, reportTitle, vesselName, columns.length, `${formatDateDisplay(periodStart)} to ${formatDateDisplay(periodEnd)}`, subtitle);
+      
+      // Apply table header (row 7)
+      applyStandardTableHeader(worksheet, columns.map(c => c.header), 7, columns.length);
+      
+      // Prepare report data
+      const reportData = anomalies.map((a, idx) => ({
+        sNo: idx + 1,
+        componentCode: a.componentCode,
+        componentName: a.componentName,
+        category: a.category,
+        department: a.department,
+        previousRh: a.previousRh.toFixed(1),
+        newRh: a.newRh.toFixed(1),
+        deltaRh: a.deltaRh.toFixed(1),
+        anomalyType: a.anomalyType,
+        severity: a.severity,
+        description: a.description,
+        updatedBy: a.updatedBy,
+        updatedAt: formatDateDisplay(a.updatedAt),
+        updateSource: a.updateSource
+      }));
+      
+      // Apply data rows
+      applyStandardDataRows(worksheet, reportData, 8, columns.length);
+      
+      // Apply severity-based coloring
+      for (let i = 0; i < reportData.length; i++) {
+        const rowNum = 8 + i;
+        const severity = anomalies[i].severity;
+        const severityCell = worksheet.getCell(`J${rowNum}`);
+        
+        if (severity === 'Critical') {
+          // Red background for critical
+          for (let col = 1; col <= columns.length; col++) {
+            worksheet.getCell(rowNum, col).fill = {
+              type: 'pattern',
+              pattern: 'solid',
+              fgColor: { argb: 'FFFECACA' } // Light red
+            };
+          }
+          severityCell.font = { color: { argb: 'FFDC2626' }, bold: true };
+        } else if (severity === 'Warning') {
+          // Orange background for warning
+          for (let col = 1; col <= columns.length; col++) {
+            worksheet.getCell(rowNum, col).fill = {
+              type: 'pattern',
+              pattern: 'solid',
+              fgColor: { argb: 'FFFEF3C7' } // Light yellow/orange
+            };
+          }
+          severityCell.font = { color: { argb: 'FFD97706' }, bold: true };
+        } else {
+          // Light blue for info
+          for (let col = 1; col <= columns.length; col++) {
+            worksheet.getCell(rowNum, col).fill = {
+              type: 'pattern',
+              pattern: 'solid',
+              fgColor: { argb: 'FFDBEAFE' } // Light blue
+            };
+          }
+          severityCell.font = { color: { argb: 'FF2563EB' }, bold: true };
+        }
+      }
+      
+      // Add summary row
+      const summaryRow = 8 + reportData.length + 1;
+      worksheet.mergeCells(`A${summaryRow}:${lastColLetter}${summaryRow}`);
+      worksheet.getCell(`A${summaryRow}`).value = 
+        `Summary: ${anomalies.length} anomalies detected | Critical: ${criticalCount} | Warning: ${warningCount} | Info: ${infoCount} | Logs analyzed: ${logsInPeriod.length}`;
+      worksheet.getCell(`A${summaryRow}`).font = { bold: true, size: 10 };
+      worksheet.getCell(`A${summaryRow}`).fill = {
+        type: 'pattern',
+        pattern: 'solid',
+        fgColor: { argb: 'FFF3F4F6' }
+      };
+      
+      // Apply page setup
+      applyStandardPageSetup(worksheet, 7, columns.length, summaryRow, vesselName);
+      worksheet.pageSetup.orientation = 'landscape';
+      
+      // Generate buffer and send
+      const buffer = await workbook.xlsx.writeBuffer();
+      const dateStr = new Date().toISOString().split('T')[0].replace(/-/g, '');
+      const filename = `RH_Anomaly_Detection_${vesselName.replace(/[^a-z0-9]/gi, '_')}_${dateStr}.xlsx`;
+      
+      console.log(`[RH ANOMALY DETECTION REPORT] Generated: ${filename}`);
+      
+      res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+      res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+      res.send(buffer);
+      
+    } catch (error: any) {
+      console.error("Error generating RH Anomaly Detection Excel report:", error);
+      res.status(500).json({ error: "Failed to generate report: " + error.message });
+    }
+  });
+
   const httpServer = createServer(app);
   
   // Recalculate recurring defects on startup (don't await - let it run in background)
