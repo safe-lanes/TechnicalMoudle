@@ -39,7 +39,7 @@ All future database schema changes MUST follow this policy without exception:
     -   Run `drizzle-kit generate` to create the migration SQL file
     -   Review the generated SQL before applying
 
-Note: Existing migrations 001-016 in `server/migrations.ts` remain functional for backward compatibility but no new code-based migrations should be added.
+**IMPORTANT**: Existing migrations 001-016 in `server/migrations.ts` are frozen for backward compatibility. **No new code-based migrations will ever be added** - all future schema changes across PMS, Certificates & Surveys, and Defects modules must use Drizzle file-based SQL migrations exclusively.
 
 **Critical Development Rule - Fleet Table Schema Contract (Permanent)**:
 All future Fleet-related tables MUST include these mandatory columns with exact naming and behavior:
