@@ -7680,9 +7680,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
   
   // Reports endpoint
-  app.get("/technical/api/reports/:reportType", async (req, res) => {
+  app.get("/technical/api/reports/:reportType", async (req, res, next) => {
     try {
       const { reportType } = req.params;
+      
+      // Skip to next handler for report types that have dedicated routes defined later
+      const dedicatedReportRoutes = [
+        'equipment-utilization-summary',
+        'running-hours-anomaly-detection',
+        'critical-equipment-status',
+        'unplanned-breakdown-jobs',
+        'crew-workload-distribution'
+      ];
+      
+      if (dedicatedReportRoutes.includes(reportType)) {
+        return next('route');
+      }
+      
       const { vesselId, dateFrom, dateTo, format } = req.query;
       
       // Mock data for now - replace with actual report generation
