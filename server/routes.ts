@@ -15034,7 +15034,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
               sNo++;
               anomalies.push({
                 sNo,
-                componentCode: log.componentCode || '-',
+                componentCode: log.componentCode || component?.componentCode || '-',
                 componentName,
                 category: component?.componentCategory || component?.category || '-',
                 department: component?.department || component?.eqptSystemDept || '-',
@@ -15264,7 +15264,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             
             if (passesTypeFilter && passesSeverityFilter) {
               anomalies.push({
-                componentCode: log.componentCode || '-',
+                componentCode: log.componentCode || component?.componentCode || '-',
                 componentName,
                 category: component?.componentCategory || component?.category || '-',
                 department: component?.department || component?.eqptSystemDept || '-',
