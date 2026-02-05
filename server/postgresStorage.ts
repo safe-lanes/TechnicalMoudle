@@ -8,6 +8,7 @@ import {
   makers,
   masterLists,
   makerList,
+  fleetComponents,
   sfiDetails,
   masterData,
   components,
@@ -62,6 +63,8 @@ import {
   type InsertMasterList,
   type MakerList,
   type InsertMakerList,
+  type FleetComponents,
+  type InsertFleetComponents,
   type SfiDetails,
   type InsertSfiDetails,
   type MasterData,
@@ -523,6 +526,72 @@ export class PostgresStorage {
     await db.update(makerList)
       .set({ isActive: false, updatedAt: new Date() })
       .where(eq(makerList.id, id));
+  }
+
+  // ============= MODULE 2A: FLEET COMPONENTS =============
+
+  async getFleetComponents(): Promise<FleetComponents[]> {
+    const db = await getDb();
+    return await db.select().from(fleetComponents)
+      .where(and(eq(fleetComponents.isActive, true), eq(fleetComponents.isDeleted, false)));
+  }
+
+  async getFleetComponent(id: number): Promise<FleetComponents | undefined> {
+    const db = await getDb();
+    const result = await db.select().from(fleetComponents).where(eq(fleetComponents.id, id));
+    return result[0];
+  }
+
+  async getFleetComponentByCode(fleetEquipmentCode: string): Promise<FleetComponents | undefined> {
+    const db = await getDb();
+    const result = await db.select().from(fleetComponents)
+      .where(eq(fleetComponents.fleetEquipmentCode, fleetEquipmentCode));
+    return result[0];
+  }
+
+  async createFleetComponent(data: InsertFleetComponents): Promise<FleetComponents> {
+    const db = await getDb();
+    const result = await db.insert(fleetComponents).values({
+      parentFleetEquipmentCode: data.parentFleetEquipmentCode || null,
+      fleetEquipmentCode: data.fleetEquipmentCode,
+      fleetEquipmentName: data.fleetEquipmentName,
+      componentCategory: data.componentCategory || null,
+      makerName: data.makerName || null,
+      makerCode: data.makerCode || null,
+      model: data.model || null,
+      modelCode: data.modelCode || null,
+      location: data.location || null,
+      rating: data.rating || null,
+      eqptSystemDept: data.eqptSystemDept || null,
+      notes: data.notes || null,
+      isActive: data.isActive ?? true,
+      sortOrder: data.sortOrder || 0,
+      createdByUuid: data.createdByUuid || null,
+      updatedByUuid: data.updatedByUuid || null,
+      isDeleted: data.isDeleted || false,
+      isSync: data.isSync || false,
+    }).returning();
+    return result[0];
+  }
+
+  async updateFleetComponent(id: number, data: Partial<FleetComponents>): Promise<FleetComponents> {
+    const db = await getDb();
+    const result = await db.update(fleetComponents)
+      .set({ ...data, updatedAt: new Date() })
+      .where(eq(fleetComponents.id, id))
+      .returning();
+    if (!result[0]) {
+      throw new Error(`Fleet component with id ${id} not found`);
+    }
+    return result[0];
+  }
+
+  async deleteFleetComponent(id: number): Promise<void> {
+    const db = await getDb();
+    // Soft delete by setting isDeleted to true
+    await db.update(fleetComponents)
+      .set({ isDeleted: true, updatedAt: new Date() })
+      .where(eq(fleetComponents.id, id));
   }
 
   // ============= MODULE 2: SFI DETAILS =============

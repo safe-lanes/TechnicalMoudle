@@ -122,6 +122,9 @@ import {
   makerList,
   type MakerList,
   type InsertMakerList,
+  fleetComponents,
+  type FleetComponents,
+  type InsertFleetComponents,
   sfiDetails,
   type SfiDetails,
   type InsertSfiDetails,
@@ -675,6 +678,14 @@ export interface IStorage {
   createMakerListItem(maker: InsertMakerList): Promise<MakerList>;
   updateMakerListItem(id: number, data: Partial<MakerList>): Promise<MakerList>;
   deleteMakerListItem(id: number): Promise<void>;
+  
+  // Fleet Components - Fleet Equipment Master Data
+  getFleetComponents(): Promise<FleetComponents[]>;
+  getFleetComponent(id: number): Promise<FleetComponents | undefined>;
+  getFleetComponentByCode(fleetEquipmentCode: string): Promise<FleetComponents | undefined>;
+  createFleetComponent(data: InsertFleetComponents): Promise<FleetComponents>;
+  updateFleetComponent(id: number, data: Partial<FleetComponents>): Promise<FleetComponents>;
+  deleteFleetComponent(id: number): Promise<void>;
   
   // SFI Details - SFI Code lookup table
   getSfiDetails(): Promise<SfiDetails[]>;
