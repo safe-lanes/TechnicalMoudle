@@ -1,0 +1,263 @@
+Critical Equipment Status Report
+text
+❌ CRITICAL FIX REQUIRED: Report 1.5 Implementation is Wrong
+
+The current report shows a list of work orders. This is INCORRECT.
+
+Report 1.5 should be COMPONENT-CENTRIC, showing critical equipment with aggregated work order statistics.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+DATABASE SCHEMA REFERENCE (DO NOT INVENT FIELDS)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+components table:
+- critical: BOOLEAN (true/false)
+- class_item: BOOLEAN (true/false)
+- component_code: TEXT
+- name: TEXT
+- component_category: TEXT
+- department: TEXT
+- location: TEXT
+- current_cumulative_rh: DECIMAL (running hours)
+- is_active: BOOLEAN
+
+work_orders table:
+- component_code: TEXT (FK to components)
+- work_order_no: TEXT
+- job_title: TEXT
+- status: TEXT ('Active', 'Completed', 'Overdue', 'Due', etc.)
+- next_due_date: TEXT
+- job_priority: TEXT
+- class_related: TEXT ('Yes'/'No')
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+CORRECT REPORT STRUCTURE (COMPONENT-CENTRIC)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Each row = ONE critical component/equipment
+Show aggregated work order statistics for each component
+
+COLUMNS TO DISPLAY:
+┌──────┬──────────────┬────────────────────────┬────────────┬──────────┬──────────┬──────────┬──────────┬──────────┬────────────┬──────┬────────────┐
+│ S.No │ Comp. Code   │ Component Name         │ Critical   │Class Item│ Dept     │ Location │ Total WOs│ Overdue  │ Due Soon │  Next Due  │ Days │
+├──────┼──────────────┼────────────────────────┼────────────┼──────────┼──────────┼──────────┼──────────┼──────────┼──────────┼────────────┼──────┤
+│  1   │ 60.02        │ Aux DG Aggregate No.02 │    Yes     │   No     │ Engine   │   E/R    │    3     │    1     │    1     │ 21-Dec-25  │ -45  │
+│  2   │ 65.01        │ LO Separator No.01     │    No      │   Yes    │ Engine   │   E/R    │    5     │    3     │    2     │ 05-Jan-26  │ -31  │
+└──────┴──────────────┴────────────────────────┴────────────┴──────────┴──────────┴──────────┴──────────┴──────────┴──────────┴────────────┴──────┘
+
+FIELD DEFINITIONS:
+- S.No: Serial number
+- Comp. Code: components.component_code
+- Component Name: components.name
+- Critical: components.critical (display as "Yes"/"No", not true/false)
+- Class Item: components.class_item (display as "Yes"/"No", not true/false)
+- Dept: components.department
+- Location: components.location
+- Total WOs: COUNT of active work_orders for this component
+- Overdue: COUNT of work_orders with status = 'Overdue'
+- Due Soon: COUNT of work_orders due within 7 days
+- Next Due: MIN(next_due_date) from work_orders
+- Days: Calculated (next_due_date - current_date)
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+CORRECTED SQL QUERY
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+```sql
+WITH critical_components AS (
+  SELECT 
+    c.id,
+    c.component_code,
+    c.name,
+    c.component_category,
+    c.department,
+    c.location,
+    c.critical,
+    c.class_item,
+    c.current_cumulative_rh AS running_hours,
+    c.is_active
+  FROM components c
+  WHERE c.vessel_id = $1
+    AND c.is_active = true
+    AND (c.critical = true OR c.class_item = true)
+),
+component_wo_stats AS (
+  SELECT 
+    wo.component_code,
+    COUNT(*) FILTER (
+      WHERE wo.status IN ('Active', 'Due', 'Due (Grace P)', 'Overdue', 'Pending Approval')
+    ) AS total_active_wos,
+    COUNT(*) FILTER (
+      WHERE wo.status = 'Overdue'
+    ) AS overdue_count,
+    COUNT(*) FILTER (
+      WHERE wo.status IN ('Due', 'Active') 
+        AND DATE(wo.next_due_date) <= CURRENT_DATE + INTERVAL '7 days'
+    ) AS due_soon_count,
+    MIN(wo.next_due_date) AS next_due_date,
+    MAX(wo.date_completed) AS last_done_date
+  FROM work_orders wo
+  WHERE wo.vessel_id = $1
+    AND wo.is_active = true
+  GROUP BY wo.component_code
+)
+SELECT 
+  cc.component_code,
+  cc.name AS component_name,
+  cc.component_category,
+  cc.department,
+  cc.location,
+  CASE WHEN cc.critical THEN 'Yes' ELSE 'No' END AS is_critical,
+  CASE WHEN cc.class_item THEN 'Yes' ELSE 'No' END AS is_class_item,
+  cc.running_hours,
+  COALESCE(ws.total_active_wos, 0) AS total_work_orders,
+  COALESCE(ws.overdue_count, 0) AS overdue_jobs,
+  COALESCE(ws.due_soon_count, 0) AS due_soon_jobs,
+  ws.next_due_date,
+  ws.last_done_date,
+  CASE 
+    WHEN ws.next_due_date IS NOT NULL 
+    THEN (DATE(ws.next_due_date) - CURRENT_DATE)
+    ELSE NULL
+  END AS days_until_due
+FROM critical_components cc
+LEFT JOIN component_wo_stats ws ON cc.component_code = ws.component_code
+ORDER BY 
+  ws.overdue_count DESC NULLS LAST,
+  ws.next_due_date ASC NULLS LAST,
+  cc.component_name;
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+SUMMARY SECTION CALCULATION
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+javascript
+const metadata = {
+  total_critical_equipment: result.rows.length,
+  critical_only: result.rows.filter(r => r.is_critical === 'Yes' && r.is_class_item === 'No').length,
+  class_item_only: result.rows.filter(r => r.is_class_item === 'Yes' && r.is_critical === 'No').length,
+  both_critical_and_class: result.rows.filter(r => r.is_critical === 'Yes' && r.is_class_item === 'Yes').length,
+  equipment_with_overdue: result.rows.filter(r => r.overdue_jobs > 0).length,
+  equipment_due_soon: result.rows.filter(r => r.due_soon_jobs > 0 && r.overdue_jobs === 0).length,
+  total_overdue_jobs: result.rows.reduce((sum, r) => sum + r.overdue_jobs, 0),
+  total_tracked_work_orders: result.rows.reduce((sum, r) => sum + r.total_work_orders, 0),
+  report_date: new Date().toISOString()
+};
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+PDF/EXCEL OUTPUT FORMAT
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+HEADER:
+"Critical Equipment Status Report"
+"SOLAS-critical and class-critical equipment"
+"Vessel: [Vessel Name] | Generated: [Date Time]"
+
+SUMMARY BOX:
+Total Critical Equipment: [count]
+
+Critical Only: [count]
+
+Class Item Only: [count]
+
+Both Critical & Class: [count]
+
+Equipment Status:
+
+With Overdue Jobs: [count]
+
+Due Soon (7 days): [count]
+
+Work Order Summary:
+
+Total Tracked WOs: [count]
+
+Total Overdue WOs: [count]
+
+TABLE COLUMNS (in order):
+
+S.No (center, width: 50px)
+
+Component Code (center, width: 100px)
+
+Component Name (left, width: 200px)
+
+Critical (center, width: 80px) - "Yes"/"No"
+
+Class Item (center, width: 80px) - "Yes"/"No"
+
+Department (center, width: 100px)
+
+Location (center, width: 100px)
+
+Total WOs (center, width: 80px)
+
+Overdue (center, width: 80px) - RED if > 0
+
+Due Soon (center, width: 80px) - ORANGE if > 0
+
+Next Due Date (center, width: 100px) - format: DD-MMM-YYYY
+
+Days (center, width: 60px) - RED if negative
+
+CONDITIONAL FORMATTING:
+
+Row background: RED if overdue_jobs > 0
+
+Row background: YELLOW if due_soon_jobs > 0 AND overdue_jobs = 0
+
+"Overdue" cell: BOLD + RED if value > 0
+
+"Days" cell: BOLD + RED if value < 0, ORANGE if 0-7
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+WHAT TO FIX IN EXISTING CODE
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+DELETE current query that selects work_orders directly
+
+REPLACE with the CTE query above
+
+UPDATE PDF table structure to show components (not work orders)
+
+UPDATE Excel table structure to show components (not work orders)
+
+UPDATE summary to count components (not work orders)
+
+REMOVE any references to "critical_type" or "SOLAS"/"Class" text
+
+USE components.critical and components.class_item as separate Yes/No columns
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+EXAMPLE OUTPUT FROM CURRENT PDF DATA
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+From the PDF showing 64 work orders for these components:
+
+Aux. Diesel Generator No.02 (appears 3 times)
+
+LO Separators No.01 (appears 5 times)
+
+FO Separators No.02 (appears 8 times)
+
+etc.
+
+Should become 10-15 rows showing:
+Row 1: Aux. Diesel Generator No.02 | Yes | No | Engine | E/R | 3 | 1 | 1 | 21-Dec-25 | -45
+Row 2: LO Separator No.01 | No | Yes | Engine | E/R | 5 | 3 | 2 | 05-Jan-26 | -31
+(etc.)
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+TESTING CHECKLIST
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Before completing:
+✅ Report shows components (not work orders)
+✅ Each component appears only ONCE
+✅ Work orders are aggregated (counted) per component
+✅ Critical and Class Item shown as separate Yes/No columns
+✅ Summary shows equipment count (not WO count)
+✅ Overdue count per equipment is correct
+✅ PDF table matches structure above
+✅ Excel table matches structure above
+✅ No invented fields like "SOLAS" text or "critical_type"
+
+START FRESH - DELETE THE WRONG IMPLEMENTATION FIRST.
