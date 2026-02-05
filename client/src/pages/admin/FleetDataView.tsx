@@ -12,7 +12,7 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import type { Component, Job, Spare, MasterData } from "@shared/schema";
+import type { Component, Job, Spare, MasterData, FleetComponents } from "@shared/schema";
 
 interface MappedFleetComponent {
   id: string | number;
@@ -37,6 +37,33 @@ interface MappedFleetComponent {
   vesselName?: string | null;
   vesselCode?: string | null;
   assignedSubCode?: string | null;
+}
+
+function mapFleetComponentsToFleetComponent(item: FleetComponents): MappedFleetComponent {
+  return {
+    id: item.id,
+    fleetEquipmentCode: item.fleetEquipmentCode,
+    fleetEquipmentName: item.fleetEquipmentName,
+    componentCode: item.fleetEquipmentCode,
+    name: item.fleetEquipmentName,
+    maker: item.makerName,
+    makerCode: item.makerCode,
+    model: item.model,
+    modelCode: item.modelCode,
+    sfiCode: null,
+    location: item.location,
+    rating: item.rating,
+    notes: item.notes,
+    category: item.componentCategory,
+    componentCategory: item.componentCategory,
+    department: item.eqptSystemDept,
+    eqptSystemDept: item.eqptSystemDept,
+    parentFleetEquipmentCode: item.parentFleetEquipmentCode,
+    vesselId: null,
+    vesselName: null,
+    vesselCode: null,
+    assignedSubCode: null,
+  };
 }
 
 function mapMasterDataToFleetComponent(item: MasterData): MappedFleetComponent {
@@ -300,12 +327,22 @@ export default function FleetDataView() {
   
   const { toast } = useToast();
 
-  const { data: masterDataResponse, isLoading: isComponentsLoading } = useQuery<{
+  // Query fleet_components table directly for Fleet Component data
+  const { data: fleetComponentsData, isLoading: isFleetComponentsLoading } = useQuery<FleetComponents[]>({
+    queryKey: ["/technical/api/fleet-admin/fleet-components"],
+  });
+  
+  // Fallback to master-data for backward compatibility when fleet-components is empty
+  const { data: masterDataResponse, isLoading: isMasterDataLoading } = useQuery<{
     items: MasterData[];
     total: number;
   }>({
     queryKey: ["/technical/api/fleet-admin/master-data?limit=1000"],
+    enabled: !fleetComponentsData || fleetComponentsData.length === 0,
   });
+  
+  // Combine loading states
+  const isComponentsLoading = isFleetComponentsLoading || isMasterDataLoading;
 
   const { data: fleetJobs } = useQuery<FleetJob[]>({
     queryKey: ["/technical/api/fleet/jobs"],
@@ -394,9 +431,14 @@ export default function FleetDataView() {
   });
 
   const mappedComponents = useMemo(() => {
+    // Prioritize fleet_components table data
+    if (fleetComponentsData && fleetComponentsData.length > 0) {
+      return fleetComponentsData.map(mapFleetComponentsToFleetComponent);
+    }
+    // Fallback to master_data for backward compatibility
     if (!masterDataResponse?.items) return [];
     return masterDataResponse.items.map(mapMasterDataToFleetComponent);
-  }, [masterDataResponse?.items]);
+  }, [fleetComponentsData, masterDataResponse?.items]);
 
   const treeData = useMemo(() => {
     if (!mappedComponents.length) return [];

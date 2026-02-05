@@ -185,6 +185,78 @@ router.get('/generate-fleet-equipment-code/:sfiCode', async (req, res) => {
 });
 
 // ============================================================
+// FLEET COMPONENTS - Fleet Equipment Master Data
+// 13 columns: Parent Fleet Equipment Code, Fleet Equipment Code, Fleet Equipment Name,
+// Component Category, Maker Name, Maker Code, Model, Model Code, Location, Rating,
+// Eqpt / System Department, Notes, IS Active
+// ============================================================
+
+// Get all fleet components with optional filtering
+router.get('/fleet-components', async (req, res) => {
+  try {
+    const { fleetEquipmentCode, isActive, limit, offset } = req.query;
+    
+    let entries = await storage.getFleetComponents();
+    
+    // Apply filters
+    if (fleetEquipmentCode) {
+      entries = entries.filter((e: any) => e.fleetEquipmentCode === fleetEquipmentCode);
+    }
+    if (isActive !== undefined) {
+      const active = isActive === 'true';
+      entries = entries.filter((e: any) => e.isActive === active);
+    }
+    
+    // Apply pagination
+    if (offset) {
+      entries = entries.slice(parseInt(offset as string));
+    }
+    if (limit) {
+      entries = entries.slice(0, parseInt(limit as string));
+    }
+    
+    res.json(entries);
+  } catch (error) {
+    console.error('Error fetching fleet components:', error);
+    res.status(500).json({ error: 'Failed to fetch fleet components' });
+  }
+});
+
+// Get single fleet component
+router.get('/fleet-components/:id', async (req, res) => {
+  try {
+    const id = parseInt(req.params.id);
+    const entry = await storage.getFleetComponent(id);
+    
+    if (!entry) {
+      return res.status(404).json({ error: 'Fleet component not found' });
+    }
+    
+    res.json(entry);
+  } catch (error) {
+    console.error('Error fetching fleet component:', error);
+    res.status(500).json({ error: 'Failed to fetch fleet component' });
+  }
+});
+
+// Get fleet component by Fleet Equipment Code
+router.get('/fleet-components/by-code/:code', async (req, res) => {
+  try {
+    const code = req.params.code;
+    const entry = await storage.getFleetComponentByCode(code);
+    
+    if (!entry) {
+      return res.status(404).json({ error: 'Fleet component not found' });
+    }
+    
+    res.json(entry);
+  } catch (error) {
+    console.error('Error fetching fleet component by code:', error);
+    res.status(500).json({ error: 'Failed to fetch fleet component' });
+  }
+});
+
+// ============================================================
 // FLEET-VESSEL MAPPING
 // ============================================================
 
