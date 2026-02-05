@@ -1,0 +1,19 @@
+{
+  "id": "f063caa2-4136-4ece-8acb-46dc0ad58f3e",
+  "type": "makers",
+  "mode": "upsert",
+  "vesselId": "743ef9d1-841a-11ed-aa7c-7003bca91a86",
+  "userId": 1,
+  "startedAt": "2026-02-05T05:14:42.834Z",
+  "completedAt": "2026-02-05T05:14:43.055Z",
+  "status": "complete",
+  "created": 0,
+  "updated": 1,
+  "skipped": 0,
+  "archived": 0,
+  "originalName": "Maker List.xlsx",
+  "storedFilePath": "local:/home/runner/workspace/uploads/bulk-imports/makers/1770268483054_Maker_List.xlsx",
+  "errorReport": null,
+  "jobComponentLinksCreated": 0,
+  "spareComponentLinksCreated": 0
+}
