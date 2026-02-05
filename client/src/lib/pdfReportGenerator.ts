@@ -788,6 +788,246 @@ class PDFReportGenerator {
     const filename = this.generateFilename(config.title, config.vessel);
     this.doc.save(filename);
   }
+
+  // ═══════════════════════════════════════════════════════════════
+  // REPORT 1.5: CRITICAL EQUIPMENT STATUS REPORT
+  // Shows SOLAS-critical and class-critical systems with risk levels
+  // ═══════════════════════════════════════════════════════════════
+  generateCriticalEquipmentReport(
+    config: PDFReportConfig,
+    columns: TableColumn[],
+    data: any[],
+    summaryData?: { label: string; value: string | number; color?: string }[],
+    metadata?: {
+      totalCriticalEquipment: number;
+      solasCritical: number;
+      classCritical: number;
+      bothSolasAndClass: number;
+      highRisk: number;
+      mediumRisk: number;
+      lowRisk: number;
+      totalOverdueJobs: number;
+      totalDueSoonJobs: number;
+    }
+  ): void {
+    // Force landscape and A4 for 14 columns
+    this.doc = new jsPDF({
+      orientation: 'landscape',
+      unit: 'mm',
+      format: 'a4'
+    });
+
+    const pageWidth = this.doc.internal.pageSize.getWidth();
+    const pageHeight = this.doc.internal.pageSize.getHeight();
+    const margin = 10;
+
+    // HEADER - Deep blue (#1E5A8E)
+    this.doc.setFillColor(...PDF_COLORS.primary);
+    this.doc.rect(0, 0, pageWidth, 30, 'F');
+
+    this.doc.setTextColor(...PDF_COLORS.textWhite);
+    this.doc.setFontSize(18);
+    this.doc.setFont('helvetica', 'bold');
+    this.doc.text(config.title, margin, 12);
+
+    if (config.subtitle) {
+      this.doc.setFontSize(10);
+      this.doc.setFont('helvetica', 'normal');
+      this.doc.text(config.subtitle, margin, 20);
+    }
+
+    // Right side info
+    this.doc.setFontSize(9);
+    this.doc.setFont('helvetica', 'normal');
+    const rightInfo = [
+      `Vessel: ${config.vessel || 'All Vessels'}`,
+      `Generated: ${format(new Date(), 'dd MMM yyyy HH:mm')}`,
+      `By: ${config.generatedBy || 'System'}`
+    ];
+    
+    let yPos = 10;
+    rightInfo.forEach(info => {
+      this.doc!.text(info, pageWidth - margin, yPos, { align: 'right' });
+      yPos += 5;
+    });
+
+    let startY = 38;
+
+    // SUMMARY SECTION
+    if (summaryData && summaryData.length > 0) {
+      this.doc.setTextColor(...PDF_COLORS.primary);
+      this.doc.setFontSize(12);
+      this.doc.setFont('helvetica', 'bold');
+      this.doc.text('SUMMARY', margin, startY);
+
+      startY += 6;
+      const boxWidth = 42;
+      const boxHeight = 18;
+      const gap = 4;
+      
+      summaryData.forEach((item, index) => {
+        const x = margin + (index % 6) * (boxWidth + gap);
+        const y = startY + Math.floor(index / 6) * (boxHeight + gap);
+
+        // Color coding for risk items
+        if (item.color === 'highlight' || item.label.toLowerCase().includes('high risk')) {
+          this.doc!.setFillColor(...PDF_COLORS.bgDanger);
+          this.doc!.setTextColor(...PDF_COLORS.textDarkRed);
+        } else if (item.label.toLowerCase().includes('medium risk')) {
+          this.doc!.setFillColor(...PDF_COLORS.bgWarning);
+          this.doc!.setTextColor(...PDF_COLORS.textDarkOrange);
+        } else {
+          this.doc!.setFillColor(...PDF_COLORS.bgLight);
+          this.doc!.setTextColor(...PDF_COLORS.textDark);
+        }
+
+        this.doc!.roundedRect(x, y, boxWidth, boxHeight, 2, 2, 'F');
+
+        this.doc!.setFontSize(7);
+        this.doc!.setFont('helvetica', 'normal');
+        this.doc!.text(item.label, x + 3, y + 6);
+
+        this.doc!.setFontSize(12);
+        this.doc!.setFont('helvetica', 'bold');
+        this.doc!.text(String(item.value), x + 3, y + 14);
+      });
+
+      const rows = Math.ceil(summaryData.length / 6);
+      startY = startY + rows * (boxHeight + gap) + 6;
+    }
+
+    // Build table data
+    const headers = columns.map(col => col.header);
+    const body = data.map(row => 
+      columns.map(col => {
+        const value = row[col.field];
+        if (value === null || value === undefined) return '-';
+        if (value instanceof Date) return format(value, 'dd MMM yyyy');
+        if (typeof value === 'object') return JSON.stringify(value);
+        return String(value);
+      })
+    );
+
+    // Find column indices for conditional formatting
+    const overdueColIndex = columns.findIndex(col => col.field === 'overdueJobs');
+    const daysColIndex = columns.findIndex(col => col.field === 'daysUntilDue');
+    const riskColIndex = columns.findIndex(col => col.field === 'riskLevel');
+
+    autoTable(this.doc, {
+      head: [headers],
+      body: body,
+      startY: startY,
+      margin: { left: margin, right: margin },
+      styles: {
+        fontSize: 7,
+        cellPadding: 2,
+        overflow: 'linebreak',
+        lineColor: PDF_COLORS.border,
+        lineWidth: 0.1,
+      },
+      headStyles: {
+        fillColor: PDF_COLORS.secondary,
+        textColor: PDF_COLORS.textWhite,
+        fontStyle: 'bold',
+        halign: 'center',
+        fontSize: 7,
+      },
+      alternateRowStyles: {
+        fillColor: PDF_COLORS.bgLight,
+      },
+      columnStyles: columns.reduce((acc, col, index) => {
+        if (col.width) {
+          acc[index] = { cellWidth: col.width };
+        }
+        return acc;
+      }, {} as Record<number, { cellWidth: number }>),
+      didParseCell: (hookData) => {
+        if (hookData.section !== 'body') return;
+        
+        const rowData = data[hookData.row.index];
+        if (!rowData) return;
+
+        // Format Overdue column - red if > 0
+        if (hookData.column.index === overdueColIndex) {
+          const overdueCount = parseInt(hookData.cell.text[0]) || 0;
+          if (overdueCount > 0) {
+            hookData.cell.styles.textColor = PDF_COLORS.textDarkRed;
+            hookData.cell.styles.fontStyle = 'bold';
+          }
+        }
+
+        // Format Days Until Due column
+        if (hookData.column.index === daysColIndex) {
+          const days = parseInt(hookData.cell.text[0]);
+          if (!isNaN(days)) {
+            if (days < 0) {
+              hookData.cell.styles.textColor = PDF_COLORS.textDarkRed;
+              hookData.cell.styles.fontStyle = 'bold';
+            } else if (days <= 7) {
+              hookData.cell.styles.textColor = PDF_COLORS.textDarkOrange;
+              hookData.cell.styles.fontStyle = 'bold';
+            }
+          }
+        }
+
+        // Format Risk Level column
+        if (hookData.column.index === riskColIndex) {
+          const riskLevel = hookData.cell.text[0];
+          if (riskLevel === 'High Risk') {
+            hookData.cell.styles.fillColor = PDF_COLORS.bgDanger;
+            hookData.cell.styles.textColor = PDF_COLORS.textDarkRed;
+            hookData.cell.styles.fontStyle = 'bold';
+          } else if (riskLevel === 'Medium Risk') {
+            hookData.cell.styles.fillColor = PDF_COLORS.bgWarning;
+            hookData.cell.styles.textColor = PDF_COLORS.textDarkOrange;
+            hookData.cell.styles.fontStyle = 'bold';
+          }
+        }
+
+        // Highlight entire row for High Risk items
+        if (rowData.riskLevel === 'High Risk') {
+          if (hookData.column.index !== riskColIndex) {
+            hookData.cell.styles.fillColor = PDF_COLORS.bgDanger;
+          }
+        }
+      },
+      didDrawPage: (hookData) => {
+        const pageCount = this.doc!.getNumberOfPages();
+        const currentPage = hookData.pageNumber;
+        
+        this.doc!.setFontSize(8);
+        this.doc!.setTextColor(...PDF_COLORS.textLight);
+        this.doc!.text(
+          `Page ${currentPage} of ${pageCount}`,
+          this.doc!.internal.pageSize.getWidth() / 2,
+          this.doc!.internal.pageSize.getHeight() - 10,
+          { align: 'center' }
+        );
+      },
+    });
+
+    // Action notice if there are high risk items
+    if (metadata && metadata.highRisk > 0) {
+      const finalY = (this.doc as any).lastAutoTable?.finalY || startY + 50;
+      this.doc.setFillColor(...PDF_COLORS.bgDanger);
+      this.doc.roundedRect(margin, finalY + 5, pageWidth - (margin * 2), 12, 2, 2, 'F');
+      this.doc.setTextColor(...PDF_COLORS.textDarkRed);
+      this.doc.setFontSize(10);
+      this.doc.setFont('helvetica', 'bold');
+      this.doc.text(
+        `ACTION REQUIRED: ${metadata.highRisk} critical equipment with HIGH RISK status requires immediate attention`,
+        pageWidth / 2,
+        finalY + 12,
+        { align: 'center' }
+      );
+    }
+
+    // Footer
+    this.addFooter(pageWidth, pageHeight, margin);
+
+    const filename = this.generateFilename(config.title, config.vessel);
+    this.doc.save(filename);
+  }
 }
 
 export const pdfReportGenerator = new PDFReportGenerator();

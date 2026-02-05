@@ -4479,6 +4479,436 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // ═══════════════════════════════════════════════════════════════
+  // REPORT 1.5: CRITICAL EQUIPMENT STATUS API
+  // Returns critical/class equipment with aggregated work order data
+  // ═══════════════════════════════════════════════════════════════
+  app.get("/technical/api/reports/critical-equipment-status", async (req, res) => {
+    try {
+      const vesselId = req.query.vesselId as string;
+      if (!vesselId) {
+        return res.status(400).json({ error: "vesselId is required" });
+      }
+
+      // Get all components for the vessel where critical=true OR classItem=true
+      const allComponents = await storage.getComponents(vesselId);
+      const criticalComponents = allComponents.filter(c => 
+        c.isActive !== false && (c.critical === true || c.classItem === true)
+      );
+
+      // Get all work orders for the vessel
+      const allWorkOrders = await storage.getWorkOrders(vesselId);
+
+      // Parse date helper
+      const parseDate = (dateStr: string | null | undefined): Date | null => {
+        if (!dateStr) return null;
+        try {
+          const d = new Date(dateStr);
+          return isNaN(d.getTime()) ? null : d;
+        } catch {
+          return null;
+        }
+      };
+
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const sevenDaysFromNow = new Date(today.getTime() + 7 * 24 * 60 * 60 * 1000);
+
+      // Build report data by aggregating work orders per component
+      const reportData = criticalComponents.map((component, index) => {
+        // Find work orders for this component
+        const componentWOs = allWorkOrders.filter(wo => 
+          wo.componentCode === component.componentCode ||
+          wo.componentCode === component.id ||
+          wo.component === component.name
+        );
+
+        // Filter active work orders (not completed)
+        const activeWOs = componentWOs.filter(wo => 
+          wo.status !== 'Completed' && wo.isActive !== false
+        );
+
+        // Count by status
+        const overdueCount = activeWOs.filter(wo => wo.status === 'Overdue').length;
+        const dueSoonCount = activeWOs.filter(wo => {
+          const dueDate = parseDate(wo.dueDate || wo.nextDueDate);
+          if (!dueDate) return false;
+          return dueDate >= today && dueDate <= sevenDaysFromNow;
+        }).length;
+        const totalActiveWOs = activeWOs.length;
+
+        // Find next due date and last done date
+        const dueDates = activeWOs
+          .map(wo => parseDate(wo.dueDate || wo.nextDueDate))
+          .filter((d): d is Date => d !== null)
+          .sort((a, b) => a.getTime() - b.getTime());
+        const nextDueDate = dueDates.length > 0 ? dueDates[0] : null;
+
+        const completedWOs = componentWOs.filter(wo => wo.status === 'Completed');
+        const completionDates = completedWOs
+          .map(wo => parseDate(wo.dateCompleted))
+          .filter((d): d is Date => d !== null)
+          .sort((a, b) => b.getTime() - a.getTime());
+        const lastDoneDate = completionDates.length > 0 ? completionDates[0] : null;
+
+        // Calculate days until due
+        const daysUntilDue = nextDueDate 
+          ? Math.ceil((nextDueDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24))
+          : null;
+
+        // Determine critical type
+        let criticalType = 'N/A';
+        if (component.critical && component.classItem) {
+          criticalType = 'SOLAS + Class';
+        } else if (component.critical) {
+          criticalType = 'SOLAS Critical';
+        } else if (component.classItem) {
+          criticalType = 'Class Critical';
+        }
+
+        // Determine risk level
+        let riskLevel = 'No Active Jobs';
+        if (overdueCount > 0) {
+          riskLevel = 'High Risk';
+        } else if (dueSoonCount > 0) {
+          riskLevel = 'Medium Risk';
+        } else if (totalActiveWOs > 0) {
+          riskLevel = 'Low Risk';
+        }
+
+        // Get job titles (limited to first 3)
+        const jobTitles = activeWOs
+          .slice(0, 3)
+          .map(wo => wo.jobTitle)
+          .filter(Boolean)
+          .join(' | ');
+
+        // Get priorities
+        const priorities = [...new Set(activeWOs.map(wo => wo.jobPriority).filter(Boolean))].join(', ');
+
+        return {
+          sNo: index + 1,
+          componentId: component.id,
+          componentCode: component.componentCode || component.id,
+          componentName: component.name || 'Unnamed Component',
+          componentCategory: component.componentCategory || component.category || '-',
+          department: component.department || component.eqptSystemDept || '-',
+          location: component.location || '-',
+          critical: component.critical,
+          classItem: component.classItem,
+          criticalType,
+          totalWorkOrders: totalActiveWOs,
+          overdueJobs: overdueCount,
+          dueSoonJobs: dueSoonCount,
+          nextDueDate: nextDueDate ? nextDueDate.toISOString().split('T')[0] : null,
+          daysUntilDue,
+          lastDoneDate: lastDoneDate ? lastDoneDate.toISOString().split('T')[0] : null,
+          riskLevel,
+          runningHours: component.currentCumulativeRh || component.runningHours || '0',
+          conditionBased: component.conditionBased,
+          jobPriorities: priorities,
+          jobTitles
+        };
+      });
+
+      // Sort by risk level (High > Medium > Low > No Jobs), then by days until due
+      reportData.sort((a, b) => {
+        const riskOrder: Record<string, number> = { 'High Risk': 1, 'Medium Risk': 2, 'Low Risk': 3, 'No Active Jobs': 4 };
+        const riskA = riskOrder[a.riskLevel] || 4;
+        const riskB = riskOrder[b.riskLevel] || 4;
+        if (riskA !== riskB) return riskA - riskB;
+        
+        // Then by days until due (nulls last)
+        if (a.daysUntilDue === null && b.daysUntilDue === null) return 0;
+        if (a.daysUntilDue === null) return 1;
+        if (b.daysUntilDue === null) return -1;
+        return a.daysUntilDue - b.daysUntilDue;
+      });
+
+      // Re-number after sorting
+      reportData.forEach((item, idx) => { item.sNo = idx + 1; });
+
+      // Calculate metadata
+      const metadata = {
+        totalCriticalEquipment: reportData.length,
+        solasCritical: reportData.filter(r => r.critical).length,
+        classCritical: reportData.filter(r => r.classItem).length,
+        bothSolasAndClass: reportData.filter(r => r.critical && r.classItem).length,
+        highRisk: reportData.filter(r => r.riskLevel === 'High Risk').length,
+        mediumRisk: reportData.filter(r => r.riskLevel === 'Medium Risk').length,
+        lowRisk: reportData.filter(r => r.riskLevel === 'Low Risk').length,
+        totalOverdueJobs: reportData.reduce((sum, r) => sum + r.overdueJobs, 0),
+        totalDueSoonJobs: reportData.reduce((sum, r) => sum + r.dueSoonJobs, 0),
+        reportDate: new Date().toISOString()
+      };
+
+      res.json({
+        success: true,
+        data: reportData,
+        metadata
+      });
+
+    } catch (error: any) {
+      console.error('Error generating critical equipment report:', error);
+      res.status(500).json({ 
+        success: false, 
+        error: error.message || 'Failed to generate critical equipment report'
+      });
+    }
+  });
+
+  // ═══════════════════════════════════════════════════════════════
+  // REPORT 1.5: CRITICAL EQUIPMENT STATUS EXCEL EXPORT
+  // Generates Excel file with critical/class equipment status
+  // ═══════════════════════════════════════════════════════════════
+  app.post("/technical/api/reports/critical-equipment-status/excel", async (req, res) => {
+    try {
+      const { vesselId } = req.body;
+      
+      if (!vesselId) {
+        return res.status(400).json({ error: "Please select a vessel" });
+      }
+
+      // Reuse the JSON endpoint logic - fetch critical equipment data
+      const allComponents = await storage.getComponents(vesselId);
+      const criticalComponents = allComponents.filter(c => 
+        c.isActive !== false && (c.critical === true || c.classItem === true)
+      );
+
+      const allWorkOrders = await storage.getWorkOrders(vesselId);
+      const allVessels = await storage.getVessels();
+      const vessel = allVessels.find(v => v.id === vesselId);
+      const vesselName = vessel?.name || vesselId;
+
+      const parseDate = (dateStr: string | null | undefined): Date | null => {
+        if (!dateStr) return null;
+        try {
+          const d = new Date(dateStr);
+          return isNaN(d.getTime()) ? null : d;
+        } catch {
+          return null;
+        }
+      };
+
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const sevenDaysFromNow = new Date(today.getTime() + 7 * 24 * 60 * 60 * 1000);
+
+      // Build report data
+      const reportData = criticalComponents.map((component, index) => {
+        const componentWOs = allWorkOrders.filter(wo => 
+          wo.componentCode === component.componentCode ||
+          wo.componentCode === component.id ||
+          wo.component === component.name
+        );
+
+        const activeWOs = componentWOs.filter(wo => 
+          wo.status !== 'Completed' && wo.isActive !== false
+        );
+
+        const overdueCount = activeWOs.filter(wo => wo.status === 'Overdue').length;
+        const dueSoonCount = activeWOs.filter(wo => {
+          const dueDate = parseDate(wo.dueDate || wo.nextDueDate);
+          if (!dueDate) return false;
+          return dueDate >= today && dueDate <= sevenDaysFromNow;
+        }).length;
+        const totalActiveWOs = activeWOs.length;
+
+        const dueDates = activeWOs
+          .map(wo => parseDate(wo.dueDate || wo.nextDueDate))
+          .filter((d): d is Date => d !== null)
+          .sort((a, b) => a.getTime() - b.getTime());
+        const nextDueDate = dueDates.length > 0 ? dueDates[0] : null;
+
+        const completedWOs = componentWOs.filter(wo => wo.status === 'Completed');
+        const completionDates = completedWOs
+          .map(wo => parseDate(wo.dateCompleted))
+          .filter((d): d is Date => d !== null)
+          .sort((a, b) => b.getTime() - a.getTime());
+        const lastDoneDate = completionDates.length > 0 ? completionDates[0] : null;
+
+        const daysUntilDue = nextDueDate 
+          ? Math.ceil((nextDueDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24))
+          : null;
+
+        let criticalType = 'N/A';
+        if (component.critical && component.classItem) {
+          criticalType = 'SOLAS + Class';
+        } else if (component.critical) {
+          criticalType = 'SOLAS Critical';
+        } else if (component.classItem) {
+          criticalType = 'Class Critical';
+        }
+
+        let riskLevel = 'No Active Jobs';
+        if (overdueCount > 0) {
+          riskLevel = 'High Risk';
+        } else if (dueSoonCount > 0) {
+          riskLevel = 'Medium Risk';
+        } else if (totalActiveWOs > 0) {
+          riskLevel = 'Low Risk';
+        }
+
+        return {
+          sNo: index + 1,
+          componentCode: component.componentCode || component.id,
+          componentName: component.name || 'Unnamed Component',
+          componentCategory: component.componentCategory || component.category || '-',
+          department: component.department || component.eqptSystemDept || '-',
+          location: component.location || '-',
+          criticalType,
+          totalWorkOrders: totalActiveWOs,
+          overdueJobs: overdueCount,
+          dueSoonJobs: dueSoonCount,
+          nextDueDate: nextDueDate ? nextDueDate.toISOString().split('T')[0] : 'N/A',
+          daysUntilDue: daysUntilDue !== null ? daysUntilDue : 'N/A',
+          lastDoneDate: lastDoneDate ? lastDoneDate.toISOString().split('T')[0] : 'N/A',
+          riskLevel,
+          runningHours: component.currentCumulativeRh || component.runningHours || '0'
+        };
+      });
+
+      // Sort by risk level then days until due
+      reportData.sort((a, b) => {
+        const riskOrder: Record<string, number> = { 'High Risk': 1, 'Medium Risk': 2, 'Low Risk': 3, 'No Active Jobs': 4 };
+        const riskA = riskOrder[a.riskLevel] || 4;
+        const riskB = riskOrder[b.riskLevel] || 4;
+        if (riskA !== riskB) return riskA - riskB;
+        
+        const daysA = a.daysUntilDue === 'N/A' ? 9999 : a.daysUntilDue;
+        const daysB = b.daysUntilDue === 'N/A' ? 9999 : b.daysUntilDue;
+        return daysA - daysB;
+      });
+
+      reportData.forEach((item, idx) => { item.sNo = idx + 1; });
+
+      // Calculate summary
+      const metadata = {
+        totalCriticalEquipment: reportData.length,
+        solasCritical: reportData.filter(r => r.criticalType.includes('SOLAS')).length,
+        classCritical: reportData.filter(r => r.criticalType.includes('Class')).length,
+        highRisk: reportData.filter(r => r.riskLevel === 'High Risk').length,
+        mediumRisk: reportData.filter(r => r.riskLevel === 'Medium Risk').length,
+        lowRisk: reportData.filter(r => r.riskLevel === 'Low Risk').length,
+        totalOverdueJobs: reportData.reduce((sum, r) => sum + r.overdueJobs, 0),
+        totalDueSoonJobs: reportData.reduce((sum, r) => sum + r.dueSoonJobs, 0)
+      };
+
+      // Generate Excel workbook
+      const workbook = new ExcelJS.Workbook();
+      const worksheet = workbook.addWorksheet('Critical Equipment Status');
+
+      // Define columns for the report
+      const columns: ColumnDef[] = [
+        { header: 'S.No', key: 'sNo', width: 6 },
+        { header: 'Component Code', key: 'componentCode', width: 15 },
+        { header: 'Component Name', key: 'componentName', width: 30 },
+        { header: 'Critical Type', key: 'criticalType', width: 15 },
+        { header: 'Dept', key: 'department', width: 12 },
+        { header: 'Location', key: 'location', width: 15 },
+        { header: 'Total WOs', key: 'totalWorkOrders', width: 10 },
+        { header: 'Overdue', key: 'overdueJobs', width: 10 },
+        { header: 'Due Soon', key: 'dueSoonJobs', width: 10 },
+        { header: 'Next Due', key: 'nextDueDate', width: 12 },
+        { header: 'Days', key: 'daysUntilDue', width: 8 },
+        { header: 'Last Done', key: 'lastDoneDate', width: 12 },
+        { header: 'Risk Level', key: 'riskLevel', width: 14 },
+        { header: 'Running Hours', key: 'runningHours', width: 12 }
+      ];
+
+      const lastCol = getLastColumnLetter(columns.length);
+
+      // Apply standard header (rows 1-6)
+      applyStandardHeader(
+        worksheet,
+        'CRITICAL EQUIPMENT STATUS REPORT',
+        'SOLAS-critical and class-critical systems status',
+        vesselName,
+        reportData.length,
+        lastCol
+      );
+
+      // Apply table headers at row 7
+      applyStandardTableHeader(worksheet, columns, 7);
+
+      // Data rows with conditional formatting for risk levels
+      reportData.forEach((row, index) => {
+        const dataRow = worksheet.getRow(8 + index);
+        const rowData = [
+          row.sNo,
+          row.componentCode,
+          row.componentName,
+          row.criticalType,
+          row.department,
+          row.location,
+          row.totalWorkOrders,
+          row.overdueJobs,
+          row.dueSoonJobs,
+          row.nextDueDate,
+          row.daysUntilDue,
+          row.lastDoneDate,
+          row.riskLevel,
+          row.runningHours
+        ];
+
+        rowData.forEach((value, colIdx) => {
+          dataRow.getCell(colIdx + 1).value = value;
+        });
+
+        // Alternating row colors
+        const fillColor = index % 2 === 0 ? COLORS.bgWhite : COLORS.bgLight;
+        dataRow.eachCell((cell, colNumber) => {
+          if (colNumber <= columns.length) {
+            cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: fillColor } };
+            cell.border = {
+              top: { style: 'thin', color: { argb: COLORS.border } },
+              left: { style: 'thin', color: { argb: COLORS.border } },
+              bottom: { style: 'thin', color: { argb: COLORS.border } },
+              right: { style: 'thin', color: { argb: COLORS.border } }
+            };
+          }
+        });
+
+        // Apply risk-level coloring to Risk Level column (column 13)
+        const riskCell = dataRow.getCell(13);
+        if (row.riskLevel === 'High Risk') {
+          riskCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: COLORS.bgDanger } };
+          riskCell.font = { color: { argb: COLORS.danger }, bold: true };
+          // Also highlight the overdue column (column 8)
+          dataRow.getCell(8).font = { color: { argb: COLORS.danger }, bold: true };
+        } else if (row.riskLevel === 'Medium Risk') {
+          riskCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: COLORS.bgWarning } };
+          riskCell.font = { color: { argb: COLORS.warning }, bold: true };
+        }
+      });
+
+      // Apply auto-filter
+      worksheet.autoFilter = {
+        from: { row: 7, column: 1 },
+        to: { row: 7 + reportData.length, column: columns.length }
+      };
+
+      // Apply standard page setup
+      applyStandardPageSetup(worksheet);
+
+      // Generate buffer and send
+      const buffer = await workbook.xlsx.writeBuffer();
+      const dateStr = new Date().toISOString().split('T')[0].replace(/-/g, '');
+      const filename = `Critical_Equipment_Status_${vesselName.replace(/[^a-z0-9]/gi, '_')}_${dateStr}.xlsx`;
+
+      res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+      res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+      res.send(buffer);
+
+    } catch (error: any) {
+      console.error('Error generating critical equipment Excel report:', error);
+      res.status(500).json({ 
+        success: false, 
+        error: error.message || 'Failed to generate critical equipment Excel report'
+      });
+    }
+  });
+
   
   // Defects API routes
   

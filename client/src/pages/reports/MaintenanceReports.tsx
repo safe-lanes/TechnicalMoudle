@@ -783,36 +783,63 @@ const MaintenanceReports: React.FC<MaintenanceReportsProps> = ({ onBack, globalF
       }
 
       case 'critical-equipment': {
-        const criticalWOs = vesselWorkOrders.filter((wo: any) => 
-          wo.criticality === 'Yes' || wo.criticality === 'Critical' || wo.critical === true
+        // Fetch data from the new API endpoint
+        const response = await fetch(
+          `/technical/api/reports/critical-equipment-status?vesselId=${effectiveVesselId}`
         );
+        if (!response.ok) {
+          throw new Error('Failed to fetch critical equipment data');
+        }
+        const { data: criticalData, metadata } = await response.json();
 
+        // Define columns for the report (14 columns for A3 landscape)
         const columns = [
-          { header: 'WO Number', field: 'workOrderNumber', width: 40 },
-          { header: 'Title', field: 'title', width: 60 },
-          { header: 'Component', field: 'component', width: 50 },
-          { header: 'Due Date', field: 'formattedDueDate', width: 30 },
-          { header: 'Status', field: 'status', width: 30 }
+          { header: 'S.No', field: 'sNo', width: 8 },
+          { header: 'Code', field: 'componentCode', width: 18 },
+          { header: 'Component Name', field: 'componentName', width: 40 },
+          { header: 'Critical Type', field: 'criticalType', width: 22 },
+          { header: 'Dept', field: 'department', width: 15 },
+          { header: 'Location', field: 'location', width: 18 },
+          { header: 'Total WOs', field: 'totalWorkOrders', width: 12 },
+          { header: 'Overdue', field: 'overdueJobs', width: 12 },
+          { header: 'Due Soon', field: 'dueSoonJobs', width: 12 },
+          { header: 'Next Due', field: 'nextDueDate', width: 18 },
+          { header: 'Days', field: 'daysUntilDue', width: 10 },
+          { header: 'Last Done', field: 'lastDoneDate', width: 18 },
+          { header: 'Risk Level', field: 'riskLevel', width: 16 },
+          { header: 'RH', field: 'runningHours', width: 12 }
         ];
 
-        const data = criticalWOs.map((wo: any) => ({
-          workOrderNumber: wo.workOrderNumber || wo.id,
-          title: wo.title || wo.jobTitle || '-',
-          component: wo.component || wo.componentName || '-',
-          formattedDueDate: formatDate(wo.dueDate),
-          status: wo.status || 'Open'
+        // Transform data for display
+        const data = criticalData.map((row: any) => ({
+          ...row,
+          nextDueDate: row.nextDueDate ? formatDate(row.nextDueDate) : 'N/A',
+          lastDoneDate: row.lastDoneDate ? formatDate(row.lastDoneDate) : 'N/A',
+          daysUntilDue: row.daysUntilDue !== null ? row.daysUntilDue : 'N/A',
+          runningHours: row.runningHours ? parseFloat(row.runningHours).toLocaleString() : '0'
         }));
 
+        // Build summary with metadata
         const summary = [
-          { label: 'Critical WOs', value: data.length },
-          { label: 'Overdue', value: data.filter((d: any) => d.status === 'Overdue').length }
+          { label: 'Total Critical Equip', value: metadata.totalCriticalEquipment },
+          { label: 'SOLAS Critical', value: metadata.solasCritical },
+          { label: 'Class Critical', value: metadata.classCritical },
+          { label: 'Both (SOLAS+Class)', value: metadata.bothSolasAndClass },
+          { label: 'High Risk', value: metadata.highRisk, color: 'highlight' },
+          { label: 'Medium Risk', value: metadata.mediumRisk }
         ];
 
-        pdfReportGenerator.generateReport(
-          { title: 'Critical Equipment Status', subtitle: 'SOLAS-critical and class-critical systems', vessel: vesselName },
+        // Use specialized critical equipment report generator
+        pdfReportGenerator.generateCriticalEquipmentReport(
+          { 
+            title: 'CRITICAL EQUIPMENT STATUS REPORT', 
+            subtitle: 'SOLAS-critical and class-critical systems status', 
+            vessel: vesselName 
+          },
           columns,
           data,
-          summary
+          summary,
+          metadata
         );
         break;
       }
@@ -1015,6 +1042,7 @@ const MaintenanceReports: React.FC<MaintenanceReportsProps> = ({ onBack, globalF
       'unplanned-jobs': '/technical/api/reports/unplanned-jobs',
       'postponement-log': '/technical/api/reports/postponement-log',
       'monthly-summary': '/technical/api/reports/maintenance/monthly-summary/excel',
+      'critical-equipment': '/technical/api/reports/critical-equipment-status/excel',
     };
 
     const endpoint = reportEndpoints[reportId];
