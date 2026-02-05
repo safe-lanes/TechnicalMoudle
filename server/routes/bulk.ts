@@ -1768,8 +1768,8 @@ router.get('/template', async (req, res) => {
     }
   }
   
-  if (!['components', 'spares', 'stores', 'work-orders', 'jobs'].includes(type as string)) {
-    return res.status(400).json({ error: 'Invalid template type. Valid types: components, spares, stores, work-orders, jobs, fleet-master-data' });
+  if (!['components', 'spares', 'stores', 'work-orders', 'jobs', 'makers'].includes(type as string)) {
+    return res.status(400).json({ error: 'Invalid template type. Valid types: components, spares, stores, work-orders, jobs, makers, fleet-master-data' });
   }
   
   // Default to V001 if no vesselId provided
@@ -1863,6 +1863,23 @@ router.get('/template', async (req, res) => {
         'Text (Task description)', 'Engine/Deck/Electrical', RESPONSIBLE_RANKS.join('/'),
         'Running Hours/Calendar/Both', 'Number (for Calendar)', 'Days/Weeks/Months/Years', 'Number (for RH)',
         'Yes/No', 'Number (hours)', 'Text (Parts list)', 'Hot Work/Enclosed Space Entry/Lockout-Tagout/Working Aloft'
+      ];
+
+      example = [];
+      break;
+      
+    case 'makers':
+      headers = [
+        // Maker List template
+        'Maker Code', 'Maker Name', 'Address', 'Contact Person', 'Email', 
+        'Phone', 'Website', 'Country', 'Notes', 'Is Active'
+      ];
+
+      validValues = [
+        'Required (Unique identifier, e.g., MAN, CAT, ABB)', 'Required (Full manufacturer name)', 
+        'Text (Manufacturer address)', 'Text (Primary contact name)', 'Text (Email address)',
+        'Text (Phone number)', 'Text (Website URL)', 'Text (Country of origin)', 
+        'Text (Additional notes)', 'Yes/No (defaults to Yes)'
       ];
 
       example = [];
@@ -2263,6 +2280,7 @@ function getTypeFromSheetName(sheetName: string): string | null {
   if (normalizedName === 'jobs' || normalizedName.includes('job')) return 'jobs';
   if (normalizedName === 'stores' || normalizedName.includes('store')) return 'stores';
   if (normalizedName === 'work-orders' || normalizedName.includes('work order') || normalizedName.includes('workorder')) return 'work-orders';
+  if (normalizedName === 'makers' || normalizedName.includes('maker') || normalizedName === 'maker list') return 'makers';
   
   return null; // No mapping found, use passed type
 }
@@ -2283,7 +2301,7 @@ router.post('/dry-run', upload.single('file'), async (req, res) => {
     
     console.log(`📋 Type determination: requested='${requestedType}', sheetName='${sheetName}', sheetBasedType='${sheetBasedType}', effective='${type}'`);
 
-    if (!['components', 'spares', 'stores', 'work-orders', 'jobs'].includes(type)) {
+    if (!['components', 'spares', 'stores', 'work-orders', 'jobs', 'makers'].includes(type)) {
       return res.status(400).json({ error: 'Invalid type' });
     }
 
@@ -2672,6 +2690,9 @@ async function validateData(type: string, data: any[], mode: string, vesselId?: 
         break;
       case 'work-orders':
         primaryField = 'Work Order Number';
+        break;
+      case 'makers':
+        primaryField = 'Maker Code';
         break;
       default:
         primaryField = 'Component Code';
@@ -3462,6 +3483,75 @@ async function validateData(type: string, data: any[], mode: string, vesselId?: 
           normalized[key] = row[key];
         }
       });
+    } else if (type === 'makers') {
+      // Validate makers (3-column format: Maker Code, Maker Name, Address)
+      
+      // Maker Code - required and unique
+      const makerCode = row['Maker Code'];
+      if (!makerCode || String(makerCode).trim() === '') {
+        errors.push(`Row ${rowNum}: Maker Code is required`);
+      } else {
+        normalized['Maker Code'] = String(makerCode).trim();
+      }
+      
+      // Maker Name - required
+      const makerName = row['Maker Name'];
+      if (!makerName || String(makerName).trim() === '') {
+        errors.push(`Row ${rowNum}: Maker Name is required`);
+      } else {
+        normalized['Maker Name'] = String(makerName).trim();
+      }
+      
+      // Address - optional
+      if (row['Address']) {
+        normalized['Address'] = String(row['Address']).trim();
+      }
+      
+      // Contact Person - optional
+      if (row['Contact Person']) {
+        normalized['Contact Person'] = String(row['Contact Person']).trim();
+      }
+      
+      // Email - optional with basic validation
+      if (row['Email']) {
+        const email = String(row['Email']).trim();
+        if (email && !email.includes('@')) {
+          warnings.push(`Row ${rowNum}: Email format may be invalid`);
+        }
+        normalized['Email'] = email;
+      }
+      
+      // Phone - optional
+      if (row['Phone']) {
+        normalized['Phone'] = String(row['Phone']).trim();
+      }
+      
+      // Website - optional
+      if (row['Website']) {
+        normalized['Website'] = String(row['Website']).trim();
+      }
+      
+      // Country - optional
+      if (row['Country']) {
+        normalized['Country'] = String(row['Country']).trim();
+      }
+      
+      // Notes - optional
+      if (row['Notes']) {
+        normalized['Notes'] = String(row['Notes']).trim();
+      }
+      
+      // Is Active - optional yes/no (defaults to Yes)
+      if (row['Is Active']) {
+        const value = String(row['Is Active']).toLowerCase().trim();
+        if (!['yes', 'no', 'y', 'n', 'true', 'false', '1', '0'].includes(value)) {
+          errors.push(`Row ${rowNum}: Is Active must be Yes or No`);
+        } else {
+          normalized['Is Active'] = ['yes', 'y', 'true', '1'].includes(value);
+        }
+      } else {
+        normalized['Is Active'] = true; // Default to active
+      }
     }
 
     // Determine status
@@ -5015,6 +5105,80 @@ async function performImport(
     }
     
     console.log(`✅ Jobs import complete: ${result.created} created, ${result.updated} updated, ${result.skipped} skipped, ${result.archived} archived, ${result.jobComponentLinksCreated || 0} job-component links created`);
+  } else if (type === 'makers') {
+    // Import makers to maker_list table
+    console.log(`🚀 Starting makers import: ${data.length} rows, mode: ${mode}`);
+    
+    // Step 1: Prefetch all existing makers for duplicate checking
+    const existingMakers = await storage.getMakerList();
+    const makersByCode = new Map(existingMakers.map(m => [m.makerCode, m]));
+    console.log(`📦 Prefetched ${existingMakers.length} existing makers`);
+    
+    // Step 2: Process each row
+    for (const row of data) {
+      const makerCode = String(row['Maker Code']).trim();
+      const makerName = String(row['Maker Name']).trim();
+      const address = row['Address'] ? String(row['Address']).trim() : null;
+      const isActive = row['Is Active'] !== false && row['Is Active'] !== 'no';
+      
+      const existingMaker = makersByCode.get(makerCode);
+      
+      if (mode === 'add') {
+        if (existingMaker) {
+          console.log(`⏭️ Skipping existing maker: ${makerCode}`);
+          result.skipped++;
+        } else {
+          // Create new maker
+          const newMaker = await storage.createMakerListItem({
+            makerCode,
+            makerName,
+            address,
+            isActive
+          });
+          makersByCode.set(makerCode, newMaker);
+          result.created++;
+          console.log(`✅ Created maker: ${makerCode} - ${makerName}`);
+        }
+      } else if (mode === 'update') {
+        if (existingMaker) {
+          // Update existing maker
+          await storage.updateMakerListItem(existingMaker.id, {
+            makerName,
+            address,
+            isActive
+          });
+          result.updated++;
+          console.log(`🔄 Updated maker: ${makerCode} - ${makerName}`);
+        } else {
+          console.log(`⏭️ Skipping non-existent maker (update mode): ${makerCode}`);
+          result.skipped++;
+        }
+      } else if (mode === 'upsert') {
+        if (existingMaker) {
+          // Update existing maker
+          await storage.updateMakerListItem(existingMaker.id, {
+            makerName,
+            address,
+            isActive
+          });
+          result.updated++;
+          console.log(`🔄 Updated maker: ${makerCode} - ${makerName}`);
+        } else {
+          // Create new maker
+          const newMaker = await storage.createMakerListItem({
+            makerCode,
+            makerName,
+            address,
+            isActive
+          });
+          makersByCode.set(makerCode, newMaker);
+          result.created++;
+          console.log(`✅ Created maker: ${makerCode} - ${makerName}`);
+        }
+      }
+    }
+    
+    console.log(`✅ Makers import complete: ${result.created} created, ${result.updated} updated, ${result.skipped} skipped`);
   }
 
   return result;
