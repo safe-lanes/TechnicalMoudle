@@ -101,30 +101,6 @@ const RunningHoursReports: React.FC<RunningHoursReportsProps> = ({ onBack, globa
       priority: "high",
       estimatedTime: "2-3 min"
     },
-    {
-      id: "rh-maintenance-triggers",
-      name: "RH-Based Maintenance Triggers",
-      description: "Equipment approaching running hours-based maintenance thresholds",
-      purpose: "Plan RH-based maintenance (Chief Eng)",
-      frequency: "Daily/Weekly",
-      fields: ["Component", "Current RH", "Next Due RH", "Remaining", "Job"],
-      outputs: ["PDF", "Dashboard"],
-      icon: Gauge,
-      priority: "high",
-      estimatedTime: "1-2 min"
-    },
-    {
-      id: "rh-condition-monitoring",
-      name: "Condition Monitoring Trends",
-      description: "Track equipment condition indicators over time",
-      purpose: "Predictive maintenance planning (Office)",
-      frequency: "Monthly",
-      fields: ["Component", "Condition Score", "Trend", "Last Reading", "Notes"],
-      outputs: ["PDF", "Excel"],
-      icon: Activity,
-      priority: "medium",
-      estimatedTime: "3-5 min"
-    }
   ];
 
   const filteredReports = reports.filter(report => {
@@ -308,67 +284,6 @@ const RunningHoursReports: React.FC<RunningHoursReportsProps> = ({ onBack, globa
         break;
       }
 
-      case 'rh-maintenance-triggers': {
-        // Use local component data for this report (API not yet implemented)
-        const rhComponents = components.filter((c: any) => 
-          c.runningHours !== undefined && c.runningHours !== null
-        );
-        
-        const columns = [
-          { header: 'Code', field: 'code', width: 30 },
-          { header: 'Component', field: 'name', width: 55 },
-          { header: 'Current RH', field: 'runningHours', width: 30 },
-          { header: 'Status', field: 'status', width: 30 }
-        ];
-
-        const data = rhComponents.map((c: any) => ({
-          code: c.componentCode || c.code || '-',
-          name: c.name || '-',
-          runningHours: c.runningHours || 0,
-          status: 'OK'
-        }));
-
-        const summary = [
-          { label: 'Components with RH', value: data.length }
-        ];
-
-        pdfReportGenerator.generateReport(
-          { title: 'RH-Based Maintenance Triggers', subtitle: 'Equipment approaching maintenance', vessel: vesselName },
-          columns,
-          data,
-          summary
-        );
-        break;
-      }
-
-      case 'rh-condition-monitoring': {
-        // Use local component data for this report (API not yet implemented)
-        const rhComponents = components.filter((c: any) => 
-          c.runningHours !== undefined && c.runningHours !== null
-        );
-        
-        const columns = [
-          { header: 'Code', field: 'code', width: 30 },
-          { header: 'Component', field: 'name', width: 60 },
-          { header: 'Running Hours', field: 'runningHours', width: 35 },
-          { header: 'Condition', field: 'condition', width: 30 }
-        ];
-
-        const data = rhComponents.map((c: any) => ({
-          code: c.componentCode || c.code || '-',
-          name: c.name || '-',
-          runningHours: c.runningHours || 0,
-          condition: 'Good'
-        }));
-
-        pdfReportGenerator.generateReport(
-          { title: 'Condition Monitoring Trends', subtitle: 'Equipment condition report', vessel: vesselName },
-          columns,
-          data
-        );
-        break;
-      }
-
       default:
         toast({
           title: "Report Not Available",
@@ -492,7 +407,7 @@ const RunningHoursReports: React.FC<RunningHoursReportsProps> = ({ onBack, globa
           </Button>
           <div>
             <h1 className="text-2xl font-bold text-gray-900">Running Hours & Condition</h1>
-            <p className="text-sm text-gray-500">4 reports for equipment monitoring</p>
+            <p className="text-sm text-gray-500">2 reports for equipment monitoring</p>
           </div>
         </div>
 
@@ -528,7 +443,7 @@ const RunningHoursReports: React.FC<RunningHoursReportsProps> = ({ onBack, globa
               <Clock className="w-4 h-4 text-purple-500" />
               Reports Available
             </CardDescription>
-            <CardTitle className="text-3xl text-purple-600">4</CardTitle>
+            <CardTitle className="text-3xl text-purple-600">2</CardTitle>
           </CardHeader>
         </Card>
         <Card className="border-l-4 border-l-red-500 bg-white">

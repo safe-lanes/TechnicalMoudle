@@ -83,7 +83,7 @@ const ReportsModule = () => {
       title: "Running Hours & Condition",
       description: "Equipment utilization, anomalies, and condition monitoring trends",
       icon: Clock,
-      reportCount: 4,
+      reportCount: 2,
       lastGenerated: "4 hours ago", 
       color: "border-blue-500",
       iconBg: "bg-blue-500",
