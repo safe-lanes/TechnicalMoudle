@@ -4491,7 +4491,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: "vesselId is required" });
       }
 
-      const criticalOnly = req.query.criticalOnly === 'true';
       const stockStatusFilter = req.query.stockStatus
         ? (Array.isArray(req.query.stockStatus) ? req.query.stockStatus as string[] : [req.query.stockStatus as string])
         : null;
@@ -4584,7 +4583,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return 'Stock level adequate';
       };
 
-      let reportRows = sparesData.map(spare => {
+      const allRows = sparesData.map(spare => {
         const robVal = spare.rob ?? 0;
         const minVal = spare.min ?? null;
         const stockStatus = getStockStatus(robVal, minVal);
@@ -4621,11 +4620,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         };
       });
 
-      if (criticalOnly) {
-        reportRows = reportRows.filter(r =>
-          r.stockStatus === 'ZERO' || r.stockStatus === 'LOW' || r.criticalityLevel === 'CRITICAL'
-        );
-      }
+      let reportRows = allRows.filter(r =>
+        r.criticalityLevel === 'CRITICAL' || r.criticalityLevel === 'ESSENTIAL'
+      );
+
       if (stockStatusFilter && stockStatusFilter.length > 0) {
         reportRows = reportRows.filter(r => stockStatusFilter.includes(r.stockStatus));
       }
@@ -4649,6 +4647,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       reportRows.forEach((r, i) => { r.sNo = i + 1; });
 
       const totalCritical = reportRows.filter(r => r.criticalityLevel === 'CRITICAL').length;
+      const totalEssential = reportRows.filter(r => r.criticalityLevel === 'ESSENTIAL').length;
+      const totalLinkedCriticalEquip = reportRows.filter(r => r.linkedToCriticalEquipment === true).length;
       const totalZeroStock = reportRows.filter(r => r.stockStatus === 'ZERO').length;
       const totalLowStock = reportRows.filter(r => r.stockStatus === 'LOW').length;
       const totalShortage = reportRows.reduce((sum, r) => sum + r.shortageQty, 0);
@@ -4669,6 +4669,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
           generatedAt: new Date().toISOString(),
           totalSpares: reportRows.length,
           totalCritical,
+          totalEssential,
+          totalLinkedCriticalEquip,
           totalZeroStock,
           totalLowStock,
         },
@@ -4700,7 +4702,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: "Please select a vessel" });
       }
 
-      const criticalOnly = filters?.criticalOnly === true;
       const stockStatusFilter: string[] | null = filters?.stockStatus && Array.isArray(filters.stockStatus) && filters.stockStatus.length > 0 ? filters.stockStatus : null;
       const departmentFilter: string | undefined = filters?.department || undefined;
 
@@ -4791,7 +4792,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return 'Stock level adequate';
       };
 
-      let reportRows = sparesData.map(spare => {
+      const allExcelRows = sparesData.map(spare => {
         const robVal = spare.rob ?? 0;
         const minVal = spare.min ?? null;
         const stockStatus = getStockStatus(robVal, minVal);
@@ -4828,11 +4829,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         };
       });
 
-      if (criticalOnly) {
-        reportRows = reportRows.filter(r =>
-          r.stockStatus === 'ZERO' || r.stockStatus === 'LOW' || r.criticalityLevel === 'CRITICAL'
-        );
-      }
+      let reportRows = allExcelRows.filter(r =>
+        r.criticalityLevel === 'CRITICAL' || r.criticalityLevel === 'ESSENTIAL'
+      );
+
       if (stockStatusFilter && stockStatusFilter.length > 0) {
         reportRows = reportRows.filter(r => stockStatusFilter.includes(r.stockStatus));
       }

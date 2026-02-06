@@ -21,6 +21,7 @@ import {
   Package,
   ShieldAlert,
   ShieldCheck,
+  XCircle,
 } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { pdfReportGenerator } from "@/lib/pdfReportGenerator";
@@ -53,6 +54,8 @@ interface CriticalSparesResponse {
     generatedAt: string;
     totalSpares: number;
     totalCritical: number;
+    totalEssential: number;
+    totalLinkedCriticalEquip: number;
     totalZeroStock: number;
     totalLowStock: number;
   };
@@ -88,13 +91,12 @@ const CriticalSparesReport: React.FC<CriticalSparesReportProps> = ({ onBack, ves
   const queryUrl = useMemo(() => {
     const params = new URLSearchParams();
     params.set('vesselId', effectiveVesselId || '');
-    if (criticalityFilter === 'critical-only') params.set('criticalOnly', 'true');
     if (stockStatusFilter !== 'all') params.set('stockStatus', stockStatusFilter);
     return `/technical/api/reports/critical-spares/preview?${params.toString()}`;
-  }, [effectiveVesselId, criticalityFilter, stockStatusFilter]);
+  }, [effectiveVesselId, stockStatusFilter]);
 
   const { data, isLoading, error } = useQuery<CriticalSparesResponse>({
-    queryKey: ['/technical/api/reports/critical-spares/preview', effectiveVesselId, criticalityFilter, stockStatusFilter],
+    queryKey: ['/technical/api/reports/critical-spares/preview', effectiveVesselId, stockStatusFilter],
     queryFn: async () => {
       const res = await fetch(queryUrl, { credentials: 'include' });
       if (!res.ok) throw new Error('Failed to fetch report');
@@ -118,6 +120,10 @@ const CriticalSparesReport: React.FC<CriticalSparesReportProps> = ({ onBack, ves
       );
     }
 
+    if (criticalityFilter !== 'all') {
+      items = items.filter(i => i.criticalityLevel === criticalityFilter);
+    }
+
     items.sort((a, b) => {
       let cmp = 0;
       const statusPriority: Record<string, number> = { ZERO: 1, LOW: 2, OK: 3, NOT_SET: 4 };
@@ -134,7 +140,7 @@ const CriticalSparesReport: React.FC<CriticalSparesReportProps> = ({ onBack, ves
     });
 
     return items;
-  }, [data?.data, searchQuery, sortField, sortDirection]);
+  }, [data?.data, searchQuery, criticalityFilter, sortField, sortDirection]);
 
   const handleSort = (field: SortField) => {
     if (sortField === field) {
@@ -154,7 +160,7 @@ const CriticalSparesReport: React.FC<CriticalSparesReportProps> = ({ onBack, ves
       case 'NOT_SET':
         return <Badge variant="outline" className="text-gray-500">Not Set</Badge>;
       default:
-        return <Badge className="bg-green-600 text-white border-green-700">OK</Badge>;
+        return <Badge className="bg-green-600 text-white border-green-700">Adequate</Badge>;
     }
   };
 
@@ -210,10 +216,10 @@ const CriticalSparesReport: React.FC<CriticalSparesReportProps> = ({ onBack, ves
       }));
 
       const summaryData = [
-        { label: 'Total Spares', value: data.reportMeta.totalSpares },
-        { label: 'Critical Equipment Spares', value: data.summary.byCriticality.CRITICAL },
-        { label: 'Out of Stock', value: data.summary.byStatus.ZERO },
-        { label: 'Low Stock', value: data.summary.byStatus.LOW },
+        { label: 'Total Critical Spares', value: data.reportMeta.totalSpares },
+        { label: 'Critical Equipment Spares', value: data.reportMeta.totalLinkedCriticalEquip },
+        { label: 'Out of Stock', value: data.reportMeta.totalZeroStock },
+        { label: 'Low Stock', value: data.reportMeta.totalLowStock },
         { label: 'Total Shortage', value: `${data.summary.totalShortage} units` },
       ];
 
@@ -239,7 +245,6 @@ const CriticalSparesReport: React.FC<CriticalSparesReportProps> = ({ onBack, ves
     setGeneratingExcel(true);
     try {
       const filters: Record<string, any> = {};
-      if (criticalityFilter === 'critical-only') filters.criticalOnly = true;
       if (stockStatusFilter !== 'all') filters.stockStatus = [stockStatusFilter];
 
       const res = await fetch('/technical/api/reports/critical-spares', {
@@ -343,29 +348,29 @@ const CriticalSparesReport: React.FC<CriticalSparesReportProps> = ({ onBack, ves
       ) : (
         <>
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-            <Card data-testid="card-total-spares">
+            <Card data-testid="card-total-critical-spares">
               <CardHeader className="pb-2">
                 <CardDescription className="flex items-center gap-1">
                   <Package className="w-4 h-4 text-blue-500" />
-                  Total Spares
+                  Total Critical Spares
                 </CardDescription>
                 <CardTitle className="text-3xl">{meta?.totalSpares || 0}</CardTitle>
               </CardHeader>
             </Card>
-            <Card data-testid="card-critical-spares">
+            <Card data-testid="card-critical-equipment-spares">
               <CardHeader className="pb-2">
                 <CardDescription className="flex items-center gap-1">
                   <ShieldAlert className="w-4 h-4 text-red-500" />
                   Critical Equipment Spares
                 </CardDescription>
-                <CardTitle className="text-3xl text-red-600">{meta?.totalCritical || 0}</CardTitle>
+                <CardTitle className="text-3xl text-red-600">{meta?.totalLinkedCriticalEquip || 0}</CardTitle>
               </CardHeader>
             </Card>
-            <Card data-testid="card-zero-stock">
+            <Card data-testid="card-out-of-stock">
               <CardHeader className="pb-2">
                 <CardDescription className="flex items-center gap-1">
-                  <AlertTriangle className="w-4 h-4 text-red-500" />
-                  Out of Stock
+                  <XCircle className="w-4 h-4 text-red-500" />
+                  Out of Stock Critical Parts
                 </CardDescription>
                 <CardTitle className="text-3xl text-red-600">{meta?.totalZeroStock || 0}</CardTitle>
               </CardHeader>
@@ -374,7 +379,7 @@ const CriticalSparesReport: React.FC<CriticalSparesReportProps> = ({ onBack, ves
               <CardHeader className="pb-2">
                 <CardDescription className="flex items-center gap-1">
                   <ShieldCheck className="w-4 h-4 text-amber-500" />
-                  Low Stock
+                  Low Stock Critical Parts
                 </CardDescription>
                 <CardTitle className="text-3xl text-amber-600">{meta?.totalLowStock || 0}</CardTitle>
               </CardHeader>
@@ -409,8 +414,9 @@ const CriticalSparesReport: React.FC<CriticalSparesReportProps> = ({ onBack, ves
                 <SelectValue placeholder="Criticality" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">All Items</SelectItem>
-                <SelectItem value="critical-only">Critical/Low/Zero Only</SelectItem>
+                <SelectItem value="all">All Criticality</SelectItem>
+                <SelectItem value="CRITICAL">Critical Only</SelectItem>
+                <SelectItem value="ESSENTIAL">Essential Only</SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -441,7 +447,7 @@ const CriticalSparesReport: React.FC<CriticalSparesReportProps> = ({ onBack, ves
                       <td colSpan={13} className="text-center py-12">
                         <Package className="h-10 w-10 text-gray-400 mx-auto mb-3" />
                         <p className="text-gray-500 font-medium">No critical spares found</p>
-                        <p className="text-sm text-gray-400 mt-1">All spare parts have adequate stock levels</p>
+                        <p className="text-sm text-gray-400 mt-1">No spare parts match the current filter criteria</p>
                       </td>
                     </tr>
                   ) : (
@@ -505,12 +511,12 @@ const CriticalSparesReport: React.FC<CriticalSparesReportProps> = ({ onBack, ves
           {filteredAndSortedItems.length > 0 && (
             <div className="flex items-center justify-between mt-4 flex-wrap gap-4">
               <span className="text-sm text-gray-500">
-                Showing {filteredAndSortedItems.length} of {meta?.totalSpares || 0} spares
+                Showing {filteredAndSortedItems.length} of {meta?.totalSpares || 0} critical/essential spares
               </span>
               {summary && (
                 <div className="flex items-center gap-4 text-sm text-gray-500">
-                  <span>Critical: <strong className="text-red-600">{summary.byCriticality.CRITICAL}</strong></span>
-                  <span>Essential: <strong className="text-amber-600">{summary.byCriticality.ESSENTIAL}</strong></span>
+                  <span>Critical: <strong className="text-red-600">{summary.byCriticality.CRITICAL || 0}</strong></span>
+                  <span>Essential: <strong className="text-amber-600">{summary.byCriticality.ESSENTIAL || 0}</strong></span>
                   <span>Total Shortage: <strong className="text-red-600">{summary.totalShortage} units</strong></span>
                 </div>
               )}

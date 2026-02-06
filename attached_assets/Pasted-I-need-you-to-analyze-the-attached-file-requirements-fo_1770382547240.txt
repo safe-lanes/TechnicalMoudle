@@ -1,0 +1,53 @@
+I need you to analyze the attached file requirements for the Critical Spares Report and implement it properly. The current report is NOT correct.
+
+CURRENT PROBLEM:
+The existing "Critical Spares Report" in the Inventory - Spares section is showing ALL spare parts data (1113 total spares), but according to the specifications, it should ONLY show CRITICAL spare parts.
+
+REQUIREMENTS FROM THE SPEC FILE:
+
+1. REPORT PURPOSE: Display ONLY critical and essential spare parts inventory status
+
+2. DATA FILTERING - The report must filter to show ONLY:
+   - Spare parts where criticality = "Critical" OR "Essential"
+   - These are the high-priority parts that require close monitoring
+   - NOT all 1113 spares in the system
+
+3. REPORT STRUCTURE:
+   
+   SUMMARY CARDS (Top section):
+   - Total Critical Spares (count of only critical/essential parts)
+   - Critical Equipment Spares (critical parts linked to critical equipment)
+   - Out of Stock Critical Parts (critical parts with ROB = 0)
+   - Low Stock Critical Parts (critical parts where ROB < minStock)
+
+4. DATA TABLE COLUMNS:
+   - S.No
+   - Part Code
+   - Part Name
+   - ROB (Remaining on Board)
+   - Min Stock
+   - Stock Status (badge: "Out of Stock", "Low Stock", "Adequate")
+   - Shortage (minStock - ROB, only if positive)
+   - Criticality ("Critical" or "Essential")
+   - Critical Equipment (YES/NO - if linked to critical equipment)
+   - Critical Components (component names if linked)
+   - Related Jobs (upcoming maintenance jobs requiring this part)
+   - Department
+   - Remarks (auto-generated based on stock status)
+
+5. FILTERING & SEARCH:
+   - Search box for part name/code
+   - Filter by Stock Status dropdown
+   - Filter by Criticality dropdown
+
+6. SORTING: All columns should be sortable
+
+7. EXPORT: PDF and Excel export functionality
+
+KEY FIX NEEDED:
+Modify the backend API endpoint for this report to include a WHERE clause that filters:
+WHERE criticality IN ('Critical', 'Essential')
+
+This is the critical change - the report should NOT return all spares, only the critical/essential ones.
+
+Please implement this correctly now.
