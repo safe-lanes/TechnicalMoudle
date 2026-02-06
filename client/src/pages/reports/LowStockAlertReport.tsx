@@ -50,7 +50,7 @@ interface LowStockAlertItem {
   avgDailyConsumption: number;
   reorderRecommendation: number;
   priorityScore: number;
-  severityLevel: 'critical' | 'warning' | 'low';
+  severityLevel: 'Critical' | 'Warning' | 'Low';
   location: string;
 }
 
@@ -164,9 +164,9 @@ const LowStockAlertReport: React.FC<LowStockAlertReportProps> = ({ onBack, vesse
 
   const getSeverityBadge = (severity: string) => {
     switch (severity) {
-      case 'critical':
+      case 'Critical':
         return <Badge className="bg-red-600 text-white border-red-700">CRITICAL</Badge>;
-      case 'warning':
+      case 'Warning':
         return <Badge className="bg-amber-500 text-white border-amber-600">WARNING</Badge>;
       default:
         return <Badge variant="outline">LOW</Badge>;
@@ -447,8 +447,8 @@ const LowStockAlertReport: React.FC<LowStockAlertReportProps> = ({ onBack, vesse
                       <tr
                         key={item.id}
                         className={`hover:bg-gray-50 ${
-                          item.severityLevel === 'critical' ? 'bg-red-50/40' :
-                          item.severityLevel === 'warning' ? 'bg-amber-50/30' : ''
+                          item.severityLevel === 'Critical' ? 'bg-red-50/40' :
+                          item.severityLevel === 'Warning' ? 'bg-amber-50/30' : ''
                         }`}
                         data-testid={`row-low-stock-${item.id}`}
                       >

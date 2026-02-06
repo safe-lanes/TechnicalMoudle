@@ -194,32 +194,39 @@ const SparesReports: React.FC<SparesReportsProps> = ({ onBack, globalFilters }) 
 
     switch (reportId) {
       case 'spares-low-stock': {
-        const lowStockItems = spares.filter((s: any) => (s.rob || 0) <= (s.min || 0));
+        const res = await fetch(`/technical/api/reports/low-stock-alert/${effectiveVesselId}`, { credentials: 'include' });
+        if (!res.ok) throw new Error('Failed to fetch low stock alert data');
+        const apiData = await res.json();
 
         const columns = [
-          { header: 'Part Code', field: 'partCode', width: 35 },
-          { header: 'Part Name', field: 'partName', width: 55 },
-          { header: 'Component', field: 'componentName', width: 45 },
-          { header: 'ROB', field: 'rob', width: 20 },
-          { header: 'Min', field: 'min', width: 20 },
-          { header: 'Shortage', field: 'shortage', width: 25 },
-          { header: 'Status', field: 'status', width: 25 }
+          { header: 'Part Code', field: 'partCode', width: 30 },
+          { header: 'Part Name', field: 'partName', width: 45 },
+          { header: 'Component', field: 'componentName', width: 40 },
+          { header: 'ROB', field: 'currentQty', width: 15 },
+          { header: 'Min', field: 'minThreshold', width: 15 },
+          { header: 'Shortage', field: 'shortage', width: 20 },
+          { header: 'Severity', field: 'severityLevel', width: 22 },
+          { header: 'Criticality', field: 'criticality', width: 25 },
+          { header: 'Priority', field: 'priorityScore', width: 20 }
         ];
 
-        const data = lowStockItems.map((s: any) => ({
-          partCode: s.partCode || '-',
-          partName: s.partName || '-',
-          componentName: s.componentName || '-',
-          rob: s.rob || 0,
-          min: s.min || 0,
-          shortage: Math.max(0, (s.min || 0) - (s.rob || 0)),
-          status: getStockStatus(s.rob || 0, s.min || 0)
+        const data = (apiData.items || []).map((i: any) => ({
+          partCode: i.partCode,
+          partName: i.partName,
+          componentName: i.componentName,
+          currentQty: i.currentQty,
+          minThreshold: i.minThreshold,
+          shortage: i.shortage,
+          severityLevel: i.severityLevel,
+          criticality: i.criticality,
+          priorityScore: i.priorityScore
         }));
 
         const summary = [
-          { label: 'Low Stock Items', value: data.length },
-          { label: 'Critical', value: data.filter((d: any) => d.status === 'Low').length },
-          { label: 'At Minimum', value: data.filter((d: any) => d.status === 'At Min').length }
+          { label: 'Total Alerts', value: apiData.summary?.totalAlerts || data.length },
+          { label: 'Critical', value: apiData.summary?.criticalCount || 0 },
+          { label: 'Warning', value: apiData.summary?.warningCount || 0 },
+          { label: 'Value at Risk', value: `$${(apiData.summary?.totalValueAtRisk || 0).toLocaleString()}` }
         ];
 
         pdfReportGenerator.generateReport(

@@ -6887,9 +6887,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const shortageScore = shortagePercent / 100;
         const priorityScore = Math.round((critScore * 30) + (shortageScore * 50) + (avgDailyConsumption > 0 ? 20 : 0));
 
-        let severityLevel: 'critical' | 'warning' | 'low' = 'low';
-        if (isCritical && shortagePercent >= 50) severityLevel = 'critical';
-        else if (shortagePercent >= 25 || isCritical) severityLevel = 'warning';
+        let severityLevel = 'Low';
+        if (isCritical && shortagePercent >= 50) severityLevel = 'Critical';
+        else if (shortagePercent >= 25 || isCritical) severityLevel = 'Warning';
 
         return {
           id: s.id,
@@ -6926,8 +6926,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       });
 
-      const criticalCount = items.filter((i: any) => i.severityLevel === 'critical').length;
-      const warningCount = items.filter((i: any) => i.severityLevel === 'warning').length;
+      const criticalCount = items.filter((i: any) => i.severityLevel === 'Critical').length;
+      const warningCount = items.filter((i: any) => i.severityLevel === 'Warning').length;
       const totalValueAtRisk = items.reduce((sum: number, i: any) => sum + i.valueAtRisk, 0);
 
       res.json({
