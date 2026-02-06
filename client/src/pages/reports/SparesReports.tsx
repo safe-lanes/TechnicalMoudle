@@ -275,45 +275,54 @@ const SparesReports: React.FC<SparesReportsProps> = ({ onBack, globalFilters }) 
       }
 
       case 'spares-consumption-analysis': {
-        const consumptionData = spareHistory
-          .filter((h: any) => h.eventType === 'CONSUME')
-          .reduce((acc: Record<string, any>, h: any) => {
-            const key = h.partCode || h.spareId;
-            if (!acc[key]) {
-              acc[key] = { 
-                partCode: h.partCode, 
-                partName: h.partName, 
-                totalConsumed: 0, 
-                transactions: 0 
-              };
-            }
-            acc[key].totalConsumed += Math.abs(h.qtyChange || 0);
-            acc[key].transactions++;
-            return acc;
-          }, {});
+        const apiRes = await fetch(`/technical/api/reports/consumption-analysis/${effectiveVesselId}`, { credentials: 'include' });
+        if (!apiRes.ok) throw new Error('Failed to fetch consumption analysis data');
+        const apiData = await apiRes.json();
+
+        const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+        const formatDateDD = (iso: string) => {
+          const d = new Date(iso);
+          const day = String(d.getUTCDate()).padStart(2, '0');
+          const mon = months[d.getUTCMonth()];
+          const yr = d.getUTCFullYear();
+          return `${day}-${mon}-${yr}`;
+        };
 
         const columns = [
-          { header: 'Part Code', field: 'partCode', width: 35 },
-          { header: 'Part Name', field: 'partName', width: 60 },
-          { header: 'Total Consumed', field: 'totalConsumed', width: 35 },
-          { header: 'Transactions', field: 'transactions', width: 30 },
-          { header: 'Avg Per Transaction', field: 'avgPerTransaction', width: 40 }
+          { header: 'S.No', field: 'sno', width: 12 },
+          { header: 'Part Code', field: 'partCode', width: 28 },
+          { header: 'Part Name', field: 'partName', width: 45 },
+          { header: 'Component', field: 'componentName', width: 40 },
+          { header: 'Total Consumed', field: 'totalConsumed', width: 25 },
+          { header: 'Consumption Events', field: 'consumptionEvents', width: 28 },
+          { header: 'Current ROB', field: 'currentRob', width: 22 },
+          { header: 'Min Stock', field: 'minStock', width: 18 },
+          { header: 'Status', field: 'status', width: 18 },
+          { header: 'Last Consumed', field: 'lastConsumed', width: 25 },
         ];
 
-        const data = Object.values(consumptionData).map((item: any) => ({
-          ...item,
-          avgPerTransaction: item.transactions > 0 
-            ? (item.totalConsumed / item.transactions).toFixed(1) 
-            : '0'
+        const data = (apiData.items || []).map((i: any, idx: number) => ({
+          sno: idx + 1,
+          partCode: i.partCode,
+          partName: i.partName,
+          componentName: i.componentName,
+          totalConsumed: i.totalConsumed,
+          consumptionEvents: i.consumptionEvents,
+          currentRob: i.currentRob,
+          minStock: i.minStock,
+          status: i.status,
+          lastConsumed: formatDateDD(i.lastConsumed),
         }));
 
         const summary = [
-          { label: 'Parts Consumed', value: data.length },
-          { label: 'Total Transactions', value: data.reduce((a: number, b: any) => a + b.transactions, 0) }
+          { label: 'Total Items', value: apiData.summary?.totalItems || data.length },
+          { label: 'Total Consumed', value: apiData.summary?.totalConsumed || 0 },
+          { label: 'Total Events', value: apiData.summary?.totalEvents || 0 },
+          { label: 'Critical Items', value: apiData.summary?.criticalItems || 0 },
         ];
 
         pdfReportGenerator.generateReport(
-          { title: 'Consumption Pattern Analysis', subtitle: 'Historical consumption trends', vessel: vesselName },
+          { title: 'Consumption Pattern Analysis', subtitle: 'Spare parts consumption patterns and trends', vessel: vesselName, orientation: 'landscape' },
           columns,
           data,
           summary
@@ -403,6 +412,22 @@ const SparesReports: React.FC<SparesReportsProps> = ({ onBack, globalFilters }) 
         const link = document.createElement('a');
         link.href = url;
         link.download = `low-stock-alert-report-${new Date().toISOString().slice(0, 10)}.xlsx`;
+        link.click();
+        URL.revokeObjectURL(url);
+        toast({ title: "Report Generated", description: "Excel report downloaded successfully!" });
+      } else if (format === 'Excel' && reportId === 'spares-consumption-analysis') {
+        const response = await fetch(`/technical/api/reports/consumption-analysis/${effectiveVesselId}/excel`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify({}),
+        });
+        if (!response.ok) throw new Error('Failed to generate Excel');
+        const blob = await response.blob();
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = `consumption-analysis-${new Date().toISOString().slice(0, 10)}.xlsx`;
         link.click();
         URL.revokeObjectURL(url);
         toast({ title: "Report Generated", description: "Excel report downloaded successfully!" });

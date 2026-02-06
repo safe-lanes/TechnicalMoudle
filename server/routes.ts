@@ -7027,6 +7027,223 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // ========== CONSUMPTION PATTERN ANALYSIS REPORT ==========
+  app.get("/technical/api/reports/consumption-analysis/:vesselId", async (req, res) => {
+    try {
+      const { vesselId } = req.params;
+      const history = await storage.getSpareHistory(vesselId);
+      const allSpares = await storage.getSpares(vesselId);
+
+      const consumeEvents = history.filter((h: any) => h.eventType === 'CONSUME');
+
+      const grouped: Record<number, { partCode: string; partName: string; componentName: string; totalConsumed: number; events: number; lastConsumed: Date }> = {};
+
+      for (const h of consumeEvents) {
+        const key = h.spareId;
+        if (!grouped[key]) {
+          grouped[key] = {
+            partCode: h.partCode || '',
+            partName: h.partName || '',
+            componentName: h.componentName || '',
+            totalConsumed: 0,
+            events: 0,
+            lastConsumed: new Date(h.timestampUTC),
+          };
+        }
+        grouped[key].totalConsumed += Math.abs(h.qtyChange || 0);
+        grouped[key].events += 1;
+        const ts = new Date(h.timestampUTC);
+        if (ts > grouped[key].lastConsumed) {
+          grouped[key].lastConsumed = ts;
+        }
+      }
+
+      const sparesMap = new Map(allSpares.map((s: any) => [s.id, s]));
+
+      const items = Object.entries(grouped).map(([spareId, g]) => {
+        const spare = sparesMap.get(Number(spareId));
+        const rob = spare?.rob ?? 0;
+        const minStock = spare?.min ?? 0;
+        const crit = ((spare?.critical || spare?.criticality || '') as string).toLowerCase();
+        const isCritical = crit === 'critical' || crit === 'yes';
+        return {
+          spareId: Number(spareId),
+          partCode: g.partCode,
+          partName: g.partName,
+          componentName: g.componentName,
+          totalConsumed: g.totalConsumed,
+          consumptionEvents: g.events,
+          currentRob: rob,
+          minStock: minStock,
+          status: isCritical ? 'Critical' : 'Normal',
+          lastConsumed: g.lastConsumed.toISOString(),
+        };
+      });
+
+      items.sort((a, b) => {
+        if (b.totalConsumed !== a.totalConsumed) return b.totalConsumed - a.totalConsumed;
+        return a.partCode.localeCompare(b.partCode);
+      });
+
+      res.json({
+        summary: {
+          totalItems: items.length,
+          totalConsumed: items.reduce((sum, i) => sum + i.totalConsumed, 0),
+          totalEvents: items.reduce((sum, i) => sum + i.consumptionEvents, 0),
+          criticalItems: items.filter(i => i.status === 'Critical').length,
+        },
+        items,
+      });
+    } catch (error: any) {
+      console.error("Error generating Consumption Pattern Analysis:", error);
+      res.status(500).json({ error: "Failed to generate report: " + error.message });
+    }
+  });
+
+  app.post("/technical/api/reports/consumption-analysis/:vesselId/excel", async (req, res) => {
+    try {
+      const { vesselId } = req.params;
+      const history = await storage.getSpareHistory(vesselId);
+      const allSpares = await storage.getSpares(vesselId);
+      const allVessels = await storage.getVessels();
+      const vessel = allVessels.find((v: any) => v.id === vesselId);
+      const vesselName = vessel?.name || vesselId;
+
+      const consumeEvents = history.filter((h: any) => h.eventType === 'CONSUME');
+
+      const grouped: Record<number, { partCode: string; partName: string; componentName: string; totalConsumed: number; events: number; lastConsumed: Date }> = {};
+
+      for (const h of consumeEvents) {
+        const key = h.spareId;
+        if (!grouped[key]) {
+          grouped[key] = {
+            partCode: h.partCode || '',
+            partName: h.partName || '',
+            componentName: h.componentName || '',
+            totalConsumed: 0,
+            events: 0,
+            lastConsumed: new Date(h.timestampUTC),
+          };
+        }
+        grouped[key].totalConsumed += Math.abs(h.qtyChange || 0);
+        grouped[key].events += 1;
+        const ts = new Date(h.timestampUTC);
+        if (ts > grouped[key].lastConsumed) {
+          grouped[key].lastConsumed = ts;
+        }
+      }
+
+      const sparesMap = new Map(allSpares.map((s: any) => [s.id, s]));
+
+      const items = Object.entries(grouped).map(([spareId, g]) => {
+        const spare = sparesMap.get(Number(spareId));
+        const rob = spare?.rob ?? 0;
+        const minStock = spare?.min ?? 0;
+        const crit = ((spare?.critical || spare?.criticality || '') as string).toLowerCase();
+        const isCritical = crit === 'critical' || crit === 'yes';
+
+        const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+        const d = g.lastConsumed;
+        const day = String(d.getUTCDate()).padStart(2, '0');
+        const mon = months[d.getUTCMonth()];
+        const yr = d.getUTCFullYear();
+        const lastConsumedFormatted = `${day}-${mon}-${yr}`;
+
+        return {
+          partCode: g.partCode,
+          partName: g.partName,
+          componentName: g.componentName,
+          totalConsumed: g.totalConsumed,
+          consumptionEvents: g.events,
+          currentRob: rob,
+          minStock: minStock,
+          status: isCritical ? 'Critical' : 'Normal',
+          lastConsumed: lastConsumedFormatted,
+        };
+      });
+
+      items.sort((a, b) => {
+        if (b.totalConsumed !== a.totalConsumed) return b.totalConsumed - a.totalConsumed;
+        return a.partCode.localeCompare(b.partCode);
+      });
+
+      const criticalCount = items.filter(i => i.status === 'Critical').length;
+      const totalConsumed = items.reduce((sum, i) => sum + i.totalConsumed, 0);
+      const totalEvents = items.reduce((sum, i) => sum + i.consumptionEvents, 0);
+
+      const workbook = new ExcelJS.Workbook();
+      workbook.creator = 'PMS System';
+      workbook.created = new Date();
+      const worksheet = workbook.addWorksheet('Consumption Analysis');
+
+      const columns: ColumnDef[] = [
+        { key: 'sno', header: 'S.No', width: 8, type: 'number', align: 'center' },
+        { key: 'partCode', header: 'Part Code', width: 20, type: 'string' },
+        { key: 'partName', header: 'Part Name', width: 32, type: 'string' },
+        { key: 'componentName', header: 'Component', width: 28, type: 'string' },
+        { key: 'totalConsumed', header: 'Total Consumed', width: 16, type: 'number', align: 'center' },
+        { key: 'consumptionEvents', header: 'Consumption Events', width: 18, type: 'number', align: 'center' },
+        { key: 'currentRob', header: 'Current ROB', width: 14, type: 'number', align: 'center' },
+        { key: 'minStock', header: 'Min Stock', width: 12, type: 'number', align: 'center' },
+        { key: 'status', header: 'Status', width: 14, type: 'string', align: 'center' },
+        { key: 'lastConsumed', header: 'Last Consumed', width: 16, type: 'string', align: 'center' },
+      ];
+
+      const totalColumns = columns.length;
+      const lastColLetter = getLastColumnLetter(totalColumns);
+
+      const subtitle = `Total Items: ${items.length} | Total Consumed: ${totalConsumed} | Total Events: ${totalEvents} | Critical: ${criticalCount}`;
+      applyStandardHeader(worksheet, 'CONSUMPTION PATTERN ANALYSIS', subtitle, vesselName, items.length, lastColLetter);
+
+      const headerRowNum = 7;
+      applyStandardTableHeader(worksheet, columns, headerRowNum);
+
+      items.forEach((item, idx) => {
+        const rowData: (string | number)[] = [
+          idx + 1,
+          item.partCode, item.partName, item.componentName,
+          item.totalConsumed, item.consumptionEvents,
+          item.currentRob, item.minStock, item.status, item.lastConsumed,
+        ];
+        const row = worksheet.addRow(rowData);
+        row.height = 20;
+
+        row.eachCell({ includeEmpty: true }, (cell, colNumber) => {
+          const colDef = columns[colNumber - 1];
+          cell.font = { name: 'Calibri', size: 10, color: { argb: COLORS.textDark } };
+          cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: idx % 2 === 0 ? COLORS.bgWhite : COLORS.bgLight } };
+          cell.border = {
+            bottom: { style: 'thin', color: { argb: COLORS.border } },
+            right: { style: 'thin', color: { argb: COLORS.border } },
+          };
+          cell.alignment = { vertical: 'middle', horizontal: (colDef?.align as any) || 'left' };
+
+          if (colNumber === 9 && item.status === 'Critical') {
+            cell.font = { name: 'Calibri', size: 10, bold: true, color: { argb: COLORS.danger } };
+            cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: COLORS.bgDanger } };
+          }
+        });
+      });
+
+      worksheet.autoFilter = {
+        from: { row: headerRowNum, column: 1 },
+        to: { row: headerRowNum, column: totalColumns }
+      };
+
+      applyStandardPageSetup(worksheet, headerRowNum, totalColumns, 6, vesselName);
+
+      const buffer = await workbook.xlsx.writeBuffer();
+      const filename = generateFilename('ConsumptionAnalysis', vesselName);
+
+      res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+      res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+      res.send(buffer);
+    } catch (error: any) {
+      console.error("Error generating Consumption Analysis Excel:", error);
+      res.status(500).json({ error: "Failed to generate report: " + error.message });
+    }
+  });
+
   // Batch consume spares (for work order consumption)
   app.post("/technical/api/spares/:vesselId/batch-consume", async (req, res) => {
     try {
