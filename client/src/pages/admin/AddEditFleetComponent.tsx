@@ -179,6 +179,7 @@ export default function AddEditFleetComponent() {
   const { toast } = useToast();
 
   const [selectedNode, setSelectedNode] = useState<TreeNode | null>(null);
+  const [activeEditId, setActiveEditId] = useState<number | null>(editId);
   const [expandedNodes, setExpandedNodes] = useState<Set<string>>(new Set());
   const [searchQuery, setSearchQuery] = useState("");
 
@@ -220,6 +221,8 @@ export default function AddEditFleetComponent() {
 
   useEffect(() => {
     if (editingComponent && fleetComponentsList.length > 0) {
+      setActiveEditId(editingComponent.id);
+
       setFormData({
         maker: editingComponent.makerName || "",
         makerCode: editingComponent.makerCode || "",
@@ -236,6 +239,14 @@ export default function AddEditFleetComponent() {
       });
 
       setIsAddingNew(false);
+
+      const matchingNode: TreeNode = {
+        code: editingComponent.fleetEquipmentCode || "",
+        name: editingComponent.fleetEquipmentName || "",
+        children: [],
+        data: editingComponent,
+      };
+      setSelectedNode(matchingNode);
 
       const code = editingComponent.fleetEquipmentCode;
       if (code) {
@@ -293,6 +304,7 @@ export default function AddEditFleetComponent() {
       queryClient.invalidateQueries({ queryKey: ["/technical/api/fleet-admin/fleet-components"] });
       toast({ title: "Success", description: "Fleet component deleted successfully" });
       setSelectedNode(null);
+      setActiveEditId(null);
       resetForm();
     },
     onError: (error: any) => {
@@ -336,6 +348,7 @@ export default function AddEditFleetComponent() {
 
   const handleNodeSelect = (node: TreeNode) => {
     setSelectedNode(node);
+    setActiveEditId(node.data?.id ?? null);
     setIsAddingNew(false);
     setNewComponentCode("");
 
@@ -367,6 +380,7 @@ export default function AddEditFleetComponent() {
   const handleAddChild = (parentCode: string) => {
     setIsAddingNew(true);
     setSelectedNode(null);
+    setActiveEditId(null);
     setNewComponentCode(`${parentCode}.`);
 
     resetForm();
@@ -408,9 +422,9 @@ export default function AddEditFleetComponent() {
         eqptSystemDept: formData.eqptSystemDept || null,
         notes: formData.notes || null,
       });
-    } else if (selectedNode?.data) {
+    } else if (activeEditId) {
       updateFleetComponentMutation.mutate({
-        id: selectedNode.data.id,
+        id: activeEditId,
         updates: {
           fleetEquipmentName: formData.fleetEquipmentName,
           parentFleetEquipmentCode: formData.parentCode || null,
@@ -425,28 +439,17 @@ export default function AddEditFleetComponent() {
           notes: formData.notes || null,
         },
       });
-    } else if (editId && editingComponent) {
-      updateFleetComponentMutation.mutate({
-        id: editId,
-        updates: {
-          fleetEquipmentName: formData.fleetEquipmentName,
-          parentFleetEquipmentCode: formData.parentCode || null,
-          componentCategory: formData.componentCategory || null,
-          makerName: formData.maker || null,
-          makerCode: formData.makerCode || null,
-          model: formData.model || null,
-          modelCode: formData.modelCode || null,
-          location: formData.location || null,
-          rating: formData.rating || null,
-          eqptSystemDept: formData.eqptSystemDept || null,
-          notes: formData.notes || null,
-        },
+    } else {
+      toast({
+        title: "Error",
+        description: "No fleet component selected for update",
+        variant: "destructive"
       });
     }
   };
 
   const handleDelete = () => {
-    const idToDelete = selectedNode?.data?.id ?? editId;
+    const idToDelete = activeEditId ?? selectedNode?.data?.id ?? editId;
     if (idToDelete) {
       if (confirm("Are you sure you want to delete this component?")) {
         deleteFleetComponentMutation.mutate(idToDelete);
@@ -462,7 +465,7 @@ export default function AddEditFleetComponent() {
     }
   };
 
-  const isEditMode = !!editId || (!!selectedNode?.data);
+  const isEditMode = !!activeEditId || !!editId || (!!selectedNode?.data);
   const displayCode = isAddingNew ? newComponentCode : (formData.fleetEquipmentCode || selectedNode?.code || "");
   const displayName = isAddingNew
     ? (formData.fleetEquipmentName || "XXX")
