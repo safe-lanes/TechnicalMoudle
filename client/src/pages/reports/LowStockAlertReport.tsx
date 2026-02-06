@@ -181,27 +181,47 @@ const LowStockAlertReport: React.FC<LowStockAlertReportProps> = ({ onBack, vesse
     setGeneratingPdf(true);
     try {
       const columns = [
-        { header: 'Part Code', field: 'partCode', width: 30 },
-        { header: 'Part Name', field: 'partName', width: 45 },
-        { header: 'Component', field: 'componentName', width: 40 },
-        { header: 'Qty', field: 'currentQty', width: 15 },
-        { header: 'Min', field: 'minThreshold', width: 15 },
-        { header: 'Shortage', field: 'shortage', width: 20 },
-        { header: 'Severity', field: 'severityLevel', width: 22 },
-        { header: 'Supplier', field: 'supplier', width: 30 },
-        { header: 'Reorder Qty', field: 'reorderRecommendation', width: 25 },
+        { header: 'S.No', field: 'sno', width: 8 },
+        { header: 'Part Code', field: 'partCode', width: 18 },
+        { header: 'Part Name', field: 'partName', width: 28 },
+        { header: 'Component', field: 'componentName', width: 24 },
+        { header: 'Severity', field: 'severity', width: 14 },
+        { header: 'Criticality', field: 'criticality', width: 16 },
+        { header: 'Current Qty', field: 'currentQty', width: 14 },
+        { header: 'Min Qty', field: 'minThreshold', width: 12 },
+        { header: 'Shortage', field: 'shortage', width: 12 },
+        { header: 'Shortage %', field: 'shortagePct', width: 14 },
+        { header: 'Unit Cost', field: 'unitCost', width: 14 },
+        { header: 'Value at Risk', field: 'valueAtRisk', width: 16 },
+        { header: 'Avg Daily Use', field: 'avgDailyUse', width: 16 },
+        { header: 'Lead Time', field: 'leadTime', width: 14 },
+        { header: 'Reorder Qty', field: 'reorderQty', width: 14 },
+        { header: 'Supplier', field: 'supplier', width: 20 },
+        { header: 'Last Ordered', field: 'lastOrdered', width: 16 },
+        { header: 'Location', field: 'location', width: 16 },
+        { header: 'Priority Score', field: 'priority', width: 16 },
       ];
 
-      const exportData = filteredAndSortedItems.map((i) => ({
+      const exportData = filteredAndSortedItems.map((i, idx) => ({
+        sno: idx + 1,
         partCode: i.partCode,
         partName: i.partName,
         componentName: i.componentName,
+        severity: i.severityLevel,
+        criticality: i.criticality,
         currentQty: i.currentQty,
         minThreshold: i.minThreshold,
-        shortage: `${i.shortage} (${i.shortagePercent}%)`,
-        severityLevel: i.severityLevel.toUpperCase(),
+        shortage: i.shortage,
+        shortagePct: i.shortagePercent,
+        unitCost: i.unitCost,
+        valueAtRisk: i.valueAtRisk,
+        avgDailyUse: i.avgDailyConsumption,
+        leadTime: i.leadTime,
+        reorderQty: i.reorderRecommendation,
         supplier: i.supplier,
-        reorderRecommendation: i.reorderRecommendation,
+        lastOrdered: i.lastOrderDate,
+        location: i.location,
+        priority: i.priorityScore,
       }));
 
       const summaryData = [
@@ -212,7 +232,7 @@ const LowStockAlertReport: React.FC<LowStockAlertReportProps> = ({ onBack, vesse
       ];
 
       pdfReportGenerator.generateReport(
-        { title: 'Low Stock Alert Report', subtitle: 'Items below minimum threshold levels' },
+        { title: 'Low Stock Alert Report', subtitle: 'Items requiring immediate attention' },
         columns,
         exportData,
         summaryData
