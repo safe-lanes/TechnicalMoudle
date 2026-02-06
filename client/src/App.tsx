@@ -79,7 +79,7 @@ function App() {
                 <Route path="/defects/:subpage" component={TechnicalModule} />
                 
                 <Route path="/admin" component={TechnicalModule} />
-                <Route path="/admin/fleet-component-editor" component={AddEditFleetComponent} />
+                <Route path="/admin/fleet-component-editor/:id?" component={AddEditFleetComponent} />
                 <Route path="/admin/:subpage" component={TechnicalModule} />
                 
                 <Route path="/cert-surveys" component={TechnicalModule} />

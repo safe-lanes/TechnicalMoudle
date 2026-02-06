@@ -1,7 +1,7 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useVessels } from "@/hooks/useVessels";
-import { useLocation } from "wouter";
+import { useLocation, useRoute } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -9,13 +9,13 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { ChevronRight, ChevronDown, Plus, Search, ArrowLeft, Trash2 } from "lucide-react";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import type { MasterData, Maker } from "@shared/schema";
+import type { FleetComponents, Maker } from "@shared/schema";
 
 interface TreeNode {
   code: string;
   name: string;
   children: TreeNode[];
-  data?: MasterData;
+  data?: FleetComponents;
   isExpanded?: boolean;
 }
 
@@ -30,7 +30,7 @@ const sfiCategories = [
   { code: "8", name: "Ship Common Systems" },
 ];
 
-function buildTree(components: MasterData[]): TreeNode[] {
+function buildTree(components: FleetComponents[]): TreeNode[] {
   const nodeMap = new Map<string, TreeNode>();
   const rootNodes: TreeNode[] = [];
 
@@ -45,7 +45,7 @@ function buildTree(components: MasterData[]): TreeNode[] {
     rootNodes.push(node);
   });
 
-  const sortedComponents = [...components].sort((a, b) => 
+  const sortedComponents = [...components].sort((a, b) =>
     (a.fleetEquipmentCode || "").localeCompare(b.fleetEquipmentCode || "")
   );
 
@@ -53,32 +53,23 @@ function buildTree(components: MasterData[]): TreeNode[] {
     const code = comp.fleetEquipmentCode;
     if (!code) return;
 
-    const parts = code.split(".");
-    let currentParentNode = nodeMap.get(parts[0]);
-    
-    if (!currentParentNode) return;
+    const node: TreeNode = {
+      code,
+      name: comp.fleetEquipmentName || "Unknown",
+      children: [],
+      data: comp,
+    };
+    nodeMap.set(code, node);
 
-    for (let i = 1; i < parts.length; i++) {
-      const partialCode = parts.slice(0, i + 1).join(".");
-      let childNode = nodeMap.get(partialCode);
-      
-      if (!childNode) {
-        const isLeaf = i === parts.length - 1;
-        childNode = {
-          code: partialCode,
-          name: isLeaf ? (comp.equipmentName || "Unknown") : partialCode,
-          children: [],
-          data: isLeaf ? comp : undefined,
-          isExpanded: false,
-        };
-        nodeMap.set(partialCode, childNode);
-        currentParentNode.children.push(childNode);
-      } else if (i === parts.length - 1 && !childNode.data) {
-        childNode.name = comp.equipmentName || childNode.name;
-        childNode.data = comp;
+    const parentCode = comp.parentFleetEquipmentCode;
+    if (parentCode && nodeMap.has(parentCode)) {
+      nodeMap.get(parentCode)!.children.push(node);
+    } else {
+      const firstDigit = code.charAt(0);
+      const categoryNode = nodeMap.get(firstDigit);
+      if (categoryNode) {
+        categoryNode.children.push(node);
       }
-      
-      currentParentNode = childNode;
     }
   });
 
@@ -108,21 +99,21 @@ function TreeItem({
   const hasChildren = node.children.length > 0;
   const isSelected = selectedCode === node.code;
 
-  const matchesSearch = searchQuery.trim() === "" || 
+  const matchesSearch = searchQuery.trim() === "" ||
     node.code.toLowerCase().includes(searchQuery.toLowerCase()) ||
     node.name.toLowerCase().includes(searchQuery.toLowerCase());
 
   const hasMatchingDescendant = useMemo(() => {
     if (searchQuery.trim() === "") return true;
-    
+
     const checkDescendants = (n: TreeNode): boolean => {
       if (n.code.toLowerCase().includes(searchQuery.toLowerCase()) ||
-          n.name.toLowerCase().includes(searchQuery.toLowerCase())) {
+        n.name.toLowerCase().includes(searchQuery.toLowerCase())) {
         return true;
       }
       return n.children.some(checkDescendants);
     };
-    
+
     return checkDescendants(node);
   }, [node, searchQuery]);
 
@@ -131,13 +122,12 @@ function TreeItem({
   return (
     <div>
       <div
-        className={`flex items-center py-2 px-2 cursor-pointer hover:bg-gray-100 group ${
-          isSelected ? "bg-blue-100 text-blue-800" : ""
-        }`}
-        style={{ paddingLeft: `${level * 16 + 8}px` }}
+        className={`flex items-center py-2 px-2 cursor-pointer hover:bg-gray-100 group ${isSelected ? "bg-blue-100 text-blue-800" : ""
+          }`}
+        style={{ paddingLeft: `${level * 20 + 8}px` }}
         data-testid={`tree-item-${node.code}`}
       >
-        <span 
+        <span
           className="mr-2 cursor-pointer"
           onClick={(e) => {
             e.stopPropagation();
@@ -156,14 +146,14 @@ function TreeItem({
             <span className="w-4 inline-block" />
           )}
         </span>
-        <span 
+        <span
           className={`text-sm flex-1 ${level === 0 ? "font-medium" : ""}`}
           onClick={() => onSelect(node)}
         >
           {node.code}. {node.name}
         </span>
         <button
-          className="opacity-0 group-hover:opacity-100 p-1 hover:bg-gray-200 rounded transition-opacity"
+          className="invisible group-hover:visible p-1 hover:bg-gray-200 rounded"
           onClick={(e) => {
             e.stopPropagation();
             onAddChild(node.code);
@@ -193,14 +183,16 @@ function TreeItem({
 
 export default function AddEditFleetComponent() {
   const [, setLocation] = useLocation();
+  const [, params] = useRoute("/admin/fleet-component-editor/:id");
+  const editId = params?.id ? parseInt(params.id) : null;
   const { toast } = useToast();
-  
+
   const [selectedNode, setSelectedNode] = useState<TreeNode | null>(null);
   const [expandedNodes, setExpandedNodes] = useState<Set<string>>(new Set(["6"]));
   const [searchQuery, setSearchQuery] = useState("");
   const [criticalityFilter, setCriticalityFilter] = useState("all");
   const [selectedVessel, setSelectedVessel] = useState("all");
-  
+
   const [formData, setFormData] = useState({
     maker: "",
     makerCode: "",
@@ -215,15 +207,12 @@ export default function AddEditFleetComponent() {
     notes: "",
     fleetEquipmentName: "",
   });
-  
+
   const [isAddingNew, setIsAddingNew] = useState(false);
   const [newComponentCode, setNewComponentCode] = useState("");
 
-  const { data: masterDataResponse, isLoading } = useQuery<{
-    items: MasterData[];
-    total: number;
-  }>({
-    queryKey: ["/technical/api/fleet-admin/master-data?limit=1000"],
+  const { data: fleetComponentsList = [], isLoading } = useQuery<FleetComponents[]>({
+    queryKey: ["/technical/api/fleet-admin/fleet-components"],
   });
 
   const { data: vessels = [] } = useVessels();
@@ -232,53 +221,106 @@ export default function AddEditFleetComponent() {
     queryKey: ["/technical/api/fleet/makers"],
   });
 
-  const updateMasterDataMutation = useMutation({
-    mutationFn: async (data: { id: number; updates: Partial<MasterData> }) => {
-      return apiRequest("PATCH", `/technical/api/fleet-admin/master-data/${data.id}`, data.updates);
+  const { data: editingComponent } = useQuery<FleetComponents>({
+    queryKey: ["/technical/api/fleet-admin/fleet-components", editId],
+    queryFn: async () => {
+      const res = await fetch(`/technical/api/fleet-admin/fleet-components/${editId}`, { credentials: 'include' });
+      if (!res.ok) throw new Error('Failed to fetch fleet component');
+      return res.json();
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/technical/api/fleet-admin/master-data?limit=1000"] });
-      toast({ title: "Success", description: "Component saved successfully" });
-    },
-    onError: (error: any) => {
-      toast({ title: "Error", description: error.message || "Failed to save component", variant: "destructive" });
-    },
+    enabled: !!editId,
   });
 
-  const createMasterDataMutation = useMutation({
-    mutationFn: async (data: Partial<MasterData>) => {
-      return apiRequest("POST", "/technical/api/fleet-admin/master-data", data);
+  useEffect(() => {
+    if (editingComponent && fleetComponentsList.length > 0) {
+      setFormData({
+        maker: editingComponent.makerName || "",
+        makerCode: editingComponent.makerCode || "",
+        model: editingComponent.model || "",
+        modelCode: editingComponent.modelCode || "",
+        parentCode: editingComponent.parentFleetEquipmentCode || "",
+        fleetEquipmentCode: editingComponent.fleetEquipmentCode || "",
+        location: editingComponent.location || "",
+        rating: editingComponent.rating || "",
+        eqptSystemDept: editingComponent.eqptSystemDept || "",
+        componentCategory: editingComponent.componentCategory || "",
+        notes: editingComponent.notes || "",
+        fleetEquipmentName: editingComponent.fleetEquipmentName || "",
+      });
+
+      setIsAddingNew(false);
+
+      const code = editingComponent.fleetEquipmentCode;
+      if (code) {
+        const pathCodes = new Set<string>();
+        const findAncestors = (targetCode: string) => {
+          const comp = fleetComponentsList.find(c => c.fleetEquipmentCode === targetCode);
+          if (comp?.parentFleetEquipmentCode) {
+            pathCodes.add(comp.parentFleetEquipmentCode);
+            findAncestors(comp.parentFleetEquipmentCode);
+          }
+          const firstDigit = targetCode.charAt(0);
+          if (/^[1-8]$/.test(firstDigit)) {
+            pathCodes.add(firstDigit);
+          }
+        };
+        findAncestors(code);
+        setExpandedNodes(prev => {
+          const newSet = new Set(Array.from(prev));
+          Array.from(pathCodes).forEach(c => newSet.add(c));
+          return newSet;
+        });
+      }
+    }
+  }, [editingComponent, fleetComponentsList]);
+
+  const createFleetComponentMutation = useMutation({
+    mutationFn: async (data: Record<string, any>) => {
+      return apiRequest("POST", "/technical/api/fleet-admin/fleet-components", data);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/technical/api/fleet-admin/master-data?limit=1000"] });
-      toast({ title: "Success", description: "Component created successfully" });
+      queryClient.invalidateQueries({ queryKey: ["/technical/api/fleet-admin/fleet-components"] });
+      toast({ title: "Success", description: "Fleet component created successfully" });
       setIsAddingNew(false);
       setNewComponentCode("");
     },
     onError: (error: any) => {
-      toast({ title: "Error", description: error.message || "Failed to create component", variant: "destructive" });
+      toast({ title: "Error", description: error.message || "Failed to create fleet component", variant: "destructive" });
     },
   });
 
-  const deleteMasterDataMutation = useMutation({
-    mutationFn: async (id: number) => {
-      return apiRequest("DELETE", `/technical/api/fleet-admin/master-data/${id}`);
+  const updateFleetComponentMutation = useMutation({
+    mutationFn: async (data: { id: number; updates: Record<string, any> }) => {
+      return apiRequest("PATCH", `/technical/api/fleet-admin/fleet-components/${data.id}`, data.updates);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/technical/api/fleet-admin/master-data?limit=1000"] });
-      toast({ title: "Success", description: "Component deleted successfully" });
+      queryClient.invalidateQueries({ queryKey: ["/technical/api/fleet-admin/fleet-components"] });
+      toast({ title: "Success", description: "Fleet component updated successfully" });
+    },
+    onError: (error: any) => {
+      toast({ title: "Error", description: error.message || "Failed to update fleet component", variant: "destructive" });
+    },
+  });
+
+  const deleteFleetComponentMutation = useMutation({
+    mutationFn: async (id: number) => {
+      return apiRequest("DELETE", `/technical/api/fleet-admin/fleet-components/${id}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/technical/api/fleet-admin/fleet-components"] });
+      toast({ title: "Success", description: "Fleet component deleted successfully" });
       setSelectedNode(null);
       resetForm();
     },
     onError: (error: any) => {
-      toast({ title: "Error", description: error.message || "Failed to delete component", variant: "destructive" });
+      toast({ title: "Error", description: error.message || "Failed to delete fleet component", variant: "destructive" });
     },
   });
 
   const treeData = useMemo(() => {
-    if (!masterDataResponse?.items) return [];
-    return buildTree(masterDataResponse.items);
-  }, [masterDataResponse?.items]);
+    if (!fleetComponentsList.length) return [];
+    return buildTree(fleetComponentsList);
+  }, [fleetComponentsList]);
 
   const handleToggle = (code: string) => {
     setExpandedNodes((prev) => {
@@ -313,34 +355,28 @@ export default function AddEditFleetComponent() {
     setSelectedNode(node);
     setIsAddingNew(false);
     setNewComponentCode("");
-    
+
     if (node.data) {
-      const parentCode = node.code.includes(".") 
-        ? node.code.split(".").slice(0, -1).join(".") 
-        : "";
-      
       setFormData({
         maker: node.data.makerName || "",
         makerCode: node.data.makerCode || "",
         model: node.data.model || "",
         modelCode: node.data.modelCode || "",
-        parentCode: parentCode,
+        parentCode: node.data.parentFleetEquipmentCode || "",
         fleetEquipmentCode: node.data.fleetEquipmentCode || "",
-        location: "",
-        rating: "",
-        eqptSystemDept: "",
-        componentCategory: node.data.sfiCode?.substring(0, 1) || "",
-        notes: "",
-        fleetEquipmentName: node.data.equipmentName || "",
+        location: node.data.location || "",
+        rating: node.data.rating || "",
+        eqptSystemDept: node.data.eqptSystemDept || "",
+        componentCategory: node.data.componentCategory || "",
+        notes: node.data.notes || "",
+        fleetEquipmentName: node.data.fleetEquipmentName || "",
       });
     } else {
       resetForm();
       setFormData(prev => ({
         ...prev,
         fleetEquipmentCode: node.code,
-        parentCode: node.code.includes(".") 
-          ? node.code.split(".").slice(0, -1).join(".") 
-          : "",
+        componentCategory: node.code.charAt(0),
       }));
     }
   };
@@ -349,13 +385,14 @@ export default function AddEditFleetComponent() {
     setIsAddingNew(true);
     setSelectedNode(null);
     setNewComponentCode(`${parentCode}.`);
-    
+
     resetForm();
     setFormData(prev => ({
       ...prev,
       parentCode: parentCode,
+      componentCategory: parentCode.charAt(0),
     }));
-    
+
     setExpandedNodes(prev => {
       const newSet = new Set(prev);
       newSet.add(parentCode);
@@ -366,42 +403,70 @@ export default function AddEditFleetComponent() {
   const handleSave = () => {
     if (isAddingNew) {
       if (!newComponentCode.trim() || !formData.fleetEquipmentName.trim()) {
-        toast({ 
-          title: "Validation Error", 
-          description: "Equipment code and name are required", 
-          variant: "destructive" 
+        toast({
+          title: "Validation Error",
+          description: "Equipment code and name are required",
+          variant: "destructive"
         });
         return;
       }
-      
-      createMasterDataMutation.mutate({
+
+      createFleetComponentMutation.mutate({
         fleetEquipmentCode: newComponentCode.trim(),
-        equipmentName: formData.fleetEquipmentName,
-        makerName: formData.maker,
-        makerCode: formData.makerCode,
-        model: formData.model,
-        modelCode: formData.modelCode,
-        sfiCode: formData.componentCategory,
+        fleetEquipmentName: formData.fleetEquipmentName,
+        parentFleetEquipmentCode: formData.parentCode || null,
+        componentCategory: formData.componentCategory || null,
+        makerName: formData.maker || null,
+        makerCode: formData.makerCode || null,
+        model: formData.model || null,
+        modelCode: formData.modelCode || null,
+        location: formData.location || null,
+        rating: formData.rating || null,
+        eqptSystemDept: formData.eqptSystemDept || null,
+        notes: formData.notes || null,
       });
     } else if (selectedNode?.data) {
-      updateMasterDataMutation.mutate({
+      updateFleetComponentMutation.mutate({
         id: selectedNode.data.id,
         updates: {
-          equipmentName: formData.fleetEquipmentName,
-          makerName: formData.maker,
-          makerCode: formData.makerCode,
-          model: formData.model,
-          modelCode: formData.modelCode,
-          sfiCode: formData.componentCategory,
+          fleetEquipmentName: formData.fleetEquipmentName,
+          parentFleetEquipmentCode: formData.parentCode || null,
+          componentCategory: formData.componentCategory || null,
+          makerName: formData.maker || null,
+          makerCode: formData.makerCode || null,
+          model: formData.model || null,
+          modelCode: formData.modelCode || null,
+          location: formData.location || null,
+          rating: formData.rating || null,
+          eqptSystemDept: formData.eqptSystemDept || null,
+          notes: formData.notes || null,
+        },
+      });
+    } else if (editId && editingComponent) {
+      updateFleetComponentMutation.mutate({
+        id: editId,
+        updates: {
+          fleetEquipmentName: formData.fleetEquipmentName,
+          parentFleetEquipmentCode: formData.parentCode || null,
+          componentCategory: formData.componentCategory || null,
+          makerName: formData.maker || null,
+          makerCode: formData.makerCode || null,
+          model: formData.model || null,
+          modelCode: formData.modelCode || null,
+          location: formData.location || null,
+          rating: formData.rating || null,
+          eqptSystemDept: formData.eqptSystemDept || null,
+          notes: formData.notes || null,
         },
       });
     }
   };
 
   const handleDelete = () => {
-    if (selectedNode?.data) {
+    const idToDelete = selectedNode?.data?.id ?? editId;
+    if (idToDelete) {
       if (confirm("Are you sure you want to delete this component?")) {
-        deleteMasterDataMutation.mutate(selectedNode.data.id);
+        deleteFleetComponentMutation.mutate(idToDelete);
       }
     }
   };
@@ -414,10 +479,11 @@ export default function AddEditFleetComponent() {
     }
   };
 
-  const displayCode = isAddingNew ? newComponentCode : (selectedNode?.code || "");
-  const displayName = isAddingNew 
-    ? (formData.fleetEquipmentName || "XXX") 
-    : (selectedNode?.name || "");
+  const isEditMode = !!editId || (!!selectedNode?.data);
+  const displayCode = isAddingNew ? newComponentCode : (formData.fleetEquipmentCode || selectedNode?.code || "");
+  const displayName = isAddingNew
+    ? (formData.fleetEquipmentName || "XXX")
+    : (formData.fleetEquipmentName || selectedNode?.name || "");
 
   return (
     <div className="min-h-screen bg-gray-100">
@@ -428,7 +494,7 @@ export default function AddEditFleetComponent() {
             <Button
               variant="outline"
               className="border-cyan-600 text-cyan-600 hover:bg-cyan-50"
-              onClick={() => handleAddChild(selectedNode?.code || "6")}
+              onClick={() => handleAddChild(selectedNode?.code || formData.fleetEquipmentCode || "6")}
               data-testid="btn-add-sub-equipment"
             >
               <Plus className="h-4 w-4 mr-1" />
@@ -436,7 +502,7 @@ export default function AddEditFleetComponent() {
             </Button>
             <Button
               variant="outline"
-              onClick={() => window.history.back()}
+              onClick={() => setLocation("/admin/fleet-data")}
               data-testid="btn-back"
             >
               <ArrowLeft className="h-4 w-4 mr-1" />
@@ -444,7 +510,7 @@ export default function AddEditFleetComponent() {
             </Button>
           </div>
         </div>
-        
+
         <div className="flex items-center gap-4 mt-4">
           <Select value={selectedVessel} onValueChange={setSelectedVessel}>
             <SelectTrigger className="w-40" data-testid="select-vessel">
@@ -459,7 +525,7 @@ export default function AddEditFleetComponent() {
               ))}
             </SelectContent>
           </Select>
-          
+
           <div className="relative flex-1 max-w-md">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
             <Input
@@ -470,7 +536,7 @@ export default function AddEditFleetComponent() {
               data-testid="input-search-components"
             />
           </div>
-          
+
           <Select value={criticalityFilter} onValueChange={setCriticalityFilter}>
             <SelectTrigger className="w-36" data-testid="select-criticality">
               <SelectValue placeholder="Criticality" />
@@ -481,34 +547,34 @@ export default function AddEditFleetComponent() {
               <SelectItem value="non-critical">Non-Critical</SelectItem>
             </SelectContent>
           </Select>
-          
+
           <Button
             variant="outline"
             size="icon"
             className="text-red-600 hover:bg-red-50"
             onClick={handleDelete}
-            disabled={!selectedNode?.data}
+            disabled={!selectedNode?.data && !editId}
             data-testid="btn-delete"
           >
             <Trash2 className="h-4 w-4" />
           </Button>
-          
+
           <Button
             className="bg-cyan-600 hover:bg-cyan-700"
             onClick={handleSave}
-            disabled={updateMasterDataMutation.isPending || createMasterDataMutation.isPending}
+            disabled={updateFleetComponentMutation.isPending || createFleetComponentMutation.isPending}
             data-testid="btn-save"
           >
             Save
           </Button>
         </div>
       </div>
-      
+
       <div className="flex h-[calc(100vh-140px)]">
         <div className="w-96 bg-white border-r flex flex-col">
           <div className="bg-cyan-600 text-white px-4 py-3 font-semibold flex items-center">
             <ChevronDown className="h-4 w-4 mr-2" />
-            COMPONENTS
+            FLEET COMPONENTS
           </div>
           <ScrollArea className="flex-1">
             {isLoading ? (
@@ -523,7 +589,7 @@ export default function AddEditFleetComponent() {
                   <TreeItem
                     key={node.code}
                     node={node}
-                    selectedCode={selectedNode?.code || null}
+                    selectedCode={selectedNode?.code || formData.fleetEquipmentCode || null}
                     onSelect={handleNodeSelect}
                     expandedNodes={expandedNodes}
                     onToggle={handleToggle}
@@ -533,7 +599,7 @@ export default function AddEditFleetComponent() {
                 ))}
               </div>
             )}
-            
+
             {isAddingNew && (
               <div className="px-4 py-2 bg-blue-50 border-t border-blue-200">
                 <Input
@@ -547,17 +613,17 @@ export default function AddEditFleetComponent() {
             )}
           </ScrollArea>
         </div>
-        
+
         <div className="flex-1 overflow-auto p-6">
-          {(selectedNode || isAddingNew) ? (
+          {(selectedNode || isAddingNew || editId) ? (
             <div className="bg-white rounded-lg shadow-sm p-6">
               <h2 className="text-lg font-semibold text-gray-600 mb-4">
                 {displayCode} {displayName}
               </h2>
-              
+
               <div className="border-t pt-4">
                 <h3 className="text-cyan-600 font-medium mb-4">Fleet Component Information</h3>
-                
+
                 <div className="grid grid-cols-4 gap-4">
                   <div>
                     <label className="text-blue-600 text-xs font-medium mb-1 block">Maker*</label>
@@ -574,7 +640,7 @@ export default function AddEditFleetComponent() {
                       </SelectContent>
                     </Select>
                   </div>
-                  
+
                   <div>
                     <label className="text-blue-600 text-xs font-medium mb-1 block">Maker Code</label>
                     <Input
@@ -585,7 +651,7 @@ export default function AddEditFleetComponent() {
                       data-testid="input-maker-code"
                     />
                   </div>
-                  
+
                   <div>
                     <label className="text-blue-600 text-xs font-medium mb-1 block">Model</label>
                     <Input
@@ -596,7 +662,7 @@ export default function AddEditFleetComponent() {
                       data-testid="input-model"
                     />
                   </div>
-                  
+
                   <div>
                     <label className="text-blue-600 text-xs font-medium mb-1 block">Model Code</label>
                     <Input
@@ -606,7 +672,7 @@ export default function AddEditFleetComponent() {
                       data-testid="input-model-code"
                     />
                   </div>
-                  
+
                   <div>
                     <label className="text-blue-600 text-xs font-medium mb-1 block">Parent Code</label>
                     <Input
@@ -616,7 +682,7 @@ export default function AddEditFleetComponent() {
                       data-testid="input-parent-code"
                     />
                   </div>
-                  
+
                   <div>
                     <label className="text-blue-600 text-xs font-medium mb-1 block">Fleet Equipment Code</label>
                     <Input
@@ -627,7 +693,7 @@ export default function AddEditFleetComponent() {
                       data-testid="input-fleet-equipment-code"
                     />
                   </div>
-                  
+
                   <div>
                     <label className="text-blue-600 text-xs font-medium mb-1 block">Location</label>
                     <Input
@@ -637,7 +703,7 @@ export default function AddEditFleetComponent() {
                       data-testid="input-location"
                     />
                   </div>
-                  
+
                   <div>
                     <label className="text-blue-600 text-xs font-medium mb-1 block">Rating</label>
                     <Input
@@ -647,7 +713,7 @@ export default function AddEditFleetComponent() {
                       data-testid="input-rating"
                     />
                   </div>
-                  
+
                   <div>
                     <label className="text-blue-600 text-xs font-medium mb-1 block">Eqpt./ System Department</label>
                     <Input
@@ -657,7 +723,7 @@ export default function AddEditFleetComponent() {
                       data-testid="input-dept"
                     />
                   </div>
-                  
+
                   <div>
                     <label className="text-blue-600 text-xs font-medium mb-1 block">Component Category</label>
                     <Input
@@ -667,7 +733,7 @@ export default function AddEditFleetComponent() {
                       data-testid="input-category"
                     />
                   </div>
-                  
+
                   <div>
                     <label className="text-blue-600 text-xs font-medium mb-1 block">Notes</label>
                     <Input
@@ -678,9 +744,9 @@ export default function AddEditFleetComponent() {
                       data-testid="input-notes"
                     />
                   </div>
-                  
+
                   <div>
-                    <label className="text-blue-600 text-xs font-medium mb-1 block">Fleet Equipment Name</label>
+                    <label className="text-blue-600 text-xs font-medium mb-1 block">Fleet Equipment Name*</label>
                     <Input
                       value={formData.fleetEquipmentName}
                       onChange={(e) => setFormData(prev => ({ ...prev, fleetEquipmentName: e.target.value }))}

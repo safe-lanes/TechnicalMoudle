@@ -8,7 +8,8 @@ import {
   insertFleetJobVesselMappingSchema,
   insertFleetSpareVesselMappingSchema,
   insertBulkImportHistorySchema,
-  insertBulkImportErrorSchema
+  insertBulkImportErrorSchema,
+  insertFleetComponentsSchema
 } from '@shared/schema';
 import { requireOfficeOrAdmin } from '../middleware/auth';
 
@@ -253,6 +254,63 @@ router.get('/fleet-components/by-code/:code', async (req, res) => {
   } catch (error) {
     console.error('Error fetching fleet component by code:', error);
     res.status(500).json({ error: 'Failed to fetch fleet component' });
+  }
+});
+
+// Create new fleet component
+router.post('/fleet-components', async (req, res) => {
+  try {
+    const validatedData = insertFleetComponentsSchema.parse(req.body);
+    
+    const existing = await storage.getFleetComponentByCode(validatedData.fleetEquipmentCode);
+    if (existing) {
+      return res.status(409).json({ error: 'Fleet component with this code already exists' });
+    }
+    
+    const newComponent = await storage.createFleetComponent(validatedData);
+    res.status(201).json(newComponent);
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({ error: 'Validation failed', details: error.errors });
+    }
+    console.error('Error creating fleet component:', error);
+    res.status(500).json({ error: 'Failed to create fleet component' });
+  }
+});
+
+// Update existing fleet component
+router.patch('/fleet-components/:id', async (req, res) => {
+  try {
+    const id = parseInt(req.params.id);
+    const existing = await storage.getFleetComponent(id);
+    
+    if (!existing) {
+      return res.status(404).json({ error: 'Fleet component not found' });
+    }
+    
+    const updated = await storage.updateFleetComponent(id, req.body);
+    res.json(updated);
+  } catch (error) {
+    console.error('Error updating fleet component:', error);
+    res.status(500).json({ error: 'Failed to update fleet component' });
+  }
+});
+
+// Delete fleet component (soft delete)
+router.delete('/fleet-components/:id', async (req, res) => {
+  try {
+    const id = parseInt(req.params.id);
+    const existing = await storage.getFleetComponent(id);
+    
+    if (!existing) {
+      return res.status(404).json({ error: 'Fleet component not found' });
+    }
+    
+    await storage.deleteFleetComponent(id);
+    res.json({ success: true, message: 'Fleet component deleted' });
+  } catch (error) {
+    console.error('Error deleting fleet component:', error);
+    res.status(500).json({ error: 'Failed to delete fleet component' });
   }
 });
 

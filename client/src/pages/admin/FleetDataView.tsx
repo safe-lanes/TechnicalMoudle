@@ -804,7 +804,7 @@ export default function FleetDataView() {
               </h2>
               <Button
                 className="bg-cyan-600 hover:bg-cyan-700 text-white"
-                onClick={() => setLocation("/admin/fleet-component-editor")}
+                onClick={() => setLocation(`/admin/fleet-component-editor/${selectedComponent.id}`)}
                 data-testid="button-add-edit-fleet-component"
               >
                 <Plus className="h-4 w-4 mr-1" />
