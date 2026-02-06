@@ -199,25 +199,14 @@ const SparesReports: React.FC<SparesReportsProps> = ({ onBack, globalFilters }) 
         const apiData = await res.json();
 
         const columns = [
-          { header: 'S.No', field: 'sno', width: 8 },
-          { header: 'Part Code', field: 'partCode', width: 18 },
-          { header: 'Part Name', field: 'partName', width: 28 },
-          { header: 'Component', field: 'componentName', width: 24 },
-          { header: 'Severity', field: 'severity', width: 14 },
-          { header: 'Criticality', field: 'criticality', width: 16 },
-          { header: 'Current Qty', field: 'currentQty', width: 14 },
-          { header: 'Min Qty', field: 'minThreshold', width: 12 },
-          { header: 'Shortage', field: 'shortage', width: 12 },
-          { header: 'Shortage %', field: 'shortagePct', width: 14 },
-          { header: 'Unit Cost', field: 'unitCost', width: 14 },
-          { header: 'Value at Risk', field: 'valueAtRisk', width: 16 },
-          { header: 'Avg Daily Use', field: 'avgDailyUse', width: 16 },
-          { header: 'Lead Time', field: 'leadTime', width: 14 },
-          { header: 'Reorder Qty', field: 'reorderQty', width: 14 },
-          { header: 'Supplier', field: 'supplier', width: 20 },
-          { header: 'Last Ordered', field: 'lastOrdered', width: 16 },
-          { header: 'Location', field: 'location', width: 16 },
-          { header: 'Priority Score', field: 'priority', width: 16 },
+          { header: 'S.No', field: 'sno', width: 12 },
+          { header: 'Part Code', field: 'partCode', width: 30 },
+          { header: 'Part Name', field: 'partName', width: 50 },
+          { header: 'Component', field: 'componentName', width: 45 },
+          { header: 'Current Qty', field: 'currentQty', width: 20 },
+          { header: 'Min Qty', field: 'minQty', width: 18 },
+          { header: 'Shortage', field: 'shortage', width: 20 },
+          { header: 'Status', field: 'status', width: 25 },
         ];
 
         const data = (apiData.items || []).map((i: any, idx: number) => ({
@@ -225,28 +214,16 @@ const SparesReports: React.FC<SparesReportsProps> = ({ onBack, globalFilters }) 
           partCode: i.partCode,
           partName: i.partName,
           componentName: i.componentName,
-          severity: i.severityLevel,
-          criticality: i.criticality,
           currentQty: i.currentQty,
-          minThreshold: i.minThreshold,
+          minQty: i.minQty,
           shortage: i.shortage,
-          shortagePct: i.shortagePercent,
-          unitCost: i.unitCost,
-          valueAtRisk: i.valueAtRisk,
-          avgDailyUse: i.avgDailyConsumption,
-          leadTime: i.leadTime,
-          reorderQty: i.reorderRecommendation,
-          supplier: i.supplier,
-          lastOrdered: i.lastOrderDate,
-          location: i.location,
-          priority: i.priorityScore,
+          status: i.status,
         }));
 
         const summary = [
-          { label: 'Total Alerts', value: apiData.summary?.totalAlerts || data.length },
+          { label: 'Total Low Stock Items', value: apiData.summary?.totalLowStock || data.length },
           { label: 'Critical', value: apiData.summary?.criticalCount || 0 },
-          { label: 'Warning', value: apiData.summary?.warningCount || 0 },
-          { label: 'Value at Risk', value: `$${(apiData.summary?.totalValueAtRisk || 0).toLocaleString()}` }
+          { label: 'At Minimum', value: apiData.summary?.atMinCount || 0 },
         ];
 
         pdfReportGenerator.generateReport(

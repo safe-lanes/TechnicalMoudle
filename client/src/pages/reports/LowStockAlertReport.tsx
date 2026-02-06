@@ -1,5 +1,5 @@
 import { useState, useMemo } from "react";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Card, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
@@ -18,14 +18,11 @@ import {
   FileText,
   Loader2,
   ArrowUpDown,
-  ShoppingCart,
-  CheckCircle2,
-  DollarSign,
   TrendingDown,
   Package,
 } from "lucide-react";
-import { useQuery, useMutation } from "@tanstack/react-query";
-import { queryClient, apiRequest } from "@/lib/queryClient";
+import { useQuery } from "@tanstack/react-query";
+import { apiRequest } from "@/lib/queryClient";
 import { pdfReportGenerator } from "@/lib/pdfReportGenerator";
 import { useToast } from "@/hooks/use-toast";
 import { useVessel } from "@/contexts/VesselContext";
@@ -35,32 +32,17 @@ interface LowStockAlertItem {
   partCode: string;
   partName: string;
   componentName: string;
-  componentCode: string;
   currentQty: number;
-  minThreshold: number;
-  maxThreshold: number;
+  minQty: number;
   shortage: number;
-  shortagePercent: number;
-  unitCost: number;
-  valueAtRisk: number;
-  criticality: string;
-  leadTime: string;
-  supplier: string;
-  lastOrderDate: string;
-  avgDailyConsumption: number;
-  reorderRecommendation: number;
-  priorityScore: number;
-  severityLevel: 'Critical' | 'Warning' | 'Low';
-  location: string;
+  status: 'Critical' | 'At Minimum' | 'Low';
 }
 
 interface LowStockAlertResponse {
   summary: {
-    totalAlerts: number;
+    totalLowStock: number;
     criticalCount: number;
-    warningCount: number;
-    lowCount: number;
-    totalValueAtRisk: number;
+    atMinCount: number;
   };
   items: LowStockAlertItem[];
 }
@@ -70,7 +52,7 @@ interface LowStockAlertReportProps {
   vesselId?: string;
 }
 
-type SortField = 'priority' | 'shortage' | 'partName' | 'value' | 'criticality' | 'currentQty';
+type SortField = 'shortage' | 'partName' | 'currentQty' | 'status';
 type SortDirection = 'asc' | 'desc';
 
 const LowStockAlertReport: React.FC<LowStockAlertReportProps> = ({ onBack, vesselId: propVesselId }) => {
@@ -80,46 +62,26 @@ const LowStockAlertReport: React.FC<LowStockAlertReportProps> = ({ onBack, vesse
 
   const [searchQuery, setSearchQuery] = useState("");
   const [criticality, setCriticality] = useState("all");
-  const [thresholdPercent, setThresholdPercent] = useState("100");
-  const [sortField, setSortField] = useState<SortField>('priority');
+  const [sortField, setSortField] = useState<SortField>('shortage');
   const [sortDirection, setSortDirection] = useState<SortDirection>('desc');
   const [generatingPdf, setGeneratingPdf] = useState(false);
 
   const queryUrl = useMemo(() => {
     const params = new URLSearchParams();
     if (criticality !== 'all') params.set('criticality', criticality);
-    if (thresholdPercent !== '100') params.set('thresholdPercent', thresholdPercent);
     params.set('sortBy', sortField);
     const qs = params.toString();
     return `/technical/api/reports/low-stock-alert/${effectiveVesselId}${qs ? `?${qs}` : ''}`;
-  }, [effectiveVesselId, criticality, thresholdPercent, sortField]);
+  }, [effectiveVesselId, criticality, sortField]);
 
   const { data, isLoading, error } = useQuery<LowStockAlertResponse>({
-    queryKey: ['/technical/api/reports/low-stock-alert', effectiveVesselId, criticality, thresholdPercent, sortField],
+    queryKey: ['/technical/api/reports/low-stock-alert', effectiveVesselId, criticality, sortField],
     queryFn: async () => {
       const res = await fetch(queryUrl, { credentials: 'include' });
       if (!res.ok) throw new Error('Failed to fetch report');
       return res.json();
     },
     enabled: !!effectiveVesselId && effectiveVesselId !== 'all',
-  });
-
-  const markOrderedMutation = useMutation({
-    mutationFn: async (spareId: number) => {
-      await apiRequest('PATCH', `/technical/api/reports/low-stock-alert/${effectiveVesselId}/mark-ordered/${spareId}`);
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({
-        predicate: (query) =>
-          Array.isArray(query.queryKey) &&
-          query.queryKey[0] === '/technical/api/reports/low-stock-alert',
-      });
-      queryClient.invalidateQueries({ queryKey: ['/technical/api/spares', effectiveVesselId] });
-      toast({ title: "Marked as Ordered", description: "Spare part order date has been updated." });
-    },
-    onError: () => {
-      toast({ title: "Error", description: "Failed to mark as ordered.", variant: "destructive" });
-    },
   });
 
   const filteredAndSortedItems = useMemo(() => {
@@ -132,20 +94,17 @@ const LowStockAlertReport: React.FC<LowStockAlertReportProps> = ({ onBack, vesse
         (i) =>
           i.partCode.toLowerCase().includes(q) ||
           i.partName.toLowerCase().includes(q) ||
-          i.componentName.toLowerCase().includes(q) ||
-          i.supplier.toLowerCase().includes(q)
+          i.componentName.toLowerCase().includes(q)
       );
     }
 
     items.sort((a, b) => {
       let cmp = 0;
       switch (sortField) {
-        case 'priority': cmp = a.priorityScore - b.priorityScore; break;
         case 'shortage': cmp = a.shortage - b.shortage; break;
         case 'partName': cmp = a.partName.localeCompare(b.partName); break;
-        case 'value': cmp = a.valueAtRisk - b.valueAtRisk; break;
-        case 'criticality': cmp = a.criticality.localeCompare(b.criticality); break;
         case 'currentQty': cmp = a.currentQty - b.currentQty; break;
+        case 'status': cmp = a.status.localeCompare(b.status); break;
       }
       return sortDirection === 'desc' ? -cmp : cmp;
     });
@@ -162,14 +121,14 @@ const LowStockAlertReport: React.FC<LowStockAlertReportProps> = ({ onBack, vesse
     }
   };
 
-  const getSeverityBadge = (severity: string) => {
-    switch (severity) {
+  const getStatusBadge = (status: string) => {
+    switch (status) {
       case 'Critical':
-        return <Badge className="bg-red-600 text-white border-red-700">CRITICAL</Badge>;
-      case 'Warning':
-        return <Badge className="bg-amber-500 text-white border-amber-600">WARNING</Badge>;
+        return <Badge className="bg-red-600 text-white border-red-700">Critical</Badge>;
+      case 'At Minimum':
+        return <Badge className="bg-amber-500 text-white border-amber-600">At Minimum</Badge>;
       default:
-        return <Badge variant="outline">LOW</Badge>;
+        return <Badge variant="outline">Low</Badge>;
     }
   };
 
@@ -181,25 +140,14 @@ const LowStockAlertReport: React.FC<LowStockAlertReportProps> = ({ onBack, vesse
     setGeneratingPdf(true);
     try {
       const columns = [
-        { header: 'S.No', field: 'sno', width: 8 },
-        { header: 'Part Code', field: 'partCode', width: 18 },
-        { header: 'Part Name', field: 'partName', width: 28 },
-        { header: 'Component', field: 'componentName', width: 24 },
-        { header: 'Severity', field: 'severity', width: 14 },
-        { header: 'Criticality', field: 'criticality', width: 16 },
-        { header: 'Current Qty', field: 'currentQty', width: 14 },
-        { header: 'Min Qty', field: 'minThreshold', width: 12 },
-        { header: 'Shortage', field: 'shortage', width: 12 },
-        { header: 'Shortage %', field: 'shortagePct', width: 14 },
-        { header: 'Unit Cost', field: 'unitCost', width: 14 },
-        { header: 'Value at Risk', field: 'valueAtRisk', width: 16 },
-        { header: 'Avg Daily Use', field: 'avgDailyUse', width: 16 },
-        { header: 'Lead Time', field: 'leadTime', width: 14 },
-        { header: 'Reorder Qty', field: 'reorderQty', width: 14 },
-        { header: 'Supplier', field: 'supplier', width: 20 },
-        { header: 'Last Ordered', field: 'lastOrdered', width: 16 },
-        { header: 'Location', field: 'location', width: 16 },
-        { header: 'Priority Score', field: 'priority', width: 16 },
+        { header: 'S.No', field: 'sno', width: 12 },
+        { header: 'Part Code', field: 'partCode', width: 30 },
+        { header: 'Part Name', field: 'partName', width: 50 },
+        { header: 'Component', field: 'componentName', width: 45 },
+        { header: 'Current Qty', field: 'currentQty', width: 20 },
+        { header: 'Min Qty', field: 'minQty', width: 18 },
+        { header: 'Shortage', field: 'shortage', width: 20 },
+        { header: 'Status', field: 'status', width: 25 },
       ];
 
       const exportData = filteredAndSortedItems.map((i, idx) => ({
@@ -207,28 +155,16 @@ const LowStockAlertReport: React.FC<LowStockAlertReportProps> = ({ onBack, vesse
         partCode: i.partCode,
         partName: i.partName,
         componentName: i.componentName,
-        severity: i.severityLevel,
-        criticality: i.criticality,
         currentQty: i.currentQty,
-        minThreshold: i.minThreshold,
+        minQty: i.minQty,
         shortage: i.shortage,
-        shortagePct: i.shortagePercent,
-        unitCost: i.unitCost,
-        valueAtRisk: i.valueAtRisk,
-        avgDailyUse: i.avgDailyConsumption,
-        leadTime: i.leadTime,
-        reorderQty: i.reorderRecommendation,
-        supplier: i.supplier,
-        lastOrdered: i.lastOrderDate,
-        location: i.location,
-        priority: i.priorityScore,
+        status: i.status,
       }));
 
       const summaryData = [
-        { label: 'Total Alerts', value: data.summary.totalAlerts },
+        { label: 'Total Low Stock Items', value: data.summary.totalLowStock },
         { label: 'Critical', value: data.summary.criticalCount },
-        { label: 'Warning', value: data.summary.warningCount },
-        { label: 'Value at Risk', value: `$${data.summary.totalValueAtRisk.toLocaleString()}` },
+        { label: 'At Minimum', value: data.summary.atMinCount },
       ];
 
       pdfReportGenerator.generateReport(
@@ -256,7 +192,6 @@ const LowStockAlertReport: React.FC<LowStockAlertReportProps> = ({ onBack, vesse
     try {
       const body: Record<string, string> = {};
       if (criticality !== 'all') body.criticality = criticality;
-      if (thresholdPercent !== '100') body.thresholdPercent = thresholdPercent;
       body.sortBy = sortField;
 
       const res = await fetch(`/technical/api/reports/low-stock-alert/${effectiveVesselId}/excel`, {
@@ -358,14 +293,14 @@ const LowStockAlertReport: React.FC<LowStockAlertReportProps> = ({ onBack, vesse
         </div>
       ) : (
         <>
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
             <Card data-testid="card-total-alerts">
               <CardHeader className="pb-2">
                 <CardDescription className="flex items-center gap-1">
                   <AlertTriangle className="w-4 h-4 text-orange-500" />
-                  Total Alerts
+                  Total Low Stock Items
                 </CardDescription>
-                <CardTitle className="text-3xl">{summary?.totalAlerts || 0}</CardTitle>
+                <CardTitle className="text-3xl">{summary?.totalLowStock || 0}</CardTitle>
               </CardHeader>
             </Card>
             <Card data-testid="card-critical-count">
@@ -377,24 +312,13 @@ const LowStockAlertReport: React.FC<LowStockAlertReportProps> = ({ onBack, vesse
                 <CardTitle className="text-3xl text-red-600">{summary?.criticalCount || 0}</CardTitle>
               </CardHeader>
             </Card>
-            <Card data-testid="card-warning-count">
+            <Card data-testid="card-at-min-count">
               <CardHeader className="pb-2">
                 <CardDescription className="flex items-center gap-1">
                   <TrendingDown className="w-4 h-4 text-amber-500" />
-                  Warning
+                  At Minimum
                 </CardDescription>
-                <CardTitle className="text-3xl text-amber-600">{summary?.warningCount || 0}</CardTitle>
-              </CardHeader>
-            </Card>
-            <Card data-testid="card-value-at-risk">
-              <CardHeader className="pb-2">
-                <CardDescription className="flex items-center gap-1">
-                  <DollarSign className="w-4 h-4 text-blue-500" />
-                  Value at Risk
-                </CardDescription>
-                <CardTitle className="text-3xl text-blue-600">
-                  ${(summary?.totalValueAtRisk || 0).toLocaleString()}
-                </CardTitle>
+                <CardTitle className="text-3xl text-amber-600">{summary?.atMinCount || 0}</CardTitle>
               </CardHeader>
             </Card>
           </div>
@@ -403,7 +327,7 @@ const LowStockAlertReport: React.FC<LowStockAlertReportProps> = ({ onBack, vesse
             <div className="relative flex-1 min-w-[200px] max-w-sm">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
               <Input
-                placeholder="Search parts, components, suppliers..."
+                placeholder="Search parts, components..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="pl-9"
@@ -420,17 +344,6 @@ const LowStockAlertReport: React.FC<LowStockAlertReportProps> = ({ onBack, vesse
                 <SelectItem value="non-critical">Non-Critical</SelectItem>
               </SelectContent>
             </Select>
-            <Select value={thresholdPercent} onValueChange={setThresholdPercent}>
-              <SelectTrigger className="w-[180px]" data-testid="select-threshold">
-                <SelectValue placeholder="Threshold" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="100">At or Below Min</SelectItem>
-                <SelectItem value="75">Below 75% of Min</SelectItem>
-                <SelectItem value="50">Below 50% of Min</SelectItem>
-                <SelectItem value="25">Below 25% of Min</SelectItem>
-              </SelectContent>
-            </Select>
           </div>
 
           <div className="rounded-lg border border-gray-200 overflow-hidden bg-white">
@@ -438,44 +351,39 @@ const LowStockAlertReport: React.FC<LowStockAlertReportProps> = ({ onBack, vesse
               <table className="w-full" data-testid="table-low-stock-alerts">
                 <thead>
                   <tr className="bg-gray-50 border-b border-gray-200">
-                    <th className="text-left py-3 px-3"><SortButton field="priority" label="Severity" /></th>
-                    <th className="text-left py-3 px-3"><SortButton field="partName" label="Part Details" /></th>
+                    <th className="text-center py-3 px-3 w-16">S.No</th>
+                    <th className="text-left py-3 px-3"><SortButton field="partName" label="Part Code" /></th>
+                    <th className="text-left py-3 px-3">Part Name</th>
                     <th className="text-left py-3 px-3">Component</th>
-                    <th className="text-right py-3 px-3"><SortButton field="currentQty" label="Qty" /></th>
-                    <th className="text-right py-3 px-3">Min</th>
+                    <th className="text-right py-3 px-3"><SortButton field="currentQty" label="Current Qty" /></th>
+                    <th className="text-right py-3 px-3">Min Qty</th>
                     <th className="text-right py-3 px-3"><SortButton field="shortage" label="Shortage" /></th>
-                    <th className="text-left py-3 px-3"><SortButton field="criticality" label="Criticality" /></th>
-                    <th className="text-left py-3 px-3">Lead Time</th>
-                    <th className="text-left py-3 px-3">Supplier</th>
-                    <th className="text-right py-3 px-3"><SortButton field="value" label="Value at Risk" /></th>
-                    <th className="text-right py-3 px-3">Reorder Qty</th>
-                    <th className="text-left py-3 px-3">Last Ordered</th>
-                    <th className="text-center py-3 px-3">Actions</th>
+                    <th className="text-left py-3 px-3"><SortButton field="status" label="Status" /></th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-200">
                   {filteredAndSortedItems.length === 0 ? (
                     <tr>
-                      <td colSpan={13} className="text-center py-12">
+                      <td colSpan={8} className="text-center py-12">
                         <Package className="h-10 w-10 text-gray-400 mx-auto mb-3" />
                         <p className="text-gray-500 font-medium">No low stock alerts found</p>
                         <p className="text-sm text-gray-400 mt-1">All items are above minimum threshold levels</p>
                       </td>
                     </tr>
                   ) : (
-                    filteredAndSortedItems.map((item) => (
+                    filteredAndSortedItems.map((item, idx) => (
                       <tr
                         key={item.id}
                         className={`hover:bg-gray-50 ${
-                          item.severityLevel === 'Critical' ? 'bg-red-50/40' :
-                          item.severityLevel === 'Warning' ? 'bg-amber-50/30' : ''
+                          item.status === 'Critical' ? 'bg-red-50/40' :
+                          item.status === 'At Minimum' ? 'bg-amber-50/30' : ''
                         }`}
                         data-testid={`row-low-stock-${item.id}`}
                       >
-                        <td className="py-3 px-3">{getSeverityBadge(item.severityLevel)}</td>
+                        <td className="py-3 px-3 text-center text-sm text-gray-500">{idx + 1}</td>
+                        <td className="py-3 px-3 text-sm text-gray-700 font-mono">{item.partCode}</td>
                         <td className="py-3 px-3">
                           <div className="font-medium text-gray-900 text-sm">{item.partName}</div>
-                          <div className="text-xs text-gray-500">{item.partCode}</div>
                         </td>
                         <td className="py-3 px-3 text-sm text-gray-700">{item.componentName}</td>
                         <td className="py-3 px-3 text-right">
@@ -485,55 +393,11 @@ const LowStockAlertReport: React.FC<LowStockAlertReportProps> = ({ onBack, vesse
                             {item.currentQty}
                           </span>
                         </td>
-                        <td className="py-3 px-3 text-right text-sm text-gray-600">{item.minThreshold}</td>
+                        <td className="py-3 px-3 text-right text-sm text-gray-600">{item.minQty}</td>
                         <td className="py-3 px-3 text-right">
                           <span className="font-semibold text-sm text-red-600">{item.shortage}</span>
-                          <span className="text-xs text-gray-400 ml-1">({item.shortagePercent}%)</span>
                         </td>
-                        <td className="py-3 px-3">
-                          {item.criticality === 'Critical' ? (
-                            <Badge className="bg-red-100 text-red-700 border-red-200" variant="outline">Critical</Badge>
-                          ) : (
-                            <Badge variant="outline">Standard</Badge>
-                          )}
-                        </td>
-                        <td className="py-3 px-3 text-sm text-gray-600">{item.leadTime}</td>
-                        <td className="py-3 px-3 text-sm text-gray-600">{item.supplier}</td>
-                        <td className="py-3 px-3 text-right text-sm font-medium text-gray-900">
-                          {item.valueAtRisk > 0 ? `$${item.valueAtRisk.toLocaleString()}` : '-'}
-                        </td>
-                        <td className="py-3 px-3 text-right">
-                          <span className="text-sm font-semibold text-blue-600">{item.reorderRecommendation}</span>
-                        </td>
-                        <td className="py-3 px-3 text-sm text-gray-500">{item.lastOrderDate}</td>
-                        <td className="py-3 px-3">
-                          <div className="flex items-center justify-center gap-1">
-                            <Button
-                              size="icon"
-                              variant="ghost"
-                              title="Mark as Ordered"
-                              onClick={() => markOrderedMutation.mutate(item.id)}
-                              disabled={markOrderedMutation.isPending}
-                              data-testid={`button-mark-ordered-${item.id}`}
-                            >
-                              <CheckCircle2 className="h-4 w-4 text-green-600" />
-                            </Button>
-                            <Button
-                              size="icon"
-                              variant="ghost"
-                              title="Generate PO"
-                              onClick={() => {
-                                toast({
-                                  title: "Purchase Order",
-                                  description: `PO generation for ${item.partName} - feature coming soon.`,
-                                });
-                              }}
-                              data-testid={`button-generate-po-${item.id}`}
-                            >
-                              <ShoppingCart className="h-4 w-4 text-blue-600" />
-                            </Button>
-                          </div>
-                        </td>
+                        <td className="py-3 px-3">{getStatusBadge(item.status)}</td>
                       </tr>
                     ))
                   )}
@@ -545,10 +409,7 @@ const LowStockAlertReport: React.FC<LowStockAlertReportProps> = ({ onBack, vesse
           {filteredAndSortedItems.length > 0 && (
             <div className="flex items-center justify-between mt-4 text-sm text-gray-500">
               <span>
-                Showing {filteredAndSortedItems.length} of {data?.summary.totalAlerts || 0} alerts
-              </span>
-              <span>
-                Avg daily consumption calculated from 90-day history
+                Showing {filteredAndSortedItems.length} of {data?.summary.totalLowStock || 0} items
               </span>
             </div>
           )}
