@@ -1,6 +1,6 @@
 import { useState, useMemo, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { useVessels } from "@/hooks/useVessels";
+
 import { useLocation, useRoute } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -190,8 +190,6 @@ export default function AddEditFleetComponent() {
   const [selectedNode, setSelectedNode] = useState<TreeNode | null>(null);
   const [expandedNodes, setExpandedNodes] = useState<Set<string>>(new Set(["6"]));
   const [searchQuery, setSearchQuery] = useState("");
-  const [criticalityFilter, setCriticalityFilter] = useState("all");
-  const [selectedVessel, setSelectedVessel] = useState("all");
 
   const [formData, setFormData] = useState({
     maker: "",
@@ -214,8 +212,6 @@ export default function AddEditFleetComponent() {
   const { data: fleetComponentsList = [], isLoading } = useQuery<FleetComponents[]>({
     queryKey: ["/technical/api/fleet-admin/fleet-components"],
   });
-
-  const { data: vessels = [] } = useVessels();
 
   const { data: makers = [] } = useQuery<Maker[]>({
     queryKey: ["/technical/api/fleet/makers"],
@@ -512,20 +508,6 @@ export default function AddEditFleetComponent() {
         </div>
 
         <div className="flex items-center gap-4 mt-4">
-          <Select value={selectedVessel} onValueChange={setSelectedVessel}>
-            <SelectTrigger className="w-40" data-testid="select-vessel">
-              <SelectValue placeholder="Vessel" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Vessels</SelectItem>
-              {vessels.map((vessel) => (
-                <SelectItem key={vessel.id} value={vessel.id}>
-                  {vessel.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-
           <div className="relative flex-1 max-w-md">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
             <Input
@@ -536,17 +518,6 @@ export default function AddEditFleetComponent() {
               data-testid="input-search-components"
             />
           </div>
-
-          <Select value={criticalityFilter} onValueChange={setCriticalityFilter}>
-            <SelectTrigger className="w-36" data-testid="select-criticality">
-              <SelectValue placeholder="Criticality" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All</SelectItem>
-              <SelectItem value="critical">Critical</SelectItem>
-              <SelectItem value="non-critical">Non-Critical</SelectItem>
-            </SelectContent>
-          </Select>
 
           <Button
             variant="outline"
