@@ -14,10 +14,7 @@ import {
   Package,
   AlertTriangle,
   TrendingDown,
-  ShoppingCart,
-  BarChart3,
   FileText,
-  Clock,
   Eye,
   Loader2,
   Download
@@ -108,48 +105,6 @@ const SparesReports: React.FC<SparesReportsProps> = ({ onBack, globalFilters }) 
       icon: TrendingDown,
       priority: "medium",
       lastGenerated: "2 days ago",
-      estimatedTime: "3-5 min"
-    },
-    {
-      id: "spares-procurement-status",
-      name: "Procurement & Delivery Status",
-      description: "Outstanding orders, deliveries, and supplier performance tracking",
-      purpose: "Track orders & supplier performance (Office/Procurement)",
-      frequency: "Weekly",
-      fields: ["Order No", "Part", "Supplier", "Order Date", "Expected Delivery", "Status", "Delay Days", "Critical Flag"],
-      filters: ["Vessel", "Supplier", "Order Status", "Overdue Only", "Date Range"],
-      outputs: ["PDF", "Excel"],
-      icon: ShoppingCart,
-      priority: "high",
-      lastGenerated: "3 hours ago",
-      estimatedTime: "1-2 min"
-    },
-    {
-      id: "spares-cost-analysis",
-      name: "Inventory Cost Analysis",
-      description: "Cost tracking, budget analysis, and spend optimization by category and supplier",
-      purpose: "Cost control & budget management (Office/Finance)",
-      frequency: "Monthly",
-      fields: ["Category", "Total Value", "Monthly Spend", "Budget vs Actual", "Cost/Unit Trends", "Top Cost Items"],
-      filters: ["Vessel", "Cost Category", "Date Range", "Budget Threshold"],
-      outputs: ["PDF", "Excel", "Dashboard"],
-      icon: BarChart3,
-      priority: "medium",
-      lastGenerated: "1 week ago",
-      estimatedTime: "2-4 min"
-    },
-    {
-      id: "spares-turnover-analysis",
-      name: "Inventory Turnover Analysis",
-      description: "Stock turnover rates, slow-moving items, and obsolescence identification",
-      purpose: "Optimize stock levels & reduce obsolescence (Office)",
-      frequency: "Quarterly",
-      fields: ["Part", "Turnover Rate", "Days in Stock", "Last Movement", "Obsolescence Risk", "Action Required"],
-      filters: ["Vessel", "Turnover Threshold", "Days Stationary", "Risk Level"],
-      outputs: ["PDF", "Excel"],
-      icon: Clock,
-      priority: "low",
-      lastGenerated: "2 weeks ago",
       estimatedTime: "3-5 min"
     },
     {
@@ -330,37 +285,6 @@ const SparesReports: React.FC<SparesReportsProps> = ({ onBack, globalFilters }) 
         break;
       }
 
-      case 'spares-procurement-status':
-      case 'spares-cost-analysis':
-      case 'spares-turnover-analysis': {
-        const columns = [
-          { header: 'Part Code', field: 'partCode', width: 35 },
-          { header: 'Part Name', field: 'partName', width: 60 },
-          { header: 'ROB', field: 'rob', width: 25 },
-          { header: 'Status', field: 'status', width: 30 }
-        ];
-
-        const data = spares.slice(0, 20).map((s: any) => ({
-          partCode: s.partCode || '-',
-          partName: s.partName || '-',
-          rob: s.rob || 0,
-          status: getStockStatus(s.rob || 0, s.min || 0)
-        }));
-
-        const reportTitles: Record<string, string> = {
-          'spares-procurement-status': 'Procurement & Delivery Status',
-          'spares-cost-analysis': 'Inventory Cost Analysis',
-          'spares-turnover-analysis': 'Inventory Turnover Analysis'
-        };
-
-        pdfReportGenerator.generateReport(
-          { title: reportTitles[reportId], subtitle: 'Based on current inventory data', vessel: vesselName },
-          columns,
-          data
-        );
-        break;
-      }
-
       default:
         toast({
           title: "Report Not Available",
@@ -481,7 +405,7 @@ const SparesReports: React.FC<SparesReportsProps> = ({ onBack, globalFilters }) 
           </Button>
           <div>
             <h1 className="text-2xl font-bold text-gray-900">Inventory - Spares</h1>
-            <p className="text-sm text-gray-500">6 reports for spare parts inventory management</p>
+            <p className="text-sm text-gray-500">3 reports for spare parts inventory management</p>
           </div>
         </div>
 
@@ -517,7 +441,7 @@ const SparesReports: React.FC<SparesReportsProps> = ({ onBack, globalFilters }) 
               <FileText className="w-4 h-4 text-blue-500" />
               Reports Available
             </CardDescription>
-            <CardTitle className="text-3xl text-blue-600">6</CardTitle>
+            <CardTitle className="text-3xl text-blue-600">{reports.length}</CardTitle>
           </CardHeader>
         </Card>
         <Card className="border-l-4 border-l-purple-500 bg-white">
