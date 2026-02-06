@@ -1,0 +1,59 @@
+Implement the Consumption Pattern Analysis Report (Tile 4.3) with IDENTICAL PDF and Excel exports.
+
+CRITICAL REQUIREMENTS:
+1. PDF and Excel must be 100% identical (same columns, same data, same order)
+2. Clean, readable format for Chief Engineer - no clutter
+3. Use only relevant, actionable information
+
+REPORT SPECIFICATIONS:
+
+Data Source:
+- Use spares_history table for consumption events (event_type = 'CONSUME')
+- JOIN with spares master table for current ROB, min_qty, critical status
+- Time period: All available data (currently ~3 weeks, will grow over time)
+
+Columns (EXACTLY 10 columns in this order):
+1. S.No - Serial number (1, 2, 3...)
+2. Part Code - part_code from spares
+3. Part Name - part_name from spares
+4. Component - component_name from spares
+5. Total Consumed - SUM of qty_change (absolute value) for CONSUME events
+6. Consumption Events - COUNT of consume events
+7. Current ROB - rob from spares master
+8. Min Stock - min_qty from spares master
+9. Status - "Critical" if critical=true, otherwise "Normal"
+10. Last Consumed - Most recent timestamp_utc for consume event (DD-MMM-YYYY format)
+
+Sorting:
+- Primary: Total Consumed (descending - highest consumption first)
+- Secondary: Part Code (ascending)
+
+Filtering:
+- Include only spares that have at least 1 CONSUME event in spares_history
+- No minimum stock filters - show all consumed items regardless of current ROB
+
+Formatting:
+- Dates: DD-MMM-YYYY format (e.g., 03-Feb-2026)
+- Numbers: No decimal places for quantities
+- Status: "Critical" or "Normal" (capitalize first letter)
+
+PDF Styling:
+- Same clean format as Low Stock Alert report
+- Landscape orientation for 10 columns
+- Proper column widths for readability
+- Report title: "Consumption Pattern Analysis"
+- Include generation timestamp
+
+Excel Styling:
+- IDENTICAL to PDF (same 10 columns, same data, same order)
+- Header row with bold text
+- Auto-fit column widths
+- No extra formatting - keep it simple
+
+Implementation Notes:
+- This report shows consumption patterns from spares_history
+- As data accumulates over time, it will become more valuable
+- Chief Engineer can identify high-consumption parts and plan accordingly
+- Link consume events to work orders via reference field if needed for future enhancements
+
+Implement both PDF and Excel generation routes, ensure they produce identical outputs, and confirm the total record count after implementation.
