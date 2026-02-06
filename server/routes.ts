@@ -6797,6 +6797,169 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
   
+  // Low Stock Alert Report - enriched report with consumption rates, priority scoring, severity
+  app.get("/technical/api/reports/low-stock-alert/:vesselId", async (req, res) => {
+    try {
+      const { vesselId } = req.params;
+      const { criticality, thresholdPercent, componentCategory, sortBy } = req.query;
+
+      const allSpares = await storage.getSpares(vesselId);
+      let history: any[] = [];
+      try {
+        history = await storage.getSpareHistory(vesselId);
+      } catch (e) {
+        history = [];
+      }
+
+      const activeSparesRaw = allSpares.filter((s: any) => !s.deleted && s.dataScope !== 'fleet');
+
+      let lowStockItems = activeSparesRaw.filter((s: any) => {
+        const rob = s.rob || 0;
+        const min = s.min || 0;
+        if (min === 0) return false;
+        if (thresholdPercent) {
+          const pct = Number(thresholdPercent);
+          return rob <= (min * pct / 100);
+        }
+        return rob <= min;
+      });
+
+      if (criticality && criticality !== 'all') {
+        lowStockItems = lowStockItems.filter((s: any) => {
+          const crit = (s.critical || s.criticality || '').toLowerCase();
+          if (criticality === 'critical') return crit === 'critical' || crit === 'yes';
+          return crit !== 'critical' && crit !== 'yes';
+        });
+      }
+
+      if (componentCategory && componentCategory !== 'all') {
+        lowStockItems = lowStockItems.filter((s: any) =>
+          (s.componentCode || '').startsWith(String(componentCategory)) ||
+          (s.componentName || '').toLowerCase().includes(String(componentCategory).toLowerCase())
+        );
+      }
+
+      const now = Date.now();
+      const ninetyDaysAgo = now - (90 * 24 * 60 * 60 * 1000);
+
+      const consumeEvents = history.filter((h: any) =>
+        h.eventType === 'CONSUME' &&
+        h.timestampUTC &&
+        new Date(h.timestampUTC).getTime() >= ninetyDaysAgo
+      );
+
+      const consumeBySpare: Record<number, { totalQty: number; events: number; earliestDate: number; latestDate: number }> = {};
+      for (const ev of consumeEvents) {
+        const sid = ev.spareId;
+        if (!consumeBySpare[sid]) {
+          consumeBySpare[sid] = { totalQty: 0, events: 0, earliestDate: now, latestDate: 0 };
+        }
+        consumeBySpare[sid].totalQty += Math.abs(ev.qtyChange || 0);
+        consumeBySpare[sid].events++;
+        const t = new Date(ev.timestampUTC).getTime();
+        if (t < consumeBySpare[sid].earliestDate) consumeBySpare[sid].earliestDate = t;
+        if (t > consumeBySpare[sid].latestDate) consumeBySpare[sid].latestDate = t;
+      }
+
+      const items = lowStockItems.map((s: any) => {
+        const rob = s.rob || 0;
+        const min = s.min || 0;
+        const max = s.max || min;
+        const shortage = Math.max(0, min - rob);
+        const shortagePercent = min > 0 ? Math.round((shortage / min) * 100) : 0;
+        const unitCost = parseFloat(s.unitCost) || 0;
+        const valueAtRisk = shortage * unitCost;
+
+        const crit = (s.critical || s.criticality || '').toLowerCase();
+        const isCritical = crit === 'critical' || crit === 'yes';
+
+        const consumption = consumeBySpare[s.id];
+        let avgDailyConsumption = 0;
+        if (consumption && consumption.totalQty > 0) {
+          avgDailyConsumption = consumption.totalQty / 90;
+        }
+
+        const leadTimeDays = parseInt(s.leadTime) || 14;
+        const leadTimeDemand = Math.ceil(avgDailyConsumption * leadTimeDays);
+        const reorderRecommendation = Math.max(0, min - rob + leadTimeDemand);
+
+        const critScore = isCritical ? 3 : 1;
+        const shortageScore = shortagePercent / 100;
+        const priorityScore = Math.round((critScore * 30) + (shortageScore * 50) + (avgDailyConsumption > 0 ? 20 : 0));
+
+        let severityLevel: 'critical' | 'warning' | 'low' = 'low';
+        if (isCritical && shortagePercent >= 50) severityLevel = 'critical';
+        else if (shortagePercent >= 25 || isCritical) severityLevel = 'warning';
+
+        return {
+          id: s.id,
+          partCode: s.partCode || '-',
+          partName: s.partName || '-',
+          componentName: s.componentName || '-',
+          componentCode: s.componentCode || '-',
+          currentQty: rob,
+          minThreshold: min,
+          maxThreshold: max,
+          shortage,
+          shortagePercent,
+          unitCost,
+          valueAtRisk,
+          criticality: isCritical ? 'Critical' : 'Non-Critical',
+          leadTime: s.leadTime || '-',
+          supplier: s.supplier || '-',
+          lastOrderDate: s.lastOrderDate || '-',
+          avgDailyConsumption: Math.round(avgDailyConsumption * 100) / 100,
+          reorderRecommendation,
+          priorityScore,
+          severityLevel,
+          location: s.location || '-',
+        };
+      });
+
+      const sortField = (sortBy as string) || 'priority';
+      items.sort((a: any, b: any) => {
+        switch (sortField) {
+          case 'shortage': return b.shortage - a.shortage;
+          case 'partName': return a.partName.localeCompare(b.partName);
+          case 'value': return b.valueAtRisk - a.valueAtRisk;
+          default: return b.priorityScore - a.priorityScore;
+        }
+      });
+
+      const criticalCount = items.filter((i: any) => i.severityLevel === 'critical').length;
+      const warningCount = items.filter((i: any) => i.severityLevel === 'warning').length;
+      const totalValueAtRisk = items.reduce((sum: number, i: any) => sum + i.valueAtRisk, 0);
+
+      res.json({
+        summary: {
+          totalAlerts: items.length,
+          criticalCount,
+          warningCount,
+          lowCount: items.length - criticalCount - warningCount,
+          totalValueAtRisk: Math.round(totalValueAtRisk * 100) / 100,
+        },
+        items,
+      });
+    } catch (error: any) {
+      console.error('Low stock alert report error:', error);
+      res.status(500).json({ error: "Failed to generate low stock alert report" });
+    }
+  });
+
+  // Mark spare as ordered (update lastOrderDate)
+  app.patch("/technical/api/reports/low-stock-alert/:vesselId/mark-ordered/:spareId", async (req, res) => {
+    try {
+      const spareId = parseInt(req.params.spareId);
+      const now = new Date();
+      const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+      const dateStr = `${String(now.getDate()).padStart(2,'0')}-${months[now.getMonth()]}-${now.getFullYear()}`;
+      const updated = await storage.updateSpare(spareId, { lastOrderDate: dateStr });
+      res.json(updated);
+    } catch (error: any) {
+      res.status(500).json({ error: "Failed to mark spare as ordered" });
+    }
+  });
+
   // Batch consume spares (for work order consumption)
   app.post("/technical/api/spares/:vesselId/batch-consume", async (req, res) => {
     try {

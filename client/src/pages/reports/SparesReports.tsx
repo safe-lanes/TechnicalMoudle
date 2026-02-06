@@ -28,6 +28,7 @@ import { useVessels } from "@/hooks/useVessels";
 import { useVessel } from "@/contexts/VesselContext";
 import { useQuery } from "@tanstack/react-query";
 import CategoryFilters, { CategoryFilterValues } from "@/components/reports/CategoryFilters";
+import LowStockAlertReport from "./LowStockAlertReport";
 
 interface SparesReport {
   id: string;
@@ -61,6 +62,7 @@ const SparesReports: React.FC<SparesReportsProps> = ({ onBack, globalFilters }) 
     dateRange: globalFilters?.dateRange || { from: null, to: null }
   });
   const [generatingReports, setGeneratingReports] = useState<Set<string>>(new Set());
+  const [activeDetailReport, setActiveDetailReport] = useState<string | null>(null);
   const { toast } = useToast();
   const { data: vessels = [] } = useVessels();
   const { vesselId: contextVesselId } = useVessel();
@@ -229,41 +231,6 @@ const SparesReports: React.FC<SparesReportsProps> = ({ onBack, globalFilters }) 
         break;
       }
 
-      case 'spares-inventory-snapshot': {
-        const columns = [
-          { header: 'Part Code', field: 'partCode', width: 30 },
-          { header: 'Part Name', field: 'partName', width: 50 },
-          { header: 'Component', field: 'componentName', width: 40 },
-          { header: 'ROB', field: 'rob', width: 20 },
-          { header: 'Min', field: 'min', width: 20 },
-          { header: 'Location', field: 'location', width: 30 },
-          { header: 'Status', field: 'status', width: 25 }
-        ];
-
-        const data = spares.map((s: any) => ({
-          partCode: s.partCode || '-',
-          partName: s.partName || '-',
-          componentName: s.componentName || '-',
-          rob: s.rob || 0,
-          min: s.min || 0,
-          location: s.location || '-',
-          status: getStockStatus(s.rob || 0, s.min || 0)
-        }));
-
-        const summary = [
-          { label: 'Total Items', value: data.length },
-          { label: 'Low Stock', value: data.filter((d: any) => d.status === 'Low').length },
-          { label: 'OK', value: data.filter((d: any) => d.status === 'OK').length }
-        ];
-
-        pdfReportGenerator.generateReport(
-          { title: 'Inventory Snapshot', subtitle: 'Complete spares inventory listing', vessel: vesselName },
-          columns,
-          data,
-          summary
-        );
-        break;
-      }
 
       case 'spares-critical-parts': {
         const criticalParts = spares.filter((s: any) => 
@@ -444,6 +411,15 @@ const SparesReports: React.FC<SparesReportsProps> = ({ onBack, globalFilters }) 
   const lowStockCount = spares.filter((s: any) => (s.rob || 0) < (s.min || 0)).length;
   const highPriorityCount = reports.filter(r => r.priority === 'high').length;
 
+  if (activeDetailReport === 'spares-low-stock') {
+    return (
+      <LowStockAlertReport
+        onBack={() => setActiveDetailReport(null)}
+        vesselId={effectiveVesselId}
+      />
+    );
+  }
+
   return (
     <div className="p-6 bg-white min-h-screen">
       <div className="mb-6">
@@ -459,7 +435,7 @@ const SparesReports: React.FC<SparesReportsProps> = ({ onBack, globalFilters }) 
           </Button>
           <div>
             <h1 className="text-2xl font-bold text-gray-900">Inventory - Spares</h1>
-            <p className="text-sm text-gray-500">7 reports for spare parts inventory management</p>
+            <p className="text-sm text-gray-500">6 reports for spare parts inventory management</p>
           </div>
         </div>
 
@@ -495,7 +471,7 @@ const SparesReports: React.FC<SparesReportsProps> = ({ onBack, globalFilters }) 
               <FileText className="w-4 h-4 text-blue-500" />
               Reports Available
             </CardDescription>
-            <CardTitle className="text-3xl text-blue-600">7</CardTitle>
+            <CardTitle className="text-3xl text-blue-600">6</CardTitle>
           </CardHeader>
         </Card>
         <Card className="border-l-4 border-l-purple-500 bg-white">
@@ -526,6 +502,11 @@ const SparesReports: React.FC<SparesReportsProps> = ({ onBack, globalFilters }) 
                 key={report.id} 
                 className="hover:bg-gray-50 cursor-pointer"
                 data-testid={`spares-report-row-${report.id}`}
+                onClick={() => {
+                  if (report.id === 'spares-low-stock') {
+                    setActiveDetailReport('spares-low-stock');
+                  }
+                }}
               >
                 <td className="py-3 px-4">
                   <div>
@@ -550,7 +531,14 @@ const SparesReports: React.FC<SparesReportsProps> = ({ onBack, globalFilters }) 
                       size="icon" 
                       variant="ghost" 
                       title="Preview"
-                      onClick={() => handleGenerateReport(report.id, 'PDF')}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        if (report.id === 'spares-low-stock') {
+                          setActiveDetailReport('spares-low-stock');
+                        } else {
+                          handleGenerateReport(report.id, 'PDF');
+                        }
+                      }}
                       disabled={generatingReports.has(`${report.id}-PDF`)}
                       data-testid={`button-preview-${report.id}`}
                     >
