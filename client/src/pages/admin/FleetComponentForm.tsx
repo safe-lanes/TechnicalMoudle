@@ -2,7 +2,7 @@ import { useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation, useQuery } from "@tanstack/react-query";
-import { type Component, insertComponentSchema } from "@shared/schema";
+import { type FleetComponents } from "@shared/schema";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -16,12 +16,14 @@ import { z } from "zod";
 const fleetComponentFormSchema = z.object({
   fleetEquipmentName: z.string().min(1, "Fleet equipment name is required"),
   fleetEquipmentCode: z.string().optional(),
-  componentCode: z.string().optional(),
   parentFleetEquipmentCode: z.string().optional(),
-  maker: z.string().optional(),
+  makerName: z.string().optional(),
+  makerCode: z.string().optional(),
   model: z.string().optional(),
-  serialNo: z.string().optional(),
-  drawingNo: z.string().optional(),
+  modelCode: z.string().optional(),
+  componentCategory: z.string().optional(),
+  eqptSystemDept: z.string().optional(),
+  rating: z.string().optional(),
   notes: z.string().optional(),
   location: z.string().optional(),
 });
@@ -31,15 +33,15 @@ type FleetComponentFormData = z.infer<typeof fleetComponentFormSchema>;
 interface FleetComponentFormProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  component: Component | null;
+  component: FleetComponents | null;
 }
 
 export default function FleetComponentForm({ open, onOpenChange, component }: FleetComponentFormProps) {
   const { toast } = useToast();
 
   // Fetch all fleet components for parent selection
-  const { data: components } = useQuery<Component[]>({
-    queryKey: ['/technical/api/fleet/components'],
+  const { data: components } = useQuery<FleetComponents[]>({
+    queryKey: ['/technical/api/fleet-admin/fleet-components'],
     enabled: open,
   });
 
@@ -48,12 +50,14 @@ export default function FleetComponentForm({ open, onOpenChange, component }: Fl
     defaultValues: {
       fleetEquipmentName: "",
       fleetEquipmentCode: "",
-      componentCode: "",
       parentFleetEquipmentCode: "",
-      maker: "",
+      makerName: "",
+      makerCode: "",
       model: "",
-      serialNo: "",
-      drawingNo: "",
+      modelCode: "",
+      componentCategory: "",
+      eqptSystemDept: "",
+      rating: "",
       notes: "",
       location: "",
     },
@@ -65,12 +69,14 @@ export default function FleetComponentForm({ open, onOpenChange, component }: Fl
       form.reset({
         fleetEquipmentName: component.fleetEquipmentName || "",
         fleetEquipmentCode: component.fleetEquipmentCode || "",
-        componentCode: component.componentCode || "",
         parentFleetEquipmentCode: component.parentFleetEquipmentCode || "",
-        maker: component.maker || "",
+        makerName: component.makerName || "",
+        makerCode: component.makerCode || "",
         model: component.model || "",
-        serialNo: component.serialNo || "",
-        drawingNo: component.drawingNo || "",
+        modelCode: component.modelCode || "",
+        componentCategory: component.componentCategory || "",
+        eqptSystemDept: component.eqptSystemDept || "",
+        rating: component.rating || "",
         notes: component.notes || "",
         location: component.location || "",
       });
@@ -78,12 +84,14 @@ export default function FleetComponentForm({ open, onOpenChange, component }: Fl
       form.reset({
         fleetEquipmentName: "",
         fleetEquipmentCode: "",
-        componentCode: "",
         parentFleetEquipmentCode: "",
-        maker: "",
+        makerName: "",
+        makerCode: "",
         model: "",
-        serialNo: "",
-        drawingNo: "",
+        modelCode: "",
+        componentCategory: "",
+        eqptSystemDept: "",
+        rating: "",
         notes: "",
         location: "",
       });
@@ -93,10 +101,10 @@ export default function FleetComponentForm({ open, onOpenChange, component }: Fl
   // Create mutation
   const createMutation = useMutation({
     mutationFn: async (data: FleetComponentFormData) => {
-      return apiRequest('POST', '/technical/api/fleet/components', { ...data, dataScope: 'fleet' });
+      return apiRequest('POST', '/technical/api/fleet-admin/fleet-components', data);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/technical/api/fleet/components'], exact: false });
+      queryClient.invalidateQueries({ queryKey: ['/technical/api/fleet-admin/fleet-components'], exact: false });
       toast({
         title: "Success",
         description: "Fleet component created successfully",
@@ -114,12 +122,12 @@ export default function FleetComponentForm({ open, onOpenChange, component }: Fl
 
   // Update mutation
   const updateMutation = useMutation({
-    mutationFn: async (data: FleetComponentFormData & { id: string }) => {
+    mutationFn: async (data: FleetComponentFormData & { id: number }) => {
       const { id, ...updateData } = data;
-      return apiRequest('PATCH', `/technical/api/fleet/components/${id}`, { ...updateData, dataScope: 'fleet' });
+      return apiRequest('PATCH', `/technical/api/fleet-admin/fleet-components/${id}`, updateData);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/technical/api/fleet/components'], exact: false });
+      queryClient.invalidateQueries({ queryKey: ['/technical/api/fleet-admin/fleet-components'], exact: false });
       toast({
         title: "Success",
         description: "Fleet component updated successfully",
@@ -186,14 +194,14 @@ export default function FleetComponentForm({ open, onOpenChange, component }: Fl
               />
             </div>
 
-            {/* Component Code (SFI Code) */}
+            {/* Component Category */}
             <div className="space-y-2">
-              <Label htmlFor="componentCode">Component Code (SFI)</Label>
+              <Label htmlFor="componentCategory">Component Category</Label>
               <Input
-                id="componentCode"
-                {...form.register("componentCode")}
-                placeholder="e.g., 122, 122.1"
-                data-testid="input-component-code"
+                id="componentCategory"
+                {...form.register("componentCategory")}
+                placeholder="e.g., 1, 2, 3"
+                data-testid="input-component-category"
               />
             </div>
           </div>
@@ -211,7 +219,7 @@ export default function FleetComponentForm({ open, onOpenChange, component }: Fl
               <SelectContent>
                 <SelectItem value="none">None (Top Level)</SelectItem>
                 {parentOptions.filter(c => c.fleetEquipmentCode).map((c) => (
-                  <SelectItem key={c.id} value={c.fleetEquipmentCode!}>
+                  <SelectItem key={c.id} value={c.fleetEquipmentCode}>
                     {c.fleetEquipmentCode} - {c.fleetEquipmentName}
                   </SelectItem>
                 ))}
@@ -220,17 +228,30 @@ export default function FleetComponentForm({ open, onOpenChange, component }: Fl
           </div>
 
           <div className="grid grid-cols-2 gap-4">
-            {/* Maker */}
+            {/* Maker Name */}
             <div className="space-y-2">
-              <Label htmlFor="maker">Maker</Label>
+              <Label htmlFor="makerName">Maker Name</Label>
               <Input
-                id="maker"
-                {...form.register("maker")}
+                id="makerName"
+                {...form.register("makerName")}
                 placeholder="Manufacturer name"
-                data-testid="input-maker"
+                data-testid="input-maker-name"
               />
             </div>
 
+            {/* Maker Code */}
+            <div className="space-y-2">
+              <Label htmlFor="makerCode">Maker Code</Label>
+              <Input
+                id="makerCode"
+                {...form.register("makerCode")}
+                placeholder="Maker code"
+                data-testid="input-maker-code"
+              />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
             {/* Model */}
             <div className="space-y-2">
               <Label htmlFor="model">Model</Label>
@@ -241,40 +262,51 @@ export default function FleetComponentForm({ open, onOpenChange, component }: Fl
                 data-testid="input-model"
               />
             </div>
+
+            {/* Model Code */}
+            <div className="space-y-2">
+              <Label htmlFor="modelCode">Model Code</Label>
+              <Input
+                id="modelCode"
+                {...form.register("modelCode")}
+                placeholder="Model code"
+                data-testid="input-model-code"
+              />
+            </div>
           </div>
 
           <div className="grid grid-cols-2 gap-4">
-            {/* Serial Number */}
+            {/* Location */}
             <div className="space-y-2">
-              <Label htmlFor="serialNo">Serial Number</Label>
+              <Label htmlFor="location">Location</Label>
               <Input
-                id="serialNo"
-                {...form.register("serialNo")}
-                placeholder="Serial number"
-                data-testid="input-serial-no"
+                id="location"
+                {...form.register("location")}
+                placeholder="Equipment location"
+                data-testid="input-location"
               />
             </div>
 
-            {/* Drawing Number */}
+            {/* Rating */}
             <div className="space-y-2">
-              <Label htmlFor="drawingNo">Drawing Number</Label>
+              <Label htmlFor="rating">Rating</Label>
               <Input
-                id="drawingNo"
-                {...form.register("drawingNo")}
-                placeholder="Drawing number"
-                data-testid="input-drawing-no"
+                id="rating"
+                {...form.register("rating")}
+                placeholder="Equipment rating"
+                data-testid="input-rating"
               />
             </div>
           </div>
 
-          {/* Location */}
+          {/* Eqpt / System Department */}
           <div className="space-y-2">
-            <Label htmlFor="location">Location</Label>
+            <Label htmlFor="eqptSystemDept">Eqpt / System Department</Label>
             <Input
-              id="location"
-              {...form.register("location")}
-              placeholder="Equipment location"
-              data-testid="input-location"
+              id="eqptSystemDept"
+              {...form.register("eqptSystemDept")}
+              placeholder="Department"
+              data-testid="input-eqpt-system-dept"
             />
           </div>
 

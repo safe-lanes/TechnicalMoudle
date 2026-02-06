@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { type Component } from "@shared/schema";
+import { type FleetComponents } from "@shared/schema";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -16,23 +16,23 @@ export default function FleetComponentsManagement() {
   const { toast } = useToast();
   const [searchQuery, setSearchQuery] = useState("");
   const [isFormOpen, setIsFormOpen] = useState(false);
-  const [selectedComponent, setSelectedComponent] = useState<Component | null>(null);
+  const [selectedComponent, setSelectedComponent] = useState<FleetComponents | null>(null);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
-  const [componentToDelete, setComponentToDelete] = useState<Component | null>(null);
+  const [componentToDelete, setComponentToDelete] = useState<FleetComponents | null>(null);
   const [expandedNodes, setExpandedNodes] = useState<Set<string>>(new Set());
 
-  // Fetch fleet components
-  const { data: components, isLoading, error } = useQuery<Component[]>({
-    queryKey: ['/technical/api/fleet/components'],
+  // Fetch fleet components from fleet_components table
+  const { data: components, isLoading, error } = useQuery<FleetComponents[]>({
+    queryKey: ['/technical/api/fleet-admin/fleet-components'],
   });
 
   // Delete mutation
   const deleteMutation = useMutation({
-    mutationFn: async (id: string) => {
-      return apiRequest('DELETE', `/technical/api/fleet/components/${id}`);
+    mutationFn: async (id: number) => {
+      return apiRequest('DELETE', `/technical/api/fleet-admin/fleet-components/${id}`);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/technical/api/fleet/components'], exact: false });
+      queryClient.invalidateQueries({ queryKey: ['/technical/api/fleet-admin/fleet-components'], exact: false });
       toast({
         title: "Success",
         description: "Component deleted successfully",
@@ -50,27 +50,25 @@ export default function FleetComponentsManagement() {
   });
 
   // Define tree node type with children
-  type TreeNode = Component & { children: TreeNode[] };
+  type TreeNode = FleetComponents & { children: TreeNode[] };
 
   // Build tree structure from flat list
-  const buildTree = (components: Component[]): TreeNode[] => {
+  const buildTree = (components: FleetComponents[]): TreeNode[] => {
     const tree: TreeNode[] = [];
     const lookup = new Map<string, TreeNode>();
 
-    // First pass: create lookup map
+    // First pass: create lookup map by fleetEquipmentCode
     components.forEach((comp) => {
-      lookup.set(comp.id, { ...comp, children: [] });
+      lookup.set(comp.fleetEquipmentCode, { ...comp, children: [] });
     });
 
     // Second pass: build tree
     components.forEach((comp) => {
-      const node = lookup.get(comp.id);
+      const node = lookup.get(comp.fleetEquipmentCode);
       if (!node) return;
 
       if (comp.parentFleetEquipmentCode) {
-        const parent = Array.from(lookup.values()).find(
-          (c) => c.fleetEquipmentCode === comp.parentFleetEquipmentCode
-        );
+        const parent = lookup.get(comp.parentFleetEquipmentCode);
         if (parent) {
           parent.children.push(node);
         } else {
@@ -91,7 +89,7 @@ export default function FleetComponentsManagement() {
     return (
       comp.fleetEquipmentName?.toLowerCase().includes(query) ||
       comp.fleetEquipmentCode?.toLowerCase().includes(query) ||
-      comp.componentCode?.toLowerCase().includes(query)
+      comp.makerName?.toLowerCase().includes(query)
     );
   }) || [];
 
@@ -110,16 +108,16 @@ export default function FleetComponentsManagement() {
   };
 
   const handleAddNew = (parentCode?: string | null) => {
-    setSelectedComponent(parentCode ? { parentFleetEquipmentCode: parentCode } as Component : null);
+    setSelectedComponent(parentCode ? { parentFleetEquipmentCode: parentCode } as FleetComponents : null);
     setIsFormOpen(true);
   };
 
-  const handleEdit = (component: Component) => {
+  const handleEdit = (component: FleetComponents) => {
     setSelectedComponent(component);
     setIsFormOpen(true);
   };
 
-  const handleDeleteClick = (component: Component) => {
+  const handleDeleteClick = (component: FleetComponents) => {
     setComponentToDelete(component);
     setDeleteDialogOpen(true);
   };
@@ -132,7 +130,7 @@ export default function FleetComponentsManagement() {
 
   const handleExport = async () => {
     try {
-      const response = await fetch('/technical/api/fleet/components/export');
+      const response = await fetch('/technical/api/fleet-admin/fleet-components/export');
       const blob = await response.blob();
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement('a');
@@ -156,20 +154,21 @@ export default function FleetComponentsManagement() {
   };
 
   const renderTreeNode = (node: TreeNode, level: number = 0, isFirstRoot: boolean = false): JSX.Element => {
-    const isExpanded = expandedNodes.has(node.id);
+    const nodeKey = String(node.id);
+    const isExpanded = expandedNodes.has(nodeKey);
     const hasChildren = node.children && node.children.length > 0;
 
     return (
       <>
-        <TableRow key={node.id} data-testid={`row-component-${node.id}`}>
+        <TableRow key={nodeKey} data-testid={`row-component-${nodeKey}`}>
           <TableCell style={{ paddingLeft: `${level * 24 + 16}px` }} data-testid={isFirstRoot ? "I4.QL.3.20" : undefined}>
             {isFirstRoot && <Marker id="I4.QL.3.20" />}
             <div className="flex items-center gap-2">
               {hasChildren ? (
                 <button
-                  onClick={() => toggleNode(node.id)}
+                  onClick={() => toggleNode(nodeKey)}
                   className="p-1 hover:bg-gray-100 rounded"
-                  data-testid={`button-toggle-${node.id}`}
+                  data-testid={`button-toggle-${nodeKey}`}
                 >
                   {isExpanded ? (
                     <ChevronDown className="h-4 w-4" />
@@ -189,11 +188,11 @@ export default function FleetComponentsManagement() {
           </TableCell>
           <TableCell className="font-mono text-sm" data-testid={isFirstRoot ? "I4.QL.3.22" : undefined}>
             {isFirstRoot && <Marker id="I4.QL.3.22" />}
-            {node.componentCode || "-"}
+            {node.componentCategory || "-"}
           </TableCell>
           <TableCell data-testid={isFirstRoot ? "I4.QL.3.23" : undefined}>
             {isFirstRoot && <Marker id="I4.QL.3.23" />}
-            {node.maker || "-"}
+            {node.makerName || "-"}
           </TableCell>
           <TableCell data-testid={isFirstRoot ? "I4.QL.3.24" : undefined}>
             {isFirstRoot && <Marker id="I4.QL.3.24" />}
@@ -205,7 +204,7 @@ export default function FleetComponentsManagement() {
                 variant="ghost"
                 size="sm"
                 onClick={() => handleAddNew(node.fleetEquipmentCode)}
-                data-testid={isFirstRoot ? "I4.QL.3.25" : `button-add-child-${node.id}`}
+                data-testid={isFirstRoot ? "I4.QL.3.25" : `button-add-child-${nodeKey}`}
                 title="Add Child"
               >
                 {isFirstRoot && <Marker id="I4.QL.3.25" />}
@@ -215,7 +214,7 @@ export default function FleetComponentsManagement() {
                 variant="ghost"
                 size="sm"
                 onClick={() => handleEdit(node)}
-                data-testid={isFirstRoot ? "I4.QL.3.26" : `button-edit-${node.id}`}
+                data-testid={isFirstRoot ? "I4.QL.3.26" : `button-edit-${nodeKey}`}
               >
                 {isFirstRoot && <Marker id="I4.QL.3.26" />}
                 <Pencil className="h-4 w-4" />
@@ -224,8 +223,8 @@ export default function FleetComponentsManagement() {
                 variant="ghost"
                 size="sm"
                 onClick={() => handleDeleteClick(node)}
-                className="text-red-600 hover:text-red-700 hover:bg-red-50"
-                data-testid={isFirstRoot ? "I4.QL.3.27" : `button-delete-${node.id}`}
+                className="text-red-600"
+                data-testid={isFirstRoot ? "I4.QL.3.27" : `button-delete-${nodeKey}`}
               >
                 {isFirstRoot && <Marker id="I4.QL.3.27" />}
                 <Trash2 className="h-4 w-4" />
@@ -311,7 +310,7 @@ export default function FleetComponentsManagement() {
                     <TableRow>
                       <TableHead data-testid="I4.QL.3.14"><Marker id="I4.QL.3.14" />Equipment Name</TableHead>
                       <TableHead data-testid="I4.QL.3.15"><Marker id="I4.QL.3.15" />Fleet Code</TableHead>
-                      <TableHead data-testid="I4.QL.3.16"><Marker id="I4.QL.3.16" />SFI Code</TableHead>
+                      <TableHead data-testid="I4.QL.3.16"><Marker id="I4.QL.3.16" />Category</TableHead>
                       <TableHead data-testid="I4.QL.3.17"><Marker id="I4.QL.3.17" />Maker</TableHead>
                       <TableHead data-testid="I4.QL.3.18"><Marker id="I4.QL.3.18" />Model</TableHead>
                       <TableHead className="text-right" data-testid="I4.QL.3.19"><Marker id="I4.QL.3.19" />Actions</TableHead>
