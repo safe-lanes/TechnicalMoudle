@@ -137,6 +137,9 @@ import {
   fleetComponentMapping,
   type FleetComponentMapping,
   type InsertFleetComponentMapping,
+  fleetJobs,
+  type FleetJobs,
+  type InsertFleetJobs,
   fleetJobVesselMapping,
   type FleetJobVesselMapping,
   type InsertFleetJobVesselMapping,
@@ -686,6 +689,14 @@ export interface IStorage {
   createFleetComponent(data: InsertFleetComponents): Promise<FleetComponents>;
   updateFleetComponent(id: number, data: Partial<FleetComponents>): Promise<FleetComponents>;
   deleteFleetComponent(id: number): Promise<void>;
+  
+  // Fleet Jobs - Fleet-level Job Master Data
+  getFleetJobs(): Promise<FleetJobs[]>;
+  getFleetJob(id: number): Promise<FleetJobs | undefined>;
+  getFleetJobByCode(jobCode: string): Promise<FleetJobs | undefined>;
+  createFleetJob(data: InsertFleetJobs): Promise<FleetJobs>;
+  updateFleetJob(id: number, data: Partial<FleetJobs>): Promise<FleetJobs>;
+  deleteFleetJob(id: number): Promise<void>;
   
   // SFI Details - SFI Code lookup table
   getSfiDetails(): Promise<SfiDetails[]>;

@@ -130,10 +130,10 @@ interface UniformBulkUploadProps {
   title: string;
   description: string;
   icon: LucideIcon;
-  templateType: 'components' | 'jobs' | 'spares' | 'stores' | 'makers' | 'fleet-components';
+  templateType: 'components' | 'jobs' | 'spares' | 'stores' | 'makers' | 'fleet-components' | 'fleet-jobs';
   templateFileName: string;
   fieldMappings: FieldMapping[];
-  vesselId: string;
+  vesselId?: string;
   previewColumns?: string[];
   storeTypes?: StoreTypeOption[];
   onRefreshData?: () => void;
@@ -188,7 +188,10 @@ export default function UniformBulkUpload({
 
   const handleDownloadTemplate = async () => {
     try {
-      const response = await fetch(`/technical/api/bulk/template?type=${templateType}&vesselId=${vesselId}`);
+      const templateUrl = vesselId 
+        ? `/technical/api/bulk/template?type=${templateType}&vesselId=${vesselId}`
+        : `/technical/api/bulk/template?type=${templateType}`;
+      const response = await fetch(templateUrl);
       if (!response.ok) throw new Error('Failed to download template');
       
       const blob = await response.blob();
@@ -318,7 +321,9 @@ export default function UniformBulkUpload({
     formData.append('file', file);
     formData.append('type', templateType);
     formData.append('mode', importMode);
-    formData.append('vesselId', vesselId);
+    if (vesselId) {
+      formData.append('vesselId', vesselId);
+    }
     formData.append('archiveMissing', 'false');
     
     if (sheetName) {

@@ -9,6 +9,7 @@ import {
   masterLists,
   makerList,
   fleetComponents,
+  fleetJobs,
   sfiDetails,
   masterData,
   components,
@@ -588,10 +589,82 @@ export class PostgresStorage {
 
   async deleteFleetComponent(id: number): Promise<void> {
     const db = await getDb();
-    // Soft delete by setting isDeleted to true
     await db.update(fleetComponents)
       .set({ isDeleted: true, updatedAt: new Date() })
       .where(eq(fleetComponents.id, id));
+  }
+
+  // ============= FLEET JOBS =============
+
+  async getFleetJobs(): Promise<any[]> {
+    const db = await getDb();
+    return await db.select().from(fleetJobs)
+      .where(and(eq(fleetJobs.isActive, true), eq(fleetJobs.isDeleted, false)));
+  }
+
+  async getFleetJob(id: number): Promise<any | undefined> {
+    const db = await getDb();
+    const result = await db.select().from(fleetJobs).where(eq(fleetJobs.id, id));
+    return result[0];
+  }
+
+  async getFleetJobByCode(jobCode: string): Promise<any | undefined> {
+    const db = await getDb();
+    const result = await db.select().from(fleetJobs)
+      .where(eq(fleetJobs.jobCode, jobCode));
+    return result[0];
+  }
+
+  async createFleetJob(data: any): Promise<any> {
+    const db = await getDb();
+    const result = await db.insert(fleetJobs).values({
+      jobCode: data.jobCode,
+      fleetEquipmentCode: data.fleetEquipmentCode,
+      fleetEquipmentName: data.fleetEquipmentName,
+      woTitle: data.woTitle,
+      maintenanceBasis: data.maintenanceBasis || null,
+      intervalValue: data.intervalValue || null,
+      unit: data.unit || null,
+      taskType: data.taskType,
+      assignedTo: data.assignedTo,
+      approver: data.approver,
+      jobPriority: data.jobPriority,
+      classRelated: data.classRelated,
+      briefWorkDescription: data.briefWorkDescription,
+      department: data.department,
+      criticality: data.criticality,
+      isActive: data.isActive ?? true,
+      requiredSpareParts: data.requiredSpareParts || [],
+      requiredTools: data.requiredTools || [],
+      ppeRequirements: data.ppeRequirements || null,
+      permitRequirements: data.permitRequirements || null,
+      otherSafetyRequirements: data.otherSafetyRequirements || null,
+      sortOrder: data.sortOrder || 0,
+      createdByUuid: data.createdByUuid || null,
+      updatedByUuid: data.updatedByUuid || null,
+      isDeleted: data.isDeleted || false,
+      isSync: data.isSync || false,
+    }).returning();
+    return result[0];
+  }
+
+  async updateFleetJob(id: number, data: Partial<any>): Promise<any> {
+    const db = await getDb();
+    const result = await db.update(fleetJobs)
+      .set({ ...data, updatedAt: new Date() })
+      .where(eq(fleetJobs.id, id))
+      .returning();
+    if (!result[0]) {
+      throw new Error(`Fleet job with id ${id} not found`);
+    }
+    return result[0];
+  }
+
+  async deleteFleetJob(id: number): Promise<void> {
+    const db = await getDb();
+    await db.update(fleetJobs)
+      .set({ isDeleted: true, updatedAt: new Date() })
+      .where(eq(fleetJobs.id, id));
   }
 
   // ============= MODULE 2: SFI DETAILS =============

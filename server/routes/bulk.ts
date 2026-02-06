@@ -452,6 +452,91 @@ const COLUMN_MAPPINGS: { [key: string]: { [variant: string]: string } } = {
     'fleetequipmentname': 'Fleet Equipment Name',
     'fleet_equipment_name': 'Fleet Equipment Name',
     'fleet equipment name': 'Fleet Equipment Name'
+  },
+  'fleet-jobs': {
+    'jobcode': 'Job Code',
+    'job_code': 'Job Code',
+    'job code': 'Job Code',
+    'fleetequipmentcode': 'Fleet Equipment Code',
+    'fleet_equipment_code': 'Fleet Equipment Code',
+    'fleet equipment code': 'Fleet Equipment Code',
+    'fleetequipmentname': 'Fleet Equipment Name',
+    'fleet_equipment_name': 'Fleet Equipment Name',
+    'fleet equipment name': 'Fleet Equipment Name',
+    'wotitle': 'WO Title',
+    'wo_title': 'WO Title',
+    'wo title': 'WO Title',
+    'jobtitle': 'WO Title',
+    'job_title': 'WO Title',
+    'job title': 'WO Title',
+    'maintenancebasis': 'Maintenance Basis',
+    'maintenance_basis': 'Maintenance Basis',
+    'maintenance basis': 'Maintenance Basis',
+    'scheduletype': 'Maintenance Basis',
+    'schedule_type': 'Maintenance Basis',
+    'schedule type': 'Maintenance Basis',
+    'intervalvalue': 'Interval Value',
+    'interval_value': 'Interval Value',
+    'interval value': 'Interval Value',
+    'calendarinterval': 'Interval Value',
+    'calendar_interval': 'Interval Value',
+    'calendar interval': 'Interval Value',
+    'unit': 'Unit',
+    'intervalunit': 'Unit',
+    'interval_unit': 'Unit',
+    'interval unit': 'Unit',
+    'tasktype': 'Task Type',
+    'task_type': 'Task Type',
+    'task type': 'Task Type',
+    'assignedto': 'Assigned To',
+    'assigned_to': 'Assigned To',
+    'assigned to': 'Assigned To',
+    'responsiblerank': 'Assigned To',
+    'responsible_rank': 'Assigned To',
+    'responsible rank': 'Assigned To',
+    'approver': 'Approver',
+    'jobpriority': 'Job Priority',
+    'job_priority': 'Job Priority',
+    'job priority': 'Job Priority',
+    'classrelated': 'Class Related',
+    'class_related': 'Class Related',
+    'class related': 'Class Related',
+    'briefworkdescription': 'Brief Work Description',
+    'brief_work_description': 'Brief Work Description',
+    'brief work description': 'Brief Work Description',
+    'jobdescription': 'Brief Work Description',
+    'job_description': 'Brief Work Description',
+    'job description': 'Brief Work Description',
+    'department': 'Department',
+    'criticality': 'Criticality',
+    'critical yes/no': 'Criticality',
+    'isactive': 'Is Active',
+    'is_active': 'Is Active',
+    'is active': 'Is Active',
+    'requiredspareParts': 'Required Spare Parts',
+    'required_spare_parts': 'Required Spare Parts',
+    'required spare parts': 'Required Spare Parts',
+    'sparepartsrequired': 'Required Spare Parts',
+    'spare_parts_required': 'Required Spare Parts',
+    'spare parts required': 'Required Spare Parts',
+    'requiredtools': 'Required Tools',
+    'required_tools': 'Required Tools',
+    'required tools': 'Required Tools',
+    'toolsrequired': 'Required Tools',
+    'tools_required': 'Required Tools',
+    'tools required': 'Required Tools',
+    'pperequirements': 'PPE Requirements',
+    'ppe_requirements': 'PPE Requirements',
+    'ppe requirements': 'PPE Requirements',
+    'permitrequirements': 'Permit Requirements',
+    'permit_requirements': 'Permit Requirements',
+    'permit requirements': 'Permit Requirements',
+    'othersafetyrequirements': 'Other Safety Requirements',
+    'other_safety_requirements': 'Other Safety Requirements',
+    'other safety requirements': 'Other Safety Requirements',
+    'safetyprocedure': 'Other Safety Requirements',
+    'safety_procedure': 'Other Safety Requirements',
+    'safety procedure': 'Other Safety Requirements'
   }
 };
 
@@ -1753,8 +1838,8 @@ router.get('/template', async (req, res) => {
     }
   }
   
-  if (!['components', 'spares', 'stores', 'work-orders', 'jobs', 'makers', 'fleet-components'].includes(type as string)) {
-    return res.status(400).json({ error: 'Invalid template type. Valid types: components, spares, stores, work-orders, jobs, makers, fleet-components, fleet-master-data' });
+  if (!['components', 'spares', 'stores', 'work-orders', 'jobs', 'makers', 'fleet-components', 'fleet-jobs'].includes(type as string)) {
+    return res.status(400).json({ error: 'Invalid template type. Valid types: components, spares, stores, work-orders, jobs, makers, fleet-components, fleet-jobs' });
   }
   
   // Default to V001 if no vesselId provided
@@ -1863,6 +1948,30 @@ router.get('/template', async (req, res) => {
         'Required (Unique identifier, e.g., MKR-000001)', 'Required (Full manufacturer name)', 
         'Text (Manufacturer address)', 'Text (Address reference ID)', 'Text (Contact person name)',
         'Text (Contact email)', 'Text (Contact phone)', 'Yes/No (defaults to Yes)'
+      ];
+
+      example = [];
+      break;
+
+    case 'fleet-jobs':
+      headers = [
+        'Job Code', 'Fleet Equipment Code', 'Fleet Equipment Name', 'WO Title',
+        'Task Type', 'Assigned To', 'Approver', 'Job Priority',
+        'Class Related', 'Brief Work Description', 'Department', 'Criticality',
+        'Is Active', 'Maintenance Basis', 'Interval Value', 'Unit',
+        'Required Spare Parts', 'Required Tools', 'PPE Requirements',
+        'Permit Requirements', 'Other Safety Requirements'
+      ];
+
+      validValues = [
+        'Required (Unique job code)', 'Required (Fleet equipment code)', 'Required (Fleet equipment name)',
+        'Required (Work order title)', 'Required (Inspection, Overhaul, Service, Testing, etc.)',
+        'Required (Assigned person/rank)', 'Required (Approval authority)', 'Required (Low, Medium, High, Critical)',
+        'Required (Yes/No)', 'Required (Work description)', 'Required (Department)', 'Required (Yes/No)',
+        'Yes/No (defaults to Yes)', 'Text (Calendar, Running Hours, Condition Based)',
+        'Number (Interval value)', 'Text (Days, Weeks, Months, Years)',
+        'Text (Spare parts list)', 'Text (Tools list)', 'Text (PPE requirements)',
+        'Text (Permit requirements)', 'Text (Other safety requirements)'
       ];
 
       example = [];
@@ -2257,10 +2366,12 @@ router.post('/sheets', upload.single('file'), async (req, res) => {
 function getTypeFromSheetName(sheetName: string): string | null {
   const normalizedName = sheetName.toLowerCase().trim();
   
-  // Direct matches - Fleet_Component must come BEFORE generic 'component' check
+  // Direct matches - Fleet_ prefixed must come BEFORE generic checks
   if (normalizedName === 'fleet_component' || normalizedName === 'fleet component') return 'fleet-components';
+  if (normalizedName === 'fleet_job' || normalizedName === 'fleet job') return 'fleet-jobs';
   if (normalizedName === 'spares' || normalizedName.includes('spare')) return 'spares';
   if (normalizedName === 'components' || normalizedName.includes('component') || normalizedName.includes('machinery')) return 'components';
+  if (normalizedName === 'vessel_job' || normalizedName === 'vessel job') return 'jobs';
   if (normalizedName === 'jobs' || normalizedName.includes('job')) return 'jobs';
   if (normalizedName === 'stores' || normalizedName.includes('store')) return 'stores';
   if (normalizedName === 'work-orders' || normalizedName.includes('work order') || normalizedName.includes('workorder')) return 'work-orders';
@@ -2285,7 +2396,7 @@ router.post('/dry-run', upload.single('file'), async (req, res) => {
     
     console.log(`📋 Type determination: requested='${requestedType}', sheetName='${sheetName}', sheetBasedType='${sheetBasedType}', effective='${type}'`);
 
-    if (!['components', 'spares', 'stores', 'work-orders', 'jobs', 'makers', 'fleet-components'].includes(type)) {
+    if (!['components', 'spares', 'stores', 'work-orders', 'jobs', 'makers', 'fleet-components', 'fleet-jobs'].includes(type)) {
       return res.status(400).json({ error: 'Invalid type' });
     }
 
@@ -2681,6 +2792,9 @@ async function validateData(type: string, data: any[], mode: string, vesselId?: 
       case 'fleet-components':
         primaryField = 'Fleet Equipment Code';
         break;
+      case 'fleet-jobs':
+        primaryField = 'Job Code';
+        break;
       default:
         primaryField = 'Component Code';
     }
@@ -2746,6 +2860,35 @@ async function validateData(type: string, data: any[], mode: string, vesselId?: 
           fleetEquipmentCodeOccurrences.set(code, []);
         }
         fleetEquipmentCodeOccurrences.get(code)!.push(index + 2); // Row number (Excel is 1-indexed + header)
+      }
+    });
+  }
+  
+  // Track duplicate Job Codes for fleet-jobs (case-insensitive)
+  const fleetJobCodeOccurrences = new Map<string, number[]>();
+  const existingDbFleetJobCodes = new Set<string>();
+  
+  if (type === 'fleet-jobs') {
+    try {
+      const existingFleetJobs = await storage.getFleetJobs();
+      existingFleetJobs.forEach((fj: any) => {
+        if (fj.jobCode) {
+          existingDbFleetJobCodes.add(fj.jobCode.toUpperCase());
+        }
+      });
+      console.log(`📋 Loaded ${existingDbFleetJobCodes.size} existing fleet job codes from database`);
+    } catch (err) {
+      console.error(`Failed to fetch existing fleet jobs:`, err);
+    }
+    
+    filteredData.forEach((row, index) => {
+      const jobCode = row['Job Code'];
+      if (jobCode) {
+        const code = String(jobCode).trim().toUpperCase();
+        if (!fleetJobCodeOccurrences.has(code)) {
+          fleetJobCodeOccurrences.set(code, []);
+        }
+        fleetJobCodeOccurrences.get(code)!.push(index + 2);
       }
     });
   }
@@ -3668,6 +3811,203 @@ async function validateData(type: string, data: any[], mode: string, vesselId?: 
         }
       } else {
         normalized['IS Active'] = true; // Default to active
+      }
+    } else if (type === 'fleet-jobs') {
+      // Validate fleet-jobs - matches fleet_jobs database schema
+      // 21 columns from Fleet Jobs Import Sheet to Table Mapping
+      
+      // Job Code - required and unique
+      const jobCode = row['Job Code'];
+      if (jobCode === undefined || jobCode === null || String(jobCode).trim() === '') {
+        errors.push(`Row ${rowNum}: Job Code is required`);
+      } else {
+        const codeStr = String(jobCode).trim();
+        normalized['Job Code'] = codeStr;
+        const codeUpperCase = codeStr.toUpperCase();
+        
+        const occurrences = fleetJobCodeOccurrences.get(codeUpperCase);
+        if (occurrences && occurrences.length > 1) {
+          const firstOccurrence = occurrences[0];
+          if (rowNum !== firstOccurrence) {
+            errors.push(`Row ${rowNum}: Duplicate Job Code '${codeStr}' - this code already appears in row ${firstOccurrence}. Each Job Code must be unique.`);
+          }
+        }
+        
+        if (existingDbFleetJobCodes.has(codeUpperCase)) {
+          if (mode === 'add') {
+            errors.push(`Row ${rowNum}: Job Code '${codeStr}' already exists in database. Use 'Update' or 'Upsert' mode to modify existing records.`);
+          }
+        } else {
+          if (mode === 'update') {
+            errors.push(`Row ${rowNum}: Job Code '${codeStr}' does not exist in database. Use 'Add' or 'Upsert' mode to create new records.`);
+          }
+        }
+      }
+      
+      // Fleet Equipment Code - required
+      const fleetEqCode = row['Fleet Equipment Code'];
+      if (fleetEqCode === undefined || fleetEqCode === null || String(fleetEqCode).trim() === '') {
+        errors.push(`Row ${rowNum}: Fleet Equipment Code is required`);
+      } else {
+        normalized['Fleet Equipment Code'] = String(fleetEqCode).trim();
+      }
+      
+      // Fleet Equipment Name - required
+      const fleetEqName = row['Fleet Equipment Name'];
+      if (fleetEqName === undefined || fleetEqName === null || String(fleetEqName).trim() === '') {
+        errors.push(`Row ${rowNum}: Fleet Equipment Name is required`);
+      } else {
+        normalized['Fleet Equipment Name'] = String(fleetEqName).trim();
+      }
+      
+      // WO Title - required
+      const woTitle = row['WO Title'];
+      if (woTitle === undefined || woTitle === null || String(woTitle).trim() === '') {
+        errors.push(`Row ${rowNum}: WO Title is required`);
+      } else {
+        normalized['WO Title'] = String(woTitle).trim();
+      }
+      
+      // Task Type - required
+      const taskType = row['Task Type'];
+      if (taskType === undefined || taskType === null || String(taskType).trim() === '') {
+        errors.push(`Row ${rowNum}: Task Type is required`);
+      } else {
+        normalized['Task Type'] = String(taskType).trim();
+      }
+      
+      // Assigned To - required
+      const assignedTo = row['Assigned To'];
+      if (assignedTo === undefined || assignedTo === null || String(assignedTo).trim() === '') {
+        errors.push(`Row ${rowNum}: Assigned To is required`);
+      } else {
+        normalized['Assigned To'] = String(assignedTo).trim();
+      }
+      
+      // Approver - required
+      const approver = row['Approver'];
+      if (approver === undefined || approver === null || String(approver).trim() === '') {
+        errors.push(`Row ${rowNum}: Approver is required`);
+      } else {
+        normalized['Approver'] = String(approver).trim();
+      }
+      
+      // Job Priority - required
+      const jobPriority = row['Job Priority'];
+      if (jobPriority === undefined || jobPriority === null || String(jobPriority).trim() === '') {
+        errors.push(`Row ${rowNum}: Job Priority is required`);
+      } else {
+        normalized['Job Priority'] = String(jobPriority).trim();
+      }
+      
+      // Class Related - required
+      const classRelated = row['Class Related'];
+      if (classRelated === undefined || classRelated === null || String(classRelated).trim() === '') {
+        errors.push(`Row ${rowNum}: Class Related is required`);
+      } else {
+        const value = String(classRelated).toLowerCase().trim();
+        if (!['yes', 'no', 'y', 'n'].includes(value)) {
+          errors.push(`Row ${rowNum}: Class Related must be Yes or No`);
+        } else {
+          normalized['Class Related'] = ['yes', 'y'].includes(value) ? 'Yes' : 'No';
+        }
+      }
+      
+      // Brief Work Description - required
+      const briefWorkDesc = row['Brief Work Description'];
+      if (briefWorkDesc === undefined || briefWorkDesc === null || String(briefWorkDesc).trim() === '') {
+        errors.push(`Row ${rowNum}: Brief Work Description is required`);
+      } else {
+        normalized['Brief Work Description'] = String(briefWorkDesc).trim();
+      }
+      
+      // Department - required
+      const department = row['Department'];
+      if (department === undefined || department === null || String(department).trim() === '') {
+        errors.push(`Row ${rowNum}: Department is required`);
+      } else {
+        normalized['Department'] = String(department).trim();
+      }
+      
+      // Criticality - required
+      const criticality = row['Criticality'];
+      if (criticality === undefined || criticality === null || String(criticality).trim() === '') {
+        errors.push(`Row ${rowNum}: Criticality is required`);
+      } else {
+        const value = String(criticality).toLowerCase().trim();
+        if (!['yes', 'no', 'y', 'n'].includes(value)) {
+          errors.push(`Row ${rowNum}: Criticality must be Yes or No`);
+        } else {
+          normalized['Criticality'] = ['yes', 'y'].includes(value) ? 'Yes' : 'No';
+        }
+      }
+      
+      // Is Active - required (defaults to Yes if not provided)
+      if (row['Is Active'] !== undefined && row['Is Active'] !== null && String(row['Is Active']).trim() !== '') {
+        const value = String(row['Is Active']).toLowerCase().trim();
+        if (!['yes', 'no', 'y', 'n', 'true', 'false', '1', '0'].includes(value)) {
+          errors.push(`Row ${rowNum}: Is Active must be Yes or No`);
+        } else {
+          normalized['Is Active'] = ['yes', 'y', 'true', '1'].includes(value);
+        }
+      } else {
+        normalized['Is Active'] = true;
+      }
+      
+      // Maintenance Basis - optional
+      if (row['Maintenance Basis'] !== undefined && row['Maintenance Basis'] !== null && String(row['Maintenance Basis']).trim() !== '') {
+        normalized['Maintenance Basis'] = String(row['Maintenance Basis']).trim();
+      } else {
+        normalized['Maintenance Basis'] = null;
+      }
+      
+      // Interval Value - optional
+      if (row['Interval Value'] !== undefined && row['Interval Value'] !== null && String(row['Interval Value']).trim() !== '') {
+        normalized['Interval Value'] = String(row['Interval Value']).trim();
+      } else {
+        normalized['Interval Value'] = null;
+      }
+      
+      // Unit - optional
+      if (row['Unit'] !== undefined && row['Unit'] !== null && String(row['Unit']).trim() !== '') {
+        normalized['Unit'] = String(row['Unit']).trim();
+      } else {
+        normalized['Unit'] = null;
+      }
+      
+      // Required Spare Parts - optional
+      if (row['Required Spare Parts'] !== undefined && row['Required Spare Parts'] !== null && String(row['Required Spare Parts']).trim() !== '') {
+        normalized['Required Spare Parts'] = String(row['Required Spare Parts']).trim();
+      } else {
+        normalized['Required Spare Parts'] = null;
+      }
+      
+      // Required Tools - optional
+      if (row['Required Tools'] !== undefined && row['Required Tools'] !== null && String(row['Required Tools']).trim() !== '') {
+        normalized['Required Tools'] = String(row['Required Tools']).trim();
+      } else {
+        normalized['Required Tools'] = null;
+      }
+      
+      // PPE Requirements - optional
+      if (row['PPE Requirements'] !== undefined && row['PPE Requirements'] !== null && String(row['PPE Requirements']).trim() !== '') {
+        normalized['PPE Requirements'] = String(row['PPE Requirements']).trim();
+      } else {
+        normalized['PPE Requirements'] = null;
+      }
+      
+      // Permit Requirements - optional
+      if (row['Permit Requirements'] !== undefined && row['Permit Requirements'] !== null && String(row['Permit Requirements']).trim() !== '') {
+        normalized['Permit Requirements'] = String(row['Permit Requirements']).trim();
+      } else {
+        normalized['Permit Requirements'] = null;
+      }
+      
+      // Other Safety Requirements - optional
+      if (row['Other Safety Requirements'] !== undefined && row['Other Safety Requirements'] !== null && String(row['Other Safety Requirements']).trim() !== '') {
+        normalized['Other Safety Requirements'] = String(row['Other Safety Requirements']).trim();
+      } else {
+        normalized['Other Safety Requirements'] = null;
       }
     }
 
@@ -5451,6 +5791,114 @@ async function performImport(
     }
     
     console.log(`✅ Fleet components import complete: ${result.created} created, ${result.updated} updated, ${result.skipped} skipped`);
+  } else if (type === 'fleet-jobs') {
+    console.log(`🚀 Starting fleet-jobs import: ${data.length} rows, mode: ${mode}`);
+    
+    const existingFleetJobs = await storage.getFleetJobs();
+    const fleetJobsByCode = new Map(existingFleetJobs.map((fj: any) => [fj.jobCode, fj]));
+    console.log(`📦 Prefetched ${existingFleetJobs.length} existing fleet jobs`);
+    
+    for (const row of data) {
+      const jobCode = row['Job Code'];
+      const fleetEquipmentCode = row['Fleet Equipment Code'];
+      const fleetEquipmentName = row['Fleet Equipment Name'];
+      const woTitle = row['WO Title'];
+      const taskType = row['Task Type'];
+      const assignedTo = row['Assigned To'];
+      const approver = row['Approver'];
+      const jobPriority = row['Job Priority'];
+      const briefWorkDescription = row['Brief Work Description'];
+      const department = row['Department'];
+      
+      const classRelated = row['Class Related'] || null;
+      const criticality = row['Criticality'] || null;
+      
+      const maintenanceBasis = row['Maintenance Basis'] || null;
+      const intervalValue = row['Interval Value'] || null;
+      const unit = row['Unit'] || null;
+      
+      const requiredSpareParts = row['Required Spare Parts'] || null;
+      const requiredTools = row['Required Tools'] || null;
+      const ppeRequirements = row['PPE Requirements'] || null;
+      const permitRequirements = row['Permit Requirements'] || null;
+      const otherSafetyRequirements = row['Other Safety Requirements'] || null;
+      
+      let isActive = true;
+      if (row['Is Active'] !== undefined && row['Is Active'] !== null) {
+        if (typeof row['Is Active'] === 'boolean') {
+          isActive = row['Is Active'];
+        } else {
+          const value = String(row['Is Active']).toLowerCase().trim();
+          isActive = ['yes', 'y', 'true', '1'].includes(value);
+        }
+      }
+      
+      if (!jobCode || !fleetEquipmentCode || !fleetEquipmentName || !woTitle || !taskType) {
+        console.warn(`⚠️ Skipping row with missing required fields: jobCode=${jobCode}`);
+        result.skipped++;
+        continue;
+      }
+      
+      const fleetJobData = {
+        jobCode,
+        fleetEquipmentCode,
+        fleetEquipmentName,
+        woTitle,
+        maintenanceBasis,
+        intervalValue,
+        unit,
+        taskType,
+        assignedTo,
+        approver,
+        jobPriority,
+        classRelated,
+        briefWorkDescription,
+        department,
+        criticality,
+        isActive,
+        requiredSpareParts: requiredSpareParts ? [requiredSpareParts] : [],
+        requiredTools: requiredTools ? [requiredTools] : [],
+        ppeRequirements,
+        permitRequirements,
+        otherSafetyRequirements,
+      };
+      
+      const existingFleetJob = fleetJobsByCode.get(jobCode);
+      
+      if (mode === 'add') {
+        if (existingFleetJob) {
+          console.log(`⏭️ Skipping existing fleet job: ${jobCode}`);
+          result.skipped++;
+        } else {
+          const newFleetJob = await storage.createFleetJob(fleetJobData);
+          fleetJobsByCode.set(jobCode, newFleetJob);
+          result.created++;
+          console.log(`✅ Created fleet job: ${jobCode} - ${woTitle}`);
+        }
+      } else if (mode === 'update') {
+        if (existingFleetJob) {
+          await storage.updateFleetJob(existingFleetJob.id, fleetJobData);
+          result.updated++;
+          console.log(`🔄 Updated fleet job: ${jobCode} - ${woTitle}`);
+        } else {
+          console.log(`⏭️ Skipping non-existent fleet job (update mode): ${jobCode}`);
+          result.skipped++;
+        }
+      } else if (mode === 'upsert') {
+        if (existingFleetJob) {
+          await storage.updateFleetJob(existingFleetJob.id, fleetJobData);
+          result.updated++;
+          console.log(`🔄 Updated fleet job: ${jobCode} - ${woTitle}`);
+        } else {
+          const newFleetJob = await storage.createFleetJob(fleetJobData);
+          fleetJobsByCode.set(jobCode, newFleetJob);
+          result.created++;
+          console.log(`✅ Created fleet job: ${jobCode} - ${woTitle}`);
+        }
+      }
+    }
+    
+    console.log(`✅ Fleet jobs import complete: ${result.created} created, ${result.updated} updated, ${result.skipped} skipped`);
   }
 
   return result;
