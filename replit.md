@@ -73,6 +73,16 @@ The application employs a modern full-stack architecture with a mobile-first, re
 - **Vessel Data Source Strategy**: Employs a unified `useVessels()` hook prioritizing local PMS data with fallback to an external master-data API.
 - **ROB Location Stock Synchronization**: Implemented dual-write synchronization between legacy ROB fields and the normalized `spare_location_stock` table for consistent inventory.
 
+## V2 Architecture Planning (Component Module)
+A detailed V2 modular architecture plan has been documented at `docs/V2-Component-Module-Refactor-Plan.md`. Key decisions:
+- **V2 Namespace**: All V2 code lives under `server/v2/`, `shared/v2/`, and `client/src/modules/` — legacy code stays untouched.
+- **V2 Schema**: Uses `serial` PK (internal) + `component_uuid` (external), 7 mandatory audit columns (`sort_order`, `created_at`, `updated_at`, `created_by_uuid`, `updated_by_uuid`, `is_deleted`, `is_sync`), all dates as `text`, no JSON columns.
+- **Layer Separation**: Repository (DB only) → Service (business logic, audit user injection) → Controller (HTTP concerns, Zod validation) → Routes (RESTful patterns).
+- **Route Prefix**: `/technical/api/v2/components/component/*` for V2 endpoints.
+- **Frontend Toggle**: `localStorage('pms_api_version')` switches between legacy and V2 API endpoints at runtime.
+- **Backward Compatibility**: Legacy and V2 use separate database tables (`components` vs `components_v2`). Instant rollback by toggling to legacy mode.
+- **Scope**: Currently planned for Component module only (bulk upload + CRUD). Other modules to follow the same pattern.
+
 ## External Dependencies
 *   **Frontend**: `@radix-ui/*`, `@tanstack/react-query`, `wouter`, `tailwindcss`, `lucide-react`
 *   **Backend**: `express`, `drizzle-orm`, `@neondatabase/serverless`, `connect-pg-simple`
