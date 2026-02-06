@@ -19,37 +19,11 @@ interface TreeNode {
   isExpanded?: boolean;
 }
 
-const sfiCategories = [
-  { code: "1", name: "Ship General" },
-  { code: "2", name: "Hull" },
-  { code: "3", name: "Equipment for Cargo" },
-  { code: "4", name: "Ship's Equipment" },
-  { code: "5", name: "Equipment for Crew & Passengers" },
-  { code: "6", name: "Machinery Main Components" },
-  { code: "7", name: "Systems for Machinery Main Components" },
-  { code: "8", name: "Ship Common Systems" },
-];
-
 function buildTree(components: FleetComponents[]): TreeNode[] {
   const nodeMap = new Map<string, TreeNode>();
   const rootNodes: TreeNode[] = [];
 
-  sfiCategories.forEach((cat) => {
-    const node: TreeNode = {
-      code: cat.code,
-      name: cat.name,
-      children: [],
-      isExpanded: false,
-    };
-    nodeMap.set(cat.code, node);
-    rootNodes.push(node);
-  });
-
-  const sortedComponents = [...components].sort((a, b) =>
-    (a.fleetEquipmentCode || "").localeCompare(b.fleetEquipmentCode || "")
-  );
-
-  sortedComponents.forEach((comp) => {
+  components.forEach((comp) => {
     const code = comp.fleetEquipmentCode;
     if (!code) return;
 
@@ -58,22 +32,39 @@ function buildTree(components: FleetComponents[]): TreeNode[] {
       name: comp.fleetEquipmentName || "Unknown",
       children: [],
       data: comp,
+      isExpanded: false,
     };
     nodeMap.set(code, node);
+  });
+
+  components.forEach((comp) => {
+    const code = comp.fleetEquipmentCode;
+    if (!code) return;
+
+    const node = nodeMap.get(code);
+    if (!node) return;
 
     const parentCode = comp.parentFleetEquipmentCode;
+
     if (parentCode && nodeMap.has(parentCode)) {
-      nodeMap.get(parentCode)!.children.push(node);
+      const parentNode = nodeMap.get(parentCode)!;
+      parentNode.children.push(node);
     } else {
-      const firstDigit = code.charAt(0);
-      const categoryNode = nodeMap.get(firstDigit);
-      if (categoryNode) {
-        categoryNode.children.push(node);
-      }
+      rootNodes.push(node);
     }
   });
 
-  return rootNodes;
+  const sortNodes = (nodes: TreeNode[]): TreeNode[] => {
+    nodes.sort((a, b) => a.code.localeCompare(b.code, undefined, { numeric: true }));
+    nodes.forEach((node) => {
+      if (node.children.length > 0) {
+        sortNodes(node.children);
+      }
+    });
+    return nodes;
+  };
+
+  return sortNodes(rootNodes);
 }
 
 function TreeItem({
@@ -188,7 +179,7 @@ export default function AddEditFleetComponent() {
   const { toast } = useToast();
 
   const [selectedNode, setSelectedNode] = useState<TreeNode | null>(null);
-  const [expandedNodes, setExpandedNodes] = useState<Set<string>>(new Set(["6"]));
+  const [expandedNodes, setExpandedNodes] = useState<Set<string>>(new Set());
   const [searchQuery, setSearchQuery] = useState("");
 
   const [formData, setFormData] = useState({
@@ -254,10 +245,6 @@ export default function AddEditFleetComponent() {
           if (comp?.parentFleetEquipmentCode) {
             pathCodes.add(comp.parentFleetEquipmentCode);
             findAncestors(comp.parentFleetEquipmentCode);
-          }
-          const firstDigit = targetCode.charAt(0);
-          if (/^[1-8]$/.test(firstDigit)) {
-            pathCodes.add(firstDigit);
           }
         };
         findAncestors(code);
