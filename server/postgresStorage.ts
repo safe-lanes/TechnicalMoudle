@@ -912,14 +912,14 @@ export class PostgresStorage {
     };
   }
 
-  // Fleet Components
-  async getFleetComponents(): Promise<Component[]> {
+  // Fleet-Scoped Components (legacy - queries components table with dataScope='fleet')
+  async getFleetScopedComponents(): Promise<Component[]> {
     const db = await getDb();
     return await db.select().from(components)
       .where(eq(components.dataScope, 'fleet'));
   }
 
-  async getFleetComponent(id: string): Promise<Component | undefined> {
+  async getFleetScopedComponent(id: string): Promise<Component | undefined> {
     const db = await getDb();
     const result = await db.select().from(components)
       .where(and(
@@ -929,7 +929,7 @@ export class PostgresStorage {
     return result[0];
   }
 
-  async createFleetComponent(component: InsertComponent): Promise<Component> {
+  async createFleetScopedComponent(component: InsertComponent): Promise<Component> {
     const db = await getDb();
     const id = component.id || `FC-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
     const result = await db.insert(components).values({
@@ -940,11 +940,11 @@ export class PostgresStorage {
     return result[0];
   }
 
-  async updateFleetComponent(id: string, data: Partial<Component>): Promise<Component> {
+  async updateFleetScopedComponent(id: string, data: Partial<Component>): Promise<Component> {
     return this.updateComponent(id, data);
   }
 
-  async deleteFleetComponent(id: string): Promise<void> {
+  async deleteFleetScopedComponent(id: string): Promise<void> {
     return this.deleteComponent(id);
   }
 

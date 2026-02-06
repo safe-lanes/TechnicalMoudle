@@ -8480,7 +8480,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Get all fleet components
   app.get("/technical/api/fleet/components", async (req, res) => {
     try {
-      const components = await storage.getFleetComponents();
+      const components = await storage.getFleetScopedComponents();
       res.json(components);
     } catch (error) {
       console.error("Error fetching fleet components:", error);
@@ -8491,7 +8491,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Get fleet component by ID
   app.get("/technical/api/fleet/components/:id", async (req, res) => {
     try {
-      const component = await storage.getFleetComponent(req.params.id);
+      const component = await storage.getFleetScopedComponent(req.params.id);
       if (!component) {
         return res.status(404).json({ error: "Fleet component not found" });
       }
@@ -8506,7 +8506,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/technical/api/fleet/components", async (req, res) => {
     try {
       const validatedData = insertComponentSchema.parse(req.body);
-      const component = await storage.createFleetComponent(validatedData);
+      const component = await storage.createFleetScopedComponent(validatedData);
       res.status(201).json(component);
     } catch (error: any) {
       if (error.name === 'ZodError') {
@@ -8525,7 +8525,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const partialComponentSchema = insertComponentSchema.partial();
       const validatedData = partialComponentSchema.parse(req.body);
-      const component = await storage.updateFleetComponent(req.params.id, validatedData);
+      const component = await storage.updateFleetScopedComponent(req.params.id, validatedData);
       res.json(component);
     } catch (error: any) {
       if (error.name === 'ZodError') {
@@ -8545,7 +8545,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Delete fleet component
   app.delete("/technical/api/fleet/components/:id", async (req, res) => {
     try {
-      await storage.deleteFleetComponent(req.params.id);
+      await storage.deleteFleetScopedComponent(req.params.id);
       res.json({ success: true });
     } catch (error: any) {
       if (error.message?.includes('not found')) {

@@ -307,12 +307,12 @@ export interface IStorage {
     inheritedUpdated: number;
   }>;
   
-  // Fleet Components methods
-  getFleetComponents(): Promise<Component[]>;
-  getFleetComponent(id: string): Promise<Component | undefined>;
-  createFleetComponent(component: InsertComponent): Promise<Component>;
-  updateFleetComponent(id: string, data: Partial<Component>): Promise<Component>;
-  deleteFleetComponent(id: string): Promise<void>;
+  // Fleet-Scoped Components (legacy - queries components table with dataScope='fleet')
+  getFleetScopedComponents(): Promise<Component[]>;
+  getFleetScopedComponent(id: string): Promise<Component | undefined>;
+  createFleetScopedComponent(component: InsertComponent): Promise<Component>;
+  updateFleetScopedComponent(id: string, data: Partial<Component>): Promise<Component>;
+  deleteFleetScopedComponent(id: string): Promise<void>;
   
   // Spares methods
   getAllSpares(): Promise<Spare[]>;

@@ -1031,12 +1031,20 @@ class MemStorage {
     return result;
   }
 
-  // Fleet component methods
-  async getFleetComponents(fleetId: string): Promise<any[]> { return []; }
+  // Fleet component methods (fleet_components table)
+  async getFleetComponents(fleetId?: string): Promise<any[]> { return []; }
   async getFleetComponent(id: number): Promise<any> { return undefined; }
+  async getFleetComponentByCode(fleetEquipmentCode: string): Promise<any> { return undefined; }
   async createFleetComponent(component: any): Promise<any> { return { ...component, id: this.getNextId('fleetComponents') }; }
   async updateFleetComponent(id: number, data: any): Promise<any> { return data; }
   async deleteFleetComponent(id: number): Promise<void> {}
+
+  // Fleet-scoped component methods (legacy - components table with dataScope='fleet')
+  async getFleetScopedComponents(): Promise<any[]> { return []; }
+  async getFleetScopedComponent(id: string): Promise<any> { return undefined; }
+  async createFleetScopedComponent(component: any): Promise<any> { return component; }
+  async updateFleetScopedComponent(id: string, data: any): Promise<any> { return data; }
+  async deleteFleetScopedComponent(id: string): Promise<void> {}
 
   // Fleet job methods
   async getFleetJobs(fleetId: string): Promise<any[]> { return []; }
