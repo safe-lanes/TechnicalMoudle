@@ -225,26 +225,40 @@ const LowStockAlertReport: React.FC<LowStockAlertReportProps> = ({ onBack, vesse
     }
   };
 
-  const handleExportExcel = () => {
+  const [generatingExcel, setGeneratingExcel] = useState(false);
+
+  const handleExportExcel = async () => {
     if (!data?.items || data.items.length === 0) {
       toast({ title: "No Data", description: "No items to export.", variant: "destructive" });
       return;
     }
-    const headers = ['Part Code', 'Part Name', 'Component', 'Current Qty', 'Min', 'Shortage', 'Shortage %', 'Severity', 'Unit Cost', 'Value at Risk', 'Lead Time', 'Supplier', 'Last Ordered', 'Avg Daily Use', 'Reorder Qty'];
-    const rows = filteredAndSortedItems.map((i) => [
-      i.partCode, i.partName, i.componentName, i.currentQty, i.minThreshold,
-      i.shortage, `${i.shortagePercent}%`, i.severityLevel.toUpperCase(),
-      i.unitCost, i.valueAtRisk, i.leadTime, i.supplier, i.lastOrderDate,
-      i.avgDailyConsumption, i.reorderRecommendation
-    ]);
-    const csv = [headers.join(','), ...rows.map(r => r.map(v => `"${v}"`).join(','))].join('\n');
-    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-    const link = document.createElement('a');
-    link.href = URL.createObjectURL(blob);
-    link.download = `low-stock-alert-report-${new Date().toISOString().slice(0, 10)}.csv`;
-    link.click();
-    URL.revokeObjectURL(link.href);
-    toast({ title: "Excel/CSV Exported", description: "Report downloaded as CSV." });
+    setGeneratingExcel(true);
+    try {
+      const body: Record<string, string> = {};
+      if (criticality !== 'all') body.criticality = criticality;
+      if (thresholdPercent !== '100') body.thresholdPercent = thresholdPercent;
+      body.sortBy = sortField;
+
+      const res = await fetch(`/technical/api/reports/low-stock-alert/${effectiveVesselId}/excel`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify(body),
+      });
+      if (!res.ok) throw new Error('Failed to generate Excel');
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `low-stock-alert-report-${new Date().toISOString().slice(0, 10)}.xlsx`;
+      link.click();
+      URL.revokeObjectURL(url);
+      toast({ title: "Excel Exported", description: "Report downloaded as Excel file." });
+    } catch (err) {
+      toast({ title: "Export Failed", description: "Failed to generate Excel report.", variant: "destructive" });
+    } finally {
+      setGeneratingExcel(false);
+    }
   };
 
   const summary = data?.summary;
@@ -303,10 +317,10 @@ const LowStockAlertReport: React.FC<LowStockAlertReportProps> = ({ onBack, vesse
           <Button
             variant="outline"
             onClick={handleExportExcel}
-            disabled={isLoading}
+            disabled={isLoading || generatingExcel}
             data-testid="button-export-excel"
           >
-            <Download className="h-4 w-4 mr-2" /> Export CSV
+            <Download className="h-4 w-4 mr-2" /> {generatingExcel ? 'Generating...' : 'Export Excel'}
           </Button>
         </div>
       </div>

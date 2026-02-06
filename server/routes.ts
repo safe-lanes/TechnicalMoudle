@@ -6960,6 +6960,214 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Low Stock Alert Report - Excel Export
+  app.post("/technical/api/reports/low-stock-alert/:vesselId/excel", async (req, res) => {
+    try {
+      const { vesselId } = req.params;
+      const { criticality, thresholdPercent, sortBy } = req.body;
+
+      const allSpares = await storage.getSpares(vesselId);
+      let history: any[] = [];
+      try { history = await storage.getSpareHistory(vesselId); } catch (e) { history = []; }
+
+      const allVessels = await storage.getVessels();
+      const vessel = allVessels.find((v: any) => v.id === vesselId);
+      const vesselName = vessel?.name || vesselId;
+
+      const activeSparesRaw = allSpares.filter((s: any) => !s.deleted && s.dataScope !== 'fleet');
+
+      let lowStockItems = activeSparesRaw.filter((s: any) => {
+        const rob = s.rob || 0;
+        const min = s.min || 0;
+        if (min === 0) return false;
+        if (thresholdPercent) {
+          const pct = Number(thresholdPercent);
+          return rob <= (min * pct / 100);
+        }
+        return rob <= min;
+      });
+
+      if (criticality && criticality !== 'all') {
+        lowStockItems = lowStockItems.filter((s: any) => {
+          const crit = (s.critical || s.criticality || '').toLowerCase();
+          if (criticality === 'critical') return crit === 'critical' || crit === 'yes';
+          return crit !== 'critical' && crit !== 'yes';
+        });
+      }
+
+      const now = Date.now();
+      const ninetyDaysAgo = now - (90 * 24 * 60 * 60 * 1000);
+      const consumeEvents = history.filter((h: any) =>
+        h.eventType === 'CONSUME' && h.timestampUTC && new Date(h.timestampUTC).getTime() >= ninetyDaysAgo
+      );
+      const consumeBySpare: Record<number, { totalQty: number }> = {};
+      for (const ev of consumeEvents) {
+        const sid = ev.spareId;
+        if (!consumeBySpare[sid]) consumeBySpare[sid] = { totalQty: 0 };
+        consumeBySpare[sid].totalQty += Math.abs(ev.qtyChange || 0);
+      }
+
+      const items = lowStockItems.map((s: any) => {
+        const rob = s.rob || 0;
+        const min = s.min || 0;
+        const max = s.max || min;
+        const shortage = Math.max(0, min - rob);
+        const shortagePercent = min > 0 ? Math.round((shortage / min) * 100) : 0;
+        const unitCost = parseFloat(s.unitCost) || 0;
+        const valueAtRisk = shortage * unitCost;
+        const crit = (s.critical || s.criticality || '').toLowerCase();
+        const isCritical = crit === 'critical' || crit === 'yes';
+        const consumption = consumeBySpare[s.id];
+        let avgDailyConsumption = 0;
+        if (consumption && consumption.totalQty > 0) avgDailyConsumption = consumption.totalQty / 90;
+        const leadTimeDays = parseInt(s.leadTime) || 14;
+        const leadTimeDemand = Math.ceil(avgDailyConsumption * leadTimeDays);
+        const reorderRecommendation = Math.max(0, min - rob + leadTimeDemand);
+        const critScore = isCritical ? 3 : 1;
+        const shortageScore = shortagePercent / 100;
+        const priorityScore = Math.round((critScore * 30) + (shortageScore * 50) + (avgDailyConsumption > 0 ? 20 : 0));
+        let severityLevel = 'Low';
+        if (isCritical && shortagePercent >= 50) severityLevel = 'Critical';
+        else if (shortagePercent >= 25 || isCritical) severityLevel = 'Warning';
+
+        return {
+          partCode: s.partCode || '-', partName: s.partName || '-',
+          componentName: s.componentName || '-', componentCode: s.componentCode || '-',
+          currentQty: rob, minThreshold: min, maxThreshold: max,
+          shortage, shortagePercent, unitCost, valueAtRisk,
+          criticality: isCritical ? 'Critical' : 'Non-Critical',
+          leadTime: s.leadTime || '-', supplier: s.supplier || '-',
+          lastOrderDate: s.lastOrderDate || '-',
+          avgDailyConsumption: Math.round(avgDailyConsumption * 100) / 100,
+          reorderRecommendation, priorityScore, severityLevel, location: s.location || '-',
+        };
+      });
+
+      const sortField = sortBy || 'priority';
+      items.sort((a: any, b: any) => {
+        switch (sortField) {
+          case 'shortage': return b.shortage - a.shortage;
+          case 'partName': return a.partName.localeCompare(b.partName);
+          case 'value': return b.valueAtRisk - a.valueAtRisk;
+          default: return b.priorityScore - a.priorityScore;
+        }
+      });
+
+      const criticalCount = items.filter(i => i.severityLevel === 'Critical').length;
+      const warningCount = items.filter(i => i.severityLevel === 'Warning').length;
+      const totalValueAtRisk = items.reduce((sum, i) => sum + i.valueAtRisk, 0);
+
+      const workbook = new ExcelJS.Workbook();
+      workbook.creator = 'PMS System';
+      workbook.created = new Date();
+      const worksheet = workbook.addWorksheet('Low Stock Alerts');
+
+      const columns: ColumnDef[] = [
+        { key: 'sno', header: 'S.No', width: 6, type: 'number', align: 'center' },
+        { key: 'partCode', header: 'Part Code', width: 14, type: 'string' },
+        { key: 'partName', header: 'Part Name', width: 26, type: 'string' },
+        { key: 'componentName', header: 'Component', width: 22, type: 'string' },
+        { key: 'severity', header: 'Severity', width: 12, type: 'string', align: 'center' },
+        { key: 'criticality', header: 'Criticality', width: 14, type: 'string', align: 'center' },
+        { key: 'currentQty', header: 'Current Qty', width: 12, type: 'number', align: 'center' },
+        { key: 'minThreshold', header: 'Min Qty', width: 10, type: 'number', align: 'center' },
+        { key: 'shortage', header: 'Shortage', width: 10, type: 'number', align: 'center' },
+        { key: 'shortagePct', header: 'Shortage %', width: 12, type: 'number', align: 'center' },
+        { key: 'unitCost', header: 'Unit Cost', width: 12, type: 'number' },
+        { key: 'valueAtRisk', header: 'Value at Risk', width: 14, type: 'number' },
+        { key: 'avgDailyUse', header: 'Avg Daily Use', width: 14, type: 'number', align: 'center' },
+        { key: 'leadTime', header: 'Lead Time', width: 12, type: 'string', align: 'center' },
+        { key: 'reorderQty', header: 'Reorder Qty', width: 12, type: 'number', align: 'center' },
+        { key: 'supplier', header: 'Supplier', width: 18, type: 'string' },
+        { key: 'lastOrdered', header: 'Last Ordered', width: 14, type: 'string', align: 'center' },
+        { key: 'location', header: 'Location', width: 14, type: 'string' },
+        { key: 'priority', header: 'Priority Score', width: 14, type: 'number', align: 'center' },
+      ];
+
+      const totalColumns = columns.length;
+
+      const summaryItems: SummaryItem[] = [
+        { label: 'Report', value: 'Low Stock Alert Report' },
+        { label: 'Vessel', value: vesselName },
+        { label: 'Generated', value: new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) },
+        { label: 'Total Alerts', value: String(items.length) },
+        { label: 'Critical', value: String(criticalCount) },
+        { label: 'Warning', value: String(warningCount) },
+        { label: 'Total Value at Risk', value: `$${Math.round(totalValueAtRisk).toLocaleString()}` },
+      ];
+
+      const lastSummaryRow = applyStandardHeader(worksheet, 'Low Stock Alert Report', vesselName, summaryItems, totalColumns);
+      const headerRowNum = lastSummaryRow + 2;
+
+      applyStandardTableHeader(worksheet, columns, headerRowNum);
+
+      const severityBgColors: Record<string, string> = {
+        'Critical': 'FFFFF1F0',
+        'Warning': 'FFFFFBE6',
+        'Low': 'FFFFFFFF',
+      };
+      const severityFontColors: Record<string, string> = {
+        'Critical': 'FFF5222D',
+        'Warning': 'FFFAAD14',
+        'Low': 'FF5A6C7D',
+      };
+
+      items.forEach((item, idx) => {
+        const rowNum = headerRowNum + 1 + idx;
+        const rowData: (string | number)[] = [
+          idx + 1,
+          item.partCode, item.partName, item.componentName,
+          item.severityLevel, item.criticality,
+          item.currentQty, item.minThreshold, item.shortage, item.shortagePercent,
+          item.unitCost, item.valueAtRisk, item.avgDailyConsumption,
+          item.leadTime, item.reorderRecommendation,
+          item.supplier, item.lastOrderDate, item.location, item.priorityScore,
+        ];
+        const row = worksheet.addRow(rowData);
+        row.height = 20;
+
+        const bgColor = severityBgColors[item.severityLevel] || 'FFFFFFFF';
+
+        row.eachCell({ includeEmpty: true }, (cell, colNumber) => {
+          const colDef = columns[colNumber - 1];
+          cell.font = { name: 'Calibri', size: 10, color: { argb: COLORS.textDark } };
+          cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: idx % 2 === 0 ? bgColor : COLORS.bgLight } };
+          cell.border = {
+            bottom: { style: 'thin', color: { argb: COLORS.border } },
+            right: { style: 'thin', color: { argb: COLORS.border } },
+          };
+          cell.alignment = { vertical: 'middle', horizontal: (colDef?.align as any) || 'left' };
+
+          if (colNumber === 5) {
+            cell.font = { name: 'Calibri', size: 10, bold: true, color: { argb: severityFontColors[item.severityLevel] || COLORS.textDark } };
+          }
+          if (colDef?.type === 'number' && typeof cell.value === 'number') {
+            if (colDef.key === 'unitCost' || colDef.key === 'valueAtRisk') {
+              cell.numFmt = '#,##0.00';
+            }
+          }
+        });
+      });
+
+      worksheet.autoFilter = {
+        from: { row: headerRowNum, column: 1 },
+        to: { row: headerRowNum, column: totalColumns }
+      };
+
+      applyStandardPageSetup(worksheet, headerRowNum, totalColumns, lastSummaryRow, vesselName);
+
+      const buffer = await workbook.xlsx.writeBuffer();
+      const filename = generateFilename('LowStockAlerts', vesselName);
+
+      res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+      res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+      res.send(buffer);
+    } catch (error: any) {
+      console.error("Error generating Low Stock Alert Excel:", error);
+      res.status(500).json({ error: "Failed to generate report: " + error.message });
+    }
+  });
+
   // Batch consume spares (for work order consumption)
   app.post("/technical/api/spares/:vesselId/batch-consume", async (req, res) => {
     try {
