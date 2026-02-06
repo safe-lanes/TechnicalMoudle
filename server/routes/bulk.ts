@@ -2367,8 +2367,8 @@ function getTypeFromSheetName(sheetName: string): string | null {
   const normalizedName = sheetName.toLowerCase().trim();
   
   // Direct matches - Fleet_ prefixed must come BEFORE generic checks
-  if (normalizedName === 'fleet_component' || normalizedName === 'fleet component') return 'fleet-components';
-  if (normalizedName === 'fleet_job' || normalizedName === 'fleet job') return 'fleet-jobs';
+  if (normalizedName === 'fleet_component' || normalizedName === 'fleet component' || (normalizedName.includes('fleet') && normalizedName.includes('component'))) return 'fleet-components';
+  if (normalizedName === 'fleet_job' || normalizedName === 'fleet job' || (normalizedName.includes('fleet') && normalizedName.includes('job'))) return 'fleet-jobs';
   if (normalizedName === 'spares' || normalizedName.includes('spare')) return 'spares';
   if (normalizedName === 'components' || normalizedName.includes('component') || normalizedName.includes('machinery')) return 'components';
   if (normalizedName === 'vessel_job' || normalizedName === 'vessel job') return 'jobs';
