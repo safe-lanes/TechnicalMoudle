@@ -1,0 +1,106 @@
+Prompt for Replit — Plan Module-wise Refactor from Existing Structure
+
+Analyse the current existing backend and frontend structure and prepare a step-by-step plan to refactor it into a module-wise RESTful architecture, starting only with:
+
+Component Bulk Upload → Component Module fetch & usage
+
+Scope of Planning (STRICT)
+
+The plan must focus only on introducing the following from the existing structure:
+
+1️⃣ Mandatory Folder Structure
+4️⃣ Repository Layer Rules
+5️⃣ Service Layer Rules
+6️⃣ Controller Layer Rules
+7️⃣ RESTful Route Patterns
+8️⃣ Frontend API Layer Rules
+
+Do not plan or modify unrelated modules.
+
+🔍 Analysis Requirements
+
+First, analyse and document:
+
+How component bulk upload is currently handled
+
+Where component data is:
+
+Parsed
+
+Validated
+
+Inserted
+
+Post-processed
+
+How the component module currently fetches and displays this data
+
+What responsibilities are currently mixed (route + logic + DB)
+
+🧱 Refactor Planning Requirements
+
+Prepare a clear phased plan that explains:
+
+Phase 1 — Structural Separation
+
+How to introduce a module folder for components without breaking existing flows
+
+How to move DB-query logic into a repository layer
+
+How to isolate business rules into a service layer
+
+How controllers will orchestrate requests
+
+Phase 2 — Bulk Upload Alignment
+
+How bulk upload logic will:
+
+Call the service layer
+
+Reuse repository methods
+
+Avoid direct DB access
+
+How post-upload effects (if any) will be handled consistently
+
+Phase 3 — REST Exposure
+
+How component fetch APIs will follow RESTful patterns
+
+How routes will map cleanly to controllers
+
+How UUIDs / identifiers are preserved from current logic
+
+Phase 4 — Frontend Integration
+
+How frontend component screens will:
+
+Stop calling legacy APIs
+
+Use a module-specific API file
+
+Consume only RESTful endpoints
+
+How this change remains backward-compatible initially
+
+🚫 Explicit Constraints
+
+This is planning only, not coding
+
+Do not redesign database schema
+
+Do not change business logic outcomes
+
+Do not refactor other modules
+
+Keep existing functionality intact throughout the plan
+
+📦 Expected Output
+
+A clear step-by-step refactor plan
+
+Mapping of current logic → target layer
+
+Identification of safe migration points
+
+Risks and ordering to avoid regressions
