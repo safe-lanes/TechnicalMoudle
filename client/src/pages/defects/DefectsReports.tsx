@@ -178,8 +178,7 @@ export default function DefectsReports() {
         </div>
       </div>
 
-      <div className="bg-white border border-gray-200 rounded-lg p-4">
-        <h2 className="text-sm font-semibold text-gray-700 mb-3">Report Filters</h2>
+      <div>
         <div className="grid grid-cols-5 gap-3">
           <div>
             <Label className="text-xs">Vessel</Label>
