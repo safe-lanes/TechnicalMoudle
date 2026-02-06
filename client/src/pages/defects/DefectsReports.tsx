@@ -326,7 +326,6 @@ export default function DefectsReports() {
       </div>
 
       <div>
-        <h2 className="text-sm font-semibold text-gray-700 mb-3">Select Report</h2>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           {reportConfigs.map((report) => {
             const Icon = report.icon;
