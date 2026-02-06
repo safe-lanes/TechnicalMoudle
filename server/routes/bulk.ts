@@ -3588,46 +3588,52 @@ async function validateData(type: string, data: any[], mode: string, vesselId?: 
         normalized['Fleet Equipment Name'] = String(fleetEquipmentName).trim();
       }
       
-      // Parent Fleet Equipment Code - optional
-      if (row['Parent Fleet Equipment Code'] !== undefined && row['Parent Fleet Equipment Code'] !== null && String(row['Parent Fleet Equipment Code']).trim() !== '') {
-        normalized['Parent Fleet Equipment Code'] = String(row['Parent Fleet Equipment Code']).trim();
+      // Parent Fleet Equipment Code - required
+      const parentFleetEquipmentCode = row['Parent Fleet Equipment Code'];
+      if (parentFleetEquipmentCode === undefined || parentFleetEquipmentCode === null || String(parentFleetEquipmentCode).trim() === '') {
+        errors.push(`Row ${rowNum}: Parent Fleet Equipment Code is required`);
       } else {
-        normalized['Parent Fleet Equipment Code'] = null;
+        normalized['Parent Fleet Equipment Code'] = String(parentFleetEquipmentCode).trim();
       }
       
-      // Component Category - optional
-      if (row['Component Category'] !== undefined && row['Component Category'] !== null && String(row['Component Category']).trim() !== '') {
-        normalized['Component Category'] = String(row['Component Category']).trim();
+      // Component Category - required
+      const componentCategory = row['Component Category'];
+      if (componentCategory === undefined || componentCategory === null || String(componentCategory).trim() === '') {
+        errors.push(`Row ${rowNum}: Component Category is required`);
       } else {
-        normalized['Component Category'] = null;
+        normalized['Component Category'] = String(componentCategory).trim();
       }
       
-      // Maker Name - optional
-      if (row['Maker Name'] !== undefined && row['Maker Name'] !== null && String(row['Maker Name']).trim() !== '') {
-        normalized['Maker Name'] = String(row['Maker Name']).trim();
+      // Maker Name - required
+      const makerName = row['Maker Name'];
+      if (makerName === undefined || makerName === null || String(makerName).trim() === '') {
+        errors.push(`Row ${rowNum}: Maker Name is required`);
       } else {
-        normalized['Maker Name'] = null;
+        normalized['Maker Name'] = String(makerName).trim();
       }
       
-      // Maker Code - optional
-      if (row['Maker Code'] !== undefined && row['Maker Code'] !== null && String(row['Maker Code']).trim() !== '') {
-        normalized['Maker Code'] = String(row['Maker Code']).trim();
+      // Maker Code - required
+      const makerCode = row['Maker Code'];
+      if (makerCode === undefined || makerCode === null || String(makerCode).trim() === '') {
+        errors.push(`Row ${rowNum}: Maker Code is required`);
       } else {
-        normalized['Maker Code'] = null;
+        normalized['Maker Code'] = String(makerCode).trim();
       }
       
-      // Model - optional
-      if (row['Model'] !== undefined && row['Model'] !== null && String(row['Model']).trim() !== '') {
-        normalized['Model'] = String(row['Model']).trim();
+      // Model - required
+      const model = row['Model'];
+      if (model === undefined || model === null || String(model).trim() === '') {
+        errors.push(`Row ${rowNum}: Model is required`);
       } else {
-        normalized['Model'] = null;
+        normalized['Model'] = String(model).trim();
       }
       
-      // Model Code - optional
-      if (row['Model Code'] !== undefined && row['Model Code'] !== null && String(row['Model Code']).trim() !== '') {
-        normalized['Model Code'] = String(row['Model Code']).trim();
+      // Model Code - required
+      const modelCode = row['Model Code'];
+      if (modelCode === undefined || modelCode === null || String(modelCode).trim() === '') {
+        errors.push(`Row ${rowNum}: Model Code is required`);
       } else {
-        normalized['Model Code'] = null;
+        normalized['Model Code'] = String(modelCode).trim();
       }
       
       // Location - optional
@@ -3644,11 +3650,12 @@ async function validateData(type: string, data: any[], mode: string, vesselId?: 
         normalized['Rating'] = null;
       }
       
-      // Eqpt / System Department - optional
-      if (row['Eqpt / System Department'] !== undefined && row['Eqpt / System Department'] !== null && String(row['Eqpt / System Department']).trim() !== '') {
-        normalized['Eqpt / System Department'] = String(row['Eqpt / System Department']).trim();
+      // Eqpt / System Department - required
+      const eqptSystemDept = row['Eqpt / System Department'];
+      if (eqptSystemDept === undefined || eqptSystemDept === null || String(eqptSystemDept).trim() === '') {
+        errors.push(`Row ${rowNum}: Eqpt / System Department is required`);
       } else {
-        normalized['Eqpt / System Department'] = null;
+        normalized['Eqpt / System Department'] = String(eqptSystemDept).trim();
       }
       
       // Notes - optional
@@ -3658,16 +3665,17 @@ async function validateData(type: string, data: any[], mode: string, vesselId?: 
         normalized['Notes'] = null;
       }
       
-      // IS Active - optional yes/no (defaults to Yes), case-insensitive parsing
-      if (row['IS Active'] !== undefined && row['IS Active'] !== null && String(row['IS Active']).trim() !== '') {
-        const value = String(row['IS Active']).toLowerCase().trim();
+      // IS Active - required yes/no, case-insensitive parsing
+      const isActiveValue = row['IS Active'];
+      if (isActiveValue === undefined || isActiveValue === null || String(isActiveValue).trim() === '') {
+        errors.push(`Row ${rowNum}: IS Active is required (Yes or No)`);
+      } else {
+        const value = String(isActiveValue).toLowerCase().trim();
         if (!['yes', 'no', 'y', 'n', 'true', 'false', '1', '0'].includes(value)) {
           errors.push(`Row ${rowNum}: IS Active must be Yes or No`);
         } else {
           normalized['IS Active'] = ['yes', 'y', 'true', '1'].includes(value);
         }
-      } else {
-        normalized['IS Active'] = true; // Default to active
       }
     }
 
