@@ -385,6 +385,23 @@ const SparesReports: React.FC<SparesReportsProps> = ({ onBack, globalFilters }) 
           title: "Report Generated",
           description: `${format} report downloaded successfully!`,
         });
+      } else if (format === 'Excel' && reportId === 'spares-low-stock') {
+        const body: Record<string, string> = {};
+        const response = await fetch(`/technical/api/reports/low-stock-alert/${effectiveVesselId}/excel`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify(body),
+        });
+        if (!response.ok) throw new Error('Failed to generate Excel');
+        const blob = await response.blob();
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = `low-stock-alert-report-${new Date().toISOString().slice(0, 10)}.xlsx`;
+        link.click();
+        URL.revokeObjectURL(url);
+        toast({ title: "Report Generated", description: "Excel report downloaded successfully!" });
       } else {
         toast({
           title: "Excel Export",
