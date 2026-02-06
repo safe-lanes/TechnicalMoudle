@@ -1860,6 +1860,58 @@ export type InsertFleetComponents = z.infer<typeof insertFleetComponentsSchema>;
 export type FleetComponents = typeof fleetComponents.$inferSelect;
 
 // =====================================================
+// FLEET JOBS - Fleet-level job master data
+// Stores fleet-wide job templates imported via Bulk Data Import
+// Distinct from vessel-level `jobs` table which holds vessel-specific instances
+// =====================================================
+export const fleetJobs = pgTable("fleet_jobs", {
+  id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
+  fleetJobsUuid: text("fleet_jobs_uuid").default(sql`gen_random_uuid()`),
+  jobCode: text("job_code").notNull().unique(),
+  fleetEquipmentCode: text("fleet_equipment_code").notNull(),
+  fleetEquipmentName: text("fleet_equipment_name").notNull(),
+  woTitle: text("wo_title").notNull(),
+  maintenanceBasis: text("maintenance_basis"),
+  intervalValue: text("interval_value"),
+  unit: text("unit"),
+  taskType: text("task_type").notNull(),
+  assignedTo: text("assigned_to").notNull(),
+  approver: text("approver").notNull(),
+  jobPriority: text("job_priority").notNull(),
+  classRelated: text("class_related").notNull(),
+  briefWorkDescription: text("brief_work_description").notNull(),
+  department: text("department").notNull(),
+  criticality: text("criticality").notNull(),
+  isActive: boolean("is_active").notNull().default(true),
+  requiredSpareParts: json("required_spare_parts").default([]),
+  requiredTools: json("required_tools").default([]),
+  ppeRequirements: text("ppe_requirements"),
+  permitRequirements: text("permit_requirements"),
+  otherSafetyRequirements: text("other_safety_requirements"),
+  sortOrder: integer("sort_order").default(0),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  createdByUuid: text("created_by_uuid"),
+  updatedByUuid: text("updated_by_uuid"),
+  isDeleted: boolean("is_deleted").default(false),
+  isSync: boolean("is_sync").default(false),
+}, (table) => ({
+  jobCodeIdx: index("idx_fleet_jobs_code").on(table.jobCode),
+  fleetEquipmentCodeIdx: index("idx_fleet_jobs_equipment").on(table.fleetEquipmentCode),
+  fleetJobsUuidIdx: index("idx_fleet_jobs_uuid").on(table.fleetJobsUuid),
+}));
+
+export const insertFleetJobsSchema = createInsertSchema(fleetJobs).omit({
+  id: true,
+  fleetJobsUuid: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type InsertFleetJobs = z.infer<typeof insertFleetJobsSchema>;
+export type FleetJobs = typeof fleetJobs.$inferSelect;
+
+// =====================================================
 // SFI DETAILS - SFI Code lookup table
 // Used for standardizing component codes across fleet
 // =====================================================
