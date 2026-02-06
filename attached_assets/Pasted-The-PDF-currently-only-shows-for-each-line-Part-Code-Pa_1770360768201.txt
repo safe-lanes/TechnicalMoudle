@@ -1,0 +1,122 @@
+The PDF currently only shows, for each line:
+​
+
+Part Code, Part Name, Component, ROB, Min, Shortage, Status (Low / At Min)
+
+So:
+
+The data set is consistent, but
+
+The field selection and grouping logic differ between the web/Excel export and the print/PDF export.
+
+Likely issues in your current implementation
+From the two files, the main implementation problems appear to be:
+
+Excel export is using an analytics-focused model (Severity, Criticality, Priority Score, Value at Risk), while the PDF renderer is using a simple operational model (just ROB, Min, Status).
+
+“Low” / “Critical” in Excel is driven by Severity + Criticality + Priority Score, while in PDF it is likely driven only by ROB vs Min, which leads to different counts in “Low / Critical / At Min” buckets.
+
+The total counts in the PDF summary (1517 Low Stock Items, 1080 Critical, 437 At Min) are not transparently traceable from the Excel, making it hard for the vessel to reconcile.
+
+Prompt for Replit to align and fix
+You can paste this directly into Replit (TechnicalMoudle_06jan26) as a task description for LowStockAlertReport.tsx and backend route:
+
+Task: Align Low Stock Alert PDF and Excel outputs with unified logic
+
+Context:
+
+We have two generated reports for the same “Low Stock Alert” for Vessel 4 dated 06 Feb 2026.
+
+low-stock-alert-report-2026-02-06.xlsx shows an enriched analytics table with the following columns:
+
+Part Code, Part Name, Component, Severity, Criticality, Current Qty, Min Qty, Shortage, Shortage %, Unit Cost, Value at Risk, Avg Daily Use, Lead Time, Reorder Qty, Supplier, Last Ordered, Location, Priority Score.
+​
+
+Vessel-4_Low_Stock_Alert_Report_20260206_1214.pdf shows a simplified table with:
+
+Part Code, Part Name, Component, ROB, Min, Shortage, Status (Low / At Min) and a header summary with “Low Stock Items”, “Critical”, “At Minimum”.
+​
+
+Both files are based on the same underlying stock data but they use different field sets and apparently different severity/priority logic.
+
+Requirements:
+
+Single data model for low stock alerts
+
+Create a unified TypeScript interface, e.g. LowStockAlertRow, used by:
+
+The backend API that fetches low stock items.
+
+The Excel export service.
+
+The PDF/print renderer (LowStockAlertReport.tsx).
+
+This model should include at minimum:
+
+partCode, partName, component, rob (currentQty), minQty, shortage, shortagePercent, severity, criticality, priorityScore, unitCost, valueAtRisk, avgDailyUse, leadTimeDays, reorderQty, supplier, lastOrderedAt, location.
+​
+
+Consistent severity and status rules
+
+Implement a single function, e.g. getLowStockSeverity(row: LowStockAlertRow) in a shared businessRules.ts:
+
+If rob < minQty and criticality === 'Critical' → severity = 'Critical', status = 'Low'.
+
+If rob < minQty and criticality !== 'Critical' → severity = 'Warning', status = 'Low'.
+
+If rob === minQty → severity = 'Warning', status = 'At Min'.
+
+If rob > minQty → item should not appear in the Low Stock report.
+
+Use this same function both for:
+
+Computing the “Critical / At Minimum / other buckets” in the summary.
+
+Setting the Status field in the PDF table.
+
+Align PDF columns with blueprint
+
+Keep the PDF layout concise, but use the same source data:
+
+At minimum show: Part Code, Part Name, Component, ROB, Min, Shortage, Status, Severity, Criticality, Priority Score.
+
+Optionally, add a second page/section for “analytics” fields (Value at Risk, Lead Time, Reorder Qty, Supplier).
+
+Ensure the header summary counts (“Low Stock Items”, “Critical”, “At Minimum”) are calculated directly from the same LowStockAlertRow[] array that is passed to the Excel export, so Excel and PDF totals always match.
+
+Backend changes
+
+In the low stock backend route/service:
+
+Filter items where rob <= minQty.
+
+Map raw inventory records to LowStockAlertRow.
+
+Compute shortage = Math.max(minQty - rob, 0) and shortagePercent where minQty > 0.
+​
+
+Attach severity, status, and priorityScore using the shared rules.
+
+Testing
+
+Add a test case using the attached sample data for Vessel 4 (the same that produced low-stock-alert-report-2026-02-06.xlsx and Vessel-4_Low_Stock_Alert_Report_20260206_1214.pdf).
+
+Verify that:
+
+The number of rows in PDF equals the number in Excel for the same filter (Vessel 4, same date/time).
+
+Summary counts in PDF match the aggregated counts from Excel for:
+
+Total low stock items.
+
+Items with severity = 'Critical'.
+
+Items with status = 'At Min'.
+
+UX clarification
+
+Clearly label in the UI:
+
+“Low Stock Alert – Analytics (Excel)” when the user downloads the enriched Excel.
+
+“Low Stock Alert – Operational (PDF)” for the compact ROB/Min/Status view, but both should use the same underlying data model and classification logic.
