@@ -3,19 +3,19 @@ import UniformBulkUpload from "@/components/admin/UniformBulkUpload";
 import { queryClient } from "@/lib/queryClient";
 
 const FIELD_MAPPINGS = [
-  { field: "Parent Fleet Equipment Code", required: true, description: "Parent component code for hierarchy - Required" },
+  { field: "Parent Fleet Equipment Code", required: false, description: "Parent component code for hierarchy" },
   { field: "Fleet Equipment Code", required: true, description: "Unique code (e.g., 601.002.01) - Required" },
   { field: "Fleet Equipment Name", required: true, description: "Equipment name - Required" },
-  { field: "Component Category", required: true, description: "Component category from Master List - Required" },
-  { field: "Maker Name", required: true, description: "Manufacturer name - Required" },
-  { field: "Maker Code", required: true, description: "Manufacturer code - Required" },
-  { field: "Model", required: true, description: "Equipment model - Required" },
-  { field: "Model Code", required: true, description: "Model code - Required" },
+  { field: "Component Category", required: false, description: "Component category from Master List" },
+  { field: "Maker Name", required: false, description: "Manufacturer name" },
+  { field: "Maker Code", required: false, description: "Manufacturer code" },
+  { field: "Model", required: false, description: "Equipment model" },
+  { field: "Model Code", required: false, description: "Model code" },
   { field: "Location", required: false, description: "Installation location" },
   { field: "Rating", required: false, description: "Power/capacity rating" },
-  { field: "Eqpt / System Department", required: true, description: "Department responsible - Required" },
+  { field: "Eqpt / System Department", required: false, description: "Department responsible" },
   { field: "Notes", required: false, description: "Additional notes" },
-  { field: "IS Active", required: true, description: "Yes/No - defaults to Yes - Required" },
+  { field: "IS Active", required: false, description: "Yes/No - defaults to Yes" },
 ];
 
 export default function FleetComponentUpload() {
