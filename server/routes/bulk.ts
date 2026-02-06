@@ -6217,6 +6217,44 @@ router.post('/undo/:historyId', async (req, res) => {
 // MAKER LIST CRUD API ENDPOINTS
 // =====================================================
 
+// Export makers to Excel
+router.get('/makers/export', async (req, res) => {
+  try {
+    const makers = await storage.getMakerList();
+
+    const headers = ['Maker Code', 'Maker Name', 'Address', 'Address ID', 'Contact Person', 'Email', 'Phone', 'IS Active'];
+
+    const rows = makers.map((m: any) => [
+      m.makerCode || '',
+      m.makerName || '',
+      m.address || '',
+      m.addressId || '',
+      m.contactPerson || '',
+      m.email || '',
+      m.phone || '',
+      m.isActive === false ? 'No' : 'Yes',
+    ]);
+
+    const wsData = [headers, ...rows];
+    const ws = XLSX.utils.aoa_to_sheet(wsData);
+
+    const colWidths = [18, 40, 35, 15, 25, 30, 20, 10];
+    ws['!cols'] = colWidths.map(w => ({ wch: w }));
+
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Maker List');
+
+    const buffer = XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' });
+
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.setHeader('Content-Disposition', `attachment; filename=maker-list-${new Date().toISOString().split('T')[0]}.xlsx`);
+    res.send(buffer);
+  } catch (error: any) {
+    console.error('Error exporting makers:', error);
+    res.status(500).json({ error: 'Failed to export makers' });
+  }
+});
+
 // Get all makers
 router.get('/makers', async (req, res) => {
   try {

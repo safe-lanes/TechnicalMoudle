@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
-import { Plus, Search, Pencil, Trash2 } from "lucide-react";
+import { Plus, Search, Pencil, Trash2, Download } from "lucide-react";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import MakerForm from "./MakerForm";
@@ -79,6 +79,31 @@ export default function MakerManagement() {
     }
   };
 
+  const handleExport = async () => {
+    try {
+      const response = await fetch('/technical/api/fleet/makers/export');
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `maker-list-${new Date().toISOString().split('T')[0]}.xlsx`;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+      toast({
+        title: "Success",
+        description: "Maker list exported successfully",
+      });
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to export maker list",
+        variant: "destructive",
+      });
+    }
+  };
+
   return (
     <div className="min-h-screen bg-gray-50 p-4 flex flex-col">
       <div className="flex-1 flex flex-col">
@@ -99,6 +124,15 @@ export default function MakerManagement() {
                   />
                   <Marker id="I4.QL.1.11" />
                 </div>
+                <Button
+                  variant="outline"
+                  onClick={handleExport}
+                  className="whitespace-nowrap"
+                  data-testid="button-export-makers"
+                >
+                  <Download className="mr-2 h-4 w-4" />
+                  Export
+                </Button>
                 <Button
                   onClick={handleAddNew}
                   className="whitespace-nowrap"
