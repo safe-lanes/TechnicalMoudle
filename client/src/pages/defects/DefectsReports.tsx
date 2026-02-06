@@ -9,7 +9,7 @@ import { BarChart3, PieChart, TrendingUp, FileSpreadsheet, FileText, FileDown, P
 import { apiRequest } from "@/lib/queryClient";
 import { cn } from "@/lib/utils";
 
-const COMING_SOON = true;
+const COMING_SOON = false;
 
 interface ReportFilter {
   vesselId?: string;
