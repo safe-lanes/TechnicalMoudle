@@ -7085,20 +7085,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       ];
 
       const totalColumns = columns.length;
+      const lastColLetter = getLastColumnLetter(totalColumns);
 
-      const summaryItems: SummaryItem[] = [
-        { label: 'Report', value: 'Low Stock Alert Report' },
-        { label: 'Vessel', value: vesselName },
-        { label: 'Generated', value: new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) },
-        { label: 'Total Alerts', value: String(items.length) },
-        { label: 'Critical', value: String(criticalCount) },
-        { label: 'Warning', value: String(warningCount) },
-        { label: 'Total Value at Risk', value: `$${Math.round(totalValueAtRisk).toLocaleString()}` },
-      ];
+      const subtitle = `Critical: ${criticalCount} | Warning: ${warningCount} | Value at Risk: $${Math.round(totalValueAtRisk).toLocaleString()}`;
+      applyStandardHeader(worksheet, 'LOW STOCK ALERT REPORT', subtitle, vesselName, items.length, lastColLetter);
 
-      const lastSummaryRow = applyStandardHeader(worksheet, 'Low Stock Alert Report', vesselName, summaryItems, totalColumns);
-      const headerRowNum = lastSummaryRow + 2;
-
+      const headerRowNum = 7;
       applyStandardTableHeader(worksheet, columns, headerRowNum);
 
       const severityBgColors: Record<string, string> = {
@@ -7154,7 +7146,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         to: { row: headerRowNum, column: totalColumns }
       };
 
-      applyStandardPageSetup(worksheet, headerRowNum, totalColumns, lastSummaryRow, vesselName);
+      applyStandardPageSetup(worksheet, headerRowNum, totalColumns, 6, vesselName);
 
       const buffer = await workbook.xlsx.writeBuffer();
       const filename = generateFilename('LowStockAlerts', vesselName);
