@@ -521,12 +521,6 @@ export interface IStorage {
   bulkUpdateWorkOrders(workOrders: Array<{ templateCode: string; data: Partial<WorkOrder> }>): Promise<WorkOrder[]>;
   bulkUpsertWorkOrders(workOrders: InsertWorkOrder[]): Promise<{ created: number; updated: number }>;
   
-  // Fleet Jobs methods
-  getFleetJobs(): Promise<Job[]>;
-  getFleetJob(id: string): Promise<Job | undefined>;
-  createFleetJob(job: InsertJob): Promise<Job>;
-  updateFleetJob(id: string, data: Partial<Job>): Promise<Job>;
-  deleteFleetJob(id: string): Promise<void>;
   
   // Work Order Execution methods
   getWorkOrderExecutions(componentId: string): Promise<WorkOrderExecution[]>;

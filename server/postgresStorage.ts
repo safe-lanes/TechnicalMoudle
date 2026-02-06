@@ -1782,42 +1782,6 @@ export class PostgresStorage {
     return map;
   }
 
-  // Fleet Jobs
-  async getFleetJobs(): Promise<Job[]> {
-    const db = await getDb();
-    return await db.select().from(jobs)
-      .where(eq(jobs.dataScope, 'fleet'))
-      .orderBy(asc(jobs.jobNo));
-  }
-
-  async getFleetJob(id: string): Promise<Job | undefined> {
-    const db = await getDb();
-    const result = await db.select().from(jobs)
-      .where(and(
-        eq(jobs.id, id),
-        eq(jobs.dataScope, 'fleet')
-      ));
-    return result[0];
-  }
-
-  async createFleetJob(job: InsertJob): Promise<Job> {
-    const db = await getDb();
-    const id = `FJ-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-    const result = await db.insert(jobs).values({
-      ...job,
-      id,
-      dataScope: 'fleet',
-    }).returning();
-    return result[0];
-  }
-
-  async updateFleetJob(id: string, data: Partial<InsertJob>): Promise<Job> {
-    return this.updateJob(id, data);
-  }
-
-  async deleteFleetJob(id: string): Promise<void> {
-    return this.deleteJob(id);
-  }
 
   // ============= MODULE 5: WORK ORDERS =============
 
