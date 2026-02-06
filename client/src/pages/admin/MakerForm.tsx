@@ -7,6 +7,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
@@ -256,6 +257,21 @@ export default function MakerForm({ open, onOpenChange, maker }: MakerFormProps)
               data-testid={isEditMode ? "I4.QL.1.24.16" : "I4.QL.1.12.16"}
             />
             {isEditMode ? <Marker id="I4.QL.1.24.16" /> : <Marker id="I4.QL.1.12.16" />}
+          </div>
+
+          {/* IS Active */}
+          <div className="flex items-center justify-between">
+            <Label htmlFor="isActive" data-testid={isEditMode ? "I4.QL.1.24.19" : "I4.QL.1.12.19"}>
+              {isEditMode ? <Marker id="I4.QL.1.24.19" /> : <Marker id="I4.QL.1.12.19" />}
+              IS Active
+            </Label>
+            <Switch
+              id="isActive"
+              checked={form.watch("isActive") ?? true}
+              onCheckedChange={(checked) => form.setValue("isActive", checked)}
+              data-testid={isEditMode ? "I4.QL.1.24.20" : "I4.QL.1.12.20"}
+            />
+            {isEditMode ? <Marker id="I4.QL.1.24.20" /> : <Marker id="I4.QL.1.12.20" />}
           </div>
 
           <DialogFooter>
