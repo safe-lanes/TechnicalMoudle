@@ -4481,6 +4481,483 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // ═══════════════════════════════════════════════════════════════
+  // REPORT 1.4: CRITICAL SPARES REPORT - PREVIEW API
+  // Returns JSON preview of critical and essential spare parts inventory
+  // ═══════════════════════════════════════════════════════════════
+  app.get("/technical/api/reports/critical-spares/preview", async (req, res) => {
+    try {
+      const vesselId = req.query.vesselId as string;
+      if (!vesselId) {
+        return res.status(400).json({ error: "vesselId is required" });
+      }
+
+      const criticalOnly = req.query.criticalOnly === 'true';
+      const stockStatusFilter = req.query.stockStatus
+        ? (Array.isArray(req.query.stockStatus) ? req.query.stockStatus as string[] : [req.query.stockStatus as string])
+        : null;
+      const departmentFilter = req.query.department as string | undefined;
+
+      const allVessels = await storage.getVessels();
+      const vessel = allVessels.find(v => v.id === vesselId);
+      const vesselName = vessel?.name || vesselId;
+
+      const sparesData = await storage.getSpares(vesselId);
+      const jobsData = await storage.getJobs(vesselId);
+      const componentsData = await storage.getComponents(vesselId);
+      const jobComponentLinks = await storage.getJobComponentLinks(vesselId);
+
+      const componentMap = new Map(componentsData.map(c => [c.id, c]));
+
+      const getStockStatus = (rob: number | null | undefined, min: number | null | undefined): string => {
+        const robVal = rob ?? 0;
+        if (robVal === 0) return 'ZERO';
+        if (min === null || min === undefined || min === 0) return 'NOT_SET';
+        if (robVal < min) return 'LOW';
+        return 'OK';
+      };
+
+      const getShortage = (rob: number | null | undefined, min: number | null | undefined): number => {
+        const robVal = rob ?? 0;
+        if (min === null || min === undefined || min === 0) return 0;
+        return Math.max(0, min - robVal);
+      };
+
+      const findRelatedJobs = (spare: any) => {
+        const related: any[] = [];
+        for (const job of jobsData) {
+          let reqParts = job.requiredSpareParts;
+          if (typeof reqParts === 'string') {
+            try { reqParts = JSON.parse(reqParts); } catch { reqParts = []; }
+          }
+          if (!Array.isArray(reqParts)) continue;
+          const match = reqParts.some((rp: any) =>
+            (rp.partCode && spare.partCode && rp.partCode === spare.partCode) ||
+            (rp.partName && spare.partName && rp.partName === spare.partName)
+          );
+          if (match) related.push(job);
+        }
+        return related;
+      };
+
+      const findCriticalComponents = (relatedJobs: any[]) => {
+        const critComps: string[] = [];
+        for (const job of relatedJobs) {
+          const links = jobComponentLinks.filter(l => l.jobId === job.id);
+          for (const link of links) {
+            const comp = componentMap.get(link.componentId);
+            if (comp && comp.critical === true) {
+              const label = comp.name || comp.componentCode || comp.id;
+              if (!critComps.includes(label)) critComps.push(label);
+            }
+          }
+        }
+        return critComps;
+      };
+
+      const getCriticality = (spare: any, relatedJobs: any[], criticalComponents: string[]): string => {
+        if (criticalComponents.length > 0) return 'CRITICAL';
+        const robVal = spare.rob ?? 0;
+        const minVal = spare.min ?? 0;
+        if (robVal === 0 || (minVal > 0 && robVal < minVal)) return 'ESSENTIAL';
+        return 'NORMAL';
+      };
+
+      const getRemarks = (stockStatus: string, criticalityLevel: string): string => {
+        if (criticalityLevel === 'CRITICAL' && stockStatus === 'ZERO') {
+          return 'CRITICAL - OUT OF STOCK - Immediate procurement required for critical equipment';
+        }
+        if (criticalityLevel === 'CRITICAL' && stockStatus === 'LOW') {
+          return 'CRITICAL - LOW STOCK - Urgent replenishment needed for critical equipment';
+        }
+        if (criticalityLevel === 'CRITICAL') {
+          return 'CRITICAL - Linked to critical equipment - monitor closely';
+        }
+        if (stockStatus === 'ZERO') {
+          return 'OUT OF STOCK - Procurement required';
+        }
+        if (stockStatus === 'LOW') {
+          return 'LOW STOCK - Replenishment recommended';
+        }
+        if (stockStatus === 'NOT_SET') {
+          return 'Minimum stock level not configured';
+        }
+        return 'Stock level adequate';
+      };
+
+      let reportRows = sparesData.map(spare => {
+        const robVal = spare.rob ?? 0;
+        const minVal = spare.min ?? null;
+        const stockStatus = getStockStatus(robVal, minVal);
+        const shortageQty = getShortage(robVal, minVal);
+        const relatedJobs = findRelatedJobs(spare);
+        const critComps = findCriticalComponents(relatedJobs);
+        const criticalityLevel = getCriticality(spare, relatedJobs, critComps);
+        const linkedToCritical = critComps.length > 0;
+
+        const departments = new Set<string>();
+        for (const job of relatedJobs) {
+          if (job.department) departments.add(job.department);
+        }
+        for (const compName of critComps) {
+          const comp = componentsData.find(c => (c.name || c.componentCode || c.id) === compName);
+          if (comp?.department) departments.add(comp.department);
+        }
+
+        return {
+          sNo: 0,
+          vesselName,
+          partCode: spare.partCode || '-',
+          partName: spare.partName || '-',
+          rob: robVal,
+          minStock: spare.min != null ? minVal : null,
+          stockStatus,
+          shortageQty,
+          criticalityLevel,
+          linkedToCriticalEquipment: linkedToCritical,
+          criticalComponents: critComps.join(', ') || '-',
+          relatedJobs: relatedJobs.map(j => j.jobNo || j.jobTitle || j.id).join(', ') || '-',
+          department: Array.from(departments).join(', ') || '-',
+          remarks: getRemarks(stockStatus, criticalityLevel),
+        };
+      });
+
+      if (criticalOnly) {
+        reportRows = reportRows.filter(r =>
+          r.stockStatus === 'ZERO' || r.stockStatus === 'LOW' || r.criticalityLevel === 'CRITICAL'
+        );
+      }
+      if (stockStatusFilter && stockStatusFilter.length > 0) {
+        reportRows = reportRows.filter(r => stockStatusFilter.includes(r.stockStatus));
+      }
+      if (departmentFilter) {
+        reportRows = reportRows.filter(r => r.department.toLowerCase().includes(departmentFilter.toLowerCase()));
+      }
+
+      const statusOrder: Record<string, number> = { 'ZERO': 0, 'LOW': 1, 'OK': 2, 'NOT_SET': 3 };
+      const critOrder: Record<string, number> = { 'CRITICAL': 0, 'ESSENTIAL': 1, 'NORMAL': 2 };
+      reportRows.sort((a, b) => {
+        const sA = statusOrder[a.stockStatus] ?? 99;
+        const sB = statusOrder[b.stockStatus] ?? 99;
+        if (sA !== sB) return sA - sB;
+        const cA = critOrder[a.criticalityLevel] ?? 99;
+        const cB = critOrder[b.criticalityLevel] ?? 99;
+        if (cA !== cB) return cA - cB;
+        if (b.shortageQty !== a.shortageQty) return b.shortageQty - a.shortageQty;
+        return (a.partCode || '').localeCompare(b.partCode || '');
+      });
+
+      reportRows.forEach((r, i) => { r.sNo = i + 1; });
+
+      const totalCritical = reportRows.filter(r => r.criticalityLevel === 'CRITICAL').length;
+      const totalZeroStock = reportRows.filter(r => r.stockStatus === 'ZERO').length;
+      const totalLowStock = reportRows.filter(r => r.stockStatus === 'LOW').length;
+      const totalShortage = reportRows.reduce((sum, r) => sum + r.shortageQty, 0);
+
+      const byStatus: Record<string, number> = {};
+      const byCriticality: Record<string, number> = {};
+      reportRows.forEach(r => {
+        byStatus[r.stockStatus] = (byStatus[r.stockStatus] || 0) + 1;
+        byCriticality[r.criticalityLevel] = (byCriticality[r.criticalityLevel] || 0) + 1;
+      });
+
+      res.json({
+        success: true,
+        reportMeta: {
+          reportType: 'CRITICAL_SPARES',
+          vesselId,
+          vesselName,
+          generatedAt: new Date().toISOString(),
+          totalSpares: reportRows.length,
+          totalCritical,
+          totalZeroStock,
+          totalLowStock,
+        },
+        data: reportRows,
+        summary: {
+          byStatus,
+          byCriticality,
+          totalShortage,
+        },
+      });
+    } catch (error: any) {
+      console.error('Error generating critical spares preview:', error);
+      res.status(500).json({
+        success: false,
+        error: error.message || 'Failed to generate critical spares report'
+      });
+    }
+  });
+
+  // ═══════════════════════════════════════════════════════════════
+  // REPORT 1.4: CRITICAL SPARES REPORT - EXCEL EXPORT
+  // Generates Excel file with critical and essential spare parts inventory
+  // ═══════════════════════════════════════════════════════════════
+  app.post("/technical/api/reports/critical-spares", async (req, res) => {
+    try {
+      const { vesselId, filters } = req.body;
+
+      if (!vesselId) {
+        return res.status(400).json({ error: "Please select a vessel" });
+      }
+
+      const criticalOnly = filters?.criticalOnly === true;
+      const stockStatusFilter: string[] | null = filters?.stockStatus && Array.isArray(filters.stockStatus) && filters.stockStatus.length > 0 ? filters.stockStatus : null;
+      const departmentFilter: string | undefined = filters?.department || undefined;
+
+      const allVessels = await storage.getVessels();
+      const vessel = allVessels.find(v => v.id === vesselId);
+      const vesselName = vessel?.name || vesselId;
+
+      const sparesData = await storage.getSpares(vesselId);
+      const jobsData = await storage.getJobs(vesselId);
+      const componentsData = await storage.getComponents(vesselId);
+      const jobComponentLinks = await storage.getJobComponentLinks(vesselId);
+
+      const componentMap = new Map(componentsData.map(c => [c.id, c]));
+
+      const getStockStatus = (rob: number | null | undefined, min: number | null | undefined): string => {
+        const robVal = rob ?? 0;
+        if (robVal === 0) return 'ZERO';
+        if (min === null || min === undefined || min === 0) return 'NOT_SET';
+        if (robVal < min) return 'LOW';
+        return 'OK';
+      };
+
+      const getShortage = (rob: number | null | undefined, min: number | null | undefined): number => {
+        const robVal = rob ?? 0;
+        if (min === null || min === undefined || min === 0) return 0;
+        return Math.max(0, min - robVal);
+      };
+
+      const findRelatedJobs = (spare: any) => {
+        const related: any[] = [];
+        for (const job of jobsData) {
+          let reqParts = job.requiredSpareParts;
+          if (typeof reqParts === 'string') {
+            try { reqParts = JSON.parse(reqParts); } catch { reqParts = []; }
+          }
+          if (!Array.isArray(reqParts)) continue;
+          const match = reqParts.some((rp: any) =>
+            (rp.partCode && spare.partCode && rp.partCode === spare.partCode) ||
+            (rp.partName && spare.partName && rp.partName === spare.partName)
+          );
+          if (match) related.push(job);
+        }
+        return related;
+      };
+
+      const findCriticalComponents = (relatedJobs: any[]) => {
+        const critComps: string[] = [];
+        for (const job of relatedJobs) {
+          const links = jobComponentLinks.filter(l => l.jobId === job.id);
+          for (const link of links) {
+            const comp = componentMap.get(link.componentId);
+            if (comp && comp.critical === true) {
+              const label = comp.name || comp.componentCode || comp.id;
+              if (!critComps.includes(label)) critComps.push(label);
+            }
+          }
+        }
+        return critComps;
+      };
+
+      const getCriticality = (spare: any, relatedJobs: any[], criticalComponents: string[]): string => {
+        if (criticalComponents.length > 0) return 'CRITICAL';
+        const robVal = spare.rob ?? 0;
+        const minVal = spare.min ?? 0;
+        if (robVal === 0 || (minVal > 0 && robVal < minVal)) return 'ESSENTIAL';
+        return 'NORMAL';
+      };
+
+      const getRemarks = (stockStatus: string, criticalityLevel: string): string => {
+        if (criticalityLevel === 'CRITICAL' && stockStatus === 'ZERO') {
+          return 'CRITICAL - OUT OF STOCK - Immediate procurement required for critical equipment';
+        }
+        if (criticalityLevel === 'CRITICAL' && stockStatus === 'LOW') {
+          return 'CRITICAL - LOW STOCK - Urgent replenishment needed for critical equipment';
+        }
+        if (criticalityLevel === 'CRITICAL') {
+          return 'CRITICAL - Linked to critical equipment - monitor closely';
+        }
+        if (stockStatus === 'ZERO') {
+          return 'OUT OF STOCK - Procurement required';
+        }
+        if (stockStatus === 'LOW') {
+          return 'LOW STOCK - Replenishment recommended';
+        }
+        if (stockStatus === 'NOT_SET') {
+          return 'Minimum stock level not configured';
+        }
+        return 'Stock level adequate';
+      };
+
+      let reportRows = sparesData.map(spare => {
+        const robVal = spare.rob ?? 0;
+        const minVal = spare.min ?? null;
+        const stockStatus = getStockStatus(robVal, minVal);
+        const shortageQty = getShortage(robVal, minVal);
+        const relatedJobs = findRelatedJobs(spare);
+        const critComps = findCriticalComponents(relatedJobs);
+        const criticalityLevel = getCriticality(spare, relatedJobs, critComps);
+        const linkedToCritical = critComps.length > 0;
+
+        const departments = new Set<string>();
+        for (const job of relatedJobs) {
+          if (job.department) departments.add(job.department);
+        }
+        for (const compName of critComps) {
+          const comp = componentsData.find(c => (c.name || c.componentCode || c.id) === compName);
+          if (comp?.department) departments.add(comp.department);
+        }
+
+        return {
+          sNo: 0,
+          vesselName,
+          partCode: spare.partCode || '-',
+          partName: spare.partName || '-',
+          rob: robVal,
+          minStock: spare.min != null ? minVal : null,
+          stockStatus,
+          shortageQty,
+          criticalityLevel,
+          criticalEquipment: linkedToCritical ? 'YES' : 'NO',
+          criticalComponents: critComps.join(', ') || '-',
+          relatedJobs: relatedJobs.map(j => j.jobNo || j.jobTitle || j.id).join(', ') || '-',
+          department: Array.from(departments).join(', ') || '-',
+          remarks: getRemarks(stockStatus, criticalityLevel),
+        };
+      });
+
+      if (criticalOnly) {
+        reportRows = reportRows.filter(r =>
+          r.stockStatus === 'ZERO' || r.stockStatus === 'LOW' || r.criticalityLevel === 'CRITICAL'
+        );
+      }
+      if (stockStatusFilter && stockStatusFilter.length > 0) {
+        reportRows = reportRows.filter(r => stockStatusFilter.includes(r.stockStatus));
+      }
+      if (departmentFilter) {
+        reportRows = reportRows.filter(r => r.department.toLowerCase().includes(departmentFilter.toLowerCase()));
+      }
+
+      const statusOrder: Record<string, number> = { 'ZERO': 0, 'LOW': 1, 'OK': 2, 'NOT_SET': 3 };
+      const critOrder: Record<string, number> = { 'CRITICAL': 0, 'ESSENTIAL': 1, 'NORMAL': 2 };
+      reportRows.sort((a, b) => {
+        const sA = statusOrder[a.stockStatus] ?? 99;
+        const sB = statusOrder[b.stockStatus] ?? 99;
+        if (sA !== sB) return sA - sB;
+        const cA = critOrder[a.criticalityLevel] ?? 99;
+        const cB = critOrder[b.criticalityLevel] ?? 99;
+        if (cA !== cB) return cA - cB;
+        if (b.shortageQty !== a.shortageQty) return b.shortageQty - a.shortageQty;
+        return (a.partCode || '').localeCompare(b.partCode || '');
+      });
+
+      reportRows.forEach((r, i) => { r.sNo = i + 1; });
+
+      const columns: ColumnDef[] = [
+        { key: 'sNo', header: 'S.No', width: 6, type: 'number', align: 'center' },
+        { key: 'vesselName', header: 'Vessel Name', width: 18, type: 'text' },
+        { key: 'partCode', header: 'Part Code', width: 18, type: 'text' },
+        { key: 'partName', header: 'Part Name', width: 35, type: 'text' },
+        { key: 'rob', header: 'ROB', width: 8, type: 'number', align: 'center' },
+        { key: 'minStock', header: 'Min Stock', width: 10, type: 'number', align: 'center' },
+        { key: 'stockStatus', header: 'Stock Status', width: 14, type: 'text', align: 'center' },
+        { key: 'shortageQty', header: 'Shortage Qty', width: 12, type: 'number', align: 'center' },
+        { key: 'criticalityLevel', header: 'Criticality', width: 14, type: 'text', align: 'center' },
+        { key: 'criticalEquipment', header: 'Critical Equip', width: 14, type: 'text', align: 'center' },
+        { key: 'criticalComponents', header: 'Critical Components', width: 30, type: 'text' },
+        { key: 'relatedJobs', header: 'Related Jobs', width: 30, type: 'text' },
+        { key: 'department', header: 'Department', width: 12, type: 'text', align: 'center' },
+        { key: 'remarks', header: 'Remarks', width: 40, type: 'text' },
+      ];
+
+      const workbook = new ExcelJS.Workbook();
+      workbook.creator = 'PMS System';
+      workbook.created = new Date();
+      const worksheet = workbook.addWorksheet('Critical Spares Report');
+
+      const lastCol = getLastColumnLetter(columns.length);
+
+      applyStandardHeader(
+        worksheet,
+        'CRITICAL SPARES REPORT',
+        'Status of Critical and Essential Spare Parts Inventory',
+        vesselName,
+        reportRows.length,
+        lastCol
+      );
+
+      applyStandardTableHeader(worksheet, columns, 7);
+
+      const conditionalStyles: ConditionalStyle[] = [
+        {
+          condition: (row: any) => row.stockStatus === 'ZERO',
+          style: 'danger',
+        },
+        {
+          condition: (row: any) => row.stockStatus === 'LOW' && row.criticalityLevel === 'CRITICAL',
+          style: 'warning',
+        },
+        {
+          condition: (row: any) => row.stockStatus === 'LOW',
+          style: 'warning',
+          textOnly: true,
+        },
+      ];
+
+      applyStandardDataRows(worksheet, reportRows, columns, 8, conditionalStyles);
+
+      const totalZeroStock = reportRows.filter(r => r.stockStatus === 'ZERO').length;
+      const totalLowStock = reportRows.filter(r => r.stockStatus === 'LOW').length;
+      const totalOkStock = reportRows.filter(r => r.stockStatus === 'OK').length;
+      const totalNotSet = reportRows.filter(r => r.stockStatus === 'NOT_SET').length;
+      const totalCritical = reportRows.filter(r => r.criticalityLevel === 'CRITICAL').length;
+      const totalEssential = reportRows.filter(r => r.criticalityLevel === 'ESSENTIAL').length;
+      const totalNormal = reportRows.filter(r => r.criticalityLevel === 'NORMAL').length;
+      const totalShortage = reportRows.reduce((sum, r) => sum + r.shortageQty, 0);
+
+      const summaryItems: SummaryItem[] = [
+        { label: 'Total Spare Parts', value: reportRows.length },
+        { label: 'Zero Stock (Out of Stock)', value: totalZeroStock, highlight: totalZeroStock > 0 },
+        { label: 'Low Stock', value: totalLowStock, highlight: totalLowStock > 0 },
+        { label: 'OK Stock', value: totalOkStock },
+        { label: 'Min Not Set', value: totalNotSet },
+        { label: 'Critical (Linked to Critical Equipment)', value: totalCritical, highlight: totalCritical > 0 },
+        { label: 'Essential (Low/Zero but not Critical)', value: totalEssential },
+        { label: 'Normal', value: totalNormal },
+        { label: 'Total Shortage Quantity', value: totalShortage, highlight: totalShortage > 0 },
+      ];
+
+      const summaryStartRow = 8 + reportRows.length + 2;
+      applyStandardSummary(worksheet, summaryItems, summaryStartRow, columns.length);
+
+      worksheet.views = [{ state: 'frozen', ySplit: 7, xSplit: 0 }];
+
+      worksheet.autoFilter = {
+        from: { row: 7, column: 1 },
+        to: { row: 7 + reportRows.length, column: columns.length }
+      };
+
+      applyStandardPageSetup(worksheet);
+
+      const buffer = await workbook.xlsx.writeBuffer();
+      const filename = generateFilename('Critical_Spares_Report', vesselName);
+
+      res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+      res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+      res.send(buffer);
+
+    } catch (error: any) {
+      console.error('Error generating critical spares Excel report:', error);
+      res.status(500).json({
+        success: false,
+        error: error.message || 'Failed to generate critical spares Excel report'
+      });
+    }
+  });
+
+  // ═══════════════════════════════════════════════════════════════
   // REPORT 1.5: CRITICAL EQUIPMENT STATUS API
   // Returns critical/class equipment with aggregated work order data
   // ═══════════════════════════════════════════════════════════════

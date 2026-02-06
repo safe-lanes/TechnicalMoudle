@@ -26,6 +26,7 @@ import { useVessel } from "@/contexts/VesselContext";
 import { useQuery } from "@tanstack/react-query";
 import CategoryFilters, { CategoryFilterValues } from "@/components/reports/CategoryFilters";
 import LowStockAlertReport from "./LowStockAlertReport";
+import CriticalSparesReport from "./CriticalSparesReport";
 
 interface SparesReport {
   id: string;
@@ -115,7 +116,7 @@ const SparesReports: React.FC<SparesReportsProps> = ({ onBack, globalFilters }) 
       frequency: "Weekly",
       fields: ["Part Code", "Part Name", "Equipment", "Criticality", "ROB", "Min Required", "Status"],
       filters: ["Vessel", "Criticality Level", "Stock Status"],
-      outputs: ["PDF", "Dashboard"],
+      outputs: ["PDF", "Excel", "Dashboard"],
       icon: AlertTriangle,
       priority: "high",
       lastGenerated: "4 hours ago",
@@ -192,36 +193,46 @@ const SparesReports: React.FC<SparesReportsProps> = ({ onBack, globalFilters }) 
 
 
       case 'spares-critical-parts': {
-        const criticalParts = spares.filter((s: any) => 
-          s.critical === 'Critical' || s.critical === 'Yes' || s.criticality === 'Critical'
-        );
+        const previewRes = await fetch(`/technical/api/reports/critical-spares/preview?vesselId=${effectiveVesselId}`, { credentials: 'include' });
+        if (!previewRes.ok) throw new Error('Failed to fetch critical spares data');
+        const previewData = await previewRes.json();
 
         const columns = [
-          { header: 'Part Code', field: 'partCode', width: 35 },
-          { header: 'Part Name', field: 'partName', width: 55 },
-          { header: 'Component', field: 'componentName', width: 45 },
-          { header: 'ROB', field: 'rob', width: 20 },
-          { header: 'Min', field: 'min', width: 20 },
-          { header: 'Status', field: 'status', width: 25 }
+          { header: 'S.No', field: 'sNo', width: 10 },
+          { header: 'Part Code', field: 'partCode', width: 28 },
+          { header: 'Part Name', field: 'partName', width: 45 },
+          { header: 'ROB', field: 'rob', width: 12 },
+          { header: 'Min Stock', field: 'minStock', width: 15 },
+          { header: 'Status', field: 'stockStatus', width: 18 },
+          { header: 'Shortage', field: 'shortageQty', width: 15 },
+          { header: 'Criticality', field: 'criticalityLevel', width: 18 },
+          { header: 'Critical Equip', field: 'criticalEquip', width: 20 },
+          { header: 'Remarks', field: 'remarks', width: 45 },
         ];
 
-        const data = criticalParts.map((s: any) => ({
-          partCode: s.partCode || '-',
-          partName: s.partName || '-',
-          componentName: s.componentName || '-',
-          rob: s.rob || 0,
-          min: s.min || 0,
-          status: getStockStatus(s.rob || 0, s.min || 0)
+        const data = (previewData.data || []).map((i: any, idx: number) => ({
+          sNo: idx + 1,
+          partCode: i.partCode,
+          partName: i.partName,
+          rob: i.rob,
+          minStock: i.minStock ?? '-',
+          stockStatus: i.stockStatus,
+          shortageQty: i.shortageQty,
+          criticalityLevel: i.criticalityLevel,
+          criticalEquip: i.linkedToCriticalEquipment ? 'YES' : 'NO',
+          remarks: i.remarks,
         }));
 
         const summary = [
-          { label: 'Critical Parts', value: data.length },
-          { label: 'Low Stock', value: data.filter((d: any) => d.status === 'Low').length },
-          { label: 'OK', value: data.filter((d: any) => d.status === 'OK').length }
+          { label: 'Total Spares', value: previewData.reportMeta?.totalSpares || data.length },
+          { label: 'Critical Equipment Spares', value: previewData.summary?.byCriticality?.CRITICAL || 0 },
+          { label: 'Out of Stock', value: previewData.summary?.byStatus?.ZERO || 0 },
+          { label: 'Low Stock', value: previewData.summary?.byStatus?.LOW || 0 },
+          { label: 'Total Shortage', value: `${previewData.summary?.totalShortage || 0} units` },
         ];
 
         pdfReportGenerator.generateReport(
-          { title: 'Critical Spares Report', subtitle: 'Status of critical spare parts', vessel: vesselName },
+          { title: 'Critical Spares Report', subtitle: 'Status of Critical and Essential Spare Parts Inventory', vessel: vesselName, orientation: 'landscape' },
           columns,
           data,
           summary
@@ -339,6 +350,23 @@ const SparesReports: React.FC<SparesReportsProps> = ({ onBack, globalFilters }) 
         link.click();
         URL.revokeObjectURL(url);
         toast({ title: "Report Generated", description: "Excel report downloaded successfully!" });
+      } else if (format === 'Excel' && reportId === 'spares-critical-parts') {
+        const filters: Record<string, any> = {};
+        const response = await fetch('/technical/api/reports/critical-spares', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify({ vesselId: effectiveVesselId, filters }),
+        });
+        if (!response.ok) throw new Error('Failed to generate Excel');
+        const blob = await response.blob();
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = `critical-spares-report-${new Date().toISOString().slice(0, 10)}.xlsx`;
+        link.click();
+        URL.revokeObjectURL(url);
+        toast({ title: "Report Generated", description: "Excel report downloaded successfully!" });
       } else if (format === 'Excel' && reportId === 'spares-consumption-analysis') {
         const response = await fetch(`/technical/api/reports/consumption-analysis/${effectiveVesselId}/excel`, {
           method: 'POST',
@@ -384,6 +412,15 @@ const SparesReports: React.FC<SparesReportsProps> = ({ onBack, globalFilters }) 
   if (activeDetailReport === 'spares-low-stock') {
     return (
       <LowStockAlertReport
+        onBack={() => setActiveDetailReport(null)}
+        vesselId={effectiveVesselId}
+      />
+    );
+  }
+
+  if (activeDetailReport === 'spares-critical-parts') {
+    return (
+      <CriticalSparesReport
         onBack={() => setActiveDetailReport(null)}
         vesselId={effectiveVesselId}
       />
@@ -473,8 +510,8 @@ const SparesReports: React.FC<SparesReportsProps> = ({ onBack, globalFilters }) 
                 className="hover:bg-gray-50 cursor-pointer"
                 data-testid={`spares-report-row-${report.id}`}
                 onClick={() => {
-                  if (report.id === 'spares-low-stock') {
-                    setActiveDetailReport('spares-low-stock');
+                  if (report.id === 'spares-low-stock' || report.id === 'spares-critical-parts') {
+                    setActiveDetailReport(report.id);
                   }
                 }}
               >
@@ -503,8 +540,8 @@ const SparesReports: React.FC<SparesReportsProps> = ({ onBack, globalFilters }) 
                       title="Preview"
                       onClick={(e) => {
                         e.stopPropagation();
-                        if (report.id === 'spares-low-stock') {
-                          setActiveDetailReport('spares-low-stock');
+                        if (report.id === 'spares-low-stock' || report.id === 'spares-critical-parts') {
+                          setActiveDetailReport(report.id);
                         } else {
                           handleGenerateReport(report.id, 'PDF');
                         }
