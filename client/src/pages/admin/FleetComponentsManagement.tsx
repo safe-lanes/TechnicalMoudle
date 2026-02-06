@@ -161,7 +161,7 @@ export default function FleetComponentsManagement() {
     return (
       <>
         <TableRow key={nodeKey} data-testid={`row-component-${nodeKey}`}>
-          <TableCell style={{ paddingLeft: `${level * 24 + 16}px` }} data-testid={isFirstRoot ? "I4.QL.3.20" : undefined}>
+          <TableCell style={{ paddingLeft: `${level * 24 + 16}px` }} className="font-mono text-sm" data-testid={isFirstRoot ? "I4.QL.3.20" : undefined}>
             {isFirstRoot && <Marker id="I4.QL.3.20" />}
             <div className="flex items-center gap-2">
               {hasChildren ? (
@@ -179,12 +179,12 @@ export default function FleetComponentsManagement() {
               ) : (
                 <div className="w-6" />
               )}
-              <span className="font-medium">{node.fleetEquipmentName}</span>
+              <span>{node.fleetEquipmentCode}</span>
             </div>
           </TableCell>
-          <TableCell className="font-mono text-sm" data-testid={isFirstRoot ? "I4.QL.3.21" : undefined}>
+          <TableCell data-testid={isFirstRoot ? "I4.QL.3.21" : undefined}>
             {isFirstRoot && <Marker id="I4.QL.3.21" />}
-            {node.fleetEquipmentCode}
+            <span className="font-medium">{node.fleetEquipmentName}</span>
           </TableCell>
           <TableCell className="font-mono text-sm" data-testid={isFirstRoot ? "I4.QL.3.22" : undefined}>
             {isFirstRoot && <Marker id="I4.QL.3.22" />}
@@ -308,8 +308,8 @@ export default function FleetComponentsManagement() {
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead data-testid="I4.QL.3.14"><Marker id="I4.QL.3.14" />Equipment Name</TableHead>
-                      <TableHead data-testid="I4.QL.3.15"><Marker id="I4.QL.3.15" />Fleet Code</TableHead>
+                      <TableHead data-testid="I4.QL.3.14"><Marker id="I4.QL.3.14" />Fleet Code</TableHead>
+                      <TableHead data-testid="I4.QL.3.15"><Marker id="I4.QL.3.15" />Equipment Name</TableHead>
                       <TableHead data-testid="I4.QL.3.16"><Marker id="I4.QL.3.16" />Category</TableHead>
                       <TableHead data-testid="I4.QL.3.17"><Marker id="I4.QL.3.17" />Maker</TableHead>
                       <TableHead data-testid="I4.QL.3.18"><Marker id="I4.QL.3.18" />Model</TableHead>
