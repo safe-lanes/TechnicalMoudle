@@ -1,0 +1,175 @@
+Implementation Plan: Low Stock Alert Report (NO Purchase Module Dependencies)
+
+Phase 1: Backend Enhancement
+1.1 New Storage Method
+Add to server/storage.ts:
+
+ts
+getLowStockAlertReport(vesselId, filters) => {
+  summary: { totalAlerts, criticalCount, warningCount, valueAtRisk },
+  items: LowStockAlertItem[]
+}
+Query logic (use only existing PMS data):
+
+Base tables: spares (master), current ROB/stock table, any existing consumption / transaction history that already exists.
+​
+
+If sparesHistory with CONSUME events (last 90 days) exists, use it; if not, skip rate-based fields for now.
+​
+
+Calculations (only if data exists; otherwise return null for that field):
+
+avgDailyConsumption: If history exists, average daily consumption over last 90 days; else null.
+
+daysBelowMin: Count consecutive days where ROB ≤ min (only if you have daily snapshots or equivalent; else null).
+
+reorderQty: max(0, min - rob) for now (no lead time multiplier since there is no purchase module yet).
+
+priorityScore: (criticalityWeight * 3) + (shortagePercent * 2) + (daysBelowMinWeight * 1) where:
+
+criticalityWeight = 1 for non‑critical, 2 for critical
+
+shortagePercent = ((min - rob) / min) * 100 (0 if min is 0 or missing)
+
+daysBelowMinWeight = min(daysBelowMin, 30) or 0 if unknown
+
+1.2 New API Endpoint
+
+GET /technical/api/reports/low-stock-alert/:vesselId
+
+Query parameters (same as your draft, but without purchase fields):
+
+Parameter	Type	Description
+criticality	string	all, critical, non-critical
+thresholdPercent	number	e.g. 50 = items at ≤ 50% of min
+componentCategory	string	Filter by component code prefix/category
+sortBy	string	priority, shortage, partName
+Response structure (keep this shape, but drop purchase fields for now):
+
+json
+{
+  "summary": {
+    "totalAlerts": 42,
+    "criticalCount": 12,
+    "warningCount": 30,
+    "totalValueAtRisk": 15420.5
+  },
+  "items": [{
+    "id": 1,
+    "partCode": "SP-001",
+    "partName": "O-Ring Seal",
+    "componentName": "Main Engine",
+    "currentQty": 2,
+    "minThreshold": 10,
+    "maxThreshold": 20,
+    "shortage": 8,
+    "shortagePercent": 80,
+    "unitCost": 15.50,
+    "valueAtRisk": 124.00,
+    "criticality": "Critical",
+    "avgDailyConsumption": 0.5,        // optional if history exists
+    "daysBelowMin": 5,                 // optional
+    "reorderRecommendation": 15,       // basic: max(0, min - rob)
+    "priorityScore": 95,
+    "severityLevel": "critical"
+  }]
+}
+For now, omit these fields from the API and UI: leadTime, supplier, lastOrderDate. They depend on a purchase / vendor module that does not exist yet.
+​
+
+Phase 2: Frontend Components
+
+Component hierarchy (keep as is, just rename actions appropriately):
+
+LowStockAlertReport/
+
+LowStockSummaryCards – top metrics bar
+
+LowStockFilters – filter controls
+
+LowStockDataTable – main sortable table
+
+LowStockRow – individual row with actions
+
+LowStockActions – export / bulk actions
+
+UI layout (same visual, but remove “Generate Bulk PO” for now):
+
+Summary cards row with: total alerts, critical count, warning count, total value at risk.
+
+Filters row with: Vessel, Criticality, Threshold %, Category.
+
+Data table columns:
+
+Part, Component, Qty, Min, Shortage (absolute + %), Criticality, Priority, Severity badge, Actions (non‑purchase).
+
+Bottom action bar:
+
+[📄 Export PDF] [📊 Export Excel]
+
+Optional: [Mark Selected as Reviewed] instead of PO.
+
+2.3 Severity color coding (unchanged):
+
+Critical: shortagePercent > 50 AND criticality = Critical → Red badge.
+
+Warning: shortagePercent > 25 OR daysBelowMin > 7 → Yellow badge (if daysBelowMin available).
+
+Low: All other below‑min items → Gray badge.
+
+Phase 3: Integration Points (SAFE for current system)
+
+Keep only what is supported without a purchase module:
+
+Work Orders (optional, only if data is already wired):
+
+If work orders reserve spares, show an icon or tooltip like “X units reserved for pending WOs”.
+
+Status / Review flag:
+
+Add a simple “Reviewed” flag in spares or a separate table so chief can mark items as reviewed.
+
+PDF / Excel exports:
+
+Reuse existing export generators already implemented in your reports.
+​
+
+Mark these explicitly as FUTURE – DO NOT BUILD NOW:
+
+“Generate PO” button or any /procurement/new route.
+
+Updating lastOrderDate from this screen.
+
+Email notifications to procurement.
+
+You can keep them in comments as future scope, but they must not be implemented or wired in this phase.
+
+Phase 4: Task Breakdown (Adjusted)
+
+Add getLowStockAlertReport storage method with aggregation logic (without purchase dependencies).
+
+Create /technical/api/reports/low-stock-alert/:vesselId endpoint.
+
+Build LowStockSummaryCards component.
+
+Build LowStockFilters component.
+
+Build LowStockDataTable with sorting/pagination.
+
+Add severity indicators and priority badges.
+
+Implement PDF/Excel export using existing generators.
+
+Add “Mark as Reviewed” or similar non‑purchase action.
+
+Wire up React Query with filters and caching.
+
+Add validation and test with sample data.
+
+Key decisions (answer in prompt so AI does not block):
+
+Work Order Reservations: “Use only if existing reservation data is already available; otherwise ignore for now.”
+
+Email Notifications: “Do NOT implement now; keep as future scope only.”
+
+Purchase Module: “Assume there is NO procurement route and NO purchase module at present; do not build PO‑related flows.”
