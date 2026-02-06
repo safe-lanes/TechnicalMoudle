@@ -1,0 +1,195 @@
+Raplit Analysis Prompt
+
+Module: PMS → Admin → Bulk Data Import → Fleet Data Import → Fleet Components
+Topic: Bulk Data Import – Fleet Components – Mapping Guide & Required Field Validation (Dry Run Only)
+
+Context
+
+In Bulk Data Import → Fleet Components, users upload an Excel template to import Fleet Component master data.
+
+A Fleet Components Mapping Guide is available where:
+
+Excel columns are mapped to system fields
+
+Certain fields can be visually highlighted as Required
+
+Currently:
+
+Required-field enforcement is either missing or unclear
+
+Users can proceed with uploads even when critical fields are empty
+
+Errors are detected late or inconsistently
+
+Requirement Overview
+
+In the Mapping Guide screen:
+
+Highlighted fields should be clearly marked as Required
+
+This requirement is visual and logical, not cosmetic only
+
+During Dry Run validation of Fleet Components bulk upload:
+
+Required-field validation must be applied
+
+Missing required values must be detected before actual import
+
+Import should not proceed if required fields are missing
+
+Required Fields to Be Flagged
+
+The following fields must be treated as mandatory for Fleet Components bulk import:
+
+Field Name
+Parent Fleet Equipment Code
+Fleet Equipment Code
+Fleet Equipment Name
+Component Category
+Maker Name
+Maker Code
+Model
+Model Code
+Eqpt / System Department
+IS Active
+Analysis Questions (To Be Answered)
+
+How does the Fleet Components Mapping Guide currently determine:
+
+Which fields are required
+
+How required fields are visually indicated
+
+Where is the dry run validation logic implemented for Fleet Components?
+
+Frontend
+
+Backend
+
+Or shared bulk-import service
+
+Why required-field validation is not currently enforced (or partially enforced)?
+
+How other bulk imports (e.g., Components, Jobs, Spares) handle:
+
+Required fields
+
+Dry run validation
+
+Error reporting
+
+At what stage of the dry run:
+
+Required-field checks should be executed
+
+Validation errors should be returned to UI
+
+Detailed Analysis Scope
+1. Mapping Guide Behavior
+
+Analyse how field metadata is defined:
+
+Required vs optional
+
+Static vs configurable
+
+Identify how the Mapping Guide UI consumes this metadata
+
+2. Dry Run Validation Flow
+
+Analyse the dry run execution lifecycle:
+
+File upload
+
+Column parsing
+
+Row-level validation
+
+Error aggregation
+
+Identify where required-field checks logically belong
+
+3. Error Reporting Mechanism
+
+How missing required fields should be:
+
+Identified per row
+
+Returned as structured errors
+
+Displayed clearly to users before import
+
+Detailed Plan (Design-Level Only)
+Step 1: Define Required Field Metadata
+
+Clearly identify required fields for Fleet Components
+
+Ensure this metadata is:
+
+Centralized
+
+Consistent between Mapping Guide and Dry Run validation
+
+Step 2: Mapping Guide Enhancement (Analysis Only)
+
+Mapping Guide should:
+
+Mark listed fields as Required
+
+Prevent ambiguity for users mapping Excel columns
+
+Step 3: Dry Run Validation Design
+
+During dry run:
+
+Each row must be checked for missing required fields
+
+Empty, null, or invalid values must be flagged
+
+Validation must occur before actual import
+
+Step 4: Validation Feedback Design
+
+Dry run response should:
+
+Clearly list missing required fields
+
+Associate errors with specific rows
+
+Block import if validation fails
+
+Step 5: Consistency Check
+
+Compare with:
+
+Other bulk import modules
+
+Ensure Fleet Components follows the same validation architecture
+
+Expected Outcome
+
+Required fields are clearly visible in the Mapping Guide
+
+Dry run detects missing mandatory data early
+
+Users cannot import incomplete Fleet Component data
+
+Bulk import behavior is consistent and predictable
+
+Mandatory Constraints (Strict)
+
+ANALYSE & PLAN ONLY
+
+DO NOT implement logic
+
+DO NOT change database schema
+
+DO NOT impact other bulk imports
+
+DO NOT add runtime validations outside dry run
+
+DO NOT change UI outside Fleet Components Mapping Guide
+
+Scope limited strictly to Fleet Components bulk import
+
+WAIT for explicit PROCEED instruction
