@@ -10,7 +10,6 @@ import {
   Clock,
   Package,
   Store,
-  FileCheck,
   Biohazard,
   Settings2,
   AlertTriangle,
@@ -22,7 +21,6 @@ import MaintenanceReports from "./MaintenanceReports";
 import RunningHoursReports from "./RunningHoursReports";
 import SparesReports from "./SparesReports";
 import StoresReports from "./StoresReports";
-import ComplianceReports from "./ComplianceReports";
 import IhmReports from "./IhmReports";
 import ChangeRequestReports from "./ChangeRequestReports";
 import AlertsApprovalsAdminReports from "./AlertsApprovalsAdminReports";
@@ -107,17 +105,6 @@ const ReportsModule = () => {
       icon: Store,
       reportCount: 5,
       lastGenerated: "6 hours ago",
-      color: "border-blue-500",
-      iconBg: "bg-blue-500",
-      iconBgLight: "bg-blue-100 text-blue-600"
-    },
-    {
-      id: "compliance",
-      title: "Compliance, Class & Certificates",
-      description: "Certificate expiry, survey planning, ISM compliance, and regulatory mapping",
-      icon: FileCheck,
-      reportCount: 5,
-      lastGenerated: "1 day ago",
       color: "border-blue-500",
       iconBg: "bg-blue-500",
       iconBgLight: "bg-blue-100 text-blue-600"
@@ -209,10 +196,6 @@ const ReportsModule = () => {
 
   if (selectedCategory === "stores") {
     return <StoresReports onBack={handleBackToMain} globalFilters={globalFilters} />;
-  }
-
-  if (selectedCategory === "compliance") {
-    return <ComplianceReports onBack={handleBackToMain} globalFilters={globalFilters} />;
   }
 
   if (selectedCategory === "ihm") {
