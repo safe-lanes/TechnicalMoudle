@@ -1,5 +1,5 @@
 import { useState, useCallback, useRef, useEffect } from "react";
-import { Calendar as CalendarIcon, X } from "lucide-react";
+import { Calendar as CalendarIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Label } from "@/components/ui/label";
@@ -120,11 +120,6 @@ export function PeriodPicker({ value, onChange, className }: PeriodPickerProps) 
     setOpen(false);
   }, [mode, selectedYear, selectedQuarter, selectedMonth, dateFrom, dateTo, onChange]);
 
-  const handleClear = useCallback((e: React.MouseEvent) => {
-    e.stopPropagation();
-    onChange(null);
-  }, [onChange]);
-
   const handleMonthClick = (monthIndex: number) => {
     setSelectedMonth(prev => prev === monthIndex ? undefined : monthIndex);
     setSelectedQuarter(undefined);
@@ -153,15 +148,7 @@ export function PeriodPicker({ value, onChange, className }: PeriodPickerProps) 
           <span className={`flex-1 text-left truncate ${displayValue ? "text-foreground" : "text-muted-foreground"}`}>
             {displayValue || "Period"}
           </span>
-          {displayValue ? (
-            <X
-              className="h-3.5 w-3.5 text-muted-foreground shrink-0"
-              onClick={handleClear}
-              data-testid="button-period-clear"
-            />
-          ) : (
-            <CalendarIcon className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
-          )}
+          <CalendarIcon className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
         </button>
       </PopoverTrigger>
       <PopoverContent
