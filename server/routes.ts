@@ -7504,6 +7504,245 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.post("/technical/api/reports/stores-inventory-status/:vesselId/excel", async (req, res) => {
+    try {
+      const { vesselId } = req.params;
+      const { tab, categoryFilter, statusFilter } = req.body;
+
+      const allItems = await storage.getStoresItems(vesselId);
+      const allVessels = await storage.getVessels();
+      const vessel = allVessels.find((v: any) => v.id === vesselId);
+      const vesselName = vessel?.name || vesselId;
+
+      let items = allItems.filter((item: any) => item.deleted !== true && item.isActive !== false);
+
+      if (categoryFilter && categoryFilter !== 'all') {
+        if (categoryFilter === 'lubricants' || categoryFilter === 'lubes') {
+          items = items.filter((i: any) => i.itemType === 'lubes' || i.itemType === 'lubricants');
+        } else if (categoryFilter === 'others') {
+          items = items.filter((i: any) => !['stores', 'lubes', 'lubricants', 'chemicals'].includes(i.itemType));
+        } else {
+          items = items.filter((i: any) => i.itemType === categoryFilter);
+        }
+      }
+
+      if (statusFilter && statusFilter !== 'all') {
+        items = items.filter((i: any) => {
+          const rob = parseFloat(String(i.rob)) || 0;
+          const min = parseFloat(String(i.min)) || 0;
+          if (rob === 0) return statusFilter === 'Critical';
+          if (rob <= min) return statusFilter === 'Low';
+          return statusFilter === 'OK';
+        });
+      }
+
+      const categoryDisplayMap: Record<string, string> = {
+        stores: 'Stores', lubes: 'Lubricants', lubricants: 'Lubricants',
+        chemicals: 'Chemicals', others: 'Others',
+      };
+
+      const getLocation = (item: any): string => {
+        const a = item.locationA || '';
+        const b = item.locationB || '';
+        if (a && b) return `${a} / ${b}`;
+        return a || b || '-';
+      };
+
+      const ledger = await storage.getStoresTransactionHistory(vesselId);
+
+      const now = new Date();
+      const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+      const fifteenDaysAgo = new Date(now.getTime() - 15 * 24 * 60 * 60 * 1000);
+
+      const consumptionMap: Record<number, { total30: number; first15: number; last15: number }> = {};
+      (ledger || []).forEach((entry: any) => {
+        if (entry.eventType !== 'CONSUME') return;
+        const entryDate = entry.timestampUTC ? new Date(entry.timestampUTC) : (entry.dateLocal ? new Date(entry.dateLocal) : null);
+        if (!entryDate || entryDate < thirtyDaysAgo) return;
+        const itemId = entry.itemId;
+        if (!consumptionMap[itemId]) consumptionMap[itemId] = { total30: 0, first15: 0, last15: 0 };
+        const qty = Math.abs(parseFloat(String(entry.qtyChangeBase)) || 0);
+        consumptionMap[itemId].total30 += qty;
+        if (entryDate >= fifteenDaysAgo) {
+          consumptionMap[itemId].last15 += qty;
+        } else {
+          consumptionMap[itemId].first15 += qty;
+        }
+      });
+
+      const getTrend = (itemId: number): string => {
+        const data = consumptionMap[itemId];
+        if (!data || (data.first15 === 0 && data.last15 === 0)) return 'Stable';
+        if (data.last15 > data.first15 * 1.1) return 'Increasing';
+        if (data.first15 > data.last15 * 1.1) return 'Decreasing';
+        return 'Stable';
+      };
+
+      const workbook = new ExcelJS.Workbook();
+      workbook.creator = 'PMS System';
+      workbook.created = new Date();
+
+      let columns: ColumnDef[];
+      let rowsData: any[][];
+      let sheetName: string;
+      let reportTitle: string;
+      let subtitle: string;
+      let statusBgColors: Record<string, string> = {};
+      let statusFontColors: Record<string, string> = {};
+      let statusColIndex = -1;
+
+      if (tab === 'consumption') {
+        sheetName = 'Consumption Trends';
+        reportTitle = 'STORES INVENTORY STATUS - CONSUMPTION TRENDS';
+        columns = [
+          { key: 'sno', header: 'S.No', width: 8, type: 'number', align: 'center' },
+          { key: 'itemCode', header: 'Item Code', width: 18 },
+          { key: 'itemName', header: 'Item Name', width: 35 },
+          { key: 'category', header: 'Category', width: 18 },
+          { key: 'rob', header: 'Current ROB', width: 14, type: 'number', align: 'right' },
+          { key: 'consumption30', header: '30 Day Consumption', width: 18, type: 'number', align: 'right' },
+          { key: 'avgMonthly', header: 'Avg Monthly', width: 16, type: 'number', align: 'right' },
+          { key: 'trend', header: 'Trend', width: 14, align: 'center' },
+        ];
+
+        rowsData = items.map((item: any, idx: number) => {
+          const rob = parseFloat(String(item.rob)) || 0;
+          const consumption = consumptionMap[item.id]?.total30 || 0;
+          const trend = getTrend(item.id);
+          return [idx + 1, item.itemCode || '-', item.itemName || '-', categoryDisplayMap[item.itemType] || item.itemType || '-', rob, parseFloat(consumption.toFixed(2)), parseFloat(consumption.toFixed(2)), trend];
+        });
+
+        subtitle = `Total Items: ${items.length}`;
+      } else if (tab === 'reorder') {
+        sheetName = 'Reorder Requirements';
+        reportTitle = 'STORES INVENTORY STATUS - REORDER REQUIREMENTS';
+        columns = [
+          { key: 'sno', header: 'S.No', width: 8, type: 'number', align: 'center' },
+          { key: 'itemCode', header: 'Item Code', width: 18 },
+          { key: 'itemName', header: 'Item Name', width: 35 },
+          { key: 'category', header: 'Category', width: 18 },
+          { key: 'rob', header: 'Current ROB', width: 14, type: 'number', align: 'right' },
+          { key: 'avgMonthly', header: 'Avg Monthly', width: 16, type: 'number', align: 'right' },
+          { key: 'daysToStockout', header: 'Days to Stockout', width: 18, type: 'number', align: 'right' },
+          { key: 'priority', header: 'Priority', width: 14, align: 'center' },
+          { key: 'suggestedQty', header: 'Suggested Qty', width: 16, type: 'number', align: 'right' },
+        ];
+
+        const reorderItems = items
+          .map((item: any) => {
+            const rob = parseFloat(String(item.rob)) || 0;
+            const min = parseFloat(String(item.min)) || 0;
+            const monthlyConsumption = consumptionMap[item.id]?.total30 || 0;
+            const dailyConsumption = monthlyConsumption / 30;
+            const daysUntilStockout = dailyConsumption > 0 ? rob / dailyConsumption : Infinity;
+            const suggestedQty = Math.max(0, (min * 2) - rob);
+            let priority: string;
+            if (daysUntilStockout < 7) priority = 'Critical';
+            else if (daysUntilStockout < 14) priority = 'High';
+            else if (daysUntilStockout < 30) priority = 'Medium';
+            else priority = 'Low';
+            return { ...item, rob, min, monthlyConsumption, daysUntilStockout, priority, suggestedQty };
+          })
+          .filter((item: any) => (item.rob - item.monthlyConsumption) <= item.min);
+
+        rowsData = reorderItems.map((item: any, idx: number) => {
+          const daysStr = !isFinite(item.daysUntilStockout) || item.daysUntilStockout > 365 ? '>365' : Math.round(item.daysUntilStockout);
+          return [idx + 1, item.itemCode || '-', item.itemName || '-', categoryDisplayMap[item.itemType] || item.itemType || '-', item.rob, parseFloat(item.monthlyConsumption.toFixed(2)), daysStr, item.priority, parseFloat(item.suggestedQty.toFixed(1))];
+        });
+
+        statusColIndex = 8;
+        statusBgColors = { 'Critical': 'FFFFF1F0', 'High': 'FFFFFBE6', 'Medium': 'FFFFFFFF', 'Low': 'FFFFFFFF' };
+        statusFontColors = { 'Critical': 'FFF5222D', 'High': 'FFFAAD14', 'Medium': 'FF5A6C7D', 'Low': 'FF5A6C7D' };
+
+        subtitle = `Reorder Items: ${reorderItems.length}`;
+      } else {
+        sheetName = 'Stock Status';
+        reportTitle = 'STORES INVENTORY STATUS - STOCK STATUS';
+        columns = [
+          { key: 'sno', header: 'S.No', width: 8, type: 'number', align: 'center' },
+          { key: 'itemCode', header: 'Item Code', width: 18 },
+          { key: 'itemName', header: 'Item Name', width: 35 },
+          { key: 'category', header: 'Category', width: 18 },
+          { key: 'rob', header: 'Current ROB', width: 14, type: 'number', align: 'right' },
+          { key: 'min', header: 'Min Stock', width: 14, type: 'number', align: 'right' },
+          { key: 'status', header: 'Status', width: 14, align: 'center' },
+          { key: 'location', header: 'Location', width: 30 },
+          { key: 'uom', header: 'UOM', width: 12 },
+        ];
+
+        statusColIndex = 7;
+        statusBgColors = { 'Critical': 'FFFFF1F0', 'Low': 'FFFFFBE6', 'OK': 'FFFFFFFF' };
+        statusFontColors = { 'Critical': 'FFF5222D', 'Low': 'FFFAAD14', 'OK': 'FF5A6C7D' };
+
+        rowsData = items.map((item: any, idx: number) => {
+          const rob = parseFloat(String(item.rob)) || 0;
+          const min = parseFloat(String(item.min)) || 0;
+          let status: string;
+          if (rob === 0) status = 'Critical';
+          else if (rob <= min) status = 'Low';
+          else status = 'OK';
+          return [idx + 1, item.itemCode || '-', item.itemName || '-', categoryDisplayMap[item.itemType] || item.itemType || '-', rob, min, status, getLocation(item), item.uom || '-'];
+        });
+
+        const critCount = rowsData.filter(r => r[6] === 'Critical').length;
+        const lowCount = rowsData.filter(r => r[6] === 'Low').length;
+        subtitle = `Total Items: ${rowsData.length} | Critical: ${critCount} | Low: ${lowCount}`;
+      }
+
+      const worksheet = workbook.addWorksheet(sheetName);
+      const totalColumns = columns.length;
+      const lastColLetter = getLastColumnLetter(totalColumns);
+
+      applyStandardHeader(worksheet, reportTitle, subtitle, vesselName, rowsData.length, lastColLetter);
+
+      const headerRowNum = 7;
+      applyStandardTableHeader(worksheet, columns, headerRowNum);
+
+      rowsData.forEach((rowData, idx) => {
+        const row = worksheet.addRow(rowData);
+        row.height = 20;
+
+        const statusVal = statusColIndex > 0 ? String(rowData[statusColIndex - 1]) : '';
+        const bgColor = statusBgColors[statusVal] || 'FFFFFFFF';
+
+        row.eachCell({ includeEmpty: true }, (cell, colNumber) => {
+          const colDef = columns[colNumber - 1];
+          cell.font = { name: 'Calibri', size: 10, color: { argb: COLORS.textDark } };
+          cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: idx % 2 === 0 ? bgColor : COLORS.bgLight } };
+          cell.border = {
+            bottom: { style: 'thin', color: { argb: COLORS.border } },
+            right: { style: 'thin', color: { argb: COLORS.border } },
+          };
+          cell.alignment = { vertical: 'middle', horizontal: (colDef?.align as any) || 'left' };
+
+          if (colNumber === statusColIndex) {
+            const fontColor = statusFontColors[statusVal];
+            if (fontColor) {
+              cell.font = { name: 'Calibri', size: 10, bold: true, color: { argb: fontColor } };
+            }
+          }
+        });
+      });
+
+      worksheet.autoFilter = {
+        from: { row: headerRowNum, column: 1 },
+        to: { row: headerRowNum, column: totalColumns }
+      };
+
+      applyStandardPageSetup(worksheet, headerRowNum, totalColumns, 6, vesselName);
+
+      const buffer = await workbook.xlsx.writeBuffer();
+      const filename = generateFilename('StoresInventoryStatus', vesselName);
+
+      res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+      res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+      res.send(buffer);
+    } catch (error: any) {
+      console.error("Error generating Stores Inventory Status Excel:", error);
+      res.status(500).json({ error: "Failed to generate report: " + error.message });
+    }
+  });
+
   // ========== CONSUMPTION PATTERN ANALYSIS REPORT ==========
   app.get("/technical/api/reports/consumption-analysis/:vesselId", async (req, res) => {
     try {

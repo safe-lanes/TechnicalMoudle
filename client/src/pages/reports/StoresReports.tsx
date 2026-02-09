@@ -158,8 +158,8 @@ const StoresReports: React.FC<StoresReportsProps> = ({ onBack, globalFilters }) 
   };
 
   const getStockStatus = (rob: number, min: number): string => {
-    if (rob < min) return 'Low';
-    if (rob === min) return 'At Min';
+    if (rob === 0) return 'Critical';
+    if (rob <= min) return 'Low';
     return 'OK';
   };
 
@@ -184,7 +184,7 @@ const StoresReports: React.FC<StoresReportsProps> = ({ onBack, globalFilters }) 
           category: s.category || s.itemType || '-',
           rob: s.rob || 0,
           min: s.min || 0,
-          location: s.location || '-',
+          location: (() => { const a = s.locationA || ''; const b = s.locationB || ''; if (a && b) return `${a} / ${b}`; return a || b || '-'; })(),
           status: getStockStatus(s.rob || 0, s.min || 0)
         }));
 
@@ -360,7 +360,25 @@ const StoresReports: React.FC<StoresReportsProps> = ({ onBack, globalFilters }) 
         await generateStoresPDF(reportId);
         toast({ title: "Report Generated", description: `${format} report downloaded successfully!` });
       } else {
-        toast({ title: "Excel Export", description: "Excel export coming soon. PDF is currently available." });
+        if (reportId === 'stores-inventory-status') {
+          const res = await fetch(`/technical/api/reports/stores-inventory-status/${effectiveVesselId}/excel`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'include',
+            body: JSON.stringify({ tab: 'stock-status' }),
+          });
+          if (!res.ok) throw new Error('Failed to generate Excel');
+          const blob = await res.blob();
+          const url = URL.createObjectURL(blob);
+          const link = document.createElement('a');
+          link.href = url;
+          link.download = `stores-inventory-status-${new Date().toISOString().slice(0, 10)}.xlsx`;
+          link.click();
+          URL.revokeObjectURL(url);
+          toast({ title: "Excel Exported", description: "Report downloaded as Excel file." });
+        } else {
+          toast({ title: "Excel Export", description: "Excel export coming soon. PDF is currently available." });
+        }
       }
       
     } catch (error) {

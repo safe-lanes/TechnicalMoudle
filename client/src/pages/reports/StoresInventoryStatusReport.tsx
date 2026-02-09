@@ -114,7 +114,7 @@ const StoresInventoryStatusReport: React.FC<StoresInventoryStatusReportProps> = 
   const { toast } = useToast();
 
   const [searchQuery, setSearchQuery] = useState("");
-  const [categoryFilter, setCategoryFilter] = useState("all");
+  const [categoryTab, setCategoryTab] = useState<string>('all');
   const [statusFilter, setStatusFilter] = useState("all");
   const [activeTab, setActiveTab] = useState<ActiveTab>('stock-status');
   const [sortField, setSortField] = useState<SortField>('itemCode');
@@ -176,7 +176,7 @@ const StoresInventoryStatusReport: React.FC<StoresInventoryStatusReportProps> = 
     return 'Stable';
   };
 
-  const filteredItems = useMemo(() => {
+  const preTabFilteredItems = useMemo(() => {
     let items = [...storesItems];
 
     if (searchQuery.trim()) {
@@ -186,14 +186,6 @@ const StoresInventoryStatusReport: React.FC<StoresInventoryStatusReportProps> = 
         (i.itemName || '').toLowerCase().includes(q) ||
         (i.category || '').toLowerCase().includes(q)
       );
-    }
-
-    if (categoryFilter !== 'all') {
-      if (categoryFilter === 'lubricants') {
-        items = items.filter(i => i.itemType === 'lubes' || i.itemType === 'lubricants');
-      } else {
-        items = items.filter(i => i.itemType === categoryFilter);
-      }
     }
 
     if (statusFilter !== 'all') {
@@ -206,7 +198,23 @@ const StoresInventoryStatusReport: React.FC<StoresInventoryStatusReportProps> = 
     }
 
     return items;
-  }, [storesItems, searchQuery, categoryFilter, statusFilter]);
+  }, [storesItems, searchQuery, statusFilter]);
+
+  const filteredItems = useMemo(() => {
+    let items = [...preTabFilteredItems];
+
+    if (categoryTab !== 'all') {
+      if (categoryTab === 'lubes') {
+        items = items.filter(i => i.itemType === 'lubes' || i.itemType === 'lubricants');
+      } else if (categoryTab === 'others') {
+        items = items.filter(i => !['stores', 'lubes', 'lubricants', 'chemicals'].includes(i.itemType));
+      } else {
+        items = items.filter(i => i.itemType === categoryTab);
+      }
+    }
+
+    return items;
+  }, [preTabFilteredItems, categoryTab]);
 
   const sortedStockItems = useMemo(() => {
     const items = [...filteredItems];
@@ -481,8 +489,37 @@ const StoresInventoryStatusReport: React.FC<StoresInventoryStatusReportProps> = 
     }
   };
 
-  const handleExportExcel = () => {
-    toast({ title: "Coming Soon", description: "Excel export coming soon." });
+  const handleExportExcel = async () => {
+    if (storesItems.length === 0) {
+      toast({ title: "No Data", description: "No items to export.", variant: "destructive" });
+      return;
+    }
+    setGeneratingPdf(true);
+    try {
+      const res = await fetch(`/technical/api/reports/stores-inventory-status/${effectiveVesselId}/excel`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({
+          tab: activeTab,
+          categoryFilter: categoryTab !== 'all' ? categoryTab : undefined,
+          statusFilter: statusFilter !== 'all' ? statusFilter : undefined,
+        }),
+      });
+      if (!res.ok) throw new Error('Failed to generate Excel');
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `stores-inventory-status-${activeTab}-${new Date().toISOString().slice(0, 10)}.xlsx`;
+      link.click();
+      URL.revokeObjectURL(url);
+      toast({ title: "Excel Exported", description: "Report downloaded as Excel file." });
+    } catch (err) {
+      toast({ title: "Export Failed", description: "Failed to generate Excel report.", variant: "destructive" });
+    } finally {
+      setGeneratingPdf(false);
+    }
   };
 
   if (!effectiveVesselId || effectiveVesselId === 'all') {
@@ -528,7 +565,7 @@ const StoresInventoryStatusReport: React.FC<StoresInventoryStatusReportProps> = 
           <Button
             variant="outline"
             onClick={handleExportExcel}
-            disabled={isLoading}
+            disabled={generatingPdf || isLoading}
             data-testid="button-export-excel"
           >
             <Download className="h-4 w-4 mr-2" /> Export Excel
@@ -599,17 +636,6 @@ const StoresInventoryStatusReport: React.FC<StoresInventoryStatusReportProps> = 
                 data-testid="input-search-stores"
               />
             </div>
-            <Select value={categoryFilter} onValueChange={setCategoryFilter}>
-              <SelectTrigger className="w-[160px]" data-testid="select-category-filter">
-                <SelectValue placeholder="Category" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Categories</SelectItem>
-                <SelectItem value="stores">Stores</SelectItem>
-                <SelectItem value="lubricants">Lubricants</SelectItem>
-                <SelectItem value="chemicals">Chemicals</SelectItem>
-              </SelectContent>
-            </Select>
             <Select value={statusFilter} onValueChange={setStatusFilter}>
               <SelectTrigger className="w-[160px]" data-testid="select-status-filter">
                 <SelectValue placeholder="Stock Status" />
@@ -621,6 +647,29 @@ const StoresInventoryStatusReport: React.FC<StoresInventoryStatusReportProps> = 
                 <SelectItem value="Critical">Critical</SelectItem>
               </SelectContent>
             </Select>
+          </div>
+
+          <div className="flex items-center gap-2 mb-4 flex-wrap">
+            {[
+              { key: 'all', label: 'All', count: preTabFilteredItems.length },
+              { key: 'stores', label: 'Stores', count: preTabFilteredItems.filter(i => i.itemType === 'stores').length },
+              { key: 'lubes', label: 'Lubricants', count: preTabFilteredItems.filter(i => i.itemType === 'lubes' || i.itemType === 'lubricants').length },
+              { key: 'chemicals', label: 'Chemicals', count: preTabFilteredItems.filter(i => i.itemType === 'chemicals').length },
+              { key: 'others', label: 'Others', count: preTabFilteredItems.filter(i => !['stores', 'lubes', 'lubricants', 'chemicals'].includes(i.itemType)).length },
+            ].filter(t => t.key === 'all' || t.count > 0).map(tab => (
+              <button
+                key={tab.key}
+                className={`px-3 py-1.5 text-sm font-medium rounded-md transition-colors ${
+                  categoryTab === tab.key
+                    ? 'bg-blue-600 text-white'
+                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                }`}
+                onClick={() => setCategoryTab(tab.key)}
+                data-testid={`button-category-tab-${tab.key}`}
+              >
+                {tab.label} ({tab.count})
+              </button>
+            ))}
           </div>
 
           <div className="flex items-center gap-1 mb-4 border-b border-gray-200">
