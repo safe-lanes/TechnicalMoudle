@@ -1,6 +1,6 @@
 import { useState, useMemo, useCallback } from 'react';
 import { useQuery, useMutation } from '@tanstack/react-query';
-import { Plus, Paperclip, Calendar } from 'lucide-react';
+import { Plus, Paperclip, Calendar, Download } from 'lucide-react';
 import { ColDef, GridReadyEvent, GridApi, ICellRendererParams, CellEditingStoppedEvent } from 'ag-grid-community';
 import AgGridTable from '@/components/AgGrid/AgGridTable';
 import AgGridTableActions from '@/components/AgGrid/AgGridTableActions';
@@ -14,6 +14,8 @@ import { useUIRole } from "@/contexts/UIRoleContext";
 import { apiRequest, queryClient } from '@/lib/queryClient';
 import { useToast } from '@/hooks/use-toast';
 import { FileAttachmentDialog, FileAttachment } from '@/components/FileAttachmentDialog';
+import { pdfReportGenerator } from '@/lib/pdfReportGenerator';
+import type { TableColumn } from '@/lib/pdfReportGenerator';
 
 type DueInFilter = 'all' | '3months' | '2months' | '1month' | 'overdue';
 
@@ -486,11 +488,59 @@ export default function SurveysPage() {
     };
   }, []);
 
+  const handleExportPdf = useCallback(() => {
+    const columns: TableColumn[] = [
+      { header: 'Company ID', field: 'companyId', width: 18 },
+      { header: 'Survey', field: 'surveyName', width: 35 },
+      { header: 'Company Group', field: 'type', width: 20 },
+      { header: 'Vessel', field: 'vessel', width: 22 },
+      { header: 'Survey Date', field: 'surveyDate', width: 20 },
+      { header: 'Due Date', field: 'dueDate', width: 20 },
+      { header: '1st Range Date', field: 'firstRangeDate', width: 20 },
+      { header: '2nd Range Date', field: 'secondRangeDate', width: 20 },
+      { header: 'Postponed', field: 'postponed', width: 20 },
+      { header: 'Last Edit', field: 'lastEdit', width: 18 },
+    ];
+
+    const data = filteredSurveys.map((survey: any) => ({
+      companyId: survey.companyId || '-',
+      surveyName: survey.surveyName || '-',
+      type: survey.type || '-',
+      vessel: survey.vessel || '-',
+      surveyDate: survey.surveyDate || '-',
+      dueDate: survey.dueDate || '-',
+      firstRangeDate: survey.firstRangeDate || '-',
+      secondRangeDate: survey.secondRangeDate || '-',
+      postponed: survey.postponed || '-',
+      lastEdit: survey.lastEdit || '-',
+    }));
+
+    pdfReportGenerator.generateReport(
+      {
+        title: 'Surveys',
+        subtitle: `Total: ${filteredSurveys.length} survey${filteredSurveys.length !== 1 ? 's' : ''}`,
+        orientation: 'landscape',
+      },
+      columns,
+      data
+    );
+  }, [filteredSurveys]);
+
   return (
     <div className="h-full flex flex-col bg-gray-50 overflow-hidden">
       <div className="flex items-center justify-between flex-shrink-0 mb-6">
         <h1 className="text-2xl font-bold text-gray-900">Surveys</h1>
         <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            className="text-xs text-[#8798ad] border-[#e1e8ed]"
+            onClick={handleExportPdf}
+            data-testid="button-export-surveys-pdf"
+          >
+            <Download className="h-3.5 w-3.5 mr-1" />
+            Export
+          </Button>
           <FiltersToggle 
             isOpen={showFilters} 
             onToggle={() => setShowFilters(!showFilters)} 

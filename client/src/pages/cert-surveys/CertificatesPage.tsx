@@ -1,6 +1,6 @@
 import { useState, useMemo, useCallback, useRef, useEffect, forwardRef, useImperativeHandle } from 'react';
 import { useQuery, useMutation } from '@tanstack/react-query';
-import { Plus, Paperclip, Calendar } from 'lucide-react';
+import { Plus, Paperclip, Calendar, Download } from 'lucide-react';
 import { ColDef, GridReadyEvent, GridApi, ICellRendererParams, CellValueChangedEvent, CellEditingStoppedEvent, ICellEditorParams } from 'ag-grid-community';
 import AgGridTable from '@/components/AgGrid/AgGridTable';
 import AgGridTableActions from '@/components/AgGrid/AgGridTableActions';
@@ -14,6 +14,8 @@ import { useUIRole } from "@/contexts/UIRoleContext";
 import { apiRequest, queryClient } from '@/lib/queryClient';
 import { useToast } from '@/hooks/use-toast';
 import { FileAttachmentDialog, FileAttachment } from '@/components/FileAttachmentDialog';
+import { pdfReportGenerator } from '@/lib/pdfReportGenerator';
+import type { TableColumn } from '@/lib/pdfReportGenerator';
 
 type DueInFilter = 'all' | '3months' | '2months' | '1month' | 'overdue';
 
@@ -774,11 +776,59 @@ export default function CertificatesPage() {
     onDateChange: handleDateChange,
   }), [handleOpenAttachments, handleDateChange]);
 
+  const handleExportPdf = useCallback(() => {
+    const columns: TableColumn[] = [
+      { header: 'Company ID', field: 'id', width: 18 },
+      { header: 'Name of Certificate', field: 'certificateName', width: 35 },
+      { header: 'Company Group', field: 'type', width: 20 },
+      { header: 'Vessel', field: 'vessel', width: 22 },
+      { header: 'Issue Date', field: 'issueDate', width: 20 },
+      { header: 'Expiry Date', field: 'expiryDate', width: 20 },
+      { header: 'Last Annual', field: 'lastAnnual', width: 20 },
+      { header: 'Last Interm', field: 'lastInterm', width: 20 },
+      { header: 'Endorsement Date', field: 'endorsementDate', width: 22 },
+      { header: 'Last Edit/ Upload', field: 'lastEditUpload', width: 18 },
+    ];
+
+    const data = filteredCertificates.map((cert: any) => ({
+      id: cert.id || '-',
+      certificateName: cert.certificateName || '-',
+      type: cert.type || '-',
+      vessel: cert.vessel || '-',
+      issueDate: cert.issueDate || '-',
+      expiryDate: cert.expiryDate || '-',
+      lastAnnual: cert.lastAnnual || '-',
+      lastInterm: cert.lastInterm || '-',
+      endorsementDate: cert.endorsementDate || '-',
+      lastEditUpload: cert.lastEditUpload || '-',
+    }));
+
+    pdfReportGenerator.generateReport(
+      {
+        title: 'Certificates',
+        subtitle: `Total: ${filteredCertificates.length} certificate${filteredCertificates.length !== 1 ? 's' : ''}`,
+        orientation: 'landscape',
+      },
+      columns,
+      data
+    );
+  }, [filteredCertificates]);
+
   return (
     <div className="h-full flex flex-col bg-gray-50 overflow-hidden">
       <div className="flex items-center justify-between flex-shrink-0 mb-6">
         <h1 className="text-2xl font-bold text-gray-900">Certificates</h1>
         <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            className="text-xs text-[#8798ad] border-[#e1e8ed]"
+            onClick={handleExportPdf}
+            data-testid="button-export-certificates-pdf"
+          >
+            <Download className="h-3.5 w-3.5 mr-1" />
+            Export
+          </Button>
           <FiltersToggle 
             isOpen={showFilters} 
             onToggle={() => setShowFilters(!showFilters)} 
