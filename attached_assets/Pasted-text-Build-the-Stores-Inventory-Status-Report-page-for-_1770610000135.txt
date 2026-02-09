@@ -1,0 +1,91 @@
+text
+Build the "Stores Inventory Status Report" page for the PMS Reports section. This report provides a comprehensive overview of all store items with stock levels, consumption trends, and reorder requirements.
+
+**REPORT SPECIFICATIONS:**
+- Report Name: Stores Inventory Status Report
+- Description: Comprehensive overview of all store items with stock levels, consumption trends, and reorder requirements
+- Frequency: Weekly
+- Priority: HIGH
+- Estimated Time: 2-3 min
+
+**DATA SOURCES - USE EXISTING TABLES/APIs ONLY:**
+
+1. **Stores Inventory Data:**
+   - Pull from Stores, Lubes, and Chemicals tables
+   - Fields needed: Item Code, Item Name, Category/Type, UOM, ROB (current stock), Min (minimum stock), Stock Status, Location details
+
+2. **Transaction History:**
+   - Pull from stores history/transaction table
+   - Fields needed: Date, Event Type (RECEIVE, CONSUME, ADJUSTMENT), Quantity Change, ROB After
+   - Use this to calculate consumption trends
+
+3. **Vessel Filter:**
+   - Use existing vessel selector (currently showing "Vessel 4")
+
+**REPORT SECTIONS TO BUILD:**
+
+**Section 1: Summary Cards (Top of Report)**
+- Total Items count (across all categories)
+- Low Stock Items count (where ROB <= Min)
+- Lubricants count
+- Chemicals count
+- Use the same card design as shown on the current reports page
+
+**Section 2: Stock Status Overview Table**
+Display all items grouped by category with:
+- Item Code
+- Item Name
+- Category (Stores/Lubes/Chemicals)
+- Current ROB
+- Minimum Stock
+- Stock Status indicator (OK/Low/Critical)
+- Location
+- UOM
+
+**Section 3: Consumption Trends Analysis**
+For each item, calculate and display:
+- Last 30 days consumption (sum of all CONSUME events)
+- Average monthly consumption rate
+- Consumption trend indicator (increasing/stable/decreasing)
+- Calculate by analyzing transaction history where Event Type = "CONSUME"
+
+**Section 4: Reorder Requirements**
+Identify and list items that need reordering:
+- Items where: (ROB - Average Monthly Consumption) <= Min
+- Calculate "Days Until Stockout" = ROB / (Monthly Consumption / 30)
+- Priority ranking: Critical (< 7 days), High (7-14 days), Medium (14-30 days)
+- Suggested reorder quantity = (Min * 2) - ROB
+
+**FILTERS TO IMPLEMENT:**
+- Vessel selector (use existing component)
+- Date range selector for consumption analysis
+- Category filter (All/Stores/Lubes/Chemicals)
+- Stock status filter (All/OK/Low/Critical)
+
+**EXPORT FUNCTIONALITY:**
+- Add "Export" button (like shown on other reports)
+- Export to PDF/Excel with all sections
+
+**UI/UX REQUIREMENTS:**
+- Follow the existing PMS report design pattern
+- Use the same color scheme: Purple for Total Items, Red for Low Stock, Blue for Lubricants, Green for Chemicals
+- Make the table sortable by all columns
+- Add search functionality
+- Responsive design for mobile/tablet viewing
+
+**KEY CALCULATIONS (DO NOT CREATE NEW FIELDS - CALCULATE FROM EXISTING DATA):**
+1. Current Stock Level = ROB field from inventory tables
+2. Stock Status = Compare ROB vs Min (if ROB <= Min then "Low", else "OK")
+3. Consumption Rate = SUM of negative Qty Change where Event Type = "CONSUME" over selected period
+4. Reorder Point = When (ROB - Monthly Avg Consumption) <= Min
+5. Days Until Stockout = ROB / (Total Consumption in period / Days in period)
+
+**ROUTING:**
+- Add route to: /pms/reports/stores-inventory-status
+- Add this report to the "Inventory - Stores/Lubes/Chemicals" category in the reports listing
+
+**IMPORTANT CONSTRAINTS:**
+- DO NOT introduce new database fields or tables
+- USE ONLY the existing stores, lubes, chemicals, and history tables
+- All calculations must be derived from existing data
+- Maintain consistency with existing report designs in the application
