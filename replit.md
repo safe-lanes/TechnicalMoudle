@@ -83,44 +83,42 @@ All future Fleet-related tables MUST include these mandatory columns with exact 
     -   `maker_list` - Updated Feb 2026 with all mandatory columns (maker_list_uuid, sortOrder, createdByUuid, updatedByUuid, isDeleted, isSync). All future FK references to this table MUST use `maker_list_uuid` column only (not the numeric `id`)
 
 ## System Architecture
-The application employs a modern full-stack architecture with a mobile-first, responsive design. The frontend is developed using React (TypeScript, Vite, Tailwind CSS, shadcn/ui, TanStack Query, Wouter), while the backend is powered by Express.js (TypeScript). PostgreSQL serves as the primary data store.
+The application employs a modern full-stack architecture with a mobile-first, responsive design. The frontend is developed using React (TypeScript, Vite, Tailwind CSS, shadcn/ui, TanStack Query, Wouter), while the backend is powered by Express.js (TypeScript). PostgreSQL serves as the primary data store. All API endpoints use the `/technical/api` prefix.
 
 **UI/UX Decisions**:
-- Emphasizes a mobile-first and responsive design philosophy.
-- Utilizes AG Charts React for interactive data visualizations and AG Grid Enterprise for tables, with custom styling and inline editing.
-- Work Order forms are single-page, scrollable designs with numbered subsections.
-- Standardized UI layout includes `p-6` padding for main content, `<div className="space-y-6">` for vertical spacing, consistent header patterns, and specific color codes for action buttons.
-- Menu items have fixed widths, and tabs use a specific background and active state styling.
+- Mobile-first, responsive design with consistent padding (`p-6`) and vertical spacing (`space-y-6`).
+- Interactive data visualizations with AG Charts React and AG Grid Enterprise for tables.
+- Single-page, scrollable Work Order forms with numbered subsections.
+- Standardized color codes for action buttons, fixed-width menu items, and specific tab styling.
 
 **Technical Implementations**:
-- **Core PMS Logic**: Distinguishes between immutable Job templates and executable Work Order records with defined lifecycles.
+- **Core PMS Logic**: Manages immutable Job templates and executable Work Orders.
 - **Vessel Context**: Supports dynamic vessel selection and an "All Vessels" aggregate view.
-- **Service Layer**: Business logic is organized into domain-specific services.
+- **Service Layer**: Organizes business logic into domain-specific services.
 - **PMS Dashboard**: Provides analytics and data visualizations.
-- **PMS Submodules**: Offers comprehensive CRUD for Components, Work Orders, Running Hours, Spares, Reports, Modify PMS, and Admin.
-- **Work Order Automation**: Features real-time status computation, vessel-specific filtering, numbering, lead time warnings, and grace period logic.
+- **PMS Submodules**: Comprehensive CRUD for Components, Work Orders, Running Hours, Spares, Reports, Modify PMS, and Admin.
+- **Work Order Automation**: Real-time status computation, vessel-specific filtering, and lead time/grace period logic.
 - **Running Hours Module**: Supports MASTER, INHERITED, and NOT_RH_DRIVEN counter types with delta propagation and safety validations.
-- **Defects Module**: Tracks Condition of Class and recurring defects, integrating with SIRE VIQ 7, with a structured form and target date extension workflow.
-- **Spares Module**: Comprehensive inventory management with many-to-many linking, location-based stock tracking, and audit trails using RECEIVE, CONSUME, and ADJUSTMENT event types.
+- **Defects Module**: Tracks Condition of Class and recurring defects, integrating with SIRE VIQ 7, including a structured form and target date extension workflow.
+- **Spares Module**: Inventory management with many-to-many linking, location-based stock tracking, and audit trails for RECEIVE, CONSUME, ADJUSTMENT events.
 - **Auto-Generation Scheduler**: Automates work order creation for calendar and RH-based jobs.
-- **Admin Module**: Includes bulk data import, data purging, and a Fleet Admin Dashboard with Fleet Vessel Mapping, On-Demand WO Generation, and Postponed WO Reappearance.
+- **Admin Module**: Features bulk data import, data purging, and a Fleet Admin Dashboard with Vessel Mapping, On-Demand WO Generation, and Postponed WO Reappearance.
 - **Role-Based Access Control (RBAC)**: Implements authorization and data isolation for Ship, Office, and PMS Admin roles.
-- **Global Business Rules**: Enforces critical rules like Parent vs Sub-Component RH Authority, Stores Module Isolation, and Work Order naming conventions.
-- **Component Document Storage**: Handles file uploads exclusively via Replit Object Storage.
-- **API Route Prefix**: All API endpoints use the `/technical/api` prefix.
-- **Change Request Workflow**: Implements an "Apply Approved Changes" step with atomic database transactions.
-- **Ship Certificates Admin Module**: Manages ship certificate requirements with a 3-tab interface (Master, Company, Vessel), configurable categories/groups, and prefixed ID formats (`{category}-{seq}`, `CMP-{seq}`, `VES-{seq}`). Integrates with `vessel_certificate_applicability`, `ship_certificates_master`, and `vessel_certificate_data` for display on the Cert & Surveys page.
-- **Ship Surveys Admin Module**: Manages ship survey requirements with a similar 3-tab interface, CRUD functionality, and prefixed ID formats as certificates. Integrates with `vessel_survey_applicability`, `ship_surveys_master`, and `vessel_survey_data` for display on the Cert & Surveys page.
-- **Standard Sequencing Component**: Admin tables use a number input field for sequence reordering, automatically adjusting positions on blur.
+- **Global Business Rules**: Enforces Parent vs Sub-Component RH Authority, Stores Module Isolation, and Work Order naming conventions.
+- **Component Document Storage**: File uploads are exclusively handled via Replit Object Storage.
+- **Change Request Workflow**: Includes an "Apply Approved Changes" step with atomic database transactions.
+- **Certificates & Surveys Admin Modules**: Manage ship certificate and survey requirements via 3-tab interfaces (Master, Company, Vessel), configurable categories/groups, and prefixed ID formats (`{category}-{seq}`, `CMP-{seq}`, `VES-{seq}`). Integrate with `vessel_certificate_applicability`, `ship_certificates_master`, `vessel_certificate_data`, `vessel_survey_applicability`, `ship_surveys_master`, and `vessel_survey_data`.
+- **Standard Sequencing Component**: Admin tables use a number input for sequence reordering with automatic adjustments.
 - **Database Migration Strategy**: Exclusively uses Drizzle file-based SQL migrations.
-- **Vessel Data Source Strategy**: Employs a unified `useVessels()` hook prioritizing local PMS data with fallback to an external master-data API.
-- **ROB Location Stock Synchronization**: Implemented dual-write synchronization between legacy ROB fields and the normalized `spare_location_stock` table for consistent inventory.
-- **Excel Report Standardization**: All Maintenance & Work Order Excel exports use a standardized 18-column template (`STANDARD_WORK_ORDER_COLUMNS` in `server/lib/excelReportStyles.ts`) with status-based full-row highlighting. Color scheme: Light/Dark Orange (due), Light/Dark Red (overdue), Light/Dark Green (completed), Light/Dark Yellow (unplanned), Light/Dark Blue (postponed). Critical Equipment rows use darker color variants. Key rules: Days Left vs Days Overdue are mutually exclusive (show "-" for the other); Running Hours columns show "-" for Calendar-based jobs.
-- **Job Postponement Log Report (Report 1.7)**: Uses dedicated `work_order_postponements` history/audit table to track all postponements. Custom 19-column format includes postponement number, original/new due dates, duration, reason, authorization, approval status, and office notification. Supports multiple postponements per work order as audit trail. Excel export at `/technical/api/reports/postponement-log` with Sky Blue highlighting for postponed rows.
-- **Running Hours Anomaly Detection Report**: Analyzes `running_hours_audit` table to identify unusual patterns. Detects 5 anomaly types: High Increment (>24 hrs/day = Critical), Negative Delta (Critical), Zero Change >7 days (Warning), Irregular Pattern 3x spike (Warning), and Meter Replacement (Info). API at `/technical/api/reports/running-hours-anomaly-detection` with Excel export via POST. Uses severity-based row coloring (red=Critical, yellow=Warning, blue=Info). **Critical note**: Drizzle schema field names are case-sensitive - use `enteredAtUTC`, `previousRH`, `newRH` (not lowercase variants).
-- **Chemicals Inventory & Expiry Tracking**: Extended `stores_items` table with 16 chemical-specific fields (expiry/manufacture dates, batch/lot numbers, shelf life, SDS reference/URL/last updated, hazard classification, UN number, flash point, storage temp range, disposal instructions, PPE requirements, emergency contact). All fields are nullable for backward compatibility. API endpoint at `/technical/api/reports/chemicals-expiry/:vesselId` returns enriched items with computed fields (daysUntilExpiry, expiryStatus, stockStatus, hasSds). Stores.tsx Add/Edit forms show chemical-specific sections (Expiry & Date Info, SDS, Storage & Safety) only when chemicals tab is active. Full report page at `ChemicalsExpiryReport.tsx` with summary cards, expired/expiring alerts, sortable inventory table, SDS compliance tracking, hazard classification breakdown, and PDF export.
-- **Consumption Pattern Analysis Report (Tile 4.3)**: Aggregates `spares_history` CONSUME events joined with `spares` master data. API at `/technical/api/reports/consumption-analysis/:vesselId` (GET for JSON, POST `/excel` for Excel export). Exactly 10 columns: S.No, Part Code, Part Name, Component, Total Consumed, Consumption Events, Current ROB, Min Stock, Status (Critical/Normal), Last Consumed (DD-MMM-YYYY). Sorted by Total Consumed DESC then Part Code ASC. PDF generated client-side via `pdfReportGenerator` in landscape orientation. Both PDF and Excel use the same API data source ensuring identical output.
-- **Low Stock Alert Report (Stores/Lubes/Chemicals)**: Monitors stores inventory items below minimum stock levels. API at `/technical/api/reports/stores-low-stock-alert/:vesselId` (GET for JSON with category/priority/location query filters, POST `/excel` for Excel export). Priority classification: Critical (ROB=0), High (ROB < 50% of Min), Medium (ROB >= 50% of Min and <= Min). Calculates average monthly consumption from `stores_ledger` CONSUME events (last 90 days), days until stockout, deficit quantities, and estimated reorder costs. Frontend at `LowStockAlertReport.tsx` with 8 summary cards (2 rows), 3 priority alert sections (Critical/High/Medium with colored alert boxes), full sortable table with 15 columns, category breakdown visual bars, recommended actions box, and PDF/Excel export. **Important**: `stores_items.item_type` uses 'lubes' (not 'lubricants') in the database - all filters and counts handle both variants. Note: A separate spares-based low-stock endpoint exists at `/technical/api/reports/low-stock-alert/:vesselId` for the Spares module.
+- **Vessel Data Source Strategy**: `useVessels()` hook prioritizes local PMS data with fallback to an external master-data API.
+- **ROB Location Stock Synchronization**: Dual-write synchronization between legacy ROB fields and `spare_location_stock` table.
+- **Excel Report Standardization**: All Maintenance & Work Order Excel exports use a standardized 18-column template with status-based full-row highlighting and a defined color scheme (Orange, Red, Green, Yellow, Blue).
+- **Job Postponement Log Report**: Uses `work_order_postponements` table to track all postponements, with a 19-column Excel export including audit trail.
+- **Running Hours Anomaly Detection Report**: Analyzes `running_hours_audit` for 5 anomaly types (High Increment, Negative Delta, Zero Change, Irregular Pattern, Meter Replacement) with severity-based coloring in Excel export.
+- **Chemicals Inventory & Expiry Tracking**: Extends `stores_items` with 16 chemical-specific fields. Provides an expiry report with computed fields, summary cards, alerts, and PDF export.
+- **Consumption Pattern Analysis Report**: Aggregates `spares_history` CONSUME events, generating a 10-column report with total consumed, consumption events, current ROB, min stock, status, and last consumed date. Supports PDF and Excel export.
+- **Low Stock Alert Report (Stores/Lubes/Chemicals)**: Monitors inventory below minimum levels, classifying alerts (Critical, High, Medium). Calculates average monthly consumption, days until stockout, deficit quantities, and estimated reorder costs. Supports PDF, Excel, and JSON output with a 13-column format and a comprehensive frontend display including summary cards and priority alerts.
+- **Report Snapshot Audit Trail**: `report_snapshots` table stores a complete record of report generations/exports, including filters, summary, and item-level data. Snapshots are saved asynchronously, with a history API for retrieval and detailed viewing.
 
 ## External Dependencies
 *   **Frontend**: `@radix-ui/*`, `@tanstack/react-query`, `wouter`, `tailwindcss`, `lucide-react`
