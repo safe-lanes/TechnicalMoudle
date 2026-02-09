@@ -83,7 +83,7 @@ A detailed V2 modular architecture plan is documented at `docs/V2-Component-Modu
 - **Route Prefix**: `/technical/api/v2/components/*` for V2 endpoints (RESTful structure: `GET /`, `GET /:id`, `POST /`, `PATCH /:id`, `DELETE /:id`, `PATCH /:id/status`, sub-resources via `/:componentId/documents`, `/:componentId/class-regulatory`, `/:componentId/requisitions`, `/:componentId/maintenance-history`).
 - **Frontend Toggle**: `localStorage('pms_api_version')` switches between legacy and V2 API endpoints at runtime. Toggle UI visible on Components page header.
 - **Backward Compatibility**: Toggle defaults to "Legacy". Both route sets always registered. Instant rollback by switching toggle — same data, same database, zero data loss.
-- **Scope**: Component module only (bulk upload + CRUD + sub-entities). Other modules to follow the same pattern.
+- **Scope**: Component module (CRUD + sub-entities) and Bulk Upload module. Other modules to follow the same pattern.
 - **Backend Files**: `server/v2/components/` (repository, services, controllers, routes), `shared/v2/components/` (schema, types).
 - **Frontend Files**: `client/src/modules/components/` (api/componentApiV2.ts, hooks/useApiVersion.ts, components/ComponentApiToggle.tsx).
 - **Toggle-Aware Queries**: Components page main queries (component list, maintenance history, documents, class-regulatory, requisitions) all use toggle-aware URL builders that switch between legacy and V2 endpoints based on localStorage toggle state.
@@ -97,6 +97,18 @@ A detailed V2 modular architecture plan is documented at `docs/V2-Component-Modu
   - `storage.getInheritedComponents()` → `repo.getInheritedComponents()` (vessel isolation safeguard)
   - Document/ClassReg/Requisition/History CRUD → dedicated repo methods with direct Drizzle queries
   - Bulk upload → `repo.bulkCreateComponents()` with transaction support
+
+## V2 Architecture (Bulk Upload Module) — SELF-CONTAINED (Zero Legacy Dependencies)
+Follows identical architectural principles as V2 Component module above:
+- **Route Prefix**: `/technical/api/v2/bulk/*` (POST `/sheets`, POST `/dry-run`, POST `/import`, GET `/history`, GET `/history/:id/download-original`, GET `/history/:id/:fileType`, POST `/undo/:historyId`, GET `/template`).
+- **Backend Files**: `server/v2/bulk/` (schema.ts, repositories/bulkRepository.ts, services/{bulkSheetService, bulkDryRunService, bulkImportService, bulkHistoryService, bulkUndoService, bulkTemplateService}.ts, controllers/bulkController.ts, routes.ts, cache/dryRunCache.ts, services/errors.ts, services/types/strategyTypes.ts).
+- **V2-Local Utilities**: `server/v2/bulk/utils/sfiLookup.ts` (SFI code-to-name lookup from CSV), `server/v2/bulk/utils/dateUtils.ts` (Excel date normalization) — duplicated from legacy to maintain zero-dependency constraint.
+- **Frontend Files**: `client/src/modules/components/api/bulkApiV2.ts` (toggle-aware URL builders for all 8 bulk endpoints).
+- **Dry-Run Cache Isolation**: V2 has its own separate in-memory Map for fileToken caching — tokens are NOT interchangeable between legacy and V2 by design.
+- **History Format**: V2 writes identical JSON structure to `uploads/bulk-imports/history/` ensuring cross-mode visibility (history created in V2 mode is visible in legacy mode and vice versa).
+- **Component Import Logic**: Maker auto-creation (MKR-000001 format), SFI hierarchy parent creation (sorted by depth), explicit parent vs auto-derived handling, add/update/upsert modes, RH counter type mapping (MASTER/INHERITED/NOT_RH_DRIVEN), archive missing support.
+- **Undo Logic**: MD5 checksum conflict detection — compares current DB row checksums against import-time snapshots to detect post-import modifications before reversal.
+- **Repository Layer**: 13 direct Drizzle ORM methods via `getDb()` for components, makers, jobs, import_history CRUD.
 
 ## External Dependencies
 *   **Frontend**: `@radix-ui/*`, `@tanstack/react-query`, `wouter`, `tailwindcss`, `lucide-react`

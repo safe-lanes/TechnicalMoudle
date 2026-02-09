@@ -58,6 +58,16 @@ import { useQuery } from "@tanstack/react-query";
 import { queryClient } from "@/lib/queryClient";
 import { invalidateAfterBulkImport } from "@/lib/cacheInvalidation";
 import { LucideIcon } from "lucide-react";
+import {
+  getBulkHistoryUrl,
+  getBulkHistoryQueryKey,
+  getBulkTemplateUrl,
+  getBulkSheetsUrl,
+  getBulkDryRunUrl,
+  getBulkImportUrl,
+  getBulkUndoUrl,
+  getBulkDownloadOriginalUrl,
+} from "@/modules/components/api/bulkApiV2";
 
 interface FieldMapping {
   field: string;
@@ -176,9 +186,9 @@ export default function UniformBulkUpload({
   const { toast } = useToast();
 
   const { data: historyData, isLoading: historyLoading } = useQuery<{items: ImportHistory[], total: number}>({
-    queryKey: ['/technical/api/bulk/history', templateType],
+    queryKey: getBulkHistoryQueryKey(templateType),
     queryFn: async () => {
-      const response = await fetch(`/technical/api/bulk/history?type=${templateType}&limit=50`);
+      const response = await fetch(getBulkHistoryUrl(templateType));
       if (!response.ok) throw new Error('Failed to fetch history');
       return response.json();
     }
@@ -188,7 +198,7 @@ export default function UniformBulkUpload({
 
   const handleDownloadTemplate = async () => {
     try {
-      const response = await fetch(`/technical/api/bulk/template?type=${templateType}&vesselId=${vesselId}`);
+      const response = await fetch(getBulkTemplateUrl(templateType, vesselId));
       if (!response.ok) throw new Error('Failed to download template');
       
       const blob = await response.blob();
@@ -223,7 +233,7 @@ export default function UniformBulkUpload({
     formData.append('file', file);
 
     try {
-      const response = await fetch('/technical/api/bulk/sheets', {
+      const response = await fetch(getBulkSheetsUrl(), {
         method: 'POST',
         body: formData
       });
@@ -330,7 +340,7 @@ export default function UniformBulkUpload({
     }
 
     try {
-      const response = await fetch('/technical/api/bulk/dry-run', {
+      const response = await fetch(getBulkDryRunUrl(), {
         method: 'POST',
         body: formData
       });
@@ -394,7 +404,7 @@ export default function UniformBulkUpload({
         requestBody.storeType = selectedStoreType;
       }
 
-      const response = await fetch('/technical/api/bulk/import', {
+      const response = await fetch(getBulkImportUrl(), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(requestBody)
@@ -422,7 +432,7 @@ export default function UniformBulkUpload({
         setSelectedStoreType('');
       }
       
-      queryClient.invalidateQueries({ queryKey: ['/technical/api/bulk/history', templateType] });
+      queryClient.invalidateQueries({ queryKey: getBulkHistoryQueryKey(templateType) });
       
       // Invalidate domain-specific caches to ensure fresh data displays
       invalidateAfterBulkImport(templateType, vesselId);
@@ -503,7 +513,7 @@ export default function UniformBulkUpload({
     setIsUndoing(true);
     
     try {
-      const response = await fetch(`/technical/api/bulk/undo/${selectedHistoryId}`, {
+      const response = await fetch(getBulkUndoUrl(selectedHistoryId), {
         method: 'POST'
       });
       
@@ -519,7 +529,7 @@ export default function UniformBulkUpload({
         description: `Deleted: ${result.deleted}, Restored: ${result.restored}, Unarchived: ${result.unarchived}`
       });
       
-      queryClient.invalidateQueries({ queryKey: ['/technical/api/bulk/history', templateType] });
+      queryClient.invalidateQueries({ queryKey: getBulkHistoryQueryKey(templateType) });
       
       // Invalidate domain-specific caches after undo
       invalidateAfterBulkImport(templateType, vesselId);
@@ -559,7 +569,7 @@ export default function UniformBulkUpload({
 
   const handleDownloadOriginalFile = async (historyId: string, fileName?: string) => {
     try {
-      const response = await fetch(`/technical/api/bulk/history/${historyId}/download-original`);
+      const response = await fetch(getBulkDownloadOriginalUrl(historyId));
       
       if (!response.ok) {
         const error = await response.json();

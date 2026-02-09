@@ -29,7 +29,9 @@ export function useApiVersion() {
       const key = query.queryKey[0];
       if (typeof key !== 'string') return false;
       return key.startsWith('/technical/api/component') || 
-             key.startsWith('/technical/api/v2/components');
+             key.startsWith('/technical/api/v2/components') ||
+             key.startsWith('/technical/api/bulk') ||
+             key.startsWith('/technical/api/v2/bulk');
     }});
   }, [mode]);
 

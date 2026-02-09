@@ -49,6 +49,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.use('/technical/api/v2/components', v2Components.router);
   console.log('V2 Component module registered at /technical/api/v2/components/*');
 
+  // Register V2 Bulk Upload Module routes (additive — legacy /technical/api/bulk routes remain unchanged)
+  const { createBulkRouter } = await import("./v2/bulk/routes");
+  const v2BulkRouter = createBulkRouter();
+  app.use('/technical/api/v2/bulk', v2BulkRouter);
+  console.log('V2 Bulk module registered at /technical/api/v2/bulk/*');
+
   // Documentation download endpoint
   app.get("/download/docs/:filename", (req, res) => {
     const filename = req.params.filename;
