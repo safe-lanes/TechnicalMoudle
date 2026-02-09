@@ -68,6 +68,7 @@ interface StoreItem {
   hazardClassification?: string;
   manufactureDate?: string;
   sdsReference?: string;
+  shelfLifeMonths?: number;
 }
 
 interface StoresHistoryItem {
@@ -124,6 +125,7 @@ interface StoresApiItem {
   hazardClassification?: string;
   manufactureDate?: string;
   sdsReference?: string;
+  shelfLifeMonths?: number;
 }
 
 const Stores: React.FC = () => {
@@ -448,7 +450,8 @@ const Stores: React.FC = () => {
     batchNumber: "",
     hazardClassification: "",
     sdsReference: "",
-    manufactureDate: ""
+    manufactureDate: "",
+    shelfLifeMonths: 0,
   });
   
   // Add Store modal state
@@ -495,6 +498,80 @@ const Stores: React.FC = () => {
     emergencyContact: "",
   });
   
+  const [expiryAutoWarning, setExpiryAutoWarning] = useState<string>("");
+
+  const calculateExpiryFromManufacture = (mfgDate: string, shelfMonths: number): string => {
+    if (!mfgDate || !shelfMonths || shelfMonths <= 0) return "";
+    const d = new Date(mfgDate);
+    if (isNaN(d.getTime())) return "";
+    d.setMonth(d.getMonth() + shelfMonths);
+    return d.toISOString().split('T')[0];
+  };
+
+  const handleAddManufactureDateChange = (value: string) => {
+    const updated = { ...addStoreForm, manufactureDate: value };
+    if (value && addStoreForm.shelfLifeMonths > 0) {
+      const calc = calculateExpiryFromManufacture(value, addStoreForm.shelfLifeMonths);
+      if (calc) {
+        updated.expiryDate = calc;
+        setExpiryAutoWarning("");
+      }
+    }
+    setAddStoreForm(updated);
+  };
+
+  const handleAddShelfLifeChange = (value: number) => {
+    const updated = { ...addStoreForm, shelfLifeMonths: value };
+    if (addStoreForm.manufactureDate && value > 0) {
+      const calc = calculateExpiryFromManufacture(addStoreForm.manufactureDate, value);
+      if (calc) {
+        updated.expiryDate = calc;
+        setExpiryAutoWarning("");
+      }
+    }
+    setAddStoreForm(updated);
+  };
+
+  const handleAddExpiryDateManualChange = (value: string) => {
+    const updated = { ...addStoreForm, expiryDate: value };
+    if (value && addStoreForm.manufactureDate && addStoreForm.shelfLifeMonths > 0) {
+      const calc = calculateExpiryFromManufacture(addStoreForm.manufactureDate, addStoreForm.shelfLifeMonths);
+      if (calc && value !== calc) {
+        setExpiryAutoWarning(`Auto-calculated expiry would be ${calc}. You've entered a different date.`);
+      } else {
+        setExpiryAutoWarning("");
+      }
+    } else {
+      setExpiryAutoWarning("");
+    }
+    setAddStoreForm(updated);
+  };
+
+  const handleEditManufactureDateChange = (value: string) => {
+    const updated = { ...editForm, manufactureDate: value };
+    const shelfLife = editForm.shelfLifeMonths || 0;
+    if (value && shelfLife > 0) {
+      const calc = calculateExpiryFromManufacture(value, shelfLife);
+      if (calc) {
+        updated.expiryDate = calc;
+        setExpiryAutoWarning("");
+      }
+    }
+    setEditForm(updated);
+  };
+
+  const handleEditShelfLifeChange = (value: number) => {
+    const updated = { ...editForm, shelfLifeMonths: value };
+    if (editForm.manufactureDate && value > 0) {
+      const calc = calculateExpiryFromManufacture(editForm.manufactureDate, value);
+      if (calc) {
+        updated.expiryDate = calc;
+        setExpiryAutoWarning("");
+      }
+    }
+    setEditForm(updated);
+  };
+
   // Store category options
   const STORE_CATEGORY_OPTIONS = [
     "General Stores",
@@ -808,7 +885,8 @@ const Stores: React.FC = () => {
       batchNumber: item.batchNumber || '',
       hazardClassification: item.hazardClassification || '',
       sdsReference: item.sdsReference || '',
-      manufactureDate: item.manufactureDate || ''
+      manufactureDate: item.manufactureDate || '',
+      shelfLifeMonths: item.shelfLifeMonths || 0,
     });
     
     // In modify mode, store original data for change tracking
@@ -1066,6 +1144,7 @@ const Stores: React.FC = () => {
         hazardClassification: activeTab === 'chemicals' ? (editForm.hazardClassification || null) : undefined,
         sdsReference: activeTab === 'chemicals' ? (editForm.sdsReference || null) : undefined,
         manufactureDate: activeTab === 'chemicals' ? (editForm.manufactureDate || null) : undefined,
+        shelfLifeMonths: activeTab === 'chemicals' ? (editForm.shelfLifeMonths || null) : undefined,
       };
       
       // Call API to persist changes
@@ -2022,7 +2101,23 @@ const Stores: React.FC = () => {
                 <div className="grid grid-cols-2 gap-4">
                   <div className="grid gap-2">
                     <Label>Expiry Date</Label>
-                    <Input type="date" value={editForm.expiryDate} onChange={(e) => setEditForm({...editForm, expiryDate: e.target.value})} data-testid="input-edit-expiry-date" />
+                    <Input type="date" value={editForm.expiryDate} onChange={(e) => {
+                      setEditForm({...editForm, expiryDate: e.target.value});
+                      const shelfLife = editForm.shelfLifeMonths || 0;
+                      if (e.target.value && editForm.manufactureDate && shelfLife > 0) {
+                        const calc = calculateExpiryFromManufacture(editForm.manufactureDate, shelfLife);
+                        if (calc && e.target.value !== calc) {
+                          setExpiryAutoWarning(`Auto-calculated expiry would be ${calc}. You've entered a different date.`);
+                        } else {
+                          setExpiryAutoWarning("");
+                        }
+                      } else {
+                        setExpiryAutoWarning("");
+                      }
+                    }} data-testid="input-edit-expiry-date" />
+                    {expiryAutoWarning && (
+                      <p className="text-xs text-amber-600 mt-1">{expiryAutoWarning}</p>
+                    )}
                   </div>
                   <div className="grid gap-2">
                     <Label>Batch Number</Label>
@@ -2030,7 +2125,11 @@ const Stores: React.FC = () => {
                   </div>
                   <div className="grid gap-2">
                     <Label>Manufacture Date</Label>
-                    <Input type="date" value={editForm.manufactureDate} onChange={(e) => setEditForm({...editForm, manufactureDate: e.target.value})} data-testid="input-edit-manufacture-date" />
+                    <Input type="date" value={editForm.manufactureDate} onChange={(e) => handleEditManufactureDateChange(e.target.value)} data-testid="input-edit-manufacture-date" />
+                  </div>
+                  <div className="grid gap-2">
+                    <Label>Shelf Life (months)</Label>
+                    <Input type="number" min="0" value={editForm.shelfLifeMonths || ""} onChange={(e) => handleEditShelfLifeChange(parseInt(e.target.value) || 0)} placeholder="e.g., 24" data-testid="input-edit-shelf-life" />
                   </div>
                   <div className="grid gap-2">
                     <Label>Hazard Classification</Label>
@@ -2371,7 +2470,7 @@ const Stores: React.FC = () => {
                       id="addManufactureDate"
                       type="date"
                       value={addStoreForm.manufactureDate}
-                      onChange={(e) => setAddStoreForm({...addStoreForm, manufactureDate: e.target.value})}
+                      onChange={(e) => handleAddManufactureDateChange(e.target.value)}
                       data-testid="input-add-store-manufacture-date"
                     />
                   </div>
@@ -2381,9 +2480,12 @@ const Stores: React.FC = () => {
                       id="addExpiryDate"
                       type="date"
                       value={addStoreForm.expiryDate}
-                      onChange={(e) => setAddStoreForm({...addStoreForm, expiryDate: e.target.value})}
+                      onChange={(e) => handleAddExpiryDateManualChange(e.target.value)}
                       data-testid="input-add-store-expiry-date"
                     />
+                    {expiryAutoWarning && (
+                      <p className="text-xs text-amber-600 mt-1">{expiryAutoWarning}</p>
+                    )}
                   </div>
                   <div className="grid gap-2">
                     <Label htmlFor="addBatchNumber">Batch Number</Label>
@@ -2412,7 +2514,7 @@ const Stores: React.FC = () => {
                       type="number"
                       min="0"
                       value={addStoreForm.shelfLifeMonths || ""}
-                      onChange={(e) => setAddStoreForm({...addStoreForm, shelfLifeMonths: parseInt(e.target.value) || 0})}
+                      onChange={(e) => handleAddShelfLifeChange(parseInt(e.target.value) || 0)}
                       placeholder="e.g., 24"
                       data-testid="input-add-store-shelf-life"
                     />

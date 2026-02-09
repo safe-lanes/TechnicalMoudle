@@ -23,6 +23,9 @@ interface StoreItem {
   category: "stores" | "lubes" | "chemicals" | "others";
   robLocationA?: number;
   robLocationB?: number;
+  expiryDate?: string;
+  batchNumber?: string;
+  sdsReference?: string;
 }
 
 const ITEMS_PER_PAGE_OPTIONS = [10, 25, 50, 100];
@@ -40,6 +43,11 @@ export default function BulkUpdateStores() {
   const [dateReceived, setDateReceived] = useState("");
   const [placeReceived, setPlaceReceived] = useState("");
   const [bulkUpdateData, setBulkUpdateData] = useState<{[key: number]: {consumedLocationA: number, consumedLocationB: number, receivedLocationA: number, receivedLocationB: number, comments?: string}}>({});
+
+  const [chemBulkData, setChemBulkData] = useState<{[key: number]: {expiryDate?: string, batchNumber?: string, sdsReference?: string}}>({});
+  const [bulkExpiryDate, setBulkExpiryDate] = useState("");
+  const [bulkBatchNumber, setBulkBatchNumber] = useState("");
+  const [bulkSdsReference, setBulkSdsReference] = useState("");
   
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(25);
@@ -85,7 +93,10 @@ export default function BulkUpdateStores() {
       location2: item.location2 || item.locationB || '',
       category: item.itemType || 'stores',
       robLocationA: parseFloat(item.robLocationA) || 0,
-      robLocationB: parseFloat(item.robLocationB) || 0
+      robLocationB: parseFloat(item.robLocationB) || 0,
+      expiryDate: item.expiryDate || '',
+      batchNumber: item.batchNumber || '',
+      sdsReference: item.sdsReference || '',
     })) as StoreItem[];
   }, [storesData]);
 
@@ -214,6 +225,86 @@ export default function BulkUpdateStores() {
     bulkUpdateMutation.mutate({ consumeItems, receiveItems });
   };
 
+  const chemUpdateMutation = useMutation({
+    mutationFn: async (updates: {itemId: number, data: any}[]) => {
+      const results = [];
+      for (const update of updates) {
+        const res = await apiRequest('PUT', `/technical/api/stores/item/${update.itemId}`, update.data);
+        results.push(res);
+      }
+      return results;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [`/technical/api/stores/${vesselId}?itemType=${activeTab}`] });
+      toast({ title: "Success", description: "Chemical fields updated successfully" });
+    },
+    onError: (error: any) => {
+      toast({ title: "Error", description: error.message || "Failed to update chemical fields", variant: "destructive" });
+    }
+  });
+
+  const handleSaveChemUpdates = async () => {
+    const updates: {itemId: number, data: any}[] = [];
+    Object.entries(chemBulkData).forEach(([id, data]) => {
+      const itemId = Number(id);
+      const item = items.find(i => i.id === itemId);
+      if (!item) return;
+      const changed: any = {};
+      if (data.expiryDate !== undefined && data.expiryDate !== item.expiryDate) changed.expiryDate = data.expiryDate;
+      if (data.batchNumber !== undefined && data.batchNumber !== item.batchNumber) changed.batchNumber = data.batchNumber;
+      if (data.sdsReference !== undefined && data.sdsReference !== item.sdsReference) changed.sdsReference = data.sdsReference;
+      if (Object.keys(changed).length > 0) {
+        updates.push({ itemId, data: changed });
+      }
+    });
+    if (updates.length === 0) {
+      toast({ title: "No Changes", description: "No chemical field updates to save", variant: "default" });
+      return;
+    }
+    chemUpdateMutation.mutate(updates);
+  };
+
+  const applyBulkExpiryToAll = () => {
+    if (!bulkExpiryDate) return;
+    setChemBulkData(prev => {
+      const updated = { ...prev };
+      items.forEach(item => {
+        updated[item.id] = { ...updated[item.id], expiryDate: bulkExpiryDate };
+      });
+      return updated;
+    });
+  };
+
+  const applyBulkBatchToAll = () => {
+    if (!bulkBatchNumber) return;
+    setChemBulkData(prev => {
+      const updated = { ...prev };
+      items.forEach(item => {
+        updated[item.id] = { ...updated[item.id], batchNumber: bulkBatchNumber };
+      });
+      return updated;
+    });
+  };
+
+  const applyBulkSdsToAll = () => {
+    if (!bulkSdsReference) return;
+    setChemBulkData(prev => {
+      const updated = { ...prev };
+      items.forEach(item => {
+        updated[item.id] = { ...updated[item.id], sdsReference: bulkSdsReference };
+      });
+      return updated;
+    });
+  };
+
+  const hasAnyChemChanges = Object.entries(chemBulkData).some(([id, data]) => {
+    const item = items.find(i => i.id === Number(id));
+    if (!item) return false;
+    return (data.expiryDate !== undefined && data.expiryDate !== item.expiryDate) ||
+           (data.batchNumber !== undefined && data.batchNumber !== item.batchNumber) ||
+           (data.sdsReference !== undefined && data.sdsReference !== item.sdsReference);
+  });
+
   const hasAnyChanges = Object.values(bulkUpdateData).some(data => 
     data.consumedLocationA > 0 || data.consumedLocationB > 0 || data.receivedLocationA > 0 || data.receivedLocationB > 0
   );
@@ -326,6 +417,58 @@ export default function BulkUpdateStores() {
             </div>
           </div>
 
+          {activeTab === "chemicals" && (
+            <div className="grid grid-cols-3 gap-4 p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800">
+              <div>
+                <Label htmlFor="bulk-expiry-date" className="text-sm">Expiry Date (Apply to all)</Label>
+                <div className="flex gap-2 items-center">
+                  <Input
+                    id="bulk-expiry-date"
+                    type="date"
+                    value={bulkExpiryDate}
+                    onChange={(e) => setBulkExpiryDate(e.target.value)}
+                    data-testid="input-bulk-expiry-date"
+                  />
+                  <Button size="sm" variant="outline" onClick={applyBulkExpiryToAll} disabled={!bulkExpiryDate} data-testid="button-apply-expiry-all">
+                    Apply
+                  </Button>
+                </div>
+              </div>
+              <div>
+                <Label htmlFor="bulk-batch-number" className="text-sm">Batch Number (Apply to all)</Label>
+                <div className="flex gap-2 items-center">
+                  <Input
+                    id="bulk-batch-number"
+                    type="text"
+                    placeholder="e.g., BT-2025-001"
+                    value={bulkBatchNumber}
+                    onChange={(e) => setBulkBatchNumber(e.target.value)}
+                    data-testid="input-bulk-batch-number"
+                  />
+                  <Button size="sm" variant="outline" onClick={applyBulkBatchToAll} disabled={!bulkBatchNumber} data-testid="button-apply-batch-all">
+                    Apply
+                  </Button>
+                </div>
+              </div>
+              <div>
+                <Label htmlFor="bulk-sds-reference" className="text-sm">SDS Reference (Apply to all)</Label>
+                <div className="flex gap-2 items-center">
+                  <Input
+                    id="bulk-sds-reference"
+                    type="text"
+                    placeholder="e.g., SDS-2025-001"
+                    value={bulkSdsReference}
+                    onChange={(e) => setBulkSdsReference(e.target.value)}
+                    data-testid="input-bulk-sds-reference"
+                  />
+                  <Button size="sm" variant="outline" onClick={applyBulkSdsToAll} disabled={!bulkSdsReference} data-testid="button-apply-sds-all">
+                    Apply
+                  </Button>
+                </div>
+              </div>
+            </div>
+          )}
+
           <div className="border rounded-lg overflow-hidden bg-white dark:bg-gray-800 flex flex-col flex-1 min-h-0">
             <div className="overflow-auto flex-1">
               <table className="w-full">
@@ -361,6 +504,13 @@ export default function BulkUpdateStores() {
                       </div>
                     </th>
                     <th className="px-2 py-2 text-center text-xs font-medium border-l">New ROB</th>
+                    {activeTab === "chemicals" && (
+                      <>
+                        <th className="px-2 py-2 text-center text-xs font-medium border-l">Expiry Date</th>
+                        <th className="px-2 py-2 text-center text-xs font-medium">Batch #</th>
+                        <th className="px-2 py-2 text-center text-xs font-medium">SDS Ref</th>
+                      </>
+                    )}
                   </tr>
                 </thead>
                 <tbody>
@@ -452,6 +602,48 @@ export default function BulkUpdateStores() {
                             )}
                           </div>
                         </td>
+                        {activeTab === "chemicals" && (
+                          <>
+                            <td className="px-1 py-2 border-l">
+                              <Input
+                                type="date"
+                                value={chemBulkData[item.id]?.expiryDate ?? item.expiryDate ?? ""}
+                                onChange={(e) => setChemBulkData(prev => ({
+                                  ...prev,
+                                  [item.id]: { ...prev[item.id], expiryDate: e.target.value }
+                                }))}
+                                className="w-32 h-7 text-xs"
+                                data-testid={`input-chem-expiry-${item.id}`}
+                              />
+                            </td>
+                            <td className="px-1 py-2">
+                              <Input
+                                type="text"
+                                value={chemBulkData[item.id]?.batchNumber ?? item.batchNumber ?? ""}
+                                onChange={(e) => setChemBulkData(prev => ({
+                                  ...prev,
+                                  [item.id]: { ...prev[item.id], batchNumber: e.target.value }
+                                }))}
+                                className="w-24 h-7 text-xs"
+                                placeholder="Batch #"
+                                data-testid={`input-chem-batch-${item.id}`}
+                              />
+                            </td>
+                            <td className="px-1 py-2">
+                              <Input
+                                type="text"
+                                value={chemBulkData[item.id]?.sdsReference ?? item.sdsReference ?? ""}
+                                onChange={(e) => setChemBulkData(prev => ({
+                                  ...prev,
+                                  [item.id]: { ...prev[item.id], sdsReference: e.target.value }
+                                }))}
+                                className="w-24 h-7 text-xs"
+                                placeholder="SDS Ref"
+                                data-testid={`input-chem-sds-${item.id}`}
+                              />
+                            </td>
+                          </>
+                        )}
                       </tr>
                     );
                   })}
@@ -548,6 +740,16 @@ export default function BulkUpdateStores() {
           >
             {bulkUpdateMutation.isPending ? "Saving..." : "Save Updates"}
           </Button>
+          {activeTab === "chemicals" && (
+            <Button 
+              onClick={handleSaveChemUpdates}
+              disabled={!hasAnyChemChanges || chemUpdateMutation.isPending}
+              className="bg-blue-600 hover:bg-blue-700 text-white"
+              data-testid="button-save-chem-updates"
+            >
+              {chemUpdateMutation.isPending ? "Saving..." : "Save Chemical Fields"}
+            </Button>
+          )}
         </div>
       </div>
     </div>

@@ -8737,6 +8737,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { vesselId } = req.params;
       const userId = req.user?.id?.toString() || 'System';
       const itemData = { ...req.body, vesselId };
+
+      if (itemData.manufactureDate && itemData.expiryDate) {
+        const mfg = new Date(itemData.manufactureDate);
+        const exp = new Date(itemData.expiryDate);
+        if (!isNaN(mfg.getTime()) && !isNaN(exp.getTime()) && exp <= mfg) {
+          return res.status(400).json({ error: "Expiry date must be after manufacture date" });
+        }
+      }
+
       const item = await storage.createStoresItem(itemData, userId);
       res.json(item);
     } catch (error: any) {
@@ -8749,6 +8758,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const itemId = parseInt(req.params.id);
       // Strip ROB fields - these must go through dedicated methods
       const { rob, robLocationA, robLocationB, ...safeData } = req.body;
+
+      if (safeData.manufactureDate && safeData.expiryDate) {
+        const mfg = new Date(safeData.manufactureDate);
+        const exp = new Date(safeData.expiryDate);
+        if (!isNaN(mfg.getTime()) && !isNaN(exp.getTime()) && exp <= mfg) {
+          return res.status(400).json({ error: "Expiry date must be after manufacture date" });
+        }
+      }
+
       const item = await storage.updateStoresItem(itemId, safeData);
       res.json(item);
     } catch (error: any) {
