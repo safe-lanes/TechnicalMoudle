@@ -1,0 +1,18 @@
+{
+  "id": "51dd708d-5922-4b68-9573-5b1fca2ca67b",
+  "type": "fleet-spares",
+  "mode": "upsert",
+  "userId": 1,
+  "startedAt": "2026-02-09T09:54:39.219Z",
+  "completedAt": "2026-02-09T09:54:39.325Z",
+  "status": "complete",
+  "created": 4,
+  "updated": 0,
+  "skipped": 0,
+  "archived": 0,
+  "originalName": "Fleet Spares.xlsx",
+  "storedFilePath": "local:/home/runner/workspace/uploads/bulk-imports/fleet-spares/1770630879325_Fleet_Spares.xlsx",
+  "errorReport": null,
+  "jobComponentLinksCreated": 0,
+  "spareComponentLinksCreated": 0
+}
