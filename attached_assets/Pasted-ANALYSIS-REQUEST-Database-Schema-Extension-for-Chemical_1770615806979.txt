@@ -1,0 +1,80 @@
+ANALYSIS REQUEST: Database Schema Extension for "Chemicals Inventory & Expiry Report"
+
+CONTEXT:
+The PMS system has a "Chemicals Inventory & Expiry Report" planned with the description: "Track chemical inventory, expiry dates, and safety data sheet compliance."
+
+CURRENT DATABASE ANALYSIS:
+I have reviewed the existing Chemicals inventory tables/APIs in the frontend. The current schema includes:
+- Basic inventory fields: Chem Code, Chemical Name, Application Area, UOM, ROB, Min, Max, Stock Status
+- Location tracking: Multiple locations with ROB per location
+- Supplier info: Supplier, Unit Cost, Last Order Date, Lead Time
+- IHM (Inventory of Hazardous Materials): IHM Presence, IHM Evidence Type, IHM Details
+- Transaction history: Received Date, Received Place, Consumed/Received quantities
+
+MISSING CRITICAL FIELDS:
+The following fields are required for the "Chemicals Inventory & Expiry Report" but are NOT present in the current database schema:
+
+1. **Expiry/Date Fields:**
+   - Manufacture Date
+   - Expiry Date
+   - Batch Number / Lot Number
+   - Shelf Life (calculated or manual)
+
+2. **Safety Data Sheet (SDS) Compliance:**
+   - SDS Document Reference / Upload
+   - SDS Last Updated Date
+   - Hazard Classification (Flammable, Toxic, Corrosive, etc.)
+   - UN Number (for hazardous materials)
+   - Flash Point
+   - Storage Temperature Range
+
+3. **Compliance & Safety:**
+   - Disposal Instructions
+   - Emergency Contact Information
+   - PPE Requirements
+   - First Aid Measures reference
+
+TASK REQUIREMENTS:
+
+1. **Database Schema Analysis:**
+   - Analyze the current Chemicals table structure in the database
+   - Identify the exact table name and fields
+   - Check if there are any related tables (e.g., chemical_batches, chemical_documents, etc.)
+   - Verify the database type (PostgreSQL, MySQL, MongoDB, etc.)
+
+2. **Schema Extension Recommendations:**
+   - Propose new fields to be added to the Chemicals table or recommend creating related tables
+   - Suggest appropriate data types for each new field
+   - Recommend indexing strategy for expiry date queries
+   - Consider batch/lot tracking approach (single vs multiple batches per chemical)
+
+3. **Migration Strategy:**
+   - Provide SQL migration scripts to add the new fields
+   - Suggest default values for existing records
+   - Recommend API endpoint modifications needed
+
+4. **Frontend Integration Points:**
+   - Identify which frontend forms need to be updated (Add Chemical, Edit Chemical, Bulk Update)
+   - List which table columns need to show expiry information
+   - Suggest UI components for SDS document upload/management
+
+5. **Report Data Requirements:**
+   For the "Chemicals Inventory & Expiry Report", specify:
+   - Which fields should be displayed in the report table
+   - What calculations are needed (e.g., days until expiry, expired chemicals count)
+   - What filters should be available (expired, expiring soon, by hazard class)
+   - What alerts/notifications should be generated (expiring within 30/60/90 days)
+
+OUTPUT FORMAT:
+Please provide:
+1. Current database schema for chemicals
+2. Proposed schema changes (SQL DDL statements)
+3. List of API endpoints that need modification
+4. List of frontend components that need updates
+5. Data model diagram showing relationships (if creating new tables)
+
+CONSTRAINTS:
+- Maintain backward compatibility with existing data
+- Follow the existing naming conventions in the codebase
+- Ensure the solution supports multiple vessels
+- Consider maritime industry best practices for chemical inventory management
