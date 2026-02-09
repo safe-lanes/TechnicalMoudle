@@ -22,6 +22,7 @@ import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import FleetJobForm from "./FleetJobForm";
 import { Marker } from "@/components/Marker";
+import { getGenerateWoUrl } from "@/modules/components/api/jobsApiV2";
 
 export default function FleetJobsManagement() {
   const { toast } = useToast();
@@ -73,7 +74,7 @@ export default function FleetJobsManagement() {
   // Generate WO on-demand mutation - use raw fetch to preserve JSON error body
   const generateWOMutation = useMutation({
     mutationFn: async ({ jobId, reason }: { jobId: string; reason: 'Planning' | 'Breakdown' | 'Other' }) => {
-      const response = await fetch(`/technical/api/jobs/${jobId}/generate-wo`, {
+      const response = await fetch(getGenerateWoUrl(jobId), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ reason }),

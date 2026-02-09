@@ -33,6 +33,7 @@ import { AdminOnly } from "@/components/RoleGuard";
 import { FEATURES } from '@/config/features';
 import { formatProfessionalDate } from "@/lib/dateUtils";
 import RunningHoursConditionPanel from "@/components/RunningHoursConditionPanel";
+import { getJobsListQueryKey } from "@/modules/components/api/jobsApiV2";
 
 interface AddEditComponentFormProps {
   isOpen: boolean;
@@ -104,7 +105,7 @@ const AddEditComponentForm: React.FC<AddEditComponentFormProps> = ({
   // Fetch related data for sections B-H (only in edit mode)
   // Filter jobs by vesselId at the database level
   const { data: allJobs = [], isLoading: isLoadingJobs } = useQuery<any[]>({
-    queryKey: [`/technical/api/jobs?vesselId=${vesselId}`],
+    queryKey: getJobsListQueryKey(vesselId),
     enabled: isEditMode && !!vesselId,
   });
 

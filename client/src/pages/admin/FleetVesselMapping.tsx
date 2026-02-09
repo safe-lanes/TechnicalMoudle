@@ -38,6 +38,7 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import type { Component, Job, Spare } from "@shared/schema";
+import { getJobsListQueryKey } from "@/modules/components/api/jobsApiV2";
 
 type MappingTab = 'components' | 'jobs' | 'spares';
 
@@ -101,7 +102,7 @@ export default function FleetVesselMapping() {
   });
 
   const { data: vesselJobs = [], isLoading: isLoadingVesselJobs } = useQuery<Job[]>({
-    queryKey: ['/technical/api/jobs', selectedVessel],
+    queryKey: getJobsListQueryKey(selectedVessel),
     enabled: !!selectedVessel,
   });
 
@@ -410,7 +411,7 @@ export default function FleetVesselMapping() {
           onClick={() => {
             queryClient.invalidateQueries({ queryKey: ['/technical/api/fleet/vessel-mappings'] });
             queryClient.invalidateQueries({ queryKey: ['/technical/api/components', selectedVessel] });
-            queryClient.invalidateQueries({ queryKey: ['/technical/api/jobs', selectedVessel] });
+            queryClient.invalidateQueries({ queryKey: getJobsListQueryKey(selectedVessel) });
             queryClient.invalidateQueries({ queryKey: ['/technical/api/spares', selectedVessel] });
           }}
           disabled={isLoading}

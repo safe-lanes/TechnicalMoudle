@@ -31,7 +31,11 @@ export function useApiVersion() {
       return key.startsWith('/technical/api/component') || 
              key.startsWith('/technical/api/v2/components') ||
              key.startsWith('/technical/api/bulk') ||
-             key.startsWith('/technical/api/v2/bulk');
+             key.startsWith('/technical/api/v2/bulk') ||
+             key.startsWith('/technical/api/jobs') ||
+             key.startsWith('/technical/api/v2/jobs') ||
+             key.startsWith('/technical/api/job-maintenance-history') ||
+             key.startsWith('/technical/api/v2/job-maintenance-history');
     }});
   }, [mode]);
 

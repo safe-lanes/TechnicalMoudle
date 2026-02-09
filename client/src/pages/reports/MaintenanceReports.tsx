@@ -29,6 +29,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useVessels } from "@/hooks/useVessels";
 import { useVessel } from "@/contexts/VesselContext";
 import { useQuery } from "@tanstack/react-query";
+import { getJobsListQueryKey } from "@/modules/components/api/jobsApiV2";
 
 interface MaintenanceReport {
   id: string;
@@ -69,7 +70,7 @@ const MaintenanceReports: React.FC<MaintenanceReportsProps> = ({ onBack, globalF
   });
 
   const { data: jobs = [] } = useQuery<any[]>({
-    queryKey: ['/technical/api/jobs', vesselId],
+    queryKey: getJobsListQueryKey(vesselId),
   });
 
   const reports: MaintenanceReport[] = [

@@ -29,6 +29,7 @@ import { ModifyFieldWrapper } from "@/components/modify/ModifyFieldWrapper";
 import { ModifyStickyFooter } from "@/components/modify/ModifyStickyFooter";
 import { useVessels } from "@/hooks/useVessels";
 import { formatProfessionalDate } from "@/lib/dateUtils";
+import { getGenerateWoUrl, getJobsListQueryKey } from "@/modules/components/api/jobsApiV2";
 import {
   Select,
   SelectContent,
@@ -826,7 +827,7 @@ const JobRow: React.FC<{
 
   const generateWOMutation = useMutation({
     mutationFn: async (reason: 'Planning' | 'Breakdown' | 'Other') => {
-      const response = await fetch(`/technical/api/jobs/${job.id}/generate-wo`, {
+      const response = await fetch(getGenerateWoUrl(job.id), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         // Pass activeComponentCode to ensure work order is created with correct component context
@@ -848,7 +849,7 @@ const JobRow: React.FC<{
       queryClient.invalidateQueries({ queryKey: ['/technical/api/work-orders'] });
       // Invalidate all jobs queries (matching any vesselId parameter)
       queryClient.invalidateQueries({ predicate: (query) => 
-        typeof query.queryKey[0] === 'string' && query.queryKey[0].startsWith('/technical/api/jobs')
+        typeof query.queryKey[0] === 'string' && (query.queryKey[0].startsWith('/technical/api/jobs') || query.queryKey[0].startsWith('/technical/api/v2/jobs'))
       });
       setShowReasonDialog(false);
     },
@@ -966,7 +967,7 @@ const WorkOrdersSection: React.FC<{ componentCode: string; componentName: string
   
   // Fetch jobs filtered by vesselId at the database level
   const { data: allJobs = [], isLoading } = useQuery<any[]>({
-    queryKey: [`/technical/api/jobs?vesselId=${vesselId}`],
+    queryKey: getJobsListQueryKey(vesselId),
     enabled: !!vesselId,
   });
   

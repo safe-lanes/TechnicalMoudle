@@ -38,7 +38,7 @@ export default function JobUpload({ vesselId, markers }: JobUploadProps) {
   const handleRefreshData = () => {
     // Invalidate all jobs queries (matching any vesselId parameter)
     queryClient.invalidateQueries({ predicate: (query) => 
-      typeof query.queryKey[0] === 'string' && query.queryKey[0].startsWith('/technical/api/jobs')
+      typeof query.queryKey[0] === 'string' && (query.queryKey[0].startsWith('/technical/api/jobs') || query.queryKey[0].startsWith('/technical/api/v2/jobs'))
     });
   };
 

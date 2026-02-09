@@ -47,9 +47,9 @@ export function invalidateComponents(vesselId?: string) {
 }
 
 export function invalidateJobs(vesselId?: string) {
-  // Use predicate to match all job-related queries
+  // Use predicate to match all job-related queries (both legacy and V2)
   queryClient.invalidateQueries({
-    predicate: (query) => queryKeyMatchesPrefix(query.queryKey, '/technical/api/jobs')
+    predicate: (query) => queryKeyMatchesPrefix(query.queryKey, '/technical/api/jobs') || queryKeyMatchesPrefix(query.queryKey, '/technical/api/v2/jobs')
   });
   
   // Jobs affect work orders

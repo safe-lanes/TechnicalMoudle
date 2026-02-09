@@ -56,6 +56,7 @@ import { PartHeader } from '@/components/PartHeader';
 import { WorkOrderDataTable } from '@/components/WorkOrderDataTable';
 import { StatusPill } from '@/components/StatusPill';
 import { Marker } from "@/components/Marker";
+import { getJobContextQueryKey, getCreateJobUrl, getJobsBaseUrl } from "@/modules/components/api/jobsApiV2";
 
 export interface HistoryWorkOrderPayload {
   template: WorkOrder;
@@ -161,7 +162,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
   // Use job context endpoint for template mode (viewing job template), 
   // work order context endpoint otherwise
   const { data: jobContext, isLoading: isJobContextLoading } = useQuery({
-    queryKey: [`/technical/api/jobs/${workOrderId}/context`],
+    queryKey: getJobContextQueryKey(workOrderId!),
     enabled: !!workOrderId && resolvedMode === 'template'
   });
 
@@ -1638,11 +1639,11 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
         dataScope: 'vessel', // Jobs created from UI are vessel-specific
       };
       
-      const response = await apiRequest('POST', '/technical/api/jobs', jobPayload);
+      const response = await apiRequest('POST', getCreateJobUrl(), jobPayload);
       const result = await response.json();
       
       // Invalidate jobs cache so the new job appears in the list
-      queryClient.invalidateQueries({ queryKey: ['/technical/api/jobs'] });
+      queryClient.invalidateQueries({ queryKey: [getJobsBaseUrl()] });
       
       toast({
         title: "Success",

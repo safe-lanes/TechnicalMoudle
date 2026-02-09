@@ -17,6 +17,7 @@ import { queryClient, apiRequest } from "@/lib/queryClient";
 import { getComponentCategory } from "@/utils/componentUtils";
 import { useVessels } from "@/hooks/useVessels";
 import type { ComponentDocument } from "@shared/schema";
+import { getJobsListQueryKey } from "@/modules/components/api/jobsApiV2";
 
 interface ComponentNode {
   id: string;
@@ -206,7 +207,7 @@ export default function ComponentRegisterAddEdit({
 
   // Filter jobs by vesselId at the database level
   const { data: allJobs = [] } = useQuery<any[]>({
-    queryKey: [`/technical/api/jobs?vesselId=${vesselId}`],
+    queryKey: getJobsListQueryKey(vesselId),
     enabled: isEditMode && !!vesselId,
   });
 

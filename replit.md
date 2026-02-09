@@ -1,7 +1,7 @@
 # Seafarer Technical Management System
 
 ## Overview
-This project is a full-stack Technical Module for a maritime Planned Maintenance System (PMS). Its primary purpose is to manage technical equipment maintenance, scheduling, and performance tracking within the maritime industry. Key capabilities include Certificate & Surveys management, Defect Reporting, and core PMS operations. The system aims to enhance operational efficiency, ensure compliance with maritime regulations, and provide a data-driven approach to maintenance.
+This project is a full-stack Technical Module for a maritime Planned Maintenance System (PMS). It manages technical equipment maintenance, scheduling, and performance tracking, including Certificate & Surveys and Defect Reporting. The system aims to enhance operational efficiency, ensure regulatory compliance, and provide data-driven maintenance within the maritime industry.
 
 ## User Preferences
 Preferred communication style: Simple, everyday language.
@@ -37,78 +37,38 @@ All future database schema changes MUST follow this policy without exception:
     -   Run `drizzle-kit generate` to create the migration SQL file
     -   Review the generated SQL before applying
 
-Note: Existing migrations 001-016 in `server/migrations.ts` remain functional for backward compatibility but no new code-based migrations should be added.
-
 ## System Architecture
-The application employs a modern full-stack architecture with a mobile-first, responsive design. The frontend is developed using React (TypeScript, Vite, Tailwind CSS, shadcn/ui, TanStack Query, Wouter), while the backend is powered by Express.js (TypeScript). PostgreSQL serves as the primary data store.
+The application features a full-stack architecture with a mobile-first, responsive design. The frontend uses React (TypeScript, Vite, Tailwind CSS, shadcn/ui, TanStack Query, Wouter), while the backend is built with Express.js (TypeScript). PostgreSQL is the primary database.
 
 **UI/UX Decisions**:
-- Emphasizes a mobile-first and responsive design philosophy.
-- Utilizes AG Charts React for interactive data visualizations and AG Grid Enterprise for tables, with custom styling and inline editing.
-- Work Order forms are single-page, scrollable designs with numbered subsections.
-- Standardized UI layout includes `p-6` padding for main content, `<div className="space-y-6">` for vertical spacing, consistent header patterns, and specific color codes for action buttons.
-- Menu items have fixed widths, and tabs use a specific background and active state styling.
+- Mobile-first and responsive design.
+- Interactive data visualizations with AG Charts React and tables with AG Grid Enterprise (custom styling, inline editing).
+- Single-page, scrollable Work Order forms with numbered subsections.
+- Standardized UI elements: `p-6` padding, `space-y-6` for vertical spacing, consistent headers, specific button color codes, fixed-width menu items, and distinct tab styling.
 
 **Technical Implementations**:
-- **Core PMS Logic**: Distinguishes between immutable Job templates and executable Work Order records with defined lifecycles.
+- **Core PMS Logic**: Manages immutable Job templates and executable Work Orders with defined lifecycles.
 - **Vessel Context**: Supports dynamic vessel selection and an "All Vessels" aggregate view.
 - **Service Layer**: Business logic is organized into domain-specific services.
 - **PMS Dashboard**: Provides analytics and data visualizations.
-- **PMS Submodules**: Offers comprehensive CRUD for Components, Work Orders, Running Hours, Spares, Reports, Modify PMS, and Admin.
-- **Work Order Automation**: Features real-time status computation, vessel-specific filtering, numbering, lead time warnings, and grace period logic.
+- **PMS Submodules**: Comprehensive CRUD for Components, Work Orders, Running Hours, Spares, Reports, Modify PMS, and Admin.
+- **Work Order Automation**: Real-time status computation, vessel-specific filtering, numbering, lead time warnings, and grace period logic.
 - **Running Hours Module**: Supports MASTER, INHERITED, and NOT_RH_DRIVEN counter types with delta propagation and safety validations.
-- **Defects Module**: Tracks Condition of Class and recurring defects, integrating with SIRE VIQ 7, with a structured form and target date extension workflow.
-- **Spares Module**: Comprehensive inventory management with many-to-many linking, location-based stock tracking, and audit trails using RECEIVE, CONSUME, and ADJUSTMENT event types.
+- **Defects Module**: Tracks Condition of Class and recurring defects, integrates with SIRE VIQ 7, includes structured forms and target date extension workflow.
+- **Spares Module**: Inventory management with many-to-many linking, location-based stock tracking, and audit trails (RECEIVE, CONSUME, ADJUSTMENT events).
 - **Auto-Generation Scheduler**: Automates work order creation for calendar and RH-based jobs.
 - **Admin Module**: Includes bulk data import, data purging, and a Fleet Admin Dashboard with Fleet Vessel Mapping, On-Demand WO Generation, and Postponed WO Reappearance.
 - **Role-Based Access Control (RBAC)**: Implements authorization and data isolation for Ship, Office, and PMS Admin roles.
-- **Global Business Rules**: Enforces critical rules like Parent vs Sub-Component RH Authority, Stores Module Isolation, and Work Order naming conventions.
-- **Component Document Storage**: Handles file uploads exclusively via Replit Object Storage.
-- **API Route Prefix**: All API endpoints use the `/technical/api` prefix.
-- **Change Request Workflow**: Implements an "Apply Approved Changes" step with atomic database transactions.
-- **Ship Certificates Admin Module**: Manages ship certificate requirements with a 3-tab interface (Master, Company, Vessel), configurable categories/groups, and prefixed ID formats (`{category}-{seq}`, `CMP-{seq}`, `VES-{seq}`). Integrates with `vessel_certificate_applicability`, `ship_certificates_master`, and `vessel_certificate_data` for display on the Cert & Surveys page.
-- **Ship Surveys Admin Module**: Manages ship survey requirements with a similar 3-tab interface, CRUD functionality, and prefixed ID formats as certificates. Integrates with `vessel_survey_applicability`, `ship_surveys_master`, and `vessel_survey_data` for display on the Cert & Surveys page.
-- **Standard Sequencing Component**: Admin tables use a number input field for sequence reordering, automatically adjusting positions on blur.
+- **Global Business Rules**: Enforces Parent vs Sub-Component RH Authority, Stores Module Isolation, and Work Order naming conventions.
+- **Component Document Storage**: File uploads handled via Replit Object Storage.
+- **API Route Prefix**: All API endpoints use `/technical/api`.
+- **Change Request Workflow**: Features an "Apply Approved Changes" step with atomic database transactions.
+- **Ship Certificates/Surveys Admin Module**: Manages requirements with a 3-tab interface (Master, Company, Vessel), configurable categories/groups, and prefixed ID formats, integrating with relevant `vessel_` and `ship_` tables.
+- **Standard Sequencing Component**: Admin tables use a number input for reordering with automatic position adjustment.
 - **Database Migration Strategy**: Exclusively uses Drizzle file-based SQL migrations.
-- **Vessel Data Source Strategy**: Employs a unified `useVessels()` hook prioritizing local PMS data with fallback to an external master-data API.
-- **ROB Location Stock Synchronization**: Implemented dual-write synchronization between legacy ROB fields and the normalized `spare_location_stock` table for consistent inventory.
-
-## V2 Architecture (Component Module) — SELF-CONTAINED (Zero Legacy Dependencies)
-A detailed V2 modular architecture plan is documented at `docs/V2-Component-Module-Refactor-Plan.md`. Implementation status and key decisions:
-- **Purely Architectural**: V2 uses 100% the same business rules, validations, and data as legacy. No functional rewrite.
-- **V2 Namespace**: All V2 code lives under `server/v2/`, `shared/v2/`, and `client/src/modules/` — legacy code stays untouched.
-- **Self-Contained Data Access**: V2 uses direct Drizzle ORM queries via `getDb()` — zero imports from `server/storage.ts`, `server/postgresStorage.ts`, or `shared/schema.ts`. Only infrastructure imports permitted: `getDb` (from `server/db.ts`) and `objectStorageClient` (from `server/objectStorage.ts`).
-- **V2 Schema Duplication**: `shared/v2/components/schema.ts` contains its own pgTable definitions (v2Components, v2Jobs, etc.) referencing the same physical SQL tables. These are query-only references — all schema management/migrations remain in legacy `shared/schema.ts`.
-- **Layer Separation**: Repository (direct Drizzle queries) → Service (business logic) → Controller (HTTP concerns, Zod validation) → Routes (RESTful patterns).
-- **Route Prefix**: `/technical/api/v2/components/*` for V2 endpoints (RESTful structure: `GET /`, `GET /:id`, `POST /`, `PATCH /:id`, `DELETE /:id`, `PATCH /:id/status`, sub-resources via `/:componentId/documents`, `/:componentId/class-regulatory`, `/:componentId/requisitions`, `/:componentId/maintenance-history`).
-- **Frontend Toggle**: `localStorage('pms_api_version')` switches between legacy and V2 API endpoints at runtime. Toggle UI visible on Components page header.
-- **Backward Compatibility**: Toggle defaults to "Legacy". Both route sets always registered. Instant rollback by switching toggle — same data, same database, zero data loss.
-- **Scope**: Component module (CRUD + sub-entities) and Bulk Upload module. Other modules to follow the same pattern.
-- **Backend Files**: `server/v2/components/` (repository, services, controllers, routes), `shared/v2/components/` (schema, types).
-- **Frontend Files**: `client/src/modules/components/` (api/componentApiV2.ts, hooks/useApiVersion.ts, components/ComponentApiToggle.tsx).
-- **Toggle-Aware Queries**: Components page main queries (component list, maintenance history, documents, class-regulatory, requisitions) all use toggle-aware URL builders that switch between legacy and V2 endpoints based on localStorage toggle state.
-- **Legacy→V2 Method Mapping** (Repository layer, 25+ methods):
-  - `storage.getComponents()` → `repo.getComponents()` (direct `select().from(v2Components).where()`)
-  - `storage.getComponentById()` → `repo.getComponentById()` (direct query with eq filter)
-  - `storage.createComponent()` → `repo.createComponent()` (direct `insert().values().returning()`)
-  - `storage.updateComponent()` → `repo.updateComponent()` (direct `update().set().where().returning()`)
-  - `storage.inactivateComponent()` → `repo.inactivateComponent()` (cascade: updates children, unlinks jobs, sets status)
-  - `storage.setRunningHours()` → `repo.setRunningHours()` (delta propagation to INHERITED children)
-  - `storage.getInheritedComponents()` → `repo.getInheritedComponents()` (vessel isolation safeguard)
-  - Document/ClassReg/Requisition/History CRUD → dedicated repo methods with direct Drizzle queries
-  - Bulk upload → `repo.bulkCreateComponents()` with transaction support
-
-## V2 Architecture (Bulk Upload Module) — SELF-CONTAINED (Zero Legacy Dependencies)
-Follows identical architectural principles as V2 Component module above:
-- **Route Prefix**: `/technical/api/v2/bulk/*` (POST `/sheets`, POST `/dry-run`, POST `/import`, GET `/history`, GET `/history/:id/download-original`, GET `/history/:id/:fileType`, POST `/undo/:historyId`, GET `/template`).
-- **Backend Files**: `server/v2/bulk/` (schema.ts, repositories/bulkRepository.ts, services/{bulkSheetService, bulkDryRunService, bulkImportService, bulkHistoryService, bulkUndoService, bulkTemplateService}.ts, controllers/bulkController.ts, routes.ts, cache/dryRunCache.ts, services/errors.ts, services/types/strategyTypes.ts).
-- **V2-Local Utilities**: `server/v2/bulk/utils/sfiLookup.ts` (SFI code-to-name lookup from CSV), `server/v2/bulk/utils/dateUtils.ts` (Excel date normalization) — duplicated from legacy to maintain zero-dependency constraint.
-- **Frontend Files**: `client/src/modules/components/api/bulkApiV2.ts` (toggle-aware URL builders for all 8 bulk endpoints).
-- **Dry-Run Cache Isolation**: V2 has its own separate in-memory Map for fileToken caching — tokens are NOT interchangeable between legacy and V2 by design.
-- **History Format**: V2 writes identical JSON structure to `uploads/bulk-imports/history/` ensuring cross-mode visibility (history created in V2 mode is visible in legacy mode and vice versa).
-- **Component Import Logic**: Maker auto-creation (MKR-000001 format), SFI hierarchy parent creation (sorted by depth), explicit parent vs auto-derived handling, add/update/upsert modes, RH counter type mapping (MASTER/INHERITED/NOT_RH_DRIVEN), archive missing support.
-- **Undo Logic**: MD5 checksum conflict detection — compares current DB row checksums against import-time snapshots to detect post-import modifications before reversal.
-- **Repository Layer**: 13 direct Drizzle ORM methods via `getDb()` for components, makers, jobs, import_history CRUD.
+- **Vessel Data Source Strategy**: Unified `useVessels()` hook prioritizes local PMS data with fallback to an external master-data API.
+- **ROB Location Stock Synchronization**: Dual-write synchronization between legacy ROB fields and `spare_location_stock` for consistent inventory.
+- **V2 Modular Architecture**: A self-contained V2 architecture is being implemented for modules like Components, Bulk Upload, and Jobs. This V2 architecture uses direct Drizzle ORM queries, avoids legacy dependencies, and duplicates schemas for isolation. It features a repository-service-controller-routes layer separation and dedicated API prefixes (`/technical/api/v2/*`). A frontend toggle allows runtime switching between legacy and V2 APIs, ensuring backward compatibility and instant rollback.
 
 ## External Dependencies
 *   **Frontend**: `@radix-ui/*`, `@tanstack/react-query`, `wouter`, `tailwindcss`, `lucide-react`

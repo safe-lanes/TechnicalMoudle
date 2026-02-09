@@ -6,6 +6,7 @@ import { useLocation } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useVessel } from "@/contexts/VesselContext";
+import { getJobsListQueryKey } from "@/modules/components/api/jobsApiV2";
 
 interface Job {
   id: string;
@@ -31,7 +32,7 @@ const JobsSelector: React.FC = () => {
 
   // Filter jobs by vesselId at the database level
   const { data: jobs = [], isLoading } = useQuery<Job[]>({
-    queryKey: [`/technical/api/jobs?vesselId=${vesselId}`],
+    queryKey: getJobsListQueryKey(vesselId),
     enabled: !!vesselId,
   });
 

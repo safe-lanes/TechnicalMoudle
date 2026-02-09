@@ -24,6 +24,7 @@ import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useVessel } from "@/contexts/VesselContext";
 import { useUIRole } from "@/contexts/UIRoleContext";
+import { getJobContextQueryKey, getJobContextUrl, getUpdateJobUrl, getJobsBaseUrl } from "@/modules/components/api/jobsApiV2";
 
 const ReadOnlyField: React.FC<{ label: string; value: string | undefined; labelMarker?: string; valueMarker?: string }> = ({ label, value, labelMarker, valueMarker }) => (
   <div className="space-y-1">
@@ -133,7 +134,7 @@ const JobsFormPage: React.FC = () => {
   const activeComponentCode = urlParams.get('activeComponentCode') || '';
 
   const { data: jobContext, isLoading } = useQuery({
-    queryKey: [`/technical/api/jobs/${jobId}/context`],
+    queryKey: getJobContextQueryKey(jobId!),
     enabled: !!jobId
   });
   
@@ -355,10 +356,10 @@ const JobsFormPage: React.FC = () => {
         return;
       }
       
-      await apiRequest('PATCH', `/technical/api/jobs/${jobId}`, updatePayload);
+      await apiRequest('PATCH', getUpdateJobUrl(jobId!), updatePayload);
       
-      queryClient.invalidateQueries({ queryKey: [`/technical/api/jobs/${jobId}/context`] });
-      queryClient.invalidateQueries({ queryKey: ['/technical/api/jobs'] });
+      queryClient.invalidateQueries({ queryKey: getJobContextQueryKey(jobId!) });
+      queryClient.invalidateQueries({ queryKey: [getJobsBaseUrl()] });
       
       toast({
         title: "Changes saved",

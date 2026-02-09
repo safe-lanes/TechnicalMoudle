@@ -2,6 +2,7 @@ import { createContext, useContext, useState, useEffect, useCallback, ReactNode 
 import { offlineStorage, SyncQueueItem } from '@/lib/offlineStorage';
 import { apiRequest } from '@/lib/queryClient';
 import { useToast } from '@/hooks/use-toast';
+import { getCreateJobUrl, getUpdateJobUrl, getDeleteJobUrl } from '@/modules/components/api/jobsApiV2';
 
 interface SyncStatus {
   isOnline: boolean;
@@ -33,34 +34,34 @@ interface OfflineContextType {
 
 const OfflineContext = createContext<OfflineContextType | null>(null);
 
-const ENTITY_ENDPOINTS: Record<string, { create: string; update: (id: string) => string; delete: (id: string) => string }> = {
+const ENTITY_ENDPOINTS: Record<string, { create: () => string; update: (id: string) => string; delete: (id: string) => string }> = {
   component: {
-    create: '/technical/api/components',
+    create: () => '/technical/api/components',
     update: (id) => `/technical/api/components/${id}`,
     delete: (id) => `/technical/api/components/${id}`
   },
   job: {
-    create: '/technical/api/jobs',
-    update: (id) => `/technical/api/jobs/${id}`,
-    delete: (id) => `/technical/api/jobs/${id}`
+    create: () => getCreateJobUrl(),
+    update: (id) => getUpdateJobUrl(id),
+    delete: (id) => getDeleteJobUrl(id)
   },
   workOrder: {
-    create: '/technical/api/work-orders',
+    create: () => '/technical/api/work-orders',
     update: (id) => `/technical/api/work-orders/${id}`,
     delete: (id) => `/technical/api/work-orders/${id}`
   },
   spare: {
-    create: '/technical/api/spares',
+    create: () => '/technical/api/spares',
     update: (id) => `/technical/api/spares/${id}`,
     delete: (id) => `/technical/api/spares/${id}`
   },
   defect: {
-    create: '/technical/api/defects',
+    create: () => '/technical/api/defects',
     update: (id) => `/technical/api/defects/${id}`,
     delete: (id) => `/technical/api/defects/${id}`
   },
   runningHours: {
-    create: '/technical/api/running-hours/cascade-update',
+    create: () => '/technical/api/running-hours/cascade-update',
     update: (id) => `/technical/api/running-hours/cascade-update`,
     delete: (id) => `/technical/api/running-hours/${id}`
   }
@@ -142,7 +143,7 @@ export function OfflineProvider({ children }: { children: ReactNode }) {
           let response;
           switch (item.operation) {
             case 'CREATE':
-              response = await apiRequest('POST', endpoints.create, item.data);
+              response = await apiRequest('POST', endpoints.create(), item.data);
               break;
             case 'UPDATE':
               response = await apiRequest('PATCH', endpoints.update(item.entityId), item.data);
