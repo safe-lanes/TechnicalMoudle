@@ -124,7 +124,7 @@ export function DefectsListModal({ open, onClose, title, defects, canEdit = true
   return (
     <>
       <Dialog open={open} onOpenChange={(isOpen) => !isOpen && onClose()}>
-        <DialogContent className="max-w-[90vw] h-[calc(100vh-10vw)] max-h-[90vh] overflow-hidden flex flex-col">
+        <DialogContent className="max-w-[90vw] h-[calc(100vh-10vw)] max-h-[90vh] overflow-hidden flex flex-col [&>button.absolute]:top-[1.65rem]">
           <DialogHeader className="pb-4 flex flex-row items-center justify-between gap-4">
             <DialogTitle className="text-xl font-semibold text-[#0f4c81]">
               {title}
@@ -132,7 +132,7 @@ export function DefectsListModal({ open, onClose, title, defects, canEdit = true
             <Button
               variant="outline"
               size="sm"
-              className="text-xs text-[#8798ad] border-[#e1e8ed] mr-6"
+              className="text-xs text-[#8798ad] border-[#e1e8ed] mr-8"
               onClick={handleExportPdf}
               data-testid="button-export-defects-pdf"
             >
