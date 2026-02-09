@@ -179,16 +179,20 @@ const StoresReports: React.FC<StoresReportsProps> = ({ onBack, globalFilters }) 
           { header: 'Status', field: 'status', width: 25 }
         ];
 
-        const data = storesItems.map((s: any) => ({
-          itemCode: s.itemCode || '-',
-          itemName: s.itemName || '-',
-          category: s.category || s.itemType || '-',
-          rob: s.rob || 0,
-          min: s.min || 0,
-          locationA: s.locationA || '-',
-          locationB: s.locationB || '-',
-          status: getStockStatus(s.rob || 0, s.min || 0)
-        }));
+        const data = storesItems.map((s: any) => {
+          const rob = parseFloat(String(s.rob)) || 0;
+          const min = parseFloat(String(s.min)) || 0;
+          return {
+            itemCode: s.itemCode || '-',
+            itemName: s.itemName || '-',
+            category: s.category || s.itemType || '-',
+            rob,
+            min,
+            locationA: s.locationA || '-',
+            locationB: s.locationB || '-',
+            status: getStockStatus(rob, min)
+          };
+        });
 
         const summary = [
           { label: 'Total Items', value: data.length },
@@ -217,14 +221,18 @@ const StoresReports: React.FC<StoresReportsProps> = ({ onBack, globalFilters }) 
           { header: 'Status', field: 'status', width: 30 }
         ];
 
-        const data = lubesItems.map((s: any) => ({
-          itemCode: s.itemCode || '-',
-          itemName: s.itemName || '-',
-          rob: s.rob || 0,
-          min: s.min || 0,
-          uom: s.uom || 'L',
-          status: getStockStatus(s.rob || 0, s.min || 0)
-        }));
+        const data = lubesItems.map((s: any) => {
+          const rob = parseFloat(String(s.rob)) || 0;
+          const min = parseFloat(String(s.min)) || 0;
+          return {
+            itemCode: s.itemCode || '-',
+            itemName: s.itemName || '-',
+            rob,
+            min,
+            uom: s.uom || 'L',
+            status: getStockStatus(rob, min)
+          };
+        });
 
         const summary = [
           { label: 'Total Lubes', value: data.length },
@@ -251,13 +259,17 @@ const StoresReports: React.FC<StoresReportsProps> = ({ onBack, globalFilters }) 
           { header: 'Status', field: 'status', width: 30 }
         ];
 
-        const data = chemicalsItems.map((s: any) => ({
-          itemCode: s.itemCode || '-',
-          itemName: s.itemName || '-',
-          rob: s.rob || 0,
-          min: s.min || 0,
-          status: getStockStatus(s.rob || 0, s.min || 0)
-        }));
+        const data = chemicalsItems.map((s: any) => {
+          const rob = parseFloat(String(s.rob)) || 0;
+          const min = parseFloat(String(s.min)) || 0;
+          return {
+            itemCode: s.itemCode || '-',
+            itemName: s.itemName || '-',
+            rob,
+            min,
+            status: getStockStatus(rob, min)
+          };
+        });
 
         const summary = [
           { label: 'Total Chemicals', value: data.length },
@@ -274,7 +286,7 @@ const StoresReports: React.FC<StoresReportsProps> = ({ onBack, globalFilters }) 
       }
 
       case 'stores-low-stock': {
-        const lowStockItems = storesItems.filter((s: any) => (s.rob || 0) <= (s.min || 0));
+        const lowStockItems = storesItems.filter((s: any) => (parseFloat(String(s.rob)) || 0) <= (parseFloat(String(s.min)) || 0));
 
         const columns = [
           { header: 'Item Code', field: 'itemCode', width: 30 },
@@ -286,15 +298,19 @@ const StoresReports: React.FC<StoresReportsProps> = ({ onBack, globalFilters }) 
           { header: 'Status', field: 'status', width: 25 }
         ];
 
-        const data = lowStockItems.map((s: any) => ({
-          itemCode: s.itemCode || '-',
-          itemName: s.itemName || '-',
-          category: s.category || s.itemType || '-',
-          rob: s.rob || 0,
-          min: s.min || 0,
-          shortage: Math.max(0, (s.min || 0) - (s.rob || 0)),
-          status: getStockStatus(s.rob || 0, s.min || 0)
-        }));
+        const data = lowStockItems.map((s: any) => {
+          const rob = parseFloat(String(s.rob)) || 0;
+          const min = parseFloat(String(s.min)) || 0;
+          return {
+            itemCode: s.itemCode || '-',
+            itemName: s.itemName || '-',
+            category: s.category || s.itemType || '-',
+            rob,
+            min,
+            shortage: Math.max(0, min - rob),
+            status: getStockStatus(rob, min)
+          };
+        });
 
         const summary = [
           { label: 'Low Stock Items', value: data.length },
@@ -319,13 +335,17 @@ const StoresReports: React.FC<StoresReportsProps> = ({ onBack, globalFilters }) 
           { header: 'Status', field: 'status', width: 30 }
         ];
 
-        const data = storesItems.map((s: any) => ({
-          itemCode: s.itemCode || '-',
-          itemName: s.itemName || '-',
-          category: s.category || s.itemType || '-',
-          rob: s.rob || 0,
-          status: getStockStatus(s.rob || 0, s.min || 0)
-        }));
+        const data = storesItems.map((s: any) => {
+          const rob = parseFloat(String(s.rob)) || 0;
+          const min = parseFloat(String(s.min)) || 0;
+          return {
+            itemCode: s.itemCode || '-',
+            itemName: s.itemName || '-',
+            category: s.category || s.itemType || '-',
+            rob,
+            status: getStockStatus(rob, min)
+          };
+        });
 
         pdfReportGenerator.generateReport(
           { title: 'Consumption Pattern Analysis', subtitle: 'Historical consumption trends', vessel: vesselName },
