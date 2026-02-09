@@ -1,14 +1,29 @@
-import { useState, useCallback } from "react";
+import { useCallback, useSyncExternalStore } from "react";
 import { queryClient } from "@/lib/queryClient";
 import { getApiMode, setApiMode, type ApiMode } from "../api/componentApiV2";
 
+const listeners = new Set<() => void>();
+
+function subscribe(callback: () => void) {
+  listeners.add(callback);
+  return () => listeners.delete(callback);
+}
+
+function getSnapshot(): ApiMode {
+  return getApiMode();
+}
+
+export function setApiModeAndNotify(newMode: ApiMode) {
+  setApiMode(newMode);
+  listeners.forEach((l) => l());
+}
+
 export function useApiVersion() {
-  const [mode, setMode] = useState<ApiMode>(getApiMode);
+  const mode = useSyncExternalStore(subscribe, getSnapshot, getSnapshot);
 
   const toggleMode = useCallback(() => {
     const newMode: ApiMode = mode === 'legacy' ? 'v2' : 'legacy';
-    setApiMode(newMode);
-    setMode(newMode);
+    setApiModeAndNotify(newMode);
 
     queryClient.invalidateQueries({ predicate: (query) => {
       const key = query.queryKey[0];
