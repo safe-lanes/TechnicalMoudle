@@ -76,7 +76,7 @@ The application employs a modern full-stack architecture with a mobile-first, re
 ## V2 Architecture Planning (Component Module)
 A detailed V2 modular architecture plan has been documented at `docs/V2-Component-Module-Refactor-Plan.md`. Key decisions:
 - **V2 Namespace**: All V2 code lives under `server/v2/`, `shared/v2/`, and `client/src/modules/` — legacy code stays untouched.
-- **V2 Schema**: Uses `serial` PK (used in API paths), 6 mandatory audit columns (`sort_order`, `created_at`, `updated_at`, `created_by_uuid`, `updated_by_uuid`, `is_sync`), all dates as `text`, no JSON columns. Standard delete (no soft delete). Existing implicit relation patterns preserved.
+- **V2 Schema**: Uses `serial` PK (internal) + `component_uuid` (external), 7 mandatory audit columns (`sort_order`, `created_at`, `updated_at`, `created_by_uuid`, `updated_by_uuid`, `is_deleted`, `is_sync`), all dates as `text`, no JSON columns.
 - **Layer Separation**: Repository (DB only) → Service (business logic, audit user injection) → Controller (HTTP concerns, Zod validation) → Routes (RESTful patterns).
 - **Route Prefix**: `/technical/api/v2/components/component/*` for V2 endpoints.
 - **Frontend Toggle**: `localStorage('pms_api_version')` switches between legacy and V2 API endpoints at runtime.

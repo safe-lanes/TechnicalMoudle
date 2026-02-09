@@ -177,8 +177,8 @@ components = pgTable("components", {
 ```
 
 **V2 Gaps Identified:**
-- Uses `text("id")` as PK instead of `serial("id")`
-- No `sort_order`, `created_by_uuid`, `updated_by_uuid`, `is_sync` columns
+- Uses `text("id")` as PK instead of `serial("id")` + `text("component_uuid")`
+- No `sort_order`, `created_by_uuid`, `updated_by_uuid`, `is_deleted`, `is_sync` columns
 - Uses `timestamp` type for dates instead of `text` (YYYY-MM-DD format)
 - Uses `.array()` for `applicableVesselIds` (not a JSON column, but array)
 - No hard FK constraints currently (already soft references) — aligns with V2 rule
@@ -290,10 +290,10 @@ client/src/modules/
 | Current Source | Current Location | V2 Target |
 |----------------|------------------|-----------|
 | `storage.getComponents()` | `server/storage.ts:224` | `componentRepository.findAll()` |
-| `storage.getComponent()` | `server/storage.ts:225` | `componentRepository.findById()` |
+| `storage.getComponent()` | `server/storage.ts:225` | `componentRepository.findByUuid()` |
 | `storage.createComponent()` | `server/storage.ts:227` | `componentRepository.create()` |
 | `storage.updateComponent()` | `server/storage.ts:228` | `componentRepository.update()` |
-| `storage.deleteComponent()` | `server/storage.ts:229` | `componentRepository.remove()` |
+| `storage.deleteComponent()` | `server/storage.ts:229` | `componentRepository.softDelete()` |
 | `storage.bulkUpsertComponents()` | `server/storage.ts:396` | `componentRepository.bulkUpsert()` |
 | `storage.getInheritedComponents()` | `server/storage.ts:267` | `componentRepository.findInherited()` |
 | `storage.setComponentRunningHours()` | `server/storage.ts:293` | `componentService.updateRunningHours()` → repo |
@@ -315,10 +315,11 @@ client/src/modules/
 Table: components_v2
 
 Columns:
-  id                          serial PK           ← Auto-increment primary key, used in API paths
+  id                          serial PK           ← Internal only, never exposed in API
+  component_uuid              text UNIQUE NOT NULL ← External identifier, used in all API paths
   fleet_equipment_code        text
   fleet_equipment_name        text
-  parent_id                   integer             ← Reference to parent component id (existing implicit relation)
+  parent_uuid                 text                ← Soft reference to parent component_uuid
   component_code              text
   name                        text
   component_category          text
@@ -339,7 +340,7 @@ Columns:
   vessel_code                 text
   is_parent                   boolean DEFAULT false
   notes                       text
-  vessel_id                   text                ← Reference to vessel (existing implicit relation)
+  vessel_uuid                 text                ← Soft reference to vessel UUID
   data_scope                  text NOT NULL DEFAULT 'vessel'
   parent_fleet_equipment_code text
   model_number                text
@@ -356,7 +357,7 @@ Columns:
   scope_notes                 text
   rh_counter_type             text NOT NULL DEFAULT 'NOT_RH_DRIVEN'
   rh_counter_source           text
-  rh_master_component_id      integer             ← Reference to master component id (existing implicit relation)
+  rh_master_component_uuid    text                ← Soft reference to master component UUID
   rh_current_master           text
   rh_master_updated_at        text
   rh_master_updated_by        text
@@ -372,27 +373,30 @@ Columns:
   updated_at                  text NOT NULL
   created_by_uuid             text
   updated_by_uuid             text
+  is_deleted                  boolean DEFAULT false ← Soft delete flag
   is_sync                     boolean DEFAULT false
 
 Indexes:
-  idx_v2_comp_vessel          (vessel_id)
-  idx_v2_comp_data_scope      (data_scope)
-  idx_v2_comp_rh_master       (rh_counter_type, vessel_id)
-  idx_v2_comp_parent          (parent_id)
+  idx_v2_comp_uuid            UNIQUE (component_uuid)
+  idx_v2_comp_vessel          (vessel_uuid) WHERE is_deleted = false
+  idx_v2_comp_data_scope      (data_scope) WHERE is_deleted = false
+  idx_v2_comp_rh_master       (rh_counter_type, vessel_uuid) WHERE is_deleted = false
+  idx_v2_comp_parent          (parent_uuid) WHERE is_deleted = false
 ```
 
 ### 3.2 Key Differences: Legacy vs V2
 
 | Aspect | Legacy (`components`) | V2 (`components_v2`) |
 |--------|----------------------|---------------------|
-| Primary Key | `text("id")` — user-provided string | `serial("id")` — auto-increment |
-| API identifier | `/components/:id` (text PK) | `/components/component/:id` (serial PK) |
-| Delete behavior | Hard delete / manual inactivation | Standard delete (same as legacy) |
+| Primary Key | `text("id")` — user-provided string | `serial("id")` — auto-increment, internal |
+| External ID | `id` (same as PK) | `component_uuid` (text, unique) |
+| API identifier | `/components/:id` (text PK) | `/components/:uuid` (component_uuid) |
+| Delete behavior | Hard delete / manual inactivation | Soft delete (`is_deleted = true`) |
 | Date storage | Mixed: `text` for dates, `timestamp` for audit | All `text` (YYYY-MM-DD / ISO 8601) |
-| Audit columns | Only `createdAt`, `updatedAt` | 6 columns: sort_order, created_at, updated_at, created_by_uuid, updated_by_uuid, is_sync |
+| Audit columns | Only `createdAt`, `updatedAt` | All 7: sort_order, created_at, updated_at, created_by_uuid, updated_by_uuid, is_deleted, is_sync |
 | Decimal fields | `decimal("running_hours")` | `text` — parsed in service layer |
 | Array columns | `applicableVesselIds: text().array()` | Dropped (or normalized into separate table if needed) |
-| FK constraints | None (implicit references) | None (existing implicit relation pattern preserved) |
+| FK constraints | None (soft references) | None (V2 rule: soft UUID references only) |
 
 ### 3.3 Drizzle Schema Definition Location
 
@@ -401,7 +405,7 @@ File: shared/v2/components/schema.ts
 
 Contents:
   - componentsV2 pgTable definition
-  - insertComponentV2Schema (Zod via createInsertSchema, omitting id, created_at, updated_at)
+  - insertComponentV2Schema (Zod via createInsertSchema, omitting id, created_at, updated_at, is_deleted)
   - InsertComponentV2 type
   - ComponentV2 type
 ```
@@ -415,6 +419,7 @@ Contents:
 **Rules:**
 - Only layer allowed to access the database
 - Uses Drizzle ORM query builders exclusively
+- Always filters `is_deleted = false` on all read queries
 - No N+1 queries — uses JOINs where needed
 - No business logic
 
@@ -422,15 +427,15 @@ Contents:
 
 | Method | Source Query | Notes |
 |--------|-------------|-------|
-| `findAll(vesselId)` | `SELECT * FROM components_v2 WHERE vessel_id = ?` | Returns all components for vessel |
-| `findById(id)` | `SELECT * FROM components_v2 WHERE id = ?` | Returns single component |
-| `findByCode(vesselId, code)` | `SELECT * FROM components_v2 WHERE vessel_id = ? AND component_code = ?` | Lookup by code |
-| `findInherited(masterId)` | `SELECT * FROM components_v2 WHERE rh_master_component_id = ?` | Find INHERITED children |
+| `findAll(vesselUuid)` | `SELECT * FROM components_v2 WHERE vessel_uuid = ? AND is_deleted = false` | Returns all active components |
+| `findByUuid(uuid)` | `SELECT * FROM components_v2 WHERE component_uuid = ? AND is_deleted = false` | Returns single component |
+| `findByCode(vesselUuid, code)` | `SELECT * FROM components_v2 WHERE vessel_uuid = ? AND component_code = ? AND is_deleted = false` | Lookup by code |
+| `findInherited(masterUuid)` | `SELECT * FROM components_v2 WHERE rh_master_component_uuid = ? AND is_deleted = false` | Find INHERITED children |
 | `create(data)` | `INSERT INTO components_v2 (...)` | Returns created row |
-| `update(id, data)` | `UPDATE components_v2 SET ... WHERE id = ?` | Returns updated row |
-| `remove(id)` | `DELETE FROM components_v2 WHERE id = ?` | Standard delete |
-| `bulkUpsert(rows)` | Drizzle `onConflictDoUpdate` on `component_code + vessel_id` | Returns {created, updated} |
-| `findByCodes(codes, vesselId)` | `SELECT * WHERE component_code IN (?) AND vessel_id = ?` | Batch lookup |
+| `update(uuid, data)` | `UPDATE components_v2 SET ... WHERE component_uuid = ?` | Returns updated row |
+| `softDelete(uuid, userUuid)` | `UPDATE SET is_deleted = true, updated_by_uuid = ?, updated_at = NOW()` | Soft delete only |
+| `bulkUpsert(rows)` | Drizzle `onConflictDoUpdate` on `component_uuid` | Returns {created, updated} |
+| `findByCodes(codes, vesselUuid)` | `SELECT * WHERE component_code IN (?) AND is_deleted = false` | Batch lookup |
 
 ### 4.2 Service Layer (`componentService.ts`)
 
@@ -446,15 +451,15 @@ Contents:
 | Business Rule | Current Location | V2 Service Method |
 |---------------|------------------|-------------------|
 | RH counter type validation (MASTER/INHERITED/NOT_RH_DRIVEN) | routes.ts:5437-5479 | `validateRhRules(data, existingComponent?)` |
-| MASTER downgrade protection (check dependents) | routes.ts:5582-5591 | `validateRhDowngrade(componentId)` |
-| Parent component exists validation | componentService.ts:37-47 | `validateParent(vesselId, parentId)` |
-| RH cascade to inherited components | routes.ts:5594-5618 | `updateRunningHours(id, rhValue, userUuid)` |
-| Component inactivation (block/cascade) | routes.ts:5652-5681 | `inactivateComponent(id, userUuid, cascade?)` |
+| MASTER downgrade protection (check dependents) | routes.ts:5582-5591 | `validateRhDowngrade(componentUuid)` |
+| Parent component exists validation | componentService.ts:37-47 | `validateParent(vesselUuid, parentUuid)` |
+| RH cascade to inherited components | routes.ts:5594-5618 | `updateRunningHours(uuid, rhValue, userUuid)` |
+| Component inactivation (block/cascade) | routes.ts:5652-5681 | `inactivateComponent(uuid, userUuid, cascade?)` |
 | Set audit user on create | Not done currently | `create(data, userUuid)` |
-| Set audit user on update | Not done currently | `update(id, data, userUuid)` |
-| Set audit user on delete | Not done currently | `remove(id, userUuid)` |
-| Build component hierarchy (tree structure) | componentService.ts:99-130 | `getHierarchy(vesselId)` |
-| Build component path (breadcrumb) | componentService.ts:135-161 | `getComponentPath(vesselId, code)` |
+| Set audit user on update | Not done currently | `update(uuid, data, userUuid)` |
+| Set audit user on delete | Not done currently | `softDelete(uuid, userUuid)` |
+| Build component hierarchy (tree structure) | componentService.ts:99-130 | `getHierarchy(vesselUuid)` |
+| Build component path (breadcrumb) | componentService.ts:135-161 | `getComponentPath(vesselUuid, code)` |
 
 ### 4.3 Upload Service (`componentUploadService.ts`)
 
@@ -493,12 +498,12 @@ componentUploadController.upload(req, res)
 
 | Controller Method | HTTP | Calls |
 |-------------------|------|-------|
-| `list(req, res)` | `GET /` | `componentService.getAll(vesselId)` |
-| `getById(req, res)` | `GET /:id` | `componentService.getById(id)` |
+| `list(req, res)` | `GET /` | `componentService.getAll(vesselUuid)` |
+| `getByUuid(req, res)` | `GET /:uuid` | `componentService.getByUuid(uuid)` |
 | `create(req, res)` | `POST /` | Zod validate → `componentService.create(data, userUuid)` |
-| `update(req, res)` | `PATCH /:id` | Zod validate → `componentService.update(id, data, userUuid)` |
-| `remove(req, res)` | `DELETE /:id` | `componentService.remove(id, userUuid)` |
-| `inactivate(req, res)` | `POST /:id/inactivate` | `componentService.inactivateComponent(id, userUuid, cascade)` |
+| `update(req, res)` | `PATCH /:uuid` | Zod validate → `componentService.update(uuid, data, userUuid)` |
+| `remove(req, res)` | `DELETE /:uuid` | `componentService.softDelete(uuid, userUuid)` |
+| `inactivate(req, res)` | `POST /:uuid/inactivate` | `componentService.inactivateComponent(uuid, userUuid, cascade)` |
 
 **Upload Controller (`componentUploadController.ts`):**
 
@@ -516,7 +521,8 @@ These rules are **mandatory** and must be enforced at every layer. Violations mu
 
 | Rule | Enforcement | Layer |
 |------|-------------|-------|
-| **Standard delete** | `DELETE` endpoints perform actual row removal (same behavior as legacy) | Repository |
+| **Soft delete only** | `DELETE` endpoints set `is_deleted = true`, never execute SQL `DELETE` | Repository |
+| **Always filter `is_deleted = false`** | Every read query in the repository appends `.where(eq(table.isDeleted, false))` | Repository |
 | **No N+1 queries** | Repository methods use JOINs or batch queries for related data | Repository |
 | **No direct DB access outside repositories** | Service and controller layers must NOT import Drizzle, `db`, or any table schema. Only repository modules import DB tooling. | Service, Controller |
 | **ORM query builders only** | No raw SQL strings in repository layer. All queries built with Drizzle query builders | Repository |
@@ -525,8 +531,8 @@ These rules are **mandatory** and must be enforced at every layer. Violations mu
 
 | Rule | Enforcement | Layer |
 |------|-------------|-------|
-| **Serial ID in APIs** | Route params use `:id` (serial PK). The auto-increment `id` column is the primary identifier in all API requests and responses (existing implicit relation pattern). | Controller, Routes |
-| **Existing implicit relations preserved** | Parent/child and cross-entity references use the same implicit relation patterns as legacy (integer IDs or text codes) | Schema |
+| **UUIDs in APIs only** | All `:uuid` route params use `component_uuid` (text). Internal serial `id` is NEVER exposed in any response or accepted in any request. | Controller, Routes |
+| **All relations via soft UUID references** | No hard FK constraints in V2 tables. Parent/child and cross-entity references use text UUID columns | Schema |
 | **All dates stored as text** | Date columns use `text` type with `YYYY-MM-DD` format. Timestamp columns use `text` with ISO 8601 format (`YYYY-MM-DDTHH:MM:SSZ`) | Schema |
 
 ### 5.3 Column & Schema Rules
@@ -534,9 +540,10 @@ These rules are **mandatory** and must be enforced at every layer. Violations mu
 | Rule | Enforcement | Layer |
 |------|-------------|-------|
 | **No JSON columns** | V2 schema must not use `json()`, `jsonb()`, or `.array()` column types. Data that requires arrays must be normalized into separate tables or stored as comma-separated text | Schema |
-| **PK: `id` (serial)** | Every V2 table has `id: serial("id").primaryKey()` as auto-increment PK, used in API paths | Schema |
-| **6 mandatory audit columns** | Every V2 table includes: `sort_order` (integer), `created_at` (text), `updated_at` (text), `created_by_uuid` (text), `updated_by_uuid` (text), `is_sync` (boolean) | Schema |
-| **Audit columns appended at end** | Audit columns are always the last 6 columns in the table definition | Schema |
+| **Internal PK: `id` (serial)** | Every V2 table has `id: serial("id").primaryKey()` as auto-increment internal PK | Schema |
+| **External identifier: `{entity}Uuid`** | Every V2 table has `{entity}_uuid: text().unique().notNull()` for external references | Schema |
+| **7 mandatory audit columns** | Every V2 table includes: `sort_order` (integer), `created_at` (text), `updated_at` (text), `created_by_uuid` (text), `updated_by_uuid` (text), `is_deleted` (boolean), `is_sync` (boolean) | Schema |
+| **Audit columns appended at end** | Audit columns are always the last 7 columns in the table definition | Schema |
 
 ### 5.4 Layer Boundary Rules
 
@@ -679,39 +686,40 @@ During the parallel period, data entered via V2 will NOT appear in legacy views 
 **V2 RESTful Route Patterns:**
 
 ```
-GET    /technical/api/v2/components/component            ← List all (query: ?vesselId=)
-GET    /technical/api/v2/components/component/:id        ← Get by ID
+GET    /technical/api/v2/components/component            ← List all (query: ?vesselUuid=)
+GET    /technical/api/v2/components/component/:uuid      ← Get by UUID
 POST   /technical/api/v2/components/component            ← Create
-PATCH  /technical/api/v2/components/component/:id        ← Update
-DELETE /technical/api/v2/components/component/:id        ← Delete
+PATCH  /technical/api/v2/components/component/:uuid      ← Update
+DELETE /technical/api/v2/components/component/:uuid      ← Soft delete
 
 POST   /technical/api/v2/components/component/upload     ← Bulk upload
-POST   /technical/api/v2/components/component/:id/inactivate ← Inactivation
+POST   /technical/api/v2/components/component/:uuid/inactivate ← Inactivation
 
 Nested sub-entities:
-GET    /technical/api/v2/components/component/:id/documents
-POST   /technical/api/v2/components/component/:id/documents
-PATCH  /technical/api/v2/components/document/:id
-DELETE /technical/api/v2/components/document/:id
+GET    /technical/api/v2/components/component/:uuid/documents
+POST   /technical/api/v2/components/component/:uuid/documents
+PATCH  /technical/api/v2/components/document/:uuid
+DELETE /technical/api/v2/components/document/:uuid
 
-GET    /technical/api/v2/components/component/:id/regulatory
-POST   /technical/api/v2/components/component/:id/regulatory
-PATCH  /technical/api/v2/components/regulatory/:id
-DELETE /technical/api/v2/components/regulatory/:id
+GET    /technical/api/v2/components/component/:uuid/regulatory
+POST   /technical/api/v2/components/component/:uuid/regulatory
+PATCH  /technical/api/v2/components/regulatory/:uuid
+DELETE /technical/api/v2/components/regulatory/:uuid
 
-GET    /technical/api/v2/components/component/:id/requisitions
-POST   /technical/api/v2/components/component/:id/requisitions
-PATCH  /technical/api/v2/components/requisition/:id
-DELETE /technical/api/v2/components/requisition/:id
+GET    /technical/api/v2/components/component/:uuid/requisitions
+POST   /technical/api/v2/components/component/:uuid/requisitions
+PATCH  /technical/api/v2/components/requisition/:uuid
+DELETE /technical/api/v2/components/requisition/:uuid
 
-GET    /technical/api/v2/components/component/:id/maintenance-history
+GET    /technical/api/v2/components/component/:uuid/maintenance-history
 ```
 
 **Validation:**
 - [ ] All V2 CRUD endpoints return correct HTTP status codes (200, 201, 400, 404)
 - [ ] Zod validation rejects invalid payloads with 400
-- [ ] All responses use serial `id` as the primary identifier
-- [ ] DELETE performs standard row removal
+- [ ] All responses use `component_uuid` (never expose internal `id`)
+- [ ] All reads filter `is_deleted = false`
+- [ ] DELETE performs soft delete (sets `is_deleted = true`)
 - [ ] Audit columns are populated correctly
 - [ ] Legacy routes remain completely unaffected
 
@@ -791,25 +799,25 @@ export const getApiBase = () => {
 
 // Typed API functions
 export const componentApi = {
-  list: (vesselId: string) =>
-    fetch(`${getApiBase()}?vesselId=${vesselId}`).then(r => r.json()),
+  list: (vesselUuid: string) =>
+    fetch(`${getApiBase()}?vesselUuid=${vesselUuid}`).then(r => r.json()),
 
-  getById: (id: number) =>
-    fetch(`${getApiBase()}/${id}`).then(r => r.json()),
+  getByUuid: (uuid: string) =>
+    fetch(`${getApiBase()}/${uuid}`).then(r => r.json()),
 
   create: (data: CreateComponentV2, auditUserUuid: string) =>
     apiRequest('POST', getApiBase(), { ...data, auditUserUuid }),
 
-  update: (id: number, data: Partial<CreateComponentV2>, auditUserUuid: string) =>
-    apiRequest('PATCH', `${getApiBase()}/${id}`, { ...data, auditUserUuid }),
+  update: (uuid: string, data: Partial<CreateComponentV2>, auditUserUuid: string) =>
+    apiRequest('PATCH', `${getApiBase()}/${uuid}`, { ...data, auditUserUuid }),
 
-  remove: (id: number, auditUserUuid: string) =>
-    apiRequest('DELETE', `${getApiBase()}/${id}`, { auditUserUuid }),
+  remove: (uuid: string, auditUserUuid: string) =>
+    apiRequest('DELETE', `${getApiBase()}/${uuid}`, { auditUserUuid }),
 
-  upload: (file: File, vesselId: string) => {
+  upload: (file: File, vesselUuid: string) => {
     const formData = new FormData();
     formData.append('file', file);
-    formData.append('vesselId', vesselId);
+    formData.append('vesselUuid', vesselUuid);
     return fetch(`${getApiBase()}/upload`, { method: 'POST', body: formData });
   },
 };
@@ -820,9 +828,9 @@ export const componentApi = {
 ```typescript
 // client/src/modules/components/hooks/useComponents.ts
 
-export const useComponents = (vesselId: string) =>
+export const useComponents = (vesselUuid: string) =>
   useQuery({
-    queryKey: [getApiBase(), vesselId],
+    queryKey: [getApiBase(), vesselUuid],
     // Default queryFn already handles fetch
   });
 
@@ -981,7 +989,7 @@ POST /technical/api/v2/components/component/upload
 | Frontend toggle state lost on clear cache | Low | Default to 'legacy' — safest fallback |
 | Performance of separate V2 table | Low | Same indexes, same DB engine |
 | Bulk upload in V2 produces different results than legacy | Medium | Test with identical input files; compare output row by row |
-| Other modules reference legacy component IDs | Medium | V2 table uses its own serial IDs; cross-module queries still use legacy table |
+| Other modules reference legacy component IDs | High | V2 table uses its own UUIDs; cross-module queries still use legacy table |
 | RH cascade in V2 only updates V2 table | Medium | Expected during parallel period; cascade logic is V2-internal |
 
 ### 10.2 Rollback Strategy
@@ -1017,11 +1025,12 @@ POST /technical/api/v2/components/component/upload
 ### Phase 1 — Structural Foundation
 
 - [ ] `server/v2/components/` directory exists with all subfolders
-- [ ] `shared/v2/components/schema.ts` defines `componentsV2` table with all 6 audit columns
+- [ ] `shared/v2/components/schema.ts` defines `componentsV2` table with all 7 audit columns
 - [ ] `shared/v2/components/types.ts` exports insert schema, select type, and request/response types
 - [ ] Migration SQL file generated by `drizzle-kit generate`
 - [ ] `components_v2` table exists in database (verify with `\dt components_v2` or SQL query)
-- [ ] Table has all columns including `sort_order`, `created_at`, `updated_at`, `created_by_uuid`, `updated_by_uuid`, `is_sync`
+- [ ] Table has all columns including `sort_order`, `created_at`, `updated_at`, `created_by_uuid`, `updated_by_uuid`, `is_deleted`, `is_sync`
+- [ ] `component_uuid` column has UNIQUE constraint
 - [ ] `componentRepository.ts` compiles without errors
 - [ ] Legacy `routes.ts` is completely unchanged (diff shows zero modifications)
 - [ ] Legacy `storage.ts` is completely unchanged
@@ -1032,9 +1041,9 @@ POST /technical/api/v2/components/component/upload
 - [ ] `componentService.ts` compiles and has no dependency on HTTP objects
 - [ ] `componentController.ts` never imports from repository layer directly
 - [ ] Zod validation rejects malformed payloads with 400 status
-- [ ] `POST /technical/api/v2/components/component` creates a row in `components_v2` with auto-generated serial `id`
-- [ ] `GET /technical/api/v2/components/component?vesselId=X` returns components for that vessel
-- [ ] `DELETE` performs standard row removal
+- [ ] `POST /technical/api/v2/components/component` creates a row in `components_v2` with generated `component_uuid`
+- [ ] `GET /technical/api/v2/components/component?vesselUuid=X` returns only non-deleted rows
+- [ ] `DELETE` sets `is_deleted = true` (not hard delete)
 - [ ] `created_by_uuid` and `updated_by_uuid` are set on every create/update
 - [ ] RH validation rules produce same errors as legacy for identical invalid input
 - [ ] MASTER downgrade protection works (reject if dependents exist)
@@ -1047,7 +1056,7 @@ POST /technical/api/v2/components/component/upload
 - [ ] Required field validation catches same errors as legacy
 - [ ] Boolean normalization handles: true/false, yes/no, 1/0, Yes/No, TRUE/FALSE
 - [ ] V2 upload endpoint returns same response structure as legacy
-- [ ] Bulk-created rows have auto-generated serial `id`
+- [ ] Bulk-created rows have `component_uuid` generated
 - [ ] Bulk-created rows have `created_by_uuid` set
 - [ ] Legacy upload endpoints (`/components/upload` and `/bulk/import`) unaffected
 
@@ -1096,8 +1105,9 @@ POST /technical/api/v2/components/component/upload
 
 | Rule | How V2 Enforces It |
 |------|-------------------|
-| Standard delete | Repository `remove()` performs actual row deletion via `DELETE` SQL |
-| Serial ID in APIs | All API paths use `:id` param (serial PK). Existing implicit relation patterns preserved. |
+| Soft delete only | Repository `softDelete()` sets `is_deleted = true`; no `DELETE` SQL |
+| Always filter `is_deleted = false` | Repository adds `.where(eq(table.isDeleted, false))` to all reads |
+| UUIDs in APIs only | Controller never exposes `id`; all paths use `:uuid` param |
 | No JSON columns | V2 schema uses only `text`, `boolean`, `integer`, `serial` |
 | No cross-module coupling | V2 component module has no imports from other modules |
 | No DB access outside repositories | Service and controller layers have no Drizzle imports |
