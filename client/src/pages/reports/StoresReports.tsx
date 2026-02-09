@@ -312,46 +312,56 @@ const StoresReports: React.FC<StoresReportsProps> = ({ onBack, globalFilters }) 
       }
 
       case 'low-stock-alert': {
-        const lowStockItems = storesItems.filter((s: any) => {
-          const rob = parseFloat(String(s.rob)) || 0;
-          const min = parseFloat(String(s.min)) || 0;
-          return min > 0 && rob <= min;
+        const reportRes = await fetch(`/technical/api/reports/stores-low-stock-alert/${effectiveVesselId}`, {
+          credentials: 'include',
         });
+        if (!reportRes.ok) throw new Error('Failed to fetch low stock alert data');
+        const reportData = await reportRes.json();
+        const items = reportData.items || [];
+        const reportSummary = reportData.summary || {};
 
         const columns = [
-          { header: 'Item Code', field: 'itemCode', width: 30 },
-          { header: 'Item Name', field: 'itemName', width: 55 },
-          { header: 'Category', field: 'category', width: 30 },
-          { header: 'ROB', field: 'rob', width: 20 },
-          { header: 'Min', field: 'min', width: 20 },
-          { header: 'Shortage', field: 'shortage', width: 25 },
-          { header: 'Status', field: 'status', width: 25 }
+          { header: 'S.No', field: 'sno', width: 12 },
+          { header: 'Priority', field: 'priority', width: 18 },
+          { header: 'Item Code', field: 'itemCode', width: 22 },
+          { header: 'Item Name', field: 'itemName', width: 40 },
+          { header: 'Type', field: 'itemType', width: 20 },
+          { header: 'Category', field: 'category', width: 22 },
+          { header: 'ROB', field: 'rob', width: 15 },
+          { header: 'Min Stock', field: 'minStock', width: 15 },
+          { header: 'Deficit', field: 'deficit', width: 15 },
+          { header: 'UOM', field: 'uom', width: 15 },
+          { header: 'Avg Monthly', field: 'avgMonthly', width: 20 },
+          { header: 'Days to Stockout', field: 'daysToStockout', width: 22 },
+          { header: 'Est. Cost', field: 'estCost', width: 20 },
         ];
 
-        const data = lowStockItems.map((s: any) => {
-          const rob = parseFloat(String(s.rob)) || 0;
-          const min = parseFloat(String(s.min)) || 0;
-          let status = 'Medium';
-          if (rob === 0) status = 'Critical';
-          else if (rob < min * 0.5) status = 'High';
-          return {
-            itemCode: s.itemCode || '-',
-            itemName: s.itemName || '-',
-            category: s.category || s.itemType || '-',
-            rob,
-            min,
-            shortage: Math.max(0, min - rob),
-            status
-          };
-        });
+        const data = items.map((item: any, idx: number) => ({
+          sno: idx + 1,
+          priority: item.priority || '-',
+          itemCode: item.itemCode || '-',
+          itemName: item.itemName || '-',
+          itemType: item.itemType || '-',
+          category: item.category || '-',
+          rob: item.rob,
+          minStock: item.minStock,
+          deficit: item.deficit,
+          uom: item.uom || '-',
+          avgMonthly: item.avgMonthlyConsumption,
+          daysToStockout: item.daysUntilStockout ?? 'N/A',
+          estCost: item.estimatedCost !== null ? `$${item.estimatedCost}` : 'N/A',
+        }));
 
         const summary = [
-          { label: 'Low Stock Items', value: data.length },
-          { label: 'Critical', value: data.filter((d: any) => d.status === 'Critical').length }
+          { label: 'Total Low Stock', value: reportSummary.totalLowStock || data.length },
+          { label: 'Critical', value: reportSummary.criticalItems || 0 },
+          { label: 'High Priority', value: reportSummary.highPriorityItems || 0 },
+          { label: 'Medium Priority', value: reportSummary.mediumPriorityItems || 0 },
+          { label: 'Est. Total Cost', value: reportSummary.estimatedTotalCost ? `$${reportSummary.estimatedTotalCost}` : '$0' },
         ];
 
         pdfReportGenerator.generateReport(
-          { title: 'Low Stock Alert Report', subtitle: 'Items requiring reorder', vessel: vesselName },
+          { title: 'Low Stock Alert Report', subtitle: 'Items requiring reorder', vessel: vesselName, orientation: 'landscape' },
           columns,
           data,
           summary

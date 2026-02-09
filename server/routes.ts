@@ -8947,9 +8947,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const headerRow = sheet.addRow([
         'S.No', 'Priority', 'Item Code', 'Item Name', 'Type', 'Category',
-        'ROB', 'Min Stock', 'Max Stock', 'Deficit', 'Deficit %', 'UOM',
-        'Avg Monthly Consumption', 'Days Until Stockout', 'Est. Reorder Cost',
-        'Supplier', 'Lead Time', 'Last Order Date'
+        'ROB', 'Min Stock', 'Deficit', 'UOM',
+        'Avg Monthly', 'Days to Stockout', 'Est. Cost'
       ]);
       headerRow.font = { bold: true, color: { argb: 'FFFFFFFF' } };
       headerRow.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1F4E79' } };
@@ -8957,9 +8956,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       sheet.columns = [
         { width: 6 }, { width: 10 }, { width: 14 }, { width: 30 }, { width: 12 }, { width: 16 },
-        { width: 8 }, { width: 10 }, { width: 10 }, { width: 8 }, { width: 10 }, { width: 8 },
-        { width: 18 }, { width: 18 }, { width: 16 },
-        { width: 22 }, { width: 12 }, { width: 14 }
+        { width: 8 }, { width: 10 }, { width: 8 }, { width: 8 },
+        { width: 16 }, { width: 18 }, { width: 14 }
       ];
 
       const priorityColors: Record<string, string> = {
@@ -8971,9 +8969,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       lowStockItems.forEach((item: any, idx: number) => {
         const row = sheet.addRow([
           idx + 1, item.priority, item.itemCode, item.itemName, item.itemType, item.category,
-          item.rob, item.minStock, item.maxStock, item.deficit, `${item.deficitPercent}%`, item.uom,
-          item.avgMonthlyConsumption, item.daysUntilStockout ?? 'N/A', item.estimatedCost !== null ? `$${item.estimatedCost}` : 'N/A',
-          item.supplier || '-', item.leadTime || '-', item.lastOrderDate || '-'
+          item.rob, item.minStock, item.deficit, item.uom || '-',
+          item.avgMonthlyConsumption, item.daysUntilStockout ?? 'N/A', item.estimatedCost !== null ? `$${item.estimatedCost}` : 'N/A'
         ]);
         const bgColor = priorityColors[item.priority] || 'FFFFFFFF';
         row.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: bgColor } };

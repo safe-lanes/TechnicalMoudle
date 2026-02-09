@@ -250,7 +250,7 @@ const LowStockAlertReport: React.FC<LowStockAlertReportProps> = ({ onBack, vesse
         { header: 'Type', field: 'itemType', width: 20 },
         { header: 'Category', field: 'category', width: 22 },
         { header: 'ROB', field: 'rob', width: 15 },
-        { header: 'Min', field: 'minStock', width: 15 },
+        { header: 'Min Stock', field: 'minStock', width: 15 },
         { header: 'Deficit', field: 'deficit', width: 15 },
         { header: 'UOM', field: 'uom', width: 15 },
         { header: 'Avg Monthly', field: 'avgMonthly', width: 20 },
