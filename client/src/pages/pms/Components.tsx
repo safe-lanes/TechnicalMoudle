@@ -3072,9 +3072,6 @@ const Components: React.FC = () => {
                     <Marker id="B7.1" /> {selectedComponent.code} {selectedComponent.name}
                   </h3>
                   <div className="flex items-center gap-3">
-                    {!isChangeRequestMode && !isChangeMode && (
-                      <ComponentApiToggle />
-                    )}
                     {(isSailAdmin || isClientAdmin) && !isChangeRequestMode && !isChangeMode && (
                       <Button
                         size="sm"
