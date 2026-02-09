@@ -1,0 +1,615 @@
+BUILD: Complete Chemicals Inventory & Expiry Report with Database Schema Extension
+
+OBJECTIVE:
+Build a fully functional "Chemicals Inventory & Expiry Report" that tracks chemical inventory, expiry dates, and safety data sheet compliance. The current stub report only shows basic fields (item code, name, ROB, min, stock status) and needs to be completely rebuilt with expiry tracking and compliance features.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+PHASE 1: DATABASE SCHEMA EXTENSION
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+**Current State:**
+- Chemicals are stored in `stores_items` table with `itemType = 'chemicals'`
+- Existing fields: item code, name, category, UOM, ROB, min/max, location tracking, supplier info, IHM fields
+
+**Required New Fields for stores_items table:**
+
+1. **Expiry & Date Tracking:**
+   - `manufacture_date` (DATE, nullable)
+   - `expiry_date` (DATE, nullable) 
+   - `batch_number` (VARCHAR(100), nullable)
+   - `lot_number` (VARCHAR(100), nullable)
+   - `shelf_life_months` (INTEGER, nullable) - for auto-calculating expiry
+
+2. **Safety Data Sheet (SDS) Compliance:**
+   - `sds_reference` (VARCHAR(255), nullable) - document reference number
+   - `sds_document_url` (TEXT, nullable) - link to uploaded SDS document
+   - `sds_last_updated` (DATE, nullable)
+   - `hazard_classification` (VARCHAR(100), nullable) - e.g., "Flammable", "Toxic", "Corrosive"
+   - `un_number` (VARCHAR(50), nullable) - UN hazard classification number
+   - `flash_point` (VARCHAR(50), nullable)
+
+3. **Storage & Safety:**
+   - `storage_temp_min` (DECIMAL(5,2), nullable) - minimum storage temperature in Celsius
+   - `storage_temp_max` (DECIMAL(5,2), nullable) - maximum storage temperature in Celsius
+   - `disposal_instructions` (TEXT, nullable)
+   - `ppe_requirements` (TEXT, nullable) - Personal Protective Equipment
+   - `emergency_contact` (VARCHAR(255), nullable)
+
+**Migration Requirements:**
+- Create a database migration script that adds these fields to `stores_items` table
+- Ensure all new fields are nullable for backward compatibility
+- Add indexes on: `expiry_date`, `hazard_classification`, `batch_number` for efficient querying
+- Default values: NULL for all new fields on existing records
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+PHASE 2: API ENDPOINT UPDATES
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+**Update the following endpoints to include new fields:**
+
+1. **GET /api/stores/items** (filter by itemType='chemicals')
+   - Include all new expiry and SDS fields in response
+   - Add query parameters: `?expired=true`, `?expiring_soon=30` (days), `?hazard_class=Flammable`
+
+2. **POST /api/stores/items** (create new chemical)
+   - Accept all new fields in request body
+   - Validate: expiry_date > manufacture_date
+   - Auto-calculate expiry_date if manufacture_date and shelf_life_months provided
+
+3. **PUT /api/stores/items/:id** (update chemical)
+   - Accept all new fields in request body
+   - Same validations as POST
+
+4. **POST /api/stores/bulk-update** (bulk update chemicals)
+   - Add support for updating expiry_date, batch_number, sds_reference in bulk
+
+5. **NEW: GET /api/reports/chemicals-expiry**
+   - Return chemicals with expiry tracking and compliance data
+   - Support filters: vessel, date range, expiry status, hazard classification
+   - Calculate: days until expiry, expiry status (expired/expiring soon/ok)
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+PHASE 3: FRONTEND FORM UPDATES
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+**3.1 Update "Add New Store Item" Dialog (when Chemicals tab is active):**
+
+Add a new section after "IHM (Inventory of Hazardous Materials)" called "Expiry & Safety Compliance":
+
+Expiry & Date Information:
+
+Manufacture Date [date picker]
+
+Expiry Date [date picker]
+
+Batch Number [text input]
+
+Lot Number [text input]
+
+Shelf Life (months) [number input] - auto-calculates expiry date
+
+Safety Data Sheet (SDS):
+
+SDS Reference Number [text input]
+
+SDS Document [file upload button] - upload PDF
+
+SDS Last Updated [date picker]
+
+Hazard Classification [dropdown: None, Flammable, Toxic, Corrosive, Oxidizer, Compressed Gas, Other]
+
+UN Number [text input]
+
+Flash Point [text input with unit selector: °C/°F]
+
+Storage & Safety:
+
+Storage Temperature Range [two number inputs: Min/Max in °C]
+
+PPE Requirements [textarea]
+
+Disposal Instructions [textarea]
+
+Emergency Contact [text input]
+
+text
+
+**3.2 Update "Edit Item" Dialog:**
+- Add the same new fields as in Add dialog
+- Show current values if they exist
+
+**3.3 Update "Bulk Update Chemicals" Page:**
+- Add fields for bulk updating:
+  - Expiry Date (Apply to all)
+  - Batch Number (Apply to all)
+  - SDS Reference (Apply to all)
+
+**3.4 Update Chemicals Inventory Table:**
+- Add column: "Expiry Date" (show date and days until expiry)
+- Add column: "Batch #"
+- Add column: "Hazard Class" (with color-coded badge)
+- Add visual indicator (icon/badge) for expired or expiring soon chemicals
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+PHASE 4: BUILD THE FULL REPORT PAGE
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+**Route:** `/pms/reports/chemicals-inventory-expiry`
+
+**Report Structure:**
+
+**HEADER SECTION:**
+- Title: "Chemicals Inventory & Expiry Report"
+- Filters:
+  - Vessel selector (existing component)
+  - Date range (for expiry date filtering)
+  - Expiry Status: [All / Expired / Expiring in 30 days / Expiring in 60 days / Expiring in 90 days / OK]
+  - Hazard Classification: [All / Flammable / Toxic / Corrosive / etc.]
+  - Stock Status: [All / OK / Low / Critical]
+- Export button (PDF/Excel)
+
+**SUMMARY CARDS:**
+┌─────────────────┐ ┌─────────────────┐ ┌─────────────────┐ ┌─────────────────┐
+│ Total Chemicals │ │ Expired │ │ Expiring Soon │ │ SDS Compliance │
+│ 10 │ │ 2 │ │ 3 │ │ 80% │
+│ (Purple) │ │ (Red) │ │ (Orange) │ │ (Blue) │
+└─────────────────┘ └─────────────────┘ └─────────────────┘ └─────────────────┘
+
+text
+
+**SECTION 1: EXPIRED CHEMICALS ALERT (Red Alert Box)**
+- Show only chemicals where expiry_date < today
+- Table columns: Chem Code, Chemical Name, Expiry Date, Days Overdue, ROB, Location, Batch #
+- Sort by: Most overdue first
+- Action: "Mark for Disposal" button
+
+**SECTION 2: EXPIRING SOON (Orange Warning Box)**
+- Show chemicals where expiry_date is within next 90 days
+- Group by urgency: 0-30 days (Critical), 31-60 days (High), 61-90 days (Medium)
+- Table columns: Chem Code, Chemical Name, Expiry Date, Days Until Expiry, ROB, Location, Batch #, Reorder Status
+- Action: "Reorder" button
+
+**SECTION 3: FULL CHEMICALS INVENTORY TABLE**
+Columns:
+- Chem Code
+- Chemical Name
+- Batch Number
+- Manufacture Date
+- Expiry Date
+- Days Until Expiry (calculated, color-coded: Red if expired, Orange if <30 days, Green if >90 days)
+- ROB
+- Min Stock
+- Stock Status (OK/Low badge)
+- Location
+- Hazard Classification (color-coded badge)
+- SDS Status (✓ if sds_reference exists, ✗ if missing)
+- Actions (View Details, Edit)
+
+**SECTION 4: SAFETY DATA SHEET COMPLIANCE**
+- Show chemicals missing SDS documentation (sds_reference is NULL or empty)
+- Table: Chem Code, Chemical Name, Hazard Class, Last Updated
+- Compliance percentage: (Chemicals with SDS / Total Chemicals) × 100
+
+**SECTION 5: HAZARD CLASSIFICATION BREAKDOWN**
+- Pie chart or bar chart showing distribution by hazard_classification
+- Table grouped by hazard class with counts
+
+**CALCULATIONS & LOGIC:**
+
+```javascript
+// Days Until Expiry
+daysUntilExpiry = expiry_date ? Math.floor((new Date(expiry_date) - new Date()) / (1000 * 60 * 60 * 24)) : null
+
+// Expiry Status
+if (daysUntilExpiry < 0) status = "Expired"
+else if (daysUntilExpiry <= 30) status = "Critical - Expiring Soon"
+else if (daysUntilExpiry <= 60) status = "High - Expiring Soon"
+else if (daysUntilExpiry <= 90) status = "Medium - Expiring Soon"
+else status = "OK"
+
+// SDS Compliance
+sdsCompliance = (chemicals with sds_reference) / (total chemicals) * 100
+
+// Auto-calculate expiry from manufacture + shelf life
+if (manufacture_date && shelf_life_months && !expiry_date) {
+  expiry_date = addMonths(manufacture_date, shelf_life_months)
+}
+VISUAL DESIGN:
+
+Follow existing PMS report design patterns
+
+Use color coding:
+
+Red: Expired or Critical
+
+Orange: Warning (expiring 31-90 days)
+
+Green: OK (>90 days to expiry)
+
+Purple: Total count
+
+Blue: Compliance/Info
+
+Make tables sortable by all columns
+
+Add search/filter functionality
+
+Responsive design for mobile/tablet
+
+EXPORT FUNCTIONALITY:
+
+PDF: Include all sections with current filters applied
+
+Excel: Export detailed table with all fields
+
+Include report generation timestamp and selected filters in export
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+PHASE 5: VALIDATION & ERROR HANDLING
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Frontend Validations:
+
+Expiry Date must be after Manufacture Date
+
+If Shelf Life is provided, auto-calculate and warn if manual expiry date differs
+
+Batch Number format validation (if applicable)
+
+File upload: Only PDF files for SDS documents, max 10MB
+
+Backend Validations:
+
+Same as frontend validations
+
+Ensure itemType='chemicals' when saving
+
+Validate date formats
+
+Sanitize text inputs
+
+Error Messages:
+
+"Expiry date must be after manufacture date"
+
+"Please upload a valid PDF file for SDS documentation"
+
+"Batch number already exists for this chemical"
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+PHASE 6: TESTING & DATA
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Test with existing data:
+
+Ensure backward compatibility with existing chemicals that don't have expiry data
+
+Show "N/A" or "-" for missing expiry dates
+
+Don't break existing functionality
+
+Sample Data for Testing:
+Add test data with various scenarios:
+
+Expired chemicals (expiry_date in the past)
+
+Expiring in 15 days
+
+Expiring in 45 days
+
+Expiring in 100 days
+
+Chemicals without expiry dates
+
+Chemicals with and without SDS documentation
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+DELIVERABLES
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+✅ Database migration script with all new fields
+
+✅
+
+your response didnt finish fully
+You're right, my response was cut off. Let me complete the comprehensive implementation prompt for Replit:
+
+COMPREHENSIVE IMPLEMENTATION PROMPT FOR REPLIT (Complete Version)
+text
+BUILD: Complete Chemicals Inventory & Expiry Report with Database Schema Extension
+
+OBJECTIVE:
+Build a fully functional "Chemicals Inventory & Expiry Report" that tracks chemical inventory, expiry dates, and safety data sheet compliance. The current stub report only shows basic fields (item code, name, ROB, min, stock status) and needs to be completely rebuilt with expiry tracking and compliance features.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+PHASE 1: DATABASE SCHEMA EXTENSION
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+**Current State:**
+- Chemicals are stored in `stores_items` table with `itemType = 'chemicals'`
+- Existing fields: item code, name, category, UOM, ROB, min/max, location tracking, supplier info, IHM fields
+
+**Required New Fields for stores_items table:**
+
+1. **Expiry & Date Tracking:**
+   - `manufacture_date` (DATE, nullable)
+   - `expiry_date` (DATE, nullable) 
+   - `batch_number` (VARCHAR(100), nullable)
+   - `lot_number` (VARCHAR(100), nullable)
+   - `shelf_life_months` (INTEGER, nullable) - for auto-calculating expiry
+
+2. **Safety Data Sheet (SDS) Compliance:**
+   - `sds_reference` (VARCHAR(255), nullable) - document reference number
+   - `sds_document_url` (TEXT, nullable) - link to uploaded SDS document
+   - `sds_last_updated` (DATE, nullable)
+   - `hazard_classification` (VARCHAR(100), nullable) - e.g., "Flammable", "Toxic", "Corrosive"
+   - `un_number` (VARCHAR(50), nullable) - UN hazard classification number
+   - `flash_point` (VARCHAR(50), nullable)
+
+3. **Storage & Safety:**
+   - `storage_temp_min` (DECIMAL(5,2), nullable) - minimum storage temperature in Celsius
+   - `storage_temp_max` (DECIMAL(5,2), nullable) - maximum storage temperature in Celsius
+   - `disposal_instructions` (TEXT, nullable)
+   - `ppe_requirements` (TEXT, nullable) - Personal Protective Equipment
+   - `emergency_contact` (VARCHAR(255), nullable)
+
+**Migration Requirements:**
+- Create a database migration script that adds these fields to `stores_items` table
+- Ensure all new fields are nullable for backward compatibility
+- Add indexes on: `expiry_date`, `hazard_classification`, `batch_number` for efficient querying
+- Default values: NULL for all new fields on existing records
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+PHASE 2: API ENDPOINT UPDATES
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+**Update the following endpoints to include new fields:**
+
+1. **GET /api/stores/items** (filter by itemType='chemicals')
+   - Include all new expiry and SDS fields in response
+   - Add query parameters: `?expired=true`, `?expiring_soon=30` (days), `?hazard_class=Flammable`
+
+2. **POST /api/stores/items** (create new chemical)
+   - Accept all new fields in request body
+   - Validate: expiry_date > manufacture_date
+   - Auto-calculate expiry_date if manufacture_date and shelf_life_months provided
+
+3. **PUT /api/stores/items/:id** (update chemical)
+   - Accept all new fields in request body
+   - Same validations as POST
+
+4. **POST /api/stores/bulk-update** (bulk update chemicals)
+   - Add support for updating expiry_date, batch_number, sds_reference in bulk
+
+5. **NEW: GET /api/reports/chemicals-expiry**
+   - Return chemicals with expiry tracking and compliance data
+   - Support filters: vessel, date range, expiry status, hazard classification
+   - Calculate: days until expiry, expiry status (expired/expiring soon/ok)
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+PHASE 3: FRONTEND FORM UPDATES
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+**3.1 Update "Add New Store Item" Dialog (when Chemicals tab is active):**
+
+Add a new section after "IHM (Inventory of Hazardous Materials)" called "Expiry & Safety Compliance":
+
+Fields to add:
+- Manufacture Date [date picker]
+- Expiry Date [date picker]
+- Batch Number [text input]
+- Lot Number [text input]
+- Shelf Life (months) [number input] - auto-calculates expiry date
+- SDS Reference Number [text input]
+- SDS Document [file upload button] - upload PDF
+- SDS Last Updated [date picker]
+- Hazard Classification [dropdown: None, Flammable, Toxic, Corrosive, Oxidizer, Compressed Gas, Other]
+- UN Number [text input]
+- Flash Point [text input with unit]
+- Storage Temperature Range [Min/Max in °C]
+- PPE Requirements [textarea]
+- Disposal Instructions [textarea]
+- Emergency Contact [text input]
+
+**3.2 Update "Edit Item" Dialog:**
+- Add the same new fields as in Add dialog
+- Show current values if they exist
+
+**3.3 Update "Bulk Update Chemicals" Page:**
+- Add fields for bulk updating:
+  - Expiry Date (Apply to all)
+  - Batch Number (Apply to all)
+  - SDS Reference (Apply to all)
+
+**3.4 Update Chemicals Inventory Table:**
+- Add column: "Expiry Date" (show date and days until expiry)
+- Add column: "Batch #"
+- Add column: "Hazard Class" (with color-coded badge)
+- Add visual indicator (icon/badge) for expired or expiring soon chemicals
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+PHASE 4: BUILD THE FULL REPORT PAGE
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+**Route:** `/pms/reports/chemicals-inventory-expiry`
+
+**Report Structure:**
+
+**HEADER SECTION:**
+- Title: "Chemicals Inventory & Expiry Report"
+- Filters:
+  - Vessel selector (existing component)
+  - Date range (for expiry date filtering)
+  - Expiry Status: [All / Expired / Expiring in 30 days / Expiring in 60 days / Expiring in 90 days / OK]
+  - Hazard Classification: [All / Flammable / Toxic / Corrosive / etc.]
+  - Stock Status: [All / OK / Low / Critical]
+- Export button (PDF/Excel)
+
+**SUMMARY CARDS (Row 1):**
+┌─────────────────┐  ┌─────────────────┐  ┌─────────────────┐  ┌─────────────────┐
+│ Total Chemicals │  │ Expired         │  │ Expiring Soon   │  │ SDS Compliance  │
+│      10         │  │      2          │  │      3          │  │     80%         │
+│  (Purple icon)  │  │   (Red icon)    │  │  (Orange icon)  │  │   (Blue icon)   │
+└─────────────────┘  └─────────────────┘  └─────────────────┘  └─────────────────┘
+
+**SECTION 1: EXPIRED CHEMICALS ALERT (Red Alert Box)**
+- Show only chemicals where expiry_date < today
+- Table columns: Chem Code, Chemical Name, Expiry Date, Days Overdue, ROB, Location, Batch #
+- Sort by: Most overdue first
+- Visual: Red warning banner
+- Action: "Mark for Disposal" button per row
+
+**SECTION 2: EXPIRING SOON (Orange Warning Box)**
+- Show chemicals where expiry_date is within next 90 days
+- Group by urgency: 
+  - 0-30 days (Critical - Red badge)
+  - 31-60 days (High - Orange badge)
+  - 61-90 days (Medium - Yellow badge)
+- Table columns: Chem Code, Chemical Name, Expiry Date, Days Until Expiry, ROB, Location, Batch #, Priority Badge
+- Action: "Create Reorder" button
+
+**SECTION 3: FULL CHEMICALS INVENTORY TABLE**
+Columns:
+- Chem Code
+- Chemical Name
+- Batch Number
+- Manufacture Date
+- Expiry Date
+- Days Until Expiry (calculated, color-coded: Red if expired, Orange if <30 days, Yellow if 30-90 days, Green if >90 days)
+- ROB (Current Stock)
+- Min Stock
+- Stock Status (OK/Low badge)
+- Location
+- Hazard Classification (color-coded badge: Red=Flammable, Purple=Toxic, Orange=Corrosive, etc.)
+- SDS Status (✓ Green if sds_reference exists, ✗ Red if missing)
+- Actions (View Details button, Edit button)
+
+Features:
+- Sortable by all columns
+- Search bar to filter by chemical name/code
+- Pagination (25/50/100 items per page)
+- Row highlighting: Red for expired, Orange for expiring soon
+
+**SECTION 4: SAFETY DATA SHEET COMPLIANCE**
+- Show chemicals missing SDS documentation (sds_reference is NULL or empty)
+- Table: Chem Code, Chemical Name, Hazard Class, Last SDS Update, Action (Upload SDS button)
+- Compliance percentage: (Chemicals with SDS / Total Chemicals) × 100
+- Progress bar showing compliance percentage
+
+**SECTION 5: HAZARD CLASSIFICATION BREAKDOWN**
+- Bar chart showing distribution by hazard_classification
+- Table grouped by hazard class:
+  - Hazard Class | Count | % of Total | Average ROB
+- Color-coded by hazard type
+
+**CALCULATIONS & LOGIC:**
+
+```javascript
+// Days Until Expiry
+const calculateDaysUntilExpiry = (expiryDate) => {
+  if (!expiryDate) return null;
+  const today = new Date();
+  const expiry = new Date(expiryDate);
+  return Math.floor((expiry - today) / (1000 * 60 * 60 * 24));
+}
+
+// Expiry Status
+const getExpiryStatus = (daysUntilExpiry) => {
+  if (daysUntilExpiry === null) return { status: "No Data", color: "gray" };
+  if (daysUntilExpiry < 0) return { status: "Expired", color: "red", priority: "Critical" };
+  if (daysUntilExpiry <= 30) return { status: "Expiring Soon", color: "red", priority: "Critical" };
+  if (daysUntilExpiry <= 60) return { status: "Expiring Soon", color: "orange", priority: "High" };
+  if (daysUntilExpiry <= 90) return { status: "Expiring Soon", color: "yellow", priority: "Medium" };
+  return { status: "OK", color: "green", priority: "Normal" };
+}
+
+// SDS Compliance Percentage
+const sdsCompliance = (chemicalsWithSDS / totalChemicals) * 100;
+
+// Auto-calculate expiry from manufacture + shelf life
+const calculateExpiryDate = (manufactureDate, shelfLifeMonths) => {
+  if (!manufactureDate || !shelfLifeMonths) return null;
+  const expiry = new Date(manufactureDate);
+  expiry.setMonth(expiry.getMonth() + shelfLifeMonths);
+  return expiry;
+}
+
+// Summary Counts
+const expiredCount = chemicals.filter(c => calculateDaysUntilExpiry(c.expiry_date) < 0).length;
+const expiringSoonCount = chemicals.filter(c => {
+  const days = calculateDaysUntilExpiry(c.expiry_date);
+  return days >= 0 && days <= 90;
+}).length;
+VISUAL DESIGN:
+
+Follow existing PMS report design patterns (as seen in other reports)
+
+Use consistent color coding:
+
+Purple: Total count
+
+Red: Expired, Critical, Flammable
+
+Orange: Warning (expiring 31-90 days), Corrosive
+
+Yellow: Medium priority
+
+Green: OK, Compliant
+
+Blue: Information, Compliance metrics
+
+Consistent card design with icons
+
+Make all tables sortable
+
+Add search/filter functionality
+
+Responsive design for mobile/tablet viewing
+
+EXPORT FUNCTIONALITY:
+
+PDF Export:
+
+Include all sections with current filters applied
+
+Format as printable report with company logo/header
+
+Include summary cards, all tables
+
+Page breaks between sections
+
+Excel Export:
+
+Export detailed table with all fields in one sheet
+
+Include calculated fields (days until expiry, expiry status)
+
+Add conditional formatting for expired items
+
+Include report generation timestamp
+
+Include applied filters in export filename
+
+Show "Generating..." loading state
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+PHASE 5: VALIDATION & ERROR HANDLING
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Frontend Validations:
+
+Expiry Date must be after Manufacture Date
+
+If Shelf Life is provided, auto-calculate and warn if manual expiry date differs significantly
+
+Batch Number format validation (alphanumeric)
+
+File upload: Only PDF files for SDS documents, max 10MB
+
+Temperature range: Min must be less than Max
+
+Required field warnings for critical safety data
+
+Backend Validations:
+
+Same date validations as frontend
