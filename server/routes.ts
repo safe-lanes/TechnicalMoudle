@@ -47,7 +47,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   const { createV2ComponentModule } = await import("./v2/components/index");
   const v2Components = createV2ComponentModule();
   app.use('/technical/api/v2/components', v2Components.router);
-  console.log('V2 Component module registered at /technical/api/v2/components/component/*');
+  console.log('V2 Component module registered at /technical/api/v2/components/*');
 
   // Documentation download endpoint
   app.get("/download/docs/:filename", (req, res) => {

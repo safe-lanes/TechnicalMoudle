@@ -23,16 +23,12 @@ export class ComponentController {
 
   async list(req: AuthenticatedRequest, res: Response): Promise<void> {
     const components = await this.service.getByVesselId(req.params.vesselId);
-    console.log(`V2 GET /component/${req.params.vesselId} returning ${components.length} components`);
+    console.log(`V2 GET /vessel/${req.params.vesselId} returning ${components.length} components`);
     res.json(components);
   }
 
   async getById(req: AuthenticatedRequest, res: Response): Promise<void> {
     const component = await this.service.getById(req.params.id);
-    if (!component) {
-      res.status(404).json({ error: "Component not found" });
-      return;
-    }
     res.json(component);
   }
 

@@ -80,7 +80,7 @@ A detailed V2 modular architecture plan is documented at `docs/V2-Component-Modu
 - **Self-Contained Data Access**: V2 uses direct Drizzle ORM queries via `getDb()` — zero imports from `server/storage.ts`, `server/postgresStorage.ts`, or `shared/schema.ts`. Only infrastructure imports permitted: `getDb` (from `server/db.ts`) and `objectStorageClient` (from `server/objectStorage.ts`).
 - **V2 Schema Duplication**: `shared/v2/components/schema.ts` contains its own pgTable definitions (v2Components, v2Jobs, etc.) referencing the same physical SQL tables. These are query-only references — all schema management/migrations remain in legacy `shared/schema.ts`.
 - **Layer Separation**: Repository (direct Drizzle queries) → Service (business logic) → Controller (HTTP concerns, Zod validation) → Routes (RESTful patterns).
-- **Route Prefix**: `/technical/api/v2/components/component/*` for V2 endpoints.
+- **Route Prefix**: `/technical/api/v2/components/*` for V2 endpoints (RESTful structure: `GET /`, `GET /:id`, `POST /`, `PATCH /:id`, `DELETE /:id`, `PATCH /:id/status`, sub-resources via `/:componentId/documents`, `/:componentId/class-regulatory`, `/:componentId/requisitions`, `/:componentId/maintenance-history`).
 - **Frontend Toggle**: `localStorage('pms_api_version')` switches between legacy and V2 API endpoints at runtime. Toggle UI visible on Components page header.
 - **Backward Compatibility**: Toggle defaults to "Legacy". Both route sets always registered. Instant rollback by switching toggle — same data, same database, zero data loss.
 - **Scope**: Component module only (bulk upload + CRUD + sub-entities). Other modules to follow the same pattern.

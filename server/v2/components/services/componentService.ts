@@ -9,8 +9,12 @@ export class ComponentService {
     return this.repository.findByVesselId(vesselId);
   }
 
-  async getById(id: string): Promise<Component | undefined> {
-    return this.repository.findById(id);
+  async getById(id: string): Promise<Component> {
+    const component = await this.repository.findById(id);
+    if (!component) {
+      throw new NotFoundError("Component not found");
+    }
+    return component;
   }
 
   async getAll(vesselId?: string): Promise<Component[]> {
