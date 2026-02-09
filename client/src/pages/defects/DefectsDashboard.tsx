@@ -10,7 +10,6 @@ import {
   CheckCircle,
   Clock,
   Ship,
-  Calendar,
   Shield,
   Filter,
   Activity,
@@ -18,9 +17,10 @@ import {
   FileText,
   Loader2
 } from "lucide-react";
-import { isAfter, subDays, startOfYear, isWithinInterval } from "date-fns";
+import { isAfter } from "date-fns";
 import { useVessels } from "@/hooks/useVessels";
 import { formatForDisplay, parseDate } from "@/lib/dateUtils";
+import { PeriodPicker, type PeriodValue } from "@/components/filters/PeriodPicker";
 import type { Defect } from "@shared/schema";
 import { 
   getComputedStatus, 
@@ -77,7 +77,7 @@ type ModalType = 'active' | 'resolved' | 'coc' | 'overdue' | 'criticalEquipment'
 
 export default function DefectsDashboard() {
   const [selectedVessel, setSelectedVessel] = useState("all");
-  const [dateRange, setDateRange] = useState("all");
+  const [periodValue, setPeriodValue] = useState<PeriodValue | null>(null);
   const [showFilters, setShowFilters] = useState(true);
   const [activeModal, setActiveModal] = useState<ModalType>(null);
   const [viewModal, setViewModal] = useState<{ open: boolean; defectId: string | null }>({ 
@@ -91,37 +91,51 @@ export default function DefectsDashboard() {
 
   const { data: masterVessels = [], isLoading: isLoadingVessels } = useVessels();
 
-  const getDateRangeStart = () => {
-    const now = new Date();
-    switch (dateRange) {
-      case 'last7days':
-        return subDays(now, 7);
-      case 'last30days':
-        return subDays(now, 30);
-      case 'last90days':
-        return subDays(now, 90);
-      case 'thisyear':
-        return startOfYear(now);
-      case 'all':
-        return new Date(2000, 0, 1);
-      default:
-        return startOfYear(now);
-    }
-  };
-
   const filteredDefects = defects.filter(d => {
     if (selectedVessel !== 'all' && d.vesselId !== selectedVessel) {
       return false;
     }
     
-    if (dateRange !== 'all' && d.issueDate) {
-      try {
-        const issueDate = parseDate(d.issueDate);
-        if (!issueDate) return true;
-        const rangeStart = getDateRangeStart();
-        const rangeEnd = new Date();
-        return isWithinInterval(issueDate, { start: rangeStart, end: rangeEnd });
-      } catch {
+    if (periodValue) {
+      if (!d.issueDate) return false;
+      const val = String(d.issueDate);
+      let issueDate: Date;
+      const isoMatch = val.match(/^(\d{4})-(\d{2})-(\d{2})/);
+      const ddmmyyyyMatch = val.match(/^(\d{2})-(\d{2})-(\d{4})$/);
+      if (isoMatch) {
+        const [, yStr, mStr, dStr] = isoMatch;
+        issueDate = new Date(parseInt(yStr), parseInt(mStr) - 1, parseInt(dStr));
+      } else if (ddmmyyyyMatch) {
+        const [, dStr, mStr, yStr] = ddmmyyyyMatch;
+        issueDate = new Date(parseInt(yStr), parseInt(mStr) - 1, parseInt(dStr));
+      } else {
+        issueDate = new Date(val);
+      }
+      if (isNaN(issueDate.getTime())) return false;
+      issueDate.setHours(0, 0, 0, 0);
+
+      if (periodValue.mode === "yearQuarterMonth") {
+        if (periodValue.month !== undefined && periodValue.year) {
+          return issueDate.getFullYear() === periodValue.year && issueDate.getMonth() === periodValue.month;
+        }
+        if (periodValue.quarter !== undefined && periodValue.year) {
+          const qStartMonth = (periodValue.quarter - 1) * 3;
+          return issueDate.getFullYear() === periodValue.year && issueDate.getMonth() >= qStartMonth && issueDate.getMonth() <= qStartMonth + 2;
+        }
+        if (periodValue.year) {
+          return issueDate.getFullYear() === periodValue.year;
+        }
+      } else if (periodValue.mode === "dateRange") {
+        if (periodValue.dateFrom) {
+          const from = new Date(periodValue.dateFrom);
+          from.setHours(0, 0, 0, 0);
+          if (issueDate < from) return false;
+        }
+        if (periodValue.dateTo) {
+          const to = new Date(periodValue.dateTo);
+          to.setHours(23, 59, 59, 999);
+          if (issueDate > to) return false;
+        }
         return true;
       }
     }
@@ -195,7 +209,7 @@ export default function DefectsDashboard() {
 
   const handleClearFilters = () => {
     setSelectedVessel('all');
-    setDateRange('all');
+    setPeriodValue(null);
   };
 
   const navigateToDefectLog = (filter?: string) => {
@@ -288,21 +302,10 @@ export default function DefectsDashboard() {
               </Select>
             </div>
 
-            <div className="flex items-center gap-2">
-              <Calendar className="h-4 w-4 text-[#8798ad]" />
-              <Select value={dateRange} onValueChange={setDateRange}>
-                <SelectTrigger className="w-[150px] h-8 text-xs text-[#8798ad]" data-testid="select-date-range">
-                  <SelectValue placeholder="Date Range" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="last7days">Last 7 Days</SelectItem>
-                  <SelectItem value="last30days">Last 30 Days</SelectItem>
-                  <SelectItem value="last90days">Last 90 Days</SelectItem>
-                  <SelectItem value="thisyear">This Year</SelectItem>
-                  <SelectItem value="all">All Time</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
+            <PeriodPicker
+              value={periodValue}
+              onChange={(val: PeriodValue | null) => setPeriodValue(val)}
+            />
 
             <Button 
               onClick={handleClearFilters}

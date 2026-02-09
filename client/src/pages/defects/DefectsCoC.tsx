@@ -9,7 +9,6 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Badge } from "@/components/ui/badge";
 import { 
   CheckCircle,
-  Clock,
   Eye, 
   Edit, 
   Link as LinkIcon, 
@@ -39,6 +38,7 @@ import DefectFormWizard from "./DefectFormWizard";
 import DefectModal from "./DefectModal";
 import LinkDefectsModal from "./LinkDefectsModal";
 import { cn } from "@/lib/utils";
+import { PeriodPicker, type PeriodValue } from "@/components/filters/PeriodPicker";
 import { VesselFleetGroupFilter, type VesselFleetGroupFilterValue } from "@/components/filters/VesselFleetGroupFilter";
 import { useToast } from "@/hooks/use-toast";
 import { useUIRole } from "@/contexts/UIRoleContext";
@@ -48,7 +48,7 @@ import AgGridTableActions from "@/components/AgGrid/AgGridTableActions";
 import { ICellRendererParams, GridReadyEvent, GridApi, ColDef } from "ag-grid-community";
 
 interface DefectsFilters {
-  period?: string;
+  periodValue?: PeriodValue | null;
   search?: string;
   vesselId?: string;
   fleet?: string;
@@ -286,7 +286,6 @@ export default function DefectsCoC() {
       
       if (filters.vesselId) params.append('vesselId', filters.vesselId);
       if (filters.search) params.append('search', filters.search);
-      if (filters.period) params.append('period', filters.period);
       if (filters.fleet) params.append('fleet', filters.fleet);
       if (filters.dueOverdue && filters.status === 'active') params.append('dueOverdue', filters.dueOverdue);
       
@@ -312,6 +311,54 @@ export default function DefectsCoC() {
       return true;
     });
     
+    if (filters.periodValue) {
+      const pv = filters.periodValue;
+      result = result.filter((defect: Defect) => {
+        if (!defect.issueDate) return false;
+        const val = String(defect.issueDate);
+        let issueDate: Date;
+        const isoMatch = val.match(/^(\d{4})-(\d{2})-(\d{2})/);
+        const ddmmyyyyMatch = val.match(/^(\d{2})-(\d{2})-(\d{4})$/);
+        if (isoMatch) {
+          const [, yStr, mStr, dStr] = isoMatch;
+          issueDate = new Date(parseInt(yStr), parseInt(mStr) - 1, parseInt(dStr));
+        } else if (ddmmyyyyMatch) {
+          const [, dStr, mStr, yStr] = ddmmyyyyMatch;
+          issueDate = new Date(parseInt(yStr), parseInt(mStr) - 1, parseInt(dStr));
+        } else {
+          issueDate = new Date(val);
+        }
+        if (isNaN(issueDate.getTime())) return false;
+        issueDate.setHours(0, 0, 0, 0);
+
+        if (pv.mode === "yearQuarterMonth") {
+          if (pv.month !== undefined && pv.year) {
+            return issueDate.getFullYear() === pv.year && issueDate.getMonth() === pv.month;
+          }
+          if (pv.quarter !== undefined && pv.year) {
+            const qStartMonth = (pv.quarter - 1) * 3;
+            return issueDate.getFullYear() === pv.year && issueDate.getMonth() >= qStartMonth && issueDate.getMonth() <= qStartMonth + 2;
+          }
+          if (pv.year) {
+            return issueDate.getFullYear() === pv.year;
+          }
+        } else if (pv.mode === "dateRange") {
+          if (pv.dateFrom) {
+            const from = new Date(pv.dateFrom);
+            from.setHours(0, 0, 0, 0);
+            if (issueDate < from) return false;
+          }
+          if (pv.dateTo) {
+            const to = new Date(pv.dateTo);
+            to.setHours(23, 59, 59, 999);
+            if (issueDate > to) return false;
+          }
+          return true;
+        }
+        return true;
+      });
+    }
+
     // Due/Overdue filter based on Target Date (only for active status)
     if (filters.status === 'active' && filters.dueOverdue && filters.dueOverdue !== 'all') {
       const today = new Date();
@@ -341,7 +388,7 @@ export default function DefectsCoC() {
     }
     
     return result;
-  }, [allDefects, filters.status, filters.dueOverdue]);
+  }, [allDefects, filters.status, filters.dueOverdue, filters.periodValue]);
 
   const includesResolved = filters.status === 'resolved' || filters.status === 'all';
 
@@ -625,20 +672,10 @@ export default function DefectsCoC() {
         {/* Collapsible Filters */}
         {showFilters && (
           <div className="flex items-center gap-3 mb-4 bg-transparent">
-            <div className="flex items-center gap-2">
-              <Clock className="h-4 w-4 text-gray-500" />
-              <Select value={filters.period} onValueChange={(value) => handleFilterChange('period', value)}>
-                <SelectTrigger className="w-[120px] h-8 text-xs border-gray-300 bg-transparent text-gray-700">
-                  <SelectValue placeholder="Period" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All</SelectItem>
-                  <SelectItem value="today">Today</SelectItem>
-                  <SelectItem value="week">This Week</SelectItem>
-                  <SelectItem value="month">This Month</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
+            <PeriodPicker
+              value={filters.periodValue || null}
+              onChange={(val: PeriodValue | null) => handleFilterChange('periodValue', val)}
+            />
 
             <div className="relative">
               <Search className="absolute left-2 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-500" />
