@@ -243,6 +243,7 @@ export default function FleetDataView() {
   
   // Collapsible section state for right panel
   const [collapsedSections, setCollapsedSections] = useState<Record<string, boolean>>({
+    A: false,
     B: false,
     C: true,
     D: true,
@@ -754,287 +755,317 @@ export default function FleetDataView() {
 
       <div className="flex-1 overflow-auto p-6">
         {selectedComponent ? (
-          <div className="space-y-0">
-            <Card className="overflow-hidden">
-              <div className="px-6 py-4 border-b border-gray-200">
-                <div className="flex items-center justify-between gap-4 flex-wrap">
-                  <h2 className="text-lg font-semibold text-gray-800" data-testid="text-selected-component-title">
-                    {selectedComponent.fleetEquipmentCode}{" "}
-                    {selectedComponent.fleetEquipmentName}
-                  </h2>
-                  <Button
-                    variant="outline"
-                    className="border-cyan-600 text-cyan-600"
-                    onClick={() => setLocation(`/admin/fleet-component-editor/${selectedComponent.id}`)}
-                    data-testid="button-add-edit-fleet-component"
-                  >
-                    <Pencil className="h-4 w-4 mr-1" />
-                    Edit Fleet Component
-                  </Button>
-                </div>
+          <div className="flex flex-col h-full">
+            <div className="p-4 border-b-2 border-[#52baf3] flex-shrink-0">
+              <div className="flex items-center justify-between gap-4 flex-wrap">
+                <h2 className="text-lg font-semibold text-[#15569e]" data-testid="text-selected-component-title">
+                  {selectedComponent.fleetEquipmentCode}{" "}
+                  {selectedComponent.fleetEquipmentName}
+                </h2>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="text-[#52baf3] border-[#52baf3]"
+                  onClick={() => setLocation(`/admin/fleet-component-editor/${selectedComponent.id}`)}
+                  data-testid="button-add-edit-fleet-component"
+                >
+                  <Pencil className="h-4 w-4 mr-1" />
+                  Edit Fleet Component
+                </Button>
               </div>
+            </div>
+            <div className="flex-1 overflow-auto p-4">
+              <div className="space-y-2">
 
-              <div className="px-6 py-5">
-                <h3 className="text-sm font-semibold text-gray-700 mb-4" data-testid="section-header-component-info">A. Fleet Component Information</h3>
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-                  <div>
-                    <label className="text-xs font-medium text-gray-600 block mb-1">Fleet Equipment Code</label>
-                    <div className="text-sm text-gray-900">{selectedComponent.fleetEquipmentCode || "—"}</div>
-                  </div>
-                  <div>
-                    <label className="text-xs font-medium text-gray-600 block mb-1">Fleet Equipment Name</label>
-                    <div className="text-sm text-gray-900">{selectedComponent.fleetEquipmentName || selectedComponent.name || "—"}</div>
-                  </div>
-                  <div>
-                    <label className="text-xs font-medium text-gray-600 block mb-1">Parent Code</label>
-                    <div className="text-sm text-gray-900">
-                      {selectedComponent.parentFleetEquipmentCode ||
-                        selectedComponent.fleetEquipmentCode?.split(".")[0] ||
-                        "—"}
+                <Card className="rounded-sm border border-gray-200" data-testid="section-card-component-info">
+                  <CardHeader
+                    className="py-3 cursor-pointer"
+                    onClick={() => setCollapsedSections(prev => ({ ...prev, A: !prev.A }))}
+                  >
+                    <div className="flex items-center justify-between">
+                      <CardTitle className="text-sm font-medium text-[#16569e] flex items-center gap-2">
+                        A. Fleet Component Information
+                      </CardTitle>
+                      <span>
+                        {collapsedSections.A ? (
+                          <ChevronRight className="h-4 w-4" />
+                        ) : (
+                          <ChevronDown className="h-4 w-4" />
+                        )}
+                      </span>
                     </div>
-                  </div>
-                  <div>
-                    <label className="text-xs font-medium text-gray-600 block mb-1">Component Category</label>
-                    <div className="text-sm text-gray-900">{selectedComponent.componentCategory || selectedComponent.category || "—"}</div>
-                  </div>
-                  <div>
-                    <label className="text-xs font-medium text-gray-600 block mb-1">Maker</label>
-                    <div className="text-sm text-gray-900">{selectedComponent.maker || "—"}</div>
-                  </div>
-                  <div>
-                    <label className="text-xs font-medium text-gray-600 block mb-1">Maker Code</label>
-                    <div className="text-sm text-gray-900">{selectedComponent.makerCode || "—"}</div>
-                  </div>
-                  <div>
-                    <label className="text-xs font-medium text-gray-600 block mb-1">Model</label>
-                    <div className="text-sm text-gray-900">{selectedComponent.model || "—"}</div>
-                  </div>
-                  <div>
-                    <label className="text-xs font-medium text-gray-600 block mb-1">Model Code</label>
-                    <div className="text-sm text-gray-900">{selectedComponent.modelCode || "—"}</div>
-                  </div>
-                  <div>
-                    <label className="text-xs font-medium text-gray-600 block mb-1">Location</label>
-                    <div className="text-sm text-gray-900">{selectedComponent.location || "—"}</div>
-                  </div>
-                  <div>
-                    <label className="text-xs font-medium text-gray-600 block mb-1">Rating</label>
-                    <div className="text-sm text-gray-900">{selectedComponent.rating || "—"}</div>
-                  </div>
-                  <div>
-                    <label className="text-xs font-medium text-gray-600 block mb-1">Eqpt / System Department</label>
-                    <div className="text-sm text-gray-900">{selectedComponent.eqptSystemDept || selectedComponent.department || "—"}</div>
-                  </div>
-                  <div className="sm:col-span-2 lg:col-span-3 xl:col-span-4">
-                    <label className="text-xs font-medium text-gray-600 block mb-1">Notes</label>
-                    <div className="text-sm text-gray-900">{selectedComponent.notes || "—"}</div>
-                  </div>
-                </div>
-              </div>
+                  </CardHeader>
+                  {!collapsedSections.A && (
+                    <CardContent className="pt-4 border-t border-gray-100">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                        <div>
+                          <label className="text-xs font-medium text-gray-600 block mb-1">Fleet Equipment Code</label>
+                          <div className="text-sm text-gray-900">{selectedComponent.fleetEquipmentCode || "—"}</div>
+                        </div>
+                        <div>
+                          <label className="text-xs font-medium text-gray-600 block mb-1">Fleet Equipment Name</label>
+                          <div className="text-sm text-gray-900">{selectedComponent.fleetEquipmentName || selectedComponent.name || "—"}</div>
+                        </div>
+                        <div>
+                          <label className="text-xs font-medium text-gray-600 block mb-1">Parent Code</label>
+                          <div className="text-sm text-gray-900">
+                            {selectedComponent.parentFleetEquipmentCode ||
+                              selectedComponent.fleetEquipmentCode?.split(".")[0] ||
+                              "—"}
+                          </div>
+                        </div>
+                        <div>
+                          <label className="text-xs font-medium text-gray-600 block mb-1">Component Category</label>
+                          <div className="text-sm text-gray-900">{selectedComponent.componentCategory || selectedComponent.category || "—"}</div>
+                        </div>
+                        <div>
+                          <label className="text-xs font-medium text-gray-600 block mb-1">Maker</label>
+                          <div className="text-sm text-gray-900">{selectedComponent.maker || "—"}</div>
+                        </div>
+                        <div>
+                          <label className="text-xs font-medium text-gray-600 block mb-1">Maker Code</label>
+                          <div className="text-sm text-gray-900">{selectedComponent.makerCode || "—"}</div>
+                        </div>
+                        <div>
+                          <label className="text-xs font-medium text-gray-600 block mb-1">Model</label>
+                          <div className="text-sm text-gray-900">{selectedComponent.model || "—"}</div>
+                        </div>
+                        <div>
+                          <label className="text-xs font-medium text-gray-600 block mb-1">Model Code</label>
+                          <div className="text-sm text-gray-900">{selectedComponent.modelCode || "—"}</div>
+                        </div>
+                        <div>
+                          <label className="text-xs font-medium text-gray-600 block mb-1">Location</label>
+                          <div className="text-sm text-gray-900">{selectedComponent.location || "—"}</div>
+                        </div>
+                        <div>
+                          <label className="text-xs font-medium text-gray-600 block mb-1">Rating</label>
+                          <div className="text-sm text-gray-900">{selectedComponent.rating || "—"}</div>
+                        </div>
+                        <div>
+                          <label className="text-xs font-medium text-gray-600 block mb-1">Eqpt / System Department</label>
+                          <div className="text-sm text-gray-900">{selectedComponent.eqptSystemDept || selectedComponent.department || "—"}</div>
+                        </div>
+                        <div className="sm:col-span-2 lg:col-span-3 xl:col-span-4">
+                          <label className="text-xs font-medium text-gray-600 block mb-1">Notes</label>
+                          <div className="text-sm text-gray-900">{selectedComponent.notes || "—"}</div>
+                        </div>
+                      </div>
+                    </CardContent>
+                  )}
+                </Card>
 
-              <div className="border-t border-gray-200">
-                <div className="flex items-center justify-between px-6 py-3">
-                  <button
-                    className="flex items-center gap-2 text-left"
-                    onClick={() => setCollapsedSections(prev => ({ ...prev, B: !prev.B }))}
-                    data-testid="btn-fleet-job-collapse"
-                  >
-                    {collapsedSections.B ? (
-                      <ChevronRight className="h-4 w-4 text-gray-500" />
-                    ) : (
-                      <ChevronDown className="h-4 w-4 text-gray-500" />
-                    )}
-                    <h3 className="text-sm font-semibold text-gray-700">B. Fleet Job Information</h3>
-                  </button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setIsJobInfoDialogOpen(true)}
-                    className="text-cyan-600 border-cyan-200"
-                    data-testid="btn-fleet-job-info-header"
-                  >
-                    <Pencil className="h-3 w-3 mr-1" />
-                    Manage Jobs
-                  </Button>
-                </div>
-                {!collapsedSections.B && (
-                  <div className="px-6 pb-5">
-                    {relatedJobs.length > 0 ? (
-                      <table className="w-full text-sm">
-                        <thead>
-                          <tr className="border-b border-gray-200">
-                            <th className="text-left py-2 text-xs font-medium text-gray-600">Job No.</th>
-                            <th className="text-left py-2 text-xs font-medium text-gray-600">Job Title</th>
-                            <th className="text-left py-2 text-xs font-medium text-gray-600">Task Type</th>
-                            <th className="text-left py-2 text-xs font-medium text-gray-600">Frequency</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {relatedJobs.map((job: FleetJob, index: number) => (
-                            <tr 
-                              key={index} 
-                              className="border-b border-gray-100 last:border-0 cursor-pointer"
-                              onDoubleClick={() => {
-                                setSelectedJobForDetail(job);
-                                setIsJobDetailsDialogOpen(true);
-                              }}
-                              data-testid={`job-row-${index}`}
-                            >
-                              <td className="py-2 text-sm text-gray-900">{job.jobCode || job.id}</td>
-                              <td className="py-2 text-sm text-gray-900">{job.woTitle || "—"}</td>
-                              <td className="py-2 text-sm text-gray-900">{job.taskType || "—"}</td>
-                              <td className="py-2 text-sm text-gray-900">
-                                {job.intervalValue && job.unit 
-                                  ? `${job.intervalValue} ${job.unit}` 
-                                  : "—"}
-                              </td>
+                <Card className="rounded-sm border border-gray-200" data-testid="section-card-job-info">
+                  <CardHeader className="py-3 cursor-pointer" onClick={() => setCollapsedSections(prev => ({ ...prev, B: !prev.B }))}>
+                    <div className="flex items-center justify-between">
+                      <CardTitle className="text-sm font-medium text-[#16569e] flex items-center gap-2" data-testid="btn-fleet-job-collapse">
+                        B. Fleet Job Information
+                      </CardTitle>
+                      <div className="flex items-center gap-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={(e) => { e.stopPropagation(); setIsJobInfoDialogOpen(true); }}
+                          className="text-[#52baf3] border-[#52baf3]"
+                          data-testid="btn-fleet-job-info-header"
+                        >
+                          <Pencil className="h-3 w-3 mr-1" />
+                          Manage Jobs
+                        </Button>
+                        <span>
+                          {collapsedSections.B ? (
+                            <ChevronRight className="h-4 w-4" />
+                          ) : (
+                            <ChevronDown className="h-4 w-4" />
+                          )}
+                        </span>
+                      </div>
+                    </div>
+                  </CardHeader>
+                  {!collapsedSections.B && (
+                    <CardContent className="pt-4 border-t border-gray-100">
+                      {relatedJobs.length > 0 ? (
+                        <table className="w-full text-sm">
+                          <thead>
+                            <tr className="border-b border-gray-200">
+                              <th className="text-left py-2 text-xs font-medium text-gray-600">Job No.</th>
+                              <th className="text-left py-2 text-xs font-medium text-gray-600">Job Title</th>
+                              <th className="text-left py-2 text-xs font-medium text-gray-600">Task Type</th>
+                              <th className="text-left py-2 text-xs font-medium text-gray-600">Frequency</th>
                             </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    ) : (
-                      <p className="text-gray-500 text-sm">No jobs linked to this component</p>
-                    )}
-                  </div>
-                )}
-              </div>
-
-              <div className="border-t border-gray-200">
-                <div className="flex items-center justify-between px-6 py-3">
-                  <button
-                    className="flex items-center gap-2 text-left"
-                    onClick={() => setCollapsedSections(prev => ({ ...prev, C: !prev.C }))}
-                    data-testid="btn-fleet-spare-collapse"
-                  >
-                    {collapsedSections.C ? (
-                      <ChevronRight className="h-4 w-4 text-gray-500" />
-                    ) : (
-                      <ChevronDown className="h-4 w-4 text-gray-500" />
-                    )}
-                    <h3 className="text-sm font-semibold text-gray-700">C. Fleet Spares Information</h3>
-                  </button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setIsSpareInfoDialogOpen(true)}
-                    className="text-cyan-600 border-cyan-200"
-                    data-testid="btn-fleet-spare-info-header"
-                  >
-                    <Pencil className="h-3 w-3 mr-1" />
-                    Manage Spares
-                  </Button>
-                </div>
-                {!collapsedSections.C && (
-                  <div className="px-6 pb-5">
-                    {relatedSpares.length > 0 ? (
-                      <table className="w-full text-sm">
-                        <thead>
-                          <tr className="border-b border-gray-200">
-                            <th className="text-left py-2 text-xs font-medium text-gray-600">Part Code</th>
-                            <th className="text-left py-2 text-xs font-medium text-gray-600">Part Name</th>
-                            <th className="text-left py-2 text-xs font-medium text-gray-600">Part Number</th>
-                            <th className="text-left py-2 text-xs font-medium text-gray-600">Maker</th>
-                            <th className="text-left py-2 text-xs font-medium text-gray-600">Unit Of Measurement</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {relatedSpares.map((spare: FleetSpare, index: number) => (
-                            <tr 
-                              key={index} 
-                              className="border-b border-gray-100 last:border-0"
-                              data-testid={`spare-row-${index}`}
-                            >
-                              <td className="py-2">
-                                <button
-                                  className="text-blue-600 underline text-left text-sm"
-                                  onClick={() => {
-                                    setSelectedSpareForDetail(spare);
-                                    setIsSpareDetailsDialogOpen(true);
-                                  }}
-                                  data-testid={`btn-spare-detail-${index}`}
-                                >
-                                  {spare.fleetPartCode || spare.partCode}
-                                </button>
-                              </td>
-                              <td className="py-2 text-sm text-gray-900">{spare.partName || "—"}</td>
-                              <td className="py-2 text-sm text-gray-900">{spare.partNumber || "—"}</td>
-                              <td className="py-2 text-sm text-gray-900">{spare.maker || "—"}</td>
-                              <td className="py-2 text-sm text-gray-900">{spare.uom || spare.unit || "—"}</td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    ) : (
-                      <p className="text-gray-500 text-sm">No spares linked to this component</p>
-                    )}
-                  </div>
-                )}
-              </div>
-
-              <div className="border-t border-gray-200">
-                <div className="flex items-center justify-between px-6 py-3">
-                  <button
-                    className="flex items-center gap-2 text-left"
-                    onClick={() => setCollapsedSections(prev => ({ ...prev, D: !prev.D }))}
-                    data-testid="btn-vessel-mapping-collapse"
-                  >
-                    {collapsedSections.D ? (
-                      <ChevronRight className="h-4 w-4 text-gray-500" />
-                    ) : (
-                      <ChevronDown className="h-4 w-4 text-gray-500" />
-                    )}
-                    <h3 className="text-sm font-semibold text-gray-700">D. Vessel Mapping Overview</h3>
-                  </button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={handleOpenMappingDialog}
-                    className="text-cyan-600 border-cyan-200"
-                    data-testid="btn-vessel-mapping-overview-header"
-                  >
-                    <Pencil className="h-3 w-3 mr-1" />
-                    Manage Mappings
-                  </Button>
-                </div>
-                {!collapsedSections.D && (
-                  <div className="px-6 pb-5">
-                    {relatedVessels.length > 0 ? (
-                      <table className="w-full text-sm">
-                        <thead>
-                          <tr className="border-b border-gray-200">
-                            <th className="text-left py-2 text-xs font-medium text-gray-600">Vessel Code</th>
-                            <th className="text-left py-2 text-xs font-medium text-gray-600">Vessel Name</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {relatedVessels.map((vessel, index) => (
-                            <tr key={index} className="border-b border-gray-100 last:border-0">
-                              <td className="py-2 text-sm text-gray-900">{vessel.id}</td>
-                              <td 
-                                className="py-2 cursor-pointer text-blue-600 underline text-sm"
-                                onClick={() => {
-                                  if (vessel.mapping) {
-                                    setSelectedVesselForDetail(vessel.mapping);
-                                    setSelectedDetailMappingIds(new Set());
-                                    setDetailSearchQuery("");
-                                    setIsDetailDialogOpen(true);
-                                  }
+                          </thead>
+                          <tbody>
+                            {relatedJobs.map((job: FleetJob, index: number) => (
+                              <tr 
+                                key={index} 
+                                className="border-b border-gray-100 last:border-0 cursor-pointer"
+                                onDoubleClick={() => {
+                                  setSelectedJobForDetail(job);
+                                  setIsJobDetailsDialogOpen(true);
                                 }}
-                                data-testid={`main-vessel-name-${vessel.id}`}
+                                data-testid={`job-row-${index}`}
                               >
-                                {vessel.name}
-                              </td>
+                                <td className="py-2 text-sm text-gray-900">{job.jobCode || job.id}</td>
+                                <td className="py-2 text-sm text-gray-900">{job.woTitle || "—"}</td>
+                                <td className="py-2 text-sm text-gray-900">{job.taskType || "—"}</td>
+                                <td className="py-2 text-sm text-gray-900">
+                                  {job.intervalValue && job.unit 
+                                    ? `${job.intervalValue} ${job.unit}` 
+                                    : "—"}
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      ) : (
+                        <p className="text-gray-500 text-sm">No jobs linked to this component</p>
+                      )}
+                    </CardContent>
+                  )}
+                </Card>
+
+                <Card className="rounded-sm border border-gray-200" data-testid="section-card-spare-info">
+                  <CardHeader className="py-3 cursor-pointer" onClick={() => setCollapsedSections(prev => ({ ...prev, C: !prev.C }))}>
+                    <div className="flex items-center justify-between">
+                      <CardTitle className="text-sm font-medium text-[#16569e] flex items-center gap-2" data-testid="btn-fleet-spare-collapse">
+                        C. Fleet Spares Information
+                      </CardTitle>
+                      <div className="flex items-center gap-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={(e) => { e.stopPropagation(); setIsSpareInfoDialogOpen(true); }}
+                          className="text-[#52baf3] border-[#52baf3]"
+                          data-testid="btn-fleet-spare-info-header"
+                        >
+                          <Pencil className="h-3 w-3 mr-1" />
+                          Manage Spares
+                        </Button>
+                        <span>
+                          {collapsedSections.C ? (
+                            <ChevronRight className="h-4 w-4" />
+                          ) : (
+                            <ChevronDown className="h-4 w-4" />
+                          )}
+                        </span>
+                      </div>
+                    </div>
+                  </CardHeader>
+                  {!collapsedSections.C && (
+                    <CardContent className="pt-4 border-t border-gray-100">
+                      {relatedSpares.length > 0 ? (
+                        <table className="w-full text-sm">
+                          <thead>
+                            <tr className="border-b border-gray-200">
+                              <th className="text-left py-2 text-xs font-medium text-gray-600">Part Code</th>
+                              <th className="text-left py-2 text-xs font-medium text-gray-600">Part Name</th>
+                              <th className="text-left py-2 text-xs font-medium text-gray-600">Part Number</th>
+                              <th className="text-left py-2 text-xs font-medium text-gray-600">Maker</th>
+                              <th className="text-left py-2 text-xs font-medium text-gray-600">Unit Of Measurement</th>
                             </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    ) : (
-                      <p className="text-gray-500 text-sm">No vessels mapped to this component</p>
-                    )}
-                  </div>
-                )}
+                          </thead>
+                          <tbody>
+                            {relatedSpares.map((spare: FleetSpare, index: number) => (
+                              <tr 
+                                key={index} 
+                                className="border-b border-gray-100 last:border-0"
+                                data-testid={`spare-row-${index}`}
+                              >
+                                <td className="py-2">
+                                  <button
+                                    className="text-blue-600 underline text-left text-sm"
+                                    onClick={() => {
+                                      setSelectedSpareForDetail(spare);
+                                      setIsSpareDetailsDialogOpen(true);
+                                    }}
+                                    data-testid={`btn-spare-detail-${index}`}
+                                  >
+                                    {spare.fleetPartCode || spare.partCode}
+                                  </button>
+                                </td>
+                                <td className="py-2 text-sm text-gray-900">{spare.partName || "—"}</td>
+                                <td className="py-2 text-sm text-gray-900">{spare.partNumber || "—"}</td>
+                                <td className="py-2 text-sm text-gray-900">{spare.maker || "—"}</td>
+                                <td className="py-2 text-sm text-gray-900">{spare.uom || spare.unit || "—"}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      ) : (
+                        <p className="text-gray-500 text-sm">No spares linked to this component</p>
+                      )}
+                    </CardContent>
+                  )}
+                </Card>
+
+                <Card className="rounded-sm border border-gray-200" data-testid="section-card-vessel-mapping">
+                  <CardHeader className="py-3 cursor-pointer" onClick={() => setCollapsedSections(prev => ({ ...prev, D: !prev.D }))}>
+                    <div className="flex items-center justify-between">
+                      <CardTitle className="text-sm font-medium text-[#16569e] flex items-center gap-2" data-testid="btn-vessel-mapping-collapse">
+                        D. Vessel Mapping Overview
+                      </CardTitle>
+                      <div className="flex items-center gap-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={(e) => { e.stopPropagation(); handleOpenMappingDialog(); }}
+                          className="text-[#52baf3] border-[#52baf3]"
+                          data-testid="btn-vessel-mapping-overview-header"
+                        >
+                          <Pencil className="h-3 w-3 mr-1" />
+                          Manage Mappings
+                        </Button>
+                        <span>
+                          {collapsedSections.D ? (
+                            <ChevronRight className="h-4 w-4" />
+                          ) : (
+                            <ChevronDown className="h-4 w-4" />
+                          )}
+                        </span>
+                      </div>
+                    </div>
+                  </CardHeader>
+                  {!collapsedSections.D && (
+                    <CardContent className="pt-4 border-t border-gray-100">
+                      {relatedVessels.length > 0 ? (
+                        <table className="w-full text-sm">
+                          <thead>
+                            <tr className="border-b border-gray-200">
+                              <th className="text-left py-2 text-xs font-medium text-gray-600">Vessel Code</th>
+                              <th className="text-left py-2 text-xs font-medium text-gray-600">Vessel Name</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {relatedVessels.map((vessel, index) => (
+                              <tr key={index} className="border-b border-gray-100 last:border-0">
+                                <td className="py-2 text-sm text-gray-900">{vessel.id}</td>
+                                <td 
+                                  className="py-2 cursor-pointer text-blue-600 underline text-sm"
+                                  onClick={() => {
+                                    if (vessel.mapping) {
+                                      setSelectedVesselForDetail(vessel.mapping);
+                                      setSelectedDetailMappingIds(new Set());
+                                      setDetailSearchQuery("");
+                                      setIsDetailDialogOpen(true);
+                                    }
+                                  }}
+                                  data-testid={`main-vessel-name-${vessel.id}`}
+                                >
+                                  {vessel.name}
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      ) : (
+                        <p className="text-gray-500 text-sm">No vessels mapped to this component</p>
+                      )}
+                    </CardContent>
+                  )}
+                </Card>
+
               </div>
-            </Card>
+            </div>
           </div>
         ) : (
           <div className="h-full flex flex-col">
