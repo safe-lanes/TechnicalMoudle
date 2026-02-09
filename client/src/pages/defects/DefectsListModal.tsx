@@ -124,7 +124,7 @@ export function DefectsListModal({ open, onClose, title, defects, canEdit = true
   return (
     <>
       <Dialog open={open} onOpenChange={(isOpen) => !isOpen && onClose()}>
-        <DialogContent className="max-w-[90vw] h-[calc(100vh-10vw)] max-h-[90vh] overflow-hidden flex flex-col [&>button.absolute]:top-[1.65rem]">
+        <DialogContent className="max-w-[90vw] h-[calc(100vh-10vw)] max-h-[90vh] overflow-hidden flex flex-col [&>button.absolute]:top-6 [&>button.absolute]:translate-y-1">
           <DialogHeader className="pb-4 flex flex-row items-center justify-between gap-4">
             <DialogTitle className="text-xl font-semibold text-[#0f4c81]">
               {title}
