@@ -8857,6 +8857,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Keep remarks in otherUpdates since it's a valid field for stores items
       const { robLocationA: _a, robLocationB: _b, rob: _r, place: _p, dateLocal: _d, tz: _t, ...otherUpdates } = req.body;
       if (Object.keys(otherUpdates).length > 0) {
+        if (otherUpdates.manufactureDate && otherUpdates.expiryDate) {
+          const mfg = new Date(otherUpdates.manufactureDate);
+          const exp = new Date(otherUpdates.expiryDate);
+          if (!isNaN(mfg.getTime()) && !isNaN(exp.getTime()) && exp <= mfg) {
+            return res.status(400).json({ error: "Expiry date must be after manufacture date" });
+          }
+        }
         const item = await storage.updateStoresItem(itemId, otherUpdates);
         return res.json(item);
       }
