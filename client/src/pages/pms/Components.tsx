@@ -3067,27 +3067,32 @@ const Components: React.FC = () => {
             <div className="bg-white rounded-lg shadow-sm h-full flex flex-col">
               <div className="p-4 border-b-2 border-[#52baf3] flex-shrink-0">
                 <Marker id="B7" />
-                <div className="flex items-center justify-between">
+                <div className="flex items-center justify-between gap-2">
                   <h3 className="text-lg font-semibold text-[#15569e]" data-testid="B7.1">
                     <Marker id="B7.1" /> {selectedComponent.code} {selectedComponent.name}
                   </h3>
-                  {(isSailAdmin || isClientAdmin) && !isChangeRequestMode && !isChangeMode && (
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      className="text-[#52baf3] border-[#52baf3] hover:bg-[#52baf3] hover:text-white"
-                      onClick={() => {
-                        // Use actualId (database UUID) for API calls, and code for tree selection
-                        setEditingComponentId(selectedComponent.actualId || selectedComponent.id);
-                        setEditingComponentCode(selectedComponent.code);
-                        setShowAddEditFullPage(true);
-                      }}
-                      data-testid="B7.2"
-                    >
-                      <Marker id="B7.2" /> <Edit2 className="h-4 w-4 mr-1" />
-                      Edit Component
-                    </Button>
-                  )}
+                  <div className="flex items-center gap-3">
+                    {!isChangeRequestMode && !isChangeMode && (
+                      <ComponentApiToggle />
+                    )}
+                    {(isSailAdmin || isClientAdmin) && !isChangeRequestMode && !isChangeMode && (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="text-[#52baf3] border-[#52baf3] hover:bg-[#52baf3] hover:text-white"
+                        onClick={() => {
+                          // Use actualId (database UUID) for API calls, and code for tree selection
+                          setEditingComponentId(selectedComponent.actualId || selectedComponent.id);
+                          setEditingComponentCode(selectedComponent.code);
+                          setShowAddEditFullPage(true);
+                        }}
+                        data-testid="B7.2"
+                      >
+                        <Marker id="B7.2" /> <Edit2 className="h-4 w-4 mr-1" />
+                        Edit Component
+                      </Button>
+                    )}
+                  </div>
                 </div>
                 
                 {/* Preview Mode Banner */}
