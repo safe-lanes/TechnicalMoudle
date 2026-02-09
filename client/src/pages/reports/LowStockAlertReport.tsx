@@ -1,5 +1,5 @@
 import { useState, useMemo } from "react";
-import { Card, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
@@ -14,37 +14,61 @@ import {
   ArrowLeft,
   AlertTriangle,
   Search,
-  Download,
   FileText,
   Loader2,
   ArrowUpDown,
-  TrendingDown,
   Package,
+  Droplets,
+  FlaskConical,
+  DollarSign,
+  AlertCircle,
+  Clock,
+  TrendingDown,
+  ShoppingCart,
 } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
-import { apiRequest } from "@/lib/queryClient";
 import { pdfReportGenerator } from "@/lib/pdfReportGenerator";
 import { useToast } from "@/hooks/use-toast";
 import { useVessel } from "@/contexts/VesselContext";
+import { format } from "date-fns";
+import { apiRequest } from "@/lib/queryClient";
 
-interface LowStockAlertItem {
+interface LowStockItem {
   id: number;
-  partCode: string;
-  partName: string;
-  componentName: string;
-  currentQty: number;
-  minQty: number;
-  shortage: number;
-  status: 'Critical' | 'At Minimum' | 'Low';
+  itemCode: string;
+  itemName: string;
+  itemType: string;
+  category: string;
+  rob: number;
+  minStock: number;
+  maxStock: number;
+  deficit: number;
+  deficitPercent: number;
+  uom: string;
+  location: string;
+  priority: 'Critical' | 'High' | 'Medium';
+  lastConsumedDate: string | null;
+  avgMonthlyConsumption: number;
+  daysUntilStockout: number | null;
+  estimatedCost: number | null;
+  supplier: string | null;
+  leadTime: string | null;
+  lastOrderDate: string | null;
+  unitCost: number | null;
 }
 
 interface LowStockAlertResponse {
   summary: {
     totalLowStock: number;
-    criticalCount: number;
-    atMinCount: number;
+    criticalItems: number;
+    highPriorityItems: number;
+    mediumPriorityItems: number;
+    storesCount: number;
+    lubesCount: number;
+    chemicalsCount: number;
+    estimatedTotalCost: number;
   };
-  items: LowStockAlertItem[];
+  items: LowStockItem[];
 }
 
 interface LowStockAlertReportProps {
@@ -52,175 +76,162 @@ interface LowStockAlertReportProps {
   vesselId?: string;
 }
 
-type SortField = 'shortage' | 'partName' | 'currentQty' | 'status';
+type SortField = 'priority' | 'itemCode' | 'itemName' | 'itemType' | 'category' | 'rob' | 'minStock' | 'deficit' | 'deficitPercent' | 'uom' | 'avgMonthlyConsumption' | 'daysUntilStockout' | 'estimatedCost' | 'supplier' | 'leadTime';
 type SortDirection = 'asc' | 'desc';
 
+function formatCurrency(val: number | null): string {
+  if (val === null || val === 0) return 'N/A';
+  return `$${val.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+}
+
+function getPriorityBadge(priority: string) {
+  switch (priority) {
+    case 'Critical':
+      return <Badge className="bg-red-600 text-white border-red-700">CRITICAL</Badge>;
+    case 'High':
+      return <Badge className="bg-orange-500 text-white border-orange-600">HIGH</Badge>;
+    case 'Medium':
+      return <Badge className="bg-yellow-500 text-white border-yellow-600">MEDIUM</Badge>;
+    default:
+      return <Badge>{priority}</Badge>;
+  }
+}
+
+function getTypeBadge(type: string) {
+  switch (type) {
+    case 'stores':
+      return <Badge variant="outline" className="border-purple-300 text-purple-700">Stores</Badge>;
+    case 'lubricants':
+    case 'lubes':
+      return <Badge variant="outline" className="border-blue-300 text-blue-700">Lubricants</Badge>;
+    case 'chemicals':
+      return <Badge variant="outline" className="border-green-300 text-green-700">Chemicals</Badge>;
+    default:
+      return <Badge variant="outline">{type}</Badge>;
+  }
+}
+
+function getDaysUntilStockoutDisplay(days: number | null) {
+  if (days === null) return <span className="text-gray-400">N/A</span>;
+  if (days === 0) return <span className="text-red-600 font-bold">0 days</span>;
+  if (days < 7) return <span className="text-orange-500 font-semibold">{days} days</span>;
+  if (days < 30) return <span className="text-yellow-600">{days} days</span>;
+  return <span className="text-green-600">{days} days</span>;
+}
+
 const LowStockAlertReport: React.FC<LowStockAlertReportProps> = ({ onBack, vesselId: propVesselId }) => {
-  const { vesselId: contextVesselId } = useVessel();
+  const { vesselId: contextVesselId, vessels } = useVessel();
   const effectiveVesselId = propVesselId || contextVesselId;
+  const vesselName = vessels?.find((v: any) => v.id === effectiveVesselId)?.name || effectiveVesselId;
   const { toast } = useToast();
 
   const [searchQuery, setSearchQuery] = useState("");
-  const [criticality, setCriticality] = useState("all");
-  const [sortField, setSortField] = useState<SortField>('shortage');
-  const [sortDirection, setSortDirection] = useState<SortDirection>('desc');
+  const [categoryFilter, setCategoryFilter] = useState("all");
+  const [priorityFilter, setPriorityFilter] = useState("all");
+  const [sortField, setSortField] = useState<SortField>('priority');
+  const [sortDirection, setSortDirection] = useState<SortDirection>('asc');
   const [generatingPdf, setGeneratingPdf] = useState(false);
-
-  const queryUrl = useMemo(() => {
-    const params = new URLSearchParams();
-    if (criticality !== 'all') params.set('criticality', criticality);
-    params.set('sortBy', sortField);
-    const qs = params.toString();
-    return `/technical/api/reports/low-stock-alert/${effectiveVesselId}${qs ? `?${qs}` : ''}`;
-  }, [effectiveVesselId, criticality, sortField]);
+  const [generatingExcel, setGeneratingExcel] = useState(false);
 
   const { data, isLoading, error } = useQuery<LowStockAlertResponse>({
-    queryKey: ['/technical/api/reports/low-stock-alert', effectiveVesselId, criticality, sortField],
+    queryKey: ['/technical/api/reports/stores-low-stock-alert', effectiveVesselId],
     queryFn: async () => {
-      const res = await fetch(queryUrl, { credentials: 'include' });
-      if (!res.ok) throw new Error('Failed to fetch report');
+      const res = await fetch(`/technical/api/reports/stores-low-stock-alert/${effectiveVesselId}`, {
+        credentials: 'include',
+      });
+      if (!res.ok) throw new Error(`${res.status}: ${res.statusText}`);
       return res.json();
     },
     enabled: !!effectiveVesselId && effectiveVesselId !== 'all',
   });
 
-  const filteredAndSortedItems = useMemo(() => {
-    if (!data?.items) return [];
-    let items = [...data.items];
+  const items = data?.items || [];
+  const summary = data?.summary || {
+    totalLowStock: 0,
+    criticalItems: 0,
+    highPriorityItems: 0,
+    mediumPriorityItems: 0,
+    storesCount: 0,
+    lubesCount: 0,
+    chemicalsCount: 0,
+    estimatedTotalCost: 0,
+  };
+
+  const filteredItems = useMemo(() => {
+    let result = [...items];
 
     if (searchQuery.trim()) {
       const q = searchQuery.toLowerCase();
-      items = items.filter(
-        (i) =>
-          i.partCode.toLowerCase().includes(q) ||
-          i.partName.toLowerCase().includes(q) ||
-          i.componentName.toLowerCase().includes(q)
+      result = result.filter(i =>
+        (i.itemCode || '').toLowerCase().includes(q) ||
+        (i.itemName || '').toLowerCase().includes(q) ||
+        (i.category || '').toLowerCase().includes(q) ||
+        (i.supplier || '').toLowerCase().includes(q)
       );
     }
 
-    items.sort((a, b) => {
+    if (categoryFilter !== 'all') {
+      if (categoryFilter === 'lubricants') {
+        result = result.filter(i => i.itemType === 'lubes' || i.itemType === 'lubricants');
+      } else {
+        result = result.filter(i => i.itemType === categoryFilter);
+      }
+    }
+
+    if (priorityFilter !== 'all') {
+      result = result.filter(i => i.priority === priorityFilter);
+    }
+
+    return result;
+  }, [items, searchQuery, categoryFilter, priorityFilter]);
+
+  const sortedItems = useMemo(() => {
+    const sorted = [...filteredItems];
+    const priorityOrder: Record<string, number> = { Critical: 0, High: 1, Medium: 2 };
+    sorted.sort((a, b) => {
       let cmp = 0;
       switch (sortField) {
-        case 'shortage': cmp = a.shortage - b.shortage; break;
-        case 'partName': cmp = a.partName.localeCompare(b.partName); break;
-        case 'currentQty': cmp = a.currentQty - b.currentQty; break;
-        case 'status': cmp = a.status.localeCompare(b.status); break;
+        case 'priority':
+          cmp = (priorityOrder[a.priority] ?? 3) - (priorityOrder[b.priority] ?? 3);
+          if (cmp === 0) cmp = b.deficit - a.deficit;
+          break;
+        case 'itemCode': cmp = (a.itemCode || '').localeCompare(b.itemCode || ''); break;
+        case 'itemName': cmp = (a.itemName || '').localeCompare(b.itemName || ''); break;
+        case 'itemType': cmp = (a.itemType || '').localeCompare(b.itemType || ''); break;
+        case 'category': cmp = (a.category || '').localeCompare(b.category || ''); break;
+        case 'rob': cmp = a.rob - b.rob; break;
+        case 'minStock': cmp = a.minStock - b.minStock; break;
+        case 'deficit': cmp = a.deficit - b.deficit; break;
+        case 'deficitPercent': cmp = a.deficitPercent - b.deficitPercent; break;
+        case 'uom': cmp = (a.uom || '').localeCompare(b.uom || ''); break;
+        case 'avgMonthlyConsumption': cmp = a.avgMonthlyConsumption - b.avgMonthlyConsumption; break;
+        case 'daysUntilStockout': cmp = (a.daysUntilStockout ?? 99999) - (b.daysUntilStockout ?? 99999); break;
+        case 'estimatedCost': cmp = (a.estimatedCost ?? 0) - (b.estimatedCost ?? 0); break;
+        case 'supplier': cmp = (a.supplier || '').localeCompare(b.supplier || ''); break;
+        case 'leadTime': cmp = (a.leadTime || '').localeCompare(b.leadTime || ''); break;
+        default: cmp = 0;
       }
       return sortDirection === 'desc' ? -cmp : cmp;
     });
+    return sorted;
+  }, [filteredItems, sortField, sortDirection]);
 
-    return items;
-  }, [data?.items, searchQuery, sortField, sortDirection]);
+  const criticalItems = useMemo(() => filteredItems.filter(i => i.priority === 'Critical'), [filteredItems]);
+  const highPriorityItems = useMemo(() => filteredItems.filter(i => i.priority === 'High'), [filteredItems]);
+  const mediumPriorityItems = useMemo(() => filteredItems.filter(i => i.priority === 'Medium'), [filteredItems]);
 
   const handleSort = (field: SortField) => {
     if (sortField === field) {
-      setSortDirection((d) => (d === 'asc' ? 'desc' : 'asc'));
+      setSortDirection(d => (d === 'asc' ? 'desc' : 'asc'));
     } else {
       setSortField(field);
-      setSortDirection('desc');
+      setSortDirection('asc');
     }
   };
-
-  const getStatusBadge = (status: string) => {
-    switch (status) {
-      case 'Critical':
-        return <Badge className="bg-red-600 text-white border-red-700">Critical</Badge>;
-      case 'At Minimum':
-        return <Badge className="bg-amber-500 text-white border-amber-600">At Minimum</Badge>;
-      default:
-        return <Badge variant="outline">Low</Badge>;
-    }
-  };
-
-  const handleExportPdf = async () => {
-    if (!data?.items || data.items.length === 0) {
-      toast({ title: "No Data", description: "No items to export.", variant: "destructive" });
-      return;
-    }
-    setGeneratingPdf(true);
-    try {
-      const columns = [
-        { header: 'S.No', field: 'sno', width: 12 },
-        { header: 'Part Code', field: 'partCode', width: 30 },
-        { header: 'Part Name', field: 'partName', width: 50 },
-        { header: 'Component', field: 'componentName', width: 45 },
-        { header: 'Current Qty', field: 'currentQty', width: 20 },
-        { header: 'Min Qty', field: 'minQty', width: 18 },
-        { header: 'Shortage', field: 'shortage', width: 20 },
-        { header: 'Status', field: 'status', width: 25 },
-      ];
-
-      const exportData = filteredAndSortedItems.map((i, idx) => ({
-        sno: idx + 1,
-        partCode: i.partCode,
-        partName: i.partName,
-        componentName: i.componentName,
-        currentQty: i.currentQty,
-        minQty: i.minQty,
-        shortage: i.shortage,
-        status: i.status,
-      }));
-
-      const summaryData = [
-        { label: 'Total Low Stock Items', value: data.summary.totalLowStock },
-        { label: 'Critical', value: data.summary.criticalCount },
-        { label: 'At Minimum', value: data.summary.atMinCount },
-      ];
-
-      pdfReportGenerator.generateReport(
-        { title: 'Low Stock Alert Report', subtitle: 'Items requiring immediate attention' },
-        columns,
-        exportData,
-        summaryData
-      );
-      toast({ title: "PDF Generated", description: "Report downloaded successfully." });
-    } catch (e) {
-      toast({ title: "Export Failed", description: "Failed to generate PDF.", variant: "destructive" });
-    } finally {
-      setGeneratingPdf(false);
-    }
-  };
-
-  const [generatingExcel, setGeneratingExcel] = useState(false);
-
-  const handleExportExcel = async () => {
-    if (!data?.items || data.items.length === 0) {
-      toast({ title: "No Data", description: "No items to export.", variant: "destructive" });
-      return;
-    }
-    setGeneratingExcel(true);
-    try {
-      const body: Record<string, string> = {};
-      if (criticality !== 'all') body.criticality = criticality;
-      body.sortBy = sortField;
-
-      const res = await fetch(`/technical/api/reports/low-stock-alert/${effectiveVesselId}/excel`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify(body),
-      });
-      if (!res.ok) throw new Error('Failed to generate Excel');
-      const blob = await res.blob();
-      const url = URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = `low-stock-alert-report-${new Date().toISOString().slice(0, 10)}.xlsx`;
-      link.click();
-      URL.revokeObjectURL(url);
-      toast({ title: "Excel Exported", description: "Report downloaded as Excel file." });
-    } catch (err) {
-      toast({ title: "Export Failed", description: "Failed to generate Excel report.", variant: "destructive" });
-    } finally {
-      setGeneratingExcel(false);
-    }
-  };
-
-  const summary = data?.summary;
 
   const SortButton = ({ field, label }: { field: SortField; label: string }) => (
     <button
-      className="flex items-center gap-1 font-semibold text-sm text-gray-700 hover:text-gray-900"
+      className="flex items-center gap-1 font-medium text-xs uppercase text-gray-600 hover:text-gray-900"
       onClick={() => handleSort(field)}
       data-testid={`button-sort-${field}`}
     >
@@ -229,12 +240,144 @@ const LowStockAlertReport: React.FC<LowStockAlertReportProps> = ({ onBack, vesse
     </button>
   );
 
+  const handlePdfExport = async () => {
+    setGeneratingPdf(true);
+    try {
+      const columns = [
+        { header: 'S.No', field: 'sno', width: 12 },
+        { header: 'Priority', field: 'priority', width: 20 },
+        { header: 'Item Code', field: 'itemCode', width: 22 },
+        { header: 'Item Name', field: 'itemName', width: 40 },
+        { header: 'Type', field: 'itemType', width: 20 },
+        { header: 'Category', field: 'category', width: 22 },
+        { header: 'ROB', field: 'rob', width: 15 },
+        { header: 'Min', field: 'minStock', width: 15 },
+        { header: 'Deficit', field: 'deficit', width: 15 },
+        { header: 'UOM', field: 'uom', width: 15 },
+        { header: 'Avg Monthly', field: 'avgMonthly', width: 20 },
+        { header: 'Days to Stockout', field: 'daysToStockout', width: 22 },
+        { header: 'Est. Cost', field: 'estCost', width: 20 },
+      ];
+
+      const exportData = sortedItems.map((item, idx) => ({
+        sno: idx + 1,
+        priority: item.priority,
+        itemCode: item.itemCode || '-',
+        itemName: item.itemName || '-',
+        itemType: item.itemType || '-',
+        category: item.category || '-',
+        rob: item.rob,
+        minStock: item.minStock,
+        deficit: item.deficit,
+        uom: item.uom || '-',
+        avgMonthly: item.avgMonthlyConsumption,
+        daysToStockout: item.daysUntilStockout ?? 'N/A',
+        estCost: item.estimatedCost !== null ? `$${item.estimatedCost}` : 'N/A',
+      }));
+
+      if (exportData.length === 0) {
+        toast({ title: "No Data", description: "No low stock items to export.", variant: "destructive" });
+        setGeneratingPdf(false);
+        return;
+      }
+
+      const summaryData = [
+        { label: 'Total Low Stock', value: summary.totalLowStock },
+        { label: 'Critical', value: summary.criticalItems },
+        { label: 'High Priority', value: summary.highPriorityItems },
+        { label: 'Medium Priority', value: summary.mediumPriorityItems },
+        { label: 'Est. Total Cost', value: formatCurrency(summary.estimatedTotalCost) },
+      ];
+
+      pdfReportGenerator.generateReport(
+        {
+          title: 'Low Stock Alert Report',
+          subtitle: `Vessel: ${vesselName || 'Unknown'} | Generated: ${format(new Date(), 'dd MMM yyyy HH:mm')}`,
+          vessel: vesselName || 'Unknown',
+          orientation: 'landscape',
+        },
+        columns,
+        exportData,
+        summaryData
+      );
+      toast({ title: "PDF Generated", description: "Low stock alert report downloaded" });
+    } catch (err) {
+      toast({ title: "Error", description: "Failed to generate PDF", variant: "destructive" });
+    } finally {
+      setGeneratingPdf(false);
+    }
+  };
+
+  const handleExcelExport = async () => {
+    setGeneratingExcel(true);
+    try {
+      const response = await apiRequest('POST', `/technical/api/reports/stores-low-stock-alert/${effectiveVesselId}/excel`);
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `low-stock-alert-${format(new Date(), 'yyyy-MM-dd')}.xlsx`;
+      a.click();
+      window.URL.revokeObjectURL(url);
+      toast({ title: "Excel Generated", description: "Low stock alert Excel report downloaded" });
+    } catch (err) {
+      toast({ title: "Error", description: "Failed to generate Excel", variant: "destructive" });
+    } finally {
+      setGeneratingExcel(false);
+    }
+  };
+
+  const renderPriorityTable = (priorityItems: LowStockItem[], label: string) => (
+    <div className="rounded-lg border overflow-hidden bg-white">
+      <div className="overflow-x-auto">
+        <table className="w-full" data-testid={`table-${label.toLowerCase()}`}>
+          <thead>
+            <tr className="bg-gray-50 border-b border-gray-200">
+              <th className="text-left py-3 px-3 font-medium text-xs uppercase text-gray-600">Item Code</th>
+              <th className="text-left py-3 px-3 font-medium text-xs uppercase text-gray-600">Item Name</th>
+              <th className="text-left py-3 px-3 font-medium text-xs uppercase text-gray-600">Category</th>
+              <th className="text-left py-3 px-3 font-medium text-xs uppercase text-gray-600">Type</th>
+              <th className="text-right py-3 px-3 font-medium text-xs uppercase text-gray-600">ROB</th>
+              <th className="text-right py-3 px-3 font-medium text-xs uppercase text-gray-600">Min</th>
+              <th className="text-right py-3 px-3 font-medium text-xs uppercase text-gray-600">Deficit</th>
+              <th className="text-left py-3 px-3 font-medium text-xs uppercase text-gray-600">UOM</th>
+              <th className="text-right py-3 px-3 font-medium text-xs uppercase text-gray-600">Avg Monthly</th>
+              <th className="text-right py-3 px-3 font-medium text-xs uppercase text-gray-600">Days to Stockout</th>
+              <th className="text-right py-3 px-3 font-medium text-xs uppercase text-gray-600">Est. Cost</th>
+              <th className="text-left py-3 px-3 font-medium text-xs uppercase text-gray-600">Supplier</th>
+              <th className="text-left py-3 px-3 font-medium text-xs uppercase text-gray-600">Lead Time</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-gray-100">
+            {priorityItems.map(item => (
+              <tr key={item.id} className="hover:bg-gray-50/50 text-sm" data-testid={`row-${label.toLowerCase()}-${item.id}`}>
+                <td className="py-3 px-3 font-mono text-gray-700">{item.itemCode || '-'}</td>
+                <td className="py-3 px-3 font-medium text-gray-900">{item.itemName || '-'}</td>
+                <td className="py-3 px-3 text-gray-600">{item.category || '-'}</td>
+                <td className="py-3 px-3">{getTypeBadge(item.itemType)}</td>
+                <td className="py-3 px-3 text-right font-semibold text-gray-900">{item.rob}</td>
+                <td className="py-3 px-3 text-right text-gray-600">{item.minStock}</td>
+                <td className="py-3 px-3 text-right font-semibold text-red-600">{item.deficit}</td>
+                <td className="py-3 px-3 text-gray-600">{item.uom || '-'}</td>
+                <td className="py-3 px-3 text-right text-gray-600">{item.avgMonthlyConsumption}</td>
+                <td className="py-3 px-3 text-right">{getDaysUntilStockoutDisplay(item.daysUntilStockout)}</td>
+                <td className="py-3 px-3 text-right text-gray-700">{formatCurrency(item.estimatedCost)}</td>
+                <td className="py-3 px-3 text-gray-600">{item.supplier || '-'}</td>
+                <td className="py-3 px-3 text-gray-600">{item.leadTime || '-'}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+
   if (!effectiveVesselId || effectiveVesselId === 'all') {
     return (
       <div className="p-6 bg-white min-h-screen">
         <div className="flex items-center gap-4 mb-6">
           <Button variant="ghost" onClick={onBack} data-testid="button-back-low-stock">
-            <ArrowLeft className="h-4 w-4 mr-2" /> Back to Reports
+            <ArrowLeft className="h-4 w-4 mr-2" /> Back to Stores Reports
           </Button>
           <h1 className="text-2xl font-bold text-gray-900">Low Stock Alert Report</h1>
         </div>
@@ -247,22 +390,24 @@ const LowStockAlertReport: React.FC<LowStockAlertReportProps> = ({ onBack, vesse
     );
   }
 
+  const totalForBars = Math.max(summary.storesCount + summary.lubesCount + summary.chemicalsCount, 1);
+
   return (
     <div className="p-6 bg-white min-h-screen">
       <div className="flex items-center justify-between gap-4 mb-6 flex-wrap">
         <div className="flex items-center gap-4">
           <Button variant="ghost" onClick={onBack} data-testid="button-back-low-stock">
-            <ArrowLeft className="h-4 w-4 mr-2" /> Back to Reports
+            <ArrowLeft className="h-4 w-4 mr-2" /> Back to Stores Reports
           </Button>
           <div>
             <h1 className="text-2xl font-bold text-gray-900">Low Stock Alert Report</h1>
-            <p className="text-sm text-gray-500">Critical and low stock items requiring immediate attention</p>
+            <p className="text-sm text-gray-500">Items below minimum stock levels requiring attention</p>
           </div>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
           <Button
             variant="outline"
-            onClick={handleExportPdf}
+            onClick={handlePdfExport}
             disabled={generatingPdf || isLoading}
             data-testid="button-export-pdf"
           >
@@ -271,19 +416,55 @@ const LowStockAlertReport: React.FC<LowStockAlertReportProps> = ({ onBack, vesse
           </Button>
           <Button
             variant="outline"
-            onClick={handleExportExcel}
-            disabled={isLoading || generatingExcel}
+            onClick={handleExcelExport}
+            disabled={generatingExcel || isLoading}
             data-testid="button-export-excel"
           >
-            <Download className="h-4 w-4 mr-2" /> {generatingExcel ? 'Generating...' : 'Export Excel'}
+            {generatingExcel ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <ShoppingCart className="h-4 w-4 mr-2" />}
+            Export Excel
           </Button>
         </div>
+      </div>
+
+      <div className="flex items-center gap-3 mb-6 flex-wrap">
+        <div className="relative flex-1 min-w-[200px] max-w-sm">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+          <Input
+            placeholder="Search by code, name, category, supplier..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="pl-9"
+            data-testid="input-search-low-stock"
+          />
+        </div>
+        <Select value={categoryFilter} onValueChange={setCategoryFilter}>
+          <SelectTrigger className="w-[180px]" data-testid="select-category-filter">
+            <SelectValue placeholder="Category" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All Categories</SelectItem>
+            <SelectItem value="stores">Stores</SelectItem>
+            <SelectItem value="lubricants">Lubricants</SelectItem>
+            <SelectItem value="chemicals">Chemicals</SelectItem>
+          </SelectContent>
+        </Select>
+        <Select value={priorityFilter} onValueChange={setPriorityFilter}>
+          <SelectTrigger className="w-[180px]" data-testid="select-priority-filter">
+            <SelectValue placeholder="Priority" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All Priorities</SelectItem>
+            <SelectItem value="Critical">Critical</SelectItem>
+            <SelectItem value="High">High</SelectItem>
+            <SelectItem value="Medium">Medium</SelectItem>
+          </SelectContent>
+        </Select>
       </div>
 
       {isLoading ? (
         <div className="flex items-center justify-center py-16">
           <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
-          <span className="ml-3 text-gray-600">Generating report...</span>
+          <span className="ml-3 text-gray-600">Loading low stock data...</span>
         </div>
       ) : error ? (
         <div className="text-center py-16">
@@ -293,126 +474,321 @@ const LowStockAlertReport: React.FC<LowStockAlertReportProps> = ({ onBack, vesse
         </div>
       ) : (
         <>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-            <Card data-testid="card-total-alerts">
-              <CardHeader className="pb-2">
-                <CardDescription className="flex items-center gap-1">
-                  <AlertTriangle className="w-4 h-4 text-orange-500" />
-                  Total Low Stock Items
-                </CardDescription>
-                <CardTitle className="text-3xl">{summary?.totalLowStock || 0}</CardTitle>
-              </CardHeader>
-            </Card>
-            <Card data-testid="card-critical-count">
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
+            <Card className="bg-red-50 border-red-200" data-testid="card-total-low-stock">
               <CardHeader className="pb-2">
                 <CardDescription className="flex items-center gap-1">
                   <AlertTriangle className="w-4 h-4 text-red-500" />
-                  Critical
+                  Total Low Stock
                 </CardDescription>
-                <CardTitle className="text-3xl text-red-600">{summary?.criticalCount || 0}</CardTitle>
+                <CardTitle className="text-3xl text-red-600">{summary.totalLowStock}</CardTitle>
               </CardHeader>
             </Card>
-            <Card data-testid="card-at-min-count">
+            <Card className="bg-red-50 border-red-200" data-testid="card-critical-items">
               <CardHeader className="pb-2">
                 <CardDescription className="flex items-center gap-1">
-                  <TrendingDown className="w-4 h-4 text-amber-500" />
-                  At Minimum
+                  <AlertCircle className="w-4 h-4 text-red-500" />
+                  Critical
                 </CardDescription>
-                <CardTitle className="text-3xl text-amber-600">{summary?.atMinCount || 0}</CardTitle>
+                <CardTitle className="text-3xl text-red-600">{summary.criticalItems}</CardTitle>
+              </CardHeader>
+            </Card>
+            <Card className="bg-orange-50 border-orange-200" data-testid="card-high-priority">
+              <CardHeader className="pb-2">
+                <CardDescription className="flex items-center gap-1">
+                  <AlertTriangle className="w-4 h-4 text-orange-500" />
+                  High Priority
+                </CardDescription>
+                <CardTitle className="text-3xl text-orange-600">{summary.highPriorityItems}</CardTitle>
+              </CardHeader>
+            </Card>
+            <Card className="bg-yellow-50 border-yellow-200" data-testid="card-medium-priority">
+              <CardHeader className="pb-2">
+                <CardDescription className="flex items-center gap-1">
+                  <Clock className="w-4 h-4 text-yellow-500" />
+                  Medium Priority
+                </CardDescription>
+                <CardTitle className="text-3xl text-yellow-600">{summary.mediumPriorityItems}</CardTitle>
               </CardHeader>
             </Card>
           </div>
 
-          <div className="flex items-center gap-3 mb-4 flex-wrap">
-            <div className="relative flex-1 min-w-[200px] max-w-sm">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
-              <Input
-                placeholder="Search parts, components..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-9"
-                data-testid="input-search-low-stock"
-              />
-            </div>
-            <Select value={criticality} onValueChange={setCriticality}>
-              <SelectTrigger className="w-[160px]" data-testid="select-criticality">
-                <SelectValue placeholder="Criticality" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Items</SelectItem>
-                <SelectItem value="critical">Critical Only</SelectItem>
-                <SelectItem value="non-critical">Non-Critical</SelectItem>
-              </SelectContent>
-            </Select>
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+            <Card className="bg-purple-50 border-purple-200" data-testid="card-stores-count">
+              <CardHeader className="pb-2">
+                <CardDescription className="flex items-center gap-1">
+                  <Package className="w-4 h-4 text-purple-500" />
+                  Stores Items
+                </CardDescription>
+                <CardTitle className="text-3xl text-purple-700">{summary.storesCount}</CardTitle>
+              </CardHeader>
+            </Card>
+            <Card className="bg-blue-50 border-blue-200" data-testid="card-lubes-count">
+              <CardHeader className="pb-2">
+                <CardDescription className="flex items-center gap-1">
+                  <Droplets className="w-4 h-4 text-blue-500" />
+                  Lubricants
+                </CardDescription>
+                <CardTitle className="text-3xl text-blue-700">{summary.lubesCount}</CardTitle>
+              </CardHeader>
+            </Card>
+            <Card className="bg-green-50 border-green-200" data-testid="card-chemicals-count">
+              <CardHeader className="pb-2">
+                <CardDescription className="flex items-center gap-1">
+                  <FlaskConical className="w-4 h-4 text-green-500" />
+                  Chemicals
+                </CardDescription>
+                <CardTitle className="text-3xl text-green-700">{summary.chemicalsCount}</CardTitle>
+              </CardHeader>
+            </Card>
+            <Card className="bg-gray-50 border-gray-200" data-testid="card-estimated-cost">
+              <CardHeader className="pb-2">
+                <CardDescription className="flex items-center gap-1">
+                  <DollarSign className="w-4 h-4 text-gray-500" />
+                  Est. Total Cost
+                </CardDescription>
+                <CardTitle className="text-2xl text-gray-700">{formatCurrency(summary.estimatedTotalCost)}</CardTitle>
+              </CardHeader>
+            </Card>
           </div>
 
-          <div className="rounded-lg border border-gray-200 overflow-hidden bg-white">
-            <div className="overflow-x-auto">
-              <table className="w-full" data-testid="table-low-stock-alerts">
-                <thead>
-                  <tr className="bg-gray-50 border-b border-gray-200">
-                    <th className="text-center py-3 px-3 w-16">S.No</th>
-                    <th className="text-left py-3 px-3"><SortButton field="partName" label="Part Code" /></th>
-                    <th className="text-left py-3 px-3">Part Name</th>
-                    <th className="text-left py-3 px-3">Component</th>
-                    <th className="text-right py-3 px-3"><SortButton field="currentQty" label="Current Qty" /></th>
-                    <th className="text-right py-3 px-3">Min Qty</th>
-                    <th className="text-right py-3 px-3"><SortButton field="shortage" label="Shortage" /></th>
-                    <th className="text-left py-3 px-3"><SortButton field="status" label="Status" /></th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-200">
-                  {filteredAndSortedItems.length === 0 ? (
-                    <tr>
-                      <td colSpan={8} className="text-center py-12">
-                        <Package className="h-10 w-10 text-gray-400 mx-auto mb-3" />
-                        <p className="text-gray-500 font-medium">No low stock alerts found</p>
-                        <p className="text-sm text-gray-400 mt-1">All items are above minimum threshold levels</p>
-                      </td>
-                    </tr>
-                  ) : (
-                    filteredAndSortedItems.map((item, idx) => (
-                      <tr
-                        key={item.id}
-                        className={`hover:bg-gray-50 ${
-                          item.status === 'Critical' ? 'bg-red-50/40' :
-                          item.status === 'At Minimum' ? 'bg-amber-50/30' : ''
-                        }`}
-                        data-testid={`row-low-stock-${item.id}`}
-                      >
-                        <td className="py-3 px-3 text-center text-sm text-gray-500">{idx + 1}</td>
-                        <td className="py-3 px-3 text-sm text-gray-700 font-mono">{item.partCode}</td>
-                        <td className="py-3 px-3">
-                          <div className="font-medium text-gray-900 text-sm">{item.partName}</div>
-                        </td>
-                        <td className="py-3 px-3 text-sm text-gray-700">{item.componentName}</td>
-                        <td className="py-3 px-3 text-right">
-                          <span className={`font-semibold text-sm ${
-                            item.currentQty === 0 ? 'text-red-600' : 'text-gray-900'
-                          }`}>
-                            {item.currentQty}
-                          </span>
-                        </td>
-                        <td className="py-3 px-3 text-right text-sm text-gray-600">{item.minQty}</td>
-                        <td className="py-3 px-3 text-right">
-                          <span className="font-semibold text-sm text-red-600">{item.shortage}</span>
-                        </td>
-                        <td className="py-3 px-3">{getStatusBadge(item.status)}</td>
-                      </tr>
-                    ))
-                  )}
-                </tbody>
-              </table>
-            </div>
-          </div>
-
-          {filteredAndSortedItems.length > 0 && (
-            <div className="flex items-center justify-between mt-4 text-sm text-gray-500">
-              <span>
-                Showing {filteredAndSortedItems.length} of {data?.summary.totalLowStock || 0} items
-              </span>
-            </div>
+          {criticalItems.length > 0 && (
+            <Card className="mb-6 border-red-300 bg-red-50/30" data-testid="section-critical-alert">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2 text-red-700">
+                  <AlertCircle className="h-5 w-5" />
+                  Critical Alert - Out of Stock Items ({criticalItems.length})
+                </CardTitle>
+                <CardDescription className="text-red-600">These items are completely depleted and require immediate ordering</CardDescription>
+              </CardHeader>
+              <CardContent>
+                {renderPriorityTable(criticalItems, 'critical')}
+              </CardContent>
+            </Card>
           )}
+
+          {highPriorityItems.length > 0 && (
+            <Card className="mb-6 border-orange-300 bg-orange-50/30" data-testid="section-high-priority">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2 text-orange-700">
+                  <AlertTriangle className="h-5 w-5" />
+                  High Priority - Stock Below 50% of Minimum ({highPriorityItems.length})
+                </CardTitle>
+                <CardDescription className="text-orange-600">These items need to be ordered soon</CardDescription>
+              </CardHeader>
+              <CardContent>
+                {renderPriorityTable(highPriorityItems, 'high')}
+              </CardContent>
+            </Card>
+          )}
+
+          {mediumPriorityItems.length > 0 && (
+            <Card className="mb-6 border-yellow-300 bg-yellow-50/30" data-testid="section-medium-priority">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2 text-yellow-700">
+                  <Clock className="h-5 w-5" />
+                  Medium Priority - Stock Below Minimum ({mediumPriorityItems.length})
+                </CardTitle>
+                <CardDescription className="text-yellow-600">These items are below minimum but not critical yet</CardDescription>
+              </CardHeader>
+              <CardContent>
+                {renderPriorityTable(mediumPriorityItems, 'medium')}
+              </CardContent>
+            </Card>
+          )}
+
+          <Card className="mb-6" data-testid="section-all-items">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <TrendingDown className="h-5 w-5 text-blue-600" />
+                All Low Stock Items
+              </CardTitle>
+              <CardDescription>Complete list of items below minimum stock levels</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="rounded-lg border border-gray-200 overflow-hidden bg-white">
+                <div className="overflow-x-auto">
+                  <table className="w-full" data-testid="table-all-items">
+                    <thead>
+                      <tr className="bg-gray-50 border-b border-gray-200">
+                        <th className="text-left py-3 px-3"><SortButton field="priority" label="Priority" /></th>
+                        <th className="text-left py-3 px-3"><SortButton field="itemCode" label="Item Code" /></th>
+                        <th className="text-left py-3 px-3"><SortButton field="itemName" label="Item Name" /></th>
+                        <th className="text-left py-3 px-3"><SortButton field="itemType" label="Type" /></th>
+                        <th className="text-left py-3 px-3"><SortButton field="category" label="Category" /></th>
+                        <th className="text-right py-3 px-3"><SortButton field="rob" label="ROB" /></th>
+                        <th className="text-right py-3 px-3"><SortButton field="minStock" label="Min Stock" /></th>
+                        <th className="text-right py-3 px-3"><SortButton field="deficit" label="Deficit" /></th>
+                        <th className="text-right py-3 px-3"><SortButton field="deficitPercent" label="Deficit %" /></th>
+                        <th className="text-left py-3 px-3"><SortButton field="uom" label="UOM" /></th>
+                        <th className="text-right py-3 px-3"><SortButton field="avgMonthlyConsumption" label="Avg Monthly" /></th>
+                        <th className="text-right py-3 px-3"><SortButton field="daysUntilStockout" label="Days to Stockout" /></th>
+                        <th className="text-right py-3 px-3"><SortButton field="estimatedCost" label="Est. Cost" /></th>
+                        <th className="text-left py-3 px-3"><SortButton field="supplier" label="Supplier" /></th>
+                        <th className="text-left py-3 px-3"><SortButton field="leadTime" label="Lead Time" /></th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-200">
+                      {sortedItems.length === 0 ? (
+                        <tr>
+                          <td colSpan={15} className="text-center py-12">
+                            <Package className="h-10 w-10 text-gray-400 mx-auto mb-3" />
+                            <p className="text-gray-500 font-medium">No low stock items found</p>
+                            <p className="text-sm text-gray-400 mt-1">Try adjusting your filters</p>
+                          </td>
+                        </tr>
+                      ) : (
+                        sortedItems.map(item => (
+                          <tr
+                            key={item.id}
+                            className={`hover:bg-gray-50 text-sm ${
+                              item.priority === 'Critical' ? 'bg-red-50/40' :
+                              item.priority === 'High' ? 'bg-orange-50/30' : ''
+                            }`}
+                            data-testid={`row-item-${item.id}`}
+                          >
+                            <td className="py-3 px-3">{getPriorityBadge(item.priority)}</td>
+                            <td className="py-3 px-3 font-mono text-gray-700">{item.itemCode || '-'}</td>
+                            <td className="py-3 px-3">
+                              <div className="font-medium text-gray-900">{item.itemName || '-'}</div>
+                            </td>
+                            <td className="py-3 px-3">{getTypeBadge(item.itemType)}</td>
+                            <td className="py-3 px-3 text-gray-600">{item.category || '-'}</td>
+                            <td className="py-3 px-3 text-right">
+                              <span className={`font-semibold ${item.rob === 0 ? 'text-red-600' : 'text-gray-900'}`}>
+                                {item.rob}
+                              </span>
+                            </td>
+                            <td className="py-3 px-3 text-right text-gray-600">{item.minStock}</td>
+                            <td className="py-3 px-3 text-right font-semibold text-red-600">{item.deficit}</td>
+                            <td className="py-3 px-3 text-right">
+                              <div className="flex items-center gap-2 justify-end">
+                                <div className="w-16 bg-gray-200 rounded-full h-2">
+                                  <div
+                                    className={`h-2 rounded-full ${
+                                      item.deficitPercent >= 80 ? 'bg-red-500' :
+                                      item.deficitPercent >= 50 ? 'bg-orange-500' : 'bg-yellow-500'
+                                    }`}
+                                    style={{ width: `${Math.min(item.deficitPercent, 100)}%` }}
+                                  />
+                                </div>
+                                <span className="text-gray-600 w-10 text-right">{item.deficitPercent}%</span>
+                              </div>
+                            </td>
+                            <td className="py-3 px-3 text-gray-600">{item.uom || '-'}</td>
+                            <td className="py-3 px-3 text-right text-gray-600">{item.avgMonthlyConsumption}</td>
+                            <td className="py-3 px-3 text-right">{getDaysUntilStockoutDisplay(item.daysUntilStockout)}</td>
+                            <td className="py-3 px-3 text-right text-gray-700">{formatCurrency(item.estimatedCost)}</td>
+                            <td className="py-3 px-3 text-gray-600">{item.supplier || '-'}</td>
+                            <td className="py-3 px-3 text-gray-600">{item.leadTime || '-'}</td>
+                          </tr>
+                        ))
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+              {sortedItems.length > 0 && (
+                <div className="flex items-center justify-between mt-4 text-sm text-gray-500">
+                  <span>Showing {sortedItems.length} of {items.length} items</span>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+            <Card data-testid="section-category-breakdown">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Package className="h-5 w-5 text-gray-600" />
+                  Category Breakdown
+                </CardTitle>
+                <CardDescription>Distribution of low stock items by category</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  <div>
+                    <div className="flex items-center justify-between mb-1">
+                      <span className="text-sm font-medium text-purple-700">Stores</span>
+                      <span className="text-sm font-semibold text-purple-700">{summary.storesCount}</span>
+                    </div>
+                    <div className="w-full bg-gray-200 rounded-full h-3">
+                      <div
+                        className="bg-purple-500 h-3 rounded-full transition-all duration-500"
+                        style={{ width: `${(summary.storesCount / totalForBars) * 100}%` }}
+                        data-testid="bar-stores"
+                      />
+                    </div>
+                  </div>
+                  <div>
+                    <div className="flex items-center justify-between mb-1">
+                      <span className="text-sm font-medium text-blue-700">Lubricants</span>
+                      <span className="text-sm font-semibold text-blue-700">{summary.lubesCount}</span>
+                    </div>
+                    <div className="w-full bg-gray-200 rounded-full h-3">
+                      <div
+                        className="bg-blue-500 h-3 rounded-full transition-all duration-500"
+                        style={{ width: `${(summary.lubesCount / totalForBars) * 100}%` }}
+                        data-testid="bar-lubricants"
+                      />
+                    </div>
+                  </div>
+                  <div>
+                    <div className="flex items-center justify-between mb-1">
+                      <span className="text-sm font-medium text-green-700">Chemicals</span>
+                      <span className="text-sm font-semibold text-green-700">{summary.chemicalsCount}</span>
+                    </div>
+                    <div className="w-full bg-gray-200 rounded-full h-3">
+                      <div
+                        className="bg-green-500 h-3 rounded-full transition-all duration-500"
+                        style={{ width: `${(summary.chemicalsCount / totalForBars) * 100}%` }}
+                        data-testid="bar-chemicals"
+                      />
+                    </div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card data-testid="section-recommended-actions">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <ShoppingCart className="h-5 w-5 text-gray-600" />
+                  Recommended Actions
+                </CardTitle>
+                <CardDescription>Summary of required actions based on stock analysis</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between py-2 border-b border-gray-100">
+                    <span className="text-sm text-gray-600">Total items requiring attention</span>
+                    <span className="text-sm font-semibold text-gray-900">{summary.totalLowStock}</span>
+                  </div>
+                  <div className="flex items-center justify-between py-2 border-b border-gray-100">
+                    <span className="text-sm text-gray-600">Estimated reorder cost</span>
+                    <span className="text-sm font-semibold text-gray-900">{formatCurrency(summary.estimatedTotalCost)}</span>
+                  </div>
+                  <div className="flex items-center justify-between py-2 border-b border-gray-100">
+                    <span className="text-sm text-gray-600">Critical items</span>
+                    <span className="text-sm font-semibold text-red-600">{summary.criticalItems}</span>
+                  </div>
+                  <div className="mt-4 p-3 rounded-lg bg-gray-50 border border-gray-200">
+                    {summary.criticalItems > 0 ? (
+                      <p className="text-sm text-gray-700">
+                        <AlertCircle className="h-4 w-4 text-red-500 inline mr-1" />
+                        <span className="font-semibold">Create purchase orders for {summary.criticalItems} critical item{summary.criticalItems !== 1 ? 's' : ''} immediately</span>
+                      </p>
+                    ) : (
+                      <p className="text-sm text-gray-700">
+                        <Clock className="h-4 w-4 text-yellow-500 inline mr-1" />
+                        <span className="font-semibold">Monitor {summary.totalLowStock} item{summary.totalLowStock !== 1 ? 's' : ''} below minimum stock levels</span>
+                      </p>
+                    )}
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
         </>
       )}
     </div>

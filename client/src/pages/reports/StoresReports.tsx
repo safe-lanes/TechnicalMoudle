@@ -29,6 +29,7 @@ import { useQuery } from "@tanstack/react-query";
 import CategoryFilters, { CategoryFilterValues } from "@/components/reports/CategoryFilters";
 import StoresInventoryStatusReport from "./StoresInventoryStatusReport";
 import ChemicalsExpiryReport from "./ChemicalsExpiryReport";
+import LowStockAlertReport from "./LowStockAlertReport";
 
 interface StoresReport {
   id: string;
@@ -116,7 +117,7 @@ const StoresReports: React.FC<StoresReportsProps> = ({ onBack, globalFilters }) 
       category: "chemicals"
     },
     {
-      id: "stores-low-stock",
+      id: "low-stock-alert",
       name: "Low Stock Alert Report",
       description: "Items below minimum levels requiring immediate attention",
       purpose: "Prevent stockouts (All stakeholders)",
@@ -310,7 +311,7 @@ const StoresReports: React.FC<StoresReportsProps> = ({ onBack, globalFilters }) 
         break;
       }
 
-      case 'stores-low-stock': {
+      case 'low-stock-alert': {
         const lowStockItems = storesItems.filter((s: any) => (parseFloat(String(s.rob)) || 0) <= (parseFloat(String(s.min)) || 0));
 
         const columns = [
@@ -462,6 +463,15 @@ const StoresReports: React.FC<StoresReportsProps> = ({ onBack, globalFilters }) 
     );
   }
 
+  if (selectedReport === 'low-stock-alert') {
+    return (
+      <LowStockAlertReport
+        onBack={() => setSelectedReport(null)}
+        vesselId={effectiveVesselId}
+      />
+    );
+  }
+
   return (
     <div className="p-6 bg-white min-h-screen">
       <div className="mb-6">
@@ -545,7 +555,7 @@ const StoresReports: React.FC<StoresReportsProps> = ({ onBack, globalFilters }) 
                 className="hover:bg-gray-50 cursor-pointer"
                 data-testid={`stores-report-row-${report.id}`}
                 onClick={() => {
-                  if (report.id === 'stores-inventory-status' || report.id === 'chemicals-tracking') {
+                  if (report.id === 'stores-inventory-status' || report.id === 'chemicals-tracking' || report.id === 'low-stock-alert') {
                     setSelectedReport(report.id);
                   }
                 }}
@@ -575,7 +585,7 @@ const StoresReports: React.FC<StoresReportsProps> = ({ onBack, globalFilters }) 
                       title="Preview"
                       onClick={(e) => {
                         e.stopPropagation();
-                        if (report.id === 'stores-inventory-status' || report.id === 'chemicals-tracking') {
+                        if (report.id === 'stores-inventory-status' || report.id === 'chemicals-tracking' || report.id === 'low-stock-alert') {
                           setSelectedReport(report.id);
                         } else {
                           handleGenerateReport(report.id, 'PDF');

@@ -4,10 +4,10 @@ import { storage } from "./storage";
 import { getPool, getDb } from "./db";
 import * as fs from "fs";
 import * as path from "path";
-import { insertRunningHoursAuditSchema, cascadeRunningHoursSchema, insertWorkOrderSchema, insertWorkOrderExecutionSchema, insertDefectSchema, insertDefectActionSchema, insertDefectAttachmentSchema, insertComponentSchema, insertSpareSchema, insertMakerSchema, insertMasterListSchema, insertComponentDocumentSchema, insertComponentClassRegulatorySchema, insertComponentRequisitionSchema, equipmentCategories, defectCategories, defectTypes, shipCertificatesMaster, insertShipCertificateMasterSchema, shipCertificatesLabelsConfig, vesselCertificateApplicability, insertVesselCertificateApplicabilitySchema, vesselCertificateData, vessels, shipSurveysMaster, shipSurveysLabelsConfig, vesselSurveyApplicability, vesselSurveyData, componentRunningHoursLog, runningHoursAudit } from "@shared/schema";
+import { insertRunningHoursAuditSchema, cascadeRunningHoursSchema, insertWorkOrderSchema, insertWorkOrderExecutionSchema, insertDefectSchema, insertDefectActionSchema, insertDefectAttachmentSchema, insertComponentSchema, insertSpareSchema, insertMakerSchema, insertMasterListSchema, insertComponentDocumentSchema, insertComponentClassRegulatorySchema, insertComponentRequisitionSchema, equipmentCategories, defectCategories, defectTypes, shipCertificatesMaster, insertShipCertificateMasterSchema, shipCertificatesLabelsConfig, vesselCertificateApplicability, insertVesselCertificateApplicabilitySchema, vesselCertificateData, vessels, shipSurveysMaster, shipSurveysLabelsConfig, vesselSurveyApplicability, vesselSurveyData, componentRunningHoursLog, runningHoursAudit, storesLedger } from "@shared/schema";
 
 import { getPostgresClient } from "./postgresClient";
-import { eq, and, asc, sql, inArray } from "drizzle-orm";
+import { eq, and, asc, sql, inArray, gte } from "drizzle-orm";
 import { computeWorkOrderStatus } from "@shared/workOrders/status";
 import { WORK_ORDER_THRESHOLDS } from "@shared/workOrders/constants";
 import { shouldGenerateWorkOrder } from "@shared/dateUtils";
@@ -8690,6 +8690,304 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error: any) {
       console.error("Error generating chemicals expiry report:", error);
       res.status(500).json({ error: error.message || "Failed to generate chemicals expiry report" });
+    }
+  });
+
+  // Stores Low Stock Alert Report endpoint (stores/lubes/chemicals inventory)
+  app.get("/technical/api/reports/stores-low-stock-alert/:vesselId", async (req, res) => {
+    try {
+      const { vesselId } = req.params;
+      const { category, priority, location } = req.query;
+
+      const allItems = await storage.getStoresItems(vesselId);
+
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const ninetyDaysAgo = new Date(today);
+      ninetyDaysAgo.setDate(ninetyDaysAgo.getDate() - 90);
+
+      const db = await getDb();
+      const consumptionData = await db.select({
+        itemId: storesLedger.itemId,
+        totalConsumed: sql<string>`COALESCE(SUM(ABS(${storesLedger.qtyChangeBase})), 0)`,
+        eventCount: sql<number>`COUNT(*)`,
+        lastConsumed: sql<string>`MAX(${storesLedger.timestampUTC})`,
+      })
+        .from(storesLedger)
+        .where(and(
+          eq(storesLedger.vesselId, vesselId),
+          eq(storesLedger.eventType, 'CONSUME'),
+          gte(storesLedger.timestampUTC, ninetyDaysAgo)
+        ))
+        .groupBy(storesLedger.itemId);
+
+      const consumptionMap = new Map<number, { totalConsumed: number; eventCount: number; lastConsumed: string | null }>();
+      for (const row of consumptionData) {
+        consumptionMap.set(row.itemId, {
+          totalConsumed: parseFloat(String(row.totalConsumed)) || 0,
+          eventCount: row.eventCount,
+          lastConsumed: row.lastConsumed,
+        });
+      }
+
+      const lowStockItems = allItems
+        .filter((item: any) => {
+          const rob = parseFloat(String(item.rob)) || 0;
+          const min = parseFloat(String(item.min)) || 0;
+          return min > 0 && rob <= min;
+        })
+        .map((item: any) => {
+          const rob = parseFloat(String(item.rob)) || 0;
+          const min = parseFloat(String(item.min)) || 0;
+          const maxStock = parseFloat(String(item.max)) || 0;
+          const unitCost = parseFloat(String(item.unitCost)) || 0;
+          const deficit = Math.max(0, min - rob);
+
+          let priorityLevel: string;
+          if (rob === 0) {
+            priorityLevel = 'Critical';
+          } else if (rob < min * 0.5) {
+            priorityLevel = 'High';
+          } else {
+            priorityLevel = 'Medium';
+          }
+
+          const consumption = consumptionMap.get(item.id);
+          const avgMonthlyConsumption = consumption ? consumption.totalConsumed / 3 : 0;
+          const avgDailyConsumption = avgMonthlyConsumption / 30;
+
+          let daysUntilStockout: number | null = null;
+          if (rob === 0) {
+            daysUntilStockout = 0;
+          } else if (avgDailyConsumption > 0) {
+            daysUntilStockout = Math.round(rob / avgDailyConsumption);
+          }
+
+          const estimatedCost = unitCost > 0 ? Math.round(deficit * unitCost * 100) / 100 : null;
+          const deficitPercent = min > 0 ? Math.round((deficit / min) * 100) : 0;
+
+          const locationDisplay = [
+            item.locationA ? `${item.locationA}: ${parseFloat(String(item.robLocationA)) || 0}` : null,
+            item.locationB ? `${item.locationB}: ${parseFloat(String(item.robLocationB)) || 0}` : null,
+          ].filter(Boolean).join(' / ') || '-';
+
+          return {
+            id: item.id,
+            itemCode: item.itemCode,
+            itemName: item.itemName,
+            itemType: item.itemType,
+            category: item.category || 'Uncategorized',
+            rob,
+            minStock: min,
+            maxStock,
+            deficit,
+            deficitPercent,
+            uom: item.uom || '-',
+            location: locationDisplay,
+            priority: priorityLevel,
+            lastConsumedDate: consumption?.lastConsumed || null,
+            avgMonthlyConsumption: Math.round(avgMonthlyConsumption * 100) / 100,
+            daysUntilStockout,
+            estimatedCost,
+            supplier: item.supplier || null,
+            leadTime: item.leadTime || null,
+            lastOrderDate: item.lastOrderDate || null,
+            unitCost: unitCost > 0 ? unitCost : null,
+          };
+        });
+
+      let filtered = lowStockItems;
+      if (category && category !== 'all') {
+        if (category === 'lubricants' || category === 'lubes') {
+          filtered = filtered.filter((i: any) => i.itemType === 'lubes' || i.itemType === 'lubricants');
+        } else {
+          filtered = filtered.filter((i: any) => i.itemType === category);
+        }
+      }
+      if (priority && priority !== 'all') {
+        const pStr = (priority as string).charAt(0).toUpperCase() + (priority as string).slice(1).toLowerCase();
+        filtered = filtered.filter((i: any) => i.priority === pStr);
+      }
+      if (location && location !== 'all') {
+        filtered = filtered.filter((i: any) => i.location.toLowerCase().includes((location as string).toLowerCase()));
+      }
+
+      filtered.sort((a: any, b: any) => {
+        const pOrder: Record<string, number> = { Critical: 0, High: 1, Medium: 2 };
+        return (pOrder[a.priority] ?? 3) - (pOrder[b.priority] ?? 3);
+      });
+
+      const criticalItems = lowStockItems.filter((i: any) => i.priority === 'Critical');
+      const highItems = lowStockItems.filter((i: any) => i.priority === 'High');
+      const mediumItems = lowStockItems.filter((i: any) => i.priority === 'Medium');
+
+      const totalEstimatedCost = lowStockItems.reduce((sum: number, i: any) => sum + (i.estimatedCost || 0), 0);
+
+      res.json({
+        summary: {
+          totalLowStock: lowStockItems.length,
+          criticalItems: criticalItems.length,
+          highPriorityItems: highItems.length,
+          mediumPriorityItems: mediumItems.length,
+          storesCount: lowStockItems.filter((i: any) => i.itemType === 'stores').length,
+          lubesCount: lowStockItems.filter((i: any) => i.itemType === 'lubes' || i.itemType === 'lubricants').length,
+          chemicalsCount: lowStockItems.filter((i: any) => i.itemType === 'chemicals').length,
+          estimatedTotalCost: Math.round(totalEstimatedCost * 100) / 100,
+        },
+        items: filtered,
+      });
+    } catch (error: any) {
+      console.error("Error generating low stock alert report:", error);
+      res.status(500).json({ error: error.message || "Failed to generate low stock alert report" });
+    }
+  });
+
+  // Stores Low Stock Alert Report - Excel Export
+  app.post("/technical/api/reports/stores-low-stock-alert/:vesselId/excel", async (req, res) => {
+    try {
+      const { vesselId } = req.params;
+      const allItems = await storage.getStoresItems(vesselId);
+
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const ninetyDaysAgo = new Date(today);
+      ninetyDaysAgo.setDate(ninetyDaysAgo.getDate() - 90);
+
+      const db = await getDb();
+      const consumptionData = await db.select({
+        itemId: storesLedger.itemId,
+        totalConsumed: sql<string>`COALESCE(SUM(ABS(${storesLedger.qtyChangeBase})), 0)`,
+        lastConsumed: sql<string>`MAX(${storesLedger.timestampUTC})`,
+      })
+        .from(storesLedger)
+        .where(and(
+          eq(storesLedger.vesselId, vesselId),
+          eq(storesLedger.eventType, 'CONSUME'),
+          gte(storesLedger.timestampUTC, ninetyDaysAgo)
+        ))
+        .groupBy(storesLedger.itemId);
+
+      const consumptionMap = new Map<number, { totalConsumed: number; lastConsumed: string | null }>();
+      for (const row of consumptionData) {
+        consumptionMap.set(row.itemId, {
+          totalConsumed: parseFloat(String(row.totalConsumed)) || 0,
+          lastConsumed: row.lastConsumed,
+        });
+      }
+
+      const lowStockItems = allItems
+        .filter((item: any) => {
+          const rob = parseFloat(String(item.rob)) || 0;
+          const min = parseFloat(String(item.min)) || 0;
+          return min > 0 && rob <= min;
+        })
+        .map((item: any) => {
+          const rob = parseFloat(String(item.rob)) || 0;
+          const min = parseFloat(String(item.min)) || 0;
+          const unitCost = parseFloat(String(item.unitCost)) || 0;
+          const deficit = Math.max(0, min - rob);
+          const consumption = consumptionMap.get(item.id);
+          const avgMonthly = consumption ? consumption.totalConsumed / 3 : 0;
+          const avgDaily = avgMonthly / 30;
+          let daysOut: number | null = null;
+          if (rob === 0) daysOut = 0;
+          else if (avgDaily > 0) daysOut = Math.round(rob / avgDaily);
+
+          let priorityLevel = 'Medium';
+          if (rob === 0) priorityLevel = 'Critical';
+          else if (rob < min * 0.5) priorityLevel = 'High';
+
+          return {
+            priority: priorityLevel,
+            itemCode: item.itemCode,
+            itemName: item.itemName,
+            type: item.itemType,
+            category: item.category || 'Uncategorized',
+            rob,
+            min,
+            max: parseFloat(String(item.max)) || 0,
+            deficit,
+            deficitPct: min > 0 ? Math.round((deficit / min) * 100) : 0,
+            uom: item.uom || '-',
+            avgMonthly: Math.round(avgMonthly * 100) / 100,
+            daysUntilStockout: daysOut,
+            estCost: unitCost > 0 ? Math.round(deficit * unitCost * 100) / 100 : null,
+            supplier: item.supplier || '-',
+            leadTime: item.leadTime || '-',
+            lastOrderDate: item.lastOrderDate || '-',
+          };
+        });
+
+      lowStockItems.sort((a: any, b: any) => {
+        const pOrder: Record<string, number> = { Critical: 0, High: 1, Medium: 2 };
+        return (pOrder[a.priority] ?? 3) - (pOrder[b.priority] ?? 3);
+      });
+
+      const ExcelJS = (await import('exceljs')).default;
+      const workbook = new ExcelJS.Workbook();
+      const sheet = workbook.addWorksheet('Low Stock Alert');
+
+      const headerRow = sheet.addRow([
+        'S.No', 'Priority', 'Item Code', 'Item Name', 'Type', 'Category',
+        'ROB', 'Min Stock', 'Max Stock', 'Deficit', 'Deficit %', 'UOM',
+        'Avg Monthly Consumption', 'Days Until Stockout', 'Est. Reorder Cost',
+        'Supplier', 'Lead Time', 'Last Order Date'
+      ]);
+      headerRow.font = { bold: true, color: { argb: 'FFFFFFFF' } };
+      headerRow.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1F4E79' } };
+      headerRow.alignment = { horizontal: 'center', vertical: 'middle' };
+
+      sheet.columns = [
+        { width: 6 }, { width: 10 }, { width: 14 }, { width: 30 }, { width: 12 }, { width: 16 },
+        { width: 8 }, { width: 10 }, { width: 10 }, { width: 8 }, { width: 10 }, { width: 8 },
+        { width: 18 }, { width: 18 }, { width: 16 },
+        { width: 22 }, { width: 12 }, { width: 14 }
+      ];
+
+      const priorityColors: Record<string, string> = {
+        Critical: 'FFFEE2E2',
+        High: 'FFFFF7ED',
+        Medium: 'FFFFFBEB',
+      };
+
+      lowStockItems.forEach((item: any, idx: number) => {
+        const row = sheet.addRow([
+          idx + 1, item.priority, item.itemCode, item.itemName, item.type, item.category,
+          item.rob, item.min, item.max, item.deficit, `${item.deficitPct}%`, item.uom,
+          item.avgMonthly, item.daysUntilStockout ?? 'N/A', item.estCost !== null ? `$${item.estCost}` : 'N/A',
+          item.supplier, item.leadTime, item.lastOrderDate
+        ]);
+        const bgColor = priorityColors[item.priority] || 'FFFFFFFF';
+        row.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: bgColor } };
+        row.alignment = { vertical: 'middle' };
+      });
+
+      const summarySheet = workbook.addWorksheet('Summary');
+      summarySheet.addRow(['Low Stock Alert Report Summary']);
+      summarySheet.getRow(1).font = { bold: true, size: 14 };
+      summarySheet.addRow([]);
+      summarySheet.addRow(['Metric', 'Count']);
+      summarySheet.getRow(3).font = { bold: true };
+      summarySheet.addRow(['Total Low Stock Items', lowStockItems.length]);
+      summarySheet.addRow(['Critical (Out of Stock)', lowStockItems.filter((i: any) => i.priority === 'Critical').length]);
+      summarySheet.addRow(['High Priority', lowStockItems.filter((i: any) => i.priority === 'High').length]);
+      summarySheet.addRow(['Medium Priority', lowStockItems.filter((i: any) => i.priority === 'Medium').length]);
+      summarySheet.addRow([]);
+      summarySheet.addRow(['By Type', 'Count']);
+      summarySheet.getRow(9).font = { bold: true };
+      summarySheet.addRow(['Stores', lowStockItems.filter((i: any) => i.type === 'stores').length]);
+      summarySheet.addRow(['Lubricants', lowStockItems.filter((i: any) => i.type === 'lubes' || i.type === 'lubricants').length]);
+      summarySheet.addRow(['Chemicals', lowStockItems.filter((i: any) => i.type === 'chemicals').length]);
+      summarySheet.column(1).width = 30;
+      summarySheet.column(2).width = 12;
+
+      res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+      res.setHeader('Content-Disposition', 'attachment; filename=low-stock-alert-report.xlsx');
+      await workbook.xlsx.write(res);
+      res.end();
+    } catch (error: any) {
+      console.error("Error generating low stock alert Excel:", error);
+      res.status(500).json({ error: error.message || "Failed to generate Excel report" });
     }
   });
 
