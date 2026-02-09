@@ -268,7 +268,7 @@ class PDFReportGenerator {
       this.doc.setFontSize(8);
       this.doc.setTextColor(...PDF_COLORS.textLight);
       this.doc.text(
-        'Seafarer Technical Management System - Confidential',
+        'SAIL',
         margin,
         pageHeight - 8
       );
