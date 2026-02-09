@@ -197,12 +197,6 @@ class PDFReportGenerator {
       alternateRowStyles: {
         fillColor: [255, 255, 255] as [number, number, number],
       },
-      columnStyles: columns.reduce((acc, col, index) => {
-        if (col.width) {
-          acc[index] = { cellWidth: col.width };
-        }
-        return acc;
-      }, {} as Record<number, { cellWidth: number }>),
       didParseCell: (hookData) => {
         // Skip header row
         if (hookData.section !== 'body') return;
