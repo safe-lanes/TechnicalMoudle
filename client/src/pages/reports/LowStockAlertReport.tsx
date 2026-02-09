@@ -11,6 +11,11 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
+import {
   ArrowLeft,
   AlertTriangle,
   Search,
@@ -25,6 +30,10 @@ import {
   Clock,
   TrendingDown,
   ShoppingCart,
+  History,
+  ChevronDown,
+  ChevronUp,
+  Eye,
 } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { pdfReportGenerator } from "@/lib/pdfReportGenerator";
@@ -131,6 +140,8 @@ const LowStockAlertReport: React.FC<LowStockAlertReportProps> = ({ onBack, vesse
   const [sortDirection, setSortDirection] = useState<SortDirection>('asc');
   const [generatingPdf, setGeneratingPdf] = useState(false);
   const [generatingExcel, setGeneratingExcel] = useState(false);
+  const [historyOpen, setHistoryOpen] = useState(false);
+  const [viewingSnapshotId, setViewingSnapshotId] = useState<number | null>(null);
 
   const { data, isLoading, error } = useQuery<LowStockAlertResponse>({
     queryKey: ['/technical/api/reports/stores-low-stock-alert', effectiveVesselId],
@@ -142,6 +153,30 @@ const LowStockAlertReport: React.FC<LowStockAlertReportProps> = ({ onBack, vesse
       return res.json();
     },
     enabled: !!effectiveVesselId && effectiveVesselId !== 'all',
+  });
+
+  const { data: snapshotsData, isLoading: snapshotsLoading } = useQuery<any[]>({
+    queryKey: ['/technical/api/reports/snapshots', effectiveVesselId, 'low-stock-alert'],
+    queryFn: async () => {
+      const res = await fetch(`/technical/api/reports/snapshots/${effectiveVesselId}?reportType=low-stock-alert&limit=20`, {
+        credentials: 'include',
+      });
+      if (!res.ok) throw new Error(`${res.status}: ${res.statusText}`);
+      return res.json();
+    },
+    enabled: !!effectiveVesselId && effectiveVesselId !== 'all' && historyOpen,
+  });
+
+  const { data: snapshotDetail } = useQuery<any>({
+    queryKey: ['/technical/api/reports/snapshots/detail', viewingSnapshotId],
+    queryFn: async () => {
+      const res = await fetch(`/technical/api/reports/snapshots/detail/${viewingSnapshotId}`, {
+        credentials: 'include',
+      });
+      if (!res.ok) throw new Error(`${res.status}: ${res.statusText}`);
+      return res.json();
+    },
+    enabled: !!viewingSnapshotId,
   });
 
   const items = data?.items || [];
@@ -796,6 +831,129 @@ const LowStockAlertReport: React.FC<LowStockAlertReportProps> = ({ onBack, vesse
               </CardContent>
             </Card>
           </div>
+
+          <Card data-testid="section-report-history">
+            <Collapsible open={historyOpen} onOpenChange={setHistoryOpen}>
+              <CollapsibleTrigger asChild>
+                <CardHeader className="cursor-pointer">
+                  <CardTitle className="flex items-center justify-between gap-2">
+                    <div className="flex items-center gap-2">
+                      <History className="h-5 w-5 text-gray-600" />
+                      Report History
+                    </div>
+                    {historyOpen ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                  </CardTitle>
+                  <CardDescription>View previously generated report snapshots</CardDescription>
+                </CardHeader>
+              </CollapsibleTrigger>
+              <CollapsibleContent>
+                <CardContent>
+                  {snapshotsLoading ? (
+                    <div className="flex items-center justify-center py-8" data-testid="loading-snapshots">
+                      <Loader2 className="h-6 w-6 animate-spin text-gray-400 mr-2" />
+                      <span className="text-sm text-gray-500">Loading history...</span>
+                    </div>
+                  ) : !snapshotsData || snapshotsData.length === 0 ? (
+                    <div className="text-center py-8 text-gray-500" data-testid="empty-snapshots">
+                      <History className="h-8 w-8 mx-auto mb-2 text-gray-300" />
+                      <p className="text-sm">No report snapshots yet. Generate a report to create the first snapshot.</p>
+                    </div>
+                  ) : (
+                    <div className="space-y-3">
+                      {snapshotsData.map((snapshot: any) => {
+                        const snapshotSummary = snapshot.summaryData as any;
+                        const isViewing = viewingSnapshotId === snapshot.id;
+                        return (
+                          <div key={snapshot.id} className="border border-gray-200 rounded-md" data-testid={`snapshot-row-${snapshot.id}`}>
+                            <div className="flex items-center justify-between gap-4 p-3 flex-wrap">
+                              <div className="flex items-center gap-3 min-w-0">
+                                <div className="flex flex-col min-w-0">
+                                  <span className="text-sm font-medium text-gray-900">
+                                    {format(new Date(snapshot.generatedAt), 'dd MMM yyyy, HH:mm')}
+                                  </span>
+                                  <span className="text-xs text-gray-500">
+                                    {snapshot.itemCount} items | Format: {snapshot.exportFormat.toUpperCase()} | By: {snapshot.generatedBy || 'System'}
+                                  </span>
+                                </div>
+                              </div>
+                              <div className="flex items-center gap-2 flex-wrap">
+                                {snapshotSummary && (
+                                  <div className="flex items-center gap-1">
+                                    {snapshotSummary.criticalItems > 0 && (
+                                      <Badge className="bg-red-600 text-white border-red-700 text-xs">{snapshotSummary.criticalItems} Critical</Badge>
+                                    )}
+                                    {snapshotSummary.highPriorityItems > 0 && (
+                                      <Badge className="bg-orange-500 text-white border-orange-600 text-xs">{snapshotSummary.highPriorityItems} High</Badge>
+                                    )}
+                                    {snapshotSummary.mediumPriorityItems > 0 && (
+                                      <Badge className="bg-yellow-500 text-white border-yellow-600 text-xs">{snapshotSummary.mediumPriorityItems} Medium</Badge>
+                                    )}
+                                  </div>
+                                )}
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={() => setViewingSnapshotId(isViewing ? null : snapshot.id)}
+                                  data-testid={`button-view-snapshot-${snapshot.id}`}
+                                >
+                                  <Eye className="h-3 w-3 mr-1" />
+                                  {isViewing ? 'Hide' : 'View'}
+                                </Button>
+                              </div>
+                            </div>
+                            {isViewing && snapshotDetail && (
+                              <div className="border-t border-gray-200 p-3 bg-gray-50">
+                                <div className="overflow-x-auto">
+                                  <table className="min-w-full text-xs" data-testid={`snapshot-table-${snapshot.id}`}>
+                                    <thead>
+                                      <tr className="bg-gray-100">
+                                        <th className="px-2 py-1 text-left font-medium text-gray-600">S.No</th>
+                                        <th className="px-2 py-1 text-left font-medium text-gray-600">Priority</th>
+                                        <th className="px-2 py-1 text-left font-medium text-gray-600">Item Code</th>
+                                        <th className="px-2 py-1 text-left font-medium text-gray-600">Item Name</th>
+                                        <th className="px-2 py-1 text-left font-medium text-gray-600">Type</th>
+                                        <th className="px-2 py-1 text-left font-medium text-gray-600">Category</th>
+                                        <th className="px-2 py-1 text-right font-medium text-gray-600">ROB</th>
+                                        <th className="px-2 py-1 text-right font-medium text-gray-600">Min Stock</th>
+                                        <th className="px-2 py-1 text-right font-medium text-gray-600">Deficit</th>
+                                        <th className="px-2 py-1 text-left font-medium text-gray-600">UOM</th>
+                                        <th className="px-2 py-1 text-right font-medium text-gray-600">Avg Monthly</th>
+                                        <th className="px-2 py-1 text-right font-medium text-gray-600">Days to Stockout</th>
+                                        <th className="px-2 py-1 text-right font-medium text-gray-600">Est. Cost</th>
+                                      </tr>
+                                    </thead>
+                                    <tbody>
+                                      {(snapshotDetail.itemsData as any[]).map((item: any, idx: number) => (
+                                        <tr key={idx} className={idx % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
+                                          <td className="px-2 py-1">{idx + 1}</td>
+                                          <td className="px-2 py-1">{getPriorityBadge(item.priority)}</td>
+                                          <td className="px-2 py-1 font-mono">{item.itemCode}</td>
+                                          <td className="px-2 py-1">{item.itemName}</td>
+                                          <td className="px-2 py-1">{item.itemType}</td>
+                                          <td className="px-2 py-1">{item.category}</td>
+                                          <td className="px-2 py-1 text-right">{item.rob}</td>
+                                          <td className="px-2 py-1 text-right">{item.minStock}</td>
+                                          <td className="px-2 py-1 text-right">{item.deficit}</td>
+                                          <td className="px-2 py-1">{item.uom}</td>
+                                          <td className="px-2 py-1 text-right">{item.avgMonthlyConsumption}</td>
+                                          <td className="px-2 py-1 text-right">{item.daysUntilStockout ?? 'N/A'}</td>
+                                          <td className="px-2 py-1 text-right">{item.estimatedCost !== null ? `$${item.estimatedCost}` : 'N/A'}</td>
+                                        </tr>
+                                      ))}
+                                    </tbody>
+                                  </table>
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </CardContent>
+              </CollapsibleContent>
+            </Collapsible>
+          </Card>
         </>
       )}
     </div>

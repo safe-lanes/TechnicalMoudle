@@ -2720,3 +2720,28 @@ export const insertWorkOrderPostponementSchema = createInsertSchema(workOrderPos
 
 export type InsertWorkOrderPostponement = z.infer<typeof insertWorkOrderPostponementSchema>;
 export type WorkOrderPostponement = typeof workOrderPostponements.$inferSelect;
+
+export const reportSnapshots = pgTable("report_snapshots", {
+  id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
+  vesselId: text("vessel_id").notNull(),
+  reportType: text("report_type").notNull(),
+  exportFormat: text("export_format").notNull(),
+  generatedAt: timestamp("generated_at").notNull().defaultNow(),
+  generatedBy: text("generated_by"),
+  itemCount: integer("item_count").notNull().default(0),
+  filtersApplied: jsonb("filters_applied"),
+  summaryData: jsonb("summary_data").notNull(),
+  itemsData: jsonb("items_data").notNull(),
+}, (table) => ({
+  vesselIdx: index("idx_report_snapshots_vessel").on(table.vesselId),
+  reportTypeIdx: index("idx_report_snapshots_type").on(table.reportType),
+  generatedAtIdx: index("idx_report_snapshots_date").on(table.generatedAt),
+}));
+
+export const insertReportSnapshotSchema = createInsertSchema(reportSnapshots).omit({
+  id: true,
+  generatedAt: true,
+});
+
+export type InsertReportSnapshot = z.infer<typeof insertReportSnapshotSchema>;
+export type ReportSnapshot = typeof reportSnapshots.$inferSelect;

@@ -4,7 +4,8 @@ import { storage } from "./storage";
 import { getPool, getDb } from "./db";
 import * as fs from "fs";
 import * as path from "path";
-import { insertRunningHoursAuditSchema, cascadeRunningHoursSchema, insertWorkOrderSchema, insertWorkOrderExecutionSchema, insertDefectSchema, insertDefectActionSchema, insertDefectAttachmentSchema, insertComponentSchema, insertSpareSchema, insertMakerSchema, insertMasterListSchema, insertComponentDocumentSchema, insertComponentClassRegulatorySchema, insertComponentRequisitionSchema, equipmentCategories, defectCategories, defectTypes, shipCertificatesMaster, insertShipCertificateMasterSchema, shipCertificatesLabelsConfig, vesselCertificateApplicability, insertVesselCertificateApplicabilitySchema, vesselCertificateData, vessels, shipSurveysMaster, shipSurveysLabelsConfig, vesselSurveyApplicability, vesselSurveyData, componentRunningHoursLog, runningHoursAudit, storesLedger } from "@shared/schema";
+import { insertRunningHoursAuditSchema, cascadeRunningHoursSchema, insertWorkOrderSchema, insertWorkOrderExecutionSchema, insertDefectSchema, insertDefectActionSchema, insertDefectAttachmentSchema, insertComponentSchema, insertSpareSchema, insertMakerSchema, insertMasterListSchema, insertComponentDocumentSchema, insertComponentClassRegulatorySchema, insertComponentRequisitionSchema, equipmentCategories, defectCategories, defectTypes, shipCertificatesMaster, insertShipCertificateMasterSchema, shipCertificatesLabelsConfig, vesselCertificateApplicability, insertVesselCertificateApplicabilitySchema, vesselCertificateData, vessels, shipSurveysMaster, shipSurveysLabelsConfig, vesselSurveyApplicability, vesselSurveyData, componentRunningHoursLog, runningHoursAudit, storesLedger, reportSnapshots } from "@shared/schema";
+import { lowStockReportService } from "./services/lowStockReportService";
 
 import { getPostgresClient } from "./postgresClient";
 import { eq, and, asc, sql, inArray, gte } from "drizzle-orm";
@@ -8698,144 +8699,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { vesselId } = req.params;
       const { category, priority, location } = req.query;
+      const filters = {
+        category: category as string | undefined,
+        priority: priority as string | undefined,
+        location: location as string | undefined,
+      };
 
-      const allItems = await storage.getStoresItems(vesselId);
+      const result = await lowStockReportService.computeReport(vesselId, filters);
 
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
-      const ninetyDaysAgo = new Date(today);
-      ninetyDaysAgo.setDate(ninetyDaysAgo.getDate() - 90);
+      lowStockReportService.saveSnapshot(
+        vesselId, 'low-stock-alert', 'json', result.summary, result.items, filters
+      ).catch(err => console.error("Snapshot save error:", err));
 
-      const db = await getDb();
-      const consumptionData = await db.select({
-        itemId: storesLedger.itemId,
-        totalConsumed: sql<string>`COALESCE(SUM(ABS(${storesLedger.qtyChangeBase})), 0)`,
-        eventCount: sql<number>`COUNT(*)`,
-        lastConsumed: sql<string>`MAX(${storesLedger.timestampUTC})`,
-      })
-        .from(storesLedger)
-        .where(and(
-          eq(storesLedger.vesselId, vesselId),
-          eq(storesLedger.eventType, 'CONSUME'),
-          gte(storesLedger.timestampUTC, ninetyDaysAgo)
-        ))
-        .groupBy(storesLedger.itemId);
-
-      const consumptionMap = new Map<number, { totalConsumed: number; eventCount: number; lastConsumed: string | null }>();
-      for (const row of consumptionData) {
-        consumptionMap.set(row.itemId, {
-          totalConsumed: parseFloat(String(row.totalConsumed)) || 0,
-          eventCount: row.eventCount,
-          lastConsumed: row.lastConsumed,
-        });
-      }
-
-      const lowStockItems = allItems
-        .filter((item: any) => {
-          const rob = parseFloat(String(item.rob)) || 0;
-          const min = parseFloat(String(item.min)) || 0;
-          return min > 0 && rob <= min;
-        })
-        .map((item: any) => {
-          const rob = parseFloat(String(item.rob)) || 0;
-          const min = parseFloat(String(item.min)) || 0;
-          const maxStock = parseFloat(String(item.max)) || 0;
-          const unitCost = parseFloat(String(item.unitCost)) || 0;
-          const deficit = Math.max(0, min - rob);
-
-          let priorityLevel: string;
-          if (rob === 0) {
-            priorityLevel = 'Critical';
-          } else if (rob < min * 0.5) {
-            priorityLevel = 'High';
-          } else {
-            priorityLevel = 'Medium';
-          }
-
-          const consumption = consumptionMap.get(item.id);
-          const avgMonthlyConsumption = consumption ? consumption.totalConsumed / 3 : 0;
-          const avgDailyConsumption = avgMonthlyConsumption / 30;
-
-          let daysUntilStockout: number | null = null;
-          if (rob === 0) {
-            daysUntilStockout = 0;
-          } else if (avgDailyConsumption > 0) {
-            daysUntilStockout = Math.round(rob / avgDailyConsumption);
-          }
-
-          const estimatedCost = unitCost > 0 ? Math.round(deficit * unitCost * 100) / 100 : null;
-          const deficitPercent = min > 0 ? Math.round((deficit / min) * 100) : 0;
-
-          const locationDisplay = [
-            item.locationA ? `${item.locationA}: ${parseFloat(String(item.robLocationA)) || 0}` : null,
-            item.locationB ? `${item.locationB}: ${parseFloat(String(item.robLocationB)) || 0}` : null,
-          ].filter(Boolean).join(' / ') || '-';
-
-          return {
-            id: item.id,
-            itemCode: item.itemCode,
-            itemName: item.itemName,
-            itemType: item.itemType,
-            category: item.category || 'Uncategorized',
-            rob,
-            minStock: min,
-            maxStock,
-            deficit,
-            deficitPercent,
-            uom: item.uom || '-',
-            location: locationDisplay,
-            priority: priorityLevel,
-            lastConsumedDate: consumption?.lastConsumed || null,
-            avgMonthlyConsumption: Math.round(avgMonthlyConsumption * 100) / 100,
-            daysUntilStockout,
-            estimatedCost,
-            supplier: item.supplier || null,
-            leadTime: item.leadTime || null,
-            lastOrderDate: item.lastOrderDate || null,
-            unitCost: unitCost > 0 ? unitCost : null,
-          };
-        });
-
-      let filtered = lowStockItems;
-      if (category && category !== 'all') {
-        if (category === 'lubricants' || category === 'lubes') {
-          filtered = filtered.filter((i: any) => i.itemType === 'lubes' || i.itemType === 'lubricants');
-        } else {
-          filtered = filtered.filter((i: any) => i.itemType === category);
-        }
-      }
-      if (priority && priority !== 'all') {
-        const pStr = (priority as string).charAt(0).toUpperCase() + (priority as string).slice(1).toLowerCase();
-        filtered = filtered.filter((i: any) => i.priority === pStr);
-      }
-      if (location && location !== 'all') {
-        filtered = filtered.filter((i: any) => i.location.toLowerCase().includes((location as string).toLowerCase()));
-      }
-
-      filtered.sort((a: any, b: any) => {
-        const pOrder: Record<string, number> = { Critical: 0, High: 1, Medium: 2 };
-        return (pOrder[a.priority] ?? 3) - (pOrder[b.priority] ?? 3);
-      });
-
-      const criticalItems = lowStockItems.filter((i: any) => i.priority === 'Critical');
-      const highItems = lowStockItems.filter((i: any) => i.priority === 'High');
-      const mediumItems = lowStockItems.filter((i: any) => i.priority === 'Medium');
-
-      const totalEstimatedCost = lowStockItems.reduce((sum: number, i: any) => sum + (i.estimatedCost || 0), 0);
-
-      res.json({
-        summary: {
-          totalLowStock: lowStockItems.length,
-          criticalItems: criticalItems.length,
-          highPriorityItems: highItems.length,
-          mediumPriorityItems: mediumItems.length,
-          storesCount: lowStockItems.filter((i: any) => i.itemType === 'stores').length,
-          lubesCount: lowStockItems.filter((i: any) => i.itemType === 'lubes' || i.itemType === 'lubricants').length,
-          chemicalsCount: lowStockItems.filter((i: any) => i.itemType === 'chemicals').length,
-          estimatedTotalCost: Math.round(totalEstimatedCost * 100) / 100,
-        },
-        items: filtered,
-      });
+      res.json({ summary: result.summary, items: result.items });
     } catch (error: any) {
       console.error("Error generating low stock alert report:", error);
       res.status(500).json({ error: error.message || "Failed to generate low stock alert report" });
@@ -8846,100 +8722,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/technical/api/reports/stores-low-stock-alert/:vesselId/excel", async (req, res) => {
     try {
       const { vesselId } = req.params;
-      const allItems = await storage.getStoresItems(vesselId);
+      const result = await lowStockReportService.computeReport(vesselId);
+      const lowStockItems = result.items;
 
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
-      const ninetyDaysAgo = new Date(today);
-      ninetyDaysAgo.setDate(ninetyDaysAgo.getDate() - 90);
-
-      const db = await getDb();
-      const consumptionData = await db.select({
-        itemId: storesLedger.itemId,
-        totalConsumed: sql<string>`COALESCE(SUM(ABS(${storesLedger.qtyChangeBase})), 0)`,
-        eventCount: sql<number>`COUNT(*)`,
-        lastConsumed: sql<string>`MAX(${storesLedger.timestampUTC})`,
-      })
-        .from(storesLedger)
-        .where(and(
-          eq(storesLedger.vesselId, vesselId),
-          eq(storesLedger.eventType, 'CONSUME'),
-          gte(storesLedger.timestampUTC, ninetyDaysAgo)
-        ))
-        .groupBy(storesLedger.itemId);
-
-      const consumptionMap = new Map<number, { totalConsumed: number; eventCount: number; lastConsumed: string | null }>();
-      for (const row of consumptionData) {
-        consumptionMap.set(row.itemId, {
-          totalConsumed: parseFloat(String(row.totalConsumed)) || 0,
-          eventCount: row.eventCount,
-          lastConsumed: row.lastConsumed,
-        });
-      }
-
-      const lowStockItems = allItems
-        .filter((item: any) => {
-          const rob = parseFloat(String(item.rob)) || 0;
-          const min = parseFloat(String(item.min)) || 0;
-          return min > 0 && rob <= min;
-        })
-        .map((item: any) => {
-          const rob = parseFloat(String(item.rob)) || 0;
-          const min = parseFloat(String(item.min)) || 0;
-          const maxStock = parseFloat(String(item.max)) || 0;
-          const unitCost = parseFloat(String(item.unitCost)) || 0;
-          const deficit = Math.max(0, min - rob);
-
-          let priorityLevel: string;
-          if (rob === 0) {
-            priorityLevel = 'Critical';
-          } else if (rob < min * 0.5) {
-            priorityLevel = 'High';
-          } else {
-            priorityLevel = 'Medium';
-          }
-
-          const consumption = consumptionMap.get(item.id);
-          const avgMonthlyConsumption = consumption ? consumption.totalConsumed / 3 : 0;
-          const avgDailyConsumption = avgMonthlyConsumption / 30;
-
-          let daysUntilStockout: number | null = null;
-          if (rob === 0) {
-            daysUntilStockout = 0;
-          } else if (avgDailyConsumption > 0) {
-            daysUntilStockout = Math.round(rob / avgDailyConsumption);
-          }
-
-          const estimatedCost = unitCost > 0 ? Math.round(deficit * unitCost * 100) / 100 : null;
-          const deficitPercent = min > 0 ? Math.round((deficit / min) * 100) : 0;
-
-          return {
-            id: item.id,
-            itemCode: item.itemCode,
-            itemName: item.itemName,
-            itemType: item.itemType,
-            category: item.category || 'Uncategorized',
-            rob,
-            minStock: min,
-            maxStock,
-            deficit,
-            deficitPercent,
-            uom: item.uom || '-',
-            priority: priorityLevel,
-            avgMonthlyConsumption: Math.round(avgMonthlyConsumption * 100) / 100,
-            daysUntilStockout,
-            estimatedCost,
-            supplier: item.supplier || null,
-            leadTime: item.leadTime || null,
-            lastOrderDate: item.lastOrderDate || null,
-            unitCost: unitCost > 0 ? unitCost : null,
-          };
-        });
-
-      lowStockItems.sort((a: any, b: any) => {
-        const pOrder: Record<string, number> = { Critical: 0, High: 1, Medium: 2 };
-        return (pOrder[a.priority] ?? 3) - (pOrder[b.priority] ?? 3);
-      });
+      lowStockReportService.saveSnapshot(
+        vesselId, 'low-stock-alert', 'excel', result.summary, lowStockItems
+      ).catch(err => console.error("Snapshot save error:", err));
 
       const ExcelJS = (await import('exceljs')).default;
       const workbook = new ExcelJS.Workbook();
@@ -9003,6 +8791,41 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error: any) {
       console.error("Error generating low stock alert Excel:", error);
       res.status(500).json({ error: error.message || "Failed to generate Excel report" });
+    }
+  });
+
+  app.get("/technical/api/reports/snapshots/:vesselId", async (req, res) => {
+    try {
+      const { vesselId } = req.params;
+      const { reportType, startDate, endDate, limit: limitParam } = req.query;
+      const snapshots = await lowStockReportService.getSnapshots(
+        vesselId,
+        reportType as string | undefined,
+        startDate ? new Date(startDate as string) : undefined,
+        endDate ? new Date(endDate as string) : undefined,
+        limitParam ? parseInt(limitParam as string) : 50
+      );
+      res.json(snapshots);
+    } catch (error: any) {
+      console.error("Error fetching report snapshots:", error);
+      res.status(500).json({ error: error.message || "Failed to fetch report snapshots" });
+    }
+  });
+
+  app.get("/technical/api/reports/snapshots/detail/:snapshotId", async (req, res) => {
+    try {
+      const snapshotId = parseInt(req.params.snapshotId);
+      if (isNaN(snapshotId)) {
+        return res.status(400).json({ error: "Invalid snapshot ID" });
+      }
+      const snapshot = await lowStockReportService.getSnapshotDetail(snapshotId);
+      if (!snapshot) {
+        return res.status(404).json({ error: "Snapshot not found" });
+      }
+      res.json(snapshot);
+    } catch (error: any) {
+      console.error("Error fetching snapshot detail:", error);
+      res.status(500).json({ error: error.message || "Failed to fetch snapshot detail" });
     }
   });
 
