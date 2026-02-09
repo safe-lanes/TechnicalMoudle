@@ -4,7 +4,9 @@ import { useVessels } from "@/hooks/useVessels";
 import { useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { ChevronRight, ChevronDown, Plus, Search, Pencil, X, FileSpreadsheet, Trash2, Anchor } from "lucide-react";
+import { ChevronRight, ChevronDown, Plus, Search, Pencil, X, FileSpreadsheet, Trash2, Anchor, Briefcase } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -1468,142 +1470,183 @@ export default function FleetDataView() {
           setSelectedJobIds(new Set());
         }
       }}>
-        <DialogContent className="max-w-6xl max-h-[80vh]">
-          <DialogHeader className="flex flex-row items-center justify-between pb-3">
-            <DialogTitle className="text-lg font-semibold text-blue-500">
-              Fleet Job Information
-            </DialogTitle>
-            <div className="flex items-center gap-2">
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-                <Input
-                  placeholder="Search Job Title/Job No./Task Type"
-                  value={jobSearchQuery}
-                  onChange={(e) => setJobSearchQuery(e.target.value)}
-                  className="pl-9 w-80"
-                  data-testid="input-job-search"
-                />
+        <DialogContent className="w-[95vw] max-w-[95vw] h-[90vh] max-h-[90vh] p-0 overflow-hidden flex flex-col" aria-describedby={undefined}>
+          <DialogTitle className="sr-only">Fleet Job Information</DialogTitle>
+          <div className="bg-gradient-to-r from-cyan-600 to-blue-600 px-6 py-5">
+            <div className="flex items-center gap-3">
+              <div className="p-2 bg-white/20 rounded-lg">
+                <Briefcase className="h-5 w-5 text-white" />
               </div>
-              <Button
-                variant="ghost"
-                size="icon"
-                className="text-gray-600 hover:text-red-600"
-                disabled={selectedJobIds.size === 0}
-                data-testid="btn-delete-jobs"
-              >
-                <Trash2 className="h-5 w-5" />
-              </Button>
-              <Button
-                size="sm"
-                className="bg-blue-600 hover:bg-blue-700 text-white"
-                onClick={() => {
-                  setNewJobFormData({});
-                  setIsAddJobDialogOpen(true);
-                }}
-                data-testid="btn-add-new-job"
-              >
-                Add New Job
-              </Button>
-              <Button
-                size="sm"
-                className="bg-blue-600 hover:bg-blue-700 text-white"
-                onClick={() => setIsJobVesselMappingDialogOpen(true)}
-                data-testid="btn-job-vessel-mapping"
-              >
-                Vessel Mapping
-              </Button>
-              <Button
-                variant="ghost"
-                size="icon"
-                className="text-green-600 hover:text-green-700"
-                data-testid="btn-export-jobs-excel"
-              >
-                <FileSpreadsheet className="h-5 w-5" />
-              </Button>
+              <div>
+                <h1 className="text-xl font-bold text-white" data-testid="title-fleet-job-info">Fleet Job Information</h1>
+                <p className="text-cyan-100 text-sm mt-0.5">
+                  Jobs linked to: {selectedComponent?.fleetEquipmentName || selectedComponent?.name || "Selected Component"}
+                </p>
+              </div>
             </div>
-          </DialogHeader>
-          <ScrollArea className="h-[400px]">
-            <table className="w-full text-sm">
-              <thead className="sticky top-0 bg-white border-b">
-                <tr className="text-gray-600 text-xs">
-                  <th className="text-left py-2 px-2 font-medium">Select</th>
-                  <th className="text-left py-2 px-2 font-medium">Job No.</th>
-                  <th className="text-left py-2 px-2 font-medium">Job Title</th>
-                  <th className="text-left py-2 px-2 font-medium">Task Type</th>
-                  <th className="text-left py-2 px-2 font-medium">Frequency</th>
-                  <th className="text-left py-2 px-2 font-medium">Assigned To</th>
-                  <th className="text-left py-2 px-2 font-medium">Approver</th>
-                  <th className="text-left py-2 px-2 font-medium">Job Priority</th>
-                  <th className="text-left py-2 px-2 font-medium">Class Related</th>
-                  <th className="text-left py-2 px-2 font-medium">Department</th>
-                  <th className="text-left py-2 px-2 font-medium">Criticality</th>
-                </tr>
-              </thead>
-              <tbody>
-                {filteredRelatedJobs.length > 0 ? (
-                  filteredRelatedJobs.map((job: FleetJob, index: number) => {
-                    const jobId = job.jobCode || job.id;
-                    return (
-                      <tr 
-                        key={index} 
-                        className="border-b last:border-0 cursor-pointer hover:bg-gray-50"
-                        onDoubleClick={() => {
-                          setSelectedJobForDetail(job);
-                          setIsJobDetailsDialogOpen(true);
-                        }}
-                        data-testid={`job-popup-row-${index}`}
-                      >
-                        <td className="py-2 px-2">
-                          <Checkbox
-                            checked={selectedJobIds.has(String(jobId))}
-                            onCheckedChange={(checked) => {
-                              setSelectedJobIds(prev => {
-                                const newSet = new Set(prev);
-                                if (checked) newSet.add(String(jobId));
-                                else newSet.delete(String(jobId));
-                                return newSet;
-                              });
-                            }}
-                            data-testid={`checkbox-job-${index}`}
-                          />
-                        </td>
-                        <td className="py-2 px-2">{job.jobCode || job.id}</td>
-                        <td 
-                          className="py-2 px-2 text-blue-600 hover:text-blue-800 hover:underline cursor-pointer"
-                          onClick={(e) => {
-                            e.stopPropagation();
+          </div>
+
+          <div className="px-6 py-4 bg-gray-50 border-b border-gray-200">
+            <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+              <div className="flex items-center gap-4">
+                <h2 className="text-base font-semibold text-gray-800" data-testid="subtitle-all-jobs">All Jobs</h2>
+                <div className="flex items-center gap-3">
+                  <Badge variant="secondary" className="bg-cyan-100 text-cyan-700 no-default-hover-elevate no-default-active-elevate" data-testid="badge-total-jobs">
+                    <Briefcase className="h-3 w-3 mr-1" />
+                    {filteredRelatedJobs.length} Total
+                  </Badge>
+                  {selectedJobIds.size > 0 && (
+                    <Badge variant="secondary" className="bg-blue-100 text-blue-700 no-default-hover-elevate no-default-active-elevate" data-testid="badge-selected-jobs">
+                      {selectedJobIds.size} Selected
+                    </Badge>
+                  )}
+                </div>
+              </div>
+              <div className="flex flex-col sm:flex-row gap-3">
+                <div className="relative flex-1 sm:min-w-[280px]">
+                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                  <Input
+                    placeholder="Search Job Title/Job No./Task Type"
+                    value={jobSearchQuery}
+                    onChange={(e) => setJobSearchQuery(e.target.value)}
+                    className="pl-10 bg-white border-gray-300"
+                    data-testid="input-job-search"
+                  />
+                </div>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="text-gray-600"
+                  disabled={selectedJobIds.size === 0}
+                  data-testid="btn-delete-jobs"
+                >
+                  <Trash2 className="h-5 w-5" />
+                </Button>
+                <Button
+                  className="bg-cyan-600 whitespace-nowrap"
+                  onClick={() => {
+                    setNewJobFormData({});
+                    setIsAddJobDialogOpen(true);
+                  }}
+                  data-testid="btn-add-new-job"
+                >
+                  <Plus className="mr-2 h-4 w-4" />
+                  Add New Job
+                </Button>
+                <Button
+                  className="bg-cyan-600 whitespace-nowrap"
+                  onClick={() => setIsJobVesselMappingDialogOpen(true)}
+                  data-testid="btn-job-vessel-mapping"
+                >
+                  <Anchor className="mr-2 h-4 w-4" />
+                  Vessel Mapping
+                </Button>
+                <Button
+                  variant="outline"
+                  className="border-gray-300 text-gray-700"
+                  data-testid="btn-export-jobs-excel"
+                >
+                  <FileSpreadsheet className="mr-2 h-4 w-4" />
+                  Export
+                </Button>
+              </div>
+            </div>
+          </div>
+
+          <div className="flex-1 overflow-auto px-6 py-4">
+            <div className="overflow-x-auto rounded-lg border border-gray-200">
+              <Table>
+                <TableHeader>
+                  <TableRow className="bg-gray-50 border-b border-gray-200">
+                    <TableHead className="text-xs font-semibold text-gray-600 uppercase tracking-wider py-3 w-12">Select</TableHead>
+                    <TableHead className="text-xs font-semibold text-gray-600 uppercase tracking-wider py-3">Job No.</TableHead>
+                    <TableHead className="text-xs font-semibold text-gray-600 uppercase tracking-wider py-3">Job Title</TableHead>
+                    <TableHead className="text-xs font-semibold text-gray-600 uppercase tracking-wider py-3">Task Type</TableHead>
+                    <TableHead className="text-xs font-semibold text-gray-600 uppercase tracking-wider py-3">Frequency</TableHead>
+                    <TableHead className="text-xs font-semibold text-gray-600 uppercase tracking-wider py-3">Assigned To</TableHead>
+                    <TableHead className="text-xs font-semibold text-gray-600 uppercase tracking-wider py-3">Approver</TableHead>
+                    <TableHead className="text-xs font-semibold text-gray-600 uppercase tracking-wider py-3">Job Priority</TableHead>
+                    <TableHead className="text-xs font-semibold text-gray-600 uppercase tracking-wider py-3">Class Related</TableHead>
+                    <TableHead className="text-xs font-semibold text-gray-600 uppercase tracking-wider py-3">Department</TableHead>
+                    <TableHead className="text-xs font-semibold text-gray-600 uppercase tracking-wider py-3">Criticality</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {filteredRelatedJobs.length > 0 ? (
+                    filteredRelatedJobs.map((job: FleetJob, index: number) => {
+                      const jobId = job.jobCode || job.id;
+                      return (
+                        <TableRow
+                          key={index}
+                          className="border-b border-gray-100 cursor-pointer"
+                          onDoubleClick={() => {
                             setSelectedJobForDetail(job);
                             setIsJobDetailsDialogOpen(true);
                           }}
-                          data-testid={`job-title-link-${index}`}
+                          data-testid={`job-popup-row-${index}`}
                         >
-                          {job.woTitle || "—"}
-                        </td>
-                        <td className="py-2 px-2">{job.taskType || "—"}</td>
-                        <td className="py-2 px-2">
-                          {job.intervalValue && job.unit 
-                            ? `${job.intervalValue} ${job.unit}` 
-                            : "—"}
-                        </td>
-                        <td className="py-2 px-2">{job.assignedTo || "—"}</td>
-                        <td className="py-2 px-2">{job.approver || "—"}</td>
-                        <td className="py-2 px-2">{job.jobPriority || "—"}</td>
-                        <td className="py-2 px-2">{job.classRelated || "No"}</td>
-                        <td className="py-2 px-2">{job.department || "—"}</td>
-                        <td className="py-2 px-2">{job.criticality || "—"}</td>
-                      </tr>
-                    );
-                  })
-                ) : (
-                  <tr>
-                    <td colSpan={11} className="py-8 text-center text-gray-500">
-                      {relatedJobs.length === 0 ? "No jobs linked to this component" : "No jobs match your search"}
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          </ScrollArea>
+                          <TableCell className="py-3 px-2">
+                            <Checkbox
+                              checked={selectedJobIds.has(String(jobId))}
+                              onCheckedChange={(checked) => {
+                                setSelectedJobIds(prev => {
+                                  const newSet = new Set(prev);
+                                  if (checked) newSet.add(String(jobId));
+                                  else newSet.delete(String(jobId));
+                                  return newSet;
+                                });
+                              }}
+                              data-testid={`checkbox-job-${index}`}
+                            />
+                          </TableCell>
+                          <TableCell className="py-3 font-mono text-sm text-gray-700">{job.jobCode || job.id}</TableCell>
+                          <TableCell
+                            className="py-3 text-blue-600 cursor-pointer"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setSelectedJobForDetail(job);
+                              setIsJobDetailsDialogOpen(true);
+                            }}
+                            data-testid={`job-title-link-${index}`}
+                          >
+                            <span className="font-medium">{job.woTitle || "—"}</span>
+                          </TableCell>
+                          <TableCell className="py-3 text-gray-600">{job.taskType || "—"}</TableCell>
+                          <TableCell className="py-3 text-gray-600">
+                            {job.intervalValue && job.unit
+                              ? `${job.intervalValue} ${job.unit}`
+                              : "—"}
+                          </TableCell>
+                          <TableCell className="py-3 text-gray-600">{job.assignedTo || "—"}</TableCell>
+                          <TableCell className="py-3 text-gray-600">{job.approver || "—"}</TableCell>
+                          <TableCell className="py-3 text-gray-600">{job.jobPriority || "—"}</TableCell>
+                          <TableCell className="py-3 text-gray-600">{job.classRelated || "No"}</TableCell>
+                          <TableCell className="py-3 text-gray-600">{job.department || "—"}</TableCell>
+                          <TableCell className="py-3 text-gray-600">{job.criticality || "—"}</TableCell>
+                        </TableRow>
+                      );
+                    })
+                  ) : (
+                    <TableRow>
+                      <TableCell colSpan={11} className="py-16 text-center">
+                        <div className="flex flex-col items-center">
+                          <div className="p-4 bg-gray-100 rounded-full w-16 h-16 mx-auto mb-4 flex items-center justify-center">
+                            <Briefcase className="h-8 w-8 text-gray-400" />
+                          </div>
+                          <p className="text-gray-600 font-medium">
+                            {relatedJobs.length === 0 ? "No jobs linked to this component" : "No jobs match your search"}
+                          </p>
+                          <p className="text-gray-400 text-sm mt-1">
+                            {relatedJobs.length === 0 ? "Add a new job to get started" : "Try adjusting your search terms"}
+                          </p>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  )}
+                </TableBody>
+              </Table>
+            </div>
+          </div>
         </DialogContent>
       </Dialog>
 
