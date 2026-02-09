@@ -312,7 +312,11 @@ const StoresReports: React.FC<StoresReportsProps> = ({ onBack, globalFilters }) 
       }
 
       case 'low-stock-alert': {
-        const lowStockItems = storesItems.filter((s: any) => (parseFloat(String(s.rob)) || 0) <= (parseFloat(String(s.min)) || 0));
+        const lowStockItems = storesItems.filter((s: any) => {
+          const rob = parseFloat(String(s.rob)) || 0;
+          const min = parseFloat(String(s.min)) || 0;
+          return min > 0 && rob <= min;
+        });
 
         const columns = [
           { header: 'Item Code', field: 'itemCode', width: 30 },
@@ -327,6 +331,9 @@ const StoresReports: React.FC<StoresReportsProps> = ({ onBack, globalFilters }) 
         const data = lowStockItems.map((s: any) => {
           const rob = parseFloat(String(s.rob)) || 0;
           const min = parseFloat(String(s.min)) || 0;
+          let status = 'Medium';
+          if (rob === 0) status = 'Critical';
+          else if (rob < min * 0.5) status = 'High';
           return {
             itemCode: s.itemCode || '-',
             itemName: s.itemName || '-',
@@ -334,13 +341,13 @@ const StoresReports: React.FC<StoresReportsProps> = ({ onBack, globalFilters }) 
             rob,
             min,
             shortage: Math.max(0, min - rob),
-            status: getStockStatus(rob, min)
+            status
           };
         });
 
         const summary = [
           { label: 'Low Stock Items', value: data.length },
-          { label: 'Critical', value: data.filter((d: any) => d.shortage > 5).length }
+          { label: 'Critical', value: data.filter((d: any) => d.status === 'Critical').length }
         ];
 
         pdfReportGenerator.generateReport(

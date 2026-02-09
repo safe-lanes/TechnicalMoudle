@@ -8842,7 +8842,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Stores Low Stock Alert Report - Excel Export
+  // Stores Low Stock Alert Report - Excel Export (uses same data as GET endpoint)
   app.post("/technical/api/reports/stores-low-stock-alert/:vesselId/excel", async (req, res) => {
     try {
       const { vesselId } = req.params;
@@ -8857,6 +8857,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const consumptionData = await db.select({
         itemId: storesLedger.itemId,
         totalConsumed: sql<string>`COALESCE(SUM(ABS(${storesLedger.qtyChangeBase})), 0)`,
+        eventCount: sql<number>`COUNT(*)`,
         lastConsumed: sql<string>`MAX(${storesLedger.timestampUTC})`,
       })
         .from(storesLedger)
@@ -8867,10 +8868,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         ))
         .groupBy(storesLedger.itemId);
 
-      const consumptionMap = new Map<number, { totalConsumed: number; lastConsumed: string | null }>();
+      const consumptionMap = new Map<number, { totalConsumed: number; eventCount: number; lastConsumed: string | null }>();
       for (const row of consumptionData) {
         consumptionMap.set(row.itemId, {
           totalConsumed: parseFloat(String(row.totalConsumed)) || 0,
+          eventCount: row.eventCount,
           lastConsumed: row.lastConsumed,
         });
       }
@@ -8884,37 +8886,53 @@ export async function registerRoutes(app: Express): Promise<Server> {
         .map((item: any) => {
           const rob = parseFloat(String(item.rob)) || 0;
           const min = parseFloat(String(item.min)) || 0;
+          const maxStock = parseFloat(String(item.max)) || 0;
           const unitCost = parseFloat(String(item.unitCost)) || 0;
           const deficit = Math.max(0, min - rob);
-          const consumption = consumptionMap.get(item.id);
-          const avgMonthly = consumption ? consumption.totalConsumed / 3 : 0;
-          const avgDaily = avgMonthly / 30;
-          let daysOut: number | null = null;
-          if (rob === 0) daysOut = 0;
-          else if (avgDaily > 0) daysOut = Math.round(rob / avgDaily);
 
-          let priorityLevel = 'Medium';
-          if (rob === 0) priorityLevel = 'Critical';
-          else if (rob < min * 0.5) priorityLevel = 'High';
+          let priorityLevel: string;
+          if (rob === 0) {
+            priorityLevel = 'Critical';
+          } else if (rob < min * 0.5) {
+            priorityLevel = 'High';
+          } else {
+            priorityLevel = 'Medium';
+          }
+
+          const consumption = consumptionMap.get(item.id);
+          const avgMonthlyConsumption = consumption ? consumption.totalConsumed / 3 : 0;
+          const avgDailyConsumption = avgMonthlyConsumption / 30;
+
+          let daysUntilStockout: number | null = null;
+          if (rob === 0) {
+            daysUntilStockout = 0;
+          } else if (avgDailyConsumption > 0) {
+            daysUntilStockout = Math.round(rob / avgDailyConsumption);
+          }
+
+          const estimatedCost = unitCost > 0 ? Math.round(deficit * unitCost * 100) / 100 : null;
+          const deficitPercent = min > 0 ? Math.round((deficit / min) * 100) : 0;
 
           return {
-            priority: priorityLevel,
+            id: item.id,
             itemCode: item.itemCode,
             itemName: item.itemName,
-            type: item.itemType,
+            itemType: item.itemType,
             category: item.category || 'Uncategorized',
             rob,
-            min,
-            max: parseFloat(String(item.max)) || 0,
+            minStock: min,
+            maxStock,
             deficit,
-            deficitPct: min > 0 ? Math.round((deficit / min) * 100) : 0,
+            deficitPercent,
             uom: item.uom || '-',
-            avgMonthly: Math.round(avgMonthly * 100) / 100,
-            daysUntilStockout: daysOut,
-            estCost: unitCost > 0 ? Math.round(deficit * unitCost * 100) / 100 : null,
-            supplier: item.supplier || '-',
-            leadTime: item.leadTime || '-',
-            lastOrderDate: item.lastOrderDate || '-',
+            priority: priorityLevel,
+            avgMonthlyConsumption: Math.round(avgMonthlyConsumption * 100) / 100,
+            daysUntilStockout,
+            estimatedCost,
+            supplier: item.supplier || null,
+            leadTime: item.leadTime || null,
+            lastOrderDate: item.lastOrderDate || null,
+            unitCost: unitCost > 0 ? unitCost : null,
           };
         });
 
@@ -8952,10 +8970,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       lowStockItems.forEach((item: any, idx: number) => {
         const row = sheet.addRow([
-          idx + 1, item.priority, item.itemCode, item.itemName, item.type, item.category,
-          item.rob, item.min, item.max, item.deficit, `${item.deficitPct}%`, item.uom,
-          item.avgMonthly, item.daysUntilStockout ?? 'N/A', item.estCost !== null ? `$${item.estCost}` : 'N/A',
-          item.supplier, item.leadTime, item.lastOrderDate
+          idx + 1, item.priority, item.itemCode, item.itemName, item.itemType, item.category,
+          item.rob, item.minStock, item.maxStock, item.deficit, `${item.deficitPercent}%`, item.uom,
+          item.avgMonthlyConsumption, item.daysUntilStockout ?? 'N/A', item.estimatedCost !== null ? `$${item.estimatedCost}` : 'N/A',
+          item.supplier || '-', item.leadTime || '-', item.lastOrderDate || '-'
         ]);
         const bgColor = priorityColors[item.priority] || 'FFFFFFFF';
         row.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: bgColor } };
@@ -8975,9 +8993,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       summarySheet.addRow([]);
       summarySheet.addRow(['By Type', 'Count']);
       summarySheet.getRow(9).font = { bold: true };
-      summarySheet.addRow(['Stores', lowStockItems.filter((i: any) => i.type === 'stores').length]);
-      summarySheet.addRow(['Lubricants', lowStockItems.filter((i: any) => i.type === 'lubes' || i.type === 'lubricants').length]);
-      summarySheet.addRow(['Chemicals', lowStockItems.filter((i: any) => i.type === 'chemicals').length]);
+      summarySheet.addRow(['Stores', lowStockItems.filter((i: any) => i.itemType === 'stores').length]);
+      summarySheet.addRow(['Lubricants', lowStockItems.filter((i: any) => i.itemType === 'lubes' || i.itemType === 'lubricants').length]);
+      summarySheet.addRow(['Chemicals', lowStockItems.filter((i: any) => i.itemType === 'chemicals').length]);
       summarySheet.getColumn(1).width = 30;
       summarySheet.getColumn(2).width = 12;
 
