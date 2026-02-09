@@ -1,0 +1,406 @@
+LOW STOCK ALERT REPORT
+text
+BUILD: Low Stock Alert Report - Daily/Weekly Monitoring
+
+OBJECTIVE:
+Create a comprehensive "Low Stock Alert Report" that identifies items below minimum levels requiring immediate attention. This is a HIGH priority report that runs Daily/Weekly to ensure critical supplies don't run out.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+CURRENT STATE ANALYSIS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+**Existing Data Available:**
+1. **Stores Items** (Stores, Lubes, Chemicals) have:
+   - Item Code, Item Name, Category/Type
+   - ROB (Remaining on Board - current stock)
+   - Min (Minimum stock level)
+   - Stock Status (OK/Low badge) - Already calculated!
+   - Location, UOM, Supplier info
+
+2. **Transaction History** (ledger table):
+   - Event types: INITIAL, RECEIVE, CONSUME, ADJUSTMENT
+   - Qty Change, ROB After, Date
+   - Allows calculation of consumption rates
+
+3. **Identified Low Stock Items (Current):**
+   - Stores: IT-0004 (Cutting Disc) - ROB: 0, Min: 6
+   - Lubes: LU-0004 (Turbocharger Lube Oil) - ROB: 0, Min: 6
+   - Chemicals: CH-0004 (Cooling Water Treatment) - ROB: 0, Min: 6
+
+**Stock Status Logic (Already Implemented):**
+- Low: ROB ≤ Min (items at or below minimum)
+- OK: ROB > Min
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+REPORT SPECIFICATIONS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+**Report Name:** Low Stock Alert Report
+**Description:** Items below minimum levels requiring immediate attention
+**Frequency:** Daily/Weekly
+**Priority:** HIGH
+**Estimated Time:** < 1 min
+
+**Route:** `/pms/reports/low-stock-alert`
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+API ENDPOINT
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+**NEW: GET /technical/api/reports/low-stock-alert/:vesselId**
+
+**Query Parameters:**
+- `category` - Filter by category (stores/lubes/chemicals/all)
+- `priority` - Filter by priority (critical/high/medium)
+- `location` - Filter by location
+
+**Response Structure:**
+```json
+{
+  "summary": {
+    "totalLowStock": 25,
+    "criticalItems": 10,
+    "highPriorityItems": 8,
+    "mediumPriorityItems": 7,
+    "storesCount": 12,
+    "lubesCount": 8,
+    "chemicalsCount": 5
+  },
+  "items": [
+    {
+      "id": "...",
+      "itemCode": "IT-0004",
+      "itemName": "Cutting Disc (Angle Grinder)",
+      "itemType": "stores",
+      "category": "Mechanical",
+      "rob": 0,
+      "minStock": 6,
+      "maxStock": 20,
+      "deficit": 6,
+      "uom": "pcs",
+      "location": "@ 0 / 0",
+      "priority": "Critical",
+      "lastConsumedDate": "2026-01-15",
+      "avgMonthlyConsumption": 3.5,
+      "daysUntilStockout": 0,
+      "estimatedCost": 450,
+      "supplier": "ABC Marine Supplies",
+      "leadTime": "2 weeks"
+    }
+  ]
+}
+Calculations Required:
+
+Deficit: deficit = minStock - rob (how many units needed to reach minimum)
+
+Priority Level:
+
+Critical: ROB = 0 (completely out of stock)
+
+High: ROB > 0 AND ROB < (Min * 0.5) (less than 50% of minimum)
+
+Medium: ROB >= (Min * 0.5) AND ROB <= Min (50%-100% of minimum)
+
+Average Monthly Consumption:
+
+Query last 90 days of CONSUME events from ledger
+
+Calculate: SUM(qty_change where event='CONSUME') / 3 (divide by 3 months)
+
+Days Until Stockout:
+
+If avgMonthlyConsumption > 0:
+
+daysUntilStockout = (ROB / (avgMonthlyConsumption / 30))
+
+If ROB = 0: daysUntilStockout = 0
+
+If no consumption data: daysUntilStockout = null
+
+Estimated Cost:
+
+estimatedCost = deficit × unitCost
+
+If unitCost is null, show "N/A"
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+REPORT UI STRUCTURE
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+HEADER SECTION:
+
+Title: "Low Stock Alert Report"
+
+Subtitle: "Items below minimum levels requiring immediate attention"
+
+Filters:
+
+Vessel selector (existing component)
+
+Category: [All / Stores / Lubes / Chemicals]
+
+Priority: [All / Critical / High / Medium]
+
+Location filter (dropdown)
+
+Export button (PDF/Excel)
+
+"Generate Purchase Order" button (for selected items)
+
+SUMMARY CARDS (Row 1):
+┌─────────────────┐ ┌─────────────────┐ ┌─────────────────┐ ┌─────────────────┐
+│ Total Low Stock │ │ Critical │ │ High Priority │ │ Medium Priority │
+│ 25 │ │ 10 │ │ 8 │ │ 7 │
+│ (Red icon) │ │ (Red icon) │ │ (Orange icon) │ │ (Yellow icon) │
+└─────────────────┘ └─────────────────┘ └─────────────────┘ └─────────────────┘
+
+SUMMARY CARDS (Row 2):
+┌─────────────────┐ ┌─────────────────┐ ┌─────────────────┐ ┌─────────────────┐
+│ Stores Items │ │ Lubricants │ │ Chemicals │ │ Est. Total Cost │
+│ 12 │ │ 8 │ │ 5 │ │ $12,450 │
+│ (Purple icon) │ │ (Blue icon) │ │ (Green icon) │ │ (Gray icon) │
+└─────────────────┘ └─────────────────┘ └─────────────────┘ └─────────────────┘
+
+SECTION 1: CRITICAL ITEMS (Red Alert Box)
+
+Title: "⚠️ Critical Alert - Out of Stock Items"
+
+Description: "These items are completely depleted and require immediate ordering"
+
+Show only items where ROB = 0
+
+Sortable table with columns:
+
+Checkbox (for bulk actions)
+
+Item Code
+
+Item Name
+
+Category (Stores/Lubes/Chemicals)
+
+Min Stock
+
+Deficit
+
+UOM
+
+Location
+
+Avg Monthly Consumption
+
+Last Consumed
+
+Estimated Cost
+
+Supplier
+
+Lead Time
+
+Actions (Create Purchase Order button, View Details button)
+
+Show count: "10 critical items requiring immediate attention"
+
+Highlight entire row in light red background
+
+SECTION 2: HIGH PRIORITY (Orange Warning Box)
+
+Title: "⚠ High Priority - Stock Below 50% of Minimum"
+
+Description: "These items need to be ordered soon"
+
+Show items where: ROB > 0 AND ROB < (Min × 0.5)
+
+Same table structure as Critical section
+
+Highlight rows in light orange background
+
+Show count: "8 high priority items"
+
+SECTION 3: MEDIUM PRIORITY (Yellow Warning Box)
+
+Title: "⚡ Medium Priority - Stock Below Minimum"
+
+Description: "These items are below minimum but not critical yet"
+
+Show items where: ROB >= (Min × 0.5) AND ROB <= Min
+
+Same table structure
+
+Highlight rows in light yellow background
+
+Show count: "7 medium priority items"
+
+SECTION 4: FULL LOW STOCK TABLE (All Low Stock Items)
+
+Combined sortable table with all low stock items
+
+Columns:
+
+Priority Badge (Critical/High/Medium with color coding)
+
+Item Code
+
+Item Name
+
+Category
+
+ROB (Current Stock)
+
+Min Stock
+
+Max Stock
+
+Deficit
+
+Deficit %: (deficit / min) × 100
+
+UOM
+
+Location
+
+Avg Monthly Consumption
+
+Days Until Stockout (calculated, color-coded)
+
+Estimated Reorder Cost
+
+Supplier
+
+Lead Time
+
+Last Order Date
+
+Actions (Create PO, View History, Edit)
+
+SECTION 5: BREAKDOWN BY CATEGORY
+
+Bar chart showing low stock items by category:
+
+Stores: 12 items
+
+Lubes: 8 items
+
+Chemicals: 5 items
+
+Table grouped by category with subtotals
+
+SECTION 6: RECOMMENDED ACTIONS
+
+Summary box showing:
+
+Total items requiring reorder: 25
+
+Estimated total reorder cost: $12,450
+
+Average lead time: 2-3 weeks
+
+Recommended action: "Create purchase orders for 10 critical items immediately"
+
+"Generate Consolidated Purchase Order" button
+
+Opens dialog to select items and create PO
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+VISUAL DESIGN
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Color Scheme:
+
+Critical: Red (#EF4444) - Dark red for text, light red for backgrounds
+
+High Priority: Orange (#F97316)
+
+Medium Priority: Yellow (#EAB308)
+
+OK Status: Green (#22C55E)
+
+Priority Badges:
+
+Critical: Red badge with "CRITICAL" text
+
+High: Orange badge with "HIGH" text
+
+Medium: Yellow badge with "MEDIUM" text
+
+Table Features:
+
+Sortable by all columns
+
+Search functionality
+
+Pagination (25/50/100 items per page)
+
+Row selection for bulk actions
+
+Hover effects on rows
+
+Responsive design
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+EXPORT FUNCTIONALITY
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+PDF Export:
+
+Include all sections with current filters
+
+Summary cards at top
+
+Critical items in red-bordered section
+
+High and Medium priority sections
+
+Full table with all low stock items
+
+Include generation timestamp and vessel info
+
+Excel Export:
+
+Single sheet with all low stock items
+
+Include all columns with calculated fields
+
+Conditional formatting:
+
+Red rows for Critical (ROB = 0)
+
+Orange rows for High
+
+Yellow rows for Medium
+
+Separate sheet for summary statistics
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+ADDITIONAL FEATURES
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Email Alert Functionality (Future):
+
+Send daily/weekly email alerts for critical items
+
+Configurable alert thresholds
+
+Email to Chief Engineer, 2nd Engineer, etc.
+
+Purchase Order Integration:
+
+"Create PO" button for each item or bulk selection
+
+Pre-populate PO with item details, deficit quantity, supplier
+
+Link to procurement workflow
+
+Quick Actions:
+
+"Mark as Ordered" status
+
+"Add to Shopping List"
+
+"View Item History" modal
+
+Trend Indicators:
+
+Show if consumption is increasing/decreasing
+
+Arrow icons: ↑ increasing, → stable, ↓ decreasing
