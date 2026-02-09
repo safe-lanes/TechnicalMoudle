@@ -68,6 +68,7 @@ import {
   getBulkUndoUrl,
   getBulkDownloadOriginalUrl,
 } from "@/modules/components/api/bulkApiV2";
+import { ComponentApiToggle } from "@/modules/components/components/ComponentApiToggle";
 
 interface FieldMapping {
   field: string;
@@ -619,10 +620,15 @@ export default function UniformBulkUpload({
             )}
           </div>
         </div>
-        <Button variant="outline" onClick={handleDownloadTemplate} data-testid={markers?.downloadTemplate || "button-download-template"}>
-          <Download className="h-4 w-4 mr-2" />
-          Download Template
-        </Button>
+        <div className="flex items-center gap-3">
+          {templateType === 'components' && (
+            <ComponentApiToggle />
+          )}
+          <Button variant="outline" onClick={handleDownloadTemplate} data-testid={markers?.downloadTemplate || "button-download-template"}>
+            <Download className="h-4 w-4 mr-2" />
+            Download Template
+          </Button>
+        </div>
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
