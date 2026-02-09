@@ -2045,21 +2045,31 @@ export default function FleetDataView() {
 
       {/* Edit Job Dialog */}
       <Dialog open={isEditJobDialogOpen} onOpenChange={setIsEditJobDialogOpen}>
-        <DialogContent className="max-w-2xl">
-          <DialogHeader className="flex flex-row items-center justify-between border-b pb-3">
-            <DialogTitle className="text-base font-semibold">Edit Job Details</DialogTitle>
-            <div className="flex gap-2">
-              <Button 
-                variant="outline" 
-                size="sm"
+        <DialogContent className="w-screen max-w-screen h-screen max-h-screen p-0 overflow-hidden flex flex-col rounded-none" aria-describedby={undefined}>
+          <DialogTitle className="sr-only">Edit Job Details</DialogTitle>
+          <div className="bg-gradient-to-r from-cyan-600 to-blue-600 px-6 py-4 flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="p-2 bg-white/20 rounded-lg">
+                <Pencil className="h-5 w-5 text-white" />
+              </div>
+              <div>
+                <h1 className="text-xl font-bold text-white" data-testid="title-edit-job">Edit Job Details</h1>
+                <p className="text-cyan-100 text-sm mt-0.5">
+                  {jobFormData.woTitle || selectedJobForDetail?.woTitle || "Edit job information"}
+                </p>
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              <Button
+                className="bg-white/20 text-white border-white/30"
+                variant="outline"
                 onClick={() => setIsEditJobDialogOpen(false)}
                 data-testid="btn-cancel-edit-job"
               >
                 Cancel
               </Button>
-              <Button 
-                size="sm"
-                className="bg-blue-600 hover:bg-blue-700"
+              <Button
+                className="bg-white text-blue-600"
                 onClick={() => {
                   toast({ title: "Success", description: "Job updated successfully" });
                   setIsEditJobDialogOpen(false);
@@ -2069,174 +2079,317 @@ export default function FleetDataView() {
                 Save
               </Button>
             </div>
-          </DialogHeader>
-          <div className="space-y-4 py-4">
-            {/* Row 1: Job No., Job Title, Task Type */}
-            <div className="grid grid-cols-3 gap-4">
-              <div>
-                <label className="text-xs font-medium text-blue-600 mb-1 block">Job No.</label>
-                <Input
-                  placeholder="Input Field"
-                  value={jobFormData.jobCode || ""}
-                  onChange={(e) => setJobFormData(prev => ({ ...prev, jobCode: e.target.value }))}
-                  className="h-9"
-                  data-testid="input-edit-job-no"
-                />
-              </div>
-              <div>
-                <label className="text-xs font-medium text-blue-600 mb-1 block">Job Title</label>
-                <Input
-                  placeholder="Input Field"
-                  value={jobFormData.woTitle || ""}
-                  onChange={(e) => setJobFormData(prev => ({ ...prev, woTitle: e.target.value }))}
-                  className="h-9"
-                  data-testid="input-edit-job-title"
-                />
-              </div>
-              <div>
-                <label className="text-xs font-medium text-blue-600 mb-1 block">Task Type</label>
-                <Input
-                  placeholder="Input Field"
-                  value={jobFormData.taskType || ""}
-                  onChange={(e) => setJobFormData(prev => ({ ...prev, taskType: e.target.value }))}
-                  className="h-9"
-                  data-testid="input-edit-task-type"
-                />
-              </div>
-            </div>
+          </div>
 
-            {/* Row 2: Maintenance Basis, Interval Value, Unit, Interval Running Hour */}
-            <div className="grid grid-cols-4 gap-4">
-              <div>
-                <label className="text-xs font-medium text-blue-600 mb-1 block">Maintenance Basis</label>
-                <Input
-                  placeholder="Input Field"
-                  value={jobFormData.maintenanceBasis || ""}
-                  onChange={(e) => setJobFormData(prev => ({ ...prev, maintenanceBasis: e.target.value }))}
-                  className="h-9"
-                  data-testid="input-edit-maint-basis"
-                />
-              </div>
-              <div>
-                <label className="text-xs font-medium text-blue-600 mb-1 block">Interval Value</label>
-                <Input
-                  placeholder="Input Field"
-                  value={jobFormData.intervalValue || ""}
-                  onChange={(e) => setJobFormData(prev => ({ ...prev, intervalValue: e.target.value }))}
-                  className="h-9"
-                  data-testid="input-edit-interval-value"
-                />
-              </div>
-              <div>
-                <label className="text-xs font-medium text-blue-600 mb-1 block">Unit</label>
-                <Input
-                  placeholder="Input Field"
-                  value={jobFormData.unit || ""}
-                  onChange={(e) => setJobFormData(prev => ({ ...prev, unit: e.target.value }))}
-                  className="h-9"
-                  data-testid="input-edit-unit"
-                />
-              </div>
-              <div>
-                <label className="text-xs font-medium text-blue-600 mb-1 block">Interval Running Hour</label>
-                <Input
-                  placeholder="Input Field"
-                  value={""}
-                  disabled
-                  className="h-9"
-                  data-testid="input-edit-interval-rh"
-                />
-              </div>
-            </div>
+          <div className="flex-1 overflow-auto px-6 py-6">
+            <div className="max-w-5xl mx-auto space-y-6">
+              <SectionBlock
+                id="edit-job-info"
+                number="A1"
+                title="Job Information"
+                description="Basic details and configuration for this job"
+              >
+                <div className="space-y-4">
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div className="space-y-1">
+                      <Label className="text-sm text-[#8798ad]">Job Title</Label>
+                      <Input
+                        placeholder="Enter job title"
+                        value={jobFormData.woTitle || ""}
+                        onChange={(e) => setJobFormData(prev => ({ ...prev, woTitle: e.target.value }))}
+                        data-testid="input-edit-job-title"
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <Label className="text-sm text-[#8798ad]">Component Name</Label>
+                      <div className="text-sm font-medium text-gray-900 bg-gray-50 px-3 py-2 rounded-md border border-gray-200 min-h-[38px] flex items-center" data-testid="field-edit-component-name">
+                        {selectedComponent?.fleetEquipmentName || selectedJobForDetail?.fleetEquipmentName || '-'}
+                      </div>
+                    </div>
+                    <div className="space-y-1">
+                      <Label className="text-sm text-[#8798ad]">Component Code</Label>
+                      <div className="text-sm font-medium text-gray-900 bg-gray-50 px-3 py-2 rounded-md border border-gray-200 min-h-[38px] flex items-center" data-testid="field-edit-component-code">
+                        {selectedComponent?.fleetEquipmentCode || selectedJobForDetail?.fleetEquipmentCode || '-'}
+                      </div>
+                    </div>
+                    <div className="space-y-1">
+                      <Label className="text-sm text-[#8798ad]">Job Code</Label>
+                      <Input
+                        placeholder="Enter job code"
+                        value={jobFormData.jobCode || ""}
+                        onChange={(e) => setJobFormData(prev => ({ ...prev, jobCode: e.target.value }))}
+                        data-testid="input-edit-job-no"
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <Label className="text-sm text-[#8798ad]">Maintenance Basis</Label>
+                      <Input
+                        placeholder="Enter maintenance basis"
+                        value={jobFormData.maintenanceBasis || ""}
+                        onChange={(e) => setJobFormData(prev => ({ ...prev, maintenanceBasis: e.target.value }))}
+                        data-testid="input-edit-maint-basis"
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <Label className="text-sm text-[#8798ad]">Frequency</Label>
+                      <div className="flex gap-2">
+                        <Input
+                          placeholder="Value"
+                          value={jobFormData.intervalValue || ""}
+                          onChange={(e) => setJobFormData(prev => ({ ...prev, intervalValue: e.target.value }))}
+                          className="flex-1"
+                          data-testid="input-edit-interval-value"
+                        />
+                        <Input
+                          placeholder="Unit"
+                          value={jobFormData.unit || ""}
+                          onChange={(e) => setJobFormData(prev => ({ ...prev, unit: e.target.value }))}
+                          className="flex-1"
+                          data-testid="input-edit-unit"
+                        />
+                      </div>
+                    </div>
+                    <div className="space-y-1">
+                      <Label className="text-sm text-[#8798ad]">Task Type</Label>
+                      <Input
+                        placeholder="Enter task type"
+                        value={jobFormData.taskType || ""}
+                        onChange={(e) => setJobFormData(prev => ({ ...prev, taskType: e.target.value }))}
+                        data-testid="input-edit-task-type"
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <Label className="text-sm text-[#8798ad]">Assigned To (Rank)</Label>
+                      <Input
+                        placeholder="Enter assigned rank"
+                        value={jobFormData.assignedTo || ""}
+                        onChange={(e) => setJobFormData(prev => ({ ...prev, assignedTo: e.target.value }))}
+                        data-testid="input-edit-assigned-to"
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <Label className="text-sm text-[#8798ad]">Approver (Rank)</Label>
+                      <Input
+                        placeholder="Enter approver rank"
+                        value={jobFormData.approver || ""}
+                        onChange={(e) => setJobFormData(prev => ({ ...prev, approver: e.target.value }))}
+                        data-testid="input-edit-approver"
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <Label className="text-sm text-[#8798ad]">Job Priority</Label>
+                      <Input
+                        placeholder="Enter priority"
+                        value={jobFormData.jobPriority || ""}
+                        onChange={(e) => setJobFormData(prev => ({ ...prev, jobPriority: e.target.value }))}
+                        data-testid="input-edit-priority"
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <Label className="text-sm text-[#8798ad]">Class Related</Label>
+                      <Input
+                        placeholder="Yes / No"
+                        value={jobFormData.classRelated || ""}
+                        onChange={(e) => setJobFormData(prev => ({ ...prev, classRelated: e.target.value }))}
+                        data-testid="input-edit-class-related"
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <Label className="text-sm text-[#8798ad]">Interval Running Hour</Label>
+                      <div className="text-sm font-medium text-gray-900 bg-gray-50 px-3 py-2 rounded-md border border-gray-200 min-h-[38px] flex items-center" data-testid="field-edit-interval-rh">
+                        -
+                      </div>
+                    </div>
+                    <div className="space-y-1">
+                      <Label className="text-sm text-[#8798ad]">Department</Label>
+                      <Input
+                        placeholder="Enter department"
+                        value={jobFormData.department || ""}
+                        onChange={(e) => setJobFormData(prev => ({ ...prev, department: e.target.value }))}
+                        data-testid="input-edit-department"
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <Label className="text-sm text-[#8798ad]">Criticality</Label>
+                      <Input
+                        placeholder="Enter criticality"
+                        value={jobFormData.criticality || ""}
+                        onChange={(e) => setJobFormData(prev => ({ ...prev, criticality: e.target.value }))}
+                        data-testid="input-edit-criticality"
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <Label className="text-sm text-[#8798ad]">Is Active</Label>
+                      <Input
+                        placeholder="Yes / No"
+                        value={jobFormData.isActive === true ? "Yes" : jobFormData.isActive === false ? "No" : ""}
+                        onChange={(e) => setJobFormData(prev => ({ ...prev, isActive: e.target.value.toLowerCase() === "yes" }))}
+                        data-testid="input-edit-is-active"
+                      />
+                    </div>
+                  </div>
 
-            {/* Row 3: Assigned To, Approver, Job Priority, Class Related */}
-            <div className="grid grid-cols-4 gap-4">
-              <div>
-                <label className="text-xs font-medium text-blue-600 mb-1 block">Assigned To</label>
-                <Input
-                  placeholder="Input Field"
-                  value={jobFormData.assignedTo || ""}
-                  onChange={(e) => setJobFormData(prev => ({ ...prev, assignedTo: e.target.value }))}
-                  className="h-9"
-                  data-testid="input-edit-assigned-to"
-                />
-              </div>
-              <div>
-                <label className="text-xs font-medium text-blue-600 mb-1 block">Approver</label>
-                <Input
-                  placeholder="Input Field"
-                  value={jobFormData.approver || ""}
-                  onChange={(e) => setJobFormData(prev => ({ ...prev, approver: e.target.value }))}
-                  className="h-9"
-                  data-testid="input-edit-approver"
-                />
-              </div>
-              <div>
-                <label className="text-xs font-medium text-blue-600 mb-1 block">Job Priority</label>
-                <Input
-                  placeholder="Input Field"
-                  value={jobFormData.jobPriority || ""}
-                  onChange={(e) => setJobFormData(prev => ({ ...prev, jobPriority: e.target.value }))}
-                  className="h-9"
-                  data-testid="input-edit-priority"
-                />
-              </div>
-              <div>
-                <label className="text-xs font-medium text-blue-600 mb-1 block">Class Related</label>
-                <Input
-                  placeholder="Input Field"
-                  value={jobFormData.classRelated || ""}
-                  onChange={(e) => setJobFormData(prev => ({ ...prev, classRelated: e.target.value }))}
-                  className="h-9"
-                  data-testid="input-edit-class-related"
-                />
-              </div>
-            </div>
+                  <div className="space-y-1">
+                    <Label className="text-sm text-[#8798ad]">Brief Work Description</Label>
+                    <Input
+                      placeholder="Enter brief work description"
+                      value={jobFormData.briefWorkDescription || ""}
+                      onChange={(e) => setJobFormData(prev => ({ ...prev, briefWorkDescription: e.target.value }))}
+                      data-testid="input-edit-job-desc"
+                    />
+                  </div>
+                </div>
+              </SectionBlock>
 
-            {/* Row 4: Department, Criticality, Is Active */}
-            <div className="grid grid-cols-3 gap-4">
-              <div>
-                <label className="text-xs font-medium text-blue-600 mb-1 block">Department</label>
-                <Input
-                  placeholder="Input Field"
-                  value={jobFormData.department || ""}
-                  onChange={(e) => setJobFormData(prev => ({ ...prev, department: e.target.value }))}
-                  className="h-9"
-                  data-testid="input-edit-department"
-                />
-              </div>
-              <div>
-                <label className="text-xs font-medium text-blue-600 mb-1 block">Criticality</label>
-                <Input
-                  placeholder="Input Field"
-                  value={jobFormData.criticality || ""}
-                  onChange={(e) => setJobFormData(prev => ({ ...prev, criticality: e.target.value }))}
-                  className="h-9"
-                  data-testid="input-edit-criticality"
-                />
-              </div>
-              <div>
-                <label className="text-xs font-medium text-blue-600 mb-1 block">Is Active</label>
-                <Input
-                  placeholder="Input Field"
-                  value={jobFormData.isActive === true ? "Yes" : jobFormData.isActive === false ? "No" : ""}
-                  onChange={(e) => setJobFormData(prev => ({ ...prev, isActive: e.target.value.toLowerCase() === "yes" }))}
-                  className="h-9"
-                  data-testid="input-edit-is-active"
-                />
-              </div>
-            </div>
+              <SectionBlock
+                id="edit-spare-parts"
+                number="A2"
+                title="Required Spare Parts"
+                description="Spare parts needed for this job"
+              >
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm border border-gray-200">
+                    <thead>
+                      <tr className="bg-gray-50 border-b border-gray-200">
+                        <th className="text-left p-2 font-medium text-gray-700 w-[20%]">PART NO.</th>
+                        <th className="text-left p-2 font-medium text-gray-700 w-[40%]">DESCRIPTION</th>
+                        <th className="text-left p-2 font-medium text-gray-700 w-[15%]">QTY REQUIRED</th>
+                        <th className="text-left p-2 font-medium text-gray-700 w-[10%]">ROB</th>
+                        <th className="text-left p-2 font-medium text-gray-700 w-[15%]">STATUS</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {(Array.isArray(jobFormData.requiredSpareParts) && (jobFormData.requiredSpareParts as any[]).length > 0) ? (
+                        (jobFormData.requiredSpareParts as any[]).map((part: any, index: number) => {
+                          const partNo = part.partNo || part.partNumber || part.code || '-';
+                          const desc = part.description || part.name || part.partName || '-';
+                          const qty = part.qty || part.quantity || part.qtyRequired || '-';
+                          const rob = part.rob || '-';
+                          const status = part.status || '-';
+                          return (
+                            <tr key={index} className="border-b border-gray-200">
+                              <td className="p-2 font-mono text-xs" data-testid={`edit-spare-partno-${index}`}>{partNo}</td>
+                              <td className="p-2" data-testid={`edit-spare-desc-${index}`}>{desc}</td>
+                              <td className="p-2" data-testid={`edit-spare-qty-${index}`}>{qty}</td>
+                              <td className="p-2" data-testid={`edit-spare-rob-${index}`}>{rob}</td>
+                              <td className="p-2" data-testid={`edit-spare-status-${index}`}>{status}</td>
+                            </tr>
+                          );
+                        })
+                      ) : (
+                        <tr>
+                          <td colSpan={5} className="text-center p-4 text-gray-500 italic">
+                            No spare parts linked to this job
+                          </td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </SectionBlock>
 
-            {/* Row 5: Brief Work Description */}
-            <div>
-              <label className="text-xs font-medium text-blue-600 mb-1 block">Brief Work Description</label>
-              <Input
-                placeholder="Input Field"
-                value={jobFormData.briefWorkDescription || ""}
-                onChange={(e) => setJobFormData(prev => ({ ...prev, briefWorkDescription: e.target.value }))}
-                className="h-9"
-                data-testid="input-edit-job-desc"
-              />
+              <SectionBlock
+                id="edit-tools"
+                number="A3"
+                title="Required Tools & Equipment"
+                description="Tools and equipment needed for this job"
+              >
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm border border-gray-200">
+                    <thead>
+                      <tr className="bg-gray-50 border-b border-gray-200">
+                        <th className="text-left p-2 font-medium text-gray-700 w-[50%]">DESCRIPTION</th>
+                        <th className="text-left p-2 font-medium text-gray-700 w-[15%]">QTY REQUIRED</th>
+                        <th className="text-left p-2 font-medium text-gray-700 w-[10%]">ROB</th>
+                        <th className="text-left p-2 font-medium text-gray-700 w-[15%]">STATUS</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {(Array.isArray(jobFormData.requiredTools) && (jobFormData.requiredTools as any[]).length > 0) ? (
+                        (jobFormData.requiredTools as any[]).map((tool: any, index: number) => (
+                          <tr key={index} className="border-b border-gray-200">
+                            <td className="p-2" data-testid={`edit-tool-desc-${index}`}>{tool.description || tool.name || '-'}</td>
+                            <td className="p-2" data-testid={`edit-tool-qty-${index}`}>{tool.qty || tool.quantity || '-'}</td>
+                            <td className="p-2" data-testid={`edit-tool-rob-${index}`}>{tool.rob || '-'}</td>
+                            <td className="p-2" data-testid={`edit-tool-status-${index}`}>{tool.status || '-'}</td>
+                          </tr>
+                        ))
+                      ) : (
+                        <tr>
+                          <td colSpan={4} className="text-center p-4 text-gray-500 italic">
+                            No tools linked to this job
+                          </td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </SectionBlock>
+
+              <SectionBlock
+                id="edit-safety"
+                number="A4"
+                title="Safety Requirements"
+                description="Safety requirements and permits for this job"
+              >
+                <div className="space-y-4">
+                  <div>
+                    <Label className="text-sm font-medium text-gray-700">Personal Protective Equipment (PPE):</Label>
+                    <Input
+                      placeholder="Enter PPE requirements (comma-separated)"
+                      value={jobFormData.ppeRequirements || ""}
+                      onChange={(e) => setJobFormData(prev => ({ ...prev, ppeRequirements: e.target.value }))}
+                      className="mt-1"
+                      data-testid="input-edit-ppe"
+                    />
+                  </div>
+                  <div>
+                    <Label className="text-sm font-medium text-gray-700">Permits Required:</Label>
+                    <Input
+                      placeholder="Enter permit requirements (comma-separated)"
+                      value={jobFormData.permitRequirements || ""}
+                      onChange={(e) => setJobFormData(prev => ({ ...prev, permitRequirements: e.target.value }))}
+                      className="mt-1"
+                      data-testid="input-edit-permits"
+                    />
+                  </div>
+                  <div>
+                    <Label className="text-sm font-medium text-gray-700">Other Safety Requirements:</Label>
+                    <Input
+                      placeholder="Enter other safety requirements (comma-separated)"
+                      value={jobFormData.otherSafetyRequirements || ""}
+                      onChange={(e) => setJobFormData(prev => ({ ...prev, otherSafetyRequirements: e.target.value }))}
+                      className="mt-1"
+                      data-testid="input-edit-other-safety"
+                    />
+                  </div>
+                </div>
+              </SectionBlock>
+
+              <SectionBlock
+                id="edit-vessel-mapping"
+                number="A5"
+                title="Job Mapped Vessel Details"
+                description="Vessel mapping information related to this job"
+              >
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm border border-gray-200">
+                    <thead>
+                      <tr className="bg-gray-50 border-b border-gray-200">
+                        <th className="text-left p-2 font-medium text-gray-700 w-[40%]">VESSEL CODE</th>
+                        <th className="text-left p-2 font-medium text-gray-700 w-[60%]">VESSEL NAME</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr>
+                        <td colSpan={2} className="text-center p-4 text-gray-500 italic">
+                          No vessels mapped to this job
+                        </td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              </SectionBlock>
             </div>
           </div>
         </DialogContent>
