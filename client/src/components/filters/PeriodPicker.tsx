@@ -96,6 +96,8 @@ export function PeriodPicker({ value, onChange, className }: PeriodPickerProps) 
     }
   }, [open, value, currentYear]);
 
+  const canApply = mode === "yearQuarterMonth" || (mode === "dateRange" && (!!dateFrom || !!dateTo));
+
   const handleApply = useCallback(() => {
     if (mode === "yearQuarterMonth") {
       onChange({
@@ -111,6 +113,8 @@ export function PeriodPicker({ value, onChange, className }: PeriodPickerProps) 
           dateFrom,
           dateTo,
         });
+      } else {
+        onChange(null);
       }
     }
     setOpen(false);
@@ -319,6 +323,7 @@ export function PeriodPicker({ value, onChange, className }: PeriodPickerProps) 
             size="sm"
             className="bg-[#1a3a7a] text-white text-xs px-6"
             onClick={handleApply}
+            disabled={!canApply}
             data-testid="button-period-apply"
           >
             Apply
