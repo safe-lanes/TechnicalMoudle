@@ -181,8 +181,8 @@ export default function DefectsReports() {
         <div className="grid grid-cols-5 gap-3">
           <div>
             <Select value={filters.vesselId || ''} onValueChange={(value) => handleFilterChange('vesselId', value)}>
-              <SelectTrigger className="h-8 text-xs">
-                <SelectValue placeholder="All Vessels" />
+              <SelectTrigger className="h-8 text-xs [&>span[data-placeholder]]:opacity-50">
+                <SelectValue placeholder="Vessel" />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All Vessels</SelectItem>
@@ -197,8 +197,8 @@ export default function DefectsReports() {
 
           <div>
             <Select value={filters.fleet} onValueChange={(value) => handleFilterChange('fleet', value)}>
-              <SelectTrigger className="h-8 text-xs">
-                <SelectValue placeholder="All Fleets" />
+              <SelectTrigger className="h-8 text-xs [&>span[data-placeholder]]:opacity-50">
+                <SelectValue placeholder="Fleet" />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All Fleets</SelectItem>
@@ -210,8 +210,8 @@ export default function DefectsReports() {
 
           <div>
             <Select value={filters.period} onValueChange={(value) => handleFilterChange('period', value)}>
-              <SelectTrigger className="h-8 text-xs">
-                <SelectValue placeholder="All Time" />
+              <SelectTrigger className="h-8 text-xs [&>span[data-placeholder]]:opacity-50">
+                <SelectValue placeholder="Period" />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All Time</SelectItem>
@@ -225,8 +225,8 @@ export default function DefectsReports() {
 
           <div>
             <Select value={filters.category} onValueChange={(value) => handleFilterChange('category', value)}>
-              <SelectTrigger className="h-8 text-xs">
-                <SelectValue placeholder="All Categories" />
+              <SelectTrigger className="h-8 text-xs [&>span[data-placeholder]]:opacity-50">
+                <SelectValue placeholder="Category" />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All Categories</SelectItem>
@@ -240,8 +240,8 @@ export default function DefectsReports() {
 
           <div>
             <Select value={filters.type} onValueChange={(value) => handleFilterChange('type', value)}>
-              <SelectTrigger className="h-8 text-xs">
-                <SelectValue placeholder="All Types" />
+              <SelectTrigger className="h-8 text-xs [&>span[data-placeholder]]:opacity-50">
+                <SelectValue placeholder="Type" />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All Types</SelectItem>
@@ -254,8 +254,8 @@ export default function DefectsReports() {
 
           <div>
             <Select value={filters.severity} onValueChange={(value) => handleFilterChange('severity', value)}>
-              <SelectTrigger className="h-8 text-xs">
-                <SelectValue placeholder="All Severities" />
+              <SelectTrigger className="h-8 text-xs [&>span[data-placeholder]]:opacity-50">
+                <SelectValue placeholder="Severity (VIQ)" />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All Severities</SelectItem>
@@ -268,8 +268,8 @@ export default function DefectsReports() {
 
           <div>
             <Select value={filters.source} onValueChange={(value) => handleFilterChange('source', value)}>
-              <SelectTrigger className="h-8 text-xs">
-                <SelectValue placeholder="All Sources" />
+              <SelectTrigger className="h-8 text-xs [&>span[data-placeholder]]:opacity-50">
+                <SelectValue placeholder="Source" />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All Sources</SelectItem>
@@ -283,8 +283,8 @@ export default function DefectsReports() {
           
           <div>
             <Select value={filters.portAtSea} onValueChange={(value) => handleFilterChange('portAtSea', value)}>
-              <SelectTrigger className="h-8 text-xs">
-                <SelectValue placeholder="All Conditions" />
+              <SelectTrigger className="h-8 text-xs [&>span[data-placeholder]]:opacity-50">
+                <SelectValue placeholder="Operating Condition" />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All Conditions</SelectItem>
@@ -297,8 +297,8 @@ export default function DefectsReports() {
           
           <div>
             <Select value={filters.routineBreakdown} onValueChange={(value) => handleFilterChange('routineBreakdown', value)}>
-              <SelectTrigger className="h-8 text-xs">
-                <SelectValue placeholder="All Types" />
+              <SelectTrigger className="h-8 text-xs [&>span[data-placeholder]]:opacity-50">
+                <SelectValue placeholder="Occurrence Type" />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All Types</SelectItem>
@@ -310,8 +310,8 @@ export default function DefectsReports() {
 
           <div>
             <Select value={filters.reportedTo} onValueChange={(value) => handleFilterChange('reportedTo', value)}>
-              <SelectTrigger className="h-8 text-xs">
-                <SelectValue placeholder="All" />
+              <SelectTrigger className="h-8 text-xs [&>span[data-placeholder]]:opacity-50">
+                <SelectValue placeholder="Reported To" />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All</SelectItem>
