@@ -27,6 +27,7 @@ import { useVessels } from "@/hooks/useVessels";
 import { useVessel } from "@/contexts/VesselContext";
 import { useQuery } from "@tanstack/react-query";
 import CategoryFilters, { CategoryFilterValues } from "@/components/reports/CategoryFilters";
+import StoresInventoryStatusReport from "./StoresInventoryStatusReport";
 
 interface StoresReport {
   id: string;
@@ -59,6 +60,7 @@ const StoresReports: React.FC<StoresReportsProps> = ({ onBack, globalFilters }) 
     dateRange: globalFilters?.dateRange || { from: null, to: null }
   });
   const [generatingReports, setGeneratingReports] = useState<Set<string>>(new Set());
+  const [selectedReport, setSelectedReport] = useState<string | null>(null);
   const { toast } = useToast();
   const { data: vessels = [] } = useVessels();
   const { vesselId: contextVesselId } = useVessel();
@@ -377,6 +379,15 @@ const StoresReports: React.FC<StoresReportsProps> = ({ onBack, globalFilters }) 
   const chemicalsCount = storesItems.filter((s: any) => s.itemType === 'chemicals').length;
   const lowStockCount = storesItems.filter((s: any) => (s.rob || 0) < (s.min || 0)).length;
 
+  if (selectedReport === 'stores-inventory-status') {
+    return (
+      <StoresInventoryStatusReport
+        onBack={() => setSelectedReport(null)}
+        vesselId={effectiveVesselId}
+      />
+    );
+  }
+
   return (
     <div className="p-6 bg-white min-h-screen">
       <div className="mb-6">
@@ -459,6 +470,11 @@ const StoresReports: React.FC<StoresReportsProps> = ({ onBack, globalFilters }) 
                 key={report.id} 
                 className="hover:bg-gray-50 cursor-pointer"
                 data-testid={`stores-report-row-${report.id}`}
+                onClick={() => {
+                  if (report.id === 'stores-inventory-status') {
+                    setSelectedReport(report.id);
+                  }
+                }}
               >
                 <td className="py-3 px-4">
                   <div>
@@ -483,7 +499,14 @@ const StoresReports: React.FC<StoresReportsProps> = ({ onBack, globalFilters }) 
                       size="icon" 
                       variant="ghost" 
                       title="Preview"
-                      onClick={() => handleGenerateReport(report.id, 'PDF')}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        if (report.id === 'stores-inventory-status') {
+                          setSelectedReport(report.id);
+                        } else {
+                          handleGenerateReport(report.id, 'PDF');
+                        }
+                      }}
                       disabled={generatingReports.has(`${report.id}-PDF`)}
                       data-testid={`button-preview-${report.id}`}
                     >
@@ -498,7 +521,7 @@ const StoresReports: React.FC<StoresReportsProps> = ({ onBack, globalFilters }) 
                         size="icon" 
                         variant="ghost" 
                         title="Download PDF"
-                        onClick={() => handleGenerateReport(report.id, 'PDF')}
+                        onClick={(e) => { e.stopPropagation(); handleGenerateReport(report.id, 'PDF'); }}
                         disabled={generatingReports.has(`${report.id}-PDF`)}
                         data-testid={`button-pdf-${report.id}`}
                       >
@@ -510,7 +533,7 @@ const StoresReports: React.FC<StoresReportsProps> = ({ onBack, globalFilters }) 
                         size="icon" 
                         variant="ghost" 
                         title="Download Excel"
-                        onClick={() => handleGenerateReport(report.id, 'Excel')}
+                        onClick={(e) => { e.stopPropagation(); handleGenerateReport(report.id, 'Excel'); }}
                         disabled={generatingReports.has(`${report.id}-Excel`)}
                         data-testid={`button-excel-${report.id}`}
                       >
