@@ -2946,31 +2946,34 @@ async function validateData(type: string, data: any[], mode: string, vesselId?: 
     });
   }
   
-  // Track duplicate Job Codes for fleet-jobs (case-insensitive)
-  const fleetJobCodeOccurrences = new Map<string, number[]>();
-  const existingDbFleetJobCodes = new Set<string>();
+  // Track duplicate Fleet Jobs by composite key (Job Code + Fleet Equipment Code) - case-insensitive
+  // The same Job Code can legitimately appear under different Fleet Equipment Codes
+  const fleetJobCompositeOccurrences = new Map<string, number[]>();
+  const existingDbFleetJobCompositeKeys = new Set<string>();
   
   if (type === 'fleet-jobs') {
     try {
       const existingFleetJobs = await storage.getFleetJobs();
       existingFleetJobs.forEach((fj: any) => {
-        if (fj.jobCode) {
-          existingDbFleetJobCodes.add(fj.jobCode.toUpperCase());
+        if (fj.jobCode && fj.fleetEquipmentCode) {
+          const compositeKey = `${fj.jobCode.toUpperCase()}|${fj.fleetEquipmentCode.toUpperCase()}`;
+          existingDbFleetJobCompositeKeys.add(compositeKey);
         }
       });
-      console.log(`📋 Loaded ${existingDbFleetJobCodes.size} existing fleet job codes from database`);
+      console.log(`📋 Loaded ${existingDbFleetJobCompositeKeys.size} existing fleet job composite keys from database`);
     } catch (err) {
       console.error(`Failed to fetch existing fleet jobs:`, err);
     }
     
     filteredData.forEach((row, index) => {
       const jobCode = row['Job Code'];
-      if (jobCode) {
-        const code = String(jobCode).trim().toUpperCase();
-        if (!fleetJobCodeOccurrences.has(code)) {
-          fleetJobCodeOccurrences.set(code, []);
+      const equipCode = row['Fleet Equipment Code'];
+      if (jobCode && equipCode) {
+        const compositeKey = `${String(jobCode).trim().toUpperCase()}|${String(equipCode).trim().toUpperCase()}`;
+        if (!fleetJobCompositeOccurrences.has(compositeKey)) {
+          fleetJobCompositeOccurrences.set(compositeKey, []);
         }
-        fleetJobCodeOccurrences.get(code)!.push(index + 2);
+        fleetJobCompositeOccurrences.get(compositeKey)!.push(index + 2);
       }
     });
   }
@@ -3927,7 +3930,7 @@ async function validateData(type: string, data: any[], mode: string, vesselId?: 
       // Validate fleet-jobs - matches fleet_jobs database schema
       // 21 columns from Fleet Jobs Import Sheet to Table Mapping
       
-      // Job Code - required and unique
+      // Job Code - required (unique per Fleet Equipment Code, not globally unique)
       const jobCode = row['Job Code'];
       if (jobCode === undefined || jobCode === null || String(jobCode).trim() === '') {
         errors.push(`Row ${rowNum}: Job Code is required`);
@@ -3936,21 +3939,29 @@ async function validateData(type: string, data: any[], mode: string, vesselId?: 
         normalized['Job Code'] = codeStr;
         const codeUpperCase = codeStr.toUpperCase();
         
-        const occurrences = fleetJobCodeOccurrences.get(codeUpperCase);
-        if (occurrences && occurrences.length > 1) {
-          const firstOccurrence = occurrences[0];
-          if (rowNum !== firstOccurrence) {
-            errors.push(`Row ${rowNum}: Duplicate Job Code '${codeStr}' - this code already appears in row ${firstOccurrence}. Each Job Code must be unique.`);
-          }
-        }
+        const rawEqCode = row['Fleet Equipment Code'];
+        const hasEquipCode = rawEqCode !== undefined && rawEqCode !== null && String(rawEqCode).trim() !== '';
         
-        if (existingDbFleetJobCodes.has(codeUpperCase)) {
-          if (mode === 'add') {
-            errors.push(`Row ${rowNum}: Job Code '${codeStr}' already exists in database. Use 'Update' or 'Upsert' mode to modify existing records.`);
+        if (hasEquipCode) {
+          const fleetEqCodeForCheck = String(rawEqCode).trim().toUpperCase();
+          const compositeKey = `${codeUpperCase}|${fleetEqCodeForCheck}`;
+          
+          const occurrences = fleetJobCompositeOccurrences.get(compositeKey);
+          if (occurrences && occurrences.length > 1) {
+            const firstOccurrence = occurrences[0];
+            if (rowNum !== firstOccurrence) {
+              errors.push(`Row ${rowNum}: Duplicate Job Code '${codeStr}' with same Fleet Equipment Code '${String(rawEqCode).trim()}' - this combination already appears in row ${firstOccurrence}.`);
+            }
           }
-        } else {
-          if (mode === 'update') {
-            errors.push(`Row ${rowNum}: Job Code '${codeStr}' does not exist in database. Use 'Add' or 'Upsert' mode to create new records.`);
+          
+          if (existingDbFleetJobCompositeKeys.has(compositeKey)) {
+            if (mode === 'add') {
+              errors.push(`Row ${rowNum}: Job Code '${codeStr}' with Fleet Equipment Code '${String(rawEqCode).trim()}' already exists in database. Use 'Update' or 'Upsert' mode to modify existing records.`);
+            }
+          } else {
+            if (mode === 'update') {
+              errors.push(`Row ${rowNum}: Job Code '${codeStr}' with Fleet Equipment Code '${String(rawEqCode).trim()}' does not exist in database. Use 'Add' or 'Upsert' mode to create new records.`);
+            }
           }
         }
       }
@@ -5996,8 +6007,11 @@ async function performImport(
     console.log(`🚀 Starting fleet-jobs import: ${data.length} rows, mode: ${mode}`);
     
     const existingFleetJobs = await storage.getFleetJobs();
-    const fleetJobsByCode = new Map(existingFleetJobs.map((fj: any) => [fj.jobCode, fj]));
-    console.log(`📦 Prefetched ${existingFleetJobs.length} existing fleet jobs`);
+    const fleetJobsByCompositeKey = new Map(existingFleetJobs.map((fj: any) => {
+      const compositeKey = `${(fj.jobCode || '').toUpperCase()}|${(fj.fleetEquipmentCode || '').toUpperCase()}`;
+      return [compositeKey, fj];
+    }));
+    console.log(`📦 Prefetched ${existingFleetJobs.length} existing fleet jobs (${fleetJobsByCompositeKey.size} unique composite keys)`);
     
     const existingFleetComponents = await storage.getFleetComponents();
     const fleetComponentsByCode = new Map(existingFleetComponents.map((fc: any) => [fc.fleetEquipmentCode, fc]));
@@ -6078,37 +6092,38 @@ async function performImport(
         otherSafetyRequirements,
       };
       
-      const existingFleetJob = fleetJobsByCode.get(jobCode);
+      const compositeKey = `${String(jobCode).toUpperCase()}|${String(fleetEquipmentCode).trim().toUpperCase()}`;
+      const existingFleetJob = fleetJobsByCompositeKey.get(compositeKey);
       
       if (mode === 'add') {
         if (existingFleetJob) {
-          console.log(`⏭️ Skipping existing fleet job: ${jobCode}`);
+          console.log(`⏭️ Skipping existing fleet job: ${jobCode} (equipment: ${fleetEquipmentCode})`);
           result.skipped++;
         } else {
           const newFleetJob = await storage.createFleetJob(fleetJobData);
-          fleetJobsByCode.set(jobCode, newFleetJob);
+          fleetJobsByCompositeKey.set(compositeKey, newFleetJob);
           result.created++;
-          console.log(`✅ Created fleet job: ${jobCode} - ${woTitle} (component: ${fleetComponentsUuid})`);
+          console.log(`✅ Created fleet job: ${jobCode} - ${woTitle} (equipment: ${fleetEquipmentCode}, component: ${fleetComponentsUuid})`);
         }
       } else if (mode === 'update') {
         if (existingFleetJob) {
           await storage.updateFleetJob(existingFleetJob.id, fleetJobData);
           result.updated++;
-          console.log(`🔄 Updated fleet job: ${jobCode} - ${woTitle} (component: ${fleetComponentsUuid})`);
+          console.log(`🔄 Updated fleet job: ${jobCode} - ${woTitle} (equipment: ${fleetEquipmentCode}, component: ${fleetComponentsUuid})`);
         } else {
-          console.log(`⏭️ Skipping non-existent fleet job (update mode): ${jobCode}`);
+          console.log(`⏭️ Skipping non-existent fleet job (update mode): ${jobCode} (equipment: ${fleetEquipmentCode})`);
           result.skipped++;
         }
       } else if (mode === 'upsert') {
         if (existingFleetJob) {
           await storage.updateFleetJob(existingFleetJob.id, fleetJobData);
           result.updated++;
-          console.log(`🔄 Updated fleet job: ${jobCode} - ${woTitle} (component: ${fleetComponentsUuid})`);
+          console.log(`🔄 Updated fleet job: ${jobCode} - ${woTitle} (equipment: ${fleetEquipmentCode}, component: ${fleetComponentsUuid})`);
         } else {
           const newFleetJob = await storage.createFleetJob(fleetJobData);
-          fleetJobsByCode.set(jobCode, newFleetJob);
+          fleetJobsByCompositeKey.set(compositeKey, newFleetJob);
           result.created++;
-          console.log(`✅ Created fleet job: ${jobCode} - ${woTitle} (component: ${fleetComponentsUuid})`);
+          console.log(`✅ Created fleet job: ${jobCode} - ${woTitle} (equipment: ${fleetEquipmentCode}, component: ${fleetComponentsUuid})`);
         }
       }
     }
