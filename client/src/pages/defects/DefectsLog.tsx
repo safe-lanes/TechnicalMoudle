@@ -10,7 +10,6 @@ import { Badge } from "@/components/ui/badge";
 import { 
   AlertTriangle, 
   CheckCircle, 
-  Clock, 
   Eye, 
   Edit, 
   Paperclip, 
@@ -35,6 +34,8 @@ import DefectFormWizard from "./DefectFormWizard";
 import { cn } from "@/lib/utils";
 import { formatForDisplay } from "@/lib/dateUtils";
 import { VesselFleetGroupFilter, VesselFleetGroupFilterValue, createDefaultFilterValue } from "@/components/filters/VesselFleetGroupFilter";
+import { PeriodPicker } from "@/components/filters/PeriodPicker";
+import type { PeriodValue } from "@/components/filters/PeriodPicker";
 import { useUIRole } from "@/contexts/UIRoleContext";
 import type { Defect } from "@shared/schema";
 
@@ -49,7 +50,7 @@ interface VesselFleetGroupFilterResult {
 }
 
 interface DefectsFilters {
-  period?: string;
+  periodValue?: PeriodValue | null;
   search?: string;
   vesselId?: string;
   fleet?: string;
@@ -126,7 +127,6 @@ export default function DefectsLog() {
       if (filters.vesselId) params.append('vesselId', filters.vesselId);
       if (filters.type) params.append('category', filters.type);
       if (filters.search) params.append('search', filters.search);
-      if (filters.period) params.append('period', filters.period);
       if (filters.fleet) params.append('fleet', filters.fleet);
       if (filters.addGroup) params.append('group', filters.addGroup);
       if (filters.dueOverdue) params.append('dueOverdue', filters.dueOverdue);
@@ -163,35 +163,39 @@ export default function DefectsLog() {
       });
     }
     
-    // Period filter based on Issue Date only
-    if (filters.period && filters.period !== 'all') {
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
-      
+    if (filters.periodValue) {
+      const pv = filters.periodValue;
       result = result.filter((defect: Defect) => {
         if (!defect.issueDate) return false;
-        
-        // Parse issueDate string to Date
         const issueDateMatch = String(defect.issueDate).match(/^(\d{4})-(\d{2})-(\d{2})/);
         if (!issueDateMatch) return false;
-        
-        const [, year, month, day] = issueDateMatch;
-        const issueDate = new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
+        const [, yStr, mStr, dStr] = issueDateMatch;
+        const issueDate = new Date(parseInt(yStr), parseInt(mStr) - 1, parseInt(dStr));
         issueDate.setHours(0, 0, 0, 0);
-        
-        if (filters.period === 'today') {
-          return issueDate.getTime() === today.getTime();
-        } else if (filters.period === 'week') {
-          // Start of current week (Sunday)
-          const startOfWeek = new Date(today);
-          startOfWeek.setDate(today.getDate() - today.getDay());
-          startOfWeek.setHours(0, 0, 0, 0);
-          return issueDate >= startOfWeek && issueDate <= today;
-        } else if (filters.period === 'month') {
-          // Start of current month
-          const startOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
-          startOfMonth.setHours(0, 0, 0, 0);
-          return issueDate >= startOfMonth && issueDate <= today;
+
+        if (pv.mode === "yearQuarterMonth") {
+          if (pv.month !== undefined && pv.year) {
+            return issueDate.getFullYear() === pv.year && issueDate.getMonth() === pv.month;
+          }
+          if (pv.quarter !== undefined && pv.year) {
+            const qStartMonth = (pv.quarter - 1) * 3;
+            return issueDate.getFullYear() === pv.year && issueDate.getMonth() >= qStartMonth && issueDate.getMonth() <= qStartMonth + 2;
+          }
+          if (pv.year) {
+            return issueDate.getFullYear() === pv.year;
+          }
+        } else if (pv.mode === "dateRange") {
+          if (pv.dateFrom) {
+            const from = new Date(pv.dateFrom);
+            from.setHours(0, 0, 0, 0);
+            if (issueDate < from) return false;
+          }
+          if (pv.dateTo) {
+            const to = new Date(pv.dateTo);
+            to.setHours(23, 59, 59, 999);
+            if (issueDate > to) return false;
+          }
+          return true;
         }
         return true;
       });
@@ -231,7 +235,7 @@ export default function DefectsLog() {
     });
     
     return result;
-  }, [defects, vesselFilterValue.selectedVessels, selectedVesselNames, filters.period]);
+  }, [defects, vesselFilterValue.selectedVessels, selectedVesselNames, filters.periodValue]);
 
   // Compute defect status based on data (matches DefectsCoC.tsx logic)
   const getComputedStatus = (defect: Defect): { label: string; color: string } => {
@@ -419,20 +423,10 @@ export default function DefectsLog() {
             <div className="flex items-center justify-between gap-4">
               <div className="flex items-center gap-3 flex-wrap">
                 {/* Period */}
-                <div className="flex items-center gap-2">
-                  <Clock className="h-4 w-4 text-gray-400" />
-                  <Select value={filters.period || ""} onValueChange={(value) => handleFilterChange('period', value)}>
-                    <SelectTrigger className="w-24 h-8 text-xs">
-                      <SelectValue placeholder="Period" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">All</SelectItem>
-                      <SelectItem value="today">Today</SelectItem>
-                      <SelectItem value="week">This Week</SelectItem>
-                      <SelectItem value="month">This Month</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
+                <PeriodPicker
+                  value={filters.periodValue}
+                  onChange={(val) => handleFilterChange('periodValue', val)}
+                />
 
                 {/* Search */}
                 <Input
