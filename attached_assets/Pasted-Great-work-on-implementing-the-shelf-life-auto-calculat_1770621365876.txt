@@ -1,0 +1,218 @@
+Great work on implementing the shelf life auto-calculation! The implementation looks solid. Now I need you to perform comprehensive testing and address a few remaining items:
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+PART 1: BACKEND VALIDATION IMPLEMENTATION
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+You mentioned you'd add backend validation. Please implement:
+
+1. **Validation Rule:** `expiry_date` must be after `manufacture_date`
+   - Check this in the POST (create) and PUT (update) endpoints
+   - Return a clear error message if validation fails
+   - Example error response:
+     ```json
+     {
+       "error": "Expiry date must be after manufacture date",
+       "field": "expiry_date"
+     }
+     ```
+
+2. **Show me the validation code:**
+   - Which file did you add it to?
+   - Show the exact validation logic
+   - Test it by attempting to create a chemical with expiry date before manufacture date
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+PART 2: AUTO-CALCULATION TESTING
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Test the auto-calculation feature:
+
+**Test Case 1: Create new chemical with auto-calculation**
+- Manufacture Date: 15-Jan-2025
+- Shelf Life: 24 months
+- Expected Expiry Date: 15-Jan-2027
+- Create this chemical and confirm the expiry date is auto-calculated correctly
+
+**Test Case 2: Manual override**
+- Manufacture Date: 15-Jan-2025  
+- Shelf Life: 24 months (should calculate to 15-Jan-2027)
+- But user manually enters Expiry Date: 15-Dec-2026
+- Confirm that manual entry is allowed and saved (user override works)
+
+**Test Case 3: Edit existing chemical**
+- Edit an existing chemical
+- Change Manufacture Date to 01-Feb-2025
+- Enter Shelf Life: 12 months
+- Confirm Expiry Date auto-updates to 01-Feb-2026
+
+Show me screenshots or data for each test case.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+PART 3: CREATE TEST CHEMICALS WITH DIFFERENT SCENARIOS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Create 5 test chemicals for the Vessel 4 with these scenarios:
+
+**Chemical 1: EXPIRED - Test Flammable Chemical**
+- Item Code: CH-TEST-001
+- Item Name: Test Flammable Chemical
+- Manufacture Date: 15-Jan-2023
+- Expiry Date: 15-Jan-2025 (EXPIRED)
+- Batch Number: BT-2023-001
+- Lot Number: LOT-001
+- Hazard Classification: Flammable
+- UN Number: UN1203
+- Flash Point: 23°C
+- SDS Reference: SDS-2025-001
+- ROB: 100 liters
+- Min Stock: 20
+- Storage Temp: 5°C to 25°C
+- PPE Requirements: Safety goggles, chemical-resistant gloves, apron
+- Disposal Instructions: Dispose according to local hazardous waste regulations
+
+**Chemical 2: EXPIRING SOON (Critical - 15 days)**
+- Item Code: CH-TEST-002
+- Item Name: Test Toxic Chemical
+- Manufacture Date: 25-Dec-2023
+- Expiry Date: 25-Feb-2026 (15 days from today)
+- Batch Number: BT-2023-002
+- Hazard Classification: Toxic
+- UN Number: UN1234
+- SDS Reference: SDS-2025-002
+- ROB: 50 liters
+- Min Stock: 10
+
+**Chemical 3: EXPIRING SOON (High - 45 days)**
+- Item Code: CH-TEST-003
+- Item Name: Test Corrosive Chemical
+- Manufacture Date: 25-Dec-2023
+- Expiry Date: 25-Mar-2026 (45 days from today)
+- Batch Number: BT-2023-003
+- Hazard Classification: Corrosive
+- UN Number: UN5678
+- SDS Reference: SDS-2025-003
+- ROB: 75 liters
+- Min Stock: 15
+
+**Chemical 4: OK (Expiring in 120 days)**
+- Item Code: CH-TEST-004
+- Item Name: Test Oxidizer Chemical
+- Manufacture Date: 10-Feb-2024
+- Expiry Date: 10-Jun-2026 (120 days from today)
+- Batch Number: BT-2024-001
+- Hazard Classification: Oxidizer
+- ROB: 200 liters
+- Min Stock: 30
+
+**Chemical 5: No SDS (for compliance testing)**
+- Item Code: CH-TEST-005
+- Item Name: Test Chemical Without SDS
+- Manufacture Date: 01-Jan-2025
+- Expiry Date: 01-Jan-2027
+- Batch Number: BT-2025-005
+- Hazard Classification: Compressed Gas
+- SDS Reference: (LEAVE EMPTY to test SDS compliance)
+- ROB: 150 liters
+- Min Stock: 25
+
+After creating these, show me:
+1. How they appear in the Chemicals Inventory table
+2. The Expiry column values
+3. The Hazard column values with color coding
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+PART 4: REPORT PAGE VERIFICATION
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+After creating the test chemicals, navigate to the Chemicals Inventory & Expiry Report page and verify:
+
+1. **Summary Cards show correct counts:**
+   - Total Chemicals: 15 (10 existing + 5 new test chemicals)
+   - Expired: 1 (CH-TEST-001)
+   - Expiring Soon: 2 (CH-TEST-002, CH-TEST-003)
+   - SDS Compliance: Should be 80% or similar (missing SDS for CH-TEST-005)
+
+2. **Expired Chemicals Alert Section:**
+   - Should show CH-TEST-001 in red alert box
+   - Should show "Days Overdue" correctly
+
+3. **Expiring Soon Section:**
+   - Should show CH-TEST-002 (Critical - 15 days)
+   - Should show CH-TEST-003 (High - 45 days)
+   - Grouped by urgency with correct badges
+
+4. **Full Inventory Table:**
+   - All 5 test chemicals visible
+   - Expiry dates displayed correctly
+   - Hazard badges with correct colors
+   - SDS Status: ✓ for 4 chemicals, ✗ for CH-TEST-005
+
+5. **SDS Compliance Section:**
+   - Should list CH-TEST-005 as missing SDS
+   - Compliance percentage calculated correctly
+
+6. **Hazard Classification Breakdown:**
+   - Should show distribution: 1 Flammable, 1 Toxic, 1 Corrosive, 1 Oxidizer, 1 Compressed Gas
+
+Take screenshots of the report page showing all these sections.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+PART 5: API TESTING
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Test the report API with different filters and show me the responses:
+
+1. `GET /technical/api/reports/chemicals-expiry/[vesselId]`
+   - Should return all chemicals with calculated fields
+
+2. `GET /technical/api/reports/chemicals-expiry/[vesselId]?expired=true`
+   - Should return only CH-TEST-001
+
+3. `GET /technical/api/reports/chemicals-expiry/[vesselId]?expiring_soon=30`
+   - Should return CH-TEST-002 (expiring in 15 days)
+
+4. `GET /technical/api/reports/chemicals-expiry/[vesselId]?hazard_class=Flammable`
+   - Should return CH-TEST-001
+
+Show the JSON response for each filter.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+PART 6: COLOR CODING CONFIRMATION
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Confirm the color scheme being used:
+
+**Hazard Classification Colors:**
+- Flammable: ?
+- Toxic: ?
+- Corrosive: ?
+- Oxidizer: ?
+- Compressed Gas: ?
+- Other: ?
+- None: ?
+
+**Expiry Status Colors:**
+- Expired: Red
+- Expiring Soon (Critical <30 days): Red/Orange?
+- Expiring Soon (High 31-60 days): Orange/Yellow?
+- Expiring Soon (Medium 61-90 days): Yellow?
+- OK (>90 days): Green
+
+Show me the exact hex colors or Tailwind classes being used.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+DELIVERABLES
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Please provide:
+
+1. ✅ Backend validation code and testing results
+2. ✅ Auto-calculation testing results (3 test cases)
+3. ✅ 5 test chemicals created with screenshots
+4. ✅ Report page screenshots showing all sections
+5. ✅ API response examples for each filter
+6. ✅ Color scheme confirmation
+7. ✅ Confirmation that everything is working as expected
+
+Once you've completed this comprehensive testing, we'll know that the Chemicals Inventory & Expiry Report is fully functional and ready for production use.
