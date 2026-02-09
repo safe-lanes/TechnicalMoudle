@@ -2992,7 +2992,7 @@ async function validateData(type: string, data: any[], mode: string, vesselId?: 
       console.warn('⚠️ Could not load existing fleet spare part codes:', err);
     }
     
-    validRows.forEach((row: any, index: number) => {
+    filteredData.forEach((row: any, index: number) => {
       const partCode = row['Part Code'];
       if (partCode) {
         const code = String(partCode).trim().toUpperCase();
