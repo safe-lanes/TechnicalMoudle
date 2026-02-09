@@ -92,7 +92,7 @@ const ReportsModule = () => {
       title: "Inventory - Spares",
       description: "Stock levels, consumption, reorder proposals, and movement analysis",
       icon: Package,
-      reportCount: 7,
+      reportCount: 3,
       lastGenerated: "1 day ago",
       color: "border-blue-500",
       iconBg: "bg-blue-500",
