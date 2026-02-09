@@ -70,7 +70,7 @@ const StoresReports: React.FC<StoresReportsProps> = ({ onBack, globalFilters }) 
     : contextVesselId;
 
   const { data: storesItems = [] } = useQuery<any[]>({
-    queryKey: ['/technical/api/stores', effectiveVesselId],
+    queryKey: [`/technical/api/stores/${effectiveVesselId}`],
     enabled: !!effectiveVesselId && effectiveVesselId !== 'all',
   });
 
