@@ -262,6 +262,8 @@ export default function FleetDataView() {
   const [selectedSpareForDetail, setSelectedSpareForDetail] = useState<FleetSpare | null>(null);
   const [selectedSpareVesselIds, setSelectedSpareVesselIds] = useState<Set<string>>(new Set());
   const [spareFormData, setSpareFormData] = useState<Partial<FleetSpare>>({});
+  const [spareSearchQuery, setSpareSearchQuery] = useState("");
+  const [selectedSpareIds, setSelectedSpareIds] = useState<Set<string>>(new Set());
   
   const { toast } = useToast();
 
@@ -411,6 +413,17 @@ export default function FleetDataView() {
       return jobNo.includes(query) || jobTitle.includes(query) || taskType.includes(query);
     });
   }, [relatedJobs, jobSearchQuery]);
+
+  const filteredRelatedSpares = useMemo(() => {
+    if (!spareSearchQuery.trim()) return relatedSpares;
+    const query = spareSearchQuery.toLowerCase();
+    return relatedSpares.filter((spare: FleetSpare) => {
+      const partCode = (spare.partCode || "").toLowerCase();
+      const partName = (spare.partName || "").toLowerCase();
+      const partNumber = (spare.partNumber || "").toLowerCase();
+      return partCode.includes(query) || partName.includes(query) || partNumber.includes(query);
+    });
+  }, [relatedSpares, spareSearchQuery]);
 
   const relatedVessels = useMemo(() => {
     if (!selectedComponent) return [];
@@ -2740,83 +2753,182 @@ export default function FleetDataView() {
       </Dialog>
 
       {/* Fleet Spare Information Dialog */}
-      <Dialog open={isSpareInfoDialogOpen} onOpenChange={setIsSpareInfoDialogOpen}>
-        <DialogContent className="max-w-4xl max-h-[80vh]">
-          <DialogHeader className="flex flex-row items-center justify-between border-b pb-3">
-            <DialogTitle className="text-base font-semibold text-green-600 border border-green-600 px-3 py-1 rounded">
-              Fleet Spares Information
-            </DialogTitle>
-            <div className="flex items-center gap-2">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setIsSpareVesselMappingDialogOpen(true)}
-                className="text-blue-600 border-blue-600 hover:bg-blue-50"
-                data-testid="btn-spare-vessel-mapping"
-              >
-                Vessel Mapping
-              </Button>
-              <Button
-                size="sm"
-                className="bg-blue-600 hover:bg-blue-700 text-white"
-                onClick={() => {
-                  setSpareFormData({});
-                  setIsAddSpareDialogOpen(true);
-                }}
-                data-testid="btn-add-new-spare"
-              >
-                <Plus className="h-4 w-4 mr-1" />
-                Add New Spare
-              </Button>
+      <Dialog open={isSpareInfoDialogOpen} onOpenChange={(open) => {
+        setIsSpareInfoDialogOpen(open);
+        if (!open) {
+          setSpareSearchQuery("");
+          setSelectedSpareIds(new Set());
+        }
+      }}>
+        <DialogContent className="w-[95vw] max-w-[95vw] h-[90vh] max-h-[90vh] p-0 overflow-hidden flex flex-col" aria-describedby={undefined}>
+          <DialogTitle className="sr-only">Fleet Spares Information</DialogTitle>
+          <div className="bg-gradient-to-r from-cyan-600 to-blue-600 px-6 py-5">
+            <div className="flex items-center gap-3">
+              <div className="p-2 bg-white/20 rounded-lg">
+                <Anchor className="h-5 w-5 text-white" />
+              </div>
+              <div>
+                <h1 className="text-xl font-bold text-white" data-testid="title-fleet-spare-info">Fleet Spares Information</h1>
+                <p className="text-cyan-100 text-sm mt-0.5">
+                  Spares linked to: {selectedComponent?.fleetEquipmentName || selectedComponent?.name || "Selected Component"}
+                </p>
+              </div>
             </div>
-          </DialogHeader>
-          <ScrollArea className="h-[400px]">
-            <table className="w-full text-sm">
-              <thead className="sticky top-0 bg-white">
-                <tr className="border-b text-gray-500 text-xs">
-                  <th className="text-left py-2 px-2 font-normal">Part Code</th>
-                  <th className="text-left py-2 px-2 font-normal">Part Name</th>
-                  <th className="text-left py-2 px-2 font-normal">Part Number</th>
-                  <th className="text-left py-2 px-2 font-normal">Maker</th>
-                  <th className="text-left py-2 px-2 font-normal">Unit</th>
-                </tr>
-              </thead>
-              <tbody>
-                {relatedSpares.length > 0 ? (
-                  relatedSpares.map((spare: FleetSpare, index: number) => (
-                    <tr 
-                      key={index} 
-                      className="border-b last:border-0 hover:bg-gray-50"
-                      data-testid={`spare-popup-row-${index}`}
-                    >
-                      <td className="py-2 px-2">
-                        <button
-                          className="text-blue-600 hover:text-blue-800 underline text-left"
-                          onClick={() => {
+          </div>
+
+          <div className="px-6 py-4 bg-gray-50 border-b border-gray-200">
+            <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+              <div className="flex items-center gap-4">
+                <h2 className="text-base font-semibold text-gray-800" data-testid="subtitle-all-spares">All Spares</h2>
+                <div className="flex items-center gap-3">
+                  <Badge variant="secondary" className="bg-cyan-100 text-cyan-700 no-default-hover-elevate no-default-active-elevate" data-testid="badge-total-spares">
+                    <Anchor className="h-3 w-3 mr-1" />
+                    {filteredRelatedSpares.length} Total
+                  </Badge>
+                  {selectedSpareIds.size > 0 && (
+                    <Badge variant="secondary" className="bg-blue-100 text-blue-700 no-default-hover-elevate no-default-active-elevate" data-testid="badge-selected-spares">
+                      {selectedSpareIds.size} Selected
+                    </Badge>
+                  )}
+                </div>
+              </div>
+              <div className="flex flex-col sm:flex-row gap-3">
+                <div className="relative flex-1 sm:min-w-[280px]">
+                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                  <Input
+                    placeholder="Search Part Code/Part Name/Part Number"
+                    value={spareSearchQuery}
+                    onChange={(e) => setSpareSearchQuery(e.target.value)}
+                    className="pl-10 bg-white border-gray-300"
+                    data-testid="input-spare-search"
+                  />
+                </div>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="text-gray-600"
+                  disabled={selectedSpareIds.size === 0}
+                  data-testid="btn-delete-spares"
+                >
+                  <Trash2 className="h-5 w-5" />
+                </Button>
+                <Button
+                  className="bg-cyan-600 whitespace-nowrap"
+                  onClick={() => {
+                    setSpareFormData({});
+                    setIsAddSpareDialogOpen(true);
+                  }}
+                  data-testid="btn-add-new-spare"
+                >
+                  <Plus className="mr-2 h-4 w-4" />
+                  Add New Spare
+                </Button>
+                <Button
+                  className="bg-cyan-600 whitespace-nowrap"
+                  onClick={() => setIsSpareVesselMappingDialogOpen(true)}
+                  data-testid="btn-spare-vessel-mapping"
+                >
+                  <Anchor className="mr-2 h-4 w-4" />
+                  Vessel Mapping
+                </Button>
+                <Button
+                  variant="outline"
+                  className="border-gray-300 text-gray-700"
+                  data-testid="btn-export-spares-excel"
+                >
+                  <FileSpreadsheet className="mr-2 h-4 w-4" />
+                  Export
+                </Button>
+              </div>
+            </div>
+          </div>
+
+          <div className="flex-1 overflow-auto px-6 py-4">
+            <div className="overflow-x-auto rounded-lg border border-gray-200">
+              <Table>
+                <TableHeader>
+                  <TableRow className="bg-gray-50 border-b border-gray-200">
+                    <TableHead className="text-xs font-semibold text-gray-600 uppercase tracking-wider py-3 w-12">Select</TableHead>
+                    <TableHead className="text-xs font-semibold text-gray-600 uppercase tracking-wider py-3">Part Code</TableHead>
+                    <TableHead className="text-xs font-semibold text-gray-600 uppercase tracking-wider py-3">Part Name</TableHead>
+                    <TableHead className="text-xs font-semibold text-gray-600 uppercase tracking-wider py-3">Part Number</TableHead>
+                    <TableHead className="text-xs font-semibold text-gray-600 uppercase tracking-wider py-3">Unit</TableHead>
+                    <TableHead className="text-xs font-semibold text-gray-600 uppercase tracking-wider py-3">Maker</TableHead>
+                    <TableHead className="text-xs font-semibold text-gray-600 uppercase tracking-wider py-3">Drawing Number</TableHead>
+                    <TableHead className="text-xs font-semibold text-gray-600 uppercase tracking-wider py-3">Position Number</TableHead>
+                    <TableHead className="text-xs font-semibold text-gray-600 uppercase tracking-wider py-3">Critical</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {filteredRelatedSpares.length > 0 ? (
+                    filteredRelatedSpares.map((spare: FleetSpare, index: number) => {
+                      const spareId = spare.partCode || String(spare.id);
+                      return (
+                        <TableRow
+                          key={index}
+                          className="border-b border-gray-100 cursor-pointer"
+                          onDoubleClick={() => {
                             setSelectedSpareForDetail(spare);
                             setIsSpareDetailsDialogOpen(true);
                           }}
-                          data-testid={`btn-spare-popup-detail-${index}`}
+                          data-testid={`spare-popup-row-${index}`}
                         >
-                          {spare.partCode}
-                        </button>
-                      </td>
-                      <td className="py-2 px-2">{spare.partName || "—"}</td>
-                      <td className="py-2 px-2">{spare.partNumber || "—"}</td>
-                      <td className="py-2 px-2">{spare.maker || "—"}</td>
-                      <td className="py-2 px-2">{spare.unitOfMeasurement || "—"}</td>
-                    </tr>
-                  ))
-                ) : (
-                  <tr>
-                    <td colSpan={5} className="py-8 text-center text-gray-500">
-                      No spares linked to this component
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          </ScrollArea>
+                          <TableCell className="py-3 px-2">
+                            <Checkbox
+                              checked={selectedSpareIds.has(String(spareId))}
+                              onCheckedChange={(checked) => {
+                                setSelectedSpareIds(prev => {
+                                  const newSet = new Set(prev);
+                                  if (checked) newSet.add(String(spareId));
+                                  else newSet.delete(String(spareId));
+                                  return newSet;
+                                });
+                              }}
+                              data-testid={`checkbox-spare-${index}`}
+                            />
+                          </TableCell>
+                          <TableCell
+                            className="py-3 text-blue-600 cursor-pointer"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setSelectedSpareForDetail(spare);
+                              setIsSpareDetailsDialogOpen(true);
+                            }}
+                            data-testid={`spare-code-link-${index}`}
+                          >
+                            <span className="font-medium">{spare.partCode || "—"}</span>
+                          </TableCell>
+                          <TableCell className="py-3 text-gray-600">{spare.partName || "—"}</TableCell>
+                          <TableCell className="py-3 font-mono text-sm text-gray-700">{spare.partNumber || "—"}</TableCell>
+                          <TableCell className="py-3 text-gray-600">{spare.unitOfMeasurement || "—"}</TableCell>
+                          <TableCell className="py-3 text-gray-600">{spare.maker || "—"}</TableCell>
+                          <TableCell className="py-3 text-gray-600">{spare.drawingNumber || "—"}</TableCell>
+                          <TableCell className="py-3 text-gray-600">{spare.positionNumber || "—"}</TableCell>
+                          <TableCell className="py-3 text-gray-600">{spare.criticality || "—"}</TableCell>
+                        </TableRow>
+                      );
+                    })
+                  ) : (
+                    <TableRow>
+                      <TableCell colSpan={9} className="py-16 text-center">
+                        <div className="flex flex-col items-center">
+                          <div className="p-4 bg-gray-100 rounded-full w-16 h-16 mx-auto mb-4 flex items-center justify-center">
+                            <Anchor className="h-8 w-8 text-gray-400" />
+                          </div>
+                          <p className="text-gray-600 font-medium">
+                            {relatedSpares.length === 0 ? "No spares linked to this component" : "No spares match your search"}
+                          </p>
+                          <p className="text-gray-400 text-sm mt-1">
+                            {relatedSpares.length === 0 ? "Add a new spare to get started" : "Try adjusting your search terms"}
+                          </p>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  )}
+                </TableBody>
+              </Table>
+            </div>
+          </div>
         </DialogContent>
       </Dialog>
 
