@@ -8,7 +8,6 @@ import { ChevronRight, ChevronDown, Plus, Search, Pencil, X, FileSpreadsheet, Tr
 import { Badge } from "@/components/ui/badge";
 import { Label } from "@/components/ui/label";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { PartHeader } from "@/components/PartHeader";
 import { SectionBlock } from "@/components/SectionBlock";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -1726,7 +1725,7 @@ export default function FleetDataView() {
 
       {/* Job Details Dialog */}
       <Dialog open={isJobDetailsDialogOpen} onOpenChange={setIsJobDetailsDialogOpen}>
-        <DialogContent className="w-[95vw] max-w-[95vw] h-[90vh] max-h-[90vh] p-0 overflow-hidden flex flex-col" aria-describedby={undefined}>
+        <DialogContent className="w-screen max-w-screen h-screen max-h-screen p-0 overflow-hidden flex flex-col rounded-none" aria-describedby={undefined}>
           <DialogTitle className="sr-only">Job Details</DialogTitle>
           <div className="bg-gradient-to-r from-cyan-600 to-blue-600 px-6 py-4 flex items-center justify-between">
             <div className="flex items-center gap-3">
@@ -1757,13 +1756,6 @@ export default function FleetDataView() {
           <div className="flex-1 overflow-auto px-6 py-6">
             {selectedJobForDetail && (
               <div className="max-w-5xl mx-auto space-y-6">
-                <PartHeader
-                  id="part-a"
-                  label="Part A"
-                  title="Job Details"
-                  description="Job template details and configuration"
-                />
-
                 <SectionBlock
                   id="job-info"
                   number="A1"
