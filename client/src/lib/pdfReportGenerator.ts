@@ -187,9 +187,10 @@ class PDFReportGenerator {
         lineColor: PDF_COLORS.border,
         lineWidth: 0.1,
       },
+      tableWidth: 'auto',
       headStyles: {
-        fillColor: [220, 225, 230] as [number, number, number],
-        textColor: PDF_COLORS.textDark,
+        fillColor: [235, 237, 240] as [number, number, number],
+        textColor: [0, 0, 0] as [number, number, number],
         fontStyle: 'bold',
         halign: 'left',
       },
