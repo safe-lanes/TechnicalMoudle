@@ -1,6 +1,6 @@
 {
-  "id": "df8de36f-f3b2-4843-a7bd-6669e473b888",
-  "prevId": "7ade0593-b1b0-4422-9478-4379678d3f38",
+  "id": "a9228c9a-9152-45b8-8de1-1a5a3f66a3f1",
+  "prevId": "7de3685e-edbe-46fd-af49-a67ec1ea0844",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -4730,165 +4730,6 @@
       "checkConstraints": {},
       "isRLSEnabled": false
     },
-    "public.fleet_equipment_master": {
-      "name": "fleet_equipment_master",
-      "schema": "",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "integer",
-          "primaryKey": true,
-          "notNull": true,
-          "identity": {
-            "type": "byDefault",
-            "name": "fleet_equipment_master_id_seq",
-            "schema": "public",
-            "increment": "1",
-            "startWith": "1",
-            "minValue": "1",
-            "maxValue": "2147483647",
-            "cache": "1",
-            "cycle": false
-          }
-        },
-        "fleet_equipment_code": {
-          "name": "fleet_equipment_code",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "fleet_equipment_name": {
-          "name": "fleet_equipment_name",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "maker": {
-          "name": "maker",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "maker_code": {
-          "name": "maker_code",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "model": {
-          "name": "model",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "model_code": {
-          "name": "model_code",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "description": {
-          "name": "description",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "is_active": {
-          "name": "is_active",
-          "type": "boolean",
-          "primaryKey": false,
-          "notNull": true,
-          "default": true
-        },
-        "created_by": {
-          "name": "created_by",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "created_at": {
-          "name": "created_at",
-          "type": "timestamp",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        },
-        "updated_by": {
-          "name": "updated_by",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "updated_at": {
-          "name": "updated_at",
-          "type": "timestamp",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        }
-      },
-      "indexes": {
-        "idx_fleet_equipment_code": {
-          "name": "idx_fleet_equipment_code",
-          "columns": [
-            {
-              "expression": "fleet_equipment_code",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "idx_fleet_maker_code": {
-          "name": "idx_fleet_maker_code",
-          "columns": [
-            {
-              "expression": "maker_code",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "idx_fleet_model_code": {
-          "name": "idx_fleet_model_code",
-          "columns": [
-            {
-              "expression": "model_code",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        }
-      },
-      "foreignKeys": {},
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {
-        "fleet_equipment_master_fleet_equipment_code_unique": {
-          "name": "fleet_equipment_master_fleet_equipment_code_unique",
-          "nullsNotDistinct": false,
-          "columns": [
-            "fleet_equipment_code"
-          ]
-        }
-      },
-      "policies": {},
-      "checkConstraints": {},
-      "isRLSEnabled": false
-    },
     "public.fleet_job_vessel_mapping": {
       "name": "fleet_job_vessel_mapping",
       "schema": "",
@@ -5017,6 +4858,273 @@
           "columns": [
             "job_code",
             "vessel_code"
+          ]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.fleet_jobs": {
+      "name": "fleet_jobs",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "integer",
+          "primaryKey": true,
+          "notNull": true,
+          "identity": {
+            "type": "byDefault",
+            "name": "fleet_jobs_id_seq",
+            "schema": "public",
+            "increment": "1",
+            "startWith": "1",
+            "minValue": "1",
+            "maxValue": "2147483647",
+            "cache": "1",
+            "cycle": false
+          }
+        },
+        "fleet_jobs_uuid": {
+          "name": "fleet_jobs_uuid",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "default": "gen_random_uuid()"
+        },
+        "job_code": {
+          "name": "job_code",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "fleet_equipment_code": {
+          "name": "fleet_equipment_code",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "fleet_equipment_name": {
+          "name": "fleet_equipment_name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "wo_title": {
+          "name": "wo_title",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "maintenance_basis": {
+          "name": "maintenance_basis",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "interval_value": {
+          "name": "interval_value",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "unit": {
+          "name": "unit",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "task_type": {
+          "name": "task_type",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "assigned_to": {
+          "name": "assigned_to",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "approver": {
+          "name": "approver",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "job_priority": {
+          "name": "job_priority",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "class_related": {
+          "name": "class_related",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "brief_work_description": {
+          "name": "brief_work_description",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "department": {
+          "name": "department",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "criticality": {
+          "name": "criticality",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "is_active": {
+          "name": "is_active",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": true
+        },
+        "required_spare_parts": {
+          "name": "required_spare_parts",
+          "type": "json",
+          "primaryKey": false,
+          "notNull": false,
+          "default": "'[]'::json"
+        },
+        "required_tools": {
+          "name": "required_tools",
+          "type": "json",
+          "primaryKey": false,
+          "notNull": false,
+          "default": "'[]'::json"
+        },
+        "ppe_requirements": {
+          "name": "ppe_requirements",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "permit_requirements": {
+          "name": "permit_requirements",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "other_safety_requirements": {
+          "name": "other_safety_requirements",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "sort_order": {
+          "name": "sort_order",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "default": 0
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "created_by_uuid": {
+          "name": "created_by_uuid",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "updated_by_uuid": {
+          "name": "updated_by_uuid",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "is_deleted": {
+          "name": "is_deleted",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": false,
+          "default": false
+        },
+        "is_sync": {
+          "name": "is_sync",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": false,
+          "default": false
+        }
+      },
+      "indexes": {
+        "idx_fleet_jobs_code": {
+          "name": "idx_fleet_jobs_code",
+          "columns": [
+            {
+              "expression": "job_code",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "idx_fleet_jobs_equipment": {
+          "name": "idx_fleet_jobs_equipment",
+          "columns": [
+            {
+              "expression": "fleet_equipment_code",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "idx_fleet_jobs_uuid": {
+          "name": "idx_fleet_jobs_uuid",
+          "columns": [
+            {
+              "expression": "fleet_jobs_uuid",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "fleet_jobs_job_code_unique": {
+          "name": "fleet_jobs_job_code_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "job_code"
           ]
         }
       },
@@ -7839,138 +7947,6 @@
       "checkConstraints": {},
       "isRLSEnabled": false
     },
-    "public.report_snapshots": {
-      "name": "report_snapshots",
-      "schema": "",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "integer",
-          "primaryKey": true,
-          "notNull": true,
-          "identity": {
-            "type": "byDefault",
-            "name": "report_snapshots_id_seq",
-            "schema": "public",
-            "increment": "1",
-            "startWith": "1",
-            "minValue": "1",
-            "maxValue": "2147483647",
-            "cache": "1",
-            "cycle": false
-          }
-        },
-        "vessel_id": {
-          "name": "vessel_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "report_type": {
-          "name": "report_type",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "export_format": {
-          "name": "export_format",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "generated_at": {
-          "name": "generated_at",
-          "type": "timestamp",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        },
-        "generated_by": {
-          "name": "generated_by",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "item_count": {
-          "name": "item_count",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "default": 0
-        },
-        "filters_applied": {
-          "name": "filters_applied",
-          "type": "jsonb",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "summary_data": {
-          "name": "summary_data",
-          "type": "jsonb",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "items_data": {
-          "name": "items_data",
-          "type": "jsonb",
-          "primaryKey": false,
-          "notNull": true
-        }
-      },
-      "indexes": {
-        "idx_report_snapshots_vessel": {
-          "name": "idx_report_snapshots_vessel",
-          "columns": [
-            {
-              "expression": "vessel_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "idx_report_snapshots_type": {
-          "name": "idx_report_snapshots_type",
-          "columns": [
-            {
-              "expression": "report_type",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "idx_report_snapshots_date": {
-          "name": "idx_report_snapshots_date",
-          "columns": [
-            {
-              "expression": "generated_at",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        }
-      },
-      "foreignKeys": {},
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
-      "policies": {},
-      "checkConstraints": {},
-      "isRLSEnabled": false
-    },
     "public.running_hours_audit": {
       "name": "running_hours_audit",
       "schema": "",
@@ -9777,102 +9753,6 @@
           "notNull": false,
           "default": "'None'"
         },
-        "manufacture_date": {
-          "name": "manufacture_date",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "expiry_date": {
-          "name": "expiry_date",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "batch_number": {
-          "name": "batch_number",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "lot_number": {
-          "name": "lot_number",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "shelf_life_months": {
-          "name": "shelf_life_months",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "sds_reference": {
-          "name": "sds_reference",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "sds_document_url": {
-          "name": "sds_document_url",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "sds_last_updated": {
-          "name": "sds_last_updated",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "hazard_classification": {
-          "name": "hazard_classification",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "un_number": {
-          "name": "un_number",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "flash_point": {
-          "name": "flash_point",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "storage_temp_min": {
-          "name": "storage_temp_min",
-          "type": "numeric(5, 2)",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "storage_temp_max": {
-          "name": "storage_temp_max",
-          "type": "numeric(5, 2)",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "disposal_instructions": {
-          "name": "disposal_instructions",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "ppe_requirements": {
-          "name": "ppe_requirements",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "emergency_contact": {
-          "name": "emergency_contact",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
         "remarks": {
           "name": "remarks",
           "type": "text",
@@ -9980,51 +9860,6 @@
           "columns": [
             {
               "expression": "deleted",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "idx_stores_expiry_date": {
-          "name": "idx_stores_expiry_date",
-          "columns": [
-            {
-              "expression": "expiry_date",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "idx_stores_hazard_class": {
-          "name": "idx_stores_hazard_class",
-          "columns": [
-            {
-              "expression": "hazard_classification",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "idx_stores_batch_number": {
-          "name": "idx_stores_batch_number",
-          "columns": [
-            {
-              "expression": "batch_number",
               "isExpression": false,
               "asc": true,
               "nulls": "last"

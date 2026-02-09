@@ -956,7 +956,6 @@ Master data management for fleet-wide configuration including equipment manufact
 |-------|---------|
 | `makers` | Equipment manufacturer registry |
 | `master_lists` | Dropdown option management |
-| `fleet_equipment_master` | Normalized fleet equipment registry |
 
 ### Relationships Inside Module
 
@@ -976,7 +975,6 @@ No direct FK relationships - lookup tables.
 |----------|-----------------|
 | `makers[]` | `makers.*` |
 | `masterLists[]` | `master_lists.*` |
-| `fleetEquipmentMaster[]` | `fleet_equipment_master.*` |
 
 ### Transaction Boundaries
 
@@ -1393,8 +1391,7 @@ No JSONB fields - fully normalized.
 | 35 | `form_version_usage` | Form Engine | - |
 | 36 | `makers` | Fleet Admin | Components, Spares |
 | 37 | `master_lists` | Fleet Admin | All modules (dropdowns) |
-| 38 | `fleet_equipment_master` | Fleet Admin | Components |
-| 39 | `maker_list` | Master Data | Components, Spares |
+| 38 | `maker_list` | Master Data | Components, Spares |
 | 40 | `sfi_details` | Master Data | Components |
 | 41 | `master_data` | Master Data | Fleet Mappings |
 | 42 | `fleet_vessel_mapping` | Fleet Sync | Vessels |
@@ -1484,7 +1481,7 @@ No JSONB fields - fully normalized.
         ▼
 ┌───────────────────────────────────────────────────────────────────────────────────────────────────┐
 │                                        MASTER DATA                                                │
-│           master_data ◄─── sfi_details, maker_list, makers, fleet_equipment_master               │
+│           master_data ◄─── sfi_details, maker_list, makers                                       │
 └───────────────────────────────────────────────────────────────────────────────────────────────────┘
 
 

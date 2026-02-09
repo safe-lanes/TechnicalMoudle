@@ -1487,36 +1487,6 @@ export const insertMasterListSchema = createInsertSchema(masterLists).omit({
 export type InsertMasterList = z.infer<typeof insertMasterListSchema>;
 export type MasterList = typeof masterLists.$inferSelect;
 
-// Fleet Equipment Master Table - Normalized master data for fleet equipment
-export const fleetEquipmentMaster = pgTable("fleet_equipment_master", {
-  id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
-  fleetEquipmentCode: text("fleet_equipment_code").notNull().unique(), // Unique identifier (XXX.XXX.XX format)
-  fleetEquipmentName: text("fleet_equipment_name").notNull(), // General name from SFI booklet
-  maker: text("maker"), // Manufacturer name
-  makerCode: text("maker_code"), // Unique code for maker
-  model: text("model"), // Equipment model
-  modelCode: text("model_code"), // Combination of Maker Code + Model
-  description: text("description"), // Additional description
-  isActive: boolean("is_active").notNull().default(true),
-  createdBy: text("created_by").notNull(),
-  createdAt: timestamp("created_at").notNull().defaultNow(),
-  updatedBy: text("updated_by"),
-  updatedAt: timestamp("updated_at").notNull().defaultNow(),
-}, (table) => ({
-  fleetEquipmentCodeIdx: index("idx_fleet_equipment_code").on(table.fleetEquipmentCode),
-  makerCodeIdx: index("idx_fleet_maker_code").on(table.makerCode),
-  modelCodeIdx: index("idx_fleet_model_code").on(table.modelCode),
-}));
-
-export const insertFleetEquipmentMasterSchema = createInsertSchema(fleetEquipmentMaster).omit({
-  id: true,
-  createdAt: true,
-  updatedAt: true,
-});
-
-export type InsertFleetEquipmentMaster = z.infer<typeof insertFleetEquipmentMasterSchema>;
-export type FleetEquipmentMaster = typeof fleetEquipmentMaster.$inferSelect;
-
 // Component Running Hours Log - Detailed audit trail for all running hours updates
 export const componentRunningHoursLog = pgTable("component_running_hours_log", {
   id: integer("id").primaryKey().generatedByDefaultAsIdentity(),

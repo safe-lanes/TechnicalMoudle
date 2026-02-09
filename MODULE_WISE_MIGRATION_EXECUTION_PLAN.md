@@ -421,7 +421,6 @@ CREATE UNIQUE INDEX idx_users_username ON users(username);
 |-------|---------|--------------|
 | `makers` | Manufacturer registry | ~100-500 |
 | `master_lists` | Dropdown/lookup values | ~50-200 |
-| `fleet_equipment_master` | Fleet equipment templates | ~50-500 |
 | `maker_list` | Alternative maker registry | ~50-500 |
 | `sfi_details` | SFI classification codes | ~1000-5000 |
 | `master_data` | Equipment code generation | ~100-1000 |
@@ -431,7 +430,6 @@ CREATE UNIQUE INDEX idx_users_username ON users(username);
 ```
 makers (standalone)
 master_lists (standalone)
-fleet_equipment_master (standalone, references maker_code)
 maker_list (standalone)
 sfi_details (standalone)
 master_data (standalone)
@@ -443,7 +441,6 @@ master_data (standalone)
 |-----------|--------------|
 | `data.makers[]` | `makers.*` (array format) |
 | `data.masterLists[]` | `master_lists.*` (array format) |
-| `data.fleetEquipmentMaster[id]` | `fleet_equipment_master.*` |
 | `data.makersList[id]` | `maker_list.*` |
 | `data.sfiDetailsList[id]` | `sfi_details.*` |
 | `data.masterDataList[id]` | `master_data.*` |
@@ -488,7 +485,6 @@ async getSfiDetailsList(): Promise<SfiDetails[]> {
 CREATE INDEX idx_master_lists_vessel ON master_lists(vessel_id);
 CREATE INDEX idx_master_lists_type ON master_lists(list_type);
 CREATE INDEX idx_sfi_details_code ON sfi_details(sfi_code);
-CREATE INDEX idx_fleet_equipment_code ON fleet_equipment_master(equipment_code);
 ```
 
 ---

@@ -92,6 +92,13 @@
       "when": 1770378455947,
       "tag": "0012_auto_2026-02-06T11-47-34",
       "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "7",
+      "when": 1770612338223,
+      "tag": "0013_drop_fleet_equipment_master",
+      "breakpoints": true
     }
   ]
 }

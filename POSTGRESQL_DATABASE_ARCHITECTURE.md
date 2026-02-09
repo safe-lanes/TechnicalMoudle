@@ -147,7 +147,7 @@ The schema already defines all 50 tables with:
 | **Forms** | form_definitions, form_versions, form_version_usage | Dynamic forms |
 | **Change Requests** | change_request, change_request_attachment, change_request_comment | Modify PMS workflow |
 | **IHM** | ihm_items, ihm_maintenance_log | Hazardous materials inventory |
-| **Fleet Admin** | makers, master_lists, fleet_equipment_master, maker_list, sfi_details, master_data | Master data management |
+| **Fleet Admin** | makers, master_lists, maker_list, sfi_details, master_data | Master data management |
 | **Fleet Mappings** | fleet_vessel_mapping, fleet_component_mapping, fleet_job_vessel_mapping, fleet_spare_vessel_mapping | Fleet-to-vessel data sync |
 | **Import** | import_history, import_change_log, bulk_import_history, bulk_import_errors | Data import tracking |
 | **Audit** | audit_log | System-wide audit trail |
@@ -697,7 +697,6 @@ CREATE INDEX idx_component_date ON running_hours_audit(component_id, date_update
 | `pms_vessel_settings` | vessel_id, lead times, grace periods | → vessels |
 | `makers` | maker_code, maker_name | - |
 | `master_lists` | list_type, list_key, list_value | - |
-| `fleet_equipment_master` | fleet_equipment_code | - |
 | `maker_list` | code, name | - |
 | `sfi_details` | sfi_code, description | - |
 | `master_data` | category, code, value | - |

@@ -317,7 +317,7 @@ spares_history, stores_ledger, stores_items, change_request, change_request_atta
 change_request_comment, alert_policies, alert_events, alert_deliveries, alert_config,
 jobs, work_orders, work_order_executions, defects, defect_actions, defect_attachments,
 recurring_defects, recurring_defect_links, import_history, import_change_log, makers,
-master_lists, fleet_equipment_master, component_running_hours_log, audit_log,
+master_lists, component_running_hours_log, audit_log,
 component_documents, component_class_regulatory, component_maintenance_history,
 component_requisitions, pms_vessel_settings, maker_list, sfi_details, master_data,
 fleet_vessel_mapping, fleet_component_mapping, fleet_job_vessel_mapping,
