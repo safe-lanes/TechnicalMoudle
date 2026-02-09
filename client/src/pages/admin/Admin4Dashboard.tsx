@@ -86,8 +86,6 @@ export default function Admin4Dashboard() {
             <ArrowLeft className="h-4 w-4 mr-2" />
             Back to Dashboard
           </Button>
-          <div className="h-6 w-px bg-gray-300" />
-          <h1 className="text-xl font-semibold text-gray-900">Maker Management</h1>
         </div>
         <MakerManagement />
       </div>
@@ -107,8 +105,6 @@ export default function Admin4Dashboard() {
             <ArrowLeft className="h-4 w-4 mr-2" />
             Back to Dashboard
           </Button>
-          <div className="h-6 w-px bg-gray-300" />
-          <h1 className="text-xl font-semibold text-gray-900">Master Lists Management</h1>
         </div>
         <MasterListsManagement />
       </div>
@@ -128,8 +124,6 @@ export default function Admin4Dashboard() {
             <ArrowLeft className="h-4 w-4 mr-2" />
             Back to Dashboard
           </Button>
-          <div className="h-6 w-px bg-gray-300" />
-          <h1 className="text-xl font-semibold text-gray-900">Fleet Equipment Code Master Data</h1>
         </div>
         <MasterDataManagement />
       </div>
@@ -149,8 +143,6 @@ export default function Admin4Dashboard() {
             <ArrowLeft className="h-4 w-4 mr-2" />
             Back to Dashboard
           </Button>
-          <div className="h-6 w-px bg-gray-300" />
-          <h1 className="text-xl font-semibold text-gray-900">Master Data</h1>
         </div>
         <MasterDataTableView />
       </div>
@@ -172,8 +164,6 @@ export default function Admin4Dashboard() {
             <ArrowLeft className="h-4 w-4 mr-2" />
             Back to Dashboard
           </Button>
-          <div className="h-5 w-px bg-gray-300" />
-          <h1 className="text-lg font-semibold text-gray-800" data-testid="I4.QL.3.7"><Marker id="I4.QL.3.7" />Fleet Components Management</h1>
         </div>
         <FleetComponentsManagement />
       </div>
@@ -194,8 +184,6 @@ export default function Admin4Dashboard() {
             <ArrowLeft className="h-4 w-4 mr-2" />
             Back to Dashboard
           </Button>
-          <div className="h-6 w-px bg-gray-300" />
-          <h1 className="text-xl font-semibold text-gray-900" data-testid="I4.QL.4.7"><Marker id="I4.QL.4.7" />Fleet Jobs Management</h1>
         </div>
         <FleetJobsManagement />
       </div>
@@ -216,8 +204,6 @@ export default function Admin4Dashboard() {
             <ArrowLeft className="h-4 w-4 mr-2" />
             Back to Dashboard
           </Button>
-          <div className="h-6 w-px bg-gray-300" />
-          <h1 className="text-xl font-semibold text-gray-900" data-testid="I4.QL5.5.7"><Marker id="I4.QL5.5.7" />Fleet Spares Management</h1>
         </div>
         <FleetSparesManagement />
       </div>
@@ -237,8 +223,6 @@ export default function Admin4Dashboard() {
             <ArrowLeft className="h-4 w-4 mr-2" />
             Back to Dashboard
           </Button>
-          <div className="h-6 w-px bg-gray-300" />
-          <h1 className="text-xl font-semibold text-gray-900">Fleet Vessel Mapping</h1>
         </div>
         <FleetVesselMapping />
       </div>
@@ -258,8 +242,6 @@ export default function Admin4Dashboard() {
             <ArrowLeft className="h-4 w-4 mr-2" />
             Back to Dashboard
           </Button>
-          <div className="h-6 w-px bg-gray-300" />
-          <h1 className="text-xl font-semibold text-gray-900">Lead Time & Grace Period Settings</h1>
         </div>
         <PmsVesselSettingsManagement />
       </div>
@@ -279,8 +261,6 @@ export default function Admin4Dashboard() {
             <ArrowLeft className="h-4 w-4 mr-2" />
             Back to Dashboard
           </Button>
-          <div className="h-6 w-px bg-gray-300" />
-          <h1 className="text-xl font-semibold text-gray-900">Fleet Equipment Data Tree View</h1>
         </div>
         <FleetEquipmentTreeView />
       </div>
@@ -300,8 +280,6 @@ export default function Admin4Dashboard() {
             <ArrowLeft className="h-4 w-4 mr-2" />
             Back to Dashboard
           </Button>
-          <div className="h-6 w-px bg-gray-300" />
-          <h1 className="text-xl font-semibold text-gray-900">Fleet & Vessel Manager</h1>
         </div>
         <FleetVesselManager />
       </div>
@@ -321,8 +299,6 @@ export default function Admin4Dashboard() {
             <ArrowLeft className="h-4 w-4 mr-2" />
             Back to Dashboard
           </Button>
-          <div className="h-6 w-px bg-gray-300" />
-          <h1 className="text-xl font-semibold text-gray-900">Fleet Data</h1>
         </div>
         <FleetDataView />
       </div>
