@@ -1,5 +1,5 @@
 
-import { pgTable, text, integer, boolean, timestamp, decimal, index, json, jsonb, numeric, primaryKey, unique, pgEnum } from "drizzle-orm/pg-core";
+import { pgTable, text, integer, boolean, timestamp, decimal, index, uniqueIndex, json, jsonb, numeric, primaryKey, unique, pgEnum } from "drizzle-orm/pg-core";
 import { sql } from "drizzle-orm";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
@@ -1815,7 +1815,7 @@ export const fleetComponents = pgTable("fleet_components", {
 }, (table) => ({
   fleetEquipmentCodeIdx: index("idx_fleet_components_code").on(table.fleetEquipmentCode),
   parentCodeIdx: index("idx_fleet_components_parent").on(table.parentFleetEquipmentCode),
-  fleetComponentsUuidIdx: index("idx_fleet_components_uuid").on(table.fleetComponentsUuid),
+  fleetComponentsUuidIdx: uniqueIndex("idx_fleet_components_uuid").on(table.fleetComponentsUuid),
   makerCodeIdx: index("idx_fleet_components_maker").on(table.makerCode),
 }));
 
@@ -1868,7 +1868,7 @@ export const fleetJobs = pgTable("fleet_jobs", {
 }, (table) => ({
   jobCodeIdx: index("idx_fleet_jobs_code").on(table.jobCode),
   fleetEquipmentCodeIdx: index("idx_fleet_jobs_equipment").on(table.fleetEquipmentCode),
-  fleetJobsUuidIdx: index("idx_fleet_jobs_uuid").on(table.fleetJobsUuid),
+  fleetJobsUuidIdx: uniqueIndex("idx_fleet_jobs_uuid").on(table.fleetJobsUuid),
 }));
 
 export const insertFleetJobsSchema = createInsertSchema(fleetJobs).omit({
