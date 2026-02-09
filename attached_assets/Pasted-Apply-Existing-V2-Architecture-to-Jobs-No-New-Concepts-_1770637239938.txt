@@ -1,0 +1,120 @@
+Apply Existing V2 Architecture to Jobs (No New Concepts)
+Objective
+
+Analyze the existing Jobs implementation and produce a clear plan to apply the same V2 modular architecture, rules, and toggle behavior that are already defined for:
+
+Component module
+
+Common Bulk Upload APIs
+
+⚠️ Planning and analysis only
+❌ Do not implement code
+❌ Do not change existing behavior
+❌ Do not introduce new patterns or concepts
+
+🔒 Legacy Preservation Rule (NON-NEGOTIABLE)
+
+All legacy Jobs logic must remain exactly as it is
+
+No changes to:
+
+Job logic
+
+Triggers
+
+Scheduling
+
+Data
+
+Legacy Jobs and V2 Jobs must run in parallel
+
+V2 must not import or call legacy Jobs code
+
+🔁 Core Rule
+
+Apply the same V2 architecture rules that already exist.
+
+Same folder structure philosophy
+
+Same repository / service / controller separation
+
+Same schema rules
+
+Same toggle behavior
+
+Same routing isolation
+
+Same rollback guarantees
+
+No deviations.
+
+📦 Scope (STRICT)
+
+Only analyze:
+
+How existing Jobs map into the current V2 structure
+
+How Jobs are separated under /api/v2
+
+How the existing toggle decides:
+
+Legacy Jobs OR
+
+V2 Jobs
+
+❌ Do not design new job systems
+❌ Do not add new abstractions
+
+🔁 Toggle Behavior (Same as Existing V2)
+
+When V2 toggle is ON:
+
+Job triggers must route to V2 Jobs
+
+When V2 toggle is OFF:
+
+Job triggers must route to legacy Jobs
+
+❌ No mixed execution
+❌ No per-job toggle
+
+🛣️ Backend Route Separation (Same Rules)
+
+Legacy job routes remain unchanged
+
+V2 job routes live strictly under:
+
+/technical/api/api/v2/...
+
+
+No shared routes or controllers
+
+No collision with legacy routes
+
+🧩 Logic Handling Rule (Same as V2)
+
+Job logic must be rewritten inside V2, not reused
+
+❌ No importing legacy job methods
+
+Behavior and outcomes must remain identical
+
+🔙 Rollback (Same as V2)
+
+Toggle OFF → immediate fallback to legacy Jobs
+
+No data loss
+
+No duplicate executions
+
+🎯 Expected Output
+
+Provide:
+
+Mapping of Legacy Jobs → V2 Jobs
+
+Toggle-based execution flow
+
+Route separation explanation
+
+Risk points & rollback validation
