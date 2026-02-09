@@ -2978,31 +2978,34 @@ async function validateData(type: string, data: any[], mode: string, vesselId?: 
     });
   }
 
-  // Track duplicate Part Codes for fleet-spares (case-insensitive)
-  const fleetSparePartCodeOccurrences = new Map<string, number[]>();
-  const existingDbFleetSparePartCodes = new Set<string>();
+  // Track duplicate Fleet Spares by composite key (Part Code + Fleet Equipment Code) - case-insensitive
+  // The same Part Code can legitimately appear under different Fleet Equipment Codes
+  const fleetSpareCompositeOccurrences = new Map<string, number[]>();
+  const existingDbFleetSpareCompositeKeys = new Set<string>();
   
   if (type === 'fleet-spares') {
     try {
       const existingFleetSpares = await storage.getFleetSparesFromTable();
       existingFleetSpares.forEach((fs: any) => {
-        if (fs.partCode) {
-          existingDbFleetSparePartCodes.add(fs.partCode.toUpperCase());
+        if (fs.partCode && fs.fleetEquipmentCode) {
+          const compositeKey = `${fs.partCode.toUpperCase()}|${fs.fleetEquipmentCode.toUpperCase()}`;
+          existingDbFleetSpareCompositeKeys.add(compositeKey);
         }
       });
-      console.log(`📋 Loaded ${existingDbFleetSparePartCodes.size} existing fleet spare part codes from database`);
+      console.log(`📋 Loaded ${existingDbFleetSpareCompositeKeys.size} existing fleet spare composite keys from database`);
     } catch (err) {
-      console.warn('⚠️ Could not load existing fleet spare part codes:', err);
+      console.warn('⚠️ Could not load existing fleet spare composite keys:', err);
     }
     
     filteredData.forEach((row: any, index: number) => {
       const partCode = row['Part Code'];
-      if (partCode) {
-        const code = String(partCode).trim().toUpperCase();
-        if (!fleetSparePartCodeOccurrences.has(code)) {
-          fleetSparePartCodeOccurrences.set(code, []);
+      const equipCode = row['Fleet Equipment Code'];
+      if (partCode && equipCode) {
+        const compositeKey = `${String(partCode).trim().toUpperCase()}|${String(equipCode).trim().toUpperCase()}`;
+        if (!fleetSpareCompositeOccurrences.has(compositeKey)) {
+          fleetSpareCompositeOccurrences.set(compositeKey, []);
         }
-        fleetSparePartCodeOccurrences.get(code)!.push(index + 2);
+        fleetSpareCompositeOccurrences.get(compositeKey)!.push(index + 2);
       }
     });
   }
@@ -4135,7 +4138,7 @@ async function validateData(type: string, data: any[], mode: string, vesselId?: 
       // Validate fleet-spares - matches fleet_spares database schema
       // 18 columns from Fleet Spares Import Template
       
-      // Part Code - required and unique
+      // Part Code - required (unique per Fleet Equipment Code, not globally unique)
       const partCode = row['Part Code'];
       if (partCode === undefined || partCode === null || String(partCode).trim() === '') {
         errors.push(`Row ${rowNum}: Part Code is required`);
@@ -4144,21 +4147,29 @@ async function validateData(type: string, data: any[], mode: string, vesselId?: 
         normalized['Part Code'] = codeStr;
         const codeUpperCase = codeStr.toUpperCase();
         
-        const occurrences = fleetSparePartCodeOccurrences.get(codeUpperCase);
-        if (occurrences && occurrences.length > 1) {
-          const firstOccurrence = occurrences[0];
-          if (rowNum !== firstOccurrence) {
-            errors.push(`Row ${rowNum}: Duplicate Part Code '${codeStr}' - this code already appears in row ${firstOccurrence}. Each Part Code must be unique.`);
-          }
-        }
+        const rawEqCode = row['Fleet Equipment Code'];
+        const hasEquipCode = rawEqCode !== undefined && rawEqCode !== null && String(rawEqCode).trim() !== '';
         
-        if (existingDbFleetSparePartCodes.has(codeUpperCase)) {
-          if (mode === 'add') {
-            errors.push(`Row ${rowNum}: Part Code '${codeStr}' already exists in database. Use 'Update' or 'Upsert' mode to modify existing records.`);
+        if (hasEquipCode) {
+          const fleetEqCodeForCheck = String(rawEqCode).trim().toUpperCase();
+          const compositeKey = `${codeUpperCase}|${fleetEqCodeForCheck}`;
+          
+          const occurrences = fleetSpareCompositeOccurrences.get(compositeKey);
+          if (occurrences && occurrences.length > 1) {
+            const firstOccurrence = occurrences[0];
+            if (rowNum !== firstOccurrence) {
+              errors.push(`Row ${rowNum}: Duplicate Part Code '${codeStr}' with same Fleet Equipment Code '${String(rawEqCode).trim()}' - this combination already appears in row ${firstOccurrence}.`);
+            }
           }
-        } else {
-          if (mode === 'update') {
-            errors.push(`Row ${rowNum}: Part Code '${codeStr}' does not exist in database. Use 'Add' or 'Upsert' mode to create new records.`);
+          
+          if (existingDbFleetSpareCompositeKeys.has(compositeKey)) {
+            if (mode === 'add') {
+              errors.push(`Row ${rowNum}: Part Code '${codeStr}' with Fleet Equipment Code '${String(rawEqCode).trim()}' already exists in database. Use 'Update' or 'Upsert' mode to modify existing records.`);
+            }
+          } else {
+            if (mode === 'update') {
+              errors.push(`Row ${rowNum}: Part Code '${codeStr}' with Fleet Equipment Code '${String(rawEqCode).trim()}' does not exist in database. Use 'Add' or 'Upsert' mode to create new records.`);
+            }
           }
         }
       }
@@ -6133,8 +6144,11 @@ async function performImport(
     console.log(`🚀 Starting fleet-spares import: ${data.length} rows, mode: ${mode}`);
     
     const existingFleetSpares = await storage.getFleetSparesFromTable();
-    const fleetSparesByCode = new Map(existingFleetSpares.map((fs: any) => [fs.partCode, fs]));
-    console.log(`📦 Prefetched ${existingFleetSpares.length} existing fleet spares`);
+    const fleetSparesByCompositeKey = new Map(existingFleetSpares.map((fs: any) => {
+      const compositeKey = `${(fs.partCode || '').toUpperCase()}|${(fs.fleetEquipmentCode || '').toUpperCase()}`;
+      return [compositeKey, fs];
+    }));
+    console.log(`📦 Prefetched ${existingFleetSpares.length} existing fleet spares (${fleetSparesByCompositeKey.size} unique composite keys)`);
     
     const existingFleetComponents = await storage.getFleetComponents();
     const fleetComponentsByCode = new Map(existingFleetComponents.map((fc: any) => [fc.fleetEquipmentCode, fc]));
@@ -6207,37 +6221,38 @@ async function performImport(
         evidenceType: evidenceType ? String(evidenceType).trim() : null,
       };
       
-      const existingFleetSpare = fleetSparesByCode.get(String(partCode).trim());
+      const compositeKey = `${String(partCode).trim().toUpperCase()}|${String(fleetEquipmentCode).trim().toUpperCase()}`;
+      const existingFleetSpare = fleetSparesByCompositeKey.get(compositeKey);
       
       if (mode === 'add') {
         if (existingFleetSpare) {
-          console.log(`⏭️ Skipping existing fleet spare: ${partCode}`);
+          console.log(`⏭️ Skipping existing fleet spare: ${partCode} (equipment: ${fleetEquipmentCode})`);
           result.skipped++;
         } else {
           const newFleetSpare = await storage.createFleetSpareInTable(fleetSpareData);
-          fleetSparesByCode.set(String(partCode).trim(), newFleetSpare);
+          fleetSparesByCompositeKey.set(compositeKey, newFleetSpare);
           result.created++;
-          console.log(`✅ Created fleet spare: ${partCode} - ${partName} (component: ${fleetComponentsUuid})`);
+          console.log(`✅ Created fleet spare: ${partCode} - ${partName} (equipment: ${fleetEquipmentCode}, component: ${fleetComponentsUuid})`);
         }
       } else if (mode === 'update') {
         if (existingFleetSpare) {
           await storage.updateFleetSpareInTable(existingFleetSpare.id, fleetSpareData);
           result.updated++;
-          console.log(`🔄 Updated fleet spare: ${partCode} - ${partName} (component: ${fleetComponentsUuid})`);
+          console.log(`🔄 Updated fleet spare: ${partCode} - ${partName} (equipment: ${fleetEquipmentCode}, component: ${fleetComponentsUuid})`);
         } else {
-          console.log(`⏭️ Skipping non-existent fleet spare (update mode): ${partCode}`);
+          console.log(`⏭️ Skipping non-existent fleet spare (update mode): ${partCode} (equipment: ${fleetEquipmentCode})`);
           result.skipped++;
         }
       } else if (mode === 'upsert') {
         if (existingFleetSpare) {
           await storage.updateFleetSpareInTable(existingFleetSpare.id, fleetSpareData);
           result.updated++;
-          console.log(`🔄 Updated fleet spare: ${partCode} - ${partName} (component: ${fleetComponentsUuid})`);
+          console.log(`🔄 Updated fleet spare: ${partCode} - ${partName} (equipment: ${fleetEquipmentCode}, component: ${fleetComponentsUuid})`);
         } else {
           const newFleetSpare = await storage.createFleetSpareInTable(fleetSpareData);
-          fleetSparesByCode.set(String(partCode).trim(), newFleetSpare);
+          fleetSparesByCompositeKey.set(compositeKey, newFleetSpare);
           result.created++;
-          console.log(`✅ Created fleet spare: ${partCode} - ${partName} (component: ${fleetComponentsUuid})`);
+          console.log(`✅ Created fleet spare: ${partCode} - ${partName} (equipment: ${fleetEquipmentCode}, component: ${fleetComponentsUuid})`);
         }
       }
     }
