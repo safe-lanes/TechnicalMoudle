@@ -43,6 +43,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.use('/technical/api', mockAuthMiddleware);
   console.log('🔒 Mock authentication enabled for /technical/api/* routes');
   
+  // Register V2 Component Module routes (additive — legacy routes remain unchanged)
+  const { createV2ComponentModule } = await import("./v2/components/index");
+  const v2Components = createV2ComponentModule();
+  app.use('/technical/api/v2/components', v2Components.router);
+  console.log('V2 Component module registered at /technical/api/v2/components/component/*');
+
   // Documentation download endpoint
   app.get("/download/docs/:filename", (req, res) => {
     const filename = req.params.filename;
