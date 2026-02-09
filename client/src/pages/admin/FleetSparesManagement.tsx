@@ -236,7 +236,8 @@ export default function FleetSparesManagement() {
                   <TableRow className="bg-gray-50 border-b border-gray-200">
                     <TableHead className="text-xs font-semibold text-gray-600 uppercase tracking-wider py-3" data-testid="I4.QL5.5.15"><Marker id="I4.QL5.5.15" />Part Code</TableHead>
                     <TableHead className="text-xs font-semibold text-gray-600 uppercase tracking-wider py-3" data-testid="I4.QL5.5.16"><Marker id="I4.QL5.5.16" />Part Name</TableHead>
-                    <TableHead className="text-xs font-semibold text-gray-600 uppercase tracking-wider py-3" data-testid="I4.QL5.5.17"><Marker id="I4.QL5.5.17" />Equipment</TableHead>
+                    <TableHead className="text-xs font-semibold text-gray-600 uppercase tracking-wider py-3" data-testid="I4.QL5.5.17"><Marker id="I4.QL5.5.17" />Fleet Equipment Code</TableHead>
+                    <TableHead className="text-xs font-semibold text-gray-600 uppercase tracking-wider py-3" data-testid="I4.QL5.5.fleet-eq-name">Fleet Equipment Name</TableHead>
                     <TableHead className="text-xs font-semibold text-gray-600 uppercase tracking-wider py-3" data-testid="I4.QL5.5.18"><Marker id="I4.QL5.5.18" />Maker Reference</TableHead>
                     <TableHead className="text-xs font-semibold text-gray-600 uppercase tracking-wider py-3" data-testid="I4.QL5.5.19"><Marker id="I4.QL5.5.19" />Unit</TableHead>
                     <TableHead className="text-xs font-semibold text-gray-600 uppercase tracking-wider py-3" data-testid="I4.QL5.5.20"><Marker id="I4.QL5.5.20" />Location</TableHead>
@@ -257,9 +258,12 @@ export default function FleetSparesManagement() {
                           {isFirstRow && <Marker id="I4.QL5.5.23" />}
                           {spare.partName}
                         </TableCell>
-                        <TableCell className="text-sm" data-testid={isFirstRow ? "I4.QL5.5.24" : undefined}>
+                        <TableCell className="font-mono text-sm" data-testid={isFirstRow ? "I4.QL5.5.24" : undefined}>
                           {isFirstRow && <Marker id="I4.QL5.5.24" />}
-                          {equipment ? `${equipment.fleetEquipmentCode} - ${equipment.fleetEquipmentName}` : spare.fleetEquipmentCode || "-"}
+                          {spare.fleetEquipmentCode || "-"}
+                        </TableCell>
+                        <TableCell className="text-sm" data-testid={isFirstRow ? "I4.QL5.5.fleet-eq-name-val" : undefined}>
+                          {equipment?.fleetEquipmentName || "-"}
                         </TableCell>
                         <TableCell className="text-sm" data-testid={isFirstRow ? "I4.QL5.5.25" : undefined}>
                           {isFirstRow && <Marker id="I4.QL5.5.25" />}
