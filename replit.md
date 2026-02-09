@@ -75,13 +75,14 @@ The application employs a modern full-stack architecture with a mobile-first, re
 
 ## V2 Architecture Planning (Component Module)
 A detailed V2 modular architecture plan has been documented at `docs/V2-Component-Module-Refactor-Plan.md`. Key decisions:
+- **Purely Architectural**: V2 uses 100% the same business rules, validations, and data as legacy. No functional rewrite.
 - **V2 Namespace**: All V2 code lives under `server/v2/`, `shared/v2/`, and `client/src/modules/` — legacy code stays untouched.
-- **V2 Schema**: Uses `serial` PK (internal) + `component_uuid` (external), 7 mandatory audit columns (`sort_order`, `created_at`, `updated_at`, `created_by_uuid`, `updated_by_uuid`, `is_deleted`, `is_sync`), all dates as `text`, no JSON columns.
-- **Layer Separation**: Repository (DB only) → Service (business logic, audit user injection) → Controller (HTTP concerns, Zod validation) → Routes (RESTful patterns).
+- **Same Database Table**: V2 calls the same `storage.*` methods and operates on the same `components` table as legacy. No separate V2 data store.
+- **Layer Separation**: Repository (wraps storage calls) → Service (business logic from routes.ts) → Controller (HTTP concerns, Zod validation) → Routes (RESTful patterns).
 - **Route Prefix**: `/technical/api/v2/components/component/*` for V2 endpoints.
 - **Frontend Toggle**: `localStorage('pms_api_version')` switches between legacy and V2 API endpoints at runtime.
-- **Backward Compatibility**: Legacy and V2 use separate database tables (`components` vs `components_v2`). Instant rollback by toggling to legacy mode.
-- **Scope**: Currently planned for Component module only (bulk upload + CRUD). Other modules to follow the same pattern.
+- **Backward Compatibility**: Toggle defaults to "Legacy". Both route sets always registered. Instant rollback by switching toggle — same data, same database, zero data loss.
+- **Scope**: Component module only (bulk upload + CRUD + sub-entities). Other modules to follow the same pattern.
 
 ## External Dependencies
 *   **Frontend**: `@radix-ui/*`, `@tanstack/react-query`, `wouter`, `tailwindcss`, `lucide-react`

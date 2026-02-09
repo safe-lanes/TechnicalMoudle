@@ -6,6 +6,8 @@ This is a **planning-only** document. No code changes are to be made. It maps th
 
 **Scope**: Component Bulk Upload + Component Module fetch & usage only.
 
+**Critical Constraint**: The V2 architecture must use 100% the same business rules, validations, calculations, and workflows as legacy. This initiative is purely an architectural re-organization, not a functional rewrite.
+
 ---
 
 ## Canonical V2 API Prefix
@@ -29,15 +31,19 @@ All references in this document use this exact prefix. No variations.
 
 1. [Current State Analysis](#1-current-state-analysis)
 2. [V2 Folder Structure](#2-v2-folder-structure)
-3. [V2 Schema Design](#3-v2-schema-design)
-4. [Layer Mapping: Current → V2](#4-layer-mapping-current--v2)
-5. [V2 Enforcement Rules](#5-v2-enforcement-rules)
-6. [Toggle Mechanism](#6-toggle-mechanism)
-7. [Phased Migration Plan](#7-phased-migration-plan)
-8. [Toggle-Based Flow Diagram](#8-toggle-based-flow-diagram)
-9. [Component Bulk Upload Refactor Plan](#9-component-bulk-upload-refactor-plan)
-10. [Risk Points & Rollback Strategy](#10-risk-points--rollback-strategy)
-11. [Validation Checklist Per Phase](#11-validation-checklist-per-phase)
+3. [Layer Mapping: Current → V2](#3-layer-mapping-current--v2)
+4. [Repository Layer Rules](#4-repository-layer-rules)
+5. [Service Layer Rules](#5-service-layer-rules)
+6. [Controller Layer Rules](#6-controller-layer-rules)
+7. [RESTful Route Patterns](#7-restful-route-patterns)
+8. [Frontend API Layer Rules](#8-frontend-api-layer-rules)
+9. [Toggle Mechanism](#9-toggle-mechanism)
+10. [Critical Enforcement Rules](#10-critical-enforcement-rules)
+11. [Phased Migration Plan](#11-phased-migration-plan)
+12. [Toggle-Based Flow Diagram](#12-toggle-based-flow-diagram)
+13. [Component Bulk Upload Refactor Plan](#13-component-bulk-upload-refactor-plan)
+14. [Risk Points & Rollback Strategy](#14-risk-points--rollback-strategy)
+15. [Validation Checklist](#15-validation-checklist)
 
 ---
 
@@ -47,219 +53,195 @@ All references in this document use this exact prefix. No variations.
 
 | File | Lines | Role | Problem |
 |------|-------|------|---------|
-| `server/routes.ts` | 11,420 | All API routes for every module | Monolithic; component routes scattered at lines 83–396 and 5433–5682 |
-| `server/postgresStorage.ts` | ~7,100 | All DB queries for every module | Acts as both repository and data-access layer |
-| `server/storage.ts` | 933 | Interface definition | Single interface for all modules |
-| `server/services/componentService.ts` | 222 | Component business logic | Exists but is **NOT used** — routes call `storage` directly |
-| `server/routes/bulk.ts` | ~6,000+ | Bulk upload routes | Partially extracted but still uses `storage` directly |
+| `server/routes.ts` | 11,420 | ALL route handlers for ALL modules | Monolithic — component routes mixed with every other module |
+| `server/postgresStorage.ts` | 7,111 | ALL database queries for ALL modules | Monolithic — component queries mixed with every other query |
+| `server/storage.ts` | 933 | Storage interface definition | 800+ methods spanning all modules in a single interface |
+| `server/services/componentService.ts` | 221 | Component service class | Exists but is **unused** — routes call `storage` directly |
+| `shared/schema.ts` | 2,610 | ALL Drizzle schema definitions | All tables in one file |
+| `client/src/pages/pms/Components.tsx` | 3,308 | Component UI page | Inline API calls via `useQuery`, no API abstraction layer |
 
 ### 1.2 Component Route Inventory (Legacy)
 
-| Method | Path | Location | Purpose |
-|--------|------|----------|---------|
-| `GET` | `/technical/api/components/:vesselId` | routes.ts:83 | List components by vessel (legacy path-param pattern) |
-| `GET` | `/technical/api/components/details/:id` | routes.ts:99 | Get single component by ID (legacy detail pattern) |
-| `POST` | `/technical/api/components/upload` | routes.ts:113 | Bulk upload CSV/Excel |
-| `POST` | `/technical/api/components` | routes.ts:5433 | Create single component |
-| `GET` | `/technical/api/components` | routes.ts:5494 | List components (query-param pattern) |
-| `GET` | `/technical/api/components/:id` | routes.ts:5505 | Get single component by ID |
-| `PATCH` | `/technical/api/components/:id` | routes.ts:5517 | Update component |
-| `DELETE` | `/technical/api/components/:id` | routes.ts:5637 | Hard delete component |
-| `POST` | `/technical/api/components/:id/inactivate` | routes.ts:5652 | Soft inactivation |
-| `GET` | `/technical/api/component-documents/:componentId` | routes.ts:1477 | List documents |
-| `POST` | `/technical/api/component-documents` | routes.ts:1523 | Upload document |
-| `PUT` | `/technical/api/component-documents/:id` | routes.ts:1635 | Update document |
-| `DELETE` | `/technical/api/component-documents/:id` | routes.ts:1691 | Delete document |
-| `GET` | `/technical/api/component-documents/:id/download` | routes.ts:1702 | Download document |
-| `GET` | `/technical/api/component-class-regulatory/:componentId` | routes.ts:1761 | List class/regulatory |
-| `POST` | `/technical/api/component-class-regulatory` | routes.ts:1788 | Create class/regulatory |
-| `PUT` | `/technical/api/component-class-regulatory/:id` | routes.ts:1808 | Update class/regulatory |
-| `DELETE` | `/technical/api/component-class-regulatory/:id` | routes.ts:1827 | Delete class/regulatory |
-| `GET` | `/technical/api/component-requisitions/:componentId` | routes.ts:1840 | List requisitions |
-| `POST` | `/technical/api/component-requisitions` | routes.ts:1945 | Create requisition |
-| `PUT` | `/technical/api/component-requisitions/:id` | routes.ts:1977 | Update requisition |
-| `DELETE` | `/technical/api/component-requisitions/:id` | routes.ts:2018 | Delete requisition |
-| `GET` | `/technical/api/component-maintenance-history/:componentId` | routes.ts:2041 | List maintenance history |
+**Primary Component Routes (routes.ts):**
+
+| Line | Method | Path | Purpose |
+|------|--------|------|---------|
+| 83 | GET | `/technical/api/components/:vesselId` | List components by vessel |
+| 99 | GET | `/technical/api/components/details/:id` | Get single component |
+| 113 | POST | `/technical/api/components/upload` | Bulk upload (CSV/XLS/XLSX) |
+| 5433 | POST | `/technical/api/components` | Create component |
+| 5494 | GET | `/technical/api/components` | List all components (query param) |
+| 5505 | GET | `/technical/api/components/:id` | Get component by ID |
+| 5517 | PATCH | `/technical/api/components/:id` | Update component |
+| 5637 | DELETE | `/technical/api/components/:id` | Delete component |
+| 5652 | POST | `/technical/api/components/:id/inactivate` | Inactivate component |
+
+**Sub-Entity Routes (routes.ts):**
+
+| Line | Method | Path | Purpose |
+|------|--------|------|---------|
+| 1477 | GET | `/technical/api/component-documents/:componentId` | List documents |
+| 1523 | POST | `/technical/api/component-documents` | Upload document |
+| 1635 | PUT | `/technical/api/component-documents/:id` | Update document |
+| 1691 | DELETE | `/technical/api/component-documents/:id` | Delete document |
+| 1702 | GET | `/technical/api/component-documents/:id/download` | Download document |
+| 1761 | GET | `/technical/api/component-class-regulatory/:componentId` | List regulatory |
+| 1788 | POST | `/technical/api/component-class-regulatory` | Create regulatory |
+| 1808 | PUT | `/technical/api/component-class-regulatory/:id` | Update regulatory |
+| 1827 | DELETE | `/technical/api/component-class-regulatory/:id` | Delete regulatory |
+| 1840 | GET | `/technical/api/component-requisitions/:componentId` | List requisitions |
+| 1901 | GET | `/technical/api/component-requisitions` | List all requisitions |
+| 1945 | POST | `/technical/api/component-requisitions` | Create requisition |
+| 1977 | PUT | `/technical/api/component-requisitions/:id` | Update requisition |
+| 2018 | DELETE | `/technical/api/component-requisitions/:id` | Delete requisition |
+| 2031 | GET | `/technical/api/component-maintenance-history` | List maintenance history |
+| 2041 | GET | `/technical/api/component-maintenance-history/:componentId` | Get maintenance history for component |
+| 2111 | GET | `/technical/api/component-maintenance-history/item/:id` | Get single history item |
 
 ### 1.3 Storage Interface Methods (Component-Related)
 
-```
-getComponents(vesselId: string): Promise<Component[]>
-getComponent(id: string): Promise<Component | undefined>
-getComponentByCode(componentCode: string, vesselId: string): Promise<Component | undefined>
-createComponent(component: InsertComponent): Promise<Component>
-updateComponent(id: string, data: Partial<Component>): Promise<Component>
-deleteComponent(id: string): Promise<void>
-inactivateComponent(id, userId, options): Promise<{success, message, ...}>
-getInheritedComponents(masterComponentId: string, vesselId?: string): Promise<Component[]>
-setComponentRunningHours(params): Promise<{component, inheritedUpdated}>
-getComponentsByCodes(codes: string[], vesselId?: string): Promise<Map<string, Component>>
-bulkCreateComponents(components: InsertComponent[]): Promise<Component[]>
-bulkUpdateComponents(updates: {id, data}[]): Promise<Component[]>
-bulkUpsertComponents(components: InsertComponent[]): Promise<{created, updated}>
-getComponentDocuments(componentId): Promise<any[]>
-getComponentDocument(id): Promise<any | undefined>
-createComponentDocument(doc): Promise<any>
-updateComponentDocument(id, data): Promise<any>
-deleteComponentDocument(id): Promise<void>
-getComponentClassRegulatory(componentId): Promise<any[]>
-createComponentClassRegulatory(item): Promise<any>
-updateComponentClassRegulatory(id, data): Promise<any>
-deleteComponentClassRegulatory(id): Promise<void>
-getComponentMaintenanceHistory(componentId): Promise<any[]>
-getComponentMaintenanceHistoryByCode(code, vesselCode): Promise<any[]>
-getComponentMaintenanceHistoryItem(id): Promise<any | undefined>
-getComponentRequisitions(componentId): Promise<any[]>
-createComponentRequisition(item): Promise<any>
-updateComponentRequisition(id, data): Promise<any>
-deleteComponentRequisition(id): Promise<void>
-```
+From `server/storage.ts`, the component-related interface methods:
+
+| Method | Returns | Used By |
+|--------|---------|---------|
+| `getComponents(vesselId)` | `Component[]` | Route L83, L5494 |
+| `getComponent(id)` | `Component \| undefined` | Route L99, L5505 |
+| `getComponentByCode(code, vesselId)` | `Component \| undefined` | Various |
+| `createComponent(data)` | `Component` | Route L5433 |
+| `updateComponent(id, data)` | `Component` | Route L5517 |
+| `deleteComponent(id)` | `void` | Route L5637 |
+| `inactivateComponent(id, userId, opts)` | Result object | Route L5652 |
+| `bulkUpsertComponents(components)` | `{ created, updated }` | Upload L380 |
+| `bulkCreateComponents(components)` | `Component[]` | Bulk import |
+| `bulkUpdateComponents(components)` | `Component[]` | Bulk import |
+| `getComponentDocuments(componentId)` | `any[]` | Route L1477 |
+| `createComponentDocument(doc)` | `any` | Route L1523 |
+| `updateComponentDocument(id, data)` | `any` | Route L1635 |
+| `deleteComponentDocument(id)` | `void` | Route L1691 |
+| `getComponentClassRegulatory(componentId)` | `any[]` | Route L1761 |
+| `createComponentClassRegulatory(data)` | `any` | Route L1788 |
+| `updateComponentClassRegulatory(id, data)` | `any` | Route L1808 |
+| `deleteComponentClassRegulatory(id)` | `void` | Route L1827 |
+| `getComponentRequisitions(componentId)` | `any[]` | Route L1840 |
+| `createComponentRequisition(data)` | `any` | Route L1945 |
+| `updateComponentRequisition(id, data)` | `any` | Route L1977 |
+| `deleteComponentRequisition(id)` | `void` | Route L2018 |
+| `setComponentRunningHours(params)` | Result object | Route L5517 (RH intercept) |
+| `getInheritedComponents(masterComponentId)` | `Component[]` | Route L5517 (downgrade check) |
+| `getMasterComponents(vesselId)` | `Component[]` | RH module |
 
 ### 1.4 Current Schema (Legacy `components` Table)
 
-```typescript
-// shared/schema.ts — lines 234-316
-components = pgTable("components", {
-  id: text("id").primaryKey(),               // ← Text PK (not serial)
-  fleetEquipmentCode: text("fleet_equipment_code"),
-  fleetEquipmentName: text("fleet_equipment_name"),
-  parentId: text("parent_id"),
-  componentCode: text("component_code"),
-  name: text("name"),
-  componentCategory: text("component_category"),
-  maker: text("maker"),
-  makerCode: text("maker_code"),
-  model: text("model"),
-  modelCode: text("model_code"),
-  serialNo: text("serial_no"),
-  drawingNo: text("drawing_no"),
-  location: text("location"),
-  critical: boolean("critical").default(false),
-  conditionBased: boolean("condition_based").default(false),
-  installationDate: text("installation_date"),
-  commissionedDate: text("commissioned_date"),
-  rating: text("rating"),
-  eqptSystemDept: text("eqpt_system_dept"),
-  isActive: boolean("is_active").default(true),
-  vesselCode: text("vessel_code"),
-  isParent: boolean("is_parent").default(false),
-  notes: text("notes"),
-  vesselId: text("vessel_id"),
-  dataScope: text("data_scope").notNull().default("vessel"),
-  parentFleetEquipmentCode: text("parent_fleet_equipment_code"),
-  modelNumber: text("model_number"),
-  department: text("department"),
-  deptCategory: text("dept_category"),
-  category: text("category"),
-  classItem: boolean("class_item").default(false),
-  noOfUnits: text("no_of_units"),
-  parentComponent: text("parent_component"),
-  dimensionsSize: text("dimensions_size"),
-  runningHours: decimal("running_hours"),
-  currentCumulativeRH: decimal("current_cumulative_rh").notNull().default("0"),
-  lastUpdated: text("last_updated"),
-  applicableVesselIds: text("applicable_vessel_ids").array(),
-  scopeNotes: text("scope_notes"),
-  rhCounterType: text("rh_counter_type").notNull().default("NOT_RH_DRIVEN"),
-  rhCounterSource: text("rh_counter_source"),
-  rhMasterComponentId: text("rh_master_component_id"),
-  rhCurrentMaster: decimal("rh_current_master"),
-  rhMasterUpdatedAt: timestamp("rh_master_updated_at"),
-  rhMasterUpdatedBy: text("rh_master_updated_by"),
-  rhMasterUpdateSource: text("rh_master_update_source"),
-  rhCurrentInheritedCached: decimal("rh_current_inherited_cached"),
-  rhInheritedUpdatedAt: timestamp("rh_inherited_updated_at"),
-  meterReplacedDate: timestamp("meter_replaced_date"),
-  meterReplacedLastRh: decimal("meter_replaced_last_rh"),
-  createdAt: timestamp("created_at").notNull().defaultNow(),   // ← timestamp, not text
-  updatedAt: timestamp("updated_at").notNull().defaultNow(),   // ← timestamp, not text
-})
-```
+From `shared/schema.ts` (line 234), the `components` table has these column groups:
 
-**V2 Gaps Identified:**
-- Uses `text("id")` as PK instead of `serial("id")` + `text("component_uuid")`
-- No `sort_order`, `created_by_uuid`, `updated_by_uuid`, `is_deleted`, `is_sync` columns
-- Uses `timestamp` type for dates instead of `text` (YYYY-MM-DD format)
-- Uses `.array()` for `applicableVesselIds` (not a JSON column, but array)
-- No hard FK constraints currently (already soft references) — aligns with V2 rule
+**Core Identifiers:**
+- `id` (text, PK) — UUID
+- `fleetEquipmentCode`, `fleetEquipmentName` — Fleet level
+- `parentId` (text) — Parent component code reference
+- `componentCode` (text) — Unique code within vessel
 
-### 1.5 Bulk Upload Flow (Current)
+**Classification:**
+- `name`, `componentCategory`, `category`, `deptCategory`
+- `maker`, `makerCode`, `model`, `modelCode`, `modelNumber`
+- `serialNo`, `drawingNo`, `location`, `department`
+- `eqptSystemDept`, `rating`, `notes`
 
-```
-Frontend (MachineryComponentUpload.tsx)
-  └→ Uses UniformBulkUpload component
-     ├→ POST /technical/api/bulk/sheets      (load sheet names from Excel)
-     ├→ POST /technical/api/bulk/dry-run      (validate without inserting)
-     └→ POST /technical/api/bulk/import       (actual import)
-        All go through server/routes/bulk.ts
+**Boolean Flags:**
+- `critical`, `classItem`, `conditionBased`, `isActive`, `isParent`
 
-Legacy Upload Path (routes.ts:113-396)
-  └→ POST /technical/api/components/upload
-     ├→ multer file receive
-     ├→ CSV parse (PapaParse) / Excel parse (XLSX)
-     ├→ 90-entry field mapping dictionary
-     ├→ Header normalization (case-insensitive)
-     ├→ Required field validation (4 fields)
-     ├→ Boolean/decimal conversion
-     └→ storage.bulkUpsertComponents() — direct DB call
-```
+**Running Hours (Section B7.B):**
+- `runningHours` (decimal 10,2)
+- `currentCumulativeRH` (decimal 10,2)
+- `rhCounterType` (text: MASTER | INHERITED | NOT_RH_DRIVEN)
+- `rhCounterSource`, `rhMasterComponentId`
+- `rhCurrentMaster` (decimal 10,2)
+- `rhMasterUpdatedAt`, `rhMasterUpdatedBy`
 
-**Two upload paths exist:**
-1. **Legacy path** (`/components/upload`) — single-step, in `routes.ts`
-2. **Uniform bulk path** (`/bulk/dry-run` + `/bulk/import`) — multi-step with preview, in `routes/bulk.ts`
+**Dates & Metadata:**
+- `installationDate`, `commissionedDate`, `lastUpdated` (all text)
+- `vesselCode`, `vesselId`, `dataScope`
+- `noOfUnits`, `dimensionsSize`
+- `parentFleetEquipmentCode`, `applicableVesselIds` (text array)
+- `scopeNotes`
+
+### 1.5 Key Business Logic in Route Handlers
+
+The following business logic currently lives **inline in routes.ts** and must be preserved exactly:
+
+**RH Field Validation (B7.B Rules) — Lines 5437-5592:**
+1. MASTER counter type: `rhMasterComponentId` must be NULL
+2. INHERITED counter type: `rhMasterComponentId` must be set, must reference a valid MASTER in same vessel
+3. NOT_RH_DRIVEN: `rhMasterComponentId` must be NULL
+4. Downgrade protection: Cannot change MASTER → other type if dependents exist
+5. Self-reference prevention: Cannot inherit from self
+
+**RH Cascade Update — Lines 5594-5618:**
+- When `currentCumulativeRH` or `runningHours` is updated, route intercepts and calls `storage.setComponentRunningHours()` for field sync and cascade to inherited components
+- Non-RH fields are then updated separately
+
+**Bulk Upload Validation — Lines 113-396:**
+- File parsing (CSV via PapaParse, XLS/XLSX via XLSX library)
+- Flexible field mapping with case-insensitive header normalization
+- Boolean field conversion (string "yes"/"true"/"1" → boolean)
+- Decimal field conversion (parseFloat with NaN check)
+- Required fields: `id`, `name`, `componentCategory`, `vesselCode`
+- Defaults: `currentCumulativeRH` → '0', `critical` → false, `classItem` → false
+
+**Inactivation — Lines 5652-5679:**
+- Option A (default): Block if any child is ACTIVE
+- Option B: Cascade inactivate with `cascadeInactivate=true`
 
 ### 1.6 Frontend API Consumption (Current)
 
-| File | API Called | Pattern |
-|------|-----------|---------|
-| `Components.tsx:1360` | `/technical/api/components/${vesselId}` | Inline queryKey with template literal |
-| `Components.tsx:2244` | `/technical/api/components/${vesselId}` | Duplicate fetch pattern |
-| `Components.tsx:1891` | `/technical/api/component-documents/${id}` | Inline queryKey |
-| `Components.tsx:2061` | `/technical/api/component-class-regulatory/${id}` | Inline queryKey |
-| `Components.tsx:2139` | `/technical/api/component-requisitions/${id}` | Inline queryKey |
-| `Components.tsx:1169` | `/technical/api/component-maintenance-history/${id}` | Inline queryKey |
-| `MachineryComponentUpload.tsx:30-31` | Cache invalidation for `/technical/api/components` | Via `queryClient.invalidateQueries` |
+From `client/src/pages/pms/Components.tsx`, API calls are made directly via `useQuery`:
 
-**No centralized API layer** — all calls are inline `useQuery` with URL-as-queryKey.
+| Query Key | Purpose |
+|-----------|---------|
+| `/technical/api/components/${vesselId}` | Fetch all components for vessel (2 places: L1360, L2244) |
+| `/technical/api/component-documents/${selectedComponent?.id}` | Fetch documents for selected component (L1891) |
+| `/technical/api/component-class-regulatory/${selectedComponent?.id}` | Fetch regulatory info (L2061) |
+| `/technical/api/component-requisitions/${selectedComponent?.id}` | Fetch requisitions (L2139) |
+| `/technical/api/component-maintenance-history/${componentDbId}` | Fetch maintenance history (L1169) |
 
-### 1.7 Responsibilities Currently Mixed in Route Handlers
+**Pattern**: No API abstraction layer. All `useQuery` calls use inline `queryKey` arrays with direct URL strings. No `queryFn` (relies on default fetcher).
 
-| Responsibility | Where It Lives Now | Should Be |
-|----------------|-------------------|-----------|
-| File parsing (CSV/Excel) | Route handler (routes.ts:126-153) | Upload Service |
-| Field mapping dictionary (90 entries) | Route handler (routes.ts:157-245) | Upload Service / Config |
-| Header normalization | Route handler (routes.ts:249-253) | Upload Service |
-| Required field validation | Route handler (routes.ts:321-357) | Service Layer |
-| Boolean/decimal conversion | Route handler (routes.ts:296-315) | Service Layer |
-| RH validation (MASTER/INHERITED rules) | Route handler (routes.ts:5437-5592) | Service Layer |
-| MASTER downgrade protection | Route handler (routes.ts:5582-5591) | Service Layer |
-| RH cascade to inherited components | Route handler (routes.ts:5594-5618) | Service Layer |
-| Direct DB calls (`storage.*`) | Route handlers throughout | Repository Layer |
-| HTTP status code decisions | Route handlers | Controller Layer |
-| Error response formatting | Route handlers | Controller Layer |
+### 1.7 Existing Service Layer (Unused)
+
+`server/services/componentService.ts` (221 lines) exists but is **not imported or used** by any route handler. Routes call `storage.*` directly. The service has:
+- `getComponents(vesselId)` — passthrough to storage
+- `getComponent(id)` — passthrough to storage
+- `getComponentByCode(vesselId, code)` — filters from `getComponents()`
+- `createComponent(data)` — validates parent exists, then calls storage
+- `updateComponent(id, data)` — passthrough to storage
+- `deleteComponent(id)` — passthrough to storage
+- `getChildComponents()`, `getAllDescendants()`, `getComponentHierarchy()` — tree operations
+- `bulkUpsertComponents()` — passthrough to storage
+- `validateComponentData()` — basic field presence validation
+
+**V2 Approach**: The V2 service layer will call the **same storage methods** that legacy routes call today, but through a proper Repository → Service → Controller chain. The business logic currently inline in routes will move to the service layer.
 
 ---
 
 ## 2. V2 Folder Structure
 
-### 2.1 Backend
+### 2.1 Backend (Component Module)
 
 ```
 server/v2/
 └── components/
-    ├── index.ts                              ← Module entry: registers routes
-    ├── routes.ts                             ← Express router with RESTful paths
+    ├── index.ts                          ← Module entry: exports router
+    ├── routes.ts                         ← Express router with V2 RESTful patterns
     ├── controllers/
-    │   ├── index.ts                          ← Barrel export
-    │   ├── componentController.ts            ← HTTP handler for CRUD
-    │   └── componentUploadController.ts      ← HTTP handler for bulk upload
+    │   ├── index.ts                      ← Re-exports all controllers
+    │   ├── componentController.ts        ← HTTP handlers for component CRUD
+    │   └── componentUploadController.ts  ← HTTP handler for bulk upload
     ├── services/
-    │   ├── index.ts                          ← Barrel export
-    │   ├── componentService.ts               ← Business logic for CRUD
-    │   └── componentUploadService.ts          ← File parsing, mapping, validation
+    │   ├── index.ts                      ← Re-exports all services
+    │   ├── componentService.ts           ← Business logic (RH validation, etc.)
+    │   └── componentUploadService.ts     ← File parsing, field mapping, validation
     └── repositories/
-        ├── index.ts                          ← Barrel export
-        └── componentRepository.ts            ← DB queries (Drizzle ORM only)
+        ├── index.ts                      ← Re-exports all repositories
+        └── componentRepository.ts        ← Database access via existing storage
 ```
 
 ### 2.2 Shared Schema & Types
@@ -267,851 +249,1085 @@ server/v2/
 ```
 shared/v2/
 └── components/
-    ├── schema.ts                             ← V2 Drizzle schema (serial PK, UUID, audit cols)
-    └── types.ts                              ← V2 request/response types, Zod schemas
+    ├── schema.ts                         ← Re-exports from shared/schema.ts (no duplication)
+    └── types.ts                          ← V2-specific request/response types, Zod schemas
 ```
 
-### 2.3 Frontend
+### 2.3 Frontend (Component Module)
 
 ```
 client/src/modules/
 └── components/
     ├── api/
-    │   └── componentApiV2.ts                 ← V2 API functions (typed, centralized)
+    │   └── componentApiV2.ts             ← V2 API functions (one file per module)
     ├── hooks/
-    │   ├── useComponents.ts                  ← V2 TanStack query hooks
-    │   └── useComponentUpload.ts             ← V2 upload mutation hook
+    │   └── useComponentsV2.ts            ← V2 query hooks wrapping componentApiV2
     └── components/
-        └── ComponentApiToggle.tsx             ← Toggle control (V2 / Legacy)
+        └── ComponentApiToggle.tsx         ← Toggle UI component (V2 / Legacy switch)
 ```
 
 ### 2.4 Mapping: Current File → V2 Target Layer
 
-| Current Source | Current Location | V2 Target |
-|----------------|------------------|-----------|
-| `storage.getComponents()` | `server/storage.ts:224` | `componentRepository.findAll()` |
-| `storage.getComponent()` | `server/storage.ts:225` | `componentRepository.findByUuid()` |
-| `storage.createComponent()` | `server/storage.ts:227` | `componentRepository.create()` |
-| `storage.updateComponent()` | `server/storage.ts:228` | `componentRepository.update()` |
-| `storage.deleteComponent()` | `server/storage.ts:229` | `componentRepository.softDelete()` |
-| `storage.bulkUpsertComponents()` | `server/storage.ts:396` | `componentRepository.bulkUpsert()` |
-| `storage.getInheritedComponents()` | `server/storage.ts:267` | `componentRepository.findInherited()` |
-| `storage.setComponentRunningHours()` | `server/storage.ts:293` | `componentService.updateRunningHours()` → repo |
-| RH validation (routes.ts:5437-5592) | Route handler | `componentService.validateRhRules()` |
-| Field mapping dict (routes.ts:157-245) | Route handler | `componentUploadService.fieldMapping` |
-| File parsing (routes.ts:126-153) | Route handler | `componentUploadService.parseFile()` |
-| Row validation (routes.ts:278-365) | Route handler | `componentUploadService.validateRows()` |
-| `componentService.ts` (existing) | `server/services/componentService.ts` | `server/v2/components/services/componentService.ts` |
+| Current Location | Lines | V2 Target | V2 File |
+|------------------|-------|-----------|---------|
+| `routes.ts` L83-96 (GET components) | 14 | Controller | `componentController.ts` |
+| `routes.ts` L99-110 (GET details) | 12 | Controller | `componentController.ts` |
+| `routes.ts` L113-396 (upload) | 284 | Upload Controller + Upload Service | `componentUploadController.ts` + `componentUploadService.ts` |
+| `routes.ts` L5433-5492 (POST create) | 60 | Controller + Service (RH validation) | `componentController.ts` + `componentService.ts` |
+| `routes.ts` L5517-5635 (PATCH update) | 119 | Controller + Service (RH validation + cascade) | `componentController.ts` + `componentService.ts` |
+| `routes.ts` L5637-5647 (DELETE) | 11 | Controller | `componentController.ts` |
+| `routes.ts` L5652-5679 (inactivate) | 28 | Controller + Service | `componentController.ts` + `componentService.ts` |
+| `routes.ts` L1477-1702 (documents) | 226 | Controller | `componentController.ts` (sub-entity) |
+| `routes.ts` L1761-1827 (regulatory) | 67 | Controller | `componentController.ts` (sub-entity) |
+| `routes.ts` L1840-2018 (requisitions) | 179 | Controller | `componentController.ts` (sub-entity) |
+| `routes.ts` L2031-2111 (maintenance history) | 81 | Controller | `componentController.ts` (sub-entity) |
+| `postgresStorage.ts` (component methods) | ~400 | Repository | `componentRepository.ts` |
+| `Components.tsx` (inline API calls) | scattered | Frontend API + Hooks | `componentApiV2.ts` + `useComponentsV2.ts` |
 
 ---
 
-## 3. V2 Schema Design
+## 3. Layer Mapping: Current → V2
 
-### 3.1 V2 Components Table (`components_v2`)
+### 3.1 How V2 Reuses Legacy Logic (Not Rewrites)
 
-> **Note**: The V2 table exists alongside the legacy `components` table. No migration of legacy data during initial rollout.
-
-```
-Table: components_v2
-
-Columns:
-  id                          serial PK           ← Internal only, never exposed in API
-  component_uuid              text UNIQUE NOT NULL ← External identifier, used in all API paths
-  fleet_equipment_code        text
-  fleet_equipment_name        text
-  parent_uuid                 text                ← Soft reference to parent component_uuid
-  component_code              text
-  name                        text
-  component_category          text
-  maker                       text
-  maker_code                  text
-  model                       text
-  model_code                  text
-  serial_no                   text
-  drawing_no                  text
-  location                    text
-  critical                    boolean DEFAULT false
-  condition_based             boolean DEFAULT false
-  installation_date           text                ← YYYY-MM-DD format (V2 rule: dates as text)
-  commissioned_date           text
-  rating                      text
-  eqpt_system_dept            text
-  is_active                   boolean DEFAULT true
-  vessel_code                 text
-  is_parent                   boolean DEFAULT false
-  notes                       text
-  vessel_uuid                 text                ← Soft reference to vessel UUID
-  data_scope                  text NOT NULL DEFAULT 'vessel'
-  parent_fleet_equipment_code text
-  model_number                text
-  department                  text
-  dept_category               text
-  category                    text
-  class_item                  boolean DEFAULT false
-  no_of_units                 text
-  parent_component            text
-  dimensions_size             text
-  running_hours               text                ← Stored as text (V2 rule: no decimal type)
-  current_cumulative_rh       text NOT NULL DEFAULT '0'
-  last_updated                text
-  scope_notes                 text
-  rh_counter_type             text NOT NULL DEFAULT 'NOT_RH_DRIVEN'
-  rh_counter_source           text
-  rh_master_component_uuid    text                ← Soft reference to master component UUID
-  rh_current_master           text
-  rh_master_updated_at        text
-  rh_master_updated_by        text
-  rh_master_update_source     text
-  rh_current_inherited_cached text
-  rh_inherited_updated_at     text
-  meter_replaced_date         text
-  meter_replaced_last_rh      text
-
-  --- V2 MANDATORY AUDIT COLUMNS ---
-  sort_order                  integer DEFAULT 0
-  created_at                  text NOT NULL        ← YYYY-MM-DDTHH:MM:SSZ format
-  updated_at                  text NOT NULL
-  created_by_uuid             text
-  updated_by_uuid             text
-  is_deleted                  boolean DEFAULT false ← Soft delete flag
-  is_sync                     boolean DEFAULT false
-
-Indexes:
-  idx_v2_comp_uuid            UNIQUE (component_uuid)
-  idx_v2_comp_vessel          (vessel_uuid) WHERE is_deleted = false
-  idx_v2_comp_data_scope      (data_scope) WHERE is_deleted = false
-  idx_v2_comp_rh_master       (rh_counter_type, vessel_uuid) WHERE is_deleted = false
-  idx_v2_comp_parent          (parent_uuid) WHERE is_deleted = false
-```
-
-### 3.2 Key Differences: Legacy vs V2
-
-| Aspect | Legacy (`components`) | V2 (`components_v2`) |
-|--------|----------------------|---------------------|
-| Primary Key | `text("id")` — user-provided string | `serial("id")` — auto-increment, internal |
-| External ID | `id` (same as PK) | `component_uuid` (text, unique) |
-| API identifier | `/components/:id` (text PK) | `/components/:uuid` (component_uuid) |
-| Delete behavior | Hard delete / manual inactivation | Soft delete (`is_deleted = true`) |
-| Date storage | Mixed: `text` for dates, `timestamp` for audit | All `text` (YYYY-MM-DD / ISO 8601) |
-| Audit columns | Only `createdAt`, `updatedAt` | All 7: sort_order, created_at, updated_at, created_by_uuid, updated_by_uuid, is_deleted, is_sync |
-| Decimal fields | `decimal("running_hours")` | `text` — parsed in service layer |
-| Array columns | `applicableVesselIds: text().array()` | Dropped (or normalized into separate table if needed) |
-| FK constraints | None (soft references) | None (V2 rule: soft UUID references only) |
-
-### 3.3 Drizzle Schema Definition Location
+**Critical principle**: V2 layers call the **same storage methods** in `postgresStorage.ts` that legacy routes call today. The repository layer wraps storage calls. The service layer encapsulates business logic currently inline in routes. The controller layer handles HTTP concerns.
 
 ```
-File: shared/v2/components/schema.ts
+LEGACY FLOW:
+  Request → routes.ts (HTTP + validation + business logic + storage call) → Response
 
-Contents:
-  - componentsV2 pgTable definition
-  - insertComponentV2Schema (Zod via createInsertSchema, omitting id, created_at, updated_at, is_deleted)
-  - InsertComponentV2 type
-  - ComponentV2 type
+V2 FLOW:
+  Request → routes.ts → Controller (HTTP only) → Service (business logic) → Repository (storage call) → Response
+```
+
+The **same `storage.*` methods** are called at the end of both flows. The only difference is architectural separation.
+
+### 3.2 Legacy Route → V2 Layer Decomposition
+
+**Example: PATCH /components/:id (Update Component, lines 5517-5635)**
+
+| Concern | Legacy Location | V2 Location |
+|---------|-----------------|-------------|
+| Extract `req.params.id` and `req.body` | Route handler | Controller |
+| Validate request body with Zod | Not done (raw `req.body`) | Controller |
+| Get existing component for validation | Route L5523 | Service |
+| RH field validation (B7.B rules) | Route L5528-5592 | Service |
+| Downgrade protection check | Route L5582-5591 | Service |
+| RH cascade update intercept | Route L5594-5618 | Service |
+| Call `storage.updateComponent()` | Route L5615-5623 | Repository |
+| Format response, set status code | Route L5626-5633 | Controller |
+| Error handling, status codes | Route L5628-5634 | Controller |
+
+**Example: POST /components/upload (Bulk Upload, lines 113-396)**
+
+| Concern | Legacy Location | V2 Location |
+|---------|-----------------|-------------|
+| multer middleware, file extraction | Route L113-117 | Controller (middleware stays on route) |
+| File type detection | Route L120 | Upload Service |
+| CSV parsing (PapaParse) | Route L126-134 | Upload Service |
+| XLSX parsing (XLSX library) | Route L135-150 | Upload Service |
+| Field mapping dictionary | Route L157-245 | Upload Service |
+| Header normalization | Route L249-253 | Upload Service |
+| Column detection for feedback | Route L256-276 | Upload Service |
+| Row-by-row validation | Route L282-365 | Upload Service |
+| Boolean field conversion | Route L296-307 | Upload Service |
+| Decimal field conversion | Route L310-315 | Upload Service |
+| Required field checks | Route L322-357 | Upload Service |
+| Defaults assignment | Route L359-362 | Upload Service |
+| `storage.bulkUpsertComponents()` | Route L380 | Repository |
+| Response construction | Route L382-390 | Controller |
+
+---
+
+## 4. Repository Layer Rules
+
+### 4.1 Purpose
+
+The repository is the **only layer** allowed to access the database. In V2, it wraps calls to the existing `storage` interface in `postgresStorage.ts`.
+
+### 4.2 Rules
+
+| Rule | Detail |
+|------|--------|
+| **Only layer with DB access** | Only file allowed to import `storage` from `server/storage.ts` |
+| **ORM query builders only** | No raw SQL strings — all queries go through existing `storage.*` methods which use Drizzle |
+| **No N+1 queries** | Must use JOINs or batch queries (existing storage methods already do this) |
+| **No business logic** | No validation, no conditional logic, no error interpretation |
+| **Same data shape as legacy** | Returns the exact same types that `storage.*` methods return today |
+| **Stateless** | No caching, no state — pure pass-through to storage |
+
+### 4.3 Repository Method Signatures
+
+```typescript
+// server/v2/components/repositories/componentRepository.ts
+
+import { storage } from "../../../storage";
+import type { Component, InsertComponent } from "@shared/schema";
+
+export class ComponentRepository {
+  async findByVesselId(vesselId: string): Promise<Component[]> {
+    return storage.getComponents(vesselId);
+  }
+
+  async findById(id: string): Promise<Component | undefined> {
+    return storage.getComponent(id);
+  }
+
+  async findByCode(code: string, vesselId: string): Promise<Component | undefined> {
+    return storage.getComponentByCode(code, vesselId);
+  }
+
+  async create(data: InsertComponent): Promise<Component> {
+    return storage.createComponent(data);
+  }
+
+  async update(id: string, data: Partial<Component>): Promise<Component> {
+    return storage.updateComponent(id, data);
+  }
+
+  async remove(id: string): Promise<void> {
+    return storage.deleteComponent(id);
+  }
+
+  async inactivate(id: string, userId: string, options?: { cascadeInactivate?: boolean }) {
+    return storage.inactivateComponent(id, userId, options);
+  }
+
+  async bulkUpsert(components: InsertComponent[]): Promise<{ created: number; updated: number }> {
+    return storage.bulkUpsertComponents(components);
+  }
+
+  async setRunningHours(params: {
+    componentId: string;
+    newRHValue: number;
+    updateSource: string;
+    userId: string;
+    lastUpdatedDate?: string;
+  }) {
+    return storage.setComponentRunningHours(params);
+  }
+
+  async getInheritedComponents(masterComponentId: string): Promise<Component[]> {
+    return storage.getInheritedComponents(masterComponentId);
+  }
+
+  // Sub-entity repositories
+  async findDocuments(componentId: string) {
+    return storage.getComponentDocuments(componentId);
+  }
+
+  async findDocument(id: number) {
+    return storage.getComponentDocument(id);
+  }
+
+  async createDocument(doc: any) {
+    return storage.createComponentDocument(doc);
+  }
+
+  async updateDocument(id: number, data: any) {
+    return storage.updateComponentDocument(id, data);
+  }
+
+  async removeDocument(id: number) {
+    return storage.deleteComponentDocument(id);
+  }
+
+  async findClassRegulatory(componentId: string) {
+    return storage.getComponentClassRegulatory(componentId);
+  }
+
+  async createClassRegulatory(data: any) {
+    return storage.createComponentClassRegulatory(data);
+  }
+
+  async updateClassRegulatory(id: number, data: any) {
+    return storage.updateComponentClassRegulatory(id, data);
+  }
+
+  async removeClassRegulatory(id: number) {
+    return storage.deleteComponentClassRegulatory(id);
+  }
+
+  async findRequisitions(componentId: string) {
+    return storage.getComponentRequisitions(componentId);
+  }
+
+  async createRequisition(data: any) {
+    return storage.createComponentRequisition(data);
+  }
+
+  async updateRequisition(id: number, data: any) {
+    return storage.updateComponentRequisition(id, data);
+  }
+
+  async removeRequisition(id: number) {
+    return storage.deleteComponentRequisition(id);
+  }
+}
+```
+
+**Key insight**: The repository does NOT create a new database layer. It wraps the existing `storage.*` calls, preserving identical query behavior and data shapes.
+
+---
+
+## 5. Service Layer Rules
+
+### 5.1 Purpose
+
+The service layer contains **all business logic** — the exact same logic currently inline in route handlers. It does not access the database directly (calls repository only) and does not handle HTTP objects.
+
+### 5.2 Rules
+
+| Rule | Detail |
+|------|--------|
+| **All business logic lives here** | RH validation, cascade, inactivation rules — all moved from routes |
+| **No HTTP objects** | No `Request`, `Response`, or `NextFunction` imports |
+| **No database access** | Calls repository only, never imports `storage` or Drizzle |
+| **Handles audit user** | Receives `userId` as a parameter, passes to repository |
+| **Same logic as legacy** | Apply create/update/validation rules identically to how they work in routes.ts today |
+| **Returns plain objects** | Returns data or throws typed errors — controller decides HTTP status |
+
+### 5.3 Business Logic Migration Map
+
+The following logic moves from `routes.ts` to `componentService.ts`:
+
+**RH Validation (B7.B Rules):**
+```typescript
+// V2 Service method — identical logic from routes.ts L5437-5592
+async validateAndUpdate(id: string, data: Partial<Component>, userId: string): Promise<Component> {
+  const existing = await this.repository.findById(id);
+  if (!existing) throw new NotFoundError("Component not found");
+
+  // RH field validation — exact same logic from routes.ts
+  const effectiveRhType = data.rhCounterType || existing.rhCounterType || 'NOT_RH_DRIVEN';
+  const effectiveMasterId = data.rhMasterComponentId !== undefined
+    ? data.rhMasterComponentId
+    : existing.rhMasterComponentId;
+
+  if (data.rhCounterType || data.rhMasterComponentId !== undefined) {
+    // MASTER validation
+    if (effectiveRhType === 'MASTER' && effectiveMasterId) {
+      throw new ValidationError("MASTER counter type cannot have a master component reference");
+    }
+    // INHERITED validation
+    if (effectiveRhType === 'INHERITED') {
+      if (!effectiveMasterId) throw new ValidationError("INHERITED requires rhMasterComponentId");
+      if (effectiveMasterId === id) throw new ValidationError("Cannot inherit from self");
+      const master = await this.repository.findById(effectiveMasterId);
+      if (!master) throw new ValidationError("Master component not found");
+      if (master.vesselId !== existing.vesselId) throw new ValidationError("Master must be same vessel");
+      if (master.rhCounterType !== 'MASTER') throw new ValidationError("Referenced component is not MASTER");
+    }
+    // NOT_RH_DRIVEN validation
+    if (effectiveRhType === 'NOT_RH_DRIVEN' && effectiveMasterId) {
+      throw new ValidationError("NOT_RH_DRIVEN cannot have master reference");
+    }
+    // Downgrade protection
+    if (existing.rhCounterType === 'MASTER' && effectiveRhType !== 'MASTER') {
+      const dependents = await this.repository.getInheritedComponents(id);
+      if (dependents.length > 0) {
+        throw new ValidationError(`Cannot change from MASTER: ${dependents.length} dependents`);
+      }
+    }
+  }
+
+  // RH cascade update — exact same logic from routes.ts L5594-5618
+  if (data.currentCumulativeRH !== undefined || data.runningHours !== undefined) {
+    const rhValue = parseFloat(data.currentCumulativeRH || data.runningHours || '0');
+    if (!isNaN(rhValue)) {
+      const result = await this.repository.setRunningHours({
+        componentId: id,
+        newRHValue: rhValue,
+        updateSource: 'MANUAL',
+        userId,
+        lastUpdatedDate: data.lastUpdated
+      });
+      const { currentCumulativeRH, runningHours, lastUpdated, ...otherData } = data;
+      if (Object.keys(otherData).length > 0) {
+        return this.repository.update(id, otherData);
+      }
+      return result.component;
+    }
+  }
+
+  return this.repository.update(id, data);
+}
+```
+
+**Create Validation:**
+```typescript
+// V2 Service method — identical logic from routes.ts L5437-5492
+async create(data: InsertComponent, userId: string): Promise<Component> {
+  const effectiveRhType = data.rhCounterType || 'NOT_RH_DRIVEN';
+
+  if (data.rhCounterType || data.rhMasterComponentId) {
+    if (effectiveRhType === 'MASTER' && data.rhMasterComponentId) {
+      throw new ValidationError("MASTER cannot have master reference");
+    }
+    if (effectiveRhType === 'INHERITED') {
+      if (!data.rhMasterComponentId) throw new ValidationError("INHERITED requires rhMasterComponentId");
+      const master = await this.repository.findById(data.rhMasterComponentId);
+      if (!master) throw new ValidationError("Master component not found");
+      if (master.vesselId !== data.vesselId) throw new ValidationError("Master must be same vessel");
+      if (master.rhCounterType !== 'MASTER') throw new ValidationError("Not a MASTER type");
+    }
+    if (effectiveRhType === 'NOT_RH_DRIVEN' && data.rhMasterComponentId) {
+      throw new ValidationError("NOT_RH_DRIVEN cannot have master reference");
+    }
+  }
+
+  return this.repository.create(data);
+}
+```
+
+**Inactivation:**
+```typescript
+// V2 Service method — identical logic from routes.ts L5652-5679
+async inactivate(id: string, userId: string, cascadeInactivate: boolean = false) {
+  return this.repository.inactivate(id, userId, { cascadeInactivate });
+}
+```
+
+### 5.4 Error Types
+
+```typescript
+// server/v2/components/services/errors.ts
+export class NotFoundError extends Error {
+  constructor(message: string) { super(message); this.name = 'NotFoundError'; }
+}
+
+export class ValidationError extends Error {
+  constructor(message: string) { super(message); this.name = 'ValidationError'; }
+}
 ```
 
 ---
 
-## 4. Layer Mapping: Current → V2
+## 6. Controller Layer Rules
 
-### 4.1 Repository Layer (`componentRepository.ts`)
+### 6.1 Purpose
 
-**Rules:**
-- Only layer allowed to access the database
-- Uses Drizzle ORM query builders exclusively
-- Always filters `is_deleted = false` on all read queries
-- No N+1 queries — uses JOINs where needed
-- No business logic
+Controllers handle **HTTP concerns only**: extract request data, validate with Zod, call service, map errors to HTTP status codes, return response.
 
-**Method Inventory:**
+### 6.2 Rules
 
-| Method | Source Query | Notes |
-|--------|-------------|-------|
-| `findAll(vesselUuid)` | `SELECT * FROM components_v2 WHERE vessel_uuid = ? AND is_deleted = false` | Returns all active components |
-| `findByUuid(uuid)` | `SELECT * FROM components_v2 WHERE component_uuid = ? AND is_deleted = false` | Returns single component |
-| `findByCode(vesselUuid, code)` | `SELECT * FROM components_v2 WHERE vessel_uuid = ? AND component_code = ? AND is_deleted = false` | Lookup by code |
-| `findInherited(masterUuid)` | `SELECT * FROM components_v2 WHERE rh_master_component_uuid = ? AND is_deleted = false` | Find INHERITED children |
-| `create(data)` | `INSERT INTO components_v2 (...)` | Returns created row |
-| `update(uuid, data)` | `UPDATE components_v2 SET ... WHERE component_uuid = ?` | Returns updated row |
-| `softDelete(uuid, userUuid)` | `UPDATE SET is_deleted = true, updated_by_uuid = ?, updated_at = NOW()` | Soft delete only |
-| `bulkUpsert(rows)` | Drizzle `onConflictDoUpdate` on `component_uuid` | Returns {created, updated} |
-| `findByCodes(codes, vesselUuid)` | `SELECT * WHERE component_code IN (?) AND is_deleted = false` | Batch lookup |
+| Rule | Detail |
+|------|--------|
+| **HTTP concerns only** | Extract params, body, query; set status codes; return JSON |
+| **Schema validation only** | Use Zod schemas for type coercion and structural checks only. Schemas must be **permissive** — they must accept the same inputs legacy routes accept (raw `req.body` with no validation). Zod must NOT reject inputs that legacy would accept. Its purpose is type safety, not stricter validation. |
+| **Calls services only** | No direct database or storage access |
+| **No ORM usage** | No Drizzle imports |
+| **No business logic** | No RH validation, no cascade logic, no conditional data transformations |
+| **Same response contracts** | Must return identical JSON shapes as legacy route handlers |
+| **DELETE = legacy behavior** | V2 DELETE calls `storage.deleteComponent()` — same hard delete as legacy. If soft delete is needed in the future, it will be a separate initiative. V2 must not change delete behavior. |
+| **Error mapping** | `NotFoundError` → 404, `ValidationError` → 400, unknown → 500 |
 
-### 4.2 Service Layer (`componentService.ts`)
+### 6.3 Controller Method Signatures
 
-**Rules:**
-- All business logic lives here
-- No HTTP objects (no `req`, `res`, `next`)
-- No direct database access (calls repository only)
-- Handles `created_by_uuid` / `updated_by_uuid` injection
-- Applies create/update rules consistently
+```typescript
+// server/v2/components/controllers/componentController.ts
 
-**Responsibilities extracted from current route handlers:**
+export class ComponentController {
+  constructor(private service: ComponentService) {}
 
-| Business Rule | Current Location | V2 Service Method |
-|---------------|------------------|-------------------|
-| RH counter type validation (MASTER/INHERITED/NOT_RH_DRIVEN) | routes.ts:5437-5479 | `validateRhRules(data, existingComponent?)` |
-| MASTER downgrade protection (check dependents) | routes.ts:5582-5591 | `validateRhDowngrade(componentUuid)` |
-| Parent component exists validation | componentService.ts:37-47 | `validateParent(vesselUuid, parentUuid)` |
-| RH cascade to inherited components | routes.ts:5594-5618 | `updateRunningHours(uuid, rhValue, userUuid)` |
-| Component inactivation (block/cascade) | routes.ts:5652-5681 | `inactivateComponent(uuid, userUuid, cascade?)` |
-| Set audit user on create | Not done currently | `create(data, userUuid)` |
-| Set audit user on update | Not done currently | `update(uuid, data, userUuid)` |
-| Set audit user on delete | Not done currently | `softDelete(uuid, userUuid)` |
-| Build component hierarchy (tree structure) | componentService.ts:99-130 | `getHierarchy(vesselUuid)` |
-| Build component path (breadcrumb) | componentService.ts:135-161 | `getComponentPath(vesselUuid, code)` |
+  async list(req: Request, res: Response): Promise<void> {
+    // Maps to legacy GET /technical/api/components/:vesselId (L83-96)
+    const { vesselId } = req.params;
+    const components = await this.service.getByVesselId(vesselId);
+    res.json(components);
+  }
 
-### 4.3 Upload Service (`componentUploadService.ts`)
+  async getById(req: Request, res: Response): Promise<void> {
+    // Maps to legacy GET /technical/api/components/:id (L5505-5514)
+    const component = await this.service.getById(req.params.id);
+    if (!component) return res.status(404).json({ error: "Component not found" });
+    res.json(component);
+  }
 
-**Responsibilities extracted from routes.ts:113-396:**
+  async create(req: Request, res: Response): Promise<void> {
+    // Maps to legacy POST /technical/api/components (L5433-5492)
+    // Note: Zod schema is permissive (passthrough) to match legacy behavior
+    const data = req.body;
+    const userId = (req as any).user?.username || 'unknown';
+    const component = await this.service.create(data, userId);
+    res.status(201).json(component);
+  }
 
-| Responsibility | Current Location | V2 Method |
-|----------------|------------------|-----------|
-| File receive & extension check | routes.ts:115-152 | `parseFile(buffer, extension)` |
-| CSV parsing (PapaParse) | routes.ts:126-134 | `parseCsv(buffer)` — called from `parseFile()` |
-| Excel parsing (XLSX) | routes.ts:135-150 | `parseExcel(buffer)` — called from `parseFile()` |
-| Field mapping dictionary (90 entries) | routes.ts:157-245 | `FIELD_MAPPING` constant |
-| Header normalization | routes.ts:249-253 | `normalizeHeader(key)` |
-| Column detection & mapping report | routes.ts:256-276 | `detectColumns(headers)` |
-| Row-level validation (required fields) | routes.ts:278-365 | `validateRows(rows)` |
-| Boolean field conversion | routes.ts:296-307 | `normalizeBoolean(value)` |
-| Decimal field conversion | routes.ts:309-315 | `normalizeDecimal(value)` |
-| Default values for optional fields | routes.ts:359-363 | `applyDefaults(component)` |
+  async update(req: Request, res: Response): Promise<void> {
+    // Maps to legacy PATCH /technical/api/components/:id (L5517-5635)
+    // Note: Zod schema is permissive (passthrough) to match legacy behavior
+    const data = req.body;
+    const userId = (req as any).user?.username || 'unknown';
+    const component = await this.service.validateAndUpdate(req.params.id, data, userId);
+    res.json(component);
+  }
 
-**Call flow in V2:**
+  async remove(req: Request, res: Response): Promise<void> {
+    // Maps to legacy DELETE /technical/api/components/:id (L5637-5647)
+    await this.service.remove(req.params.id);
+    res.json({ success: true });
+  }
+
+  async inactivate(req: Request, res: Response): Promise<void> {
+    // Maps to legacy POST /technical/api/components/:id/inactivate (L5652-5679)
+    const { cascadeInactivate, userId } = req.body;
+    const result = await this.service.inactivate(req.params.id, userId || 'system', cascadeInactivate === true);
+    if (!result.success) {
+      const status = result.activeChildrenCount > 0 ? 400 : 400;
+      return res.status(status).json(result);
+    }
+    res.json(result);
+  }
+}
 ```
-componentUploadController.upload(req, res)
-  └→ componentUploadService.parseFile(buffer, ext)
-     └→ componentUploadService.mapAndValidate(rows)
-        └→ componentService.bulkUpsert(validRows, userUuid)
-           └→ componentRepository.bulkUpsert(rows)
+
+### 6.4 Upload Controller
+
+```typescript
+// server/v2/components/controllers/componentUploadController.ts
+
+export class ComponentUploadController {
+  constructor(private uploadService: ComponentUploadService) {}
+
+  async upload(req: Request, res: Response): Promise<void> {
+    // Maps to legacy POST /technical/api/components/upload (L113-396)
+    if (!req.file) return res.status(400).json({ error: "No file uploaded" });
+
+    const result = await this.uploadService.processUpload(req.file);
+    res.json(result);
+  }
+}
 ```
 
-### 4.4 Controller Layer (`componentController.ts`)
+### 6.5 Error Handling Middleware
 
-**Rules:**
-- HTTP concerns only (req, res, status codes)
-- Schema validation (Zod) before calling services
-- Calls services only — no ORM, no business logic
-
-**Method Inventory:**
-
-| Controller Method | HTTP | Calls |
-|-------------------|------|-------|
-| `list(req, res)` | `GET /` | `componentService.getAll(vesselUuid)` |
-| `getByUuid(req, res)` | `GET /:uuid` | `componentService.getByUuid(uuid)` |
-| `create(req, res)` | `POST /` | Zod validate → `componentService.create(data, userUuid)` |
-| `update(req, res)` | `PATCH /:uuid` | Zod validate → `componentService.update(uuid, data, userUuid)` |
-| `remove(req, res)` | `DELETE /:uuid` | `componentService.softDelete(uuid, userUuid)` |
-| `inactivate(req, res)` | `POST /:uuid/inactivate` | `componentService.inactivateComponent(uuid, userUuid, cascade)` |
-
-**Upload Controller (`componentUploadController.ts`):**
-
-| Controller Method | HTTP | Calls |
-|-------------------|------|-------|
-| `upload(req, res)` | `POST /upload` | `componentUploadService.parseFile()` → `.mapAndValidate()` → `componentService.bulkUpsert()` |
+```typescript
+// Wrap all controller methods with error handling
+function asyncHandler(fn: (req: Request, res: Response) => Promise<void>) {
+  return (req: Request, res: Response, next: NextFunction) => {
+    fn(req, res).catch((error) => {
+      if (error instanceof NotFoundError) {
+        return res.status(404).json({ error: error.message });
+      }
+      if (error instanceof ValidationError) {
+        return res.status(400).json({ error: error.message });
+      }
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: error.errors });
+      }
+      console.error("V2 Component Error:", error);
+      res.status(500).json({ error: error.message || "Internal server error" });
+    });
+  };
+}
+```
 
 ---
 
-## 5. V2 Enforcement Rules
+## 7. RESTful Route Patterns
 
-These rules are **mandatory** and must be enforced at every layer. Violations must be caught during code review.
+### 7.1 V2 Component Routes
 
-### 5.1 Data Layer Rules
+```
+GET    /technical/api/v2/components/component/:vesselId      ← List all by vessel
+GET    /technical/api/v2/components/component/by-id/:id      ← Get by ID
+POST   /technical/api/v2/components/component                ← Create
+PATCH  /technical/api/v2/components/component/:id            ← Update
+DELETE /technical/api/v2/components/component/:id            ← Delete (hard delete, matches legacy)
+POST   /technical/api/v2/components/component/:id/inactivate ← Inactivate (preferred over delete)
+POST   /technical/api/v2/components/component/upload         ← Bulk upload
+```
 
-| Rule | Enforcement | Layer |
-|------|-------------|-------|
-| **Soft delete only** | `DELETE` endpoints set `is_deleted = true`, never execute SQL `DELETE` | Repository |
-| **Always filter `is_deleted = false`** | Every read query in the repository appends `.where(eq(table.isDeleted, false))` | Repository |
-| **No N+1 queries** | Repository methods use JOINs or batch queries for related data | Repository |
-| **No direct DB access outside repositories** | Service and controller layers must NOT import Drizzle, `db`, or any table schema. Only repository modules import DB tooling. | Service, Controller |
-| **ORM query builders only** | No raw SQL strings in repository layer. All queries built with Drizzle query builders | Repository |
+### 7.2 V2 Sub-Entity Routes (Nested Under Component)
 
-### 5.2 API & Identity Rules
+```
+GET    /technical/api/v2/components/component/:componentId/documents
+POST   /technical/api/v2/components/component/:componentId/documents
+PUT    /technical/api/v2/components/component/documents/:id
+DELETE /technical/api/v2/components/component/documents/:id
+GET    /technical/api/v2/components/component/documents/:id/download
 
-| Rule | Enforcement | Layer |
-|------|-------------|-------|
-| **UUIDs in APIs only** | All `:uuid` route params use `component_uuid` (text). Internal serial `id` is NEVER exposed in any response or accepted in any request. | Controller, Routes |
-| **All relations via soft UUID references** | No hard FK constraints in V2 tables. Parent/child and cross-entity references use text UUID columns | Schema |
-| **All dates stored as text** | Date columns use `text` type with `YYYY-MM-DD` format. Timestamp columns use `text` with ISO 8601 format (`YYYY-MM-DDTHH:MM:SSZ`) | Schema |
+GET    /technical/api/v2/components/component/:componentId/class-regulatory
+POST   /technical/api/v2/components/component/:componentId/class-regulatory
+PUT    /technical/api/v2/components/component/class-regulatory/:id
+DELETE /technical/api/v2/components/component/class-regulatory/:id
 
-### 5.3 Column & Schema Rules
+GET    /technical/api/v2/components/component/:componentId/requisitions
+POST   /technical/api/v2/components/component/:componentId/requisitions
+PUT    /technical/api/v2/components/component/requisitions/:id
+DELETE /technical/api/v2/components/component/requisitions/:id
 
-| Rule | Enforcement | Layer |
-|------|-------------|-------|
-| **No JSON columns** | V2 schema must not use `json()`, `jsonb()`, or `.array()` column types. Data that requires arrays must be normalized into separate tables or stored as comma-separated text | Schema |
-| **Internal PK: `id` (serial)** | Every V2 table has `id: serial("id").primaryKey()` as auto-increment internal PK | Schema |
-| **External identifier: `{entity}Uuid`** | Every V2 table has `{entity}_uuid: text().unique().notNull()` for external references | Schema |
-| **7 mandatory audit columns** | Every V2 table includes: `sort_order` (integer), `created_at` (text), `updated_at` (text), `created_by_uuid` (text), `updated_by_uuid` (text), `is_deleted` (boolean), `is_sync` (boolean) | Schema |
-| **Audit columns appended at end** | Audit columns are always the last 7 columns in the table definition | Schema |
+GET    /technical/api/v2/components/component/:componentId/maintenance-history
+GET    /technical/api/v2/components/component/maintenance-history/:id
+```
 
-### 5.4 Layer Boundary Rules
+### 7.3 Route Response Contract Rule
 
-| Rule | Enforcement | Layer |
-|------|-------------|-------|
-| **Service handles audit user** | `created_by_uuid` and `updated_by_uuid` are set exclusively in the service layer before passing data to the repository | Service |
-| **Controller: HTTP concerns only** | Controllers extract `req.params`, `req.body`, `req.query`, validate with Zod, call service, and return `res.json()` / `res.status()`. No business logic. | Controller |
-| **Service: No HTTP objects** | Service methods accept plain TypeScript objects/strings. No `Request`, `Response`, or `NextFunction` imports. | Service |
-| **No cross-module coupling** | V2 component module must not import from other V2 modules or legacy modules. If cross-module data is needed, it must go through a shared service or API call. | All layers |
-| **No changes to legacy logic** | All V2 code lives in new files under `server/v2/`, `shared/v2/`, and `client/src/modules/`. Zero modifications to existing legacy files (except Phase 4 toggle integration). | All layers |
+**All V2 routes must return identical JSON shapes as legacy routes.** Specifically:
 
-### 5.5 Numeric Field Handling
+| V2 Route | Must Match Legacy Route | Response Shape |
+|----------|------------------------|----------------|
+| GET `/:vesselId` | GET `/technical/api/components/:vesselId` | `Component[]` |
+| GET `/by-id/:id` | GET `/technical/api/components/:id` | `Component` |
+| POST `/` | POST `/technical/api/components` | `Component` (201) |
+| PATCH `/:id` | PATCH `/technical/api/components/:id` | `Component` |
+| DELETE `/:id` | DELETE `/technical/api/components/:id` | `{ success: true }` |
+| POST `/upload` | POST `/technical/api/components/upload` | `{ success, created, updated, failed, errors, preview, columnInfo }` |
+| POST `/:id/inactivate` | POST `/technical/api/components/:id/inactivate` | `{ success, message, componentsInactivated, ... }` |
 
-| Legacy Type | V2 Type | Conversion |
-|-------------|---------|------------|
-| `decimal("running_hours", { precision: 10, scale: 2 })` | `text("running_hours")` | Stored as text. Service layer validates numeric format using `parseFloat()` before saving. |
-| `decimal("current_cumulative_rh")` | `text("current_cumulative_rh")` | Same pattern. All numeric precision is maintained as string representation. |
-| `integer("quantity")` | `integer("quantity")` | Integers remain as `integer` type (not affected by the "dates as text" rule). |
+### 7.4 Route Registration
+
+```typescript
+// server/v2/components/routes.ts
+import { Router } from 'express';
+
+export function createComponentRouter(controller: ComponentController, uploadController: ComponentUploadController): Router {
+  const router = Router();
+
+  router.get('/component/:vesselId', asyncHandler(ctrl.list));
+  router.get('/component/by-id/:id', asyncHandler(ctrl.getById));
+  router.post('/component', asyncHandler(ctrl.create));
+  router.patch('/component/:id', asyncHandler(ctrl.update));
+  router.delete('/component/:id', asyncHandler(ctrl.remove));
+  router.post('/component/:id/inactivate', asyncHandler(ctrl.inactivate));
+  router.post('/component/upload', upload.single('file'), asyncHandler(uploadCtrl.upload));
+
+  // Sub-entity routes...
+  return router;
+}
+
+// server/v2/components/index.ts — Module entry point
+import { createComponentRouter } from './routes';
+// Wire up dependencies and export router
+
+// Registration in main app (additive only):
+// app.use('/technical/api/v2/components', v2ComponentRouter);
+```
 
 ---
 
-## 6. Toggle Mechanism
+## 8. Frontend API Layer Rules
 
-### 6.1 Frontend Toggle Design
+### 8.1 Rules
+
+| Rule | Detail |
+|------|--------|
+| **One API file per module** | `componentApiV2.ts` contains all V2 API functions |
+| **Toggle decides Legacy vs V2** | `getApiBase()` reads `localStorage('pms_api_version')` |
+| **Always pass auditUserUuid** | All mutation calls include user context |
+| **No direct fetch calls in components** | Components consume hooks, hooks consume API file |
+| **Hooks/components consume module API only** | No inline `useQuery` with URL strings |
+| **UI behavior must remain unchanged** | Same data shapes, same loading states, same error handling |
+
+### 8.2 API File Pattern
+
+```typescript
+// client/src/modules/components/api/componentApiV2.ts
+
+const getApiBase = () => {
+  const mode = localStorage.getItem('pms_api_version') || 'legacy';
+  return mode === 'v2'
+    ? '/technical/api/v2/components/component'
+    : '/technical/api';
+};
+
+export const componentApi = {
+  getByVesselId: (vesselId: string) => {
+    const base = getApiBase();
+    const mode = localStorage.getItem('pms_api_version') || 'legacy';
+    const url = mode === 'v2'
+      ? `${base}/${vesselId}`
+      : `/technical/api/components/${vesselId}`;
+    return fetch(url).then(r => r.json());
+  },
+
+  getById: (id: string) => {
+    const base = getApiBase();
+    const mode = localStorage.getItem('pms_api_version') || 'legacy';
+    const url = mode === 'v2'
+      ? `${base}/by-id/${id}`
+      : `/technical/api/components/${id}`;
+    return fetch(url).then(r => r.json());
+  },
+
+  create: (data: any) => {
+    const base = getApiBase();
+    const mode = localStorage.getItem('pms_api_version') || 'legacy';
+    const url = mode === 'v2' ? base : '/technical/api/components';
+    return fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) }).then(r => r.json());
+  },
+
+  // ... same pattern for update, delete, upload, inactivate
+
+  getDocuments: (componentId: string) => {
+    const base = getApiBase();
+    const mode = localStorage.getItem('pms_api_version') || 'legacy';
+    const url = mode === 'v2'
+      ? `${base}/${componentId}/documents`
+      : `/technical/api/component-documents/${componentId}`;
+    return fetch(url).then(r => r.json());
+  },
+
+  // ... same pattern for regulatory, requisitions, maintenance-history
+};
+```
+
+### 8.3 Hook Pattern
+
+```typescript
+// client/src/modules/components/hooks/useComponentsV2.ts
+import { useQuery, useMutation } from '@tanstack/react-query';
+import { queryClient } from '@/lib/queryClient';
+import { componentApi } from '../api/componentApiV2';
+
+export function useComponents(vesselId: string) {
+  return useQuery({
+    queryKey: ['components', vesselId],
+    queryFn: () => componentApi.getByVesselId(vesselId),
+    enabled: !!vesselId,
+  });
+}
+
+export function useComponentDocuments(componentId: string | undefined) {
+  return useQuery({
+    queryKey: ['component-documents', componentId],
+    queryFn: () => componentApi.getDocuments(componentId!),
+    enabled: !!componentId,
+  });
+}
+
+// ... same pattern for other queries and mutations
+```
+
+---
+
+## 9. Toggle Mechanism
+
+### 9.1 Frontend Toggle Design
 
 **Storage:** `localStorage` key: `pms_api_version` with values `'v2'` or `'legacy'` (default: `'legacy'`).
 
 **Toggle Component:** `client/src/modules/components/components/ComponentApiToggle.tsx`
 
 ```
-Location: Placed in the Component module header area (near existing settings/admin controls)
-Behavior:
-  - Toggle switch or dropdown: "V2 Mode" / "Legacy Mode"
+Design:
+  - Simple switch/toggle UI element in the Component page header
+  - Shows "V2 Mode" or "Legacy Mode" indicator
   - On toggle, sets localStorage value and invalidates all component query caches
   - Shows visual indicator of active mode (small badge/pill)
 ```
 
-### 6.2 API Selection Logic
+### 9.2 How the Toggle Determines API Selection
 
-**File:** `client/src/modules/components/api/componentApiV2.ts`
-
-```
-Pattern:
-  const getApiBase = () => {
-    const mode = localStorage.getItem('pms_api_version') || 'legacy';
-    return mode === 'v2'
-      ? '/technical/api/v2/components/component'
-      : '/technical/api/components';
-  };
-
-  // All hook/api functions use getApiBase() to determine endpoint
+```typescript
+const getApiBase = () => {
+  const mode = localStorage.getItem('pms_api_version') || 'legacy';
+  return mode === 'v2'
+    ? '/technical/api/v2/components/component'
+    : '/technical/api';
+};
 ```
 
-### 6.3 How Both Systems Run in Parallel
+- When toggle = `'legacy'` (default): All API calls go to existing legacy endpoints
+- When toggle = `'v2'`: All API calls go to V2 endpoints under `/technical/api/v2/components/component/`
+
+### 9.3 How Legacy and V2 Run in Parallel
 
 ```
 ┌─────────────────────────────────────────────────────────┐
 │                     Express Server                       │
 │                                                          │
-│  Legacy Routes (routes.ts)        V2 Routes (v2/)        │
-│  ┌────────────────────────┐     ┌─────────────────────┐  │
-│  │ /technical/api/        │     │ /technical/api/      │  │
-│  │   components/*         │     │   api/v2/components/ │  │
-│  │                        │     │   *                  │  │
-│  │ → storage.*(...)       │     │ → controller         │  │
-│  │   (direct DB call)     │     │   → service          │  │
-│  │                        │     │   → repository       │  │
-│  │ Reads/writes:          │     │   → componentV2 DB   │  │
-│  │   components table     │     │ Reads/writes:        │  │
-│  └────────────────────────┘     │   components_v2 tbl  │  │
-│                                 └─────────────────────┘  │
+│  Legacy Routes (always registered):                      │
+│    app.get("/technical/api/components/:vesselId", ...)   │
+│    app.post("/technical/api/components/upload", ...)     │
+│    app.patch("/technical/api/components/:id", ...)       │
+│    ... (all existing routes unchanged)                   │
 │                                                          │
-│  Both route sets coexist. No shared state. No conflict.  │
+│  V2 Routes (always registered, additive):                │
+│    app.use("/technical/api/v2/components", v2Router)     │
+│    → GET /component/:vesselId                            │
+│    → POST /component/upload                              │
+│    → PATCH /component/:id                                │
+│    ... (new routes, same storage underneath)              │
+│                                                          │
+│  BOTH route sets call the SAME storage methods:          │
+│    storage.getComponents()                                │
+│    storage.updateComponent()                              │
+│    storage.bulkUpsertComponents()                         │
+│    etc.                                                   │
 └─────────────────────────────────────────────────────────┘
 ```
 
-**Key principle:** Legacy and V2 use **separate database tables** (`components` vs `components_v2`). This ensures:
-- No data corruption risk
-- Instant rollback by toggling back to legacy
-- No migration of existing data required during initial rollout
+**Key facts:**
+- Both route sets are always registered — no server restart needed
+- Both call the same `storage.*` methods → same database → same data
+- Toggle only controls which URL the frontend calls
+- No data divergence risk — there is only ONE database table (`components`)
 
-### 6.4 Data Synchronization (Optional Future Phase)
-
-During the parallel period, data entered via V2 will NOT appear in legacy views and vice versa. This is intentional to avoid complexity. A sync mechanism can be introduced in a later phase if needed:
-- **Option A:** Background job that mirrors `components_v2` → `components` (one-way)
-- **Option B:** Read from both tables and merge (complex, not recommended initially)
-- **Option C:** Bulk data migration script run during a planned cutover window
-
-### 6.5 Rollback to Legacy
+### 9.4 How Rollback Happens Instantly
 
 **Instant rollback:**
 1. User clicks toggle → switches to "Legacy"
 2. `localStorage` updates to `'legacy'`
-3. All frontend queries re-fire against legacy endpoints
-4. No data loss — legacy table was never modified
-5. V2 table data persists but is simply not queried
+3. All query caches are invalidated
+4. Next render: all `useQuery` hooks fire with legacy URLs
+5. Same data loads from same database table
 
-**No server restart needed.** Both route sets are always registered.
+**Zero data loss**: Both V2 and legacy operate on the same `components` table in the same database. There is no separate V2 data store. Switching modes is purely a URL routing change.
 
----
-
-## 7. Phased Migration Plan
-
-### Phase 1 — Structural Foundation (No functional change)
-
-**Goal:** Create V2 folder structure, schema, and repository layer without affecting legacy.
-
-| Step | Action | Files Created/Modified | Risk |
-|------|--------|----------------------|------|
-| 1.1 | Create `server/v2/components/` directory tree | New directories only | None |
-| 1.2 | Create `shared/v2/components/schema.ts` with V2 Drizzle schema | New file | None |
-| 1.3 | Create `shared/v2/components/types.ts` with Zod schemas + types | New file | None |
-| 1.4 | Run `drizzle-kit generate` to create migration for `components_v2` table | New migration SQL file | Low — new table only |
-| 1.5 | Apply migration to create `components_v2` table in DB | Database DDL | Low — additive only |
-| 1.6 | Create `componentRepository.ts` with all query methods | New file | None |
-| 1.7 | Create barrel `index.ts` files for each sublayer | New files | None |
-
-**Validation:**
-- [ ] V2 folder structure matches specification
-- [ ] `components_v2` table exists in DB with all columns and indexes
-- [ ] Repository methods compile and can be unit-tested in isolation
-- [ ] Legacy routes, tables, and functionality completely untouched
+**No behavior difference**: V2 service layer executes identical business logic to what's inline in legacy routes. Same inputs → same validation → same storage calls → same outputs.
 
 ---
 
-### Phase 2 — Service & Controller Layers
+## 10. Critical Enforcement Rules
 
-**Goal:** Implement business logic and HTTP handling for V2 component CRUD.
+These rules are **mandatory** for all V2 code. Violations must be caught during code review.
 
-| Step | Action | Files Created/Modified | Risk |
-|------|--------|----------------------|------|
-| 2.1 | Create `componentService.ts` with CRUD business logic | New file | None |
-| 2.2 | Extract RH validation rules into service methods | New methods | None |
-| 2.3 | Implement audit column injection (`created_by_uuid`, `updated_by_uuid`) | Service layer | None |
-| 2.4 | Create `componentController.ts` with HTTP handlers | New file | None |
-| 2.5 | Add Zod request body validation in controller | Controller | None |
-| 2.6 | Create `routes.ts` with RESTful patterns | New file | None |
-| 2.7 | Register V2 routes in Express app under `/technical/api/v2/` | `server/index.ts` or `server/v2/components/index.ts` | Low — additive |
+### 10.1 Architecture Enforcement
 
-**V2 RESTful Route Patterns:**
+| Rule | Detail |
+|------|--------|
+| **No JSON columns** | V2 shared types must not introduce `json()` or `jsonb()` column types |
+| **No cross-module coupling** | V2 component module must not import from other V2 modules. If cross-module data is needed, go through storage or a shared API call |
+| **No DB access outside repositories** | Service and controller layers must NOT import `storage`, `db`, or any Drizzle table schema |
+| **No functional or logical changes** | V2 must produce identical outputs for identical inputs as legacy |
+| **No data model behavior change** | Same table, same columns, same constraints — no schema changes |
+| **No legacy code modification** | All V2 code lives in new files under `server/v2/`, `shared/v2/`, and `client/src/modules/`. Zero modifications to existing legacy files (Phase 4 toggle integration excepted) |
 
-```
-GET    /technical/api/v2/components/component            ← List all (query: ?vesselUuid=)
-GET    /technical/api/v2/components/component/:uuid      ← Get by UUID
-POST   /technical/api/v2/components/component            ← Create
-PATCH  /technical/api/v2/components/component/:uuid      ← Update
-DELETE /technical/api/v2/components/component/:uuid      ← Soft delete
+### 10.2 Layer Boundary Enforcement
 
-POST   /technical/api/v2/components/component/upload     ← Bulk upload
-POST   /technical/api/v2/components/component/:uuid/inactivate ← Inactivation
+| Rule | Enforcement | Layer |
+|------|-------------|-------|
+| **Repository: DB only** | Only layer that imports `storage`. No business logic, no HTTP objects. | Repository |
+| **Service: logic only** | No `Request`/`Response` imports. No `storage` import. Receives plain params, returns plain objects or throws errors. | Service |
+| **Controller: HTTP only** | Extracts req data, validates with Zod, calls service, maps errors to status codes. No business logic. | Controller |
+| **Routes: wiring only** | Maps HTTP methods + paths to controller methods. No inline logic. | Routes |
 
-Nested sub-entities:
-GET    /technical/api/v2/components/component/:uuid/documents
-POST   /technical/api/v2/components/component/:uuid/documents
-PATCH  /technical/api/v2/components/document/:uuid
-DELETE /technical/api/v2/components/document/:uuid
+### 10.3 Response Contract Enforcement
 
-GET    /technical/api/v2/components/component/:uuid/regulatory
-POST   /technical/api/v2/components/component/:uuid/regulatory
-PATCH  /technical/api/v2/components/regulatory/:uuid
-DELETE /technical/api/v2/components/regulatory/:uuid
+| Rule | Detail |
+|------|--------|
+| **Same inputs** | V2 accepts the same request shapes (params, body, query) as legacy |
+| **Same logic** | V2 service executes the same validation/cascade/business rules as legacy route handlers |
+| **Same outputs** | V2 returns the same JSON response shapes as legacy endpoints |
 
-GET    /technical/api/v2/components/component/:uuid/requisitions
-POST   /technical/api/v2/components/component/:uuid/requisitions
-PATCH  /technical/api/v2/components/requisition/:uuid
-DELETE /technical/api/v2/components/requisition/:uuid
+---
 
-GET    /technical/api/v2/components/component/:uuid/maintenance-history
-```
+## 11. Phased Migration Plan
+
+### Phase 1 — Backend Structure (No functional change)
+
+**Goal:** Create V2 folder structure, repository, and service layers. Wire up routes. No legacy changes.
+
+| Step | Task | File | Legacy Impact |
+|------|------|------|---------------|
+| 1.1 | Create `server/v2/components/` directory structure | New directories | None |
+| 1.2 | Create `shared/v2/components/schema.ts` (re-exports from shared/schema.ts) | New file | None |
+| 1.3 | Create `shared/v2/components/types.ts` (Zod schemas for request validation) | New file | None |
+| 1.4 | Implement `componentRepository.ts` (wraps storage calls) | New file | None |
+| 1.5 | Implement `componentService.ts` (business logic from routes) | New file | None |
+| 1.6 | Implement `componentUploadService.ts` (file parsing/validation from routes) | New file | None |
+| 1.7 | Implement `componentController.ts` (HTTP handlers) | New file | None |
+| 1.8 | Implement `componentUploadController.ts` (upload handler) | New file | None |
+| 1.9 | Create `routes.ts` with RESTful patterns | New file | None |
+| 1.10 | Create `index.ts` module entry point | New file | None |
+| 1.11 | Register V2 routes in Express app under `/technical/api/v2/components/` | Additive change to server startup | Low — additive only |
 
 **Validation:**
 - [ ] All V2 CRUD endpoints return correct HTTP status codes (200, 201, 400, 404)
 - [ ] Zod validation rejects invalid payloads with 400
-- [ ] All responses use `component_uuid` (never expose internal `id`)
-- [ ] All reads filter `is_deleted = false`
-- [ ] DELETE performs soft delete (sets `is_deleted = true`)
-- [ ] Audit columns are populated correctly
+- [ ] All responses match legacy response shapes exactly
 - [ ] Legacy routes remain completely unaffected
+- [ ] RH validation rules produce identical results to legacy
+- [ ] RH cascade update works identically
+- [ ] Inactivation with/without cascade works identically
 
----
+### Phase 2 — Sub-Entity Routes
+
+**Goal:** Add V2 routes for component sub-entities (documents, regulatory, requisitions, maintenance history).
+
+| Step | Task | File | Legacy Impact |
+|------|------|------|---------------|
+| 2.1 | Add document CRUD to repository | `componentRepository.ts` | None |
+| 2.2 | Add document handlers to controller | `componentController.ts` | None |
+| 2.3 | Add class-regulatory CRUD to repository and controller | Same files | None |
+| 2.4 | Add requisition CRUD to repository and controller | Same files | None |
+| 2.5 | Add maintenance-history read endpoints | Same files | None |
+| 2.6 | Register all sub-entity routes | `routes.ts` | None |
+
+**Validation:**
+- [ ] All sub-entity GET/POST/PUT/DELETE endpoints work
+- [ ] Document download works
+- [ ] Response shapes match legacy exactly
 
 ### Phase 3 — Bulk Upload Alignment
 
-**Goal:** Extract upload logic into V2 service layer, reusing V2 repository.
+**Goal:** Move bulk upload logic from controller to upload service, keeping identical parsing and validation behavior.
 
-| Step | Action | Files Created/Modified | Risk |
-|------|--------|----------------------|------|
-| 3.1 | Create `componentUploadService.ts` with file parsing logic | New file | None |
-| 3.2 | Extract field mapping dictionary from routes.ts into upload service | New constant | None |
-| 3.3 | Implement `parseFile()`, `parseCsv()`, `parseExcel()` methods | Upload service | None |
-| 3.4 | Implement `mapAndValidate()` with row validation | Upload service | None |
-| 3.5 | Create `componentUploadController.ts` | New file | None |
-| 3.6 | Wire upload controller to call upload service → component service → repository | Controller | None |
-| 3.7 | Register upload route: `POST /technical/api/v2/components/component/upload` | routes.ts | Low — additive |
-
-**V2 Upload Call Chain:**
-```
-POST /technical/api/v2/components/component/upload
-  → componentUploadController.upload(req, res)
-    → Extracts file from multer
-    → componentUploadService.parseFile(buffer, ext)
-       → Returns parsed rows with detected headers
-    → componentUploadService.mapAndValidate(rows, fieldMapping)
-       → Returns { validRows, errors, columnInfo }
-    → componentService.bulkUpsert(validRows, auditUserUuid)
-       → componentRepository.bulkUpsert(rows)
-    → Controller formats response { success, created, updated, failed, errors, preview }
-```
-
-**Key difference from legacy:** The upload service calls `componentService.bulkUpsert()` which in turn calls `componentRepository.bulkUpsert()`. This ensures:
-- Same validation rules for single and bulk operations
-- Audit columns handled by service layer
-- No direct DB access from upload logic
-- Consistent error handling
+| Step | Task | File | Legacy Impact |
+|------|------|------|---------------|
+| 3.1 | Implement `processUpload()` in upload service | `componentUploadService.ts` | None |
+| 3.2 | Wire upload controller to use upload service | `componentUploadController.ts` | None |
+| 3.3 | Verify field mapping dictionary matches legacy exactly | Test comparison | None |
+| 3.4 | Verify boolean/decimal conversion matches legacy | Test comparison | None |
 
 **Validation:**
-- [ ] V2 upload endpoint accepts CSV and Excel files
-- [ ] Field mapping produces same results as legacy for identical input files
-- [ ] Validation errors match legacy format (row number, field, message)
-- [ ] Bulk upsert uses repository methods (no direct SQL)
-- [ ] Audit columns populated for bulk-created rows
-- [ ] Legacy upload endpoints remain fully functional
+- [ ] Upload same test file via legacy and V2 → compare results row by row
+- [ ] Column detection (`columnInfo`) output matches exactly
+- [ ] Error messages match exactly
+- [ ] Same defaults applied
 
----
+### Phase 4 — Frontend Integration & Toggle
 
-### Phase 4 — Frontend Integration
+**Goal:** Create frontend API abstraction, hooks, and toggle component.
 
-**Goal:** Create V2 frontend API layer, hooks, and toggle mechanism.
-
-| Step | Action | Files Created/Modified | Risk |
-|------|--------|----------------------|------|
-| 4.1 | Create `client/src/modules/components/` directory tree | New directories | None |
-| 4.2 | Create `componentApiV2.ts` with typed API functions | New file | None |
-| 4.3 | Create `useComponents.ts` with TanStack Query hooks | New file | None |
-| 4.4 | Create `useComponentUpload.ts` with upload mutation hook | New file | None |
-| 4.5 | Create `ComponentApiToggle.tsx` toggle component | New file | None |
-| 4.6 | Add toggle to Component page header area | `Components.tsx` (minor) | Low |
-| 4.7 | Replace inline queryKey strings with hook calls (behind toggle) | `Components.tsx` | Medium |
-| 4.8 | Replace upload API call with V2 hook (behind toggle) | `MachineryComponentUpload.tsx` | Low |
-
-**Frontend API Layer Design:**
-
-```typescript
-// client/src/modules/components/api/componentApiV2.ts
-
-const V2_BASE = '/technical/api/v2/components/component';
-const LEGACY_BASE = '/technical/api/components';
-
-export const getApiBase = () => {
-  const mode = localStorage.getItem('pms_api_version') || 'legacy';
-  return mode === 'v2' ? V2_BASE : LEGACY_BASE;
-};
-
-// Typed API functions
-export const componentApi = {
-  list: (vesselUuid: string) =>
-    fetch(`${getApiBase()}?vesselUuid=${vesselUuid}`).then(r => r.json()),
-
-  getByUuid: (uuid: string) =>
-    fetch(`${getApiBase()}/${uuid}`).then(r => r.json()),
-
-  create: (data: CreateComponentV2, auditUserUuid: string) =>
-    apiRequest('POST', getApiBase(), { ...data, auditUserUuid }),
-
-  update: (uuid: string, data: Partial<CreateComponentV2>, auditUserUuid: string) =>
-    apiRequest('PATCH', `${getApiBase()}/${uuid}`, { ...data, auditUserUuid }),
-
-  remove: (uuid: string, auditUserUuid: string) =>
-    apiRequest('DELETE', `${getApiBase()}/${uuid}`, { auditUserUuid }),
-
-  upload: (file: File, vesselUuid: string) => {
-    const formData = new FormData();
-    formData.append('file', file);
-    formData.append('vesselUuid', vesselUuid);
-    return fetch(`${getApiBase()}/upload`, { method: 'POST', body: formData });
-  },
-};
-```
-
-**Hook Design:**
-
-```typescript
-// client/src/modules/components/hooks/useComponents.ts
-
-export const useComponents = (vesselUuid: string) =>
-  useQuery({
-    queryKey: [getApiBase(), vesselUuid],
-    // Default queryFn already handles fetch
-  });
-
-export const useCreateComponent = () =>
-  useMutation({
-    mutationFn: ({ data, userUuid }) => componentApi.create(data, userUuid),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: [getApiBase()] }),
-  });
-```
+| Step | Task | File | Legacy Impact |
+|------|------|------|---------------|
+| 4.1 | Create `componentApiV2.ts` with toggle-aware API functions | New file | None |
+| 4.2 | Create `useComponentsV2.ts` hooks | New file | None |
+| 4.3 | Create `ComponentApiToggle.tsx` toggle UI | New file | None |
+| 4.4 | Add toggle to Component page header | `Components.tsx` — minimal change | Low — additive toggle UI |
+| 4.5 | Replace inline `useQuery` calls with V2 hooks (toggle-aware) | `Components.tsx` | Medium — refactor API consumption |
+| 4.6 | Test toggle switching between legacy and V2 | Manual test | None |
 
 **Validation:**
-- [ ] Toggle switches between legacy and V2 API endpoints at runtime
-- [ ] Component list loads from correct endpoint based on toggle state
-- [ ] Bulk upload uses correct endpoint based on toggle state
-- [ ] Cache invalidation works correctly after toggle switch
-- [ ] No changes to legacy query patterns when toggle is set to "Legacy"
+- [ ] Toggle defaults to "Legacy" mode
+- [ ] Switching to V2 mode: all data loads correctly
+- [ ] Switching back to Legacy mode: all data loads correctly
+- [ ] No visual differences between modes
 - [ ] All `auditUserUuid` passed to V2 API calls
 
 ---
 
-## 8. Toggle-Based Flow Diagram
+## 12. Toggle-Based Flow Diagram
 
 ```
 ┌──────────────────────────────────────────────────────────────────┐
 │                        FRONTEND                                  │
 │                                                                  │
-│  ┌────────────────────────────────────────────────────────────┐  │
-│  │  ComponentApiToggle  [ V2 Mode ●──○ Legacy Mode ]         │  │
-│  │  Stores: localStorage('pms_api_version')                   │  │
-│  └────────────────────┬───────────────────────────────────────┘  │
-│                       │                                          │
-│                       ▼                                          │
-│  ┌──────────────────────────────────────────────────────┐       │
-│  │  componentApiV2.ts → getApiBase()                    │       │
-│  │                                                      │       │
-│  │  if (mode === 'v2') {                                │       │
-│  │    base = '/technical/api/v2/components/component'│       │
-│  │  } else {                                            │       │
-│  │    base = '/technical/api/components'                 │       │
-│  │  }                                                   │       │
-│  └────────────┬──────────────────────┬──────────────────┘       │
-│               │                      │                           │
-│          V2 Mode                Legacy Mode                      │
-│               │                      │                           │
-└───────────────┼──────────────────────┼───────────────────────────┘
-                │                      │
-                ▼                      ▼
-┌───────────────────────────┐  ┌──────────────────────────┐
-│     V2 BACKEND STACK      │  │   LEGACY BACKEND STACK   │
-│                           │  │                          │
-│  Routes (v2/routes.ts)    │  │  routes.ts (monolithic)  │
-│    ↓                      │  │    ↓                     │
-│  Controller               │  │  (direct handler)        │
-│    ↓                      │  │    ↓                     │
-│  Service (business logic) │  │  storage.ts interface    │
-│    ↓                      │  │    ↓                     │
-│  Repository (DB queries)  │  │  postgresStorage.ts      │
-│    ↓                      │  │    ↓                     │
-│  components_v2 TABLE      │  │  components TABLE        │
-└───────────────────────────┘  └──────────────────────────┘
-
-ROLLBACK: Toggle → Legacy → All calls hit legacy stack → No data loss
+│  ┌─────────────┐                                                 │
+│  │  Toggle UI  │  localStorage: 'pms_api_version' = 'v2'|'legacy'│
+│  └──────┬──────┘                                                 │
+│         │                                                        │
+│         ▼                                                        │
+│  ┌───────────────────┐                                           │
+│  │ componentApiV2.ts │  getApiBase() reads toggle                │
+│  └──────┬────────────┘                                           │
+│         │                                                        │
+│    ┌────┴────┐                                                   │
+│    │         │                                                   │
+│    ▼         ▼                                                   │
+│  Legacy    V2 URL                                                │
+│  URL       /technical/api/v2/components/component/...            │
+│  /technical/api/components/...                                   │
+└────┬─────────┬───────────────────────────────────────────────────┘
+     │         │
+     ▼         ▼
+┌────────────────────────────────────────────────────────────────┐
+│                      EXPRESS SERVER                              │
+│                                                                  │
+│  Legacy Handler          V2 Handler                              │
+│  (routes.ts)             (v2/components/routes.ts)               │
+│  inline logic            Controller → Service → Repository      │
+│         │                         │                              │
+│         └─────────┬───────────────┘                              │
+│                   ▼                                              │
+│         ┌─────────────────┐                                      │
+│         │ storage.*()     │  SAME storage methods                │
+│         │ (postgresStorage│  SAME database table                 │
+│         │  .ts)           │  SAME data                           │
+│         └────────┬────────┘                                      │
+│                  ▼                                                │
+│         ┌────────────────┐                                       │
+│         │  PostgreSQL    │                                       │
+│         │  components    │  ← ONE table, shared by both          │
+│         │  table         │                                       │
+│         └────────────────┘                                       │
+└──────────────────────────────────────────────────────────────────┘
 ```
 
 ---
 
-## 9. Component Bulk Upload Refactor Plan
+## 13. Component Bulk Upload Refactor Plan
 
-### 9.1 Current State (Two Paths)
+### 13.1 Current State
 
-**Path A — Legacy Direct Upload:**
+**Legacy Upload Handler (routes.ts L113-396, 284 lines):**
+
 ```
-POST /technical/api/components/upload (routes.ts:113-396)
-  → multer → parse → map → validate → storage.bulkUpsertComponents()
-  → 283 lines in one handler
+POST /technical/api/components/upload
+  → multer middleware (file extraction)
+  → File type detection (CSV vs XLSX/XLS)
+  → CSV: PapaParse with header=true, skipEmptyLines, dynamicTyping
+  → XLSX: XLSX.read + sheet_to_json, manual header extraction
+  → Field mapping dictionary (89 entries, case-insensitive normalization)
+  → Column detection for user feedback
+  → Row-by-row validation:
+    - Required: id, name, componentCategory, vesselCode
+    - Boolean conversion: critical, classItem, conditionBased, isParent, isActive
+    - Decimal conversion: currentCumulativeRH, runningHours
+    - Defaults: currentCumulativeRH='0', critical=false, classItem=false
+  → storage.bulkUpsertComponents(processedComponents)
+  → Response: { success, created, updated, failed, errors, preview, columnInfo }
 ```
 
-**Path B — Uniform Bulk Upload:**
-```
-POST /technical/api/bulk/sheets (routes/bulk.ts)
-POST /technical/api/bulk/dry-run (routes/bulk.ts)
-POST /technical/api/bulk/import (routes/bulk.ts)
-  → Multi-step with sheet selection, preview, and actual import
-```
-
-### 9.2 V2 Upload Architecture
+### 13.2 V2 Upload Architecture
 
 ```
 V2 Upload Path:
 
 POST /technical/api/v2/components/component/upload
   │
-  ├→ componentUploadController.upload(req, res)
-  │    │
-  │    ├→ Extract file from multer middleware
-  │    ├→ Validate file extension (CSV/XLSX/XLS)
-  │    │
-  │    ├→ componentUploadService.parseFile(buffer, extension)
-  │    │    ├→ CSV: Papa.parse(content, { header, skipEmptyLines })
-  │    │    └→ Excel: XLSX.read(buffer) → sheet_to_json()
-  │    │    └→ Returns { rows: any[], headers: string[] }
-  │    │
-  │    ├→ componentUploadService.mapAndValidate(rows, headers)
-  │    │    ├→ Apply FIELD_MAPPING constant (90 entries)
-  │    │    ├→ Normalize headers (case-insensitive, flexible separators)
-  │    │    ├→ Detect mapped/unmapped columns
-  │    │    ├→ Per-row validation:
-  │    │    │    ├→ Required: Component Code, Name, Category, Vessel Code
-  │    │    │    ├→ Boolean normalization (true/false/yes/no/1/0)
-  │    │    │    ├→ Decimal normalization (RH fields)
-  │    │    │    └→ Apply defaults (currentCumulativeRH='0', critical=false)
-  │    │    └→ Returns { validRows, errors, columnInfo }
-  │    │
-  │    ├→ componentService.bulkUpsert(validRows, auditUserUuid)
-  │    │    ├→ Generate componentUuid for new rows
-  │    │    ├→ Set created_by_uuid / updated_by_uuid
-  │    │    ├→ Set created_at / updated_at
-  │    │    └→ componentRepository.bulkUpsert(rows)
-  │    │
-  │    └→ Return response:
-  │         { success, created, updated, failed, errors, preview, columnInfo }
+  ├→ Controller: componentUploadController.ts
+  │   - multer middleware on route definition
+  │   - Validates file exists
+  │   - Calls uploadService.processUpload(req.file)
+  │   - Returns result as JSON
   │
-  └→ Legacy Path A and Path B remain fully intact
+  ├→ Upload Service: componentUploadService.ts
+  │   - parseFile(buffer, extension) → { data, headers }
+  │   - mapAndValidate(parsedData, headers) → { processedComponents, errors, columnInfo }
+  │   - Contains EXACT same:
+  │     · Field mapping dictionary (89 entries)
+  │     · normalizeKey() function
+  │     · Boolean conversion logic
+  │     · Decimal conversion logic
+  │     · Required field checks
+  │     · Default value assignment
+  │   - processUpload(file) → orchestrates parse + validate + repository call
+  │
+  └→ Repository: componentRepository.ts
+      - bulkUpsert(processedComponents) → storage.bulkUpsertComponents()
 ```
 
-### 9.3 Mapping: Legacy Upload Handler → V2 Layers
+### 13.3 Mapping: Legacy Upload Handler → V2 Layers
 
 | Legacy Code (routes.ts) | Lines | V2 Layer | V2 Method |
 |--------------------------|-------|----------|-----------|
-| `upload.single('file')` | 113 | Controller middleware | multer stays on route |
-| File extension check | 120-152 | Upload Service | `parseFile(buffer, ext)` |
-| Papa.parse (CSV) | 127-134 | Upload Service | `parseCsv(buffer)` |
-| XLSX.read (Excel) | 136-150 | Upload Service | `parseExcel(buffer)` |
-| `fieldMapping` dictionary | 157-245 | Upload Service | `FIELD_MAPPING` constant |
-| `normalizeKey()` | 249 | Upload Service | `normalizeHeader(key)` |
-| `normalizedMapping` build | 250-253 | Upload Service | `buildNormalizedMapping()` |
-| Column detection | 256-276 | Upload Service | `detectColumns(headers, mapping)` |
-| Row validation loop | 278-365 | Upload Service | `validateRows(rows, mapping)` |
-| Boolean conversion | 296-307 | Upload Service | `normalizeBoolean(value)` |
-| Decimal conversion | 309-315 | Upload Service | `normalizeDecimal(value)` |
-| Default values | 359-363 | Upload Service | `applyDefaults(component)` |
-| `storage.bulkUpsertComponents()` | 380 | Service → Repository | `componentService.bulkUpsert() → repo.bulkUpsert()` |
-| Response construction | 382-390 | Controller | `res.json({...})` |
+| `upload.single('file')` | 113 | Route middleware | multer stays on route definition |
+| File existence check | 114-117 | Controller | `upload()` method |
+| File extension detection | 120 | Upload Service | `parseFile()` |
+| CSV parsing (PapaParse) | 126-134 | Upload Service | `parseFile()` |
+| XLSX parsing | 135-150 | Upload Service | `parseFile()` |
+| Field mapping dictionary | 157-245 | Upload Service | Class constant |
+| `normalizeKey()` function | 249 | Upload Service | Private method |
+| Column detection | 256-276 | Upload Service | `mapAndValidate()` |
+| Row-by-row validation | 282-365 | Upload Service | `mapAndValidate()` |
+| Boolean field conversion | 296-307 | Upload Service | `mapAndValidate()` |
+| Decimal field conversion | 310-315 | Upload Service | `mapAndValidate()` |
+| Required field checks | 322-357 | Upload Service | `mapAndValidate()` |
+| Default assignment | 359-362 | Upload Service | `mapAndValidate()` |
+| `storage.bulkUpsertComponents()` | 380 | Repository | `bulkUpsert()` |
+| Response construction | 382-390 | Controller | `upload()` method |
+
+### 13.4 Verification Strategy
+
+To prove V2 upload produces identical results:
+
+1. Take a test upload file (CSV and XLSX)
+2. Upload via legacy endpoint → capture full response JSON
+3. Upload same file via V2 endpoint → capture full response JSON
+4. Compare:
+   - `created` count must match
+   - `updated` count must match
+   - `failed` count must match
+   - `errors` array must match (same row numbers, same messages)
+   - `columnInfo.mapped` must match
+   - `columnInfo.unmapped` must match
+   - `preview` records must match
+5. Query database → both should have produced identical rows
 
 ---
 
-## 10. Risk Points & Rollback Strategy
+## 14. Risk Points & Rollback Strategy
 
-### 10.1 Risk Assessment
+### 14.1 Risk Assessment
 
 | Risk | Severity | Mitigation |
 |------|----------|------------|
-| V2 table migration fails | Medium | V2 table is additive — no impact on legacy table |
-| V2 route conflicts with legacy | Low | Different URL prefix (`/api/v2/` vs no prefix) |
-| Data entered in V2 not visible in legacy | Medium (expected) | Document clearly; sync is a later phase |
-| Frontend toggle state lost on clear cache | Low | Default to 'legacy' — safest fallback |
-| Performance of separate V2 table | Low | Same indexes, same DB engine |
-| Bulk upload in V2 produces different results than legacy | Medium | Test with identical input files; compare output row by row |
-| Other modules reference legacy component IDs | High | V2 table uses its own UUIDs; cross-module queries still use legacy table |
-| RH cascade in V2 only updates V2 table | Medium | Expected during parallel period; cascade logic is V2-internal |
+| V2 service logic diverges from legacy | High | Copy exact logic from routes.ts, not rewrite. Line-by-line comparison during review. |
+| V2 upload produces different results | Medium | Side-by-side test with identical input files, compare JSON responses |
+| V2 routes conflict with legacy routes | Low | V2 routes use `/v2/` namespace — no URL overlap possible |
+| Toggle breaks existing UI | Low | Toggle defaults to "Legacy". V2 mode is opt-in only. |
+| Storage method behavior changes | None | V2 calls same `storage.*` methods — no storage changes |
+| Database integrity risk | None | Both flows use same database table via same storage methods |
 
-### 10.2 Rollback Strategy
+### 14.2 Rollback Strategy
 
 **Instant Rollback (Frontend):**
 - Toggle switch → "Legacy Mode"
 - All frontend queries immediately target legacy endpoints
-- No server restart required
-- No data loss — V2 data persists in `components_v2`, legacy data untouched in `components`
+- Same data, same database, zero downtime
 
-**V2 Route Removal (Server):**
-- Comment out V2 route registration in Express app
-- Restart server
-- V2 endpoints return 404; frontend toggle defaults to legacy
+**Server Rollback (If Needed):**
+- Comment out `app.use('/technical/api/v2/components', v2Router)` in server startup
+- V2 routes disappear, all traffic goes to legacy
+- No database cleanup needed — same table was used throughout
 
-**V2 Table Cleanup (If Needed):**
-- `DROP TABLE components_v2;` — only if fully abandoning V2
-- Legacy table and all legacy functionality completely unaffected
+**Complete Removal (If Abandoning V2):**
+- Delete `server/v2/components/` directory
+- Delete `shared/v2/components/` directory
+- Delete `client/src/modules/components/` directory
+- Remove V2 route registration from server startup
+- Remove toggle from Components.tsx
+- No database changes needed
 
-### 10.3 Safe Migration Points
+### 14.3 Safe Migration Points
 
 | Phase | Safe Rollback Point | What to Roll Back |
 |-------|---------------------|-------------------|
-| Phase 1 complete | Drop `components_v2` table | Remove new files from `server/v2/` and `shared/v2/` |
-| Phase 2 complete | Remove V2 route registration | Comment out `app.use('/technical/api/v2', v2Router)` |
-| Phase 3 complete | Same as Phase 2 | Upload service is only called by V2 routes |
+| Phase 1 complete | Remove V2 route registration | Comment out `app.use('/technical/api/v2/components', v2Router)` |
+| Phase 2 complete | Same as Phase 1 | Same — sub-entity routes are part of V2 router |
+| Phase 3 complete | Same as Phase 1 | Upload service is only called by V2 routes |
 | Phase 4 complete | Toggle to "Legacy" | Frontend reverts to legacy API calls |
 
 ---
 
-## 11. Validation Checklist Per Phase
+## 15. Validation Checklist
 
-### Phase 1 — Structural Foundation
+### 15.1 Same Inputs
 
-- [ ] `server/v2/components/` directory exists with all subfolders
-- [ ] `shared/v2/components/schema.ts` defines `componentsV2` table with all 7 audit columns
-- [ ] `shared/v2/components/types.ts` exports insert schema, select type, and request/response types
-- [ ] Migration SQL file generated by `drizzle-kit generate`
-- [ ] `components_v2` table exists in database (verify with `\dt components_v2` or SQL query)
-- [ ] Table has all columns including `sort_order`, `created_at`, `updated_at`, `created_by_uuid`, `updated_by_uuid`, `is_deleted`, `is_sync`
-- [ ] `component_uuid` column has UNIQUE constraint
-- [ ] `componentRepository.ts` compiles without errors
-- [ ] Legacy `routes.ts` is completely unchanged (diff shows zero modifications)
-- [ ] Legacy `storage.ts` is completely unchanged
-- [ ] Application starts and all legacy endpoints respond correctly
+- [ ] V2 `POST /component` accepts same JSON body as legacy `POST /technical/api/components`
+- [ ] V2 `PATCH /component/:id` accepts same JSON body as legacy `PATCH /technical/api/components/:id`
+- [ ] V2 `POST /component/upload` accepts same file types (CSV, XLS, XLSX) as legacy
+- [ ] V2 `POST /component/:id/inactivate` accepts same body as legacy
+- [ ] V2 sub-entity routes accept same bodies as legacy
 
-### Phase 2 — Service & Controller Layers
+### 15.2 Same Logic
 
-- [ ] `componentService.ts` compiles and has no dependency on HTTP objects
-- [ ] `componentController.ts` never imports from repository layer directly
-- [ ] Zod validation rejects malformed payloads with 400 status
-- [ ] `POST /technical/api/v2/components/component` creates a row in `components_v2` with generated `component_uuid`
-- [ ] `GET /technical/api/v2/components/component?vesselUuid=X` returns only non-deleted rows
-- [ ] `DELETE` sets `is_deleted = true` (not hard delete)
-- [ ] `created_by_uuid` and `updated_by_uuid` are set on every create/update
-- [ ] RH validation rules produce same errors as legacy for identical invalid input
-- [ ] MASTER downgrade protection works (reject if dependents exist)
-- [ ] All legacy endpoints still respond correctly (regression test)
+- [ ] RH MASTER validation: reject if `rhMasterComponentId` provided → same error
+- [ ] RH INHERITED validation: require `rhMasterComponentId`, validate same vessel, validate MASTER type → same errors
+- [ ] RH NOT_RH_DRIVEN validation: reject if `rhMasterComponentId` provided → same error
+- [ ] RH self-reference prevention: reject if master = self → same error
+- [ ] RH downgrade protection: reject if MASTER has dependents → same error with dependent names
+- [ ] RH cascade update: `setComponentRunningHours()` called with same params
+- [ ] Upload field mapping: 89-entry dictionary produces same column mappings
+- [ ] Upload boolean conversion: "yes", "true", "1" → true; others → false
+- [ ] Upload decimal conversion: parseFloat with NaN check
+- [ ] Upload required fields: id, name, componentCategory, vesselCode
+- [ ] Upload defaults: currentCumulativeRH='0', critical=false, classItem=false
+- [ ] Inactivation Option A (block): same 400 response when children are active
+- [ ] Inactivation Option B (cascade): same cascade behavior
 
-### Phase 3 — Bulk Upload Alignment
+### 15.3 Same Outputs
 
-- [ ] `componentUploadService.ts` can parse both CSV and XLSX files
-- [ ] Field mapping produces identical output to legacy for same input file
-- [ ] Required field validation catches same errors as legacy
-- [ ] Boolean normalization handles: true/false, yes/no, 1/0, Yes/No, TRUE/FALSE
-- [ ] V2 upload endpoint returns same response structure as legacy
-- [ ] Bulk-created rows have `component_uuid` generated
-- [ ] Bulk-created rows have `created_by_uuid` set
-- [ ] Legacy upload endpoints (`/components/upload` and `/bulk/import`) unaffected
+- [ ] GET list: returns identical `Component[]` array
+- [ ] GET by ID: returns identical `Component` object (or 404)
+- [ ] POST create: returns identical `Component` with 201 status
+- [ ] PATCH update: returns identical `Component` after RH cascade
+- [ ] DELETE: returns `{ success: true }`
+- [ ] Upload: returns identical `{ success, created, updated, failed, errors, preview, columnInfo }`
+- [ ] Inactivate: returns identical result object
+- [ ] All error responses: same HTTP status codes, same error message strings
 
-### Phase 4 — Frontend Integration
+### 15.4 Architecture Compliance
 
-- [ ] `client/src/modules/components/` directory exists
-- [ ] `componentApiV2.ts` exports typed functions for all CRUD + upload operations
-- [ ] Toggle defaults to "Legacy" when `localStorage` has no value
-- [ ] Toggle switch immediately invalidates all component query caches
-- [ ] In V2 mode: component list fetches from V2 endpoint
-- [ ] In Legacy mode: component list fetches from legacy endpoint
-- [ ] Upload in V2 mode sends to V2 upload endpoint
-- [ ] `auditUserUuid` is always passed in V2 API calls
-- [ ] No console errors in either mode
-- [ ] Switching toggle back and forth does not cause data issues
-
----
-
-## Appendix A: File Creation Checklist
-
-| File | Phase | Purpose |
-|------|-------|---------|
-| `shared/v2/components/schema.ts` | 1 | V2 Drizzle table definition |
-| `shared/v2/components/types.ts` | 1 | V2 types and Zod schemas |
-| `server/v2/components/index.ts` | 1 | Module entry, route registration |
-| `server/v2/components/routes.ts` | 2 | Express router |
-| `server/v2/components/repositories/index.ts` | 1 | Barrel export |
-| `server/v2/components/repositories/componentRepository.ts` | 1 | DB queries |
-| `server/v2/components/services/index.ts` | 2 | Barrel export |
-| `server/v2/components/services/componentService.ts` | 2 | Business logic |
-| `server/v2/components/services/componentUploadService.ts` | 3 | Upload parsing/validation |
-| `server/v2/components/controllers/index.ts` | 2 | Barrel export |
-| `server/v2/components/controllers/componentController.ts` | 2 | HTTP handlers |
-| `server/v2/components/controllers/componentUploadController.ts` | 3 | Upload HTTP handler |
-| `client/src/modules/components/api/componentApiV2.ts` | 4 | Frontend API layer |
-| `client/src/modules/components/hooks/useComponents.ts` | 4 | Query hooks |
-| `client/src/modules/components/hooks/useComponentUpload.ts` | 4 | Upload mutation hook |
-| `client/src/modules/components/components/ComponentApiToggle.tsx` | 4 | Toggle UI |
-
-**Total new files: 16**
-**Modified legacy files: 0** (until Phase 4.6 toggle integration)
-
----
-
-## Appendix B: Enforcement Rules Compliance Matrix
-
-| Rule | How V2 Enforces It |
-|------|-------------------|
-| Soft delete only | Repository `softDelete()` sets `is_deleted = true`; no `DELETE` SQL |
-| Always filter `is_deleted = false` | Repository adds `.where(eq(table.isDeleted, false))` to all reads |
-| UUIDs in APIs only | Controller never exposes `id`; all paths use `:uuid` param |
-| No JSON columns | V2 schema uses only `text`, `boolean`, `integer`, `serial` |
-| No cross-module coupling | V2 component module has no imports from other modules |
-| No DB access outside repositories | Service and controller layers have no Drizzle imports |
-| No changes to legacy logic | All V2 code in new files under `server/v2/` and `shared/v2/` |
-| Audit columns in service layer | `componentService.create()` injects `created_by_uuid`, `created_at` etc. |
-| All dates as text | V2 schema uses `text` for all date columns (YYYY-MM-DD format) |
-| Nginx prefix respected | All V2 routes under `/technical/api/v2/...` |
+- [ ] No legacy files modified (until Phase 4 toggle integration)
+- [ ] All V2 code in new files under `server/v2/`, `shared/v2/`, `client/src/modules/`
+- [ ] Repository is the only layer importing `storage`
+- [ ] Service has no HTTP object imports
+- [ ] Controller has no storage/Drizzle imports
+- [ ] No JSON columns introduced
+- [ ] No cross-module coupling
+- [ ] Nginx prefix `/technical/api/` respected on all V2 routes
+- [ ] All V2 routes under `/technical/api/v2/components/...`
