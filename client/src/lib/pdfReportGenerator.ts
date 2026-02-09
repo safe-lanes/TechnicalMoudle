@@ -71,7 +71,7 @@ class PDFReportGenerator {
 
     this.addHeader(config, pageWidth, margin);
 
-    let startY = 45;
+    let startY = 32;
 
     if (summaryData && summaryData.length > 0) {
       startY = this.addSummarySection(summaryData, startY, margin);
@@ -88,12 +88,9 @@ class PDFReportGenerator {
   private addHeader(config: PDFReportConfig, pageWidth: number, margin: number): void {
     if (!this.doc) return;
 
-    // Use standardized maritime deep blue (#1E5A8E) for all reports
     const headerColor = config.headerColor || PDF_COLORS.primary;
-    this.doc.setFillColor(headerColor[0], headerColor[1], headerColor[2]);
-    this.doc.rect(0, 0, pageWidth, 35, 'F');
 
-    this.doc.setTextColor(...PDF_COLORS.textWhite);
+    this.doc.setTextColor(headerColor[0], headerColor[1], headerColor[2]);
     this.doc.setFontSize(18);
     this.doc.setFont('helvetica', 'bold');
     this.doc.text(config.title, margin, 15);
@@ -101,22 +98,18 @@ class PDFReportGenerator {
     if (config.subtitle) {
       this.doc.setFontSize(11);
       this.doc.setFont('helvetica', 'normal');
+      this.doc.setTextColor(...PDF_COLORS.textDark);
       this.doc.text(config.subtitle, margin, 22);
     }
 
+    this.doc.setDrawColor(headerColor[0], headerColor[1], headerColor[2]);
+    this.doc.setLineWidth(0.8);
+    this.doc.line(margin, config.subtitle ? 25 : 19, pageWidth - margin, config.subtitle ? 25 : 19);
+
     this.doc.setFontSize(9);
     this.doc.setFont('helvetica', 'normal');
-    const rightInfo = [
-      `Vessel: ${config.vessel || 'All Vessels'}`,
-      `Generated: ${format(new Date(), 'dd MMM yyyy HH:mm')}`,
-      `By: ${config.generatedBy || 'System'}`
-    ];
-    
-    let yPos = 12;
-    rightInfo.forEach(info => {
-      this.doc!.text(info, pageWidth - margin, yPos, { align: 'right' });
-      yPos += 5;
-    });
+    this.doc.setTextColor(...PDF_COLORS.textDark);
+    this.doc.text(`Vessel: ${config.vessel || 'All Vessels'}`, pageWidth - margin, 15, { align: 'right' });
   }
 
   private addSummarySection(
@@ -195,13 +188,13 @@ class PDFReportGenerator {
         lineWidth: 0.1,
       },
       headStyles: {
-        fillColor: PDF_COLORS.secondary, // Light blue #5DADE2 - matches app table headers
-        textColor: PDF_COLORS.textWhite,
+        fillColor: [220, 225, 230] as [number, number, number],
+        textColor: PDF_COLORS.textDark,
         fontStyle: 'bold',
         halign: 'left',
       },
       alternateRowStyles: {
-        fillColor: PDF_COLORS.bgLight, // Very light blue-gray #F7F9FC
+        fillColor: [255, 255, 255] as [number, number, number],
       },
       columnStyles: columns.reduce((acc, col, index) => {
         if (col.width) {
