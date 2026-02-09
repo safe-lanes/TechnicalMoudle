@@ -252,19 +252,6 @@ class PDFReportGenerator {
           }
         }
       },
-      didDrawPage: (hookData) => {
-        const pageCount = this.doc!.getNumberOfPages();
-        const currentPage = hookData.pageNumber;
-        
-        this.doc!.setFontSize(8);
-        this.doc!.setTextColor(...PDF_COLORS.textLight);
-        this.doc!.text(
-          `Page ${currentPage} of ${pageCount}`,
-          this.doc!.internal.pageSize.getWidth() / 2,
-          this.doc!.internal.pageSize.getHeight() - 10,
-          { align: 'center' }
-        );
-      },
     });
   }
 
