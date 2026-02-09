@@ -252,25 +252,27 @@ export default function FleetComponentsManagement({ onBack }: { onBack?: () => v
   return (
     <div className="p-6">
       <Card className="overflow-hidden">
-        <div className="bg-gradient-to-r from-cyan-600 to-blue-600 px-6 py-5">
-          {onBack && (
-            <button
-              onClick={onBack}
-              className="flex items-center gap-1 text-cyan-100 hover:text-white text-sm mb-2 transition-colors"
-              data-testid="button-back-to-dashboard"
-            >
-              <ArrowLeft className="h-4 w-4" />
-              Back to Dashboard
-            </button>
-          )}
-          <div className="flex items-center gap-3 mb-1">
-            <div className="p-2 bg-white/20 rounded-lg">
-              <Settings className="h-5 w-5 text-white" />
+        <div className="bg-gradient-to-r from-cyan-600 to-blue-600 px-6 py-3">
+          <div className="flex items-center justify-between gap-4">
+            <div className="flex items-center gap-3">
+              <div className="p-2 bg-white/20 rounded-lg">
+                <Settings className="h-5 w-5 text-white" />
+              </div>
+              <div>
+                <h1 className="text-xl font-bold text-white">Fleet Components Management</h1>
+                <p className="text-cyan-100 text-sm mt-0.5" data-testid="I4.QL.3.9"><Marker id="I4.QL.3.9" />Manage fleet-level equipment hierarchy (SFI structure)</p>
+              </div>
             </div>
-            <div>
-              <h1 className="text-xl font-bold text-white">Fleet Components Management</h1>
-              <p className="text-cyan-100 text-sm mt-0.5" data-testid="I4.QL.3.9"><Marker id="I4.QL.3.9" />Manage fleet-level equipment hierarchy (SFI structure)</p>
-            </div>
+            {onBack && (
+              <button
+                onClick={onBack}
+                className="flex items-center gap-1 text-cyan-100 hover:text-white text-sm transition-colors"
+                data-testid="button-back-to-dashboard"
+              >
+                <ArrowLeft className="h-4 w-4" />
+                Back to Dashboard
+              </button>
+            )}
           </div>
         </div>
 

@@ -221,25 +221,27 @@ export default function FleetEquipmentTreeView({ onBack }: { onBack?: () => void
   
   return (
     <div className="p-6 space-y-4">
-      <div className="bg-gradient-to-r from-cyan-600 to-blue-600 px-6 py-5 rounded-lg">
-        {onBack && (
-          <button
-            onClick={onBack}
-            className="flex items-center gap-1 text-cyan-100 hover:text-white text-sm mb-2 transition-colors"
-            data-testid="button-back-to-dashboard"
-          >
-            <ArrowLeft className="h-4 w-4" />
-            Back to Dashboard
-          </button>
-        )}
-        <div className="flex items-center gap-3 mb-1">
-          <div className="p-2 bg-white/20 rounded-lg">
-            <GitBranch className="h-5 w-5 text-white" />
+      <div className="bg-gradient-to-r from-cyan-600 to-blue-600 px-6 py-3 rounded-lg">
+        <div className="flex items-center justify-between gap-4">
+          <div className="flex items-center gap-3">
+            <div className="p-2 bg-white/20 rounded-lg">
+              <GitBranch className="h-5 w-5 text-white" />
+            </div>
+            <div>
+              <h1 className="text-xl font-bold text-white">Fleet Equipment Data Tree View</h1>
+              <p className="text-cyan-100 text-sm mt-0.5">Browse fleet equipment hierarchy</p>
+            </div>
           </div>
-          <div>
-            <h1 className="text-xl font-bold text-white">Fleet Equipment Data Tree View</h1>
-            <p className="text-cyan-100 text-sm mt-0.5">Browse fleet equipment hierarchy</p>
-          </div>
+          {onBack && (
+            <button
+              onClick={onBack}
+              className="flex items-center gap-1 text-cyan-100 hover:text-white text-sm transition-colors"
+              data-testid="button-back-to-dashboard"
+            >
+              <ArrowLeft className="h-4 w-4" />
+              Back to Dashboard
+            </button>
+          )}
         </div>
       </div>
       <div className="flex items-center justify-between">
