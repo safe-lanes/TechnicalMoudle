@@ -44,6 +44,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useUIRole } from "@/contexts/UIRoleContext";
 import type { Defect } from "@shared/schema";
 import AgGridTable from "@/components/AgGrid/AgGridTable";
+import AgGridTableActions from "@/components/AgGrid/AgGridTableActions";
 import { ICellRendererParams, GridReadyEvent, GridApi, ColDef } from "ag-grid-community";
 
 interface DefectsFilters {
@@ -722,6 +723,16 @@ export default function DefectsCoC() {
             />
           </div>
         )}
+
+        <div className="flex-shrink-0 py-2">
+          <AgGridTableActions
+            gridApi={gridApi}
+            exportFilename="coc_defects"
+            showExportButtons={true}
+            showFilterButtons={true}
+            showGroupButtons={true}
+          />
+        </div>
       </div>
       
       {/* Link Defects Modal */}
