@@ -1,0 +1,197 @@
+V2 Architecture Analysis — Common Bulk Upload APIs (Legacy Preserved)
+Objective
+
+Analyze the existing bulk upload APIs and produce a clear architectural plan to support them under the V2 modular architecture, while keeping them common and reusable for all bulk upload flows.
+
+The following APIs are shared across all bulk uploads and must be analyzed:
+
+/technical/api/bulk/sheets
+/technical/api/bulk/dry-run
+/technical/api/bulk/import
+/technical/api/bulk/history?type=components&limit=50
+
+
+Initial consumer:
+
+Component Bulk Upload
+
+Future consumers:
+
+Other bulk upload modules (out of scope)
+
+⚠️ Planning and analysis only
+❌ Do not implement code
+❌ Do not modify existing behavior
+
+🔒 Legacy Preservation Rule (NON-NEGOTIABLE)
+
+All legacy bulk APIs must remain exactly as they are.
+
+No changes to:
+
+Routes
+
+Logic
+
+Schemas
+
+Data
+
+Legacy bulk flows must continue to work independently
+
+V2 bulk architecture must be added in parallel, not as a replacement
+
+❌ No refactoring of legacy bulk code
+❌ No shared files between legacy and V2
+
+🔁 Core Principle
+
+Bulk upload APIs are common infrastructure, not module-specific logic.
+
+V2 must support these APIs without duplication per module
+
+Behavior, validations, and responses must remain identical to legacy
+
+V2 must not import or call legacy bulk logic
+
+V2 must reproduce logic, not reuse it
+
+🧱 Architecture Questions Replit Must Answer
+1️⃣ Where Common Bulk APIs Live in V2
+
+Explain:
+
+The proposed V2 location for common bulk APIs (e.g. server/v2/bulk/)
+
+Why this placement:
+
+Keeps bulk logic centralized
+
+Avoids cross-module coupling
+
+Does not interfere with legacy
+
+2️⃣ V2 Route Design for Common Bulk APIs
+
+Explain how V2 routes are exposed without impacting legacy:
+
+Proposed examples (for analysis only):
+
+/technical/api/api/v2/bulk/sheets
+/technical/api/api/v2/bulk/dry-run
+/technical/api/api/v2/bulk/import
+/technical/api/api/v2/bulk/history
+
+
+Explain:
+
+How query params like type=components are handled
+
+How route names avoid collision with /technical/api/bulk/*
+
+How routing supports future bulk types
+
+3️⃣ Toggle Interaction (Frontend + Backend)
+
+Explain how the frontend toggle controls routing:
+
+When V2 toggle is ON:
+
+All bulk upload calls go to V2 bulk APIs
+
+When V2 toggle is OFF:
+
+All bulk upload calls go to legacy bulk APIs
+
+❌ No per-endpoint toggle
+❌ No mixed routing within a bulk operation
+
+4️⃣ Logic Ownership & Rewriting Rule
+
+Explain how V2 bulk logic is handled:
+
+All logic must be:
+
+Written directly in V2 repositories/services
+
+Self-contained
+
+❌ No calling legacy bulk functions
+
+Logic must:
+
+Match legacy validations
+
+Match dry-run behavior
+
+Match import rules
+
+Match history generation
+
+5️⃣ Module Awareness Without Coupling
+
+Explain how:
+
+Bulk APIs remain module-agnostic
+
+Modules like components integrate via configuration or contracts
+
+Bulk infrastructure does not depend directly on module internals
+
+Future bulk modules can be added without rewriting bulk logic
+
+6️⃣ Data & Schema Considerations
+
+Explain:
+
+How bulk history tables exist in V2
+
+Whether schemas are duplicated or versioned
+
+How audit columns are handled
+
+How V2 avoids impacting legacy data
+
+7️⃣ Rollback & Safety
+
+Explain:
+
+How toggling OFF instantly routes traffic back to legacy
+
+How in-flight bulk operations are handled
+
+How data consistency is preserved
+
+Why rollback is safe in production
+
+🚨 Enforcement Rules
+
+❌ No modification of legacy bulk code
+
+❌ No shared legacy/V2 files
+
+❌ No logic reuse via imports
+
+❌ No API contract changes
+
+❌ No UI behavior change
+
+🎯 Expected Output
+
+Provide:
+
+A V2 common bulk architecture proposal
+
+Legacy vs V2 bulk route mapping table
+
+Toggle-based routing flow diagram
+
+Identified risk points with mitigation
+
+Validation checklist proving:
+
+Legacy remains untouched
+
+V2 bulk APIs are centralized
+
+Toggle fully controls routing
