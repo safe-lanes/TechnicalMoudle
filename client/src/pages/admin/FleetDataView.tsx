@@ -241,6 +241,13 @@ export default function FleetDataView() {
   const [jobSearchQuery, setJobSearchQuery] = useState("");
   const [selectedJobIds, setSelectedJobIds] = useState<Set<string>>(new Set());
   
+  // Collapsible section state for right panel
+  const [collapsedSections, setCollapsedSections] = useState<Record<string, boolean>>({
+    B: false,
+    C: true,
+    D: true,
+  });
+
   // Fleet Spare Information state
   const [isSpareInfoDialogOpen, setIsSpareInfoDialogOpen] = useState(false);
   const [isSpareVesselMappingDialogOpen, setIsSpareVesselMappingDialogOpen] = useState(false);
@@ -747,306 +754,294 @@ export default function FleetDataView() {
 
       <div className="flex-1 overflow-auto p-6">
         {selectedComponent ? (
-          <div className="space-y-6">
-            <div className="flex items-center justify-between">
-              <h2 className="text-lg font-semibold text-gray-600">
-                {selectedComponent.fleetEquipmentCode}{" "}
-                {selectedComponent.fleetEquipmentName}
-              </h2>
-              <Button
-                className="bg-cyan-600 hover:bg-cyan-700 text-white"
-                onClick={() => setLocation(`/admin/fleet-component-editor/${selectedComponent.id}`)}
-                data-testid="button-add-edit-fleet-component"
-              >
-                <Plus className="h-4 w-4 mr-1" />
-                Add / Edit Fleet Component
-              </Button>
-            </div>
+          <div className="space-y-0">
+            <Card className="overflow-hidden">
+              <div className="px-6 py-4 border-b border-gray-200">
+                <div className="flex items-center justify-between gap-4 flex-wrap">
+                  <h2 className="text-lg font-semibold text-gray-800" data-testid="text-selected-component-title">
+                    {selectedComponent.fleetEquipmentCode}{" "}
+                    {selectedComponent.fleetEquipmentName}
+                  </h2>
+                  <Button
+                    variant="outline"
+                    className="border-cyan-600 text-cyan-600"
+                    onClick={() => setLocation(`/admin/fleet-component-editor/${selectedComponent.id}`)}
+                    data-testid="button-add-edit-fleet-component"
+                  >
+                    <Pencil className="h-4 w-4 mr-1" />
+                    Edit Fleet Component
+                  </Button>
+                </div>
+              </div>
 
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-base font-semibold text-cyan-600">
-                  Fleet Component Information
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="grid grid-cols-4 gap-4 text-sm">
+              <div className="px-6 py-5">
+                <h3 className="text-sm font-semibold text-gray-700 mb-4" data-testid="section-header-component-info">A. Fleet Component Information</h3>
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
                   <div>
-                    <div className="text-gray-500 text-xs">Maker</div>
-                    <div className="font-medium">
-                      {selectedComponent.maker || "—"}
-                    </div>
+                    <label className="text-xs font-medium text-gray-600 block mb-1">Fleet Equipment Code</label>
+                    <div className="text-sm text-gray-900">{selectedComponent.fleetEquipmentCode || "—"}</div>
                   </div>
                   <div>
-                    <div className="text-gray-500 text-xs">Maker Code</div>
-                    <div className="font-medium">
-                      {selectedComponent.makerCode || "—"}
-                    </div>
+                    <label className="text-xs font-medium text-gray-600 block mb-1">Fleet Equipment Name</label>
+                    <div className="text-sm text-gray-900">{selectedComponent.fleetEquipmentName || selectedComponent.name || "—"}</div>
                   </div>
                   <div>
-                    <div className="text-gray-500 text-xs">Model</div>
-                    <div className="font-medium">
-                      {selectedComponent.model || "—"}
-                    </div>
-                  </div>
-                  <div>
-                    <div className="text-gray-500 text-xs">Model Code</div>
-                    <div className="font-medium">
-                      {selectedComponent.modelCode || "—"}
-                    </div>
-                  </div>
-
-                  <div>
-                    <div className="text-gray-500 text-xs">
-                      Fleet Equipment Code
-                    </div>
-                    <div className="font-medium">
-                      {selectedComponent.fleetEquipmentCode || "—"}
-                    </div>
-                  </div>
-                  <div>
-                    <div className="text-gray-500 text-xs">Parent Code</div>
-                    <div className="font-medium">
+                    <label className="text-xs font-medium text-gray-600 block mb-1">Parent Code</label>
+                    <div className="text-sm text-gray-900">
                       {selectedComponent.parentFleetEquipmentCode ||
                         selectedComponent.fleetEquipmentCode?.split(".")[0] ||
                         "—"}
                     </div>
                   </div>
-                  <div className="col-span-2">
-                    <div className="text-gray-500 text-xs">
-                      Fleet Equipment Name
-                    </div>
-                    <div className="font-medium">
-                      {selectedComponent.fleetEquipmentName || selectedComponent.name || "—"}
-                    </div>
-                  </div>
-
                   <div>
-                    <div className="text-gray-500 text-xs">
-                      Component Category
-                    </div>
-                    <div className="font-medium">
-                      {selectedComponent.componentCategory || selectedComponent.category || "—"}
-                    </div>
+                    <label className="text-xs font-medium text-gray-600 block mb-1">Component Category</label>
+                    <div className="text-sm text-gray-900">{selectedComponent.componentCategory || selectedComponent.category || "—"}</div>
                   </div>
                   <div>
-                    <div className="text-gray-500 text-xs">Location</div>
-                    <div className="font-medium">
-                      {selectedComponent.location || "—"}
-                    </div>
+                    <label className="text-xs font-medium text-gray-600 block mb-1">Maker</label>
+                    <div className="text-sm text-gray-900">{selectedComponent.maker || "—"}</div>
                   </div>
                   <div>
-                    <div className="text-gray-500 text-xs">Rating</div>
-                    <div className="font-medium">
-                      {selectedComponent.rating || "—"}
-                    </div>
+                    <label className="text-xs font-medium text-gray-600 block mb-1">Maker Code</label>
+                    <div className="text-sm text-gray-900">{selectedComponent.makerCode || "—"}</div>
                   </div>
                   <div>
-                    <div className="text-gray-500 text-xs">
-                      Eqpt / System Department
-                    </div>
-                    <div className="font-medium">
-                      {selectedComponent.eqptSystemDept || selectedComponent.department || "—"}
-                    </div>
+                    <label className="text-xs font-medium text-gray-600 block mb-1">Model</label>
+                    <div className="text-sm text-gray-900">{selectedComponent.model || "—"}</div>
                   </div>
-
-                  <div className="col-span-4">
-                    <div className="text-gray-500 text-xs">Notes</div>
-                    <div className="font-medium">
-                      {selectedComponent.notes || "—"}
-                    </div>
+                  <div>
+                    <label className="text-xs font-medium text-gray-600 block mb-1">Model Code</label>
+                    <div className="text-sm text-gray-900">{selectedComponent.modelCode || "—"}</div>
+                  </div>
+                  <div>
+                    <label className="text-xs font-medium text-gray-600 block mb-1">Location</label>
+                    <div className="text-sm text-gray-900">{selectedComponent.location || "—"}</div>
+                  </div>
+                  <div>
+                    <label className="text-xs font-medium text-gray-600 block mb-1">Rating</label>
+                    <div className="text-sm text-gray-900">{selectedComponent.rating || "—"}</div>
+                  </div>
+                  <div>
+                    <label className="text-xs font-medium text-gray-600 block mb-1">Eqpt / System Department</label>
+                    <div className="text-sm text-gray-900">{selectedComponent.eqptSystemDept || selectedComponent.department || "—"}</div>
+                  </div>
+                  <div className="sm:col-span-2 lg:col-span-3 xl:col-span-4">
+                    <label className="text-xs font-medium text-gray-600 block mb-1">Notes</label>
+                    <div className="text-sm text-gray-900">{selectedComponent.notes || "—"}</div>
                   </div>
                 </div>
-              </CardContent>
-            </Card>
+              </div>
 
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle 
-                  className="text-base font-semibold text-orange-500 cursor-pointer hover:underline inline-block border border-orange-500 px-2 py-1 rounded"
-                  onClick={() => setIsJobInfoDialogOpen(true)}
-                  data-testid="btn-fleet-job-info-header"
-                >
-                  Fleet Job Information
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                {relatedJobs.length > 0 ? (
-                  <table className="w-full text-sm">
-                    <thead>
-                      <tr className="border-b text-gray-500 text-xs">
-                        <th className="text-left py-2 font-normal">Job No.</th>
-                        <th className="text-left py-2 font-normal">
-                          Job Title
-                        </th>
-                        <th className="text-left py-2 font-normal">
-                          Task Type
-                        </th>
-                        <th className="text-left py-2 font-normal">
-                          Frequency
-                        </th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {relatedJobs.map((job: FleetJob, index: number) => (
-                        <tr 
-                          key={index} 
-                          className="border-b last:border-0 cursor-pointer hover:bg-gray-50"
-                          onDoubleClick={() => {
-                            setSelectedJobForDetail(job);
-                            setIsJobDetailsDialogOpen(true);
-                          }}
-                          data-testid={`job-row-${index}`}
-                        >
-                          <td className="py-2">{job.jobCode || job.id}</td>
-                          <td className="py-2">
-                            {job.woTitle || "—"}
-                          </td>
-                          <td className="py-2">
-                            {job.taskType || "—"}
-                          </td>
-                          <td className="py-2">
-                            {job.intervalValue && job.unit 
-                              ? `${job.intervalValue} ${job.unit}` 
-                              : "—"}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                ) : (
-                  <p className="text-gray-500 text-sm">
-                    No jobs linked to this component
-                  </p>
-                )}
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle 
-                  className="text-base font-semibold text-green-600 cursor-pointer hover:underline inline-block border border-green-600 px-2 py-1 rounded"
-                  onClick={() => setIsSpareInfoDialogOpen(true)}
-                  data-testid="btn-fleet-spare-info-header"
-                >
-                  Fleet Spares Information
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                {relatedSpares.length > 0 ? (
-                  <table className="w-full text-sm">
-                    <thead>
-                      <tr className="border-b text-gray-500 text-xs">
-                        <th className="text-left py-2 font-normal">
-                          Part Code
-                        </th>
-                        <th className="text-left py-2 font-normal">
-                          Part Name
-                        </th>
-                        <th className="text-left py-2 font-normal">
-                          Part Number
-                        </th>
-                        <th className="text-left py-2 font-normal">Maker</th>
-                        <th className="text-left py-2 font-normal">
-                          Unit Of Measurement
-                        </th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {relatedSpares.map((spare: FleetSpare, index: number) => (
-                        <tr 
-                          key={index} 
-                          className="border-b last:border-0 hover:bg-gray-50"
-                          data-testid={`spare-row-${index}`}
-                        >
-                          <td className="py-2">
-                            <button
-                              className="text-blue-600 hover:text-blue-800 underline text-left"
-                              onClick={() => {
-                                setSelectedSpareForDetail(spare);
-                                setIsSpareDetailsDialogOpen(true);
+              <div className="border-t border-gray-200">
+                <div className="flex items-center justify-between px-6 py-3">
+                  <button
+                    className="flex items-center gap-2 text-left"
+                    onClick={() => setCollapsedSections(prev => ({ ...prev, B: !prev.B }))}
+                    data-testid="btn-fleet-job-collapse"
+                  >
+                    {collapsedSections.B ? (
+                      <ChevronRight className="h-4 w-4 text-gray-500" />
+                    ) : (
+                      <ChevronDown className="h-4 w-4 text-gray-500" />
+                    )}
+                    <h3 className="text-sm font-semibold text-gray-700">B. Fleet Job Information</h3>
+                  </button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setIsJobInfoDialogOpen(true)}
+                    className="text-cyan-600 border-cyan-200"
+                    data-testid="btn-fleet-job-info-header"
+                  >
+                    <Pencil className="h-3 w-3 mr-1" />
+                    Manage Jobs
+                  </Button>
+                </div>
+                {!collapsedSections.B && (
+                  <div className="px-6 pb-5">
+                    {relatedJobs.length > 0 ? (
+                      <table className="w-full text-sm">
+                        <thead>
+                          <tr className="border-b border-gray-200">
+                            <th className="text-left py-2 text-xs font-medium text-gray-600">Job No.</th>
+                            <th className="text-left py-2 text-xs font-medium text-gray-600">Job Title</th>
+                            <th className="text-left py-2 text-xs font-medium text-gray-600">Task Type</th>
+                            <th className="text-left py-2 text-xs font-medium text-gray-600">Frequency</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {relatedJobs.map((job: FleetJob, index: number) => (
+                            <tr 
+                              key={index} 
+                              className="border-b border-gray-100 last:border-0 cursor-pointer"
+                              onDoubleClick={() => {
+                                setSelectedJobForDetail(job);
+                                setIsJobDetailsDialogOpen(true);
                               }}
-                              data-testid={`btn-spare-detail-${index}`}
+                              data-testid={`job-row-${index}`}
                             >
-                              {spare.fleetPartCode || spare.partCode}
-                            </button>
-                          </td>
-                          <td className="py-2">
-                            {spare.partName || "—"}
-                          </td>
-                          <td className="py-2">{spare.partNumber || "—"}</td>
-                          <td className="py-2">{spare.maker || "—"}</td>
-                          <td className="py-2">{spare.uom || spare.unit || "—"}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                ) : (
-                  <p className="text-gray-500 text-sm">
-                    No spares linked to this component
-                  </p>
+                              <td className="py-2 text-sm text-gray-900">{job.jobCode || job.id}</td>
+                              <td className="py-2 text-sm text-gray-900">{job.woTitle || "—"}</td>
+                              <td className="py-2 text-sm text-gray-900">{job.taskType || "—"}</td>
+                              <td className="py-2 text-sm text-gray-900">
+                                {job.intervalValue && job.unit 
+                                  ? `${job.intervalValue} ${job.unit}` 
+                                  : "—"}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    ) : (
+                      <p className="text-gray-500 text-sm">No jobs linked to this component</p>
+                    )}
+                  </div>
                 )}
-              </CardContent>
-            </Card>
+              </div>
 
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle 
-                  className="text-base font-semibold text-purple-600 cursor-pointer hover:underline inline-block border border-purple-600 px-2 py-1 rounded"
-                  onClick={handleOpenMappingDialog}
-                  data-testid="btn-vessel-mapping-overview-header"
-                >
-                  Vessel Mapping Overview
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                {relatedVessels.length > 0 ? (
-                  <table className="w-full text-sm">
-                    <thead>
-                      <tr className="border-b text-gray-500 text-xs">
-                        <th className="text-left py-2 font-normal">
-                          Vessel Code
-                        </th>
-                        <th className="text-left py-2 font-normal">
-                          Vessel Name
-                        </th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {relatedVessels.map((vessel, index) => (
-                        <tr key={index} className="border-b last:border-0">
-                          <td className="py-2">{vessel.id}</td>
-                          <td 
-                            className="py-2 cursor-pointer text-blue-600 hover:underline"
-                            onClick={() => {
-                              if (vessel.mapping) {
-                                setSelectedVesselForDetail(vessel.mapping);
-                                setSelectedDetailMappingIds(new Set());
-                                setDetailSearchQuery("");
-                                setIsDetailDialogOpen(true);
-                              }
-                            }}
-                            data-testid={`main-vessel-name-${vessel.id}`}
-                          >
-                            {vessel.name}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                ) : (
-                  <p className="text-gray-500 text-sm">
-                    No vessels mapped to this component
-                  </p>
+              <div className="border-t border-gray-200">
+                <div className="flex items-center justify-between px-6 py-3">
+                  <button
+                    className="flex items-center gap-2 text-left"
+                    onClick={() => setCollapsedSections(prev => ({ ...prev, C: !prev.C }))}
+                    data-testid="btn-fleet-spare-collapse"
+                  >
+                    {collapsedSections.C ? (
+                      <ChevronRight className="h-4 w-4 text-gray-500" />
+                    ) : (
+                      <ChevronDown className="h-4 w-4 text-gray-500" />
+                    )}
+                    <h3 className="text-sm font-semibold text-gray-700">C. Fleet Spares Information</h3>
+                  </button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setIsSpareInfoDialogOpen(true)}
+                    className="text-cyan-600 border-cyan-200"
+                    data-testid="btn-fleet-spare-info-header"
+                  >
+                    <Pencil className="h-3 w-3 mr-1" />
+                    Manage Spares
+                  </Button>
+                </div>
+                {!collapsedSections.C && (
+                  <div className="px-6 pb-5">
+                    {relatedSpares.length > 0 ? (
+                      <table className="w-full text-sm">
+                        <thead>
+                          <tr className="border-b border-gray-200">
+                            <th className="text-left py-2 text-xs font-medium text-gray-600">Part Code</th>
+                            <th className="text-left py-2 text-xs font-medium text-gray-600">Part Name</th>
+                            <th className="text-left py-2 text-xs font-medium text-gray-600">Part Number</th>
+                            <th className="text-left py-2 text-xs font-medium text-gray-600">Maker</th>
+                            <th className="text-left py-2 text-xs font-medium text-gray-600">Unit Of Measurement</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {relatedSpares.map((spare: FleetSpare, index: number) => (
+                            <tr 
+                              key={index} 
+                              className="border-b border-gray-100 last:border-0"
+                              data-testid={`spare-row-${index}`}
+                            >
+                              <td className="py-2">
+                                <button
+                                  className="text-blue-600 underline text-left text-sm"
+                                  onClick={() => {
+                                    setSelectedSpareForDetail(spare);
+                                    setIsSpareDetailsDialogOpen(true);
+                                  }}
+                                  data-testid={`btn-spare-detail-${index}`}
+                                >
+                                  {spare.fleetPartCode || spare.partCode}
+                                </button>
+                              </td>
+                              <td className="py-2 text-sm text-gray-900">{spare.partName || "—"}</td>
+                              <td className="py-2 text-sm text-gray-900">{spare.partNumber || "—"}</td>
+                              <td className="py-2 text-sm text-gray-900">{spare.maker || "—"}</td>
+                              <td className="py-2 text-sm text-gray-900">{spare.uom || spare.unit || "—"}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    ) : (
+                      <p className="text-gray-500 text-sm">No spares linked to this component</p>
+                    )}
+                  </div>
                 )}
-              </CardContent>
+              </div>
+
+              <div className="border-t border-gray-200">
+                <div className="flex items-center justify-between px-6 py-3">
+                  <button
+                    className="flex items-center gap-2 text-left"
+                    onClick={() => setCollapsedSections(prev => ({ ...prev, D: !prev.D }))}
+                    data-testid="btn-vessel-mapping-collapse"
+                  >
+                    {collapsedSections.D ? (
+                      <ChevronRight className="h-4 w-4 text-gray-500" />
+                    ) : (
+                      <ChevronDown className="h-4 w-4 text-gray-500" />
+                    )}
+                    <h3 className="text-sm font-semibold text-gray-700">D. Vessel Mapping Overview</h3>
+                  </button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={handleOpenMappingDialog}
+                    className="text-cyan-600 border-cyan-200"
+                    data-testid="btn-vessel-mapping-overview-header"
+                  >
+                    <Pencil className="h-3 w-3 mr-1" />
+                    Manage Mappings
+                  </Button>
+                </div>
+                {!collapsedSections.D && (
+                  <div className="px-6 pb-5">
+                    {relatedVessels.length > 0 ? (
+                      <table className="w-full text-sm">
+                        <thead>
+                          <tr className="border-b border-gray-200">
+                            <th className="text-left py-2 text-xs font-medium text-gray-600">Vessel Code</th>
+                            <th className="text-left py-2 text-xs font-medium text-gray-600">Vessel Name</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {relatedVessels.map((vessel, index) => (
+                            <tr key={index} className="border-b border-gray-100 last:border-0">
+                              <td className="py-2 text-sm text-gray-900">{vessel.id}</td>
+                              <td 
+                                className="py-2 cursor-pointer text-blue-600 underline text-sm"
+                                onClick={() => {
+                                  if (vessel.mapping) {
+                                    setSelectedVesselForDetail(vessel.mapping);
+                                    setSelectedDetailMappingIds(new Set());
+                                    setDetailSearchQuery("");
+                                    setIsDetailDialogOpen(true);
+                                  }
+                                }}
+                                data-testid={`main-vessel-name-${vessel.id}`}
+                              >
+                                {vessel.name}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    ) : (
+                      <p className="text-gray-500 text-sm">No vessels mapped to this component</p>
+                    )}
+                  </div>
+                )}
+              </div>
             </Card>
           </div>
         ) : (
           <div className="h-full flex flex-col">
             <div className="flex justify-end mb-4">
               <Button
-                className="bg-cyan-600 hover:bg-cyan-700 text-white"
+                variant="outline"
+                className="border-cyan-600 text-cyan-600"
                 onClick={() => setLocation("/admin/fleet-component-editor")}
                 data-testid="button-add-edit-fleet-component"
               >
