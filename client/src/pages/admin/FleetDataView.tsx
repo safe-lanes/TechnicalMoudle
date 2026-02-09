@@ -3381,16 +3381,19 @@ export default function FleetDataView() {
 
       {/* Add New Spare Dialog */}
       <Dialog open={isAddSpareDialogOpen} onOpenChange={setIsAddSpareDialogOpen}>
-        <DialogContent className="max-w-2xl">
-          <DialogHeader className="flex flex-row items-center justify-between border-b pb-3">
-            <DialogTitle className="text-base font-semibold">Add New Spare Information</DialogTitle>
+        <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+          <DialogHeader className="flex flex-row items-center justify-between">
+            <DialogTitle className="flex items-center gap-2">
+              <Plus className="h-5 w-5 text-blue-600" />
+              Add New Spare Information
+            </DialogTitle>
             <div className="flex items-center gap-2">
               <Button variant="outline" size="sm" onClick={() => setIsAddSpareDialogOpen(false)} data-testid="btn-cancel-add-spare">
                 Cancel
               </Button>
               <Button 
                 size="sm"
-                className="bg-blue-600 hover:bg-blue-700"
+                className="bg-blue-600 text-white"
                 onClick={() => {
                   toast({ title: "Success", description: "New spare added successfully" });
                   setIsAddSpareDialogOpen(false);
@@ -3401,12 +3404,12 @@ export default function FleetDataView() {
               </Button>
             </div>
           </DialogHeader>
-          <ScrollArea className="max-h-[60vh]">
-            <div className="py-4 space-y-4">
-              {/* Row 1: Part Code, Part Name, Part Number, Drawing Number */}
-              <div className="grid grid-cols-4 gap-4">
+          <div className="space-y-4">
+            <div className="bg-gray-50 rounded-lg p-4">
+              <h3 className="text-sm font-semibold text-gray-700 mb-3 border-b pb-2">Basic Information</h3>
+              <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="text-blue-600 text-xs font-medium mb-1 block">Part Code</label>
+                  <label className="text-gray-500 text-xs font-medium mb-1 block">Part Code</label>
                   <Input
                     value={spareFormData.partCode || ""}
                     onChange={(e) => setSpareFormData(prev => ({ ...prev, partCode: e.target.value }))}
@@ -3414,7 +3417,7 @@ export default function FleetDataView() {
                   />
                 </div>
                 <div>
-                  <label className="text-blue-600 text-xs font-medium mb-1 block">Part Name</label>
+                  <label className="text-gray-500 text-xs font-medium mb-1 block">Part Name</label>
                   <Input
                     value={spareFormData.partName || ""}
                     onChange={(e) => setSpareFormData(prev => ({ ...prev, partName: e.target.value }))}
@@ -3422,7 +3425,7 @@ export default function FleetDataView() {
                   />
                 </div>
                 <div>
-                  <label className="text-blue-600 text-xs font-medium mb-1 block">Part Number</label>
+                  <label className="text-gray-500 text-xs font-medium mb-1 block">Part Number</label>
                   <Input
                     value={spareFormData.partNumber || ""}
                     onChange={(e) => setSpareFormData(prev => ({ ...prev, partNumber: e.target.value }))}
@@ -3430,62 +3433,21 @@ export default function FleetDataView() {
                   />
                 </div>
                 <div>
-                  <label className="text-blue-600 text-xs font-medium mb-1 block">Drawing Number</label>
+                  <label className="text-gray-500 text-xs font-medium mb-1 block">Unit Of Measurement</label>
                   <Input
-                    value={spareFormData.drawingNumber || ""}
-                    onChange={(e) => setSpareFormData(prev => ({ ...prev, drawingNumber: e.target.value }))}
-                    data-testid="input-new-drawing-number"
+                    value={spareFormData.unitOfMeasurement || ""}
+                    onChange={(e) => setSpareFormData(prev => ({ ...prev, unitOfMeasurement: e.target.value }))}
+                    data-testid="input-new-uom"
                   />
                 </div>
               </div>
+            </div>
 
-              {/* Row 2: Maker, Maker Code, Is Active, Position Number */}
-              <div className="grid grid-cols-4 gap-4">
+            <div className="bg-blue-50 rounded-lg p-4">
+              <h3 className="text-sm font-semibold text-gray-700 mb-3 border-b pb-2">Status & Classification</h3>
+              <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="text-blue-600 text-xs font-medium mb-1 block">Maker</label>
-                  <Input
-                    value={spareFormData.maker || ""}
-                    onChange={(e) => setSpareFormData(prev => ({ ...prev, maker: e.target.value }))}
-                    data-testid="input-new-maker"
-                  />
-                </div>
-                <div>
-                  <label className="text-blue-600 text-xs font-medium mb-1 block">Maker Code</label>
-                  <Input
-                    value={spareFormData.makerCode || ""}
-                    onChange={(e) => setSpareFormData(prev => ({ ...prev, makerCode: e.target.value }))}
-                    data-testid="input-new-maker-code"
-                  />
-                </div>
-                <div>
-                  <label className="text-blue-600 text-xs font-medium mb-1 block">Is Active</label>
-                  <Select
-                    value={spareFormData.isActive !== false ? "Yes" : "No"}
-                    onValueChange={(value) => setSpareFormData(prev => ({ ...prev, isActive: value === "Yes" }))}
-                  >
-                    <SelectTrigger data-testid="select-new-spare-is-active">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="Yes">Yes</SelectItem>
-                      <SelectItem value="No">No</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div>
-                  <label className="text-blue-600 text-xs font-medium mb-1 block">Position Number</label>
-                  <Input
-                    value={spareFormData.positionNumber || ""}
-                    onChange={(e) => setSpareFormData(prev => ({ ...prev, positionNumber: e.target.value }))}
-                    data-testid="input-new-position-number"
-                  />
-                </div>
-              </div>
-
-              {/* Row 3: Criticality, Unit Of Measurement, Specification */}
-              <div className="grid grid-cols-3 gap-4">
-                <div>
-                  <label className="text-blue-600 text-xs font-medium mb-1 block">Criticality</label>
+                  <label className="text-gray-500 text-xs font-medium mb-1 block">Criticality</label>
                   <Select
                     value={spareFormData.criticality || ""}
                     onValueChange={(value) => setSpareFormData(prev => ({ ...prev, criticality: value }))}
@@ -3500,15 +3462,83 @@ export default function FleetDataView() {
                   </Select>
                 </div>
                 <div>
-                  <label className="text-blue-600 text-xs font-medium mb-1 block">Unit Of Measurement</label>
+                  <label className="text-gray-500 text-xs font-medium mb-1 block">Is Active</label>
+                  <Select
+                    value={spareFormData.isActive !== false ? "Yes" : "No"}
+                    onValueChange={(value) => setSpareFormData(prev => ({ ...prev, isActive: value === "Yes" }))}
+                  >
+                    <SelectTrigger data-testid="select-new-spare-is-active">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="Yes">Yes</SelectItem>
+                      <SelectItem value="No">No</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <label className="text-gray-500 text-xs font-medium mb-1 block">IHM</label>
+                  <Select
+                    value={spareFormData.ihm || "No"}
+                    onValueChange={(value) => setSpareFormData(prev => ({ ...prev, ihm: value }))}
+                  >
+                    <SelectTrigger data-testid="select-new-spare-ihm">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="Yes">Yes</SelectItem>
+                      <SelectItem value="No">No</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <label className="text-gray-500 text-xs font-medium mb-1 block">Evidence Type</label>
                   <Input
-                    value={spareFormData.unitOfMeasurement || ""}
-                    onChange={(e) => setSpareFormData(prev => ({ ...prev, unitOfMeasurement: e.target.value }))}
-                    data-testid="input-new-uom"
+                    value={spareFormData.evidenceType || ""}
+                    onChange={(e) => setSpareFormData(prev => ({ ...prev, evidenceType: e.target.value }))}
+                    data-testid="input-new-evidence-type"
+                  />
+                </div>
+              </div>
+            </div>
+
+            <div className="bg-green-50 rounded-lg p-4">
+              <h3 className="text-sm font-semibold text-gray-700 mb-3 border-b pb-2">Technical Details</h3>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="text-gray-500 text-xs font-medium mb-1 block">Maker</label>
+                  <Input
+                    value={spareFormData.maker || ""}
+                    onChange={(e) => setSpareFormData(prev => ({ ...prev, maker: e.target.value }))}
+                    data-testid="input-new-maker"
                   />
                 </div>
                 <div>
-                  <label className="text-blue-600 text-xs font-medium mb-1 block">Specification</label>
+                  <label className="text-gray-500 text-xs font-medium mb-1 block">Maker Code</label>
+                  <Input
+                    value={spareFormData.makerCode || ""}
+                    onChange={(e) => setSpareFormData(prev => ({ ...prev, makerCode: e.target.value }))}
+                    data-testid="input-new-maker-code"
+                  />
+                </div>
+                <div>
+                  <label className="text-gray-500 text-xs font-medium mb-1 block">Drawing Number</label>
+                  <Input
+                    value={spareFormData.drawingNumber || ""}
+                    onChange={(e) => setSpareFormData(prev => ({ ...prev, drawingNumber: e.target.value }))}
+                    data-testid="input-new-drawing-number"
+                  />
+                </div>
+                <div>
+                  <label className="text-gray-500 text-xs font-medium mb-1 block">Position Number</label>
+                  <Input
+                    value={spareFormData.positionNumber || ""}
+                    onChange={(e) => setSpareFormData(prev => ({ ...prev, positionNumber: e.target.value }))}
+                    data-testid="input-new-position-number"
+                  />
+                </div>
+                <div className="col-span-2">
+                  <label className="text-gray-500 text-xs font-medium mb-1 block">Specification</label>
                   <Input
                     value={spareFormData.specification || ""}
                     onChange={(e) => setSpareFormData(prev => ({ ...prev, specification: e.target.value }))}
@@ -3516,18 +3546,38 @@ export default function FleetDataView() {
                   />
                 </div>
               </div>
+            </div>
 
-              {/* Row 4: Note */}
-              <div>
-                <label className="text-blue-600 text-xs font-medium mb-1 block">Note</label>
-                <Input
-                  value={spareFormData.note || ""}
-                  onChange={(e) => setSpareFormData(prev => ({ ...prev, note: e.target.value }))}
-                  data-testid="input-new-note"
-                />
+            <div className="bg-yellow-50 rounded-lg p-4">
+              <h3 className="text-sm font-semibold text-gray-700 mb-3 border-b pb-2">Manual Reference</h3>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="text-gray-500 text-xs font-medium mb-1 block">Manual Name</label>
+                  <Input
+                    value={spareFormData.manualName || ""}
+                    onChange={(e) => setSpareFormData(prev => ({ ...prev, manualName: e.target.value }))}
+                    data-testid="input-new-manual-name"
+                  />
+                </div>
+                <div>
+                  <label className="text-gray-500 text-xs font-medium mb-1 block">Page Number</label>
+                  <Input
+                    value={spareFormData.pageNumber || ""}
+                    onChange={(e) => setSpareFormData(prev => ({ ...prev, pageNumber: e.target.value }))}
+                    data-testid="input-new-page-number"
+                  />
+                </div>
+                <div className="col-span-2">
+                  <label className="text-gray-500 text-xs font-medium mb-1 block">Note</label>
+                  <Input
+                    value={spareFormData.note || ""}
+                    onChange={(e) => setSpareFormData(prev => ({ ...prev, note: e.target.value }))}
+                    data-testid="input-new-note"
+                  />
+                </div>
               </div>
             </div>
-          </ScrollArea>
+          </div>
         </DialogContent>
       </Dialog>
     </div>
