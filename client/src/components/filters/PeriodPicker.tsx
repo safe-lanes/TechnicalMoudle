@@ -142,7 +142,7 @@ export function PeriodPicker({ value, onChange, className }: PeriodPickerProps) 
       <PopoverTrigger asChild>
         <button
           type="button"
-          className={`flex items-center gap-2 h-8 px-3 rounded-md border border-input bg-transparent text-xs cursor-pointer hover-elevate ${className || ""}`}
+          className={`flex items-center gap-2 h-8 px-3 rounded-md border border-gray-300 bg-transparent text-xs cursor-pointer hover-elevate ${className || ""}`}
           data-testid="button-period-picker"
         >
           <span className={`flex-1 text-left truncate ${displayValue ? "text-foreground" : "text-muted-foreground"}`}>
