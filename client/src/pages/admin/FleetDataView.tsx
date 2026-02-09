@@ -963,22 +963,15 @@ export default function FleetDataView() {
                               <th className="text-left py-2 text-xs font-medium text-gray-600">Part Code</th>
                               <th className="text-left py-2 text-xs font-medium text-gray-600">Part Name</th>
                               <th className="text-left py-2 text-xs font-medium text-gray-600">Part Number</th>
-                              <th className="text-left py-2 text-xs font-medium text-gray-600">Unit</th>
                               <th className="text-left py-2 text-xs font-medium text-gray-600">Maker</th>
-                              <th className="text-left py-2 text-xs font-medium text-gray-600">Drawing Number</th>
-                              <th className="text-left py-2 text-xs font-medium text-gray-600">Position Number</th>
-                              <th className="text-left py-2 text-xs font-medium text-gray-600">Critical</th>
+                              <th className="text-left py-2 text-xs font-medium text-gray-600">Unit Of Measurement</th>
                             </tr>
                           </thead>
                           <tbody>
                             {relatedSpares.map((spare: FleetSpare, index: number) => (
                               <tr 
                                 key={index} 
-                                className="border-b border-gray-100 last:border-0 cursor-pointer"
-                                onDoubleClick={() => {
-                                  setSelectedSpareForDetail(spare);
-                                  setIsSpareDetailsDialogOpen(true);
-                                }}
+                                className="border-b border-gray-100 last:border-0"
                                 data-testid={`spare-row-${index}`}
                               >
                                 <td className="py-2">
@@ -990,16 +983,13 @@ export default function FleetDataView() {
                                     }}
                                     data-testid={`btn-spare-detail-${index}`}
                                   >
-                                    {spare.partCode || "—"}
+                                    {spare.partCode}
                                   </button>
                                 </td>
                                 <td className="py-2 text-sm text-gray-900">{spare.partName || "—"}</td>
                                 <td className="py-2 text-sm text-gray-900">{spare.partNumber || "—"}</td>
-                                <td className="py-2 text-sm text-gray-900">{spare.unitOfMeasurement || "—"}</td>
                                 <td className="py-2 text-sm text-gray-900">{spare.maker || "—"}</td>
-                                <td className="py-2 text-sm text-gray-900">{spare.drawingNumber || "—"}</td>
-                                <td className="py-2 text-sm text-gray-900">{spare.positionNumber || "—"}</td>
-                                <td className="py-2 text-sm text-gray-900">{spare.criticality || "—"}</td>
+                                <td className="py-2 text-sm text-gray-900">{spare.unitOfMeasurement || "—"}</td>
                               </tr>
                             ))}
                           </tbody>
