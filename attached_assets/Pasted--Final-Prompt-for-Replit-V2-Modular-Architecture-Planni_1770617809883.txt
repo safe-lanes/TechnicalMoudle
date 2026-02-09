@@ -1,0 +1,121 @@
+ 
+
+Final Prompt for Replit — V2 Modular Architecture Planning with Toggle Support
+Analyse the current existing backend and frontend architecture and produce a clear, step-by-step plan to introduce a V2 module-wise RESTful architecture, starting only with:
+Component Bulk Upload → Component Module fetch & usage
+⚠️ This is a planning and analysis task only.
+❌ Do not implement code.
+❌ Do not modify existing behavior.
+________________________________________
+🔒 Backward Compatibility & Toggle Requirement (CRITICAL)
+•	The current (legacy) structure must remain fully intact
+•	All new architecture must live strictly under a new v2 namespace
+•	No existing routes, services, or UI behavior should break
+Frontend Toggle Rule
+A frontend toggle (V2 / Switch to Legacy) will be used to:
+•	Enable or disable V2 behavior at runtime
+•	Decide whether data is fetched from:
+o	Legacy APIs (current structure)
+o	OR V2 APIs (/technical/api/api/v2/...)
+The plan must explain:
+•	How the toggle controls API selection
+•	How both systems can run in parallel
+•	How rollback to legacy works instantly without data loss
+________________________________________
+🔍 Scope of Work (STRICT)
+The plan must introduce and align the following layers and rules based on the existing structure, without changing legacy code paths:
+1️⃣ Mandatory Folder Structure
+2️⃣ Table & Schema Rules (V2 Standard)
+3️⃣ Standard Audit Columns
+4️⃣ Repository Layer Rules
+5️⃣ Service Layer Rules
+6️⃣ Controller Layer Rules
+7️⃣ RESTful Route Patterns
+8️⃣ Frontend API Layer Rules
+9️⃣ Critical Enforcement Rules
+Only Component Bulk Upload and Component Module consumption are in scope.
+________________________________________
+1️⃣ Mandatory Folder Structure (V2 ONLY)
+Backend (per module)
+server/v2/{module}/
+├── index.ts
+├── routes.ts
+├── controllers/
+│   ├── index.ts
+│   └── {entity}Controller.ts
+├── services/
+│   ├── index.ts
+│   └── {entity}Service.ts
+└── repositories/
+    ├── index.ts
+    └── {entity}Repository.ts
+Shared Schema & Types
+shared/v2/{module}/
+├── schema.ts
+└── types.ts
+Frontend (per module)
+client/src/modules/{module}/
+├── components/
+├── hooks/
+└── api/{module}ApiV2.ts
+The plan must explain how existing logic maps into this structure without touching legacy code.
+________________________________________
+4️⃣ Repository Layer Rules
+•	Only layer allowed to access database
+•	ORM query builders only
+•	❌ No N+1 queries (use JOINs)
+•	No business logic
+________________________________________
+5️⃣ Service Layer Rules
+•	All business logic lives here
+•	No HTTP objects
+•	No DB access
+•	Handles audit user
+•	Applies create/update rules consistently
+________________________________________
+6️⃣ Controller Layer Rules
+•	HTTP concerns only
+•	Schema validation
+•	Calls services only
+•	No ORM usage
+•	No business logic
+________________________________________
+7️⃣ RESTful Route Patterns (V2 ONLY)
+GET    /api/v2/{module}/{entity}
+GET    /api/v2/{module}/{entity}/:uuid
+POST   /api/v2/{module}/{entity}
+PATCH  /api/v2/{module}/{entity}/:uuid
+DELETE /api/v2/{module}/{entity}/:uuid   (soft delete)
+Nested routes must follow hierarchy.
+________________________________________
+🌐 Mandatory API Prefix (Nginx Rule)
+All V2 frontend calls must start with:
+/technical/api/
+This is mandatory to:
+•	Separate PMS and Crew traffic
+•	Support Nginx routing
+•	Avoid legacy collision
+________________________________________
+8️⃣ Frontend API Layer Rules (V2)
+•	One API file per module
+•	Toggle decides legacy vs V2 API
+•	Always pass auditUserUuid
+•	No direct fetch in components
+•	Hooks/components consume module API only
+________________________________________
+9️⃣ Critical Enforcement Rules
+•	Soft delete only
+•	UUIDs in APIs only
+•	❌ No JSON columns
+•	❌ No cross-module coupling
+•	❌ No DB access outside repositories
+•	❌ No changes to legacy logic
+________________________________________
+🎯 Expected Output
+Provide:
+•	A phased migration plan
+•	Toggle-based flow diagram (Legacy ↔ V2)
+•	Component bulk upload refactor plan
+•	Risk points & rollback strategy
+•	Validation checklist per phase
+
