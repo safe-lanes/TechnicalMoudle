@@ -4,7 +4,7 @@ import { useVessels } from "@/hooks/useVessels";
 import { useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { ChevronRight, ChevronDown, Plus, Search, Pencil, X, FileSpreadsheet, Trash2, Anchor, Briefcase } from "lucide-react";
+import { ChevronRight, ChevronDown, Plus, Search, Pencil, X, FileSpreadsheet, Trash2, Anchor, Briefcase, Info } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Label } from "@/components/ui/label";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -3005,14 +3005,15 @@ export default function FleetDataView() {
 
       {/* Spare Details Dialog */}
       <Dialog open={isSpareDetailsDialogOpen} onOpenChange={setIsSpareDetailsDialogOpen}>
-        <DialogContent className="max-w-2xl">
-          <DialogHeader className="flex flex-row items-center justify-between border-b pb-3">
-            <DialogTitle className="text-base font-semibold text-gray-800">
+        <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+          <DialogHeader className="flex flex-row items-center justify-between">
+            <DialogTitle className="flex items-center gap-2">
+              <Info className="h-5 w-5 text-blue-600" />
               Spare Details
             </DialogTitle>
             <Button
               size="sm"
-              className="bg-blue-500 hover:bg-blue-600 text-white"
+              className="bg-blue-500 text-white"
               onClick={() => {
                 setSpareFormData(selectedSpareForDetail || {});
                 setIsEditSpareDialogOpen(true);
@@ -3024,93 +3025,137 @@ export default function FleetDataView() {
             </Button>
           </DialogHeader>
           {selectedSpareForDetail && (
-            <div className="py-4 space-y-6">
-              {/* Row 1: Part Code, Part Name, Part Number, Drawing Number */}
-              <div className="grid grid-cols-4 gap-4">
-                <div>
-                  <div className="text-blue-600 text-xs font-medium mb-1">Part Code</div>
-                  <div className="text-sm font-medium">{selectedSpareForDetail.partCode || "—"}</div>
-                </div>
-                <div>
-                  <div className="text-blue-600 text-xs font-medium mb-1">Part Name</div>
-                  <div className="text-sm font-medium">{selectedSpareForDetail.partName || "—"}</div>
-                </div>
-                <div>
-                  <div className="text-blue-600 text-xs font-medium mb-1">Part Number</div>
-                  <div className="text-sm font-medium">{selectedSpareForDetail.partNumber || "—"}</div>
-                </div>
-                <div>
-                  <div className="text-blue-600 text-xs font-medium mb-1">Drawing Number</div>
-                  <div className="text-sm font-medium">{selectedSpareForDetail.drawingNumber || "—"}</div>
-                </div>
-              </div>
-
-              {/* Row 2: Maker, Maker Code, Is Active, Position Number */}
-              <div className="grid grid-cols-4 gap-4">
-                <div>
-                  <div className="text-blue-600 text-xs font-medium mb-1">Maker</div>
-                  <div className="text-sm font-medium">{selectedSpareForDetail.maker || "—"}</div>
-                </div>
-                <div>
-                  <div className="text-blue-600 text-xs font-medium mb-1">Maker Code</div>
-                  <div className="text-sm font-medium">{selectedSpareForDetail.makerCode || "—"}</div>
-                </div>
-                <div>
-                  <div className="text-blue-600 text-xs font-medium mb-1">Is Active</div>
-                  <div className="text-sm font-medium">{selectedSpareForDetail.isActive ? "Yes" : "No"}</div>
-                </div>
-                <div>
-                  <div className="text-blue-600 text-xs font-medium mb-1">Position Number</div>
-                  <div className="text-sm font-medium">{selectedSpareForDetail.positionNumber || "—"}</div>
+            <div className="space-y-4">
+              <div className="bg-gray-50 rounded-lg p-4">
+                <h3 className="text-sm font-semibold text-gray-700 mb-3 border-b pb-2">Basic Information</h3>
+                <div className="grid grid-cols-2 gap-4 text-sm">
+                  <div>
+                    <span className="text-gray-500">Part Code:</span>
+                    <span className="ml-2 font-medium text-gray-900">{selectedSpareForDetail.partCode || '-'}</span>
+                  </div>
+                  <div>
+                    <span className="text-gray-500">Part Name:</span>
+                    <span className="ml-2 font-medium text-gray-900">{selectedSpareForDetail.partName || '-'}</span>
+                  </div>
+                  <div>
+                    <span className="text-gray-500">Part Number:</span>
+                    <span className="ml-2 font-medium text-gray-900">{selectedSpareForDetail.partNumber || '-'}</span>
+                  </div>
+                  <div>
+                    <span className="text-gray-500">UOM:</span>
+                    <span className="ml-2 font-medium text-gray-900">{selectedSpareForDetail.unitOfMeasurement || '-'}</span>
+                  </div>
+                  <div>
+                    <span className="text-gray-500">Equipment:</span>
+                    <span className="ml-2 font-medium text-gray-900">{selectedSpareForDetail.fleetEquipmentName || '-'}</span>
+                  </div>
+                  <div>
+                    <span className="text-gray-500">Equipment Code:</span>
+                    <span className="ml-2 font-medium text-gray-900">{selectedSpareForDetail.fleetEquipmentCode || '-'}</span>
+                  </div>
                 </div>
               </div>
 
-              {/* Row 3: Criticality, Unit Of Measurement, Specification */}
-              <div className="grid grid-cols-3 gap-4">
-                <div>
-                  <div className="text-blue-600 text-xs font-medium mb-1">Criticality</div>
-                  <div className="text-sm font-medium">{selectedSpareForDetail.criticality || "—"}</div>
-                </div>
-                <div>
-                  <div className="text-blue-600 text-xs font-medium mb-1">Unit Of Measurement</div>
-                  <div className="text-sm font-medium">{selectedSpareForDetail.unitOfMeasurement || "—"}</div>
-                </div>
-                <div>
-                  <div className="text-blue-600 text-xs font-medium mb-1">Specification</div>
-                  <div className="text-sm font-medium">{selectedSpareForDetail.specification || "—"}</div>
+              <div className="bg-blue-50 rounded-lg p-4">
+                <h3 className="text-sm font-semibold text-gray-700 mb-3 border-b pb-2">Status & Classification</h3>
+                <div className="grid grid-cols-2 gap-4 text-sm">
+                  <div>
+                    <span className="text-gray-500">Criticality:</span>
+                    <span className={`ml-2 px-2 py-0.5 rounded text-xs font-medium ${
+                      selectedSpareForDetail.criticality === 'Yes' || selectedSpareForDetail.criticality === 'Critical'
+                        ? 'bg-red-100 text-red-800'
+                        : 'bg-green-100 text-green-800'
+                    }`}>
+                      {selectedSpareForDetail.criticality || 'No'}
+                    </span>
+                  </div>
+                  <div>
+                    <span className="text-gray-500">Is Active:</span>
+                    <span className={`ml-2 px-2 py-0.5 rounded text-xs font-medium ${
+                      selectedSpareForDetail.isActive !== false
+                        ? 'bg-green-100 text-green-800'
+                        : 'bg-gray-100 text-gray-800'
+                    }`}>
+                      {selectedSpareForDetail.isActive !== false ? 'Yes' : 'No'}
+                    </span>
+                  </div>
+                  <div>
+                    <span className="text-gray-500">IHM:</span>
+                    <span className={`ml-2 px-2 py-0.5 rounded text-xs font-medium ${
+                      selectedSpareForDetail.ihm === 'Yes'
+                        ? 'bg-red-100 text-red-800'
+                        : 'bg-green-100 text-green-800'
+                    }`}>
+                      {selectedSpareForDetail.ihm || 'No'}
+                    </span>
+                  </div>
+                  <div>
+                    <span className="text-gray-500">Evidence Type:</span>
+                    <span className="ml-2 font-medium text-gray-900">{selectedSpareForDetail.evidenceType || '-'}</span>
+                  </div>
                 </div>
               </div>
 
-              {/* Row 4: Note */}
-              <div>
-                <div className="text-blue-600 text-xs font-medium mb-1">Note</div>
-                <div className="text-sm font-medium">{selectedSpareForDetail.note || "—"}</div>
+              <div className="bg-green-50 rounded-lg p-4">
+                <h3 className="text-sm font-semibold text-gray-700 mb-3 border-b pb-2">Technical Details</h3>
+                <div className="grid grid-cols-2 gap-4 text-sm">
+                  <div>
+                    <span className="text-gray-500">Maker:</span>
+                    <span className="ml-2 font-medium text-gray-900">{selectedSpareForDetail.maker || '-'}</span>
+                  </div>
+                  <div>
+                    <span className="text-gray-500">Maker Code:</span>
+                    <span className="ml-2 font-medium text-gray-900">{selectedSpareForDetail.makerCode || '-'}</span>
+                  </div>
+                  <div>
+                    <span className="text-gray-500">Drawing Number:</span>
+                    <span className="ml-2 font-medium text-gray-900">{selectedSpareForDetail.drawingNumber || '-'}</span>
+                  </div>
+                  <div>
+                    <span className="text-gray-500">Position Number:</span>
+                    <span className="ml-2 font-medium text-gray-900">{selectedSpareForDetail.positionNumber || '-'}</span>
+                  </div>
+                  <div className="col-span-2">
+                    <span className="text-gray-500">Specification:</span>
+                    <span className="ml-2 font-medium text-gray-900">{selectedSpareForDetail.specification || '-'}</span>
+                  </div>
+                </div>
               </div>
 
-              {/* Anchor Icon Divider */}
-              <div className="flex items-center justify-center py-2 gap-4">
-                <div className="flex-1 h-px bg-gray-200"></div>
-                <Anchor className="h-5 w-5 text-blue-500" />
-                <div className="flex-1 h-px bg-gray-200"></div>
+              <div className="bg-yellow-50 rounded-lg p-4">
+                <h3 className="text-sm font-semibold text-gray-700 mb-3 border-b pb-2">Manual Reference</h3>
+                <div className="grid grid-cols-2 gap-4 text-sm">
+                  <div>
+                    <span className="text-gray-500">Manual Name:</span>
+                    <span className="ml-2 font-medium text-gray-900">{selectedSpareForDetail.manualName || '-'}</span>
+                  </div>
+                  <div>
+                    <span className="text-gray-500">Page Number:</span>
+                    <span className="ml-2 font-medium text-gray-900">{selectedSpareForDetail.pageNumber || '-'}</span>
+                  </div>
+                  <div className="col-span-2">
+                    <span className="text-gray-500">Note:</span>
+                    <span className="ml-2 font-medium text-gray-900">{selectedSpareForDetail.note || '-'}</span>
+                  </div>
+                </div>
               </div>
 
-              {/* Spare Mapped Vessel Details */}
-              <div>
-                <h3 className="text-sm font-semibold text-gray-800 mb-3">Spare Mapped Vessel Details</h3>
+              <div className="bg-purple-50 rounded-lg p-4">
+                <h3 className="text-sm font-semibold text-gray-700 mb-3 border-b pb-2">Spare Mapped Vessel Details</h3>
                 <table className="w-full text-sm">
                   <thead>
                     <tr className="border-b text-left">
-                      <th className="py-2 text-blue-600 font-medium">Vessel Code</th>
-                      <th className="py-2 text-blue-600 font-medium">Vessel Name</th>
+                      <th className="py-2 text-gray-600 font-medium">Vessel Code</th>
+                      <th className="py-2 text-gray-600 font-medium">Vessel Name</th>
                     </tr>
                   </thead>
                   <tbody>
                     {(() => {
-                      const mappedVessels = (vessels || []).filter(v => 
-                        v.id === selectedSpareForDetail.vesselId
+                      const mappedVessels = (vessels || []).filter((v: any) => 
+                        v.id === (selectedSpareForDetail as any).vesselId
                       );
                       return mappedVessels.length > 0 ? (
-                        mappedVessels.map((vessel, idx) => (
+                        mappedVessels.map((vessel: any, idx: number) => (
                           <tr key={idx} className="border-b last:border-0">
                             <td className="py-2">{vessel.id}</td>
                             <td className="py-2">{vessel.name}</td>
