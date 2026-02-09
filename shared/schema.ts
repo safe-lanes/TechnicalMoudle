@@ -1884,6 +1884,57 @@ export type InsertFleetJobs = z.infer<typeof insertFleetJobsSchema>;
 export type FleetJobs = typeof fleetJobs.$inferSelect;
 
 // =====================================================
+// FLEET SPARES - Fleet-level spare parts master data
+// Stores fleet-wide spare part templates imported via Bulk Data Import
+// Distinct from vessel-level `spares` table which holds vessel-specific instances
+// =====================================================
+export const fleetSpares = pgTable("fleet_spares", {
+  id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
+  fleetSparesUuid: text("fleet_spares_uuid").default(sql`gen_random_uuid()`),
+  fleetComponentsUuid: text("fleet_components_uuid"),
+  partCode: text("part_code").notNull().unique(),
+  fleetEquipmentCode: text("fleet_equipment_code").notNull(),
+  fleetEquipmentName: text("fleet_equipment_name").notNull(),
+  partName: text("part_name").notNull(),
+  partNumber: text("part_number"),
+  unitOfMeasurement: text("unit_of_measurement").notNull(),
+  drawingNumber: text("drawing_number"),
+  positionNumber: text("position_number"),
+  note: text("note"),
+  specification: text("specification"),
+  maker: text("maker"),
+  makerCode: text("maker_code"),
+  manualName: text("manual_name"),
+  pageNumber: text("page_number"),
+  criticality: text("criticality"),
+  isActive: boolean("is_active").notNull().default(true),
+  ihm: text("ihm"),
+  evidenceType: text("evidence_type"),
+  sortOrder: integer("sort_order").default(0),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  createdByUuid: text("created_by_uuid"),
+  updatedByUuid: text("updated_by_uuid"),
+  isDeleted: boolean("is_deleted").default(false),
+  isSync: boolean("is_sync").default(false),
+}, (table) => ({
+  partCodeIdx: uniqueIndex("idx_fleet_spares_part_code").on(table.partCode),
+  fleetEquipmentCodeIdx: index("idx_fleet_spares_equipment").on(table.fleetEquipmentCode),
+  fleetSparesUuidIdx: uniqueIndex("idx_fleet_spares_uuid").on(table.fleetSparesUuid),
+  fleetComponentsUuidIdx: index("idx_fleet_spares_component_uuid").on(table.fleetComponentsUuid),
+}));
+
+export const insertFleetSparesSchema = createInsertSchema(fleetSpares).omit({
+  id: true,
+  fleetSparesUuid: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type InsertFleetSpares = z.infer<typeof insertFleetSparesSchema>;
+export type FleetSpares = typeof fleetSpares.$inferSelect;
+
+// =====================================================
 // SFI DETAILS - SFI Code lookup table
 // Used for standardizing component codes across fleet
 // =====================================================
