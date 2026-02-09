@@ -9,7 +9,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Plus, Search, Pencil, Trash2, Download, RefreshCw, FileCode2 } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { Plus, Search, Pencil, Trash2, Download, RefreshCw, FileCode2, Package } from "lucide-react";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { useForm } from "react-hook-form";
@@ -251,66 +252,74 @@ export default function MasterDataManagement() {
 
   const isPending = createMutation.isPending || updateMutation.isPending;
 
+  const totalRecords = masterDataResponse?.total || 0;
+  const shownRecords = filteredItems.length;
+
   return (
-    <div className="min-h-screen bg-gray-50 p-6">
-      <div className="max-w-7xl mx-auto">
-        <div className="mb-6">
-          <h1 className="text-3xl font-bold text-gray-900">Fleet Equipment Code Master Data</h1>
-          <p className="text-gray-600 mt-2">
-            Manage Fleet Equipment Codes that link fleet-level components to vessels. 
-            Codes are auto-generated in format: XXX.XXX.XX (e.g., 722.001.AA)
-          </p>
+    <div className="p-6">
+      <Card className="overflow-hidden">
+        <div className="bg-gradient-to-r from-cyan-600 to-blue-600 px-6 py-5">
+          <div className="flex items-center gap-3 mb-1">
+            <div className="p-2 bg-white/20 rounded-lg">
+              <FileCode2 className="h-5 w-5 text-white" />
+            </div>
+            <div>
+              <h1 className="text-xl font-bold text-white">Fleet Equipment Code Master Data</h1>
+              <p className="text-cyan-100 text-sm mt-0.5">Manage Fleet Equipment Codes that link fleet-level components to vessels</p>
+            </div>
+          </div>
         </div>
 
-        <Card>
-          <CardHeader>
-            <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-              <CardTitle className="flex items-center gap-2">
-                <FileCode2 className="h-5 w-5 text-blue-600" />
-                Master Data Registry
-              </CardTitle>
-              <div className="flex flex-col sm:flex-row gap-3">
-                <div className="relative flex-1 sm:min-w-[300px]">
-                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-                  <Input
-                    type="text"
-                    placeholder="Search by code, component, equipment name..."
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    className="pl-10"
-                    data-testid="input-search-master-data"
-                  />
-                </div>
-                <div className="flex gap-2">
-                  <Button
-                    variant="outline"
-                    onClick={() => refetch()}
-                    data-testid="button-refresh"
-                  >
-                    <RefreshCw className="h-4 w-4" />
-                  </Button>
-                  <Button
-                    variant="outline"
-                    onClick={handleExport}
-                    data-testid="button-export"
-                  >
-                    <Download className="h-4 w-4 mr-2" />
-                    Export
-                  </Button>
-                  <Button
-                    onClick={handleAddNew}
-                    className="whitespace-nowrap"
-                    data-testid="button-add-master-data"
-                  >
-                    <Plus className="mr-2 h-4 w-4" />
-                    Add Entry
-                  </Button>
-                </div>
+        <div className="px-6 py-4 bg-gray-50 border-b border-gray-200">
+          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+            <div className="flex items-center gap-4">
+              <h2 className="text-base font-semibold text-gray-800">All Equipment Codes</h2>
+              <div className="flex items-center gap-3">
+                <Badge variant="secondary" className="bg-cyan-100 text-cyan-700 no-default-hover-elevate no-default-active-elevate" data-testid="badge-total-records">
+                  <Package className="h-3 w-3 mr-1" />
+                  {totalRecords} Total
+                </Badge>
+                <Badge variant="secondary" className="bg-green-100 text-green-700 no-default-hover-elevate no-default-active-elevate" data-testid="badge-shown-records">
+                  {shownRecords} Shown
+                </Badge>
               </div>
             </div>
-          </CardHeader>
+            <div className="flex flex-col sm:flex-row items-center gap-3">
+              <div className="relative flex-1 sm:min-w-[250px]">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                <Input
+                  type="text"
+                  placeholder="Search equipment codes..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="pl-10 bg-white border-gray-300"
+                  data-testid="input-search-master-data"
+                />
+              </div>
+              <div className="flex gap-2">
+                <Button
+                  variant="outline"
+                  className="border-gray-300"
+                  onClick={handleExport}
+                  data-testid="button-export"
+                >
+                  <Download className="h-4 w-4 mr-2" />
+                  Export
+                </Button>
+                <Button
+                  onClick={handleAddNew}
+                  className="whitespace-nowrap bg-cyan-600"
+                  data-testid="button-add-master-data"
+                >
+                  <Plus className="mr-1 h-4 w-4" />
+                  Add Entry
+                </Button>
+              </div>
+            </div>
+          </div>
+        </div>
 
-          <CardContent>
+        <div className="px-6 py-4">
             {isLoading ? (
               <div className="space-y-3">
                 {[...Array(5)].map((_, i) => (
@@ -338,14 +347,14 @@ export default function MasterDataManagement() {
               <div className="overflow-x-auto">
                 <Table>
                   <TableHeader>
-                    <TableRow>
-                      <TableHead>Fleet Equipment Code</TableHead>
-                      <TableHead>Component Code</TableHead>
-                      <TableHead>Equipment Name</TableHead>
-                      <TableHead>Model Code</TableHead>
-                      <TableHead>Vessel Name</TableHead>
-                      <TableHead>Count Component Code</TableHead>
-                      <TableHead className="text-right">Actions</TableHead>
+                    <TableRow className="bg-gray-50">
+                      <TableHead className="text-xs font-semibold uppercase tracking-wider text-gray-600">Fleet Equipment Code</TableHead>
+                      <TableHead className="text-xs font-semibold uppercase tracking-wider text-gray-600">Component Code</TableHead>
+                      <TableHead className="text-xs font-semibold uppercase tracking-wider text-gray-600">Equipment Name</TableHead>
+                      <TableHead className="text-xs font-semibold uppercase tracking-wider text-gray-600">Model Code</TableHead>
+                      <TableHead className="text-xs font-semibold uppercase tracking-wider text-gray-600">Vessel Name</TableHead>
+                      <TableHead className="text-xs font-semibold uppercase tracking-wider text-gray-600">Count Component Code</TableHead>
+                      <TableHead className="text-xs font-semibold uppercase tracking-wider text-gray-600 text-right">Actions</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -373,7 +382,7 @@ export default function MasterDataManagement() {
                               variant="ghost"
                               size="sm"
                               onClick={() => handleDeleteClick(item)}
-                              className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                              className="text-red-500"
                               data-testid={`button-delete-${item.id}`}
                             >
                               <Trash2 className="h-4 w-4" />
@@ -386,16 +395,8 @@ export default function MasterDataManagement() {
                 </Table>
               </div>
             )}
-          </CardContent>
-        </Card>
-
-        <div className="mt-4 text-sm text-gray-500 flex items-center gap-2">
-          <span>Total Records: {filteredItems.length}</span>
-          {searchQuery && (
-            <span>| Filtered from {masterDataResponse?.total || 0} total</span>
-          )}
         </div>
-      </div>
+      </Card>
 
       <Dialog open={isFormOpen} onOpenChange={setIsFormOpen}>
         <DialogContent className="sm:max-w-[600px]" data-testid="dialog-master-data-form">

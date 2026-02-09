@@ -10,7 +10,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
-import { Plus, Pencil, Trash2 } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { Plus, Pencil, Trash2, List, Package } from "lucide-react";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { useForm } from "react-hook-form";
@@ -182,62 +183,77 @@ export default function MasterListsManagement() {
 
   const isPending = createMutation.isPending || updateMutation.isPending;
 
+  const totalItems = masterLists?.length || 0;
+
   return (
-    <div className="min-h-screen bg-gray-50 p-6">
-      <div className="max-w-7xl mx-auto">
-        <div className="mb-6">
-          <h1 className="text-3xl font-bold text-gray-900" data-testid="I4.QL.2.7"><Marker id="I4.QL.2.7" />Master Lists Management</h1>
-          <p className="text-gray-600 mt-2" data-testid="I4.QL.2.9"><Marker id="I4.QL.2.9" />Configure dropdown options and system classifications</p>
+    <div className="p-6">
+      <Card className="overflow-hidden">
+        <div className="bg-gradient-to-r from-cyan-600 to-blue-600 px-6 py-5">
+          <div className="flex items-center gap-3 mb-1">
+            <div className="p-2 bg-white/20 rounded-lg">
+              <List className="h-5 w-5 text-white" />
+            </div>
+            <div>
+              <h1 className="text-xl font-bold text-white" data-testid="I4.QL.2.7"><Marker id="I4.QL.2.7" />Master Lists Management</h1>
+              <p className="text-cyan-100 text-sm mt-0.5" data-testid="I4.QL.2.9"><Marker id="I4.QL.2.9" />Configure dropdown options and system classifications</p>
+            </div>
+          </div>
         </div>
 
-        <Card className="shadow-sm">
-          <CardHeader className="pb-4">
-            <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-              <CardTitle className="text-lg font-semibold" data-testid="I4.QL.2.8"><Marker id="I4.QL.2.8" />Master List Items</CardTitle>
-              <div className="flex flex-col sm:flex-row items-center gap-3">
-                {/* List Type Selector */}
-                <Select value={selectedListType} onValueChange={(value) => {
-                  setSelectedListType(value);
-                  setSelectedRowItem(null);
-                }}>
-                  <SelectTrigger className="w-full sm:w-[200px] bg-white" data-testid="I4.QL.2.10">
-                    <Marker id="I4.QL.2.10" />
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {LIST_TYPES.map((type) => (
-                      <SelectItem key={type.value} value={type.value}>
-                        {type.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                {/* Edit Button - for selected row */}
-                <Button
-                  onClick={() => selectedRowItem && handleEdit(selectedRowItem)}
-                  disabled={!selectedRowItem}
-                  className="whitespace-nowrap bg-blue-500 hover:bg-blue-600 text-white disabled:opacity-50"
-                  data-testid="I4.QL.2.11"
-                >
-                  <Marker id="I4.QL.2.11" />
-                  Edit
-                </Button>
-                {/* Add New Button */}
-                <Button
-                  onClick={handleAddNew}
-                  className="whitespace-nowrap bg-green-500 hover:bg-green-600 text-white"
-                  data-testid="I4.QL.2.12"
-                >
-                  <Marker id="I4.QL.2.12" />
-                  <Plus className="mr-2 h-4 w-4" />
-                  Add New
-                </Button>
+        <div className="px-6 py-4 bg-gray-50 border-b border-gray-200">
+          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+            <div className="flex items-center gap-4">
+              <h2 className="text-base font-semibold text-gray-800" data-testid="I4.QL.2.8"><Marker id="I4.QL.2.8" />Master List Items</h2>
+              <div className="flex items-center gap-3">
+                <Badge variant="secondary" className="bg-cyan-100 text-cyan-700 no-default-hover-elevate no-default-active-elevate" data-testid="badge-total-items">
+                  <Package className="h-3 w-3 mr-1" />
+                  {totalItems} Total
+                </Badge>
               </div>
             </div>
-          </CardHeader>
+            <div className="flex flex-col sm:flex-row items-center gap-3">
+              <Select value={selectedListType} onValueChange={(value) => {
+                setSelectedListType(value);
+                setSelectedRowItem(null);
+              }}>
+                <SelectTrigger className="w-full sm:w-[200px] bg-white border-gray-300" data-testid="I4.QL.2.10">
+                  <Marker id="I4.QL.2.10" />
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {LIST_TYPES.map((type) => (
+                    <SelectItem key={type.value} value={type.value}>
+                      {type.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <Button
+                onClick={() => selectedRowItem && handleEdit(selectedRowItem)}
+                disabled={!selectedRowItem}
+                variant="outline"
+                className="whitespace-nowrap border-gray-300 text-gray-700 disabled:opacity-50"
+                data-testid="I4.QL.2.11"
+              >
+                <Marker id="I4.QL.2.11" />
+                <Pencil className="mr-1 h-4 w-4" />
+                Edit
+              </Button>
+              <Button
+                onClick={handleAddNew}
+                className="whitespace-nowrap bg-cyan-600"
+                data-testid="I4.QL.2.12"
+              >
+                <Marker id="I4.QL.2.12" />
+                <Plus className="mr-1 h-4 w-4" />
+                Add New
+              </Button>
+            </div>
+          </div>
+        </div>
 
-          <CardContent>
-            {isLoading ? (
+        <div className="px-6 py-4">
+          {isLoading ? (
               <div className="space-y-3">
                 {[...Array(5)].map((_, i) => (
                   <div key={i} className="h-16 bg-gray-100 animate-pulse rounded"></div>
@@ -257,12 +273,12 @@ export default function MasterListsManagement() {
               <div className="overflow-x-auto">
                 <Table>
                   <TableHeader>
-                    <TableRow>
-                      <TableHead data-testid="I4.QL.2.13"><Marker id="I4.QL.2.13" />Key</TableHead>
-                      <TableHead data-testid="I4.QL.2.14"><Marker id="I4.QL.2.14" />Value</TableHead>
-                      <TableHead data-testid="I4.QL.2.15"><Marker id="I4.QL.2.15" />Display Order</TableHead>
-                      <TableHead data-testid="I4.QL.2.16"><Marker id="I4.QL.2.16" />Active</TableHead>
-                      <TableHead className="text-right" data-testid="I4.QL.2.17"><Marker id="I4.QL.2.17" />Actions</TableHead>
+                    <TableRow className="bg-gray-50">
+                      <TableHead className="text-xs font-semibold uppercase tracking-wider text-gray-600" data-testid="I4.QL.2.13"><Marker id="I4.QL.2.13" />Key</TableHead>
+                      <TableHead className="text-xs font-semibold uppercase tracking-wider text-gray-600" data-testid="I4.QL.2.14"><Marker id="I4.QL.2.14" />Value</TableHead>
+                      <TableHead className="text-xs font-semibold uppercase tracking-wider text-gray-600" data-testid="I4.QL.2.15"><Marker id="I4.QL.2.15" />Display Order</TableHead>
+                      <TableHead className="text-xs font-semibold uppercase tracking-wider text-gray-600" data-testid="I4.QL.2.16"><Marker id="I4.QL.2.16" />Active</TableHead>
+                      <TableHead className="text-xs font-semibold uppercase tracking-wider text-gray-600 text-right" data-testid="I4.QL.2.17"><Marker id="I4.QL.2.17" />Actions</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -271,9 +287,9 @@ export default function MasterListsManagement() {
                         key={item.id} 
                         data-testid={`row-master-list-${item.id}`}
                         onClick={() => setSelectedRowItem(selectedRowItem?.id === item.id ? null : item)}
-                        className={`cursor-pointer hover:bg-gray-50 ${
+                        className={`cursor-pointer ${
                           selectedRowItem?.id === item.id 
-                            ? 'bg-blue-50 hover:bg-blue-100' 
+                            ? 'bg-blue-50' 
                             : ''
                         }`}
                       >
@@ -310,7 +326,7 @@ export default function MasterListsManagement() {
                                 e.stopPropagation();
                                 handleEdit(item);
                               }}
-                              className="text-gray-500 hover:text-gray-700"
+                              className="text-gray-500"
                               data-testid={index === 0 ? "I4.QL.2.22" : `button-edit-${item.id}`}
                             >
                               {index === 0 && <Marker id="I4.QL.2.22" />}
@@ -323,7 +339,7 @@ export default function MasterListsManagement() {
                                 e.stopPropagation();
                                 handleDeleteClick(item);
                               }}
-                              className="text-red-500 hover:text-red-700 hover:bg-red-50"
+                              className="text-red-500"
                               data-testid={index === 0 ? "I4.QL.2.23" : `button-delete-${item.id}`}
                             >
                               {index === 0 && <Marker id="I4.QL.2.23" />}
@@ -337,9 +353,8 @@ export default function MasterListsManagement() {
                 </Table>
               </div>
             )}
-          </CardContent>
-        </Card>
-      </div>
+        </div>
+      </Card>
 
       {/* Add/Edit Dialog */}
       <Dialog open={isFormOpen} onOpenChange={setIsFormOpen}>
