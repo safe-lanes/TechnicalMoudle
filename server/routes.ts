@@ -8603,6 +8603,96 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
   
+  // Chemicals Expiry Report endpoint
+  app.get("/technical/api/reports/chemicals-expiry/:vesselId", async (req, res) => {
+    try {
+      const { vesselId } = req.params;
+      const { expired, expiring_soon, hazard_class, stock_status } = req.query;
+      
+      let chemicals = await storage.getStoresItems(vesselId, 'chemicals');
+      
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      
+      const parseDate = (dateStr: string | null | undefined): Date | null => {
+        if (!dateStr) return null;
+        const d = new Date(dateStr);
+        return isNaN(d.getTime()) ? null : d;
+      };
+      
+      const enriched = chemicals.map((item: any) => {
+        const expiryParsed = parseDate(item.expiryDate);
+        let daysUntilExpiry: number | null = null;
+        let expiryStatus = 'No Date';
+        
+        if (expiryParsed) {
+          daysUntilExpiry = Math.floor((expiryParsed.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+          if (daysUntilExpiry < 0) expiryStatus = 'Expired';
+          else if (daysUntilExpiry <= 30) expiryStatus = 'Critical';
+          else if (daysUntilExpiry <= 60) expiryStatus = 'High';
+          else if (daysUntilExpiry <= 90) expiryStatus = 'Medium';
+          else expiryStatus = 'OK';
+        }
+        
+        const rob = parseFloat(String(item.rob)) || 0;
+        const min = parseFloat(String(item.min)) || 0;
+        const stockStatus = rob === 0 ? 'Critical' : rob <= min ? 'Low' : 'OK';
+        const hasSds = !!(item.sdsReference && item.sdsReference.trim());
+        
+        return {
+          ...item,
+          daysUntilExpiry,
+          expiryStatus,
+          stockStatus,
+          hasSds,
+        };
+      });
+      
+      let filtered = enriched;
+      
+      if (expired === 'true') {
+        filtered = filtered.filter((i: any) => i.expiryStatus === 'Expired');
+      }
+      
+      if (expiring_soon) {
+        const days = parseInt(expiring_soon as string);
+        if (!isNaN(days)) {
+          filtered = filtered.filter((i: any) => i.daysUntilExpiry !== null && i.daysUntilExpiry >= 0 && i.daysUntilExpiry <= days);
+        }
+      }
+      
+      if (hazard_class && hazard_class !== 'all') {
+        filtered = filtered.filter((i: any) => i.hazardClassification === hazard_class);
+      }
+      
+      if (stock_status && stock_status !== 'all') {
+        filtered = filtered.filter((i: any) => i.stockStatus === stock_status);
+      }
+      
+      const totalChemicals = enriched.length;
+      const expiredCount = enriched.filter((i: any) => i.expiryStatus === 'Expired').length;
+      const expiringSoonCount = enriched.filter((i: any) => ['Critical', 'High', 'Medium'].includes(i.expiryStatus)).length;
+      const withSds = enriched.filter((i: any) => i.hasSds).length;
+      const sdsCompliancePercent = totalChemicals > 0 ? Math.round((withSds / totalChemicals) * 100) : 0;
+      
+      res.json({
+        items: filtered,
+        summary: {
+          totalChemicals,
+          expiredCount,
+          expiringSoonCount,
+          sdsCompliancePercent,
+          withSds,
+          withoutSds: totalChemicals - withSds,
+          lowStockCount: enriched.filter((i: any) => i.stockStatus === 'Low' || i.stockStatus === 'Critical').length,
+        }
+      });
+    } catch (error: any) {
+      console.error("Error generating chemicals expiry report:", error);
+      res.status(500).json({ error: error.message || "Failed to generate chemicals expiry report" });
+    }
+  });
+
   // Stores endpoints - ZERO PMS linkages (isolated from Components/Jobs/Work Orders per Global Business Rule Section 7.2)
   // Note: Auth removed to match spares endpoint pattern for development
   app.get("/technical/api/stores/:vesselId", async (req, res) => {

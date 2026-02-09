@@ -11,6 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { Badge } from "@/components/ui/badge";
 import { Search, Edit2, Clock, Trash2, FileSpreadsheet, X, MessageSquare, Calendar, PlusCircle, MinusCircle, Download, AlertCircle, CheckCircle, HelpCircle, MapPin, ChevronDown } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useQuery, useMutation } from "@tanstack/react-query";
@@ -61,6 +62,12 @@ interface StoreItem {
   // IHM fields
   ihmPresence?: typeof IHM_PRESENCE[number];
   ihmEvidenceType?: typeof IHM_EVIDENCE_TYPES[number];
+  // Chemical fields
+  expiryDate?: string;
+  batchNumber?: string;
+  hazardClassification?: string;
+  manufactureDate?: string;
+  sdsReference?: string;
 }
 
 interface StoresHistoryItem {
@@ -112,6 +119,11 @@ interface StoresApiItem {
   isArchived?: boolean;
   ihmPresence?: string;
   ihmEvidenceType?: string;
+  expiryDate?: string;
+  batchNumber?: string;
+  hazardClassification?: string;
+  manufactureDate?: string;
+  sdsReference?: string;
 }
 
 const Stores: React.FC = () => {
@@ -212,6 +224,11 @@ const Stores: React.FC = () => {
           locationBName: item.locationB || '',
           ihmPresence: (item.ihmPresence as typeof IHM_PRESENCE[number]) || 'Unknown',
           ihmEvidenceType: (item.ihmEvidenceType as typeof IHM_EVIDENCE_TYPES[number]) || 'None',
+          expiryDate: item.expiryDate || '',
+          batchNumber: item.batchNumber || '',
+          hazardClassification: item.hazardClassification || '',
+          manufactureDate: item.manufactureDate || '',
+          sdsReference: item.sdsReference || '',
         };
       });
       setItems(mappedItems);
@@ -426,7 +443,12 @@ const Stores: React.FC = () => {
     location: "",
     notes: "",
     ihmPresence: 'Unknown' as 'Unknown' | 'Present' | 'Not Present',
-    ihmEvidenceType: 'None' as 'None' | 'MD' | 'SDoC' | 'Test'
+    ihmEvidenceType: 'None' as 'None' | 'MD' | 'SDoC' | 'Test',
+    expiryDate: "",
+    batchNumber: "",
+    hazardClassification: "",
+    sdsReference: "",
+    manufactureDate: ""
   });
   
   // Add Store modal state
@@ -455,7 +477,22 @@ const Stores: React.FC = () => {
     ihmDetails: "",
     ihmPresence: "Unknown" as "Unknown" | "Present" | "Not Present",
     ihmEvidenceType: "None" as "None" | "MD" | "SDoC" | "Test",
-    remarks: ""
+    remarks: "",
+    manufactureDate: "",
+    expiryDate: "",
+    batchNumber: "",
+    lotNumber: "",
+    shelfLifeMonths: 0,
+    sdsReference: "",
+    sdsLastUpdated: "",
+    hazardClassification: "",
+    unNumber: "",
+    flashPoint: "",
+    storageTempMin: "",
+    storageTempMax: "",
+    disposalInstructions: "",
+    ppeRequirements: "",
+    emergencyContact: "",
   });
   
   // Store category options
@@ -766,7 +803,12 @@ const Stores: React.FC = () => {
       location: item.location,
       notes: item.notes || "",
       ihmPresence: item.ihmPresence || 'Unknown',
-      ihmEvidenceType: item.ihmEvidenceType || 'None'
+      ihmEvidenceType: item.ihmEvidenceType || 'None',
+      expiryDate: item.expiryDate || '',
+      batchNumber: item.batchNumber || '',
+      hazardClassification: item.hazardClassification || '',
+      sdsReference: item.sdsReference || '',
+      manufactureDate: item.manufactureDate || ''
     });
     
     // In modify mode, store original data for change tracking
@@ -898,7 +940,22 @@ const Stores: React.FC = () => {
       ihmDetails: "",
       ihmPresence: "Unknown",
       ihmEvidenceType: "None",
-      remarks: ""
+      remarks: "",
+      manufactureDate: "",
+      expiryDate: "",
+      batchNumber: "",
+      lotNumber: "",
+      shelfLifeMonths: 0,
+      sdsReference: "",
+      sdsLastUpdated: "",
+      hazardClassification: "",
+      unNumber: "",
+      flashPoint: "",
+      storageTempMin: "",
+      storageTempMax: "",
+      disposalInstructions: "",
+      ppeRequirements: "",
+      emergencyContact: "",
     });
     setIsAddStoreModalOpen(true);
   };
@@ -951,7 +1008,22 @@ const Stores: React.FC = () => {
         ihmPresence: addStoreForm.ihmPresence,
         ihmEvidenceType: addStoreForm.ihmEvidenceType,
         remarks: addStoreForm.remarks.trim() || null,
-        isActive: true
+        isActive: true,
+        manufactureDate: activeTab === 'chemicals' ? (addStoreForm.manufactureDate || null) : null,
+        expiryDate: activeTab === 'chemicals' ? (addStoreForm.expiryDate || null) : null,
+        batchNumber: activeTab === 'chemicals' ? (addStoreForm.batchNumber.trim() || null) : null,
+        lotNumber: activeTab === 'chemicals' ? (addStoreForm.lotNumber.trim() || null) : null,
+        shelfLifeMonths: activeTab === 'chemicals' ? (addStoreForm.shelfLifeMonths || null) : null,
+        sdsReference: activeTab === 'chemicals' ? (addStoreForm.sdsReference.trim() || null) : null,
+        sdsLastUpdated: activeTab === 'chemicals' ? (addStoreForm.sdsLastUpdated || null) : null,
+        hazardClassification: activeTab === 'chemicals' ? (addStoreForm.hazardClassification || null) : null,
+        unNumber: activeTab === 'chemicals' ? (addStoreForm.unNumber.trim() || null) : null,
+        flashPoint: activeTab === 'chemicals' ? (addStoreForm.flashPoint.trim() || null) : null,
+        storageTempMin: activeTab === 'chemicals' ? (addStoreForm.storageTempMin || null) : null,
+        storageTempMax: activeTab === 'chemicals' ? (addStoreForm.storageTempMax || null) : null,
+        disposalInstructions: activeTab === 'chemicals' ? (addStoreForm.disposalInstructions.trim() || null) : null,
+        ppeRequirements: activeTab === 'chemicals' ? (addStoreForm.ppeRequirements.trim() || null) : null,
+        emergencyContact: activeTab === 'chemicals' ? (addStoreForm.emergencyContact.trim() || null) : null,
       };
       
       await apiRequest('POST', `/technical/api/stores/${vesselId}/create`, payload);
@@ -988,7 +1060,12 @@ const Stores: React.FC = () => {
         locationA: editForm.location, // Map location to locationA for storage
         remarks: editForm.notes,
         ihmPresence: editForm.ihmPresence || 'Unknown',
-        ihmEvidenceType: editForm.ihmEvidenceType || 'None'
+        ihmEvidenceType: editForm.ihmEvidenceType || 'None',
+        expiryDate: activeTab === 'chemicals' ? (editForm.expiryDate || null) : undefined,
+        batchNumber: activeTab === 'chemicals' ? (editForm.batchNumber || null) : undefined,
+        hazardClassification: activeTab === 'chemicals' ? (editForm.hazardClassification || null) : undefined,
+        sdsReference: activeTab === 'chemicals' ? (editForm.sdsReference || null) : undefined,
+        manufactureDate: activeTab === 'chemicals' ? (editForm.manufactureDate || null) : undefined,
       };
       
       // Call API to persist changes
@@ -1501,7 +1578,7 @@ const Stores: React.FC = () => {
         <div className="bg-white rounded-lg shadow overflow-hidden">
         {/* Table Header */}
         <div className="bg-[#52baf3] text-white p-4">
-          <div className="grid gap-4 items-center text-sm font-medium" style={{gridTemplateColumns: FEATURES.IHM ? '2fr 2fr 2fr 0.8fr 0.8fr 0.8fr 0.8fr 1fr 0.6fr 1fr' : '2fr 2fr 2fr 0.8fr 0.8fr 0.8fr 0.8fr 1.5fr 1fr'}}>
+          <div className="grid gap-4 items-center text-sm font-medium" style={{gridTemplateColumns: activeTab === 'chemicals' ? (FEATURES.IHM ? '2fr 2fr 2fr 0.8fr 0.8fr 0.8fr 0.8fr 1fr 0.8fr 0.8fr 0.8fr 0.6fr 1fr' : '2fr 2fr 2fr 0.8fr 0.8fr 0.8fr 0.8fr 1fr 0.8fr 0.8fr 0.8fr 1fr') : (FEATURES.IHM ? '2fr 2fr 2fr 0.8fr 0.8fr 0.8fr 0.8fr 1fr 0.6fr 1fr' : '2fr 2fr 2fr 0.8fr 0.8fr 0.8fr 0.8fr 1.5fr 1fr')}}>
             <div data-testid={getMarkerId(activeTab, "10")}>
               <Marker id={getMarkerId(activeTab, "10")} />
               {activeTab === "lubes" ? "Lube Grade" : 
@@ -1525,6 +1602,9 @@ const Stores: React.FC = () => {
             <div data-testid={getMarkerId(activeTab, "15")}><Marker id={getMarkerId(activeTab, "15")} />Min</div>
             <div data-testid={getMarkerId(activeTab, "16")}><Marker id={getMarkerId(activeTab, "16")} />Stock</div>
             <div data-testid={getMarkerId(activeTab, "17")}><Marker id={getMarkerId(activeTab, "17")} />Location</div>
+            {activeTab === "chemicals" && <div className="text-center">Expiry</div>}
+            {activeTab === "chemicals" && <div className="text-center">Batch #</div>}
+            {activeTab === "chemicals" && <div className="text-center">Hazard</div>}
             {FEATURES.IHM && <div className="text-center" data-testid={getMarkerId(activeTab, "18")}><Marker id={getMarkerId(activeTab, "18")} />IHM</div>}
             <div className="text-right pr-2" data-testid={getMarkerId(activeTab, "19")}><Marker id={getMarkerId(activeTab, "19")} />Actions</div>
           </div>
@@ -1534,7 +1614,7 @@ const Stores: React.FC = () => {
         <div className="divide-y divide-gray-200">
           {filteredItems.map((item, index) => (
             <div key={item.id} className="hover:bg-gray-50">
-              <div className="grid gap-4 items-center text-sm py-3 px-4" style={{gridTemplateColumns: FEATURES.IHM ? '2fr 2fr 2fr 0.8fr 0.8fr 0.8fr 0.8fr 1fr 0.6fr 1fr' : '2fr 2fr 2fr 0.8fr 0.8fr 0.8fr 0.8fr 1.5fr 1fr'}}>
+              <div className="grid gap-4 items-center text-sm py-3 px-4" style={{gridTemplateColumns: activeTab === 'chemicals' ? (FEATURES.IHM ? '2fr 2fr 2fr 0.8fr 0.8fr 0.8fr 0.8fr 1fr 0.8fr 0.8fr 0.8fr 0.6fr 1fr' : '2fr 2fr 2fr 0.8fr 0.8fr 0.8fr 0.8fr 1fr 0.8fr 0.8fr 0.8fr 1fr') : (FEATURES.IHM ? '2fr 2fr 2fr 0.8fr 0.8fr 0.8fr 0.8fr 1fr 0.6fr 1fr' : '2fr 2fr 2fr 0.8fr 0.8fr 0.8fr 0.8fr 1.5fr 1fr')}}>
                 <div className="font-medium text-gray-900 truncate" data-testid={index === 0 ? getMarkerId(activeTab, "20") : undefined}>
                   {index === 0 && <Marker id={getMarkerId(activeTab, "20")} />}
                   {item.itemCode}
@@ -1669,6 +1749,44 @@ const Stores: React.FC = () => {
                     );
                   })()}
                 </div>
+                {activeTab === "chemicals" && (
+                  <div className="text-center text-xs">
+                    {item.expiryDate ? (
+                      <span className={`${
+                        (() => {
+                          const d = new Date(item.expiryDate);
+                          const today = new Date();
+                          const days = Math.floor((d.getTime() - today.getTime()) / (1000*60*60*24));
+                          if (days < 0) return 'text-red-600 font-semibold';
+                          if (days <= 30) return 'text-orange-600 font-semibold';
+                          if (days <= 90) return 'text-yellow-600';
+                          return 'text-green-600';
+                        })()
+                      }`}>
+                        {item.expiryDate}
+                      </span>
+                    ) : '-'}
+                  </div>
+                )}
+                {activeTab === "chemicals" && (
+                  <div className="text-center text-xs truncate">{item.batchNumber || '-'}</div>
+                )}
+                {activeTab === "chemicals" && (
+                  <div className="text-center">
+                    {item.hazardClassification && item.hazardClassification !== 'None' ? (
+                      <Badge variant="outline" className={`text-xs ${
+                        item.hazardClassification === 'Flammable' ? 'border-red-300 text-red-700 bg-red-50' :
+                        item.hazardClassification === 'Toxic' ? 'border-purple-300 text-purple-700 bg-purple-50' :
+                        item.hazardClassification === 'Corrosive' ? 'border-yellow-300 text-yellow-700 bg-yellow-50' :
+                        item.hazardClassification === 'Oxidizer' ? 'border-blue-300 text-blue-700 bg-blue-50' :
+                        item.hazardClassification === 'Compressed Gas' ? 'border-cyan-300 text-cyan-700 bg-cyan-50' :
+                        'border-gray-300 text-gray-700 bg-gray-50'
+                      }`}>
+                        {item.hazardClassification}
+                      </Badge>
+                    ) : '-'}
+                  </div>
+                )}
                 {FEATURES.IHM && (
                   <div className="flex justify-center" data-testid={index === 0 ? getMarkerId(activeTab, "28") : undefined}>
                     {index === 0 && <Marker id={getMarkerId(activeTab, "28")} />}
@@ -1897,6 +2015,44 @@ const Stores: React.FC = () => {
                   </Select>
                 </div>
               </>
+            )}
+            {activeTab === "chemicals" && (
+              <div className="border-t pt-4">
+                <Label className="text-base font-semibold text-gray-700 mb-2 block">Chemical Expiry & Safety</Label>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="grid gap-2">
+                    <Label>Expiry Date</Label>
+                    <Input type="date" value={editForm.expiryDate} onChange={(e) => setEditForm({...editForm, expiryDate: e.target.value})} data-testid="input-edit-expiry-date" />
+                  </div>
+                  <div className="grid gap-2">
+                    <Label>Batch Number</Label>
+                    <Input value={editForm.batchNumber} onChange={(e) => setEditForm({...editForm, batchNumber: e.target.value})} data-testid="input-edit-batch-number" />
+                  </div>
+                  <div className="grid gap-2">
+                    <Label>Manufacture Date</Label>
+                    <Input type="date" value={editForm.manufactureDate} onChange={(e) => setEditForm({...editForm, manufactureDate: e.target.value})} data-testid="input-edit-manufacture-date" />
+                  </div>
+                  <div className="grid gap-2">
+                    <Label>Hazard Classification</Label>
+                    <Select value={editForm.hazardClassification} onValueChange={(value) => setEditForm({...editForm, hazardClassification: value})}>
+                      <SelectTrigger data-testid="select-edit-hazard-class"><SelectValue placeholder="Select hazard class" /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="None">None</SelectItem>
+                        <SelectItem value="Flammable">Flammable</SelectItem>
+                        <SelectItem value="Toxic">Toxic</SelectItem>
+                        <SelectItem value="Corrosive">Corrosive</SelectItem>
+                        <SelectItem value="Oxidizer">Oxidizer</SelectItem>
+                        <SelectItem value="Compressed Gas">Compressed Gas</SelectItem>
+                        <SelectItem value="Other">Other</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="grid gap-2">
+                    <Label>SDS Reference</Label>
+                    <Input value={editForm.sdsReference} onChange={(e) => setEditForm({...editForm, sdsReference: e.target.value})} data-testid="input-edit-sds-reference" />
+                  </div>
+                </div>
+              </div>
             )}
           </div>
           <DialogFooter>
@@ -2205,6 +2361,198 @@ const Stores: React.FC = () => {
               </div>
             )}
             
+            {activeTab === "chemicals" && (
+              <div className="border-t pt-4">
+                <Label className="text-base font-semibold text-gray-700 mb-2 block">Expiry & Date Information</Label>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="grid gap-2">
+                    <Label htmlFor="addManufactureDate">Manufacture Date</Label>
+                    <Input
+                      id="addManufactureDate"
+                      type="date"
+                      value={addStoreForm.manufactureDate}
+                      onChange={(e) => setAddStoreForm({...addStoreForm, manufactureDate: e.target.value})}
+                      data-testid="input-add-store-manufacture-date"
+                    />
+                  </div>
+                  <div className="grid gap-2">
+                    <Label htmlFor="addExpiryDate">Expiry Date</Label>
+                    <Input
+                      id="addExpiryDate"
+                      type="date"
+                      value={addStoreForm.expiryDate}
+                      onChange={(e) => setAddStoreForm({...addStoreForm, expiryDate: e.target.value})}
+                      data-testid="input-add-store-expiry-date"
+                    />
+                  </div>
+                  <div className="grid gap-2">
+                    <Label htmlFor="addBatchNumber">Batch Number</Label>
+                    <Input
+                      id="addBatchNumber"
+                      value={addStoreForm.batchNumber}
+                      onChange={(e) => setAddStoreForm({...addStoreForm, batchNumber: e.target.value})}
+                      placeholder="e.g., BT-2025-001"
+                      data-testid="input-add-store-batch-number"
+                    />
+                  </div>
+                  <div className="grid gap-2">
+                    <Label htmlFor="addLotNumber">Lot Number</Label>
+                    <Input
+                      id="addLotNumber"
+                      value={addStoreForm.lotNumber}
+                      onChange={(e) => setAddStoreForm({...addStoreForm, lotNumber: e.target.value})}
+                      placeholder="e.g., LOT-001"
+                      data-testid="input-add-store-lot-number"
+                    />
+                  </div>
+                  <div className="grid gap-2">
+                    <Label htmlFor="addShelfLife">Shelf Life (months)</Label>
+                    <Input
+                      id="addShelfLife"
+                      type="number"
+                      min="0"
+                      value={addStoreForm.shelfLifeMonths || ""}
+                      onChange={(e) => setAddStoreForm({...addStoreForm, shelfLifeMonths: parseInt(e.target.value) || 0})}
+                      placeholder="e.g., 24"
+                      data-testid="input-add-store-shelf-life"
+                    />
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {activeTab === "chemicals" && (
+              <div className="border-t pt-4">
+                <Label className="text-base font-semibold text-gray-700 mb-2 block">Safety Data Sheet (SDS)</Label>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="grid gap-2">
+                    <Label htmlFor="addSdsReference">SDS Reference Number</Label>
+                    <Input
+                      id="addSdsReference"
+                      value={addStoreForm.sdsReference}
+                      onChange={(e) => setAddStoreForm({...addStoreForm, sdsReference: e.target.value})}
+                      placeholder="e.g., SDS-2025-001"
+                      data-testid="input-add-store-sds-reference"
+                    />
+                  </div>
+                  <div className="grid gap-2">
+                    <Label htmlFor="addSdsLastUpdated">SDS Last Updated</Label>
+                    <Input
+                      id="addSdsLastUpdated"
+                      type="date"
+                      value={addStoreForm.sdsLastUpdated}
+                      onChange={(e) => setAddStoreForm({...addStoreForm, sdsLastUpdated: e.target.value})}
+                      data-testid="input-add-store-sds-last-updated"
+                    />
+                  </div>
+                  <div className="grid gap-2">
+                    <Label htmlFor="addHazardClass">Hazard Classification</Label>
+                    <Select
+                      value={addStoreForm.hazardClassification}
+                      onValueChange={(value) => setAddStoreForm({...addStoreForm, hazardClassification: value})}
+                    >
+                      <SelectTrigger data-testid="select-add-store-hazard-class">
+                        <SelectValue placeholder="Select hazard class" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="None">None</SelectItem>
+                        <SelectItem value="Flammable">Flammable</SelectItem>
+                        <SelectItem value="Toxic">Toxic</SelectItem>
+                        <SelectItem value="Corrosive">Corrosive</SelectItem>
+                        <SelectItem value="Oxidizer">Oxidizer</SelectItem>
+                        <SelectItem value="Compressed Gas">Compressed Gas</SelectItem>
+                        <SelectItem value="Other">Other</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="grid gap-2">
+                    <Label htmlFor="addUnNumber">UN Number</Label>
+                    <Input
+                      id="addUnNumber"
+                      value={addStoreForm.unNumber}
+                      onChange={(e) => setAddStoreForm({...addStoreForm, unNumber: e.target.value})}
+                      placeholder="e.g., UN1234"
+                      data-testid="input-add-store-un-number"
+                    />
+                  </div>
+                  <div className="grid gap-2">
+                    <Label htmlFor="addFlashPoint">Flash Point</Label>
+                    <Input
+                      id="addFlashPoint"
+                      value={addStoreForm.flashPoint}
+                      onChange={(e) => setAddStoreForm({...addStoreForm, flashPoint: e.target.value})}
+                      placeholder="e.g., 23°C"
+                      data-testid="input-add-store-flash-point"
+                    />
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {activeTab === "chemicals" && (
+              <div className="border-t pt-4">
+                <Label className="text-base font-semibold text-gray-700 mb-2 block">Storage & Safety</Label>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="grid gap-2">
+                    <Label htmlFor="addStorageTempMin">Min Storage Temp (°C)</Label>
+                    <Input
+                      id="addStorageTempMin"
+                      type="number"
+                      step="0.1"
+                      value={addStoreForm.storageTempMin}
+                      onChange={(e) => setAddStoreForm({...addStoreForm, storageTempMin: e.target.value})}
+                      placeholder="e.g., 5"
+                      data-testid="input-add-store-temp-min"
+                    />
+                  </div>
+                  <div className="grid gap-2">
+                    <Label htmlFor="addStorageTempMax">Max Storage Temp (°C)</Label>
+                    <Input
+                      id="addStorageTempMax"
+                      type="number"
+                      step="0.1"
+                      value={addStoreForm.storageTempMax}
+                      onChange={(e) => setAddStoreForm({...addStoreForm, storageTempMax: e.target.value})}
+                      placeholder="e.g., 25"
+                      data-testid="input-add-store-temp-max"
+                    />
+                  </div>
+                </div>
+                <div className="grid gap-2 mt-4">
+                  <Label htmlFor="addPpeRequirements">PPE Requirements</Label>
+                  <Textarea
+                    id="addPpeRequirements"
+                    value={addStoreForm.ppeRequirements}
+                    onChange={(e) => setAddStoreForm({...addStoreForm, ppeRequirements: e.target.value})}
+                    placeholder="e.g., Safety goggles, chemical-resistant gloves, apron"
+                    rows={2}
+                    data-testid="textarea-add-store-ppe"
+                  />
+                </div>
+                <div className="grid gap-2 mt-4">
+                  <Label htmlFor="addDisposalInstructions">Disposal Instructions</Label>
+                  <Textarea
+                    id="addDisposalInstructions"
+                    value={addStoreForm.disposalInstructions}
+                    onChange={(e) => setAddStoreForm({...addStoreForm, disposalInstructions: e.target.value})}
+                    placeholder="Disposal instructions per MARPOL/local regulations"
+                    rows={2}
+                    data-testid="textarea-add-store-disposal"
+                  />
+                </div>
+                <div className="grid gap-2 mt-4">
+                  <Label htmlFor="addEmergencyContact">Emergency Contact</Label>
+                  <Input
+                    id="addEmergencyContact"
+                    value={addStoreForm.emergencyContact}
+                    onChange={(e) => setAddStoreForm({...addStoreForm, emergencyContact: e.target.value})}
+                    placeholder="Emergency contact information"
+                    data-testid="input-add-store-emergency-contact"
+                  />
+                </div>
+              </div>
+            )}
+
             {/* Remarks */}
             <div className="border-t pt-4">
               <div className="grid gap-2">

@@ -28,6 +28,7 @@ import { useVessel } from "@/contexts/VesselContext";
 import { useQuery } from "@tanstack/react-query";
 import CategoryFilters, { CategoryFilterValues } from "@/components/reports/CategoryFilters";
 import StoresInventoryStatusReport from "./StoresInventoryStatusReport";
+import ChemicalsExpiryReport from "./ChemicalsExpiryReport";
 
 interface StoresReport {
   id: string;
@@ -252,32 +253,56 @@ const StoresReports: React.FC<StoresReportsProps> = ({ onBack, globalFilters }) 
         const chemicalsItems = storesItems.filter((s: any) => s.itemType === 'chemicals');
 
         const columns = [
-          { header: 'Item Code', field: 'itemCode', width: 30 },
-          { header: 'Item Name', field: 'itemName', width: 60 },
-          { header: 'ROB', field: 'rob', width: 25 },
-          { header: 'Min', field: 'min', width: 25 },
-          { header: 'Status', field: 'status', width: 30 }
+          { header: 'Item Code', field: 'itemCode', width: 25 },
+          { header: 'Item Name', field: 'itemName', width: 45 },
+          { header: 'Batch #', field: 'batchNumber', width: 25 },
+          { header: 'Expiry Date', field: 'expiryDate', width: 25 },
+          { header: 'Hazard', field: 'hazardClassification', width: 25 },
+          { header: 'SDS Ref', field: 'sdsReference', width: 25 },
+          { header: 'ROB', field: 'rob', width: 20 },
+          { header: 'Min', field: 'min', width: 20 },
+          { header: 'Status', field: 'status', width: 25 }
         ];
 
+        const today = new Date();
         const data = chemicalsItems.map((s: any) => {
           const rob = parseFloat(String(s.rob)) || 0;
           const min = parseFloat(String(s.min)) || 0;
+          const expiryDate = s.expiryDate || '-';
+          let expiryStatus = '-';
+          if (s.expiryDate) {
+            const d = new Date(s.expiryDate);
+            const days = Math.floor((d.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+            expiryStatus = days < 0 ? 'EXPIRED' : days <= 30 ? `${days}d` : days <= 90 ? `${days}d` : 'OK';
+          }
           return {
             itemCode: s.itemCode || '-',
             itemName: s.itemName || '-',
+            batchNumber: s.batchNumber || '-',
+            expiryDate: expiryDate !== '-' ? `${expiryDate} (${expiryStatus})` : '-',
+            hazardClassification: s.hazardClassification || 'None',
+            sdsReference: s.sdsReference || '-',
             rob,
             min,
             status: getStockStatus(rob, min)
           };
         });
 
+        const expiredCount = chemicalsItems.filter((s: any) => {
+          if (!s.expiryDate) return false;
+          return new Date(s.expiryDate) < today;
+        }).length;
+        const withSds = chemicalsItems.filter((s: any) => s.sdsReference && s.sdsReference.trim()).length;
+
         const summary = [
           { label: 'Total Chemicals', value: data.length },
-          { label: 'Low Stock', value: data.filter((d: any) => d.status === 'Low').length }
+          { label: 'Expired', value: expiredCount },
+          { label: 'Low Stock', value: data.filter((d: any) => d.status === 'Low').length },
+          { label: 'SDS Compliance', value: data.length > 0 ? `${Math.round((withSds / data.length) * 100)}%` : '0%' }
         ];
 
         pdfReportGenerator.generateReport(
-          { title: 'Chemicals Inventory & Expiry', subtitle: 'Chemical stock tracking', vessel: vesselName },
+          { title: 'Chemicals Inventory & Expiry', subtitle: 'Chemical stock tracking with expiry & SDS compliance', vessel: vesselName },
           columns,
           data,
           summary
@@ -428,6 +453,15 @@ const StoresReports: React.FC<StoresReportsProps> = ({ onBack, globalFilters }) 
     );
   }
 
+  if (selectedReport === 'chemicals-tracking') {
+    return (
+      <ChemicalsExpiryReport
+        onBack={() => setSelectedReport(null)}
+        vesselId={effectiveVesselId}
+      />
+    );
+  }
+
   return (
     <div className="p-6 bg-white min-h-screen">
       <div className="mb-6">
@@ -511,7 +545,7 @@ const StoresReports: React.FC<StoresReportsProps> = ({ onBack, globalFilters }) 
                 className="hover:bg-gray-50 cursor-pointer"
                 data-testid={`stores-report-row-${report.id}`}
                 onClick={() => {
-                  if (report.id === 'stores-inventory-status') {
+                  if (report.id === 'stores-inventory-status' || report.id === 'chemicals-tracking') {
                     setSelectedReport(report.id);
                   }
                 }}
@@ -541,7 +575,7 @@ const StoresReports: React.FC<StoresReportsProps> = ({ onBack, globalFilters }) 
                       title="Preview"
                       onClick={(e) => {
                         e.stopPropagation();
-                        if (report.id === 'stores-inventory-status') {
+                        if (report.id === 'stores-inventory-status' || report.id === 'chemicals-tracking') {
                           setSelectedReport(report.id);
                         } else {
                           handleGenerateReport(report.id, 'PDF');

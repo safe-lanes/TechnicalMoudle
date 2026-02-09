@@ -599,6 +599,22 @@ export const storesItems = pgTable("stores_items", {
   ihmDetails: text("ihm_details"), // IHM related information
   ihmPresence: text("ihm_presence").default("Unknown"), // Unknown | Present | Not Present
   ihmEvidenceType: text("ihm_evidence_type").default("None"), // None | MD | SDoC | Test
+  manufactureDate: text("manufacture_date"), // DD-MMM-YYYY format
+  expiryDate: text("expiry_date"), // DD-MMM-YYYY format
+  batchNumber: text("batch_number"),
+  lotNumber: text("lot_number"),
+  shelfLifeMonths: integer("shelf_life_months"),
+  sdsReference: text("sds_reference"),
+  sdsDocumentUrl: text("sds_document_url"),
+  sdsLastUpdated: text("sds_last_updated"), // DD-MMM-YYYY format
+  hazardClassification: text("hazard_classification"), // None | Flammable | Toxic | Corrosive | Oxidizer | Compressed Gas | Other
+  unNumber: text("un_number"),
+  flashPoint: text("flash_point"),
+  storageTempMin: decimal("storage_temp_min", { precision: 5, scale: 2 }),
+  storageTempMax: decimal("storage_temp_max", { precision: 5, scale: 2 }),
+  disposalInstructions: text("disposal_instructions"),
+  ppeRequirements: text("ppe_requirements"),
+  emergencyContact: text("emergency_contact"),
   remarks: text("remarks"), // User notes
   deleted: boolean("deleted").notNull().default(false), // Soft delete flag
   isActive: boolean("is_active").notNull().default(true), // Active status
@@ -610,6 +626,9 @@ export const storesItems = pgTable("stores_items", {
   itemCodeIdx: index("idx_stores_item_code").on(table.vesselId, table.itemCode),
   impaCodeIdx: index("idx_stores_impa_code").on(table.impaCode),
   deletedIdx: index("idx_stores_deleted").on(table.deleted),
+  expiryDateIdx: index("idx_stores_expiry_date").on(table.expiryDate),
+  hazardClassIdx: index("idx_stores_hazard_class").on(table.hazardClassification),
+  batchNumberIdx: index("idx_stores_batch_number").on(table.batchNumber),
 }));
 
 export const insertStoresItemSchema = createInsertSchema(storesItems).omit({
