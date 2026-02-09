@@ -12,7 +12,7 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import type { Component, Job, Spare, FleetComponents } from "@shared/schema";
+import type { Component, Job, Spare, FleetComponents, FleetJobs } from "@shared/schema";
 
 interface MappedFleetComponent {
   id: string | number;
@@ -68,7 +68,7 @@ function mapFleetComponentsToFleetComponent(item: FleetComponents): MappedFleetC
 
 
 type FleetComponent = MappedFleetComponent;
-type FleetJob = Job;
+type FleetJob = FleetJobs;
 type FleetSpare = Spare;
 
 interface TreeNode {
@@ -323,7 +323,7 @@ export default function FleetDataView() {
         dataScope: "fleet",
         componentCode: data.fleetEquipmentCode,
         componentName: selectedComponent?.fleetEquipmentName || data.fleetEquipmentCode,
-        title: data.jobTitle || "New Fleet Job",
+        title: data.woTitle || "New Fleet Job",
       });
     },
     onSuccess: () => {
@@ -377,8 +377,7 @@ export default function FleetDataView() {
     if (!selectedComponent || !fleetJobs) return [];
     return fleetJobs.filter(
       (job: FleetJob) =>
-        job.fleetEquipmentCode === selectedComponent.fleetEquipmentCode ||
-        job.componentCode === selectedComponent.fleetEquipmentCode
+        job.fleetEquipmentCode === selectedComponent.fleetEquipmentCode
     );
   }, [selectedComponent, fleetJobs]);
 
@@ -395,9 +394,9 @@ export default function FleetDataView() {
     if (!jobSearchQuery.trim()) return relatedJobs;
     const query = jobSearchQuery.toLowerCase();
     return relatedJobs.filter((job: FleetJob) => {
-      const jobNo = (job.fleetJobCode || job.jobNo || job.id || "").toString().toLowerCase();
-      const jobTitle = (job.jobTitle || "").toLowerCase();
-      const taskType = (job.maintenanceType || "").toLowerCase();
+      const jobNo = (job.jobCode || job.id || "").toString().toLowerCase();
+      const jobTitle = (job.woTitle || "").toLowerCase();
+      const taskType = (job.taskType || "").toLowerCase();
       return jobNo.includes(query) || jobTitle.includes(query) || taskType.includes(query);
     });
   }, [relatedJobs, jobSearchQuery]);
@@ -899,19 +898,17 @@ export default function FleetDataView() {
                           }}
                           data-testid={`job-row-${index}`}
                         >
-                          <td className="py-2">{job.fleetJobCode || job.jobNo || job.id}</td>
+                          <td className="py-2">{job.jobCode || job.id}</td>
                           <td className="py-2">
-                            {job.jobTitle || "—"}
+                            {job.woTitle || "—"}
                           </td>
                           <td className="py-2">
-                            {job.maintenanceType || "—"}
+                            {job.taskType || "—"}
                           </td>
                           <td className="py-2">
-                            {job.frequencyValue && job.frequencyUnit 
-                              ? `${job.frequencyValue} ${job.frequencyUnit}` 
-                              : job.intervalRunningHour 
-                                ? `${job.intervalRunningHour} RH` 
-                                : "—"}
+                            {job.intervalValue && job.unit 
+                              ? `${job.intervalValue} ${job.unit}` 
+                              : "—"}
                           </td>
                         </tr>
                       ))}
@@ -1519,7 +1516,7 @@ export default function FleetDataView() {
               <tbody>
                 {filteredRelatedJobs.length > 0 ? (
                   filteredRelatedJobs.map((job: FleetJob, index: number) => {
-                    const jobId = job.fleetJobCode || job.jobNo || job.id;
+                    const jobId = job.jobCode || job.id;
                     return (
                       <tr 
                         key={index} 
@@ -1544,7 +1541,7 @@ export default function FleetDataView() {
                             data-testid={`checkbox-job-${index}`}
                           />
                         </td>
-                        <td className="py-2 px-2">{job.fleetJobCode || job.jobNo || job.id}</td>
+                        <td className="py-2 px-2">{job.jobCode || job.id}</td>
                         <td 
                           className="py-2 px-2 text-blue-600 hover:text-blue-800 hover:underline cursor-pointer"
                           onClick={(e) => {
@@ -1554,15 +1551,13 @@ export default function FleetDataView() {
                           }}
                           data-testid={`job-title-link-${index}`}
                         >
-                          {job.jobTitle || "—"}
+                          {job.woTitle || "—"}
                         </td>
-                        <td className="py-2 px-2">{job.maintenanceType || "—"}</td>
+                        <td className="py-2 px-2">{job.taskType || "—"}</td>
                         <td className="py-2 px-2">
-                          {job.frequencyValue && job.frequencyUnit 
-                            ? `${job.frequencyValue} ${job.frequencyUnit}` 
-                            : job.intervalRunningHour 
-                              ? `${job.intervalRunningHour} RH` 
-                              : "—"}
+                          {job.intervalValue && job.unit 
+                            ? `${job.intervalValue} ${job.unit}` 
+                            : "—"}
                         </td>
                         <td className="py-2 px-2">{job.assignedTo || "—"}</td>
                         <td className="py-2 px-2">{job.approver || "—"}</td>
@@ -1682,15 +1677,15 @@ export default function FleetDataView() {
               <div className="grid grid-cols-3 gap-4">
                 <div>
                   <div className="text-blue-600 text-xs font-medium mb-1">Job No.</div>
-                  <div className="text-sm font-medium">{selectedJobForDetail.fleetJobCode || selectedJobForDetail.jobNo || "—"}</div>
+                  <div className="text-sm font-medium">{selectedJobForDetail.jobCode || "—"}</div>
                 </div>
                 <div>
                   <div className="text-blue-600 text-xs font-medium mb-1">Job Title</div>
-                  <div className="text-sm font-medium">{selectedJobForDetail.jobTitle || "—"}</div>
+                  <div className="text-sm font-medium">{selectedJobForDetail.woTitle || "—"}</div>
                 </div>
                 <div>
                   <div className="text-blue-600 text-xs font-medium mb-1">Task Type</div>
-                  <div className="text-sm font-medium">{selectedJobForDetail.maintenanceType || "—"}</div>
+                  <div className="text-sm font-medium">{selectedJobForDetail.taskType || "—"}</div>
                 </div>
               </div>
 
@@ -1702,15 +1697,15 @@ export default function FleetDataView() {
                 </div>
                 <div>
                   <div className="text-blue-600 text-xs font-medium mb-1">Interval Value</div>
-                  <div className="text-sm font-medium">{selectedJobForDetail.frequencyValue || "—"}</div>
+                  <div className="text-sm font-medium">{selectedJobForDetail.intervalValue || "—"}</div>
                 </div>
                 <div>
                   <div className="text-blue-600 text-xs font-medium mb-1">Unit</div>
-                  <div className="text-sm font-medium">{selectedJobForDetail.frequencyUnit || "—"}</div>
+                  <div className="text-sm font-medium">{selectedJobForDetail.unit || "—"}</div>
                 </div>
                 <div>
                   <div className="text-blue-600 text-xs font-medium mb-1">Interval Running Hour</div>
-                  <div className="text-sm font-medium">{selectedJobForDetail.intervalRunningHour || "—"}</div>
+                  <div className="text-sm font-medium">{"—"}</div>
                 </div>
               </div>
 
@@ -1755,7 +1750,7 @@ export default function FleetDataView() {
               {/* Row 5: Brief Work Description */}
               <div>
                 <div className="text-blue-600 text-xs font-medium mb-1">Brief Work Description</div>
-                <div className="text-sm font-medium">{selectedJobForDetail.jobDescription || "—"}</div>
+                <div className="text-sm font-medium">{selectedJobForDetail.briefWorkDescription || "—"}</div>
               </div>
 
               {/* Divider */}
@@ -1825,8 +1820,8 @@ export default function FleetDataView() {
                 <label className="text-xs font-medium text-blue-600 mb-1 block">Job No.</label>
                 <Input
                   placeholder="Input Field"
-                  value={jobFormData.fleetJobCode || jobFormData.jobNo || ""}
-                  onChange={(e) => setJobFormData(prev => ({ ...prev, fleetJobCode: e.target.value }))}
+                  value={jobFormData.jobCode || ""}
+                  onChange={(e) => setJobFormData(prev => ({ ...prev, jobCode: e.target.value }))}
                   className="h-9"
                   data-testid="input-edit-job-no"
                 />
@@ -1835,8 +1830,8 @@ export default function FleetDataView() {
                 <label className="text-xs font-medium text-blue-600 mb-1 block">Job Title</label>
                 <Input
                   placeholder="Input Field"
-                  value={jobFormData.jobTitle || ""}
-                  onChange={(e) => setJobFormData(prev => ({ ...prev, jobTitle: e.target.value }))}
+                  value={jobFormData.woTitle || ""}
+                  onChange={(e) => setJobFormData(prev => ({ ...prev, woTitle: e.target.value }))}
                   className="h-9"
                   data-testid="input-edit-job-title"
                 />
@@ -1845,8 +1840,8 @@ export default function FleetDataView() {
                 <label className="text-xs font-medium text-blue-600 mb-1 block">Task Type</label>
                 <Input
                   placeholder="Input Field"
-                  value={jobFormData.maintenanceType || ""}
-                  onChange={(e) => setJobFormData(prev => ({ ...prev, maintenanceType: e.target.value }))}
+                  value={jobFormData.taskType || ""}
+                  onChange={(e) => setJobFormData(prev => ({ ...prev, taskType: e.target.value }))}
                   className="h-9"
                   data-testid="input-edit-task-type"
                 />
@@ -1869,8 +1864,8 @@ export default function FleetDataView() {
                 <label className="text-xs font-medium text-blue-600 mb-1 block">Interval Value</label>
                 <Input
                   placeholder="Input Field"
-                  value={jobFormData.frequencyValue || ""}
-                  onChange={(e) => setJobFormData(prev => ({ ...prev, frequencyValue: e.target.value }))}
+                  value={jobFormData.intervalValue || ""}
+                  onChange={(e) => setJobFormData(prev => ({ ...prev, intervalValue: e.target.value }))}
                   className="h-9"
                   data-testid="input-edit-interval-value"
                 />
@@ -1879,8 +1874,8 @@ export default function FleetDataView() {
                 <label className="text-xs font-medium text-blue-600 mb-1 block">Unit</label>
                 <Input
                   placeholder="Input Field"
-                  value={jobFormData.frequencyUnit || ""}
-                  onChange={(e) => setJobFormData(prev => ({ ...prev, frequencyUnit: e.target.value }))}
+                  value={jobFormData.unit || ""}
+                  onChange={(e) => setJobFormData(prev => ({ ...prev, unit: e.target.value }))}
                   className="h-9"
                   data-testid="input-edit-unit"
                 />
@@ -1889,8 +1884,8 @@ export default function FleetDataView() {
                 <label className="text-xs font-medium text-blue-600 mb-1 block">Interval Running Hour</label>
                 <Input
                   placeholder="Input Field"
-                  value={jobFormData.intervalRunningHour?.toString() || ""}
-                  onChange={(e) => setJobFormData(prev => ({ ...prev, intervalRunningHour: e.target.value ? parseInt(e.target.value, 10) || 0 : undefined }))}
+                  value={""}
+                  disabled
                   className="h-9"
                   data-testid="input-edit-interval-rh"
                 />
@@ -1980,8 +1975,8 @@ export default function FleetDataView() {
               <label className="text-xs font-medium text-blue-600 mb-1 block">Brief Work Description</label>
               <Input
                 placeholder="Input Field"
-                value={jobFormData.jobDescription || ""}
-                onChange={(e) => setJobFormData(prev => ({ ...prev, jobDescription: e.target.value }))}
+                value={jobFormData.briefWorkDescription || ""}
+                onChange={(e) => setJobFormData(prev => ({ ...prev, briefWorkDescription: e.target.value }))}
                 className="h-9"
                 data-testid="input-edit-job-desc"
               />
@@ -2041,8 +2036,8 @@ export default function FleetDataView() {
                 <label className="text-xs font-medium text-gray-600 mb-1 block">Job No.</label>
                 <Input
                   placeholder="Input Field"
-                  value={newJobFormData.fleetJobCode || ""}
-                  onChange={(e) => setNewJobFormData(prev => ({ ...prev, fleetJobCode: e.target.value }))}
+                  value={newJobFormData.jobCode || ""}
+                  onChange={(e) => setNewJobFormData(prev => ({ ...prev, jobCode: e.target.value }))}
                   className="h-9"
                   data-testid="input-new-job-no"
                 />
@@ -2051,8 +2046,8 @@ export default function FleetDataView() {
                 <label className="text-xs font-medium text-gray-600 mb-1 block">Job Title</label>
                 <Input
                   placeholder="Input Field"
-                  value={newJobFormData.jobTitle || ""}
-                  onChange={(e) => setNewJobFormData(prev => ({ ...prev, jobTitle: e.target.value }))}
+                  value={newJobFormData.woTitle || ""}
+                  onChange={(e) => setNewJobFormData(prev => ({ ...prev, woTitle: e.target.value }))}
                   className="h-9"
                   data-testid="input-new-job-title"
                 />
@@ -2061,8 +2056,8 @@ export default function FleetDataView() {
                 <label className="text-xs font-medium text-gray-600 mb-1 block">Task Type</label>
                 <Input
                   placeholder="Input Field"
-                  value={newJobFormData.maintenanceType || ""}
-                  onChange={(e) => setNewJobFormData(prev => ({ ...prev, maintenanceType: e.target.value }))}
+                  value={newJobFormData.taskType || ""}
+                  onChange={(e) => setNewJobFormData(prev => ({ ...prev, taskType: e.target.value }))}
                   className="h-9"
                   data-testid="input-new-task-type"
                 />
@@ -2085,8 +2080,8 @@ export default function FleetDataView() {
                 <label className="text-xs font-medium text-gray-600 mb-1 block">Interval Value</label>
                 <Input
                   placeholder="Input Field"
-                  value={newJobFormData.frequencyValue || ""}
-                  onChange={(e) => setNewJobFormData(prev => ({ ...prev, frequencyValue: e.target.value }))}
+                  value={newJobFormData.intervalValue || ""}
+                  onChange={(e) => setNewJobFormData(prev => ({ ...prev, intervalValue: e.target.value }))}
                   className="h-9"
                   data-testid="input-new-interval-value"
                 />
@@ -2095,8 +2090,8 @@ export default function FleetDataView() {
                 <label className="text-xs font-medium text-gray-600 mb-1 block">Unit</label>
                 <Input
                   placeholder="Input Field"
-                  value={newJobFormData.frequencyUnit || ""}
-                  onChange={(e) => setNewJobFormData(prev => ({ ...prev, frequencyUnit: e.target.value }))}
+                  value={newJobFormData.unit || ""}
+                  onChange={(e) => setNewJobFormData(prev => ({ ...prev, unit: e.target.value }))}
                   className="h-9"
                   data-testid="input-new-unit"
                 />
@@ -2106,8 +2101,8 @@ export default function FleetDataView() {
                 <Input
                   placeholder="Input Field"
                   type="number"
-                  value={newJobFormData.intervalRunningHour || ""}
-                  onChange={(e) => setNewJobFormData(prev => ({ ...prev, intervalRunningHour: e.target.value ? parseInt(e.target.value) : undefined }))}
+                  value={""}
+                  disabled
                   className="h-9"
                   data-testid="input-new-interval-rh"
                 />
