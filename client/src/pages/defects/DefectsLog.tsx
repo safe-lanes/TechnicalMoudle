@@ -167,10 +167,20 @@ export default function DefectsLog() {
       const pv = filters.periodValue;
       result = result.filter((defect: Defect) => {
         if (!defect.issueDate) return false;
-        const issueDateMatch = String(defect.issueDate).match(/^(\d{4})-(\d{2})-(\d{2})/);
-        if (!issueDateMatch) return false;
-        const [, yStr, mStr, dStr] = issueDateMatch;
-        const issueDate = new Date(parseInt(yStr), parseInt(mStr) - 1, parseInt(dStr));
+        const val = String(defect.issueDate);
+        let issueDate: Date;
+        const isoMatch = val.match(/^(\d{4})-(\d{2})-(\d{2})/);
+        const ddmmyyyyMatch = val.match(/^(\d{2})-(\d{2})-(\d{4})$/);
+        if (isoMatch) {
+          const [, yStr, mStr, dStr] = isoMatch;
+          issueDate = new Date(parseInt(yStr), parseInt(mStr) - 1, parseInt(dStr));
+        } else if (ddmmyyyyMatch) {
+          const [, dStr, mStr, yStr] = ddmmyyyyMatch;
+          issueDate = new Date(parseInt(yStr), parseInt(mStr) - 1, parseInt(dStr));
+        } else {
+          issueDate = new Date(val);
+        }
+        if (isNaN(issueDate.getTime())) return false;
         issueDate.setHours(0, 0, 0, 0);
 
         if (pv.mode === "yearQuarterMonth") {
