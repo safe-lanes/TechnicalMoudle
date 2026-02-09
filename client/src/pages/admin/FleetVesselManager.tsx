@@ -46,7 +46,7 @@ import {
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
-import { Plus, Pencil, Trash2, Ship, Anchor, Building2 } from "lucide-react";
+import { Plus, Pencil, Trash2, Ship, Anchor, Building2, ArrowLeft } from "lucide-react";
 import type { Fleet, Vessel } from "@shared/schema";
 
 interface VesselWithFleet extends Vessel {
@@ -80,7 +80,7 @@ const vesselAssignmentSchema = z.object({
 
 type VesselAssignmentData = z.infer<typeof vesselAssignmentSchema>;
 
-export default function FleetVesselManager() {
+export default function FleetVesselManager({ onBack }: { onBack?: () => void }) {
   const { toast } = useToast();
   const [isFleetDialogOpen, setIsFleetDialogOpen] = useState(false);
   const [isVesselDialogOpen, setIsVesselDialogOpen] = useState(false);
@@ -285,11 +285,28 @@ export default function FleetVesselManager() {
 
   return (
     <div className="p-6 space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-2xl font-bold text-gray-900">Fleet & Vessel Manager</h2>
-          <p className="text-gray-600 mt-1">Organize your vessels into fleets for easier management</p>
+      <div className="bg-gradient-to-r from-cyan-600 to-blue-600 px-6 py-5 rounded-lg">
+        {onBack && (
+          <button
+            onClick={onBack}
+            className="flex items-center gap-1 text-cyan-100 hover:text-white text-sm mb-2 transition-colors"
+            data-testid="button-back-to-dashboard"
+          >
+            <ArrowLeft className="h-4 w-4" />
+            Back to Dashboard
+          </button>
+        )}
+        <div className="flex items-center gap-3 mb-1">
+          <div className="p-2 bg-white/20 rounded-lg">
+            <Ship className="h-5 w-5 text-white" />
+          </div>
+          <div>
+            <h1 className="text-xl font-bold text-white">Fleet & Vessel Manager</h1>
+            <p className="text-cyan-100 text-sm mt-0.5">Manage fleets and vessel assignments</p>
+          </div>
         </div>
+      </div>
+      <div className="flex items-center justify-end">
         <div className="flex gap-2">
           <Button
             onClick={() => handleCreateVessel()}

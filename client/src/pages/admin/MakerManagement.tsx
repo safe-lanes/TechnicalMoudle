@@ -4,14 +4,15 @@ import { type MakerList } from "@shared/schema";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Badge } from "@/components/ui/badge";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
-import { Plus, Search, Pencil, Trash2, Download } from "lucide-react";
+import { Plus, Search, Pencil, Trash2, Download, ArrowLeft, Building2 } from "lucide-react";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import MakerForm from "./MakerForm";
 import { Marker } from "@/components/Marker";
 
-export default function MakerManagement() {
+export default function MakerManagement({ onBack }: { onBack?: () => void }) {
   const { toast } = useToast();
   const [searchQuery, setSearchQuery] = useState("");
   const [isFormOpen, setIsFormOpen] = useState(false);
@@ -107,7 +108,28 @@ export default function MakerManagement() {
   return (
     <div className="min-h-screen bg-gray-50 p-4 flex flex-col">
       <div className="flex-1 flex flex-col">
-        <Card className="flex-1 flex flex-col">
+        <Card className="flex-1 flex flex-col overflow-hidden">
+          <div className="bg-gradient-to-r from-cyan-600 to-blue-600 px-6 py-5">
+            {onBack && (
+              <button
+                onClick={onBack}
+                className="flex items-center gap-1 text-cyan-100 hover:text-white text-sm mb-2 transition-colors"
+                data-testid="button-back-to-dashboard"
+              >
+                <ArrowLeft className="h-4 w-4" />
+                Back to Dashboard
+              </button>
+            )}
+            <div className="flex items-center gap-3 mb-1">
+              <div className="p-2 bg-white/20 rounded-lg">
+                <Building2 className="h-5 w-5 text-white" />
+              </div>
+              <div>
+                <h1 className="text-xl font-bold text-white">Maker Management</h1>
+                <p className="text-cyan-100 text-sm mt-0.5">Manage equipment manufacturers and suppliers</p>
+              </div>
+            </div>
+          </div>
           <CardHeader>
             <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
               <CardTitle data-testid="I4.QL.1.10"><Marker id="I4.QL.1.10" />All Makers</CardTitle>

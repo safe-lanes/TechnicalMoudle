@@ -4,7 +4,7 @@ import { useVessels } from "@/hooks/useVessels";
 import { useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { ChevronRight, ChevronDown, Plus, Search, Pencil, X, FileSpreadsheet, Trash2, Anchor, Briefcase, Info } from "lucide-react";
+import { ChevronRight, ChevronDown, Plus, Search, Pencil, X, FileSpreadsheet, Trash2, Anchor, Briefcase, Info, ArrowLeft } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Label } from "@/components/ui/label";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -213,7 +213,7 @@ interface ComponentVesselMapping {
   updatedAt?: string;
 }
 
-export default function FleetDataView() {
+export default function FleetDataView({ onBack }: { onBack?: () => void }) {
   const [, setLocation] = useLocation();
   const [selectedNode, setSelectedNode] = useState<TreeNode | null>(null);
   const [expandedNodes, setExpandedNodes] = useState<Set<string>>(new Set());
@@ -739,7 +739,17 @@ export default function FleetDataView() {
   return (
     <div className="flex h-[calc(100vh-140px)] bg-gray-50">
       <div className="w-80 bg-white border-r flex flex-col">
-        <div className="bg-cyan-600 text-white px-4 py-3 font-semibold">
+        <div className="bg-gradient-to-r from-cyan-600 to-blue-600 text-white px-4 py-3 font-semibold">
+          {onBack && (
+            <button
+              onClick={onBack}
+              className="flex items-center gap-1 text-cyan-100 hover:text-white text-sm mb-2 transition-colors"
+              data-testid="button-back-to-dashboard"
+            >
+              <ArrowLeft className="h-4 w-4" />
+              Back to Dashboard
+            </button>
+          )}
           Fleet Components
         </div>
         <ScrollArea className="flex-1">

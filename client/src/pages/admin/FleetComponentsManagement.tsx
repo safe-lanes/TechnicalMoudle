@@ -7,13 +7,13 @@ import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
-import { Plus, Search, Pencil, Trash2, ChevronRight, ChevronDown, Upload, Download, Settings, Package } from "lucide-react";
+import { Plus, Search, Pencil, Trash2, ChevronRight, ChevronDown, Upload, Download, Settings, Package, ArrowLeft } from "lucide-react";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import FleetComponentForm from "./FleetComponentForm";
 import { Marker } from "@/components/Marker";
 
-export default function FleetComponentsManagement() {
+export default function FleetComponentsManagement({ onBack }: { onBack?: () => void }) {
   const { toast } = useToast();
   const [searchQuery, setSearchQuery] = useState("");
   const [isFormOpen, setIsFormOpen] = useState(false);
@@ -253,6 +253,16 @@ export default function FleetComponentsManagement() {
     <div className="p-6">
       <Card className="overflow-hidden">
         <div className="bg-gradient-to-r from-cyan-600 to-blue-600 px-6 py-5">
+          {onBack && (
+            <button
+              onClick={onBack}
+              className="flex items-center gap-1 text-cyan-100 hover:text-white text-sm mb-2 transition-colors"
+              data-testid="button-back-to-dashboard"
+            >
+              <ArrowLeft className="h-4 w-4" />
+              Back to Dashboard
+            </button>
+          )}
           <div className="flex items-center gap-3 mb-1">
             <div className="p-2 bg-white/20 rounded-lg">
               <Settings className="h-5 w-5 text-white" />

@@ -8,13 +8,13 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
-import { Plus, Search, Pencil, Trash2, Download, Wrench, Package } from "lucide-react";
+import { Plus, Search, Pencil, Trash2, Download, Wrench, Package, ArrowLeft } from "lucide-react";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import FleetSpareForm from "./FleetSpareForm";
 import { Marker } from "@/components/Marker";
 
-export default function FleetSparesManagement() {
+export default function FleetSparesManagement({ onBack }: { onBack?: () => void }) {
   const { toast } = useToast();
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedEquipment, setSelectedEquipment] = useState<string>("all");
@@ -127,6 +127,16 @@ export default function FleetSparesManagement() {
     <div className="p-6">
       <Card className="overflow-hidden">
         <div className="bg-gradient-to-r from-cyan-600 to-blue-600 px-6 py-5">
+          {onBack && (
+            <button
+              onClick={onBack}
+              className="flex items-center gap-1 text-cyan-100 hover:text-white text-sm mb-2 transition-colors"
+              data-testid="button-back-to-dashboard"
+            >
+              <ArrowLeft className="h-4 w-4" />
+              Back to Dashboard
+            </button>
+          )}
           <div className="flex items-center gap-3 mb-1">
             <div className="p-2 bg-white/20 rounded-lg">
               <Wrench className="h-5 w-5 text-white" />

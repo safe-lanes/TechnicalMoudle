@@ -11,7 +11,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
-import { Plus, Pencil, Trash2, List, Package } from "lucide-react";
+import { Plus, Pencil, Trash2, List, Package, ArrowLeft } from "lucide-react";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { useForm } from "react-hook-form";
@@ -30,7 +30,7 @@ const LIST_TYPES = [
   { value: "location", label: "Location" },
 ];
 
-export default function MasterListsManagement() {
+export default function MasterListsManagement({ onBack }: { onBack?: () => void }) {
   const { toast } = useToast();
   const [selectedListType, setSelectedListType] = useState<string>("department");
   const [isFormOpen, setIsFormOpen] = useState(false);
@@ -189,6 +189,16 @@ export default function MasterListsManagement() {
     <div className="p-6">
       <Card className="overflow-hidden">
         <div className="bg-gradient-to-r from-cyan-600 to-blue-600 px-6 py-5">
+          {onBack && (
+            <button
+              onClick={onBack}
+              className="flex items-center gap-1 text-cyan-100 hover:text-white text-sm mb-2 transition-colors"
+              data-testid="button-back-to-dashboard"
+            >
+              <ArrowLeft className="h-4 w-4" />
+              Back to Dashboard
+            </button>
+          )}
           <div className="flex items-center gap-3 mb-1">
             <div className="p-2 bg-white/20 rounded-lg">
               <List className="h-5 w-5 text-white" />

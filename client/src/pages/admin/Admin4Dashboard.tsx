@@ -73,236 +73,54 @@ export default function Admin4Dashboard() {
   const totalFleets = Array.isArray(fleetsData) ? fleetsData.length : 0;
   const configuredPmsSettings = Array.isArray(pmsSettingsData) ? pmsSettingsData.length : 0;
 
+  const handleBackToDashboard = () => setCurrentView('dashboard');
+
   if (currentView === 'makers') {
-    return (
-      <div className="min-h-screen bg-gray-50">
-        <div className="bg-white border-b px-6 py-4 flex items-center gap-4">
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => setCurrentView('dashboard')}
-            data-testid="button-back-to-dashboard"
-          >
-            <ArrowLeft className="h-4 w-4 mr-2" />
-            Back to Dashboard
-          </Button>
-        </div>
-        <MakerManagement />
-      </div>
-    );
+    return <MakerManagement onBack={handleBackToDashboard} />;
   }
 
   if (currentView === 'master-lists') {
-    return (
-      <div className="min-h-screen bg-gray-50">
-        <div className="bg-white border-b px-6 py-4 flex items-center gap-4">
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => setCurrentView('dashboard')}
-            data-testid="button-back-to-dashboard"
-          >
-            <ArrowLeft className="h-4 w-4 mr-2" />
-            Back to Dashboard
-          </Button>
-        </div>
-        <MasterListsManagement />
-      </div>
-    );
+    return <MasterListsManagement onBack={handleBackToDashboard} />;
   }
 
   if (currentView === 'master-data') {
-    return (
-      <div className="min-h-screen bg-gray-50">
-        <div className="bg-white border-b px-6 py-4 flex items-center gap-4">
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => setCurrentView('dashboard')}
-            data-testid="button-back-to-dashboard"
-          >
-            <ArrowLeft className="h-4 w-4 mr-2" />
-            Back to Dashboard
-          </Button>
-        </div>
-        <MasterDataManagement />
-      </div>
-    );
+    return <MasterDataManagement onBack={handleBackToDashboard} />;
   }
 
   if (currentView === 'master-data-table') {
-    return (
-      <div className="min-h-screen bg-gray-50">
-        <div className="bg-white border-b px-6 py-4 flex items-center gap-4">
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => setCurrentView('dashboard')}
-            data-testid="button-back-to-dashboard"
-          >
-            <ArrowLeft className="h-4 w-4 mr-2" />
-            Back to Dashboard
-          </Button>
-        </div>
-        <MasterDataTableView />
-      </div>
-    );
+    return <MasterDataTableView onBack={handleBackToDashboard} />;
   }
 
   if (currentView === 'components') {
-    return (
-      <div className="min-h-screen bg-gray-50">
-        <div className="bg-white border-b px-6 py-3 flex items-center gap-3">
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => setCurrentView('dashboard')}
-            className="text-cyan-700"
-            data-testid="I4.QL.3.6"
-          >
-            <Marker id="I4.QL.3.6" />
-            <ArrowLeft className="h-4 w-4 mr-2" />
-            Back to Dashboard
-          </Button>
-        </div>
-        <FleetComponentsManagement />
-      </div>
-    );
+    return <FleetComponentsManagement onBack={handleBackToDashboard} />;
   }
 
   if (currentView === 'jobs') {
-    return (
-      <div className="min-h-screen bg-gray-50">
-        <div className="bg-white border-b px-6 py-4 flex items-center gap-4">
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => setCurrentView('dashboard')}
-            data-testid="I4.QL.4.6"
-          >
-            <Marker id="I4.QL.4.6" />
-            <ArrowLeft className="h-4 w-4 mr-2" />
-            Back to Dashboard
-          </Button>
-        </div>
-        <FleetJobsManagement />
-      </div>
-    );
+    return <FleetJobsManagement onBack={handleBackToDashboard} />;
   }
 
   if (currentView === 'spares') {
-    return (
-      <div className="min-h-screen bg-gray-50">
-        <div className="bg-white border-b px-6 py-4 flex items-center gap-4">
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => setCurrentView('dashboard')}
-            data-testid="I4.QL5.5.6"
-          >
-            <Marker id="I4.QL5.5.6" />
-            <ArrowLeft className="h-4 w-4 mr-2" />
-            Back to Dashboard
-          </Button>
-        </div>
-        <FleetSparesManagement />
-      </div>
-    );
+    return <FleetSparesManagement onBack={handleBackToDashboard} />;
   }
 
   if (currentView === 'vessel-mapping') {
-    return (
-      <div className="min-h-screen bg-gray-50">
-        <div className="bg-white border-b px-6 py-4 flex items-center gap-4">
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => setCurrentView('dashboard')}
-            data-testid="button-back-to-dashboard"
-          >
-            <ArrowLeft className="h-4 w-4 mr-2" />
-            Back to Dashboard
-          </Button>
-        </div>
-        <FleetVesselMapping />
-      </div>
-    );
+    return <FleetVesselMapping onBack={handleBackToDashboard} />;
   }
 
   if (currentView === 'pms-settings') {
-    return (
-      <div className="min-h-screen bg-gray-50">
-        <div className="bg-white border-b px-6 py-4 flex items-center gap-4">
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => setCurrentView('dashboard')}
-            data-testid="button-back-to-dashboard"
-          >
-            <ArrowLeft className="h-4 w-4 mr-2" />
-            Back to Dashboard
-          </Button>
-        </div>
-        <PmsVesselSettingsManagement />
-      </div>
-    );
+    return <PmsVesselSettingsManagement onBack={handleBackToDashboard} />;
   }
 
   if (currentView === 'equipment-tree') {
-    return (
-      <div className="min-h-screen bg-gray-50">
-        <div className="bg-white border-b px-6 py-4 flex items-center gap-4">
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => setCurrentView('dashboard')}
-            data-testid="button-back-to-dashboard"
-          >
-            <ArrowLeft className="h-4 w-4 mr-2" />
-            Back to Dashboard
-          </Button>
-        </div>
-        <FleetEquipmentTreeView />
-      </div>
-    );
+    return <FleetEquipmentTreeView onBack={handleBackToDashboard} />;
   }
 
   if (currentView === 'fleet-vessel-manager') {
-    return (
-      <div className="min-h-screen bg-gray-50">
-        <div className="bg-white border-b px-6 py-4 flex items-center gap-4">
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => setCurrentView('dashboard')}
-            data-testid="button-back-to-dashboard"
-          >
-            <ArrowLeft className="h-4 w-4 mr-2" />
-            Back to Dashboard
-          </Button>
-        </div>
-        <FleetVesselManager />
-      </div>
-    );
+    return <FleetVesselManager onBack={handleBackToDashboard} />;
   }
 
   if (currentView === 'fleet-data') {
-    return (
-      <div className="min-h-screen bg-gray-50">
-        <div className="bg-white border-b px-6 py-4 flex items-center gap-4">
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => setCurrentView('dashboard')}
-            data-testid="button-back-to-dashboard"
-          >
-            <ArrowLeft className="h-4 w-4 mr-2" />
-            Back to Dashboard
-          </Button>
-        </div>
-        <FleetDataView />
-      </div>
-    );
+    return <FleetDataView onBack={handleBackToDashboard} />;
   }
 
   return (

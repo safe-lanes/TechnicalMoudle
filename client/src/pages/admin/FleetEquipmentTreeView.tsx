@@ -19,6 +19,8 @@ import {
   FolderTree,
   FileText,
   Info,
+  ArrowLeft,
+  GitBranch,
 } from 'lucide-react';
 import type { MasterData, Job, FleetSpares } from '@shared/schema';
 
@@ -34,7 +36,7 @@ interface TreeNode {
 
 type MasterDataResponse = { items: MasterData[]; total: number };
 
-export default function FleetEquipmentTreeView() {
+export default function FleetEquipmentTreeView({ onBack }: { onBack?: () => void }) {
   const [searchQuery, setSearchQuery] = useState('');
   const [expandedNodes, setExpandedNodes] = useState<Set<string>>(new Set());
   const [selectedEquipment, setSelectedEquipment] = useState<MasterData | null>(null);
@@ -219,11 +221,29 @@ export default function FleetEquipmentTreeView() {
   
   return (
     <div className="p-6 space-y-4">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-4">
-          <h1 className="text-2xl font-bold">Fleet Equipment Data</h1>
-          <Badge variant="outline">{masterDataList.length} Equipment</Badge>
+      <div className="bg-gradient-to-r from-cyan-600 to-blue-600 px-6 py-5 rounded-lg">
+        {onBack && (
+          <button
+            onClick={onBack}
+            className="flex items-center gap-1 text-cyan-100 hover:text-white text-sm mb-2 transition-colors"
+            data-testid="button-back-to-dashboard"
+          >
+            <ArrowLeft className="h-4 w-4" />
+            Back to Dashboard
+          </button>
+        )}
+        <div className="flex items-center gap-3 mb-1">
+          <div className="p-2 bg-white/20 rounded-lg">
+            <GitBranch className="h-5 w-5 text-white" />
+          </div>
+          <div>
+            <h1 className="text-xl font-bold text-white">Fleet Equipment Data Tree View</h1>
+            <p className="text-cyan-100 text-sm mt-0.5">Browse fleet equipment hierarchy</p>
+          </div>
         </div>
+      </div>
+      <div className="flex items-center justify-between">
+        <Badge variant="outline">{masterDataList.length} Equipment</Badge>
         <Button variant="outline" size="sm" onClick={() => refetch()} data-testid="btn-refresh-tree">
           <RefreshCw className="w-4 h-4 mr-2" />
           Refresh

@@ -33,7 +33,7 @@ import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import { 
   Plus, Trash2, Ship, Box, Wrench, Package, Search, CheckCircle2, XCircle, 
-  ArrowRight, RefreshCw, Link2, Link2Off, AlertTriangle, Zap
+  ArrowRight, RefreshCw, Link2, Link2Off, AlertTriangle, Zap, ArrowLeft
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
@@ -71,7 +71,7 @@ interface EntityWithStatus {
   conflictReason?: string;
 }
 
-export default function FleetVesselMapping() {
+export default function FleetVesselMapping({ onBack }: { onBack?: () => void }) {
   const { toast } = useToast();
   const [activeTab, setActiveTab] = useState<MappingTab>('components');
   const [searchTerm, setSearchTerm] = useState("");
@@ -362,11 +362,26 @@ export default function FleetVesselMapping() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold text-gray-900">Fleet Vessel Mapping</h1>
-        <p className="text-gray-600 mt-1">
-          Map fleet-level templates to vessel-specific instances
-        </p>
+      <div className="bg-gradient-to-r from-cyan-600 to-blue-600 px-6 py-5 rounded-lg">
+        {onBack && (
+          <button
+            onClick={onBack}
+            className="flex items-center gap-1 text-cyan-100 hover:text-white text-sm mb-2 transition-colors"
+            data-testid="button-back-to-dashboard"
+          >
+            <ArrowLeft className="h-4 w-4" />
+            Back to Dashboard
+          </button>
+        )}
+        <div className="flex items-center gap-3 mb-1">
+          <div className="p-2 bg-white/20 rounded-lg">
+            <Ship className="h-5 w-5 text-white" />
+          </div>
+          <div>
+            <h1 className="text-xl font-bold text-white">Fleet Vessel Mapping</h1>
+            <p className="text-cyan-100 text-sm mt-0.5">Map fleet components to vessels</p>
+          </div>
+        </div>
       </div>
 
       <div className="flex items-center gap-4">

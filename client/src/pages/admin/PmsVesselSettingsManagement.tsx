@@ -10,7 +10,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient, apiRequest } from "@/lib/queryClient";
-import { Clock, Settings, Ship, Save, X, Calendar, Gauge, AlertCircle, CheckCircle2 } from "lucide-react";
+import { Clock, Settings, Ship, Save, X, Calendar, Gauge, AlertCircle, CheckCircle2, ArrowLeft } from "lucide-react";
 import type { PmsVesselSettings } from "@shared/schema";
 import { Marker } from "@/components/Marker";
 
@@ -20,7 +20,7 @@ interface Vessel {
   vesselCode?: string;
 }
 
-export default function PmsVesselSettingsManagement() {
+export default function PmsVesselSettingsManagement({ onBack }: { onBack?: () => void }) {
   const { toast } = useToast();
   const [selectedVessel, setSelectedVessel] = useState<Vessel | null>(null);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
@@ -128,6 +128,16 @@ export default function PmsVesselSettingsManagement() {
     <div className="p-6">
       <Card className="overflow-hidden">
         <div className="bg-gradient-to-r from-cyan-600 to-blue-600 px-6 py-5">
+          {onBack && (
+            <button
+              onClick={onBack}
+              className="flex items-center gap-1 text-cyan-100 hover:text-white text-sm mb-2 transition-colors"
+              data-testid="button-back-to-dashboard"
+            >
+              <ArrowLeft className="h-4 w-4" />
+              Back to Dashboard
+            </button>
+          )}
           <div className="flex items-center gap-3 mb-1">
             <div className="p-2 bg-white/20 rounded-lg">
               <Clock className="h-5 w-5 text-white" />
