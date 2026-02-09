@@ -47,6 +47,9 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { WorkOrderViewerSheet } from "@/components/WorkOrderViewerSheet";
+import { ComponentApiToggle } from "@/modules/components/components/ComponentApiToggle";
+import { getComponentListUrl, getComponentByIdUrl, getComponentDocumentsUrl, getComponentClassRegulatoryUrl, getComponentRequisitionsUrl, getMaintenanceHistoryUrl } from "@/modules/components/api/componentApiV2";
+import { useApiVersion } from "@/modules/components/hooks/useApiVersion";
 
 interface ComponentNode {
   id: string;
@@ -1165,8 +1168,10 @@ const MaintenanceHistorySection: React.FC<{ selectedComponent: ComponentNode | n
   // NOTE: Must use actualId (database UUID) not id (tree node code) for API calls
   // Only enable query when actualId exists (real component nodes, not category nodes)
   const componentDbId = selectedComponent?.actualId;
+  const { mode: mhApiMode } = useApiVersion();
+  const mhUrl = componentDbId ? getMaintenanceHistoryUrl(componentDbId) : '';
   const { data: maintenanceHistory = [], isLoading } = useQuery<any[]>({
-    queryKey: [`/technical/api/component-maintenance-history/${componentDbId}`],
+    queryKey: [mhUrl, mhApiMode],
     enabled: !!componentDbId,
   });
   
@@ -1355,9 +1360,11 @@ const SparesSection: React.FC<{ selectedComponent: ComponentNode | null }> = ({ 
   const ROWS_PER_PAGE = 10;
   
   const vesselId = selectedComponent?.vesselId || selectedComponent?.vesselCode || 'V001';
+  const { mode: detailApiMode } = useApiVersion();
   
+  const detailComponentListUrl = getComponentListUrl(vesselId);
   const { data: vesselComponents = [] } = useQuery<any[]>({
-    queryKey: [`/technical/api/components/${vesselId}`],
+    queryKey: [detailComponentListUrl, detailApiMode],
     enabled: !!vesselId,
   });
   
@@ -1886,9 +1893,10 @@ const DrawingsAndManualsSection: React.FC<{ selectedComponent: ComponentNode | n
   const COLLAPSED_ROWS = 2;
   const ROWS_PER_PAGE = 10;
   
-  // Fetch documents for the selected component
+  const { mode: docApiMode } = useApiVersion();
+  const docUrl = selectedComponent?.id ? getComponentDocumentsUrl(selectedComponent.id) : '';
   const { data: documents = [], isLoading } = useQuery<any[]>({
-    queryKey: [`/technical/api/component-documents/${selectedComponent?.id}`],
+    queryKey: [docUrl, docApiMode],
     enabled: !!selectedComponent?.id,
   });
   
@@ -2056,9 +2064,10 @@ const DrawingsAndManualsSection: React.FC<{ selectedComponent: ComponentNode | n
 };
 
 const ClassificationRegulatorySection: React.FC<{ selectedComponent: ComponentNode | null }> = ({ selectedComponent }) => {
-  // Fetch class regulatory data for the selected component
+  const { mode: crApiMode } = useApiVersion();
+  const crUrl = selectedComponent?.id ? getComponentClassRegulatoryUrl(selectedComponent.id) : '';
   const { data: classRegData = [], isLoading } = useQuery<any[]>({
-    queryKey: [`/technical/api/component-class-regulatory/${selectedComponent?.id}`],
+    queryKey: [crUrl, crApiMode],
     enabled: !!selectedComponent?.id,
   });
   
@@ -2134,9 +2143,10 @@ const ClassificationRegulatorySection: React.FC<{ selectedComponent: ComponentNo
 };
 
 const RequisitionsSection: React.FC<{ selectedComponent: ComponentNode | null }> = ({ selectedComponent }) => {
-  // Fetch requisitions for the selected component
+  const { mode: reqApiMode } = useApiVersion();
+  const reqUrl = selectedComponent?.id ? getComponentRequisitionsUrl(selectedComponent.id) : '';
   const { data: requisitions = [], isLoading } = useQuery<any[]>({
-    queryKey: [`/technical/api/component-requisitions/${selectedComponent?.id}`],
+    queryKey: [reqUrl, reqApiMode],
     enabled: !!selectedComponent?.id,
   });
   
@@ -2238,10 +2248,13 @@ const Components: React.FC = () => {
   const { vesselId, setVesselId } = useVessel();
   const { data: vessels = [] } = useVessels();
   const { isSailAdmin, isClientAdmin } = useUIRole();
+  const { mode: apiMode } = useApiVersion();
   
-  // Fetch components from API and build tree
+  // Fetch components from API and build tree (toggle-aware: uses V2 or legacy URL)
+  const componentListUrl = vesselId ? getComponentListUrl(vesselId) : '';
   const { data: fetchedComponents = [], isLoading: isLoadingComponents } = useQuery<any[]>({
-    queryKey: [`/technical/api/components/${vesselId}`],
+    queryKey: [componentListUrl, apiMode],
+    enabled: !!vesselId,
   });
   
   // Build component tree from fetched data
@@ -2963,19 +2976,24 @@ const Components: React.FC = () => {
               <Marker id="B1" /> Components {isChangeMode ? '- Edit Mode' : isChangeRequestMode ? '- Change Request Mode' : ''}
             </h1>
           </div>
-          {(isSailAdmin || isClientAdmin) && !isChangeRequestMode && !isChangeMode && (
-            <Button 
-              className="bg-[#5dc86f] hover:bg-[#4db85f] text-white"
-              onClick={() => {
-                setEditingComponentId(null);
-                setEditingComponentCode(null);
-                setShowAddEditFullPage(true);
-              }}
-              data-testid="B5"
-            >
-              <Marker id="B5" /> + Add / Edit Component
-            </Button>
-          )}
+          <div className="flex items-center gap-3">
+            {!isChangeRequestMode && !isChangeMode && (
+              <ComponentApiToggle />
+            )}
+            {(isSailAdmin || isClientAdmin) && !isChangeRequestMode && !isChangeMode && (
+              <Button 
+                className="bg-[#5dc86f] hover:bg-[#4db85f] text-white"
+                onClick={() => {
+                  setEditingComponentId(null);
+                  setEditingComponentCode(null);
+                  setShowAddEditFullPage(true);
+                }}
+                data-testid="B5"
+              >
+                <Marker id="B5" /> + Add / Edit Component
+              </Button>
+            )}
+          </div>
         </div>
         
         {/* Filters Row */}

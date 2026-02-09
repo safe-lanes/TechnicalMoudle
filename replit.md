@@ -73,16 +73,19 @@ The application employs a modern full-stack architecture with a mobile-first, re
 - **Vessel Data Source Strategy**: Employs a unified `useVessels()` hook prioritizing local PMS data with fallback to an external master-data API.
 - **ROB Location Stock Synchronization**: Implemented dual-write synchronization between legacy ROB fields and the normalized `spare_location_stock` table for consistent inventory.
 
-## V2 Architecture Planning (Component Module)
-A detailed V2 modular architecture plan has been documented at `docs/V2-Component-Module-Refactor-Plan.md`. Key decisions:
+## V2 Architecture (Component Module) — IMPLEMENTED
+A detailed V2 modular architecture plan is documented at `docs/V2-Component-Module-Refactor-Plan.md`. Implementation status and key decisions:
 - **Purely Architectural**: V2 uses 100% the same business rules, validations, and data as legacy. No functional rewrite.
 - **V2 Namespace**: All V2 code lives under `server/v2/`, `shared/v2/`, and `client/src/modules/` — legacy code stays untouched.
 - **Same Database Table**: V2 calls the same `storage.*` methods and operates on the same `components` table as legacy. No separate V2 data store.
 - **Layer Separation**: Repository (wraps storage calls) → Service (business logic from routes.ts) → Controller (HTTP concerns, Zod validation) → Routes (RESTful patterns).
 - **Route Prefix**: `/technical/api/v2/components/component/*` for V2 endpoints.
-- **Frontend Toggle**: `localStorage('pms_api_version')` switches between legacy and V2 API endpoints at runtime.
+- **Frontend Toggle**: `localStorage('pms_api_version')` switches between legacy and V2 API endpoints at runtime. Toggle UI visible on Components page header.
 - **Backward Compatibility**: Toggle defaults to "Legacy". Both route sets always registered. Instant rollback by switching toggle — same data, same database, zero data loss.
 - **Scope**: Component module only (bulk upload + CRUD + sub-entities). Other modules to follow the same pattern.
+- **Backend Files**: `server/v2/components/` (repository, services, controllers, routes), `shared/v2/components/` (schema, types).
+- **Frontend Files**: `client/src/modules/components/` (api/componentApiV2.ts, hooks/useApiVersion.ts, components/ComponentApiToggle.tsx).
+- **Toggle-Aware Queries**: Components page main queries (component list, maintenance history, documents, class-regulatory, requisitions) all use toggle-aware URL builders that switch between legacy and V2 endpoints based on localStorage toggle state.
 
 ## External Dependencies
 *   **Frontend**: `@radix-ui/*`, `@tanstack/react-query`, `wouter`, `tailwindcss`, `lucide-react`
