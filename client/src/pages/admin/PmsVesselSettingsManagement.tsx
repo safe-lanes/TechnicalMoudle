@@ -121,29 +121,58 @@ export default function PmsVesselSettingsManagement() {
     );
   }
 
+  const configuredCount = vessels.filter(v => isConfigured(v.id)).length;
+  const notSetCount = vessels.length - configuredCount;
+
   return (
     <div className="p-6">
-      <div className="mb-6">
-        <h2 className="text-xl font-semibold text-gray-900" data-testid="I4.QL7.1"><Marker id="I4.QL7.1" />Lead Time & Grace Period Settings</h2>
-        <p className="text-gray-600 mt-1" data-testid="I4.QL7.2">
-          <Marker id="I4.QL7.2" />Configure vessel-specific lead times for work order generation and grace periods for status calculation.
-        </p>
-      </div>
-
-      <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
-        <div className="flex items-start gap-3">
-          <AlertCircle className="h-5 w-5 text-blue-600 mt-0.5" />
-          <div>
-            <h3 className="font-medium text-blue-900">Company Standard Grace Rule</h3>
-            <p className="text-sm text-blue-700 mt-1">
-              When enabled, grace period is calculated as: If due date falls in last 7 days of month, grace = 7 days. 
-              Otherwise, grace extends to end of month.
-            </p>
+      <Card className="overflow-hidden">
+        <div className="bg-gradient-to-r from-cyan-600 to-blue-600 px-6 py-5">
+          <div className="flex items-center gap-3 mb-1">
+            <div className="p-2 bg-white/20 rounded-lg">
+              <Clock className="h-5 w-5 text-white" />
+            </div>
+            <div>
+              <h1 className="text-xl font-bold text-white" data-testid="I4.QL7.1"><Marker id="I4.QL7.1" />Lead Time & Grace Period Settings</h1>
+              <p className="text-cyan-100 text-sm mt-0.5" data-testid="I4.QL7.2">
+                <Marker id="I4.QL7.2" />Configure vessel-specific lead times for work order generation and grace periods for status calculation
+              </p>
+            </div>
           </div>
         </div>
-      </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        <div className="px-6 py-4 bg-gray-50 border-b border-gray-200">
+          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+            <div className="flex items-center gap-4">
+              <h2 className="text-base font-semibold text-gray-800">All Vessels</h2>
+              <div className="flex items-center gap-3">
+                <Badge variant="secondary" className="bg-green-100 text-green-700 no-default-hover-elevate no-default-active-elevate" data-testid="badge-configured-count">
+                  <CheckCircle2 className="h-3 w-3 mr-1" />
+                  {configuredCount} Configured
+                </Badge>
+                <Badge variant="secondary" className="bg-gray-100 text-gray-600 no-default-hover-elevate no-default-active-elevate" data-testid="badge-not-set-count">
+                  {notSetCount} Not Set
+                </Badge>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div className="p-6">
+          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
+            <div className="flex items-start gap-3">
+              <AlertCircle className="h-5 w-5 text-blue-600 mt-0.5" />
+              <div>
+                <h3 className="font-medium text-blue-900">Company Standard Grace Rule</h3>
+                <p className="text-sm text-blue-700 mt-1">
+                  When enabled, grace period is calculated as: If due date falls in last 7 days of month, grace = 7 days. 
+                  Otherwise, grace extends to end of month.
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         {vessels.map((vessel) => {
           const configured = isConfigured(vessel.id);
           const summary = formatSettingsSummary(vessel.id);
@@ -201,13 +230,15 @@ export default function PmsVesselSettingsManagement() {
         })}
       </div>
 
-      {vessels.length === 0 && (
-        <div className="text-center py-12 bg-gray-50 rounded-lg">
-          <Ship className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-          <h3 className="text-lg font-medium text-gray-900">No Vessels Found</h3>
-          <p className="text-gray-600 mt-1">Add vessels to configure their PMS settings.</p>
+          {vessels.length === 0 && (
+            <div className="text-center py-12 bg-gray-50 rounded-lg">
+              <Ship className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+              <h3 className="text-lg font-medium text-gray-900">No Vessels Found</h3>
+              <p className="text-gray-600 mt-1">Add vessels to configure their PMS settings.</p>
+            </div>
+          )}
         </div>
-      )}
+      </Card>
 
       <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
         <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
