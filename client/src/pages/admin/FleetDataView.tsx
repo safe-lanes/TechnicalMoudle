@@ -6,7 +6,10 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ChevronRight, ChevronDown, Plus, Search, Pencil, X, FileSpreadsheet, Trash2, Anchor, Briefcase } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import { Label } from "@/components/ui/label";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { PartHeader } from "@/components/PartHeader";
+import { SectionBlock } from "@/components/SectionBlock";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -1723,135 +1726,328 @@ export default function FleetDataView() {
 
       {/* Job Details Dialog */}
       <Dialog open={isJobDetailsDialogOpen} onOpenChange={setIsJobDetailsDialogOpen}>
-        <DialogContent className="max-w-2xl">
-          <DialogHeader className="flex flex-row items-center justify-between border-b pb-3">
-            <DialogTitle className="text-base font-semibold text-gray-800">
-              Job Details
-            </DialogTitle>
+        <DialogContent className="w-[95vw] max-w-[95vw] h-[90vh] max-h-[90vh] p-0 overflow-hidden flex flex-col" aria-describedby={undefined}>
+          <DialogTitle className="sr-only">Job Details</DialogTitle>
+          <div className="bg-gradient-to-r from-cyan-600 to-blue-600 px-6 py-4 flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="p-2 bg-white/20 rounded-lg">
+                <Briefcase className="h-5 w-5 text-white" />
+              </div>
+              <div>
+                <h1 className="text-xl font-bold text-white" data-testid="title-job-details">Job Details</h1>
+                <p className="text-cyan-100 text-sm mt-0.5">
+                  {selectedJobForDetail?.woTitle || "Job Information"}
+                </p>
+              </div>
+            </div>
             <Button
-              size="sm"
-              className="bg-blue-600 hover:bg-blue-700 text-white"
+              className="bg-white/20 text-white border-white/30"
+              variant="outline"
               onClick={() => {
                 setJobFormData(selectedJobForDetail || {});
                 setIsEditJobDialogOpen(true);
               }}
               data-testid="btn-edit-job"
             >
+              <Pencil className="mr-2 h-4 w-4" />
               Edit
             </Button>
-          </DialogHeader>
-          {selectedJobForDetail && (
-            <div className="py-4 space-y-6">
-              {/* Row 1: Job No., Job Title, Task Type */}
-              <div className="grid grid-cols-3 gap-4">
-                <div>
-                  <div className="text-blue-600 text-xs font-medium mb-1">Job No.</div>
-                  <div className="text-sm font-medium">{selectedJobForDetail.jobCode || "—"}</div>
-                </div>
-                <div>
-                  <div className="text-blue-600 text-xs font-medium mb-1">Job Title</div>
-                  <div className="text-sm font-medium">{selectedJobForDetail.woTitle || "—"}</div>
-                </div>
-                <div>
-                  <div className="text-blue-600 text-xs font-medium mb-1">Task Type</div>
-                  <div className="text-sm font-medium">{selectedJobForDetail.taskType || "—"}</div>
-                </div>
-              </div>
+          </div>
 
-              {/* Row 2: Maintenance Basis, Interval Value, Unit, Interval Running Hour */}
-              <div className="grid grid-cols-4 gap-4">
-                <div>
-                  <div className="text-blue-600 text-xs font-medium mb-1">Maintenance Basis</div>
-                  <div className="text-sm font-medium">{selectedJobForDetail.maintenanceBasis || "—"}</div>
-                </div>
-                <div>
-                  <div className="text-blue-600 text-xs font-medium mb-1">Interval Value</div>
-                  <div className="text-sm font-medium">{selectedJobForDetail.intervalValue || "—"}</div>
-                </div>
-                <div>
-                  <div className="text-blue-600 text-xs font-medium mb-1">Unit</div>
-                  <div className="text-sm font-medium">{selectedJobForDetail.unit || "—"}</div>
-                </div>
-                <div>
-                  <div className="text-blue-600 text-xs font-medium mb-1">Interval Running Hour</div>
-                  <div className="text-sm font-medium">{"—"}</div>
-                </div>
-              </div>
+          <div className="flex-1 overflow-auto px-6 py-6">
+            {selectedJobForDetail && (
+              <div className="max-w-5xl mx-auto space-y-6">
+                <PartHeader
+                  id="part-a"
+                  label="Part A"
+                  title="Job Details"
+                  description="Job template details and configuration"
+                />
 
-              {/* Row 3: Assigned To, Approver, Job Priority, Class Related */}
-              <div className="grid grid-cols-4 gap-4">
-                <div>
-                  <div className="text-blue-600 text-xs font-medium mb-1">Assigned To</div>
-                  <div className="text-sm font-medium">{selectedJobForDetail.assignedTo || "—"}</div>
-                </div>
-                <div>
-                  <div className="text-blue-600 text-xs font-medium mb-1">Approver</div>
-                  <div className="text-sm font-medium">{selectedJobForDetail.approver || "—"}</div>
-                </div>
-                <div>
-                  <div className="text-blue-600 text-xs font-medium mb-1">Job Priority</div>
-                  <div className="text-sm font-medium">{selectedJobForDetail.jobPriority || "—"}</div>
-                </div>
-                <div>
-                  <div className="text-blue-600 text-xs font-medium mb-1">Class Related</div>
-                  <div className="text-sm font-medium">{selectedJobForDetail.classRelated || "No"}</div>
-                </div>
-              </div>
+                <SectionBlock
+                  id="job-info"
+                  number="A1"
+                  title="Job Information"
+                  description="Basic details and configuration for this job"
+                >
+                  <div className="space-y-4">
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                      <div className="space-y-1">
+                        <Label className="text-sm text-[#8798ad]">Job Title</Label>
+                        <div className="text-sm font-medium text-gray-900 bg-gray-50 px-3 py-2 rounded-md border border-gray-200 min-h-[38px] flex items-center" data-testid="field-job-title">
+                          {selectedJobForDetail.woTitle || '-'}
+                        </div>
+                      </div>
+                      <div className="space-y-1">
+                        <Label className="text-sm text-[#8798ad]">Component Name</Label>
+                        <div className="text-sm font-medium text-gray-900 bg-gray-50 px-3 py-2 rounded-md border border-gray-200 min-h-[38px] flex items-center" data-testid="field-component-name">
+                          {selectedJobForDetail.fleetEquipmentName || '-'}
+                        </div>
+                      </div>
+                      <div className="space-y-1">
+                        <Label className="text-sm text-[#8798ad]">Component Code</Label>
+                        <div className="text-sm font-medium text-gray-900 bg-gray-50 px-3 py-2 rounded-md border border-gray-200 min-h-[38px] flex items-center" data-testid="field-component-code">
+                          {selectedJobForDetail.fleetEquipmentCode || '-'}
+                        </div>
+                      </div>
+                      <div className="space-y-1">
+                        <Label className="text-sm text-[#8798ad]">Job Code</Label>
+                        <div className="text-sm font-medium text-gray-900 bg-gray-50 px-3 py-2 rounded-md border border-gray-200 min-h-[38px] flex items-center" data-testid="field-job-code">
+                          {selectedJobForDetail.jobCode || '-'}
+                        </div>
+                      </div>
+                      <div className="space-y-1">
+                        <Label className="text-sm text-[#8798ad]">Maintenance Basis</Label>
+                        <div className="text-sm font-medium text-gray-900 bg-gray-50 px-3 py-2 rounded-md border border-gray-200 min-h-[38px] flex items-center" data-testid="field-maintenance-basis">
+                          {selectedJobForDetail.maintenanceBasis || '-'}
+                        </div>
+                      </div>
+                      <div className="space-y-1">
+                        <Label className="text-sm text-[#8798ad]">Frequency</Label>
+                        <div className="text-sm font-medium text-gray-900 bg-gray-50 px-3 py-2 rounded-md border border-gray-200 min-h-[38px] flex items-center" data-testid="field-frequency">
+                          {selectedJobForDetail.intervalValue && selectedJobForDetail.unit
+                            ? `${selectedJobForDetail.intervalValue} ${selectedJobForDetail.unit}`
+                            : selectedJobForDetail.intervalValue || '-'}
+                        </div>
+                      </div>
+                      <div className="space-y-1">
+                        <Label className="text-sm text-[#8798ad]">Task Type</Label>
+                        <div className="text-sm font-medium text-gray-900 bg-gray-50 px-3 py-2 rounded-md border border-gray-200 min-h-[38px] flex items-center" data-testid="field-task-type">
+                          {selectedJobForDetail.taskType || '-'}
+                        </div>
+                      </div>
+                      <div className="space-y-1">
+                        <Label className="text-sm text-[#8798ad]">Assigned To (Rank)</Label>
+                        <div className="text-sm font-medium text-gray-900 bg-gray-50 px-3 py-2 rounded-md border border-gray-200 min-h-[38px] flex items-center" data-testid="field-assigned-to">
+                          {selectedJobForDetail.assignedTo || '-'}
+                        </div>
+                      </div>
+                      <div className="space-y-1">
+                        <Label className="text-sm text-[#8798ad]">Approver (Rank)</Label>
+                        <div className="text-sm font-medium text-gray-900 bg-gray-50 px-3 py-2 rounded-md border border-gray-200 min-h-[38px] flex items-center" data-testid="field-approver">
+                          {selectedJobForDetail.approver || '-'}
+                        </div>
+                      </div>
+                      <div className="space-y-1">
+                        <Label className="text-sm text-[#8798ad]">Job Priority</Label>
+                        <div className="text-sm font-medium text-gray-900 bg-gray-50 px-3 py-2 rounded-md border border-gray-200 min-h-[38px] flex items-center" data-testid="field-job-priority">
+                          {selectedJobForDetail.jobPriority || '-'}
+                        </div>
+                      </div>
+                      <div className="space-y-1">
+                        <Label className="text-sm text-[#8798ad]">Class Related</Label>
+                        <div className="text-sm font-medium text-gray-900 bg-gray-50 px-3 py-2 rounded-md border border-gray-200 min-h-[38px] flex items-center" data-testid="field-class-related">
+                          {selectedJobForDetail.classRelated || 'No'}
+                        </div>
+                      </div>
+                      <div className="space-y-1">
+                        <Label className="text-sm text-[#8798ad]">Interval Running Hour</Label>
+                        <div className="text-sm font-medium text-gray-900 bg-gray-50 px-3 py-2 rounded-md border border-gray-200 min-h-[38px] flex items-center" data-testid="field-interval-rh">
+                          -
+                        </div>
+                      </div>
+                      <div className="space-y-1">
+                        <Label className="text-sm text-[#8798ad]">Department</Label>
+                        <div className="text-sm font-medium text-gray-900 bg-gray-50 px-3 py-2 rounded-md border border-gray-200 min-h-[38px] flex items-center" data-testid="field-department">
+                          {selectedJobForDetail.department || '-'}
+                        </div>
+                      </div>
+                      <div className="space-y-1">
+                        <Label className="text-sm text-[#8798ad]">Criticality</Label>
+                        <div className="text-sm font-medium text-gray-900 bg-gray-50 px-3 py-2 rounded-md border border-gray-200 min-h-[38px] flex items-center" data-testid="field-criticality">
+                          {selectedJobForDetail.criticality || '-'}
+                        </div>
+                      </div>
+                      <div className="space-y-1">
+                        <Label className="text-sm text-[#8798ad]">Is Active</Label>
+                        <div className="text-sm font-medium text-gray-900 bg-gray-50 px-3 py-2 rounded-md border border-gray-200 min-h-[38px] flex items-center" data-testid="field-is-active">
+                          {selectedJobForDetail.isActive === true ? 'Yes' : selectedJobForDetail.isActive === false ? 'No' : '-'}
+                        </div>
+                      </div>
+                    </div>
 
-              {/* Row 4: Department, Criticality, Is Active */}
-              <div className="grid grid-cols-3 gap-4">
-                <div>
-                  <div className="text-blue-600 text-xs font-medium mb-1">Department</div>
-                  <div className="text-sm font-medium">{selectedJobForDetail.department || "—"}</div>
-                </div>
-                <div>
-                  <div className="text-blue-600 text-xs font-medium mb-1">Criticality</div>
-                  <div className="text-sm font-medium">{selectedJobForDetail.criticality || "—"}</div>
-                </div>
-                <div>
-                  <div className="text-blue-600 text-xs font-medium mb-1">Is Active</div>
-                  <div className="text-sm font-medium">
-                    {selectedJobForDetail.isActive === true ? "Yes" : selectedJobForDetail.isActive === false ? "No" : "—"}
+                    <div className="space-y-1">
+                      <Label className="text-sm text-[#8798ad]">Brief Work Description</Label>
+                      <div className="text-sm font-medium text-gray-900 bg-gray-50 px-3 py-3 rounded-md border border-gray-200 min-h-[60px]" data-testid="field-brief-work-description">
+                        {selectedJobForDetail.briefWorkDescription || '-'}
+                      </div>
+                    </div>
                   </div>
-                </div>
-              </div>
+                </SectionBlock>
 
-              {/* Row 5: Brief Work Description */}
-              <div>
-                <div className="text-blue-600 text-xs font-medium mb-1">Brief Work Description</div>
-                <div className="text-sm font-medium">{selectedJobForDetail.briefWorkDescription || "—"}</div>
-              </div>
-
-              {/* Divider */}
-              <div className="border-t pt-4">
-                <h4 className="text-base font-semibold text-gray-800 mb-3">Job Mapped Vessel Detail</h4>
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="text-blue-600 text-xs">
-                      <th className="text-left py-2 font-medium">Vessel Code</th>
-                      <th className="text-left py-2 font-medium">Vessel Name</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {relatedVessels.length > 0 ? (
-                      relatedVessels.map((vessel, index) => (
-                        <tr key={index} className="border-t">
-                          <td className="py-2">{vessel.id}</td>
-                          <td className="py-2">{vessel.name}</td>
+                <SectionBlock
+                  id="spare-parts"
+                  number="A2"
+                  title="Required Spare Parts"
+                  description="Spare parts needed for this job"
+                >
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-sm border border-gray-200">
+                      <thead>
+                        <tr className="bg-gray-50 border-b border-gray-200">
+                          <th className="text-left p-2 font-medium text-gray-700 w-[20%]">PART NO.</th>
+                          <th className="text-left p-2 font-medium text-gray-700 w-[40%]">DESCRIPTION</th>
+                          <th className="text-left p-2 font-medium text-gray-700 w-[15%]">QTY REQUIRED</th>
+                          <th className="text-left p-2 font-medium text-gray-700 w-[10%]">ROB</th>
+                          <th className="text-left p-2 font-medium text-gray-700 w-[15%]">STATUS</th>
                         </tr>
-                      ))
-                    ) : (
-                      <tr className="border-t">
-                        <td colSpan={2} className="py-4 text-center text-gray-500">
-                          No vessels mapped to this job
-                        </td>
-                      </tr>
-                    )}
-                  </tbody>
-                </table>
+                      </thead>
+                      <tbody>
+                        {(Array.isArray(selectedJobForDetail.requiredSpareParts) && selectedJobForDetail.requiredSpareParts.length > 0) ? (
+                          (selectedJobForDetail.requiredSpareParts as any[]).map((part: any, index: number) => {
+                            const robValue = part.rob !== null && part.rob !== undefined ? part.rob : null;
+                            const qtyRequired = parseInt(part.quantityRequired) || 0;
+                            const isAvailable = robValue !== null && robValue >= qtyRequired;
+                            return (
+                              <tr key={index} className="border-b border-gray-200">
+                                <td className="p-2">{part.partNo || '-'}</td>
+                                <td className="p-2">{part.description || '-'}</td>
+                                <td className="p-2">{part.quantityRequired || '-'}</td>
+                                <td className="p-2 text-center">{robValue !== null ? robValue : '-'}</td>
+                                <td className="p-2">
+                                  <span className={`px-2 py-1 text-xs font-medium rounded-full ${isAvailable ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
+                                    {isAvailable ? 'Available' : 'Unavailable'}
+                                  </span>
+                                </td>
+                              </tr>
+                            );
+                          })
+                        ) : (
+                          <tr>
+                            <td colSpan={5} className="text-center p-4 text-gray-500 italic">
+                              No spare parts added yet
+                            </td>
+                          </tr>
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                </SectionBlock>
+
+                <SectionBlock
+                  id="tools"
+                  number="A3"
+                  title="Required Tools & Equipment"
+                  description="Tools and equipment needed for this job"
+                >
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-sm border border-gray-200">
+                      <thead>
+                        <tr className="bg-gray-50 border-b border-gray-200">
+                          <th className="text-left p-2 font-medium text-gray-700 w-[50%]">DESCRIPTION</th>
+                          <th className="text-left p-2 font-medium text-gray-700 w-[15%]">QTY REQUIRED</th>
+                          <th className="text-left p-2 font-medium text-gray-700 w-[10%]">ROB</th>
+                          <th className="text-left p-2 font-medium text-gray-700 w-[15%]">STATUS</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {(Array.isArray(selectedJobForDetail.requiredTools) && selectedJobForDetail.requiredTools.length > 0) ? (
+                          (selectedJobForDetail.requiredTools as any[]).map((tool: any, index: number) => (
+                            <tr key={index} className="border-b border-gray-200">
+                              <td className="p-2">{tool.toolName || tool.description || '-'}</td>
+                              <td className="p-2">{tool.quantity || '-'}</td>
+                              <td className="p-2 text-center">-</td>
+                              <td className="p-2">
+                                <span className="px-2 py-1 text-xs font-medium rounded-full bg-green-100 text-green-800">
+                                  Available
+                                </span>
+                              </td>
+                            </tr>
+                          ))
+                        ) : (
+                          <tr>
+                            <td colSpan={4} className="text-center p-4 text-gray-500 italic">
+                              No tools added yet
+                            </td>
+                          </tr>
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                </SectionBlock>
+
+                <SectionBlock
+                  id="safety"
+                  number="A4"
+                  title="Safety Requirements"
+                  description="Safety requirements and permits for this job"
+                >
+                  <div className="space-y-4">
+                    <div>
+                      <Label className="text-sm font-medium text-gray-700">Personal Protective Equipment (PPE):</Label>
+                      {selectedJobForDetail.ppeRequirements ? (
+                        <ul className="list-disc list-inside mt-1 text-sm text-gray-600">
+                          {selectedJobForDetail.ppeRequirements.split(',').map((item: string, index: number) => (
+                            <li key={index}>{item.trim()}</li>
+                          ))}
+                        </ul>
+                      ) : (
+                        <p className="text-sm text-gray-500 italic mt-1">No PPE requirements specified</p>
+                      )}
+                    </div>
+                    <div>
+                      <Label className="text-sm font-medium text-gray-700">Permits Required:</Label>
+                      {selectedJobForDetail.permitRequirements ? (
+                        <ul className="list-disc list-inside mt-1 text-sm text-gray-600">
+                          {selectedJobForDetail.permitRequirements.split(',').map((item: string, index: number) => (
+                            <li key={index}>{item.trim()}</li>
+                          ))}
+                        </ul>
+                      ) : (
+                        <p className="text-sm text-gray-500 italic mt-1">No permits required</p>
+                      )}
+                    </div>
+                    <div>
+                      <Label className="text-sm font-medium text-gray-700">Other Safety Requirements:</Label>
+                      {selectedJobForDetail.otherSafetyRequirements ? (
+                        <ul className="list-disc list-inside mt-1 text-sm text-gray-600">
+                          {selectedJobForDetail.otherSafetyRequirements.split(',').map((item: string, index: number) => (
+                            <li key={index}>{item.trim()}</li>
+                          ))}
+                        </ul>
+                      ) : (
+                        <p className="text-sm text-gray-500 italic mt-1">No other safety requirements specified</p>
+                      )}
+                    </div>
+                  </div>
+                </SectionBlock>
+
+                <SectionBlock
+                  id="vessel-mapping"
+                  number="A5"
+                  title="Job Mapped Vessel Details"
+                  description="Vessel mapping information related to this job"
+                >
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-sm border border-gray-200">
+                      <thead>
+                        <tr className="bg-gray-50 border-b border-gray-200">
+                          <th className="text-left p-2 font-medium text-gray-700 w-[40%]">VESSEL CODE</th>
+                          <th className="text-left p-2 font-medium text-gray-700 w-[60%]">VESSEL NAME</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {relatedVessels.length > 0 ? (
+                          relatedVessels.map((vessel, index) => (
+                            <tr key={index} className="border-b border-gray-200" data-testid={`vessel-mapping-row-${index}`}>
+                              <td className="p-2">{vessel.id}</td>
+                              <td className="p-2">{vessel.name}</td>
+                            </tr>
+                          ))
+                        ) : (
+                          <tr>
+                            <td colSpan={2} className="text-center p-4 text-gray-500 italic">
+                              No vessels mapped to this job
+                            </td>
+                          </tr>
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                </SectionBlock>
               </div>
-            </div>
-          )}
+            )}
+          </div>
         </DialogContent>
       </Dialog>
 
