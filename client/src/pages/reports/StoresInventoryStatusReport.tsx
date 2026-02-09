@@ -398,7 +398,8 @@ const StoresInventoryStatusReport: React.FC<StoresInventoryStatusReportProps> = 
           { header: 'Current ROB', field: 'rob', width: 22 },
           { header: 'Min Stock', field: 'min', width: 20 },
           { header: 'Status', field: 'status', width: 20 },
-          { header: 'Location', field: 'location', width: 25 },
+          { header: 'Location A', field: 'locationA', width: 20 },
+          { header: 'Location B', field: 'locationB', width: 20 },
           { header: 'UOM', field: 'uom', width: 15 },
         ];
         exportData = sortedStockItems.map((item, idx) => ({
@@ -409,7 +410,8 @@ const StoresInventoryStatusReport: React.FC<StoresInventoryStatusReportProps> = 
           rob: parseFloat(String(item.rob)) || 0,
           min: parseFloat(String(item.min)) || 0,
           status: getStockStatus(parseFloat(String(item.rob)) || 0, parseFloat(String(item.min)) || 0),
-          location: getLocation(item),
+          locationA: item.locationA || '-',
+          locationB: item.locationB || '-',
           uom: item.uom || '-',
         }));
       } else if (activeTab === 'consumption') {
@@ -721,14 +723,15 @@ const StoresInventoryStatusReport: React.FC<StoresInventoryStatusReportProps> = 
                       <th className="text-right py-3 px-3"><SortButton field="rob" label="Current ROB" /></th>
                       <th className="text-right py-3 px-3"><SortButton field="min" label="Min Stock" /></th>
                       <th className="text-left py-3 px-3"><SortButton field="status" label="Stock Status" /></th>
-                      <th className="text-left py-3 px-3 font-semibold text-sm text-gray-700">Location</th>
+                      <th className="text-left py-3 px-3 font-semibold text-sm text-gray-700">Location A</th>
+                      <th className="text-left py-3 px-3 font-semibold text-sm text-gray-700">Location B</th>
                       <th className="text-left py-3 px-3 font-semibold text-sm text-gray-700">UOM</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-200">
                     {sortedStockItems.length === 0 ? (
                       <tr>
-                        <td colSpan={9} className="text-center py-12">
+                        <td colSpan={10} className="text-center py-12">
                           <Package className="h-10 w-10 text-gray-400 mx-auto mb-3" />
                           <p className="text-gray-500 font-medium">No items found</p>
                           <p className="text-sm text-gray-400 mt-1">Try adjusting your filters</p>
@@ -761,7 +764,8 @@ const StoresInventoryStatusReport: React.FC<StoresInventoryStatusReportProps> = 
                             </td>
                             <td className="py-3 px-3 text-right text-sm text-gray-600">{min}</td>
                             <td className="py-3 px-3">{getStatusBadge(status)}</td>
-                            <td className="py-3 px-3 text-sm text-gray-600">{getLocation(item)}</td>
+                            <td className="py-3 px-3 text-sm text-gray-600">{item.locationA || '-'}</td>
+                            <td className="py-3 px-3 text-sm text-gray-600">{item.locationB || '-'}</td>
                             <td className="py-3 px-3 text-sm text-gray-600">{item.uom || '-'}</td>
                           </tr>
                         );

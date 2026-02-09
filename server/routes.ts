@@ -7666,7 +7666,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
           { key: 'rob', header: 'Current ROB', width: 14, type: 'number', align: 'right' },
           { key: 'min', header: 'Min Stock', width: 14, type: 'number', align: 'right' },
           { key: 'status', header: 'Status', width: 14, align: 'center' },
-          { key: 'location', header: 'Location', width: 30 },
+          { key: 'locationA', header: 'Location A', width: 18 },
+          { key: 'locationB', header: 'Location B', width: 18 },
           { key: 'uom', header: 'UOM', width: 12 },
         ];
 
@@ -7681,7 +7682,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           if (rob === 0) status = 'Critical';
           else if (rob <= min) status = 'Low';
           else status = 'OK';
-          return [idx + 1, item.itemCode || '-', item.itemName || '-', categoryDisplayMap[item.itemType] || item.itemType || '-', rob, min, status, getLocation(item), item.uom || '-'];
+          return [idx + 1, item.itemCode || '-', item.itemName || '-', categoryDisplayMap[item.itemType] || item.itemType || '-', rob, min, status, item.locationA || '-', item.locationB || '-', item.uom || '-'];
         });
 
         const critCount = rowsData.filter(r => r[6] === 'Critical').length;

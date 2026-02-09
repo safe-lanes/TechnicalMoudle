@@ -174,7 +174,8 @@ const StoresReports: React.FC<StoresReportsProps> = ({ onBack, globalFilters }) 
           { header: 'Category', field: 'category', width: 30 },
           { header: 'ROB', field: 'rob', width: 20 },
           { header: 'Min', field: 'min', width: 20 },
-          { header: 'Location', field: 'location', width: 30 },
+          { header: 'Location A', field: 'locationA', width: 25 },
+          { header: 'Location B', field: 'locationB', width: 25 },
           { header: 'Status', field: 'status', width: 25 }
         ];
 
@@ -184,7 +185,8 @@ const StoresReports: React.FC<StoresReportsProps> = ({ onBack, globalFilters }) 
           category: s.category || s.itemType || '-',
           rob: s.rob || 0,
           min: s.min || 0,
-          location: (() => { const a = s.locationA || ''; const b = s.locationB || ''; if (a && b) return `${a} / ${b}`; return a || b || '-'; })(),
+          locationA: s.locationA || '-',
+          locationB: s.locationB || '-',
           status: getStockStatus(s.rob || 0, s.min || 0)
         }));
 
