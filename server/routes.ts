@@ -8978,8 +8978,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       summarySheet.addRow(['Stores', lowStockItems.filter((i: any) => i.type === 'stores').length]);
       summarySheet.addRow(['Lubricants', lowStockItems.filter((i: any) => i.type === 'lubes' || i.type === 'lubricants').length]);
       summarySheet.addRow(['Chemicals', lowStockItems.filter((i: any) => i.type === 'chemicals').length]);
-      summarySheet.column(1).width = 30;
-      summarySheet.column(2).width = 12;
+      summarySheet.getColumn(1).width = 30;
+      summarySheet.getColumn(2).width = 12;
 
       res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
       res.setHeader('Content-Disposition', 'attachment; filename=low-stock-alert-report.xlsx');

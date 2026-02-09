@@ -31,7 +31,6 @@ import { pdfReportGenerator } from "@/lib/pdfReportGenerator";
 import { useToast } from "@/hooks/use-toast";
 import { useVessel } from "@/contexts/VesselContext";
 import { format } from "date-fns";
-import { apiRequest } from "@/lib/queryClient";
 
 interface LowStockItem {
   id: number;
@@ -311,13 +310,21 @@ const LowStockAlertReport: React.FC<LowStockAlertReportProps> = ({ onBack, vesse
   const handleExcelExport = async () => {
     setGeneratingExcel(true);
     try {
-      const response = await apiRequest('POST', `/technical/api/reports/stores-low-stock-alert/${effectiveVesselId}/excel`);
+      const response = await fetch(`/technical/api/reports/stores-low-stock-alert/${effectiveVesselId}/excel`, {
+        method: 'POST',
+        credentials: 'include',
+      });
+      if (!response.ok) {
+        throw new Error('Failed to generate Excel');
+      }
       const blob = await response.blob();
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
       a.download = `low-stock-alert-${format(new Date(), 'yyyy-MM-dd')}.xlsx`;
+      document.body.appendChild(a);
       a.click();
+      document.body.removeChild(a);
       window.URL.revokeObjectURL(url);
       toast({ title: "Excel Generated", description: "Low stock alert Excel report downloaded" });
     } catch (err) {
