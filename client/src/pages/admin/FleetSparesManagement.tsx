@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { type Spare, type Component } from "@shared/schema";
+import { type FleetSpares, type FleetComponents } from "@shared/schema";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -18,17 +18,17 @@ export default function FleetSparesManagement() {
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedEquipment, setSelectedEquipment] = useState<string>("all");
   const [isFormOpen, setIsFormOpen] = useState(false);
-  const [selectedSpare, setSelectedSpare] = useState<Spare | null>(null);
+  const [selectedSpare, setSelectedSpare] = useState<FleetSpares | null>(null);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
-  const [spareToDelete, setSpareToDelete] = useState<Spare | null>(null);
+  const [spareToDelete, setSpareToDelete] = useState<FleetSpares | null>(null);
 
   // Fetch fleet spares
-  const { data: spares, isLoading, error } = useQuery<Spare[]>({
+  const { data: spares, isLoading, error } = useQuery<FleetSpares[]>({
     queryKey: ['/technical/api/fleet/spares'],
   });
 
   // Fetch fleet components for equipment filter
-  const { data: components } = useQuery<Component[]>({
+  const { data: components } = useQuery<FleetComponents[]>({
     queryKey: ['/technical/api/fleet/components'],
   });
 
@@ -67,7 +67,7 @@ export default function FleetSparesManagement() {
     const query = searchQuery.toLowerCase();
     return (
       spare.partName?.toLowerCase().includes(query) ||
-      spare.fleetPartCode?.toLowerCase().includes(query) ||
+      spare.partCode?.toLowerCase().includes(query) ||
       spare.maker?.toLowerCase().includes(query) ||
       spare.fleetEquipmentCode?.toLowerCase().includes(query)
     );
@@ -78,12 +78,12 @@ export default function FleetSparesManagement() {
     setIsFormOpen(true);
   };
 
-  const handleEdit = (spare: Spare) => {
+  const handleEdit = (spare: FleetSpares) => {
     setSelectedSpare(spare);
     setIsFormOpen(true);
   };
 
-  const handleDeleteClick = (spare: Spare) => {
+  const handleDeleteClick = (spare: FleetSpares) => {
     setSpareToDelete(spare);
     setDeleteDialogOpen(true);
   };
@@ -229,7 +229,7 @@ export default function FleetSparesManagement() {
                         <TableRow key={spare.id} data-testid={`row-spare-${spare.id}`}>
                           <TableCell className="font-mono text-sm" data-testid={isFirstRow ? "I4.QL5.5.22" : undefined}>
                             {isFirstRow && <Marker id="I4.QL5.5.22" />}
-                            {spare.fleetPartCode}
+                            {spare.partCode}
                           </TableCell>
                           <TableCell className="font-medium" data-testid={isFirstRow ? "I4.QL5.5.23" : undefined}>
                             {isFirstRow && <Marker id="I4.QL5.5.23" />}
@@ -245,11 +245,11 @@ export default function FleetSparesManagement() {
                           </TableCell>
                           <TableCell data-testid={isFirstRow ? "I4.QL5.5.26" : undefined}>
                             {isFirstRow && <Marker id="I4.QL5.5.26" />}
-                            {spare.uom || "-"}
+                            {spare.unitOfMeasurement || "-"}
                           </TableCell>
                           <TableCell data-testid={isFirstRow ? "I4.QL5.5.27" : undefined}>
                             {isFirstRow && <Marker id="I4.QL5.5.27" />}
-                            {spare.location || "-"}
+                            -
                           </TableCell>
                           <TableCell className="text-right">
                             <div className="flex justify-end gap-2">

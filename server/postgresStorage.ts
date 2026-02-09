@@ -180,6 +180,9 @@ import {
   workOrderPostponements,
   type WorkOrderPostponement,
   type InsertWorkOrderPostponement,
+  fleetSpares,
+  type FleetSpares,
+  type InsertFleetSpares,
 } from '@shared/schema';
 
 /**
@@ -2706,7 +2709,58 @@ export class PostgresStorage {
     return results;
   }
 
-  // Fleet Spares
+  // Fleet Spares - New fleet_spares table methods
+  async getFleetSparesFromTable(): Promise<FleetSpares[]> {
+    const db = await getDb();
+    return await db.select().from(fleetSpares)
+      .where(eq(fleetSpares.isDeleted, false));
+  }
+
+  async getFleetSpareFromTable(id: number): Promise<FleetSpares | undefined> {
+    const db = await getDb();
+    const result = await db.select().from(fleetSpares)
+      .where(and(
+        eq(fleetSpares.id, id),
+        eq(fleetSpares.isDeleted, false)
+      ));
+    return result[0];
+  }
+
+  async createFleetSpareInTable(spare: InsertFleetSpares): Promise<FleetSpares> {
+    const db = await getDb();
+    const result = await db.insert(fleetSpares).values({
+      ...spare,
+    }).returning();
+    return result[0];
+  }
+
+  async updateFleetSpareInTable(id: number, data: Partial<FleetSpares>): Promise<FleetSpares> {
+    const db = await getDb();
+    const result = await db.update(fleetSpares)
+      .set({ ...data, updatedAt: new Date() })
+      .where(eq(fleetSpares.id, id))
+      .returning();
+    return result[0];
+  }
+
+  async deleteFleetSpareFromTable(id: number): Promise<void> {
+    const db = await getDb();
+    await db.update(fleetSpares)
+      .set({ isDeleted: true, updatedAt: new Date() })
+      .where(eq(fleetSpares.id, id));
+  }
+
+  async getFleetSpareByPartCode(partCode: string): Promise<FleetSpares | undefined> {
+    const db = await getDb();
+    const result = await db.select().from(fleetSpares)
+      .where(and(
+        eq(fleetSpares.partCode, partCode),
+        eq(fleetSpares.isDeleted, false)
+      ));
+    return result[0];
+  }
+
+  // Legacy Fleet Spares (spares table with dataScope='fleet')
   async getFleetSpares(): Promise<Spare[]> {
     const db = await getDb();
     return await db.select().from(spares)

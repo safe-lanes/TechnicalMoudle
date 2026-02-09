@@ -130,7 +130,7 @@ interface UniformBulkUploadProps {
   title: string;
   description: string;
   icon: LucideIcon;
-  templateType: 'components' | 'jobs' | 'spares' | 'stores' | 'makers' | 'fleet-components' | 'fleet-jobs';
+  templateType: 'components' | 'jobs' | 'spares' | 'stores' | 'makers' | 'fleet-components' | 'fleet-jobs' | 'fleet-spares';
   templateFileName: string;
   fieldMappings: FieldMapping[];
   vesselId?: string;

@@ -537,6 +537,64 @@ const COLUMN_MAPPINGS: { [key: string]: { [variant: string]: string } } = {
     'safetyprocedure': 'Other Safety Requirements',
     'safety_procedure': 'Other Safety Requirements',
     'safety procedure': 'Other Safety Requirements'
+  },
+  'fleet-spares': {
+    'partcode': 'Part Code',
+    'part_code': 'Part Code',
+    'part code': 'Part Code',
+    'fleetequipmentcode': 'Fleet Equipment Code',
+    'fleet_equipment_code': 'Fleet Equipment Code',
+    'fleet equipment code': 'Fleet Equipment Code',
+    'fleetequipmentname': 'Fleet Equipment Name',
+    'fleet_equipment_name': 'Fleet Equipment Name',
+    'fleet equipment name': 'Fleet Equipment Name',
+    'partname': 'Part Name',
+    'part_name': 'Part Name',
+    'part name': 'Part Name',
+    'partnumber': 'Part Number',
+    'part_number': 'Part Number',
+    'part number': 'Part Number',
+    'unitofmeasurement': 'Unit Of Measurement',
+    'unit_of_measurement': 'Unit Of Measurement',
+    'unit of measurement': 'Unit Of Measurement',
+    'uom': 'Unit Of Measurement',
+    'drawingnumber': 'Drawing Number',
+    'drawing_number': 'Drawing Number',
+    'drawing number': 'Drawing Number',
+    'drawingno': 'Drawing Number',
+    'drawing_no': 'Drawing Number',
+    'drawing no': 'Drawing Number',
+    'positionnumber': 'Position Number',
+    'position_number': 'Position Number',
+    'position number': 'Position Number',
+    'note': 'Note',
+    'notes': 'Note',
+    'specification': 'Specification',
+    'spec': 'Specification',
+    'maker': 'Maker',
+    'makername': 'Maker',
+    'maker_name': 'Maker',
+    'maker name': 'Maker',
+    'makercode': 'Maker Code',
+    'maker_code': 'Maker Code',
+    'maker code': 'Maker Code',
+    'manualname': 'Manual Name',
+    'manual_name': 'Manual Name',
+    'manual name': 'Manual Name',
+    'pagenumber': 'Page Number',
+    'page_number': 'Page Number',
+    'page number': 'Page Number',
+    'criticality': 'Criticality',
+    'critical': 'Criticality',
+    'isactive': 'Is Active',
+    'is_active': 'Is Active',
+    'is active': 'Is Active',
+    'ihm': 'IHM (Inventory of Hazardous Materials)',
+    'ihm (inventory of hazardous materials)': 'IHM (Inventory of Hazardous Materials)',
+    'inventory of hazardous materials': 'IHM (Inventory of Hazardous Materials)',
+    'evidencetype': 'Evidence Type',
+    'evidence_type': 'Evidence Type',
+    'evidence type': 'Evidence Type'
   }
 };
 
@@ -1838,8 +1896,8 @@ router.get('/template', async (req, res) => {
     }
   }
   
-  if (!['components', 'spares', 'stores', 'work-orders', 'jobs', 'makers', 'fleet-components', 'fleet-jobs'].includes(type as string)) {
-    return res.status(400).json({ error: 'Invalid template type. Valid types: components, spares, stores, work-orders, jobs, makers, fleet-components, fleet-jobs' });
+  if (!['components', 'spares', 'stores', 'work-orders', 'jobs', 'makers', 'fleet-components', 'fleet-jobs', 'fleet-spares'].includes(type as string)) {
+    return res.status(400).json({ error: 'Invalid template type. Valid types: components, spares, stores, work-orders, jobs, makers, fleet-components, fleet-jobs, fleet-spares' });
   }
   
   // Default to V001 if no vesselId provided
@@ -1972,6 +2030,26 @@ router.get('/template', async (req, res) => {
         'Number (Interval value)', 'Text (Days, Weeks, Months, Years)',
         'Text (Spare parts list)', 'Text (Tools list)', 'Text (PPE requirements)',
         'Text (Permit requirements)', 'Text (Other safety requirements)'
+      ];
+
+      example = [];
+      break;
+    case 'fleet-spares':
+      headers = [
+        'Part Code', 'Fleet Equipment Code', 'Fleet Equipment Name', 'Part Name',
+        'Part Number', 'Unit Of Measurement', 'Drawing Number', 'Position Number',
+        'Note', 'Specification', 'Maker', 'Maker Code',
+        'Manual Name', 'Page Number', 'Criticality', 'Is Active',
+        'IHM (Inventory of Hazardous Materials)', 'Evidence Type'
+      ];
+
+      validValues = [
+        'Required (Unique part code)', 'Required (Fleet equipment code)', 'Required (Fleet equipment name)',
+        'Required (Part name)', 'Text (Manufacturer part number)', 'Required (Unit of measurement)',
+        'Text (Drawing number)', 'Text (Position number)',
+        'Text (Notes)', 'Text (Specification)', 'Text (Maker name)', 'Text (Maker code)',
+        'Text (Manual name)', 'Text (Page number)', 'Text (Yes/No)', 'Required (Yes/No, defaults to Yes)',
+        'Text (Yes/No)', 'Text (Evidence type)'
       ];
 
       example = [];
@@ -2369,6 +2447,7 @@ function getTypeFromSheetName(sheetName: string): string | null {
   // Direct matches - Fleet_ prefixed must come BEFORE generic checks
   if (normalizedName === 'fleet_component' || normalizedName === 'fleet component' || (normalizedName.includes('fleet') && normalizedName.includes('component'))) return 'fleet-components';
   if (normalizedName === 'fleet_job' || normalizedName === 'fleet job' || (normalizedName.includes('fleet') && normalizedName.includes('job'))) return 'fleet-jobs';
+  if (normalizedName === 'fleet_spare' || normalizedName === 'fleet spare' || normalizedName === 'fleet_spares' || normalizedName === 'fleet spares' || (normalizedName.includes('fleet') && normalizedName.includes('spare'))) return 'fleet-spares';
   if (normalizedName === 'spares' || normalizedName.includes('spare')) return 'spares';
   if (normalizedName === 'components' || normalizedName.includes('component') || normalizedName.includes('machinery')) return 'components';
   if (normalizedName === 'vessel_job' || normalizedName === 'vessel job') return 'jobs';
@@ -2396,7 +2475,7 @@ router.post('/dry-run', upload.single('file'), async (req, res) => {
     
     console.log(`📋 Type determination: requested='${requestedType}', sheetName='${sheetName}', sheetBasedType='${sheetBasedType}', effective='${type}'`);
 
-    if (!['components', 'spares', 'stores', 'work-orders', 'jobs', 'makers', 'fleet-components', 'fleet-jobs'].includes(type)) {
+    if (!['components', 'spares', 'stores', 'work-orders', 'jobs', 'makers', 'fleet-components', 'fleet-jobs', 'fleet-spares'].includes(type)) {
       return res.status(400).json({ error: 'Invalid type' });
     }
 
@@ -2795,6 +2874,9 @@ async function validateData(type: string, data: any[], mode: string, vesselId?: 
       case 'fleet-jobs':
         primaryField = 'Job Code';
         break;
+      case 'fleet-spares':
+        primaryField = 'Part Code';
+        break;
       default:
         primaryField = 'Component Code';
     }
@@ -2889,6 +2971,35 @@ async function validateData(type: string, data: any[], mode: string, vesselId?: 
           fleetJobCodeOccurrences.set(code, []);
         }
         fleetJobCodeOccurrences.get(code)!.push(index + 2);
+      }
+    });
+  }
+
+  // Track duplicate Part Codes for fleet-spares (case-insensitive)
+  const fleetSparePartCodeOccurrences = new Map<string, number[]>();
+  const existingDbFleetSparePartCodes = new Set<string>();
+  
+  if (type === 'fleet-spares') {
+    try {
+      const existingFleetSpares = await storage.getFleetSparesFromTable();
+      existingFleetSpares.forEach((fs: any) => {
+        if (fs.partCode) {
+          existingDbFleetSparePartCodes.add(fs.partCode.toUpperCase());
+        }
+      });
+      console.log(`📋 Loaded ${existingDbFleetSparePartCodes.size} existing fleet spare part codes from database`);
+    } catch (err) {
+      console.warn('⚠️ Could not load existing fleet spare part codes:', err);
+    }
+    
+    validRows.forEach((row: any, index: number) => {
+      const partCode = row['Part Code'];
+      if (partCode) {
+        const code = String(partCode).trim().toUpperCase();
+        if (!fleetSparePartCodeOccurrences.has(code)) {
+          fleetSparePartCodeOccurrences.set(code, []);
+        }
+        fleetSparePartCodeOccurrences.get(code)!.push(index + 2);
       }
     });
   }
@@ -4009,6 +4120,96 @@ async function validateData(type: string, data: any[], mode: string, vesselId?: 
       } else {
         normalized['Other Safety Requirements'] = null;
       }
+    } else if (type === 'fleet-spares') {
+      // Validate fleet-spares - matches fleet_spares database schema
+      // 18 columns from Fleet Spares Import Template
+      
+      // Part Code - required and unique
+      const partCode = row['Part Code'];
+      if (partCode === undefined || partCode === null || String(partCode).trim() === '') {
+        errors.push(`Row ${rowNum}: Part Code is required`);
+      } else {
+        const codeStr = String(partCode).trim();
+        normalized['Part Code'] = codeStr;
+        const codeUpperCase = codeStr.toUpperCase();
+        
+        const occurrences = fleetSparePartCodeOccurrences.get(codeUpperCase);
+        if (occurrences && occurrences.length > 1) {
+          const firstOccurrence = occurrences[0];
+          if (rowNum !== firstOccurrence) {
+            errors.push(`Row ${rowNum}: Duplicate Part Code '${codeStr}' - this code already appears in row ${firstOccurrence}. Each Part Code must be unique.`);
+          }
+        }
+        
+        if (existingDbFleetSparePartCodes.has(codeUpperCase)) {
+          if (mode === 'add') {
+            errors.push(`Row ${rowNum}: Part Code '${codeStr}' already exists in database. Use 'Update' or 'Upsert' mode to modify existing records.`);
+          }
+        } else {
+          if (mode === 'update') {
+            errors.push(`Row ${rowNum}: Part Code '${codeStr}' does not exist in database. Use 'Add' or 'Upsert' mode to create new records.`);
+          }
+        }
+      }
+      
+      // Fleet Equipment Code - required
+      const fleetEqCode = row['Fleet Equipment Code'];
+      if (fleetEqCode === undefined || fleetEqCode === null || String(fleetEqCode).trim() === '') {
+        errors.push(`Row ${rowNum}: Fleet Equipment Code is required`);
+      } else {
+        normalized['Fleet Equipment Code'] = String(fleetEqCode).trim();
+      }
+      
+      // Fleet Equipment Name - required
+      const fleetEqName = row['Fleet Equipment Name'];
+      if (fleetEqName === undefined || fleetEqName === null || String(fleetEqName).trim() === '') {
+        errors.push(`Row ${rowNum}: Fleet Equipment Name is required`);
+      } else {
+        normalized['Fleet Equipment Name'] = String(fleetEqName).trim();
+      }
+      
+      // Part Name - required
+      const partName = row['Part Name'];
+      if (partName === undefined || partName === null || String(partName).trim() === '') {
+        errors.push(`Row ${rowNum}: Part Name is required`);
+      } else {
+        normalized['Part Name'] = String(partName).trim();
+      }
+      
+      // Unit Of Measurement - required
+      const uom = row['Unit Of Measurement'];
+      if (uom === undefined || uom === null || String(uom).trim() === '') {
+        errors.push(`Row ${rowNum}: Unit Of Measurement is required`);
+      } else {
+        normalized['Unit Of Measurement'] = String(uom).trim().toUpperCase();
+      }
+      
+      // Is Active - required
+      const isActiveVal = row['Is Active'];
+      if (isActiveVal === undefined || isActiveVal === null || String(isActiveVal).trim() === '') {
+        errors.push(`Row ${rowNum}: Is Active is required`);
+      } else {
+        const val = String(isActiveVal).trim().toLowerCase();
+        if (!['yes', 'no', 'y', 'n', 'true', 'false', '1', '0'].includes(val)) {
+          errors.push(`Row ${rowNum}: Is Active must be Yes/No`);
+        } else {
+          normalized['Is Active'] = isActiveVal;
+        }
+      }
+      
+      // Optional fields - normalize if present
+      if (row['Part Number']) normalized['Part Number'] = String(row['Part Number']).trim();
+      if (row['Drawing Number']) normalized['Drawing Number'] = String(row['Drawing Number']).trim();
+      if (row['Position Number']) normalized['Position Number'] = String(row['Position Number']).trim();
+      if (row['Note']) normalized['Note'] = String(row['Note']).trim();
+      if (row['Specification']) normalized['Specification'] = String(row['Specification']).trim();
+      if (row['Maker']) normalized['Maker'] = String(row['Maker']).trim();
+      if (row['Maker Code']) normalized['Maker Code'] = String(row['Maker Code']).trim();
+      if (row['Manual Name']) normalized['Manual Name'] = String(row['Manual Name']).trim();
+      if (row['Page Number']) normalized['Page Number'] = String(row['Page Number']).trim();
+      if (row['Criticality']) normalized['Criticality'] = String(row['Criticality']).trim();
+      if (row['IHM (Inventory of Hazardous Materials)']) normalized['IHM (Inventory of Hazardous Materials)'] = String(row['IHM (Inventory of Hazardous Materials)']).trim();
+      if (row['Evidence Type']) normalized['Evidence Type'] = String(row['Evidence Type']).trim();
     }
 
     // Determine status
@@ -5913,6 +6114,120 @@ async function performImport(
     }
     
     console.log(`✅ Fleet jobs import complete: ${result.created} created, ${result.updated} updated, ${result.skipped} skipped`);
+  } else if (type === 'fleet-spares') {
+    console.log(`🚀 Starting fleet-spares import: ${data.length} rows, mode: ${mode}`);
+    
+    const existingFleetSpares = await storage.getFleetSparesFromTable();
+    const fleetSparesByCode = new Map(existingFleetSpares.map((fs: any) => [fs.partCode, fs]));
+    console.log(`📦 Prefetched ${existingFleetSpares.length} existing fleet spares`);
+    
+    const existingFleetComponents = await storage.getFleetComponents();
+    const fleetComponentsByCode = new Map(existingFleetComponents.map((fc: any) => [fc.fleetEquipmentCode, fc]));
+    console.log(`📦 Prefetched ${existingFleetComponents.length} fleet components for UUID lookup`);
+    
+    for (const row of data) {
+      const partCode = row['Part Code'];
+      const fleetEquipmentCode = row['Fleet Equipment Code'];
+      const fleetEquipmentName = row['Fleet Equipment Name'];
+      const partName = row['Part Name'];
+      const unitOfMeasurement = row['Unit Of Measurement'];
+      
+      const partNumber = row['Part Number'] || null;
+      const drawingNumber = row['Drawing Number'] || null;
+      const positionNumber = row['Position Number'] || null;
+      const note = row['Note'] || null;
+      const specification = row['Specification'] || null;
+      const maker = row['Maker'] || null;
+      const makerCode = row['Maker Code'] || null;
+      const manualName = row['Manual Name'] || null;
+      const pageNumber = row['Page Number'] || null;
+      const criticality = row['Criticality'] || null;
+      const ihmVal = row['IHM (Inventory of Hazardous Materials)'] || null;
+      const evidenceType = row['Evidence Type'] || null;
+      
+      let isActive = true;
+      if (row['Is Active'] !== undefined && row['Is Active'] !== null) {
+        if (typeof row['Is Active'] === 'boolean') {
+          isActive = row['Is Active'];
+        } else {
+          const value = String(row['Is Active']).toLowerCase().trim();
+          isActive = ['yes', 'y', 'true', '1'].includes(value);
+        }
+      }
+      
+      if (!partCode || !fleetEquipmentCode || !fleetEquipmentName || !partName || !unitOfMeasurement) {
+        console.warn(`⚠️ Skipping row with missing required fields: partCode=${partCode}`);
+        result.skipped++;
+        continue;
+      }
+      
+      const matchedComponent = fleetComponentsByCode.get(String(fleetEquipmentCode).trim());
+      if (!matchedComponent) {
+        console.warn(`⚠️ Skipping fleet spare ${partCode}: Fleet Equipment Code '${fleetEquipmentCode}' not found in fleet_components. Fleet Components must be uploaded first.`);
+        result.skipped++;
+        continue;
+      }
+      
+      const fleetComponentsUuid = matchedComponent.fleetComponentsUuid;
+      
+      const fleetSpareData = {
+        partCode: String(partCode).trim(),
+        fleetComponentsUuid,
+        fleetEquipmentCode: String(fleetEquipmentCode).trim(),
+        fleetEquipmentName: String(fleetEquipmentName).trim(),
+        partName: String(partName).trim(),
+        partNumber: partNumber ? String(partNumber).trim() : null,
+        unitOfMeasurement: String(unitOfMeasurement).trim().toUpperCase(),
+        drawingNumber: drawingNumber ? String(drawingNumber).trim() : null,
+        positionNumber: positionNumber ? String(positionNumber).trim() : null,
+        note: note ? String(note).trim() : null,
+        specification: specification ? String(specification).trim() : null,
+        maker: maker ? String(maker).trim() : null,
+        makerCode: makerCode ? String(makerCode).trim() : null,
+        manualName: manualName ? String(manualName).trim() : null,
+        pageNumber: pageNumber ? String(pageNumber).trim() : null,
+        criticality: criticality ? String(criticality).trim() : null,
+        isActive,
+        ihm: ihmVal ? String(ihmVal).trim() : null,
+        evidenceType: evidenceType ? String(evidenceType).trim() : null,
+      };
+      
+      const existingFleetSpare = fleetSparesByCode.get(String(partCode).trim());
+      
+      if (mode === 'add') {
+        if (existingFleetSpare) {
+          console.log(`⏭️ Skipping existing fleet spare: ${partCode}`);
+          result.skipped++;
+        } else {
+          const newFleetSpare = await storage.createFleetSpareInTable(fleetSpareData);
+          fleetSparesByCode.set(String(partCode).trim(), newFleetSpare);
+          result.created++;
+          console.log(`✅ Created fleet spare: ${partCode} - ${partName} (component: ${fleetComponentsUuid})`);
+        }
+      } else if (mode === 'update') {
+        if (existingFleetSpare) {
+          await storage.updateFleetSpareInTable(existingFleetSpare.id, fleetSpareData);
+          result.updated++;
+          console.log(`🔄 Updated fleet spare: ${partCode} - ${partName} (component: ${fleetComponentsUuid})`);
+        } else {
+          console.log(`⏭️ Skipping non-existent fleet spare (update mode): ${partCode}`);
+          result.skipped++;
+        }
+      } else if (mode === 'upsert') {
+        if (existingFleetSpare) {
+          await storage.updateFleetSpareInTable(existingFleetSpare.id, fleetSpareData);
+          result.updated++;
+          console.log(`🔄 Updated fleet spare: ${partCode} - ${partName} (component: ${fleetComponentsUuid})`);
+        } else {
+          const newFleetSpare = await storage.createFleetSpareInTable(fleetSpareData);
+          fleetSparesByCode.set(String(partCode).trim(), newFleetSpare);
+          result.created++;
+          console.log(`✅ Created fleet spare: ${partCode} - ${partName} (component: ${fleetComponentsUuid})`);
+        }
+      }
+    }
+    
+    console.log(`✅ Fleet spares import complete: ${result.created} created, ${result.updated} updated, ${result.skipped} skipped`);
   }
 
   return result;

@@ -145,6 +145,8 @@ import {
   type InsertFleetJobVesselMapping,
   fleetSpareVesselMapping,
   type FleetSpareVesselMapping,
+  type FleetSpares,
+  type InsertFleetSpares,
   type InsertFleetSpareVesselMapping,
   bulkImportHistory,
   type BulkImportHistory,
@@ -365,7 +367,15 @@ export interface IStorage {
     tz?: string
   ): Promise<{ spare: Spare; isTransfer: boolean }>;
   
-  // Fleet Spares methods
+  // Fleet Spares methods (new fleet_spares table)
+  getFleetSparesFromTable(): Promise<FleetSpares[]>;
+  getFleetSpareFromTable(id: number): Promise<FleetSpares | undefined>;
+  createFleetSpareInTable(spare: InsertFleetSpares): Promise<FleetSpares>;
+  updateFleetSpareInTable(id: number, data: Partial<FleetSpares>): Promise<FleetSpares>;
+  deleteFleetSpareFromTable(id: number): Promise<void>;
+  getFleetSpareByPartCode(partCode: string): Promise<FleetSpares | undefined>;
+
+  // Legacy Fleet Spares methods (spares table with dataScope='fleet')
   getFleetSpares(): Promise<Spare[]>;
   getFleetSpare(id: number): Promise<Spare | undefined>;
   createFleetSpare(spare: InsertSpare): Promise<Spare>;

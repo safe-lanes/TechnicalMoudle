@@ -20,7 +20,7 @@ import {
   FileText,
   Info,
 } from 'lucide-react';
-import type { MasterData, Job, Spare } from '@shared/schema';
+import type { MasterData, Job, FleetSpares } from '@shared/schema';
 
 interface TreeNode {
   id: string;
@@ -52,7 +52,7 @@ export default function FleetEquipmentTreeView() {
     queryKey: ['/technical/api/fleet/jobs'],
   });
   
-  const { data: fleetSparesData } = useQuery<Spare[]>({
+  const { data: fleetSparesData } = useQuery<FleetSpares[]>({
     queryKey: ['/technical/api/fleet/spares'],
   });
   
@@ -139,9 +139,8 @@ export default function FleetEquipmentTreeView() {
     if (!selectedEquipment || !fleetSparesData) return [];
     const equipCode = selectedEquipment.fleetEquipmentCode;
     const sfiCode = selectedEquipment.sfiCode || '';
-    return (fleetSparesData as Spare[]).filter((spare) => 
-      spare.fleetEquipmentCode === equipCode ||
-      spare.componentCode?.startsWith(sfiCode)
+    return (fleetSparesData as FleetSpares[]).filter((spare) => 
+      spare.fleetEquipmentCode === equipCode
     ).slice(0, 20);
   }, [selectedEquipment, fleetSparesData]);
   
@@ -402,9 +401,9 @@ export default function FleetEquipmentTreeView() {
                                 </p>
                               </div>
                               <div className="text-right">
-                                <Badge variant="outline">ROB: {spare.rob ?? 0}</Badge>
+                                <Badge variant="outline">{spare.unitOfMeasurement || "—"}</Badge>
                                 <p className="text-xs text-muted-foreground mt-1">
-                                  Min: {spare.min ?? 0}
+                                  {spare.maker || "—"}
                                 </p>
                               </div>
                             </div>

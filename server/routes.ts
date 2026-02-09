@@ -4,7 +4,42 @@ import { storage } from "./storage";
 import { getPool, getDb } from "./db";
 import * as fs from "fs";
 import * as path from "path";
-import { insertRunningHoursAuditSchema, cascadeRunningHoursSchema, insertWorkOrderSchema, insertWorkOrderExecutionSchema, insertDefectSchema, insertDefectActionSchema, insertDefectAttachmentSchema, insertComponentSchema, insertSpareSchema, insertMakerSchema, insertMasterListSchema, insertComponentDocumentSchema, insertComponentClassRegulatorySchema, insertComponentRequisitionSchema, equipmentCategories, defectCategories, defectTypes, shipCertificatesMaster, insertShipCertificateMasterSchema, shipCertificatesLabelsConfig, vesselCertificateApplicability, insertVesselCertificateApplicabilitySchema, vesselCertificateData, vessels, shipSurveysMaster, shipSurveysLabelsConfig, vesselSurveyApplicability, vesselSurveyData, componentRunningHoursLog, runningHoursAudit, storesLedger, reportSnapshots } from "@shared/schema";
+import {
+  insertRunningHoursAuditSchema,
+  cascadeRunningHoursSchema,
+  insertWorkOrderSchema,
+  insertWorkOrderExecutionSchema,
+  insertDefectSchema,
+  insertDefectActionSchema,
+  insertDefectAttachmentSchema,
+  insertComponentSchema,
+  insertSpareSchema,
+  insertMakerSchema,
+  insertMasterListSchema,
+  insertComponentDocumentSchema,
+  insertComponentClassRegulatorySchema,
+  insertComponentRequisitionSchema,
+  insertFleetSparesSchema,            // ✅ from incoming
+  equipmentCategories,
+  defectCategories,
+  defectTypes,
+  shipCertificatesMaster,
+  insertShipCertificateMasterSchema,
+  shipCertificatesLabelsConfig,
+  vesselCertificateApplicability,
+  insertVesselCertificateApplicabilitySchema,
+  vesselCertificateData,
+  vessels,
+  shipSurveysMaster,
+  shipSurveysLabelsConfig,
+  vesselSurveyApplicability,
+  vesselSurveyData,
+  componentRunningHoursLog,
+  runningHoursAudit,
+  storesLedger,                         // ✅ from HEAD
+  reportSnapshots                      // ✅ from HEAD
+} from "@shared/schema";
+
 import { lowStockReportService } from "./services/lowStockReportService";
 
 import { getPostgresClient } from "./postgresClient";
@@ -9611,12 +9646,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
   
-  // Fleet Admin - Spares Routes
+  // Fleet Admin - Spares Routes (using dedicated fleet_spares table)
   
   // Get all fleet spares
   app.get("/technical/api/fleet/spares", async (req, res) => {
     try {
-      const spares = await storage.getFleetSpares();
+      const spares = await storage.getFleetSparesFromTable();
       res.json(spares);
     } catch (error) {
       console.error("Error fetching fleet spares:", error);
@@ -9627,7 +9662,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Get fleet spare by ID
   app.get("/technical/api/fleet/spares/:id", async (req, res) => {
     try {
-      const spare = await storage.getFleetSpare(parseInt(req.params.id));
+      const spare = await storage.getFleetSpareFromTable(parseInt(req.params.id));
       if (!spare) {
         return res.status(404).json({ error: "Fleet spare not found" });
       }
@@ -9641,15 +9676,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Create new fleet spare
   app.post("/technical/api/fleet/spares", async (req, res) => {
     try {
-      const validatedData = insertSpareSchema.parse(req.body);
-      const spare = await storage.createFleetSpare(validatedData);
+      const validatedData = insertFleetSparesSchema.parse(req.body);
+      const spare = await storage.createFleetSpareInTable(validatedData);
       res.status(201).json(spare);
     } catch (error: any) {
       if (error.name === 'ZodError') {
         return res.status(400).json({ error: "Invalid spare data", details: error.errors });
-      }
-      if (error.message?.includes('must have dataScope') || error.message?.includes('cannot have vesselId') || error.message?.includes('not found')) {
-        return res.status(400).json({ error: error.message });
       }
       console.error("Error creating fleet spare:", error);
       res.status(500).json({ error: error.message || "Failed to create fleet spare" });
@@ -9659,9 +9691,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Update fleet spare
   app.patch("/technical/api/fleet/spares/:id", async (req, res) => {
     try {
-      const partialSpareSchema = insertSpareSchema.partial();
-      const validatedData = partialSpareSchema.parse(req.body);
-      const spare = await storage.updateFleetSpare(parseInt(req.params.id), validatedData);
+      const partialSchema = insertFleetSparesSchema.partial();
+      const validatedData = partialSchema.parse(req.body);
+      const spare = await storage.updateFleetSpareInTable(parseInt(req.params.id), validatedData);
       res.json(spare);
     } catch (error: any) {
       if (error.name === 'ZodError') {
@@ -9669,9 +9701,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       if (error.message?.includes('not found')) {
         return res.status(404).json({ error: error.message });
-      }
-      if (error.message?.includes('not a fleet') || error.message?.includes('Cannot change dataScope') || error.message?.includes('Cannot assign vesselId')) {
-        return res.status(400).json({ error: error.message });
       }
       console.error("Error updating fleet spare:", error);
       res.status(500).json({ error: "Failed to update fleet spare" });
@@ -9681,14 +9710,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Delete fleet spare
   app.delete("/technical/api/fleet/spares/:id", async (req, res) => {
     try {
-      await storage.deleteFleetSpare(parseInt(req.params.id));
+      await storage.deleteFleetSpareFromTable(parseInt(req.params.id));
       res.json({ success: true });
     } catch (error: any) {
       if (error.message?.includes('not found')) {
         return res.status(404).json({ error: error.message });
-      }
-      if (error.message?.includes('not a fleet')) {
-        return res.status(400).json({ error: error.message });
       }
       console.error("Error deleting fleet spare:", error);
       res.status(500).json({ error: "Failed to delete fleet spare" });

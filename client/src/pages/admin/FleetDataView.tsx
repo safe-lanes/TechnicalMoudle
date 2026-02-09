@@ -16,7 +16,7 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import type { Component, Job, Spare, FleetComponents, FleetJobs } from "@shared/schema";
+import type { Component, Job, Spare, FleetComponents, FleetJobs, FleetSpares } from "@shared/schema";
 
 interface MappedFleetComponent {
   id: string | number;
@@ -73,7 +73,7 @@ function mapFleetComponentsToFleetComponent(item: FleetComponents): MappedFleetC
 
 type FleetComponent = MappedFleetComponent;
 type FleetJob = FleetJobs;
-type FleetSpare = Spare;
+type FleetSpare = FleetSpares;
 
 interface TreeNode {
   code: string;
@@ -397,8 +397,7 @@ export default function FleetDataView() {
     if (!selectedComponent || !fleetSpares) return [];
     return fleetSpares.filter(
       (spare: FleetSpare) =>
-        spare.fleetEquipmentCode === selectedComponent.fleetEquipmentCode ||
-        spare.componentCode === selectedComponent.fleetEquipmentCode
+        spare.fleetEquipmentCode === selectedComponent.fleetEquipmentCode
     );
   }, [selectedComponent, fleetSpares]);
 
@@ -984,13 +983,13 @@ export default function FleetDataView() {
                                     }}
                                     data-testid={`btn-spare-detail-${index}`}
                                   >
-                                    {spare.fleetPartCode || spare.partCode}
+                                    {spare.partCode}
                                   </button>
                                 </td>
                                 <td className="py-2 text-sm text-gray-900">{spare.partName || "—"}</td>
                                 <td className="py-2 text-sm text-gray-900">{spare.partNumber || "—"}</td>
                                 <td className="py-2 text-sm text-gray-900">{spare.maker || "—"}</td>
-                                <td className="py-2 text-sm text-gray-900">{spare.uom || spare.unit || "—"}</td>
+                                <td className="py-2 text-sm text-gray-900">{spare.unitOfMeasurement || "—"}</td>
                               </tr>
                             ))}
                           </tbody>
@@ -2799,13 +2798,13 @@ export default function FleetDataView() {
                           }}
                           data-testid={`btn-spare-popup-detail-${index}`}
                         >
-                          {spare.fleetPartCode || spare.partCode}
+                          {spare.partCode}
                         </button>
                       </td>
                       <td className="py-2 px-2">{spare.partName || "—"}</td>
                       <td className="py-2 px-2">{spare.partNumber || "—"}</td>
                       <td className="py-2 px-2">{spare.maker || "—"}</td>
-                      <td className="py-2 px-2">{spare.uom || spare.unit || "—"}</td>
+                      <td className="py-2 px-2">{spare.unitOfMeasurement || "—"}</td>
                     </tr>
                   ))
                 ) : (
@@ -2918,7 +2917,7 @@ export default function FleetDataView() {
               <div className="grid grid-cols-4 gap-4">
                 <div>
                   <div className="text-blue-600 text-xs font-medium mb-1">Part Code</div>
-                  <div className="text-sm font-medium">{selectedSpareForDetail.fleetPartCode || selectedSpareForDetail.partCode || "—"}</div>
+                  <div className="text-sm font-medium">{selectedSpareForDetail.partCode || "—"}</div>
                 </div>
                 <div>
                   <div className="text-blue-600 text-xs font-medium mb-1">Part Name</div>
@@ -2962,7 +2961,7 @@ export default function FleetDataView() {
                 </div>
                 <div>
                   <div className="text-blue-600 text-xs font-medium mb-1">Unit Of Measurement</div>
-                  <div className="text-sm font-medium">{selectedSpareForDetail.uom || selectedSpareForDetail.unit || "—"}</div>
+                  <div className="text-sm font-medium">{selectedSpareForDetail.unitOfMeasurement || "—"}</div>
                 </div>
                 <div>
                   <div className="text-blue-600 text-xs font-medium mb-1">Specification</div>
@@ -3050,8 +3049,8 @@ export default function FleetDataView() {
                 <div>
                   <label className="text-blue-600 text-xs font-medium mb-1 block">Part Code</label>
                   <Input
-                    value={spareFormData.fleetPartCode || spareFormData.partCode || ""}
-                    onChange={(e) => setSpareFormData(prev => ({ ...prev, fleetPartCode: e.target.value }))}
+                    value={spareFormData.partCode || ""}
+                    onChange={(e) => setSpareFormData(prev => ({ ...prev, partCode: e.target.value }))}
                     data-testid="input-edit-part-code"
                   />
                 </div>
@@ -3144,8 +3143,8 @@ export default function FleetDataView() {
                 <div>
                   <label className="text-blue-600 text-xs font-medium mb-1 block">Unit Of Measurement</label>
                   <Input
-                    value={spareFormData.uom || spareFormData.unit || ""}
-                    onChange={(e) => setSpareFormData(prev => ({ ...prev, uom: e.target.value }))}
+                    value={spareFormData.unitOfMeasurement || ""}
+                    onChange={(e) => setSpareFormData(prev => ({ ...prev, unitOfMeasurement: e.target.value }))}
                     data-testid="input-edit-uom"
                   />
                 </div>
@@ -3202,8 +3201,8 @@ export default function FleetDataView() {
                 <div>
                   <label className="text-blue-600 text-xs font-medium mb-1 block">Part Code</label>
                   <Input
-                    value={spareFormData.fleetPartCode || ""}
-                    onChange={(e) => setSpareFormData(prev => ({ ...prev, fleetPartCode: e.target.value }))}
+                    value={spareFormData.partCode || ""}
+                    onChange={(e) => setSpareFormData(prev => ({ ...prev, partCode: e.target.value }))}
                     data-testid="input-new-part-code"
                   />
                 </div>
@@ -3296,8 +3295,8 @@ export default function FleetDataView() {
                 <div>
                   <label className="text-blue-600 text-xs font-medium mb-1 block">Unit Of Measurement</label>
                   <Input
-                    value={spareFormData.uom || ""}
-                    onChange={(e) => setSpareFormData(prev => ({ ...prev, uom: e.target.value }))}
+                    value={spareFormData.unitOfMeasurement || ""}
+                    onChange={(e) => setSpareFormData(prev => ({ ...prev, unitOfMeasurement: e.target.value }))}
                     data-testid="input-new-uom"
                   />
                 </div>

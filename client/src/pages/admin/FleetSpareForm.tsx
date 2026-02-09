@@ -2,7 +2,7 @@ import { useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation, useQuery } from "@tanstack/react-query";
-import { type Spare, type Component } from "@shared/schema";
+import { type FleetSpares, type FleetComponents } from "@shared/schema";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -18,16 +18,20 @@ import { Marker } from "@/components/Marker";
 const fleetSpareFormSchema = z.object({
   partName: z.string().min(1, "Part name is required"),
   fleetEquipmentCode: z.string().min(1, "Equipment is required"),
-  fleetPartCode: z.string().optional(),
+  partCode: z.string().optional(),
   partNumber: z.string().optional(),
   maker: z.string().optional(),
-  model: z.string().optional(),
-  uom: z.string().optional(),
+  makerCode: z.string().optional(),
+  unitOfMeasurement: z.string().optional(),
   drawingNumber: z.string().optional(),
   specification: z.string().optional(),
-  location: z.string().optional(),
+  positionNumber: z.string().optional(),
   note: z.string().optional(),
   criticality: z.string().optional(),
+  ihm: z.string().optional(),
+  evidenceType: z.string().optional(),
+  manualName: z.string().optional(),
+  pageNumber: z.string().optional(),
   isActive: z.boolean().default(true),
 });
 
@@ -36,14 +40,14 @@ type FleetSpareFormData = z.infer<typeof fleetSpareFormSchema>;
 interface FleetSpareFormProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  spare: Spare | null;
+  spare: FleetSpares | null;
 }
 
 export default function FleetSpareForm({ open, onOpenChange, spare }: FleetSpareFormProps) {
   const { toast } = useToast();
 
   // Fetch fleet components for equipment selection
-  const { data: components } = useQuery<Component[]>({
+  const { data: components } = useQuery<FleetComponents[]>({
     queryKey: ['/technical/api/fleet/components'],
     enabled: open,
   });
@@ -52,17 +56,21 @@ export default function FleetSpareForm({ open, onOpenChange, spare }: FleetSpare
     resolver: zodResolver(fleetSpareFormSchema),
     defaultValues: {
       partName: "",
-      fleetPartCode: "",
+      partCode: "",
       fleetEquipmentCode: "",
       partNumber: "",
       maker: "",
-      model: "",
-      uom: "",
+      makerCode: "",
+      unitOfMeasurement: "",
       drawingNumber: "",
       specification: "",
-      location: "",
+      positionNumber: "",
       note: "",
       criticality: "",
+      ihm: "",
+      evidenceType: "",
+      manualName: "",
+      pageNumber: "",
       isActive: true,
     },
   });
@@ -72,33 +80,41 @@ export default function FleetSpareForm({ open, onOpenChange, spare }: FleetSpare
     if (spare) {
       form.reset({
         partName: spare.partName || "",
-        fleetPartCode: spare.fleetPartCode || "",
+        partCode: spare.partCode || "",
         fleetEquipmentCode: spare.fleetEquipmentCode || "",
         partNumber: spare.partNumber || "",
         maker: spare.maker || "",
-        model: spare.model || "",
-        uom: spare.uom || "",
+        makerCode: spare.makerCode || "",
+        unitOfMeasurement: spare.unitOfMeasurement || "",
         drawingNumber: spare.drawingNumber || "",
         specification: spare.specification || "",
-        location: spare.location || "",
+        positionNumber: spare.positionNumber || "",
         note: spare.note || "",
         criticality: spare.criticality || "",
+        ihm: spare.ihm || "",
+        evidenceType: spare.evidenceType || "",
+        manualName: spare.manualName || "",
+        pageNumber: spare.pageNumber || "",
         isActive: spare.isActive ?? true,
       });
     } else {
       form.reset({
         partName: "",
-        fleetPartCode: "",
+        partCode: "",
         fleetEquipmentCode: "",
         partNumber: "",
         maker: "",
-        model: "",
-        uom: "",
+        makerCode: "",
+        unitOfMeasurement: "",
         drawingNumber: "",
         specification: "",
-        location: "",
+        positionNumber: "",
         note: "",
         criticality: "",
+        ihm: "",
+        evidenceType: "",
+        manualName: "",
+        pageNumber: "",
         isActive: true,
       });
     }
@@ -107,7 +123,11 @@ export default function FleetSpareForm({ open, onOpenChange, spare }: FleetSpare
   // Create mutation
   const createMutation = useMutation({
     mutationFn: async (data: FleetSpareFormData) => {
-      return apiRequest('POST', '/technical/api/fleet/spares', { ...data, dataScope: 'fleet' });
+      const selectedComp = components?.find(c => c.fleetEquipmentCode === data.fleetEquipmentCode);
+      return apiRequest('POST', '/technical/api/fleet/spares', {
+        ...data,
+        fleetEquipmentName: selectedComp?.fleetEquipmentName || data.fleetEquipmentCode,
+      });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/technical/api/fleet/spares'], exact: false });
@@ -130,7 +150,11 @@ export default function FleetSpareForm({ open, onOpenChange, spare }: FleetSpare
   const updateMutation = useMutation({
     mutationFn: async (data: FleetSpareFormData & { id: number }) => {
       const { id, ...updateData } = data;
-      return apiRequest('PATCH', `/technical/api/fleet/spares/${id}`, { ...updateData, dataScope: 'fleet' });
+      const selectedComp = components?.find(c => c.fleetEquipmentCode === updateData.fleetEquipmentCode);
+      return apiRequest('PATCH', `/technical/api/fleet/spares/${id}`, {
+        ...updateData,
+        fleetEquipmentName: selectedComp?.fleetEquipmentName || updateData.fleetEquipmentCode || '',
+      });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/technical/api/fleet/spares'], exact: false });
@@ -222,13 +246,13 @@ export default function FleetSpareForm({ open, onOpenChange, spare }: FleetSpare
           <div className="grid grid-cols-2 gap-4">
             {/* Fleet Part Code */}
             <div className="space-y-2">
-              <Label htmlFor="fleetPartCode" data-testid={m("I4.QL5.5.14.7", "I4.QL5.5.28.7")}>
+              <Label htmlFor="partCode" data-testid={m("I4.QL5.5.14.7", "I4.QL5.5.28.7")}>
                 <Marker id={m("I4.QL5.5.14.7", "I4.QL5.5.28.7")} />
-                Fleet Part Code
+                Part Code
               </Label>
               <Input
-                id="fleetPartCode"
-                {...form.register("fleetPartCode")}
+                id="partCode"
+                {...form.register("partCode")}
                 placeholder="Auto-generated if empty"
                 data-testid={m("I4.QL5.5.14.8", "I4.QL5.5.28.8")}
               />
@@ -269,14 +293,14 @@ export default function FleetSpareForm({ open, onOpenChange, spare }: FleetSpare
 
             {/* Model */}
             <div className="space-y-2">
-              <Label htmlFor="model" data-testid={m("I4.QL5.5.14.23", "I4.QL5.5.28.13")}>
+              <Label htmlFor="makerCode" data-testid={m("I4.QL5.5.14.23", "I4.QL5.5.28.13")}>
                 <Marker id={m("I4.QL5.5.14.23", "I4.QL5.5.28.13")} />
-                Model
+                Maker Code
               </Label>
               <Input
-                id="model"
-                {...form.register("model")}
-                placeholder="Model number"
+                id="makerCode"
+                {...form.register("makerCode")}
+                placeholder="Manufacturer code"
                 data-testid={m("I4.QL5.5.14.24", "I4.QL5.5.28.14")}
               />
               <Marker id={m("I4.QL5.5.14.24", "I4.QL5.5.28.14")} />
@@ -286,14 +310,14 @@ export default function FleetSpareForm({ open, onOpenChange, spare }: FleetSpare
           <div className="grid grid-cols-2 gap-4">
             {/* UOM */}
             <div className="space-y-2">
-              <Label htmlFor="uom" data-testid={m("I4.QL5.5.14.11", "I4.QL5.5.28.15")}>
+              <Label htmlFor="unitOfMeasurement" data-testid={m("I4.QL5.5.14.11", "I4.QL5.5.28.15")}>
                 <Marker id={m("I4.QL5.5.14.11", "I4.QL5.5.28.15")} />
                 Unit of Measurement
               </Label>
               <Input
-                id="uom"
-                {...form.register("uom")}
-                placeholder="e.g., pcs, kg, ltr"
+                id="unitOfMeasurement"
+                {...form.register("unitOfMeasurement")}
+                placeholder="e.g., PCS, KG, LTR"
                 data-testid={m("I4.QL5.5.14.12", "I4.QL5.5.28.16")}
               />
               <Marker id={m("I4.QL5.5.14.12", "I4.QL5.5.28.16")} />
@@ -332,17 +356,59 @@ export default function FleetSpareForm({ open, onOpenChange, spare }: FleetSpare
 
           {/* Location */}
           <div className="space-y-2">
-            <Label htmlFor="location" data-testid={m("I4.QL5.5.14.15", "I4.QL5.5.28.21")}>
+            <Label htmlFor="positionNumber" data-testid={m("I4.QL5.5.14.15", "I4.QL5.5.28.21")}>
               <Marker id={m("I4.QL5.5.14.15", "I4.QL5.5.28.21")} />
-              Location
+              Position Number
             </Label>
             <Input
-              id="location"
-              {...form.register("location")}
-              placeholder="Storage location"
+              id="positionNumber"
+              {...form.register("positionNumber")}
+              placeholder="Position in assembly"
               data-testid={m("I4.QL5.5.14.16", "I4.QL5.5.28.22")}
             />
             <Marker id={m("I4.QL5.5.14.16", "I4.QL5.5.28.22")} />
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="ihm">IHM</Label>
+              <Input
+                id="ihm"
+                {...form.register("ihm")}
+                placeholder="IHM reference"
+                data-testid="input-fleet-spare-ihm"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="evidenceType">Evidence Type</Label>
+              <Input
+                id="evidenceType"
+                {...form.register("evidenceType")}
+                placeholder="Evidence type"
+                data-testid="input-fleet-spare-evidence-type"
+              />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="manualName">Manual Name</Label>
+              <Input
+                id="manualName"
+                {...form.register("manualName")}
+                placeholder="Manual reference name"
+                data-testid="input-fleet-spare-manual-name"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="pageNumber">Page Number</Label>
+              <Input
+                id="pageNumber"
+                {...form.register("pageNumber")}
+                placeholder="Page number reference"
+                data-testid="input-fleet-spare-page-number"
+              />
+            </div>
           </div>
 
           {/* Note */}

@@ -37,7 +37,7 @@ import {
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import type { Component, Job, Spare } from "@shared/schema";
+import type { Component, Job, Spare, FleetSpares } from "@shared/schema";
 
 type MappingTab = 'components' | 'jobs' | 'spares';
 
@@ -91,7 +91,7 @@ export default function FleetVesselMapping() {
     queryKey: ['/technical/api/fleet/jobs'],
   });
 
-  const { data: fleetSpares = [], isLoading: isLoadingFleetSpares } = useQuery<Spare[]>({
+  const { data: fleetSpares = [], isLoading: isLoadingFleetSpares } = useQuery<FleetSpares[]>({
     queryKey: ['/technical/api/fleet/spares'],
   });
 
@@ -182,7 +182,7 @@ export default function FleetVesselMapping() {
     } else if (activeTab === 'jobs') {
       items = fleetJobs.filter(j => (j as any).dataScope === 'fleet');
     } else {
-      items = fleetSpares.filter(s => s.dataScope === 'fleet');
+      items = fleetSpares;
     }
 
     return items.map((item: any) => {
