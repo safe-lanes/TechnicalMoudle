@@ -421,9 +421,27 @@ const StoresReports: React.FC<StoresReportsProps> = ({ onBack, globalFilters }) 
           const link = document.createElement('a');
           link.href = url;
           link.download = `stores-inventory-status-${new Date().toISOString().slice(0, 10)}.xlsx`;
+          document.body.appendChild(link);
           link.click();
+          document.body.removeChild(link);
           URL.revokeObjectURL(url);
           toast({ title: "Excel Exported", description: "Report downloaded as Excel file." });
+        } else if (reportId === 'low-stock-alert') {
+          const res = await fetch(`/technical/api/reports/stores-low-stock-alert/${effectiveVesselId}/excel`, {
+            method: 'POST',
+            credentials: 'include',
+          });
+          if (!res.ok) throw new Error('Failed to generate Excel');
+          const blob = await res.blob();
+          const url = URL.createObjectURL(blob);
+          const link = document.createElement('a');
+          link.href = url;
+          link.download = `low-stock-alert-${new Date().toISOString().slice(0, 10)}.xlsx`;
+          document.body.appendChild(link);
+          link.click();
+          document.body.removeChild(link);
+          URL.revokeObjectURL(url);
+          toast({ title: "Excel Exported", description: "Low stock alert report downloaded as Excel file." });
         } else {
           toast({ title: "Excel Export", description: "Excel export coming soon. PDF is currently available." });
         }
