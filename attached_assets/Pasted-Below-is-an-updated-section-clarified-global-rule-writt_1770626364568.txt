@@ -1,0 +1,154 @@
+Below is an updated section + clarified global rule, written so that Replit clearly understands:
+
+❌ No calling old repository/service methods
+
+✅ Logic must be re-written inside V2 repository & schema files
+
+✅ Logic must be identical in behavior
+
+🎯 Architecture changes, logic outcome stays the same
+
+You can replace / append this into your existing prompt.
+
+🔁 Legacy Logic Reproduction Rule (CRITICAL CLARIFICATION)
+
+V2 must NOT call or import legacy repository, service, or schema methods.
+
+As of now, the system uses legacy business logic inside repositories by calling methods from old files.
+This approach is not allowed for V2.
+
+New V2 Rule
+
+All database-related logic must be written directly inside V2 repositories
+
+All table definitions, constraints, and schema rules must be written directly inside V2 schema files
+
+V2 files must be self-contained
+
+❌ No method calls, imports, or delegation to legacy files
+
+Important Constraint
+
+Logic must be functionally identical to legacy
+
+Implementation must be new, but behavior and results must match exactly
+
+Updated Repository Layer Rules (V2)
+4️⃣ Repository Layer Rules
+
+Only layer allowed to access the database
+
+ORM query builders only
+
+❌ No N+1 queries (must use JOINs)
+
+❌ No business logic
+
+❌ No calls to legacy repository or service methods
+
+✅ All DB query logic must be explicitly re-written in this layer
+
+✅ Repository queries must:
+
+Match legacy filtering rules
+
+Match legacy joins and constraints
+
+Return the same data shape and semantics
+
+Replit must analyze legacy repository code and reproduce the queries directly in V2 repositories.
+
+Updated Schema Rules (V2)
+📐 Schema & Table Definition Rule
+
+V2 schema files must:
+
+Be written directly in shared/v2/{module}/schema.ts
+
+Contain full table definitions
+
+Reproduce:
+
+Columns
+
+Data types
+
+Defaults
+
+Constraints
+
+Indexes
+
+❌ No importing or referencing legacy schema files
+
+❌ No shared table objects between legacy and V2
+
+Replit must analyze legacy schema definitions and recreate them one-to-one in V2 schema files.
+
+Service Layer Rule (Clarified)
+5️⃣ Service Layer Rules
+
+Service layer uses V2 repositories only
+
+❌ No calls to legacy services
+
+❌ No calls to legacy repositories
+
+Business logic flow must remain logically identical, but:
+
+Steps must be re-expressed using V2 repository APIs
+
+No delegation to old code
+
+Controller Layer Rule (Clarified)
+6️⃣ Controller Layer Rules
+
+Controllers must call only V2 services
+
+❌ No legacy imports
+
+❌ No fallback logic inside controller
+
+Behavior must match legacy responses exactly
+
+📌 Explicit Instruction to Replit (Non-Negotiable)
+
+Replit must:
+
+Analyze legacy repository + schema files
+
+Extract the database logic
+
+Re-write that logic directly inside V2 repository & schema files
+
+Not reuse, import, or call legacy methods
+
+Ensure output data, side effects, and validations are identical
+
+This applies specifically to:
+
+Component Bulk Upload
+
+Component Module fetch & usage
+
+🎯 Expected Output (Updated)
+
+In addition to previous outputs, also provide:
+
+A Legacy → V2 logic mapping table
+
+Legacy file
+
+Legacy method
+
+New V2 file
+
+Rewritten responsibility
+
+Confirmation checklist proving:
+
+No legacy method calls exist
+
+All DB logic lives in V2 repositories
+
+All schema definitions exist in V2 schema files

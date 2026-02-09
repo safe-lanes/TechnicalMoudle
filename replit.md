@@ -73,12 +73,13 @@ The application employs a modern full-stack architecture with a mobile-first, re
 - **Vessel Data Source Strategy**: Employs a unified `useVessels()` hook prioritizing local PMS data with fallback to an external master-data API.
 - **ROB Location Stock Synchronization**: Implemented dual-write synchronization between legacy ROB fields and the normalized `spare_location_stock` table for consistent inventory.
 
-## V2 Architecture (Component Module) — IMPLEMENTED
+## V2 Architecture (Component Module) — SELF-CONTAINED (Zero Legacy Dependencies)
 A detailed V2 modular architecture plan is documented at `docs/V2-Component-Module-Refactor-Plan.md`. Implementation status and key decisions:
 - **Purely Architectural**: V2 uses 100% the same business rules, validations, and data as legacy. No functional rewrite.
 - **V2 Namespace**: All V2 code lives under `server/v2/`, `shared/v2/`, and `client/src/modules/` — legacy code stays untouched.
-- **Same Database Table**: V2 calls the same `storage.*` methods and operates on the same `components` table as legacy. No separate V2 data store.
-- **Layer Separation**: Repository (wraps storage calls) → Service (business logic from routes.ts) → Controller (HTTP concerns, Zod validation) → Routes (RESTful patterns).
+- **Self-Contained Data Access**: V2 uses direct Drizzle ORM queries via `getDb()` — zero imports from `server/storage.ts`, `server/postgresStorage.ts`, or `shared/schema.ts`. Only infrastructure imports permitted: `getDb` (from `server/db.ts`) and `objectStorageClient` (from `server/objectStorage.ts`).
+- **V2 Schema Duplication**: `shared/v2/components/schema.ts` contains its own pgTable definitions (v2Components, v2Jobs, etc.) referencing the same physical SQL tables. These are query-only references — all schema management/migrations remain in legacy `shared/schema.ts`.
+- **Layer Separation**: Repository (direct Drizzle queries) → Service (business logic) → Controller (HTTP concerns, Zod validation) → Routes (RESTful patterns).
 - **Route Prefix**: `/technical/api/v2/components/component/*` for V2 endpoints.
 - **Frontend Toggle**: `localStorage('pms_api_version')` switches between legacy and V2 API endpoints at runtime. Toggle UI visible on Components page header.
 - **Backward Compatibility**: Toggle defaults to "Legacy". Both route sets always registered. Instant rollback by switching toggle — same data, same database, zero data loss.
@@ -86,6 +87,16 @@ A detailed V2 modular architecture plan is documented at `docs/V2-Component-Modu
 - **Backend Files**: `server/v2/components/` (repository, services, controllers, routes), `shared/v2/components/` (schema, types).
 - **Frontend Files**: `client/src/modules/components/` (api/componentApiV2.ts, hooks/useApiVersion.ts, components/ComponentApiToggle.tsx).
 - **Toggle-Aware Queries**: Components page main queries (component list, maintenance history, documents, class-regulatory, requisitions) all use toggle-aware URL builders that switch between legacy and V2 endpoints based on localStorage toggle state.
+- **Legacy→V2 Method Mapping** (Repository layer, 25+ methods):
+  - `storage.getComponents()` → `repo.getComponents()` (direct `select().from(v2Components).where()`)
+  - `storage.getComponentById()` → `repo.getComponentById()` (direct query with eq filter)
+  - `storage.createComponent()` → `repo.createComponent()` (direct `insert().values().returning()`)
+  - `storage.updateComponent()` → `repo.updateComponent()` (direct `update().set().where().returning()`)
+  - `storage.inactivateComponent()` → `repo.inactivateComponent()` (cascade: updates children, unlinks jobs, sets status)
+  - `storage.setRunningHours()` → `repo.setRunningHours()` (delta propagation to INHERITED children)
+  - `storage.getInheritedComponents()` → `repo.getInheritedComponents()` (vessel isolation safeguard)
+  - Document/ClassReg/Requisition/History CRUD → dedicated repo methods with direct Drizzle queries
+  - Bulk upload → `repo.bulkCreateComponents()` with transaction support
 
 ## External Dependencies
 *   **Frontend**: `@radix-ui/*`, `@tanstack/react-query`, `wouter`, `tailwindcss`, `lucide-react`

@@ -188,7 +188,7 @@ export class ComponentService {
       }
     }
 
-    let requisitions = await this.repository.findRequisitions(componentId);
+    let requisitions: any[] = await this.repository.findRequisitions(componentId);
 
     if (component.componentCode === "401.005" && requisitions.length === 0) {
       requisitions = [
@@ -203,7 +203,7 @@ export class ComponentService {
           priority: "Normal",
           status: "PO Raised",
           requestedBy: "Chief Engineer",
-          vesselCode: component.vesselCode
+          vesselCode: component.vesselCode || ''
         },
         {
           id: 1002,
@@ -216,7 +216,7 @@ export class ComponentService {
           priority: "Urgent",
           status: "Delivered On Board",
           requestedBy: "2nd Engineer",
-          vesselCode: component.vesselCode
+          vesselCode: component.vesselCode || ''
         }
       ];
     }
