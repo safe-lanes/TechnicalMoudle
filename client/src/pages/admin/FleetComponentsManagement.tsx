@@ -1,12 +1,13 @@
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { type FleetComponents } from "@shared/schema";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Badge } from "@/components/ui/badge";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
-import { Plus, Search, Pencil, Trash2, ChevronRight, ChevronDown, Upload, Download } from "lucide-react";
+import { Plus, Search, Pencil, Trash2, ChevronRight, ChevronDown, Upload, Download, Settings, Package } from "lucide-react";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import FleetComponentForm from "./FleetComponentForm";
@@ -153,6 +154,9 @@ export default function FleetComponentsManagement() {
     }
   };
 
+  const totalComponents = components?.length || 0;
+  const rootComponents = treeData.length;
+
   const renderTreeNode = (node: TreeNode, level: number = 0, isFirstRoot: boolean = false): JSX.Element => {
     const nodeKey = String(node.id);
     const isExpanded = expandedNodes.has(nodeKey);
@@ -160,14 +164,18 @@ export default function FleetComponentsManagement() {
 
     return (
       <>
-        <TableRow key={nodeKey} data-testid={`row-component-${nodeKey}`}>
-          <TableCell style={{ paddingLeft: `${level * 24 + 16}px` }} className="font-mono text-sm" data-testid={isFirstRoot ? "I4.QL.3.20" : undefined}>
+        <TableRow
+          key={nodeKey}
+          className="hover:bg-blue-50/40 transition-colors border-b border-gray-100"
+          data-testid={`row-component-${nodeKey}`}
+        >
+          <TableCell style={{ paddingLeft: `${level * 28 + 16}px` }} className="font-mono text-sm py-3" data-testid={isFirstRoot ? "I4.QL.3.20" : undefined}>
             {isFirstRoot && <Marker id="I4.QL.3.20" />}
             <div className="flex items-center gap-2">
               {hasChildren ? (
                 <button
                   onClick={() => toggleNode(nodeKey)}
-                  className="p-1 hover:bg-gray-100 rounded"
+                  className="p-1 rounded-md hover:bg-cyan-100 text-cyan-700 transition-colors"
                   data-testid={`button-toggle-${nodeKey}`}
                 >
                   {isExpanded ? (
@@ -179,31 +187,32 @@ export default function FleetComponentsManagement() {
               ) : (
                 <div className="w-6" />
               )}
-              <span>{node.fleetEquipmentCode}</span>
+              <span className="text-gray-700 font-semibold">{node.fleetEquipmentCode}</span>
             </div>
           </TableCell>
-          <TableCell data-testid={isFirstRoot ? "I4.QL.3.21" : undefined}>
+          <TableCell className="py-3" data-testid={isFirstRoot ? "I4.QL.3.21" : undefined}>
             {isFirstRoot && <Marker id="I4.QL.3.21" />}
-            <span className="font-medium">{node.fleetEquipmentName}</span>
+            <span className="font-medium text-gray-800">{node.fleetEquipmentName}</span>
           </TableCell>
-          <TableCell className="font-mono text-sm" data-testid={isFirstRoot ? "I4.QL.3.22" : undefined}>
+          <TableCell className="font-mono text-sm text-gray-500 py-3" data-testid={isFirstRoot ? "I4.QL.3.22" : undefined}>
             {isFirstRoot && <Marker id="I4.QL.3.22" />}
             {node.componentCategory || "-"}
           </TableCell>
-          <TableCell data-testid={isFirstRoot ? "I4.QL.3.23" : undefined}>
+          <TableCell className="text-gray-600 py-3" data-testid={isFirstRoot ? "I4.QL.3.23" : undefined}>
             {isFirstRoot && <Marker id="I4.QL.3.23" />}
             {node.makerName || "-"}
           </TableCell>
-          <TableCell data-testid={isFirstRoot ? "I4.QL.3.24" : undefined}>
+          <TableCell className="text-gray-600 py-3" data-testid={isFirstRoot ? "I4.QL.3.24" : undefined}>
             {isFirstRoot && <Marker id="I4.QL.3.24" />}
             {node.model || "-"}
           </TableCell>
-          <TableCell className="text-right">
-            <div className="flex justify-end gap-2">
+          <TableCell className="text-right py-3">
+            <div className="flex justify-end gap-1">
               <Button
                 variant="ghost"
-                size="sm"
+                size="icon"
                 onClick={() => handleAddNew(node.fleetEquipmentCode)}
+                className="text-cyan-600"
                 data-testid={isFirstRoot ? "I4.QL.3.25" : `button-add-child-${nodeKey}`}
                 title="Add Child"
               >
@@ -212,19 +221,22 @@ export default function FleetComponentsManagement() {
               </Button>
               <Button
                 variant="ghost"
-                size="sm"
+                size="icon"
                 onClick={() => handleEdit(node)}
+                className="text-blue-600"
                 data-testid={isFirstRoot ? "I4.QL.3.26" : `button-edit-${nodeKey}`}
+                title="Edit"
               >
                 {isFirstRoot && <Marker id="I4.QL.3.26" />}
                 <Pencil className="h-4 w-4" />
               </Button>
               <Button
                 variant="ghost"
-                size="sm"
+                size="icon"
                 onClick={() => handleDeleteClick(node)}
-                className="text-red-600"
+                className="text-red-500"
                 data-testid={isFirstRoot ? "I4.QL.3.27" : `button-delete-${nodeKey}`}
+                title="Delete"
               >
                 {isFirstRoot && <Marker id="I4.QL.3.27" />}
                 <Trash2 className="h-4 w-4" />
@@ -238,115 +250,143 @@ export default function FleetComponentsManagement() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 p-6">
-      <div className="max-w-7xl mx-auto">
-        <div className="mb-6">
-          <h1 className="text-3xl font-bold text-gray-900">Fleet Components Management</h1>
-          <p className="text-gray-600 mt-2" data-testid="I4.QL.3.9"><Marker id="I4.QL.3.9" />Manage fleet-level equipment hierarchy (SFI structure)</p>
+    <div className="p-6">
+      <Card className="overflow-hidden">
+        <div className="bg-gradient-to-r from-cyan-600 to-blue-600 px-6 py-5">
+          <div className="flex items-center gap-3 mb-1">
+            <div className="p-2 bg-white/20 rounded-lg">
+              <Settings className="h-5 w-5 text-white" />
+            </div>
+            <div>
+              <h1 className="text-xl font-bold text-white">Fleet Components Management</h1>
+              <p className="text-cyan-100 text-sm mt-0.5" data-testid="I4.QL.3.9"><Marker id="I4.QL.3.9" />Manage fleet-level equipment hierarchy (SFI structure)</p>
+            </div>
+          </div>
         </div>
 
-        <Card>
-          <CardHeader>
-            <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-              <CardTitle data-testid="I4.QL.3.10"><Marker id="I4.QL.3.10" />All Fleet Components</CardTitle>
-              <div className="flex flex-col sm:flex-row gap-3">
-                {/* Search Bar */}
-                <div className="relative flex-1 sm:min-w-[300px]">
-                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-                  <Input
-                    type="text"
-                    placeholder="Search by name, code, or SFI..."
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    className="pl-10"
-                    data-testid="I4.QL.3.11"
-                  />
-                  <Marker id="I4.QL.3.11" />
-                </div>
-                {/* Action Buttons */}
-                <Button
-                  variant="outline"
-                  onClick={handleExport}
-                  data-testid="I4.QL.3.12"
-                >
-                  <Marker id="I4.QL.3.12" />
-                  <Download className="mr-2 h-4 w-4" />
-                  Export
-                </Button>
-                <Button
-                  onClick={() => handleAddNew()}
-                  className="whitespace-nowrap"
-                  data-testid="I4.QL.3.13"
-                >
-                  <Marker id="I4.QL.3.13" />
-                  <Plus className="mr-2 h-4 w-4" />
-                  Add New Component
-                </Button>
+        <div className="px-6 py-4 bg-gray-50 border-b border-gray-200">
+          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+            <div className="flex items-center gap-4">
+              <h2 className="text-base font-semibold text-gray-800" data-testid="I4.QL.3.10"><Marker id="I4.QL.3.10" />All Fleet Components</h2>
+              <div className="flex items-center gap-3">
+                <Badge variant="secondary" className="bg-cyan-100 text-cyan-700 no-default-hover-elevate no-default-active-elevate" data-testid="badge-total-components">
+                  <Package className="h-3 w-3 mr-1" />
+                  {totalComponents} Total
+                </Badge>
+                <Badge variant="secondary" className="bg-blue-100 text-blue-700 no-default-hover-elevate no-default-active-elevate" data-testid="badge-root-components">
+                  {rootComponents} Root
+                </Badge>
               </div>
             </div>
-          </CardHeader>
+            <div className="flex flex-col sm:flex-row gap-3">
+              <div className="relative flex-1 sm:min-w-[280px]">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                <Input
+                  type="text"
+                  placeholder="Search by name, code, or SFI..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="pl-10 bg-white border-gray-300"
+                  data-testid="I4.QL.3.11"
+                />
+                <Marker id="I4.QL.3.11" />
+              </div>
+              <Button
+                variant="outline"
+                onClick={handleExport}
+                className="border-gray-300 text-gray-700"
+                data-testid="I4.QL.3.12"
+              >
+                <Marker id="I4.QL.3.12" />
+                <Download className="mr-2 h-4 w-4" />
+                Export
+              </Button>
+              <Button
+                onClick={() => handleAddNew()}
+                className="bg-cyan-600 whitespace-nowrap"
+                data-testid="I4.QL.3.13"
+              >
+                <Marker id="I4.QL.3.13" />
+                <Plus className="mr-2 h-4 w-4" />
+                Add New Component
+              </Button>
+            </div>
+          </div>
+        </div>
 
-          <CardContent>
-            {isLoading ? (
-              <div className="space-y-3">
-                {[...Array(5)].map((_, i) => (
-                  <div key={i} className="h-16 bg-gray-100 animate-pulse rounded"></div>
-                ))}
+        <div className="px-6 py-4">
+          {isLoading ? (
+            <div className="space-y-3">
+              {[...Array(6)].map((_, i) => (
+                <div key={i} className="flex items-center gap-4">
+                  <div className="h-5 w-16 bg-gray-200 animate-pulse rounded" />
+                  <div className="h-5 flex-1 bg-gray-100 animate-pulse rounded" />
+                  <div className="h-5 w-20 bg-gray-100 animate-pulse rounded" />
+                  <div className="h-5 w-24 bg-gray-100 animate-pulse rounded" />
+                  <div className="h-5 w-20 bg-gray-100 animate-pulse rounded" />
+                  <div className="h-5 w-24 bg-gray-100 animate-pulse rounded" />
+                </div>
+              ))}
+            </div>
+          ) : error ? (
+            <div className="bg-red-50 border border-red-200 rounded-lg p-6 text-center">
+              <Trash2 className="h-8 w-8 text-red-400 mx-auto mb-2" />
+              <p className="text-red-700 font-medium">Failed to load components</p>
+              <p className="text-red-500 text-sm mt-1">Please try refreshing the page</p>
+            </div>
+          ) : filteredComponents.length === 0 ? (
+            <div className="text-center py-16">
+              <div className="p-4 bg-gray-100 rounded-full w-16 h-16 mx-auto mb-4 flex items-center justify-center">
+                <Package className="h-8 w-8 text-gray-400" />
               </div>
-            ) : error ? (
-              <div className="bg-red-50 border border-red-200 rounded-lg p-4 text-center">
-                <p className="text-red-700">Failed to load components</p>
-              </div>
-            ) : filteredComponents.length === 0 ? (
-              <div className="text-center py-12">
-                <p className="text-gray-500">
-                  {searchQuery ? "No components found matching your search" : "No components yet. Add your first component to get started."}
-                </p>
-              </div>
-            ) : (
-              <div className="overflow-x-auto">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead data-testid="I4.QL.3.14"><Marker id="I4.QL.3.14" />Fleet Code</TableHead>
-                      <TableHead data-testid="I4.QL.3.15"><Marker id="I4.QL.3.15" />Equipment Name</TableHead>
-                      <TableHead data-testid="I4.QL.3.16"><Marker id="I4.QL.3.16" />Category</TableHead>
-                      <TableHead data-testid="I4.QL.3.17"><Marker id="I4.QL.3.17" />Maker</TableHead>
-                      <TableHead data-testid="I4.QL.3.18"><Marker id="I4.QL.3.18" />Model</TableHead>
-                      <TableHead className="text-right" data-testid="I4.QL.3.19"><Marker id="I4.QL.3.19" />Actions</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {treeData.map((node, index) => renderTreeNode(node, 0, index === 0))}
-                  </TableBody>
-                </Table>
-              </div>
-            )}
-          </CardContent>
-        </Card>
-      </div>
+              <p className="text-gray-600 font-medium">
+                {searchQuery ? "No components found matching your search" : "No components yet"}
+              </p>
+              <p className="text-gray-400 text-sm mt-1">
+                {searchQuery ? "Try adjusting your search terms" : "Add your first component to get started"}
+              </p>
+            </div>
+          ) : (
+            <div className="overflow-x-auto rounded-lg border border-gray-200">
+              <Table>
+                <TableHeader>
+                  <TableRow className="bg-gray-50 border-b border-gray-200">
+                    <TableHead className="text-xs font-semibold text-gray-600 uppercase tracking-wider py-3" data-testid="I4.QL.3.14"><Marker id="I4.QL.3.14" />Fleet Code</TableHead>
+                    <TableHead className="text-xs font-semibold text-gray-600 uppercase tracking-wider py-3" data-testid="I4.QL.3.15"><Marker id="I4.QL.3.15" />Equipment Name</TableHead>
+                    <TableHead className="text-xs font-semibold text-gray-600 uppercase tracking-wider py-3" data-testid="I4.QL.3.16"><Marker id="I4.QL.3.16" />Category</TableHead>
+                    <TableHead className="text-xs font-semibold text-gray-600 uppercase tracking-wider py-3" data-testid="I4.QL.3.17"><Marker id="I4.QL.3.17" />Maker</TableHead>
+                    <TableHead className="text-xs font-semibold text-gray-600 uppercase tracking-wider py-3" data-testid="I4.QL.3.18"><Marker id="I4.QL.3.18" />Model</TableHead>
+                    <TableHead className="text-right text-xs font-semibold text-gray-600 uppercase tracking-wider py-3" data-testid="I4.QL.3.19"><Marker id="I4.QL.3.19" />Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {treeData.map((node, index) => renderTreeNode(node, 0, index === 0))}
+                </TableBody>
+              </Table>
+            </div>
+          )}
+        </div>
+      </Card>
 
-      {/* Component Form Dialog */}
       <FleetComponentForm
         open={isFormOpen}
         onOpenChange={setIsFormOpen}
         component={selectedComponent}
       />
 
-      {/* Delete Confirmation Dialog */}
       <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
         <AlertDialogContent data-testid="dialog-delete-component">
           <AlertDialogHeader>
-            <AlertDialogTitle>Delete Component</AlertDialogTitle>
-            <AlertDialogDescription>
-              Are you sure you want to delete "{componentToDelete?.fleetEquipmentName}"? This action cannot be undone and will also delete all child components.
+            <AlertDialogTitle className="text-gray-900">Delete Component</AlertDialogTitle>
+            <AlertDialogDescription className="text-gray-600">
+              Are you sure you want to delete "<span className="font-medium text-gray-800">{componentToDelete?.fleetEquipmentName}</span>"? This action cannot be undone and will also delete all child components.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel data-testid="button-cancel-delete">Cancel</AlertDialogCancel>
             <AlertDialogAction
               onClick={handleDeleteConfirm}
-              className="bg-red-600 hover:bg-red-700"
+              className="bg-red-600"
               disabled={deleteMutation.isPending}
               data-testid="button-confirm-delete"
             >

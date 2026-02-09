@@ -160,19 +160,20 @@ export default function Admin4Dashboard() {
   if (currentView === 'components') {
     return (
       <div className="min-h-screen bg-gray-50">
-        <div className="bg-white border-b px-6 py-4 flex items-center gap-4">
+        <div className="bg-white border-b px-6 py-3 flex items-center gap-3">
           <Button
             variant="ghost"
             size="sm"
             onClick={() => setCurrentView('dashboard')}
+            className="text-cyan-700"
             data-testid="I4.QL.3.6"
           >
             <Marker id="I4.QL.3.6" />
             <ArrowLeft className="h-4 w-4 mr-2" />
             Back to Dashboard
           </Button>
-          <div className="h-6 w-px bg-gray-300" />
-          <h1 className="text-xl font-semibold text-gray-900" data-testid="I4.QL.3.7"><Marker id="I4.QL.3.7" />Fleet Components Management</h1>
+          <div className="h-5 w-px bg-gray-300" />
+          <h1 className="text-lg font-semibold text-gray-800" data-testid="I4.QL.3.7"><Marker id="I4.QL.3.7" />Fleet Components Management</h1>
         </div>
         <FleetComponentsManagement />
       </div>
