@@ -14,7 +14,9 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Eye, Edit } from "lucide-react";
+import { Eye, Edit, Download } from "lucide-react";
+import { pdfReportGenerator } from "@/lib/pdfReportGenerator";
+import type { TableColumn } from "@/lib/pdfReportGenerator";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import DefectModal from "./DefectModal";
 import { getComputedStatus } from "@/lib/defectStatusUtils";
@@ -47,6 +49,47 @@ export function DefectsListModal({ open, onClose, title, defects, canEdit = true
   const handleEditClick = (defect: Defect) => {
     if (!canEdit) return;
     setEditModal({ open: true, defectId: defect.id });
+  };
+
+  const handleExportPdf = () => {
+    const columns: TableColumn[] = [
+      { header: 'ID', field: 'id', width: 25 },
+      { header: 'Vessel', field: 'vessel', width: 20 },
+      { header: 'Issue Date', field: 'issueDate', width: 18 },
+      { header: 'Category', field: 'category', width: 15 },
+      { header: 'Component', field: 'component', width: 20 },
+      { header: 'Description', field: 'description', width: 40 },
+      { header: 'Target Date', field: 'targetDate', width: 18 },
+      { header: 'Date Compl.', field: 'dateCompleted', width: 18 },
+      { header: 'Status', field: 'status', width: 18 },
+      { header: 'Priority', field: 'priority', width: 15 },
+    ];
+
+    const data = defects.map((defect) => {
+      const computedStatus = getComputedStatus(defect);
+      return {
+        id: defect.id || '-',
+        vessel: defect.vesselName || defect.vesselId || '-',
+        issueDate: formatDate(defect.issueDate),
+        category: `${defect.category || '-'}${defect.is_coc ? ' (CoC)' : ''}`,
+        component: defect.componentHardwareLevel3 || '-',
+        description: defect.description || '-',
+        targetDate: formatDate(defect.targetCloseDate),
+        dateCompleted: formatDate(defect.dateCompleted),
+        status: computedStatus.label,
+        priority: defect.priority || '-',
+      };
+    });
+
+    pdfReportGenerator.generateReport(
+      {
+        title,
+        subtitle: `Total: ${defects.length} defect${defects.length !== 1 ? 's' : ''}`,
+        orientation: 'landscape',
+      },
+      columns,
+      data
+    );
   };
 
   const formatDate = (dateStr: string | null | undefined): string => {
@@ -82,10 +125,20 @@ export function DefectsListModal({ open, onClose, title, defects, canEdit = true
     <>
       <Dialog open={open} onOpenChange={(isOpen) => !isOpen && onClose()}>
         <DialogContent className="max-w-[90vw] h-[calc(100vh-10vw)] max-h-[90vh] overflow-hidden flex flex-col">
-          <DialogHeader className="pb-4">
+          <DialogHeader className="pb-4 flex flex-row items-center justify-between gap-4">
             <DialogTitle className="text-xl font-semibold text-[#0f4c81]">
               {title}
             </DialogTitle>
+            <Button
+              variant="outline"
+              size="sm"
+              className="text-xs text-[#8798ad] border-[#e1e8ed] mr-6"
+              onClick={handleExportPdf}
+              data-testid="button-export-defects-pdf"
+            >
+              <Download className="h-3.5 w-3.5 mr-1" />
+              Export
+            </Button>
           </DialogHeader>
           
           <div className="flex-1 overflow-auto border border-gray-200 rounded-lg">
