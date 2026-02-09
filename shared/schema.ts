@@ -1838,6 +1838,7 @@ export const fleetJobs = pgTable("fleet_jobs", {
   id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
   fleetJobsUuid: text("fleet_jobs_uuid").default(sql`gen_random_uuid()`),
   jobCode: text("job_code").notNull().unique(),
+  fleetComponentsUuid: text("fleet_components_uuid"),
   fleetEquipmentCode: text("fleet_equipment_code").notNull(),
   fleetEquipmentName: text("fleet_equipment_name").notNull(),
   woTitle: text("wo_title").notNull(),
@@ -1869,6 +1870,7 @@ export const fleetJobs = pgTable("fleet_jobs", {
   jobCodeIdx: index("idx_fleet_jobs_code").on(table.jobCode),
   fleetEquipmentCodeIdx: index("idx_fleet_jobs_equipment").on(table.fleetEquipmentCode),
   fleetJobsUuidIdx: uniqueIndex("idx_fleet_jobs_uuid").on(table.fleetJobsUuid),
+  fleetComponentsUuidIdx: index("idx_fleet_jobs_component_uuid").on(table.fleetComponentsUuid),
 }));
 
 export const insertFleetJobsSchema = createInsertSchema(fleetJobs).omit({

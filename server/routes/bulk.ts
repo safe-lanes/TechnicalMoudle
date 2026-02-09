@@ -5798,6 +5798,10 @@ async function performImport(
     const fleetJobsByCode = new Map(existingFleetJobs.map((fj: any) => [fj.jobCode, fj]));
     console.log(`📦 Prefetched ${existingFleetJobs.length} existing fleet jobs`);
     
+    const existingFleetComponents = await storage.getFleetComponents();
+    const fleetComponentsByCode = new Map(existingFleetComponents.map((fc: any) => [fc.fleetEquipmentCode, fc]));
+    console.log(`📦 Prefetched ${existingFleetComponents.length} fleet components for UUID lookup`);
+    
     for (const row of data) {
       const jobCode = row['Job Code'];
       const fleetEquipmentCode = row['Fleet Equipment Code'];
@@ -5839,8 +5843,18 @@ async function performImport(
         continue;
       }
       
+      const matchedComponent = fleetComponentsByCode.get(String(fleetEquipmentCode).trim());
+      if (!matchedComponent) {
+        console.warn(`⚠️ Skipping fleet job ${jobCode}: Fleet Equipment Code '${fleetEquipmentCode}' not found in fleet_components. Fleet Components must be uploaded first.`);
+        result.skipped++;
+        continue;
+      }
+      
+      const fleetComponentsUuid = matchedComponent.fleetComponentsUuid;
+      
       const fleetJobData = {
         jobCode,
+        fleetComponentsUuid,
         fleetEquipmentCode,
         fleetEquipmentName,
         woTitle,
@@ -5873,13 +5887,13 @@ async function performImport(
           const newFleetJob = await storage.createFleetJob(fleetJobData);
           fleetJobsByCode.set(jobCode, newFleetJob);
           result.created++;
-          console.log(`✅ Created fleet job: ${jobCode} - ${woTitle}`);
+          console.log(`✅ Created fleet job: ${jobCode} - ${woTitle} (component: ${fleetComponentsUuid})`);
         }
       } else if (mode === 'update') {
         if (existingFleetJob) {
           await storage.updateFleetJob(existingFleetJob.id, fleetJobData);
           result.updated++;
-          console.log(`🔄 Updated fleet job: ${jobCode} - ${woTitle}`);
+          console.log(`🔄 Updated fleet job: ${jobCode} - ${woTitle} (component: ${fleetComponentsUuid})`);
         } else {
           console.log(`⏭️ Skipping non-existent fleet job (update mode): ${jobCode}`);
           result.skipped++;
@@ -5888,12 +5902,12 @@ async function performImport(
         if (existingFleetJob) {
           await storage.updateFleetJob(existingFleetJob.id, fleetJobData);
           result.updated++;
-          console.log(`🔄 Updated fleet job: ${jobCode} - ${woTitle}`);
+          console.log(`🔄 Updated fleet job: ${jobCode} - ${woTitle} (component: ${fleetComponentsUuid})`);
         } else {
           const newFleetJob = await storage.createFleetJob(fleetJobData);
           fleetJobsByCode.set(jobCode, newFleetJob);
           result.created++;
-          console.log(`✅ Created fleet job: ${jobCode} - ${woTitle}`);
+          console.log(`✅ Created fleet job: ${jobCode} - ${woTitle} (component: ${fleetComponentsUuid})`);
         }
       }
     }

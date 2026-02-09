@@ -1,6 +1,6 @@
 {
-  "id": "0fbdfbd0-d4c2-40d9-94c8-64e35f72bf5a",
-  "prevId": "a9228c9a-9152-45b8-8de1-1a5a3f66a3f1",
+  "id": "11395b78-0feb-4ca5-b0fd-7648bb522630",
+  "prevId": "0fbdfbd0-d4c2-40d9-94c8-64e35f72bf5a",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -7968,6 +7968,138 @@
       "checkConstraints": {},
       "isRLSEnabled": false
     },
+    "public.report_snapshots": {
+      "name": "report_snapshots",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "integer",
+          "primaryKey": true,
+          "notNull": true,
+          "identity": {
+            "type": "byDefault",
+            "name": "report_snapshots_id_seq",
+            "schema": "public",
+            "increment": "1",
+            "startWith": "1",
+            "minValue": "1",
+            "maxValue": "2147483647",
+            "cache": "1",
+            "cycle": false
+          }
+        },
+        "vessel_id": {
+          "name": "vessel_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "report_type": {
+          "name": "report_type",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "export_format": {
+          "name": "export_format",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "generated_at": {
+          "name": "generated_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "generated_by": {
+          "name": "generated_by",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "item_count": {
+          "name": "item_count",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "filters_applied": {
+          "name": "filters_applied",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "summary_data": {
+          "name": "summary_data",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "items_data": {
+          "name": "items_data",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "indexes": {
+        "idx_report_snapshots_vessel": {
+          "name": "idx_report_snapshots_vessel",
+          "columns": [
+            {
+              "expression": "vessel_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "idx_report_snapshots_type": {
+          "name": "idx_report_snapshots_type",
+          "columns": [
+            {
+              "expression": "report_type",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "idx_report_snapshots_date": {
+          "name": "idx_report_snapshots_date",
+          "columns": [
+            {
+              "expression": "generated_at",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
     "public.running_hours_audit": {
       "name": "running_hours_audit",
       "schema": "",
@@ -9774,6 +9906,102 @@
           "notNull": false,
           "default": "'None'"
         },
+        "manufacture_date": {
+          "name": "manufacture_date",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "expiry_date": {
+          "name": "expiry_date",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "batch_number": {
+          "name": "batch_number",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "lot_number": {
+          "name": "lot_number",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "shelf_life_months": {
+          "name": "shelf_life_months",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "sds_reference": {
+          "name": "sds_reference",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "sds_document_url": {
+          "name": "sds_document_url",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "sds_last_updated": {
+          "name": "sds_last_updated",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "hazard_classification": {
+          "name": "hazard_classification",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "un_number": {
+          "name": "un_number",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "flash_point": {
+          "name": "flash_point",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "storage_temp_min": {
+          "name": "storage_temp_min",
+          "type": "numeric(5, 2)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "storage_temp_max": {
+          "name": "storage_temp_max",
+          "type": "numeric(5, 2)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "disposal_instructions": {
+          "name": "disposal_instructions",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "ppe_requirements": {
+          "name": "ppe_requirements",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "emergency_contact": {
+          "name": "emergency_contact",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
         "remarks": {
           "name": "remarks",
           "type": "text",
@@ -9881,6 +10109,51 @@
           "columns": [
             {
               "expression": "deleted",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "idx_stores_expiry_date": {
+          "name": "idx_stores_expiry_date",
+          "columns": [
+            {
+              "expression": "expiry_date",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "idx_stores_hazard_class": {
+          "name": "idx_stores_hazard_class",
+          "columns": [
+            {
+              "expression": "hazard_classification",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "idx_stores_batch_number": {
+          "name": "idx_stores_batch_number",
+          "columns": [
+            {
+              "expression": "batch_number",
               "isExpression": false,
               "asc": true,
               "nulls": "last"

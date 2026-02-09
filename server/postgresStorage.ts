@@ -619,6 +619,7 @@ export class PostgresStorage {
     const db = await getDb();
     const result = await db.insert(fleetJobs).values({
       jobCode: data.jobCode,
+      fleetComponentsUuid: data.fleetComponentsUuid || null,
       fleetEquipmentCode: data.fleetEquipmentCode,
       fleetEquipmentName: data.fleetEquipmentName,
       woTitle: data.woTitle,
