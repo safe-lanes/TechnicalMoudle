@@ -734,7 +734,7 @@ export default function DefectFormWizard({
               Export
             </Button>
           )}
-          {currentDefect && (
+          {currentDefect && isViewMode && (
             <Button
               variant="outline"
               onClick={toggleViewMode}
@@ -742,7 +742,7 @@ export default function DefectFormWizard({
               data-testid="button-toggle-mode"
             >
               <Eye className="h-4 w-4 mr-2" />
-              {isViewMode ? 'Edit' : 'View'}
+              Edit
             </Button>
           )}
           {!isViewMode && (
