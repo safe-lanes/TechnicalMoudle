@@ -1042,10 +1042,6 @@ export class BulkImportService {
       const name = sfiName || subName || parentCode;
 
       const parentOfParent = getParentSFICode(parentCode);
-      let parentId: string | null = null;
-      if (parentOfParent && existingMap.has(parentOfParent)) {
-        parentId = existingMap.get(parentOfParent).id;
-      }
 
       const id = uuidv4();
       try {
@@ -1054,7 +1050,7 @@ export class BulkImportService {
           componentCode: parentCode,
           name,
           componentCategory: category,
-          parentId,
+          parentId: parentOfParent || null,
           parentComponent: parentOfParent || null,
           vesselId,
           vesselCode: null,
@@ -1101,12 +1097,6 @@ export class BulkImportService {
     const meta = row['__meta'];
     let parentCode = meta?.parentCode || null;
 
-    let parentId: string | null = null;
-    if (parentCode) {
-      const parent = await this.repository.getComponentByCode(parentCode, vesselId);
-      if (parent) parentId = parent.id;
-    }
-
     const rhCounterType = String(row['RH Counter Type'] || 'NOT_RH_DRIVEN').trim().toUpperCase();
     const rhCounterSource = row['RH Counter Source'] ? String(row['RH Counter Source']).trim() : null;
     const runningHours = row['Running Hours'] !== undefined && row['Running Hours'] !== null
@@ -1135,7 +1125,7 @@ export class BulkImportService {
       name: row['Component Name'] || null,
       componentCategory: row['Component Category'] || null,
       category: row['Category'] || null,
-      parentId,
+      parentId: parentCode,
       parentComponent: parentCode,
       vesselId,
       vesselCode: row['Vessel Code'] || null,
