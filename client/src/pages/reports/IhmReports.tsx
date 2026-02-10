@@ -19,6 +19,7 @@ import { useVessels } from "@/hooks/useVessels";
 import { useVessel } from "@/contexts/VesselContext";
 import { useQuery } from "@tanstack/react-query";
 import CategoryFilters, { CategoryFilterValues } from "@/components/reports/CategoryFilters";
+import IhmInventoryStatusReport from "./IhmInventoryStatusReport";
 
 interface IhmReport {
   id: string;
@@ -50,6 +51,7 @@ const IhmReports: React.FC<IhmReportsProps> = ({ onBack, globalFilters }) => {
     dateRange: globalFilters?.dateRange || { from: null, to: null }
   });
   const [generatingReports, setGeneratingReports] = useState<Set<string>>(new Set());
+  const [viewingReport, setViewingReport] = useState<string | null>(null);
   const { toast } = useToast();
   const { data: vessels = [] } = useVessels();
   const { vesselId: contextVesselId } = useVessel();
@@ -222,6 +224,15 @@ const IhmReports: React.FC<IhmReportsProps> = ({ onBack, globalFilters }) => {
   const ihmNotPresent = spares.filter((s: any) => s.ihm === 'Not Present').length;
   const ihmUnknown = spares.filter((s: any) => !s.ihm || s.ihm === 'Unknown').length;
 
+  if (viewingReport === 'ihm-inventory-status') {
+    return (
+      <IhmInventoryStatusReport
+        onBack={() => setViewingReport(null)}
+        vesselId={effectiveVesselId || undefined}
+      />
+    );
+  }
+
   return (
     <div className="p-6 bg-white min-h-screen">
       <div className="mb-6">
@@ -324,36 +335,52 @@ const IhmReports: React.FC<IhmReportsProps> = ({ onBack, globalFilters }) => {
                 </td>
                 <td className="py-3 px-4">
                   <div className="flex items-center gap-1">
+                    {report.id === 'ihm-inventory-status' ? (
+                      <Button 
+                        size="icon" 
+                        variant="ghost" 
+                        title="View Interactive Report"
+                        onClick={() => setViewingReport(report.id)}
+                        data-testid={`button-preview-${report.id}`}
+                      >
+                        <Eye className="h-4 w-4" />
+                      </Button>
+                    ) : (
+                      <Button 
+                        size="icon" 
+                        variant="ghost" 
+                        title="Preview"
+                        onClick={() => handleGenerateReport(report.id, 'PDF')}
+                        disabled={generatingReports.has(`${report.id}-PDF`)}
+                        data-testid={`button-preview-${report.id}`}
+                      >
+                        {generatingReports.has(`${report.id}-PDF`) ? (
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : (
+                          <Eye className="h-4 w-4" />
+                        )}
+                      </Button>
+                    )}
                     <Button 
                       size="icon" 
                       variant="ghost" 
-                      title="Preview"
-                      onClick={() => handleGenerateReport(report.id, 'PDF')}
+                      title={report.id === 'ihm-inventory-status' ? 'View Full Report' : 'Download PDF'}
+                      onClick={() => report.id === 'ihm-inventory-status' ? setViewingReport(report.id) : handleGenerateReport(report.id, 'PDF')}
                       disabled={generatingReports.has(`${report.id}-PDF`)}
-                      data-testid={`button-preview-${report.id}`}
+                      data-testid={`button-pdf-${report.id}`}
                     >
                       {generatingReports.has(`${report.id}-PDF`) ? (
                         <Loader2 className="h-4 w-4 animate-spin" />
                       ) : (
-                        <Eye className="h-4 w-4" />
+                        <FileText className="h-4 w-4" />
                       )}
-                    </Button>
-                    <Button 
-                      size="icon" 
-                      variant="ghost" 
-                      title="Download PDF"
-                      onClick={() => handleGenerateReport(report.id, 'PDF')}
-                      disabled={generatingReports.has(`${report.id}-PDF`)}
-                      data-testid={`button-pdf-${report.id}`}
-                    >
-                      <FileText className="h-4 w-4" />
                     </Button>
                     {report.outputs.includes('Excel') && (
                       <Button 
                         size="icon" 
                         variant="ghost" 
                         title="Download Excel"
-                        onClick={() => handleGenerateReport(report.id, 'Excel')}
+                        onClick={() => report.id === 'ihm-inventory-status' ? setViewingReport(report.id) : handleGenerateReport(report.id, 'Excel')}
                         disabled={generatingReports.has(`${report.id}-Excel`)}
                         data-testid={`button-excel-${report.id}`}
                       >

@@ -17593,6 +17593,404 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // ═══════════════════════════════════════════════════════════════════════════
+  // REPORT 2.1: IHM INVENTORY STATUS REPORT
+  // Combined spares + stores IHM (Inventory of Hazardous Materials) data
+  // ═══════════════════════════════════════════════════════════════════════════
+  app.get("/technical/api/reports/ihm-inventory-status", async (req, res) => {
+    try {
+      const vesselId = req.query.vesselId as string;
+      if (!vesselId) {
+        return res.status(400).json({ error: "vesselId is required" });
+      }
+
+      const ihmStatusFilter = (req.query.ihmStatus as string) || 'all';
+      const itemTypeFilter = (req.query.itemType as string) || 'all';
+      const searchQuery = (req.query.search as string) || '';
+      const sortBy = (req.query.sortBy as string) || 'itemCode';
+      const sortOrder = (req.query.sortOrder as string) || 'asc';
+      const page = parseInt(req.query.page as string) || 1;
+      const pageSize = parseInt(req.query.pageSize as string) || 50;
+
+      const normalizeSpareIhm = (ihm: string | null | undefined, ihmPresence: string | null | undefined): string => {
+        if (ihmPresence) {
+          const p = ihmPresence.toUpperCase();
+          if (p === 'YES') return 'present';
+          if (p === 'NO') return 'not_present';
+          if (p === 'UNKNOWN') return 'unknown';
+        }
+        if (ihm) {
+          const v = ihm.toLowerCase().trim();
+          if (v === 'yes' || v === 'present' || v === 'true') return 'present';
+          if (v === 'no' || v === 'not present' || v === 'false') return 'not_present';
+        }
+        return 'unknown';
+      };
+
+      const normalizeStoreIhm = (ihmPresence: string | null | undefined, ihm: boolean | null | undefined): string => {
+        if (ihmPresence) {
+          const p = ihmPresence.toLowerCase().trim();
+          if (p === 'present') return 'present';
+          if (p === 'not present') return 'not_present';
+          if (p === 'unknown') return 'unknown';
+        }
+        if (ihm === true) return 'present';
+        if (ihm === false) return 'not_present';
+        return 'unknown';
+      };
+
+      const sparesData = await storage.getSpares(vesselId);
+      const storesData = await storage.getStoresItems(vesselId);
+
+      interface IhmItem {
+        id: number;
+        itemCode: string;
+        itemName: string;
+        itemType: 'spare' | 'store';
+        storeCategory: string;
+        componentOrCategory: string;
+        ihmStatus: string;
+        evidenceType: string;
+        hazardClassification: string;
+        sdsReference: string;
+        currentROB: number;
+        uom: string;
+        location: string;
+        partNumber: string;
+        lastUpdated: string;
+      }
+
+      let combinedItems: IhmItem[] = [];
+
+      for (const s of sparesData) {
+        if (s.deleted || s.dataScope === 'fleet') continue;
+        combinedItems.push({
+          id: s.id,
+          itemCode: s.partCode || s.componentSpareCode || '',
+          itemName: s.partName || '',
+          itemType: 'spare',
+          storeCategory: '',
+          componentOrCategory: s.componentName || '',
+          ihmStatus: normalizeSpareIhm(s.ihm, s.ihmPresence),
+          evidenceType: s.evidenceType || 'None',
+          hazardClassification: '',
+          sdsReference: '',
+          currentROB: s.rob ?? 0,
+          uom: s.uom || s.unit || 'PCS',
+          location: [s.location, s.location2].filter(Boolean).join(' / ') || '-',
+          partNumber: s.partNumber || '',
+          lastUpdated: s.updatedAt ? new Date(s.updatedAt).toISOString() : '',
+        });
+      }
+
+      for (const st of storesData) {
+        if (st.deleted || st.isActive === false) continue;
+        combinedItems.push({
+          id: st.id + 1000000,
+          itemCode: st.itemCode || '',
+          itemName: st.itemName || '',
+          itemType: 'store',
+          storeCategory: st.itemType || 'stores',
+          componentOrCategory: st.category || st.itemType || '',
+          ihmStatus: normalizeStoreIhm(st.ihmPresence, st.ihm),
+          evidenceType: st.ihmEvidenceType || 'None',
+          hazardClassification: st.hazardClassification || '',
+          sdsReference: st.sdsReference || '',
+          currentROB: parseFloat(String(st.rob)) || 0,
+          uom: st.uom || 'PCS',
+          location: [st.locationA, st.locationB].filter(Boolean).join(' / ') || '-',
+          partNumber: '',
+          lastUpdated: st.updatedAt ? new Date(st.updatedAt).toISOString() : '',
+        });
+      }
+
+      const totalAll = combinedItems.length;
+      const totalSpares = combinedItems.filter(i => i.itemType === 'spare').length;
+      const totalStores = combinedItems.filter(i => i.itemType === 'store').length;
+
+      const summaryPresent = combinedItems.filter(i => i.ihmStatus === 'present').length;
+      const summaryNotPresent = combinedItems.filter(i => i.ihmStatus === 'not_present').length;
+      const summaryUnknown = combinedItems.filter(i => i.ihmStatus === 'unknown').length;
+
+      if (ihmStatusFilter && ihmStatusFilter !== 'all') {
+        combinedItems = combinedItems.filter(i => i.ihmStatus === ihmStatusFilter);
+      }
+
+      if (itemTypeFilter && itemTypeFilter !== 'all') {
+        if (itemTypeFilter === 'spare') {
+          combinedItems = combinedItems.filter(i => i.itemType === 'spare');
+        } else if (itemTypeFilter === 'store') {
+          combinedItems = combinedItems.filter(i => i.itemType === 'store');
+        } else if (['stores', 'lubricants', 'lubes', 'chemicals', 'others'].includes(itemTypeFilter)) {
+          combinedItems = combinedItems.filter(i => {
+            if (i.itemType !== 'store') return false;
+            if (itemTypeFilter === 'lubes' || itemTypeFilter === 'lubricants') {
+              return i.storeCategory === 'lubes' || i.storeCategory === 'lubricants';
+            }
+            return i.storeCategory === itemTypeFilter;
+          });
+        }
+      }
+
+      if (searchQuery.trim()) {
+        const q = searchQuery.toLowerCase();
+        combinedItems = combinedItems.filter(i =>
+          i.itemCode.toLowerCase().includes(q) ||
+          i.itemName.toLowerCase().includes(q) ||
+          i.componentOrCategory.toLowerCase().includes(q) ||
+          i.partNumber.toLowerCase().includes(q) ||
+          i.location.toLowerCase().includes(q)
+        );
+      }
+
+      const statusOrder: Record<string, number> = { present: 0, unknown: 1, not_present: 2 };
+
+      combinedItems.sort((a, b) => {
+        let cmp = 0;
+        switch (sortBy) {
+          case 'itemCode': cmp = a.itemCode.localeCompare(b.itemCode); break;
+          case 'itemName': cmp = a.itemName.localeCompare(b.itemName); break;
+          case 'itemType': cmp = a.itemType.localeCompare(b.itemType); break;
+          case 'componentOrCategory': cmp = a.componentOrCategory.localeCompare(b.componentOrCategory); break;
+          case 'ihmStatus': cmp = (statusOrder[a.ihmStatus] ?? 3) - (statusOrder[b.ihmStatus] ?? 3); break;
+          case 'evidenceType': cmp = a.evidenceType.localeCompare(b.evidenceType); break;
+          case 'currentROB': cmp = a.currentROB - b.currentROB; break;
+          case 'location': cmp = a.location.localeCompare(b.location); break;
+          default: cmp = a.itemCode.localeCompare(b.itemCode);
+        }
+        return sortOrder === 'desc' ? -cmp : cmp;
+      });
+
+      const totalFiltered = combinedItems.length;
+      const totalPages = Math.ceil(totalFiltered / pageSize);
+      const startIdx = (page - 1) * pageSize;
+      const paginatedItems = combinedItems.slice(startIdx, startIdx + pageSize);
+
+      res.json({
+        summary: {
+          totalItems: totalAll,
+          ihmPresent: summaryPresent,
+          noIhm: summaryNotPresent,
+          unknown: summaryUnknown,
+        },
+        items: paginatedItems,
+        pagination: {
+          currentPage: page,
+          totalPages,
+          totalItems: totalFiltered,
+          pageSize,
+        },
+        categoryCounts: {
+          all: totalAll,
+          spares: totalSpares,
+          stores: totalStores,
+        },
+      });
+    } catch (error: any) {
+      console.error("Error fetching IHM inventory status:", error);
+      res.status(500).json({ error: "Failed to fetch IHM inventory data", details: error.message });
+    }
+  });
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // REPORT 2.1: IHM INVENTORY STATUS - EXCEL EXPORT
+  // ═══════════════════════════════════════════════════════════════════════════
+  app.post("/technical/api/reports/ihm-inventory-status/excel", async (req, res) => {
+    try {
+      const { vesselId, ihmStatus, itemType, search } = req.body;
+      if (!vesselId) {
+        return res.status(400).json({ error: "vesselId is required" });
+      }
+
+      const vessels = await storage.getVessels();
+      const vessel = vessels.find(v => v.id === vesselId || v.vesselCode === vesselId);
+      const vesselName = vessel?.name || vessel?.vesselName || String(vesselId);
+
+      const sparesData = await storage.getSpares(vesselId);
+      const storesData = await storage.getStoresItems(vesselId);
+
+      const normalizeSpareIhm = (ihm: string | null | undefined, ihmPresence: string | null | undefined): string => {
+        if (ihmPresence) {
+          const p = ihmPresence.toUpperCase();
+          if (p === 'YES') return 'Present';
+          if (p === 'NO') return 'Not Present';
+        }
+        if (ihm) {
+          const v = ihm.toLowerCase().trim();
+          if (v === 'yes' || v === 'present' || v === 'true') return 'Present';
+          if (v === 'no' || v === 'not present' || v === 'false') return 'Not Present';
+        }
+        return 'Unknown';
+      };
+
+      const normalizeStoreIhm = (ihmPresence: string | null | undefined, ihm: boolean | null | undefined): string => {
+        if (ihmPresence) {
+          const p = ihmPresence.toLowerCase().trim();
+          if (p === 'present') return 'Present';
+          if (p === 'not present') return 'Not Present';
+        }
+        if (ihm === true) return 'Present';
+        if (ihm === false) return 'Not Present';
+        return 'Unknown';
+      };
+
+      let allItems: any[] = [];
+
+      for (const s of sparesData) {
+        if (s.deleted || s.dataScope === 'fleet') continue;
+        allItems.push({
+          itemCode: s.partCode || s.componentSpareCode || '-',
+          itemName: s.partName || '-',
+          itemType: 'Spare',
+          componentOrCategory: s.componentName || '-',
+          ihmStatus: normalizeSpareIhm(s.ihm, s.ihmPresence),
+          evidenceType: s.evidenceType || 'None',
+          hazardClassification: '-',
+          sdsReference: '-',
+          currentROB: s.rob ?? 0,
+          uom: s.uom || s.unit || 'PCS',
+          location: [s.location, s.location2].filter(Boolean).join(' / ') || '-',
+          partNumber: s.partNumber || '-',
+        });
+      }
+
+      for (const st of storesData) {
+        if (st.deleted || st.isActive === false) continue;
+        allItems.push({
+          itemCode: st.itemCode || '-',
+          itemName: st.itemName || '-',
+          itemType: st.itemType ? st.itemType.charAt(0).toUpperCase() + st.itemType.slice(1) : 'Store',
+          componentOrCategory: st.category || st.itemType || '-',
+          ihmStatus: normalizeStoreIhm(st.ihmPresence, st.ihm),
+          evidenceType: st.ihmEvidenceType || 'None',
+          hazardClassification: st.hazardClassification || '-',
+          sdsReference: st.sdsReference || '-',
+          currentROB: parseFloat(String(st.rob)) || 0,
+          uom: st.uom || 'PCS',
+          location: [st.locationA, st.locationB].filter(Boolean).join(' / ') || '-',
+          partNumber: '-',
+        });
+      }
+
+      if (ihmStatus && ihmStatus !== 'all') {
+        const statusMap: Record<string, string> = { present: 'Present', not_present: 'Not Present', unknown: 'Unknown' };
+        const target = statusMap[ihmStatus] || ihmStatus;
+        allItems = allItems.filter(i => i.ihmStatus === target);
+      }
+
+      if (itemType && itemType !== 'all') {
+        if (itemType === 'spare') {
+          allItems = allItems.filter(i => i.itemType === 'Spare');
+        } else if (itemType === 'store') {
+          allItems = allItems.filter(i => i.itemType !== 'Spare');
+        }
+      }
+
+      if (search && search.trim()) {
+        const q = search.toLowerCase();
+        allItems = allItems.filter(i =>
+          i.itemCode.toLowerCase().includes(q) ||
+          i.itemName.toLowerCase().includes(q) ||
+          i.componentOrCategory.toLowerCase().includes(q)
+        );
+      }
+
+      const statusOrder: Record<string, number> = { 'Present': 0, 'Unknown': 1, 'Not Present': 2 };
+      allItems.sort((a, b) => (statusOrder[a.ihmStatus] ?? 3) - (statusOrder[b.ihmStatus] ?? 3));
+
+      const workbook = new ExcelJS.Workbook();
+      const worksheet = workbook.addWorksheet('IHM Inventory Status');
+
+      const columns: ColumnDef[] = [
+        { header: 'S.No', key: 'sNo', width: 8 },
+        { header: 'Item Code', key: 'itemCode', width: 18 },
+        { header: 'Item Name', key: 'itemName', width: 35 },
+        { header: 'Item Type', key: 'itemType', width: 14 },
+        { header: 'Component / Category', key: 'componentOrCategory', width: 28 },
+        { header: 'IHM Status', key: 'ihmStatus', width: 16 },
+        { header: 'Evidence Type', key: 'evidenceType', width: 16 },
+        { header: 'Hazard Classification', key: 'hazardClassification', width: 20 },
+        { header: 'SDS Reference', key: 'sdsReference', width: 18 },
+        { header: 'Current ROB', key: 'currentROB', width: 14 },
+        { header: 'UOM', key: 'uom', width: 10 },
+        { header: 'Location', key: 'location', width: 22 },
+        { header: 'Part Number', key: 'partNumber', width: 18 },
+      ];
+
+      const totalPresent = allItems.filter(i => i.ihmStatus === 'Present').length;
+      const totalNotPresent = allItems.filter(i => i.ihmStatus === 'Not Present').length;
+      const totalUnknown = allItems.filter(i => i.ihmStatus === 'Unknown').length;
+      const compliancePct = allItems.length > 0 ? Math.round(((totalPresent + totalNotPresent) / allItems.length) * 100) : 100;
+
+      applyStandardHeader(
+        worksheet,
+        'IHM Inventory Status Report',
+        `Vessel: ${vesselName} | Generated: ${new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}`,
+        columns.length,
+        [
+          { label: 'Total Items', value: allItems.length },
+          { label: 'IHM Present', value: totalPresent },
+          { label: 'No IHM', value: totalNotPresent },
+          { label: 'Unknown', value: totalUnknown },
+          { label: 'Compliance %', value: `${compliancePct}%` },
+        ]
+      );
+
+      applyStandardTableHeader(worksheet, columns, 7);
+
+      const reportData = allItems.map((item, idx) => ({
+        sNo: idx + 1,
+        itemCode: item.itemCode,
+        itemName: item.itemName,
+        itemType: item.itemType,
+        componentOrCategory: item.componentOrCategory,
+        ihmStatus: item.ihmStatus,
+        evidenceType: item.evidenceType,
+        hazardClassification: item.hazardClassification,
+        sdsReference: item.sdsReference,
+        currentROB: item.currentROB,
+        uom: item.uom,
+        location: item.location,
+        partNumber: item.partNumber,
+      }));
+
+      const conditionalStyles: ConditionalStyle[] = [
+        { column: 'ihmStatus', value: 'Present', color: 'FFDC2626' },
+        { column: 'ihmStatus', value: 'Not Present', color: 'FF16A34A' },
+        { column: 'ihmStatus', value: 'Unknown', color: 'FFD97706' },
+      ];
+
+      applyStandardDataRows(worksheet, reportData, columns, 8, conditionalStyles);
+
+      const lastColLetter = getLastColumnLetter(columns.length);
+      const summaryRow = 8 + reportData.length + 1;
+      worksheet.mergeCells(`A${summaryRow}:${lastColLetter}${summaryRow}`);
+      worksheet.getCell(`A${summaryRow}`).value =
+        `Summary: ${allItems.length} items | IHM Present: ${totalPresent} | No IHM: ${totalNotPresent} | Unknown: ${totalUnknown} | Documentation Compliance: ${compliancePct}%`;
+      worksheet.getCell(`A${summaryRow}`).font = { bold: true, size: 10 };
+      worksheet.getCell(`A${summaryRow}`).fill = {
+        type: 'pattern',
+        pattern: 'solid',
+        fgColor: { argb: 'FFF3F4F6' }
+      };
+
+      applyStandardPageSetup(worksheet, 7, columns.length, summaryRow, vesselName);
+      worksheet.pageSetup.orientation = 'landscape';
+
+      const buffer = await workbook.xlsx.writeBuffer();
+      const dateStr = new Date().toISOString().split('T')[0].replace(/-/g, '');
+      const filename = `IHM_Inventory_Status_${vesselName.replace(/[^a-z0-9]/gi, '_')}_${dateStr}.xlsx`;
+
+      res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+      res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+      res.send(buffer);
+
+    } catch (error: any) {
+      console.error("Error generating IHM Inventory Status Excel report:", error);
+      res.status(500).json({ error: "Failed to generate report: " + error.message });
+    }
+  });
+
   const httpServer = createServer(app);
   
   // Recalculate recurring defects on startup (don't await - let it run in background)
