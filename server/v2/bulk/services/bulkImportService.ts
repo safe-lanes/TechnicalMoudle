@@ -87,6 +87,14 @@ export class BulkImportService {
           params.userId,
           importHistoryId
         );
+      } else if (effectiveType === 'stores') {
+        result = await this.importStores(
+          dataToImport,
+          params.mode,
+          params.vesselId,
+          params.userId,
+          importHistoryId
+        );
       } else {
         result = await this.importComponents(
           dataToImport,
@@ -1319,6 +1327,200 @@ export class BulkImportService {
     if (Object.keys(updates).length === 0) return null;
 
     return await this.repository.updateComponent(id, updates);
+  }
+
+  private async importStores(
+    data: any[],
+    mode: string,
+    vesselId: string,
+    userId: string,
+    importHistoryId: string
+  ): Promise<ImportResult> {
+    const result: ImportResult = { created: 0, updated: 0, skipped: 0, archived: 0 };
+    console.log(`[V2] Starting stores import: ${data.length} rows, mode: ${mode}, vesselId: ${vesselId}`);
+
+    const existingItems = await this.repository.getStoresItems(vesselId);
+    const itemsByCode = new Map(existingItems.map((item: any) => [item.itemCode, item]));
+
+    for (const row of data) {
+      try {
+        const itemCode = String(row['Item Code'] || '').trim();
+        if (!itemCode) {
+          result.skipped++;
+          continue;
+        }
+
+        const itemName = String(row['Item Name'] || '').trim();
+        if (!itemName) {
+          result.skipped++;
+          continue;
+        }
+
+        const existingItem = itemsByCode.get(itemCode);
+
+        const robLocationA = parseFloat(String(row['Location A - ROB'] || '0')) || 0;
+        const robLocationB = parseFloat(String(row['Location B - ROB'] || '0')) || 0;
+
+        let totalRob = robLocationA + robLocationB;
+        if (row['Total ROB'] !== undefined && row['Total ROB'] !== null && String(row['Total ROB']).trim() !== '') {
+          const explicitTotal = parseFloat(String(row['Total ROB']));
+          if (!isNaN(explicitTotal) && explicitTotal >= 0) {
+            totalRob = explicitTotal;
+          }
+        }
+
+        const storesData: any = {
+          vesselId,
+          itemType: 'General Stores',
+          itemCode,
+          impaCode: row['IMPA Code'] ? String(row['IMPA Code']).trim() : null,
+          itemName,
+          category: row['Category'] ? String(row['Category']).trim() : null,
+          uom: row['UOM'] ? String(row['UOM']).trim().toUpperCase() : null,
+          rob: String(totalRob),
+          robLocationA: String(robLocationA),
+          robLocationB: String(robLocationB),
+          locationA: row['Location A'] ? String(row['Location A']).trim() : null,
+          locationB: row['Location B'] ? String(row['Location B']).trim() : null,
+          min: row['Min'] !== undefined && row['Min'] !== null && String(row['Min']).trim() !== ''
+            ? String(parseFloat(String(row['Min'])) || 0) : '0',
+          isActive: true,
+          deleted: false,
+        };
+
+        if (mode === 'add') {
+          if (existingItem) {
+            result.skipped++;
+            continue;
+          }
+          const created = await this.repository.createStoresItem(storesData);
+          if (created) {
+            itemsByCode.set(itemCode, created);
+            result.created++;
+
+            if (totalRob > 0) {
+              await this.repository.createStoresLedgerEntry({
+                vesselId,
+                section: storesData.itemType,
+                itemId: created.id,
+                partCode: itemCode,
+                itemName,
+                uom: storesData.uom,
+                eventType: 'INITIAL',
+                qtyChangeBase: String(totalRob),
+                qtyDisplay: String(totalRob),
+                robAfterBase: String(totalRob),
+                dateLocal: new Date().toISOString().split('T')[0],
+                tz: 'UTC',
+                timestampUTC: new Date(),
+                place: `Location A: ${robLocationA}, Location B: ${robLocationB}`,
+                userId,
+                remarks: 'Initial stock from bulk import',
+              });
+            }
+
+            const { checksum } = createRecordSnapshot(created);
+            await this.repository.createImportChangeLog({
+              id: uuidv4(),
+              importHistoryId,
+              entityType: 'stores',
+              entityId: String(created.id),
+              operation: 'created',
+              previousData: null,
+              newData: { itemCode, itemName },
+              checksum,
+            });
+          }
+        } else if (mode === 'update') {
+          if (!existingItem) {
+            result.skipped++;
+            continue;
+          }
+          const { vesselId: _v, deleted: _d, ...updateData } = storesData;
+          const updated = await this.repository.updateStoresItem(existingItem.id, updateData);
+          if (updated) {
+            itemsByCode.set(itemCode, updated);
+            result.updated++;
+            const { checksum } = createRecordSnapshot(updated);
+            await this.repository.createImportChangeLog({
+              id: uuidv4(),
+              importHistoryId,
+              entityType: 'stores',
+              entityId: String(existingItem.id),
+              operation: 'updated',
+              previousData: existingItem,
+              newData: { itemCode, itemName },
+              checksum,
+            });
+          }
+        } else if (mode === 'upsert') {
+          if (existingItem) {
+            const { vesselId: _v, deleted: _d, ...updateData } = storesData;
+            const updated = await this.repository.updateStoresItem(existingItem.id, updateData);
+            if (updated) {
+              itemsByCode.set(itemCode, updated);
+              result.updated++;
+              const { checksum } = createRecordSnapshot(updated);
+              await this.repository.createImportChangeLog({
+                id: uuidv4(),
+                importHistoryId,
+                entityType: 'stores',
+                entityId: String(existingItem.id),
+                operation: 'updated',
+                previousData: existingItem,
+                newData: { itemCode, itemName },
+                checksum,
+              });
+            }
+          } else {
+            const created = await this.repository.createStoresItem(storesData);
+            if (created) {
+              itemsByCode.set(itemCode, created);
+              result.created++;
+
+              if (totalRob > 0) {
+                await this.repository.createStoresLedgerEntry({
+                  vesselId,
+                  section: storesData.itemType,
+                  itemId: created.id,
+                  partCode: itemCode,
+                  itemName,
+                  uom: storesData.uom,
+                  eventType: 'INITIAL',
+                  qtyChangeBase: String(totalRob),
+                  qtyDisplay: String(totalRob),
+                  robAfterBase: String(totalRob),
+                  dateLocal: new Date().toISOString().split('T')[0],
+                  tz: 'UTC',
+                  timestampUTC: new Date(),
+                  place: `Location A: ${robLocationA}, Location B: ${robLocationB}`,
+                  userId,
+                  remarks: 'Initial stock from bulk import',
+                });
+              }
+
+              const { checksum } = createRecordSnapshot(created);
+              await this.repository.createImportChangeLog({
+                id: uuidv4(),
+                importHistoryId,
+                entityType: 'stores',
+                entityId: String(created.id),
+                operation: 'created',
+                previousData: null,
+                newData: { itemCode, itemName },
+                checksum,
+              });
+            }
+          }
+        }
+      } catch (error: any) {
+        console.error(`[V2] Error importing stores row:`, error.message);
+        result.skipped++;
+      }
+    }
+
+    console.log(`[V2] Stores import complete: ${result.created} created, ${result.updated} updated, ${result.skipped} skipped`);
+    return result;
   }
 }
 

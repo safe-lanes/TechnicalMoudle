@@ -136,6 +136,14 @@ export class BulkController {
   }
 
   async getTemplate(req: Request, res: Response): Promise<void> {
+    const { type } = req.query;
+    if (type === 'stores') {
+      const buffer = this.templateService.generateStoresTemplate();
+      res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+      res.setHeader('Content-Disposition', 'attachment; filename="stores-import-template.xlsx"');
+      res.send(buffer);
+      return;
+    }
     const buffer = this.templateService.generateComponentTemplate();
     res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
     res.setHeader('Content-Disposition', 'attachment; filename="component-import-template.xlsx"');

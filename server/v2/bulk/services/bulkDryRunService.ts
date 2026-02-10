@@ -279,6 +279,45 @@ const SPARE_COLUMN_MAPPINGS: Record<string, string> = {
   'vessel code': 'Vessel Code',
 };
 
+const STORES_COLUMN_MAPPINGS: Record<string, string> = {
+  'itemcode': 'Item Code',
+  'item_code': 'Item Code',
+  'item code': 'Item Code',
+  'impacode': 'IMPA Code',
+  'impa_code': 'IMPA Code',
+  'impa code': 'IMPA Code',
+  'itemname': 'Item Name',
+  'item_name': 'Item Name',
+  'item name': 'Item Name',
+  'uom': 'UOM',
+  'unitofmeasurement': 'UOM',
+  'unit_of_measurement': 'UOM',
+  'unit of measurement': 'UOM',
+  'category': 'Category',
+  'totalrob': 'Total ROB',
+  'total_rob': 'Total ROB',
+  'total rob': 'Total ROB',
+  'locationa': 'Location A',
+  'location_a': 'Location A',
+  'location a': 'Location A',
+  'locationarob': 'Location A - ROB',
+  'location_a_rob': 'Location A - ROB',
+  'location a - rob': 'Location A - ROB',
+  'locationb': 'Location B',
+  'location_b': 'Location B',
+  'location b': 'Location B',
+  'locationbrob': 'Location B - ROB',
+  'location_b_rob': 'Location B - ROB',
+  'location b - rob': 'Location B - ROB',
+  'min': 'Min',
+  'minimum': 'Min',
+  'minimumstock': 'Min',
+  'minimum_stock': 'Min',
+  'minimum stock': 'Min',
+};
+
+const VALID_STORES_CATEGORIES = ['General Stores', 'Electrical', 'Mechanical', 'Safety'];
+
 const COMPONENT_CATEGORY_MAP: Record<string, string> = {
   '1': '1 Ship General',
   '2': '2 Hull',
@@ -394,6 +433,7 @@ function getColumnMappingsForType(type: string): Record<string, string> {
   switch (type) {
     case 'jobs': return JOB_COLUMN_MAPPINGS;
     case 'spares': return SPARE_COLUMN_MAPPINGS;
+    case 'stores': return STORES_COLUMN_MAPPINGS;
     default: return COMPONENT_COLUMN_MAPPINGS;
   }
 }
@@ -474,6 +514,8 @@ export class BulkDryRunService {
       rows = await this.validateJobRows(filteredData, mode, vesselId);
     } else if (type === 'spares') {
       rows = await this.validateSpareRows(filteredData, mode, vesselId);
+    } else if (type === 'stores') {
+      rows = await this.validateStoresRows(filteredData, mode, vesselId);
     } else {
       rows = await this.validateComponentRows(filteredData, mode, vesselId);
     }
@@ -870,6 +912,113 @@ export class BulkDryRunService {
         'Position Number', 'Location A', 'Location B', 'Note',
         'Manual Name', 'Page Number', 'Evidence Type', 'Fleet Equipment Code', 'Remarks',
       ];
+      for (const field of textFields) {
+        const val = row[field];
+        if (val !== undefined && val !== null && String(val).trim() !== '') {
+          normalized[field] = String(val).trim();
+        }
+      }
+
+      const status = errors.length > 0 ? 'error' : warnings.length > 0 ? 'warning' : 'ok';
+
+      rows.push({
+        row: rowNum,
+        status,
+        errors,
+        warnings,
+        normalized,
+        original: row,
+      });
+    }
+
+    return rows;
+  }
+
+  private async validateStoresRows(
+    filteredData: Record<string, any>[],
+    mode: string,
+    vesselId: string | undefined
+  ): Promise<RowValidationResult[]> {
+    const rows: RowValidationResult[] = [];
+
+    const codeCounts = new Map<string, number>();
+    for (const row of filteredData) {
+      const code = String(row['Item Code'] || '').trim().toLowerCase();
+      if (code) {
+        codeCounts.set(code, (codeCounts.get(code) || 0) + 1);
+      }
+    }
+
+    let existingMap = new Map<string, any>();
+    if (vesselId && (mode === 'add' || mode === 'upsert')) {
+      const codes = filteredData
+        .map(r => String(r['Item Code'] || '').trim())
+        .filter(c => c);
+      if (codes.length > 0) {
+        existingMap = await this.repository.getStoresItemsByCodes(codes, vesselId);
+      }
+    }
+
+    for (let i = 0; i < filteredData.length; i++) {
+      const row = filteredData[i];
+      const rowNum = i + 2;
+      const errors: string[] = [];
+      const warnings: string[] = [];
+      const normalized: Record<string, any> = {};
+
+      const itemCode = String(row['Item Code'] || '').trim();
+      if (!itemCode) {
+        errors.push(`Row ${rowNum}: Item Code is required`);
+      } else {
+        normalized['Item Code'] = itemCode;
+        const lowerCode = itemCode.toLowerCase();
+        if ((codeCounts.get(lowerCode) || 0) > 1) {
+          warnings.push(`Duplicate Item Code "${itemCode}" found in file`);
+        }
+        if (mode === 'add' && existingMap.has(itemCode)) {
+          errors.push(`Item Code "${itemCode}" already exists in the database`);
+        }
+      }
+
+      const itemName = String(row['Item Name'] || '').trim();
+      if (!itemName) {
+        errors.push(`Row ${rowNum}: Item Name is required`);
+      } else {
+        normalized['Item Name'] = itemName;
+      }
+
+      if (row['IMPA Code'] && String(row['IMPA Code']).trim()) {
+        normalized['IMPA Code'] = String(row['IMPA Code']).trim();
+      }
+
+      if (row['UOM'] && String(row['UOM']).trim()) {
+        normalized['UOM'] = String(row['UOM']).trim().toUpperCase();
+      }
+
+      if (row['Category'] && String(row['Category']).trim()) {
+        const cat = String(row['Category']).trim();
+        if (!VALID_STORES_CATEGORIES.includes(cat)) {
+          warnings.push(`Row ${rowNum}: Category "${cat}" is not one of the standard categories (${VALID_STORES_CATEGORIES.join(', ')})`);
+        }
+        normalized['Category'] = cat;
+      }
+
+      const numericFields = ['Location A - ROB', 'Location B - ROB', 'Total ROB', 'Min'];
+      for (const field of numericFields) {
+        const val = row[field];
+        if (val !== undefined && val !== null && String(val).trim() !== '') {
+          const num = parseFloat(String(val));
+          if (isNaN(num)) {
+            warnings.push(`Row ${rowNum}: ${field} should be a number (got: '${val}')`);
+          } else if (num < 0) {
+            errors.push(`Row ${rowNum}: ${field} cannot be negative`);
+          } else {
+            normalized[field] = num;
+          }
+        }
+      }
+
+      const textFields = ['Location A', 'Location B'];
       for (const field of textFields) {
         const val = row[field];
         if (val !== undefined && val !== null && String(val).trim() !== '') {

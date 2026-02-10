@@ -9,6 +9,7 @@ import {
   v2SpareLocationStock,
   v2InventoryTransactions,
 } from '@shared/v2/spares/schema';
+import { v2StoresItems, v2StoresLedger } from '@shared/v2/stores/schema';
 
 export class BulkRepository {
   async getComponents(vesselId: string) {
@@ -280,6 +281,75 @@ export class BulkRepository {
   async createInventoryTransaction(data: any) {
     const db = await getDb();
     const results = await db.insert(v2InventoryTransactions).values(data).returning();
+    return results[0];
+  }
+
+  async getStoresItems(vesselId: string, itemType?: string) {
+    const db = await getDb();
+    if (itemType) {
+      return await db.select().from(v2StoresItems)
+        .where(and(
+          eq(v2StoresItems.vesselId, vesselId),
+          eq(v2StoresItems.itemType, itemType),
+          eq(v2StoresItems.deleted, false)
+        ));
+    }
+    return await db.select().from(v2StoresItems)
+      .where(and(
+        eq(v2StoresItems.vesselId, vesselId),
+        eq(v2StoresItems.deleted, false)
+      ));
+  }
+
+  async getStoresItemByCode(itemCode: string, vesselId: string, itemType?: string) {
+    const db = await getDb();
+    const conditions = [
+      eq(v2StoresItems.itemCode, itemCode),
+      eq(v2StoresItems.vesselId, vesselId),
+      eq(v2StoresItems.deleted, false),
+    ];
+    if (itemType) {
+      conditions.push(eq(v2StoresItems.itemType, itemType));
+    }
+    const results = await db.select().from(v2StoresItems)
+      .where(and(...conditions));
+    return results[0] || null;
+  }
+
+  async getStoresItemsByCodes(codes: string[], vesselId: string): Promise<Map<string, any>> {
+    const db = await getDb();
+    if (codes.length === 0) return new Map();
+    const results = await db.select().from(v2StoresItems)
+      .where(and(
+        inArray(v2StoresItems.itemCode, codes),
+        eq(v2StoresItems.vesselId, vesselId),
+        eq(v2StoresItems.deleted, false)
+      ));
+    const map = new Map<string, any>();
+    for (const r of results) {
+      map.set(r.itemCode, r);
+    }
+    return map;
+  }
+
+  async createStoresItem(data: any) {
+    const db = await getDb();
+    const results = await db.insert(v2StoresItems).values(data).returning();
+    return results[0];
+  }
+
+  async updateStoresItem(id: number, data: any) {
+    const db = await getDb();
+    const results = await db.update(v2StoresItems)
+      .set({ ...data, updatedAt: new Date() })
+      .where(eq(v2StoresItems.id, id))
+      .returning();
+    return results[0] || null;
+  }
+
+  async createStoresLedgerEntry(data: any) {
+    const db = await getDb();
+    const results = await db.insert(v2StoresLedger).values(data).returning();
     return results[0];
   }
 }
