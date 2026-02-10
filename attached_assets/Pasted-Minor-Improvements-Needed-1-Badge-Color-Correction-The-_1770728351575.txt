@@ -1,0 +1,72 @@
+Minor Improvements Needed
+1. Badge Color Correction:
+The analysis shows IHM Present should be red/alert (hazardous = warning), but that's actually correct for maritime regulations - the presence of hazardous materials IS the concern. However, clarify:
+
+Present = Red/Alert (hazardous material detected)
+
+Not Present = Green/OK (no hazardous material)
+
+Unknown = Yellow/Warning (needs investigation)
+
+2. Missing Specifications:
+While the plan is solid, explicitly remind Replit to:
+
+Use TanStack Query for API calls
+
+Reuse shadcn/ui components
+
+Include TypeScript types for API response
+
+Handle empty vessel selection case
+
+Add debounce (300ms) to search input
+
+3. Data Normalization Logic:
+Be explicit about the mapping:
+
+text
+Spares.ihm: "Yes" → "present", "No" → "not_present", null → "unknown"
+StoresItems.ihmPresence: "Present" → "present", "Not Present" → "not_present", "Unknown" → "unknown"
+Final Verdict
+Is this sufficient? YES ✓
+
+Replit now has:
+
+Clear implementation path
+
+Specific component structure
+
+Data flow understanding
+
+Navigation strategy
+
+Testing plan
+
+This is a production-ready specification. Replit can now proceed with implementation.
+
+Recommended Response to Replit
+"Perfect! Your plan is comprehensive and technically sound. A few clarifications before you start:
+
+Badge colors are correct - IHM Present (red) indicates hazardous materials detected, which is the regulatory concern.
+
+Data normalization mapping:
+
+Spares table: ihm field: "Yes"→present, "No"→not_present, null/undefined→unknown
+
+Stores table: ihmPresence field: "Present"→present, "Not Present"→not_present, "Unknown"→unknown
+
+Technical stack reminder:
+
+Use TanStack Query (@tanstack/react-query) for API calls
+
+Use shadcn/ui components (already in project)
+
+Add 300ms debounce to search input
+
+TypeScript types for all API contracts
+
+Navigation: The viewingReport state approach is perfect - maintains consistency with how you're handling other report sections.
+
+Compliance percentage calculation: (ihmPresent / totalItems) × 100 - items with documented IHM evidence.
+
+Please proceed with implementation. Start with the API endpoint first, then the UI components. Let me know when you need testing or encounter any blockers."
