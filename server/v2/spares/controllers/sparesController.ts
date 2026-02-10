@@ -19,10 +19,10 @@ export async function listByVessel(req: Request, res: Response) {
   try {
     const params = vesselIdSchema.safeParse(req.params);
     if (!params.success) return res.status(400).json({ error: params.error.errors[0]?.message });
-    const spares = await sparesService.getSpares(params.data.vesselId);
-    res.json(spares);
+    const spares = await sparesService.getSparesWithInventory(params.data.vesselId);
+    res.json({ success: true, data: spares });
   } catch (error: any) {
-    res.status(500).json({ error: "Failed to fetch spares" });
+    res.status(500).json({ success: false, error: "Failed to fetch spares" });
   }
 }
 
@@ -82,6 +82,8 @@ export async function create(req: Request, res: Response) {
 
     const spare = await sparesService.createSpare({
       ...body.data,
+      componentName: body.data.componentName || '',
+      critical: body.data.critical || 'No',
       vesselId: params.data.vesselId,
     });
     res.status(201).json(spare);

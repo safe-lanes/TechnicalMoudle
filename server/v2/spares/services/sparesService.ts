@@ -11,6 +11,10 @@ export async function getSpares(vesselId: string): Promise<Spare[]> {
   return repo.getSpares(vesselId);
 }
 
+export async function getSparesWithInventory(vesselId: string) {
+  return repo.getSparesWithInventory(vesselId);
+}
+
 export async function getSpare(id: number): Promise<Spare | undefined> {
   return repo.getSpare(id);
 }

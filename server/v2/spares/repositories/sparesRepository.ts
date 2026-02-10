@@ -1,10 +1,11 @@
 import { eq, and, desc, sql } from 'drizzle-orm';
 import { getDb } from '../../../db';
 import {
-  v2Spares, v2SparesHistory, v2Locations, v2SpareLocationStock,
+  v2Spares, v2SparesHistory, v2Locations, v2SpareLocationStock, v2SpareComponentLinks,
   type Spare, type InsertSpare, type SpareHistory, type InsertSpareHistory,
   type Location, type SpareLocationStock,
 } from '@shared/v2/spares/schema';
+import { v2Components } from '@shared/v2/components/schema';
 
 export class SparesRepository {
 
@@ -22,6 +23,82 @@ export class SparesRepository {
         eq(v2Spares.dataScope, 'vessel'),
         eq(v2Spares.deleted, false)
       ));
+  }
+
+  async getSparesWithInventory(vesselId: string): Promise<Array<{
+    spare: Spare;
+    robTotal: number;
+    stockStatus: 'OK' | 'At Min';
+    locations: Array<{ locationId: number; locationName: string; qty: number }>;
+    linkedComponents: Array<{ componentId: string; componentCode: string; componentName: string }>;
+  }>> {
+    const db = await getDb();
+    const spares = await this.getSpares(vesselId);
+
+    const allLinks = await db.select().from(v2SpareComponentLinks)
+      .where(eq(v2SpareComponentLinks.vesselId, vesselId));
+
+    const allStock = await db.select().from(v2SpareLocationStock)
+      .where(eq(v2SpareLocationStock.vesselId, vesselId));
+
+    const allLocations = await db.select().from(v2Locations)
+      .where(eq(v2Locations.vesselId, vesselId));
+
+    const componentIdsSet = new Set(allLinks.map(l => l.componentId));
+    const componentIds = Array.from(componentIdsSet);
+    const componentsMap = new Map<string, { id: string; componentCode: string | null; name: string | null }>();
+    if (componentIds.length > 0) {
+      const components = await db.select({
+        id: v2Components.id,
+        componentCode: v2Components.componentCode,
+        name: v2Components.name,
+      }).from(v2Components)
+        .where(sql`${v2Components.id} IN ${componentIds}`);
+      for (const c of components) {
+        componentsMap.set(c.id, c);
+      }
+    }
+
+    const locationsMap = new Map(allLocations.map(l => [l.id, l]));
+    const linksBySpare = new Map<number, typeof allLinks>();
+    for (const link of allLinks) {
+      const existing = linksBySpare.get(link.spareId) || [];
+      existing.push(link);
+      linksBySpare.set(link.spareId, existing);
+    }
+    const stockBySpare = new Map<number, typeof allStock>();
+    for (const stock of allStock) {
+      const existing = stockBySpare.get(stock.spareId) || [];
+      existing.push(stock);
+      stockBySpare.set(stock.spareId, existing);
+    }
+
+    return spares.map(spare => {
+      const robTotal = (spare.robLocationA ?? 0) + (spare.robLocationB ?? 0);
+      const stockStatus: 'OK' | 'At Min' = (spare.rob ?? 0) <= (spare.min ?? 0) ? 'At Min' : 'OK';
+
+      const spareStock = stockBySpare.get(spare.id) || [];
+      const locations = spareStock.map(s => {
+        const loc = locationsMap.get(s.locationId);
+        return {
+          locationId: s.locationId,
+          locationName: loc?.locationName || `Location ${s.locationId}`,
+          qty: s.qty,
+        };
+      });
+
+      const spareLinks = linksBySpare.get(spare.id) || [];
+      const linkedComponents = spareLinks.map(link => {
+        const comp = componentsMap.get(link.componentId);
+        return {
+          componentId: link.componentId,
+          componentCode: comp?.componentCode || '',
+          componentName: comp?.name || '',
+        };
+      });
+
+      return { spare, robTotal, stockStatus, locations, linkedComponents };
+    });
   }
 
   async getSpare(id: number): Promise<Spare | undefined> {
