@@ -8029,6 +8029,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 : `Analysis based on ${daysOfData} days of data. High confidence in trend projections.`,
           },
           totalInventoryItems: allItems.filter((i: any) => !i.deleted && i.isActive !== false).length,
+          dataMonths: Math.max(0.1, Math.round((daysOfData / 30) * 10) / 10),
         },
         consumptionTrends,
         topConsumedItems,

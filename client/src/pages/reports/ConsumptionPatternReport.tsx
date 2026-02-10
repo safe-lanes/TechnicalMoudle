@@ -132,6 +132,7 @@ const ConsumptionPatternReport: React.FC<ConsumptionPatternReportProps> = ({ onB
           { header: "Month", field: "month", width: 30 },
           { header: "Total Qty", field: "totalQty", width: 25 },
           { header: "Events", field: "eventCount", width: 20 },
+          { header: "Item Count", field: "itemCount", width: 20 },
           { header: "Stores", field: "stores", width: 20 },
           { header: "Lubricants", field: "lubricants", width: 25 },
           { header: "Chemicals", field: "chemicals", width: 25 },
@@ -279,10 +280,10 @@ const ConsumptionPatternReport: React.FC<ConsumptionPatternReportProps> = ({ onB
           <h1 className="text-2xl font-bold text-gray-900">Consumption Pattern Analysis</h1>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
-          <Button variant="outline" onClick={handleExportPdf} disabled={!data} data-testid="button-export-pdf">
+          <Button variant="outline" onClick={handleExportPdf} disabled={!data || (summary?.totalConsumptionEvents ?? 0) === 0} data-testid="button-export-pdf">
             <FileText className="h-4 w-4 mr-1" /> PDF
           </Button>
-          <Button variant="outline" onClick={handleExportExcel} disabled={!data || generatingExcel} data-testid="button-export-excel">
+          <Button variant="outline" onClick={handleExportExcel} disabled={!data || generatingExcel || (summary?.totalConsumptionEvents ?? 0) === 0} data-testid="button-export-excel">
             {generatingExcel ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <Download className="h-4 w-4 mr-1" />} Excel
           </Button>
         </div>
@@ -433,6 +434,7 @@ const ConsumptionPatternReport: React.FC<ConsumptionPatternReportProps> = ({ onB
                         <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase">Month</th>
                         <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase">Total Qty</th>
                         <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase">Events</th>
+                        <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase">Item Count</th>
                         <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase">Stores</th>
                         <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase">Lubricants</th>
                         <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase">Chemicals</th>
@@ -445,6 +447,7 @@ const ConsumptionPatternReport: React.FC<ConsumptionPatternReportProps> = ({ onB
                           <td className="px-3 py-2 font-medium">{t.month}</td>
                           <td className="px-3 py-2">{Number(t.totalQty).toLocaleString()}</td>
                           <td className="px-3 py-2">{t.eventCount}</td>
+                          <td className="px-3 py-2">{t.itemCount}</td>
                           <td className="px-3 py-2">{t.stores}</td>
                           <td className="px-3 py-2">{t.lubricants}</td>
                           <td className="px-3 py-2">{t.chemicals}</td>
@@ -656,7 +659,7 @@ const ConsumptionPatternReport: React.FC<ConsumptionPatternReportProps> = ({ onB
                               {item.movementSpeed === "slow" && <Badge className="bg-yellow-100 text-yellow-700 border-yellow-300">Slow</Badge>}
                               {item.movementSpeed === "non-moving" && <Badge className="bg-gray-100 text-gray-600 border-gray-300">Non-Moving</Badge>}
                             </td>
-                            <td className="px-3 py-2">{item.daysUntilStockout != null ? item.daysUntilStockout : "-"}</td>
+                            <td className="px-3 py-2">{item.movementSpeed === "non-moving" ? "\u221E" : (item.daysUntilStockout != null ? item.daysUntilStockout : "-")}</td>
                             <td className="px-3 py-2">
                               {item.belowMinStock ? <Badge className="bg-red-100 text-red-700 border-red-300">Yes</Badge> : <Badge className="bg-green-100 text-green-700 border-green-300">No</Badge>}
                             </td>
