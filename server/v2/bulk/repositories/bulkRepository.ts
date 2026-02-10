@@ -1,4 +1,4 @@
-import { eq, and, inArray } from 'drizzle-orm';
+import { eq, and, inArray, desc, sql } from 'drizzle-orm';
 import { getDb } from '../../../db';
 import { bulkComponents, bulkMakerList, bulkImportChangeLog, bulkImportHistory } from '../schema';
 
@@ -83,6 +83,31 @@ export class BulkRepository {
     const db = await getDb();
     const results = await db.insert(bulkMakerList).values(data).returning();
     return results[0];
+  }
+
+  async getImportHistoryById(id: string) {
+    const db = await getDb();
+    const results = await db.select().from(bulkImportHistory)
+      .where(eq(bulkImportHistory.id, id));
+    return results[0] || null;
+  }
+
+  async getImportHistoryList(type?: string, limit: number = 50, offset: number = 0) {
+    const db = await getDb();
+    const conditions = type ? eq(bulkImportHistory.type, type) : undefined;
+
+    const countResult = await db.select({ count: sql<number>`count(*)` })
+      .from(bulkImportHistory)
+      .where(conditions);
+    const total = Number(countResult[0]?.count ?? 0);
+
+    const items = await db.select().from(bulkImportHistory)
+      .where(conditions)
+      .orderBy(desc(bulkImportHistory.startedAt))
+      .limit(limit)
+      .offset(offset);
+
+    return { items, total };
   }
 
   async createImportHistory(data: any) {
