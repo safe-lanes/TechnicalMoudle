@@ -1,0 +1,73 @@
+Prompt for Replit – Running Hours Module (v2 Architecture)
+
+Analyze the existing Running Hours module implementation in the backend.
+
+The legacy implementation must remain completely unchanged.
+
+Follow the same v2 architecture approach already defined and applied for other modules (Bulk Uploads, Jobs, Work Orders).
+Do not introduce any new patterns, concepts, or structures.
+
+⚠️ Strict constraint:
+The v2 implementation must be a direct structural and logical mirror of the legacy implementation.
+No new business logic, no altered logic, no optimized logic, and no inferred behavior is allowed in v2.
+
+Your task:
+
+Create a v2 implementation for the Running Hours module, keeping it fully separated from legacy code.
+
+Ensure all business logic is implemented directly inside the v2 repository layer, including:
+
+Calculations
+
+Inherited logic
+
+Vessel / component–based logic
+
+⚠️ Important:
+All logic written in v2 must be derived explicitly from the legacy implementation.
+Do not create, enhance, simplify, or reinterpret logic under any circumstance.
+
+Do not reuse or call any methods from legacy files for logic or schema.
+
+Recreate schemas, repositories, services, and routes in v2, matching legacy behavior one-to-one.
+
+⚠️ Schema rule:
+v2 schemas must be a direct replication of legacy schemas (field-for-field, type-for-type).
+Do not add, remove, rename, normalize, denormalize, or redesign any schema elements.
+
+Ensure backend routes are clearly separated between legacy and v2 (same approach as earlier v2 modules).
+
+Implement support so that the frontend toggle can decide whether:
+
+Legacy Running Hours logic is used, or
+
+v2 Running Hours logic is used.
+
+Validate that outputs from v2 match legacy results exactly, without deviation, for:
+
+Individual vessel running hours
+
+Component-level running hours
+
+Inherited running hour calculations
+
+⚠️ Validation requirement:
+If any output differs from legacy behavior, the v2 implementation must be considered incorrect.
+
+Final output required:
+
+Folder/file structure for Running Hours v2
+
+Repository logic details (with clear reference to corresponding legacy logic)
+
+Route separation explanation (legacy vs v2)
+
+Toggle flow explanation (frontend → backend → repository)
+
+Explicit confirmation that:
+
+No new logic was created
+
+No schema changes were introduced
+
+Legacy behavior is preserved without modification
