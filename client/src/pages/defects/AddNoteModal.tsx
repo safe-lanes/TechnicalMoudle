@@ -47,7 +47,7 @@ export default function AddNoteModal({ open, onClose, defectId }: AddNoteModalPr
       });
       queryClient.invalidateQueries({ queryKey: ['/technical/api/defects'] });
       queryClient.invalidateQueries({ queryKey: ['/technical/api/defects', defectId] });
-      queryClient.invalidateQueries({ queryKey: ['/technical/api/defects?includeClosedDefects=true'] });
+      queryClient.invalidateQueries({ queryKey: ['/technical/api/defects', 'dashboard'] });
       handleClose();
     },
     onError: (error: any) => {

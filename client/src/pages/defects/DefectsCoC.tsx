@@ -680,7 +680,7 @@ export default function DefectsCoC() {
 
   const invalidateCoCQueries = () => {
     queryClient.invalidateQueries({ queryKey: ['/technical/api/defects'] });
-    queryClient.invalidateQueries({ queryKey: ['/technical/api/defects?includeClosedDefects=true'] });
+    queryClient.invalidateQueries({ queryKey: ['/technical/api/defects', 'dashboard'] });
     queryClient.invalidateQueries({ 
       predicate: (query) => {
         const queryKey = query.queryKey;

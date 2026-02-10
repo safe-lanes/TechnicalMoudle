@@ -545,7 +545,7 @@ export default function DefectsLogWithTabs() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['defects'] });
-      queryClient.invalidateQueries({ queryKey: ['/technical/api/defects?includeClosedDefects=true'] });
+      queryClient.invalidateQueries({ queryKey: ['/technical/api/defects'] });
       toast({
         title: "Success",
         description: "Defect has been deleted successfully."
@@ -578,7 +578,7 @@ export default function DefectsLogWithTabs() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['defects'] });
-      queryClient.invalidateQueries({ queryKey: ['/technical/api/defects?includeClosedDefects=true'] });
+      queryClient.invalidateQueries({ queryKey: ['/technical/api/defects'] });
     },
     onError: (error: Error) => {
       toast({
@@ -914,7 +914,7 @@ export default function DefectsLogWithTabs() {
           onClose={() => {
             setLinkModal({ open: false, defectId: null, linkedDefects: [] });
             queryClient.invalidateQueries({ queryKey: ['defects'] });
-            queryClient.invalidateQueries({ queryKey: ['/technical/api/defects?includeClosedDefects=true'] });
+            queryClient.invalidateQueries({ queryKey: ['/technical/api/defects'] });
           }}
           defectId={linkModal.defectId}
           currentLinkedDefects={linkModal.linkedDefects}
@@ -926,7 +926,7 @@ export default function DefectsLogWithTabs() {
         onClose={() => {
           setNewDefectModalOpen(false);
           queryClient.invalidateQueries({ queryKey: ['defects'] });
-          queryClient.invalidateQueries({ queryKey: ['/technical/api/defects?includeClosedDefects=true'] });
+          queryClient.invalidateQueries({ queryKey: ['/technical/api/defects'] });
         }}
         mode="new"
       />
@@ -948,7 +948,7 @@ export default function DefectsLogWithTabs() {
           onClose={() => {
             setEditModal({ open: false, defectId: null });
             queryClient.invalidateQueries({ queryKey: ['defects'] });
-            queryClient.invalidateQueries({ queryKey: ['/technical/api/defects?includeClosedDefects=true'] });
+            queryClient.invalidateQueries({ queryKey: ['/technical/api/defects'] });
           }}
           defectId={editModal.defectId}
           mode="edit"

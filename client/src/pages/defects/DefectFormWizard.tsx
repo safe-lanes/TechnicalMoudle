@@ -411,23 +411,21 @@ export default function DefectFormWizard({
       if (existingId) {
         await apiRequest('PATCH', `/technical/api/defects/${existingId}`, submitData);
         queryClient.invalidateQueries({ queryKey: ['defects'] });
-        queryClient.invalidateQueries({ queryKey: ['/technical/api/defects?includeClosedDefects=true'] });
+        queryClient.invalidateQueries({ queryKey: ['/technical/api/defects'] });
         if (showToast) {
           toast({ title: "Defect updated successfully" });
         }
       } else {
         const response = await apiRequest('POST', '/technical/api/defects', submitData);
-        // Store the created defect ID to prevent duplicate creation on subsequent saves
         try {
           const createdDefect = await response.json();
           if (createdDefect && createdDefect.id) {
             setCreatedDefectId(createdDefect.id);
           }
         } catch (e) {
-          // Response might not be JSON, ignore
         }
         queryClient.invalidateQueries({ queryKey: ['defects'] });
-        queryClient.invalidateQueries({ queryKey: ['/technical/api/defects?includeClosedDefects=true'] });
+        queryClient.invalidateQueries({ queryKey: ['/technical/api/defects'] });
         if (showToast) {
           toast({ title: "Defect created successfully" });
         }

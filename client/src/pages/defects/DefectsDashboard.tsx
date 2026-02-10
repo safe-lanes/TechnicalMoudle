@@ -86,7 +86,14 @@ export default function DefectsDashboard() {
   });
 
   const { data: defects = [], isLoading, refetch } = useQuery<Defect[]>({
-    queryKey: ['/technical/api/defects?includeClosedDefects=true'],
+    queryKey: ['/technical/api/defects', 'dashboard', 'active'],
+    queryFn: async () => {
+      const params = new URLSearchParams();
+      params.append('statusScope', 'active');
+      const response = await fetch(`/technical/api/defects?${params}`);
+      if (!response.ok) throw new Error('Failed to fetch defects');
+      return response.json();
+    },
   });
 
   const { data: masterVessels = [], isLoading: isLoadingVessels } = useVessels();
@@ -164,13 +171,11 @@ export default function DefectsDashboard() {
     ? Math.round((kpis.totalResolved / (kpis.totalActive + kpis.totalResolved)) * 100)
     : 0;
 
-  // For vessel chart, use ALL defects (not filtered) to always show multi-vessel comparison
   const allDefectsWithComputedStatus = defects.map(d => ({
     ...d,
     computedStatus: getComputedStatus(d)
   }));
-  
-  // Get unique vessel IDs from ALL defects, then enrich with vessel names from masterVessels
+
   const vesselIdsFromDefects = Array.from(new Set(allDefectsWithComputedStatus.map(d => d.vesselId))).filter(Boolean);
   const vessels = vesselIdsFromDefects.map(vesselId => {
     // Normalize lookup - check both id and vesselId fields

@@ -277,7 +277,7 @@ export function DefectsListModal({ open, onClose, title, defects, canEdit = true
           open={editModal.open}
           onClose={() => {
             setEditModal({ open: false, defectId: null });
-            queryClient.invalidateQueries({ queryKey: ['/technical/api/defects?includeClosedDefects=true'] });
+            queryClient.invalidateQueries({ queryKey: ['/technical/api/defects'] });
           }}
           defectId={editModal.defectId}
           mode="edit"

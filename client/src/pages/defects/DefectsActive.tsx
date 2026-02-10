@@ -157,7 +157,6 @@ export default function DefectsActive() {
     },
     onSuccess: (data, defectId) => {
       queryClient.invalidateQueries({ queryKey: ['/technical/api/defects'] });
-      queryClient.invalidateQueries({ queryKey: ['/technical/api/defects?includeClosedDefects=true'] });
       
       // Show success toast with action to view in Resolved tab
       toast({
