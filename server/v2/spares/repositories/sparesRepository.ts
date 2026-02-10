@@ -760,38 +760,102 @@ export class SparesRepository {
       remarks?: string;
       userId?: string;
     }>
-  ): Promise<Spare[]> {
-    const results: Spare[] = [];
+  ): Promise<Array<{
+    componentSpareId: number;
+    success: boolean;
+    message?: string;
+    robAfter?: number;
+  }>> {
+    const results: Array<{
+      componentSpareId: number;
+      success: boolean;
+      message?: string;
+      robAfter?: number;
+    }> = [];
 
     for (const row of rows) {
-      const userId = row.userId || 'system';
+      const {
+        componentSpareId,
+        consumedA = 0,
+        consumedB = 0,
+        receivedA = 0,
+        receivedB = 0,
+        receivedDate,
+        receivedPlace,
+        dateLocal,
+        remarks,
+        userId: rowUserId = 'system'
+      } = row;
 
-      if (row.consumedA && row.consumedA > 0) {
-        const result = await this.consumeSpareFromLocation(
-          row.componentSpareId, row.consumedA, 'A', userId, row.remarks, undefined, row.dateLocal
-        );
-        results.push(result.spare);
-      }
+      const transactionDate = (receivedDate && receivedDate.trim())
+        ? receivedDate.trim()
+        : ((dateLocal && dateLocal.trim()) ? dateLocal.trim() : undefined);
 
-      if (row.consumedB && row.consumedB > 0) {
-        const result = await this.consumeSpareFromLocation(
-          row.componentSpareId, row.consumedB, 'B', userId, row.remarks, undefined, row.dateLocal
-        );
-        results.push(result.spare);
-      }
+      try {
+        const errors: string[] = [];
 
-      if (row.receivedA && row.receivedA > 0) {
-        const result = await this.receiveSpareToLocation(
-          row.componentSpareId, row.receivedA, 'A', userId, row.remarks, undefined, row.receivedDate || row.dateLocal
-        );
-        results.push(result.spare);
-      }
+        if (consumedA > 0) {
+          try {
+            await this.consumeSpareFromLocation(
+              componentSpareId, consumedA, 'A', rowUserId, remarks, undefined, transactionDate
+            );
+          } catch (e: any) {
+            errors.push(`Consume A: ${e.message}`);
+          }
+        }
 
-      if (row.receivedB && row.receivedB > 0) {
-        const result = await this.receiveSpareToLocation(
-          row.componentSpareId, row.receivedB, 'B', userId, row.remarks, undefined, row.receivedDate || row.dateLocal
-        );
-        results.push(result.spare);
+        if (consumedB > 0) {
+          try {
+            await this.consumeSpareFromLocation(
+              componentSpareId, consumedB, 'B', rowUserId, remarks, undefined, transactionDate
+            );
+          } catch (e: any) {
+            errors.push(`Consume B: ${e.message}`);
+          }
+        }
+
+        if (receivedA > 0) {
+          try {
+            await this.receiveSpareToLocation(
+              componentSpareId, receivedA, 'A', rowUserId, remarks, receivedPlace, transactionDate
+            );
+          } catch (e: any) {
+            errors.push(`Receive A: ${e.message}`);
+          }
+        }
+
+        if (receivedB > 0) {
+          try {
+            await this.receiveSpareToLocation(
+              componentSpareId, receivedB, 'B', rowUserId, remarks, receivedPlace, transactionDate
+            );
+          } catch (e: any) {
+            errors.push(`Receive B: ${e.message}`);
+          }
+        }
+
+        const spare = await this.getSpare(componentSpareId);
+
+        if (errors.length > 0) {
+          results.push({
+            componentSpareId,
+            success: false,
+            message: errors.join('; '),
+            robAfter: spare?.rob ?? undefined,
+          });
+        } else {
+          results.push({
+            componentSpareId,
+            success: true,
+            robAfter: spare?.rob ?? undefined,
+          });
+        }
+      } catch (error: any) {
+        results.push({
+          componentSpareId,
+          success: false,
+          message: error.message || 'Unknown error',
+        });
       }
     }
 
@@ -824,13 +888,13 @@ export class SparesRepository {
       .where(and(
         eq(v2Spares.vesselId, vesselId),
         eq(v2Spares.deleted, false),
-        sql`${v2Spares.rob} <= ${v2Spares.min}`
+        sql`COALESCE(${v2Spares.rob}, 0) <= COALESCE(${v2Spares.min}, 0)`
       ));
   }
 
   async batchConsume(
     vesselId: string,
-    items: Array<{ spareId: number; quantity: number }>,
+    items: Array<{ spareId: number; quantity: number; location?: 'A' | 'B' }>,
     workOrderId?: string,
     consumedBy?: string
   ): Promise<Spare[]> {
@@ -838,8 +902,9 @@ export class SparesRepository {
     const userId = consumedBy || 'system';
 
     for (const item of items) {
+      const location = item.location || 'A';
       const result = await this.consumeSpareFromLocation(
-        item.spareId, item.quantity, 'A', userId, undefined, workOrderId
+        item.spareId, item.quantity, location, userId, undefined, workOrderId
       );
       results.push(result.spare);
     }
@@ -849,7 +914,7 @@ export class SparesRepository {
 
   async batchReceive(
     vesselId: string,
-    items: Array<{ spareId: number; quantity: number }>,
+    items: Array<{ spareId: number; quantity: number; location?: 'A' | 'B' }>,
     purchaseOrderRef?: string,
     receivedBy?: string
   ): Promise<Spare[]> {
@@ -857,8 +922,9 @@ export class SparesRepository {
     const userId = receivedBy || 'system';
 
     for (const item of items) {
+      const location = item.location || 'A';
       const result = await this.receiveSpareToLocation(
-        item.spareId, item.quantity, 'A', userId, undefined, purchaseOrderRef
+        item.spareId, item.quantity, location, userId, undefined, purchaseOrderRef
       );
       results.push(result.spare);
     }

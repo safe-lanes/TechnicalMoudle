@@ -130,7 +130,12 @@ export async function bulkUpdate(
     remarks?: string;
     userId?: string;
   }>
-): Promise<Spare[]> {
+): Promise<Array<{
+  componentSpareId: number;
+  success: boolean;
+  message?: string;
+  robAfter?: number;
+}>> {
   return repo.bulkUpdate(vesselId, rows);
 }
 
@@ -152,7 +157,7 @@ export async function getLowStockSpares(vesselId: string): Promise<Spare[]> {
 
 export async function batchConsume(
   vesselId: string,
-  items: Array<{ spareId: number; quantity: number }>,
+  items: Array<{ spareId: number; quantity: number; location?: 'A' | 'B' }>,
   workOrderId?: string,
   consumedBy?: string
 ): Promise<Spare[]> {
@@ -161,7 +166,7 @@ export async function batchConsume(
 
 export async function batchReceive(
   vesselId: string,
-  items: Array<{ spareId: number; quantity: number }>,
+  items: Array<{ spareId: number; quantity: number; location?: 'A' | 'B' }>,
   purchaseOrderRef?: string,
   receivedBy?: string
 ): Promise<Spare[]> {

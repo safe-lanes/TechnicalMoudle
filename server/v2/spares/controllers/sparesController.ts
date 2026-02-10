@@ -609,11 +609,11 @@ export async function bulkUpdateHandler(req: Request, res: Response) {
     const payload = bulkUpdateSchema.parse(req.body);
     const results = await sparesService.bulkUpdate(payload.vesselId, payload.rows);
 
-    res.json({ success: true, results });
+    res.json(results);
   } catch (error: any) {
     if (error.name === 'ZodError') {
       return res.status(400).json({ error: "Invalid request payload", details: error.errors });
     }
-    res.status(500).json({ error: error.message || "Failed to bulk update spares" });
+    res.status(500).json({ error: error.message || 'Failed to perform bulk update' });
   }
 }
