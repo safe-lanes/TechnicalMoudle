@@ -1,0 +1,113 @@
+Apply Existing V2 Architecture to Work Orders Module
+Objective
+
+Analyze the existing Work Orders implementation and produce a clear migration plan to apply the same V2 modular architecture already defined and used for:
+
+Components
+
+Common Bulk Upload APIs
+
+Jobs
+
+⚠️ This is a planning and analysis task only
+❌ Do not write or modify any code
+❌ Do not change existing behavior
+❌ Do not introduce new patterns, layers, or concepts
+
+🔒 Legacy Must Remain Untouched
+
+All legacy Work Orders logic must remain exactly as it is
+
+No refactoring, reuse, or imports from legacy code
+
+Legacy and V2 Work Orders must run in parallel
+
+V2 logic must be rewritten inside V2 files but behave identically
+
+🔁 Core Rule
+
+Follow the same V2 architecture and enforcement rules already defined.
+
+Same folder structure
+
+Same repository / service / controller separation
+
+Same schema & type rules
+
+Same REST patterns
+
+Same frontend toggle behavior
+
+Same rollback guarantees
+
+❌ No deviations
+❌ No new abstractions
+
+📦 Scope (STRICT)
+
+Only analyze:
+
+How existing Work Orders logic maps into V2 structure
+
+How Work Orders routes are isolated under /api/v2
+
+How the existing frontend toggle selects:
+
+Legacy Work Orders APIs OR
+
+V2 Work Orders APIs
+
+Do not design new workflows or states.
+
+🔁 Toggle Behavior (Same as Existing V2)
+
+Toggle ON → use V2 Work Orders APIs
+
+Toggle OFF → use legacy Work Orders APIs
+
+Toggle must be runtime-switchable
+
+No partial execution or mixed calls
+
+🛣️ Backend Route Separation
+
+Legacy routes remain unchanged
+
+V2 routes live strictly under:
+
+/technical/api/api/v2/work-orders/...
+
+
+No shared controllers or services
+
+No legacy route modification
+
+🧠 Logic Handling Rule
+
+All Work Orders business logic must exist inside V2
+
+❌ Do not import or call legacy Work Orders logic
+
+V2 output must match legacy behavior exactly
+
+🔙 Rollback & Safety
+
+Toggle OFF → instant fallback to legacy
+
+No data loss
+
+No side effects
+
+No duplicate processing
+
+🎯 Expected Output
+
+Provide:
+
+Legacy → V2 Work Orders mapping
+
+Toggle-based request & execution flow
+
+Route separation explanation
+
+Risk points and rollback checklist
