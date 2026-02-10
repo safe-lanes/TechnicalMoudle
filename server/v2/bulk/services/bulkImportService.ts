@@ -149,7 +149,7 @@ export class BulkImportService {
     userId: string,
     importHistoryId: string
   ): Promise<ImportResult> {
-    const result: ImportResult = { created: 0, updated: 0, skipped: 0, archived: 0, spareComponentLinksCreated: 0 };
+    const result: ImportResult = { created: 0, updated: 0, skipped: 0, archived: 0, spareComponentLinksCreated: 0, jobComponentLinksCreated: 0 };
     console.log(`[V2] Starting jobs import: ${data.length} rows, mode: ${mode}, vesselId: ${vesselId}`);
 
     const allExistingJobs = await this.repository.getJobs(vesselId);
@@ -168,13 +168,20 @@ export class BulkImportService {
     const allSpares = await this.repository.getSpares(vesselId);
     const sparesByPartCode = new Map(allSpares.map((s: any) => [s.partCode, s]));
 
-    let maxJobNum = 0;
-    for (const job of allExistingJobs) {
+    const TASK_TYPE_CODES: Record<string, string> = {
+      'Inspection': 'IN', 'Service': 'SE', 'Overhaul': 'OV', 'Calibration': 'CA',
+      'Test': 'TE', 'Testing': 'TE', 'Replacement': 'RE', 'Cleaning': 'CL',
+      'Lubrication': 'LU', 'General': 'GN', 'Repair': 'RP',
+    };
+
+    let maxJobSequence = 0;
+    const allJobs = await this.repository.getAllJobs();
+    for (const job of allJobs) {
       if (job.jobNo) {
-        const match = job.jobNo.match(/^JOB-(\d+)$/);
+        const match = job.jobNo.match(/^MKR-[A-Z]{2}-(\d{5})$/);
         if (match) {
-          const num = parseInt(match[1], 10);
-          if (num > maxJobNum) maxJobNum = num;
+          const seq = parseInt(match[1], 10);
+          if (seq > maxJobSequence) maxJobSequence = seq;
         }
       }
     }
@@ -196,10 +203,13 @@ export class BulkImportService {
           continue;
         }
 
+        const taskType = row['Task Type'] || null;
+
         let jobNo = String(row['Job Code'] || '').trim();
         if (!jobNo) {
-          maxJobNum++;
-          jobNo = `JOB-${String(maxJobNum).padStart(6, '0')}`;
+          maxJobSequence++;
+          const typeCode = (taskType && TASK_TYPE_CODES[taskType]) ? TASK_TYPE_CODES[taskType] : 'IN';
+          jobNo = `MKR-${typeCode}-${String(maxJobSequence).padStart(5, '0')}`;
         }
 
         const maintenanceBasis = row['Maintenance Basis'] || null;
@@ -304,15 +314,29 @@ export class BulkImportService {
           return parts;
         };
 
-        const requiredSpareParts = parseSpareParts(row['Spare Parts']);
-        const requiredTools = parseStringList(row['Required Tools']).map(t => ({ toolName: t, quantity: '1' }));
-        const safetyReqs = parseStringList(row['Safety Requirements']);
-        const safetyPermit = row['Safety Permit'] ? String(row['Safety Permit']).trim() : null;
+        const parseTools = (value: any): Array<{ toolName: string; quantity: string; remarks: string }> => {
+          const items = parseStringList(value);
+          return items.map(item => ({
+            toolName: item,
+            quantity: '',
+            remarks: '',
+          }));
+        };
 
+        const requiredSpareParts = parseSpareParts(row['Required Spare Parts']);
+        const requiredTools = parseTools(row['Required Tools']);
         const safetyRequirements = {
-          ppeRequirements: safetyReqs.filter(r => !['Hot Work', 'Enclosed Space Entry', 'Lockout-Tagout', 'Working Aloft'].includes(r)),
-          permitRequirements: safetyPermit ? [safetyPermit] : [],
-          otherRequirements: [] as string[],
+          ppeRequirements: parseStringList(row['PPE Requirements']),
+          permitRequirements: parseStringList(row['Permit Requirements']),
+          otherRequirements: parseStringList(row['Other Safety Requirements']),
+        };
+
+        const normalizeYesNo = (value: any): string | null => {
+          if (!value) return null;
+          const str = String(value).toLowerCase().trim();
+          if (['yes', 'y', 'true'].includes(str) || value === true) return 'Yes';
+          if (['no', 'n', 'false'].includes(str) || value === false) return 'No';
+          return null;
         };
 
         const compositeKey = getJobUniqueKey(vesselId, componentCode, jobNo);
@@ -322,11 +346,12 @@ export class BulkImportService {
           vesselId,
           componentId: component.id,
           componentCode,
-          componentName: component.name || row['Component Name'] || '',
+          componentName: row['Component Name'] || component.name || null,
           jobNo,
           jobTitle: woTitle,
+          maintenanceType: taskType,
           maintenanceBasis,
-          frequencyValue,
+          frequencyValue: frequencyValue ? parseFloat(frequencyValue) : null,
           frequencyUnit,
           intervalRunningHour: intervalRH,
           lastDoneDate,
@@ -334,21 +359,60 @@ export class BulkImportService {
           lastDoneRH,
           nextDueRH,
           jobPriority: row['Job Priority'] || null,
-          classRelated: row['Class Related'] || null,
+          classRelated: normalizeYesNo(row['Class Related']),
           briefWorkDescription: row['Brief Work Description'] || null,
-          jobDescription: row['Job Description'] || null,
+          jobDescription: row['Brief Work Description'] || null,
           department: row['Department'] || null,
           assignedTo: row['Assigned To'] || null,
+          approver: row['Approver'] || null,
           estimatedManHours: row['Estimated Man Hours'] || null,
-          criticality: row['Criticality'] || null,
+          criticality: normalizeYesNo(row['Critical Yes/No'] ?? row['Criticality']),
+          isActive: row['Is Active'] ? (String(row['Is Active']).toLowerCase() === 'yes') : true,
           requiredSpareParts,
           requiredTools,
           safetyRequirements,
           fleetEquipmentCode: row['Fleet Equipment Code'] || null,
           sfiCode: componentCode,
           dataScope: 'vessel',
-          isActive: true,
           createdBy: userId,
+        };
+
+        const createJobAndLink = async (jobId: string): Promise<any> => {
+          const created = await this.repository.createJob({ id: jobId, ...jobData });
+          if (created) {
+            try {
+              await this.repository.createJobComponentLink({
+                vesselId,
+                jobId: created.id,
+                componentId: component.id,
+                componentCode,
+                linkedBy: 'system-bulk-import',
+              });
+              result.jobComponentLinksCreated = (result.jobComponentLinksCreated || 0) + 1;
+            } catch (linkError: any) {
+              console.warn(`[V2] Job created but failed to create job-component link: ${linkError.message}`);
+            }
+          }
+          return created;
+        };
+
+        const ensureJobComponentLink = async (jobId: string): Promise<void> => {
+          try {
+            const existingLinks = await this.repository.getJobComponentLinksByJob(jobId);
+            const linkAlreadyExists = existingLinks.some((link: any) => link.componentId === component.id);
+            if (!linkAlreadyExists) {
+              await this.repository.createJobComponentLink({
+                vesselId,
+                jobId,
+                componentId: component.id,
+                componentCode,
+                linkedBy: 'system-bulk-import',
+              });
+              result.jobComponentLinksCreated = (result.jobComponentLinksCreated || 0) + 1;
+            }
+          } catch (linkError: any) {
+            console.warn(`[V2] Failed to create job-component link: ${linkError.message}`);
+          }
         };
 
         if (mode === 'add') {
@@ -357,7 +421,7 @@ export class BulkImportService {
             continue;
           }
           const id = uuidv4();
-          const created = await this.repository.createJob({ id, ...jobData });
+          const created = await createJobAndLink(id);
           if (created) {
             jobsByCompositeKey.set(compositeKey, created);
             result.created++;
@@ -378,7 +442,7 @@ export class BulkImportService {
             result.skipped++;
             continue;
           }
-          const { checksum: beforeChecksum } = createRecordSnapshot(existingJob);
+          await ensureJobComponentLink(existingJob.id);
           const updated = await this.repository.updateJob(existingJob.id, jobData);
           if (updated) {
             jobsByCompositeKey.set(compositeKey, updated);
@@ -397,7 +461,7 @@ export class BulkImportService {
           }
         } else if (mode === 'upsert') {
           if (existingJob) {
-            const { checksum: beforeChecksum } = createRecordSnapshot(existingJob);
+            await ensureJobComponentLink(existingJob.id);
             const updated = await this.repository.updateJob(existingJob.id, jobData);
             if (updated) {
               jobsByCompositeKey.set(compositeKey, updated);
@@ -416,7 +480,7 @@ export class BulkImportService {
             }
           } else {
             const id = uuidv4();
-            const created = await this.repository.createJob({ id, ...jobData });
+            const created = await createJobAndLink(id);
             if (created) {
               jobsByCompositeKey.set(compositeKey, created);
               result.created++;
@@ -440,7 +504,7 @@ export class BulkImportService {
       }
     }
 
-    console.log(`[V2] Jobs import complete: ${result.created} created, ${result.updated} updated, ${result.skipped} skipped`);
+    console.log(`[V2] Jobs import complete: ${result.created} created, ${result.updated} updated, ${result.skipped} skipped, ${result.jobComponentLinksCreated || 0} links created`);
     return result;
   }
 

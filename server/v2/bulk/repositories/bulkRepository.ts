@@ -1,7 +1,7 @@
 import { eq, and, inArray, desc, sql } from 'drizzle-orm';
 import { getDb } from '../../../db';
 import { v2Components as bulkComponents, v2MakerList as bulkMakerList, v2ImportChangeLog as bulkImportChangeLog, v2ImportHistory as bulkImportHistory } from '@shared/v2/bulk/schema';
-import { v2Jobs } from '@shared/v2/components/schema';
+import { v2Jobs, v2JobComponentLinks } from '@shared/v2/components/schema';
 import {
   v2Spares,
   v2SpareComponentLinks,
@@ -175,6 +175,23 @@ export class BulkRepository {
       .where(eq(v2Jobs.id, id))
       .returning();
     return results[0] || null;
+  }
+
+  async getAllJobs() {
+    const db = await getDb();
+    return await db.select().from(v2Jobs);
+  }
+
+  async createJobComponentLink(data: { vesselId: string; jobId: string; componentId: string; componentCode: string; linkedBy: string }) {
+    const db = await getDb();
+    const results = await db.insert(v2JobComponentLinks).values(data).returning();
+    return results[0];
+  }
+
+  async getJobComponentLinksByJob(jobId: string) {
+    const db = await getDb();
+    return await db.select().from(v2JobComponentLinks)
+      .where(eq(v2JobComponentLinks.jobId, jobId));
   }
 
   async getSpares(vesselId: string) {
