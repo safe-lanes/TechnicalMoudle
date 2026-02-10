@@ -26,9 +26,11 @@ export function deleteCachedDryRun(fileToken: string): void {
 
 function cleanExpired(): void {
   const now = Date.now();
-  for (const [key, value] of cache.entries()) {
+  const keysToDelete: string[] = [];
+  cache.forEach((value, key) => {
     if (now - value.createdAt > CACHE_TTL_MS) {
-      cache.delete(key);
+      keysToDelete.push(key);
     }
-  }
+  });
+  keysToDelete.forEach(key => cache.delete(key));
 }
