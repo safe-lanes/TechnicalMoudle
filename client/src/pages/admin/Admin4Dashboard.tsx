@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useVessels } from "@/hooks/useVessels";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -21,8 +21,12 @@ import type { PmsVesselSettings, Fleet } from "@shared/schema";
 
 type ViewType = 'dashboard' | 'makers' | 'master-lists' | 'master-data' | 'master-data-table' | 'components' | 'jobs' | 'spares' | 'vessel-mapping' | 'pms-settings' | 'equipment-tree' | 'fleet-vessel-manager' | 'fleet-data';
 
-export default function Admin4Dashboard() {
+export default function Admin4Dashboard({ onSubViewChange }: { onSubViewChange?: (isSubView: boolean) => void }) {
   const [currentView, setCurrentView] = useState<ViewType>('dashboard');
+
+  useEffect(() => {
+    onSubViewChange?.(currentView !== 'dashboard');
+  }, [currentView, onSubViewChange]);
 
   const { data: makersData, isLoading: isMakersLoading } = useQuery({
     queryKey: ['/technical/api/fleet/makers'],

@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import BulkDataImport from "../admin/BulkDataImport";
 import Alerts from "../admin/Alerts";
@@ -13,6 +13,11 @@ export default function PMSAdmin() {
   const showBulkDataImp = isSailAdmin || isClientAdmin; // Not Head of Dept or Vessel
   const showMasterData = isSailAdmin; // Only Sail Admin
   const [activeTab, setActiveTab] = useState(showBulkDataImp ? "bulk-data-imp" : "alerts");
+  const [isSubViewActive, setIsSubViewActive] = useState(false);
+
+  const handleSubViewChange = useCallback((isSubView: boolean) => {
+    setIsSubViewActive(isSubView);
+  }, []);
 
   // Reset to appropriate tab when switching roles (since hidden tabs shouldn't be active)
   useEffect(() => {
@@ -41,65 +46,69 @@ export default function PMSAdmin() {
     }
   };
 
+  const hideHeader = activeTab === "admin-4" && isSubViewActive;
+
   return (
     <div className="space-y-6">
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <div className="flex items-center justify-between relative">
-          <h1 className="text-2xl font-bold text-black dark:text-white" data-testid="I4.QL.3.1">
-            <Marker id="I4.QL.3.1" />{getPageTitle()}
-          </h1>
-          
-          <TabsList className="bg-gray-100 absolute left-1/2 -translate-x-1/2">
-            {showBulkDataImp && (
+        {!hideHeader && (
+          <div className="flex items-center justify-between relative">
+            <h1 className="text-2xl font-bold text-black dark:text-white" data-testid="I4.QL.3.1">
+              <Marker id="I4.QL.3.1" />{getPageTitle()}
+            </h1>
+            
+            <TabsList className="bg-gray-100 absolute left-1/2 -translate-x-1/2">
+              {showBulkDataImp && (
+                <TabsTrigger 
+                  value="bulk-data-imp" 
+                  className={cn(
+                    "px-4",
+                    activeTab === "bulk-data-imp" && "bg-[#52baf3] text-white data-[state=active]:bg-[#52baf3] data-[state=active]:text-white"
+                  )}
+                  data-testid="I4.QL.3.2"
+                >
+                  <Marker id="I4.QL.3.2" />
+                  Bulk Data Imp
+                </TabsTrigger>
+              )}
               <TabsTrigger 
-                value="bulk-data-imp" 
+                value="alerts" 
                 className={cn(
                   "px-4",
-                  activeTab === "bulk-data-imp" && "bg-[#52baf3] text-white data-[state=active]:bg-[#52baf3] data-[state=active]:text-white"
+                  activeTab === "alerts" && "bg-[#52baf3] text-white data-[state=active]:bg-[#52baf3] data-[state=active]:text-white"
                 )}
-                data-testid="I4.QL.3.2"
+                data-testid="I4.QL.3.3"
               >
-                <Marker id="I4.QL.3.2" />
-                Bulk Data Imp
+                <Marker id="I4.QL.3.3" />
+                Alerts
               </TabsTrigger>
-            )}
-            <TabsTrigger 
-              value="alerts" 
-              className={cn(
-                "px-4",
-                activeTab === "alerts" && "bg-[#52baf3] text-white data-[state=active]:bg-[#52baf3] data-[state=active]:text-white"
-              )}
-              data-testid="I4.QL.3.3"
-            >
-              <Marker id="I4.QL.3.3" />
-              Alerts
-            </TabsTrigger>
-            <TabsTrigger 
-              value="forms" 
-              className={cn(
-                "px-4",
-                activeTab === "forms" && "bg-[#52baf3] text-white data-[state=active]:bg-[#52baf3] data-[state=active]:text-white"
-              )}
-              data-testid="I4.QL.3.4"
-            >
-              <Marker id="I4.QL.3.4" />
-              Forms
-            </TabsTrigger>
-            {showMasterData && (
               <TabsTrigger 
-                value="admin-4" 
+                value="forms" 
                 className={cn(
                   "px-4",
-                  activeTab === "admin-4" && "bg-[#52baf3] text-white data-[state=active]:bg-[#52baf3] data-[state=active]:text-white"
+                  activeTab === "forms" && "bg-[#52baf3] text-white data-[state=active]:bg-[#52baf3] data-[state=active]:text-white"
                 )}
-                data-testid="I4.QL.3.5"
+                data-testid="I4.QL.3.4"
               >
-                <Marker id="I4.QL.3.5" />
-                Master Data
+                <Marker id="I4.QL.3.4" />
+                Forms
               </TabsTrigger>
-            )}
-          </TabsList>
-        </div>
+              {showMasterData && (
+                <TabsTrigger 
+                  value="admin-4" 
+                  className={cn(
+                    "px-4",
+                    activeTab === "admin-4" && "bg-[#52baf3] text-white data-[state=active]:bg-[#52baf3] data-[state=active]:text-white"
+                  )}
+                  data-testid="I4.QL.3.5"
+                >
+                  <Marker id="I4.QL.3.5" />
+                  Master Data
+                </TabsTrigger>
+              )}
+            </TabsList>
+          </div>
+        )}
 
         <TabsContent value="bulk-data-imp" className="mt-6">
           <BulkDataImport />
@@ -113,8 +122,8 @@ export default function PMSAdmin() {
           <Forms />
         </TabsContent>
 
-        <TabsContent value="admin-4" className="mt-6">
-          <Admin4Dashboard />
+        <TabsContent value="admin-4" className={hideHeader ? "mt-0" : "mt-6"}>
+          <Admin4Dashboard onSubViewChange={handleSubViewChange} />
         </TabsContent>
       </Tabs>
     </div>
