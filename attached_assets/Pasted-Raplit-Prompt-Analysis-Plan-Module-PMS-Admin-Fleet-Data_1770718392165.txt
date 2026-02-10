@@ -1,0 +1,115 @@
+Raplit Prompt — Analysis & Plan
+
+Module: PMS → Admin → Fleet Data → Fleet Jobs Management
+Scope: Edit Job Navigation Flow
+Change Type: Functional Flow (Navigation + Save Return)
+
+Context
+
+In Fleet Jobs Management screen, when a user clicks the Edit button for any Fleet Job:
+
+The system should open the Edit Job Details screen
+
+After modifying details and clicking Save, the system must:
+
+Save the updated job successfully
+
+Navigate the user back to the previous Fleet Jobs Management screen
+
+Preserve the user’s context (same section/list view)
+
+Currently, this expected navigation behavior is not working as intended.
+
+Problem Statement
+
+Clicking Edit does not reliably return the user to the Fleet Jobs Management screen after saving
+
+The post-save navigation flow is inconsistent or missing
+
+User loses context after editing a job
+
+Analysis Objectives
+
+Analyse the current Edit button behavior:
+
+How navigation is triggered from Fleet Jobs Management
+
+Which screen/component opens on Edit
+
+Analyse the Save action behavior:
+
+What happens after Save is clicked
+
+Whether navigation is explicitly defined or missing
+
+Identify:
+
+Missing routing logic
+
+Missing state/context preservation
+
+Incorrect redirection target after save
+
+Expected Correct Behavior (Target Flow)
+
+User clicks Edit on Fleet Jobs Management screen
+
+Edit Job Details screen opens
+
+User modifies job data
+
+User clicks Save
+
+System actions:
+
+Persist updated job data
+
+Navigate back to Fleet Jobs Management screen
+
+Display updated job in the same section/list
+
+Detailed Plan to Resolve
+
+Edit Action Handling
+
+Ensure Edit button explicitly routes to Edit Job Details screen
+
+Pass job identifier and return context (previous screen reference)
+
+Save Action Handling
+
+After successful save:
+
+Trigger navigation back to Fleet Jobs Management
+
+Do not redirect to dashboard or blank screen
+
+Context Preservation
+
+Maintain:
+
+Same module (Fleet Data → Fleet Jobs)
+
+Same listing view after return
+
+Avoid full page reload where possible
+
+Error Handling
+
+Only navigate back if save is successful
+
+On save failure, remain on Edit Job Details screen
+
+Constraints (Strict)
+
+Do not change Job form UI
+
+Do not change validation rules
+
+Do not modify database schema
+
+Do not impact Bulk Import or other job flows
+
+Apply changes only to Fleet Jobs Management → Edit Job flow
+
+No unrelated navigation changes
