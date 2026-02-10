@@ -371,30 +371,29 @@ const StoresReports: React.FC<StoresReportsProps> = ({ onBack, globalFilters }) 
       }
 
       case 'stores-consumption-analysis': {
-        const columns = [
-          { header: 'Item Code', field: 'itemCode', width: 30 },
-          { header: 'Item Name', field: 'itemName', width: 60 },
-          { header: 'Category', field: 'category', width: 30 },
-          { header: 'ROB', field: 'rob', width: 25 },
-          { header: 'Status', field: 'status', width: 30 }
-        ];
-
-        const data = storesItems.map((s: any) => {
-          const rob = parseFloat(String(s.rob)) || 0;
-          const min = parseFloat(String(s.min)) || 0;
-          return {
-            itemCode: s.itemCode || '-',
-            itemName: s.itemName || '-',
-            category: s.category || s.itemType || '-',
-            rob,
-            status: getStockStatus(rob, min)
-          };
-        });
-
-        pdfReportGenerator.generateReport(
-          { title: 'Consumption Pattern Analysis', subtitle: 'Historical consumption trends', vessel: vesselName },
-          columns,
-          data
+        const apiRes = await fetch(`/technical/api/reports/stores-consumption-analysis/${effectiveVesselId}`, { credentials: 'include' });
+        if (!apiRes.ok) throw new Error('Failed to fetch consumption analysis data');
+        const freshData = await apiRes.json();
+        const daysOfData = freshData.summary?.dataQuality?.daysOfData || 0;
+        const confidence = daysOfData > 90 ? 'High' : daysOfData >= 30 ? 'Medium' : 'Low';
+        pdfReportGenerator.generateConsumptionAnalysisPDF(
+          {
+            title: 'Consumption Pattern Analysis',
+            vessel: effectiveVesselId,
+            vesselName: freshData.summary?.vesselName || vesselName,
+            orientation: 'landscape',
+            daysOfData,
+            confidence,
+          },
+          {
+            summary: freshData.summary,
+            consumptionTrends: freshData.consumptionTrends || [],
+            topConsumedItems: freshData.topConsumedItems || [],
+            categoryBreakdown: freshData.categoryBreakdown || [],
+            stockEfficiency: freshData.stockEfficiency || [],
+            forecastData: freshData.forecastData || [],
+            nonMovingItems: freshData.nonMovingItems || [],
+          }
         );
         break;
       }
@@ -460,6 +459,24 @@ const StoresReports: React.FC<StoresReportsProps> = ({ onBack, globalFilters }) 
           document.body.removeChild(link);
           URL.revokeObjectURL(url);
           toast({ title: "Excel Exported", description: "Low stock alert report downloaded as Excel file." });
+        } else if (reportId === 'stores-consumption-analysis') {
+          const res = await fetch(`/technical/api/reports/stores-consumption-analysis/${effectiveVesselId}/excel`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'include',
+            body: JSON.stringify({}),
+          });
+          if (!res.ok) throw new Error('Failed to generate Excel');
+          const blob = await res.blob();
+          const url = URL.createObjectURL(blob);
+          const link = document.createElement('a');
+          link.href = url;
+          link.download = `consumption-pattern-analysis-${new Date().toISOString().slice(0, 10)}.xlsx`;
+          document.body.appendChild(link);
+          link.click();
+          document.body.removeChild(link);
+          URL.revokeObjectURL(url);
+          toast({ title: "Excel Exported", description: "Consumption pattern analysis downloaded as Excel file." });
         } else {
           toast({ title: "Excel Export", description: "Excel export coming soon. PDF is currently available." });
         }
