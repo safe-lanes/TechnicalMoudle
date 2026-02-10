@@ -1,0 +1,293 @@
+Bulk Fleet ↔ Vessel Synchronization Mapping Module
+1. Module Purpose
+
+This module automatically establishes mapping between:
+
+• Fleet Master Components
+• Vessel Installed Components
+
+Using:
+
+👉 Fleet Equipment Code as the universal reference key
+👉 Fully automated bulk matching
+👉 Preview confirmation safeguard
+👉 Transaction-based database insertion
+
+2. Functional Scope
+The Module WILL:
+
+✔ Display Fleet component hierarchy
+✔ Display Vessel component hierarchy
+✔ Perform automatic bulk matching
+✔ Show preview before saving
+✔ Store mapping in backend
+✔ Prevent duplicate linkage
+
+The Module WILL NOT:
+
+❌ Allow manual selection
+❌ Allow manual mapping
+❌ Allow partial component selection
+
+3. UI Design Specification
+3.1 Main Screen Layout
+LEFT PANEL – Fleet Components Tree
+Purpose
+
+Reference structure only.
+
+Headers
+
+Fleet Equipment Code
+
+Fleet Equipment Name
+
+Behaviour
+
+Hierarchical tree
+
+Expand / Collapse nodes
+
+Read-only
+
+RIGHT PANEL – Vessel Components Tree
+Headers
+
+Component Code
+
+Component Name
+
+Fleet Equipment Code
+
+Status
+
+Status Calculation Logic
+Condition	Status
+Mapping record exists	Linked
+Fleet code exists but mapping missing	Ready for Link
+Fleet code missing	Not Matchable
+4. Auto Match Engine
+Trigger
+
+User clicks:
+
+AUTO MATCH
+
+Engine Processing Flow
+Load Fleet Components
+Load Vessel Components
+Compare Fleet Equipment Codes
+Generate Match Candidates
+Send Preview Data
+
+5. Matching Algorithm (Production Logic)
+Step 1 – Load Fleet Components
+
+Retrieve:
+
+fleet_components_uuid
+
+fleet_equipment_code
+
+Step 2 – Load Vessel Components
+
+Retrieve:
+
+component_code_uuid
+
+fleet_equipment_code
+
+vessel_id
+
+Step 3 – Perform Matching
+Core Rule
+IF vessel.fleet_equipment_code == fleet.fleet_equipment_code
+THEN create mapping candidate
+
+Step 4 – Exclusion Rules
+
+Skip if:
+
+• Vessel component already mapped
+• Fleet code is null
+• Fleet component does not exist
+
+6. Preview Popup Design
+Popup Title
+Bulk Fleet Vessel Auto Match Preview
+
+Popup Columns
+
+| Fleet Equipment Code | Component Code | Component Name | Status |
+
+Popup Status Values
+Status	Meaning
+Ready to Link	Will be mapped
+Already Linked	Skipped
+No Fleet Match	Skipped
+Popup Controls
+
+✔ Confirm
+✔ Cancel
+
+7. Confirmation Processing Logic
+When User Clicks CONFIRM
+BEGIN DATABASE TRANSACTION
+
+Insert all "Ready to Link" records
+
+COMMIT
+
+Refresh Vessel Tree
+
+8. Database Design
+Table Name
+fleet_vessel_mapping
+
+Final Column Structure
+Column	Type	Description
+fleet_vessel_mapping_uuid	UUID (PK)	Unique mapping ID
+fleet_components_uuid	UUID	Fleet component reference
+component_code_uuid	UUID	Vessel component reference
+fleet_equipment_code	VARCHAR	Matching reference
+vessel_id	VARCHAR / UUID	Vessel reference
+Database Constraints
+Primary Key
+fleet_vessel_mapping_uuid
+
+Foreign Keys
+fleet_components_uuid → fleet_components
+component_code_uuid → vessel_components
+
+Unique Constraint
+(component_code_uuid, vessel_id)
+
+
+👉 Prevents multi mapping inside same vessel.
+
+Recommended Indexes
+INDEX fleet_equipment_code
+INDEX vessel_id
+INDEX component_code_uuid
+
+9. API Layer Design
+9.1 Preview Auto Match API
+Endpoint
+POST /fleet-vessel/bulk-auto-match/preview
+
+Backend Tasks
+
+✔ Load Fleet Components
+✔ Load Vessel Components
+✔ Execute Matching Engine
+✔ Return Preview Dataset
+
+9.2 Confirm Mapping API
+Endpoint
+POST /fleet-vessel/bulk-auto-match/confirm
+
+Backend Tasks
+
+✔ Validate duplicates
+✔ Perform batch insert
+✔ Return success response
+
+10. Data Flow Architecture
+Step 1 – Screen Load
+Load Fleet Tree
+Load Vessel Tree
+Load Mapping Status
+
+Step 2 – User Click Auto Match
+Preview API Called
+
+Step 3 – Popup Display
+Show Candidate Mapping
+
+Step 4 – Confirm Mapping
+Confirm API Called
+Mapping Inserted
+
+Step 5 – UI Refresh
+Status Updated
+
+11. Validation Framework
+Mandatory Validations
+
+✔ Vessel component must contain Fleet Equipment Code
+✔ Fleet component must exist
+
+Duplicate Prevention
+
+Before insert:
+
+Check component_code_uuid + vessel_id
+
+12. Performance Strategy
+
+✔ Bulk insert operations
+✔ Fleet code indexing
+✔ Lazy tree rendering
+✔ Pre-fetch caching
+
+13. Error Handling Strategy
+Error	System Behaviour
+No matches	Display info message
+Duplicate mapping	Skip record
+DB failure	Rollback
+14. Security & Audit Tracking
+
+(Add strongly recommended columns)
+
+created_by
+created_date
+modified_by
+modified_date
+
+15. Non-Functional Behaviour
+Transaction Safety
+
+Mapping insertion must be atomic.
+
+Scalability
+
+System must handle thousands of components.
+
+Data Integrity
+
+Fleet Equipment Code must remain authoritative reference.
+
+16. Future Expandability
+
+• Bulk Unlink Module
+• Version comparison between Fleet & Vessel
+• Smart fuzzy matching
+• Mapping audit history
+
+✅ FINAL SYSTEM SUMMARY
+
+This module will operate as a:
+
+Fleet-to-Vessel Synchronization Engine
+
+Providing:
+
+✔ Automated mapping
+✔ Bulk processing
+✔ Safe confirmation workflow
+✔ Transaction-controlled database updates
+✔ Fully standardized fleet template propagation
+
+📌 Recommended Next Development Step
+
+From implementation perspective, the most logical next artifact is:
+
+👉 Complete SQL Schema + Constraints + Index Strategy
+
+Because:
+
+It stabilizes backend structure
+
+Prevents rework later
+
+Enables API development immediately
