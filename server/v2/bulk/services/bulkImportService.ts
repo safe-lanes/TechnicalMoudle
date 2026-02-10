@@ -8,6 +8,7 @@ import { getParentSFICode, stripSFISuffix, getComponentCategory, getSubGroupName
 import { sortObjectKeys, createRecordSnapshot } from './bulkUndoService';
 import { getSFIName } from '../utils/sfiLookup';
 import { normalizeDateToDDMMMYYYY } from '../utils/dateUtils';
+import { calculateNextDueDate } from '../../../../shared/dateUtils';
 import { objectStorageClient } from '../../../objectStorage';
 import type { ImportResult } from './types/strategyTypes';
 
@@ -68,14 +69,34 @@ export class BulkImportService {
     }
 
     try {
-      const result = await this.importComponents(
-        dataToImport,
-        params.mode,
-        params.archiveMissing || false,
-        params.vesselId,
-        params.userId,
-        importHistoryId
-      );
+      let result: ImportResult;
+
+      if (effectiveType === 'jobs') {
+        result = await this.importJobs(
+          dataToImport,
+          params.mode,
+          params.vesselId,
+          params.userId,
+          importHistoryId
+        );
+      } else if (effectiveType === 'spares') {
+        result = await this.importSpares(
+          dataToImport,
+          params.mode,
+          params.vesselId,
+          params.userId,
+          importHistoryId
+        );
+      } else {
+        result = await this.importComponents(
+          dataToImport,
+          params.mode,
+          params.archiveMissing || false,
+          params.vesselId,
+          params.userId,
+          importHistoryId
+        );
+      }
 
       await this.historyService.updateHistory(importHistoryId, {
         status: 'complete',
@@ -118,6 +139,680 @@ export class BulkImportService {
         storedFilePath: storedPath,
       });
     } catch (_err) {
+    }
+  }
+
+  private async importJobs(
+    data: any[],
+    mode: string,
+    vesselId: string,
+    userId: string,
+    importHistoryId: string
+  ): Promise<ImportResult> {
+    const result: ImportResult = { created: 0, updated: 0, skipped: 0, archived: 0, spareComponentLinksCreated: 0 };
+    console.log(`[V2] Starting jobs import: ${data.length} rows, mode: ${mode}, vesselId: ${vesselId}`);
+
+    const allExistingJobs = await this.repository.getJobs(vesselId);
+    const getJobUniqueKey = (vid: string, ccode: string, jno: string) => `${vid}::${ccode}::${jno}`;
+    const jobsByCompositeKey = new Map<string, any>();
+    for (const job of allExistingJobs) {
+      if (job.jobNo && job.componentCode) {
+        const key = getJobUniqueKey(job.vesselId || vesselId, job.componentCode, job.jobNo);
+        jobsByCompositeKey.set(key, job);
+      }
+    }
+
+    const allComponentCodes = data.map(row => String(row['Component Code'] || '').trim()).filter(c => c);
+    const componentsByCode = await this.repository.getComponentsByCodes(allComponentCodes, vesselId);
+
+    const allSpares = await this.repository.getSpares(vesselId);
+    const sparesByPartCode = new Map(allSpares.map((s: any) => [s.partCode, s]));
+
+    let maxJobNum = 0;
+    for (const job of allExistingJobs) {
+      if (job.jobNo) {
+        const match = job.jobNo.match(/^JOB-(\d+)$/);
+        if (match) {
+          const num = parseInt(match[1], 10);
+          if (num > maxJobNum) maxJobNum = num;
+        }
+      }
+    }
+
+    for (const row of data) {
+      try {
+        const componentCode = String(row['Component Code'] || '').trim();
+        const component = componentsByCode.get(componentCode);
+
+        if (!component) {
+          console.warn(`[V2] Component not found: ${componentCode}, skipping job`);
+          result.skipped++;
+          continue;
+        }
+
+        const woTitle = String(row['WO Title'] || '').trim();
+        if (!woTitle) {
+          result.skipped++;
+          continue;
+        }
+
+        let jobNo = String(row['Job Code'] || '').trim();
+        if (!jobNo) {
+          maxJobNum++;
+          jobNo = `JOB-${String(maxJobNum).padStart(6, '0')}`;
+        }
+
+        const maintenanceBasis = row['Maintenance Basis'] || null;
+        const frequencyValue = row['Interval Value'] ? String(row['Interval Value']).trim() : null;
+        const frequencyUnit = row['Unit'] ? String(row['Unit']).trim() : null;
+
+        const rawLastDone = row['Last Done Date'];
+        let lastDoneDate = rawLastDone ? normalizeDateToDDMMMYYYY(rawLastDone) : null;
+        if (!lastDoneDate && component.installationDate) {
+          try {
+            lastDoneDate = normalizeDateToDDMMMYYYY(component.installationDate);
+          } catch (_e) {
+            lastDoneDate = null;
+          }
+        }
+
+        let nextDueDate: string | null = null;
+        if (maintenanceBasis === 'Calendar' && lastDoneDate && frequencyValue && frequencyUnit) {
+          nextDueDate = calculateNextDueDate(lastDoneDate, frequencyValue, frequencyUnit);
+        }
+
+        let intervalRH: number | null = null;
+        const rawIntervalRH = row['Interval Running Hours'];
+        const hasExplicitIntervalRH = rawIntervalRH !== undefined && rawIntervalRH !== null && String(rawIntervalRH).trim() !== '';
+        if (hasExplicitIntervalRH) {
+          intervalRH = Number(String(rawIntervalRH).trim());
+        } else if (maintenanceBasis === 'Running Hours' && frequencyValue) {
+          intervalRH = Number(frequencyValue);
+        }
+
+        let nextDueRH: string | null = null;
+        let lastDoneRH: string | null = null;
+
+        if (maintenanceBasis === 'Running Hours') {
+          if (intervalRH === null || isNaN(intervalRH) || intervalRH <= 0) {
+            result.skipped++;
+            console.warn(`[V2] Skipping RH job for ${componentCode}: Invalid Interval Running Hours`);
+            continue;
+          }
+
+          const rawLastDoneRH = row['Last Done RH'];
+          if (rawLastDoneRH !== undefined && rawLastDoneRH !== null && rawLastDoneRH !== '') {
+            lastDoneRH = String(rawLastDoneRH).trim();
+          } else if (component.runningHours !== undefined && component.runningHours !== null) {
+            lastDoneRH = String(component.runningHours);
+          } else {
+            lastDoneRH = '0';
+          }
+
+          const lastRH = Number(lastDoneRH);
+          if (isNaN(lastRH)) {
+            result.skipped++;
+            console.warn(`[V2] Skipping RH job for ${componentCode}: lastDoneRH is not a valid number`);
+            continue;
+          }
+          nextDueRH = String(lastRH + intervalRH);
+        }
+
+        const parseStringList = (value: any): string[] => {
+          if (!value) return [];
+          const str = String(value).trim();
+          if (!str) return [];
+          const separator = str.includes(';') ? ';' : ',';
+          return str.split(separator).map(s => s.trim()).filter(s => s.length > 0);
+        };
+
+        const parseSpareParts = (value: any): Array<{ partCode: string; partNo: string; description: string; quantityRequired: string; remarks: string }> => {
+          const items = parseStringList(value);
+          const parts: Array<{ partCode: string; partNo: string; description: string; quantityRequired: string; remarks: string }> = [];
+          for (const item of items) {
+            if (item.includes(':')) {
+              const [partCode, quantityStr] = item.split(':').map(s => s.trim());
+              const quantity = parseInt(quantityStr) || 1;
+              const spare = sparesByPartCode.get(partCode);
+              if (spare) {
+                parts.push({
+                  partCode,
+                  partNo: spare.partNumber || '',
+                  description: spare.partName || '',
+                  quantityRequired: String(quantity),
+                  remarks: '',
+                });
+              } else {
+                parts.push({
+                  partCode,
+                  partNo: '',
+                  description: `[NOT FOUND: ${partCode}]`,
+                  quantityRequired: String(quantity),
+                  remarks: 'PartCode not found in spares database',
+                });
+              }
+            } else {
+              parts.push({
+                partCode: '',
+                partNo: '',
+                description: item,
+                quantityRequired: '1',
+                remarks: '',
+              });
+            }
+          }
+          return parts;
+        };
+
+        const requiredSpareParts = parseSpareParts(row['Spare Parts']);
+        const requiredTools = parseStringList(row['Required Tools']).map(t => ({ toolName: t, quantity: '1' }));
+        const safetyReqs = parseStringList(row['Safety Requirements']);
+        const safetyPermit = row['Safety Permit'] ? String(row['Safety Permit']).trim() : null;
+
+        const safetyRequirements = {
+          ppeRequirements: safetyReqs.filter(r => !['Hot Work', 'Enclosed Space Entry', 'Lockout-Tagout', 'Working Aloft'].includes(r)),
+          permitRequirements: safetyPermit ? [safetyPermit] : [],
+          otherRequirements: [] as string[],
+        };
+
+        const compositeKey = getJobUniqueKey(vesselId, componentCode, jobNo);
+        const existingJob = jobsByCompositeKey.get(compositeKey);
+
+        const jobData: any = {
+          vesselId,
+          componentId: component.id,
+          componentCode,
+          componentName: component.name || row['Component Name'] || '',
+          jobNo,
+          jobTitle: woTitle,
+          maintenanceBasis,
+          frequencyValue,
+          frequencyUnit,
+          intervalRunningHour: intervalRH,
+          lastDoneDate,
+          nextDueDate,
+          lastDoneRH,
+          nextDueRH,
+          jobPriority: row['Job Priority'] || null,
+          classRelated: row['Class Related'] || null,
+          briefWorkDescription: row['Brief Work Description'] || null,
+          jobDescription: row['Job Description'] || null,
+          department: row['Department'] || null,
+          assignedTo: row['Assigned To'] || null,
+          estimatedManHours: row['Estimated Man Hours'] || null,
+          criticality: row['Criticality'] || null,
+          requiredSpareParts,
+          requiredTools,
+          safetyRequirements,
+          fleetEquipmentCode: row['Fleet Equipment Code'] || null,
+          sfiCode: componentCode,
+          dataScope: 'vessel',
+          isActive: true,
+          createdBy: userId,
+        };
+
+        if (mode === 'add') {
+          if (existingJob) {
+            result.skipped++;
+            continue;
+          }
+          const id = uuidv4();
+          const created = await this.repository.createJob({ id, ...jobData });
+          if (created) {
+            jobsByCompositeKey.set(compositeKey, created);
+            result.created++;
+            const { checksum } = createRecordSnapshot(created);
+            await this.repository.createImportChangeLog({
+              id: uuidv4(),
+              importHistoryId,
+              entityType: 'job',
+              entityId: id,
+              operation: 'created',
+              previousData: null,
+              newData: { jobNo, jobTitle: woTitle, componentCode },
+              checksum,
+            });
+          }
+        } else if (mode === 'update') {
+          if (!existingJob) {
+            result.skipped++;
+            continue;
+          }
+          const { checksum: beforeChecksum } = createRecordSnapshot(existingJob);
+          const updated = await this.repository.updateJob(existingJob.id, jobData);
+          if (updated) {
+            jobsByCompositeKey.set(compositeKey, updated);
+            result.updated++;
+            const { checksum: afterChecksum } = createRecordSnapshot(updated);
+            await this.repository.createImportChangeLog({
+              id: uuidv4(),
+              importHistoryId,
+              entityType: 'job',
+              entityId: existingJob.id,
+              operation: 'updated',
+              previousData: existingJob,
+              newData: { jobNo, jobTitle: woTitle, componentCode },
+              checksum: afterChecksum,
+            });
+          }
+        } else if (mode === 'upsert') {
+          if (existingJob) {
+            const { checksum: beforeChecksum } = createRecordSnapshot(existingJob);
+            const updated = await this.repository.updateJob(existingJob.id, jobData);
+            if (updated) {
+              jobsByCompositeKey.set(compositeKey, updated);
+              result.updated++;
+              const { checksum: afterChecksum } = createRecordSnapshot(updated);
+              await this.repository.createImportChangeLog({
+                id: uuidv4(),
+                importHistoryId,
+                entityType: 'job',
+                entityId: existingJob.id,
+                operation: 'updated',
+                previousData: existingJob,
+                newData: { jobNo, jobTitle: woTitle, componentCode },
+                checksum: afterChecksum,
+              });
+            }
+          } else {
+            const id = uuidv4();
+            const created = await this.repository.createJob({ id, ...jobData });
+            if (created) {
+              jobsByCompositeKey.set(compositeKey, created);
+              result.created++;
+              const { checksum } = createRecordSnapshot(created);
+              await this.repository.createImportChangeLog({
+                id: uuidv4(),
+                importHistoryId,
+                entityType: 'job',
+                entityId: id,
+                operation: 'created',
+                previousData: null,
+                newData: { jobNo, jobTitle: woTitle, componentCode },
+                checksum,
+              });
+            }
+          }
+        }
+      } catch (error: any) {
+        console.error(`[V2] Error importing job row:`, error.message);
+        result.skipped++;
+      }
+    }
+
+    console.log(`[V2] Jobs import complete: ${result.created} created, ${result.updated} updated, ${result.skipped} skipped`);
+    return result;
+  }
+
+  private async importSpares(
+    data: any[],
+    mode: string,
+    vesselId: string,
+    userId: string,
+    importHistoryId: string
+  ): Promise<ImportResult> {
+    const result: ImportResult = { created: 0, updated: 0, skipped: 0, archived: 0, spareComponentLinksCreated: 0 };
+    console.log(`[V2] Starting spares import: ${data.length} rows, mode: ${mode}, vesselId: ${vesselId}`);
+
+    const allComponents = await this.repository.getComponents(vesselId);
+    const componentsByCode = new Map(allComponents.map((c: any) => [c.componentCode, c]));
+
+    const existingSpares = await this.repository.getSpares(vesselId);
+    const sparesByPartCode = new Map(existingSpares.map((s: any) => [s.partCode, s]));
+
+    let maxPartCodeNum = 0;
+    existingSpares.forEach((spare: any) => {
+      if (spare.partCode && spare.partCode.startsWith('PT-')) {
+        const match = spare.partCode.match(/PT-(\d+)/);
+        if (match) {
+          const num = parseInt(match[1]);
+          if (num > maxPartCodeNum) maxPartCodeNum = num;
+        }
+      }
+    });
+    let nextPartCodeNum = maxPartCodeNum + 1;
+
+    for (const row of data) {
+      try {
+        const componentCode = String(row['Component Code'] || '').trim();
+        const component = componentsByCode.get(componentCode);
+
+        if (!component) {
+          console.warn(`[V2] Component ${componentCode} not found, skipping spare`);
+          result.skipped++;
+          continue;
+        }
+
+        let partCode = row['Part Code'] ? String(row['Part Code']).trim() : '';
+        if (!partCode) {
+          partCode = `PT-${String(nextPartCodeNum).padStart(6, '0')}`;
+          nextPartCodeNum++;
+        }
+
+        const existingSpare = sparesByPartCode.get(partCode);
+
+        const criticalVal = row['Criticality'] || 'No';
+        const isActiveVal = row['Is Active'];
+        const ihmVal = row['IHM (Inventory of Hazardous Materials)'];
+
+        let totalRob = 0;
+        if (row['Total ROB'] !== undefined && row['Total ROB'] !== null && row['Total ROB'] !== '') {
+          totalRob = parseInt(String(row['Total ROB'])) || 0;
+        } else {
+          const locARob = parseInt(String(row['Location A - ROB'] || '0')) || 0;
+          const locBRob = parseInt(String(row['Location B - ROB'] || '0')) || 0;
+          totalRob = locARob + locBRob;
+        }
+
+        const robLocationAVal = parseInt(String(row['Location A - ROB'] || '0')) || 0;
+        const robLocationBVal = parseInt(String(row['Location B - ROB'] || '0')) || 0;
+
+        const spareData: any = {
+          partCode,
+          partName: String(row['Part Name'] || '').trim(),
+          componentId: component.id,
+          componentCode,
+          componentName: component.name || '',
+          componentSpareCode: `SP-${componentCode}-${String(result.created + 1).padStart(3, '0')}`,
+          critical: criticalVal === 'Yes' || criticalVal === true ? 'Yes' : 'No',
+          rob: totalRob,
+          robLocationA: robLocationAVal,
+          robLocationB: robLocationBVal,
+          min: row['Minimum Stock'] ? parseInt(String(row['Minimum Stock'])) : 0,
+          location: row['Location A'] ? String(row['Location A']).trim() : null,
+          location2: row['Location B'] ? String(row['Location B']).trim() : null,
+          vesselId,
+          partNumber: row['Part Number'] ? String(row['Part Number']).trim() : null,
+          uom: row['UOM'] ? String(row['UOM']).trim().toUpperCase() : null,
+          maker: row['Maker'] ? String(row['Maker']).trim() : null,
+          makerCode: row['Maker Code'] ? String(row['Maker Code']).trim() : null,
+          specification: row['Specification'] ? String(row['Specification']).trim() : null,
+          drawingNumber: row['Drawing Number'] ? String(row['Drawing Number']).trim() : null,
+          positionNumber: row['Position Number'] ? String(row['Position Number']).trim() : null,
+          note: row['Note'] ? String(row['Note']).trim() : null,
+          manualName: row['Manual Name'] ? String(row['Manual Name']).trim() : null,
+          pageNumber: row['Page Number'] ? String(row['Page Number']).trim() : null,
+          isActive: isActiveVal === 'Yes' || isActiveVal === true ? true : (isActiveVal === 'No' || isActiveVal === false ? false : true),
+          ihm: ihmVal === 'Yes' || ihmVal === true ? 'Yes' : 'No',
+          remarks: row['Evidence Type'] ? String(row['Evidence Type']).trim() : (row['Remarks'] ? String(row['Remarks']).trim() : null),
+          fleetEquipmentCode: row['Fleet Equipment Code'] ? String(row['Fleet Equipment Code']).trim() : null,
+          dataScope: 'vessel',
+        };
+
+        if (mode === 'add') {
+          if (existingSpare) {
+            try {
+              const existingLinks = await this.repository.getSpareComponentLinksBySpare(existingSpare.id);
+              const linkAlreadyExists = existingLinks.some((link: any) => link.componentId === component.id);
+              if (!linkAlreadyExists) {
+                await this.repository.createSpareComponentLink({
+                  vesselId,
+                  spareId: existingSpare.id,
+                  componentId: component.id,
+                  linkedBy: 'system-bulk-import',
+                });
+                result.spareComponentLinksCreated = (result.spareComponentLinksCreated || 0) + 1;
+                result.updated++;
+              } else {
+                result.skipped++;
+              }
+            } catch (_e) {
+              result.skipped++;
+            }
+            continue;
+          }
+
+          const newSpare = await this.repository.createSpare(spareData);
+          sparesByPartCode.set(partCode, newSpare);
+          result.created++;
+
+          if (importHistoryId) {
+            const { checksum } = createRecordSnapshot(newSpare);
+            await this.repository.createImportChangeLog({
+              id: uuidv4(),
+              importHistoryId,
+              entityType: 'spare',
+              entityId: String(newSpare.id),
+              operation: 'created',
+              previousData: null,
+              newData: { partCode, partName: newSpare.partName },
+              checksum,
+            });
+          }
+
+          await this.processSpareInventory({
+            spareId: newSpare.id,
+            vesselId,
+            componentId: component.id,
+            locationAName: row['Location A'] ? String(row['Location A']).trim() : null,
+            locationBName: row['Location B'] ? String(row['Location B']).trim() : null,
+            robLocationA: robLocationAVal,
+            robLocationB: robLocationBVal,
+            isNewSpare: true,
+            userId,
+          });
+          result.spareComponentLinksCreated = (result.spareComponentLinksCreated || 0) + 1;
+
+        } else if (mode === 'update') {
+          if (!existingSpare) {
+            result.skipped++;
+            continue;
+          }
+
+          const { checksum: beforeChecksum } = createRecordSnapshot(existingSpare);
+          const updateData = { ...spareData };
+          delete updateData.componentSpareCode;
+
+          if (!updateData.partName) updateData.partName = existingSpare.partName;
+
+          const updatedSpare = await this.repository.updateSpare(existingSpare.id, updateData);
+          sparesByPartCode.set(partCode, updatedSpare);
+          result.updated++;
+
+          if (importHistoryId) {
+            const { checksum: afterChecksum } = createRecordSnapshot(updatedSpare);
+            await this.repository.createImportChangeLog({
+              id: uuidv4(),
+              importHistoryId,
+              entityType: 'spare',
+              entityId: String(existingSpare.id),
+              operation: 'updated',
+              previousData: existingSpare,
+              newData: { partCode },
+              checksum: afterChecksum,
+            });
+          }
+
+          await this.processSpareInventory({
+            spareId: existingSpare.id,
+            vesselId,
+            componentId: component.id,
+            locationAName: row['Location A'] ? String(row['Location A']).trim() : existingSpare.location,
+            locationBName: row['Location B'] ? String(row['Location B']).trim() : existingSpare.location2,
+            robLocationA: robLocationAVal,
+            robLocationB: robLocationBVal,
+            isNewSpare: false,
+            userId,
+          });
+
+        } else if (mode === 'upsert') {
+          if (existingSpare) {
+            try {
+              const existingLinks = await this.repository.getSpareComponentLinksBySpare(existingSpare.id);
+              const linkAlreadyExists = existingLinks.some((link: any) => link.componentId === component.id);
+              if (!linkAlreadyExists) {
+                await this.repository.createSpareComponentLink({
+                  vesselId,
+                  spareId: existingSpare.id,
+                  componentId: component.id,
+                  linkedBy: 'system-bulk-import',
+                });
+                result.spareComponentLinksCreated = (result.spareComponentLinksCreated || 0) + 1;
+              }
+            } catch (_e) {}
+
+            const updateData = { ...spareData };
+            delete updateData.componentSpareCode;
+            const updatedSpare = await this.repository.updateSpare(existingSpare.id, updateData);
+            sparesByPartCode.set(partCode, updatedSpare);
+            result.updated++;
+
+            if (importHistoryId) {
+              const { checksum: afterChecksum } = createRecordSnapshot(updatedSpare);
+              await this.repository.createImportChangeLog({
+                id: uuidv4(),
+                importHistoryId,
+                entityType: 'spare',
+                entityId: String(existingSpare.id),
+                operation: 'updated',
+                previousData: existingSpare,
+                newData: { partCode },
+                checksum: afterChecksum,
+              });
+            }
+
+            await this.processSpareInventory({
+              spareId: existingSpare.id,
+              vesselId,
+              componentId: component.id,
+              locationAName: row['Location A'] ? String(row['Location A']).trim() : existingSpare.location,
+              locationBName: row['Location B'] ? String(row['Location B']).trim() : existingSpare.location2,
+              robLocationA: robLocationAVal,
+              robLocationB: robLocationBVal,
+              isNewSpare: false,
+              userId,
+            });
+          } else {
+            const newSpare = await this.repository.createSpare(spareData);
+            sparesByPartCode.set(partCode, newSpare);
+            result.created++;
+
+            if (importHistoryId) {
+              const { checksum } = createRecordSnapshot(newSpare);
+              await this.repository.createImportChangeLog({
+                id: uuidv4(),
+                importHistoryId,
+                entityType: 'spare',
+                entityId: String(newSpare.id),
+                operation: 'created',
+                previousData: null,
+                newData: { partCode, partName: newSpare.partName },
+                checksum,
+              });
+            }
+
+            await this.processSpareInventory({
+              spareId: newSpare.id,
+              vesselId,
+              componentId: component.id,
+              locationAName: row['Location A'] ? String(row['Location A']).trim() : null,
+              locationBName: row['Location B'] ? String(row['Location B']).trim() : null,
+              robLocationA: robLocationAVal,
+              robLocationB: robLocationBVal,
+              isNewSpare: true,
+              userId,
+            });
+            result.spareComponentLinksCreated = (result.spareComponentLinksCreated || 0) + 1;
+          }
+        }
+      } catch (error: any) {
+        console.error(`[V2] Error importing spare row:`, error.message);
+        result.skipped++;
+      }
+    }
+
+    console.log(`[V2] Spares import complete: ${result.created} created, ${result.updated} updated, ${result.skipped} skipped`);
+    return result;
+  }
+
+  private async processSpareInventory(params: {
+    spareId: number;
+    vesselId: string;
+    componentId: string;
+    locationAName: string | null;
+    locationBName: string | null;
+    robLocationA: number;
+    robLocationB: number;
+    isNewSpare: boolean;
+    userId: string;
+  }): Promise<void> {
+    try {
+      await this.repository.createSpareComponentLink({
+        vesselId: params.vesselId,
+        spareId: params.spareId,
+        componentId: params.componentId,
+        linkedBy: 'system-bulk-import',
+      }).catch(() => {});
+
+      if (params.locationAName) {
+        const locationA = await this.repository.findOrCreateLocation(
+          params.vesselId, params.locationAName, params.userId
+        );
+        const existingStock = await this.repository.getSpareLocationStock(params.spareId, locationA.id);
+        if (existingStock) {
+          await this.repository.updateSpareLocationStock(existingStock.id, params.robLocationA);
+        } else {
+          await this.repository.createSpareLocationStock({
+            vesselId: params.vesselId,
+            spareId: params.spareId,
+            locationId: locationA.id,
+            qty: params.robLocationA,
+          });
+        }
+
+        if (params.isNewSpare && params.robLocationA > 0) {
+          await this.repository.createInventoryTransaction({
+            vesselId: params.vesselId,
+            spareId: params.spareId,
+            locationId: locationA.id,
+            eventType: 'ADJUST',
+            qtyChange: params.robLocationA,
+            robTotalBefore: 0,
+            robTotalAfter: params.robLocationA + params.robLocationB,
+            robLocationBefore: 0,
+            robLocationAfter: params.robLocationA,
+            referenceType: 'BULK_IMPORT',
+            referenceNote: 'Opening balance from bulk import',
+            userId: params.userId,
+          });
+        }
+      }
+
+      if (params.locationBName) {
+        const locationB = await this.repository.findOrCreateLocation(
+          params.vesselId, params.locationBName, params.userId
+        );
+        const existingStock = await this.repository.getSpareLocationStock(params.spareId, locationB.id);
+        if (existingStock) {
+          await this.repository.updateSpareLocationStock(existingStock.id, params.robLocationB);
+        } else {
+          await this.repository.createSpareLocationStock({
+            vesselId: params.vesselId,
+            spareId: params.spareId,
+            locationId: locationB.id,
+            qty: params.robLocationB,
+          });
+        }
+
+        if (params.isNewSpare && params.robLocationB > 0) {
+          await this.repository.createInventoryTransaction({
+            vesselId: params.vesselId,
+            spareId: params.spareId,
+            locationId: locationB.id,
+            eventType: 'ADJUST',
+            qtyChange: params.robLocationB,
+            robTotalBefore: params.robLocationA,
+            robTotalAfter: params.robLocationA + params.robLocationB,
+            robLocationBefore: 0,
+            robLocationAfter: params.robLocationB,
+            referenceType: 'BULK_IMPORT',
+            referenceNote: 'Opening balance from bulk import',
+            userId: params.userId,
+          });
+        }
+      }
+    } catch (error: any) {
+      console.warn(`[V2] Error processing spare inventory for spareId ${params.spareId}:`, error.message);
     }
   }
 
