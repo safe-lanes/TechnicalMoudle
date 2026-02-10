@@ -66,6 +66,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.use('/technical/api/v2/work-orders', createWorkOrderRouter());
   console.log('V2 Work Orders module registered at /technical/api/v2/work-orders/*');
 
+  const { createSparesRouter } = await import("./v2/spares");
+  app.use('/technical/api/v2/spares', createSparesRouter());
+  console.log('V2 Spares module registered at /technical/api/v2/spares/*');
+
   // Documentation download endpoint
   app.get("/download/docs/:filename", (req, res) => {
     const filename = req.params.filename;
