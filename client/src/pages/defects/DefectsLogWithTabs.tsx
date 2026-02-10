@@ -778,7 +778,7 @@ export default function DefectsLogWithTabs() {
               />
             )}
 
-            <Select value={filters.dueOverdue} onValueChange={(value) => handleFilterChange('dueOverdue', value)}>
+            <Select value={filters.dueOverdue || ""} onValueChange={(value) => handleFilterChange('dueOverdue', value)}>
               <SelectTrigger className="w-[130px] h-8 text-xs border-gray-300 bg-transparent text-gray-700">
                 <SelectValue placeholder="Due / Overdue" />
               </SelectTrigger>
