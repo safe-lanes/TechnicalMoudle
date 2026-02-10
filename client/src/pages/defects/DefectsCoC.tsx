@@ -14,8 +14,11 @@ import {
   Link as LinkIcon, 
   Plus, 
   Filter,
-  Search
+  Search,
+  Download
 } from "lucide-react";
+import { pdfReportGenerator } from "@/lib/pdfReportGenerator";
+import type { TableColumn } from "@/lib/pdfReportGenerator";
 import { Dialog, DialogContent, DialogTrigger, DialogTitle } from "@/components/ui/dialog";
 import {
   AlertDialog,
@@ -406,6 +409,56 @@ export default function DefectsCoC() {
     setFilters({ status: 'active' });
   };
 
+  const handleExportPdf = () => {
+    const formatDate = (dateStr: string | null | undefined): string => {
+      if (!dateStr) return "-";
+      const parts = dateStr.split("-");
+      if (parts.length === 3 && parts[0].length === 4) {
+        return `${parts[2]}-${parts[1]}-${parts[0]}`;
+      }
+      return dateStr;
+    };
+
+    const columns: TableColumn[] = [
+      { header: 'ID', field: 'id', width: 25 },
+      { header: 'Vessel', field: 'vessel', width: 20 },
+      { header: 'Issue Date', field: 'issueDate', width: 18 },
+      { header: 'Category', field: 'category', width: 15 },
+      { header: 'Component', field: 'component', width: 20 },
+      { header: 'Description', field: 'description', width: 40 },
+      { header: 'Target Date', field: 'targetDate', width: 18 },
+      { header: 'Date Compl.', field: 'dateCompleted', width: 18 },
+      { header: 'Status', field: 'status', width: 18 },
+      { header: 'Priority', field: 'priority', width: 15 },
+    ];
+
+    const data = defects.map((defect: Defect) => {
+      const computedStatus = getComputedStatus(defect);
+      return {
+        id: defect.id || '-',
+        vessel: defect.vesselName || defect.vesselId || '-',
+        issueDate: formatDate(defect.issueDate),
+        category: defect.category || '-',
+        component: defect.componentHardwareLevel3 || '-',
+        description: defect.description || '-',
+        targetDate: formatDate(defect.targetCloseDate),
+        dateCompleted: formatDate(defect.dateCompleted),
+        status: computedStatus.label,
+        priority: defect.priority || '-',
+      };
+    });
+
+    pdfReportGenerator.generateReport(
+      {
+        title: 'Condition of Class (CoC) Defects',
+        subtitle: `Total: ${defects.length} defect${defects.length !== 1 ? 's' : ''}`,
+        orientation: 'landscape',
+      },
+      columns,
+      data
+    );
+  };
+
   const handleViewDefect = useCallback((defect: Defect) => {
     console.log('[COC] handleViewDefect called with:', defect.id);
     setSelectedDefect(defect);
@@ -647,6 +700,16 @@ export default function DefectsCoC() {
         <div className="flex items-center justify-between mb-4 gap-4">
           <h1 className="text-2xl font-bold text-black dark:text-white">Condition of Class (CoC) Defects</h1>
           <div className="flex items-center gap-3">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleExportPdf}
+              className="h-8 gap-2 bg-white dark:bg-gray-800 text-[#0f172a] dark:text-white border-gray-300 dark:border-gray-600"
+              data-testid="button-export-coc-defects"
+            >
+              <Download className="h-4 w-4" />
+              Export
+            </Button>
             <Button
               variant="outline"
               size="sm"
