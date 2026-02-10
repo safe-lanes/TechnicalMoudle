@@ -1892,7 +1892,7 @@ export const fleetSpares = pgTable("fleet_spares", {
   id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
   fleetSparesUuid: text("fleet_spares_uuid").default(sql`gen_random_uuid()`),
   fleetComponentsUuid: text("fleet_components_uuid"),
-  partCode: text("part_code").notNull().unique(),
+  partCode: text("part_code").notNull(),
   fleetEquipmentCode: text("fleet_equipment_code").notNull(),
   fleetEquipmentName: text("fleet_equipment_name").notNull(),
   partName: text("part_name").notNull(),
@@ -1918,7 +1918,7 @@ export const fleetSpares = pgTable("fleet_spares", {
   isDeleted: boolean("is_deleted").default(false),
   isSync: boolean("is_sync").default(false),
 }, (table) => ({
-  partCodeIdx: uniqueIndex("idx_fleet_spares_part_code").on(table.partCode),
+  partCodeIdx: index("idx_fleet_spares_part_code").on(table.partCode),
   fleetEquipmentCodeIdx: index("idx_fleet_spares_equipment").on(table.fleetEquipmentCode),
   fleetSparesUuidIdx: uniqueIndex("idx_fleet_spares_uuid").on(table.fleetSparesUuid),
   fleetComponentsUuidIdx: index("idx_fleet_spares_component_uuid").on(table.fleetComponentsUuid),
