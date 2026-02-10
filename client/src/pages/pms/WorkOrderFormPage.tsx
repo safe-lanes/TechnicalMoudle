@@ -57,6 +57,7 @@ import { WorkOrderDataTable } from '@/components/WorkOrderDataTable';
 import { StatusPill } from '@/components/StatusPill';
 import { Marker } from "@/components/Marker";
 import { getJobContextQueryKey, getCreateJobUrl, getJobsBaseUrl } from "@/modules/components/api/jobsApiV2";
+import { getWorkOrderContextQueryKey, getUpdateWorkOrderUrl } from "@/modules/components/api/workOrdersApiV2";
 
 export interface HistoryWorkOrderPayload {
   template: WorkOrder;
@@ -167,7 +168,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
   });
 
   const { data: woContext, isLoading: isWoContextLoading } = useQuery({
-    queryKey: [`/technical/api/work-orders/${workOrderId}/context`],
+    queryKey: getWorkOrderContextQueryKey(workOrderId!),
     enabled: !!workOrderId && resolvedMode !== 'template'
   });
   
@@ -1525,7 +1526,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
         runningHours: runningHoursValue || executionData.runningHours
       };
       
-      response = await fetch(`/technical/api/work-orders/${workOrderId}`, {
+      response = await fetch(getUpdateWorkOrderUrl(workOrderId), {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json'
@@ -1533,8 +1534,6 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
         body: JSON.stringify({
           ...templateData,
           ...saveExecutionData,
-          // If completion data is filled, set status to "Pending Approval"
-          // Otherwise keep current status (likely "Active" or "Due")
           status: hasCompletionData ? 'Pending Approval' : undefined
         })
       });
@@ -1545,10 +1544,8 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
         throw new Error(result.error || 'Failed to save work order');
       }
       
-      // Invalidate all work orders-related caches so the updated status is reflected
-      // This includes the list (with any vesselId variants) and the specific work order context
-      await queryClient.invalidateQueries({ queryKey: ['/technical/api/work-orders'] });
-      await queryClient.invalidateQueries({ queryKey: [`/technical/api/work-orders/${workOrderId}/context`] });
+      await queryClient.invalidateQueries({ predicate: (query) => { const key = query.queryKey[0]; return typeof key === 'string' && (key.startsWith('/technical/api/work-orders') || key.startsWith('/technical/api/v2/work-orders')); } });
+      await queryClient.invalidateQueries({ queryKey: getWorkOrderContextQueryKey(workOrderId) });
       
       toast({
         title: "Success",
@@ -1683,7 +1680,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
         payload.dateCompleted = actualCompletionDate;
       }
       
-      const response = await fetch(`/technical/api/work-orders/${workOrderId}`, {
+      const response = await fetch(getUpdateWorkOrderUrl(workOrderId), {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json'
@@ -1729,7 +1726,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
     
     setIsProcessingApproval(true);
     try {
-      const response = await fetch(`/technical/api/work-orders/${workOrderId}`, {
+      const response = await fetch(getUpdateWorkOrderUrl(workOrderId), {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json'
@@ -1748,8 +1745,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
       }
       
       setCurrentWorkOrderStatus('Rejected');
-      // Invalidate work orders cache so the list shows updated data
-      queryClient.invalidateQueries({ queryKey: ['/technical/api/work-orders'] });
+      queryClient.invalidateQueries({ predicate: (query) => { const key = query.queryKey[0]; return typeof key === 'string' && (key.startsWith('/technical/api/work-orders') || key.startsWith('/technical/api/v2/work-orders')); } });
       toast({
         title: "Rejected",
         description: "Work order has been rejected",

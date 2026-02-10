@@ -6,6 +6,7 @@ import { useVessel } from "@/contexts/VesselContext";
 import { useUIRole } from "@/contexts/UIRoleContext";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
+import { getWorkOrdersListQueryKey, getWorkOrdersListUrl, getBulkApproveUrl, getBulkRejectUrl } from "@/modules/components/api/workOrdersApiV2";
 import {
   RefreshCw,
   AlertTriangle,
@@ -78,11 +79,11 @@ const Dashboard = () => {
 
   // Fetch real work orders data
   const { data: workOrdersData = [], isLoading: isWorkOrdersLoading } = useQuery<WorkOrder[]>({
-    queryKey: ['/technical/api/work-orders', vesselId],
+    queryKey: getWorkOrdersListQueryKey(vesselId),
     queryFn: async () => {
       const url = isAllVessels 
-        ? '/technical/api/work-orders' 
-        : `/technical/api/work-orders?vesselId=${vesselId}`;
+        ? getWorkOrdersListUrl() 
+        : getWorkOrdersListUrl(vesselId);
       const response = await fetch(url);
       if (!response.ok) throw new Error('Failed to fetch work orders');
       return await response.json();
@@ -219,7 +220,7 @@ const Dashboard = () => {
   // Approve single work order mutation (for Head of Dept quick actions)
   const approveMutation = useMutation({
     mutationFn: async (workOrderId: string) => {
-      const response = await apiRequest('POST', '/technical/api/work-orders/bulk-approve', {
+      const response = await apiRequest('POST', getBulkApproveUrl(), {
         workOrderIds: [workOrderId],
         approver: "Head of Dept"
       });
@@ -227,7 +228,7 @@ const Dashboard = () => {
     },
     onSuccess: () => {
       toast({ title: "Success", description: "Work order approved successfully" });
-      queryClient.invalidateQueries({ queryKey: ['/technical/api/work-orders', vesselId] });
+      queryClient.invalidateQueries({ queryKey: getWorkOrdersListQueryKey(vesselId) });
     },
     onError: (error: any) => {
       toast({ title: "Error", description: error.message || "Failed to approve work order", variant: "destructive" });
@@ -237,7 +238,7 @@ const Dashboard = () => {
   // Reject single work order mutation (for Head of Dept quick actions)
   const rejectMutation = useMutation({
     mutationFn: async ({ workOrderId, comments }: { workOrderId: string; comments: string }) => {
-      const response = await apiRequest('POST', '/technical/api/work-orders/bulk-reject', {
+      const response = await apiRequest('POST', getBulkRejectUrl(), {
         workOrderIds: [workOrderId],
         approver: "Head of Dept",
         rejectionComments: comments
@@ -246,7 +247,7 @@ const Dashboard = () => {
     },
     onSuccess: () => {
       toast({ title: "Rejected", description: "Work order rejected and sent back to Due" });
-      queryClient.invalidateQueries({ queryKey: ['/technical/api/work-orders', vesselId] });
+      queryClient.invalidateQueries({ queryKey: getWorkOrdersListQueryKey(vesselId) });
     },
     onError: (error: any) => {
       toast({ title: "Error", description: error.message || "Failed to reject work order", variant: "destructive" });

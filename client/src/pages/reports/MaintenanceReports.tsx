@@ -30,6 +30,7 @@ import { useVessels } from "@/hooks/useVessels";
 import { useVessel } from "@/contexts/VesselContext";
 import { useQuery } from "@tanstack/react-query";
 import { getJobsListQueryKey } from "@/modules/components/api/jobsApiV2";
+import { getWorkOrdersListQueryKey } from "@/modules/components/api/workOrdersApiV2";
 
 interface MaintenanceReport {
   id: string;
@@ -66,7 +67,7 @@ const MaintenanceReports: React.FC<MaintenanceReportsProps> = ({ onBack, globalF
   const { vesselId } = useVessel();
 
   const { data: workOrders = [] } = useQuery<any[]>({
-    queryKey: ['/technical/api/work-orders'],
+    queryKey: getWorkOrdersListQueryKey(),
   });
 
   const { data: jobs = [] } = useQuery<any[]>({

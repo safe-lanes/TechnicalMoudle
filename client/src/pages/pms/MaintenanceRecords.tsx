@@ -13,6 +13,7 @@ import {
 } from "@/components/ui/select";
 import { WorkOrderExecution } from "@shared/schema";
 import { useToast } from "@/hooks/use-toast";
+import { getWorkOrdersListQueryKey, getWorkOrdersListUrl } from "@/modules/components/api/workOrdersApiV2";
 
 const MaintenanceRecords: React.FC = () => {
   const { toast } = useToast();
@@ -43,10 +44,10 @@ const MaintenanceRecords: React.FC = () => {
 
   // Fetch all work orders to get templates - filter by vesselId from component
   const { data: allWorkOrders = [], isLoading: templatesLoading } = useQuery<any[]>({
-    queryKey: ['/technical/api/work-orders', component?.vesselId],
+    queryKey: getWorkOrdersListQueryKey(component?.vesselId),
     queryFn: async () => {
       if (!component?.vesselId) return [];
-      const response = await fetch(`/technical/api/work-orders?vesselId=${component.vesselId}`);
+      const response = await fetch(getWorkOrdersListUrl(component.vesselId));
       if (!response.ok) throw new Error('Failed to fetch work orders');
       return await response.json();
     },

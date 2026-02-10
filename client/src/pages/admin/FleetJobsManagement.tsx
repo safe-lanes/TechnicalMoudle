@@ -19,6 +19,7 @@ import {
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Plus, Search, Pencil, Trash2, Download, PlayCircle } from "lucide-react";
 import { apiRequest, queryClient } from "@/lib/queryClient";
+import { getWorkOrdersListQueryKey } from "@/modules/components/api/workOrdersApiV2";
 import { useToast } from "@/hooks/use-toast";
 import FleetJobForm from "./FleetJobForm";
 import { Marker } from "@/components/Marker";
@@ -99,7 +100,7 @@ export default function FleetJobsManagement() {
       return data;
     },
     onSuccess: (data) => {
-      queryClient.invalidateQueries({ queryKey: ['/technical/api/work-orders'], exact: false });
+      queryClient.invalidateQueries({ predicate: (query) => { const key = query.queryKey[0]; return typeof key === 'string' && (key.startsWith('/technical/api/work-orders') || key.startsWith('/technical/api/v2/work-orders')); } });
       toast({
         title: "Work Order Created",
         description: `Work Order ${data.workOrderNo || data.id || 'N/A'} has been created successfully.`,

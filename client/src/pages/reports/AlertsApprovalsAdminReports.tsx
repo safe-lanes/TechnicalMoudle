@@ -30,6 +30,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useVessels } from "@/hooks/useVessels";
 import { useVessel } from "@/contexts/VesselContext";
 import { useQuery } from "@tanstack/react-query";
+import { getWorkOrdersListQueryKey } from "@/modules/components/api/workOrdersApiV2";
 
 interface AdminReport {
   id: string;
@@ -58,7 +59,7 @@ const AlertsApprovalsAdminReports: React.FC<AlertsApprovalsAdminReportsProps> = 
   const { vesselId } = useVessel();
 
   const { data: workOrders = [] } = useQuery<any[]>({
-    queryKey: ['/technical/api/work-orders'],
+    queryKey: getWorkOrdersListQueryKey(),
   });
 
   const { data: defects = [] } = useQuery<any[]>({

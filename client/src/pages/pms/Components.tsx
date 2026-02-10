@@ -846,7 +846,7 @@ const JobRow: React.FC<{
         title: "Work Order Created",
         description: `Work order ${data.workOrderNo} has been created successfully.`
       });
-      queryClient.invalidateQueries({ queryKey: ['/technical/api/work-orders'] });
+      queryClient.invalidateQueries({ predicate: (query) => { const key = query.queryKey[0]; return typeof key === 'string' && (key.startsWith('/technical/api/work-orders') || key.startsWith('/technical/api/v2/work-orders')); } });
       // Invalidate all jobs queries (matching any vesselId parameter)
       queryClient.invalidateQueries({ predicate: (query) => 
         typeof query.queryKey[0] === 'string' && (query.queryKey[0].startsWith('/technical/api/jobs') || query.queryKey[0].startsWith('/technical/api/v2/jobs'))

@@ -3,6 +3,7 @@ import { offlineStorage, SyncQueueItem } from '@/lib/offlineStorage';
 import { apiRequest } from '@/lib/queryClient';
 import { useToast } from '@/hooks/use-toast';
 import { getCreateJobUrl, getUpdateJobUrl, getDeleteJobUrl } from '@/modules/components/api/jobsApiV2';
+import { getCreateWorkOrderUrl, getUpdateWorkOrderUrl, getDeleteWorkOrderUrl } from '@/modules/components/api/workOrdersApiV2';
 
 interface SyncStatus {
   isOnline: boolean;
@@ -46,9 +47,9 @@ const ENTITY_ENDPOINTS: Record<string, { create: () => string; update: (id: stri
     delete: (id) => getDeleteJobUrl(id)
   },
   workOrder: {
-    create: () => '/technical/api/work-orders',
-    update: (id) => `/technical/api/work-orders/${id}`,
-    delete: (id) => `/technical/api/work-orders/${id}`
+    create: () => getCreateWorkOrderUrl(),
+    update: (id) => getUpdateWorkOrderUrl(id),
+    delete: (id) => getDeleteWorkOrderUrl(id)
   },
   spare: {
     create: () => '/technical/api/spares',

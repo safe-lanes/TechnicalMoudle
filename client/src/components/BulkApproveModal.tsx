@@ -2,6 +2,7 @@ import { useState, useMemo } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { getBulkApproveUrl, getBulkRejectUrl, getWorkOrdersListQueryKey } from "@/modules/components/api/workOrdersApiV2";
 import { useLocation } from "wouter";
 import {
   Dialog,
@@ -79,7 +80,7 @@ export function BulkApproveModal({
 
   const bulkApproveMutation = useMutation({
     mutationFn: async (workOrderIds: string[]) => {
-      const response = await apiRequest('POST', '/technical/api/work-orders/bulk-approve', {
+      const response = await apiRequest('POST', getBulkApproveUrl(), {
         workOrderIds,
         approver: "Head of Dept"
       });
@@ -90,7 +91,7 @@ export function BulkApproveModal({
         title: "Bulk Approval Complete",
         description: `${data.results.success.length} work orders approved successfully.`
       });
-      queryClient.invalidateQueries({ queryKey: ['/technical/api/work-orders', vesselId] });
+      queryClient.invalidateQueries({ queryKey: getWorkOrdersListQueryKey(vesselId) });
       setSelectedIds(new Set());
       onOpenChange(false);
     },
@@ -105,7 +106,7 @@ export function BulkApproveModal({
 
   const bulkRejectMutation = useMutation({
     mutationFn: async (workOrderIds: string[]) => {
-      const response = await apiRequest('POST', '/technical/api/work-orders/bulk-reject', {
+      const response = await apiRequest('POST', getBulkRejectUrl(), {
         workOrderIds,
         approver: "Head of Dept",
         rejectionComments
@@ -117,7 +118,7 @@ export function BulkApproveModal({
         title: "Bulk Rejection Complete",
         description: `${data.results.success.length} work orders rejected and sent back to Due.`
       });
-      queryClient.invalidateQueries({ queryKey: ['/technical/api/work-orders', vesselId] });
+      queryClient.invalidateQueries({ queryKey: getWorkOrdersListQueryKey(vesselId) });
       setSelectedIds(new Set());
       setRejectionComments("");
       setShowRejectInput(false);

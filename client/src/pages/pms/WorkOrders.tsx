@@ -23,6 +23,7 @@ import { ComputedWorkOrderStatus } from "@shared/workOrders/status";
 import { useToast } from "@/hooks/use-toast";
 import { useVessels } from "@/hooks/useVessels";
 import { formatProfessionalDate, calculateLeadTimeStatus } from "@/lib/dateUtils";
+import { getWorkOrdersListQueryKey, getWorkOrdersListUrl, getCreateWorkOrderUrl, getUpdateWorkOrderUrl, getDeleteWorkOrderUrl } from "@/modules/components/api/workOrdersApiV2";
 import { Marker } from "@/components/Marker";
 import { useUIRole } from "@/contexts/UIRoleContext";
 
@@ -91,9 +92,9 @@ const WorkOrders: React.FC = () => {
   
   // Fetch work orders using React Query (includes computedStatus and lead time from backend)
   const { data: workOrdersList = [], isLoading, error } = useQuery<WorkOrderWithHydratedData[]>({
-    queryKey: ['/technical/api/work-orders', vesselId],
+    queryKey: getWorkOrdersListQueryKey(vesselId),
     queryFn: async () => {
-      const response = await fetch(`/technical/api/work-orders?vesselId=${vesselId}`);
+      const response = await fetch(getWorkOrdersListUrl(vesselId));
       if (!response.ok) throw new Error('Failed to fetch work orders');
       return await response.json() as WorkOrderWithHydratedData[];
     },
@@ -103,11 +104,11 @@ const WorkOrders: React.FC = () => {
   // Create work order mutation
   const createWorkOrderMutation = useMutation({
     mutationFn: async (data: InsertWorkOrder) => {
-      const response = await apiRequest('POST', '/technical/api/work-orders', data);
+      const response = await apiRequest('POST', getCreateWorkOrderUrl(), data);
       return response.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/technical/api/work-orders', vesselId] });
+      queryClient.invalidateQueries({ queryKey: getWorkOrdersListQueryKey(vesselId) });
       toast({ title: "Success", description: "Work order created successfully" });
     },
     onError: (error: any) => {
@@ -118,11 +119,11 @@ const WorkOrders: React.FC = () => {
   // Update work order mutation
   const updateWorkOrderMutation = useMutation({
     mutationFn: async ({ id, data }: { id: string; data: Partial<InsertWorkOrder> }) => {
-      const response = await apiRequest('PATCH', `/technical/api/work-orders/${id}`, data);
+      const response = await apiRequest('PATCH', getUpdateWorkOrderUrl(id), data);
       return response.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/technical/api/work-orders', vesselId] });
+      queryClient.invalidateQueries({ queryKey: getWorkOrdersListQueryKey(vesselId) });
       toast({ title: "Success", description: "Work order updated successfully" });
     },
     onError: (error: any) => {
@@ -133,11 +134,11 @@ const WorkOrders: React.FC = () => {
   // Delete work order mutation
   const deleteWorkOrderMutation = useMutation({
     mutationFn: async (id: string) => {
-      const response = await apiRequest('DELETE', `/technical/api/work-orders/${id}`);
+      const response = await apiRequest('DELETE', getDeleteWorkOrderUrl(id));
       return response.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/technical/api/work-orders', vesselId] });
+      queryClient.invalidateQueries({ queryKey: getWorkOrdersListQueryKey(vesselId) });
       toast({ title: "Success", description: "Work order deleted successfully" });
     },
     onError: (error: any) => {

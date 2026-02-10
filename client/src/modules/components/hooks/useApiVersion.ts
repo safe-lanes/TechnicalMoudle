@@ -35,7 +35,9 @@ export function useApiVersion() {
              key.startsWith('/technical/api/jobs') ||
              key.startsWith('/technical/api/v2/jobs') ||
              key.startsWith('/technical/api/job-maintenance-history') ||
-             key.startsWith('/technical/api/v2/job-maintenance-history');
+             key.startsWith('/technical/api/v2/job-maintenance-history') ||
+             key.startsWith('/technical/api/work-orders') ||
+             key.startsWith('/technical/api/v2/work-orders');
     }});
   }, [mode]);
 

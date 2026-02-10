@@ -59,7 +59,7 @@ export function invalidateJobs(vesselId?: string) {
 export function invalidateWorkOrders(vesselId?: string) {
   // Use predicate to match all work-order-related queries
   queryClient.invalidateQueries({
-    predicate: (query) => queryKeyMatchesPrefix(query.queryKey, '/technical/api/work-orders')
+    predicate: (query) => queryKeyMatchesPrefix(query.queryKey, '/technical/api/work-orders') || queryKeyMatchesPrefix(query.queryKey, '/technical/api/v2/work-orders')
   });
 }
 
