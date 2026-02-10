@@ -8,6 +8,25 @@ export type { Component, ComponentMaintenanceHistory, InsertComponentMaintenance
 export { v2Spares } from "../jobs/schema";
 export type { Job, InsertJob, JobComponentLink, Spare } from "../jobs/schema";
 
+export {
+  v2SpareComponentLinks,
+  v2Locations,
+  v2SpareLocationStock,
+  v2InventoryTransactions,
+  insertLocationSchema,
+  insertSpareLocationStockSchema,
+  insertInventoryTransactionSchema,
+} from "../spares/schema";
+export type {
+  SpareComponentLink,
+  Location,
+  InsertLocation,
+  SpareLocationStock,
+  InsertSpareLocationStock,
+  InventoryTransaction,
+  InsertInventoryTransaction,
+} from "../spares/schema";
+
 export const v2WorkOrders = pgTable("work_orders", {
   id: text("id").primaryKey(),
   vesselId: text("vessel_id"),
@@ -211,92 +230,3 @@ export const v2PmsVesselSettings = pgTable("pms_vessel_settings", {
 }));
 
 export type PmsVesselSettings = typeof v2PmsVesselSettings.$inferSelect;
-
-export const v2SpareComponentLinks = pgTable("spare_component_links", {
-  id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
-  vesselId: text("vessel_id").notNull(),
-  spareId: integer("spare_id").notNull(),
-  componentId: text("component_id").notNull(),
-  linkedBy: text("linked_by").notNull(),
-  linkedAt: timestamp("linked_at").notNull().defaultNow(),
-}, (table) => ({
-  spareIdIdx: index("idx_spare_component_link_spare").on(table.spareId),
-  componentIdIdx: index("idx_spare_component_link_component").on(table.componentId),
-  vesselIdIdx: index("idx_spare_component_link_vessel").on(table.vesselId),
-  uniqueSpareComponent: unique("unique_spare_component_link").on(table.spareId, table.componentId),
-}));
-
-export type SpareComponentLink = typeof v2SpareComponentLinks.$inferSelect;
-
-export const v2Locations = pgTable("locations", {
-  id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
-  vesselId: text("vessel_id").notNull(),
-  locationName: text("location_name").notNull(),
-  locationType: text("location_type"),
-  createdAt: timestamp("created_at").notNull().defaultNow(),
-  createdBy: text("created_by").notNull(),
-}, (table) => ({
-  vesselLocationIdx: index("idx_location_vessel").on(table.vesselId),
-  uniqueVesselLocation: unique("unique_vessel_location").on(table.vesselId, table.locationName),
-}));
-
-export const insertLocationSchema = createInsertSchema(v2Locations).omit({
-  id: true,
-  createdAt: true,
-});
-
-export type InsertLocation = z.infer<typeof insertLocationSchema>;
-export type Location = typeof v2Locations.$inferSelect;
-
-export const v2SpareLocationStock = pgTable("spare_location_stock", {
-  id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
-  vesselId: text("vessel_id").notNull(),
-  spareId: integer("spare_id").notNull(),
-  locationId: integer("location_id").notNull(),
-  qty: integer("qty").notNull().default(0),
-}, (table) => ({
-  spareIdIdx: index("idx_spare_location_stock_spare").on(table.spareId),
-  locationIdIdx: index("idx_spare_location_stock_location").on(table.locationId),
-  vesselIdIdx: index("idx_spare_location_stock_vessel").on(table.vesselId),
-  uniqueSpareLocation: unique("unique_spare_location_stock").on(table.spareId, table.locationId),
-}));
-
-export const insertSpareLocationStockSchema = createInsertSchema(v2SpareLocationStock).omit({
-  id: true,
-});
-
-export type InsertSpareLocationStock = z.infer<typeof insertSpareLocationStockSchema>;
-export type SpareLocationStock = typeof v2SpareLocationStock.$inferSelect;
-
-export const v2InventoryTransactions = pgTable("inventory_transactions", {
-  id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
-  vesselId: text("vessel_id").notNull(),
-  txnDatetime: timestamp("txn_datetime").notNull().defaultNow(),
-  spareId: integer("spare_id").notNull(),
-  locationId: integer("location_id"),
-  eventType: text("event_type").notNull(),
-  qtyChange: integer("qty_change").notNull(),
-  robTotalBefore: integer("rob_total_before").notNull(),
-  robTotalAfter: integer("rob_total_after").notNull(),
-  robLocationBefore: integer("rob_location_before"),
-  robLocationAfter: integer("rob_location_after"),
-  referenceType: text("reference_type").notNull(),
-  referenceId: text("reference_id"),
-  referenceNote: text("reference_note"),
-  userId: text("user_id").notNull(),
-}, (table) => ({
-  vesselIdIdx: index("idx_inventory_txn_vessel").on(table.vesselId),
-  spareIdIdx: index("idx_inventory_txn_spare").on(table.spareId),
-  locationIdIdx: index("idx_inventory_txn_location").on(table.locationId),
-  txnDatetimeIdx: index("idx_inventory_txn_datetime").on(table.txnDatetime),
-  eventTypeIdx: index("idx_inventory_txn_event").on(table.eventType),
-  referenceTypeIdx: index("idx_inventory_txn_ref_type").on(table.referenceType),
-}));
-
-export const insertInventoryTransactionSchema = createInsertSchema(v2InventoryTransactions).omit({
-  id: true,
-  txnDatetime: true,
-});
-
-export type InsertInventoryTransaction = z.infer<typeof insertInventoryTransactionSchema>;
-export type InventoryTransaction = typeof v2InventoryTransactions.$inferSelect;

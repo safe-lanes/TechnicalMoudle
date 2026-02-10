@@ -795,7 +795,7 @@ export class SparesRepository {
     const result = await db.select().from(v2Locations)
       .where(and(
         eq(v2Locations.vesselId, vesselId),
-        sql`UPPER(TRIM(${v2Locations.name})) = ${normalizedName}`
+        sql`UPPER(TRIM(${v2Locations.locationName})) = ${normalizedName}`
       ));
 
     if (result[0]) {
@@ -804,7 +804,7 @@ export class SparesRepository {
 
     const inserted = await db.insert(v2Locations).values({
       vesselId,
-      name: locationName.trim(),
+      locationName: locationName.trim(),
       createdBy,
     }).returning();
     return inserted[0];
