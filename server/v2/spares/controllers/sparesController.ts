@@ -11,9 +11,15 @@ export async function listAll(req: Request, res: Response) {
   }
 }
 
+const vesselIdSchema = z.object({ vesselId: z.string().min(1, 'vesselId is required') });
+const spareIdSchema = z.object({ id: z.coerce.number().int().positive('Spare ID must be a positive integer') });
+const vesselAndSpareSchema = vesselIdSchema.merge(spareIdSchema);
+
 export async function listByVessel(req: Request, res: Response) {
   try {
-    const spares = await sparesService.getSpares(req.params.vesselId);
+    const params = vesselIdSchema.safeParse(req.params);
+    if (!params.success) return res.status(400).json({ error: params.error.errors[0]?.message });
+    const spares = await sparesService.getSpares(params.data.vesselId);
     res.json(spares);
   } catch (error: any) {
     res.status(500).json({ error: "Failed to fetch spares" });
@@ -22,7 +28,9 @@ export async function listByVessel(req: Request, res: Response) {
 
 export async function getById(req: Request, res: Response) {
   try {
-    const spare = await sparesService.getSpare(parseInt(req.params.id));
+    const params = spareIdSchema.safeParse(req.params);
+    if (!params.success) return res.status(400).json({ error: params.error.errors[0]?.message });
+    const spare = await sparesService.getSpare(params.data.id);
     if (!spare) {
       return res.status(404).json({ error: "Spare not found" });
     }
@@ -32,34 +40,80 @@ export async function getById(req: Request, res: Response) {
   }
 }
 
+const createSpareSchema = z.object({
+  partCode: z.string().min(1, 'partCode is required'),
+  partName: z.string().min(1, 'partName is required'),
+  componentId: z.string().min(1, 'componentId is required'),
+  componentName: z.string().optional(),
+  componentCode: z.string().optional(),
+  componentSpareCode: z.string().optional(),
+  critical: z.string().optional(),
+  rob: z.coerce.number().min(0).optional(),
+  min: z.coerce.number().min(0).optional(),
+  max: z.coerce.number().min(0).optional(),
+  location: z.string().optional(),
+  location2: z.string().optional(),
+  robLocationA: z.coerce.number().min(0).optional(),
+  robLocationB: z.coerce.number().min(0).optional(),
+  partNumber: z.string().optional(),
+  uom: z.string().optional(),
+  drawingNumber: z.string().optional(),
+  positionNumber: z.string().optional(),
+  note: z.string().optional(),
+  specification: z.string().optional(),
+  maker: z.string().optional(),
+  makerCode: z.string().optional(),
+  manualName: z.string().optional(),
+  pageNumber: z.string().optional(),
+  ihm: z.string().optional(),
+  remarks: z.string().optional(),
+  criticality: z.string().optional(),
+});
+
 export async function create(req: Request, res: Response) {
   try {
+    const params = vesselIdSchema.safeParse(req.params);
+    if (!params.success) return res.status(400).json({ error: params.error.errors[0]?.message });
+
+    const body = createSpareSchema.safeParse(req.body);
+    if (!body.success) {
+      return res.status(400).json({ error: "Invalid spare data", details: body.error.errors });
+    }
+
     const spare = await sparesService.createSpare({
-      ...req.body,
-      vesselId: req.params.vesselId,
+      ...body.data,
+      vesselId: params.data.vesselId,
     });
     res.status(201).json(spare);
   } catch (error: any) {
-    if (error.name === 'ZodError') {
-      return res.status(400).json({ error: "Invalid spare data", details: error.errors });
-    }
     res.status(500).json({ error: "Failed to create spare" });
   }
 }
 
+const updateSpareSchema = createSpareSchema.partial().extend({
+  robLocationA: z.coerce.number().min(0, 'robLocationA must be non-negative').optional(),
+  robLocationB: z.coerce.number().min(0, 'robLocationB must be non-negative').optional(),
+  remarks: z.string().optional(),
+  place: z.string().optional(),
+  dateLocal: z.string().optional(),
+  tz: z.string().optional(),
+});
+
 export async function update(req: Request, res: Response) {
   try {
-    const spareId = parseInt(req.params.id);
-    const { robLocationA, robLocationB, remarks, place, dateLocal, tz, ...otherUpdates } = req.body;
+    const params = spareIdSchema.safeParse(req.params);
+    if (!params.success) return res.status(400).json({ error: params.error.errors[0]?.message });
+    const spareId = params.data.id;
+
+    const body = updateSpareSchema.safeParse(req.body);
+    if (!body.success) {
+      return res.status(400).json({ error: "Invalid update data", details: body.error.errors });
+    }
+
+    const { robLocationA, robLocationB, remarks, place, dateLocal, tz, ...otherUpdates } = body.data;
     const userId = (req as any).user?.id?.toString() || 'System';
 
     if (robLocationA !== undefined || robLocationB !== undefined) {
-      if (robLocationA !== undefined && (isNaN(Number(robLocationA)) || Number(robLocationA) < 0)) {
-        return res.status(400).json({ error: "robLocationA must be a valid non-negative number" });
-      }
-      if (robLocationB !== undefined && (isNaN(Number(robLocationB)) || Number(robLocationB) < 0)) {
-        return res.status(400).json({ error: "robLocationB must be a valid non-negative number" });
-      }
 
       const currentSpare = await sparesService.getSpare(spareId);
       if (!currentSpare) {
@@ -100,7 +154,9 @@ export async function update(req: Request, res: Response) {
 
 export async function remove(req: Request, res: Response) {
   try {
-    await sparesService.deleteSpare(parseInt(req.params.id));
+    const params = spareIdSchema.safeParse(req.params);
+    if (!params.success) return res.status(400).json({ error: params.error.errors[0]?.message });
+    await sparesService.deleteSpare(params.data.id);
     res.json({ success: true });
   } catch (error: any) {
     if (error.message?.includes('not found')) {
@@ -121,10 +177,14 @@ export async function adjustment(req: Request, res: Response) {
       tz: z.string().optional(),
     });
 
+    const paramsResult = vesselAndSpareSchema.safeParse(req.params);
+    if (!paramsResult.success) {
+      return res.status(400).json({ error: paramsResult.error.errors[0]?.message });
+    }
+
     const payload = adjustmentPayloadSchema.parse(req.body);
     const userId = (req as any).user?.id?.toString() || 'System';
-    const vesselId = req.params.vesselId;
-    const spareId = parseInt(req.params.id);
+    const { vesselId, id: spareId } = paramsResult.data;
 
     const existingSpare = await sparesService.getSpare(spareId);
     if (!existingSpare) {
@@ -162,6 +222,9 @@ export async function adjustment(req: Request, res: Response) {
 
 export async function adjust(req: Request, res: Response) {
   try {
+    const params = spareIdSchema.safeParse(req.params);
+    if (!params.success) return res.status(400).json({ error: params.error.errors[0]?.message });
+
     const adjustPayloadSchema = z.object({
       qtyChange: z.number(),
       eventType: z.enum(['CONSUME', 'RECEIVE', 'ADJUST']),
@@ -171,7 +234,7 @@ export async function adjust(req: Request, res: Response) {
 
     const payload = adjustPayloadSchema.parse(req.body);
     const spare = await sparesService.adjustSpareQuantity(
-      parseInt(req.params.id),
+      params.data.id,
       payload.qtyChange,
       payload.eventType,
       payload.reference,
@@ -195,7 +258,9 @@ export async function adjust(req: Request, res: Response) {
 
 export async function historyByVessel(req: Request, res: Response) {
   try {
-    const history = await sparesService.getSpareHistory(req.params.vesselId);
+    const params = vesselIdSchema.safeParse(req.params);
+    if (!params.success) return res.status(400).json({ error: params.error.errors[0]?.message });
+    const history = await sparesService.getSpareHistory(params.data.vesselId);
     res.json(history);
   } catch (error: any) {
     res.status(500).json({ error: "Failed to fetch history" });
@@ -204,7 +269,9 @@ export async function historyByVessel(req: Request, res: Response) {
 
 export async function historyByVesselLegacy(req: Request, res: Response) {
   try {
-    const history = await sparesService.getSpareHistory(req.params.vesselId);
+    const params = vesselIdSchema.safeParse(req.params);
+    if (!params.success) return res.status(400).json({ error: params.error.errors[0]?.message });
+    const history = await sparesService.getSpareHistory(params.data.vesselId);
     res.json(history);
   } catch (error: any) {
     res.status(500).json({ error: "Failed to fetch history" });
@@ -213,26 +280,40 @@ export async function historyByVesselLegacy(req: Request, res: Response) {
 
 export async function lowStock(req: Request, res: Response) {
   try {
-    const spares = await sparesService.getLowStockSpares(req.params.vesselId);
+    const params = vesselIdSchema.safeParse(req.params);
+    if (!params.success) return res.status(400).json({ error: params.error.errors[0]?.message });
+    const spares = await sparesService.getLowStockSpares(params.data.vesselId);
     res.json(spares);
   } catch (error: any) {
     res.status(500).json({ error: "Failed to fetch low stock spares" });
   }
 }
 
+const batchConsumeSchema = z.object({
+  items: z.array(z.object({
+    spareId: z.coerce.number().int().positive(),
+    quantity: z.coerce.number().positive(),
+    location: z.enum(['A', 'B']).optional(),
+  })).min(1, 'Items array must have at least one item'),
+  workOrderId: z.string().optional(),
+  consumedBy: z.string().optional(),
+});
+
 export async function batchConsumeHandler(req: Request, res: Response) {
   try {
-    const { items, workOrderId, consumedBy } = req.body;
+    const params = vesselIdSchema.safeParse(req.params);
+    if (!params.success) return res.status(400).json({ error: params.error.errors[0]?.message });
 
-    if (!Array.isArray(items) || items.length === 0) {
-      return res.status(400).json({ error: "Items array is required" });
+    const body = batchConsumeSchema.safeParse(req.body);
+    if (!body.success) {
+      return res.status(400).json({ error: "Invalid batch consume data", details: body.error.errors });
     }
 
     const results = await sparesService.batchConsume(
-      req.params.vesselId,
-      items,
-      workOrderId,
-      consumedBy
+      params.data.vesselId,
+      body.data.items,
+      body.data.workOrderId,
+      body.data.consumedBy
     );
 
     res.json({ success: true, results });
@@ -241,19 +322,31 @@ export async function batchConsumeHandler(req: Request, res: Response) {
   }
 }
 
+const batchReceiveSchema = z.object({
+  items: z.array(z.object({
+    spareId: z.coerce.number().int().positive(),
+    quantity: z.coerce.number().positive(),
+    location: z.enum(['A', 'B']).optional(),
+  })).min(1, 'Items array must have at least one item'),
+  purchaseOrderRef: z.string().optional(),
+  receivedBy: z.string().optional(),
+});
+
 export async function batchReceiveHandler(req: Request, res: Response) {
   try {
-    const { items, purchaseOrderRef, receivedBy } = req.body;
+    const params = vesselIdSchema.safeParse(req.params);
+    if (!params.success) return res.status(400).json({ error: params.error.errors[0]?.message });
 
-    if (!Array.isArray(items) || items.length === 0) {
-      return res.status(400).json({ error: "Items array is required" });
+    const body = batchReceiveSchema.safeParse(req.body);
+    if (!body.success) {
+      return res.status(400).json({ error: "Invalid batch receive data", details: body.error.errors });
     }
 
     const results = await sparesService.batchReceive(
-      req.params.vesselId,
-      items,
-      purchaseOrderRef,
-      receivedBy
+      params.data.vesselId,
+      body.data.items,
+      body.data.purchaseOrderRef,
+      body.data.receivedBy
     );
 
     res.json({ success: true, results });
@@ -262,21 +355,29 @@ export async function batchReceiveHandler(req: Request, res: Response) {
   }
 }
 
+const simpleConsumeSchema = z.object({
+  qty: z.coerce.number().positive('Quantity must be a positive number'),
+  dateLocal: z.string().optional(),
+  place: z.string().optional(),
+  remarks: z.string().optional(),
+  userId: z.string().optional(),
+  workOrder: z.string().optional(),
+});
+
 export async function consume(req: Request, res: Response) {
   try {
-    const spareId = parseInt(req.params.id);
-    if (isNaN(spareId)) {
-      return res.status(400).json({ error: "Invalid spare ID" });
+    const params = spareIdSchema.safeParse(req.params);
+    if (!params.success) return res.status(400).json({ error: params.error.errors[0]?.message });
+
+    const body = simpleConsumeSchema.safeParse(req.body);
+    if (!body.success) {
+      return res.status(400).json({ error: body.error.errors[0]?.message });
     }
 
-    const { qty, dateLocal, place, remarks, userId, workOrder } = req.body;
-
-    if (!qty || qty <= 0) {
-      return res.status(400).json({ error: "Quantity must be a positive number" });
-    }
+    const { qty, dateLocal, place, remarks, userId, workOrder } = body.data;
 
     const result = await sparesService.consumeSpareFromLocation(
-      spareId,
+      params.data.id,
       qty,
       'A',
       userId || 'User',
@@ -297,21 +398,28 @@ export async function consume(req: Request, res: Response) {
   }
 }
 
+const simpleReceiveSchema = z.object({
+  qty: z.coerce.number().positive('Quantity must be a positive number'),
+  dateLocal: z.string().optional(),
+  supplierPO: z.string().optional(),
+  remarks: z.string().optional(),
+  userId: z.string().optional(),
+});
+
 export async function receive(req: Request, res: Response) {
   try {
-    const spareId = parseInt(req.params.id);
-    if (isNaN(spareId)) {
-      return res.status(400).json({ error: "Invalid spare ID" });
+    const params = spareIdSchema.safeParse(req.params);
+    if (!params.success) return res.status(400).json({ error: params.error.errors[0]?.message });
+
+    const body = simpleReceiveSchema.safeParse(req.body);
+    if (!body.success) {
+      return res.status(400).json({ error: body.error.errors[0]?.message });
     }
 
-    const { qty, dateLocal, supplierPO, remarks, userId } = req.body;
-
-    if (!qty || qty <= 0) {
-      return res.status(400).json({ error: "Quantity must be a positive number" });
-    }
+    const { qty, dateLocal, supplierPO, remarks, userId } = body.data;
 
     const result = await sparesService.receiveSpareToLocation(
-      spareId,
+      params.data.id,
       qty,
       'A',
       userId || 'User',
