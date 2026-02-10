@@ -1,6 +1,6 @@
 import { eq, and, inArray } from 'drizzle-orm';
 import { getDb } from '../../../db';
-import { bulkComponents, bulkMakerList, bulkImportChangeLog } from '../schema';
+import { bulkComponents, bulkMakerList, bulkImportChangeLog, bulkImportHistory } from '../schema';
 
 export class BulkRepository {
   async getComponents(vesselId: string) {
@@ -83,6 +83,21 @@ export class BulkRepository {
     const db = await getDb();
     const results = await db.insert(bulkMakerList).values(data).returning();
     return results[0];
+  }
+
+  async createImportHistory(data: any) {
+    const db = await getDb();
+    const results = await db.insert(bulkImportHistory).values(data).returning();
+    return results[0];
+  }
+
+  async updateImportHistory(id: string, data: any) {
+    const db = await getDb();
+    const results = await db.update(bulkImportHistory)
+      .set(data)
+      .where(eq(bulkImportHistory.id, id))
+      .returning();
+    return results[0] || null;
   }
 
   async createImportChangeLog(data: any) {

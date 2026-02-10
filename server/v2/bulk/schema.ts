@@ -67,6 +67,27 @@ export const bulkMakerList = pgTable("maker_list", {
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 });
 
+export const bulkImportHistory = pgTable("import_history", {
+  id: text("id").primaryKey(),
+  type: text("type").notNull(),
+  mode: text("mode").notNull(),
+  archiveMissing: boolean("archive_missing").default(false),
+  userId: text("user_id"),
+  vesselId: text("vessel_id"),
+  created: integer("created").default(0),
+  updated: integer("updated").default(0),
+  skipped: integer("skipped").default(0),
+  archived: integer("archived").default(0),
+  startedAt: timestamp("started_at").defaultNow(),
+  finishedAt: timestamp("finished_at"),
+  status: text("status").notNull().default("in_progress"),
+  originalName: text("original_name"),
+  fileSize: integer("file_size"),
+  storedFilePath: text("stored_file_path"),
+  undoneAt: timestamp("undone_at"),
+  errorMessage: text("error_message"),
+});
+
 export const bulkImportChangeLog = pgTable("import_change_log", {
   id: text("id").primaryKey(),
   importHistoryId: text("import_history_id").notNull(),

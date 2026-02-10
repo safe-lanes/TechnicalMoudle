@@ -1,6 +1,7 @@
 import fs from 'fs';
 import path from 'path';
 import { promises as fsPromises } from 'fs';
+import type { BulkRepository } from '../repositories/bulkRepository';
 
 const HISTORY_DIR = path.join(process.cwd(), 'uploads', 'bulk-imports', 'history');
 
@@ -30,6 +31,12 @@ async function ensureHistoryDir(): Promise<void> {
 }
 
 export class BulkHistoryService {
+  private repository: BulkRepository;
+
+  constructor(repository: BulkRepository) {
+    this.repository = repository;
+  }
+
   async saveHistory(data: ImportHistoryRecord): Promise<ImportHistoryRecord> {
     await ensureHistoryDir();
 
@@ -50,6 +57,24 @@ export class BulkHistoryService {
       storedFilePath: data.storedFilePath,
       errorReport: data.errorReport || null,
     };
+
+    await this.repository.createImportHistory({
+      id: record.id,
+      type: record.type,
+      mode: record.mode,
+      userId: record.userId,
+      vesselId: record.vesselId,
+      startedAt: record.startedAt ? new Date(record.startedAt) : new Date(),
+      finishedAt: record.completedAt ? new Date(record.completedAt) : null,
+      status: record.status,
+      created: record.created,
+      updated: record.updated,
+      skipped: record.skipped,
+      archived: record.archived,
+      originalName: record.originalName,
+      storedFilePath: record.storedFilePath,
+      errorMessage: record.errorReport,
+    });
 
     const filePath = path.join(HISTORY_DIR, `${record.id}.json`);
     await fsPromises.writeFile(filePath, JSON.stringify(record, null, 2), 'utf8');
@@ -113,6 +138,23 @@ export class BulkHistoryService {
     const updated = { ...existing, ...updates };
     const filePath = path.join(HISTORY_DIR, `${id}.json`);
     await fsPromises.writeFile(filePath, JSON.stringify(updated, null, 2), 'utf8');
+
+    const dbUpdates: any = {};
+    if (updates.status !== undefined) dbUpdates.status = updates.status;
+    if (updates.completedAt !== undefined) dbUpdates.finishedAt = new Date(updates.completedAt);
+    if (updates.created !== undefined) dbUpdates.created = updates.created;
+    if (updates.updated !== undefined) dbUpdates.updated = updates.updated;
+    if (updates.skipped !== undefined) dbUpdates.skipped = updates.skipped;
+    if (updates.archived !== undefined) dbUpdates.archived = updates.archived;
+    if (updates.storedFilePath !== undefined) dbUpdates.storedFilePath = updates.storedFilePath;
+    if (updates.errorReport !== undefined) dbUpdates.errorMessage = updates.errorReport;
+    if (Object.keys(dbUpdates).length > 0) {
+      try {
+        await this.repository.updateImportHistory(id, dbUpdates);
+      } catch (_err) {
+      }
+    }
+
     return updated;
   }
 }

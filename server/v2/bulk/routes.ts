@@ -41,7 +41,7 @@ export function createBulkRouter(): Router {
   const repository = new BulkRepository();
   const sheetService = new BulkSheetService();
   const dryRunService = new BulkDryRunService(repository);
-  const historyService = new BulkHistoryService();
+  const historyService = new BulkHistoryService(repository);
   const importService = new BulkImportService(repository, historyService);
   const undoService = new BulkUndoService(repository, historyService);
   const templateService = new BulkTemplateService();
