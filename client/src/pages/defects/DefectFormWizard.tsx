@@ -11,7 +11,8 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Switch } from "@/components/ui/switch";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Upload, Plus, Edit, Trash2, Eye, X, Paperclip } from "lucide-react";
+import { Upload, Plus, Edit, Trash2, Eye, X, Paperclip, Download } from "lucide-react";
+import { pdfReportGenerator, DefectReportPdfData, formatDate } from "@/lib/pdfReportGenerator";
 import { insertDefectSchema } from "@shared/schema";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -638,12 +639,101 @@ export default function DefectFormWizard({
     ref.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
   };
 
+  const handleExportPdf = () => {
+    const data = form.getValues();
+    const vesselName = vessels.find((v: any) => v.id === data.vesselId)?.name || data.vesselName || '';
+    const sourceName = findSourceById(data.source || '')?.name || data.source || '';
+    const componentDisplay = data.componentHardwareLevel3 || '';
+    const sireHardwareDisplay = data.sireHardwareLevel3 || '';
+
+    const immediateCauseVal = data.immediateCause;
+    const immediateCauseText = typeof immediateCauseVal === 'object' && immediateCauseVal
+      ? buildImmediateCauseText(immediateCauseVal as { unsafeAct: string[]; unsafeCondition: string[] })
+      : String(immediateCauseVal || '');
+
+    const rootCauseVal = data.rootCause;
+    const rootCauseText = typeof rootCauseVal === 'object' && rootCauseVal
+      ? buildRootCauseText(rootCauseVal as { individualFactor: string[]; systemFactor: string[] })
+      : String(rootCauseVal || '');
+
+    const lastExt = targetDateExtensions.length > 0 ? targetDateExtensions[targetDateExtensions.length - 1] : null;
+
+    const pdfData: DefectReportPdfData = {
+      reportId: currentDefect?.defectId || defectId,
+      vessel: vesselName,
+      category: data.equipmentCategory || '',
+      dateObserved: formatDate(data.issueDate),
+      source: sourceName,
+      component: componentDisplay,
+      dateReportedToOffice: formatDate(data.dateReportedToOffice),
+      defectCategory: data.defectCategory || '',
+      make: data.equipmentMake || '',
+      dateRegisteredInSystem: formatDate(data.dateRegisteredInSystem),
+      defectType: data.defectType || '',
+      model: data.equipmentModel || '',
+      targetDate: formatDate(data.targetCloseDate),
+      raisedBy: data.reportedBy || '',
+      isCoc: data.is_coc || false,
+      isCritical: data.critical || false,
+      dateClosed: formatDate(data.dateCompleted),
+      description: data.description || '',
+
+      immediateCause: immediateCauseText,
+      immediateCauseExplanation: data.immediateCauseExplanation || '',
+      rootCause: rootCauseText,
+      rootCauseExplanation: data.rootCauseExplanation || '',
+      sireVersion: data.viqVersion || '',
+      sireReference: data.viqRef || '',
+      sireHardwareClass: sireHardwareDisplay,
+      riskLevel: data.riskLevel || '',
+      priority: data.priority || '',
+      actions: actions.map(a => ({
+        actionType: a.actionType || '',
+        description: a.actionDescription || '',
+        proposedBy: a.proposedBy || '',
+        responsibility: a.responsibility || '',
+        dueDate: formatDate(a.dueDate),
+        status: a.status || '',
+      })),
+      targetDateExtension: lastExt ? {
+        existingTargetDate: formatDate(lastExt.existingTargetDate),
+        newTargetDate: formatDate(lastExt.newTargetDate),
+        reasonForExtension: lastExt.reasonForExtension || '',
+        approved: lastExt.status || '',
+        approvalDate: formatDate(lastExt.approvalDate),
+        approverComments: lastExt.approverComments || '',
+      } : undefined,
+
+      confirmCompleted: data.confirmCompleted || false,
+      dateCompleted: formatDate(data.dateCompleted),
+      closedByName: data.closedByName || '',
+      closedByRank: data.closedByRank || '',
+      verified: data.verified || false,
+      dateVerified: formatDate(data.dateVerified || (data as any).verifiedDate),
+      verifiedByName: data.verifiedByName || '',
+      verifiedByOfficePosition: data.verifiedByOfficePosition || '',
+    };
+
+    pdfReportGenerator.generateDefectReportPdf(pdfData);
+  };
+
   return (
     <div className="fixed inset-0 bg-gray-100 z-50 flex flex-col">
       {/* Header */}
       <header className="bg-white border-b border-gray-200 px-4 py-3 flex items-center justify-between shrink-0">
         <h1 className="text-lg font-semibold text-gray-900">{getTitle()}</h1>
         <div className="flex items-center gap-2">
+          {currentDefect && (
+            <Button
+              variant="outline"
+              onClick={handleExportPdf}
+              className="text-gray-700 border-gray-300 h-9"
+              data-testid="button-export-pdf"
+            >
+              <Download className="h-4 w-4 mr-2" />
+              Export
+            </Button>
+          )}
           {currentDefect && (
             <Button
               variant="outline"

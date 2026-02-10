@@ -50,6 +50,62 @@ export interface TableColumn {
   width?: number;
 }
 
+export interface DefectReportPdfData {
+  reportId: string;
+  vessel: string;
+  category: string;
+  dateObserved: string;
+  source: string;
+  component: string;
+  dateReportedToOffice: string;
+  defectCategory: string;
+  make: string;
+  dateRegisteredInSystem: string;
+  defectType: string;
+  model: string;
+  targetDate: string;
+  raisedBy: string;
+  isCoc: boolean;
+  isCritical: boolean;
+  dateClosed: string;
+  description: string;
+
+  immediateCause: string;
+  immediateCauseExplanation: string;
+  rootCause: string;
+  rootCauseExplanation: string;
+  sireVersion: string;
+  sireReference: string;
+  sireHardwareClass: string;
+  riskLevel: string;
+  priority: string;
+  actions: Array<{
+    actionType: string;
+    description: string;
+    proposedBy: string;
+    responsibility: string;
+    dueDate: string;
+    status: string;
+  }>;
+  targetDateExtension?: {
+    existingTargetDate: string;
+    newTargetDate: string;
+    reasonForExtension: string;
+    approved: string;
+    approvalDate: string;
+    approverComments: string;
+  };
+
+  confirmCompleted: boolean;
+  dateCompleted: string;
+  closedByName: string;
+  closedByRank: string;
+  verified: boolean;
+  dateVerified: string;
+  verifiedByName: string;
+  verifiedByOfficePosition: string;
+}
+
 class PDFReportGenerator {
   private doc: jsPDF | null = null;
 
@@ -1152,6 +1208,280 @@ class PDFReportGenerator {
     this.addFooter(pageWidth, pageHeight, margin);
 
     const filename = this.generateFilename(config.title, config.vessel);
+    this.doc.save(filename);
+  }
+
+  private addFormField(x: number, y: number, label: string, value: string, width: number): number {
+    if (!this.doc) return y;
+    this.doc.setFontSize(8);
+    this.doc.setFont('helvetica', 'normal');
+    this.doc.setTextColor(...PDF_COLORS.textLight);
+    this.doc.text(label, x, y);
+
+    this.doc.setFontSize(9.5);
+    this.doc.setFont('helvetica', 'normal');
+    this.doc.setTextColor(...PDF_COLORS.textDark);
+    const lines = this.doc.splitTextToSize(value || '-', width - 2);
+    this.doc.text(lines, x, y + 4);
+    return y + 4 + lines.length * 4;
+  }
+
+  private addSectionHeader(y: number, title: string, subtitle?: string, margin?: number): number {
+    if (!this.doc) return y;
+    const m = margin || 15;
+    const pageWidth = this.doc.internal.pageSize.getWidth();
+
+    this.doc.setFontSize(13);
+    this.doc.setFont('helvetica', 'bold');
+    this.doc.setTextColor(...PDF_COLORS.primary);
+    this.doc.text(title, m, y);
+
+    y += 2;
+    this.doc.setDrawColor(...PDF_COLORS.primary);
+    this.doc.setLineWidth(0.5);
+    this.doc.line(m, y, pageWidth - m, y);
+    y += 4;
+
+    if (subtitle) {
+      this.doc.setFontSize(9);
+      this.doc.setFont('helvetica', 'normal');
+      this.doc.setTextColor(...PDF_COLORS.textLight);
+      this.doc.text(subtitle, m, y);
+      y += 5;
+    }
+
+    return y;
+  }
+
+  private checkPageBreak(y: number, needed: number): number {
+    if (!this.doc) return y;
+    const pageHeight = this.doc.internal.pageSize.getHeight();
+    if (y + needed > pageHeight - 20) {
+      this.doc.addPage();
+      return 15;
+    }
+    return y;
+  }
+
+  generateDefectReportPdf(defectData: DefectReportPdfData): void {
+    this.doc = new jsPDF({
+      orientation: 'portrait',
+      unit: 'mm',
+      format: 'a4',
+    });
+
+    const pageWidth = this.doc.internal.pageSize.getWidth();
+    const pageHeight = this.doc.internal.pageSize.getHeight();
+    const margin = 15;
+    const contentWidth = pageWidth - margin * 2;
+    const col3Width = contentWidth / 3;
+    const col2Width = contentWidth / 2;
+
+    this.doc.setTextColor(...PDF_COLORS.primary);
+    this.doc.setFontSize(18);
+    this.doc.setFont('helvetica', 'bold');
+    this.doc.text('DEFECT REPORT', margin, 15);
+
+    this.doc.setFontSize(9);
+    this.doc.setFont('helvetica', 'normal');
+    this.doc.setTextColor(...PDF_COLORS.textDark);
+    this.doc.text(`Report ID: ${defectData.reportId}`, pageWidth - margin, 15, { align: 'right' });
+
+    this.doc.setDrawColor(...PDF_COLORS.primary);
+    this.doc.setLineWidth(0.8);
+    this.doc.line(margin, 19, pageWidth - margin, 19);
+
+    let y = 28;
+
+    y = this.addSectionHeader(y, 'PART A - REPORTING', 'Describe what happened', margin);
+    y += 2;
+
+    let y1: number, y2: number, y3: number;
+
+    y1 = this.addFormField(margin, y, 'Vessel', defectData.vessel, col3Width);
+    y2 = this.addFormField(margin + col3Width, y, 'Category', defectData.category, col3Width);
+    y3 = this.addFormField(margin + col3Width * 2, y, 'Date Observed', defectData.dateObserved, col3Width);
+    y = Math.max(y1, y2, y3) + 2;
+
+    y1 = this.addFormField(margin, y, 'Source', defectData.source, col3Width);
+    y2 = this.addFormField(margin + col3Width, y, 'Component', defectData.component, col3Width);
+    y3 = this.addFormField(margin + col3Width * 2, y, 'Date Reported to Office', defectData.dateReportedToOffice, col3Width);
+    y = Math.max(y1, y2, y3) + 2;
+
+    y1 = this.addFormField(margin, y, 'Defect Category', defectData.defectCategory, col3Width);
+    y2 = this.addFormField(margin + col3Width, y, 'Make', defectData.make, col3Width);
+    y3 = this.addFormField(margin + col3Width * 2, y, 'Date Registered in System', defectData.dateRegisteredInSystem, col3Width);
+    y = Math.max(y1, y2, y3) + 2;
+
+    y1 = this.addFormField(margin, y, 'Defect Type', defectData.defectType, col3Width);
+    y2 = this.addFormField(margin + col3Width, y, 'Model', defectData.model, col3Width);
+    y3 = this.addFormField(margin + col3Width * 2, y, 'Target Date', defectData.targetDate, col3Width);
+    y = Math.max(y1, y2, y3) + 2;
+
+    const cocCritVal = `CoC: ${defectData.isCoc ? 'Yes' : 'No'}, Critical: ${defectData.isCritical ? 'Yes' : 'No'}`;
+    y1 = this.addFormField(margin, y, 'Raised By', defectData.raisedBy, col3Width);
+    y2 = this.addFormField(margin + col3Width, y, 'CoC / Critical', cocCritVal, col3Width);
+    y3 = this.addFormField(margin + col3Width * 2, y, 'Date Closed', defectData.dateClosed, col3Width);
+    y = Math.max(y1, y2, y3) + 2;
+
+    y += 2;
+    y = this.addFormField(margin, y, 'Description', defectData.description, contentWidth);
+    y += 6;
+
+    y = this.checkPageBreak(y, 60);
+
+    y = this.addSectionHeader(y, 'PART B - ANALYSIS & ACTIONS', undefined, margin);
+    y += 2;
+
+    this.doc.setFontSize(10);
+    this.doc.setFont('helvetica', 'bold');
+    this.doc.setTextColor(...PDF_COLORS.textDark);
+    this.doc.text('B1. Cause Analysis', margin, y);
+    y += 5;
+
+    y1 = this.addFormField(margin, y, 'Immediate Cause', defectData.immediateCause, col2Width);
+    y2 = this.addFormField(margin + col2Width, y, 'Further Explanation', defectData.immediateCauseExplanation, col2Width);
+    y = Math.max(y1, y2) + 2;
+
+    y = this.checkPageBreak(y, 30);
+    y1 = this.addFormField(margin, y, 'Root Cause', defectData.rootCause, col2Width);
+    y2 = this.addFormField(margin + col2Width, y, 'Further Explanation', defectData.rootCauseExplanation, col2Width);
+    y = Math.max(y1, y2) + 2;
+
+    y = this.checkPageBreak(y, 30);
+
+    this.doc.setFontSize(10);
+    this.doc.setFont('helvetica', 'bold');
+    this.doc.setTextColor(...PDF_COLORS.textDark);
+    this.doc.text('B2. SIRE Reference', margin, y);
+    y += 5;
+
+    y1 = this.addFormField(margin, y, 'SIRE Version', defectData.sireVersion, col3Width);
+    y2 = this.addFormField(margin + col3Width, y, 'SIRE Reference', defectData.sireReference, col3Width);
+    y3 = this.addFormField(margin + col3Width * 2, y, 'SIRE Hardware Class', defectData.sireHardwareClass, col3Width);
+    y = Math.max(y1, y2, y3) + 2;
+
+    this.doc.setFontSize(10);
+    this.doc.setFont('helvetica', 'bold');
+    this.doc.setTextColor(...PDF_COLORS.textDark);
+    this.doc.text('B3. Risk & Priority', margin, y);
+    y += 5;
+
+    y1 = this.addFormField(margin, y, 'Risk Level', defectData.riskLevel, col2Width);
+    y2 = this.addFormField(margin + col2Width, y, 'Priority', defectData.priority, col2Width);
+    y = Math.max(y1, y2) + 2;
+
+    y = this.checkPageBreak(y, 60);
+
+    this.doc.setFontSize(10);
+    this.doc.setFont('helvetica', 'bold');
+    this.doc.setTextColor(...PDF_COLORS.textDark);
+    this.doc.text('B4. Actions', margin, y);
+    y += 5;
+
+    if (defectData.actions && defectData.actions.length > 0) {
+      const actHeaders = ['Action Type', 'Description', 'Proposed By', 'Responsibility', 'Due Date', 'Status'];
+      const actBody = defectData.actions.map(a => [
+        a.actionType || '-',
+        a.description || '-',
+        a.proposedBy || '-',
+        a.responsibility || '-',
+        a.dueDate || '-',
+        a.status || '-',
+      ]);
+
+      autoTable(this.doc, {
+        head: [actHeaders],
+        body: actBody,
+        startY: y,
+        margin: { left: margin, right: margin },
+        styles: {
+          fontSize: 8,
+          cellPadding: 2,
+          lineColor: PDF_COLORS.border,
+          lineWidth: 0.1,
+        },
+        headStyles: {
+          fillColor: PDF_COLORS.bgLight,
+          textColor: PDF_COLORS.textDark,
+          fontStyle: 'bold',
+        },
+        alternateRowStyles: {
+          fillColor: [255, 255, 255] as [number, number, number],
+        },
+      });
+
+      y = (this.doc as any).lastAutoTable?.finalY + 6 || y + 30;
+    } else {
+      this.doc.setFontSize(9);
+      this.doc.setFont('helvetica', 'italic');
+      this.doc.setTextColor(...PDF_COLORS.textLight);
+      this.doc.text('No actions recorded', margin, y);
+      y += 8;
+    }
+
+    if (defectData.targetDateExtension) {
+      y = this.checkPageBreak(y, 60);
+
+      this.doc.setFontSize(10);
+      this.doc.setFont('helvetica', 'bold');
+      this.doc.setTextColor(...PDF_COLORS.textDark);
+      this.doc.text('B5. Target Date Extension', margin, y);
+      y += 5;
+
+      const ext = defectData.targetDateExtension;
+      y1 = this.addFormField(margin, y, 'Existing Target Date', ext.existingTargetDate, col2Width);
+      y2 = this.addFormField(margin + col2Width, y, 'New Target Date', ext.newTargetDate, col2Width);
+      y = Math.max(y1, y2) + 2;
+
+      y = this.addFormField(margin, y, 'Reason for Extension', ext.reasonForExtension, contentWidth);
+      y += 4;
+
+      y1 = this.addFormField(margin, y, 'Approved', ext.approved, col2Width);
+      y2 = this.addFormField(margin + col2Width, y, 'Approval Date', ext.approvalDate, col2Width);
+      y = Math.max(y1, y2) + 2;
+
+      y = this.addFormField(margin, y, 'Approver Comments', ext.approverComments, contentWidth);
+      y += 6;
+    }
+
+    y = this.checkPageBreak(y, 60);
+
+    y = this.addSectionHeader(y, 'PART C - CLOSEOUT', undefined, margin);
+    y += 2;
+
+    this.doc.setFontSize(10);
+    this.doc.setFont('helvetica', 'bold');
+    this.doc.setTextColor(...PDF_COLORS.textDark);
+    this.doc.text('C1. Closeout', margin, y);
+    y += 5;
+
+    y1 = this.addFormField(margin, y, 'Confirm Completed', defectData.confirmCompleted ? 'Yes' : 'No', col2Width);
+    y2 = this.addFormField(margin + col2Width, y, 'Date Completed', defectData.dateCompleted, col2Width);
+    y = Math.max(y1, y2) + 2;
+
+    y1 = this.addFormField(margin, y, 'Closed By (Name)', defectData.closedByName, col2Width);
+    y2 = this.addFormField(margin + col2Width, y, 'Closed By (Rank)', defectData.closedByRank, col2Width);
+    y = Math.max(y1, y2) + 2;
+
+    y = this.checkPageBreak(y, 30);
+    this.doc.setFontSize(10);
+    this.doc.setFont('helvetica', 'bold');
+    this.doc.setTextColor(...PDF_COLORS.textDark);
+    this.doc.text('C2. Verification', margin, y);
+    y += 5;
+
+    y1 = this.addFormField(margin, y, 'Verified', defectData.verified ? 'Yes' : 'No', col2Width);
+    y2 = this.addFormField(margin + col2Width, y, 'Date Verified', defectData.dateVerified, col2Width);
+    y = Math.max(y1, y2) + 2;
+
+    y1 = this.addFormField(margin, y, 'Verified By (Name)', defectData.verifiedByName, col2Width);
+    y2 = this.addFormField(margin + col2Width, y, 'Verified By (Office Position)', defectData.verifiedByOfficePosition, col2Width);
+
+    this.addFooter(pageWidth, pageHeight, margin);
+
+    const timestamp = format(new Date(), 'yyyyMMdd_HHmm');
+    const filename = `Defect_Report_${defectData.reportId}_${timestamp}.pdf`;
     this.doc.save(filename);
   }
 }
