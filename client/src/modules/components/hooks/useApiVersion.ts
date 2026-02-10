@@ -37,7 +37,10 @@ export function useApiVersion() {
              key.startsWith('/technical/api/job-maintenance-history') ||
              key.startsWith('/technical/api/v2/job-maintenance-history') ||
              key.startsWith('/technical/api/work-orders') ||
-             key.startsWith('/technical/api/v2/work-orders');
+             key.startsWith('/technical/api/v2/work-orders') ||
+             key.startsWith('/technical/api/spares') ||
+             key.startsWith('/technical/api/v2/spares') ||
+             key.startsWith('/technical/api/inventory/spares-with-inventory');
     }});
   }, [mode]);
 
