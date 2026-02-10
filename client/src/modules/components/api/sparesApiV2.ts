@@ -7,6 +7,31 @@ function getBase(): string {
   return getApiMode() === 'v2' ? V2_SPARES_BASE : LEGACY_SPARES_BASE;
 }
 
+export function isV2Mode(): boolean {
+  return getApiMode() === 'v2';
+}
+
+export function getSparesWithInventoryUrl(vesselId: string): string {
+  if (getApiMode() === 'v2') {
+    return `${V2_SPARES_BASE}/${vesselId}`;
+  }
+  return `/technical/api/inventory/spares-with-inventory/${vesselId}`;
+}
+
+export function getSparesWithInventoryQueryKey(vesselId: string): (string | undefined)[] {
+  if (getApiMode() === 'v2') {
+    return [V2_SPARES_BASE, vesselId];
+  }
+  return ['/technical/api/inventory/spares-with-inventory', vesselId];
+}
+
+export function getHistoryQueryKey(vesselId: string): (string | undefined)[] {
+  if (getApiMode() === 'v2') {
+    return [`${V2_SPARES_BASE}/history`, vesselId];
+  }
+  return ['/technical/api/spares/history', vesselId];
+}
+
 // List all spares (no vessel filter)
 export function getSparesListAllUrl(): string {
   return getBase();

@@ -8,6 +8,7 @@ import { Search, X, ArrowLeft, ChevronLeft, ChevronRight } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
+import { getSparesWithInventoryUrl, getSparesWithInventoryQueryKey, getBulkUpdateUrl } from "@/modules/components/api/sparesApiV2";
 
 interface Spare {
   id: number;
@@ -36,9 +37,9 @@ export default function BulkUpdateSpares() {
   const [itemsPerPage, setItemsPerPage] = useState(25);
 
   const { data: sparesData = [], isLoading } = useQuery({
-    queryKey: ['/technical/api/inventory/spares-with-inventory', vesselId],
+    queryKey: getSparesWithInventoryQueryKey(vesselId!),
     queryFn: async () => {
-      const response = await fetch(`/technical/api/inventory/spares-with-inventory/${vesselId}`);
+      const response = await fetch(getSparesWithInventoryUrl(vesselId!));
       if (!response.ok) return [];
       return response.json();
     },
@@ -110,11 +111,11 @@ export default function BulkUpdateSpares() {
 
   const bulkUpdateMutation = useMutation({
     mutationFn: async (payload: { vesselId: string, tz: string, rows: any[] }) => {
-      const response = await apiRequest('POST', '/technical/api/spares/bulk-update', payload);
+      const response = await apiRequest('POST', getBulkUpdateUrl(), payload);
       return response;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/technical/api/inventory/spares-with-inventory', vesselId] });
+      queryClient.invalidateQueries({ queryKey: getSparesWithInventoryQueryKey(vesselId!) });
       toast({ title: "Success", description: "Bulk update completed successfully" });
       setLocation("/spares");
     },
