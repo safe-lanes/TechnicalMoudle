@@ -1,6 +1,6 @@
 import { eq, and, inArray, desc, sql } from 'drizzle-orm';
 import { getDb } from '../../../db';
-import { bulkComponents, bulkMakerList, bulkImportChangeLog, bulkImportHistory } from '../schema';
+import { v2Components as bulkComponents, v2MakerList as bulkMakerList, v2ImportChangeLog as bulkImportChangeLog, v2ImportHistory as bulkImportHistory } from '@shared/v2/bulk/schema';
 
 export class BulkRepository {
   async getComponents(vesselId: string) {

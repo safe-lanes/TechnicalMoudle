@@ -1,16 +1,16 @@
 import { eq, and, desc } from "drizzle-orm";
 import { getDb } from "../../../db";
 import {
-  workOrders,
-  jobs,
-  components,
-  spares,
-  pmsVesselSettings,
-  componentMaintenanceHistory,
-  inventoryTransactions,
-  spareLocationStock,
-  locations,
-  jobComponentLinks,
+  v2WorkOrders as workOrders,
+  v2Jobs as jobs,
+  v2Components as components,
+  v2Spares as spares,
+  v2PmsVesselSettings as pmsVesselSettings,
+  v2ComponentMaintenanceHistory as componentMaintenanceHistory,
+  v2InventoryTransactions as inventoryTransactions,
+  v2SpareLocationStock as spareLocationStock,
+  v2Locations as locations,
+  v2JobComponentLinks as jobComponentLinks,
   type WorkOrder,
   type InsertWorkOrder,
   type Job,
@@ -23,7 +23,7 @@ import {
   type SpareLocationStock,
   type InsertLocation,
   type Location,
-} from "../schema";
+} from "@shared/v2/work-orders/schema";
 
 export async function getWorkOrders(vesselId?: string): Promise<WorkOrder[]> {
   const db = await getDb();
@@ -151,7 +151,7 @@ export async function getSpareByPartNo(partNo: string, vesselId: string): Promis
 
 export async function updateSpare(id: number, data: Partial<any>): Promise<Spare> {
   const db = await getDb();
-  const [result] = await db.update(spares).set({ ...data, updatedAt: new Date() }).where(eq(spares.id, id)).returning();
+  const [result] = await db.update(spares).set(data).where(eq(spares.id, id)).returning();
   return result;
 }
 

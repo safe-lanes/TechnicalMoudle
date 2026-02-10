@@ -1,7 +1,7 @@
 import { computeWorkOrderStatus } from "@shared/workOrders/status";
 import { WORK_ORDER_THRESHOLDS } from "@shared/workOrders/constants";
 import * as repo from "../repositories/workOrderRepository";
-import type { WorkOrder, Job, Component, PmsVesselSettings } from "../schema";
+import type { WorkOrder, Job, Component, PmsVesselSettings } from "@shared/v2/work-orders/schema";
 
 function parseRH(value: string | number | null | undefined): number | undefined {
   if (value == null || value === '') return undefined;

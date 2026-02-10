@@ -1,4 +1,4 @@
-import { pgTable, text, integer, boolean, decimal, json } from "drizzle-orm/pg-core";
+import { pgTable, text, integer, boolean } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
@@ -13,10 +13,6 @@ export type InsertJob = z.infer<typeof insertJobSchema>;
 export type Job = typeof v2Jobs.$inferSelect;
 
 export type JobComponentLink = typeof v2JobComponentLinks.$inferSelect;
-
-export { workOrders as v2WorkOrders } from "@shared/schema";
-
-export type WorkOrder = import("@shared/schema").WorkOrder;
 
 export const v2Spares = pgTable("spares", {
   id: integer("id").primaryKey().generatedByDefaultAsIdentity(),

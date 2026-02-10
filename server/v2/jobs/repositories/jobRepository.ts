@@ -1,6 +1,8 @@
 import { getDb } from '../../../db';
-import { v2Jobs, v2JobComponentLinks, v2Components, v2ComponentMaintenanceHistory, v2WorkOrders, v2Spares } from '../../../../shared/v2/jobs/schema';
-import type { Job, InsertJob, JobComponentLink, WorkOrder } from '../../../../shared/v2/jobs/schema';
+import { v2Jobs, v2JobComponentLinks, v2Components, v2ComponentMaintenanceHistory, v2Spares } from '@shared/v2/jobs/schema';
+import { v2WorkOrders } from '@shared/v2/work-orders/schema';
+import type { Job, InsertJob, JobComponentLink } from '@shared/v2/jobs/schema';
+import type { WorkOrder } from '@shared/v2/work-orders/schema';
 import { eq, and, sql, inArray, like, desc, asc } from 'drizzle-orm';
 import { v4 as uuidv4 } from 'uuid';
 
