@@ -20,7 +20,6 @@ import {
   insertComponentClassRegulatorySchema,
   insertComponentRequisitionSchema,
   insertFleetSparesSchema,            // ✅ from incoming
-  insertFleetJobsSchema,
   equipmentCategories,
   defectCategories,
   defectTypes,
@@ -10321,7 +10320,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Create new fleet job
   app.post("/technical/api/fleet/jobs", async (req, res) => {
     try {
-      const validatedData = insertFleetJobsSchema.parse(req.body);
+      const validatedData = insertJobSchema.parse(req.body);
       const job = await storage.createFleetJob(validatedData);
       res.status(201).json(job);
     } catch (error: any) {
@@ -10339,9 +10338,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Update fleet job
   app.patch("/technical/api/fleet/jobs/:id", async (req, res) => {
     try {
-      const partialFleetJobSchema = insertFleetJobsSchema.partial();
-      const validatedData = partialFleetJobSchema.parse(req.body);
-      const job = await storage.updateFleetJob(parseInt(req.params.id), validatedData);
+      const partialJobSchema = insertJobSchema.partial();
+      const validatedData = partialJobSchema.parse(req.body);
+      const job = await storage.updateFleetJob(req.params.id, validatedData);
       res.json(job);
     } catch (error: any) {
       if (error.name === 'ZodError') {
