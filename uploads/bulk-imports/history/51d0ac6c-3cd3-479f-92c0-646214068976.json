@@ -1,0 +1,18 @@
+{
+  "id": "51d0ac6c-3cd3-479f-92c0-646214068976",
+  "type": "fleet-jobs",
+  "mode": "upsert",
+  "userId": 1,
+  "startedAt": "2026-02-10T05:00:58.974Z",
+  "completedAt": "2026-02-10T05:00:59.022Z",
+  "status": "complete",
+  "created": 1,
+  "updated": 2,
+  "skipped": 0,
+  "archived": 0,
+  "originalName": "Fleet_Job Sheet.xlsx",
+  "storedFilePath": "local:/home/runner/workspace/uploads/bulk-imports/fleet-jobs/1770699659021_Fleet_Job_Sheet.xlsx",
+  "errorReport": null,
+  "jobComponentLinksCreated": 0,
+  "spareComponentLinksCreated": 0
+}
