@@ -7788,6 +7788,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const allHistory = await storage.getStoresTransactionHistory(vesselId);
       const allItems = await storage.getStoresItems(vesselId);
+      const allVessels = await storage.getVessels();
+      const vessel = allVessels.find((v: any) => v.id === vesselId);
+      const vesselName = vessel?.name || vesselId;
       const itemsMap = new Map(allItems.map((item: any) => [item.id, item]));
 
       let consumeEvents = allHistory.filter((h: any) => h.eventType === 'CONSUME');
@@ -8030,6 +8033,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           },
           totalInventoryItems: allItems.filter((i: any) => !i.deleted && i.isActive !== false).length,
           dataMonths: Math.max(0.1, Math.round((daysOfData / 30) * 10) / 10),
+          vesselName,
         },
         consumptionTrends,
         topConsumedItems,

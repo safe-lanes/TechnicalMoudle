@@ -1211,6 +1211,7 @@ class PDFReportGenerator {
     this.doc.save(filename);
   }
 
+
   private addFormField(x: number, y: number, label: string, value: string, width: number): number {
     if (!this.doc) return y;
     this.doc.setFontSize(8);
@@ -1478,10 +1479,312 @@ class PDFReportGenerator {
     y1 = this.addFormField(margin, y, 'Verified By (Name)', defectData.verifiedByName, col2Width);
     y2 = this.addFormField(margin + col2Width, y, 'Verified By (Office Position)', defectData.verifiedByOfficePosition, col2Width);
 
+  generateConsumptionAnalysisPDF(
+    config: PDFReportConfig & { vesselName?: string; datePeriod?: string; daysOfData?: number; confidence?: string },
+    apiData: {
+      summary: any;
+      consumptionTrends: any[];
+      topConsumedItems: any[];
+      categoryBreakdown: any[];
+      stockEfficiency: any[];
+      forecastData: any[];
+      nonMovingItems?: any[];
+    }
+  ): void {
+    this.doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
+    const pageWidth = this.doc.internal.pageSize.getWidth();
+    const pageHeight = this.doc.internal.pageSize.getHeight();
+    const margin = 12;
+    const { summary, consumptionTrends, topConsumedItems, categoryBreakdown, stockEfficiency, forecastData, nonMovingItems } = apiData;
+    const vesselName = config.vesselName || config.vessel || 'Unknown';
+    const daysOfData = config.daysOfData || summary?.dataQuality?.daysOfData || 0;
+    const confidence = config.confidence || (daysOfData > 90 ? 'High' : daysOfData >= 30 ? 'Medium' : 'Low');
+    const drStart = summary?.dateRange?.start || summary?.dateRange?.from;
+    const drEnd = summary?.dateRange?.end || summary?.dateRange?.to;
+    const datePeriod = config.datePeriod || (drStart && drEnd
+      ? `${new Date(drStart).toISOString().slice(0, 10)} to ${new Date(drEnd).toISOString().slice(0, 10)}` : 'N/A');
+
+    const addSectionHeader = (title: string, subtitle: string, startY: number): number => {
+      if (!this.doc) return startY;
+      this.doc.setFillColor(...PDF_COLORS.primary);
+      this.doc.rect(0, 0, pageWidth, 30, 'F');
+      this.doc.setTextColor(...PDF_COLORS.textWhite);
+      this.doc.setFontSize(16);
+      this.doc.setFont('helvetica', 'bold');
+      this.doc.text(title, margin, 12);
+      this.doc.setFontSize(10);
+      this.doc.setFont('helvetica', 'normal');
+      this.doc.text(subtitle, margin, 20);
+      this.doc.setFontSize(9);
+      this.doc.text(`Vessel: ${vesselName}`, pageWidth - margin, 12, { align: 'right' });
+      this.doc.text(`Generated: ${format(new Date(), 'dd MMM yyyy HH:mm')}`, pageWidth - margin, 19, { align: 'right' });
+      return 36;
+    };
+
+    const addAutoTableSection = (headers: string[], body: string[][], startY: number, opts?: { didParseCell?: (d: any) => void }): number => {
+      if (!this.doc) return startY;
+      autoTable(this.doc, {
+        head: [headers],
+        body,
+        startY,
+        margin: { left: margin, right: margin },
+        styles: { fontSize: 8, cellPadding: 2.5, overflow: 'linebreak', lineColor: PDF_COLORS.border, lineWidth: 0.1 },
+        headStyles: { fillColor: PDF_COLORS.secondary, textColor: PDF_COLORS.textWhite, fontStyle: 'bold', halign: 'center', fontSize: 8 },
+        alternateRowStyles: { fillColor: PDF_COLORS.bgLight },
+        didParseCell: opts?.didParseCell,
+      });
+      return ((this.doc as any).lastAutoTable?.finalY || startY + 20) + 4;
+    };
+
+    // ===== PAGE 1: SUMMARY =====
+    let y = addSectionHeader('CONSUMPTION PATTERN ANALYSIS', `Data Period: ${datePeriod} | Confidence: ${confidence}`, 0);
+
+    if (confidence === 'Low') {
+      this.doc.setFillColor(...PDF_COLORS.bgWarning);
+      this.doc.roundedRect(margin, y, pageWidth - margin * 2, 10, 2, 2, 'F');
+      this.doc.setTextColor(...PDF_COLORS.textDarkOrange);
+      this.doc.setFontSize(9);
+      this.doc.setFont('helvetica', 'bold');
+      this.doc.text(`DATA QUALITY WARNING: Only ${daysOfData} day(s) of data available. Trends and forecasts have low confidence.`, margin + 4, y + 6);
+      y += 14;
+    }
+
+    this.doc.setTextColor(...PDF_COLORS.primary);
+    this.doc.setFontSize(13);
+    this.doc.setFont('helvetica', 'bold');
+    this.doc.text('KEY METRICS', margin, y);
+    y += 6;
+
+    const summaryItems = [
+      { label: 'Items Consumed', value: String(summary?.totalItemsConsumed || 0) },
+      { label: 'Total Qty Consumed', value: String(summary?.totalQuantityConsumed || 0) },
+      { label: 'Consumption Events', value: String(summary?.totalConsumptionEvents || 0) },
+      { label: 'Data Period', value: `${daysOfData} days` },
+      { label: 'Total Inventory Items', value: String(summary?.totalInventoryItems || 0) },
+      { label: 'Confidence Level', value: confidence },
+    ];
+    const boxW = 42; const boxH = 18; const gap = 4;
+    summaryItems.forEach((item, i) => {
+      const x = margin + (i % 6) * (boxW + gap);
+      const bY = y + Math.floor(i / 6) * (boxH + gap);
+      this.doc!.setFillColor(...PDF_COLORS.bgLight);
+      this.doc!.roundedRect(x, bY, boxW, boxH, 2, 2, 'F');
+      this.doc!.setFontSize(7);
+      this.doc!.setFont('helvetica', 'normal');
+      this.doc!.setTextColor(...PDF_COLORS.textLight);
+      this.doc!.text(item.label, x + 3, bY + 6);
+      this.doc!.setFontSize(12);
+      this.doc!.setFont('helvetica', 'bold');
+      this.doc!.setTextColor(...PDF_COLORS.textDark);
+      this.doc!.text(item.value, x + 3, bY + 14);
+    });
+    y += Math.ceil(summaryItems.length / 6) * (boxH + gap) + 8;
+
+    if (summary?.dataQuality?.description) {
+      this.doc.setFontSize(8);
+      this.doc.setFont('helvetica', 'italic');
+      this.doc.setTextColor(...PDF_COLORS.textLight);
+      this.doc.text(summary.dataQuality.description, margin, y);
+      y += 8;
+    }
+
+    // Quick summary table of date range if available
+    if (summary?.dateRange?.from && summary?.dateRange?.to) {
+      y = addAutoTableSection(
+        ['Metric', 'Value'],
+        [
+          ['Earliest Consumption', summary.dateRange.from],
+          ['Latest Consumption', summary.dateRange.to],
+          ['Days of Data', String(daysOfData)],
+          ['Data Months', String(summary.dataMonths || 0)],
+        ],
+        y
+      );
+    }
+
+    // ===== PAGE 2: CONSUMPTION TRENDS =====
+    this.doc.addPage();
+    y = addSectionHeader('MONTHLY CONSUMPTION TRENDS', `Data Period: ${datePeriod}`, 0);
+
+    if (consumptionTrends.length === 0) {
+      this.doc.setFontSize(11);
+      this.doc.setTextColor(...PDF_COLORS.textLight);
+      this.doc.text('No consumption data available for the selected period.', margin, y + 10);
+    } else {
+      y = addAutoTableSection(
+        ['Month', 'Total Qty', 'Events', 'Item Count', 'Stores', 'Lubricants', 'Chemicals', 'Others'],
+        consumptionTrends.map((t: any) => [
+          t.month || '', String(t.totalQty ?? 0), String(t.eventCount ?? 0), String(t.itemCount ?? 0),
+          String(t.byType?.stores ?? 0), String(t.byType?.lubricants ?? 0),
+          String(t.byType?.chemicals ?? 0), String(t.byType?.others ?? 0),
+        ]),
+        y
+      );
+    }
+
+    // ===== PAGE 3: ITEM ANALYSIS =====
+    this.doc.addPage();
+    y = addSectionHeader('ITEM-WISE CONSUMPTION ANALYSIS', `${topConsumedItems.length} items consumed | Data Period: ${datePeriod}`, 0);
+
+    if (topConsumedItems.length === 0) {
+      this.doc.setFontSize(11);
+      this.doc.setTextColor(...PDF_COLORS.textLight);
+      this.doc.text('No items consumed during the selected period.', margin, y + 10);
+    } else {
+      y = addAutoTableSection(
+        ['S.No', 'Item Code', 'Item Name', 'Type', 'Category', 'UOM', 'Total Consumed', 'Events', 'Avg Monthly', 'Current ROB', 'Min Stock', 'Last Consumed'],
+        topConsumedItems.map((item: any, idx: number) => [
+          String(idx + 1), item.itemCode || '', item.itemName || '', item.itemType || '',
+          item.category || '', item.uom || '',
+          String(item.totalConsumed ?? 0), String(item.eventCount ?? 0),
+          String(item.avgMonthlyConsumption != null ? (Math.round(item.avgMonthlyConsumption * 100) / 100) : 0),
+          String(item.currentRob ?? 0), String(item.minStock ?? 0),
+          item.lastConsumedDate ? (typeof item.lastConsumedDate === 'string' ? item.lastConsumedDate.slice(0, 10) : format(new Date(item.lastConsumedDate), 'dd MMM yyyy')) : '-',
+        ]),
+        y
+      );
+    }
+
+    // ===== PAGE 4: CATEGORY BREAKDOWN =====
+    this.doc.addPage();
+    y = addSectionHeader('CATEGORY-WISE CONSUMPTION BREAKDOWN', `Data Period: ${datePeriod}`, 0);
+
+    if (categoryBreakdown.length === 0) {
+      this.doc.setFontSize(11);
+      this.doc.setTextColor(...PDF_COLORS.textLight);
+      this.doc.text('No category data available.', margin, y + 10);
+    } else {
+      y = addAutoTableSection(
+        ['S.No', 'Category', 'Item Type', 'Total Consumed', 'Items', '% Share'],
+        categoryBreakdown.map((c: any, idx: number) => [
+          String(idx + 1), c.category || '', c.itemType || '',
+          String(c.totalQty ?? 0), String(c.itemCount ?? 0),
+          `${c.percentage ?? 0}%`,
+        ]),
+        y
+      );
+    }
+
+    // ===== PAGE 5: STOCK EFFICIENCY =====
+    this.doc.addPage();
+    y = addSectionHeader('STOCK EFFICIENCY ANALYSIS', `Movement thresholds adjusted for ${daysOfData}-day sample | Data Period: ${datePeriod}`, 0);
+
+    if (stockEfficiency.length === 0) {
+      this.doc.setFontSize(11);
+      this.doc.setTextColor(...PDF_COLORS.textLight);
+      this.doc.text('No stock efficiency data available.', margin, y + 10);
+    } else {
+      y = addAutoTableSection(
+        ['S.No', 'Item Code', 'Item Name', 'Type', 'ROB', 'Min', 'Consumed', 'Turnover', 'Movement', 'Days to Stockout', 'Below Min'],
+        stockEfficiency.map((item: any, idx: number) => [
+          String(idx + 1), item.itemCode || '', item.itemName || '', item.itemType || '',
+          String(item.currentRob ?? 0), String(item.minStock ?? 0),
+          String(item.totalConsumed ?? 0),
+          String(item.stockTurnoverRatio ?? item.turnoverRatio ?? 0),
+          item.movementSpeed || 'Non-Moving',
+          item.movementSpeed === 'non-moving' || item.movementSpeed === 'Non-Moving'
+            ? '\u221E'
+            : (item.daysToStockout != null ? String(Math.round(item.daysToStockout)) : '-'),
+          (item.currentRob ?? 0) < (item.minStock ?? 0) ? 'Yes' : 'No',
+        ]),
+        y,
+        {
+          didParseCell: (hookData: any) => {
+            if (hookData.section !== 'body') return;
+            const colIdx = hookData.column.index;
+            const cellText = hookData.cell.text?.[0] || '';
+            if (colIdx === 8) {
+              if (cellText === 'fast' || cellText === 'Fast') hookData.cell.styles.textColor = PDF_COLORS.success;
+              else if (cellText === 'non-moving' || cellText === 'Non-Moving') hookData.cell.styles.textColor = PDF_COLORS.danger;
+            }
+            if (colIdx === 10 && cellText === 'Yes') {
+              hookData.cell.styles.textColor = PDF_COLORS.danger;
+              hookData.cell.styles.fontStyle = 'bold';
+              hookData.cell.styles.fillColor = PDF_COLORS.bgDanger;
+            }
+          }
+        }
+      );
+
+      if (nonMovingItems && nonMovingItems.length > 0) {
+        this.doc.setTextColor(...PDF_COLORS.primary);
+        this.doc.setFontSize(11);
+        this.doc.setFont('helvetica', 'bold');
+        this.doc.text(`Non-Moving Items (${nonMovingItems.length})`, margin, y + 4);
+        y += 8;
+        y = addAutoTableSection(
+          ['S.No', 'Item Code', 'Item Name', 'Type', 'Category', 'ROB', 'Min Stock'],
+          nonMovingItems.map((item: any, idx: number) => [
+            String(idx + 1), item.itemCode || '', item.itemName || '',
+            item.itemType || '', item.category || '',
+            String(item.rob ?? item.currentRob ?? 0), String(item.min ?? item.minStock ?? 0),
+          ]),
+          y
+        );
+      }
+    }
+
+    // ===== PAGE 6: FORECASTING =====
+    this.doc.addPage();
+    y = addSectionHeader('CONSUMPTION FORECAST & REORDER PROJECTIONS', `Confidence: ${confidence} | Data Period: ${datePeriod}`, 0);
+
+    if (confidence === 'Low') {
+      this.doc.setFillColor(...PDF_COLORS.bgWarning);
+      this.doc.roundedRect(margin, y, pageWidth - margin * 2, 8, 2, 2, 'F');
+      this.doc.setTextColor(...PDF_COLORS.textDarkOrange);
+      this.doc.setFontSize(8);
+      this.doc.setFont('helvetica', 'bold');
+      this.doc.text(`Note: Forecasts based on only ${daysOfData} day(s) of data. Use projections with caution.`, margin + 3, y + 5);
+      y += 12;
+    }
+
+    if (forecastData.length === 0) {
+      this.doc.setFontSize(11);
+      this.doc.setTextColor(...PDF_COLORS.textLight);
+      this.doc.text('No forecast data available.', margin, y + 10);
+    } else {
+      y = addAutoTableSection(
+        ['S.No', 'Item Code', 'Item Name', 'UOM', 'Avg Monthly', 'Projected Next Month', 'ROB', 'Min Stock', 'Months Left', 'Reorder?', 'Suggested Qty', 'Confidence'],
+        forecastData.map((f: any, idx: number) => [
+          String(idx + 1), f.itemCode || '', f.itemName || '', f.uom || '',
+          String(f.avgMonthlyConsumption != null ? (Math.round(f.avgMonthlyConsumption * 100) / 100) : 0),
+          String(f.projectedNextMonth != null ? (Math.round(f.projectedNextMonth * 100) / 100) : 0),
+          String(f.currentRob ?? 0), String(f.minStock ?? 0),
+          f.monthsOfStockRemaining != null ? String(Math.round(f.monthsOfStockRemaining * 10) / 10) : '-',
+          f.reorderNeeded ? 'Yes' : 'No',
+          String(f.suggestedReorderQty ?? 0),
+          confidence,
+        ]),
+        y,
+        {
+          didParseCell: (hookData: any) => {
+            if (hookData.section !== 'body') return;
+            const colIdx = hookData.column.index;
+            const cellText = hookData.cell.text?.[0] || '';
+            if (colIdx === 9 && cellText === 'Yes') {
+              hookData.cell.styles.textColor = PDF_COLORS.danger;
+              hookData.cell.styles.fontStyle = 'bold';
+              hookData.cell.styles.fillColor = PDF_COLORS.bgDanger;
+            }
+            if (colIdx === 11 && cellText === 'Low') {
+              hookData.cell.styles.textColor = PDF_COLORS.warning;
+              hookData.cell.styles.fontStyle = 'italic';
+            }
+          }
+        }
+      );
+    }
+
+
     this.addFooter(pageWidth, pageHeight, margin);
 
     const timestamp = format(new Date(), 'yyyyMMdd_HHmm');
+
     const filename = `Defect_Report_${defectData.reportId}_${timestamp}.pdf`;
+
+    const cleanVessel = vesselName.replace(/[^a-zA-Z0-9 ]/g, '').replace(/\s+/g, '-');
+    const filename = `Vessel-${cleanVessel}_Consumption_Pattern_Analysis_${timestamp}.pdf`;
+
     this.doc.save(filename);
   }
 }

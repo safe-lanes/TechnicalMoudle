@@ -120,93 +120,50 @@ const ConsumptionPatternReport: React.FC<ConsumptionPatternReportProps> = ({ onB
     return items;
   }, [topConsumedItems, sortField, sortDirection]);
 
-  const handleExportPdf = () => {
-    if (!data) return;
+  const [generatingPdf, setGeneratingPdf] = useState(false);
+
+  const handleExportPdf = async () => {
+    if (!vesselId) return;
+    setGeneratingPdf(true);
     try {
-      let columns: any[] = [];
-      let rows: any[] = [];
-      let title = "Consumption Pattern Analysis";
+      const params = new URLSearchParams();
+      if (appliedFilters.startDate) params.set("startDate", appliedFilters.startDate);
+      if (appliedFilters.endDate) params.set("endDate", appliedFilters.endDate);
+      if (appliedFilters.itemType && appliedFilters.itemType !== "all") params.set("itemType", appliedFilters.itemType);
+      if (appliedFilters.category) params.set("category", appliedFilters.category);
+      const qs = params.toString();
+      const url = `/technical/api/reports/stores-consumption-analysis/${vesselId}${qs ? `?${qs}` : ""}`;
+      const res = await fetch(url, { credentials: "include" });
+      if (!res.ok) throw new Error(`${res.status}: ${res.statusText}`);
+      const freshData = await res.json();
 
-      if (activeTab === "trends") {
-        columns = [
-          { header: "Month", field: "month", width: 30 },
-          { header: "Total Qty", field: "totalQty", width: 25 },
-          { header: "Events", field: "eventCount", width: 20 },
-          { header: "Item Count", field: "itemCount", width: 20 },
-          { header: "Stores", field: "stores", width: 20 },
-          { header: "Lubricants", field: "lubricants", width: 25 },
-          { header: "Chemicals", field: "chemicals", width: 25 },
-          { header: "Others", field: "others", width: 20 },
-        ];
-        rows = consumptionTrends.map((t: any) => ({
-          month: t.month, totalQty: t.totalQty, eventCount: t.eventCount,
-          stores: t.byType?.stores || 0, lubricants: t.byType?.lubricants || 0,
-          chemicals: t.byType?.chemicals || 0, others: t.byType?.others || 0,
-        }));
-        title = "Consumption Trends";
-      } else if (activeTab === "items") {
-        columns = [
-          { header: "Item Code", field: "itemCode", width: 25 },
-          { header: "Item Name", field: "itemName", width: 45 },
-          { header: "Type", field: "itemType", width: 20 },
-          { header: "Total Consumed", field: "totalConsumed", width: 25 },
-          { header: "Events", field: "eventCount", width: 15 },
-          { header: "Avg Monthly", field: "avgMonthlyConsumption", width: 25 },
-          { header: "ROB", field: "currentRob", width: 15 },
-          { header: "Min", field: "minStock", width: 15 },
-        ];
-        rows = sortedItems;
-        title = "Item Analysis";
-      } else if (activeTab === "categories") {
-        columns = [
-          { header: "Category", field: "category", width: 40 },
-          { header: "Type", field: "itemType", width: 25 },
-          { header: "Total Qty", field: "totalQty", width: 25 },
-          { header: "Items", field: "itemCount", width: 20 },
-          { header: "% Share", field: "percentage", width: 20 },
-        ];
-        rows = categoryBreakdown;
-        title = "Category Analysis";
-      } else if (activeTab === "efficiency") {
-        columns = [
-          { header: "Item Code", field: "itemCode", width: 25 },
-          { header: "Item Name", field: "itemName", width: 40 },
-          { header: "ROB", field: "currentRob", width: 15 },
-          { header: "Min", field: "minStock", width: 15 },
-          { header: "Consumed", field: "totalConsumed", width: 20 },
-          { header: "Turnover", field: "stockTurnoverRatio", width: 20 },
-          { header: "Movement", field: "movementSpeed", width: 20 },
-        ];
-        rows = stockEfficiency;
-        title = "Stock Efficiency";
-      } else if (activeTab === "forecast") {
-        columns = [
-          { header: "Item Code", field: "itemCode", width: 25 },
-          { header: "Item Name", field: "itemName", width: 40 },
-          { header: "Avg Monthly", field: "avgMonthlyConsumption", width: 25 },
-          { header: "Projected", field: "projectedNextMonth", width: 25 },
-          { header: "ROB", field: "currentRob", width: 15 },
-          { header: "Months Left", field: "monthsOfStockRemaining", width: 25 },
-          { header: "Reorder?", field: "reorderNeeded", width: 20 },
-        ];
-        rows = forecastData.map((f: any) => ({ ...f, reorderNeeded: f.reorderNeeded ? "Yes" : "No" }));
-        title = "Forecasting";
-      }
+      const daysOfData = freshData.summary?.dataQuality?.daysOfData || 0;
+      const confidence = daysOfData > 90 ? 'High' : daysOfData >= 30 ? 'Medium' : 'Low';
 
-      const summaryData = summary ? [
-        { label: "Items Consumed", value: summary.totalItemsConsumed },
-        { label: "Total Qty", value: summary.totalQuantityConsumed },
-        { label: "Events", value: summary.totalConsumptionEvents },
-        { label: "Data Period", value: `${summary.dataQuality?.daysOfData || 0} days` },
-      ] : undefined;
-
-      pdfReportGenerator.generateReport(
-        { title, subtitle: `Consumption Pattern Analysis`, vessel: vesselId || undefined, orientation: "landscape" },
-        columns, rows, summaryData
+      pdfReportGenerator.generateConsumptionAnalysisPDF(
+        {
+          title: "Consumption Pattern Analysis",
+          vessel: vesselId,
+          vesselName: freshData.summary?.vesselName || vesselId,
+          orientation: "landscape",
+          daysOfData,
+          confidence,
+        },
+        {
+          summary: freshData.summary,
+          consumptionTrends: freshData.consumptionTrends || [],
+          topConsumedItems: freshData.topConsumedItems || [],
+          categoryBreakdown: freshData.categoryBreakdown || [],
+          stockEfficiency: freshData.stockEfficiency || [],
+          forecastData: freshData.forecastData || [],
+          nonMovingItems: freshData.nonMovingItems || [],
+        }
       );
-      toast({ title: "PDF Generated", description: "Report downloaded successfully" });
+      toast({ title: "PDF Generated", description: "Comprehensive 6-section report downloaded" });
     } catch {
       toast({ title: "Error", description: "Failed to generate PDF", variant: "destructive" });
+    } finally {
+      setGeneratingPdf(false);
     }
   };
 
@@ -280,8 +237,8 @@ const ConsumptionPatternReport: React.FC<ConsumptionPatternReportProps> = ({ onB
           <h1 className="text-2xl font-bold text-gray-900">Consumption Pattern Analysis</h1>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
-          <Button variant="outline" onClick={handleExportPdf} disabled={!data || (summary?.totalConsumptionEvents ?? 0) === 0} data-testid="button-export-pdf">
-            <FileText className="h-4 w-4 mr-1" /> PDF
+          <Button variant="outline" onClick={handleExportPdf} disabled={!data || generatingPdf || (summary?.totalConsumptionEvents ?? 0) === 0} data-testid="button-export-pdf">
+            {generatingPdf ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <FileText className="h-4 w-4 mr-1" />} PDF
           </Button>
           <Button variant="outline" onClick={handleExportExcel} disabled={!data || generatingExcel || (summary?.totalConsumptionEvents ?? 0) === 0} data-testid="button-export-excel">
             {generatingExcel ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <Download className="h-4 w-4 mr-1" />} Excel
