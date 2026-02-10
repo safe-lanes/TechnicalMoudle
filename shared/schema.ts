@@ -1837,7 +1837,7 @@ export type FleetComponents = typeof fleetComponents.$inferSelect;
 export const fleetJobs = pgTable("fleet_jobs", {
   id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
   fleetJobsUuid: text("fleet_jobs_uuid").default(sql`gen_random_uuid()`),
-  jobCode: text("job_code").notNull().unique(),
+  jobCode: text("job_code").notNull(),
   fleetComponentsUuid: text("fleet_components_uuid"),
   fleetEquipmentCode: text("fleet_equipment_code").notNull(),
   fleetEquipmentName: text("fleet_equipment_name").notNull(),
