@@ -1632,17 +1632,26 @@ class PDFReportGenerator {
       this.doc.text('No items consumed during the selected period.', margin, y + 10);
     } else {
       y = addAutoTableSection(
-        ['S.No', 'Item Code', 'Item Name', 'Type', 'Category', 'UOM', 'Total Consumed', 'Events', 'Avg Monthly', 'Current ROB', 'Min Stock', 'Last Consumed'],
+        ['S.No', 'Item Code', 'Item Name', 'Type', 'Category', 'UOM', 'Total Consumed', 'Events', 'Avg Monthly', 'Raw Rate', 'ROB', 'Min', 'Last Consumed'],
         topConsumedItems.map((item: any, idx: number) => [
           String(idx + 1), item.itemCode || '', item.itemName || '', item.itemType || '',
           item.category || '', item.uom || '',
           String(item.totalConsumed ?? 0), String(item.eventCount ?? 0),
-          String(item.avgMonthlyConsumption != null ? (Math.round(item.avgMonthlyConsumption * 100) / 100) : 0),
+          `${item.avgMonthlyConsumption != null ? (Math.round(item.avgMonthlyConsumption * 100) / 100) : 0}${item.adjustmentNote ? '*' : ''}`,
+          item.rawAvgMonthlyConsumption != null && item.rawAvgMonthlyConsumption !== item.avgMonthlyConsumption
+            ? String(Math.round(item.rawAvgMonthlyConsumption * 100) / 100) : '-',
           String(item.currentRob ?? 0), String(item.minStock ?? 0),
           item.lastConsumedDate ? (typeof item.lastConsumedDate === 'string' ? item.lastConsumedDate.slice(0, 10) : format(new Date(item.lastConsumedDate), 'dd MMM yyyy')) : '-',
         ]),
         y
       );
+      if (topConsumedItems.some((i: any) => i.adjustmentNote)) {
+        this.doc.setFontSize(7);
+        this.doc.setFont('helvetica', 'italic');
+        this.doc.setTextColor(...PDF_COLORS.textDarkOrange);
+        this.doc.text(`* Avg Monthly adjusted with confidence multiplier for limited data period (${daysOfData} days). Raw Rate shows unadjusted projection.`, margin, y);
+        y += 5;
+      }
     }
 
     // ===== PAGE 4: CATEGORY BREAKDOWN =====
@@ -1675,16 +1684,18 @@ class PDFReportGenerator {
       this.doc.text('No stock efficiency data available.', margin, y + 10);
     } else {
       y = addAutoTableSection(
-        ['S.No', 'Item Code', 'Item Name', 'Type', 'ROB', 'Min', 'Consumed', 'Turnover', 'Movement', 'Days to Stockout', 'Below Min'],
+        ['S.No', 'Item Code', 'Item Name', 'Type', 'ROB', 'Min', 'Consumed', 'Turnover', 'Movement', 'Note', 'Days to Stockout', 'Range', 'Below Min'],
         stockEfficiency.map((item: any, idx: number) => [
           String(idx + 1), item.itemCode || '', item.itemName || '', item.itemType || '',
           String(item.currentRob ?? 0), String(item.minStock ?? 0),
           String(item.totalConsumed ?? 0),
           String(item.stockTurnoverRatio ?? item.turnoverRatio ?? 0),
-          item.movementSpeed || 'Non-Moving',
+          item.movementSpeed === 'very-slow' ? 'Very Slow' : (item.movementSpeed || 'Non-Moving'),
+          item.movementNote || '-',
           item.movementSpeed === 'non-moving' || item.movementSpeed === 'Non-Moving'
             ? '\u221E'
-            : (item.daysToStockout != null ? String(Math.round(item.daysToStockout)) : '-'),
+            : (item.daysUntilStockout != null ? String(Math.round(item.daysUntilStockout)) : '-'),
+          item.stockoutRange ? `${item.stockoutRange.lower}-${item.stockoutRange.upper}d` : '-',
           (item.currentRob ?? 0) < (item.minStock ?? 0) ? 'Yes' : 'No',
         ]),
         y,
@@ -1695,9 +1706,10 @@ class PDFReportGenerator {
             const cellText = hookData.cell.text?.[0] || '';
             if (colIdx === 8) {
               if (cellText === 'fast' || cellText === 'Fast') hookData.cell.styles.textColor = PDF_COLORS.success;
+              else if (cellText === 'Very Slow') hookData.cell.styles.textColor = PDF_COLORS.warning;
               else if (cellText === 'non-moving' || cellText === 'Non-Moving') hookData.cell.styles.textColor = PDF_COLORS.danger;
             }
-            if (colIdx === 10 && cellText === 'Yes') {
+            if (colIdx === 12 && cellText === 'Yes') {
               hookData.cell.styles.textColor = PDF_COLORS.danger;
               hookData.cell.styles.fontStyle = 'bold';
               hookData.cell.styles.fillColor = PDF_COLORS.bgDanger;
@@ -1744,15 +1756,17 @@ class PDFReportGenerator {
       this.doc.text('No forecast data available.', margin, y + 10);
     } else {
       y = addAutoTableSection(
-        ['S.No', 'Item Code', 'Item Name', 'UOM', 'Avg Monthly', 'Projected Next Month', 'ROB', 'Min Stock', 'Months Left', 'Reorder?', 'Suggested Qty', 'Confidence'],
+        ['S.No', 'Item Code', 'Item Name', 'UOM', 'Avg Monthly', 'Projected', 'ROB', 'Min', 'Reorder Pt', 'Months Left', 'Reorder?', 'Qty', 'Reasoning', 'Confidence'],
         forecastData.map((f: any, idx: number) => [
           String(idx + 1), f.itemCode || '', f.itemName || '', f.uom || '',
-          String(f.avgMonthlyConsumption != null ? (Math.round(f.avgMonthlyConsumption * 100) / 100) : 0),
+          `${f.avgMonthlyConsumption != null ? (Math.round(f.avgMonthlyConsumption * 100) / 100) : 0}${f.rawAvgMonthlyConsumption && f.rawAvgMonthlyConsumption !== f.avgMonthlyConsumption ? ` (raw:${Math.round(f.rawAvgMonthlyConsumption * 100) / 100})` : ''}`,
           String(f.projectedNextMonth != null ? (Math.round(f.projectedNextMonth * 100) / 100) : 0),
           String(f.currentRob ?? 0), String(f.minStock ?? 0),
+          f.reorderPoint != null ? String(Math.round(f.reorderPoint)) : '-',
           f.monthsOfStockRemaining != null ? String(Math.round(f.monthsOfStockRemaining * 10) / 10) : '-',
           f.reorderNeeded ? 'Yes' : 'No',
           String(f.suggestedReorderQty ?? 0),
+          f.reorderReasoning || '-',
           confidence,
         ]),
         y,
@@ -1761,12 +1775,12 @@ class PDFReportGenerator {
             if (hookData.section !== 'body') return;
             const colIdx = hookData.column.index;
             const cellText = hookData.cell.text?.[0] || '';
-            if (colIdx === 9 && cellText === 'Yes') {
+            if (colIdx === 10 && cellText === 'Yes') {
               hookData.cell.styles.textColor = PDF_COLORS.danger;
               hookData.cell.styles.fontStyle = 'bold';
               hookData.cell.styles.fillColor = PDF_COLORS.bgDanger;
             }
-            if (colIdx === 11 && cellText === 'Low') {
+            if (colIdx === 13 && cellText === 'Low') {
               hookData.cell.styles.textColor = PDF_COLORS.warning;
               hookData.cell.styles.fontStyle = 'italic';
             }

@@ -476,7 +476,12 @@ const ConsumptionPatternReport: React.FC<ConsumptionPatternReportProps> = ({ onB
                               <td className="px-3 py-2">{item.uom}</td>
                               <td className="px-3 py-2 font-medium">{Number(item.totalConsumed).toLocaleString()}</td>
                               <td className="px-3 py-2">{item.eventCount}</td>
-                              <td className="px-3 py-2">{Number(item.avgMonthlyConsumption || 0).toFixed(1)}</td>
+                              <td className="px-3 py-2">
+                                {Number(item.avgMonthlyConsumption || 0).toFixed(1)}
+                                {item.adjustmentNote && (
+                                  <span className="block text-xs text-amber-600 mt-0.5" title={item.adjustmentNote}>*adjusted</span>
+                                )}
+                              </td>
                               <td className="px-3 py-2">{item.currentRob}</td>
                               <td className="px-3 py-2">{item.minStock}</td>
                               <td className="px-3 py-2">{item.lastConsumedDate ? format(new Date(item.lastConsumedDate), "dd MMM yyyy") : "-"}</td>
@@ -614,9 +619,22 @@ const ConsumptionPatternReport: React.FC<ConsumptionPatternReportProps> = ({ onB
                             <td className="px-3 py-2">
                               {item.movementSpeed === "fast" && <Badge className="bg-green-100 text-green-700 border-green-300">Fast</Badge>}
                               {item.movementSpeed === "slow" && <Badge className="bg-yellow-100 text-yellow-700 border-yellow-300">Slow</Badge>}
+                              {item.movementSpeed === "very-slow" && <Badge className="bg-orange-100 text-orange-700 border-orange-300">Very Slow</Badge>}
                               {item.movementSpeed === "non-moving" && <Badge className="bg-gray-100 text-gray-600 border-gray-300">Non-Moving</Badge>}
+                              {item.movementNote && <span className="block text-xs text-gray-500 mt-0.5">{item.movementNote}</span>}
                             </td>
-                            <td className="px-3 py-2">{item.movementSpeed === "non-moving" ? "\u221E" : (item.daysUntilStockout != null ? item.daysUntilStockout : "-")}</td>
+                            <td className="px-3 py-2">
+                              {item.movementSpeed === "non-moving" ? "\u221E" : (
+                                item.daysUntilStockout != null ? (
+                                  <span>
+                                    {item.daysUntilStockout}
+                                    {item.stockoutRange && (
+                                      <span className="block text-xs text-gray-500">{item.stockoutRange.lower}-{item.stockoutRange.upper}d</span>
+                                    )}
+                                  </span>
+                                ) : "-"
+                              )}
+                            </td>
                             <td className="px-3 py-2">
                               {item.belowMinStock ? <Badge className="bg-red-100 text-red-700 border-red-300">Yes</Badge> : <Badge className="bg-green-100 text-green-700 border-green-300">No</Badge>}
                             </td>
@@ -692,9 +710,10 @@ const ConsumptionPatternReport: React.FC<ConsumptionPatternReportProps> = ({ onB
                         <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase">Item Name</th>
                         <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase">UOM</th>
                         <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase">Avg Monthly</th>
-                        <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase">Projected Next Month</th>
+                        <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase">Projected</th>
                         <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase">ROB</th>
                         <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase">Min</th>
+                        <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase">Reorder Pt</th>
                         <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase">Months Left</th>
                         <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase">Reorder?</th>
                         <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase">Suggested Qty</th>
@@ -706,12 +725,23 @@ const ConsumptionPatternReport: React.FC<ConsumptionPatternReportProps> = ({ onB
                         <tr key={f.itemId || idx} className="text-sm" data-testid={`row-forecast-${f.itemId}`}>
                           <td className="px-3 py-2">{idx + 1}</td>
                           <td className="px-3 py-2 font-medium">{f.itemCode}</td>
-                          <td className="px-3 py-2">{f.itemName}</td>
+                          <td className="px-3 py-2">
+                            {f.itemName}
+                            {f.reorderReasoning && f.reorderNeeded && (
+                              <span className="block text-xs text-gray-500 mt-0.5">{f.reorderReasoning}</span>
+                            )}
+                          </td>
                           <td className="px-3 py-2">{f.uom}</td>
-                          <td className="px-3 py-2">{Number(f.avgMonthlyConsumption || 0).toFixed(1)}</td>
+                          <td className="px-3 py-2">
+                            {Number(f.avgMonthlyConsumption || 0).toFixed(1)}
+                            {f.rawAvgMonthlyConsumption && f.rawAvgMonthlyConsumption !== f.avgMonthlyConsumption && (
+                              <span className="block text-xs text-amber-600">raw: {Number(f.rawAvgMonthlyConsumption).toFixed(1)}</span>
+                            )}
+                          </td>
                           <td className="px-3 py-2">{Number(f.projectedNextMonth || 0).toFixed(1)}</td>
                           <td className="px-3 py-2">{f.currentRob}</td>
                           <td className="px-3 py-2">{f.minStock}</td>
+                          <td className="px-3 py-2">{f.reorderPoint != null ? Number(f.reorderPoint).toFixed(0) : "-"}</td>
                           <td className="px-3 py-2">{f.monthsOfStockRemaining != null ? Number(f.monthsOfStockRemaining).toFixed(1) : "-"}</td>
                           <td className="px-3 py-2">
                             {f.reorderNeeded ? <Badge className="bg-red-100 text-red-700 border-red-300">Yes</Badge> : <span className="text-gray-400">No</span>}

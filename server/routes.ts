@@ -7879,7 +7879,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
           const item = itemsMap.get(itemId);
           const currentRob = parseFloat(String(item?.rob)) || 0;
           const minStock = parseFloat(String(item?.min)) || 0;
-          const avgMonthlyConsumption = daysOfData > 0 ? Math.round((g.totalConsumed / daysOfData) * 30 * 100) / 100 : 0;
+          const rawMonthlyRate = daysOfData > 0 ? (g.totalConsumed / daysOfData) * 30 : 0;
+          let confidenceMultiplier = 1.0;
+          if (daysOfData < 7) confidenceMultiplier = 0.5;
+          else if (daysOfData < 30) confidenceMultiplier = 0.75;
+          const avgMonthlyConsumption = Math.round(rawMonthlyRate * confidenceMultiplier * 100) / 100;
           return {
             itemId,
             itemCode: item?.itemCode || '',
@@ -7890,6 +7894,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
             totalConsumed: Math.round(g.totalConsumed * 100) / 100,
             eventCount: g.events,
             avgMonthlyConsumption,
+            rawAvgMonthlyConsumption: Math.round(rawMonthlyRate * 100) / 100,
+            confidenceMultiplier,
+            adjustmentNote: daysOfData < 7 
+              ? `Adjusted estimate (×${confidenceMultiplier}) based on limited ${daysOfData}-day sample. Raw rate: ${Math.round(rawMonthlyRate * 100) / 100}/month`
+              : daysOfData < 30
+                ? `Adjusted estimate (×${confidenceMultiplier}) based on ${daysOfData}-day sample. Raw rate: ${Math.round(rawMonthlyRate * 100) / 100}/month`
+                : null,
             currentRob,
             minStock,
             lastConsumedDate: g.lastConsumed.toISOString(),
@@ -7934,13 +7945,44 @@ export async function registerRoutes(app: Express): Promise<Server> {
             : currentRob;
           const stockTurnoverRatio = avgRob > 0 ? Math.round((totalConsumed / avgRob) * 100) / 100 : 0;
 
-          let movementSpeed: 'fast' | 'slow' | 'non-moving' = 'non-moving';
           const eventCount = consumed?.events || 0;
-          if (eventCount >= 3) movementSpeed = 'fast';
-          else if (eventCount >= 1) movementSpeed = 'slow';
+          const consumptionFrequency = daysOfData > 0 ? eventCount / daysOfData : 0;
+          const stockHealthRatio = minStock > 0 ? currentRob / minStock : null;
+
+          let movementSpeed: 'fast' | 'slow' | 'very-slow' | 'non-moving' = 'non-moving';
+          let movementNote = '';
+          if (totalConsumed === 0) {
+            movementSpeed = 'non-moving';
+            movementNote = currentRob > 0 ? 'No consumption recorded - consider stock reduction' : '';
+          } else {
+            const fastThreshold = daysOfData < 30 ? 0.5 : 2.0;
+            const slowThreshold = daysOfData < 30 ? 0.05 : 0.5;
+            if (stockTurnoverRatio >= fastThreshold || consumptionFrequency >= 0.5) {
+              movementSpeed = 'fast';
+              movementNote = totalConsumed >= minStock ? 'High consumption rate' : '';
+            } else if (stockTurnoverRatio >= slowThreshold || consumptionFrequency >= 0.1) {
+              movementSpeed = 'slow';
+              movementNote = 'Monitor stock levels';
+            } else {
+              movementSpeed = 'very-slow';
+              movementNote = 'Consider stock reduction';
+            }
+          }
 
           const avgDailyConsumption = daysOfData > 0 ? totalConsumed / daysOfData : 0;
-          const daysUntilStockout = avgDailyConsumption > 0 ? Math.round(currentRob / avgDailyConsumption) : null;
+          const baseStockoutDays = avgDailyConsumption > 0 ? currentRob / avgDailyConsumption : null;
+          let daysUntilStockout = baseStockoutDays !== null ? Math.round(baseStockoutDays) : null;
+          let stockoutRange: { lower: number; upper: number } | null = null;
+          let stockoutConfidence: 'low' | 'medium' | 'high' = 'high';
+          if (baseStockoutDays !== null && baseStockoutDays > 0) {
+            if (daysOfData < 7) {
+              stockoutRange = { lower: Math.floor(baseStockoutDays * 0.5), upper: Math.ceil(baseStockoutDays * 2.0) };
+              stockoutConfidence = 'low';
+            } else if (daysOfData < 30) {
+              stockoutRange = { lower: Math.floor(baseStockoutDays * 0.75), upper: Math.ceil(baseStockoutDays * 1.5) };
+              stockoutConfidence = 'medium';
+            }
+          }
           const belowMinStock = currentRob < minStock;
           const negativeRob = currentRob < 0;
 
@@ -7956,7 +7998,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
             totalConsumed: Math.round(totalConsumed * 100) / 100,
             stockTurnoverRatio,
             movementSpeed,
+            movementNote,
+            consumptionFrequency: Math.round(consumptionFrequency * 1000) / 1000,
+            stockHealthRatio: stockHealthRatio !== null ? Math.round(stockHealthRatio * 100) / 100 : null,
             daysUntilStockout,
+            stockoutRange,
+            stockoutConfidence,
             belowMinStock,
             negativeRob,
             eventCount,
@@ -7966,10 +8013,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const forecastData = topConsumedItems.map(item => {
         const avgDaily = daysOfData > 0 ? item.totalConsumed / daysOfData : 0;
-        const projectedMonthly = Math.round(avgDaily * 30 * 100) / 100;
-        const monthsRemaining = avgDaily > 0 ? Math.round((item.currentRob / avgDaily / 30) * 10) / 10 : null;
-        const reorderNeeded = monthsRemaining !== null && monthsRemaining < 2 && item.currentRob < item.minStock * 2;
-        const suggestedReorderQty = reorderNeeded ? Math.max(0, Math.round(projectedMonthly * 3 - item.currentRob)) : 0;
+        let forecastConfidenceMultiplier = 1.0;
+        if (daysOfData < 7) forecastConfidenceMultiplier = 0.5;
+        else if (daysOfData < 30) forecastConfidenceMultiplier = 0.75;
+        const adjustedDaily = avgDaily * forecastConfidenceMultiplier;
+        const projectedMonthly = Math.round(adjustedDaily * 30 * 100) / 100;
+        const monthsRemaining = adjustedDaily > 0 ? Math.round((item.currentRob / adjustedDaily / 30) * 10) / 10 : null;
+
+        const leadTimeDays = 30;
+        const safetyStock = projectedMonthly;
+        const reorderPoint = Math.round((adjustedDaily * leadTimeDays + safetyStock) * 100) / 100;
+        const targetLevel = Math.max(item.minStock * 3, projectedMonthly * 6);
+        const reorderNeeded = item.currentRob <= reorderPoint && projectedMonthly > 0;
+        const suggestedReorderQty = reorderNeeded ? Math.max(0, Math.ceil(targetLevel - item.currentRob)) : 0;
+        const reorderReasoning = reorderNeeded
+          ? `Bring stock from ${item.currentRob} to ${Math.round(targetLevel)} (${projectedMonthly > 0 ? Math.round(targetLevel / projectedMonthly * 10) / 10 : '∞'} months supply at ${projectedMonthly}/month)`
+          : item.currentRob > reorderPoint ? 'Stock adequate - above reorder point' : 'No consumption recorded';
 
         return {
           itemId: item.itemId,
@@ -7978,12 +8037,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
           itemType: item.itemType,
           uom: item.uom,
           avgMonthlyConsumption: item.avgMonthlyConsumption,
+          rawAvgMonthlyConsumption: item.rawAvgMonthlyConsumption,
           projectedNextMonth: projectedMonthly,
           currentRob: item.currentRob,
           minStock: item.minStock,
           monthsOfStockRemaining: monthsRemaining,
           reorderNeeded,
           suggestedReorderQty,
+          reorderPoint,
+          targetLevel: Math.round(targetLevel),
+          safetyStock: Math.round(safetyStock * 100) / 100,
+          leadTimeDays,
+          reorderReasoning,
           confidenceLevel,
         };
       });
@@ -8174,11 +8239,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       const itemRows = Object.entries(itemGrouped).map(([id, g]) => {
         const item = itemsMap.get(Number(id));
+        const rawMonthlyRate = Math.round((g.totalConsumed / daysOfData) * 30 * 100) / 100;
+        let confidenceMultiplier = 1.0;
+        if (daysOfData < 7) confidenceMultiplier = 0.5;
+        else if (daysOfData < 30) confidenceMultiplier = 0.75;
+        const adjustedMonthly = Math.round(rawMonthlyRate * confidenceMultiplier * 100) / 100;
         return {
           itemCode: item?.itemCode || '', itemName: item?.itemName || '', itemType: item?.itemType || '',
           category: item?.category || '', uom: item?.uom || '',
           totalConsumed: Math.round(g.totalConsumed * 100) / 100, events: g.events,
-          avgMonthly: Math.round((g.totalConsumed / daysOfData) * 30 * 100) / 100,
+          avgMonthly: adjustedMonthly,
+          rawRate: rawMonthlyRate !== adjustedMonthly ? rawMonthlyRate : null,
           currentRob: parseFloat(String(item?.rob)) || 0, minStock: parseFloat(String(item?.min)) || 0,
           lastConsumed: g.lastConsumed.toISOString().slice(0, 10),
         };
@@ -8194,6 +8265,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         { key: 'totalConsumed', header: 'Total Consumed', width: 16, type: 'number', align: 'center' },
         { key: 'events', header: 'Events', width: 10, type: 'number', align: 'center' },
         { key: 'avgMonthly', header: 'Avg Monthly', width: 14, type: 'number', align: 'center' },
+        { key: 'rawRate', header: 'Raw Rate', width: 12, type: 'string', align: 'center' },
         { key: 'currentRob', header: 'Current ROB', width: 14, type: 'number', align: 'center' },
         { key: 'minStock', header: 'Min Stock', width: 12, type: 'number', align: 'center' },
         { key: 'lastConsumed', header: 'Last Consumed', width: 14, type: 'string', align: 'center' },
@@ -8203,7 +8275,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       applyStandardTableHeader(itemSheet, itemCols, 7);
 
       itemRows.forEach((item, idx) => {
-        const row = itemSheet.addRow([idx + 1, item.itemCode, item.itemName, item.itemType, item.category, item.uom, item.totalConsumed, item.events, item.avgMonthly, item.currentRob, item.minStock, item.lastConsumed]);
+        const row = itemSheet.addRow([idx + 1, item.itemCode, item.itemName, item.itemType, item.category, item.uom, item.totalConsumed, item.events, item.avgMonthly, item.rawRate != null ? item.rawRate : '-', item.currentRob, item.minStock, item.lastConsumed]);
         row.height = 20;
         row.eachCell((cell, colNum) => {
           const colDef = itemCols[colNum - 1];
@@ -8265,14 +8337,40 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const minStock = parseFloat(String(item.min)) || 0;
         const avgDaily = daysOfData > 0 ? totalConsumed / daysOfData : 0;
         const events = consumed?.events || 0;
+        const consumptionFrequency = daysOfData > 0 ? events / daysOfData : 0;
+        const turnover = currentRob > 0 ? Math.round((totalConsumed / currentRob) * 100) / 100 : 0;
         let speed = 'Non-Moving';
-        if (events >= 3) speed = 'Fast';
-        else if (events >= 1) speed = 'Slow';
+        let movementNote = '';
+        if (totalConsumed === 0) {
+          speed = 'Non-Moving';
+          movementNote = currentRob > 0 ? 'No consumption - consider reduction' : '';
+        } else {
+          const fastThreshold = daysOfData < 30 ? 0.5 : 2.0;
+          const slowThreshold = daysOfData < 30 ? 0.05 : 0.5;
+          if (turnover >= fastThreshold || consumptionFrequency >= 0.5) {
+            speed = 'Fast';
+            movementNote = totalConsumed >= minStock ? 'High consumption rate' : '';
+          } else if (turnover >= slowThreshold || consumptionFrequency >= 0.1) {
+            speed = 'Slow';
+            movementNote = 'Monitor stock levels';
+          } else {
+            speed = 'Very Slow';
+            movementNote = 'Consider stock reduction';
+          }
+        }
+        const baseStockoutDays = avgDaily > 0 ? currentRob / avgDaily : null;
+        const daysToStockoutVal = baseStockoutDays !== null ? Math.round(baseStockoutDays) : null;
+        let stockoutRange = '-';
+        if (baseStockoutDays !== null && baseStockoutDays > 0) {
+          if (daysOfData < 7) stockoutRange = `${Math.floor(baseStockoutDays * 0.5)}-${Math.ceil(baseStockoutDays * 2.0)}d`;
+          else if (daysOfData < 30) stockoutRange = `${Math.floor(baseStockoutDays * 0.75)}-${Math.ceil(baseStockoutDays * 1.5)}d`;
+        }
         return {
           itemCode: item.itemCode || '', itemName: item.itemName || '', itemType: item.itemType || '',
           uom: item.uom || '', currentRob, minStock, totalConsumed: Math.round(totalConsumed * 100) / 100,
-          turnover: currentRob > 0 ? Math.round((totalConsumed / currentRob) * 100) / 100 : 0,
-          speed, daysToStockout: avgDaily > 0 ? Math.round(currentRob / avgDaily) : '-',
+          turnover, speed, movementNote,
+          daysToStockout: daysToStockoutVal !== null ? daysToStockoutVal : '\u221E',
+          stockoutRange,
           belowMin: currentRob < minStock ? 'Yes' : 'No',
         };
       }).sort((a: any, b: any) => (b.turnover || 0) - (a.turnover || 0));
@@ -8288,14 +8386,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
         { key: 'turnover', header: 'Turnover', width: 12, type: 'number', align: 'center' },
         { key: 'speed', header: 'Movement', width: 14, type: 'string', align: 'center' },
         { key: 'daysToStockout', header: 'Days to Stockout', width: 16, type: 'string', align: 'center' },
+        { key: 'stockoutRange', header: 'Stockout Range', width: 14, type: 'string', align: 'center' },
         { key: 'belowMin', header: 'Below Min', width: 12, type: 'string', align: 'center' },
+        { key: 'movementNote', header: 'Note', width: 24, type: 'string' },
       ];
       const effLastCol = getLastColumnLetter(effCols.length);
       applyStandardHeader(effSheet, 'STOCK EFFICIENCY ANALYSIS', `Data Period: ${datePeriod} | Movement thresholds adjusted for ${daysOfData}-day sample`, vesselName, effItems.length, effLastCol);
       applyStandardTableHeader(effSheet, effCols, 7);
 
       effItems.forEach((item: any, idx: number) => {
-        const row = effSheet.addRow([idx + 1, item.itemCode, item.itemName, item.itemType, item.currentRob, item.minStock, item.totalConsumed, item.turnover, item.speed, item.daysToStockout, item.belowMin]);
+        const row = effSheet.addRow([idx + 1, item.itemCode, item.itemName, item.itemType, item.currentRob, item.minStock, item.totalConsumed, item.turnover, item.speed, item.daysToStockout, item.stockoutRange, item.belowMin, item.movementNote]);
         row.height = 20;
         row.eachCell((cell, colNum) => {
           const colDef = effCols[colNum - 1];
@@ -8306,7 +8406,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
           if (colNum === 9 && item.speed === 'Fast') {
             cell.font = { name: 'Calibri', size: 10, bold: true, color: { argb: COLORS.success } };
           }
-          if (colNum === 11 && item.belowMin === 'Yes') {
+          if (colNum === 9 && item.speed === 'Very Slow') {
+            cell.font = { name: 'Calibri', size: 10, bold: true, color: { argb: COLORS.warning } };
+          }
+          if (colNum === 12 && item.belowMin === 'Yes') {
             cell.font = { name: 'Calibri', size: 10, bold: true, color: { argb: COLORS.danger } };
             cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: COLORS.bgDanger } };
           }
@@ -8319,17 +8422,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const forecastItems = Object.entries(itemGrouped).map(([id, g]) => {
         const item = itemsMap.get(Number(id));
         const avgDaily = daysOfData > 0 ? g.totalConsumed / daysOfData : 0;
-        const projMonthly = Math.round(avgDaily * 30 * 100) / 100;
+        let fcMultiplier = 1.0;
+        if (daysOfData < 7) fcMultiplier = 0.5;
+        else if (daysOfData < 30) fcMultiplier = 0.75;
+        const adjustedDaily = avgDaily * fcMultiplier;
+        const projMonthly = Math.round(adjustedDaily * 30 * 100) / 100;
+        const rawMonthly = Math.round(avgDaily * 30 * 100) / 100;
         const currentRob = parseFloat(String(item?.rob)) || 0;
         const minStock = parseFloat(String(item?.min)) || 0;
-        const monthsRem = avgDaily > 0 ? Math.round((currentRob / avgDaily / 30) * 10) / 10 : null;
-        const reorder = monthsRem !== null && monthsRem < 2 && currentRob < minStock * 2;
-        const suggestedQty = reorder ? Math.max(0, Math.round(projMonthly * 3 - currentRob)) : 0;
+        const monthsRem = adjustedDaily > 0 ? Math.round((currentRob / adjustedDaily / 30) * 10) / 10 : null;
+        const leadTimeDays = 30;
+        const safetyStock = projMonthly;
+        const reorderPoint = Math.round((adjustedDaily * leadTimeDays + safetyStock) * 100) / 100;
+        const targetLevel = Math.max(minStock * 3, projMonthly * 6);
+        const reorder = currentRob <= reorderPoint && projMonthly > 0;
+        const suggestedQty = reorder ? Math.max(0, Math.ceil(targetLevel - currentRob)) : 0;
+        const reasoning = reorder
+          ? `Stock ${currentRob} \u2192 ${Math.round(targetLevel)} (${projMonthly > 0 ? Math.round(targetLevel / projMonthly * 10) / 10 : '\u221E'}mo supply)`
+          : currentRob > reorderPoint ? 'Stock adequate' : 'No consumption';
         return {
           itemCode: item?.itemCode || '', itemName: item?.itemName || '', uom: item?.uom || '',
-          avgMonthly: projMonthly, projNextMonth: projMonthly, currentRob, minStock,
+          avgMonthly: projMonthly, rawRate: rawMonthly !== projMonthly ? rawMonthly : null,
+          projNextMonth: projMonthly, currentRob, minStock, reorderPoint: Math.round(reorderPoint),
           monthsRemaining: monthsRem !== null ? monthsRem : '-',
-          reorderNeeded: reorder ? 'Yes' : 'No', suggestedQty,
+          reorderNeeded: reorder ? 'Yes' : 'No', suggestedQty, reasoning,
           confidence: daysOfData > 90 ? 'High' : daysOfData >= 30 ? 'Medium' : 'Low',
         };
       }).sort((a, b) => (typeof b.monthsRemaining === 'number' ? b.monthsRemaining : 999) - (typeof a.monthsRemaining === 'number' ? a.monthsRemaining : 999));
@@ -8340,12 +8456,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
         { key: 'itemName', header: 'Item Name', width: 32, type: 'string' },
         { key: 'uom', header: 'UOM', width: 10, type: 'string', align: 'center' },
         { key: 'avgMonthly', header: 'Avg Monthly', width: 14, type: 'number', align: 'center' },
+        { key: 'rawRate', header: 'Raw Rate', width: 12, type: 'string', align: 'center' },
         { key: 'projNextMonth', header: 'Projected', width: 14, type: 'number', align: 'center' },
         { key: 'currentRob', header: 'ROB', width: 12, type: 'number', align: 'center' },
         { key: 'minStock', header: 'Min', width: 10, type: 'number', align: 'center' },
+        { key: 'reorderPoint', header: 'Reorder Pt', width: 12, type: 'number', align: 'center' },
         { key: 'monthsRemaining', header: 'Months Left', width: 14, type: 'string', align: 'center' },
         { key: 'reorderNeeded', header: 'Reorder?', width: 12, type: 'string', align: 'center' },
         { key: 'suggestedQty', header: 'Suggested Qty', width: 14, type: 'number', align: 'center' },
+        { key: 'reasoning', header: 'Reasoning', width: 36, type: 'string' },
         { key: 'confidence', header: 'Confidence', width: 14, type: 'string', align: 'center' },
       ];
       const fcLastCol = getLastColumnLetter(fcCols.length);
@@ -8353,7 +8472,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       applyStandardTableHeader(forecastSheet, fcCols, 7);
 
       forecastItems.forEach((item, idx) => {
-        const row = forecastSheet.addRow([idx + 1, item.itemCode, item.itemName, item.uom, item.avgMonthly, item.projNextMonth, item.currentRob, item.minStock, item.monthsRemaining, item.reorderNeeded, item.suggestedQty, item.confidence]);
+        const row = forecastSheet.addRow([idx + 1, item.itemCode, item.itemName, item.uom, item.avgMonthly, item.rawRate != null ? item.rawRate : '-', item.projNextMonth, item.currentRob, item.minStock, item.reorderPoint, item.monthsRemaining, item.reorderNeeded, item.suggestedQty, item.reasoning, item.confidence]);
         row.height = 20;
         row.eachCell((cell, colNum) => {
           const colDef = fcCols[colNum - 1];
@@ -8361,11 +8480,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
           cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: idx % 2 === 0 ? COLORS.bgWhite : COLORS.bgLight } };
           cell.border = { bottom: { style: 'thin', color: { argb: COLORS.border } }, right: { style: 'thin', color: { argb: COLORS.border } } };
           cell.alignment = { vertical: 'middle', horizontal: (colDef?.align as any) || 'left' };
-          if (colNum === 10 && item.reorderNeeded === 'Yes') {
+          if (colNum === 12 && item.reorderNeeded === 'Yes') {
             cell.font = { name: 'Calibri', size: 10, bold: true, color: { argb: COLORS.danger } };
             cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: COLORS.bgDanger } };
           }
-          if (colNum === 12 && item.confidence === 'Low') {
+          if (colNum === 15 && item.confidence === 'Low') {
             cell.font = { name: 'Calibri', size: 10, italic: true, color: { argb: COLORS.warning } };
           }
         });
