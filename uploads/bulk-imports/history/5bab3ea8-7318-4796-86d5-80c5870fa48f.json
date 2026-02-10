@@ -1,0 +1,17 @@
+{
+  "id": "5bab3ea8-7318-4796-86d5-80c5870fa48f",
+  "type": "components",
+  "mode": "upsert",
+  "vesselId": "744bafc7-841a-11ed-aa7c-7003bca91a86",
+  "userId": 1,
+  "startedAt": "2026-02-10T05:18:18.526Z",
+  "completedAt": "2026-02-10T05:18:21.263Z",
+  "status": "complete",
+  "created": 200,
+  "updated": 70,
+  "skipped": 0,
+  "archived": 0,
+  "originalName": "Vessel component _ Test Vessel_01_Rev01 9.xlsx",
+  "storedFilePath": null,
+  "errorReport": null
+}
