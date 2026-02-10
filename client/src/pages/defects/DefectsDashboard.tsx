@@ -73,7 +73,7 @@ const KPICard = ({ title, value, borderColor, textColor, onClick }: KPICardProps
   );
 };
 
-type ModalType = 'active' | 'resolved' | 'coc' | 'overdue' | 'criticalEquipment' | 'highPriority' | null;
+type ModalType = 'active' | 'resolved' | 'coc' | 'overdue' | 'criticalEquipment' | 'highPriority' | `status_${string}` | `vessel_${string}` | `vessel_active_${string}` | `vessel_closed_${string}` | null;
 
 export default function DefectsDashboard() {
   const [selectedVessel, setSelectedVessel] = useState("all");
@@ -191,9 +191,9 @@ export default function DefectsDashboard() {
     { name: 'Verified', value: defectsWithComputedStatus.filter(d => d.computedStatus.label === 'Verified').length, color: '#00AF7B' },
   ].filter(s => s.value > 0);
 
-  // Use ALL defects for vessel chart to show complete multi-vessel comparison
   const vesselData = vessels.map(vessel => ({
     vessel: vessel.name || vessel.id,
+    vesselId: vessel.id,
     active: allDefectsWithComputedStatus.filter(d => d.vesselId === vessel.id && isActiveComputedStatus(d.computedStatus.label)).length,
     closed: allDefectsWithComputedStatus.filter(d => d.vesselId === vessel.id && isResolvedComputedStatus(d.computedStatus.label)).length
   })).filter(v => v.active > 0 || v.closed > 0);
@@ -225,6 +225,7 @@ export default function DefectsDashboard() {
   };
 
   const getModalDefects = () => {
+    if (!activeModal) return [];
     switch (activeModal) {
       case 'active':
         return activeDefects;
@@ -239,11 +240,28 @@ export default function DefectsDashboard() {
       case 'highPriority':
         return activeDefects.filter(d => d.priority === 'High');
       default:
+        if (activeModal.startsWith('status_')) {
+          const statusName = activeModal.replace('status_', '');
+          return defectsWithComputedStatus.filter(d => d.computedStatus.label === statusName);
+        }
+        if (activeModal.startsWith('vessel_active_')) {
+          const vId = activeModal.replace('vessel_active_', '');
+          return allDefectsWithComputedStatus.filter(d => d.vesselId === vId && isActiveComputedStatus(d.computedStatus.label));
+        }
+        if (activeModal.startsWith('vessel_closed_')) {
+          const vId = activeModal.replace('vessel_closed_', '');
+          return allDefectsWithComputedStatus.filter(d => d.vesselId === vId && isResolvedComputedStatus(d.computedStatus.label));
+        }
+        if (activeModal.startsWith('vessel_')) {
+          const vId = activeModal.replace('vessel_', '');
+          return allDefectsWithComputedStatus.filter(d => d.vesselId === vId);
+        }
         return [];
     }
   };
 
   const getModalTitle = () => {
+    if (!activeModal) return 'Defects';
     switch (activeModal) {
       case 'active':
         return 'Active Defects';
@@ -258,6 +276,25 @@ export default function DefectsDashboard() {
       case 'highPriority':
         return 'High Priority Defects';
       default:
+        if (activeModal.startsWith('status_')) {
+          const statusName = activeModal.replace('status_', '');
+          return `${statusName} Defects`;
+        }
+        if (activeModal.startsWith('vessel_active_')) {
+          const vId = activeModal.replace('vessel_active_', '');
+          const vName = vessels.find(v => v.id === vId)?.name || vId;
+          return `Active Defects - ${vName}`;
+        }
+        if (activeModal.startsWith('vessel_closed_')) {
+          const vId = activeModal.replace('vessel_closed_', '');
+          const vName = vessels.find(v => v.id === vId)?.name || vId;
+          return `Closed Defects - ${vName}`;
+        }
+        if (activeModal.startsWith('vessel_')) {
+          const vId = activeModal.replace('vessel_', '');
+          const vName = vessels.find(v => v.id === vId)?.name || vId;
+          return `Defects - ${vName}`;
+        }
         return 'Defects';
     }
   };
@@ -390,9 +427,16 @@ export default function DefectsDashboard() {
                     paddingAngle={5}
                     dataKey="value"
                     label={({ name, value }) => `${name}: ${value}`}
+                    style={{ cursor: 'pointer' }}
+                    onClick={(_data: any, index: number) => {
+                      const clicked = statusData[index];
+                      if (clicked && clicked.value > 0) {
+                        setActiveModal(`status_${clicked.name}` as ModalType);
+                      }
+                    }}
                   >
                     {statusData.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={entry.color} />
+                      <Cell key={`cell-${index}`} fill={entry.color} style={{ cursor: 'pointer' }} />
                     ))}
                   </Pie>
                   <Tooltip />
@@ -418,14 +462,34 @@ export default function DefectsDashboard() {
               </div>
             ) : (
               <ResponsiveContainer width="100%" height={250}>
-                <BarChart data={vesselData}>
+                <BarChart data={vesselData} style={{ cursor: 'pointer' }}>
                   <CartesianGrid strokeDasharray="3 3" />
                   <XAxis dataKey="vessel" angle={-45} textAnchor="end" height={80} />
                   <YAxis allowDecimals={false} />
                   <Tooltip />
                   <Legend />
-                  <Bar dataKey="active" fill="#ff6961" name="Active" />
-                  <Bar dataKey="closed" fill="#5dc86f" name="Closed" />
+                  <Bar
+                    dataKey="active"
+                    fill="#ff6961"
+                    name="Active"
+                    style={{ cursor: 'pointer' }}
+                    onClick={(data: any) => {
+                      if (data && data.vesselId && data.active > 0) {
+                        setActiveModal(`vessel_active_${data.vesselId}` as ModalType);
+                      }
+                    }}
+                  />
+                  <Bar
+                    dataKey="closed"
+                    fill="#5dc86f"
+                    name="Closed"
+                    style={{ cursor: 'pointer' }}
+                    onClick={(data: any) => {
+                      if (data && data.vesselId && data.closed > 0) {
+                        setActiveModal(`vessel_closed_${data.vesselId}` as ModalType);
+                      }
+                    }}
+                  />
                 </BarChart>
               </ResponsiveContainer>
             )}
