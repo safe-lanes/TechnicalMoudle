@@ -30,6 +30,7 @@ import CategoryFilters, { CategoryFilterValues } from "@/components/reports/Cate
 import StoresInventoryStatusReport from "./StoresInventoryStatusReport";
 import ChemicalsExpiryReport from "./ChemicalsExpiryReport";
 import LowStockAlertReport from "./LowStockAlertReport";
+import ConsumptionPatternReport from "./ConsumptionPatternReport";
 
 interface StoresReport {
   id: string;
@@ -507,6 +508,15 @@ const StoresReports: React.FC<StoresReportsProps> = ({ onBack, globalFilters }) 
     );
   }
 
+  if (selectedReport === 'stores-consumption-analysis') {
+    return (
+      <ConsumptionPatternReport
+        onBack={() => setSelectedReport(null)}
+        vesselId={effectiveVesselId}
+      />
+    );
+  }
+
   return (
     <div className="p-6 bg-white min-h-screen">
       <div className="mb-6">
@@ -590,7 +600,7 @@ const StoresReports: React.FC<StoresReportsProps> = ({ onBack, globalFilters }) 
                 className="hover:bg-gray-50 cursor-pointer"
                 data-testid={`stores-report-row-${report.id}`}
                 onClick={() => {
-                  if (report.id === 'stores-inventory-status' || report.id === 'chemicals-tracking' || report.id === 'low-stock-alert') {
+                  if (report.id === 'stores-inventory-status' || report.id === 'chemicals-tracking' || report.id === 'low-stock-alert' || report.id === 'stores-consumption-analysis') {
                     setSelectedReport(report.id);
                   }
                 }}
@@ -620,7 +630,7 @@ const StoresReports: React.FC<StoresReportsProps> = ({ onBack, globalFilters }) 
                       title="Preview"
                       onClick={(e) => {
                         e.stopPropagation();
-                        if (report.id === 'stores-inventory-status' || report.id === 'chemicals-tracking' || report.id === 'low-stock-alert') {
+                        if (report.id === 'stores-inventory-status' || report.id === 'chemicals-tracking' || report.id === 'low-stock-alert' || report.id === 'stores-consumption-analysis') {
                           setSelectedReport(report.id);
                         } else {
                           handleGenerateReport(report.id, 'PDF');

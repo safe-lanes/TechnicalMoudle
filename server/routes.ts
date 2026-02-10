@@ -7780,6 +7780,609 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // ========== STORES CONSUMPTION PATTERN ANALYSIS REPORT (stores_ledger based) ==========
+  app.get("/technical/api/reports/stores-consumption-analysis/:vesselId", async (req, res) => {
+    try {
+      const { vesselId } = req.params;
+      const { startDate, endDate, itemType, category } = req.query;
+
+      const allHistory = await storage.getStoresTransactionHistory(vesselId);
+      const allItems = await storage.getStoresItems(vesselId);
+      const itemsMap = new Map(allItems.map((item: any) => [item.id, item]));
+
+      let consumeEvents = allHistory.filter((h: any) => h.eventType === 'CONSUME');
+      let allLedgerEvents = allHistory;
+
+      if (startDate) {
+        const sd = new Date(startDate as string);
+        consumeEvents = consumeEvents.filter((h: any) => new Date(h.timestampUTC) >= sd);
+        allLedgerEvents = allLedgerEvents.filter((h: any) => new Date(h.timestampUTC) >= sd);
+      }
+      if (endDate) {
+        const ed = new Date(endDate as string);
+        ed.setHours(23, 59, 59, 999);
+        consumeEvents = consumeEvents.filter((h: any) => new Date(h.timestampUTC) <= ed);
+        allLedgerEvents = allLedgerEvents.filter((h: any) => new Date(h.timestampUTC) <= ed);
+      }
+      if (itemType && itemType !== 'all') {
+        consumeEvents = consumeEvents.filter((h: any) => h.section === itemType);
+        allLedgerEvents = allLedgerEvents.filter((h: any) => h.section === itemType);
+      }
+      if (category && category !== 'all') {
+        const catItemIds = new Set(allItems.filter((i: any) => i.category === category).map((i: any) => i.id));
+        consumeEvents = consumeEvents.filter((h: any) => catItemIds.has(h.itemId));
+        allLedgerEvents = allLedgerEvents.filter((h: any) => catItemIds.has(h.itemId));
+      }
+
+      const dates = consumeEvents.map((h: any) => new Date(h.timestampUTC)).filter((d: Date) => !isNaN(d.getTime()));
+      const earliestDate = dates.length > 0 ? new Date(Math.min(...dates.map((d: Date) => d.getTime()))) : new Date();
+      const latestDate = dates.length > 0 ? new Date(Math.max(...dates.map((d: Date) => d.getTime()))) : new Date();
+      const daysOfData = Math.max(1, Math.ceil((latestDate.getTime() - earliestDate.getTime()) / (1000 * 60 * 60 * 24)));
+
+      let confidenceLevel: 'low' | 'medium' | 'high' = 'low';
+      if (daysOfData > 90) confidenceLevel = 'high';
+      else if (daysOfData >= 30) confidenceLevel = 'medium';
+
+      const monthlyMap: Record<string, { totalQty: number; eventCount: number; itemIds: Set<number>; byType: Record<string, number> }> = {};
+      for (const h of consumeEvents) {
+        const d = new Date(h.timestampUTC);
+        const monthKey = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+        if (!monthlyMap[monthKey]) {
+          monthlyMap[monthKey] = { totalQty: 0, eventCount: 0, itemIds: new Set(), byType: {} };
+        }
+        const qty = Math.abs(parseFloat(String(h.qtyChangeBase)) || 0);
+        monthlyMap[monthKey].totalQty += qty;
+        monthlyMap[monthKey].eventCount += 1;
+        monthlyMap[monthKey].itemIds.add(h.itemId);
+        const section = h.section || 'stores';
+        monthlyMap[monthKey].byType[section] = (monthlyMap[monthKey].byType[section] || 0) + qty;
+      }
+
+      const consumptionTrends = Object.entries(monthlyMap)
+        .sort(([a], [b]) => a.localeCompare(b))
+        .map(([month, data]) => ({
+          month,
+          totalQty: Math.round(data.totalQty * 100) / 100,
+          eventCount: data.eventCount,
+          itemCount: data.itemIds.size,
+          byType: {
+            stores: Math.round((data.byType['stores'] || 0) * 100) / 100,
+            lubricants: Math.round((data.byType['lubricants'] || data.byType['lubes'] || 0) * 100) / 100,
+            chemicals: Math.round((data.byType['chemicals'] || 0) * 100) / 100,
+            others: Math.round((data.byType['others'] || 0) * 100) / 100,
+          }
+        }));
+
+      const itemGrouped: Record<number, { totalConsumed: number; events: number; lastConsumed: Date; robSnapshots: number[] }> = {};
+      for (const h of consumeEvents) {
+        const key = h.itemId;
+        if (!itemGrouped[key]) {
+          itemGrouped[key] = { totalConsumed: 0, events: 0, lastConsumed: new Date(h.timestampUTC), robSnapshots: [] };
+        }
+        const qty = Math.abs(parseFloat(String(h.qtyChangeBase)) || 0);
+        itemGrouped[key].totalConsumed += qty;
+        itemGrouped[key].events += 1;
+        const robAfter = parseFloat(String(h.robAfterBase)) || 0;
+        itemGrouped[key].robSnapshots.push(robAfter);
+        const ts = new Date(h.timestampUTC);
+        if (ts > itemGrouped[key].lastConsumed) {
+          itemGrouped[key].lastConsumed = ts;
+        }
+      }
+
+      const topConsumedItems = Object.entries(itemGrouped)
+        .map(([itemIdStr, g]) => {
+          const itemId = Number(itemIdStr);
+          const item = itemsMap.get(itemId);
+          const currentRob = parseFloat(String(item?.rob)) || 0;
+          const minStock = parseFloat(String(item?.min)) || 0;
+          const avgMonthlyConsumption = daysOfData > 0 ? Math.round((g.totalConsumed / daysOfData) * 30 * 100) / 100 : 0;
+          return {
+            itemId,
+            itemCode: item?.itemCode || '',
+            itemName: item?.itemName || '',
+            itemType: item?.itemType || '',
+            category: item?.category || '',
+            uom: item?.uom || '',
+            totalConsumed: Math.round(g.totalConsumed * 100) / 100,
+            eventCount: g.events,
+            avgMonthlyConsumption,
+            currentRob,
+            minStock,
+            lastConsumedDate: g.lastConsumed.toISOString(),
+            hasSingleEvent: g.events === 1,
+          };
+        })
+        .sort((a, b) => b.totalConsumed - a.totalConsumed);
+
+      const categoryMap: Record<string, { totalQty: number; itemCount: Set<number>; itemType: string }> = {};
+      for (const h of consumeEvents) {
+        const item = itemsMap.get(h.itemId);
+        const cat = item?.category || item?.itemType || 'Uncategorized';
+        if (!categoryMap[cat]) {
+          categoryMap[cat] = { totalQty: 0, itemCount: new Set(), itemType: item?.itemType || '' };
+        }
+        categoryMap[cat].totalQty += Math.abs(parseFloat(String(h.qtyChangeBase)) || 0);
+        categoryMap[cat].itemCount.add(h.itemId);
+      }
+
+      const totalConsumptionQty = Object.values(categoryMap).reduce((sum, c) => sum + c.totalQty, 0);
+      const categoryBreakdown = Object.entries(categoryMap)
+        .map(([cat, data]) => ({
+          category: cat,
+          itemType: data.itemType,
+          totalQty: Math.round(data.totalQty * 100) / 100,
+          itemCount: data.itemCount.size,
+          percentage: totalConsumptionQty > 0 ? Math.round((data.totalQty / totalConsumptionQty) * 10000) / 100 : 0,
+        }))
+        .sort((a, b) => b.totalQty - a.totalQty);
+
+      const stockEfficiency = allItems
+        .filter((item: any) => !item.deleted && item.isActive !== false)
+        .map((item: any) => {
+          const itemId = item.id;
+          const consumed = itemGrouped[itemId];
+          const totalConsumed = consumed?.totalConsumed || 0;
+          const currentRob = parseFloat(String(item.rob)) || 0;
+          const minStock = parseFloat(String(item.min)) || 0;
+          const robSnapshots = consumed?.robSnapshots || [];
+          const avgRob = robSnapshots.length > 0
+            ? robSnapshots.reduce((s: number, v: number) => s + v, 0) / robSnapshots.length
+            : currentRob;
+          const stockTurnoverRatio = avgRob > 0 ? Math.round((totalConsumed / avgRob) * 100) / 100 : 0;
+
+          let movementSpeed: 'fast' | 'slow' | 'non-moving' = 'non-moving';
+          const eventCount = consumed?.events || 0;
+          if (eventCount >= 3) movementSpeed = 'fast';
+          else if (eventCount >= 1) movementSpeed = 'slow';
+
+          const avgDailyConsumption = daysOfData > 0 ? totalConsumed / daysOfData : 0;
+          const daysUntilStockout = avgDailyConsumption > 0 ? Math.round(currentRob / avgDailyConsumption) : null;
+          const belowMinStock = currentRob < minStock;
+          const negativeRob = currentRob < 0;
+
+          return {
+            itemId,
+            itemCode: item.itemCode || '',
+            itemName: item.itemName || '',
+            itemType: item.itemType || '',
+            uom: item.uom || '',
+            currentRob,
+            minStock,
+            avgRob: Math.round(avgRob * 100) / 100,
+            totalConsumed: Math.round(totalConsumed * 100) / 100,
+            stockTurnoverRatio,
+            movementSpeed,
+            daysUntilStockout,
+            belowMinStock,
+            negativeRob,
+            eventCount,
+          };
+        })
+        .sort((a: any, b: any) => b.stockTurnoverRatio - a.stockTurnoverRatio);
+
+      const forecastData = topConsumedItems.map(item => {
+        const avgDaily = daysOfData > 0 ? item.totalConsumed / daysOfData : 0;
+        const projectedMonthly = Math.round(avgDaily * 30 * 100) / 100;
+        const monthsRemaining = avgDaily > 0 ? Math.round((item.currentRob / avgDaily / 30) * 10) / 10 : null;
+        const reorderNeeded = monthsRemaining !== null && monthsRemaining < 2 && item.currentRob < item.minStock * 2;
+        const suggestedReorderQty = reorderNeeded ? Math.max(0, Math.round(projectedMonthly * 3 - item.currentRob)) : 0;
+
+        return {
+          itemId: item.itemId,
+          itemCode: item.itemCode,
+          itemName: item.itemName,
+          itemType: item.itemType,
+          uom: item.uom,
+          avgMonthlyConsumption: item.avgMonthlyConsumption,
+          projectedNextMonth: projectedMonthly,
+          currentRob: item.currentRob,
+          minStock: item.minStock,
+          monthsOfStockRemaining: monthsRemaining,
+          reorderNeeded,
+          suggestedReorderQty,
+          confidenceLevel,
+        };
+      });
+
+      const nonMovingItems = stockEfficiency
+        .filter((i: any) => i.movementSpeed === 'non-moving' && i.currentRob > 0)
+        .slice(0, 50);
+
+      const recentTransactions = [...consumeEvents]
+        .sort((a: any, b: any) => {
+          const dateA = new Date(a.timestampUTC || a.dateLocal || 0).getTime();
+          const dateB = new Date(b.timestampUTC || b.dateLocal || 0).getTime();
+          return dateB - dateA;
+        })
+        .slice(0, 100)
+        .map((h: any) => ({
+          id: h.id,
+          date: h.timestampUTC || h.dateLocal,
+          itemId: h.itemId,
+          itemCode: h.partCode,
+          itemName: h.itemName,
+          section: h.section,
+          qtyConsumed: Math.abs(parseFloat(String(h.qtyChangeBase)) || 0),
+          robAfter: parseFloat(String(h.robAfterBase)) || 0,
+          uom: h.uom || '',
+          userId: h.userId || '',
+          remarks: h.remarks || '',
+        }));
+
+      const uniqueItemsConsumed = new Set(consumeEvents.map((h: any) => h.itemId)).size;
+
+      res.json({
+        summary: {
+          totalItemsConsumed: uniqueItemsConsumed,
+          totalQuantityConsumed: Math.round(consumeEvents.reduce((sum: number, h: any) => sum + Math.abs(parseFloat(String(h.qtyChangeBase)) || 0), 0) * 100) / 100,
+          totalConsumptionEvents: consumeEvents.length,
+          dateRange: { start: earliestDate.toISOString(), end: latestDate.toISOString() },
+          dataQuality: {
+            daysOfData,
+            isLimitedData: daysOfData < 30,
+            confidenceLevel,
+            message: daysOfData < 30
+              ? `Analysis based on ${daysOfData} days of consumption data. More accurate trends will develop over time.`
+              : daysOfData < 90
+                ? `Analysis based on ${daysOfData} days of data. Moderate confidence in trend projections.`
+                : `Analysis based on ${daysOfData} days of data. High confidence in trend projections.`,
+          },
+          totalInventoryItems: allItems.filter((i: any) => !i.deleted && i.isActive !== false).length,
+        },
+        consumptionTrends,
+        topConsumedItems,
+        categoryBreakdown,
+        stockEfficiency,
+        forecastData,
+        nonMovingItems,
+        recentTransactions,
+      });
+    } catch (error: any) {
+      console.error("Error generating Stores Consumption Pattern Analysis:", error);
+      res.status(500).json({ error: "Failed to generate report: " + error.message });
+    }
+  });
+
+  app.post("/technical/api/reports/stores-consumption-analysis/:vesselId/excel", async (req, res) => {
+    try {
+      const { vesselId } = req.params;
+      const { startDate, endDate, itemType, category } = req.body;
+
+      const allHistory = await storage.getStoresTransactionHistory(vesselId);
+      const allItems = await storage.getStoresItems(vesselId);
+      const allVessels = await storage.getVessels();
+      const vessel = allVessels.find((v: any) => v.id === vesselId);
+      const vesselName = vessel?.name || vesselId;
+      const itemsMap = new Map(allItems.map((item: any) => [item.id, item]));
+
+      let consumeEvents = allHistory.filter((h: any) => h.eventType === 'CONSUME');
+      if (startDate) {
+        const sd = new Date(startDate);
+        consumeEvents = consumeEvents.filter((h: any) => new Date(h.timestampUTC) >= sd);
+      }
+      if (endDate) {
+        const ed = new Date(endDate);
+        ed.setHours(23, 59, 59, 999);
+        consumeEvents = consumeEvents.filter((h: any) => new Date(h.timestampUTC) <= ed);
+      }
+      if (itemType && itemType !== 'all') {
+        consumeEvents = consumeEvents.filter((h: any) => h.section === itemType);
+      }
+      if (category && category !== 'all') {
+        const catItemIds = new Set(allItems.filter((i: any) => i.category === category).map((i: any) => i.id));
+        consumeEvents = consumeEvents.filter((h: any) => catItemIds.has(h.itemId));
+      }
+
+      const dates = consumeEvents.map((h: any) => new Date(h.timestampUTC)).filter((d: Date) => !isNaN(d.getTime()));
+      const earliestDate = dates.length > 0 ? new Date(Math.min(...dates.map((d: Date) => d.getTime()))) : new Date();
+      const latestDate = dates.length > 0 ? new Date(Math.max(...dates.map((d: Date) => d.getTime()))) : new Date();
+      const daysOfData = Math.max(1, Math.ceil((latestDate.getTime() - earliestDate.getTime()) / (1000 * 60 * 60 * 24)));
+
+      const workbook = new ExcelJS.Workbook();
+      workbook.creator = 'PMS System';
+      workbook.created = new Date();
+
+      const datePeriod = `${earliestDate.toISOString().slice(0, 10)} to ${latestDate.toISOString().slice(0, 10)}`;
+
+      // Sheet 1: Summary
+      const summarySheet = workbook.addWorksheet('Summary');
+      const uniqueItems = new Set(consumeEvents.map((h: any) => h.itemId)).size;
+      const totalQty = consumeEvents.reduce((sum: number, h: any) => sum + Math.abs(parseFloat(String(h.qtyChangeBase)) || 0), 0);
+      const summaryLastCol = getLastColumnLetter(4);
+      applyStandardHeader(summarySheet, 'STORES CONSUMPTION PATTERN ANALYSIS - SUMMARY', `Data Period: ${datePeriod} (${daysOfData} days)`, vesselName, uniqueItems, summaryLastCol);
+
+      const summaryData = [
+        ['Metric', 'Value'],
+        ['Data Period', datePeriod],
+        ['Days of Data', daysOfData],
+        ['Unique Items Consumed', uniqueItems],
+        ['Total Quantity Consumed', Math.round(totalQty * 100) / 100],
+        ['Total Consumption Events', consumeEvents.length],
+        ['Total Inventory Items', allItems.filter((i: any) => !i.deleted && i.isActive !== false).length],
+        ['Confidence Level', daysOfData > 90 ? 'High' : daysOfData >= 30 ? 'Medium' : 'Low'],
+      ];
+      summaryData.forEach((row, idx) => {
+        const r = summarySheet.addRow(row);
+        r.height = 22;
+        r.eachCell((cell) => {
+          cell.font = { name: 'Calibri', size: idx === 0 ? 11 : 10, bold: idx === 0, color: { argb: COLORS.textDark } };
+          cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: idx === 0 ? COLORS.primary : idx % 2 === 0 ? COLORS.bgWhite : COLORS.bgLight } };
+          if (idx === 0) cell.font = { name: 'Calibri', size: 11, bold: true, color: { argb: 'FFFFFFFF' } };
+          cell.border = { bottom: { style: 'thin', color: { argb: COLORS.border } }, right: { style: 'thin', color: { argb: COLORS.border } } };
+        });
+      });
+      summarySheet.getColumn(1).width = 30;
+      summarySheet.getColumn(2).width = 30;
+
+      // Sheet 2: Monthly Trends
+      const trendsSheet = workbook.addWorksheet('Monthly Trends');
+      const monthlyMap: Record<string, { totalQty: number; eventCount: number; stores: number; lubricants: number; chemicals: number; others: number }> = {};
+      for (const h of consumeEvents) {
+        const d = new Date(h.timestampUTC);
+        const mk = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+        if (!monthlyMap[mk]) monthlyMap[mk] = { totalQty: 0, eventCount: 0, stores: 0, lubricants: 0, chemicals: 0, others: 0 };
+        const qty = Math.abs(parseFloat(String(h.qtyChangeBase)) || 0);
+        monthlyMap[mk].totalQty += qty;
+        monthlyMap[mk].eventCount += 1;
+        const sec = h.section || 'stores';
+        if (sec === 'stores') monthlyMap[mk].stores += qty;
+        else if (sec === 'lubricants' || sec === 'lubes') monthlyMap[mk].lubricants += qty;
+        else if (sec === 'chemicals') monthlyMap[mk].chemicals += qty;
+        else monthlyMap[mk].others += qty;
+      }
+      const trendsCols: ColumnDef[] = [
+        { key: 'month', header: 'Month', width: 14, type: 'string' },
+        { key: 'totalQty', header: 'Total Qty', width: 14, type: 'number', align: 'center' },
+        { key: 'events', header: 'Events', width: 12, type: 'number', align: 'center' },
+        { key: 'stores', header: 'Stores', width: 14, type: 'number', align: 'center' },
+        { key: 'lubricants', header: 'Lubricants', width: 14, type: 'number', align: 'center' },
+        { key: 'chemicals', header: 'Chemicals', width: 14, type: 'number', align: 'center' },
+        { key: 'others', header: 'Others', width: 14, type: 'number', align: 'center' },
+      ];
+      const trendsLastCol = getLastColumnLetter(trendsCols.length);
+      applyStandardHeader(trendsSheet, 'MONTHLY CONSUMPTION TRENDS', `Data Period: ${datePeriod}`, vesselName, Object.keys(monthlyMap).length, trendsLastCol);
+      applyStandardTableHeader(trendsSheet, trendsCols, 7);
+
+      Object.entries(monthlyMap).sort(([a], [b]) => a.localeCompare(b)).forEach(([month, data], idx) => {
+        const row = trendsSheet.addRow([month, Math.round(data.totalQty * 100) / 100, data.eventCount, Math.round(data.stores * 100) / 100, Math.round(data.lubricants * 100) / 100, Math.round(data.chemicals * 100) / 100, Math.round(data.others * 100) / 100]);
+        row.height = 20;
+        row.eachCell((cell, colNum) => {
+          const colDef = trendsCols[colNum - 1];
+          cell.font = { name: 'Calibri', size: 10, color: { argb: COLORS.textDark } };
+          cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: idx % 2 === 0 ? COLORS.bgWhite : COLORS.bgLight } };
+          cell.border = { bottom: { style: 'thin', color: { argb: COLORS.border } }, right: { style: 'thin', color: { argb: COLORS.border } } };
+          cell.alignment = { vertical: 'middle', horizontal: (colDef?.align as any) || 'left' };
+        });
+      });
+      applyStandardPageSetup(trendsSheet, 7, trendsCols.length, 6, vesselName);
+
+      // Sheet 3: Item Analysis
+      const itemSheet = workbook.addWorksheet('Item Analysis');
+      const itemGrouped: Record<number, { totalConsumed: number; events: number; lastConsumed: Date }> = {};
+      for (const h of consumeEvents) {
+        if (!itemGrouped[h.itemId]) itemGrouped[h.itemId] = { totalConsumed: 0, events: 0, lastConsumed: new Date(h.timestampUTC) };
+        itemGrouped[h.itemId].totalConsumed += Math.abs(parseFloat(String(h.qtyChangeBase)) || 0);
+        itemGrouped[h.itemId].events += 1;
+        const ts = new Date(h.timestampUTC);
+        if (ts > itemGrouped[h.itemId].lastConsumed) itemGrouped[h.itemId].lastConsumed = ts;
+      }
+      const itemRows = Object.entries(itemGrouped).map(([id, g]) => {
+        const item = itemsMap.get(Number(id));
+        return {
+          itemCode: item?.itemCode || '', itemName: item?.itemName || '', itemType: item?.itemType || '',
+          category: item?.category || '', uom: item?.uom || '',
+          totalConsumed: Math.round(g.totalConsumed * 100) / 100, events: g.events,
+          avgMonthly: Math.round((g.totalConsumed / daysOfData) * 30 * 100) / 100,
+          currentRob: parseFloat(String(item?.rob)) || 0, minStock: parseFloat(String(item?.min)) || 0,
+          lastConsumed: g.lastConsumed.toISOString().slice(0, 10),
+        };
+      }).sort((a, b) => b.totalConsumed - a.totalConsumed);
+
+      const itemCols: ColumnDef[] = [
+        { key: 'sno', header: 'S.No', width: 8, type: 'number', align: 'center' },
+        { key: 'itemCode', header: 'Item Code', width: 16, type: 'string' },
+        { key: 'itemName', header: 'Item Name', width: 32, type: 'string' },
+        { key: 'itemType', header: 'Type', width: 14, type: 'string' },
+        { key: 'category', header: 'Category', width: 18, type: 'string' },
+        { key: 'uom', header: 'UOM', width: 10, type: 'string', align: 'center' },
+        { key: 'totalConsumed', header: 'Total Consumed', width: 16, type: 'number', align: 'center' },
+        { key: 'events', header: 'Events', width: 10, type: 'number', align: 'center' },
+        { key: 'avgMonthly', header: 'Avg Monthly', width: 14, type: 'number', align: 'center' },
+        { key: 'currentRob', header: 'Current ROB', width: 14, type: 'number', align: 'center' },
+        { key: 'minStock', header: 'Min Stock', width: 12, type: 'number', align: 'center' },
+        { key: 'lastConsumed', header: 'Last Consumed', width: 14, type: 'string', align: 'center' },
+      ];
+      const itemLastCol = getLastColumnLetter(itemCols.length);
+      applyStandardHeader(itemSheet, 'ITEM-WISE CONSUMPTION ANALYSIS', `Data Period: ${datePeriod} | ${itemRows.length} items consumed`, vesselName, itemRows.length, itemLastCol);
+      applyStandardTableHeader(itemSheet, itemCols, 7);
+
+      itemRows.forEach((item, idx) => {
+        const row = itemSheet.addRow([idx + 1, item.itemCode, item.itemName, item.itemType, item.category, item.uom, item.totalConsumed, item.events, item.avgMonthly, item.currentRob, item.minStock, item.lastConsumed]);
+        row.height = 20;
+        row.eachCell((cell, colNum) => {
+          const colDef = itemCols[colNum - 1];
+          cell.font = { name: 'Calibri', size: 10, color: { argb: COLORS.textDark } };
+          cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: idx % 2 === 0 ? COLORS.bgWhite : COLORS.bgLight } };
+          cell.border = { bottom: { style: 'thin', color: { argb: COLORS.border } }, right: { style: 'thin', color: { argb: COLORS.border } } };
+          cell.alignment = { vertical: 'middle', horizontal: (colDef?.align as any) || 'left' };
+        });
+      });
+      applyStandardPageSetup(itemSheet, 7, itemCols.length, 6, vesselName);
+
+      // Sheet 4: Category Breakdown
+      const catSheet = workbook.addWorksheet('Category Breakdown');
+      const catMap: Record<string, { totalQty: number; items: Set<number>; itemType: string }> = {};
+      for (const h of consumeEvents) {
+        const item = itemsMap.get(h.itemId);
+        const cat = item?.category || item?.itemType || 'Uncategorized';
+        if (!catMap[cat]) catMap[cat] = { totalQty: 0, items: new Set(), itemType: item?.itemType || '' };
+        catMap[cat].totalQty += Math.abs(parseFloat(String(h.qtyChangeBase)) || 0);
+        catMap[cat].items.add(h.itemId);
+      }
+      const catTotal = Object.values(catMap).reduce((s, c) => s + c.totalQty, 0);
+      const catRows = Object.entries(catMap).map(([cat, data]) => ({
+        category: cat, itemType: data.itemType, totalQty: Math.round(data.totalQty * 100) / 100,
+        itemCount: data.items.size, percentage: catTotal > 0 ? Math.round((data.totalQty / catTotal) * 10000) / 100 : 0,
+      })).sort((a, b) => b.totalQty - a.totalQty);
+
+      const catCols: ColumnDef[] = [
+        { key: 'sno', header: 'S.No', width: 8, type: 'number', align: 'center' },
+        { key: 'category', header: 'Category', width: 28, type: 'string' },
+        { key: 'itemType', header: 'Item Type', width: 16, type: 'string' },
+        { key: 'totalQty', header: 'Total Consumed', width: 16, type: 'number', align: 'center' },
+        { key: 'itemCount', header: 'Items', width: 10, type: 'number', align: 'center' },
+        { key: 'percentage', header: '% Share', width: 12, type: 'number', align: 'center' },
+      ];
+      const catLastCol = getLastColumnLetter(catCols.length);
+      applyStandardHeader(catSheet, 'CATEGORY-WISE CONSUMPTION BREAKDOWN', `Data Period: ${datePeriod}`, vesselName, catRows.length, catLastCol);
+      applyStandardTableHeader(catSheet, catCols, 7);
+
+      catRows.forEach((item, idx) => {
+        const row = catSheet.addRow([idx + 1, item.category, item.itemType, item.totalQty, item.itemCount, item.percentage]);
+        row.height = 20;
+        row.eachCell((cell, colNum) => {
+          const colDef = catCols[colNum - 1];
+          cell.font = { name: 'Calibri', size: 10, color: { argb: COLORS.textDark } };
+          cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: idx % 2 === 0 ? COLORS.bgWhite : COLORS.bgLight } };
+          cell.border = { bottom: { style: 'thin', color: { argb: COLORS.border } }, right: { style: 'thin', color: { argb: COLORS.border } } };
+          cell.alignment = { vertical: 'middle', horizontal: (colDef?.align as any) || 'left' };
+        });
+      });
+      applyStandardPageSetup(catSheet, 7, catCols.length, 6, vesselName);
+
+      // Sheet 5: Stock Efficiency
+      const effSheet = workbook.addWorksheet('Stock Efficiency');
+      const effItems = allItems.filter((i: any) => !i.deleted && i.isActive !== false).map((item: any) => {
+        const consumed = itemGrouped[item.id];
+        const totalConsumed = consumed?.totalConsumed || 0;
+        const currentRob = parseFloat(String(item.rob)) || 0;
+        const minStock = parseFloat(String(item.min)) || 0;
+        const avgDaily = daysOfData > 0 ? totalConsumed / daysOfData : 0;
+        const events = consumed?.events || 0;
+        let speed = 'Non-Moving';
+        if (events >= 3) speed = 'Fast';
+        else if (events >= 1) speed = 'Slow';
+        return {
+          itemCode: item.itemCode || '', itemName: item.itemName || '', itemType: item.itemType || '',
+          uom: item.uom || '', currentRob, minStock, totalConsumed: Math.round(totalConsumed * 100) / 100,
+          turnover: currentRob > 0 ? Math.round((totalConsumed / currentRob) * 100) / 100 : 0,
+          speed, daysToStockout: avgDaily > 0 ? Math.round(currentRob / avgDaily) : '-',
+          belowMin: currentRob < minStock ? 'Yes' : 'No',
+        };
+      }).sort((a: any, b: any) => (b.turnover || 0) - (a.turnover || 0));
+
+      const effCols: ColumnDef[] = [
+        { key: 'sno', header: 'S.No', width: 8, type: 'number', align: 'center' },
+        { key: 'itemCode', header: 'Item Code', width: 16, type: 'string' },
+        { key: 'itemName', header: 'Item Name', width: 32, type: 'string' },
+        { key: 'itemType', header: 'Type', width: 14, type: 'string' },
+        { key: 'currentRob', header: 'ROB', width: 12, type: 'number', align: 'center' },
+        { key: 'minStock', header: 'Min', width: 10, type: 'number', align: 'center' },
+        { key: 'totalConsumed', header: 'Consumed', width: 14, type: 'number', align: 'center' },
+        { key: 'turnover', header: 'Turnover', width: 12, type: 'number', align: 'center' },
+        { key: 'speed', header: 'Movement', width: 14, type: 'string', align: 'center' },
+        { key: 'daysToStockout', header: 'Days to Stockout', width: 16, type: 'string', align: 'center' },
+        { key: 'belowMin', header: 'Below Min', width: 12, type: 'string', align: 'center' },
+      ];
+      const effLastCol = getLastColumnLetter(effCols.length);
+      applyStandardHeader(effSheet, 'STOCK EFFICIENCY ANALYSIS', `Data Period: ${datePeriod} | Movement thresholds adjusted for ${daysOfData}-day sample`, vesselName, effItems.length, effLastCol);
+      applyStandardTableHeader(effSheet, effCols, 7);
+
+      effItems.forEach((item: any, idx: number) => {
+        const row = effSheet.addRow([idx + 1, item.itemCode, item.itemName, item.itemType, item.currentRob, item.minStock, item.totalConsumed, item.turnover, item.speed, item.daysToStockout, item.belowMin]);
+        row.height = 20;
+        row.eachCell((cell, colNum) => {
+          const colDef = effCols[colNum - 1];
+          cell.font = { name: 'Calibri', size: 10, color: { argb: COLORS.textDark } };
+          cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: idx % 2 === 0 ? COLORS.bgWhite : COLORS.bgLight } };
+          cell.border = { bottom: { style: 'thin', color: { argb: COLORS.border } }, right: { style: 'thin', color: { argb: COLORS.border } } };
+          cell.alignment = { vertical: 'middle', horizontal: (colDef?.align as any) || 'left' };
+          if (colNum === 9 && item.speed === 'Fast') {
+            cell.font = { name: 'Calibri', size: 10, bold: true, color: { argb: COLORS.success } };
+          }
+          if (colNum === 11 && item.belowMin === 'Yes') {
+            cell.font = { name: 'Calibri', size: 10, bold: true, color: { argb: COLORS.danger } };
+            cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: COLORS.bgDanger } };
+          }
+        });
+      });
+      applyStandardPageSetup(effSheet, 7, effCols.length, 6, vesselName);
+
+      // Sheet 6: Forecast
+      const forecastSheet = workbook.addWorksheet('Forecast');
+      const forecastItems = Object.entries(itemGrouped).map(([id, g]) => {
+        const item = itemsMap.get(Number(id));
+        const avgDaily = daysOfData > 0 ? g.totalConsumed / daysOfData : 0;
+        const projMonthly = Math.round(avgDaily * 30 * 100) / 100;
+        const currentRob = parseFloat(String(item?.rob)) || 0;
+        const minStock = parseFloat(String(item?.min)) || 0;
+        const monthsRem = avgDaily > 0 ? Math.round((currentRob / avgDaily / 30) * 10) / 10 : null;
+        const reorder = monthsRem !== null && monthsRem < 2 && currentRob < minStock * 2;
+        const suggestedQty = reorder ? Math.max(0, Math.round(projMonthly * 3 - currentRob)) : 0;
+        return {
+          itemCode: item?.itemCode || '', itemName: item?.itemName || '', uom: item?.uom || '',
+          avgMonthly: projMonthly, projNextMonth: projMonthly, currentRob, minStock,
+          monthsRemaining: monthsRem !== null ? monthsRem : '-',
+          reorderNeeded: reorder ? 'Yes' : 'No', suggestedQty,
+          confidence: daysOfData > 90 ? 'High' : daysOfData >= 30 ? 'Medium' : 'Low',
+        };
+      }).sort((a, b) => (typeof b.monthsRemaining === 'number' ? b.monthsRemaining : 999) - (typeof a.monthsRemaining === 'number' ? a.monthsRemaining : 999));
+
+      const fcCols: ColumnDef[] = [
+        { key: 'sno', header: 'S.No', width: 8, type: 'number', align: 'center' },
+        { key: 'itemCode', header: 'Item Code', width: 16, type: 'string' },
+        { key: 'itemName', header: 'Item Name', width: 32, type: 'string' },
+        { key: 'uom', header: 'UOM', width: 10, type: 'string', align: 'center' },
+        { key: 'avgMonthly', header: 'Avg Monthly', width: 14, type: 'number', align: 'center' },
+        { key: 'projNextMonth', header: 'Projected', width: 14, type: 'number', align: 'center' },
+        { key: 'currentRob', header: 'ROB', width: 12, type: 'number', align: 'center' },
+        { key: 'minStock', header: 'Min', width: 10, type: 'number', align: 'center' },
+        { key: 'monthsRemaining', header: 'Months Left', width: 14, type: 'string', align: 'center' },
+        { key: 'reorderNeeded', header: 'Reorder?', width: 12, type: 'string', align: 'center' },
+        { key: 'suggestedQty', header: 'Suggested Qty', width: 14, type: 'number', align: 'center' },
+        { key: 'confidence', header: 'Confidence', width: 14, type: 'string', align: 'center' },
+      ];
+      const fcLastCol = getLastColumnLetter(fcCols.length);
+      applyStandardHeader(forecastSheet, 'CONSUMPTION FORECAST & REORDER PROJECTIONS', `Data Period: ${datePeriod} | Confidence: ${daysOfData > 90 ? 'High' : daysOfData >= 30 ? 'Medium' : 'Low'}`, vesselName, forecastItems.length, fcLastCol);
+      applyStandardTableHeader(forecastSheet, fcCols, 7);
+
+      forecastItems.forEach((item, idx) => {
+        const row = forecastSheet.addRow([idx + 1, item.itemCode, item.itemName, item.uom, item.avgMonthly, item.projNextMonth, item.currentRob, item.minStock, item.monthsRemaining, item.reorderNeeded, item.suggestedQty, item.confidence]);
+        row.height = 20;
+        row.eachCell((cell, colNum) => {
+          const colDef = fcCols[colNum - 1];
+          cell.font = { name: 'Calibri', size: 10, color: { argb: COLORS.textDark } };
+          cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: idx % 2 === 0 ? COLORS.bgWhite : COLORS.bgLight } };
+          cell.border = { bottom: { style: 'thin', color: { argb: COLORS.border } }, right: { style: 'thin', color: { argb: COLORS.border } } };
+          cell.alignment = { vertical: 'middle', horizontal: (colDef?.align as any) || 'left' };
+          if (colNum === 10 && item.reorderNeeded === 'Yes') {
+            cell.font = { name: 'Calibri', size: 10, bold: true, color: { argb: COLORS.danger } };
+            cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: COLORS.bgDanger } };
+          }
+          if (colNum === 12 && item.confidence === 'Low') {
+            cell.font = { name: 'Calibri', size: 10, italic: true, color: { argb: COLORS.warning } };
+          }
+        });
+      });
+      applyStandardPageSetup(forecastSheet, 7, fcCols.length, 6, vesselName);
+
+      const startStr = earliestDate.toISOString().slice(0, 10);
+      const endStr = latestDate.toISOString().slice(0, 10);
+      const shortVessel = vesselName.replace(/[^a-zA-Z0-9]/g, '').slice(0, 20);
+      const timestamp = new Date().toISOString().slice(0, 10).replace(/-/g, '');
+      const filename = `Consumption_Pattern_Analysis_${shortVessel}_${startStr}_to_${endStr}_${timestamp}.xlsx`;
+
+      const buffer = await workbook.xlsx.writeBuffer();
+      res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+      res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+      res.send(buffer);
+    } catch (error: any) {
+      console.error("Error generating Stores Consumption Analysis Excel:", error);
+      res.status(500).json({ error: "Failed to generate report: " + error.message });
+    }
+  });
+
   // ========== CONSUMPTION PATTERN ANALYSIS REPORT ==========
   app.get("/technical/api/reports/consumption-analysis/:vesselId", async (req, res) => {
     try {
