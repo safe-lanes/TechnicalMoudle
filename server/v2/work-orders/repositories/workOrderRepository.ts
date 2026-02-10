@@ -198,3 +198,8 @@ export async function getJobComponentLinks(jobId: string): Promise<any[]> {
   const db = await getDb();
   return db.select().from(jobComponentLinks).where(eq(jobComponentLinks.jobId, jobId));
 }
+
+export async function getAllJobComponentLinks(): Promise<any[]> {
+  const db = await getDb();
+  return db.select().from(jobComponentLinks);
+}

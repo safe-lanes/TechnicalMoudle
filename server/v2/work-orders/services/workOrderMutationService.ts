@@ -1,6 +1,11 @@
 import { v4 as uuidv4 } from "uuid";
 import * as repo from "../repositories/workOrderRepository";
-import { generateWorkOrderNumber, generateExecutionId } from "../utils/workOrderNumbering";
+import {
+  generatePlannedWorkOrderNumber,
+  generateUnplannedWorkOrderNumber,
+  generateExecutionId,
+  isBlockingStatus,
+} from "../utils/workOrderNumbering";
 import { getEnrichedWorkOrder } from "./workOrderListService";
 
 function normalizeDateToISO(dateStr: string | undefined | null): string | null {
@@ -18,31 +23,53 @@ function normalizeDateToISO(dateStr: string | undefined | null): string | null {
 
 export async function createWorkOrderHandler(body: any) {
   const id = body.id || uuidv4();
-  let workOrderNo = body.workOrderNo;
-  if (!workOrderNo) {
-    workOrderNo = generateWorkOrderNumber();
+
+  if (!body.vesselId) {
+    throw new Error('Vessel ID is required');
+  }
+  if (!body.jobTitle) {
+    throw new Error('Job title is required');
   }
 
-  let data: any = {
-    ...body,
-    id,
-    workOrderNo,
-    workOrderType: body.workOrderType || (body.jobId ? 'Planned' : 'Unplanned'),
-  };
+  let data: any = { ...body, id };
 
   if (body.jobId) {
+    const existingWOs = await repo.getWorkOrdersByVessel(body.vesselId);
+    const newComponentCode = body.componentCode || null;
+
+    const existingActiveWO = existingWOs.find(wo => {
+      if (wo.jobId !== body.jobId) return false;
+      if (!isBlockingStatus(wo.status)) return false;
+      const existingComponentCode = wo.componentCode || null;
+      return existingComponentCode === newComponentCode;
+    });
+
+    if (existingActiveWO) {
+      throw new Error(`Work Order already exists for this job and component: ${existingActiveWO.workOrderNo}. Only one active work order is allowed per job-component combination.`);
+    }
+
     const job = await repo.getJob(body.jobId);
     if (job) {
       if (!data.maintenanceBasis) data.maintenanceBasis = job.maintenanceBasis;
       if (!data.frequencyValue) data.frequencyValue = job.frequencyValue;
       if (!data.frequencyUnit) data.frequencyUnit = job.frequencyUnit;
       if (!data.maintenanceType) data.maintenanceType = job.maintenanceType;
+      if (!data.taskType) data.taskType = job.maintenanceType;
       if (!data.jobPriority) data.jobPriority = job.jobPriority;
       if (!data.classRelated) data.classRelated = job.classRelated;
       if (!data.department) data.department = job.department;
       if (!data.approver) data.approver = job.approver;
       if (!data.briefWorkDescription) data.briefWorkDescription = job.briefWorkDescription || job.jobDescription;
-      if (!data.templateCode) data.templateCode = job.jobNo;
+
+      if (!data.workOrderNo) {
+        const componentCode = data.componentCode || '';
+        if (componentCode) {
+          data.workOrderNo = await generatePlannedWorkOrderNumber(job.jobNo, componentCode, body.vesselId);
+        }
+      }
+      if (!data.templateCode) data.templateCode = data.workOrderNo || job.jobNo;
+
+      data.workOrderType = 'Planned';
 
       if (job.maintenanceBasis === 'Running Hours') {
         data.driverType = 'RH';
@@ -57,6 +84,20 @@ export async function createWorkOrderHandler(body: any) {
         if (job.lastDoneDate) data.lastDoneDateSnapshot = job.lastDoneDate;
       }
     }
+  } else {
+    data.workOrderType = data.workOrderType || 'Unplanned';
+    if (!data.workOrderNo) {
+      const componentCode = data.componentCode || '';
+      if (componentCode && data.vesselId) {
+        data.workOrderNo = await generateUnplannedWorkOrderNumber(data.vesselId, componentCode);
+      }
+    }
+    if (!data.templateCode) data.templateCode = data.workOrderNo;
+  }
+
+  if (!data.workOrderNo) {
+    const randomDigits = Math.floor(Math.random() * 10000000).toString().padStart(7, '0');
+    data.workOrderNo = `WO-${randomDigits}`;
   }
 
   if (data.vesselId && (data.component || data.componentCode)) {
@@ -72,11 +113,6 @@ export async function createWorkOrderHandler(body: any) {
     if (resolvedComponent) {
       data.componentCode = resolvedComponent.componentCode;
     }
-  }
-
-  if (data.dueDate && data.dueDate.match(/^\d{4}-\d{2}-\d{2}$/)) {
-    const [year, month, day] = data.dueDate.split('-');
-    data.dueDate = `${day}-${month}-${year}`;
   }
 
   delete data.dateOfCompletion;
@@ -194,6 +230,41 @@ async function processApproval(existingWO: any, updateData: any) {
       }
     } catch (err) {
       console.error('Failed to create maintenance history during approval:', err);
+    }
+
+    if (existingWO.runningHours) {
+      const rhValue = parseFloat(existingWO.runningHours);
+      if (!isNaN(rhValue)) {
+        const counterType = (component.rhCounterType || '').toUpperCase();
+
+        if (counterType === 'MASTER' && existingWO.vesselId) {
+          await repo.updateComponent(component.id, {
+            currentCumulativeRH: rhValue.toString(),
+            rhCurrentMaster: rhValue.toString(),
+            lastUpdated: new Date().toISOString(),
+          });
+
+          const allComponents = await repo.getComponents(existingWO.vesselId);
+          const inheritedChildren = allComponents.filter(c => {
+            const ct = (c.rhCounterType || '').toUpperCase();
+            return ct === 'INHERITED' && (
+              c.rhMasterComponentId === component!.id ||
+              c.rhCounterSource === component!.componentCode
+            );
+          });
+          for (const child of inheritedChildren) {
+            await repo.updateComponent(child.id, {
+              currentCumulativeRH: rhValue.toString(),
+              lastUpdated: new Date().toISOString(),
+            });
+          }
+        } else {
+          await repo.updateComponent(component.id, {
+            currentCumulativeRH: rhValue.toString(),
+            lastUpdated: new Date().toISOString(),
+          });
+        }
+      }
     }
 
     try {

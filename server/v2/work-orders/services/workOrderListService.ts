@@ -1,6 +1,7 @@
 import { computeWorkOrderStatus } from "@shared/workOrders/status";
 import { WORK_ORDER_THRESHOLDS } from "@shared/workOrders/constants";
 import * as repo from "../repositories/workOrderRepository";
+import { isJobCritical } from "../utils/workOrderNumbering";
 import type { WorkOrder, Job, Component, PmsVesselSettings } from "@shared/v2/work-orders/schema";
 
 function parseRH(value: string | number | null | undefined): number | undefined {
@@ -34,9 +35,11 @@ function enrichWorkOrder(
     ? (parseRH(component?.currentCumulativeRH) ?? parseRH((component as any)?.rhCurrentMaster) ?? parseRH((wo as any).currentReading))
     : undefined;
 
-  const isJobCritical = job?.jobPriority === 'Critical' || job?.classRelated === 'true' || (job?.classRelated as any) === true;
+  const jobCritical = job ? isJobCritical(job) : false;
+  const classRelatedYes = job?.classRelated === 'Yes' || job?.classRelated === 'true' || (job?.classRelated as any) === true;
+  const effectiveCritical = jobCritical || classRelatedYes;
   const rhLeadTimeHours = wo.maintenanceBasis === 'Running Hours'
-    ? (isJobCritical
+    ? (effectiveCritical
         ? (vesselSettings?.rhLeadHoursCritical ?? WORK_ORDER_THRESHOLDS.RH_LEAD_TIME_HOURS_CRITICAL)
         : (vesselSettings?.rhLeadHoursNonCritical ?? WORK_ORDER_THRESHOLDS.RH_LEAD_TIME_HOURS_NON_CRITICAL))
     : undefined;

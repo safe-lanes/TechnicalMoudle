@@ -2,26 +2,38 @@ import { v4 as uuidv4 } from "uuid";
 import { computeWorkOrderStatus } from "@shared/workOrders/status";
 import { WORK_ORDER_THRESHOLDS } from "@shared/workOrders/constants";
 import * as repo from "../repositories/workOrderRepository";
-import { generateWorkOrderNumber } from "../utils/workOrderNumbering";
+import {
+  generatePlannedWorkOrderNumber,
+  isBlockingStatus,
+  isJobCritical,
+  extractJobNoFromWorkOrderNo,
+} from "../utils/workOrderNumbering";
 
 export async function autoGenerate(body: any) {
   const { vesselId } = body;
   if (!vesselId) return { error: 'vesselId is required' };
 
-  const [vesselSettings, allJobs, existingWOs, allComponents] = await Promise.all([
+  const [vesselSettings, allJobs, existingWOs, allComponents, allJobComponentLinks] = await Promise.all([
     repo.getPmsVesselSettings(vesselId),
     repo.getJobs(vesselId),
     repo.getWorkOrdersByVessel(vesselId),
     repo.getComponents(vesselId),
+    repo.getAllJobComponentLinks(),
   ]);
 
   const componentMap = new Map(allComponents.map(c => [c.id, c]));
-  const terminalStatuses = ['Completed', 'Approved'];
-  const activeWOsByJobId = new Map<string, any[]>();
-  for (const wo of existingWOs) {
-    if (wo.jobId && !terminalStatuses.includes(wo.status || '')) {
-      if (!activeWOsByJobId.has(wo.jobId)) activeWOsByJobId.set(wo.jobId, []);
-      activeWOsByJobId.get(wo.jobId)!.push(wo);
+  const componentByCodeMap = new Map(allComponents.map(c => [c.componentCode, c]));
+
+  const jobLinksMap = new Map<string, Array<{ componentId: string; componentCode: string; componentName: string }>>();
+  for (const link of allJobComponentLinks) {
+    if (!jobLinksMap.has(link.jobId)) jobLinksMap.set(link.jobId, []);
+    const comp = componentMap.get(link.componentId);
+    if (comp) {
+      jobLinksMap.get(link.jobId)!.push({
+        componentId: comp.id,
+        componentCode: comp.componentCode || '',
+        componentName: comp.name || '',
+      });
     }
   }
 
@@ -31,86 +43,225 @@ export async function autoGenerate(body: any) {
   const generated: any[] = [];
   const skipped: any[] = [];
 
+  function getCalendarLeadDays(job: any): number {
+    if (!vesselSettings) return 0;
+    return isJobCritical(job)
+      ? vesselSettings.calendarLeadDaysCritical
+      : vesselSettings.calendarLeadDaysNonCritical;
+  }
+
+  function getRhLeadHours(job: any): number {
+    if (!vesselSettings) return 0;
+    return isJobCritical(job)
+      ? vesselSettings.rhLeadHoursCritical
+      : vesselSettings.rhLeadHoursNonCritical;
+  }
+
   for (const job of allJobs) {
     if (job.dataScope !== 'vessel') continue;
     if (!job.maintenanceBasis) continue;
-
-    const activeWOs = activeWOsByJobId.get(job.id) || [];
-    if (activeWOs.length > 0) {
-      skipped.push({ jobId: job.id, reason: 'Active WO already exists' });
-      continue;
-    }
-
-    const component = job.componentId ? componentMap.get(job.componentId) : null;
+    if (job.isActive === false) continue;
 
     if (job.maintenanceBasis === 'Calendar') {
       if (!job.nextDueDate) continue;
+
       const dueDate = parseFlexibleDate(job.nextDueDate);
       if (!dueDate) continue;
 
-      const leadDays = (job.jobPriority === 'Critical' || job.classRelated === 'Yes')
-        ? (vesselSettings?.calendarLeadDaysCritical ?? WORK_ORDER_THRESHOLDS.CALENDAR_LEAD_TIME_DAYS_CRITICAL)
-        : (vesselSettings?.calendarLeadDaysNonCritical ?? WORK_ORDER_THRESHOLDS.CALENDAR_LEAD_TIME_DAYS_NON_CRITICAL);
-
+      const leadDays = getCalendarLeadDays(job);
       const generateDate = new Date(dueDate);
       generateDate.setDate(generateDate.getDate() - leadDays);
 
-      if (today >= generateDate) {
-        const hasCycleDuplicate = existingWOs.some(wo =>
+      if (today < generateDate) continue;
+
+      const dueDateStr = dueDate.toISOString().split('T')[0];
+      const generateDateStr = generateDate.toISOString().split('T')[0];
+
+      let linkedComponents = jobLinksMap.get(job.id) || [];
+      if (linkedComponents.length === 0 && job.componentId) {
+        const primaryComp = componentMap.get(job.componentId);
+        if (primaryComp) {
+          linkedComponents = [{
+            componentId: primaryComp.id,
+            componentCode: primaryComp.componentCode || '',
+            componentName: primaryComp.name || '',
+          }];
+        }
+      }
+
+      if (linkedComponents.length === 0) {
+        skipped.push({ jobId: job.id, reason: 'No linked components' });
+        continue;
+      }
+
+      for (const linkedComp of linkedComponents) {
+        if (!linkedComp.componentCode) continue;
+
+        const existingActiveWO = existingWOs.find(wo =>
           wo.jobId === job.id &&
-          wo.cycleDueDateSnapshot === job.nextDueDate &&
-          !terminalStatuses.includes(wo.status || '')
+          wo.componentCode === linkedComp.componentCode &&
+          isBlockingStatus(wo.status)
         );
-        if (hasCycleDuplicate) {
-          skipped.push({ jobId: job.id, reason: 'Cycle duplicate exists' });
+        if (existingActiveWO) {
+          skipped.push({ jobId: job.id, componentCode: linkedComp.componentCode, reason: 'Active WO already exists' });
           continue;
         }
 
-        const woData = buildWorkOrderFromJob(job, vesselId, component);
-        woData.driverType = 'CALENDAR';
-        woData.cycleDueDateSnapshot = job.nextDueDate;
-        woData.generateDateSnapshot = generateDate.toISOString().split('T')[0];
-        woData.dueDateSnapshot = job.nextDueDate;
-        woData.lastDoneDateSnapshot = job.lastDoneDate;
-        woData.dueDate = job.nextDueDate;
+        const componentCycleKey = existingWOs.find(wo =>
+          wo.jobId === job.id &&
+          wo.componentCode === linkedComp.componentCode &&
+          wo.cycleDueDateSnapshot === dueDateStr &&
+          !isCompletedCancelled(wo.status)
+        );
+        if (componentCycleKey) {
+          skipped.push({ jobId: job.id, componentCode: linkedComp.componentCode, reason: 'Cycle duplicate exists' });
+          continue;
+        }
 
-        const result = await repo.createWorkOrder(woData);
-        generated.push(result);
+        const workOrderNo = await generatePlannedWorkOrderNumber(job.jobNo, linkedComp.componentCode, vesselId);
+
+        const woData: any = {
+          id: uuidv4(),
+          vesselId,
+          component: linkedComp.componentName,
+          componentCode: linkedComp.componentCode,
+          jobId: job.id,
+          workOrderNo,
+          workOrderType: 'Planned',
+          templateCode: workOrderNo,
+          jobTitle: job.jobTitle,
+          assignedTo: job.assignedTo || 'Unassigned',
+          dueDate: job.nextDueDate,
+          status: 'Due',
+          taskType: job.maintenanceType,
+          maintenanceBasis: job.maintenanceBasis,
+          maintenanceType: job.maintenanceType,
+          frequencyValue: job.frequencyValue?.toString(),
+          frequencyUnit: job.frequencyUnit,
+          jobPriority: job.jobPriority,
+          classRelated: job.classRelated,
+          department: job.department,
+          briefWorkDescription: job.briefWorkDescription,
+          criticality: job.criticality,
+          approver: job.approver,
+          dataScope: 'vessel',
+          requiredSpareParts: job.requiredSpareParts || [],
+          requiredTools: job.requiredTools || [],
+          safetyRequirements: job.safetyRequirements || { ppeRequirements: [], permitRequirements: [], otherRequirements: [] },
+          driverType: 'CALENDAR',
+          cycleDueDateSnapshot: dueDateStr,
+          generateDateSnapshot: generateDateStr,
+          dueDateSnapshot: dueDateStr,
+          lastDoneDateSnapshot: job.lastDoneDate || null,
+        };
+
+        try {
+          const result = await repo.createWorkOrder(woData);
+          generated.push(result);
+          existingWOs.push(result);
+        } catch (err: any) {
+          skipped.push({ jobId: job.id, componentCode: linkedComp.componentCode, reason: err.message });
+        }
       }
     } else if (job.maintenanceBasis === 'Running Hours') {
-      if (!job.nextDueRH || !component) continue;
-      const dueRH = parseFloat(job.nextDueRH);
-      const currentRH = parseFloat(component.currentCumulativeRH || '0');
-      if (isNaN(dueRH) || isNaN(currentRH)) continue;
+      if (!job.nextDueRH) continue;
 
-      const leadHours = (job.jobPriority === 'Critical' || job.classRelated === 'Yes')
-        ? (vesselSettings?.rhLeadHoursCritical ?? WORK_ORDER_THRESHOLDS.RH_LEAD_TIME_HOURS_CRITICAL)
-        : (vesselSettings?.rhLeadHoursNonCritical ?? WORK_ORDER_THRESHOLDS.RH_LEAD_TIME_HOURS_NON_CRITICAL);
+      let linkedComponents = jobLinksMap.get(job.id) || [];
+      if (linkedComponents.length === 0 && job.componentId) {
+        const primaryComp = componentMap.get(job.componentId);
+        if (primaryComp) {
+          linkedComponents = [{
+            componentId: primaryComp.id,
+            componentCode: primaryComp.componentCode || '',
+            componentName: primaryComp.name || '',
+          }];
+        }
+      }
 
-      const generateRH = dueRH - leadHours;
+      if (linkedComponents.length === 0) {
+        skipped.push({ jobId: job.id, reason: 'No linked components for RH job' });
+        continue;
+      }
 
-      if (currentRH >= generateRH) {
-        const hasCycleDuplicate = existingWOs.some(wo =>
+      for (const linkedComp of linkedComponents) {
+        const component = componentMap.get(linkedComp.componentId);
+        if (!component) continue;
+
+        const dueRH = parseFloat(job.nextDueRH);
+        const currentRH = parseFloat(component.currentCumulativeRH || '0');
+        if (isNaN(dueRH) || isNaN(currentRH)) continue;
+
+        const leadHours = getRhLeadHours(job);
+        const generateRH = dueRH - leadHours;
+
+        if (currentRH < generateRH) continue;
+
+        const existingActiveWO = existingWOs.find(wo =>
           wo.jobId === job.id &&
-          wo.cycleDueRhSnapshot !== null &&
-          parseFloat(wo.cycleDueRhSnapshot) === dueRH &&
-          !terminalStatuses.includes(wo.status || '')
+          wo.componentCode === linkedComp.componentCode &&
+          isBlockingStatus(wo.status)
         );
-        if (hasCycleDuplicate) {
-          skipped.push({ jobId: job.id, reason: 'Cycle duplicate exists' });
+        if (existingActiveWO) {
+          skipped.push({ jobId: job.id, componentCode: linkedComp.componentCode, reason: 'Active WO already exists' });
           continue;
         }
 
-        const woData = buildWorkOrderFromJob(job, vesselId, component);
-        woData.driverType = 'RH';
-        woData.cycleDueRhSnapshot = dueRH.toString();
-        woData.generateRhSnapshot = generateRH.toString();
-        woData.dueRhSnapshot = dueRH.toString();
-        woData.effectiveRhAtGeneration = currentRH.toString();
-        woData.rhLastDoneSnapshot = job.lastDoneRH;
+        const hasCycleDuplicate = existingWOs.find(wo =>
+          wo.jobId === job.id &&
+          wo.componentCode === linkedComp.componentCode &&
+          wo.cycleDueRhSnapshot !== null &&
+          parseFloat(wo.cycleDueRhSnapshot || '0') === dueRH &&
+          !isCompletedCancelled(wo.status)
+        );
+        if (hasCycleDuplicate) {
+          skipped.push({ jobId: job.id, componentCode: linkedComp.componentCode, reason: 'Cycle duplicate exists' });
+          continue;
+        }
 
-        const result = await repo.createWorkOrder(woData);
-        generated.push(result);
+        const workOrderNo = await generatePlannedWorkOrderNumber(job.jobNo, linkedComp.componentCode, vesselId);
+
+        const woData: any = {
+          id: uuidv4(),
+          vesselId,
+          component: linkedComp.componentName,
+          componentCode: linkedComp.componentCode,
+          jobId: job.id,
+          workOrderNo,
+          workOrderType: 'Planned',
+          templateCode: workOrderNo,
+          jobTitle: job.jobTitle,
+          assignedTo: job.assignedTo || 'Unassigned',
+          status: 'Due',
+          taskType: job.maintenanceType,
+          maintenanceBasis: job.maintenanceBasis,
+          maintenanceType: job.maintenanceType,
+          frequencyValue: job.frequencyValue?.toString(),
+          frequencyUnit: job.frequencyUnit,
+          jobPriority: job.jobPriority,
+          classRelated: job.classRelated,
+          department: job.department,
+          briefWorkDescription: job.briefWorkDescription,
+          criticality: job.criticality,
+          approver: job.approver,
+          dataScope: 'vessel',
+          requiredSpareParts: job.requiredSpareParts || [],
+          requiredTools: job.requiredTools || [],
+          safetyRequirements: job.safetyRequirements || { ppeRequirements: [], permitRequirements: [], otherRequirements: [] },
+          driverType: 'RH',
+          cycleDueRhSnapshot: dueRH.toString(),
+          generateRhSnapshot: generateRH.toString(),
+          dueRhSnapshot: dueRH.toString(),
+          effectiveRhAtGeneration: currentRH.toString(),
+          rhLastDoneSnapshot: job.lastDoneRH,
+        };
+
+        try {
+          const result = await repo.createWorkOrder(woData);
+          generated.push(result);
+          existingWOs.push(result);
+        } catch (err: any) {
+          skipped.push({ jobId: job.id, componentCode: linkedComp.componentCode, reason: err.message });
+        }
       }
     }
   }
@@ -118,34 +269,10 @@ export async function autoGenerate(body: any) {
   return { generated, skipped, totalGenerated: generated.length, totalSkipped: skipped.length };
 }
 
-function buildWorkOrderFromJob(job: any, vesselId: string, component: any) {
-  return {
-    id: uuidv4(),
-    vesselId,
-    component: job.componentId || job.componentName || '',
-    componentCode: component?.componentCode || job.componentCode || '',
-    jobId: job.id,
-    workOrderNo: generateWorkOrderNumber(),
-    workOrderType: 'Planned',
-    templateCode: job.jobNo,
-    jobTitle: job.jobTitle,
-    assignedTo: job.assignedTo || 'Unassigned',
-    status: 'Active',
-    maintenanceBasis: job.maintenanceBasis,
-    maintenanceType: job.maintenanceType,
-    frequencyValue: job.frequencyValue,
-    frequencyUnit: job.frequencyUnit,
-    jobPriority: job.jobPriority,
-    classRelated: job.classRelated,
-    department: job.department,
-    approver: job.approver,
-    briefWorkDescription: job.briefWorkDescription || job.jobDescription,
-    criticality: job.criticality,
-    dataScope: 'vessel',
-    requiredSpareParts: job.requiredSpareParts || [],
-    requiredTools: job.requiredTools || [],
-    safetyRequirements: job.safetyRequirements || { ppeRequirements: [], permitRequirements: [], otherRequirements: [] },
-  };
+function isCompletedCancelled(status: string | null | undefined): boolean {
+  if (!status) return false;
+  const s = status.toLowerCase().trim();
+  return s === 'cancelled' || s === 'canceled';
 }
 
 function parseFlexibleDate(dateStr: string): Date | null {
@@ -177,7 +304,6 @@ function parseFlexibleDate(dateStr: string): Date | null {
 
 export async function recalculateStatuses(body: any) {
   const { vesselId } = body;
-  const terminalStatuses = ['Completed', 'Approved'];
 
   const [workOrdersList, jobsList, componentsList] = await Promise.all([
     repo.getWorkOrders(vesselId),
@@ -205,7 +331,7 @@ export async function recalculateStatuses(body: any) {
 
   let updated = 0;
   for (const wo of workOrdersList) {
-    if (terminalStatuses.includes(wo.status || '')) continue;
+    if (wo.status === 'Completed' || wo.status === 'Approved') continue;
     if (wo.status === 'Pending Approval') continue;
     if (wo.status === 'Postponed') continue;
 
@@ -221,9 +347,12 @@ export async function recalculateStatuses(body: any) {
       ? (parseRH(component?.currentCumulativeRH))
       : undefined;
 
-    const isJobCritical = job?.jobPriority === 'Critical' || job?.classRelated === 'true' || (job?.classRelated as any) === true;
+    const jobCritical = job ? isJobCritical(job) : false;
+    const classRelatedYes = job?.classRelated === 'Yes' || job?.classRelated === 'true' || (job?.classRelated as any) === true;
+    const effectiveCritical = jobCritical || classRelatedYes;
+
     const rhLeadTimeHours = wo.maintenanceBasis === 'Running Hours'
-      ? (isJobCritical
+      ? (effectiveCritical
           ? (vesselSettings?.rhLeadHoursCritical ?? WORK_ORDER_THRESHOLDS.RH_LEAD_TIME_HOURS_CRITICAL)
           : (vesselSettings?.rhLeadHoursNonCritical ?? WORK_ORDER_THRESHOLDS.RH_LEAD_TIME_HOURS_NON_CRITICAL))
       : undefined;

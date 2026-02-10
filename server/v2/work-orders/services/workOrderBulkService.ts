@@ -75,10 +75,35 @@ export async function bulkApprove(body: any) {
         if (wo.runningHours) {
           const rhValue = parseFloat(wo.runningHours);
           if (!isNaN(rhValue)) {
-            await repo.updateComponent(component.id, {
-              currentCumulativeRH: rhValue.toString(),
-              lastUpdated: new Date().toISOString(),
-            });
+            const counterType = (component.rhCounterType || '').toUpperCase();
+
+            if (counterType === 'MASTER' && wo.vesselId) {
+              await repo.updateComponent(component.id, {
+                currentCumulativeRH: rhValue.toString(),
+                rhCurrentMaster: rhValue.toString(),
+                lastUpdated: new Date().toISOString(),
+              });
+
+              const allComponents = await repo.getComponents(wo.vesselId);
+              const inheritedChildren = allComponents.filter((c: any) => {
+                const ct = (c.rhCounterType || '').toUpperCase();
+                return ct === 'INHERITED' && (
+                  c.rhMasterComponentId === component!.id ||
+                  c.rhCounterSource === component!.componentCode
+                );
+              });
+              for (const child of inheritedChildren) {
+                await repo.updateComponent(child.id, {
+                  currentCumulativeRH: rhValue.toString(),
+                  lastUpdated: new Date().toISOString(),
+                });
+              }
+            } else {
+              await repo.updateComponent(component.id, {
+                currentCumulativeRH: rhValue.toString(),
+                lastUpdated: new Date().toISOString(),
+              });
+            }
           }
         }
       }
