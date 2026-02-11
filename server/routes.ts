@@ -7967,16 +7967,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Create a new vessel
   app.post("/technical/api/vessels", async (req, res) => {
     try {
-      const { id, name, code, fleetId, imoNumber, vesselType, flag, isActive } = req.body;
+      const { id, vuuid: bodyVuuid, name, code, fleetId, imoNumber, vesselType, flag, isActive } = req.body;
+      const resolvedVuuid = bodyVuuid || id;
       
-      if (!id || !name) {
-        return res.status(400).json({ error: "Vessel ID and name are required" });
+      if (!resolvedVuuid || !name) {
+        return res.status(400).json({ error: "Vessel vuuid (or id) and name are required" });
       }
       
       const vessel = await storage.createVessel({
-        id,
+        vuuid: resolvedVuuid,
         name,
-        code: code || id,
+        code: code || resolvedVuuid,
         fleetId: fleetId || null,
         imoNumber: imoNumber || null,
         vesselType: vesselType || null,
@@ -8830,11 +8831,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
           const imoNumber = getFieldValue(v, ['imo_number', 'imoNumber', 'imo_no', 'imo']);
           const vesselType = getFieldValue(v, ['vessel_type_name', 'vesselTypeName', 'vessel_type', 'vesselType', 'type']);
           
-          // Upsert vessel: match on vuuid (external UUID), keep id=vuuid for backward compatibility
-          // Once full refactor is done (id→integer), id will auto-generate and vuuid will be the only UUID column
+          // Upsert vessel: id is auto-generated serial, vuuid is the external UUID identity column
           await pool.query(`
-            INSERT INTO vessels (id, vuuid, name, code, imo_number, vessel_type, is_active, created_at, updated_at)
-            VALUES ($1, $2, $3, $4, $5, $6, true, NOW(), NOW())
+            INSERT INTO vessels (vuuid, name, code, imo_number, vessel_type, is_active, created_at, updated_at)
+            VALUES ($1, $2, $3, $4, $5, true, NOW(), NOW())
             ON CONFLICT (vuuid) DO UPDATE SET
               name = EXCLUDED.name,
               code = EXCLUDED.code,
@@ -8842,7 +8842,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
               vessel_type = EXCLUDED.vessel_type,
               is_active = true,
               updated_at = NOW()
-          `, [externalUuid, externalUuid, name, externalUuid, imoNumber, vesselType]);
+          `, [externalUuid, name, externalUuid, imoNumber, vesselType]);
           stats.vessels.updated++;
         } catch (e: any) {
           stats.vessels.errors.push(`Vessel ${v.vuid || v.vesselId}: ${e.message}`);

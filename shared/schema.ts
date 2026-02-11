@@ -1,5 +1,5 @@
 
-import { pgTable, text, integer, boolean, timestamp, decimal, index, json, jsonb, numeric, primaryKey, unique, pgEnum } from "drizzle-orm/pg-core";
+import { pgTable, text, integer, serial, boolean, timestamp, decimal, index, json, jsonb, numeric, primaryKey, unique, pgEnum } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
@@ -55,8 +55,8 @@ export type Fleet = typeof fleets.$inferSelect;
 
 // Vessels Table - Core vessel registry
 export const vessels = pgTable("vessels", {
-  id: text("id").primaryKey(),
-  vuuid: text("vuuid").unique(),
+  id: serial("id").primaryKey(),
+  vuuid: text("vuuid").notNull().unique(),
   name: text("name").notNull(),
   code: text("code").notNull(),
   fleetId: text("fleet_id"),
@@ -70,6 +70,7 @@ export const vessels = pgTable("vessels", {
 });
 
 export const insertVesselSchema = createInsertSchema(vessels).omit({
+  id: true,
   createdAt: true,
   updatedAt: true,
 });

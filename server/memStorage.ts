@@ -52,7 +52,7 @@ class MemStorage {
   
   private initializeIdCounters(): void {
     // Scan existing collections to find max IDs
-    const collections = ['users', 'runningHoursAudits', 'audits', 'spares', 'defects', 'jobs', 'workOrders', 'storesItems'];
+    const collections = ['users', 'runningHoursAudits', 'audits', 'spares', 'defects', 'jobs', 'workOrders', 'storesItems', 'vessels'];
     for (const collection of collections) {
       const items = this.data[collection];
       if (items) {
@@ -554,7 +554,7 @@ class MemStorage {
   }
   async createVessel(vessel: any): Promise<any> {
     if (!this.data.vessels) this.data.vessels = {};
-    const newVessel = { ...vessel, id: vessel.id || `V${String(this.getNextId('vessels')).padStart(3, '0')}` };
+    const newVessel = { ...vessel, id: this.getNextId('vessels') };
     this.data.vessels[newVessel.id] = newVessel;
     this.saveData();
     return newVessel;
