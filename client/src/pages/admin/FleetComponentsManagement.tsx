@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { type FleetComponents } from "@shared/schema";
 import { Card, CardContent } from "@/components/ui/card";
@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
-import { Plus, Search, Pencil, Trash2, ChevronRight, ChevronDown, Upload, Download, Settings, Package, ArrowLeft } from "lucide-react";
+import { Plus, Search, Pencil, Trash2, ChevronRight, ChevronDown, Upload, Download, Settings, Package, ArrowLeft, Info, MapPin, Star, FileText, CheckCircle, XCircle } from "lucide-react";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import FleetComponentForm from "./FleetComponentForm";
@@ -21,13 +21,12 @@ export default function FleetComponentsManagement({ onBack }: { onBack?: () => v
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [componentToDelete, setComponentToDelete] = useState<FleetComponents | null>(null);
   const [expandedNodes, setExpandedNodes] = useState<Set<string>>(new Set());
+  const [detailComponent, setDetailComponent] = useState<FleetComponents | null>(null);
 
-  // Fetch fleet components from fleet_components table
   const { data: components, isLoading, error } = useQuery<FleetComponents[]>({
     queryKey: ['/technical/api/fleet-admin/fleet-components'],
   });
 
-  // Delete mutation
   const deleteMutation = useMutation({
     mutationFn: async (id: number) => {
       return apiRequest('DELETE', `/technical/api/fleet-admin/fleet-components/${id}`);
@@ -50,20 +49,16 @@ export default function FleetComponentsManagement({ onBack }: { onBack?: () => v
     },
   });
 
-  // Define tree node type with children
   type TreeNode = FleetComponents & { children: TreeNode[] };
 
-  // Build tree structure from flat list
   const buildTree = (components: FleetComponents[]): TreeNode[] => {
     const tree: TreeNode[] = [];
     const lookup = new Map<string, TreeNode>();
 
-    // First pass: create lookup map by fleetEquipmentCode
     components.forEach((comp) => {
       lookup.set(comp.fleetEquipmentCode, { ...comp, children: [] });
     });
 
-    // Second pass: build tree
     components.forEach((comp) => {
       const node = lookup.get(comp.fleetEquipmentCode);
       if (!node) return;
@@ -83,7 +78,6 @@ export default function FleetComponentsManagement({ onBack }: { onBack?: () => v
     return tree;
   };
 
-  // Filter components based on search query
   const filteredComponents = components?.filter((comp) => {
     if (!searchQuery) return true;
     const query = searchQuery.toLowerCase();
@@ -129,6 +123,19 @@ export default function FleetComponentsManagement({ onBack }: { onBack?: () => v
     }
   };
 
+  const handleRowDoubleClick = (component: FleetComponents) => {
+    setDetailComponent(component);
+  };
+
+  useEffect(() => {
+    if (detailComponent && components) {
+      const updated = components.find(c => c.id === detailComponent.id);
+      if (updated) {
+        setDetailComponent(updated);
+      }
+    }
+  }, [components]);
+
   const handleExport = async () => {
     try {
       const response = await fetch('/technical/api/fleet-admin/fleet-components/export');
@@ -157,6 +164,133 @@ export default function FleetComponentsManagement({ onBack }: { onBack?: () => v
   const totalComponents = components?.length || 0;
   const rootComponents = treeData.length;
 
+  const renderDetailField = (label: string, value: string | null | undefined, testId?: string) => (
+    <div className="space-y-1" data-testid={testId}>
+      <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider">{label}</p>
+      <p className="text-sm text-gray-800 font-medium">{value || "-"}</p>
+    </div>
+  );
+
+  if (detailComponent) {
+    const parentName = components?.find(c => c.fleetEquipmentCode === detailComponent.parentFleetEquipmentCode)?.fleetEquipmentName;
+
+    return (
+      <div className="p-6">
+        <Card className="overflow-hidden">
+          <div className="bg-gradient-to-r from-cyan-600 to-blue-600 px-6 py-3">
+            <div className="flex items-center justify-between gap-4">
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-white/20 rounded-lg">
+                  <Info className="h-5 w-5 text-white" />
+                </div>
+                <div>
+                  <h1 className="text-xl font-bold text-white" data-testid="title-component-details">Component Details</h1>
+                  <p className="text-cyan-100 text-sm mt-0.5">
+                    {detailComponent.fleetEquipmentCode} - {detailComponent.fleetEquipmentName}
+                  </p>
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                <Button
+                  className="bg-white/20 text-white border-white/30"
+                  variant="outline"
+                  onClick={() => {
+                    handleEdit(detailComponent);
+                  }}
+                  data-testid="btn-edit-component-detail"
+                >
+                  <Pencil className="mr-2 h-4 w-4" />
+                  Edit
+                </Button>
+                <button
+                  onClick={() => setDetailComponent(null)}
+                  className="flex items-center gap-1 text-cyan-100 hover:text-white text-sm transition-colors"
+                  data-testid="button-back-to-list"
+                >
+                  <ArrowLeft className="h-4 w-4" />
+                  Back to List
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <div className="p-6 space-y-6">
+            <div className="bg-gray-50 border border-gray-200 rounded-lg p-5">
+              <div className="flex items-center gap-2 mb-4">
+                <Settings className="h-4 w-4 text-cyan-600" />
+                <h3 className="text-sm font-semibold text-gray-700 uppercase tracking-wider">Equipment Information</h3>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-x-8 gap-y-4">
+                {renderDetailField("Fleet Equipment Code", detailComponent.fleetEquipmentCode, "detail-fleet-code")}
+                {renderDetailField("Equipment Name", detailComponent.fleetEquipmentName, "detail-equipment-name")}
+                {renderDetailField("Parent Fleet Equipment Code", detailComponent.parentFleetEquipmentCode, "detail-parent-code")}
+                {renderDetailField("Parent Equipment Name", parentName, "detail-parent-name")}
+                {renderDetailField("Component Category", detailComponent.componentCategory, "detail-category")}
+                {renderDetailField("Equipment System / Department", detailComponent.eqptSystemDept, "detail-eqpt-system-dept")}
+              </div>
+            </div>
+
+            <div className="bg-gray-50 border border-gray-200 rounded-lg p-5">
+              <div className="flex items-center gap-2 mb-4">
+                <Package className="h-4 w-4 text-cyan-600" />
+                <h3 className="text-sm font-semibold text-gray-700 uppercase tracking-wider">Maker & Model Details</h3>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-x-8 gap-y-4">
+                {renderDetailField("Maker Name", detailComponent.makerName, "detail-maker-name")}
+                {renderDetailField("Maker Code", detailComponent.makerCode, "detail-maker-code")}
+                {renderDetailField("Model", detailComponent.model, "detail-model")}
+                {renderDetailField("Model Code", detailComponent.modelCode, "detail-model-code")}
+              </div>
+            </div>
+
+            <div className="bg-gray-50 border border-gray-200 rounded-lg p-5">
+              <div className="flex items-center gap-2 mb-4">
+                <MapPin className="h-4 w-4 text-cyan-600" />
+                <h3 className="text-sm font-semibold text-gray-700 uppercase tracking-wider">Additional Details</h3>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-x-8 gap-y-4">
+                {renderDetailField("Location", detailComponent.location, "detail-location")}
+                {renderDetailField("Rating", detailComponent.rating, "detail-rating")}
+                <div className="space-y-1" data-testid="detail-is-active">
+                  <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Is Active</p>
+                  <div className="flex items-center gap-1.5">
+                    {detailComponent.isActive ? (
+                      <>
+                        <CheckCircle className="h-4 w-4 text-green-500" />
+                        <span className="text-sm text-green-700 font-medium">Yes</span>
+                      </>
+                    ) : (
+                      <>
+                        <XCircle className="h-4 w-4 text-red-500" />
+                        <span className="text-sm text-red-700 font-medium">No</span>
+                      </>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {detailComponent.notes && (
+              <div className="bg-gray-50 border border-gray-200 rounded-lg p-5">
+                <div className="flex items-center gap-2 mb-4">
+                  <FileText className="h-4 w-4 text-cyan-600" />
+                  <h3 className="text-sm font-semibold text-gray-700 uppercase tracking-wider">Notes</h3>
+                </div>
+                <p className="text-sm text-gray-700 whitespace-pre-wrap">{detailComponent.notes}</p>
+              </div>
+            )}
+          </div>
+        </Card>
+
+        <FleetComponentForm
+          open={isFormOpen}
+          onOpenChange={setIsFormOpen}
+          component={selectedComponent}
+        />
+      </div>
+    );
+  }
+
   const renderTreeNode = (node: TreeNode, level: number = 0, isFirstRoot: boolean = false): JSX.Element => {
     const nodeKey = String(node.id);
     const isExpanded = expandedNodes.has(nodeKey);
@@ -166,15 +300,16 @@ export default function FleetComponentsManagement({ onBack }: { onBack?: () => v
       <>
         <TableRow
           key={nodeKey}
-          className="hover:bg-blue-50/40 transition-colors border-b border-gray-100"
+          className="hover:bg-blue-50/40 transition-colors border-b border-gray-100 cursor-pointer"
           data-testid={`row-component-${nodeKey}`}
+          onDoubleClick={() => handleRowDoubleClick(node)}
         >
           <TableCell style={{ paddingLeft: `${level * 28 + 16}px` }} className="font-mono text-sm py-3" data-testid={isFirstRoot ? "I4.QL.3.20" : undefined}>
             {isFirstRoot && <Marker id="I4.QL.3.20" />}
             <div className="flex items-center gap-2">
               {hasChildren ? (
                 <button
-                  onClick={() => toggleNode(nodeKey)}
+                  onClick={(e) => { e.stopPropagation(); toggleNode(nodeKey); }}
                   className="p-1 rounded-md hover:bg-cyan-100 text-cyan-700 transition-colors"
                   data-testid={`button-toggle-${nodeKey}`}
                 >
@@ -211,7 +346,8 @@ export default function FleetComponentsManagement({ onBack }: { onBack?: () => v
               <Button
                 variant="ghost"
                 size="icon"
-                onClick={() => handleAddNew(node.fleetEquipmentCode)}
+                onClick={(e) => { e.stopPropagation(); handleAddNew(node.fleetEquipmentCode); }}
+                onDoubleClick={(e) => e.stopPropagation()}
                 className="text-cyan-600"
                 data-testid={isFirstRoot ? "I4.QL.3.25" : `button-add-child-${nodeKey}`}
                 title="Add Child"
@@ -222,7 +358,8 @@ export default function FleetComponentsManagement({ onBack }: { onBack?: () => v
               <Button
                 variant="ghost"
                 size="icon"
-                onClick={() => handleEdit(node)}
+                onClick={(e) => { e.stopPropagation(); handleEdit(node); }}
+                onDoubleClick={(e) => e.stopPropagation()}
                 className="text-blue-600"
                 data-testid={isFirstRoot ? "I4.QL.3.26" : `button-edit-${nodeKey}`}
                 title="Edit"
@@ -233,7 +370,8 @@ export default function FleetComponentsManagement({ onBack }: { onBack?: () => v
               <Button
                 variant="ghost"
                 size="icon"
-                onClick={() => handleDeleteClick(node)}
+                onClick={(e) => { e.stopPropagation(); handleDeleteClick(node); }}
+                onDoubleClick={(e) => e.stopPropagation()}
                 className="text-red-500"
                 data-testid={isFirstRoot ? "I4.QL.3.27" : `button-delete-${nodeKey}`}
                 title="Delete"
