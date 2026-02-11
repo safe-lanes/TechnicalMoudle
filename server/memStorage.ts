@@ -550,7 +550,7 @@ class MemStorage {
   async getVessels(): Promise<any[]> { return toArray(this.data.vessels); }
   async getVessel(id: string): Promise<any> { 
     if (this.data.vessels && this.data.vessels[id]) return this.data.vessels[id];
-    return toArray(this.data.vessels).find((v: any) => v.id === id); 
+    return toArray(this.data.vessels).find((v: any) => v.vuuid === id); 
   }
   async createVessel(vessel: any): Promise<any> {
     if (!this.data.vessels) this.data.vessels = {};
