@@ -140,13 +140,18 @@ export default function FleetJobsManagement({ onBack }: { onBack?: () => void })
 
   const updateJobMutation = useMutation({
     mutationFn: async ({ id, data }: { id: number; data: Partial<FleetJobs> }) => {
-      return apiRequest('PATCH', `/technical/api/fleet/jobs/${id}`, data);
+      const res = await apiRequest('PATCH', `/technical/api/fleet/jobs/${id}`, data);
+      return res.json();
     },
-    onSuccess: () => {
+    onSuccess: (responseData: any) => {
       queryClient.invalidateQueries({ queryKey: ['/technical/api/fleet/jobs'], exact: false });
+      const count = responseData?.affectedCount || 1;
+      const jobCode = jobFormData.jobCode || '';
       toast({
         title: "Success",
-        description: "Job updated successfully",
+        description: count > 1
+          ? `Updated ${count} records with Job Code ${jobCode}`
+          : "Job updated successfully",
       });
       setEditingJob(null);
       setJobFormData({});

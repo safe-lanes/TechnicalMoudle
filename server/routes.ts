@@ -10341,8 +10341,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const partialFleetJobSchema = insertFleetJobsSchema.partial();
       const validatedData = partialFleetJobSchema.parse(req.body);
-      const job = await storage.updateFleetJob(Number(req.params.id), validatedData);
-      res.json(job);
+      const { updatedJob, affectedCount } = await storage.updateFleetJob(Number(req.params.id), validatedData);
+      res.json({ ...updatedJob, affectedCount });
     } catch (error: any) {
       if (error.name === 'ZodError') {
         return res.status(400).json({ error: "Invalid job data", details: error.errors });

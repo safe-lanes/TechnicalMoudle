@@ -652,16 +652,40 @@ export class PostgresStorage {
     return result[0];
   }
 
-  async updateFleetJob(id: number, data: Partial<any>): Promise<any> {
+  async updateFleetJob(id: number, data: Partial<any>): Promise<{ updatedJob: any; affectedCount: number }> {
     const db = await getDb();
-    const result = await db.update(fleetJobs)
-      .set({ ...data, updatedAt: new Date() })
-      .where(eq(fleetJobs.id, id))
-      .returning();
-    if (!result[0]) {
-      throw new Error(`Fleet job with id ${id} not found`);
-    }
-    return result[0];
+
+    const GLOBAL_FIELDS = [
+      'woTitle', 'maintenanceBasis', 'intervalValue', 'unit',
+      'taskType', 'assignedTo', 'approver', 'jobPriority',
+      'classRelated', 'briefWorkDescription', 'department',
+      'criticality', 'isActive',
+    ];
+
+    return await db.transaction(async (tx) => {
+      const [existing] = await tx.select().from(fleetJobs).where(eq(fleetJobs.id, id));
+      if (!existing) {
+        throw new Error(`Fleet job with id ${id} not found`);
+      }
+
+      const jobCode = existing.jobCode;
+
+      const globalUpdate: Record<string, any> = { updatedAt: new Date() };
+      for (const field of GLOBAL_FIELDS) {
+        if (field in data) {
+          globalUpdate[field] = (data as any)[field];
+        }
+      }
+
+      const results = await tx.update(fleetJobs)
+        .set(globalUpdate)
+        .where(eq(fleetJobs.jobCode, jobCode))
+        .returning();
+
+      const updatedJob = results.find(r => r.id === id) || results[0];
+
+      return { updatedJob, affectedCount: results.length };
+    });
   }
 
   async deleteFleetJob(id: number): Promise<void> {

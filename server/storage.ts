@@ -699,7 +699,7 @@ export interface IStorage {
   getFleetJob(id: number): Promise<FleetJobs | undefined>;
   getFleetJobByCode(jobCode: string): Promise<FleetJobs | undefined>;
   createFleetJob(data: InsertFleetJobs): Promise<FleetJobs>;
-  updateFleetJob(id: number, data: Partial<FleetJobs>): Promise<FleetJobs>;
+  updateFleetJob(id: number, data: Partial<FleetJobs>): Promise<{ updatedJob: FleetJobs; affectedCount: number }>;
   deleteFleetJob(id: number): Promise<void>;
   
   // SFI Details - SFI Code lookup table
