@@ -125,7 +125,7 @@ const ReportsModule = () => {
       title: "Modify PMS (Change Requests)",
       description: "Change request status and approved changes audit trail",
       icon: Settings2,
-      reportCount: 2,
+      reportCount: 1,
       lastGenerated: "5 hours ago",
       color: "border-blue-500",
       iconBg: "bg-blue-500",

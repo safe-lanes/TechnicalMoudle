@@ -13,7 +13,6 @@ import {
   ArrowLeft,
   GitPullRequest,
   ClipboardList,
-  TrendingUp,
   Clock,
   CheckCircle,
   Eye,
@@ -164,18 +163,6 @@ const ChangeRequestReports: React.FC<ChangeRequestReportsProps> = ({ onBack, glo
       icon: GitPullRequest,
       priority: "high",
       estimatedTime: "2-3 min"
-    },
-    {
-      id: "change-analytics",
-      name: "Change Request Analytics",
-      description: "Statistical analysis of change requests including trends, cycle times, and approval rates",
-      purpose: "Process improvement & trend analysis (Management)",
-      frequency: "Monthly",
-      fields: ["Period", "Total Requests", "Approved", "Rejected", "Avg Cycle Time"],
-      outputs: ["PDF", "Dashboard"],
-      icon: TrendingUp,
-      priority: "medium",
-      estimatedTime: "3-5 min"
     }
   ];
 
@@ -387,7 +374,7 @@ const ChangeRequestReports: React.FC<ChangeRequestReportsProps> = ({ onBack, glo
           </Button>
           <div>
             <h1 className="text-2xl font-bold text-gray-900 dark:text-foreground" data-testid="text-page-title">Change Requests</h1>
-            <p className="text-sm text-gray-500 dark:text-muted-foreground">2 reports for change tracking</p>
+            <p className="text-sm text-gray-500 dark:text-muted-foreground">1 report for change tracking</p>
           </div>
         </div>
 
