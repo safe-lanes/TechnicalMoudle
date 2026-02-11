@@ -17665,6 +17665,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       for (const s of sparesData) {
         if (s.deleted || s.dataScope === 'fleet') continue;
+        const ihmStatus = normalizeSpareIhm(s.ihm, s.ihmPresence);
+        if (ihmStatus !== 'present') continue;
         combinedItems.push({
           id: s.id,
           itemCode: s.partCode || s.componentSpareCode || '',
@@ -17672,7 +17674,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           itemType: 'spare',
           storeCategory: '',
           componentOrCategory: s.componentName || '',
-          ihmStatus: normalizeSpareIhm(s.ihm, s.ihmPresence),
+          ihmStatus,
           evidenceType: s.evidenceType || 'None',
           hazardClassification: '',
           sdsReference: '',
@@ -17686,6 +17688,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       for (const st of storesData) {
         if (st.deleted || st.isActive === false) continue;
+        const ihmStatus = normalizeStoreIhm(st.ihmPresence, st.ihm);
+        if (ihmStatus !== 'present') continue;
         combinedItems.push({
           id: st.id + 1000000,
           itemCode: st.itemCode || '',
@@ -17693,7 +17697,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           itemType: 'store',
           storeCategory: st.itemType || 'stores',
           componentOrCategory: st.category || st.itemType || '',
-          ihmStatus: normalizeStoreIhm(st.ihmPresence, st.ihm),
+          ihmStatus,
           evidenceType: st.ihmEvidenceType || 'None',
           hazardClassification: st.hazardClassification || '',
           sdsReference: st.sdsReference || '',
@@ -17709,13 +17713,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const totalSpares = combinedItems.filter(i => i.itemType === 'spare').length;
       const totalStores = combinedItems.filter(i => i.itemType === 'store').length;
 
-      const summaryPresent = combinedItems.filter(i => i.ihmStatus === 'present').length;
-      const summaryNotPresent = combinedItems.filter(i => i.ihmStatus === 'not_present').length;
-      const summaryUnknown = combinedItems.filter(i => i.ihmStatus === 'unknown').length;
-
-      if (ihmStatusFilter && ihmStatusFilter !== 'all') {
-        combinedItems = combinedItems.filter(i => i.ihmStatus === ihmStatusFilter);
-      }
+      const summaryPresent = combinedItems.length;
+      const summaryNotPresent = 0;
+      const summaryUnknown = 0;
 
       if (itemTypeFilter && itemTypeFilter !== 'all') {
         if (itemTypeFilter === 'spare') {
@@ -17839,12 +17839,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       for (const s of sparesData) {
         if (s.deleted || s.dataScope === 'fleet') continue;
+        const status = normalizeSpareIhm(s.ihm, s.ihmPresence);
+        if (status !== 'Present') continue;
         allItems.push({
           itemCode: s.partCode || s.componentSpareCode || '-',
           itemName: s.partName || '-',
           itemType: 'Spare',
           componentOrCategory: s.componentName || '-',
-          ihmStatus: normalizeSpareIhm(s.ihm, s.ihmPresence),
+          ihmStatus: status,
           evidenceType: s.evidenceType || 'None',
           hazardClassification: '-',
           sdsReference: '-',
@@ -17857,12 +17859,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       for (const st of storesData) {
         if (st.deleted || st.isActive === false) continue;
+        const status = normalizeStoreIhm(st.ihmPresence, st.ihm);
+        if (status !== 'Present') continue;
         allItems.push({
           itemCode: st.itemCode || '-',
           itemName: st.itemName || '-',
           itemType: st.itemType ? st.itemType.charAt(0).toUpperCase() + st.itemType.slice(1) : 'Store',
           componentOrCategory: st.category || st.itemType || '-',
-          ihmStatus: normalizeStoreIhm(st.ihmPresence, st.ihm),
+          ihmStatus: status,
           evidenceType: st.ihmEvidenceType || 'None',
           hazardClassification: st.hazardClassification || '-',
           sdsReference: st.sdsReference || '-',

@@ -4,13 +4,6 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import {
   ArrowLeft,
   ArrowUpDown,
   Search,
@@ -19,8 +12,6 @@ import {
   Loader2,
   AlertTriangle,
   AlertCircle,
-  CheckCircle,
-  HelpCircle,
   Package,
   ChevronLeft,
   ChevronRight,
@@ -85,7 +76,6 @@ const IhmInventoryStatusReport: React.FC<IhmInventoryStatusReportProps> = ({ onB
 
   const [searchInput, setSearchInput] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
-  const [ihmStatusFilter, setIhmStatusFilter] = useState<string>("all");
   const [itemTypeFilter, setItemTypeFilter] = useState<string>("all");
   const [sortField, setSortField] = useState<SortField>("itemCode");
   const [sortDirection, setSortDirection] = useState<SortDirection>("asc");
@@ -104,12 +94,11 @@ const IhmInventoryStatusReport: React.FC<IhmInventoryStatusReportProps> = ({ onB
 
   useEffect(() => {
     setPage(1);
-  }, [ihmStatusFilter, itemTypeFilter]);
+  }, [itemTypeFilter]);
 
   const queryParams = useMemo(() => {
     const params = new URLSearchParams();
     params.set('vesselId', effectiveVesselId || '');
-    if (ihmStatusFilter !== 'all') params.set('ihmStatus', ihmStatusFilter);
     if (itemTypeFilter !== 'all') params.set('itemType', itemTypeFilter);
     if (debouncedSearch) params.set('search', debouncedSearch);
     params.set('sortBy', sortField);
@@ -117,7 +106,7 @@ const IhmInventoryStatusReport: React.FC<IhmInventoryStatusReportProps> = ({ onB
     params.set('page', String(page));
     params.set('pageSize', String(pageSize));
     return params.toString();
-  }, [effectiveVesselId, ihmStatusFilter, itemTypeFilter, debouncedSearch, sortField, sortDirection, page, pageSize]);
+  }, [effectiveVesselId, itemTypeFilter, debouncedSearch, sortField, sortDirection, page, pageSize]);
 
   const { data, isLoading, error, refetch } = useQuery<IhmInventoryStatusResponse>({
     queryKey: ['/technical/api/reports/ihm-inventory-status', queryParams],
@@ -135,10 +124,6 @@ const IhmInventoryStatusReport: React.FC<IhmInventoryStatusReportProps> = ({ onB
   const items = data?.items || [];
   const pagination = data?.pagination || { currentPage: 1, totalPages: 1, totalItems: 0, pageSize: 25 };
   const categoryCounts = data?.categoryCounts || { all: 0, spares: 0, stores: 0 };
-
-  const compliancePercent = summary.totalItems > 0
-    ? Math.round(((summary.ihmPresent + summary.noIhm) / summary.totalItems) * 100)
-    : 0;
 
   const handleSort = (field: SortField) => {
     if (sortField === field) {
@@ -197,7 +182,6 @@ const IhmInventoryStatusReport: React.FC<IhmInventoryStatusReportProps> = ({ onB
     try {
       const allParams = new URLSearchParams();
       allParams.set('vesselId', effectiveVesselId || '');
-      if (ihmStatusFilter !== 'all') allParams.set('ihmStatus', ihmStatusFilter);
       if (itemTypeFilter !== 'all') allParams.set('itemType', itemTypeFilter);
       if (debouncedSearch) allParams.set('search', debouncedSearch);
       allParams.set('sortBy', sortField);
@@ -251,7 +235,7 @@ const IhmInventoryStatusReport: React.FC<IhmInventoryStatusReportProps> = ({ onB
       ];
 
       pdfReportGenerator.generateReport(
-        { title: 'IHM Inventory Status Report', subtitle: 'Complete inventory of hazardous materials with presence status and evidence documentation', vessel: vesselName },
+        { title: 'IHM Inventory Status Report', subtitle: 'Confirmed hazardous materials present on board', vessel: vesselName },
         columns,
         exportData,
         summaryData
@@ -274,7 +258,6 @@ const IhmInventoryStatusReport: React.FC<IhmInventoryStatusReportProps> = ({ onB
         credentials: 'include',
         body: JSON.stringify({
           vesselId: effectiveVesselId,
-          ihmStatus: ihmStatusFilter !== 'all' ? ihmStatusFilter : undefined,
           itemType: itemTypeFilter !== 'all' ? itemTypeFilter : undefined,
           search: debouncedSearch || undefined,
         }),
@@ -331,7 +314,7 @@ const IhmInventoryStatusReport: React.FC<IhmInventoryStatusReportProps> = ({ onB
           </Button>
           <div>
             <h1 className="text-2xl font-bold text-gray-900" data-testid="text-report-title">IHM Inventory Status Report</h1>
-            <p className="text-sm text-gray-500">Complete inventory of hazardous materials with presence status and evidence documentation</p>
+            <p className="text-sm text-gray-500">Confirmed hazardous materials present on board</p>
           </div>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
@@ -372,57 +355,34 @@ const IhmInventoryStatusReport: React.FC<IhmInventoryStatusReportProps> = ({ onB
         </div>
       ) : (
         <>
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
-            <Card className="border-l-4 border-l-purple-500 bg-white" data-testid="card-total-items">
-              <CardHeader className="pb-2">
-                <CardDescription className="flex items-center gap-1">
-                  <Package className="w-4 h-4 text-purple-500" />
-                  Total Items
-                </CardDescription>
-                <CardTitle className="text-3xl">{summary.totalItems}</CardTitle>
-              </CardHeader>
-            </Card>
-            <Card className="border-l-4 border-l-red-500 bg-white" data-testid="card-ihm-present">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+            <Card className="border-l-4 border-l-red-500 bg-white" data-testid="card-total-items">
               <CardHeader className="pb-2">
                 <CardDescription className="flex items-center gap-1">
                   <AlertCircle className="w-4 h-4 text-red-500" />
-                  IHM Present
+                  Total IHM Items
                 </CardDescription>
-                <CardTitle className="text-3xl text-red-600">{summary.ihmPresent}</CardTitle>
+                <CardTitle className="text-3xl text-red-600">{summary.totalItems}</CardTitle>
               </CardHeader>
             </Card>
-            <Card className="border-l-4 border-l-green-500 bg-white" data-testid="card-no-ihm">
+            <Card className="border-l-4 border-l-blue-500 bg-white" data-testid="card-spares">
               <CardHeader className="pb-2">
                 <CardDescription className="flex items-center gap-1">
-                  <CheckCircle className="w-4 h-4 text-green-500" />
-                  No IHM
+                  <Package className="w-4 h-4 text-blue-500" />
+                  Spares with IHM
                 </CardDescription>
-                <CardTitle className="text-3xl text-green-600">{summary.noIhm}</CardTitle>
+                <CardTitle className="text-3xl text-blue-600">{categoryCounts.spares}</CardTitle>
               </CardHeader>
             </Card>
-            <Card className="border-l-4 border-l-yellow-500 bg-white" data-testid="card-unknown">
+            <Card className="border-l-4 border-l-purple-500 bg-white" data-testid="card-stores">
               <CardHeader className="pb-2">
                 <CardDescription className="flex items-center gap-1">
-                  <HelpCircle className="w-4 h-4 text-yellow-500" />
-                  Unknown
+                  <Package className="w-4 h-4 text-purple-500" />
+                  Stores with IHM
                 </CardDescription>
-                <CardTitle className="text-3xl text-yellow-600">{summary.unknown}</CardTitle>
+                <CardTitle className="text-3xl text-purple-600">{categoryCounts.stores}</CardTitle>
               </CardHeader>
             </Card>
-          </div>
-
-          <div className="mb-6 bg-gray-50 rounded-lg p-4" data-testid="compliance-bar">
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-sm font-medium text-gray-700">Documentation Compliance</span>
-              <span className="text-sm font-bold text-gray-900">{compliancePercent}%</span>
-            </div>
-            <div className="w-full bg-gray-200 rounded-full h-3">
-              <div
-                className={`h-3 rounded-full transition-all ${compliancePercent >= 80 ? 'bg-green-500' : compliancePercent >= 50 ? 'bg-amber-500' : 'bg-red-500'}`}
-                style={{ width: `${compliancePercent}%` }}
-                data-testid="compliance-progress"
-              />
-            </div>
           </div>
 
           <div className="flex items-center gap-4 mb-4 flex-wrap">
@@ -436,17 +396,6 @@ const IhmInventoryStatusReport: React.FC<IhmInventoryStatusReportProps> = ({ onB
                 data-testid="input-search"
               />
             </div>
-            <Select value={ihmStatusFilter} onValueChange={setIhmStatusFilter}>
-              <SelectTrigger className="w-[180px]" data-testid="select-ihm-status">
-                <SelectValue placeholder="All Status" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Status</SelectItem>
-                <SelectItem value="present">Present</SelectItem>
-                <SelectItem value="not_present">Not Present</SelectItem>
-                <SelectItem value="unknown">Unknown</SelectItem>
-              </SelectContent>
-            </Select>
           </div>
 
           <div className="flex items-center gap-1 mb-4" data-testid="item-type-tabs">
