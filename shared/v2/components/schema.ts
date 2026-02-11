@@ -78,7 +78,7 @@ export type Component = typeof v2Components.$inferSelect;
 
 export const v2ComponentDocuments = pgTable("component_documents", {
   id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
-  componentId: text("component_id").notNull(),
+  componentId: text("component_id").notNull().references(() => v2Components.cuuid, { onDelete: "restrict", onUpdate: "cascade" }),
   componentCode: text("component_code").notNull(),
   vesselCode: text("vessel_code").notNull(),
   fleetEquipmentCode: text("fleet_equipment_code"),
@@ -112,7 +112,7 @@ export type ComponentDocument = typeof v2ComponentDocuments.$inferSelect;
 
 export const v2ComponentClassRegulatory = pgTable("component_class_regulatory", {
   id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
-  componentId: text("component_id").notNull(),
+  componentId: text("component_id").notNull().references(() => v2Components.cuuid, { onDelete: "restrict", onUpdate: "cascade" }),
   componentCode: text("component_code").notNull(),
   vesselCode: text("vessel_code").notNull(),
   classificationSociety: text("classification_society").notNull(),
@@ -148,7 +148,7 @@ export type ComponentClassRegulatory = typeof v2ComponentClassRegulatory.$inferS
 
 export const v2ComponentMaintenanceHistory = pgTable("component_maintenance_history", {
   id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
-  componentId: text("component_id").notNull(),
+  componentId: text("component_id").notNull().references(() => v2Components.cuuid, { onDelete: "restrict", onUpdate: "cascade" }),
   componentCode: text("component_code").notNull(),
   vesselCode: text("vessel_code").notNull(),
   jobId: text("job_id"),
@@ -189,7 +189,7 @@ export type ComponentMaintenanceHistory = typeof v2ComponentMaintenanceHistory.$
 export const v2ComponentRequisitions = pgTable("component_requisitions", {
   id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
   requisitionNo: text("requisition_no").notNull().unique(),
-  componentId: text("component_id").notNull(),
+  componentId: text("component_id").notNull().references(() => v2Components.cuuid, { onDelete: "restrict", onUpdate: "cascade" }),
   componentCode: text("component_code").notNull(),
   vesselCode: text("vessel_code").notNull(),
   raisedOn: text("raised_on").notNull(),
@@ -283,7 +283,7 @@ export const v2JobComponentLinks = pgTable("job_component_links", {
   id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
   vesselId: text("vessel_id").notNull(),
   jobId: text("job_id").notNull(),
-  componentId: text("component_id").notNull(),
+  componentId: text("component_id").notNull().references(() => v2Components.cuuid, { onDelete: "restrict", onUpdate: "cascade" }),
   componentCode: text("component_code"),
   linkedBy: text("linked_by").notNull(),
   linkedAt: timestamp("linked_at").notNull().defaultNow(),

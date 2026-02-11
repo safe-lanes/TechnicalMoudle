@@ -3,11 +3,12 @@ import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
 export { v2Components, type Component } from "../components/schema";
+import { v2Components } from "../components/schema";
 
 export const v2RunningHoursAudit = pgTable("running_hours_audit", {
   id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
   vesselId: text("vessel_id").notNull(),
-  componentId: text("component_id").notNull(),
+  componentId: text("component_id").notNull().references(() => v2Components.cuuid, { onDelete: "restrict", onUpdate: "cascade" }),
   previousRH: decimal("previous_rh", { precision: 10, scale: 2 }).notNull(),
   newRH: decimal("new_rh", { precision: 10, scale: 2 }).notNull(),
   cumulativeRH: decimal("cumulative_rh", { precision: 10, scale: 2 }).notNull(),
@@ -45,7 +46,7 @@ export const v2ComponentRunningHoursLog = pgTable("component_running_hours_log",
   id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
   vesselCode: text("vessel_code").notNull(),
   componentCode: text("component_code").notNull(),
-  componentId: text("component_id").notNull(),
+  componentId: text("component_id").notNull().references(() => v2Components.cuuid, { onDelete: "restrict", onUpdate: "cascade" }),
   previousRh: decimal("previous_rh", { precision: 10, scale: 2 }).notNull(),
   newRh: decimal("new_rh", { precision: 10, scale: 2 }).notNull(),
   deltaRh: decimal("delta_rh", { precision: 10, scale: 2 }).notNull(),

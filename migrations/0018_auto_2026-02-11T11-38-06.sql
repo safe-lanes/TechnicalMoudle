@@ -1,0 +1,3 @@
+ALTER TABLE "running_hours_audit" ADD CONSTRAINT "running_hours_audit_component_id_components_cuuid_fk" FOREIGN KEY ("component_id") REFERENCES "public"."components"("cuuid") ON DELETE restrict ON UPDATE cascade;--> statement-breakpoint
+ALTER TABLE "spares" ADD CONSTRAINT "spares_component_id_components_cuuid_fk" FOREIGN KEY ("component_id") REFERENCES "public"."components"("cuuid") ON DELETE restrict ON UPDATE cascade;--> statement-breakpoint
+ALTER TABLE "spares_history" ADD CONSTRAINT "spares_history_component_id_components_cuuid_fk" FOREIGN KEY ("component_id") REFERENCES "public"."components"("cuuid") ON DELETE restrict ON UPDATE cascade;

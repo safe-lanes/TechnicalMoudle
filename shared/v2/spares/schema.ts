@@ -3,13 +3,14 @@ import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
 export { v2Components } from "../components/schema";
+import { v2Components } from "../components/schema";
 export type { Component } from "../components/schema";
 
 export const v2Spares = pgTable("spares", {
   id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
   partCode: text("part_code").notNull(),
   partName: text("part_name").notNull(),
-  componentId: text("component_id"),
+  componentId: text("component_id").references(() => v2Components.cuuid, { onDelete: "restrict", onUpdate: "cascade" }),
   componentCode: text("component_code"),
   componentName: text("component_name").notNull(),
   componentSpareCode: text("component_spare_code"),
@@ -83,7 +84,7 @@ export const v2SparesHistory = pgTable("spares_history", {
   spareId: integer("spare_id").notNull(),
   partCode: text("part_code").notNull(),
   partName: text("part_name").notNull(),
-  componentId: text("component_id").notNull(),
+  componentId: text("component_id").notNull().references(() => v2Components.cuuid, { onDelete: "restrict", onUpdate: "cascade" }),
   componentCode: text("component_code"),
   componentName: text("component_name").notNull(),
   componentSpareCode: text("component_spare_code"),
@@ -153,7 +154,7 @@ export const v2SpareComponentLinks = pgTable("spare_component_links", {
   id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
   vesselId: text("vessel_id").notNull(),
   spareId: integer("spare_id").notNull(),
-  componentId: text("component_id").notNull(),
+  componentId: text("component_id").notNull().references(() => v2Components.cuuid, { onDelete: "restrict", onUpdate: "cascade" }),
   linkedBy: text("linked_by").notNull(),
   linkedAt: timestamp("linked_at").notNull().defaultNow(),
 }, (table) => ({

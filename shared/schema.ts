@@ -99,7 +99,7 @@ export type DefectSequence = typeof defectSequences.$inferSelect;
 export const runningHoursAudit = pgTable("running_hours_audit", {
   id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
   vesselId: text("vessel_id").notNull().references(() => vessels.vuuid),
-  componentId: text("component_id").notNull(),
+  componentId: text("component_id").notNull().references(() => components.cuuid, { onDelete: "restrict", onUpdate: "cascade" }),
   previousRH: decimal("previous_rh", { precision: 10, scale: 2 }).notNull(),
   newRH: decimal("new_rh", { precision: 10, scale: 2 }).notNull(),
   cumulativeRH: decimal("cumulative_rh", { precision: 10, scale: 2 }).notNull(),
@@ -440,7 +440,7 @@ export const spares = pgTable("spares", {
   id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
   partCode: text("part_code").notNull(),
   partName: text("part_name").notNull(),
-  componentId: text("component_id"), // Nullable for fleet spares
+  componentId: text("component_id").references(() => components.cuuid, { onDelete: "restrict", onUpdate: "cascade" }), // Nullable for fleet spares
   componentCode: text("component_code"),
   componentName: text("component_name").notNull(),
   componentSpareCode: text("component_spare_code"), // Format: SP-<ComponentCode>-<NNN>
@@ -516,7 +516,7 @@ export const sparesHistory = pgTable("spares_history", {
   spareId: integer("spare_id").notNull(),
   partCode: text("part_code").notNull(),
   partName: text("part_name").notNull(),
-  componentId: text("component_id").notNull(),
+  componentId: text("component_id").notNull().references(() => components.cuuid, { onDelete: "restrict", onUpdate: "cascade" }),
   componentCode: text("component_code"),
   componentName: text("component_name").notNull(),
   componentSpareCode: text("component_spare_code"), // Component Spare Code at time of event
@@ -1026,7 +1026,7 @@ export type WorkOrderWithLeadTime = WorkOrder & {
 export const workOrderExecutions = pgTable("work_order_executions", {
   id: text("id").primaryKey(),
   templateId: text("template_id").notNull(), // Reference to work_orders (template)
-  componentId: text("component_id").notNull(), // Component this execution belongs to
+  componentId: text("component_id").notNull().references(() => components.cuuid, { onDelete: "restrict", onUpdate: "cascade" }), // Component this execution belongs to
   vesselId: text("vessel_id").notNull().references(() => vessels.vuuid), // Vessel identifier
   executionId: text("execution_id").notNull().unique(), // Unique execution code (WOE-XXXXXXX)
   
@@ -1092,7 +1092,7 @@ export const defects = pgTable("defects", {
   equipmentSerialNo: text("equipment_serial_no"), // Serial No field from screenshot
   equipmentLocation: text("equipment_location"), // Location field from screenshot
   equipmentSystem: text("equipment_system"), // System field from screenshot
-  componentId: text("component_id"), // Link to PMS component
+  componentId: text("component_id").references(() => components.cuuid, { onDelete: "restrict", onUpdate: "cascade" }), // Link to PMS component
   purchaseOrderRef: text("purchase_order_ref"),
   responsibleDept: text("responsible_dept"), // Responsible Dept from screenshot
   verifiedDate: text("verified_date"), // ISO format YYYY-MM-DD
@@ -1506,7 +1506,7 @@ export const componentRunningHoursLog = pgTable("component_running_hours_log", {
   id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
   vesselCode: text("vessel_code").notNull(),
   componentCode: text("component_code").notNull(),
-  componentId: text("component_id").notNull(),
+  componentId: text("component_id").notNull().references(() => components.cuuid, { onDelete: "restrict", onUpdate: "cascade" }),
   previousRh: decimal("previous_rh", { precision: 10, scale: 2 }).notNull(),
   newRh: decimal("new_rh", { precision: 10, scale: 2 }).notNull(),
   deltaRh: decimal("delta_rh", { precision: 10, scale: 2 }).notNull(), // Change in running hours (can be negative for corrections)
@@ -1566,7 +1566,7 @@ export type AuditLog = typeof auditLog.$inferSelect;
 // Component Documents Table - Drawings, manuals, and technical documents
 export const componentDocuments = pgTable("component_documents", {
   id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
-  componentId: text("component_id").notNull(),
+  componentId: text("component_id").notNull().references(() => components.cuuid, { onDelete: "restrict", onUpdate: "cascade" }),
   componentCode: text("component_code").notNull(),
   vesselCode: text("vessel_code").notNull(),
   fleetEquipmentCode: text("fleet_equipment_code"), // Link to fleet equipment for auto-preloading
@@ -1601,7 +1601,7 @@ export type ComponentDocument = typeof componentDocuments.$inferSelect;
 // Component Class Regulatory Table - Classification and regulatory survey data (multiple rows per component)
 export const componentClassRegulatory = pgTable("component_class_regulatory", {
   id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
-  componentId: text("component_id").notNull(),
+  componentId: text("component_id").notNull().references(() => components.cuuid, { onDelete: "restrict", onUpdate: "cascade" }),
   componentCode: text("component_code").notNull(),
   vesselCode: text("vessel_code").notNull(),
   classificationSociety: text("classification_society").notNull(), // 'DNV' | 'ABS' | 'Lloyd\'s Register' | 'ClassNK' | 'RINA' | 'IRS'
@@ -1638,7 +1638,7 @@ export type ComponentClassRegulatory = typeof componentClassRegulatory.$inferSel
 // Component Maintenance History Table - Immutable maintenance records (NO EDITS/DELETES ALLOWED)
 export const componentMaintenanceHistory = pgTable("component_maintenance_history", {
   id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
-  componentId: text("component_id").notNull(),
+  componentId: text("component_id").notNull().references(() => components.cuuid, { onDelete: "restrict", onUpdate: "cascade" }),
   componentCode: text("component_code").notNull(),
   vesselCode: text("vessel_code").notNull(),
   jobId: text("job_id"), // Link to parent job for Jobs Form A5 history
@@ -1680,7 +1680,7 @@ export type ComponentMaintenanceHistory = typeof componentMaintenanceHistory.$in
 export const componentRequisitions = pgTable("component_requisitions", {
   id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
   requisitionNo: text("requisition_no").notNull().unique(), // REQ-V001-2024-001 format
-  componentId: text("component_id").notNull(),
+  componentId: text("component_id").notNull().references(() => components.cuuid, { onDelete: "restrict", onUpdate: "cascade" }),
   componentCode: text("component_code").notNull(),
   vesselCode: text("vessel_code").notNull(),
   raisedOn: text("raised_on").notNull(), // DD-MMM-YYYY format
@@ -2189,7 +2189,7 @@ export const spareComponentLinks = pgTable("spare_component_links", {
   id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
   vesselId: text("vessel_id").notNull().references(() => vessels.vuuid),
   spareId: integer("spare_id").notNull(), // FK → spares.id
-  componentId: text("component_id").notNull(), // FK → components.id
+  componentId: text("component_id").notNull().references(() => components.cuuid, { onDelete: "restrict", onUpdate: "cascade" }),
   linkedBy: text("linked_by").notNull(),
   linkedAt: timestamp("linked_at").notNull().defaultNow(),
 }, (table) => ({
@@ -2312,7 +2312,7 @@ export const jobComponentLinks = pgTable("job_component_links", {
   id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
   vesselId: text("vessel_id").notNull().references(() => vessels.vuuid),
   jobId: text("job_id").notNull(), // FK → jobs.id (UUID)
-  componentId: text("component_id").notNull(), // FK → components.id (UUID)
+  componentId: text("component_id").notNull().references(() => components.cuuid, { onDelete: "restrict", onUpdate: "cascade" }),
   componentCode: text("component_code"), // Denormalized for faster lookups
   linkedBy: text("linked_by").notNull(),
   linkedAt: timestamp("linked_at").notNull().defaultNow(),

@@ -3,6 +3,7 @@ import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
 export { v2Components, v2ComponentMaintenanceHistory, v2Jobs, v2JobComponentLinks } from "../components/schema";
+import { v2Components } from "../components/schema";
 export type { Component, ComponentMaintenanceHistory, InsertComponentMaintenanceHistory } from "../components/schema";
 
 export { v2Spares } from "../jobs/schema";
@@ -145,7 +146,7 @@ export type WorkOrder = typeof v2WorkOrders.$inferSelect;
 export const v2WorkOrderExecutions = pgTable("work_order_executions", {
   id: text("id").primaryKey(),
   templateId: text("template_id").notNull(),
-  componentId: text("component_id").notNull(),
+  componentId: text("component_id").notNull().references(() => v2Components.cuuid, { onDelete: "restrict", onUpdate: "cascade" }),
   vesselId: text("vessel_id").notNull(),
   executionId: text("execution_id").notNull().unique(),
   dateCompleted: text("date_completed"),
