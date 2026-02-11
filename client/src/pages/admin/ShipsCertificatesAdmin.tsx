@@ -1597,7 +1597,9 @@ export default function ShipsCertificatesAdmin() {
         sequence: cert.companySequence ?? companySequences[cert.id] ?? cert.sequence,
       }));
 
-    const filteredData = companyDataFromMaster.filter(cert => {
+    const sortedCompanyData = [...companyDataFromMaster].sort((a, b) => a.sequence - b.sequence);
+
+    const filteredData = sortedCompanyData.filter(cert => {
       const matchesSearch = cert.certificateLabel.toLowerCase().includes(searchTerm.toLowerCase()) ||
                            cert.masterId.toLowerCase().includes(searchTerm.toLowerCase());
       return matchesSearch;
