@@ -31,7 +31,7 @@ export class RunningHoursService {
 
     const parentsWithCounts = await Promise.all(
       masterComponents.map(async (component) => {
-        const inheritedComponents = await runningHoursRepository.getInheritedComponents(component.id, vesselId);
+        const inheritedComponents = await runningHoursRepository.getInheritedComponents(component.cuuid, vesselId);
 
         const meterReplacedLastRh = parseFloat(component.meterReplacedLastRh || '0');
         const currentMeterRH = parseFloat(component.rhCurrentMaster || component.currentCumulativeRH || '0');
@@ -62,7 +62,7 @@ export class RunningHoursService {
       return null;
     }
 
-    const children = await runningHoursRepository.getInheritedComponents(parent.id, vesselId);
+    const children = await runningHoursRepository.getInheritedComponents(parent.cuuid, vesselId);
 
     const childrenWithRH = children.map(child => {
       const displayRH = child.currentCumulativeRH || child.rhCurrentInheritedCached || '0.00';
@@ -246,7 +246,7 @@ export class RunningHoursService {
     }
 
     return {
-      componentId: component.id,
+      componentId: component.cuuid,
       componentName: component.name,
       rhCounterType: component.rhCounterType,
       rhMasterComponentId: component.rhMasterComponentId,
@@ -393,7 +393,7 @@ export class RunningHoursService {
       if (currentRH > 0) {
         try {
           const result = await runningHoursRepository.updateMasterRunningHours({
-            componentId: master.id,
+            componentId: master.cuuid,
             newRHValue: currentRH,
             updateSource: 'AUTOMATION',
             userId: userId,

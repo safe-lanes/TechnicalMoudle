@@ -63,7 +63,7 @@ export class JobRepository {
 
   async findComponentById(id: string) {
     const db = await getDb();
-    const [comp] = await db.select().from(v2Components).where(eq(v2Components.id, id));
+    const [comp] = await db.select().from(v2Components).where(eq(v2Components.cuuid, id));
     return comp;
   }
 

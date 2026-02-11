@@ -34,7 +34,7 @@ export class ComponentRepository {
 
   async findById(id: string): Promise<Component | undefined> {
     const db = await getDb();
-    const result = await db.select().from(v2Components).where(eq(v2Components.id, id));
+    const result = await db.select().from(v2Components).where(eq(v2Components.cuuid, id));
     return result[0];
   }
 
@@ -65,7 +65,7 @@ export class ComponentRepository {
     const db = await getDb();
     const result = await db.update(v2Components)
       .set({ ...data, updatedAt: new Date() })
-      .where(eq(v2Components.id, id))
+      .where(eq(v2Components.cuuid, id))
       .returning();
     if (!result[0]) {
       throw new Error(`Component ${id} not found`);
@@ -75,7 +75,7 @@ export class ComponentRepository {
 
   async remove(id: string): Promise<void> {
     const db = await getDb();
-    await db.delete(v2Components).where(eq(v2Components.id, id));
+    await db.delete(v2Components).where(eq(v2Components.cuuid, id));
   }
 
   async inactivate(id: string, userId: string, options?: { cascadeInactivate?: boolean }): Promise<{
@@ -88,7 +88,7 @@ export class ComponentRepository {
     const db = await getDb();
 
     const componentResult = await db.select().from(v2Components)
-      .where(eq(v2Components.id, id))
+      .where(eq(v2Components.cuuid, id))
       .limit(1);
 
     if (componentResult.length === 0) {
@@ -120,10 +120,10 @@ export class ComponentRepository {
     let jobsInactivated = 0;
 
     if (options?.cascadeInactivate && activeChildren.length > 0) {
-      const childIds = activeChildren.map(c => c.id);
+      const childIds = activeChildren.map(c => c.cuuid);
       await db.update(v2Components)
         .set({ isActive: false })
-        .where(inArray(v2Components.id, childIds));
+        .where(inArray(v2Components.cuuid, childIds));
       componentsInactivated += childIds.length;
 
       const childJobIdsToInactivate = new Set<string>();
@@ -152,7 +152,7 @@ export class ComponentRepository {
 
     await db.update(v2Components)
       .set({ isActive: false })
-      .where(eq(v2Components.id, id));
+      .where(eq(v2Components.cuuid, id));
     componentsInactivated++;
 
     const mainJobIdsToInactivate = new Set<string>();
@@ -191,13 +191,13 @@ export class ComponentRepository {
 
     for (const comp of componentsData) {
       const existing = await db.select().from(v2Components)
-        .where(eq(v2Components.id, comp.id))
+        .where(eq(v2Components.cuuid, comp.cuuid))
         .limit(1);
 
       if (existing.length > 0) {
         await db.update(v2Components)
           .set(comp)
-          .where(eq(v2Components.id, comp.id));
+          .where(eq(v2Components.cuuid, comp.cuuid));
         updated++;
       } else {
         await db.insert(v2Components).values(comp);
@@ -241,7 +241,7 @@ export class ComponentRepository {
           lastUpdated: lastUpdatedValue,
           updatedAt: now,
         })
-        .where(eq(v2Components.id, params.componentId))
+        .where(eq(v2Components.cuuid, params.componentId))
         .returning();
 
       if (!result[0]) {
@@ -269,7 +269,7 @@ export class ComponentRepository {
             lastUpdated: lastUpdatedValue,
             updatedAt: now,
           })
-          .where(eq(v2Components.id, inherited.id));
+          .where(eq(v2Components.cuuid, inherited.cuuid));
 
         inheritedUpdated++;
       }
@@ -284,7 +284,7 @@ export class ComponentRepository {
           lastUpdated: lastUpdatedValue,
           updatedAt: now,
         })
-        .where(eq(v2Components.id, params.componentId))
+        .where(eq(v2Components.cuuid, params.componentId))
         .returning();
 
       if (!result[0]) {
@@ -299,7 +299,7 @@ export class ComponentRepository {
           lastUpdated: lastUpdatedValue,
           updatedAt: now,
         })
-        .where(eq(v2Components.id, params.componentId))
+        .where(eq(v2Components.cuuid, params.componentId))
         .returning();
 
       if (!result[0]) {

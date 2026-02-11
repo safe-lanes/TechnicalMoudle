@@ -352,7 +352,7 @@ export class BulkImportService {
 
         const jobData: any = {
           vesselId,
-          componentId: component.id,
+          componentId: component.cuuid,
           componentCode,
           componentName: row['Component Name'] || component.name || null,
           jobNo,
@@ -392,7 +392,7 @@ export class BulkImportService {
               await this.repository.createJobComponentLink({
                 vesselId,
                 jobId: created.id,
-                componentId: component.id,
+                componentId: component.cuuid,
                 componentCode,
                 linkedBy: 'system-bulk-import',
               });
@@ -407,12 +407,12 @@ export class BulkImportService {
         const ensureJobComponentLink = async (jobId: string): Promise<void> => {
           try {
             const existingLinks = await this.repository.getJobComponentLinksByJob(jobId);
-            const linkAlreadyExists = existingLinks.some((link: any) => link.componentId === component.id);
+            const linkAlreadyExists = existingLinks.some((link: any) => link.componentId === component.cuuid);
             if (!linkAlreadyExists) {
               await this.repository.createJobComponentLink({
                 vesselId,
                 jobId,
-                componentId: component.id,
+                componentId: component.cuuid,
                 componentCode,
                 linkedBy: 'system-bulk-import',
               });
@@ -582,7 +582,7 @@ export class BulkImportService {
         const spareData: any = {
           partCode,
           partName: String(row['Part Name'] || '').trim(),
-          componentId: component.id,
+          componentId: component.cuuid,
           componentCode,
           componentName: component.name || '',
           componentSpareCode: `SP-${componentCode}-${String(result.created + 1).padStart(3, '0')}`,
@@ -615,12 +615,12 @@ export class BulkImportService {
           if (existingSpare) {
             try {
               const existingLinks = await this.repository.getSpareComponentLinksBySpare(existingSpare.id);
-              const linkAlreadyExists = existingLinks.some((link: any) => link.componentId === component.id);
+              const linkAlreadyExists = existingLinks.some((link: any) => link.componentId === component.cuuid);
               if (!linkAlreadyExists) {
                 await this.repository.createSpareComponentLink({
                   vesselId,
                   spareId: existingSpare.id,
-                  componentId: component.id,
+                  componentId: component.cuuid,
                   linkedBy: 'system-bulk-import',
                 });
                 result.spareComponentLinksCreated = (result.spareComponentLinksCreated || 0) + 1;
@@ -655,7 +655,7 @@ export class BulkImportService {
           await this.processSpareInventory({
             spareId: newSpare.id,
             vesselId,
-            componentId: component.id,
+            componentId: component.cuuid,
             locationAName: row['Location A'] ? String(row['Location A']).trim() : null,
             locationBName: row['Location B'] ? String(row['Location B']).trim() : null,
             robLocationA: robLocationAVal,
@@ -698,7 +698,7 @@ export class BulkImportService {
           await this.processSpareInventory({
             spareId: existingSpare.id,
             vesselId,
-            componentId: component.id,
+            componentId: component.cuuid,
             locationAName: row['Location A'] ? String(row['Location A']).trim() : existingSpare.location,
             locationBName: row['Location B'] ? String(row['Location B']).trim() : existingSpare.location2,
             robLocationA: robLocationAVal,
@@ -711,12 +711,12 @@ export class BulkImportService {
           if (existingSpare) {
             try {
               const existingLinks = await this.repository.getSpareComponentLinksBySpare(existingSpare.id);
-              const linkAlreadyExists = existingLinks.some((link: any) => link.componentId === component.id);
+              const linkAlreadyExists = existingLinks.some((link: any) => link.componentId === component.cuuid);
               if (!linkAlreadyExists) {
                 await this.repository.createSpareComponentLink({
                   vesselId,
                   spareId: existingSpare.id,
-                  componentId: component.id,
+                  componentId: component.cuuid,
                   linkedBy: 'system-bulk-import',
                 });
                 result.spareComponentLinksCreated = (result.spareComponentLinksCreated || 0) + 1;
@@ -746,7 +746,7 @@ export class BulkImportService {
             await this.processSpareInventory({
               spareId: existingSpare.id,
               vesselId,
-              componentId: component.id,
+              componentId: component.cuuid,
               locationAName: row['Location A'] ? String(row['Location A']).trim() : existingSpare.location,
               locationBName: row['Location B'] ? String(row['Location B']).trim() : existingSpare.location2,
               robLocationA: robLocationAVal,
@@ -776,7 +776,7 @@ export class BulkImportService {
             await this.processSpareInventory({
               spareId: newSpare.id,
               vesselId,
-              componentId: component.id,
+              componentId: component.cuuid,
               locationAName: row['Location A'] ? String(row['Location A']).trim() : null,
               locationBName: row['Location B'] ? String(row['Location B']).trim() : null,
               robLocationA: robLocationAVal,

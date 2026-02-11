@@ -40,7 +40,7 @@ export async function completeWorkOrder(id: string, body: any) {
       const counterType = (component.rhCounterType || '').toUpperCase();
 
       if (counterType === 'MASTER') {
-        await repo.updateComponent(component.id, {
+        await repo.updateComponent(component.cuuid, {
           currentCumulativeRH: rhValue.toString(),
           rhCurrentMaster: rhValue.toString(),
           lastUpdated: new Date().toISOString(),
@@ -56,14 +56,14 @@ export async function completeWorkOrder(id: string, body: any) {
             );
           });
           for (const child of inheritedChildren) {
-            await repo.updateComponent(child.id, {
+            await repo.updateComponent(child.cuuid, {
               currentCumulativeRH: rhValue.toString(),
               lastUpdated: new Date().toISOString(),
             });
           }
         }
       } else {
-        await repo.updateComponent(component.id, {
+        await repo.updateComponent(component.cuuid, {
           currentCumulativeRH: rhValue.toString(),
           lastUpdated: new Date().toISOString(),
         });
@@ -74,7 +74,7 @@ export async function completeWorkOrder(id: string, body: any) {
   if (component) {
     try {
       await repo.createMaintenanceHistory({
-        componentId: component.id,
+        componentId: component.cuuid,
         componentCode: wo.componentCode || component.componentCode,
         vesselCode: wo.vesselId || '',
         workOrderId: wo.id,

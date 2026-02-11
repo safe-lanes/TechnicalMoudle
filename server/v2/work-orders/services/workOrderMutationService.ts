@@ -209,7 +209,7 @@ async function processApproval(existingWO: any, updateData: any) {
 
       if (dateOfCompletion) {
         await repo.createMaintenanceHistory({
-          componentId: component.id,
+          componentId: component.cuuid,
           componentCode: existingWO.componentCode || component.componentCode,
           vesselCode: existingWO.vesselId,
           workOrderId: existingWO.id,
@@ -238,7 +238,7 @@ async function processApproval(existingWO: any, updateData: any) {
         const counterType = (component.rhCounterType || '').toUpperCase();
 
         if (counterType === 'MASTER' && existingWO.vesselId) {
-          await repo.updateComponent(component.id, {
+          await repo.updateComponent(component.cuuid, {
             currentCumulativeRH: rhValue.toString(),
             rhCurrentMaster: rhValue.toString(),
             lastUpdated: new Date().toISOString(),
@@ -253,13 +253,13 @@ async function processApproval(existingWO: any, updateData: any) {
             );
           });
           for (const child of inheritedChildren) {
-            await repo.updateComponent(child.id, {
+            await repo.updateComponent(child.cuuid, {
               currentCumulativeRH: rhValue.toString(),
               lastUpdated: new Date().toISOString(),
             });
           }
         } else {
-          await repo.updateComponent(component.id, {
+          await repo.updateComponent(component.cuuid, {
             currentCumulativeRH: rhValue.toString(),
             lastUpdated: new Date().toISOString(),
           });

@@ -22,7 +22,7 @@ export class JobMutationService {
       if (!component && jobData.componentCode && jobData.vesselId) {
         component = await this.repo.findComponentByCode(jobData.componentCode, jobData.vesselId);
         if (component) {
-          jobData = { ...jobData, componentId: component.id };
+          jobData = { ...jobData, componentId: component.cuuid };
         }
       }
 

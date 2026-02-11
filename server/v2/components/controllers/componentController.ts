@@ -146,7 +146,7 @@ export class ComponentController {
     }
 
     const coercedBody = {
-      componentId: component.id,
+      componentId: component.cuuid,
       componentCode: component.componentCode,
       vesselCode: component.vesselCode,
       fleetEquipmentCode: req.body.fleetEquipmentCode || null,

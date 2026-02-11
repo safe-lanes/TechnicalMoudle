@@ -30,7 +30,7 @@ export async function autoGenerate(body: any) {
     const comp = componentMap.get(link.componentId);
     if (comp) {
       jobLinksMap.get(link.jobId)!.push({
-        componentId: comp.id,
+        componentId: comp.cuuid,
         componentCode: comp.componentCode || '',
         componentName: comp.name || '',
       });
@@ -82,7 +82,7 @@ export async function autoGenerate(body: any) {
         const primaryComp = componentMap.get(job.componentId);
         if (primaryComp) {
           linkedComponents = [{
-            componentId: primaryComp.id,
+            componentId: primaryComp.cuuid,
             componentCode: primaryComp.componentCode || '',
             componentName: primaryComp.name || '',
           }];
@@ -171,7 +171,7 @@ export async function autoGenerate(body: any) {
         const primaryComp = componentMap.get(job.componentId);
         if (primaryComp) {
           linkedComponents = [{
-            componentId: primaryComp.id,
+            componentId: primaryComp.cuuid,
             componentCode: primaryComp.componentCode || '',
             componentName: primaryComp.name || '',
           }];

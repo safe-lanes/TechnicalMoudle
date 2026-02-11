@@ -39,7 +39,7 @@ export function registerRunningHoursRoutes(app: Express) {
       const parentsWithCounts = await Promise.all(
         masterComponents.map(async (component) => {
           // Use storage layer method which handles all ID formats (composite, code, uuid)
-          const inheritedComponents = await storage.getInheritedComponents(component.id, vesselId);
+          const inheritedComponents = await storage.getInheritedComponents(component.cuuid, vesselId);
           
           // Calculate total cumulative RH (includes meter replacement history)
           // Total = meterReplacedLastRh + current meter reading
@@ -340,7 +340,7 @@ export function registerRunningHoursRoutes(app: Express) {
       }
 
       res.json({
-        componentId: component.id,
+        componentId: component.cuuid,
         componentName: component.name,
         rhCounterType: component.rhCounterType,
         rhMasterComponentId: component.rhMasterComponentId,

@@ -127,7 +127,7 @@ export class RunningHoursRepository {
   async getComponent(componentId: string): Promise<Component | undefined> {
     const db = await getDb();
     const result = await db.select().from(v2Components)
-      .where(eq(v2Components.id, componentId))
+      .where(eq(v2Components.cuuid, componentId))
       .limit(1);
     return result[0] || undefined;
   }
@@ -164,7 +164,7 @@ export class RunningHoursRepository {
     }
 
     const masterComponentCode = masterComponent?.componentCode || masterComponentId;
-    const masterComponentFullId = masterComponent?.id || masterComponentId;
+    const masterComponentFullId = masterComponent?.cuuid || masterComponentId;
     const effectiveVesselId = vesselId || masterComponent?.vesselId;
 
     if (!effectiveVesselId) {
@@ -189,7 +189,7 @@ export class RunningHoursRepository {
     const db = await getDb();
     const result = await db.update(v2Components)
       .set(data as any)
-      .where(eq(v2Components.id, componentId))
+      .where(eq(v2Components.cuuid, componentId))
       .returning();
     if (!result[0]) {
       throw new Error(`Component ${componentId} not found`);
@@ -249,7 +249,7 @@ export class RunningHoursRepository {
 
     const result = await db.update(v2Components)
       .set(updateData)
-      .where(eq(v2Components.id, params.componentId))
+      .where(eq(v2Components.cuuid, params.componentId))
       .returning();
 
     if (!result[0]) {
@@ -289,7 +289,7 @@ export class RunningHoursRepository {
         lastUpdated: now.toISOString(),
         updatedAt: now,
       })
-      .where(eq(v2Components.id, params.componentId))
+      .where(eq(v2Components.cuuid, params.componentId))
       .returning();
 
     if (!masterResult[0]) {
@@ -340,7 +340,7 @@ export class RunningHoursRepository {
           lastUpdated: now.toISOString(),
           updatedAt: now,
         })
-        .where(eq(v2Components.id, inherited.id));
+        .where(eq(v2Components.cuuid, inherited.cuuid));
 
       inheritedUpdated++;
     }
@@ -374,7 +374,7 @@ export class RunningHoursRepository {
       .where(eq(v2Components.parentId, parentComponentId));
 
     const parentResult = await db.select().from(v2Components)
-      .where(eq(v2Components.id, parentComponentId))
+      .where(eq(v2Components.cuuid, parentComponentId))
       .limit(1);
 
     let updatedComponents = 0;
@@ -447,7 +447,7 @@ export class RunningHoursRepository {
 
       await db.update(v2Components)
         .set(updateData)
-        .where(eq(v2Components.id, parentComponentId));
+        .where(eq(v2Components.cuuid, parentComponentId));
 
       const totalCumulativeRH = meterReplaced
         ? previousTotalForReplacement + newRH
@@ -512,11 +512,11 @@ export class RunningHoursRepository {
                 lastUpdated: dateUpdated,
                 updatedAt: now
               })
-              .where(eq(v2Components.id, inherited.id));
+              .where(eq(v2Components.cuuid, inherited.cuuid));
 
             await db.insert(v2RunningHoursAudit).values({
               vesselId: inherited.vesselId || 'unknown',
-              componentId: inherited.id,
+              componentId: inherited.cuuid,
               previousRH: inheritedCurrentRH.toString(),
               newRH: newInheritedRH.toString(),
               cumulativeRH: newInheritedRH.toString(),
@@ -559,11 +559,11 @@ export class RunningHoursRepository {
 
       await db.update(v2Components)
         .set(childUpdateData)
-        .where(eq(v2Components.id, child.id));
+        .where(eq(v2Components.cuuid, child.cuuid));
 
       await db.insert(v2RunningHoursAudit).values({
         vesselId: child.vesselId || 'unknown',
-        componentId: child.id,
+        componentId: child.cuuid,
         previousRH: childCurrentRH.toString(),
         newRH: childNewRH.toString(),
         cumulativeRH: childNewRH.toString(),

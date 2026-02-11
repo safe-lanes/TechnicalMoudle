@@ -96,7 +96,7 @@ export async function getComponents(vesselId?: string): Promise<Component[]> {
 
 export async function getComponent(id: string): Promise<Component | undefined> {
   const db = await getDb();
-  const [result] = await db.select().from(components).where(eq(components.id, id));
+  const [result] = await db.select().from(components).where(eq(components.cuuid, id));
   return result;
 }
 
@@ -117,7 +117,7 @@ export async function getComponentsByName(name: string, vesselId: string): Promi
 
 export async function updateComponent(id: string, data: Partial<any>): Promise<Component> {
   const db = await getDb();
-  const [result] = await db.update(components).set(data).where(eq(components.id, id)).returning();
+  const [result] = await db.update(components).set(data).where(eq(components.cuuid, id)).returning();
   return result;
 }
 
