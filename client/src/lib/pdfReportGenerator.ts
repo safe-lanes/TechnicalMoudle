@@ -1482,7 +1482,9 @@ class PDFReportGenerator {
 
     this.addFooter(pageWidth, pageHeight, margin);
 
-    this.doc.save(this.generateFilename('Defect_Report', 'vessel'));
+    const timestamp = format(new Date(), 'yyyyMMdd_HHmm');
+    const filename = `Defect_Report_${defectData.reportId}_${timestamp}.pdf`;
+    this.doc.save(filename);
   }
 
   generateConsumptionAnalysisPDF(
@@ -1799,7 +1801,6 @@ class PDFReportGenerator {
     this.addFooter(pageWidth, pageHeight, margin);
 
     const timestamp = format(new Date(), 'yyyyMMdd_HHmm');
-
     const cleanVessel = vesselName.replace(/[^a-zA-Z0-9 ]/g, '').replace(/\s+/g, '-');
     const filename = `Vessel-${cleanVessel}_Consumption_Pattern_Analysis_${timestamp}.pdf`;
 
