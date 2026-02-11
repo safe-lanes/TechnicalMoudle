@@ -1,0 +1,1 @@
+ALTER TABLE "running_hours_audit" ADD CONSTRAINT "running_hours_audit_vessel_id_vessels_vuuid_fk" FOREIGN KEY ("vessel_id") REFERENCES "public"."vessels"("vuuid") ON DELETE no action ON UPDATE no action;

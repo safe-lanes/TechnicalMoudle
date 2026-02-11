@@ -1,0 +1,2 @@
+ALTER TABLE "defect_sequences" ADD CONSTRAINT "defect_sequences_vessel_id_vessels_vuuid_fk" FOREIGN KEY ("vessel_id") REFERENCES "public"."vessels"("vuuid") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "users" ADD CONSTRAINT "users_vessel_id_vessels_vuuid_fk" FOREIGN KEY ("vessel_id") REFERENCES "public"."vessels"("vuuid") ON DELETE no action ON UPDATE no action;

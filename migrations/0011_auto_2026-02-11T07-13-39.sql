@@ -1,0 +1,8 @@
+ALTER TABLE "change_request" ADD CONSTRAINT "change_request_vessel_id_vessels_vuuid_fk" FOREIGN KEY ("vessel_id") REFERENCES "public"."vessels"("vuuid") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "components" ADD CONSTRAINT "components_vessel_id_vessels_vuuid_fk" FOREIGN KEY ("vessel_id") REFERENCES "public"."vessels"("vuuid") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "ihm_items" ADD CONSTRAINT "ihm_items_vessel_id_vessels_vuuid_fk" FOREIGN KEY ("vessel_id") REFERENCES "public"."vessels"("vuuid") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "ihm_maintenance_log" ADD CONSTRAINT "ihm_maintenance_log_vessel_id_vessels_vuuid_fk" FOREIGN KEY ("vessel_id") REFERENCES "public"."vessels"("vuuid") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "spares" ADD CONSTRAINT "spares_vessel_id_vessels_vuuid_fk" FOREIGN KEY ("vessel_id") REFERENCES "public"."vessels"("vuuid") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "spares_history" ADD CONSTRAINT "spares_history_vessel_id_vessels_vuuid_fk" FOREIGN KEY ("vessel_id") REFERENCES "public"."vessels"("vuuid") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "stores_items" ADD CONSTRAINT "stores_items_vessel_id_vessels_vuuid_fk" FOREIGN KEY ("vessel_id") REFERENCES "public"."vessels"("vuuid") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "stores_ledger" ADD CONSTRAINT "stores_ledger_vessel_id_vessels_vuuid_fk" FOREIGN KEY ("vessel_id") REFERENCES "public"."vessels"("vuuid") ON DELETE no action ON UPDATE no action;

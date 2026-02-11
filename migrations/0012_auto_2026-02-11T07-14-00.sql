@@ -1,0 +1,11 @@
+ALTER TABLE "alert_config" ADD CONSTRAINT "alert_config_vessel_id_vessels_vuuid_fk" FOREIGN KEY ("vessel_id") REFERENCES "public"."vessels"("vuuid") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "alert_events" ADD CONSTRAINT "alert_events_vessel_id_vessels_vuuid_fk" FOREIGN KEY ("vessel_id") REFERENCES "public"."vessels"("vuuid") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "certificates" ADD CONSTRAINT "certificates_vessel_id_vessels_vuuid_fk" FOREIGN KEY ("vessel_id") REFERENCES "public"."vessels"("vuuid") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "defects" ADD CONSTRAINT "defects_vessel_id_vessels_vuuid_fk" FOREIGN KEY ("vessel_id") REFERENCES "public"."vessels"("vuuid") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "import_history" ADD CONSTRAINT "import_history_vessel_id_vessels_vuuid_fk" FOREIGN KEY ("vessel_id") REFERENCES "public"."vessels"("vuuid") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "jobs" ADD CONSTRAINT "jobs_vessel_id_vessels_vuuid_fk" FOREIGN KEY ("vessel_id") REFERENCES "public"."vessels"("vuuid") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "pms_vessel_settings" ADD CONSTRAINT "pms_vessel_settings_vessel_id_vessels_vuuid_fk" FOREIGN KEY ("vessel_id") REFERENCES "public"."vessels"("vuuid") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "surveys" ADD CONSTRAINT "surveys_vessel_id_vessels_vuuid_fk" FOREIGN KEY ("vessel_id") REFERENCES "public"."vessels"("vuuid") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "work_order_execution_details" ADD CONSTRAINT "work_order_execution_details_vessel_id_vessels_vuuid_fk" FOREIGN KEY ("vessel_id") REFERENCES "public"."vessels"("vuuid") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "work_order_executions" ADD CONSTRAINT "work_order_executions_vessel_id_vessels_vuuid_fk" FOREIGN KEY ("vessel_id") REFERENCES "public"."vessels"("vuuid") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "work_orders" ADD CONSTRAINT "work_orders_vessel_id_vessels_vuuid_fk" FOREIGN KEY ("vessel_id") REFERENCES "public"."vessels"("vuuid") ON DELETE no action ON UPDATE no action;
