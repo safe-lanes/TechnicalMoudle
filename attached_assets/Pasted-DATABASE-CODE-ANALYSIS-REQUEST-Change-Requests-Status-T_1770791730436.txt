@@ -1,0 +1,236 @@
+DATABASE & CODE ANALYSIS REQUEST - Change Requests Status & Tracking Report
+I need to build a new report called "Change Requests Status & Tracking" for the PMS module. This report needs to track all change requests across Components, Jobs, Spares, and Stores categories with their approval workflow status.
+
+WHAT I OBSERVED IN THE CURRENT SYSTEM:
+Change Requests List Page:
+
+Shows columns: Request Title, Requested By, Date, Status
+
+Has category filter: Components, Jobs, Spares, Stores
+
+Has search box labeled "Search Status"
+
+Shows 3 change requests currently (all Components, all from Chief Engineer)
+
+Status values seen: "Pending Approval" (blue badge), "Approved" (green badge)
+
+Change Request Detail Modal:
+Shows these fields:
+
+Title: "Modify Component: 278.010.01 Impressed Current Systems No.01"
+
+Category: "Components"
+
+Requested By: "Chief Engineer"
+
+Status: "Pending Approval"
+
+Reason: "Component modification request"
+
+Created: "1/29/2026"
+
+Changes Made section showing: COMPONENTINFO.CRITICAL changed from "Yes" to "No"
+
+Action buttons: View Changes, Reject, Approve, Close
+
+Reports Page:
+
+Shows filters: Vessel dropdown (All Vessels), Date Range picker
+
+Dashboard shows: Unplanned WOs: 0, Pending: 0, Total Jobs: 1025, Reports: 2
+
+PLEASE PROVIDE THE FOLLOWING ANALYSIS:
+1. DATABASE SCHEMA INFORMATION
+A. Change Requests Table:
+
+text
+Please provide:
+- Exact table name
+- Complete CREATE TABLE statement or schema definition
+- All column names with data types
+- Primary key and foreign keys
+- Any indexes
+- Sample SELECT query showing actual data structure
+B. Related Tables:
+
+text
+Please identify and provide schema for:
+- Table storing field-level changes (the "Changes Made" data)
+- Any status history/audit table
+- Any approval/workflow table
+C. Join Relationships:
+
+text
+Show how change requests link to:
+- Components table
+- Jobs table
+- Spares table
+- Stores table
+- Users/Ranks table (for "Requested By")
+- Vessels table (if applicable)
+2. EXISTING CODE LOCATIONS
+Please provide file paths and relevant code for:
+
+A. Models/Schemas:
+
+text
+- Change request model definition
+- Related model definitions
+B. API Routes:
+
+text
+- Route that fetches change requests list
+- Route that fetches change request details
+- Route for approval/rejection
+- Show me the actual endpoint paths and handler functions
+C. Database Queries:
+
+text
+- Existing queries that fetch change requests
+- Queries that filter by status, category, date
+- Queries that calculate counts (Pending, Approved, etc.)
+D. Similar Report Implementation:
+
+text
+- Code for "Change Request Analytics" report (the other report in this category)
+- How it generates data
+- How it creates PDF/Excel exports
+- Report template/component used
+3. DATA STRUCTURE ANALYSIS
+A. Field-Level Changes:
+
+text
+Question: How is "COMPONENTINFO.CRITICAL" change from "Yes" to "No" stored?
+- Is it in a separate change_details table?
+- Is it JSON in the change_requests table?
+- Show me the exact structure with a sample query
+B. Status Values:
+
+text
+Question: What are ALL possible status values?
+I saw: "Pending Approval", "Approved"
+Are there others like: "Rejected", "Cancelled", "Draft", etc.?
+- Provide complete enum/list
+C. Category Values:
+
+text
+Confirm the categories are: Components, Jobs, Spares, Stores
+- How is this stored? (enum, string, foreign key?)
+D. Requested By:
+
+text
+Question: "Chief Engineer" - is this:
+- A direct string value?
+- A user's rank pulled from users table?
+- A user_id that joins to users?
+Show me the join/lookup logic
+4. WORKFLOW & APPROVAL LOGIC
+A. Approval Process:
+
+text
+- What happens when "Approve" button is clicked?
+- Which fields get updated?
+- Is there an approved_by field?
+- Is there an approved_date field?
+- Show me the approval handler code
+B. Status Transitions:
+
+text
+- Show the state machine or status flow
+- What statuses can transition to what?
+C. Target Entity Updates:
+
+text
+- After approval, does the component/job/spare/store get updated automatically?
+- Show me the code that applies the changes
+5. FILTER & SEARCH IMPLEMENTATION
+A. Vessel Filter:
+
+text
+- How is vessel filtering implemented?
+- Is there a vessel_id field on change_requests?
+- Show me the query logic
+B. Date Range Filter:
+
+text
+- Which date field is used for filtering? (created_date?)
+- Show me the query logic
+C. Search Functionality:
+
+text
+- The "Search Status" box - what does it search?
+- Show me the search implementation
+6. REPORT GENERATION PATTERNS
+A. Existing Report Utils:
+
+text
+- What utility functions exist for report generation?
+- PDF generation library/method
+- Excel generation library/method
+- Show me file paths and example usage
+B. Report Data Structure:
+
+text
+- What format do reports expect data in?
+- Any specific data transformation patterns?
+7. SAMPLE QUERIES NEEDED
+Please provide working SQL/ORM queries for:
+
+A. Main Report Query:
+
+sql
+-- Query to fetch all change requests with filters
+-- Include: title, category, requested_by, created_date, status
+-- With joins to get requester name, vessel name, etc.
+-- With date range filter
+-- With vessel filter
+-- With status filter
+-- With category filter
+B. Detailed Changes Query:
+
+sql
+-- Query to fetch field-level changes for a change request
+-- Include: field_name, old_value, new_value
+C. Aggregation Queries:
+
+sql
+-- Count by status
+-- Count by category
+-- Count by vessel
+-- Average time to approval (if possible)
+8. FRONTEND COMPONENTS
+Please provide file paths for:
+
+text
+- Change requests list page component
+- Change request detail modal component
+- Filter components (Vessel selector, Date Range picker)
+- Report page component
+- Export buttons implementation
+OUTPUT FORMAT REQUESTED:
+For each section above, please provide:
+
+Exact file paths (e.g., /server/models/changeRequest.js)
+
+Relevant code snippets (actual code, not pseudocode)
+
+Schema definitions (actual DDL or ORM schema)
+
+Working queries (actual SQL or ORM queries that run in the system)
+
+Explanations of any complex logic
+
+Please be thorough and provide actual code/schema from the codebase, not theoretical examples.
+
+GOAL:
+After receiving your analysis, I will be able to:
+
+Understand exactly how change requests are stored
+
+Write queries to fetch the data needed for the report
+
+Follow existing patterns for report generation
+
+Implement the "Change Requests Status & Tracking" report correctly
+
+Please analyze the codebase and provide complete, factual information.
