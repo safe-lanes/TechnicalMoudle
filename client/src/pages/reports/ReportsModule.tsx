@@ -12,7 +12,6 @@ import {
   Store,
   Biohazard,
   Settings2,
-  AlertTriangle,
   Search,
   Download,
   Calendar
@@ -23,7 +22,6 @@ import SparesReports from "./SparesReports";
 import StoresReports from "./StoresReports";
 import IhmReports from "./IhmReports";
 import ChangeRequestReports from "./ChangeRequestReports";
-import AlertsApprovalsAdminReports from "./AlertsApprovalsAdminReports";
 import MaintenancePlanner from "./MaintenancePlanner";
 import GlobalFilters, { FilterValues } from "@/components/reports/GlobalFilters";
 
@@ -131,17 +129,6 @@ const ReportsModule = () => {
       iconBg: "bg-blue-500",
       iconBgLight: "bg-blue-100 text-blue-600"
     },
-    {
-      id: "alerts-admin",
-      title: "Alerts, Approvals & Admin",
-      description: "Alert monitoring, approval trails, data quality, and user activity",
-      icon: AlertTriangle,
-      reportCount: 6,
-      lastGenerated: "2 hours ago",
-      color: "border-blue-500",
-      iconBg: "bg-blue-500",
-      iconBgLight: "bg-blue-100 text-blue-600"
-    }
   ];
 
   const handleCategoryClick = (categoryId: string) => {
@@ -206,9 +193,6 @@ const ReportsModule = () => {
     return <ChangeRequestReports onBack={handleBackToMain} globalFilters={globalFilters} />;
   }
 
-  if (selectedCategory === "alerts-admin") {
-    return <AlertsApprovalsAdminReports onBack={handleBackToMain} globalFilters={globalFilters} />;
-  }
 
   // TODO: Add other category components when implemented
 
