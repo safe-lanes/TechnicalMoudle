@@ -5,21 +5,26 @@ import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
-import { Plus, Search, Pencil, Trash2, Download, ArrowLeft, Building2, Package } from "lucide-react";
+import { Plus, Search, Pencil, Trash2, Download, ArrowLeft, Building2, Package, Info } from "lucide-react";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import MakerForm from "./MakerForm";
 import { Marker } from "@/components/Marker";
+import { SectionBlock } from "@/components/SectionBlock";
 
 export default function MakerManagement({ onBack }: { onBack?: () => void }) {
   const { toast } = useToast();
   const [searchQuery, setSearchQuery] = useState("");
-  const [isFormOpen, setIsFormOpen] = useState(false);
-  const [selectedMaker, setSelectedMaker] = useState<MakerList | null>(null);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [makerToDelete, setMakerToDelete] = useState<MakerList | null>(null);
+
+  const [detailMaker, setDetailMaker] = useState<MakerList | null>(null);
+  const [isEditMode, setIsEditMode] = useState(false);
+  const [isAddMode, setIsAddMode] = useState(false);
+  const [makerFormData, setMakerFormData] = useState<Partial<MakerList>>({});
 
   const { data: makers, isLoading, error } = useQuery<MakerList[]>({
     queryKey: ['/technical/api/fleet/makers'],
@@ -31,19 +36,45 @@ export default function MakerManagement({ onBack }: { onBack?: () => void }) {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/technical/api/fleet/makers'], exact: false });
-      toast({
-        title: "Success",
-        description: "Maker deleted successfully",
-      });
+      toast({ title: "Success", description: "Maker deleted successfully" });
       setDeleteDialogOpen(false);
       setMakerToDelete(null);
     },
     onError: (error: Error) => {
-      toast({
-        title: "Error",
-        description: error.message || "Failed to delete maker",
-        variant: "destructive",
-      });
+      toast({ title: "Error", description: error.message || "Failed to delete maker", variant: "destructive" });
+    },
+  });
+
+  const updateMakerMutation = useMutation({
+    mutationFn: async ({ id, data }: { id: number; data: Partial<MakerList> }) => {
+      const res = await apiRequest('PUT', `/technical/api/fleet/makers/${id}`, data);
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/technical/api/fleet/makers'], exact: false });
+      toast({ title: "Success", description: "Maker updated successfully" });
+      setIsEditMode(false);
+      setDetailMaker(null);
+      setMakerFormData({});
+    },
+    onError: (error: Error) => {
+      toast({ title: "Error", description: error.message || "Failed to update maker", variant: "destructive" });
+    },
+  });
+
+  const createMakerMutation = useMutation({
+    mutationFn: async (data: Partial<MakerList>) => {
+      const res = await apiRequest('POST', '/technical/api/fleet/makers', data);
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/technical/api/fleet/makers'], exact: false });
+      toast({ title: "Success", description: "Maker created successfully" });
+      setIsAddMode(false);
+      setMakerFormData({});
+    },
+    onError: (error: Error) => {
+      toast({ title: "Error", description: error.message || "Failed to create maker", variant: "destructive" });
     },
   });
 
@@ -58,13 +89,22 @@ export default function MakerManagement({ onBack }: { onBack?: () => void }) {
   }) || [];
 
   const handleAddNew = () => {
-    setSelectedMaker(null);
-    setIsFormOpen(true);
+    setMakerFormData({ isActive: true });
+    setIsAddMode(true);
+    setDetailMaker(null);
+    setIsEditMode(false);
   };
 
   const handleEdit = (maker: MakerList) => {
-    setSelectedMaker(maker);
-    setIsFormOpen(true);
+    setDetailMaker(maker);
+    setMakerFormData({ ...maker });
+    setIsEditMode(true);
+  };
+
+  const handleRowDoubleClick = (maker: MakerList) => {
+    setDetailMaker(maker);
+    setIsEditMode(false);
+    setIsAddMode(false);
   };
 
   const handleDeleteClick = (maker: MakerList) => {
@@ -76,6 +116,60 @@ export default function MakerManagement({ onBack }: { onBack?: () => void }) {
     if (makerToDelete) {
       deleteMutation.mutate(makerToDelete.id);
     }
+  };
+
+  const handleSaveEdit = () => {
+    if (!detailMaker) return;
+    const EDITABLE_FIELDS: (keyof MakerList)[] = [
+      'makerCode', 'makerName', 'address', 'addressId',
+      'contactPerson', 'email', 'phone', 'isActive',
+    ];
+    const changedFields: Record<string, any> = {};
+    for (const field of EDITABLE_FIELDS) {
+      const oldVal = detailMaker[field];
+      const newVal = makerFormData[field];
+      if (newVal !== oldVal) {
+        changedFields[field] = newVal;
+      }
+    }
+    if (Object.keys(changedFields).length === 0) {
+      toast({ title: "No Changes", description: "No changes were made" });
+      return;
+    }
+    updateMakerMutation.mutate({ id: detailMaker.id, data: changedFields });
+  };
+
+  const handleSaveAdd = () => {
+    if (!makerFormData.makerName?.trim()) {
+      toast({ title: "Validation Error", description: "Maker Name is required", variant: "destructive" });
+      return;
+    }
+    const payload: Record<string, any> = {};
+    Object.entries(makerFormData).forEach(([key, value]) => {
+      if (value !== undefined && value !== null && value !== '') {
+        payload[key] = value;
+      }
+    });
+    if (!payload.makerCode) {
+      payload.makerCode = '';
+    }
+    createMakerMutation.mutate(payload as Partial<MakerList>);
+  };
+
+  const handleCancelEdit = () => {
+    setIsEditMode(false);
+    setMakerFormData({});
+  };
+
+  const handleCancelAdd = () => {
+    setIsAddMode(false);
+    setMakerFormData({});
+  };
+
+  const handleBackToList = () => {
+    setDetailMaker(null);
+    setIsEditMode(false);
+    setMakerFormData({});
   };
 
   const handleExport = async () => {
@@ -90,20 +184,283 @@ export default function MakerManagement({ onBack }: { onBack?: () => void }) {
       a.click();
       window.URL.revokeObjectURL(url);
       document.body.removeChild(a);
-      toast({
-        title: "Success",
-        description: "Maker list exported successfully",
-      });
+      toast({ title: "Success", description: "Maker list exported successfully" });
     } catch (error) {
-      toast({
-        title: "Error",
-        description: "Failed to export maker list",
-        variant: "destructive",
-      });
+      toast({ title: "Error", description: "Failed to export maker list", variant: "destructive" });
     }
   };
 
   const totalMakers = makers?.length || 0;
+
+  const renderMakerFormSections = (formData: Partial<MakerList>, setFormData: (fn: (prev: Partial<MakerList>) => Partial<MakerList>) => void) => (
+    <div className="max-w-5xl mx-auto space-y-6">
+      <SectionBlock id="maker-info" number="A1" title="Maker Information" description="Core identification details for the manufacturer">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="space-y-1">
+            <Label className="text-sm text-[#8798ad]">Maker Code</Label>
+            <Input
+              placeholder="Auto-generated if empty"
+              value={formData.makerCode || ""}
+              onChange={(e) => setFormData(prev => ({ ...prev, makerCode: e.target.value }))}
+              data-testid="input-maker-code"
+            />
+          </div>
+          <div className="space-y-1 md:col-span-2">
+            <Label className="text-sm text-[#8798ad]">Maker Name *</Label>
+            <Input
+              placeholder="Enter maker name"
+              value={formData.makerName || ""}
+              onChange={(e) => setFormData(prev => ({ ...prev, makerName: e.target.value }))}
+              data-testid="input-maker-name"
+            />
+          </div>
+          <div className="space-y-1 md:col-span-2">
+            <Label className="text-sm text-[#8798ad]">Address</Label>
+            <Input
+              placeholder="Enter address"
+              value={formData.address || ""}
+              onChange={(e) => setFormData(prev => ({ ...prev, address: e.target.value }))}
+              data-testid="input-maker-address"
+            />
+          </div>
+          <div className="space-y-1">
+            <Label className="text-sm text-[#8798ad]">Address ID</Label>
+            <Input
+              placeholder="Enter address ID"
+              value={formData.addressId || ""}
+              onChange={(e) => setFormData(prev => ({ ...prev, addressId: e.target.value }))}
+              data-testid="input-maker-address-id"
+            />
+          </div>
+        </div>
+      </SectionBlock>
+
+      <SectionBlock id="maker-contact" number="A2" title="Contact & Status" description="Contact information and active status">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="space-y-1">
+            <Label className="text-sm text-[#8798ad]">Contact Person</Label>
+            <Input
+              placeholder="Enter contact person"
+              value={formData.contactPerson || ""}
+              onChange={(e) => setFormData(prev => ({ ...prev, contactPerson: e.target.value }))}
+              data-testid="input-maker-contact-person"
+            />
+          </div>
+          <div className="space-y-1">
+            <Label className="text-sm text-[#8798ad]">Email</Label>
+            <Input
+              placeholder="Enter email"
+              value={formData.email || ""}
+              onChange={(e) => setFormData(prev => ({ ...prev, email: e.target.value }))}
+              data-testid="input-maker-email"
+            />
+          </div>
+          <div className="space-y-1">
+            <Label className="text-sm text-[#8798ad]">Phone</Label>
+            <Input
+              placeholder="Enter phone number"
+              value={formData.phone || ""}
+              onChange={(e) => setFormData(prev => ({ ...prev, phone: e.target.value }))}
+              data-testid="input-maker-phone"
+            />
+          </div>
+          <div className="space-y-1">
+            <Label className="text-sm text-[#8798ad]">Status</Label>
+            <Select
+              value={formData.isActive === true ? "Active" : formData.isActive === false ? "Inactive" : ""}
+              onValueChange={(val) => setFormData(prev => ({ ...prev, isActive: val === "Active" }))}
+            >
+              <SelectTrigger data-testid="input-maker-status">
+                <SelectValue placeholder="Select status" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="Active">Active</SelectItem>
+                <SelectItem value="Inactive">Inactive</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
+      </SectionBlock>
+    </div>
+  );
+
+  if (isAddMode) {
+    return (
+      <div className="flex flex-col h-full">
+        <div className="bg-gradient-to-r from-cyan-600 to-blue-600 px-6 py-4 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="p-2 bg-white/20 rounded-lg">
+              <Plus className="h-5 w-5 text-white" />
+            </div>
+            <div>
+              <h1 className="text-xl font-bold text-white" data-testid="title-add-maker">Add New Maker</h1>
+              <p className="text-cyan-100 text-sm mt-0.5">
+                {makerFormData.makerName || "Create a new manufacturer"}
+              </p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            <Button
+              className="bg-white/20 text-white border-white/30"
+              variant="outline"
+              onClick={handleCancelAdd}
+              data-testid="btn-cancel-add-maker"
+            >
+              Cancel
+            </Button>
+            <Button
+              className="bg-white text-blue-600"
+              onClick={handleSaveAdd}
+              disabled={createMakerMutation.isPending}
+              data-testid="btn-save-add-maker"
+            >
+              {createMakerMutation.isPending ? "Saving..." : "Save"}
+            </Button>
+          </div>
+        </div>
+
+        <div className="flex-1 overflow-auto px-6 py-6">
+          {renderMakerFormSections(makerFormData, setMakerFormData)}
+        </div>
+      </div>
+    );
+  }
+
+  if (detailMaker && isEditMode) {
+    return (
+      <div className="flex flex-col h-full">
+        <div className="bg-gradient-to-r from-cyan-600 to-blue-600 px-6 py-4 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="p-2 bg-white/20 rounded-lg">
+              <Pencil className="h-5 w-5 text-white" />
+            </div>
+            <div>
+              <h1 className="text-xl font-bold text-white" data-testid="title-edit-maker">Edit Maker Details</h1>
+              <p className="text-cyan-100 text-sm mt-0.5">
+                {makerFormData.makerName || detailMaker.makerName || "Edit manufacturer information"}
+              </p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            <Button
+              className="bg-white/20 text-white border-white/30"
+              variant="outline"
+              onClick={handleCancelEdit}
+              data-testid="btn-cancel-edit-maker"
+            >
+              Cancel
+            </Button>
+            <Button
+              className="bg-white text-blue-600"
+              onClick={handleSaveEdit}
+              disabled={updateMakerMutation.isPending}
+              data-testid="btn-save-edit-maker"
+            >
+              {updateMakerMutation.isPending ? "Saving..." : "Save"}
+            </Button>
+          </div>
+        </div>
+
+        <div className="flex-1 overflow-auto px-6 py-6">
+          {renderMakerFormSections(makerFormData, setMakerFormData)}
+        </div>
+      </div>
+    );
+  }
+
+  if (detailMaker) {
+    return (
+      <div className="flex flex-col h-full">
+        <div className="bg-gradient-to-r from-cyan-600 to-blue-600 px-6 py-4 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="p-2 bg-white/20 rounded-lg">
+              <Info className="h-5 w-5 text-white" />
+            </div>
+            <div>
+              <h1 className="text-xl font-bold text-white" data-testid="title-maker-details">Maker Details</h1>
+              <p className="text-cyan-100 text-sm mt-0.5">{detailMaker.makerName || "View manufacturer information"}</p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            <Button
+              className="bg-white/20 text-white border-white/30"
+              variant="outline"
+              onClick={handleBackToList}
+              data-testid="btn-back-maker-list"
+            >
+              <ArrowLeft className="h-4 w-4 mr-1" />
+              Back
+            </Button>
+            <Button
+              className="bg-white text-blue-600"
+              onClick={() => handleEdit(detailMaker)}
+              data-testid="btn-edit-maker"
+            >
+              <Pencil className="h-4 w-4 mr-1" />
+              Edit
+            </Button>
+          </div>
+        </div>
+
+        <div className="flex-1 overflow-auto px-6 py-6">
+          <div className="max-w-5xl mx-auto space-y-6">
+            <SectionBlock id="detail-maker-info" number="A1" title="Maker Information" description="Core identification details for the manufacturer">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="space-y-1">
+                  <Label className="text-sm text-[#8798ad]">Maker Code</Label>
+                  <div className="text-sm font-medium text-gray-900" data-testid="detail-maker-code">{detailMaker.makerCode || '-'}</div>
+                </div>
+                <div className="space-y-1 md:col-span-2">
+                  <Label className="text-sm text-[#8798ad]">Maker Name</Label>
+                  <div className="text-sm font-medium text-gray-900" data-testid="detail-maker-name">{detailMaker.makerName || '-'}</div>
+                </div>
+                <div className="space-y-1 md:col-span-2">
+                  <Label className="text-sm text-[#8798ad]">Address</Label>
+                  <div className="text-sm font-medium text-gray-900" data-testid="detail-maker-address">{detailMaker.address || '-'}</div>
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-sm text-[#8798ad]">Address ID</Label>
+                  <div className="text-sm font-medium text-gray-900" data-testid="detail-maker-address-id">{detailMaker.addressId || '-'}</div>
+                </div>
+              </div>
+            </SectionBlock>
+
+            <SectionBlock id="detail-maker-contact" number="A2" title="Contact & Status" description="Contact information and active status">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="space-y-1">
+                  <Label className="text-sm text-[#8798ad]">Contact Person</Label>
+                  <div className="text-sm font-medium text-gray-900" data-testid="detail-contact-person">{detailMaker.contactPerson || '-'}</div>
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-sm text-[#8798ad]">Email</Label>
+                  <div className="text-sm font-medium text-gray-900" data-testid="detail-email">{detailMaker.email || '-'}</div>
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-sm text-[#8798ad]">Phone</Label>
+                  <div className="text-sm font-medium text-gray-900" data-testid="detail-phone">{detailMaker.phone || '-'}</div>
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-sm text-[#8798ad]">Status</Label>
+                  <div data-testid="detail-status">
+                    <Badge
+                      variant="outline"
+                      className={`no-default-hover-elevate no-default-active-elevate ${
+                        detailMaker.isActive !== false
+                          ? 'bg-green-50 text-green-700 border-green-200'
+                          : 'bg-red-50 text-red-700 border-red-200'
+                      }`}
+                    >
+                      {detailMaker.isActive !== false ? 'Active' : 'Inactive'}
+                    </Badge>
+                  </div>
+                </div>
+              </div>
+            </SectionBlock>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="p-6">
@@ -223,7 +580,12 @@ export default function MakerManagement({ onBack }: { onBack?: () => void }) {
                   {filteredMakers.map((maker, index) => {
                     const isFirstRow = index === 0;
                     return (
-                      <TableRow key={maker.id} data-testid={`row-maker-${maker.id}`}>
+                      <TableRow
+                        key={maker.id}
+                        data-testid={`row-maker-${maker.id}`}
+                        className="cursor-pointer"
+                        onDoubleClick={() => handleRowDoubleClick(maker)}
+                      >
                         <TableCell className="font-medium" data-testid={isFirstRow ? "I4.QL.1.19" : undefined}>
                           {isFirstRow && <Marker id="I4.QL.1.19" />}
                           {index + 1}
@@ -261,7 +623,7 @@ export default function MakerManagement({ onBack }: { onBack?: () => void }) {
                             <Button
                               variant="ghost"
                               size="icon"
-                              onClick={() => handleEdit(maker)}
+                              onClick={(e) => { e.stopPropagation(); handleEdit(maker); }}
                               data-testid={isFirstRow ? "I4.QL.1.24" : `button-edit-${maker.id}`}
                             >
                               {isFirstRow && <Marker id="I4.QL.1.24" />}
@@ -270,7 +632,7 @@ export default function MakerManagement({ onBack }: { onBack?: () => void }) {
                             <Button
                               variant="ghost"
                               size="icon"
-                              onClick={() => handleDeleteClick(maker)}
+                              onClick={(e) => { e.stopPropagation(); handleDeleteClick(maker); }}
                               className="text-red-600"
                               data-testid={isFirstRow ? "I4.QL.1.25" : `button-delete-${maker.id}`}
                             >
@@ -288,12 +650,6 @@ export default function MakerManagement({ onBack }: { onBack?: () => void }) {
           )}
         </div>
       </Card>
-
-      <MakerForm
-        open={isFormOpen}
-        onOpenChange={setIsFormOpen}
-        maker={selectedMaker}
-      />
 
       <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
         <AlertDialogContent data-testid="dialog-delete-maker">
