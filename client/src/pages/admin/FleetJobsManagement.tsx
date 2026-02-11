@@ -18,7 +18,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import { Plus, Search, Pencil, Trash2, Download, PlayCircle, Briefcase, Package, ArrowLeft } from "lucide-react";
+import { Plus, Search, Pencil, Trash2, Download, PlayCircle, Briefcase, Package, ArrowLeft, Info, Settings, Users, FileText, Shield, CheckCircle, XCircle, Wrench, MapPin, Clock } from "lucide-react";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import FleetJobForm from "./FleetJobForm";
@@ -40,6 +40,7 @@ export default function FleetJobsManagement({ onBack }: { onBack?: () => void })
 
   const [editingJob, setEditingJob] = useState<FleetJobs | null>(null);
   const [jobFormData, setJobFormData] = useState<Partial<FleetJobs>>({});
+  const [detailJob, setDetailJob] = useState<FleetJobs | null>(null);
 
   const { data: jobs, isLoading, error } = useQuery<FleetJobs[]>({
     queryKey: ['/technical/api/fleet/jobs'],
@@ -282,6 +283,200 @@ export default function FleetJobsManagement({ onBack }: { onBack?: () => void })
 
   const equipmentOptions = components?.filter(c => c.fleetEquipmentCode) || [];
   const totalJobs = jobs?.length || 0;
+
+  const renderDetailField = (label: string, value: string | null | undefined, testId?: string) => (
+    <div className="space-y-1" data-testid={testId}>
+      <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider">{label}</p>
+      <p className="text-sm text-gray-800 font-medium">{value || "-"}</p>
+    </div>
+  );
+
+  if (detailJob) {
+    return (
+      <div className="p-6">
+        <Card className="overflow-hidden">
+          <div className="bg-gradient-to-r from-cyan-600 to-blue-600 px-6 py-3">
+            <div className="flex items-center justify-between gap-4">
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-white/20 rounded-lg">
+                  <Info className="h-5 w-5 text-white" />
+                </div>
+                <div>
+                  <h1 className="text-xl font-bold text-white" data-testid="title-job-details">Job Details</h1>
+                  <p className="text-cyan-100 text-sm mt-0.5">
+                    {detailJob.jobCode} - {detailJob.woTitle}
+                  </p>
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                <Button
+                  className="bg-white/20 text-white border-white/30"
+                  variant="outline"
+                  onClick={() => {
+                    setDetailJob(null);
+                    handleEdit(detailJob);
+                  }}
+                  data-testid="btn-edit-job-detail"
+                >
+                  <Pencil className="mr-2 h-4 w-4" />
+                  Edit
+                </Button>
+                <button
+                  onClick={() => setDetailJob(null)}
+                  className="flex items-center gap-1 text-cyan-100 hover:text-white text-sm transition-colors"
+                  data-testid="button-back-to-job-list"
+                >
+                  <ArrowLeft className="h-4 w-4" />
+                  Back to List
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <div className="p-6 space-y-6">
+            <div className="bg-gray-50 border border-gray-200 rounded-lg p-5">
+              <div className="flex items-center gap-2 mb-4">
+                <Settings className="h-4 w-4 text-cyan-600" />
+                <h3 className="text-sm font-semibold text-gray-700 uppercase tracking-wider">Job Information</h3>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-x-8 gap-y-4">
+                {renderDetailField("Job Code", detailJob.jobCode, "detail-job-code")}
+                {renderDetailField("Job Title", detailJob.woTitle, "detail-job-title")}
+                {renderDetailField("Fleet Equipment Code", detailJob.fleetEquipmentCode, "detail-job-equip-code")}
+                {renderDetailField("Fleet Equipment Name", detailJob.fleetEquipmentName, "detail-job-equip-name")}
+                {renderDetailField("Maintenance Basis", detailJob.maintenanceBasis, "detail-job-maint-basis")}
+                {renderDetailField("Interval", detailJob.intervalValue && detailJob.unit ? `${detailJob.intervalValue} ${detailJob.unit}` : null, "detail-job-interval")}
+                {renderDetailField("Task Type", detailJob.taskType, "detail-job-task-type")}
+              </div>
+            </div>
+
+            <div className="bg-gray-50 border border-gray-200 rounded-lg p-5">
+              <div className="flex items-center gap-2 mb-4">
+                <Users className="h-4 w-4 text-cyan-600" />
+                <h3 className="text-sm font-semibold text-gray-700 uppercase tracking-wider">Assignment & Priority</h3>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-x-8 gap-y-4">
+                {renderDetailField("Assigned To (Rank)", detailJob.assignedTo, "detail-job-assigned-to")}
+                {renderDetailField("Approver (Rank)", detailJob.approver, "detail-job-approver")}
+                {renderDetailField("Job Priority", detailJob.jobPriority, "detail-job-priority")}
+                {renderDetailField("Class Related", detailJob.classRelated, "detail-job-class-related")}
+                {renderDetailField("Department", detailJob.department, "detail-job-department")}
+                {renderDetailField("Criticality", detailJob.criticality, "detail-job-criticality")}
+                <div className="space-y-1" data-testid="detail-job-is-active">
+                  <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Is Active</p>
+                  <div className="flex items-center gap-1.5">
+                    {detailJob.isActive ? (
+                      <>
+                        <CheckCircle className="h-4 w-4 text-green-500" />
+                        <span className="text-sm text-green-700 font-medium">Yes</span>
+                      </>
+                    ) : (
+                      <>
+                        <XCircle className="h-4 w-4 text-red-500" />
+                        <span className="text-sm text-red-700 font-medium">No</span>
+                      </>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="bg-gray-50 border border-gray-200 rounded-lg p-5">
+              <div className="flex items-center gap-2 mb-4">
+                <FileText className="h-4 w-4 text-cyan-600" />
+                <h3 className="text-sm font-semibold text-gray-700 uppercase tracking-wider">Work Description</h3>
+              </div>
+              <p className="text-sm text-gray-700 whitespace-pre-wrap">{detailJob.briefWorkDescription || "-"}</p>
+            </div>
+
+            <div className="bg-gray-50 border border-gray-200 rounded-lg p-5">
+              <div className="flex items-center gap-2 mb-4">
+                <Package className="h-4 w-4 text-cyan-600" />
+                <h3 className="text-sm font-semibold text-gray-700 uppercase tracking-wider">Required Spare Parts</h3>
+              </div>
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm border border-gray-200">
+                  <thead>
+                    <tr className="bg-white border-b border-gray-200">
+                      <th className="text-left p-2 font-medium text-gray-700 text-xs uppercase tracking-wider w-[20%]">Part No.</th>
+                      <th className="text-left p-2 font-medium text-gray-700 text-xs uppercase tracking-wider w-[40%]">Description</th>
+                      <th className="text-left p-2 font-medium text-gray-700 text-xs uppercase tracking-wider w-[15%]">Qty Required</th>
+                      <th className="text-left p-2 font-medium text-gray-700 text-xs uppercase tracking-wider w-[10%]">ROB</th>
+                      <th className="text-left p-2 font-medium text-gray-700 text-xs uppercase tracking-wider w-[15%]">Status</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {(Array.isArray(detailJob.requiredSpareParts) && (detailJob.requiredSpareParts as any[]).length > 0) ? (
+                      (detailJob.requiredSpareParts as any[]).map((part: any, index: number) => (
+                        <tr key={index} className="border-b border-gray-200">
+                          <td className="p-2 font-mono text-xs">{part.partNo || part.partNumber || part.code || '-'}</td>
+                          <td className="p-2">{part.description || part.name || part.partName || '-'}</td>
+                          <td className="p-2">{part.qty || part.quantity || part.qtyRequired || '-'}</td>
+                          <td className="p-2">{part.rob || '-'}</td>
+                          <td className="p-2">{part.status || '-'}</td>
+                        </tr>
+                      ))
+                    ) : (
+                      <tr>
+                        <td colSpan={5} className="text-center p-4 text-gray-500 italic">No spare parts linked to this job</td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            <div className="bg-gray-50 border border-gray-200 rounded-lg p-5">
+              <div className="flex items-center gap-2 mb-4">
+                <Wrench className="h-4 w-4 text-cyan-600" />
+                <h3 className="text-sm font-semibold text-gray-700 uppercase tracking-wider">Required Tools & Equipment</h3>
+              </div>
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm border border-gray-200">
+                  <thead>
+                    <tr className="bg-white border-b border-gray-200">
+                      <th className="text-left p-2 font-medium text-gray-700 text-xs uppercase tracking-wider w-[50%]">Description</th>
+                      <th className="text-left p-2 font-medium text-gray-700 text-xs uppercase tracking-wider w-[15%]">Qty Required</th>
+                      <th className="text-left p-2 font-medium text-gray-700 text-xs uppercase tracking-wider w-[10%]">ROB</th>
+                      <th className="text-left p-2 font-medium text-gray-700 text-xs uppercase tracking-wider w-[15%]">Status</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {(Array.isArray(detailJob.requiredTools) && (detailJob.requiredTools as any[]).length > 0) ? (
+                      (detailJob.requiredTools as any[]).map((tool: any, index: number) => (
+                        <tr key={index} className="border-b border-gray-200">
+                          <td className="p-2">{tool.description || tool.name || '-'}</td>
+                          <td className="p-2">{tool.qty || tool.quantity || '-'}</td>
+                          <td className="p-2">{tool.rob || '-'}</td>
+                          <td className="p-2">{tool.status || '-'}</td>
+                        </tr>
+                      ))
+                    ) : (
+                      <tr>
+                        <td colSpan={4} className="text-center p-4 text-gray-500 italic">No tools linked to this job</td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            <div className="bg-gray-50 border border-gray-200 rounded-lg p-5">
+              <div className="flex items-center gap-2 mb-4">
+                <Shield className="h-4 w-4 text-cyan-600" />
+                <h3 className="text-sm font-semibold text-gray-700 uppercase tracking-wider">Safety Requirements</h3>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-x-8 gap-y-4">
+                {renderDetailField("PPE Requirements", detailJob.ppeRequirements, "detail-job-ppe")}
+                {renderDetailField("Permit Requirements", detailJob.permitRequirements, "detail-job-permits")}
+                {renderDetailField("Other Safety Requirements", detailJob.otherSafetyRequirements, "detail-job-other-safety")}
+              </div>
+            </div>
+          </div>
+        </Card>
+      </div>
+    );
+  }
 
   if (editingJob) {
     return (
@@ -814,7 +1009,7 @@ export default function FleetJobsManagement({ onBack }: { onBack?: () => void })
                   {filteredJobs.map((job, index) => {
                     const isFirstRow = index === 0;
                     return (
-                      <TableRow key={job.id} data-testid={`row-job-${job.id}`}>
+                      <TableRow key={job.id} data-testid={`row-job-${job.id}`} className="cursor-pointer" onDoubleClick={() => setDetailJob(job)}>
                         <TableCell className="font-mono text-sm" data-testid={isFirstRow ? "I4.QL.4.21" : undefined}>
                           {isFirstRow && <Marker id="I4.QL.4.21" />}
                           {job.jobCode}
@@ -847,7 +1042,7 @@ export default function FleetJobsManagement({ onBack }: { onBack?: () => void })
                             <Button
                               variant="outline"
                               size="sm"
-                              onClick={() => handleGenerateWOClick(job)}
+                              onClick={(e) => { e.stopPropagation(); handleGenerateWOClick(job); }}
                               className="text-green-600 border-green-200"
                               title="Create Work Order Now"
                               data-testid={isFirstRow ? "I4.QL.4.26" : `button-generate-wo-${job.id}`}
@@ -859,7 +1054,7 @@ export default function FleetJobsManagement({ onBack }: { onBack?: () => void })
                             <Button
                               variant="ghost"
                               size="icon"
-                              onClick={() => handleEdit(job)}
+                              onClick={(e) => { e.stopPropagation(); handleEdit(job); }}
                               data-testid={isFirstRow ? "I4.QL.4.27" : `button-edit-${job.id}`}
                             >
                               {isFirstRow && <Marker id="I4.QL.4.27" />}
@@ -868,7 +1063,7 @@ export default function FleetJobsManagement({ onBack }: { onBack?: () => void })
                             <Button
                               variant="ghost"
                               size="icon"
-                              onClick={() => handleDeleteClick(job)}
+                              onClick={(e) => { e.stopPropagation(); handleDeleteClick(job); }}
                               className="text-red-600"
                               data-testid={isFirstRow ? "I4.QL.4.28" : `button-delete-${job.id}`}
                             >
