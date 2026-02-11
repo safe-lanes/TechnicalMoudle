@@ -235,6 +235,7 @@ export type RHConfigResponse = {
 // Column order matches UI form field order (Section A: Component Information)
 export const components = pgTable("components", {
   id: text("id").primaryKey(),
+  cuuid: text("cuuid").notNull().unique(),
   // === UI Row 1: Fleet Equipment Code, Fleet Equipment Name, Parent Component Code, Component Code ===
   fleetEquipmentCode: text("fleet_equipment_code"), // Fleet equipment code (XXX.XXX.XX format) - NOT unique, multiple components can share same code
   fleetEquipmentName: text("fleet_equipment_name"), // General name from SFI booklet
@@ -318,7 +319,8 @@ export const components = pgTable("components", {
 }));
 
 export const insertComponentSchema = createInsertSchema(components).omit({
-  id: true, // Auto-generated
+  id: true,
+  cuuid: true,
   createdAt: true,
   updatedAt: true,
 });

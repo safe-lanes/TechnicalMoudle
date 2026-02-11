@@ -1,4 +1,5 @@
 import { eq, and, desc, sql, inArray, or, ilike, asc, gte, lte, lt } from 'drizzle-orm';
+import crypto from 'crypto';
 import { getDb } from './db';
 import {
   users,
@@ -698,9 +699,11 @@ export class PostgresStorage {
   async createComponent(component: InsertComponent): Promise<Component> {
     const db = await getDb();
     const id = component.id || `COMP-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+    const cuuid = (component as any).cuuid || crypto.randomUUID();
     const result = await db.insert(components).values({
       ...component,
       id,
+      cuuid,
       dataScope: component.dataScope || 'vessel',
     }).returning();
     return result[0];
@@ -861,9 +864,11 @@ export class PostgresStorage {
   async createFleetComponent(component: InsertComponent): Promise<Component> {
     const db = await getDb();
     const id = component.id || `FC-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+    const cuuid = (component as any).cuuid || crypto.randomUUID();
     const result = await db.insert(components).values({
       ...component,
       id,
+      cuuid,
       dataScope: 'fleet',
     }).returning();
     return result[0];
@@ -5572,7 +5577,12 @@ export class PostgresStorage {
   async bulkCreateComponents(componentsData: InsertComponent[]): Promise<Component[]> {
     if (componentsData.length === 0) return [];
     const db = await getDb();
-    const result = await db.insert(components).values(componentsData).returning();
+    const withIds = componentsData.map(c => ({
+      ...c,
+      id: (c as any).id || `COMP-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+      cuuid: (c as any).cuuid || crypto.randomUUID(),
+    }));
+    const result = await db.insert(components).values(withIds as any).returning();
     return result;
   }
 
@@ -5600,17 +5610,20 @@ export class PostgresStorage {
     let updated = 0;
     
     for (const comp of componentsData) {
-      const existing = await db.select().from(components)
-        .where(eq(components.id, comp.id))
-        .limit(1);
+      const compId = (comp as any).id;
+      const existing = compId ? await db.select().from(components)
+        .where(eq(components.id, compId))
+        .limit(1) : [];
       
       if (existing.length > 0) {
         await db.update(components)
           .set(comp)
-          .where(eq(components.id, comp.id));
+          .where(eq(components.id, compId));
         updated++;
       } else {
-        await db.insert(components).values(comp);
+        const id = compId || `COMP-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+        const cuuid = (comp as any).cuuid || crypto.randomUUID();
+        await db.insert(components).values({ ...comp, id, cuuid } as any);
         created++;
       }
     }

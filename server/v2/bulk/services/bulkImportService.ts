@@ -1116,9 +1116,11 @@ export class BulkImportService {
       const parentOfParent = getParentSFICode(parentCode);
 
       const id = uuidv4();
+      const cuuid = uuidv4();
       try {
         const created = await this.repository.createComponent({
           id,
+          cuuid,
           componentCode: parentCode,
           name,
           componentCategory: category,
@@ -1191,8 +1193,10 @@ export class BulkImportService {
       ? normalizeDateToDDMMMYYYY(row['Last Updated']) : null;
 
     const id = uuidv4();
+    const cuuid = uuidv4();
     const data: any = {
       id,
+      cuuid,
       componentCode: code,
       name: row['Component Name'] || null,
       componentCategory: row['Component Category'] || null,

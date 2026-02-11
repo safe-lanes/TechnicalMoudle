@@ -4,6 +4,7 @@ import { z } from "zod";
 
 export const v2Components = pgTable("components", {
   id: text("id").primaryKey(),
+  cuuid: text("cuuid").notNull().unique(),
   fleetEquipmentCode: text("fleet_equipment_code"),
   fleetEquipmentName: text("fleet_equipment_name"),
   parentId: text("parent_id"),
@@ -67,6 +68,7 @@ export const v2Components = pgTable("components", {
 
 export const insertComponentSchema = createInsertSchema(v2Components).omit({
   id: true,
+  cuuid: true,
   createdAt: true,
   updatedAt: true,
 });
