@@ -55,14 +55,15 @@ export type Fleet = typeof fleets.$inferSelect;
 
 // Vessels Table - Core vessel registry
 export const vessels = pgTable("vessels", {
-  id: text("id").primaryKey(), // Vessel code like V001, V002
-  name: text("name").notNull(), // Vessel display name
-  code: text("code").notNull(), // Same as id for compatibility
-  fleetId: text("fleet_id"), // Optional reference to fleet
-  imoNumber: text("imo_number"), // IMO number if applicable
-  vesselType: text("vessel_type"), // e.g., Tanker, Bulk Carrier, Container
-  flag: text("flag"), // Flag state
-  vesselSequence: integer("vessel_sequence"), // Numeric sequence for vessel (1, 2, 3... for defect IDs)
+  id: text("id").primaryKey(),
+  vuuid: text("vuuid").unique(),
+  name: text("name").notNull(),
+  code: text("code").notNull(),
+  fleetId: text("fleet_id"),
+  imoNumber: text("imo_number"),
+  vesselType: text("vessel_type"),
+  flag: text("flag"),
+  vesselSequence: integer("vessel_sequence"),
   isActive: boolean("is_active").notNull().default(true),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),

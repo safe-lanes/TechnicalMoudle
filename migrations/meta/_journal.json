@@ -57,6 +57,13 @@
       "when": 1770115247757,
       "tag": "0007_auto_2026-02-03T10-40-46",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1770792658403,
+      "tag": "0008_daily_havok",
+      "breakpoints": true
     }
   ]
 }
