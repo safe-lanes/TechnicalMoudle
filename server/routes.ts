@@ -8632,11 +8632,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const graceSettingsMap = new Map<string, any>();
       
       for (const vessel of allVessels) {
-        if (vessel.id) {
-          const settings = await storage.getPmsVesselSettings(vessel.id);
+        if (vessel.vuuid) {
+          const settings = await storage.getPmsVesselSettings(vessel.vuuid);
           if (settings) {
-            vesselSettingsMap.set(vessel.id, settings);
-            graceSettingsMap.set(vessel.id, settings);
+            vesselSettingsMap.set(vessel.vuuid, settings);
+            graceSettingsMap.set(vessel.vuuid, settings);
           }
         }
       }
@@ -9957,10 +9957,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
           
           for (const masterId of companyWideMasterIds) {
             for (const vessel of allVessels) {
-              const key = `${vessel.id}-${masterId}`;
+              const key = `${vessel.vuuid}-${masterId}`;
               if (!existingKeys.has(key)) {
                 applicabilityToInsert.push({
-                  vesselId: vessel.id,
+                  vesselId: vessel.vuuid,
                   vesselName: vessel.name,
                   masterId: masterId,
                   isApplicable: true,
@@ -9977,10 +9977,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
           
           for (const masterId of vesselOnlyMasterIds) {
             for (const vessel of targetVessels) {
-              const key = `${vessel.id}-${masterId}`;
+              const key = `${vessel.vuuid}-${masterId}`;
               if (!existingKeys.has(key)) {
                 applicabilityToInsert.push({
-                  vesselId: vessel.id,
+                  vesselId: vessel.vuuid,
                   vesselName: vessel.name,
                   masterId: masterId,
                   isApplicable: true,
@@ -10264,7 +10264,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       const { and, inArray } = await import('drizzle-orm');
-      const vesselIds = vessels.map(v => v.id);
+      const vesselIds = vessels.map(v => v.vuuid);
       
       // Update all matching records
       const updatedRecords = await db.update(vesselCertificateApplicability)
@@ -10277,12 +10277,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // For vessels without existing records, create them
       const updatedVesselIds = new Set(updatedRecords.map(r => r.vesselId));
-      const missingVessels = vessels.filter(v => !updatedVesselIds.has(v.id));
+      const missingVessels = vessels.filter(v => !updatedVesselIds.has(v.vuuid));
       
       if (missingVessels.length > 0) {
         const newRecords = await db.insert(vesselCertificateApplicability)
           .values(missingVessels.map(v => ({
-            vesselId: v.id,
+            vesselId: v.vuuid,
             vesselName: v.name,
             masterId,
             isApplicable,
@@ -10439,10 +10439,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         // Create applicability for non-vessel-specific surveys - for ALL vessels
         for (const masterId of nonVesselMasterIds) {
           for (const vessel of allVessels) {
-            const key = `${vessel.id}-${masterId}`;
+            const key = `${vessel.vuuid}-${masterId}`;
             if (!existingKeys.has(key)) {
               applicabilityToInsert.push({
-                vesselId: vessel.id,
+                vesselId: vessel.vuuid,
                 vesselName: vessel.name,
                 masterId: masterId,
                 isApplicable: true, // Default to applicable
@@ -10457,10 +10457,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
           
           for (const masterId of vesselOnlyMasterIds) {
             for (const vessel of targetVessels) {
-              const key = `${vessel.id}-${masterId}`;
+              const key = `${vessel.vuuid}-${masterId}`;
               if (!existingKeys.has(key)) {
                 applicabilityToInsert.push({
-                  vesselId: vessel.id,
+                  vesselId: vessel.vuuid,
                   vesselName: vessel.name,
                   masterId: masterId,
                   isApplicable: true, // Default to applicable
@@ -10692,7 +10692,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: "vessels array, masterId, and isApplicable are required" });
       }
       
-      const vesselIds = vessels.map((v: any) => v.id);
+      const vesselIds = vessels.map((v: any) => v.vuuid);
       
       // Update all matching records
       const updatedRecords = await db.update(vesselSurveyApplicability)
@@ -10705,12 +10705,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // For vessels without existing records, create them
       const updatedVesselIds = new Set(updatedRecords.map((r: any) => r.vesselId));
-      const missingVessels = vessels.filter((v: any) => !updatedVesselIds.has(v.id));
+      const missingVessels = vessels.filter((v: any) => !updatedVesselIds.has(v.vuuid));
       
       if (missingVessels.length > 0) {
         const newRecords = await db.insert(vesselSurveyApplicability)
           .values(missingVessels.map((v: any) => ({
-            vesselId: v.id,
+            vesselId: v.vuuid,
             vesselName: v.name,
             masterId,
             isApplicable,

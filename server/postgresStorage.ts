@@ -274,7 +274,7 @@ export class PostgresStorage {
     const db = await getDb();
     const result = await db.select().from(vessels);
     return result.map(v => ({
-      id: v.id,
+      id: v.vuuid,
       vuuid: v.vuuid,
       name: v.name,
       code: v.code
