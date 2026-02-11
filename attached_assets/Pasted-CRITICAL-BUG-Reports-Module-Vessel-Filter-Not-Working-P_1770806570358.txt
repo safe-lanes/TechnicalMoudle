@@ -1,0 +1,124 @@
+CRITICAL BUG: Reports Module - Vessel Filter Not Working
+Problem Statement
+The reports in the PMS Reports module are not respecting the vessel selection from the dropdown filter. Reports are generating data irrespective of which vessel is selected, showing incorrect vessel data.
+
+Current Behavior (Bug)
+When selecting "Vessel 1" from the vessel dropdown on /pms/reports
+
+Clicking on any report category (e.g., "Maintenance Planner")
+
+The report displays data for "Vessel 4" instead of "Vessel 1"
+
+The report header shows "Planning view for Vessel 4" with 156 jobs
+
+All report data (jobs, spares, stores, etc.) appears to be from a different vessel than selected
+
+Expected Behavior
+When a specific vessel is selected (e.g., "Vessel 1"):
+
+All reports should display ONLY data for that specific vessel
+
+Report headers should show "Planning view for Vessel 1" (or respective vessel name)
+
+All counts, statistics, and data tables should be filtered by the selected vessel
+
+The vessel filter should persist when navigating between different report categories
+
+When "All Vessels" is selected:
+
+Reports should compile and aggregate data from ALL vessels in the system
+
+Report headers should indicate "All Vessels" or "Fleet-wide" view
+
+Summary statistics should show combined totals
+
+Data tables should include vessel identification column to distinguish which data belongs to which vessel
+
+Affected Report Categories (All 7 categories)
+Maintenance Planner - Currently showing Vessel 4 data regardless of filter
+
+Maintenance & Work Orders (10 reports) - Need vessel-specific filtering
+
+Running Hours & Condition (2 reports) - Need vessel-specific filtering
+
+Inventory - Spares (3 reports) - Need vessel-specific filtering
+
+Inventory - Stores/Lubes/Chemicals (5 reports) - Need vessel-specific filtering
+
+IHM (Inventory of Hazardous Materials) (1 report) - Need vessel-specific filtering
+
+Modify PMS (Change Requests) (1 report) - Need vessel-specific filtering
+
+Technical Analysis Required
+Please investigate and fix the following:
+
+Frontend State Management:
+
+Verify that the vessel selection state is being captured correctly from the dropdown
+
+Check if the selected vessel ID/name is being passed to report generation functions
+
+Ensure vessel filter state persists when navigating between report categories
+
+Backend API Queries:
+
+Review all report generation API endpoints (likely in /api/reports/...)
+
+Verify WHERE clauses in database queries include vessel filtering
+
+Check if vessel_id or equivalent field is being properly used in query parameters
+
+Ensure JOIN operations maintain vessel filtering across related tables
+
+Data Flow:
+
+Trace the vessel selection from UI dropdown → API request → database query → response
+
+Check if vessel parameter is being properly serialized in API calls
+
+Verify that the selected vessel value is not being overridden or reset
+
+Database Schema:
+
+Confirm all relevant tables have proper vessel identification columns
+
+Tables likely involved: work_orders, jobs, components, spares, stores, lubes, chemicals, ihm_items, change_requests, running_hours
+
+Report Generation Logic:
+
+For single vessel selection: Apply WHERE vessel_id = ? filter
+
+For "All Vessels" selection: Either remove vessel filter OR include GROUP BY vessel with vessel identification in results
+
+Files/Components Likely Affected
+/pms/reports page component (vessel dropdown state)
+
+/pms/reports/maintenance-planner (and all other report category pages)
+
+Backend report API routes
+
+Database query builders for each report type
+
+Report data aggregation functions
+
+Testing Checklist After Fix
+ Select "Vessel 1" → Open Maintenance Planner → Verify shows Vessel 1 data only
+
+ Select "Vessel 2" → Open Maintenance Planner → Verify shows Vessel 2 data only
+
+ Select "All Vessels" → Open Maintenance Planner → Verify shows aggregated data from all vessels
+
+ Verify vessel filter works for all 7 report categories
+
+ Verify vessel filter persists when switching between report types
+
+ Verify report counts and statistics match the filtered vessel data
+
+ Test with vessels having no data (should show empty state, not other vessel data)
+
+Database Reference
+The system currently has 10+ vessels in the fleet:
+
+Vessel 1, Vessel 2, Vessel 3, Vessel 4, Vessel 5, Vessel 6, Vessel 7, Vessel 8, Vessel 9, Vessel 10 (and possibly more)
+
+PRIORITY: HIGH - This is a critical data integrity issue affecting all reports functionality.
