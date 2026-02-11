@@ -201,7 +201,31 @@ export default function ShipsSurveysAdmin() {
         companyGroup: s.companyGroup || s.company_group || "",
         companySequence: s.companySequence || s.company_sequence || undefined,
       }));
-      setMasterData(mappedSurveys);
+
+      const companyItems = mappedSurveys.filter((s: any) => s.applicableToCompany);
+      const effectiveSeqs = companyItems.map((s: any) => s.companySequence ?? s.sequence);
+      const hasMissing = companyItems.some((s: any) => s.companySequence === undefined);
+      const hasDuplicates = new Set(effectiveSeqs).size !== effectiveSeqs.length;
+
+      if (hasMissing || hasDuplicates) {
+        const sortedCompanyIds = [...companyItems]
+          .sort((a: any, b: any) => (a.companySequence ?? a.sequence) - (b.companySequence ?? b.sequence))
+          .map((s: any) => s.id);
+        const companySeqMap = new Map<number, number>();
+        sortedCompanyIds.forEach((id: number, idx: number) => {
+          companySeqMap.set(id, idx + 1);
+        });
+
+        const normalized = mappedSurveys.map((s: any) => {
+          if (s.applicableToCompany && companySeqMap.has(s.id)) {
+            return { ...s, companySequence: companySeqMap.get(s.id) };
+          }
+          return s;
+        });
+        setMasterData(normalized);
+      } else {
+        setMasterData(mappedSurveys);
+      }
       setHasUnsavedChanges(false);
     }
   }, [savedSurveys]);
