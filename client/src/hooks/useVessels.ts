@@ -2,6 +2,7 @@ import { useLocalVessels, useExternalVessels } from "@/hooks/useExternalMasterDa
 
 interface Vessel {
   id: string;
+  vuuid: string;
   name: string;
   code: string;
   imoNumber?: string;
@@ -29,11 +30,12 @@ export function useVessels() {
   const error = hasLocalData ? localError : externalError;
 
   const vessels: Vessel[] = vesselEntries
-    .filter((entry: any) => entry.vuid || entry.vesselId || entry.id)
+    .filter((entry: any) => entry.vuuid || entry.vuid || entry.vesselId || entry.id)
     .map((entry: any) => ({
-      id: String(entry.vuid || entry.vesselId || entry.id),
+      id: String(entry.vuuid || entry.vuid || entry.vesselId || entry.id),
+      vuuid: String(entry.vuuid || entry.vuid || entry.vesselId || entry.id),
       name: String(entry.vessel || entry.vesselName || entry.name || ''),
-      code: String(entry.vuid || entry.vesselId || entry.code || entry.id),
+      code: String(entry.vuuid || entry.vuid || entry.vesselId || entry.code || entry.id),
       imoNumber: String(entry.imoNumber || entry.imo_number || ''),
       vesselType: String(entry.vesselType || entry.vessel_type || ''),
     }));

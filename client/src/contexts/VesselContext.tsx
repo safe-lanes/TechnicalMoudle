@@ -3,6 +3,7 @@ import { useVessels } from '@/hooks/useVessels';
 
 interface Vessel {
   id: string;
+  vuuid: string;
   name: string;
   code: string;
 }
@@ -24,11 +25,12 @@ export const VesselProvider = ({ children }: { children: ReactNode }) => {
   const { data: vesselData = [], isLoading } = useVessels();
   
   const vessels: Vessel[] = vesselData
-    .filter((entry: any) => entry.id)
+    .filter((entry: any) => entry.vuuid || entry.id)
     .map((entry: any) => ({
-      id: String(entry.id),
+      id: String(entry.vuuid || entry.id),
+      vuuid: String(entry.vuuid || entry.id),
       name: String(entry.name || ''),
-      code: String(entry.code || entry.id),
+      code: String(entry.code || entry.vuuid || entry.id),
     }));
 
   useEffect(() => {
