@@ -1,6 +1,6 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { type FleetComponents } from "@shared/schema";
+import { type FleetComponents, type MakerList } from "@shared/schema";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -25,8 +25,16 @@ export default function FleetComponentsManagement({ onBack }: { onBack?: () => v
   const [isAddMode, setIsAddMode] = useState(false);
   const [editFormData, setEditFormData] = useState<Record<string, any>>({});
 
+  const [makerSearchText, setMakerSearchText] = useState("");
+  const [showMakerSuggestions, setShowMakerSuggestions] = useState(false);
+  const makerSearchRef = useRef<HTMLDivElement>(null);
+
   const { data: components, isLoading, error } = useQuery<FleetComponents[]>({
     queryKey: ['/technical/api/fleet-admin/fleet-components'],
+  });
+
+  const { data: makersData } = useQuery<MakerList[]>({
+    queryKey: ['/technical/api/fleet/makers'],
   });
 
   const deleteMutation = useMutation({
@@ -165,6 +173,7 @@ export default function FleetComponentsManagement({ onBack }: { onBack?: () => v
       isActive: true,
       notes: "",
     });
+    setMakerSearchText("");
     setIsAddMode(true);
   };
 
@@ -185,6 +194,7 @@ export default function FleetComponentsManagement({ onBack }: { onBack?: () => v
       isActive: component.isActive,
       notes: component.notes || "",
     });
+    setMakerSearchText(component.makerName || "");
     setIsEditMode(true);
   };
 
@@ -260,6 +270,94 @@ export default function FleetComponentsManagement({ onBack }: { onBack?: () => v
     </div>
   );
 
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (makerSearchRef.current && !makerSearchRef.current.contains(event.target as Node)) {
+        setShowMakerSuggestions(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  const filteredMakers = (makersData || []).filter(m => {
+    if (!makerSearchText) return true;
+    const q = makerSearchText.toLowerCase();
+    return m.makerName?.toLowerCase().includes(q) || m.makerCode?.toLowerCase().includes(q);
+  });
+
+  const handleSelectMaker = (maker: MakerList) => {
+    setEditFormData(prev => ({
+      ...prev,
+      makerName: maker.makerName || "",
+      makerCode: maker.makerCode || "",
+    }));
+    setMakerSearchText(maker.makerName || "");
+    setShowMakerSuggestions(false);
+  };
+
+  const handleClearMaker = () => {
+    setEditFormData(prev => ({
+      ...prev,
+      makerName: "",
+      makerCode: "",
+    }));
+    setMakerSearchText("");
+    setShowMakerSuggestions(false);
+  };
+
+  const renderMakerSearchField = (testId?: string) => (
+    <div className="space-y-1 relative" ref={makerSearchRef} data-testid={testId}>
+      <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Maker</p>
+      <div className="relative">
+        <Search className="absolute left-2.5 top-1/2 transform -translate-y-1/2 h-3.5 w-3.5 text-gray-400" />
+        <Input
+          value={makerSearchText}
+          onChange={(e) => {
+            setMakerSearchText(e.target.value);
+            setShowMakerSuggestions(true);
+          }}
+          onFocus={() => setShowMakerSuggestions(true)}
+          placeholder="Search maker name..."
+          className="bg-white border-gray-300 text-sm pl-8 pr-8"
+          data-testid="edit-input-makerSearch"
+        />
+        {makerSearchText && (
+          <button
+            type="button"
+            onClick={handleClearMaker}
+            className="absolute right-2.5 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
+            data-testid="btn-clear-maker"
+          >
+            <X className="h-3.5 w-3.5" />
+          </button>
+        )}
+      </div>
+      {showMakerSuggestions && filteredMakers.length > 0 && (
+        <div className="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-md shadow-lg max-h-48 overflow-y-auto">
+          {filteredMakers.slice(0, 20).map((maker) => (
+            <div
+              key={maker.id}
+              className="px-3 py-2 text-sm cursor-pointer hover:bg-cyan-50 flex items-center justify-between"
+              onClick={() => handleSelectMaker(maker)}
+              data-testid={`maker-suggestion-${maker.id}`}
+            >
+              <span className="font-medium text-gray-800 truncate">{maker.makerName}</span>
+              {maker.makerCode && (
+                <span className="text-xs text-gray-400 ml-2 shrink-0">{maker.makerCode}</span>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+      {showMakerSuggestions && makerSearchText && filteredMakers.length === 0 && (
+        <div className="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-md shadow-lg">
+          <div className="px-3 py-2 text-sm text-gray-500">No makers found</div>
+        </div>
+      )}
+    </div>
+  );
+
   const handleStartEdit = () => {
     if (!detailComponent) return;
     setEditFormData({
@@ -277,6 +375,7 @@ export default function FleetComponentsManagement({ onBack }: { onBack?: () => v
       isActive: detailComponent.isActive,
       notes: detailComponent.notes || "",
     });
+    setMakerSearchText(detailComponent.makerName || "");
     setIsEditMode(true);
   };
 
@@ -424,8 +523,17 @@ export default function FleetComponentsManagement({ onBack }: { onBack?: () => v
                 <h3 className="text-sm font-semibold text-gray-700 uppercase tracking-wider">Maker & Model Details</h3>
               </div>
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-x-8 gap-y-4">
-                {renderEditField("Maker Name", "makerName", "add-maker-name")}
-                {renderEditField("Maker Code", "makerCode", "add-maker-code")}
+                {renderMakerSearchField("add-maker-name")}
+                <div className="space-y-1" data-testid="add-maker-code">
+                  <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Maker Code</p>
+                  <Input
+                    value={editFormData.makerCode || ""}
+                    readOnly
+                    className="bg-gray-100 border-gray-300 text-sm text-gray-600"
+                    placeholder="Auto-filled from maker selection"
+                    data-testid="edit-input-makerCode"
+                  />
+                </div>
                 {renderEditField("Model", "model", "add-model")}
                 {renderEditField("Model Code", "modelCode", "add-model-code")}
               </div>
@@ -601,8 +709,17 @@ export default function FleetComponentsManagement({ onBack }: { onBack?: () => v
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-x-8 gap-y-4">
                 {isEditMode ? (
                   <>
-                    {renderEditField("Maker Name", "makerName", "detail-maker-name")}
-                    {renderEditField("Maker Code", "makerCode", "detail-maker-code")}
+                    {renderMakerSearchField("detail-maker-name")}
+                    <div className="space-y-1" data-testid="detail-maker-code">
+                      <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Maker Code</p>
+                      <Input
+                        value={editFormData.makerCode || ""}
+                        readOnly
+                        className="bg-gray-100 border-gray-300 text-sm text-gray-600"
+                        placeholder="Auto-filled from maker selection"
+                        data-testid="edit-input-makerCode-detail"
+                      />
+                    </div>
                     {renderEditField("Model", "model", "detail-model")}
                     {renderEditField("Model Code", "modelCode", "detail-model-code")}
                   </>
