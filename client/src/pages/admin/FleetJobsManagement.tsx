@@ -177,9 +177,30 @@ export default function FleetJobsManagement({ onBack }: { onBack?: () => void })
 
   const handleSaveEdit = () => {
     if (!editingJob) return;
+    const editablePayload = {
+      woTitle: jobFormData.woTitle,
+      jobCode: jobFormData.jobCode,
+      maintenanceBasis: jobFormData.maintenanceBasis,
+      intervalValue: jobFormData.intervalValue,
+      unit: jobFormData.unit,
+      taskType: jobFormData.taskType,
+      assignedTo: jobFormData.assignedTo,
+      approver: jobFormData.approver,
+      jobPriority: jobFormData.jobPriority,
+      classRelated: jobFormData.classRelated,
+      briefWorkDescription: jobFormData.briefWorkDescription,
+      department: jobFormData.department,
+      criticality: jobFormData.criticality,
+      isActive: jobFormData.isActive,
+      ppeRequirements: jobFormData.ppeRequirements,
+      permitRequirements: jobFormData.permitRequirements,
+      otherSafetyRequirements: jobFormData.otherSafetyRequirements,
+      requiredSpareParts: jobFormData.requiredSpareParts,
+      requiredTools: jobFormData.requiredTools,
+    };
     updateJobMutation.mutate({
       id: editingJob.id,
-      data: jobFormData,
+      data: editablePayload,
     });
   };
 
