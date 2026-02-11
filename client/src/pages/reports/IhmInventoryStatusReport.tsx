@@ -257,8 +257,9 @@ const IhmInventoryStatusReport: React.FC<IhmInventoryStatusReportProps> = ({ onB
         summaryData
       );
       toast({ title: "PDF Generated", description: "Report downloaded successfully." });
-    } catch (e) {
-      toast({ title: "Export Failed", description: "Failed to generate PDF.", variant: "destructive" });
+    } catch (e: any) {
+      console.error("PDF export error:", e);
+      toast({ title: "Export Failed", description: e?.message || "Failed to generate PDF.", variant: "destructive" });
     } finally {
       setGeneratingPdf(false);
     }
@@ -284,11 +285,17 @@ const IhmInventoryStatusReport: React.FC<IhmInventoryStatusReportProps> = ({ onB
       const link = document.createElement('a');
       link.href = url;
       link.download = `ihm-inventory-status-${new Date().toISOString().slice(0, 10)}.xlsx`;
+      link.style.display = 'none';
+      document.body.appendChild(link);
       link.click();
-      URL.revokeObjectURL(url);
+      setTimeout(() => {
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
+      }, 1000);
       toast({ title: "Excel Exported", description: "Report downloaded as Excel file." });
-    } catch (err) {
-      toast({ title: "Export Failed", description: "Failed to generate Excel report.", variant: "destructive" });
+    } catch (err: any) {
+      console.error("Excel export error:", err);
+      toast({ title: "Export Failed", description: err?.message || "Failed to generate Excel report.", variant: "destructive" });
     } finally {
       setExportingExcel(false);
     }
