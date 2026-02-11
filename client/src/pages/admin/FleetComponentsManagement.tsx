@@ -12,19 +12,17 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { Plus, Search, Pencil, Trash2, ChevronRight, ChevronDown, Upload, Download, Settings, Package, ArrowLeft, Info, MapPin, Star, FileText, CheckCircle, XCircle, Save, X } from "lucide-react";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import FleetComponentForm from "./FleetComponentForm";
 import { Marker } from "@/components/Marker";
 
 export default function FleetComponentsManagement({ onBack }: { onBack?: () => void }) {
   const { toast } = useToast();
   const [searchQuery, setSearchQuery] = useState("");
-  const [isFormOpen, setIsFormOpen] = useState(false);
-  const [selectedComponent, setSelectedComponent] = useState<FleetComponents | null>(null);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [componentToDelete, setComponentToDelete] = useState<FleetComponents | null>(null);
   const [expandedNodes, setExpandedNodes] = useState<Set<string>>(new Set());
   const [detailComponent, setDetailComponent] = useState<FleetComponents | null>(null);
   const [isEditMode, setIsEditMode] = useState(false);
+  const [isAddMode, setIsAddMode] = useState(false);
   const [editFormData, setEditFormData] = useState<Record<string, any>>({});
 
   const { data: components, isLoading, error } = useQuery<FleetComponents[]>({
@@ -69,6 +67,28 @@ export default function FleetComponentsManagement({ onBack }: { onBack?: () => v
       toast({
         title: "Error",
         description: error.message || "Failed to update component",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const createMutation = useMutation({
+    mutationFn: async (data: Record<string, any>) => {
+      return apiRequest('POST', '/technical/api/fleet-admin/fleet-components', data);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/technical/api/fleet-admin/fleet-components'], exact: false });
+      toast({
+        title: "Success",
+        description: "Component created successfully",
+      });
+      setIsAddMode(false);
+      setEditFormData({});
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to create component",
         variant: "destructive",
       });
     },
@@ -128,8 +148,24 @@ export default function FleetComponentsManagement({ onBack }: { onBack?: () => v
   };
 
   const handleAddNew = (parentCode?: string | null) => {
-    setSelectedComponent(parentCode ? { parentFleetEquipmentCode: parentCode } as FleetComponents : null);
-    setIsFormOpen(true);
+    setDetailComponent(null);
+    setIsEditMode(false);
+    setEditFormData({
+      fleetEquipmentCode: "",
+      fleetEquipmentName: "",
+      parentFleetEquipmentCode: parentCode || "",
+      componentCategory: "",
+      eqptSystemDept: "",
+      makerName: "",
+      makerCode: "",
+      model: "",
+      modelCode: "",
+      location: "",
+      rating: "",
+      isActive: true,
+      notes: "",
+    });
+    setIsAddMode(true);
   };
 
   const handleEdit = (component: FleetComponents) => {
@@ -283,7 +319,163 @@ export default function FleetComponentsManagement({ onBack }: { onBack?: () => v
     setEditFormData({});
   };
 
+  const handleSaveAdd = () => {
+    if (!editFormData.fleetEquipmentCode || !editFormData.fleetEquipmentName) {
+      toast({
+        title: "Validation Error",
+        description: "Fleet Equipment Code and Equipment Name are required",
+        variant: "destructive",
+      });
+      return;
+    }
+    const payload: Record<string, any> = {};
+    for (const [key, value] of Object.entries(editFormData)) {
+      if (value !== "" && value !== null && value !== undefined) {
+        payload[key] = value;
+      }
+    }
+    createMutation.mutate(payload);
+  };
+
+  const handleCancelAdd = () => {
+    setIsAddMode(false);
+    setEditFormData({});
+  };
+
+  const parentOptionsForAdd = components?.filter(c => c.fleetEquipmentCode) || [];
   const parentOptions = components?.filter(c => c.id !== detailComponent?.id && c.fleetEquipmentCode) || [];
+
+  if (isAddMode) {
+    return (
+      <div className="p-6">
+        <Card className="overflow-hidden">
+          <div className="bg-gradient-to-r from-cyan-600 to-blue-600 px-6 py-3">
+            <div className="flex items-center justify-between gap-4">
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-white/20 rounded-lg">
+                  <Plus className="h-5 w-5 text-white" />
+                </div>
+                <div>
+                  <h1 className="text-xl font-bold text-white" data-testid="title-add-component">Add New Component</h1>
+                  <p className="text-cyan-100 text-sm mt-0.5">Create a new fleet component</p>
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                <Button
+                  className="bg-white/20 text-white border-white/30"
+                  variant="outline"
+                  onClick={handleSaveAdd}
+                  disabled={createMutation.isPending}
+                  data-testid="btn-save-add-component"
+                >
+                  <Save className="mr-2 h-4 w-4" />
+                  {createMutation.isPending ? "Saving..." : "Save"}
+                </Button>
+                <Button
+                  className="bg-white/10 text-white border-white/20"
+                  variant="outline"
+                  onClick={handleCancelAdd}
+                  disabled={createMutation.isPending}
+                  data-testid="btn-cancel-add-component"
+                >
+                  <X className="mr-2 h-4 w-4" />
+                  Cancel
+                </Button>
+              </div>
+            </div>
+          </div>
+
+          <div className="p-6 space-y-6">
+            <div className="bg-gray-50 border border-gray-200 rounded-lg p-5">
+              <div className="flex items-center gap-2 mb-4">
+                <Settings className="h-4 w-4 text-cyan-600" />
+                <h3 className="text-sm font-semibold text-gray-700 uppercase tracking-wider">Equipment Information</h3>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-x-8 gap-y-4">
+                {renderEditField("Fleet Equipment Code", "fleetEquipmentCode", "add-fleet-code")}
+                {renderEditField("Equipment Name", "fleetEquipmentName", "add-equipment-name")}
+                <div className="space-y-1" data-testid="add-parent-code">
+                  <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Parent Fleet Equipment Code</p>
+                  <Select
+                    value={editFormData.parentFleetEquipmentCode || "none"}
+                    onValueChange={(val) => setEditFormData(prev => ({ ...prev, parentFleetEquipmentCode: val === "none" ? "" : val }))}
+                  >
+                    <SelectTrigger className="bg-white border-gray-300 text-sm" data-testid="add-select-parent">
+                      <SelectValue placeholder="Select parent (optional)" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none">None (Top Level)</SelectItem>
+                      {parentOptionsForAdd.map((c) => (
+                        <SelectItem key={c.id} value={c.fleetEquipmentCode}>
+                          {c.fleetEquipmentCode} - {c.fleetEquipmentName}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                {renderEditField("Component Category", "componentCategory", "add-category")}
+                {renderEditField("Equipment System / Department", "eqptSystemDept", "add-eqpt-system-dept")}
+              </div>
+            </div>
+
+            <div className="bg-gray-50 border border-gray-200 rounded-lg p-5">
+              <div className="flex items-center gap-2 mb-4">
+                <Package className="h-4 w-4 text-cyan-600" />
+                <h3 className="text-sm font-semibold text-gray-700 uppercase tracking-wider">Maker & Model Details</h3>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-x-8 gap-y-4">
+                {renderEditField("Maker Name", "makerName", "add-maker-name")}
+                {renderEditField("Maker Code", "makerCode", "add-maker-code")}
+                {renderEditField("Model", "model", "add-model")}
+                {renderEditField("Model Code", "modelCode", "add-model-code")}
+              </div>
+            </div>
+
+            <div className="bg-gray-50 border border-gray-200 rounded-lg p-5">
+              <div className="flex items-center gap-2 mb-4">
+                <MapPin className="h-4 w-4 text-cyan-600" />
+                <h3 className="text-sm font-semibold text-gray-700 uppercase tracking-wider">Additional Details</h3>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-x-8 gap-y-4">
+                {renderEditField("Location", "location", "add-location")}
+                {renderEditField("Rating", "rating", "add-rating")}
+                <div className="space-y-1" data-testid="add-is-active">
+                  <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Is Active</p>
+                  <Select
+                    value={editFormData.isActive === true ? "Yes" : editFormData.isActive === false ? "No" : ""}
+                    onValueChange={(val) => setEditFormData(prev => ({ ...prev, isActive: val === "Yes" }))}
+                  >
+                    <SelectTrigger className="bg-white border-gray-300 text-sm" data-testid="add-select-is-active">
+                      <SelectValue placeholder="Select status" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="Yes">Yes</SelectItem>
+                      <SelectItem value="No">No</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+            </div>
+
+            <div className="bg-gray-50 border border-gray-200 rounded-lg p-5">
+              <div className="flex items-center gap-2 mb-4">
+                <FileText className="h-4 w-4 text-cyan-600" />
+                <h3 className="text-sm font-semibold text-gray-700 uppercase tracking-wider">Notes</h3>
+              </div>
+              <Textarea
+                value={editFormData.notes || ""}
+                onChange={(e) => setEditFormData(prev => ({ ...prev, notes: e.target.value }))}
+                placeholder="Additional details about the equipment"
+                rows={4}
+                className="bg-white border-gray-300 text-sm"
+                data-testid="add-input-notes"
+              />
+            </div>
+          </div>
+        </Card>
+      </div>
+    );
+  }
 
   if (detailComponent) {
     const parentName = components?.find(c => c.fleetEquipmentCode === detailComponent.parentFleetEquipmentCode)?.fleetEquipmentName;
@@ -497,11 +689,6 @@ export default function FleetComponentsManagement({ onBack }: { onBack?: () => v
           </div>
         </Card>
 
-        <FleetComponentForm
-          open={isFormOpen}
-          onOpenChange={setIsFormOpen}
-          component={selectedComponent}
-        />
       </div>
     );
   }
@@ -732,12 +919,6 @@ export default function FleetComponentsManagement({ onBack }: { onBack?: () => v
           )}
         </div>
       </Card>
-
-      <FleetComponentForm
-        open={isFormOpen}
-        onOpenChange={setIsFormOpen}
-        component={selectedComponent}
-      />
 
       <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
         <AlertDialogContent data-testid="dialog-delete-component">
