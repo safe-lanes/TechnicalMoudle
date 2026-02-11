@@ -1,0 +1,176 @@
+Below is the new structured Raplit Prompt, aligned exactly to your requirement — job_code must be the primary update target and changes must reflect across all records sharing the same job code.
+
+Raplit Analysis & Implementation Plan Prompt
+Fleet Job Edit — Update by job_code Across Multiple Components
+Module
+
+PMS → Admin → Fleet Data → Fleet Job Management → Edit Job Details
+
+🎯 Objective
+
+When editing a Fleet Job from the Edit Job Details page, if multiple records exist in the fleet_jobs table with the same job_code but linked to multiple Fleet Components, then:
+
+The job_code must be treated as the primary update target.
+Any changes made in the selected editable fields must reflect in ALL records having the same job_code.
+
+📌 Business Rule
+
+If multiple rows exist such as:
+
+id	job_code	fleet_equipment_code	...
+1	J001	FE001	...
+2	J001	FE002	...
+3	J001	FE003	...
+
+Then:
+
+Editing any one of these records must apply changes to:
+
+ALL rows WHERE job_code = 'J001'
+
+
+Regardless of how many components it is linked to.
+
+🔍 Required Analysis
+1️⃣ Data Structure Validation
+
+Analyse and confirm:
+
+job_code is the logical master identifier
+
+Multiple records exist because jobs are linked to multiple Fleet Components
+
+Component linkage should remain unchanged
+
+Only editable job-level fields must be updated
+
+2️⃣ Update Strategy
+
+Instead of updating by:
+
+WHERE id = :id
+
+
+The update must target:
+
+WHERE job_code = :job_code
+
+
+This ensures:
+
+All linked component jobs remain synchronized
+
+No divergence between same job definitions
+
+3️⃣ Field Scope
+
+Clarify which fields must be synchronized across same job_code.
+These typically include:
+
+wo_title
+
+maintenance_basis
+
+interval_value
+
+unit
+
+task_type
+
+assigned_to
+
+approver
+
+job_priority
+
+class_related
+
+brief_work_description
+
+department
+
+criticality
+
+is_active
+
+Component-specific linkage fields must NOT be modified:
+
+fleet_equipment_code
+
+fleet_equipment_name
+
+⚙️ Implementation Plan
+Step 1 — Frontend Behavior
+
+On Save, send:
+
+job_code
+
+Editable job-level fields
+
+Do not rely solely on record id
+
+Step 2 — Backend Update Logic
+
+Implement update query:
+
+UPDATE fleet_jobs
+SET
+    wo_title = :wo_title,
+    maintenance_basis = :maintenance_basis,
+    interval_value = :interval_value,
+    unit = :unit,
+    task_type = :task_type,
+    assigned_to = :assigned_to,
+    approver = :approver,
+    job_priority = :job_priority,
+    class_related = :class_related,
+    brief_work_description = :brief_work_description,
+    department = :department,
+    criticality = :criticality,
+    is_active = :is_active
+WHERE job_code = :job_code;
+
+Step 3 — Transaction Safety
+
+Wrap update in DB transaction
+
+Log affected row count
+
+Return number of updated records
+
+Step 4 — UI Response
+
+After successful update:
+
+Show success message with count of updated records
+
+Navigate back to Fleet Job Management
+
+Refresh job list
+
+🚨 Important Constraints
+
+job_code must be the primary update target
+
+Do not modify schema
+
+Do not break bulk import logic
+
+Do not affect other modules
+
+Do not duplicate records
+
+Component linkage must remain intact
+
+📌 Expected Outcome
+
+Editing a Fleet Job updates all jobs with same job_code
+
+Component mappings remain unchanged
+
+Data consistency across linked Fleet Components
+
+No manual propagation logic required
+
+Clean and predictable update behavior
