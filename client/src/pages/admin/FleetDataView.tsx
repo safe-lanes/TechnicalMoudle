@@ -358,6 +358,72 @@ export default function FleetDataView({ onBack }: { onBack?: () => void }) {
     },
   });
 
+  const updateFleetJobMutation = useMutation({
+    mutationFn: async ({ id, data, jobCode }: { id: number; data: Partial<FleetJob>; jobCode?: string }) => {
+      const res = await apiRequest('PATCH', `/technical/api/fleet/jobs/${id}`, data);
+      try {
+        const json = await res.json();
+        return { ...json, _jobCode: jobCode };
+      } catch {
+        return { affectedCount: 1, _jobCode: jobCode };
+      }
+    },
+    onSuccess: (responseData: any) => {
+      queryClient.invalidateQueries({ queryKey: ['/technical/api/fleet/jobs'], exact: false });
+      const count = responseData?.affectedCount || 1;
+      const jobCode = responseData?._jobCode || '';
+      toast({
+        title: "Success",
+        description: count > 1
+          ? `Updated ${count} records with job code ${jobCode}`
+          : "Job updated successfully",
+      });
+      setIsEditJobDialogOpen(false);
+      if (selectedJobForDetail) {
+        setSelectedJobForDetail({ ...selectedJobForDetail, ...jobFormData } as FleetJob);
+      }
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to update fleet job",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const handleSaveEditJob = () => {
+    if (!selectedJobForDetail) return;
+    const EDITABLE_FIELDS: (keyof FleetJob)[] = [
+      'woTitle', 'jobCode', 'maintenanceBasis', 'intervalValue', 'unit',
+      'taskType', 'assignedTo', 'approver', 'jobPriority',
+      'classRelated', 'briefWorkDescription', 'department',
+      'criticality', 'isActive',
+      'ppeRequirements', 'permitRequirements', 'otherSafetyRequirements',
+      'requiredSpareParts', 'requiredTools',
+    ];
+    const changedPayload: Record<string, any> = {};
+    for (const field of EDITABLE_FIELDS) {
+      const newVal = jobFormData[field];
+      const oldVal = selectedJobForDetail[field];
+      if (JSON.stringify(newVal) !== JSON.stringify(oldVal)) {
+        changedPayload[field] = newVal;
+      }
+    }
+    if (Object.keys(changedPayload).length === 0) {
+      toast({
+        title: "No Changes",
+        description: "No fields were modified",
+      });
+      return;
+    }
+    updateFleetJobMutation.mutate({
+      id: selectedJobForDetail.id,
+      data: changedPayload,
+      jobCode: jobFormData.jobCode,
+    });
+  };
+
   const mappedComponents = useMemo(() => {
     if (!fleetComponentsData || fleetComponentsData.length === 0) return [];
     return fleetComponentsData.map(mapFleetComponentsToFleetComponent);
@@ -2094,13 +2160,11 @@ export default function FleetDataView({ onBack }: { onBack?: () => void }) {
               </Button>
               <Button
                 className="bg-white text-blue-600"
-                onClick={() => {
-                  toast({ title: "Success", description: "Job updated successfully" });
-                  setIsEditJobDialogOpen(false);
-                }}
+                onClick={handleSaveEditJob}
+                disabled={updateFleetJobMutation.isPending}
                 data-testid="btn-save-job"
               >
-                Save
+                {updateFleetJobMutation.isPending ? "Saving..." : "Save"}
               </Button>
             </div>
           </div>
