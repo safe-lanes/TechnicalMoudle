@@ -1,0 +1,392 @@
+PROMPT FOR REPLIT AGENT - Implement Change Requests Status & Tracking Report
+CONTEXT FROM YOUR ANALYSIS:
+Thank you for the detailed analysis. I now understand:
+
+Database Schema - change_request table structure:
+
+IDs: id, vesselId
+
+Classification: category (components/work_orders/spares/stores), title, reason
+
+Target linking: targetType, targetId
+
+Change data: snapshotBeforeJson, proposedChangesJson (JSON fields)
+
+Status: status (draft, submitted, returned, approved, rejected)
+
+People: requestedByUserId, reviewedByUserId
+
+Timing: submittedAt, reviewedAt, createdAt, updatedAt
+
+History: revisionNumber, revisionHistory (JSON)
+
+Current Problem - The report in ChangeRequestReports.tsx is using placeholder data (work orders/jobs) instead of actual change_request table data
+
+Existing Infrastructure - PDF generator (pdfReportGenerator.ts with jsPDF), Excel utilities (ExcelJS), API at /technical/api/change-requests
+
+IMPLEMENTATION REQUIREMENTS:
+1. BACKEND - Report Data Endpoint
+Create a new API endpoint specifically for the "Change Requests Status & Tracking" report:
+
+Endpoint: GET /pms/api/reports/change-requests-status-tracking
+
+Query Parameters:
+
+vesselId (optional) - Filter by vessel, or "all" for all vessels
+
+startDate (optional) - Start of date range (ISO format)
+
+endDate (optional) - End of date range (ISO format)
+
+status (optional) - Filter by status (draft/submitted/returned/approved/rejected)
+
+category (optional) - Filter by category (components/work_orders/spares/stores)
+
+Response Structure:
+
+typescript
+{
+  summary: {
+    totalRequests: number,
+    byStatus: {
+      draft: number,
+      submitted: number,
+      returned: number,
+      approved: number,
+      rejected: number
+    },
+    byCategory: {
+      components: number,
+      work_orders: number,
+      spares: number,
+      stores: number
+    },
+    avgApprovalTimeHours: number,
+    pendingRequests: number
+  },
+  requests: [
+    {
+      id: string,
+      title: string,
+      category: string,
+      status: string,
+      requestedBy: { // Join with users table
+        name: string,
+        rank: string,
+        userId: string
+      },
+      reviewedBy: { // Join with users table (if reviewed)
+        name: string,
+        rank: string,
+        userId: string
+      } | null,
+      vessel: { // Join with vessels table
+        id: string,
+        name: string
+      },
+      submittedAt: string,
+      reviewedAt: string | null,
+      createdAt: string,
+      reason: string,
+      targetInfo: { // Denormalized info about the target
+        type: string,
+        id: string,
+        name: string // e.g., component name, job code, etc.
+      },
+      changesCount: number, // Count of fields changed
+      fieldChanges: [ // Parse from proposedChangesJson
+        {
+          fieldPath: string, // e.g., "COMPONENTINFO.CRITICAL"
+          oldValue: any,
+          newValue: any,
+          fieldLabel: string // Human-readable field name
+        }
+      ],
+      cycleTimeHours: number | null, // submittedAt to reviewedAt
+      revisionNumber: number
+    }
+  ]
+}
+Implementation Notes:
+
+Join change_request with users table twice (for requestedBy and reviewedBy)
+
+Join with vessels table for vessel name
+
+Parse proposedChangesJson to extract field-level changes
+
+Calculate cycleTimeHours from submittedAt to reviewedAt
+
+Get target entity name by querying the appropriate table based on targetType and targetId
+
+Apply all filters (vessel, date range, status, category)
+
+Order by submittedAt DESC
+
+2. FRONTEND - Update ChangeRequestReports.tsx
+A. Replace Placeholder Data Logic:
+
+Remove work orders/jobs placeholder query
+
+Add API call to new endpoint: /pms/api/reports/change-requests-status-tracking
+
+Implement proper loading states
+
+Handle errors gracefully
+
+B. Dashboard Metrics (Top Cards):
+Currently showing:
+
+Unplanned WOs: 0 (this seems wrong for change requests)
+
+Pending: 0
+
+Total Jobs: 1025 (this is incorrect)
+
+Reports: 2
+
+Replace with:
+
+Submitted - Count of submitted status
+
+Pending Review - Count of submitted + returned status
+
+Total Requests - Total count in date range
+
+Approved - Count of approved status
+
+C. Filters Implementation:
+
+Vessel Selector - Use existing vessel dropdown, bind to vesselId parameter
+
+Date Range Picker - Use existing date range component, bind to startDate/endDate
+
+Add Status Filter - Dropdown with options: All, Draft, Submitted, Returned, Approved, Rejected
+
+Add Category Filter - Dropdown with options: All, Components, Jobs, Spares, Stores
+
+3. PDF EXPORT - Using pdfReportGenerator.ts
+Report Layout:
+
+Page 1 - Summary:
+
+text
+===================================
+CHANGE REQUESTS STATUS & TRACKING
+===================================
+
+Report Period: [Start Date] to [End Date]
+Vessel: [Vessel Name or "All Vessels"]
+Generated: [Current DateTime]
+
+SUMMARY STATISTICS
+------------------
+Total Requests: [X]
+Approved: [X] ([X]%)
+Rejected: [X] ([X]%)
+Pending Review: [X]
+Average Approval Time: [X] hours
+
+BY CATEGORY
+-----------
+Components: [X]
+Jobs: [X]
+Spares: [X]
+Stores: [X]
+
+BY STATUS
+---------
+Draft: [X]
+Submitted: [X]
+Returned: [X]
+Approved: [X]
+Rejected: [X]
+Page 2+ - Detailed Listing:
+
+text
+CHANGE REQUESTS DETAILS
+========================
+
+[For each request:]
+
+Request #[ID]
+Title: [Title]
+Category: [Category] | Status: [Status]
+Requested By: [Name] ([Rank])
+Submitted: [Date/Time]
+Reviewed: [Date/Time] | Reviewed By: [Name] ([Rank])
+Cycle Time: [X] hours
+Target: [Target Type] - [Target Name]
+Reason: [Reason text]
+
+Changes Made:
+  - [Field Label]: "[Old Value]" → "[New Value]"
+  - [Field Label]: "[Old Value]" → "[New Value]"
+
+-------------------------------------------
+Implementation:
+
+Use jsPDF from pdfReportGenerator.ts
+
+Add proper page breaks
+
+Use consistent formatting
+
+Include header/footer on each page
+
+Add page numbers
+
+4. EXCEL EXPORT - Using ExcelJS
+Replace "Excel export coming soon" with actual implementation:
+
+Workbook Structure:
+
+Sheet 1 - Summary:
+
+Metric	Value
+Total Requests	[X]
+Approved	[X]
+Rejected	[X]
+Pending Review	[X]
+Avg Approval Time (hrs)	[X]
+Sheet 2 - By Category:
+
+Category	Count
+Components	[X]
+Jobs	[X]
+Spares	[X]
+Stores	[X]
+Sheet 3 - By Status:
+
+Status	Count
+Draft	[X]
+Submitted	[X]
+Returned	[X]
+Approved	[X]
+Rejected	[X]
+Sheet 4 - Detailed Requests:
+
+ID	Title	Category	Status	Requested By	Rank	Submitted At	Reviewed By	Reviewed At	Cycle Time (hrs)	Target	Changes Count	Reason
+Sheet 5 - Field-Level Changes:
+
+Request ID	Request Title	Field Path	Field Label	Old Value	New Value
+Implementation:
+
+Use ExcelJS library
+
+Apply cell styling (headers in bold, borders, alternating row colors)
+
+Auto-size columns
+
+Add filters to header rows
+
+Freeze header rows
+
+Generate filename: Change_Requests_Status_Tracking_[VesselName]_[DateRange].xlsx
+
+5. FIELD LABEL MAPPING
+Since field paths like "COMPONENTINFO.CRITICAL" are technical, create a mapping for human-readable labels:
+
+typescript
+const fieldLabelMap = {
+  'COMPONENTINFO.CRITICAL': 'Critical Status',
+  'COMPONENTINFO.MAKER': 'Manufacturer',
+  'COMPONENTINFO.MODEL': 'Model Number',
+  'jobInfo.isActive': 'Active Status',
+  'jobInfo.frequency': 'Maintenance Frequency',
+  'jobInfo.taskType': 'Task Type',
+  'jobInfo.priority': 'Priority Level',
+  'spareInfo.quantity': 'Quantity',
+  'spareInfo.reorderLevel': 'Reorder Level',
+  'storeInfo.category': 'Store Category',
+  // Add more mappings as needed
+}
+Use this in both PDF and Excel exports to show readable field names.
+
+6. ERROR HANDLING & EDGE CASES
+Handle these scenarios:
+
+No change requests in date range (show "No data available" message)
+
+API errors (show error toast/message)
+
+Large datasets (implement pagination or limit warning)
+
+Missing reviewer info (show "Not yet reviewed")
+
+Null/empty proposedChangesJson (show "No changes recorded")
+
+Long titles/reasons (truncate with ellipsis in tables, full text in PDF)
+
+7. UI IMPROVEMENTS
+Preview Modal:
+
+Show formatted preview of the report before download
+
+Include summary statistics
+
+Show first 10-20 requests in a scrollable table
+
+"Download PDF" and "Download Excel" buttons at bottom
+
+Loading States:
+
+Show spinner while fetching data
+
+Disable download buttons while generating
+
+Show progress indicator for large exports
+
+TESTING REQUIREMENTS
+After implementation, please test:
+
+Different Filters:
+
+All vessels vs specific vessel
+
+Different date ranges (1 week, 1 month, custom)
+
+Each status filter
+
+Each category filter
+
+Combined filters
+
+Edge Cases:
+
+Empty dataset
+
+Single request
+
+100+ requests (performance)
+
+Requests with many field changes (10+)
+
+Requests with null reviewer (not yet reviewed)
+
+Export Quality:
+
+PDF readability
+
+Excel formatting
+
+Field label accuracy
+
+Data completeness
+
+DELIVERABLES
+Please implement and provide:
+
+Backend API endpoint code with proper SQL/ORM queries
+
+Updated ChangeRequestReports.tsx component
+
+PDF generation function
+
+Excel generation function
+
+Field label mapping constants
+
+Test the implementation with current data in the system
+
+Please proceed with the implementation following these specifications.
