@@ -19,6 +19,8 @@ import {
   Loader2,
   AlertTriangle,
   AlertCircle,
+  CheckCircle,
+  HelpCircle,
   Package,
   ChevronLeft,
   ChevronRight,
