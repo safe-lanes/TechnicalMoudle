@@ -1,10 +1,11 @@
-import { useState } from "react";
+import { useState, useCallback } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Marker } from "@/components/Marker";
 import { useUIRole } from "@/contexts/UIRoleContext";
+import { useVessel } from "@/contexts/VesselContext";
 import {
   ClipboardList,
   Clock,
@@ -42,6 +43,7 @@ interface ReportCategory {
 
 const ReportsModule = () => {
   const { isSailAdmin } = useUIRole();
+  const { setVesselId } = useVessel();
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [globalFilters, setGlobalFilters] = useState<FilterValues>({
@@ -139,18 +141,21 @@ const ReportsModule = () => {
     setSelectedCategory(null);
   };
 
-  const handleFiltersChange = (filters: FilterValues) => {
+  const handleFiltersChange = useCallback((filters: FilterValues) => {
     setGlobalFilters(filters);
-  };
+    if (filters.vessel && filters.vessel !== "all") {
+      setVesselId(filters.vessel);
+    }
+  }, [setVesselId]);
 
-  const handleFiltersReset = () => {
+  const handleFiltersReset = useCallback(() => {
     setGlobalFilters({
       vessel: "all",
       department: "all",
       dateRange: { from: null, to: null },
       priority: "all"
     });
-  };
+  }, []);
 
   const handleClearAll = () => {
     setSearchQuery("");
@@ -166,7 +171,7 @@ const ReportsModule = () => {
 
   // Render category-specific views
   if (selectedCategory === "planner") {
-    return <MaintenancePlanner onBack={handleBackToMain} />;
+    return <MaintenancePlanner onBack={handleBackToMain} globalFilters={globalFilters} />;
   }
 
   if (selectedCategory === "maintenance") {

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -66,8 +66,19 @@ const MaintenanceReports: React.FC<MaintenanceReportsProps> = ({ onBack, globalF
   const { toast } = useToast();
   const { data: vessels = [] } = useVessels();
   const { vesselId: contextVesselId } = useVessel();
+
+  useEffect(() => {
+    if (globalFilters?.vessel) {
+      setCategoryFilters(prev => ({ ...prev, vessel: globalFilters.vessel }));
+    }
+  }, [globalFilters?.vessel]);
+
+  useEffect(() => {
+    if (globalFilters?.dateRange) {
+      setCategoryFilters(prev => ({ ...prev, dateRange: globalFilters.dateRange }));
+    }
+  }, [globalFilters?.dateRange]);
   
-  // Use category filters vessel if provided, otherwise fall back to context vesselId
   const effectiveVesselId = (categoryFilters.vessel && categoryFilters.vessel !== 'all') 
     ? categoryFilters.vessel 
     : contextVesselId;

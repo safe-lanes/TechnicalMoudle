@@ -112,10 +112,19 @@ const DEPARTMENTS = ["Engine", "Deck", "Electrical", "Catering", "Safety"];
 
 interface MaintenancePlannerProps {
   onBack?: () => void;
+  globalFilters?: {
+    vessel: string;
+    department: string;
+    dateRange: { from: Date | null; to: Date | null };
+    priority: string;
+  };
 }
 
-export default function MaintenancePlanner({ onBack }: MaintenancePlannerProps) {
-  const { vesselId, setVesselId, vessels } = useVessel();
+export default function MaintenancePlanner({ onBack, globalFilters }: MaintenancePlannerProps) {
+  const { vesselId: contextVesselId, setVesselId, vessels } = useVessel();
+  const vesselId = (globalFilters?.vessel && globalFilters.vessel !== 'all')
+    ? globalFilters.vessel
+    : contextVesselId;
   const [, setLocation] = useLocation();
   const { toast } = useToast();
   const { isSailAdmin, isClientAdmin } = useUIRole();
