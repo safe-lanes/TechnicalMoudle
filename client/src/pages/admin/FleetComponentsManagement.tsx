@@ -237,7 +237,7 @@ export default function FleetComponentsManagement({ onBack }: { onBack?: () => v
     }
   };
 
-  const totalComponents = components?.length || 0;
+  const totalComponents = components?.filter(c => c.fleetEquipmentCode?.length === 10).length || 0;
   const rootComponents = treeData.length;
 
   const renderDetailField = (label: string, value: string | null | undefined, testId?: string) => (
