@@ -1,6 +1,6 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { type FleetSpares, type FleetComponents } from "@shared/schema";
+import { type FleetSpares, type FleetComponents, type Maker } from "@shared/schema";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -26,6 +26,8 @@ export default function FleetSparesManagement({ onBack }: { onBack?: () => void 
   const [isEditMode, setIsEditMode] = useState(false);
   const [isAddMode, setIsAddMode] = useState(false);
   const [spareFormData, setSpareFormData] = useState<Partial<FleetSpares>>({});
+  const [makerSearchText, setMakerSearchText] = useState("");
+  const [showMakerSuggestions, setShowMakerSuggestions] = useState(false);
 
   const { data: spares, isLoading, error } = useQuery<FleetSpares[]>({
     queryKey: ['/technical/api/fleet/spares'],
@@ -33,6 +35,10 @@ export default function FleetSparesManagement({ onBack }: { onBack?: () => void 
 
   const { data: components } = useQuery<FleetComponents[]>({
     queryKey: ['/technical/api/fleet/components'],
+  });
+
+  const { data: makers = [] } = useQuery<Maker[]>({
+    queryKey: ['/technical/api/fleet/makers'],
   });
 
   const deleteMutation = useMutation({
@@ -61,6 +67,7 @@ export default function FleetSparesManagement({ onBack }: { onBack?: () => void 
       setIsEditMode(false);
       setDetailSpare(null);
       setSpareFormData({});
+      setMakerSearchText("");
     },
     onError: (error: Error) => {
       toast({ title: "Error", description: error.message || "Failed to update spare", variant: "destructive" });
@@ -77,6 +84,7 @@ export default function FleetSparesManagement({ onBack }: { onBack?: () => void 
       toast({ title: "Success", description: "Fleet spare created successfully" });
       setIsAddMode(false);
       setSpareFormData({});
+      setMakerSearchText("");
     },
     onError: (error: Error) => {
       toast({ title: "Error", description: error.message || "Failed to create spare", variant: "destructive" });
@@ -97,8 +105,40 @@ export default function FleetSparesManagement({ onBack }: { onBack?: () => void 
     );
   }) || [];
 
+  const filteredMakers = useMemo(() => {
+    if (!makerSearchText.trim()) return [];
+    return makers.filter(m =>
+      m.makerName?.toLowerCase().includes(makerSearchText.toLowerCase())
+    ).slice(0, 10);
+  }, [makerSearchText, makers]);
+
+  const handleMakerSearchChange = (value: string) => {
+    setMakerSearchText(value);
+    setShowMakerSuggestions(true);
+    if (!value.trim()) {
+      setSpareFormData(prev => ({ ...prev, maker: "", makerCode: "" }));
+    }
+  };
+
+  const handleMakerSelect = (maker: Maker) => {
+    setMakerSearchText(maker.makerName || "");
+    setSpareFormData(prev => ({
+      ...prev,
+      maker: maker.makerName || "",
+      makerCode: maker.makerCode || "",
+    }));
+    setShowMakerSuggestions(false);
+  };
+
+  const handleClearMaker = () => {
+    setMakerSearchText("");
+    setSpareFormData(prev => ({ ...prev, maker: "", makerCode: "" }));
+    setShowMakerSuggestions(false);
+  };
+
   const handleAddNew = () => {
     setSpareFormData({ isActive: true });
+    setMakerSearchText("");
     setIsAddMode(true);
     setDetailSpare(null);
     setIsEditMode(false);
@@ -107,6 +147,7 @@ export default function FleetSparesManagement({ onBack }: { onBack?: () => void 
   const handleEdit = (spare: FleetSpares) => {
     setDetailSpare(spare);
     setSpareFormData({ ...spare });
+    setMakerSearchText(spare.maker || "");
     setIsEditMode(true);
   };
 
@@ -180,17 +221,20 @@ export default function FleetSparesManagement({ onBack }: { onBack?: () => void 
   const handleCancelEdit = () => {
     setIsEditMode(false);
     setSpareFormData({});
+    setMakerSearchText("");
   };
 
   const handleCancelAdd = () => {
     setIsAddMode(false);
     setSpareFormData({});
+    setMakerSearchText("");
   };
 
   const handleBackToList = () => {
     setDetailSpare(null);
     setIsEditMode(false);
     setSpareFormData({});
+    setMakerSearchText("");
   };
 
   const handleExport = async () => {
@@ -351,21 +395,54 @@ export default function FleetSparesManagement({ onBack }: { onBack?: () => void 
 
       <SectionBlock id="spare-technical" number="A3" title="Technical Details" description="Maker and technical specifications">
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <div className="space-y-1">
+          <div className="space-y-1 relative">
             <Label className="text-sm text-[#8798ad]">Maker</Label>
-            <Input
-              placeholder="Enter maker"
-              value={formData.maker || ""}
-              onChange={(e) => setFormData(prev => ({ ...prev, maker: e.target.value }))}
-              data-testid="input-spare-maker"
-            />
+            <div className="relative">
+              <Input
+                placeholder="Type to search makers..."
+                value={makerSearchText}
+                onChange={(e) => handleMakerSearchChange(e.target.value)}
+                onFocus={() => { if (makerSearchText.trim()) setShowMakerSuggestions(true); }}
+                onBlur={() => setTimeout(() => setShowMakerSuggestions(false), 200)}
+                className="pr-8"
+                data-testid="input-spare-maker"
+              />
+              {makerSearchText && (
+                <button
+                  type="button"
+                  onClick={handleClearMaker}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                  data-testid="button-clear-spare-maker"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              )}
+            </div>
+            {showMakerSuggestions && filteredMakers.length > 0 && (
+              <div className="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-md shadow-lg max-h-48 overflow-y-auto">
+                {filteredMakers.map((maker) => (
+                  <div
+                    key={maker.id}
+                    className="px-3 py-2 text-sm cursor-pointer hover:bg-cyan-50 hover:text-cyan-700 border-b border-gray-100 last:border-b-0"
+                    onMouseDown={() => handleMakerSelect(maker)}
+                    data-testid={`spare-maker-suggestion-${maker.id}`}
+                  >
+                    <span className="font-medium">{maker.makerName}</span>
+                    {maker.makerCode && (
+                      <span className="text-gray-400 ml-2 text-xs">({maker.makerCode})</span>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
           <div className="space-y-1">
             <Label className="text-sm text-[#8798ad]">Maker Code</Label>
             <Input
-              placeholder="Enter maker code"
+              placeholder="Auto-filled from maker selection"
               value={formData.makerCode || ""}
-              onChange={(e) => setFormData(prev => ({ ...prev, makerCode: e.target.value }))}
+              readOnly
+              className="bg-gray-100 text-gray-600"
               data-testid="input-spare-maker-code"
             />
           </div>
