@@ -114,7 +114,7 @@ const ReportsModule = () => {
       title: "IHM (Inventory of Hazardous Materials)",
       description: "Hazardous materials tracking and evidence documentation",
       icon: Biohazard,
-      reportCount: 2,
+      reportCount: 1,
       lastGenerated: "3 days ago",
       color: "border-blue-500",
       iconBg: "bg-blue-500",

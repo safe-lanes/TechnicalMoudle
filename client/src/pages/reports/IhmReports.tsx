@@ -8,7 +8,6 @@ import {
   AlertCircle,
   CheckCircle,
   Package,
-  Shield,
   Eye,
   Loader2,
   Download
@@ -86,18 +85,6 @@ const IhmReports: React.FC<IhmReportsProps> = ({ onBack, globalFilters }) => {
       icon: Package,
       priority: "high",
       estimatedTime: "3-5 min"
-    },
-    {
-      id: "ihm-compliance-summary",
-      name: "IHM Compliance Summary",
-      description: "Overall IHM compliance status and documentation completeness",
-      purpose: "Regulatory audit preparation (Office/Auditors)",
-      frequency: "Monthly",
-      fields: ["Category", "Known Status", "Unknown Status", "With IHM", "Without IHM", "Compliance %"],
-      outputs: ["PDF", "Dashboard"],
-      icon: Shield,
-      priority: "high",
-      estimatedTime: "2-3 min"
     }
   ];
 
@@ -166,43 +153,6 @@ const IhmReports: React.FC<IhmReportsProps> = ({ onBack, globalFilters }) => {
 
         pdfReportGenerator.generateReport(
           { title: 'IHM Inventory Status Report', subtitle: 'Confirmed hazardous materials present on board', vessel: vesselName },
-          columns,
-          data,
-          summary
-        );
-        break;
-      }
-
-      case 'ihm-compliance-summary': {
-        const total = ihmSummary.totalItems;
-        const withIhm = ihmSummary.ihmPresent;
-        const withoutIhm = ihmSummary.noIhm;
-        const unknown = ihmSummary.unknown;
-
-        const columns = [
-          { header: 'Category', field: 'category', width: 50 },
-          { header: 'Count', field: 'count', width: 30 },
-          { header: 'Percentage', field: 'percentage', width: 35 }
-        ];
-
-        const data = [
-          { category: 'Items with IHM Present', count: withIhm, percentage: total > 0 ? `${Math.round(withIhm/total*100)}%` : '0%' },
-          { category: 'Items without IHM', count: withoutIhm, percentage: total > 0 ? `${Math.round(withoutIhm/total*100)}%` : '0%' },
-          { category: 'Unknown Status', count: unknown, percentage: total > 0 ? `${Math.round(unknown/total*100)}%` : '0%' }
-        ];
-
-        const knownStatus = withIhm + withoutIhm;
-        const complianceRate = total > 0 ? Math.round(knownStatus / total * 100) : 100;
-
-        const summary = [
-          { label: 'Compliance Rate', value: `${complianceRate}%` },
-          { label: 'Total Items', value: total },
-          { label: 'Known Status', value: knownStatus },
-          { label: 'Unknown', value: unknown }
-        ];
-
-        pdfReportGenerator.generateReport(
-          { title: 'IHM Compliance Summary', subtitle: 'Hazardous materials compliance status', vessel: vesselName },
           columns,
           data,
           summary
@@ -302,7 +252,7 @@ const IhmReports: React.FC<IhmReportsProps> = ({ onBack, globalFilters }) => {
           </Button>
           <div>
             <h1 className="text-2xl font-bold text-gray-900">IHM (Inventory of Hazardous Materials)</h1>
-            <p className="text-sm text-gray-500">2 reports for hazardous materials tracking</p>
+            <p className="text-sm text-gray-500">1 report for hazardous materials tracking</p>
           </div>
         </div>
 
