@@ -28,7 +28,6 @@ export const v2Components = pgTable("components", {
   isParent: boolean("is_parent").default(false),
   notes: text("notes"),
   vesselId: text("vessel_id"),
-  vesselIdInt: integer("vessel_id_int"),
   dataScope: text("data_scope").notNull().default("vessel"),
   parentFleetEquipmentCode: text("parent_fleet_equipment_code"),
   modelNumber: text("model_number"),
@@ -231,7 +230,6 @@ export type ComponentRequisition = typeof v2ComponentRequisitions.$inferSelect;
 export const v2Jobs = pgTable("jobs", {
   id: text("id").primaryKey(),
   vesselId: text("vessel_id"),
-  vesselIdInt: integer("vessel_id_int"),
   componentId: text("component_id"),
   componentCode: text("component_code"),
   componentName: text("component_name"),
@@ -282,7 +280,6 @@ export const v2Jobs = pgTable("jobs", {
 export const v2JobComponentLinks = pgTable("job_component_links", {
   id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
   vesselId: text("vessel_id").notNull(),
-  vesselIdInt: integer("vessel_id_int"),
   jobId: text("job_id").notNull(),
   componentId: text("component_id").notNull(),
   componentCode: text("component_code"),

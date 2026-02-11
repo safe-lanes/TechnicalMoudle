@@ -24,7 +24,6 @@ export const v2Spares = pgTable("spares", {
   robLocationA: integer("rob_location_a").notNull().default(0),
   robLocationB: integer("rob_location_b").notNull().default(0),
   vesselId: text("vessel_id"),
-  vesselIdInt: integer("vessel_id_int"),
   deleted: boolean("deleted").notNull().default(false),
 });
 

@@ -26,7 +26,6 @@ export const v2Spares = pgTable("spares", {
   lastOrderDate: text("last_order_date"),
   location: text("location"),
   vesselId: text("vessel_id"),
-  vesselIdInt: integer("vessel_id_int"),
   deleted: boolean("deleted").notNull().default(false),
   dataScope: text("data_scope").notNull().default("vessel"),
   fleetEquipmentCode: text("fleet_equipment_code"),
@@ -81,7 +80,6 @@ export const v2SparesHistory = pgTable("spares_history", {
   id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
   timestampUTC: timestamp("timestamp_utc").notNull(),
   vesselId: text("vessel_id").notNull(),
-  vesselIdInt: integer("vessel_id_int"),
   spareId: integer("spare_id").notNull(),
   partCode: text("part_code").notNull(),
   partName: text("part_name").notNull(),
@@ -114,7 +112,6 @@ export type SpareHistory = typeof v2SparesHistory.$inferSelect;
 export const v2Locations = pgTable("locations", {
   id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
   vesselId: text("vessel_id").notNull(),
-  vesselIdInt: integer("vessel_id_int"),
   locationName: text("location_name").notNull(),
   locationType: text("location_type"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
@@ -135,7 +132,6 @@ export type Location = typeof v2Locations.$inferSelect;
 export const v2SpareLocationStock = pgTable("spare_location_stock", {
   id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
   vesselId: text("vessel_id").notNull(),
-  vesselIdInt: integer("vessel_id_int"),
   spareId: integer("spare_id").notNull(),
   locationId: integer("location_id").notNull(),
   qty: integer("qty").notNull().default(0),
@@ -156,7 +152,6 @@ export type SpareLocationStock = typeof v2SpareLocationStock.$inferSelect;
 export const v2SpareComponentLinks = pgTable("spare_component_links", {
   id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
   vesselId: text("vessel_id").notNull(),
-  vesselIdInt: integer("vessel_id_int"),
   spareId: integer("spare_id").notNull(),
   componentId: text("component_id").notNull(),
   linkedBy: text("linked_by").notNull(),
@@ -173,7 +168,6 @@ export type SpareComponentLink = typeof v2SpareComponentLinks.$inferSelect;
 export const v2InventoryTransactions = pgTable("inventory_transactions", {
   id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
   vesselId: text("vessel_id").notNull(),
-  vesselIdInt: integer("vessel_id_int"),
   txnDatetime: timestamp("txn_datetime").notNull().defaultNow(),
   spareId: integer("spare_id").notNull(),
   locationId: integer("location_id"),
