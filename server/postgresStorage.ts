@@ -660,6 +660,8 @@ export class PostgresStorage {
       'taskType', 'assignedTo', 'approver', 'jobPriority',
       'classRelated', 'briefWorkDescription', 'department',
       'criticality', 'isActive',
+      'ppeRequirements', 'permitRequirements', 'otherSafetyRequirements',
+      'requiredSpareParts', 'requiredTools',
     ];
 
     return await db.transaction(async (tx) => {

@@ -139,14 +139,19 @@ export default function FleetJobsManagement({ onBack }: { onBack?: () => void })
   }) || [];
 
   const updateJobMutation = useMutation({
-    mutationFn: async ({ id, data }: { id: number; data: Partial<FleetJobs> }) => {
+    mutationFn: async ({ id, data, jobCode }: { id: number; data: Partial<FleetJobs>; jobCode?: string }) => {
       const res = await apiRequest('PATCH', `/technical/api/fleet/jobs/${id}`, data);
-      return res.json();
+      try {
+        const json = await res.json();
+        return { ...json, _jobCode: jobCode };
+      } catch {
+        return { affectedCount: 1, _jobCode: jobCode };
+      }
     },
     onSuccess: (responseData: any) => {
       queryClient.invalidateQueries({ queryKey: ['/technical/api/fleet/jobs'], exact: false });
       const count = responseData?.affectedCount || 1;
-      const jobCode = jobFormData.jobCode || '';
+      const jobCode = responseData?._jobCode || '';
       toast({
         title: "Success",
         description: count > 1
@@ -206,6 +211,7 @@ export default function FleetJobsManagement({ onBack }: { onBack?: () => void })
     updateJobMutation.mutate({
       id: editingJob.id,
       data: editablePayload,
+      jobCode: jobFormData.jobCode,
     });
   };
 
