@@ -3,6 +3,13 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
   ArrowLeft,
   GitPullRequest,
   ClipboardList,
@@ -12,7 +19,10 @@ import {
   Eye,
   Loader2,
   FileText,
-  Download
+  Download,
+  XCircle,
+  Send,
+  CornerDownLeft
 } from "lucide-react";
 import { pdfReportGenerator, formatDate } from "@/lib/pdfReportGenerator";
 import { useToast } from "@/hooks/use-toast";
@@ -20,6 +30,50 @@ import { useVessels } from "@/hooks/useVessels";
 import { useVessel } from "@/contexts/VesselContext";
 import { useQuery } from "@tanstack/react-query";
 import CategoryFilters, { CategoryFilterValues } from "@/components/reports/CategoryFilters";
+
+interface ChangeRequestReportData {
+  summary: {
+    totalRequests: number;
+    byStatus: {
+      draft: number;
+      submitted: number;
+      returned: number;
+      approved: number;
+      rejected: number;
+    };
+    byCategory: {
+      components: number;
+      work_orders: number;
+      spares: number;
+      stores: number;
+    };
+    avgApprovalTimeHours: number;
+    pendingRequests: number;
+  };
+  requests: Array<{
+    id: number;
+    title: string;
+    category: string;
+    status: string;
+    requestedBy: { name: string; rank: string; userId: string };
+    reviewedBy: { name: string; rank: string; userId: string } | null;
+    vessel: { id: string; name: string };
+    submittedAt: string | null;
+    reviewedAt: string | null;
+    createdAt: string;
+    reason: string;
+    targetInfo: { type: string; id: string; name: string };
+    changesCount: number;
+    fieldChanges: Array<{
+      fieldPath: string;
+      oldValue: any;
+      newValue: any;
+      fieldLabel: string;
+    }>;
+    cycleTimeHours: number | null;
+    revisionNumber: number;
+  }>;
+}
 
 interface ChangeRequestReport {
   id: string;
@@ -44,27 +98,58 @@ interface ChangeRequestReportsProps {
   };
 }
 
+const CATEGORY_LABELS: Record<string, string> = {
+  components: 'Components',
+  work_orders: 'Work Orders',
+  spares: 'Spares',
+  stores: 'Stores',
+};
+
+const STATUS_LABELS: Record<string, string> = {
+  draft: 'Draft',
+  submitted: 'Submitted',
+  returned: 'Returned',
+  approved: 'Approved',
+  rejected: 'Rejected',
+};
+
 const ChangeRequestReports: React.FC<ChangeRequestReportsProps> = ({ onBack, globalFilters }) => {
   const [categoryFilters, setCategoryFilters] = useState<CategoryFilterValues>({
     searchQuery: "",
     vessel: globalFilters?.vessel || "all",
     dateRange: globalFilters?.dateRange || { from: null, to: null }
   });
+  const [statusFilter, setStatusFilter] = useState<string>("all");
+  const [categoryFilter, setCategoryFilter] = useState<string>("all");
   const [generatingReports, setGeneratingReports] = useState<Set<string>>(new Set());
   const { toast } = useToast();
   const { data: vessels = [] } = useVessels();
   const { vesselId: contextVesselId } = useVessel();
 
-  const effectiveVesselId = (categoryFilters.vessel && categoryFilters.vessel !== 'all') 
-    ? categoryFilters.vessel 
+  const effectiveVesselId = (categoryFilters.vessel && categoryFilters.vessel !== 'all')
+    ? categoryFilters.vessel
     : contextVesselId;
 
-  const { data: workOrders = [] } = useQuery<any[]>({
-    queryKey: ['/technical/api/work-orders', effectiveVesselId],
-  });
+  const buildQueryString = () => {
+    const params = new URLSearchParams();
+    if (effectiveVesselId) params.set('vesselId', effectiveVesselId);
+    else params.set('vesselId', 'all');
+    if (statusFilter !== 'all') params.set('status', statusFilter);
+    if (categoryFilter !== 'all') params.set('category', categoryFilter);
+    if (categoryFilters.dateRange.from) params.set('startDate', categoryFilters.dateRange.from.toISOString());
+    if (categoryFilters.dateRange.to) params.set('endDate', categoryFilters.dateRange.to.toISOString());
+    return params.toString();
+  };
 
-  const { data: jobs = [] } = useQuery<any[]>({
-    queryKey: ['/technical/api/jobs', effectiveVesselId],
+  const queryString = buildQueryString();
+
+  const { data: reportData, isLoading, error } = useQuery<ChangeRequestReportData>({
+    queryKey: ['/technical/api/reports/change-requests-status-tracking', effectiveVesselId || 'all', statusFilter, categoryFilter, categoryFilters.dateRange.from?.toISOString(), categoryFilters.dateRange.to?.toISOString()],
+    queryFn: async () => {
+      const res = await fetch(`/technical/api/reports/change-requests-status-tracking?${queryString}`);
+      if (!res.ok) throw new Error('Failed to fetch report data');
+      return res.json();
+    },
   });
 
   const reports: ChangeRequestReport[] = [
@@ -101,57 +186,76 @@ const ChangeRequestReports: React.FC<ChangeRequestReportsProps> = ({ onBack, glo
 
   const getPriorityColor = (priority: string) => {
     switch (priority) {
-      case 'high': return 'bg-red-100 text-red-800';
-      case 'medium': return 'bg-yellow-100 text-yellow-800';
-      case 'low': return 'bg-gray-100 text-gray-800';
-      default: return 'bg-gray-100 text-gray-800';
+      case 'high': return 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300';
+      case 'medium': return 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300';
+      case 'low': return 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-300';
+      default: return 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-300';
     }
   };
 
+  const formatFieldValue = (val: any): string => {
+    if (val === null || val === undefined) return '-';
+    if (typeof val === 'boolean') return val ? 'Yes' : 'No';
+    return String(val);
+  };
+
   const generateChangeRequestPDF = async (reportId: string) => {
+    if (!reportData) {
+      toast({ title: "No Data", description: "No report data available to export.", variant: "destructive" });
+      return;
+    }
+
     const vesselName = vessels.find(v => v.id === effectiveVesselId)?.name || effectiveVesselId || 'All Vessels';
+    const summary = reportData.summary;
 
     switch (reportId) {
       case 'change-requests-status': {
         const columns = [
-          { header: 'Type', field: 'type', width: 30 },
-          { header: 'ID', field: 'id', width: 40 },
-          { header: 'Title', field: 'title', width: 60 },
-          { header: 'Status', field: 'status', width: 30 },
-          { header: 'Date', field: 'date', width: 30 }
+          { header: 'ID', field: 'id', width: 15 },
+          { header: 'Title', field: 'title', width: 50 },
+          { header: 'Category', field: 'category', width: 25 },
+          { header: 'Status', field: 'status', width: 22 },
+          { header: 'Requested By', field: 'requestedBy', width: 28 },
+          { header: 'Date', field: 'date', width: 25 },
+          { header: 'Changes', field: 'changes', width: 18 }
         ];
 
-        const changes: any[] = [];
-        
-        workOrders
-          .filter((wo: any) => wo.type === 'Unplanned' || wo.workOrderNumber?.startsWith('UWO'))
-          .forEach((wo: any) => changes.push({
-            type: 'Unplanned WO',
-            id: wo.workOrderNumber || wo.id,
-            title: wo.title || wo.jobTitle || '-',
-            status: wo.status || 'Open',
-            date: formatDate(wo.createdAt || wo.dueDate)
-          }));
+        const tableData = reportData.requests.map(req => ({
+          id: String(req.id),
+          title: req.title.length > 50 ? req.title.substring(0, 47) + '...' : req.title,
+          category: CATEGORY_LABELS[req.category] || req.category,
+          status: STATUS_LABELS[req.status] || req.status,
+          requestedBy: req.requestedBy?.name || '-',
+          date: req.submittedAt ? formatDate(req.submittedAt) : formatDate(req.createdAt),
+          changes: String(req.changesCount)
+        }));
 
-        jobs
-          .filter((j: any) => j.status === 'Draft' || j.status === 'Pending')
-          .forEach((j: any) => changes.push({
-            type: 'Job Change',
-            id: j.jobCode || j.id,
-            title: j.title || j.name || '-',
-            status: j.status || 'Pending',
-            date: formatDate(j.createdAt)
-          }));
+        const totalReqs = summary.totalRequests;
+        const approvedPct = totalReqs > 0 ? Math.round((summary.byStatus.approved / totalReqs) * 100) : 0;
+        const rejectedPct = totalReqs > 0 ? Math.round((summary.byStatus.rejected / totalReqs) * 100) : 0;
 
-        const summary = [
-          { label: 'Total Changes', value: changes.length }
+        const summaryItems = [
+          { label: 'Total Requests', value: summary.totalRequests },
+          { label: `Approved (${approvedPct}%)`, value: summary.byStatus.approved },
+          { label: `Rejected (${rejectedPct}%)`, value: summary.byStatus.rejected },
+          { label: 'Pending Review', value: summary.pendingRequests },
+          { label: 'Avg Approval Time (hrs)', value: summary.avgApprovalTimeHours },
+          { label: 'Components', value: summary.byCategory.components },
+          { label: 'Work Orders', value: summary.byCategory.work_orders },
+          { label: 'Spares', value: summary.byCategory.spares },
+          { label: 'Stores', value: summary.byCategory.stores }
         ];
 
         pdfReportGenerator.generateReport(
-          { title: 'Change Requests Status', subtitle: 'All change requests and modifications', vessel: vesselName },
+          {
+            title: 'Change Requests Status & Tracking',
+            subtitle: `Comprehensive tracking report - ${reportData.requests.length} requests`,
+            vessel: vesselName,
+            orientation: 'landscape'
+          },
           columns,
-          changes.length > 0 ? changes : [{ type: 'None', id: '-', title: 'No change requests', status: '-', date: '-' }],
-          summary
+          tableData.length > 0 ? tableData : [{ id: '-', title: 'No change requests found', category: '-', status: '-', requestedBy: '-', date: '-', changes: '-' }],
+          summaryItems
         );
         break;
       }
@@ -163,17 +267,19 @@ const ChangeRequestReports: React.FC<ChangeRequestReportsProps> = ({ onBack, glo
           { header: 'Notes', field: 'notes', width: 60 }
         ];
 
-        const unplannedWOs = workOrders.filter((wo: any) => 
-          wo.type === 'Unplanned' || wo.workOrderNumber?.startsWith('UWO')
-        ).length;
-
-        const completedWOs = workOrders.filter((wo: any) => wo.status === 'Completed').length;
+        const totalReqs = summary.totalRequests;
+        const approvedPct = totalReqs > 0 ? `${Math.round((summary.byStatus.approved / totalReqs) * 100)}%` : 'N/A';
 
         const data = [
-          { metric: 'Total Unplanned Work Orders', value: unplannedWOs, notes: 'Current period' },
-          { metric: 'Completed Work Orders', value: completedWOs, notes: 'All statuses' },
-          { metric: 'Total Jobs', value: jobs.length, notes: 'Active job templates' },
-          { metric: 'Completion Rate', value: workOrders.length > 0 ? `${Math.round(completedWOs/workOrders.length*100)}%` : 'N/A', notes: 'Based on total WOs' }
+          { metric: 'Total Change Requests', value: summary.totalRequests, notes: 'Current period' },
+          { metric: 'Approved Requests', value: summary.byStatus.approved, notes: `Approval rate: ${approvedPct}` },
+          { metric: 'Rejected Requests', value: summary.byStatus.rejected, notes: 'Review needed for patterns' },
+          { metric: 'Pending Review', value: summary.pendingRequests, notes: 'Submitted + Returned' },
+          { metric: 'Avg Approval Time (hours)', value: summary.avgApprovalTimeHours, notes: 'From submission to review' },
+          { metric: 'Components Changes', value: summary.byCategory.components, notes: 'Component modifications' },
+          { metric: 'Work Order Changes', value: summary.byCategory.work_orders, notes: 'Work order modifications' },
+          { metric: 'Spares Changes', value: summary.byCategory.spares, notes: 'Spare parts modifications' },
+          { metric: 'Stores Changes', value: summary.byCategory.stores, notes: 'Stores modifications' }
         ];
 
         pdfReportGenerator.generateReport(
@@ -189,9 +295,43 @@ const ChangeRequestReports: React.FC<ChangeRequestReportsProps> = ({ onBack, glo
     }
   };
 
+  const handleExcelExport = async (reportId: string) => {
+    if (reportId !== 'change-requests-status') {
+      toast({ title: "Not Available", description: "Excel export is only available for the Status & Tracking report.", variant: "destructive" });
+      return;
+    }
+
+    try {
+      const params = new URLSearchParams();
+      params.set('vesselId', effectiveVesselId || 'all');
+      if (statusFilter !== 'all') params.set('status', statusFilter);
+      if (categoryFilter !== 'all') params.set('category', categoryFilter);
+      if (categoryFilters.dateRange.from) params.set('startDate', categoryFilters.dateRange.from.toISOString());
+      if (categoryFilters.dateRange.to) params.set('endDate', categoryFilters.dateRange.to.toISOString());
+
+      const response = await fetch(`/technical/api/reports/change-requests-status-tracking/export?${params.toString()}`);
+      if (!response.ok) throw new Error('Export failed');
+
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      const disposition = response.headers.get('Content-Disposition');
+      const filenameMatch = disposition?.match(/filename="(.+)"/);
+      a.download = filenameMatch ? filenameMatch[1] : 'Change_Requests_Status_Tracking.xlsx';
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      window.URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error('Excel export error:', err);
+      throw err;
+    }
+  };
+
   const handleGenerateReport = async (reportId: string, format: 'PDF' | 'Excel') => {
     const reportKey = `${reportId}-${format}`;
-    
+
     if (generatingReports.has(reportKey)) return;
 
     try {
@@ -202,9 +342,10 @@ const ChangeRequestReports: React.FC<ChangeRequestReportsProps> = ({ onBack, glo
         await generateChangeRequestPDF(reportId);
         toast({ title: "Report Generated", description: `${format} report downloaded successfully!` });
       } else {
-        toast({ title: "Excel Export", description: "Excel export coming soon." });
+        await handleExcelExport(reportId);
+        toast({ title: "Report Generated", description: "Excel report downloaded successfully!" });
       }
-      
+
     } catch (error) {
       console.error('Error generating report:', error);
       toast({ title: "Generation Failed", description: "Failed to generate report.", variant: "destructive" });
@@ -217,18 +358,14 @@ const ChangeRequestReports: React.FC<ChangeRequestReportsProps> = ({ onBack, glo
     }
   };
 
-  const unplannedWOs = workOrders.filter((wo: any) => 
-    wo.type === 'Unplanned' || wo.workOrderNumber?.startsWith('UWO')
-  ).length;
-
-  const pendingChanges = workOrders.filter((wo: any) => wo.status === 'Pending').length;
+  const summary = reportData?.summary;
 
   return (
-    <div className="p-6 bg-white min-h-screen">
+    <div className="p-6 bg-white dark:bg-background min-h-screen">
       <div className="mb-6">
-        <div className="flex items-center gap-4 mb-6">
-          <Button 
-            variant="ghost" 
+        <div className="flex items-center gap-4 mb-6 flex-wrap">
+          <Button
+            variant="ghost"
             onClick={onBack}
             className="flex items-center gap-2"
             data-testid="button-back-to-reports"
@@ -237,8 +374,8 @@ const ChangeRequestReports: React.FC<ChangeRequestReportsProps> = ({ onBack, glo
             Back to Reports
           </Button>
           <div>
-            <h1 className="text-2xl font-bold text-gray-900">Change Requests</h1>
-            <p className="text-sm text-gray-500">2 reports for change tracking</p>
+            <h1 className="text-2xl font-bold text-gray-900 dark:text-foreground" data-testid="text-page-title">Change Requests</h1>
+            <p className="text-sm text-gray-500 dark:text-muted-foreground">2 reports for change tracking</p>
           </div>
         </div>
 
@@ -247,69 +384,117 @@ const ChangeRequestReports: React.FC<ChangeRequestReportsProps> = ({ onBack, glo
           onFiltersChange={setCategoryFilters}
           searchPlaceholder="Search change request reports..."
         />
+
+        <div className="flex items-center gap-3 mt-3 flex-wrap">
+          <div className="flex items-center gap-2">
+            <span className="text-sm text-gray-500 dark:text-muted-foreground">Status:</span>
+            <Select value={statusFilter} onValueChange={setStatusFilter}>
+              <SelectTrigger className="w-[150px]" data-testid="select-status-filter">
+                <SelectValue placeholder="All Statuses" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Statuses</SelectItem>
+                <SelectItem value="draft">Draft</SelectItem>
+                <SelectItem value="submitted">Submitted</SelectItem>
+                <SelectItem value="returned">Returned</SelectItem>
+                <SelectItem value="approved">Approved</SelectItem>
+                <SelectItem value="rejected">Rejected</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="text-sm text-gray-500 dark:text-muted-foreground">Category:</span>
+            <Select value={categoryFilter} onValueChange={setCategoryFilter}>
+              <SelectTrigger className="w-[150px]" data-testid="select-category-filter">
+                <SelectValue placeholder="All Categories" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Categories</SelectItem>
+                <SelectItem value="components">Components</SelectItem>
+                <SelectItem value="work_orders">Work Orders</SelectItem>
+                <SelectItem value="spares">Spares</SelectItem>
+                <SelectItem value="stores">Stores</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-        <Card className="border-l-4 border-l-cyan-500 bg-white">
+        <Card>
           <CardHeader className="pb-2">
             <CardDescription className="flex items-center gap-1">
-              <GitPullRequest className="w-4 h-4 text-cyan-500" />
-              Unplanned WOs
+              <Send className="w-4 h-4 text-blue-500" />
+              Submitted
             </CardDescription>
-            <CardTitle className="text-3xl">{unplannedWOs}</CardTitle>
+            <CardTitle className="text-3xl" data-testid="text-submitted-count">
+              {isLoading ? '...' : (summary?.byStatus.submitted ?? 0)}
+            </CardTitle>
           </CardHeader>
         </Card>
-        <Card className="border-l-4 border-l-yellow-500 bg-white">
+        <Card>
           <CardHeader className="pb-2">
             <CardDescription className="flex items-center gap-1">
               <Clock className="w-4 h-4 text-yellow-500" />
-              Pending
+              Pending Review
             </CardDescription>
-            <CardTitle className="text-3xl text-yellow-600">{pendingChanges}</CardTitle>
+            <CardTitle className="text-3xl text-yellow-600" data-testid="text-pending-count">
+              {isLoading ? '...' : (summary?.pendingRequests ?? 0)}
+            </CardTitle>
           </CardHeader>
         </Card>
-        <Card className="border-l-4 border-l-blue-500 bg-white">
+        <Card>
           <CardHeader className="pb-2">
             <CardDescription className="flex items-center gap-1">
               <ClipboardList className="w-4 h-4 text-blue-500" />
-              Total Jobs
+              Total Requests
             </CardDescription>
-            <CardTitle className="text-3xl text-blue-600">{jobs.length}</CardTitle>
+            <CardTitle className="text-3xl text-blue-600" data-testid="text-total-count">
+              {isLoading ? '...' : (summary?.totalRequests ?? 0)}
+            </CardTitle>
           </CardHeader>
         </Card>
-        <Card className="border-l-4 border-l-purple-500 bg-white">
+        <Card>
           <CardHeader className="pb-2">
             <CardDescription className="flex items-center gap-1">
-              <TrendingUp className="w-4 h-4 text-purple-500" />
-              Reports
+              <CheckCircle className="w-4 h-4 text-green-500" />
+              Approved
             </CardDescription>
-            <CardTitle className="text-3xl text-purple-600">2</CardTitle>
+            <CardTitle className="text-3xl text-green-600" data-testid="text-approved-count">
+              {isLoading ? '...' : (summary?.byStatus.approved ?? 0)}
+            </CardTitle>
           </CardHeader>
         </Card>
       </div>
 
-      <div className="rounded-lg border border-gray-200 overflow-hidden bg-white">
+      {error && (
+        <div className="mb-6 p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg" data-testid="text-error-message">
+          <p className="text-red-700 dark:text-red-300 text-sm">Failed to load report data. Please try again.</p>
+        </div>
+      )}
+
+      <div className="rounded-lg border border-gray-200 dark:border-border overflow-hidden bg-white dark:bg-card">
         <table className="w-full">
           <thead>
-            <tr className="bg-gray-50 border-b border-gray-200">
-              <th className="text-left py-3 px-4 font-semibold text-sm text-gray-700">Report Name</th>
-              <th className="text-left py-3 px-4 font-semibold text-sm text-gray-700">Frequency</th>
-              <th className="text-left py-3 px-4 font-semibold text-sm text-gray-700">Priority</th>
-              <th className="text-left py-3 px-4 font-semibold text-sm text-gray-700">Est. Time</th>
-              <th className="text-left py-3 px-4 font-semibold text-sm text-gray-700">Actions</th>
+            <tr className="bg-gray-50 dark:bg-muted/50 border-b border-gray-200 dark:border-border">
+              <th className="text-left py-3 px-4 font-semibold text-sm text-gray-700 dark:text-foreground">Report Name</th>
+              <th className="text-left py-3 px-4 font-semibold text-sm text-gray-700 dark:text-foreground">Frequency</th>
+              <th className="text-left py-3 px-4 font-semibold text-sm text-gray-700 dark:text-foreground">Priority</th>
+              <th className="text-left py-3 px-4 font-semibold text-sm text-gray-700 dark:text-foreground">Est. Time</th>
+              <th className="text-left py-3 px-4 font-semibold text-sm text-gray-700 dark:text-foreground">Actions</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-gray-200">
+          <tbody className="divide-y divide-gray-200 dark:divide-border">
             {filteredReports.map((report) => (
-              <tr 
-                key={report.id} 
-                className="hover:bg-gray-50 cursor-pointer"
+              <tr
+                key={report.id}
+                className="hover-elevate cursor-pointer"
                 data-testid={`change-report-row-${report.id}`}
               >
                 <td className="py-3 px-4">
                   <div>
-                    <div className="font-medium text-gray-900">{report.name}</div>
-                    <div className="text-sm text-gray-500">{report.description}</div>
+                    <div className="font-medium text-gray-900 dark:text-foreground">{report.name}</div>
+                    <div className="text-sm text-gray-500 dark:text-muted-foreground">{report.description}</div>
                   </div>
                 </td>
                 <td className="py-3 px-4">
@@ -321,16 +506,16 @@ const ChangeRequestReports: React.FC<ChangeRequestReportsProps> = ({ onBack, glo
                   </Badge>
                 </td>
                 <td className="py-3 px-4">
-                  <span className="text-xs text-gray-500">{report.estimatedTime}</span>
+                  <span className="text-xs text-gray-500 dark:text-muted-foreground">{report.estimatedTime}</span>
                 </td>
                 <td className="py-3 px-4">
                   <div className="flex items-center gap-1">
-                    <Button 
-                      size="icon" 
-                      variant="ghost" 
-                      title="Preview"
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      title="Preview (PDF)"
                       onClick={() => handleGenerateReport(report.id, 'PDF')}
-                      disabled={generatingReports.has(`${report.id}-PDF`)}
+                      disabled={generatingReports.has(`${report.id}-PDF`) || isLoading}
                       data-testid={`button-preview-${report.id}`}
                     >
                       {generatingReports.has(`${report.id}-PDF`) ? (
@@ -339,23 +524,23 @@ const ChangeRequestReports: React.FC<ChangeRequestReportsProps> = ({ onBack, glo
                         <Eye className="h-4 w-4" />
                       )}
                     </Button>
-                    <Button 
-                      size="icon" 
-                      variant="ghost" 
+                    <Button
+                      size="icon"
+                      variant="ghost"
                       title="Download PDF"
                       onClick={() => handleGenerateReport(report.id, 'PDF')}
-                      disabled={generatingReports.has(`${report.id}-PDF`)}
+                      disabled={generatingReports.has(`${report.id}-PDF`) || isLoading}
                       data-testid={`button-pdf-${report.id}`}
                     >
                       <FileText className="h-4 w-4" />
                     </Button>
                     {report.outputs.includes('Excel') && (
-                      <Button 
-                        size="icon" 
-                        variant="ghost" 
+                      <Button
+                        size="icon"
+                        variant="ghost"
                         title="Download Excel"
                         onClick={() => handleGenerateReport(report.id, 'Excel')}
-                        disabled={generatingReports.has(`${report.id}-Excel`)}
+                        disabled={generatingReports.has(`${report.id}-Excel`) || isLoading}
                         data-testid={`button-excel-${report.id}`}
                       >
                         <Download className="h-4 w-4" />
@@ -372,8 +557,8 @@ const ChangeRequestReports: React.FC<ChangeRequestReportsProps> = ({ onBack, glo
       {filteredReports.length === 0 && (
         <div className="text-center py-12">
           <GitPullRequest className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-          <h3 className="text-lg font-semibold text-gray-700 mb-2">No reports found</h3>
-          <p className="text-gray-500">Try adjusting your search criteria</p>
+          <h3 className="text-lg font-semibold text-gray-700 dark:text-foreground mb-2">No reports found</h3>
+          <p className="text-gray-500 dark:text-muted-foreground">Try adjusting your search criteria</p>
         </div>
       )}
     </div>

@@ -9866,7 +9866,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         'critical-equipment-status',
         'unplanned-breakdown-jobs',
         'crew-workload-distribution',
-        'ihm-inventory-status'
+        'ihm-inventory-status',
+        'change-requests-status-tracking'
       ];
       
       if (dedicatedReportRoutes.includes(reportType)) {
@@ -9960,7 +9961,347 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Mount the Change Requests router  
   const changeRequestsRouter = createChangeRequestsRouter(storage);
   app.use("/technical/api/change-requests", changeRequestsRouter);
-  
+
+  // ============================================================================
+  // CHANGE REQUESTS STATUS & TRACKING REPORT
+  // ============================================================================
+
+  app.get("/technical/api/reports/change-requests-status-tracking", async (req, res) => {
+    try {
+      const { vesselId, startDate, endDate, status, category } = req.query;
+
+      const allVessels = await storage.getVessels();
+      const vesselMap = new Map(allVessels.map(v => [v.id, v]));
+
+      let allRequests: any[] = [];
+      if (vesselId && vesselId !== 'all') {
+        allRequests = await storage.getChangeRequests({ vesselId: vesselId as string });
+      } else {
+        for (const v of allVessels) {
+          const vReqs = await storage.getChangeRequests({ vesselId: v.id });
+          allRequests.push(...vReqs);
+        }
+      }
+
+      if (status && status !== 'all') {
+        allRequests = allRequests.filter(r => r.status === status);
+      }
+      if (category && category !== 'all') {
+        allRequests = allRequests.filter(r => r.category === category);
+      }
+      if (startDate) {
+        const start = new Date(startDate as string);
+        allRequests = allRequests.filter(r => {
+          const d = r.submittedAt ? new Date(r.submittedAt) : new Date(r.createdAt);
+          return d >= start;
+        });
+      }
+      if (endDate) {
+        const end = new Date(endDate as string);
+        end.setHours(23, 59, 59, 999);
+        allRequests = allRequests.filter(r => {
+          const d = r.submittedAt ? new Date(r.submittedAt) : new Date(r.createdAt);
+          return d <= end;
+        });
+      }
+
+      allRequests.sort((a, b) => {
+        const aTime = new Date(a.createdAt).getTime();
+        const bTime = new Date(b.createdAt).getTime();
+        return bTime - aTime;
+      });
+
+      const byStatus: Record<string, number> = { draft: 0, submitted: 0, returned: 0, approved: 0, rejected: 0 };
+      const byCategory: Record<string, number> = { components: 0, work_orders: 0, spares: 0, stores: 0 };
+      let totalApprovalTime = 0;
+      let approvalCount = 0;
+
+      for (const r of allRequests) {
+        if (byStatus[r.status] !== undefined) byStatus[r.status]++;
+        if (byCategory[r.category] !== undefined) byCategory[r.category]++;
+        if (r.status === 'approved' && r.submittedAt && r.reviewedAt) {
+          const diff = new Date(r.reviewedAt).getTime() - new Date(r.submittedAt).getTime();
+          if (diff > 0) {
+            totalApprovalTime += diff / (1000 * 60 * 60);
+            approvalCount++;
+          }
+        }
+      }
+
+      const enrichedRequests = await Promise.all(allRequests.map(async (r) => {
+        const vessel = vesselMap.get(r.vesselId);
+        let targetName = '';
+        try {
+          if (r.targetType && r.targetId) {
+            switch (r.targetType) {
+              case 'component': {
+                const comp = await storage.getComponent(r.targetId);
+                targetName = comp?.name || comp?.componentCode || r.targetId;
+                break;
+              }
+              case 'job': {
+                const job = await storage.getJob(r.targetId);
+                targetName = job?.jobTitle || job?.jobCode || r.targetId;
+                break;
+              }
+              case 'work_order': {
+                const wo = await storage.getWorkOrder(r.targetId);
+                targetName = wo?.jobTitle || wo?.workOrderNumber || r.targetId;
+                break;
+              }
+              case 'spare': {
+                const spare = await storage.getSpare(parseInt(r.targetId));
+                targetName = spare?.partName || spare?.partCode || r.targetId;
+                break;
+              }
+              case 'store': {
+                const store = await storage.getStoresItem(parseInt(r.targetId));
+                targetName = store?.itemName || store?.itemCode || r.targetId;
+                break;
+              }
+            }
+          }
+        } catch { targetName = r.targetId || ''; }
+
+        let fieldChanges: any[] = [];
+        let changesCount = 0;
+        if (r.proposedChangesJson) {
+          const changes = Array.isArray(r.proposedChangesJson) ? r.proposedChangesJson : [];
+          changesCount = changes.length;
+          fieldChanges = changes.map((c: any) => ({
+            fieldPath: c.fieldPath || c.columnName || c.field || '',
+            oldValue: c.oldValue ?? c.currentValue ?? null,
+            newValue: c.newValue ?? c.proposedValue ?? null,
+            fieldLabel: c.displayName || c.fieldLabel || c.fieldPath || c.columnName || c.field || ''
+          }));
+        }
+
+        let cycleTimeHours: number | null = null;
+        if (r.submittedAt && r.reviewedAt) {
+          const diff = new Date(r.reviewedAt).getTime() - new Date(r.submittedAt).getTime();
+          if (diff > 0) cycleTimeHours = Math.round((diff / (1000 * 60 * 60)) * 10) / 10;
+        }
+
+        return {
+          id: r.id,
+          title: r.title,
+          category: r.category,
+          status: r.status,
+          requestedBy: {
+            userId: r.requestedByUserId,
+            name: r.requestedByUserId || 'Unknown',
+            rank: ''
+          },
+          reviewedBy: r.reviewedByUserId ? {
+            userId: r.reviewedByUserId,
+            name: r.reviewedByUserId || 'Unknown',
+            rank: ''
+          } : null,
+          vessel: {
+            id: r.vesselId,
+            name: vessel?.name || r.vesselId
+          },
+          submittedAt: r.submittedAt ? new Date(r.submittedAt).toISOString() : null,
+          reviewedAt: r.reviewedAt ? new Date(r.reviewedAt).toISOString() : null,
+          createdAt: new Date(r.createdAt).toISOString(),
+          reason: r.reason,
+          targetInfo: {
+            type: r.targetType || '',
+            id: r.targetId || '',
+            name: targetName
+          },
+          changesCount,
+          fieldChanges,
+          cycleTimeHours,
+          revisionNumber: r.revisionNumber || 0
+        };
+      }));
+
+      res.json({
+        summary: {
+          totalRequests: allRequests.length,
+          byStatus,
+          byCategory,
+          avgApprovalTimeHours: approvalCount > 0 ? Math.round((totalApprovalTime / approvalCount) * 10) / 10 : 0,
+          pendingRequests: byStatus.submitted + byStatus.returned
+        },
+        requests: enrichedRequests
+      });
+    } catch (error) {
+      console.error("Error generating change requests status report:", error);
+      res.status(500).json({ error: "Failed to generate change requests status report" });
+    }
+  });
+
+  app.get("/technical/api/reports/change-requests-status-tracking/export", async (req, res) => {
+    try {
+      const { vesselId, startDate, endDate, status, category } = req.query;
+
+      const params = new URLSearchParams();
+      if (vesselId) params.set('vesselId', vesselId as string);
+      if (startDate) params.set('startDate', startDate as string);
+      if (endDate) params.set('endDate', endDate as string);
+      if (status) params.set('status', status as string);
+      if (category) params.set('category', category as string);
+
+      const port = process.env.PORT || 5000;
+      const response = await fetch(`http://localhost:${port}/technical/api/reports/change-requests-status-tracking?${params.toString()}`);
+      const reportData = await response.json();
+
+      const wb = new ExcelJS.Workbook();
+      wb.creator = 'PMS Report Generator';
+      wb.created = new Date();
+
+      const headerFill: ExcelJS.FillPattern = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1E5A8E' } };
+      const headerFont: Partial<ExcelJS.Font> = { bold: true, color: { argb: 'FFFFFFFF' }, size: 11 };
+      const subHeaderFill: ExcelJS.FillPattern = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF0F4F8' } };
+      const borderStyle: Partial<ExcelJS.Borders> = {
+        top: { style: 'thin', color: { argb: 'FFD0D5DD' } },
+        left: { style: 'thin', color: { argb: 'FFD0D5DD' } },
+        bottom: { style: 'thin', color: { argb: 'FFD0D5DD' } },
+        right: { style: 'thin', color: { argb: 'FFD0D5DD' } }
+      };
+
+      const summarySheet = wb.addWorksheet('Summary');
+      summarySheet.columns = [
+        { header: 'Metric', key: 'metric', width: 35 },
+        { header: 'Value', key: 'value', width: 20 }
+      ];
+      const summaryHeaderRow = summarySheet.getRow(1);
+      summaryHeaderRow.eachCell(cell => { cell.fill = headerFill; cell.font = headerFont; cell.border = borderStyle; });
+
+      const s = reportData.summary;
+      const summaryRows = [
+        { metric: 'Total Requests', value: s.totalRequests },
+        { metric: 'Approved', value: s.byStatus.approved },
+        { metric: 'Rejected', value: s.byStatus.rejected },
+        { metric: 'Pending Review (Submitted + Returned)', value: s.pendingRequests },
+        { metric: 'Draft', value: s.byStatus.draft },
+        { metric: 'Avg Approval Time (hours)', value: s.avgApprovalTimeHours }
+      ];
+      summaryRows.forEach((row, i) => {
+        const r = summarySheet.addRow(row);
+        r.eachCell(cell => { cell.border = borderStyle; });
+        if (i % 2 === 1) r.eachCell(cell => { cell.fill = subHeaderFill; });
+      });
+
+      const catSheet = wb.addWorksheet('By Category');
+      catSheet.columns = [
+        { header: 'Category', key: 'category', width: 25 },
+        { header: 'Count', key: 'count', width: 15 }
+      ];
+      const catHeaderRow = catSheet.getRow(1);
+      catHeaderRow.eachCell(cell => { cell.fill = headerFill; cell.font = headerFont; cell.border = borderStyle; });
+      const catNames: Record<string, string> = { components: 'Components', work_orders: 'Work Orders', spares: 'Spares', stores: 'Stores' };
+      Object.entries(s.byCategory).forEach(([key, val]) => {
+        const r = catSheet.addRow({ category: catNames[key] || key, count: val });
+        r.eachCell(cell => { cell.border = borderStyle; });
+      });
+
+      const statusSheet = wb.addWorksheet('By Status');
+      statusSheet.columns = [
+        { header: 'Status', key: 'status', width: 25 },
+        { header: 'Count', key: 'count', width: 15 }
+      ];
+      const statusHeaderRow = statusSheet.getRow(1);
+      statusHeaderRow.eachCell(cell => { cell.fill = headerFill; cell.font = headerFont; cell.border = borderStyle; });
+      const statusNames: Record<string, string> = { draft: 'Draft', submitted: 'Submitted', returned: 'Returned', approved: 'Approved', rejected: 'Rejected' };
+      Object.entries(s.byStatus).forEach(([key, val]) => {
+        const r = statusSheet.addRow({ status: statusNames[key] || key, count: val });
+        r.eachCell(cell => { cell.border = borderStyle; });
+      });
+
+      const detailSheet = wb.addWorksheet('Detailed Requests');
+      detailSheet.columns = [
+        { header: 'ID', key: 'id', width: 8 },
+        { header: 'Title', key: 'title', width: 40 },
+        { header: 'Category', key: 'category', width: 15 },
+        { header: 'Status', key: 'status', width: 14 },
+        { header: 'Requested By', key: 'requestedBy', width: 20 },
+        { header: 'Vessel', key: 'vessel', width: 18 },
+        { header: 'Submitted At', key: 'submittedAt', width: 20 },
+        { header: 'Reviewed By', key: 'reviewedBy', width: 20 },
+        { header: 'Reviewed At', key: 'reviewedAt', width: 20 },
+        { header: 'Cycle Time (hrs)', key: 'cycleTime', width: 16 },
+        { header: 'Target', key: 'target', width: 30 },
+        { header: 'Changes Count', key: 'changesCount', width: 14 },
+        { header: 'Reason', key: 'reason', width: 35 }
+      ];
+      const detailHeaderRow = detailSheet.getRow(1);
+      detailHeaderRow.eachCell(cell => { cell.fill = headerFill; cell.font = headerFont; cell.border = borderStyle; });
+      detailSheet.autoFilter = { from: 'A1', to: 'M1' };
+      detailSheet.views = [{ state: 'frozen', ySplit: 1, xSplit: 0 }];
+
+      (reportData.requests || []).forEach((req: any, i: number) => {
+        const fmtDate = (d: string | null) => d ? new Date(d).toLocaleDateString() : '-';
+        const r = detailSheet.addRow({
+          id: req.id,
+          title: req.title,
+          category: catNames[req.category] || req.category,
+          status: statusNames[req.status] || req.status,
+          requestedBy: req.requestedBy?.name || '-',
+          vessel: req.vessel?.name || '-',
+          submittedAt: fmtDate(req.submittedAt),
+          reviewedBy: req.reviewedBy?.name || '-',
+          reviewedAt: fmtDate(req.reviewedAt),
+          cycleTime: req.cycleTimeHours ?? '-',
+          target: req.targetInfo?.name ? `${catNames[req.targetInfo.type] || req.targetInfo.type} - ${req.targetInfo.name}` : '-',
+          changesCount: req.changesCount,
+          reason: req.reason
+        });
+        r.eachCell(cell => { cell.border = borderStyle; });
+        if (i % 2 === 1) r.eachCell(cell => { cell.fill = subHeaderFill; });
+      });
+
+      const changesSheet = wb.addWorksheet('Field-Level Changes');
+      changesSheet.columns = [
+        { header: 'Request ID', key: 'requestId', width: 12 },
+        { header: 'Request Title', key: 'requestTitle', width: 35 },
+        { header: 'Field Path', key: 'fieldPath', width: 25 },
+        { header: 'Field Label', key: 'fieldLabel', width: 25 },
+        { header: 'Old Value', key: 'oldValue', width: 25 },
+        { header: 'New Value', key: 'newValue', width: 25 }
+      ];
+      const changesHeaderRow = changesSheet.getRow(1);
+      changesHeaderRow.eachCell(cell => { cell.fill = headerFill; cell.font = headerFont; cell.border = borderStyle; });
+      changesSheet.autoFilter = { from: 'A1', to: 'F1' };
+      changesSheet.views = [{ state: 'frozen', ySplit: 1, xSplit: 0 }];
+
+      let changeRowIdx = 0;
+      (reportData.requests || []).forEach((req: any) => {
+        (req.fieldChanges || []).forEach((fc: any) => {
+          const formatVal = (v: any) => v === null || v === undefined ? '-' : typeof v === 'boolean' ? (v ? 'Yes' : 'No') : String(v);
+          const r = changesSheet.addRow({
+            requestId: req.id,
+            requestTitle: req.title,
+            fieldPath: fc.fieldPath,
+            fieldLabel: fc.fieldLabel || fc.fieldPath,
+            oldValue: formatVal(fc.oldValue),
+            newValue: formatVal(fc.newValue)
+          });
+          r.eachCell(cell => { cell.border = borderStyle; });
+          if (changeRowIdx % 2 === 1) r.eachCell(cell => { cell.fill = subHeaderFill; });
+          changeRowIdx++;
+        });
+      });
+
+      const vesselName = vesselId && vesselId !== 'all'
+        ? (await storage.getVessels()).find(v => v.id === vesselId)?.name || vesselId
+        : 'All_Vessels';
+      const dateStr = new Date().toISOString().split('T')[0];
+      const filename = `Change_Requests_Status_Tracking_${vesselName}_${dateStr}.xlsx`;
+
+      res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+      res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+
+      await wb.xlsx.write(res);
+      res.end();
+    } catch (error) {
+      console.error("Error exporting change requests report to Excel:", error);
+      res.status(500).json({ error: "Failed to export change requests report" });
+    }
+  });
+
   // Template builder endpoints
   app.get("/technical/api/template-builder/:templateType", async (req, res) => {
     try {
