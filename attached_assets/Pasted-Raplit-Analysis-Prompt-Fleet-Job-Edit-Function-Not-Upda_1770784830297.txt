@@ -1,0 +1,256 @@
+Raplit Analysis Prompt — Fleet Job Edit Function Not Updating fleet_jobs Table
+Module
+
+PMS → Admin → Fleet Data → Fleet Job Management → Edit Job Details
+
+🎯 Objective
+
+Analyse how the Edit Job Details function is currently working and determine:
+
+How the edit flow is implemented
+
+Whether changes are being saved into the fleet_jobs table
+
+If not updating, why it is failing
+
+What the exact root cause is
+
+The correct end-to-end fix plan
+
+🔍 Issues to Analyse
+1️⃣ How Edit Job Should Work (Expected Flow)
+
+When user clicks Edit from Fleet Job Management:
+
+System navigates to Edit Job Details page
+
+Selected job data is fetched from fleet_jobs table
+
+All editable fields are pre-filled
+
+User modifies data
+
+On clicking Save:
+
+API call should trigger UPDATE query
+
+Record in fleet_jobs table should be updated
+
+Success response returned
+
+User navigates back to Fleet Job Management
+
+Updated values should be reflected in list
+
+2️⃣ What to Verify in Current Implementation
+
+Analyse the following:
+
+Which API endpoint is called on Save?
+
+Is it:
+
+POST (incorrect for update?)
+
+PUT / PATCH (correct for update?)
+
+Is Job ID or primary key passed properly?
+
+Is the WHERE clause missing in update query?
+
+Is the update calling a different table (e.g., jobs instead of fleet_jobs)?
+
+Is the record ID mismatched?
+
+Is state not binding properly to form?
+
+Is form using incorrect column names?
+
+Is there silent failure in API but still showing success?
+
+3️⃣ Critical Root Cause Checks
+
+Check whether:
+
+The edit page is using fleet_jobs table or another table
+
+The update API exists for fleet jobs
+
+The correct primary key is being used
+
+The payload matches DB column names
+
+The backend update query includes correct WHERE condition
+
+The API returns proper error but frontend ignores it
+
+There is validation failure blocking update
+
+Transaction is failing silently
+
+🚨 If Data Is NOT Updating
+
+Possible Root Causes:
+
+Wrong API endpoint
+
+No UPDATE query implemented
+
+Update query missing primary key
+
+Frontend not sending ID
+
+Backend updating wrong table
+
+Column name mismatch
+
+Soft validation failure
+
+Database constraint violation
+
+Save button calling create API instead of update API
+
+📊 Required Technical Analysis
+
+Frontend:
+
+Inspect Save button handler
+
+Inspect payload structure
+
+Confirm job_id / job_code sent
+
+Confirm API URL
+
+Backend:
+
+Inspect update route
+
+Inspect SQL query
+
+Verify WHERE clause
+
+Verify table name (fleet_jobs)
+
+Check response handling
+
+Check error handling
+
+Database:
+
+Confirm primary key
+
+Confirm constraints
+
+Confirm record exists before update
+
+✅ Correct Implementation Plan
+Step 1 — Confirm Table Authority
+
+All edits must update:
+
+fleet_jobs
+
+
+No other table must be involved.
+
+Step 2 — Standardize Update API
+
+Create or verify endpoint:
+
+PUT /fleet-jobs/:id
+
+
+Requirements:
+
+Accept full editable payload
+
+Validate required fields
+
+Execute UPDATE on fleet_jobs
+
+Return updated record
+
+Step 3 — Ensure Proper WHERE Condition
+
+Example:
+
+UPDATE fleet_jobs
+SET column1 = value1,
+    column2 = value2
+WHERE id = :id;
+
+
+No update should occur without primary key.
+
+Step 4 — Ensure Correct Frontend Payload
+
+Payload must include:
+
+Primary key
+
+All editable columns
+
+Matching DB column names
+
+Step 5 — Proper API Response Handling
+
+Frontend must:
+
+Show success ONLY if backend confirms update
+
+Show error toast if failure
+
+Navigate only after successful response
+
+Step 6 — Data Refresh Strategy
+
+After Save:
+
+Either refetch list
+OR
+
+Optimistically update local state
+OR
+
+Reload from backend
+
+Step 7 — Logging & Debugging Layer
+
+Temporarily add:
+
+Backend console logging for update
+
+SQL result logging
+
+Response logging
+
+Remove after confirmation.
+
+⚠️ Constraints (Strict)
+
+Analyse only
+
+Do not redesign UI
+
+Do not change schema
+
+Do not modify unrelated job modules
+
+Do not affect bulk import logic
+
+Keep fix scoped only to Edit Job update issue
+
+📌 Expected Outcome
+
+Editing a Fleet Job updates the fleet_jobs table
+
+No silent failures
+
+Proper API lifecycle handling
+
+Save reflects real database update
+
+Navigation works correctly
+
+No data inconsistency
