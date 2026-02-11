@@ -1482,9 +1482,7 @@ class PDFReportGenerator {
 
     this.addFooter(pageWidth, pageHeight, margin);
 
-    const timestamp = format(new Date(), 'yyyyMMdd_HHmm');
-    const filename = `Defect_Report_${defectData.reportId}_${timestamp}.pdf`;
-    this.doc.save(filename);
+    this.doc.save(this.generateFilename('Defect_Report', 'vessel'));
   }
 
   generateConsumptionAnalysisPDF(
