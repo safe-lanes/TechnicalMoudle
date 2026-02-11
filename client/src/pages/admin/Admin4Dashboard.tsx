@@ -37,7 +37,7 @@ export default function Admin4Dashboard({ onSubViewChange }: { onSubViewChange?:
   });
 
   const { data: componentsData, isLoading: isComponentsLoading } = useQuery({
-    queryKey: ['/technical/api/fleet/components'],
+    queryKey: ['/technical/api/fleet-admin/fleet-components'],
   });
 
   const { data: jobsData, isLoading: isJobsLoading } = useQuery({
