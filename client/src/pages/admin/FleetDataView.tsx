@@ -392,6 +392,12 @@ export default function FleetDataView({ onBack }: { onBack?: () => void }) {
     },
   });
 
+  useEffect(() => {
+    if (jobFormData.maintenanceBasis === 'Running Hours') {
+      setJobFormData(prev => ({ ...prev, unit: 'Hours' }));
+    }
+  }, [jobFormData.maintenanceBasis]);
+
   const handleSaveEditJob = () => {
     if (!selectedJobForDetail) return;
     const EDITABLE_FIELDS: (keyof FleetJob)[] = [
@@ -422,6 +428,15 @@ export default function FleetDataView({ onBack }: { onBack?: () => void }) {
       data: changedPayload,
       jobCode: jobFormData.jobCode,
     });
+  };
+
+  const normalizeJobPriority = (val: string | null | undefined): string => {
+    if (!val) return '';
+    const lower = val.toLowerCase();
+    if (lower === 'high') return 'High';
+    if (lower === 'medium') return 'Medium';
+    if (lower === 'low') return 'Low';
+    return val;
   };
 
   const mappedComponents = useMemo(() => {
@@ -1833,7 +1848,11 @@ export default function FleetDataView({ onBack }: { onBack?: () => void }) {
               className="bg-white/20 text-white border-white/30"
               variant="outline"
               onClick={() => {
-                setJobFormData(selectedJobForDetail || {});
+                if (selectedJobForDetail) {
+                  setJobFormData({ ...selectedJobForDetail, jobPriority: normalizeJobPriority(selectedJobForDetail.jobPriority) });
+                } else {
+                  setJobFormData({});
+                }
                 setIsEditJobDialogOpen(true);
               }}
               data-testid="btn-edit-job"
@@ -2211,30 +2230,50 @@ export default function FleetDataView({ onBack }: { onBack?: () => void }) {
                     </div>
                     <div className="space-y-1">
                       <Label className="text-sm text-[#8798ad]">Maintenance Basis</Label>
-                      <Input
-                        placeholder="Enter maintenance basis"
+                      <Select
                         value={jobFormData.maintenanceBasis || ""}
-                        onChange={(e) => setJobFormData(prev => ({ ...prev, maintenanceBasis: e.target.value }))}
-                        data-testid="input-edit-maint-basis"
-                      />
+                        onValueChange={(val) => setJobFormData(prev => ({ ...prev, maintenanceBasis: val }))}
+                      >
+                        <SelectTrigger data-testid="input-edit-maint-basis">
+                          <SelectValue placeholder="Select maintenance basis" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="Calendar">Calendar</SelectItem>
+                          <SelectItem value="Running Hours">Running Hours</SelectItem>
+                        </SelectContent>
+                      </Select>
                     </div>
                     <div className="space-y-1">
                       <Label className="text-sm text-[#8798ad]">Frequency</Label>
                       <div className="flex gap-2">
                         <Input
                           placeholder="Value"
+                          type="number"
                           value={jobFormData.intervalValue || ""}
                           onChange={(e) => setJobFormData(prev => ({ ...prev, intervalValue: e.target.value }))}
                           className="flex-1"
                           data-testid="input-edit-interval-value"
                         />
-                        <Input
-                          placeholder="Unit"
-                          value={jobFormData.unit || ""}
-                          onChange={(e) => setJobFormData(prev => ({ ...prev, unit: e.target.value }))}
-                          className="flex-1"
-                          data-testid="input-edit-unit"
-                        />
+                        {jobFormData.maintenanceBasis === 'Running Hours' ? (
+                          <div className="flex-1 text-sm font-medium text-gray-900 bg-gray-50 px-3 py-2 rounded-md border border-gray-200 min-h-[38px] flex items-center" data-testid="input-edit-unit">
+                            Hours
+                          </div>
+                        ) : (
+                          <Select
+                            value={jobFormData.unit || ""}
+                            onValueChange={(val) => setJobFormData(prev => ({ ...prev, unit: val }))}
+                          >
+                            <SelectTrigger className="flex-1" data-testid="input-edit-unit">
+                              <SelectValue placeholder="Unit" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="Months">Months</SelectItem>
+                              <SelectItem value="Years">Years</SelectItem>
+                              <SelectItem value="Weeks">Weeks</SelectItem>
+                              <SelectItem value="Days">Days</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        )}
                       </div>
                     </div>
                     <div className="space-y-1">
@@ -2266,21 +2305,34 @@ export default function FleetDataView({ onBack }: { onBack?: () => void }) {
                     </div>
                     <div className="space-y-1">
                       <Label className="text-sm text-[#8798ad]">Job Priority</Label>
-                      <Input
-                        placeholder="Enter priority"
+                      <Select
                         value={jobFormData.jobPriority || ""}
-                        onChange={(e) => setJobFormData(prev => ({ ...prev, jobPriority: e.target.value }))}
-                        data-testid="input-edit-priority"
-                      />
+                        onValueChange={(val) => setJobFormData(prev => ({ ...prev, jobPriority: val }))}
+                      >
+                        <SelectTrigger data-testid="input-edit-priority">
+                          <SelectValue placeholder="Select priority" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="High">High</SelectItem>
+                          <SelectItem value="Medium">Medium</SelectItem>
+                          <SelectItem value="Low">Low</SelectItem>
+                        </SelectContent>
+                      </Select>
                     </div>
                     <div className="space-y-1">
                       <Label className="text-sm text-[#8798ad]">Class Related</Label>
-                      <Input
-                        placeholder="Yes / No"
+                      <Select
                         value={jobFormData.classRelated || ""}
-                        onChange={(e) => setJobFormData(prev => ({ ...prev, classRelated: e.target.value }))}
-                        data-testid="input-edit-class-related"
-                      />
+                        onValueChange={(val) => setJobFormData(prev => ({ ...prev, classRelated: val }))}
+                      >
+                        <SelectTrigger data-testid="input-edit-class-related">
+                          <SelectValue placeholder="Select" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="Yes">Yes</SelectItem>
+                          <SelectItem value="No">No</SelectItem>
+                        </SelectContent>
+                      </Select>
                     </div>
                     <div className="space-y-1">
                       <Label className="text-sm text-[#8798ad]">Interval Running Hour</Label>
@@ -2299,21 +2351,33 @@ export default function FleetDataView({ onBack }: { onBack?: () => void }) {
                     </div>
                     <div className="space-y-1">
                       <Label className="text-sm text-[#8798ad]">Criticality</Label>
-                      <Input
-                        placeholder="Enter criticality"
+                      <Select
                         value={jobFormData.criticality || ""}
-                        onChange={(e) => setJobFormData(prev => ({ ...prev, criticality: e.target.value }))}
-                        data-testid="input-edit-criticality"
-                      />
+                        onValueChange={(val) => setJobFormData(prev => ({ ...prev, criticality: val }))}
+                      >
+                        <SelectTrigger data-testid="input-edit-criticality">
+                          <SelectValue placeholder="Select" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="Yes">Yes</SelectItem>
+                          <SelectItem value="No">No</SelectItem>
+                        </SelectContent>
+                      </Select>
                     </div>
                     <div className="space-y-1">
                       <Label className="text-sm text-[#8798ad]">Is Active</Label>
-                      <Input
-                        placeholder="Yes / No"
+                      <Select
                         value={jobFormData.isActive === true ? "Yes" : jobFormData.isActive === false ? "No" : ""}
-                        onChange={(e) => setJobFormData(prev => ({ ...prev, isActive: e.target.value.toLowerCase() === "yes" }))}
-                        data-testid="input-edit-is-active"
-                      />
+                        onValueChange={(val) => setJobFormData(prev => ({ ...prev, isActive: val === "Yes" }))}
+                      >
+                        <SelectTrigger data-testid="input-edit-is-active">
+                          <SelectValue placeholder="Select" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="Yes">Yes</SelectItem>
+                          <SelectItem value="No">No</SelectItem>
+                        </SelectContent>
+                      </Select>
                     </div>
                   </div>
 
