@@ -1,0 +1,2 @@
+ALTER TABLE "jobs" ALTER COLUMN "component_id" SET NOT NULL;--> statement-breakpoint
+ALTER TABLE "jobs" ADD CONSTRAINT "jobs_component_id_components_cuuid_fk" FOREIGN KEY ("component_id") REFERENCES "public"."components"("cuuid") ON DELETE restrict ON UPDATE cascade;

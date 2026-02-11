@@ -818,7 +818,7 @@ export type AlertConfig = typeof alertConfig.$inferSelect;
 export const jobs = pgTable("jobs", {
   id: text("id").primaryKey(),
   vesselId: text("vessel_id").references(() => vessels.vuuid),
-  componentId: text("component_id"), // DEPRECATED: Use jobComponentLinks for many-to-many. Nullable for backward compatibility
+  componentId: text("component_id").notNull().references(() => components.cuuid, { onDelete: "restrict", onUpdate: "cascade" }),
   componentCode: text("component_code"), // DEPRECATED: Use jobComponentLinks for many-to-many
   componentName: text("component_name"), // DEPRECATED: Use jobComponentLinks for many-to-many
   jobNo: text("job_no").notNull(), // Auto-generated JOB-XXXXXXX (not globally unique - same job_no can exist across vessels/components)
