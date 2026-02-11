@@ -9864,7 +9864,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         'running-hours-anomaly-detection',
         'critical-equipment-status',
         'unplanned-breakdown-jobs',
-        'crew-workload-distribution'
+        'crew-workload-distribution',
+        'ihm-inventory-status'
       ];
       
       if (dedicatedReportRoutes.includes(reportType)) {
@@ -17922,18 +17923,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const totalUnknown = allItems.filter(i => i.ihmStatus === 'Unknown').length;
       const compliancePct = allItems.length > 0 ? Math.round(((totalPresent + totalNotPresent) / allItems.length) * 100) : 100;
 
+      const lastCol = String.fromCharCode(64 + columns.length);
       applyStandardHeader(
         worksheet,
         'IHM Inventory Status Report',
-        `Vessel: ${vesselName} | Generated: ${new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}`,
-        columns.length,
-        [
-          { label: 'Total Items', value: allItems.length },
-          { label: 'IHM Present', value: totalPresent },
-          { label: 'No IHM', value: totalNotPresent },
-          { label: 'Unknown', value: totalUnknown },
-          { label: 'Compliance %', value: `${compliancePct}%` },
-        ]
+        `IHM Present: ${totalPresent} | No IHM: ${totalNotPresent} | Unknown: ${totalUnknown} | Compliance: ${compliancePct}%`,
+        vesselName,
+        allItems.length,
+        lastCol
       );
 
       applyStandardTableHeader(worksheet, columns, 7);
@@ -17955,9 +17952,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }));
 
       const conditionalStyles: ConditionalStyle[] = [
-        { column: 'ihmStatus', value: 'Present', color: 'FFDC2626' },
-        { column: 'ihmStatus', value: 'Not Present', color: 'FF16A34A' },
-        { column: 'ihmStatus', value: 'Unknown', color: 'FFD97706' },
+        { condition: (row: any) => row.ihmStatus === 'Present', style: 'danger' as const },
+        { condition: (row: any) => row.ihmStatus === 'Unknown', style: 'warning' as const },
+        { condition: (row: any) => row.ihmStatus === 'Not Present', style: 'success' as const },
       ];
 
       applyStandardDataRows(worksheet, reportData, columns, 8, conditionalStyles);
