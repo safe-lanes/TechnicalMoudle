@@ -56,6 +56,7 @@ export type Fleet = typeof fleets.$inferSelect;
 // Vessels Table - Core vessel registry
 export const vessels = pgTable("vessels", {
   id: text("id").primaryKey(), // Vessel code like V001, V002
+  vuuid: text("vuuid").unique(), // External UUID from sync (unique vessel identifier across systems)
   name: text("name").notNull(), // Vessel display name
   code: text("code").notNull(), // Same as id for compatibility
   fleetId: text("fleet_id"), // Optional reference to fleet

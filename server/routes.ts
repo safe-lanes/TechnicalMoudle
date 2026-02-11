@@ -8830,18 +8830,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
           const imoNumber = getFieldValue(v, ['imo_number', 'imoNumber', 'imo_no', 'imo']);
           const vesselType = getFieldValue(v, ['vessel_type_name', 'vesselTypeName', 'vessel_type', 'vesselType', 'type']);
           
-          // Upsert vessel using raw SQL
           await pool.query(`
-            INSERT INTO vessels (id, name, code, imo_number, vessel_type, is_active, created_at, updated_at)
-            VALUES ($1, $2, $3, $4, $5, true, NOW(), NOW())
+            INSERT INTO vessels (id, vuuid, name, code, imo_number, vessel_type, is_active, created_at, updated_at)
+            VALUES ($1, $2, $3, $4, $5, $6, true, NOW(), NOW())
             ON CONFLICT (id) DO UPDATE SET
+              vuuid = EXCLUDED.vuuid,
               name = EXCLUDED.name,
               code = EXCLUDED.code,
               imo_number = EXCLUDED.imo_number,
               vessel_type = EXCLUDED.vessel_type,
               is_active = true,
               updated_at = NOW()
-          `, [entryId, name, entryId, imoNumber, vesselType]);
+          `, [entryId, entryId, name, entryId, imoNumber, vesselType]);
           stats.vessels.updated++;
         } catch (e: any) {
           stats.vessels.errors.push(`Vessel ${v.vuid || v.vesselId}: ${e.message}`);
