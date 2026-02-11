@@ -1,5 +1,4 @@
 import { sql } from 'drizzle-orm';
-import { migrate } from 'drizzle-orm/node-postgres/migrator';
 import { resolvePostgres } from './postgresClient';
 import { isFileStorageForced } from './storageFactory';
 import { exec } from 'child_process';
@@ -670,17 +669,84 @@ export async function runDrizzleMigrations(): Promise<void> {
     return;
   }
   
+  const journalPath = path.join(migrationsFolder, 'meta', '_journal.json');
+  if (!fs.existsSync(journalPath)) {
+    console.log('⏭️  Skipping Drizzle migrations - meta/_journal.json not found');
+    return;
+  }
+  
+  await ensureMigrationsTable(db);
+  
+  let journal: { entries: Array<{ idx: number; tag: string }> };
   try {
-    await migrate(db, { migrationsFolder });
-    console.log('✅ Drizzle file-based migrations complete');
-  } catch (error: any) {
-    if (error.message?.includes('already exists') || error.code === '42P07') {
-      console.log('✅ Drizzle migrations complete (tables already exist)');
-    } else {
-      console.error('❌ Drizzle migration error:', error.message);
-      throw error;
+    journal = JSON.parse(fs.readFileSync(journalPath, 'utf-8'));
+  } catch (err: any) {
+    console.error('❌ Failed to parse migration journal:', err.message);
+    return;
+  }
+  
+  const sortedEntries = [...journal.entries].sort((a, b) => a.idx - b.idx);
+  let applied = 0;
+  let skipped = 0;
+  
+  for (const entry of sortedEntries) {
+    const migrationId = `drizzle_${entry.tag}`;
+    
+    const alreadyApplied = await getMigrationStatus(db, migrationId);
+    if (alreadyApplied) {
+      skipped++;
+      continue;
+    }
+    
+    const sqlFilePath = path.join(migrationsFolder, `${entry.tag}.sql`);
+    if (!fs.existsSync(sqlFilePath)) {
+      console.warn(`  ⚠️  Migration file not found: ${entry.tag}.sql - skipping`);
+      continue;
+    }
+    
+    const migrationSql = fs.readFileSync(sqlFilePath, 'utf-8');
+    const statements = migrationSql
+      .split('--> statement-breakpoint')
+      .map(s => s.replace(/--.*$/gm, '').trim())
+      .filter(s => s.length > 0);
+    
+    console.log(`  📝 Applying Drizzle migration: ${entry.tag} (${statements.length} statements)`);
+    
+    let migrationSuccess = true;
+    for (const stmt of statements) {
+      try {
+        await db.execute(sql.raw(stmt));
+      } catch (error: any) {
+        if (
+          error.message?.includes('already exists') ||
+          error.code === '42P07' ||
+          error.code === '42701' ||
+          error.message?.includes('duplicate key') ||
+          error.code === '23505'
+        ) {
+          console.log(`    ⚠️  Statement skipped (already exists): ${stmt.substring(0, 80)}...`);
+        } else {
+          console.error(`  ❌ Drizzle migration ${entry.tag} failed:`, error.message);
+          console.error(`     Statement: ${stmt.substring(0, 120)}`);
+          migrationSuccess = false;
+          break;
+        }
+      }
+    }
+    
+    if (migrationSuccess) {
+      await markMigrationComplete(db, {
+        id: migrationId,
+        name: `Drizzle migration: ${entry.tag}`,
+        description: `Auto-applied from migrations/${entry.tag}.sql`,
+        sql: ''
+      });
+      applied++;
+      console.log(`  ✅ Drizzle migration ${entry.tag} applied`);
     }
   }
+  
+  console.log(`✅ Drizzle file-based migrations complete: ${applied} applied, ${skipped} skipped`);
 }
 
 export async function runBackupAndMigrations(): Promise<void> {
