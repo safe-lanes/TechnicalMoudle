@@ -5,8 +5,7 @@ import { useLocation, useRoute } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { ChevronRight, ChevronDown, Plus, Search, ArrowLeft, Trash2 } from "lucide-react";
+import { ChevronRight, ChevronDown, Plus, Search, ArrowLeft, Trash2, X } from "lucide-react";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import type { FleetComponents, Maker } from "@shared/schema";
@@ -200,6 +199,8 @@ export default function AddEditFleetComponent() {
 
   const [isAddingNew, setIsAddingNew] = useState(false);
   const [newComponentCode, setNewComponentCode] = useState("");
+  const [makerSearchText, setMakerSearchText] = useState("");
+  const [showMakerSuggestions, setShowMakerSuggestions] = useState(false);
 
   const { data: fleetComponentsList = [], isLoading } = useQuery<FleetComponents[]>({
     queryKey: ["/technical/api/fleet-admin/fleet-components"],
@@ -238,6 +239,7 @@ export default function AddEditFleetComponent() {
         fleetEquipmentName: editingComponent.fleetEquipmentName || "",
       });
 
+      setMakerSearchText(editingComponent.makerName || "");
       setIsAddingNew(false);
 
       const matchingNode: TreeNode = {
@@ -344,6 +346,8 @@ export default function AddEditFleetComponent() {
       notes: "",
       fleetEquipmentName: "",
     });
+    setMakerSearchText("");
+    setShowMakerSuggestions(false);
   };
 
   const handleNodeSelect = (node: TreeNode) => {
@@ -353,6 +357,7 @@ export default function AddEditFleetComponent() {
     setNewComponentCode("");
 
     if (node.data) {
+      setMakerSearchText(node.data.makerName || "");
       setFormData({
         maker: node.data.makerName || "",
         makerCode: node.data.makerCode || "",
@@ -457,12 +462,35 @@ export default function AddEditFleetComponent() {
     }
   };
 
-  const handleMakerChange = (makerName: string) => {
-    setFormData(prev => ({ ...prev, maker: makerName }));
-    const selectedMaker = makers.find(m => m.makerName === makerName);
-    if (selectedMaker) {
-      setFormData(prev => ({ ...prev, makerCode: selectedMaker.makerCode || "" }));
+  const filteredMakers = useMemo(() => {
+    if (!makerSearchText.trim()) return [];
+    return makers.filter(m =>
+      m.makerName?.toLowerCase().includes(makerSearchText.toLowerCase())
+    ).slice(0, 10);
+  }, [makerSearchText, makers]);
+
+  const handleMakerSearchChange = (value: string) => {
+    setMakerSearchText(value);
+    setShowMakerSuggestions(true);
+    if (!value.trim()) {
+      setFormData(prev => ({ ...prev, maker: "", makerCode: "" }));
     }
+  };
+
+  const handleMakerSelect = (maker: Maker) => {
+    setMakerSearchText(maker.makerName || "");
+    setFormData(prev => ({
+      ...prev,
+      maker: maker.makerName || "",
+      makerCode: maker.makerCode || "",
+    }));
+    setShowMakerSuggestions(false);
+  };
+
+  const handleClearMaker = () => {
+    setMakerSearchText("");
+    setFormData(prev => ({ ...prev, maker: "", makerCode: "" }));
+    setShowMakerSuggestions(false);
   };
 
   const isEditMode = !!activeEditId || !!editId || (!!selectedNode?.data);
@@ -586,29 +614,55 @@ export default function AddEditFleetComponent() {
                 <h3 className="text-cyan-600 font-medium mb-4">Fleet Component Information</h3>
 
                 <div className="grid grid-cols-4 gap-4">
-                  <div>
+                  <div className="relative">
                     <label className="text-blue-600 text-xs font-medium mb-1 block">Maker*</label>
-                    <Select value={formData.maker} onValueChange={handleMakerChange}>
-                      <SelectTrigger className="text-sm" data-testid="select-maker">
-                        <SelectValue placeholder="Auto Update as per Maker Code" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {makers.map((maker) => (
-                          <SelectItem key={maker.id} value={maker.makerName}>
-                            {maker.makerName}
-                          </SelectItem>
+                    <div className="relative">
+                      <Input
+                        value={makerSearchText}
+                        onChange={(e) => handleMakerSearchChange(e.target.value)}
+                        onFocus={() => { if (makerSearchText.trim()) setShowMakerSuggestions(true); }}
+                        onBlur={() => setTimeout(() => setShowMakerSuggestions(false), 200)}
+                        placeholder="Type to search makers..."
+                        className="text-sm pr-8"
+                        data-testid="input-maker-search"
+                      />
+                      {makerSearchText && (
+                        <button
+                          type="button"
+                          onClick={handleClearMaker}
+                          className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                          data-testid="button-clear-maker"
+                        >
+                          <X className="h-4 w-4" />
+                        </button>
+                      )}
+                    </div>
+                    {showMakerSuggestions && filteredMakers.length > 0 && (
+                      <div className="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-md shadow-lg max-h-48 overflow-y-auto">
+                        {filteredMakers.map((maker) => (
+                          <div
+                            key={maker.id}
+                            className="px-3 py-2 text-sm cursor-pointer hover:bg-cyan-50 hover:text-cyan-700 border-b border-gray-100 last:border-b-0"
+                            onMouseDown={() => handleMakerSelect(maker)}
+                            data-testid={`maker-suggestion-${maker.id}`}
+                          >
+                            <span className="font-medium">{maker.makerName}</span>
+                            {maker.makerCode && (
+                              <span className="text-gray-400 ml-2 text-xs">({maker.makerCode})</span>
+                            )}
+                          </div>
                         ))}
-                      </SelectContent>
-                    </Select>
+                      </div>
+                    )}
                   </div>
 
                   <div>
                     <label className="text-blue-600 text-xs font-medium mb-1 block">Maker Code</label>
                     <Input
                       value={formData.makerCode}
-                      onChange={(e) => setFormData(prev => ({ ...prev, makerCode: e.target.value }))}
-                      placeholder="As Per the Maker List"
-                      className="text-sm"
+                      readOnly
+                      placeholder="Auto-filled from maker selection"
+                      className="text-sm bg-gray-100 text-gray-600"
                       data-testid="input-maker-code"
                     />
                   </div>
