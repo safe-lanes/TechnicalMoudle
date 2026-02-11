@@ -1478,6 +1478,14 @@ class PDFReportGenerator {
 
     y1 = this.addFormField(margin, y, 'Verified By (Name)', defectData.verifiedByName, col2Width);
     y2 = this.addFormField(margin + col2Width, y, 'Verified By (Office Position)', defectData.verifiedByOfficePosition, col2Width);
+    y = Math.max(y1, y2) + 2;
+
+    this.addFooter(pageWidth, pageHeight, margin);
+
+    const timestamp = format(new Date(), 'yyyyMMdd_HHmm');
+    const filename = `Defect_Report_${defectData.reportId}_${timestamp}.pdf`;
+    this.doc.save(filename);
+  }
 
   generateConsumptionAnalysisPDF(
     config: PDFReportConfig & { vesselName?: string; datePeriod?: string; daysOfData?: number; confidence?: string },
@@ -1793,8 +1801,6 @@ class PDFReportGenerator {
     this.addFooter(pageWidth, pageHeight, margin);
 
     const timestamp = format(new Date(), 'yyyyMMdd_HHmm');
-
-    const filename = `Defect_Report_${defectData.reportId}_${timestamp}.pdf`;
 
     const cleanVessel = vesselName.replace(/[^a-zA-Z0-9 ]/g, '').replace(/\s+/g, '-');
     const filename = `Vessel-${cleanVessel}_Consumption_Pattern_Analysis_${timestamp}.pdf`;
