@@ -4,10 +4,12 @@ import { type FleetComponents } from "@shared/schema";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
-import { Plus, Search, Pencil, Trash2, ChevronRight, ChevronDown, Upload, Download, Settings, Package, ArrowLeft, Info, MapPin, Star, FileText, CheckCircle, XCircle } from "lucide-react";
+import { Plus, Search, Pencil, Trash2, ChevronRight, ChevronDown, Upload, Download, Settings, Package, ArrowLeft, Info, MapPin, Star, FileText, CheckCircle, XCircle, Save, X } from "lucide-react";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import FleetComponentForm from "./FleetComponentForm";
@@ -22,6 +24,8 @@ export default function FleetComponentsManagement({ onBack }: { onBack?: () => v
   const [componentToDelete, setComponentToDelete] = useState<FleetComponents | null>(null);
   const [expandedNodes, setExpandedNodes] = useState<Set<string>>(new Set());
   const [detailComponent, setDetailComponent] = useState<FleetComponents | null>(null);
+  const [isEditMode, setIsEditMode] = useState(false);
+  const [editFormData, setEditFormData] = useState<Record<string, any>>({});
 
   const { data: components, isLoading, error } = useQuery<FleetComponents[]>({
     queryKey: ['/technical/api/fleet-admin/fleet-components'],
@@ -44,6 +48,27 @@ export default function FleetComponentsManagement({ onBack }: { onBack?: () => v
       toast({
         title: "Error",
         description: error.message || "Failed to delete component",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const inlineUpdateMutation = useMutation({
+    mutationFn: async ({ id, data }: { id: number; data: Record<string, any> }) => {
+      return apiRequest('PATCH', `/technical/api/fleet-admin/fleet-components/${id}`, data);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/technical/api/fleet-admin/fleet-components'], exact: false });
+      toast({
+        title: "Success",
+        description: "Component updated successfully",
+      });
+      setIsEditMode(false);
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to update component",
         variant: "destructive",
       });
     },
@@ -108,8 +133,23 @@ export default function FleetComponentsManagement({ onBack }: { onBack?: () => v
   };
 
   const handleEdit = (component: FleetComponents) => {
-    setSelectedComponent(component);
-    setIsFormOpen(true);
+    setDetailComponent(component);
+    setEditFormData({
+      fleetEquipmentCode: component.fleetEquipmentCode || "",
+      fleetEquipmentName: component.fleetEquipmentName || "",
+      parentFleetEquipmentCode: component.parentFleetEquipmentCode || "",
+      componentCategory: component.componentCategory || "",
+      eqptSystemDept: component.eqptSystemDept || "",
+      makerName: component.makerName || "",
+      makerCode: component.makerCode || "",
+      model: component.model || "",
+      modelCode: component.modelCode || "",
+      location: component.location || "",
+      rating: component.rating || "",
+      isActive: component.isActive,
+      notes: component.notes || "",
+    });
+    setIsEditMode(true);
   };
 
   const handleDeleteClick = (component: FleetComponents) => {
@@ -171,6 +211,80 @@ export default function FleetComponentsManagement({ onBack }: { onBack?: () => v
     </div>
   );
 
+  const renderEditField = (label: string, fieldKey: string, testId?: string, placeholder?: string) => (
+    <div className="space-y-1" data-testid={testId}>
+      <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider">{label}</p>
+      <Input
+        value={editFormData[fieldKey] || ""}
+        onChange={(e) => setEditFormData(prev => ({ ...prev, [fieldKey]: e.target.value }))}
+        placeholder={placeholder || label}
+        className="bg-white border-gray-300 text-sm"
+        data-testid={`edit-input-${fieldKey}`}
+      />
+    </div>
+  );
+
+  const handleStartEdit = () => {
+    if (!detailComponent) return;
+    setEditFormData({
+      fleetEquipmentCode: detailComponent.fleetEquipmentCode || "",
+      fleetEquipmentName: detailComponent.fleetEquipmentName || "",
+      parentFleetEquipmentCode: detailComponent.parentFleetEquipmentCode || "",
+      componentCategory: detailComponent.componentCategory || "",
+      eqptSystemDept: detailComponent.eqptSystemDept || "",
+      makerName: detailComponent.makerName || "",
+      makerCode: detailComponent.makerCode || "",
+      model: detailComponent.model || "",
+      modelCode: detailComponent.modelCode || "",
+      location: detailComponent.location || "",
+      rating: detailComponent.rating || "",
+      isActive: detailComponent.isActive,
+      notes: detailComponent.notes || "",
+    });
+    setIsEditMode(true);
+  };
+
+  const handleSaveEdit = () => {
+    if (!detailComponent) return;
+    const changedFields: Record<string, any> = {};
+    const originalData: Record<string, any> = {
+      fleetEquipmentCode: detailComponent.fleetEquipmentCode || "",
+      fleetEquipmentName: detailComponent.fleetEquipmentName || "",
+      parentFleetEquipmentCode: detailComponent.parentFleetEquipmentCode || "",
+      componentCategory: detailComponent.componentCategory || "",
+      eqptSystemDept: detailComponent.eqptSystemDept || "",
+      makerName: detailComponent.makerName || "",
+      makerCode: detailComponent.makerCode || "",
+      model: detailComponent.model || "",
+      modelCode: detailComponent.modelCode || "",
+      location: detailComponent.location || "",
+      rating: detailComponent.rating || "",
+      isActive: detailComponent.isActive,
+      notes: detailComponent.notes || "",
+    };
+
+    for (const key of Object.keys(editFormData)) {
+      if (editFormData[key] !== originalData[key]) {
+        changedFields[key] = editFormData[key];
+      }
+    }
+
+    if (Object.keys(changedFields).length === 0) {
+      toast({ title: "No Changes", description: "No fields were modified" });
+      setIsEditMode(false);
+      return;
+    }
+
+    inlineUpdateMutation.mutate({ id: detailComponent.id, data: changedFields });
+  };
+
+  const handleCancelEdit = () => {
+    setIsEditMode(false);
+    setEditFormData({});
+  };
+
+  const parentOptions = components?.filter(c => c.id !== detailComponent?.id && c.fleetEquipmentCode) || [];
+
   if (detailComponent) {
     const parentName = components?.find(c => c.fleetEquipmentCode === detailComponent.parentFleetEquipmentCode)?.fleetEquipmentName;
 
@@ -181,35 +295,62 @@ export default function FleetComponentsManagement({ onBack }: { onBack?: () => v
             <div className="flex items-center justify-between gap-4">
               <div className="flex items-center gap-3">
                 <div className="p-2 bg-white/20 rounded-lg">
-                  <Info className="h-5 w-5 text-white" />
+                  {isEditMode ? <Pencil className="h-5 w-5 text-white" /> : <Info className="h-5 w-5 text-white" />}
                 </div>
                 <div>
-                  <h1 className="text-xl font-bold text-white" data-testid="title-component-details">Component Details</h1>
+                  <h1 className="text-xl font-bold text-white" data-testid="title-component-details">
+                    {isEditMode ? "Edit Component Details" : "Component Details"}
+                  </h1>
                   <p className="text-cyan-100 text-sm mt-0.5">
                     {detailComponent.fleetEquipmentCode} - {detailComponent.fleetEquipmentName}
                   </p>
                 </div>
               </div>
               <div className="flex items-center gap-2">
-                <Button
-                  className="bg-white/20 text-white border-white/30"
-                  variant="outline"
-                  onClick={() => {
-                    handleEdit(detailComponent);
-                  }}
-                  data-testid="btn-edit-component-detail"
-                >
-                  <Pencil className="mr-2 h-4 w-4" />
-                  Edit
-                </Button>
-                <button
-                  onClick={() => setDetailComponent(null)}
-                  className="flex items-center gap-1 text-cyan-100 hover:text-white text-sm transition-colors"
-                  data-testid="button-back-to-list"
-                >
-                  <ArrowLeft className="h-4 w-4" />
-                  Back to List
-                </button>
+                {isEditMode ? (
+                  <>
+                    <Button
+                      className="bg-white/20 text-white border-white/30"
+                      variant="outline"
+                      onClick={handleSaveEdit}
+                      disabled={inlineUpdateMutation.isPending}
+                      data-testid="btn-save-component-edit"
+                    >
+                      <Save className="mr-2 h-4 w-4" />
+                      {inlineUpdateMutation.isPending ? "Saving..." : "Save"}
+                    </Button>
+                    <Button
+                      className="bg-white/10 text-white border-white/20"
+                      variant="outline"
+                      onClick={handleCancelEdit}
+                      disabled={inlineUpdateMutation.isPending}
+                      data-testid="btn-cancel-component-edit"
+                    >
+                      <X className="mr-2 h-4 w-4" />
+                      Cancel
+                    </Button>
+                  </>
+                ) : (
+                  <>
+                    <Button
+                      className="bg-white/20 text-white border-white/30"
+                      variant="outline"
+                      onClick={handleStartEdit}
+                      data-testid="btn-edit-component-detail"
+                    >
+                      <Pencil className="mr-2 h-4 w-4" />
+                      Edit
+                    </Button>
+                    <button
+                      onClick={() => { setDetailComponent(null); setIsEditMode(false); }}
+                      className="flex items-center gap-1 text-cyan-100 hover:text-white text-sm transition-colors"
+                      data-testid="button-back-to-list"
+                    >
+                      <ArrowLeft className="h-4 w-4" />
+                      Back to List
+                    </button>
+                  </>
+                )}
               </div>
             </div>
           </div>
@@ -221,12 +362,42 @@ export default function FleetComponentsManagement({ onBack }: { onBack?: () => v
                 <h3 className="text-sm font-semibold text-gray-700 uppercase tracking-wider">Equipment Information</h3>
               </div>
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-x-8 gap-y-4">
-                {renderDetailField("Fleet Equipment Code", detailComponent.fleetEquipmentCode, "detail-fleet-code")}
-                {renderDetailField("Equipment Name", detailComponent.fleetEquipmentName, "detail-equipment-name")}
-                {renderDetailField("Parent Fleet Equipment Code", detailComponent.parentFleetEquipmentCode, "detail-parent-code")}
-                {renderDetailField("Parent Equipment Name", parentName, "detail-parent-name")}
-                {renderDetailField("Component Category", detailComponent.componentCategory, "detail-category")}
-                {renderDetailField("Equipment System / Department", detailComponent.eqptSystemDept, "detail-eqpt-system-dept")}
+                {isEditMode ? (
+                  <>
+                    {renderEditField("Fleet Equipment Code", "fleetEquipmentCode", "detail-fleet-code")}
+                    {renderEditField("Equipment Name", "fleetEquipmentName", "detail-equipment-name")}
+                    <div className="space-y-1" data-testid="detail-parent-code">
+                      <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Parent Fleet Equipment Code</p>
+                      <Select
+                        value={editFormData.parentFleetEquipmentCode || "none"}
+                        onValueChange={(val) => setEditFormData(prev => ({ ...prev, parentFleetEquipmentCode: val === "none" ? "" : val }))}
+                      >
+                        <SelectTrigger className="bg-white border-gray-300 text-sm" data-testid="edit-select-parent">
+                          <SelectValue placeholder="Select parent (optional)" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="none">None (Top Level)</SelectItem>
+                          {parentOptions.map((c) => (
+                            <SelectItem key={c.id} value={c.fleetEquipmentCode}>
+                              {c.fleetEquipmentCode} - {c.fleetEquipmentName}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    {renderEditField("Component Category", "componentCategory", "detail-category")}
+                    {renderEditField("Equipment System / Department", "eqptSystemDept", "detail-eqpt-system-dept")}
+                  </>
+                ) : (
+                  <>
+                    {renderDetailField("Fleet Equipment Code", detailComponent.fleetEquipmentCode, "detail-fleet-code")}
+                    {renderDetailField("Equipment Name", detailComponent.fleetEquipmentName, "detail-equipment-name")}
+                    {renderDetailField("Parent Fleet Equipment Code", detailComponent.parentFleetEquipmentCode, "detail-parent-code")}
+                    {renderDetailField("Parent Equipment Name", parentName, "detail-parent-name")}
+                    {renderDetailField("Component Category", detailComponent.componentCategory, "detail-category")}
+                    {renderDetailField("Equipment System / Department", detailComponent.eqptSystemDept, "detail-eqpt-system-dept")}
+                  </>
+                )}
               </div>
             </div>
 
@@ -236,10 +407,21 @@ export default function FleetComponentsManagement({ onBack }: { onBack?: () => v
                 <h3 className="text-sm font-semibold text-gray-700 uppercase tracking-wider">Maker & Model Details</h3>
               </div>
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-x-8 gap-y-4">
-                {renderDetailField("Maker Name", detailComponent.makerName, "detail-maker-name")}
-                {renderDetailField("Maker Code", detailComponent.makerCode, "detail-maker-code")}
-                {renderDetailField("Model", detailComponent.model, "detail-model")}
-                {renderDetailField("Model Code", detailComponent.modelCode, "detail-model-code")}
+                {isEditMode ? (
+                  <>
+                    {renderEditField("Maker Name", "makerName", "detail-maker-name")}
+                    {renderEditField("Maker Code", "makerCode", "detail-maker-code")}
+                    {renderEditField("Model", "model", "detail-model")}
+                    {renderEditField("Model Code", "modelCode", "detail-model-code")}
+                  </>
+                ) : (
+                  <>
+                    {renderDetailField("Maker Name", detailComponent.makerName, "detail-maker-name")}
+                    {renderDetailField("Maker Code", detailComponent.makerCode, "detail-maker-code")}
+                    {renderDetailField("Model", detailComponent.model, "detail-model")}
+                    {renderDetailField("Model Code", detailComponent.modelCode, "detail-model-code")}
+                  </>
+                )}
               </div>
             </div>
 
@@ -249,36 +431,69 @@ export default function FleetComponentsManagement({ onBack }: { onBack?: () => v
                 <h3 className="text-sm font-semibold text-gray-700 uppercase tracking-wider">Additional Details</h3>
               </div>
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-x-8 gap-y-4">
-                {renderDetailField("Location", detailComponent.location, "detail-location")}
-                {renderDetailField("Rating", detailComponent.rating, "detail-rating")}
-                <div className="space-y-1" data-testid="detail-is-active">
-                  <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Is Active</p>
-                  <div className="flex items-center gap-1.5">
-                    {detailComponent.isActive ? (
-                      <>
-                        <CheckCircle className="h-4 w-4 text-green-500" />
-                        <span className="text-sm text-green-700 font-medium">Yes</span>
-                      </>
-                    ) : (
-                      <>
-                        <XCircle className="h-4 w-4 text-red-500" />
-                        <span className="text-sm text-red-700 font-medium">No</span>
-                      </>
-                    )}
-                  </div>
-                </div>
+                {isEditMode ? (
+                  <>
+                    {renderEditField("Location", "location", "detail-location")}
+                    {renderEditField("Rating", "rating", "detail-rating")}
+                    <div className="space-y-1" data-testid="detail-is-active">
+                      <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Is Active</p>
+                      <Select
+                        value={editFormData.isActive === true ? "Yes" : editFormData.isActive === false ? "No" : ""}
+                        onValueChange={(val) => setEditFormData(prev => ({ ...prev, isActive: val === "Yes" }))}
+                      >
+                        <SelectTrigger className="bg-white border-gray-300 text-sm" data-testid="edit-select-is-active">
+                          <SelectValue placeholder="Select status" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="Yes">Yes</SelectItem>
+                          <SelectItem value="No">No</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    {renderDetailField("Location", detailComponent.location, "detail-location")}
+                    {renderDetailField("Rating", detailComponent.rating, "detail-rating")}
+                    <div className="space-y-1" data-testid="detail-is-active">
+                      <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Is Active</p>
+                      <div className="flex items-center gap-1.5">
+                        {detailComponent.isActive ? (
+                          <>
+                            <CheckCircle className="h-4 w-4 text-green-500" />
+                            <span className="text-sm text-green-700 font-medium">Yes</span>
+                          </>
+                        ) : (
+                          <>
+                            <XCircle className="h-4 w-4 text-red-500" />
+                            <span className="text-sm text-red-700 font-medium">No</span>
+                          </>
+                        )}
+                      </div>
+                    </div>
+                  </>
+                )}
               </div>
             </div>
 
-            {detailComponent.notes && (
-              <div className="bg-gray-50 border border-gray-200 rounded-lg p-5">
-                <div className="flex items-center gap-2 mb-4">
-                  <FileText className="h-4 w-4 text-cyan-600" />
-                  <h3 className="text-sm font-semibold text-gray-700 uppercase tracking-wider">Notes</h3>
-                </div>
-                <p className="text-sm text-gray-700 whitespace-pre-wrap">{detailComponent.notes}</p>
+            <div className="bg-gray-50 border border-gray-200 rounded-lg p-5">
+              <div className="flex items-center gap-2 mb-4">
+                <FileText className="h-4 w-4 text-cyan-600" />
+                <h3 className="text-sm font-semibold text-gray-700 uppercase tracking-wider">Notes</h3>
               </div>
-            )}
+              {isEditMode ? (
+                <Textarea
+                  value={editFormData.notes || ""}
+                  onChange={(e) => setEditFormData(prev => ({ ...prev, notes: e.target.value }))}
+                  placeholder="Additional details about the equipment"
+                  rows={4}
+                  className="bg-white border-gray-300 text-sm"
+                  data-testid="edit-input-notes"
+                />
+              ) : (
+                <p className="text-sm text-gray-700 whitespace-pre-wrap">{detailComponent.notes || "-"}</p>
+              )}
+            </div>
           </div>
         </Card>
 
