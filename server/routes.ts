@@ -10339,14 +10339,70 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Update fleet job
   app.patch("/technical/api/fleet/jobs/:id", async (req, res) => {
     try {
-      const partialFleetJobSchema = insertFleetJobsSchema.partial();
-      const validatedData = partialFleetJobSchema.parse(req.body);
-      const { updatedJob, affectedCount } = await storage.updateFleetJob(Number(req.params.id), validatedData);
+      const STRING_FIELDS = [
+        'woTitle', 'jobCode', 'maintenanceBasis', 'intervalValue', 'unit',
+        'taskType', 'assignedTo', 'approver', 'jobPriority',
+        'classRelated', 'briefWorkDescription', 'department',
+        'criticality', 'ppeRequirements', 'permitRequirements',
+        'otherSafetyRequirements',
+      ];
+      const NOTNULL_STRING_FIELDS = new Set([
+        'woTitle', 'jobCode', 'taskType', 'assignedTo', 'approver',
+        'jobPriority', 'classRelated', 'briefWorkDescription',
+        'department', 'criticality',
+      ]);
+      const JSON_FIELDS = ['requiredSpareParts', 'requiredTools'];
+      const BOOLEAN_FIELDS = ['isActive'];
+
+      const sanitizedData: Record<string, any> = {};
+      const errors: string[] = [];
+
+      for (const field of STRING_FIELDS) {
+        if (field in req.body && req.body[field] !== undefined) {
+          const val = req.body[field];
+          if (typeof val !== 'string') {
+            errors.push(`${field} must be a string`);
+            continue;
+          }
+          if (NOTNULL_STRING_FIELDS.has(field) && val.trim() === '') {
+            continue;
+          }
+          sanitizedData[field] = val;
+        }
+      }
+
+      for (const field of JSON_FIELDS) {
+        if (field in req.body && req.body[field] !== undefined) {
+          const val = req.body[field];
+          if (val !== null && !Array.isArray(val) && typeof val !== 'object') {
+            errors.push(`${field} must be an array or object`);
+            continue;
+          }
+          sanitizedData[field] = val;
+        }
+      }
+
+      for (const field of BOOLEAN_FIELDS) {
+        if (field in req.body && req.body[field] !== undefined) {
+          const val = req.body[field];
+          if (typeof val !== 'boolean') {
+            errors.push(`${field} must be a boolean`);
+            continue;
+          }
+          sanitizedData[field] = val;
+        }
+      }
+
+      if (errors.length > 0) {
+        return res.status(400).json({ error: "Invalid field types", details: errors });
+      }
+      if (Object.keys(sanitizedData).length === 0) {
+        return res.status(400).json({ error: "No valid fields to update" });
+      }
+      console.log(`[Fleet Jobs PATCH] id=${req.params.id}, fields: ${Object.keys(sanitizedData).join(', ')}`);
+      const { updatedJob, affectedCount } = await storage.updateFleetJob(Number(req.params.id), sanitizedData);
       res.json({ ...updatedJob, affectedCount });
     } catch (error: any) {
-      if (error.name === 'ZodError') {
-        return res.status(400).json({ error: "Invalid job data", details: error.errors });
-      }
       if (error.message?.includes('not found')) {
         return res.status(404).json({ error: error.message });
       }

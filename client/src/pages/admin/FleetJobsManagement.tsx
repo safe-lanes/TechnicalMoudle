@@ -187,30 +187,32 @@ export default function FleetJobsManagement({ onBack }: { onBack?: () => void })
 
   const handleSaveEdit = () => {
     if (!editingJob) return;
-    const editablePayload = {
-      woTitle: jobFormData.woTitle,
-      jobCode: jobFormData.jobCode,
-      maintenanceBasis: jobFormData.maintenanceBasis,
-      intervalValue: jobFormData.intervalValue,
-      unit: jobFormData.unit,
-      taskType: jobFormData.taskType,
-      assignedTo: jobFormData.assignedTo,
-      approver: jobFormData.approver,
-      jobPriority: jobFormData.jobPriority,
-      classRelated: jobFormData.classRelated,
-      briefWorkDescription: jobFormData.briefWorkDescription,
-      department: jobFormData.department,
-      criticality: jobFormData.criticality,
-      isActive: jobFormData.isActive,
-      ppeRequirements: jobFormData.ppeRequirements,
-      permitRequirements: jobFormData.permitRequirements,
-      otherSafetyRequirements: jobFormData.otherSafetyRequirements,
-      requiredSpareParts: jobFormData.requiredSpareParts,
-      requiredTools: jobFormData.requiredTools,
-    };
+    const EDITABLE_FIELDS: (keyof FleetJobs)[] = [
+      'woTitle', 'jobCode', 'maintenanceBasis', 'intervalValue', 'unit',
+      'taskType', 'assignedTo', 'approver', 'jobPriority',
+      'classRelated', 'briefWorkDescription', 'department',
+      'criticality', 'isActive',
+      'ppeRequirements', 'permitRequirements', 'otherSafetyRequirements',
+      'requiredSpareParts', 'requiredTools',
+    ];
+    const changedPayload: Record<string, any> = {};
+    for (const field of EDITABLE_FIELDS) {
+      const newVal = jobFormData[field];
+      const oldVal = editingJob[field];
+      if (JSON.stringify(newVal) !== JSON.stringify(oldVal)) {
+        changedPayload[field] = newVal;
+      }
+    }
+    if (Object.keys(changedPayload).length === 0) {
+      toast({
+        title: "No Changes",
+        description: "No fields were modified",
+      });
+      return;
+    }
     updateJobMutation.mutate({
       id: editingJob.id,
-      data: editablePayload,
+      data: changedPayload,
       jobCode: jobFormData.jobCode,
     });
   };
