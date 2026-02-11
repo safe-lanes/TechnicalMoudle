@@ -4,7 +4,7 @@ import { useVessels } from "@/hooks/useVessels";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Building2, List, ArrowRight, ArrowLeft, Box, Wrench, Package, Ship, Clock, FileCode2, FolderTree, Anchor, Database, Layers, AlertTriangle, CheckCircle2, XCircle, TrendingUp, Activity, Shield, BarChart3, CircleDot } from "lucide-react";
+import { Building2, List, ArrowRight, Box, Wrench, Package, Ship, Clock, FileCode2, Anchor, Database, Layers, AlertTriangle, CheckCircle2 } from "lucide-react";
 import { Marker } from "@/components/Marker";
 import MakerManagement from "./MakerManagement";
 import MasterListsManagement from "./MasterListsManagement";
@@ -139,28 +139,6 @@ export default function Admin4Dashboard({ onSubViewChange }: { onSubViewChange?:
     return (
       <div className="w-full bg-gray-200 rounded-full h-2 mt-2">
         <div className={`h-2 rounded-full ${color}`} style={{ width: `${pct}%` }} />
-      </div>
-    );
-  };
-
-  const BreakdownBar = ({ data, colors }: { data: Record<string, number>; colors: string[] }) => {
-    const total = Object.values(data).reduce((a, b) => a + b, 0);
-    if (total === 0) return null;
-    const entries = Object.entries(data).sort((a, b) => b[1] - a[1]);
-    return (
-      <div className="space-y-2 mt-3">
-        {entries.map(([label, count], i) => {
-          const pct = Math.round((count / total) * 100);
-          return (
-            <div key={label} className="flex items-center gap-2">
-              <div className="w-24 text-xs text-gray-600 truncate" title={label}>{label}</div>
-              <div className="flex-1 bg-gray-100 rounded-full h-2">
-                <div className={`h-2 rounded-full ${colors[i % colors.length]}`} style={{ width: `${pct}%` }} />
-              </div>
-              <div className="w-8 text-xs text-gray-500 text-right">{count}</div>
-            </div>
-          );
-        })}
       </div>
     );
   };
@@ -372,131 +350,6 @@ export default function Admin4Dashboard({ onSubViewChange }: { onSubViewChange?:
           </Card>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
-          {stats?.components?.categoryBreakdown && Object.keys(stats.components.categoryBreakdown).length > 0 && (
-            <Card data-testid="chart-component-categories">
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-medium text-gray-700 flex items-center gap-2">
-                  <BarChart3 className="h-4 w-4 text-purple-500" />
-                  Components by Category
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <BreakdownBar data={stats.components.categoryBreakdown} colors={['bg-purple-500', 'bg-purple-400', 'bg-purple-300', 'bg-indigo-400', 'bg-violet-400']} />
-              </CardContent>
-            </Card>
-          )}
-
-          {stats?.jobs?.byTaskType && Object.keys(stats.jobs.byTaskType).length > 0 && (
-            <Card data-testid="chart-job-types">
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-medium text-gray-700 flex items-center gap-2">
-                  <BarChart3 className="h-4 w-4 text-orange-500" />
-                  Jobs by Task Type
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <BreakdownBar data={stats.jobs.byTaskType} colors={['bg-orange-500', 'bg-orange-400', 'bg-amber-400', 'bg-yellow-400', 'bg-orange-300']} />
-              </CardContent>
-            </Card>
-          )}
-
-          {stats?.jobs?.byPriority && Object.keys(stats.jobs.byPriority).length > 0 && (
-            <Card data-testid="chart-job-priority">
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-medium text-gray-700 flex items-center gap-2">
-                  <Shield className="h-4 w-4 text-red-500" />
-                  Jobs by Priority
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <BreakdownBar data={stats.jobs.byPriority} colors={['bg-red-500', 'bg-red-400', 'bg-rose-400', 'bg-pink-400', 'bg-red-300']} />
-              </CardContent>
-            </Card>
-          )}
-        </div>
-
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
-          {stats?.components?.deptBreakdown && Object.keys(stats.components.deptBreakdown).length > 0 && (
-            <Card data-testid="chart-component-depts">
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-medium text-gray-700 flex items-center gap-2">
-                  <BarChart3 className="h-4 w-4 text-indigo-500" />
-                  Components by Department
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <BreakdownBar data={stats.components.deptBreakdown} colors={['bg-indigo-500', 'bg-indigo-400', 'bg-blue-400', 'bg-sky-400', 'bg-indigo-300']} />
-              </CardContent>
-            </Card>
-          )}
-
-          {stats?.jobs?.byCriticality && Object.keys(stats.jobs.byCriticality).length > 0 && (
-            <Card data-testid="chart-job-criticality">
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-medium text-gray-700 flex items-center gap-2">
-                  <AlertTriangle className="h-4 w-4 text-amber-500" />
-                  Jobs by Criticality
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <BreakdownBar data={stats.jobs.byCriticality} colors={['bg-amber-500', 'bg-amber-400', 'bg-yellow-400', 'bg-orange-300', 'bg-amber-300']} />
-              </CardContent>
-            </Card>
-          )}
-
-          {stats?.spares?.byCriticality && Object.keys(stats.spares.byCriticality).length > 0 && (
-            <Card data-testid="chart-spares-criticality">
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-medium text-gray-700 flex items-center gap-2">
-                  <Shield className="h-4 w-4 text-teal-500" />
-                  Spares by Criticality
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <BreakdownBar data={stats.spares.byCriticality} colors={['bg-teal-500', 'bg-teal-400', 'bg-emerald-400', 'bg-green-400', 'bg-teal-300']} />
-              </CardContent>
-            </Card>
-          )}
-        </div>
-
-        {stats?.recentActivity && stats.recentActivity.length > 0 && (
-          <Card className="mb-6" data-testid="recent-activity">
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium text-gray-700 flex items-center gap-2">
-                <Activity className="h-4 w-4 text-cyan-500" />
-                Recent Activity
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-2">
-                {stats.recentActivity.map((item: any, idx: number) => (
-                  <div key={`${item.type}-${item.id}`} className="flex items-center gap-3 py-2 border-b border-gray-100 last:border-b-0">
-                    <div className={`p-1.5 rounded-md ${
-                      item.type === 'component' ? 'bg-purple-100' : item.type === 'job' ? 'bg-orange-100' : 'bg-teal-100'
-                    }`}>
-                      {item.type === 'component' ? <Box className="h-3.5 w-3.5 text-purple-600" /> :
-                       item.type === 'job' ? <Wrench className="h-3.5 w-3.5 text-orange-600" /> :
-                       <Package className="h-3.5 w-3.5 text-teal-600" />}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2">
-                        <span className="text-xs font-mono text-gray-500">{item.code}</span>
-                        <span className="text-sm text-gray-800 truncate">{item.name}</span>
-                      </div>
-                    </div>
-                    <Badge variant="secondary" className="text-xs capitalize flex-shrink-0">
-                      {item.type}
-                    </Badge>
-                    <span className="text-xs text-gray-400 flex-shrink-0">
-                      {new Date(item.date).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}
-                    </span>
-                  </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
-        )}
 
         <Card>
           <CardHeader className="pb-3">
