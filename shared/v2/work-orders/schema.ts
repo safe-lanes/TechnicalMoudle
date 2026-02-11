@@ -30,6 +30,7 @@ export type {
 export const v2WorkOrders = pgTable("work_orders", {
   id: text("id").primaryKey(),
   vesselId: text("vessel_id"),
+  vesselIdInt: integer("vessel_id_int"),
   component: text("component").notNull(),
   componentCode: text("component_code"),
   jobId: text("job_id"),
@@ -147,6 +148,7 @@ export const v2WorkOrderExecutions = pgTable("work_order_executions", {
   templateId: text("template_id").notNull(),
   componentId: text("component_id").notNull(),
   vesselId: text("vessel_id").notNull(),
+  vesselIdInt: integer("vessel_id_int"),
   executionId: text("execution_id").notNull().unique(),
   dateCompleted: text("date_completed"),
   runningHoursAtCompletion: decimal("running_hours_at_completion", { precision: 10, scale: 2 }),
@@ -180,6 +182,7 @@ export const v2WorkOrderExecutionDetails = pgTable("work_order_execution_details
   id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
   workOrderId: text("work_order_id").notNull(),
   vesselId: text("vessel_id").notNull(),
+  vesselIdInt: integer("vessel_id_int"),
   executedBy: text("executed_by"),
   executedDate: text("executed_date"),
   completionNotes: text("completion_notes"),
@@ -213,6 +216,7 @@ export type WorkOrderExecutionDetails = typeof v2WorkOrderExecutionDetails.$infe
 export const v2PmsVesselSettings = pgTable("pms_vessel_settings", {
   id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
   vesselId: text("vessel_id").notNull().unique(),
+  vesselIdInt: integer("vessel_id_int"),
   calendarLeadDaysCritical: integer("calendar_lead_days_critical").notNull().default(7),
   calendarLeadDaysNonCritical: integer("calendar_lead_days_non_critical").notNull().default(14),
   calendarGraceMode: text("calendar_grace_mode").notNull().default("COMPANY_STANDARD"),

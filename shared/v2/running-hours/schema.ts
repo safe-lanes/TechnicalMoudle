@@ -7,6 +7,7 @@ export { v2Components, type Component } from "../components/schema";
 export const v2RunningHoursAudit = pgTable("running_hours_audit", {
   id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
   vesselId: text("vessel_id").notNull(),
+  vesselIdInt: integer("vessel_id_int"),
   componentId: text("component_id").notNull(),
   previousRH: decimal("previous_rh", { precision: 10, scale: 2 }).notNull(),
   newRH: decimal("new_rh", { precision: 10, scale: 2 }).notNull(),

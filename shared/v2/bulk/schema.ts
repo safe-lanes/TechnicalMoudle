@@ -35,6 +35,7 @@ export const v2ImportHistory = pgTable("import_history", {
   archiveMissing: boolean("archive_missing").notNull().default(false),
   userId: text("user_id").notNull(),
   vesselId: text("vessel_id"),
+  vesselIdInt: integer("vessel_id_int"),
   created: integer("created").notNull().default(0),
   updated: integer("updated").notNull().default(0),
   skipped: integer("skipped").notNull().default(0),

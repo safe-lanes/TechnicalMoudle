@@ -5,6 +5,7 @@ import { z } from "zod";
 export const v2StoresItems = pgTable("stores_items", {
   id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
   vesselId: text("vessel_id").notNull(),
+  vesselIdInt: integer("vessel_id_int"),
   itemType: text("item_type").notNull(),
   itemCode: text("item_code").notNull(),
   impaCode: text("impa_code"),
@@ -53,6 +54,7 @@ export type V2StoresItem = typeof v2StoresItems.$inferSelect;
 export const v2StoresLedger = pgTable("stores_ledger", {
   id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
   vesselId: text("vessel_id").notNull(),
+  vesselIdInt: integer("vessel_id_int"),
   section: text("section").notNull(),
   itemId: integer("item_id").notNull(),
   partCode: text("part_code").notNull(),

@@ -1,5 +1,5 @@
 
-import { pgTable, text, integer, boolean, timestamp, decimal, index, json, jsonb, numeric, primaryKey, unique, pgEnum } from "drizzle-orm/pg-core";
+import { pgTable, text, integer, serial, boolean, timestamp, decimal, index, json, jsonb, numeric, primaryKey, unique, pgEnum } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
@@ -14,6 +14,7 @@ export const users = pgTable("users", {
   email: text("email"),
   role: userRoleEnum("role").notNull().default("Ship"),
   vesselId: text("vessel_id"), // Required for Ship role, null for Office/PMS Admin
+  vesselIdInt: integer("vessel_id_int"),
   department: text("department"), // Rule #19: User's department for approver validation (e.g., 'Deck', 'Engine', 'Electrical')
   isActive: boolean("is_active").notNull().default(true),
   createdAt: timestamp("created_at").notNull().defaultNow(),
@@ -57,6 +58,7 @@ export type Fleet = typeof fleets.$inferSelect;
 export const vessels = pgTable("vessels", {
   id: text("id").primaryKey(), // Vessel code like V001, V002
   vuuid: text("vuuid").unique(), // External UUID from sync (unique vessel identifier across systems)
+  idInt: serial("id_int"),
   name: text("name").notNull(), // Vessel display name
   code: text("code").notNull(), // Same as id for compatibility
   fleetId: text("fleet_id"), // Optional reference to fleet
@@ -81,6 +83,7 @@ export type Vessel = typeof vessels.$inferSelect;
 export const defectSequences = pgTable("defect_sequences", {
   id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
   vesselId: text("vessel_id").notNull(),
+  vesselIdInt: integer("vessel_id_int"),
   year: integer("year").notNull(), // 2-digit year stored as 4-digit (e.g., 2026)
   lastSequence: integer("last_sequence").notNull().default(0), // Last used sequence number
 }, (table) => ({
@@ -98,6 +101,7 @@ export type DefectSequence = typeof defectSequences.$inferSelect;
 export const runningHoursAudit = pgTable("running_hours_audit", {
   id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
   vesselId: text("vessel_id").notNull(),
+  vesselIdInt: integer("vessel_id_int"),
   componentId: text("component_id").notNull(),
   previousRH: decimal("previous_rh", { precision: 10, scale: 2 }).notNull(),
   newRH: decimal("new_rh", { precision: 10, scale: 2 }).notNull(),
@@ -266,6 +270,7 @@ export const components = pgTable("components", {
   notes: text("notes"), // Specifications or additional information
   // === Non-UI Fields (Internal/System Fields) ===
   vesselId: text("vessel_id"), // Nullable - only required when dataScope='vessel'
+  vesselIdInt: integer("vessel_id_int"),
   dataScope: text("data_scope").notNull().default("vessel"), // 'fleet' | 'vessel' - discriminator for fleet vs vessel data
   parentFleetEquipmentCode: text("parent_fleet_equipment_code"), // For fleet hierarchy
   modelNumber: text("model_number"), // Model number (stored separately from model)
@@ -389,6 +394,7 @@ export const ihmItems = pgTable("ihm_items", {
   supplier: text("supplier"),
   remarks: text("remarks"),
   vesselId: text("vessel_id").notNull().default("V001"),
+  vesselIdInt: integer("vessel_id_int"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 }, (table) => ({
@@ -417,6 +423,7 @@ export const ihmMaintenanceLog = pgTable("ihm_maintenance_log", {
   materials: text("materials").array(),
   remarks: text("remarks"),
   vesselId: text("vessel_id").notNull().default("V001"),
+  vesselIdInt: integer("vessel_id_int"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   userId: text("user_id").notNull(),
 }, (table) => ({
@@ -454,6 +461,7 @@ export const spares = pgTable("spares", {
   lastOrderDate: text("last_order_date"), // Last procurement date (DD-MMM-YYYY format)
   location: text("location"),
   vesselId: text("vessel_id"), // Nullable - only required when dataScope='vessel'
+  vesselIdInt: integer("vessel_id_int"),
   deleted: boolean("deleted").notNull().default(false),
   // Fleet-specific fields (when dataScope='fleet')
   dataScope: text("data_scope").notNull().default("vessel"), // 'fleet' | 'vessel'
@@ -510,6 +518,7 @@ export const sparesHistory = pgTable("spares_history", {
   id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
   timestampUTC: timestamp("timestamp_utc").notNull(),
   vesselId: text("vessel_id").notNull(),
+  vesselIdInt: integer("vessel_id_int"),
   spareId: integer("spare_id").notNull(),
   partCode: text("part_code").notNull(),
   partName: text("part_name").notNull(),
@@ -543,6 +552,7 @@ export type SpareHistory = typeof sparesHistory.$inferSelect;
 export const storesLedger = pgTable("stores_ledger", {
   id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
   vesselId: text("vessel_id").notNull(),
+  vesselIdInt: integer("vessel_id_int"),
   section: text("section").notNull(), // 'stores' | 'lubes' | 'chemicals' | 'others'
   itemId: integer("item_id").notNull(),
   partCode: text("part_code").notNull(),
@@ -577,6 +587,7 @@ export type StoresLedger = typeof storesLedger.$inferSelect;
 export const storesItems = pgTable("stores_items", {
   id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
   vesselId: text("vessel_id").notNull(),
+  vesselIdInt: integer("vessel_id_int"),
   itemType: text("item_type").notNull(), // 'stores' | 'lubricants' | 'chemicals' | 'others'
   itemCode: text("item_code").notNull(), // Unique item identifier (Part Code)
   impaCode: text("impa_code"), // IMPA Code - standardization code for stores
@@ -626,6 +637,7 @@ export type StoresItem = typeof storesItems.$inferSelect;
 export const changeRequest = pgTable("change_request", {
   id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
   vesselId: text("vessel_id").notNull(),
+  vesselIdInt: integer("vessel_id_int"),
   category: text("category").notNull(), // 'components' | 'work_orders' | 'spares' | 'stores'
   title: text("title").notNull(), // max 120 chars enforced in application
   reason: text("reason").notNull(),
@@ -743,6 +755,7 @@ export const alertEvents = pgTable("alert_events", {
   objectType: text("object_type"), // 'work_order' | 'component' | 'spare' | 'certificate' | 'system'
   objectId: text("object_id"),
   vesselId: text("vessel_id"),
+  vesselIdInt: integer("vessel_id_int"),
   dedupeKey: text("dedupe_key").notNull(),
   state: text("state"), // 'due' | 'overdue' | 'low' | 'critical' | 'expired' | 'failed' etc
   payload: text("payload").notNull(), // JSON string with all event details
@@ -790,6 +803,7 @@ export type AlertDelivery = typeof alertDeliveries.$inferSelect;
 export const alertConfig = pgTable("alert_config", {
   id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
   vesselId: text("vessel_id").notNull(),
+  vesselIdInt: integer("vessel_id_int"),
   quietHoursEnabled: boolean("quiet_hours_enabled").notNull().default(false),
   quietHoursStart: text("quiet_hours_start"), // HH:mm format
   quietHoursEnd: text("quiet_hours_end"), // HH:mm format
@@ -815,6 +829,7 @@ export type AlertConfig = typeof alertConfig.$inferSelect;
 export const jobs = pgTable("jobs", {
   id: text("id").primaryKey(),
   vesselId: text("vessel_id"),
+  vesselIdInt: integer("vessel_id_int"),
   componentId: text("component_id"), // DEPRECATED: Use jobComponentLinks for many-to-many. Nullable for backward compatibility
   componentCode: text("component_code"), // DEPRECATED: Use jobComponentLinks for many-to-many
   componentName: text("component_name"), // DEPRECATED: Use jobComponentLinks for many-to-many
@@ -880,6 +895,7 @@ export type Job = typeof jobs.$inferSelect;
 export const workOrders = pgTable("work_orders", {
   id: text("id").primaryKey(),
   vesselId: text("vessel_id"), // Nullable - only required when dataScope='vessel'
+  vesselIdInt: integer("vessel_id_int"),
   component: text("component").notNull(),
   componentCode: text("component_code"),
   jobId: text("job_id"), // Reference to jobs.id for reliable lead time hydration
@@ -1025,6 +1041,7 @@ export const workOrderExecutions = pgTable("work_order_executions", {
   templateId: text("template_id").notNull(), // Reference to work_orders (template)
   componentId: text("component_id").notNull(), // Component this execution belongs to
   vesselId: text("vessel_id").notNull(), // Vessel identifier
+  vesselIdInt: integer("vessel_id_int"),
   executionId: text("execution_id").notNull().unique(), // Unique execution code (WOE-XXXXXXX)
   
   // Execution tracking
@@ -1065,6 +1082,7 @@ export type WorkOrderExecution = typeof workOrderExecutions.$inferSelect;
 export const defects = pgTable("defects", {
   id: text("id").primaryKey(),
   vesselId: text("vessel_id").notNull(),
+  vesselIdInt: integer("vessel_id_int"),
   vesselName: text("vessel_name").notNull(),
   issueDate: text("issue_date").notNull(), // ISO format YYYY-MM-DD
   category: text("category").notNull(), // 'Defect' | 'COC' | 'Observation' | 'NCR'
@@ -1370,6 +1388,7 @@ export const importHistory = pgTable("import_history", {
   archiveMissing: boolean("archive_missing").notNull().default(false),
   userId: text("user_id").notNull(),
   vesselId: text("vessel_id"),
+  vesselIdInt: integer("vessel_id_int"),
   created: integer("created").notNull().default(0),
   updated: integer("updated").notNull().default(0),
   skipped: integer("skipped").notNull().default(0),
@@ -1722,6 +1741,7 @@ export type ComponentRequisition = typeof componentRequisitions.$inferSelect;
 export const pmsVesselSettings = pgTable("pms_vessel_settings", {
   id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
   vesselId: text("vessel_id").notNull().unique(), // Unique per vessel
+  vesselIdInt: integer("vessel_id_int"),
 
   // Calendar-based jobs settings
   calendarLeadDaysCritical: integer("calendar_lead_days_critical").notNull().default(7), // Days before due for critical jobs
@@ -2037,6 +2057,7 @@ export const certificates = pgTable("certificates", {
   type: text("type").notNull(), // 'Flag' | 'Class' | 'Statutory'
   vessel: text("vessel").notNull(), // Vessel name
   vesselId: text("vessel_id"), // Optional vessel ID reference
+  vesselIdInt: integer("vessel_id_int"),
   issueDate: text("issue_date"), // DD MMM YYYY format
   expiryDate: text("expiry_date"), // DD MMM YYYY format
   lastAnnual: text("last_annual"), // DD MMM YYYY format
@@ -2072,6 +2093,7 @@ export const surveys = pgTable("surveys", {
   type: text("type").notNull(), // 'Annual' | 'Int' (Intermediate) | 'Special' | 'Renewal'
   vessel: text("vessel").notNull(), // Vessel name
   vesselId: text("vessel_id"), // Optional vessel ID reference
+  vesselIdInt: integer("vessel_id_int"),
   surveyDate: text("survey_date"), // DD MMM YYYY format - Last survey date
   dueDate: text("due_date"), // DD MMM YYYY format - Next due date
   firstRangeDate: text("first_range_date"), // DD MMM YYYY format - Window start
@@ -2105,6 +2127,7 @@ export const workOrderExecutionDetails = pgTable("work_order_execution_details",
   id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
   workOrderId: text("work_order_id").notNull(), // Reference to work_orders
   vesselId: text("vessel_id").notNull(),
+  vesselIdInt: integer("vessel_id_int"),
   executedBy: text("executed_by"), // User who performed the work
   executedDate: text("executed_date"), // DD-MMM-YYYY format
   completionNotes: text("completion_notes"),
@@ -2164,6 +2187,7 @@ export const ihmEvidenceTypeEnum = pgEnum("ihm_evidence_type", ["NONE", "DOC", "
 export const locations = pgTable("locations", {
   id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
   vesselId: text("vessel_id").notNull(),
+  vesselIdInt: integer("vessel_id_int"),
   locationName: text("location_name").notNull(), // Unique per vessel, trimmed + case-normalized
   locationType: text("location_type"), // STORE/LOCKER/BOX/etc.
   createdAt: timestamp("created_at").notNull().defaultNow(),
@@ -2185,6 +2209,7 @@ export type Location = typeof locations.$inferSelect;
 export const spareComponentLinks = pgTable("spare_component_links", {
   id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
   vesselId: text("vessel_id").notNull(),
+  vesselIdInt: integer("vessel_id_int"),
   spareId: integer("spare_id").notNull(), // FK → spares.id
   componentId: text("component_id").notNull(), // FK → components.id
   linkedBy: text("linked_by").notNull(),
@@ -2208,6 +2233,7 @@ export type SpareComponentLink = typeof spareComponentLinks.$inferSelect;
 export const spareLocationStock = pgTable("spare_location_stock", {
   id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
   vesselId: text("vessel_id").notNull(),
+  vesselIdInt: integer("vessel_id_int"),
   spareId: integer("spare_id").notNull(), // FK → spares.id
   locationId: integer("location_id").notNull(), // FK → locations.id
   qty: integer("qty").notNull().default(0), // Must never go negative
@@ -2229,6 +2255,7 @@ export type SpareLocationStock = typeof spareLocationStock.$inferSelect;
 export const inventoryTransactions = pgTable("inventory_transactions", {
   id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
   vesselId: text("vessel_id").notNull(),
+  vesselIdInt: integer("vessel_id_int"),
   txnDatetime: timestamp("txn_datetime").notNull().defaultNow(),
   spareId: integer("spare_id").notNull(), // FK → spares.id
   locationId: integer("location_id"), // Nullable only if non-location specific; for consume/receive MUST set
@@ -2308,6 +2335,7 @@ export type SpareWithInventory = {
 export const jobComponentLinks = pgTable("job_component_links", {
   id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
   vesselId: text("vessel_id").notNull(),
+  vesselIdInt: integer("vessel_id_int"),
   jobId: text("job_id").notNull(), // FK → jobs.id (UUID)
   componentId: text("component_id").notNull(), // FK → components.id (UUID)
   componentCode: text("component_code"), // Denormalized for faster lookups
@@ -2449,6 +2477,7 @@ export type ShipCertificatesLabelsConfig = typeof shipCertificatesLabelsConfig.$
 export const vesselCertificateApplicability = pgTable("vessel_certificate_applicability", {
   id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
   vesselId: text("vessel_id").notNull(), // External vessel ID from Vessel Master API
+  vesselIdInt: integer("vessel_id_int"),
   vesselName: text("vessel_name").notNull(), // Vessel name for display
   masterId: text("master_id").notNull(), // References ship_certificates_master.master_id
   isApplicable: boolean("is_applicable").notNull().default(true), // Whether this certificate is applicable to this vessel
@@ -2473,6 +2502,7 @@ export type VesselCertificateApplicability = typeof vesselCertificateApplicabili
 export const vesselCertificateData = pgTable("vessel_certificate_data", {
   id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
   vesselId: text("vessel_id").notNull(), // External vessel ID from Vessel Master API
+  vesselIdInt: integer("vessel_id_int"),
   vesselName: text("vessel_name").notNull(), // Vessel name for display
   masterId: text("master_id").notNull(), // References ship_certificates_master.master_id
   issueDate: text("issue_date"), // Date certificate was issued
@@ -2560,6 +2590,7 @@ export type ShipSurveysLabelsConfig = typeof shipSurveysLabelsConfig.$inferSelec
 export const vesselSurveyApplicability = pgTable("vessel_survey_applicability", {
   id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
   vesselId: text("vessel_id").notNull(), // External vessel ID from Vessel Master API
+  vesselIdInt: integer("vessel_id_int"),
   vesselName: text("vessel_name").notNull(), // Vessel name for display
   masterId: text("master_id").notNull(), // References ship_surveys_master.master_id
   isApplicable: boolean("is_applicable").notNull().default(true), // Whether this survey is applicable to this vessel
@@ -2584,6 +2615,7 @@ export type VesselSurveyApplicability = typeof vesselSurveyApplicability.$inferS
 export const vesselSurveyData = pgTable("vessel_survey_data", {
   id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
   vesselId: text("vessel_id").notNull(), // External vessel ID from Vessel Master API
+  vesselIdInt: integer("vessel_id_int"),
   vesselName: text("vessel_name").notNull(), // Vessel name for display
   masterId: text("master_id").notNull(), // References ship_surveys_master.master_id
   surveyDate: text("survey_date"), // Date of survey
