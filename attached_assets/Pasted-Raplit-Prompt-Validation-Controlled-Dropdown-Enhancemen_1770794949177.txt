@@ -1,0 +1,129 @@
+Raplit Prompt — Validation & Controlled Dropdown Enhancements
+Module: Edit Job Details (Fleet Jobs)
+🎯 Objective
+
+Enhance the Edit Job Details screen by adding controlled dropdown validations and dynamic field behavior.
+
+This change applies only to the Edit Job Details screen.
+
+📌 Required UI & Validation Changes
+1️⃣ Maintenance Basis Field
+
+Convert Maintenance Basis into a dropdown with only two selectable options:
+
+Calendar
+
+Running Hours
+
+No free text entry allowed.
+
+2️⃣ Interval Unit Behavior (Currently “Months” Section)
+
+Implement dynamic behavior based on Maintenance Basis selection:
+
+Case A — If “Calendar” is selected:
+
+The Interval Unit dropdown must show:
+
+Months
+
+Years
+
+Weeks
+
+Days
+
+User must be able to select one of these options.
+
+Case B — If “Running Hours” is selected:
+
+Interval Unit field must automatically display:
+Hours
+
+Field must be non-editable (read-only)
+
+User cannot modify it
+
+3️⃣ Job Priority Field
+
+Convert Job Priority into dropdown with:
+
+High
+
+Medium
+
+Low
+
+No free text allowed.
+
+4️⃣ Boolean Fields as Dropdowns
+
+The following fields must use controlled dropdown values:
+
+Field Name	Options
+Class Related	Yes / No
+Criticality	Yes / No
+IS Active	Yes / No
+
+No manual entry allowed.
+
+🔍 Required Analysis
+
+Ensure dropdown values align with DB column data types
+
+Confirm whether values are stored as:
+
+Boolean (true/false)
+
+String (Yes/No)
+
+Enum
+
+Ensure compatibility with existing fleet_jobs table
+
+⚙️ Implementation Plan
+Step 1 — Replace free-text inputs with controlled dropdowns
+Step 2 — Add conditional rendering logic for Interval Unit field
+Step 3 — Add validation rule:
+
+Maintenance Basis is required
+
+Interval Unit required when Calendar selected
+
+Interval Value must remain numeric
+
+Dropdown selections must map correctly to DB values
+
+Step 4 — Ensure:
+
+Save API payload matches expected DB format
+
+No schema changes required
+
+No impact on bulk import logic
+
+⚠️ Constraints
+
+UI and validation change only
+
+Do not change schema
+
+Do not modify unrelated job modules
+
+Do not affect bulk import process
+
+Do not redesign layout
+
+Do not alter update-by-job_code logic
+
+📌 Expected Outcome
+
+Controlled dropdown-driven form
+
+No invalid manual entries
+
+Dynamic Interval Unit behavior
+
+Clean validation enforcement
+
+Consistent data stored in fleet_jobs table
