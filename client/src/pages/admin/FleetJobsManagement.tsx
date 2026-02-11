@@ -21,7 +21,6 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Plus, Search, Pencil, Trash2, Download, PlayCircle, Briefcase, Package, ArrowLeft, Info, Settings, Users, FileText, Shield, CheckCircle, XCircle, Wrench, MapPin, Clock } from "lucide-react";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import FleetJobForm from "./FleetJobForm";
 import { Marker } from "@/components/Marker";
 import { SectionBlock } from "@/components/SectionBlock";
 
@@ -29,8 +28,7 @@ export default function FleetJobsManagement({ onBack }: { onBack?: () => void })
   const { toast } = useToast();
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedEquipment, setSelectedEquipment] = useState<string>("all");
-  const [isFormOpen, setIsFormOpen] = useState(false);
-  const [selectedJob, setSelectedJob] = useState<FleetJobs | null>(null);
+  const [isAddMode, setIsAddMode] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [jobToDelete, setJobToDelete] = useState<FleetJobs | null>(null);
   
@@ -171,9 +169,50 @@ export default function FleetJobsManagement({ onBack }: { onBack?: () => void })
     },
   });
 
+  const createJobMutation = useMutation({
+    mutationFn: async (data: Partial<FleetJobs>) => {
+      const res = await apiRequest('POST', '/technical/api/fleet/jobs', data);
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/technical/api/fleet/jobs'], exact: false });
+      toast({ title: "Success", description: "Fleet job created successfully" });
+      setIsAddMode(false);
+      setJobFormData({});
+    },
+    onError: (error: Error) => {
+      toast({ title: "Error", description: error.message || "Failed to create job", variant: "destructive" });
+    },
+  });
+
   const handleAddNew = () => {
-    setSelectedJob(null);
-    setIsFormOpen(true);
+    setJobFormData({ isActive: true });
+    setIsAddMode(true);
+    setDetailJob(null);
+    setEditingJob(null);
+  };
+
+  const handleSaveAdd = () => {
+    if (!jobFormData.woTitle?.trim()) {
+      toast({ title: "Validation Error", description: "Job Title is required", variant: "destructive" });
+      return;
+    }
+    if (!jobFormData.fleetEquipmentCode?.trim()) {
+      toast({ title: "Validation Error", description: "Fleet Equipment Code is required", variant: "destructive" });
+      return;
+    }
+    const payload: Record<string, any> = {};
+    Object.entries(jobFormData).forEach(([key, value]) => {
+      if (value !== undefined && value !== null && value !== '') {
+        payload[key] = value;
+      }
+    });
+    createJobMutation.mutate(payload as Partial<FleetJobs>);
+  };
+
+  const handleCancelAdd = () => {
+    setIsAddMode(false);
+    setJobFormData({});
   };
 
   const normalizeJobPriority = (val: string | null | undefined): string => {
@@ -474,6 +513,390 @@ export default function FleetJobsManagement({ onBack }: { onBack?: () => void })
             </div>
           </div>
         </Card>
+      </div>
+    );
+  }
+
+  if (isAddMode) {
+    return (
+      <div className="flex flex-col h-full">
+        <div className="bg-gradient-to-r from-cyan-600 to-blue-600 px-6 py-4 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="p-2 bg-white/20 rounded-lg">
+              <Plus className="h-5 w-5 text-white" />
+            </div>
+            <div>
+              <h1 className="text-xl font-bold text-white" data-testid="title-add-job">Add New Job</h1>
+              <p className="text-cyan-100 text-sm mt-0.5">
+                {jobFormData.woTitle || "Create a new fleet job"}
+              </p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            <Button
+              className="bg-white/20 text-white border-white/30"
+              variant="outline"
+              onClick={handleCancelAdd}
+              data-testid="btn-cancel-add-job"
+            >
+              Cancel
+            </Button>
+            <Button
+              className="bg-white text-blue-600"
+              onClick={handleSaveAdd}
+              disabled={createJobMutation.isPending}
+              data-testid="btn-save-add-job"
+            >
+              {createJobMutation.isPending ? "Saving..." : "Save"}
+            </Button>
+          </div>
+        </div>
+
+        <div className="flex-1 overflow-auto px-6 py-6">
+          <div className="max-w-5xl mx-auto space-y-6">
+            <SectionBlock
+              id="add-job-info"
+              number="A1"
+              title="Job Information"
+              description="Basic details and configuration for this job"
+            >
+              <div className="space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div className="space-y-1">
+                    <Label className="text-sm text-[#8798ad]">Job Title *</Label>
+                    <Input
+                      placeholder="Enter job title"
+                      value={jobFormData.woTitle || ""}
+                      onChange={(e) => setJobFormData(prev => ({ ...prev, woTitle: e.target.value }))}
+                      data-testid="input-add-job-title"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-sm text-[#8798ad]">Fleet Equipment Code *</Label>
+                    <Select
+                      value={jobFormData.fleetEquipmentCode || ""}
+                      onValueChange={(val) => {
+                        const comp = components?.find(c => c.fleetEquipmentCode === val);
+                        setJobFormData(prev => ({
+                          ...prev,
+                          fleetEquipmentCode: val,
+                          fleetEquipmentName: comp?.fleetEquipmentName || "",
+                        }));
+                      }}
+                    >
+                      <SelectTrigger data-testid="input-add-equipment-code">
+                        <SelectValue placeholder="Select equipment" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {components?.map((comp) => (
+                          <SelectItem key={comp.id} value={comp.fleetEquipmentCode || ""}>
+                            {comp.fleetEquipmentCode} - {comp.fleetEquipmentName}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-sm text-[#8798ad]">Component Name</Label>
+                    <div className="text-sm font-medium text-gray-900 bg-gray-50 px-3 py-2 rounded-md border border-gray-200 min-h-[38px] flex items-center" data-testid="field-add-component-name">
+                      {jobFormData.fleetEquipmentName || '-'}
+                    </div>
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-sm text-[#8798ad]">Job Code</Label>
+                    <Input
+                      placeholder="Enter job code"
+                      value={jobFormData.jobCode || ""}
+                      onChange={(e) => setJobFormData(prev => ({ ...prev, jobCode: e.target.value }))}
+                      data-testid="input-add-job-code"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-sm text-[#8798ad]">Maintenance Basis</Label>
+                    <Select
+                      value={jobFormData.maintenanceBasis || ""}
+                      onValueChange={(val) => setJobFormData(prev => ({ ...prev, maintenanceBasis: val }))}
+                    >
+                      <SelectTrigger data-testid="input-add-maint-basis">
+                        <SelectValue placeholder="Select maintenance basis" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="Calendar">Calendar</SelectItem>
+                        <SelectItem value="Running Hours">Running Hours</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-sm text-[#8798ad]">Frequency</Label>
+                    <div className="flex gap-2">
+                      <Input
+                        placeholder="Value"
+                        type="number"
+                        value={jobFormData.intervalValue || ""}
+                        onChange={(e) => setJobFormData(prev => ({ ...prev, intervalValue: e.target.value }))}
+                        className="flex-1"
+                        data-testid="input-add-interval-value"
+                      />
+                      {jobFormData.maintenanceBasis === 'Running Hours' ? (
+                        <div className="flex-1 text-sm font-medium text-gray-900 bg-gray-50 px-3 py-2 rounded-md border border-gray-200 min-h-[38px] flex items-center" data-testid="input-add-unit">
+                          Hours
+                        </div>
+                      ) : (
+                        <Select
+                          value={jobFormData.unit || ""}
+                          onValueChange={(val) => setJobFormData(prev => ({ ...prev, unit: val }))}
+                        >
+                          <SelectTrigger className="flex-1" data-testid="input-add-unit">
+                            <SelectValue placeholder="Unit" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="Months">Months</SelectItem>
+                            <SelectItem value="Years">Years</SelectItem>
+                            <SelectItem value="Weeks">Weeks</SelectItem>
+                            <SelectItem value="Days">Days</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      )}
+                    </div>
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-sm text-[#8798ad]">Task Type</Label>
+                    <Input
+                      placeholder="Enter task type"
+                      value={jobFormData.taskType || ""}
+                      onChange={(e) => setJobFormData(prev => ({ ...prev, taskType: e.target.value }))}
+                      data-testid="input-add-task-type"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-sm text-[#8798ad]">Assigned To (Rank)</Label>
+                    <Input
+                      placeholder="Enter assigned rank"
+                      value={jobFormData.assignedTo || ""}
+                      onChange={(e) => setJobFormData(prev => ({ ...prev, assignedTo: e.target.value }))}
+                      data-testid="input-add-assigned-to"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-sm text-[#8798ad]">Approver (Rank)</Label>
+                    <Input
+                      placeholder="Enter approver rank"
+                      value={jobFormData.approver || ""}
+                      onChange={(e) => setJobFormData(prev => ({ ...prev, approver: e.target.value }))}
+                      data-testid="input-add-approver"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-sm text-[#8798ad]">Job Priority</Label>
+                    <Select
+                      value={jobFormData.jobPriority || ""}
+                      onValueChange={(val) => setJobFormData(prev => ({ ...prev, jobPriority: val }))}
+                    >
+                      <SelectTrigger data-testid="input-add-priority">
+                        <SelectValue placeholder="Select priority" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="High">High</SelectItem>
+                        <SelectItem value="Medium">Medium</SelectItem>
+                        <SelectItem value="Low">Low</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-sm text-[#8798ad]">Class Related</Label>
+                    <Select
+                      value={jobFormData.classRelated || ""}
+                      onValueChange={(val) => setJobFormData(prev => ({ ...prev, classRelated: val }))}
+                    >
+                      <SelectTrigger data-testid="input-add-class-related">
+                        <SelectValue placeholder="Select" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="Yes">Yes</SelectItem>
+                        <SelectItem value="No">No</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-sm text-[#8798ad]">Interval Running Hour</Label>
+                    <div className="text-sm font-medium text-gray-900 bg-gray-50 px-3 py-2 rounded-md border border-gray-200 min-h-[38px] flex items-center" data-testid="field-add-interval-rh">
+                      -
+                    </div>
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-sm text-[#8798ad]">Department</Label>
+                    <Input
+                      placeholder="Enter department"
+                      value={jobFormData.department || ""}
+                      onChange={(e) => setJobFormData(prev => ({ ...prev, department: e.target.value }))}
+                      data-testid="input-add-department"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-sm text-[#8798ad]">Criticality</Label>
+                    <Select
+                      value={jobFormData.criticality || ""}
+                      onValueChange={(val) => setJobFormData(prev => ({ ...prev, criticality: val }))}
+                    >
+                      <SelectTrigger data-testid="input-add-criticality">
+                        <SelectValue placeholder="Select" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="Yes">Yes</SelectItem>
+                        <SelectItem value="No">No</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-sm text-[#8798ad]">Is Active</Label>
+                    <Select
+                      value={jobFormData.isActive === true ? "Yes" : jobFormData.isActive === false ? "No" : ""}
+                      onValueChange={(val) => setJobFormData(prev => ({ ...prev, isActive: val === "Yes" }))}
+                    >
+                      <SelectTrigger data-testid="input-add-is-active">
+                        <SelectValue placeholder="Select" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="Yes">Yes</SelectItem>
+                        <SelectItem value="No">No</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+
+                <div className="space-y-1">
+                  <Label className="text-sm text-[#8798ad]">Brief Work Description</Label>
+                  <Input
+                    placeholder="Enter brief work description"
+                    value={jobFormData.briefWorkDescription || ""}
+                    onChange={(e) => setJobFormData(prev => ({ ...prev, briefWorkDescription: e.target.value }))}
+                    data-testid="input-add-job-desc"
+                  />
+                </div>
+              </div>
+            </SectionBlock>
+
+            <SectionBlock
+              id="add-spare-parts"
+              number="A2"
+              title="Required Spare Parts"
+              description="Spare parts needed for this job"
+            >
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm border border-gray-200">
+                  <thead>
+                    <tr className="bg-gray-50 border-b border-gray-200">
+                      <th className="text-left p-2 font-medium text-gray-700 w-[20%]">PART NO.</th>
+                      <th className="text-left p-2 font-medium text-gray-700 w-[40%]">DESCRIPTION</th>
+                      <th className="text-left p-2 font-medium text-gray-700 w-[15%]">QTY REQUIRED</th>
+                      <th className="text-left p-2 font-medium text-gray-700 w-[10%]">ROB</th>
+                      <th className="text-left p-2 font-medium text-gray-700 w-[15%]">STATUS</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr>
+                      <td colSpan={5} className="text-center p-4 text-gray-500 italic">
+                        No spare parts linked to this job
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </SectionBlock>
+
+            <SectionBlock
+              id="add-tools"
+              number="A3"
+              title="Required Tools & Equipment"
+              description="Tools and equipment needed for this job"
+            >
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm border border-gray-200">
+                  <thead>
+                    <tr className="bg-gray-50 border-b border-gray-200">
+                      <th className="text-left p-2 font-medium text-gray-700 w-[50%]">DESCRIPTION</th>
+                      <th className="text-left p-2 font-medium text-gray-700 w-[15%]">QTY REQUIRED</th>
+                      <th className="text-left p-2 font-medium text-gray-700 w-[10%]">ROB</th>
+                      <th className="text-left p-2 font-medium text-gray-700 w-[15%]">STATUS</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr>
+                      <td colSpan={4} className="text-center p-4 text-gray-500 italic">
+                        No tools linked to this job
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </SectionBlock>
+
+            <SectionBlock
+              id="add-safety"
+              number="A4"
+              title="Safety Requirements"
+              description="Safety requirements and permits for this job"
+            >
+              <div className="space-y-4">
+                <div>
+                  <Label className="text-sm font-medium text-gray-700">Personal Protective Equipment (PPE):</Label>
+                  <Input
+                    placeholder="Enter PPE requirements (comma-separated)"
+                    value={jobFormData.ppeRequirements || ""}
+                    onChange={(e) => setJobFormData(prev => ({ ...prev, ppeRequirements: e.target.value }))}
+                    className="mt-1"
+                    data-testid="input-add-ppe"
+                  />
+                </div>
+                <div>
+                  <Label className="text-sm font-medium text-gray-700">Permits Required:</Label>
+                  <Input
+                    placeholder="Enter permit requirements (comma-separated)"
+                    value={jobFormData.permitRequirements || ""}
+                    onChange={(e) => setJobFormData(prev => ({ ...prev, permitRequirements: e.target.value }))}
+                    className="mt-1"
+                    data-testid="input-add-permits"
+                  />
+                </div>
+                <div>
+                  <Label className="text-sm font-medium text-gray-700">Other Safety Requirements:</Label>
+                  <Input
+                    placeholder="Enter other safety requirements (comma-separated)"
+                    value={jobFormData.otherSafetyRequirements || ""}
+                    onChange={(e) => setJobFormData(prev => ({ ...prev, otherSafetyRequirements: e.target.value }))}
+                    className="mt-1"
+                    data-testid="input-add-other-safety"
+                  />
+                </div>
+              </div>
+            </SectionBlock>
+
+            <SectionBlock
+              id="add-vessel-mapping"
+              number="A5"
+              title="Job Mapped Vessel Details"
+              description="Vessel mapping information related to this job"
+            >
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm border border-gray-200">
+                  <thead>
+                    <tr className="bg-gray-50 border-b border-gray-200">
+                      <th className="text-left p-2 font-medium text-gray-700 w-[40%]">VESSEL CODE</th>
+                      <th className="text-left p-2 font-medium text-gray-700 w-[60%]">VESSEL NAME</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr>
+                      <td colSpan={2} className="text-center p-4 text-gray-500 italic">
+                        No vessels mapped to this job
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </SectionBlock>
+          </div>
+        </div>
       </div>
     );
   }
@@ -1081,12 +1504,6 @@ export default function FleetJobsManagement({ onBack }: { onBack?: () => void })
           )}
         </div>
       </Card>
-
-      <FleetJobForm
-        open={isFormOpen}
-        onOpenChange={setIsFormOpen}
-        job={selectedJob as any}
-      />
 
       <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
         <AlertDialogContent data-testid="dialog-delete-job">
