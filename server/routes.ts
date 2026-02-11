@@ -10155,6 +10155,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const headerFill: ExcelJS.FillPattern = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1E5A8E' } };
       const headerFont: Partial<ExcelJS.Font> = { bold: true, color: { argb: 'FFFFFFFF' }, size: 11 };
       const subHeaderFill: ExcelJS.FillPattern = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF0F4F8' } };
+      const summaryLabelFill: ExcelJS.FillPattern = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE8EDF2' } };
       const borderStyle: Partial<ExcelJS.Borders> = {
         top: { style: 'thin', color: { argb: 'FFD0D5DD' } },
         left: { style: 'thin', color: { argb: 'FFD0D5DD' } },
@@ -10162,134 +10163,106 @@ export async function registerRoutes(app: Express): Promise<Server> {
         right: { style: 'thin', color: { argb: 'FFD0D5DD' } }
       };
 
-      const summarySheet = wb.addWorksheet('Summary');
-      summarySheet.columns = [
-        { header: 'Metric', key: 'metric', width: 35 },
-        { header: 'Value', key: 'value', width: 20 }
-      ];
-      const summaryHeaderRow = summarySheet.getRow(1);
-      summaryHeaderRow.eachCell(cell => { cell.fill = headerFill; cell.font = headerFont; cell.border = borderStyle; });
+      const catNames: Record<string, string> = { components: 'Components', work_orders: 'Work Orders', spares: 'Spares', stores: 'Stores' };
+      const statusNames: Record<string, string> = { draft: 'Draft', submitted: 'Submitted', returned: 'Returned', approved: 'Approved', rejected: 'Rejected' };
+
+      const resolvedVesselName = vesselId && vesselId !== 'all'
+        ? (await storage.getVessels()).find(v => v.id === vesselId)?.name || vesselId
+        : 'All Vessels';
+
+      const ws = wb.addWorksheet('CR Status & Tracking');
+      const totalColumns = 13;
 
       const s = reportData.summary;
-      const summaryRows = [
-        { metric: 'Total Requests', value: s.totalRequests },
-        { metric: 'Approved', value: s.byStatus.approved },
-        { metric: 'Rejected', value: s.byStatus.rejected },
-        { metric: 'Pending Review (Submitted + Returned)', value: s.pendingRequests },
-        { metric: 'Draft', value: s.byStatus.draft },
-        { metric: 'Avg Approval Time (hours)', value: s.avgApprovalTimeHours }
+      const totalReqs = s.totalRequests;
+      const approvedPct = totalReqs > 0 ? Math.round((s.byStatus.approved / totalReqs) * 100) : 0;
+      const rejectedPct = totalReqs > 0 ? Math.round((s.byStatus.rejected / totalReqs) * 100) : 0;
+
+      const titleRow = ws.addRow(['Change Requests Status & Tracking']);
+      ws.mergeCells(1, 1, 1, totalColumns);
+      titleRow.getCell(1).font = { bold: true, size: 14, color: { argb: 'FF1E5A8E' } };
+      titleRow.getCell(1).alignment = { horizontal: 'center' };
+
+      const subtitleRow = ws.addRow([`Vessel: ${resolvedVesselName} | Generated: ${new Date().toLocaleDateString()} | Total Requests: ${totalReqs}`]);
+      ws.mergeCells(2, 1, 2, totalColumns);
+      subtitleRow.getCell(1).font = { size: 10, italic: true };
+      subtitleRow.getCell(1).alignment = { horizontal: 'center' };
+
+      ws.addRow([]);
+
+      const summaryItems = [
+        { label: 'Total Requests', value: s.totalRequests },
+        { label: `Approved (${approvedPct}%)`, value: s.byStatus.approved },
+        { label: `Rejected (${rejectedPct}%)`, value: s.byStatus.rejected },
+        { label: 'Pending Review', value: s.pendingRequests },
+        { label: 'Avg Approval Time (hrs)', value: s.avgApprovalTimeHours },
+        { label: 'Components', value: s.byCategory.components },
+        { label: 'Work Orders', value: s.byCategory.work_orders },
+        { label: 'Spares', value: s.byCategory.spares },
+        { label: 'Stores', value: s.byCategory.stores }
       ];
-      summaryRows.forEach((row, i) => {
-        const r = summarySheet.addRow(row);
-        r.eachCell(cell => { cell.border = borderStyle; });
-        if (i % 2 === 1) r.eachCell(cell => { cell.fill = subHeaderFill; });
+
+      const summaryHeaderRow = ws.addRow(['Summary']);
+      ws.mergeCells(ws.rowCount, 1, ws.rowCount, totalColumns);
+      summaryHeaderRow.getCell(1).font = { bold: true, size: 11 };
+      summaryHeaderRow.getCell(1).fill = headerFill;
+      summaryHeaderRow.getCell(1).font = { bold: true, size: 11, color: { argb: 'FFFFFFFF' } };
+
+      summaryItems.forEach((item) => {
+        const r = ws.addRow([item.label, item.value]);
+        r.getCell(1).font = { bold: true, size: 10 };
+        r.getCell(1).fill = summaryLabelFill;
+        r.getCell(1).border = borderStyle;
+        r.getCell(2).border = borderStyle;
+        r.getCell(2).alignment = { horizontal: 'center' };
       });
 
-      const catSheet = wb.addWorksheet('By Category');
-      catSheet.columns = [
-        { header: 'Category', key: 'category', width: 25 },
-        { header: 'Count', key: 'count', width: 15 }
-      ];
-      const catHeaderRow = catSheet.getRow(1);
-      catHeaderRow.eachCell(cell => { cell.fill = headerFill; cell.font = headerFont; cell.border = borderStyle; });
-      const catNames: Record<string, string> = { components: 'Components', work_orders: 'Work Orders', spares: 'Spares', stores: 'Stores' };
-      Object.entries(s.byCategory).forEach(([key, val]) => {
-        const r = catSheet.addRow({ category: catNames[key] || key, count: val });
-        r.eachCell(cell => { cell.border = borderStyle; });
+      ws.addRow([]);
+
+      const colHeaders = ['ID', 'Title', 'Category', 'Status', 'Requested By', 'Vessel', 'Submitted', 'Reviewed By', 'Reviewed At', 'Cycle Time (hrs)', 'Target', 'Changes', 'Reason'];
+      const colWidths = [10, 40, 18, 16, 20, 18, 18, 20, 18, 16, 28, 12, 30];
+      colWidths.forEach((w, i) => { ws.getColumn(i + 1).width = w; });
+
+      const tableHeaderRow = ws.addRow(colHeaders);
+      tableHeaderRow.eachCell(cell => {
+        cell.fill = headerFill;
+        cell.font = headerFont;
+        cell.border = borderStyle;
+        cell.alignment = { horizontal: 'center' };
       });
 
-      const statusSheet = wb.addWorksheet('By Status');
-      statusSheet.columns = [
-        { header: 'Status', key: 'status', width: 25 },
-        { header: 'Count', key: 'count', width: 15 }
-      ];
-      const statusHeaderRow = statusSheet.getRow(1);
-      statusHeaderRow.eachCell(cell => { cell.fill = headerFill; cell.font = headerFont; cell.border = borderStyle; });
-      const statusNames: Record<string, string> = { draft: 'Draft', submitted: 'Submitted', returned: 'Returned', approved: 'Approved', rejected: 'Rejected' };
-      Object.entries(s.byStatus).forEach(([key, val]) => {
-        const r = statusSheet.addRow({ status: statusNames[key] || key, count: val });
-        r.eachCell(cell => { cell.border = borderStyle; });
-      });
+      const headerRowNum = ws.rowCount;
+      ws.autoFilter = { from: { row: headerRowNum, column: 1 }, to: { row: headerRowNum, column: totalColumns } };
+      ws.views = [{ state: 'frozen', ySplit: headerRowNum, xSplit: 0 }];
 
-      const detailSheet = wb.addWorksheet('Detailed Requests');
-      detailSheet.columns = [
-        { header: 'ID', key: 'id', width: 8 },
-        { header: 'Title', key: 'title', width: 40 },
-        { header: 'Category', key: 'category', width: 15 },
-        { header: 'Status', key: 'status', width: 14 },
-        { header: 'Requested By', key: 'requestedBy', width: 20 },
-        { header: 'Vessel', key: 'vessel', width: 18 },
-        { header: 'Submitted At', key: 'submittedAt', width: 20 },
-        { header: 'Reviewed By', key: 'reviewedBy', width: 20 },
-        { header: 'Reviewed At', key: 'reviewedAt', width: 20 },
-        { header: 'Cycle Time (hrs)', key: 'cycleTime', width: 16 },
-        { header: 'Target', key: 'target', width: 30 },
-        { header: 'Changes Count', key: 'changesCount', width: 14 },
-        { header: 'Reason', key: 'reason', width: 35 }
-      ];
-      const detailHeaderRow = detailSheet.getRow(1);
-      detailHeaderRow.eachCell(cell => { cell.fill = headerFill; cell.font = headerFont; cell.border = borderStyle; });
-      detailSheet.autoFilter = { from: 'A1', to: 'M1' };
-      detailSheet.views = [{ state: 'frozen', ySplit: 1, xSplit: 0 }];
-
+      const fmtDate = (d: string | null) => {
+        if (!d) return '-';
+        const dt = new Date(d);
+        const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+        return `${dt.getDate().toString().padStart(2,'0')} ${months[dt.getMonth()]} ${dt.getFullYear()}`;
+      };
       (reportData.requests || []).forEach((req: any, i: number) => {
-        const fmtDate = (d: string | null) => d ? new Date(d).toLocaleDateString() : '-';
-        const r = detailSheet.addRow({
-          id: req.id,
-          title: req.title,
-          category: catNames[req.category] || req.category,
-          status: statusNames[req.status] || req.status,
-          requestedBy: req.requestedBy?.name || '-',
-          vessel: req.vessel?.name || '-',
-          submittedAt: fmtDate(req.submittedAt),
-          reviewedBy: req.reviewedBy?.name || '-',
-          reviewedAt: fmtDate(req.reviewedAt),
-          cycleTime: req.cycleTimeHours ?? '-',
-          target: req.targetInfo?.name ? `${catNames[req.targetInfo.type] || req.targetInfo.type} - ${req.targetInfo.name}` : '-',
-          changesCount: req.changesCount,
-          reason: req.reason
-        });
+        const r = ws.addRow([
+          req.id,
+          req.title,
+          catNames[req.category] || req.category,
+          statusNames[req.status] || req.status,
+          req.requestedBy?.name || '-',
+          req.vessel?.name || '-',
+          fmtDate(req.submittedAt || req.createdAt),
+          req.reviewedBy?.name || '-',
+          fmtDate(req.reviewedAt),
+          req.cycleTimeHours ?? '-',
+          req.targetInfo?.name ? `${catNames[req.targetInfo.type] || req.targetInfo.type} - ${req.targetInfo.name}` : '-',
+          req.changesCount,
+          req.reason || '-'
+        ]);
         r.eachCell(cell => { cell.border = borderStyle; });
         if (i % 2 === 1) r.eachCell(cell => { cell.fill = subHeaderFill; });
       });
 
-      const changesSheet = wb.addWorksheet('Field-Level Changes');
-      changesSheet.columns = [
-        { header: 'Request ID', key: 'requestId', width: 12 },
-        { header: 'Request Title', key: 'requestTitle', width: 35 },
-        { header: 'Field Path', key: 'fieldPath', width: 25 },
-        { header: 'Field Label', key: 'fieldLabel', width: 25 },
-        { header: 'Old Value', key: 'oldValue', width: 25 },
-        { header: 'New Value', key: 'newValue', width: 25 }
-      ];
-      const changesHeaderRow = changesSheet.getRow(1);
-      changesHeaderRow.eachCell(cell => { cell.fill = headerFill; cell.font = headerFont; cell.border = borderStyle; });
-      changesSheet.autoFilter = { from: 'A1', to: 'F1' };
-      changesSheet.views = [{ state: 'frozen', ySplit: 1, xSplit: 0 }];
-
-      let changeRowIdx = 0;
-      (reportData.requests || []).forEach((req: any) => {
-        (req.fieldChanges || []).forEach((fc: any) => {
-          const formatVal = (v: any) => v === null || v === undefined ? '-' : typeof v === 'boolean' ? (v ? 'Yes' : 'No') : String(v);
-          const r = changesSheet.addRow({
-            requestId: req.id,
-            requestTitle: req.title,
-            fieldPath: fc.fieldPath,
-            fieldLabel: fc.fieldLabel || fc.fieldPath,
-            oldValue: formatVal(fc.oldValue),
-            newValue: formatVal(fc.newValue)
-          });
-          r.eachCell(cell => { cell.border = borderStyle; });
-          if (changeRowIdx % 2 === 1) r.eachCell(cell => { cell.fill = subHeaderFill; });
-          changeRowIdx++;
-        });
-      });
-
-      const vesselName = vesselId && vesselId !== 'all'
-        ? (await storage.getVessels()).find(v => v.id === vesselId)?.name || vesselId
-        : 'All_Vessels';
       const dateStr = new Date().toISOString().split('T')[0];
-      const filename = `Change_Requests_Status_Tracking_${vesselName}_${dateStr}.xlsx`;
+      const filename = `Change_Requests_Status_Tracking_${resolvedVesselName.replace(/\s+/g, '_')}_${dateStr}.xlsx`;
 
       res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
       res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);

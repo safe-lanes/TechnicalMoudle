@@ -211,13 +211,19 @@ const ChangeRequestReports: React.FC<ChangeRequestReportsProps> = ({ onBack, glo
     switch (reportId) {
       case 'change-requests-status': {
         const columns = [
-          { header: 'ID', field: 'id', width: 15 },
-          { header: 'Title', field: 'title', width: 50 },
-          { header: 'Category', field: 'category', width: 25 },
-          { header: 'Status', field: 'status', width: 22 },
-          { header: 'Requested By', field: 'requestedBy', width: 28 },
-          { header: 'Date', field: 'date', width: 25 },
-          { header: 'Changes', field: 'changes', width: 18 }
+          { header: 'ID', field: 'id', width: 10 },
+          { header: 'Title', field: 'title', width: 40 },
+          { header: 'Category', field: 'category', width: 18 },
+          { header: 'Status', field: 'status', width: 16 },
+          { header: 'Requested By', field: 'requestedBy', width: 20 },
+          { header: 'Vessel', field: 'vessel', width: 18 },
+          { header: 'Submitted', field: 'submittedAt', width: 18 },
+          { header: 'Reviewed By', field: 'reviewedBy', width: 20 },
+          { header: 'Reviewed At', field: 'reviewedAt', width: 18 },
+          { header: 'Cycle Time (hrs)', field: 'cycleTime', width: 16 },
+          { header: 'Target', field: 'target', width: 28 },
+          { header: 'Changes', field: 'changesCount', width: 12 },
+          { header: 'Reason', field: 'reason', width: 30 }
         ];
 
         const tableData = reportData.requests.map(req => ({
@@ -226,8 +232,14 @@ const ChangeRequestReports: React.FC<ChangeRequestReportsProps> = ({ onBack, glo
           category: CATEGORY_LABELS[req.category] || req.category,
           status: STATUS_LABELS[req.status] || req.status,
           requestedBy: req.requestedBy?.name || '-',
-          date: req.submittedAt ? formatDate(req.submittedAt) : formatDate(req.createdAt),
-          changes: String(req.changesCount)
+          vessel: req.vessel?.name || '-',
+          submittedAt: req.submittedAt ? formatDate(req.submittedAt) : formatDate(req.createdAt),
+          reviewedBy: req.reviewedBy?.name || '-',
+          reviewedAt: req.reviewedAt ? formatDate(req.reviewedAt) : '-',
+          cycleTime: req.cycleTimeHours != null ? String(req.cycleTimeHours) : '-',
+          target: req.targetInfo?.name ? `${CATEGORY_LABELS[req.targetInfo.type] || req.targetInfo.type} - ${req.targetInfo.name}` : '-',
+          changesCount: String(req.changesCount),
+          reason: req.reason || '-'
         }));
 
         const totalReqs = summary.totalRequests;
@@ -254,7 +266,7 @@ const ChangeRequestReports: React.FC<ChangeRequestReportsProps> = ({ onBack, glo
             orientation: 'landscape'
           },
           columns,
-          tableData.length > 0 ? tableData : [{ id: '-', title: 'No change requests found', category: '-', status: '-', requestedBy: '-', date: '-', changes: '-' }],
+          tableData.length > 0 ? tableData : [{ id: '-', title: 'No change requests found', category: '-', status: '-', requestedBy: '-', vessel: '-', submittedAt: '-', reviewedBy: '-', reviewedAt: '-', cycleTime: '-', target: '-', changesCount: '-', reason: '-' }],
           summaryItems
         );
         break;
