@@ -1,6 +1,8 @@
 import { Router } from 'express';
 import { storage } from '../storage';
 import { z } from 'zod';
+import { eq } from 'drizzle-orm';
+import { getDb } from '../db';
 import { 
   insertMasterDataSchema, 
   insertFleetVesselMappingSchema,
@@ -9,7 +11,11 @@ import {
   insertFleetSpareVesselMappingSchema,
   insertBulkImportHistorySchema,
   insertBulkImportErrorSchema,
-  insertFleetComponentsSchema
+  insertFleetComponentsSchema,
+  fleetComponents,
+  fleetJobs,
+  fleetSpares,
+  makerList,
 } from '@shared/schema';
 import { requireOfficeOrAdmin } from '../middleware/auth';
 
@@ -842,6 +848,129 @@ router.get('/dashboard-metrics', async (req, res) => {
   } catch (error) {
     console.error('Error fetching dashboard metrics:', error);
     res.status(500).json({ error: 'Failed to fetch dashboard metrics' });
+  }
+});
+
+router.get('/dashboard-stats', async (req, res) => {
+  try {
+    const db = await getDb();
+    const allComponents = await db.select().from(fleetComponents).where(eq(fleetComponents.isDeleted, false));
+    const allJobs = await db.select().from(fleetJobs).where(eq(fleetJobs.isDeleted, false));
+    const allSpares = await db.select().from(fleetSpares).where(eq(fleetSpares.isDeleted, false));
+    const allMakers = await db.select().from(makerList).where(eq(makerList.isDeleted, false));
+
+    const leafComponents = allComponents.filter(c => c.fleetEquipmentCode?.length === 10);
+    const componentsWithMaker = leafComponents.filter(c => c.makerName && c.makerName.trim() !== '');
+    const componentsWithoutMaker = leafComponents.filter(c => !c.makerName || c.makerName.trim() === '');
+    const activeComponents = leafComponents.filter(c => c.isActive);
+    const inactiveComponents = leafComponents.filter(c => !c.isActive);
+
+    const categoryBreakdown: Record<string, number> = {};
+    const deptBreakdown: Record<string, number> = {};
+    leafComponents.forEach(c => {
+      const cat = c.componentCategory || 'Uncategorized';
+      categoryBreakdown[cat] = (categoryBreakdown[cat] || 0) + 1;
+      const dept = c.eqptSystemDept || 'Unassigned';
+      deptBreakdown[dept] = (deptBreakdown[dept] || 0) + 1;
+    });
+
+    const jobsByTaskType: Record<string, number> = {};
+    const jobsByPriority: Record<string, number> = {};
+    const jobsByCriticality: Record<string, number> = {};
+    const jobsByBasis: Record<string, number> = {};
+    allJobs.forEach(j => {
+      const tt = j.taskType || 'Unknown';
+      jobsByTaskType[tt] = (jobsByTaskType[tt] || 0) + 1;
+      const pr = j.jobPriority || 'Unknown';
+      jobsByPriority[pr] = (jobsByPriority[pr] || 0) + 1;
+      const cr = j.criticality || 'Unknown';
+      jobsByCriticality[cr] = (jobsByCriticality[cr] || 0) + 1;
+      const mb = j.maintenanceBasis || 'Unknown';
+      jobsByBasis[mb] = (jobsByBasis[mb] || 0) + 1;
+    });
+    const activeJobs = allJobs.filter(j => j.isActive);
+
+    const sparesWithMaker = allSpares.filter(s => s.maker && s.maker.trim() !== '');
+    const sparesByCriticality: Record<string, number> = {};
+    allSpares.forEach(s => {
+      const cr = s.criticality || 'Not Set';
+      sparesByCriticality[cr] = (sparesByCriticality[cr] || 0) + 1;
+    });
+
+    const usedMakerCodes = new Set([
+      ...allComponents.filter(c => c.makerCode).map(c => c.makerCode),
+      ...allSpares.filter(s => s.makerCode).map(s => s.makerCode),
+    ]);
+    const linkedMakers = allMakers.filter(m => usedMakerCodes.has(m.makerCode));
+    const unlinkedMakers = allMakers.filter(m => !usedMakerCodes.has(m.makerCode));
+
+    const componentEquipCodes = new Set(leafComponents.map(c => c.fleetEquipmentCode));
+    const jobsWithValidComponent = allJobs.filter(j => componentEquipCodes.has(j.fleetEquipmentCode));
+    const jobsWithInvalidComponent = allJobs.filter(j => !componentEquipCodes.has(j.fleetEquipmentCode));
+    const sparesWithValidComponent = allSpares.filter(s => componentEquipCodes.has(s.fleetEquipmentCode));
+    const sparesWithInvalidComponent = allSpares.filter(s => !componentEquipCodes.has(s.fleetEquipmentCode));
+
+    const recentComponents = [...leafComponents]
+      .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+      .slice(0, 5)
+      .map(c => ({ id: c.id, code: c.fleetEquipmentCode, name: c.fleetEquipmentName, date: c.createdAt, type: 'component' as const }));
+    const recentJobs = [...allJobs]
+      .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+      .slice(0, 5)
+      .map(j => ({ id: j.id, code: j.jobCode, name: j.woTitle, date: j.createdAt, type: 'job' as const }));
+    const recentSpares = [...allSpares]
+      .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+      .slice(0, 5)
+      .map(s => ({ id: s.id, code: s.partCode, name: s.partName, date: s.createdAt, type: 'spare' as const }));
+
+    res.json({
+      components: {
+        total: leafComponents.length,
+        allHierarchy: allComponents.length,
+        withMaker: componentsWithMaker.length,
+        withoutMaker: componentsWithoutMaker.length,
+        active: activeComponents.length,
+        inactive: inactiveComponents.length,
+        categoryBreakdown,
+        deptBreakdown,
+      },
+      jobs: {
+        total: allJobs.length,
+        active: activeJobs.length,
+        withValidComponent: jobsWithValidComponent.length,
+        withInvalidComponent: jobsWithInvalidComponent.length,
+        byTaskType: jobsByTaskType,
+        byPriority: jobsByPriority,
+        byCriticality: jobsByCriticality,
+        byBasis: jobsByBasis,
+      },
+      spares: {
+        total: allSpares.length,
+        withMaker: sparesWithMaker.length,
+        withoutMaker: allSpares.length - sparesWithMaker.length,
+        withValidComponent: sparesWithValidComponent.length,
+        withInvalidComponent: sparesWithInvalidComponent.length,
+        byCriticality: sparesByCriticality,
+      },
+      makers: {
+        total: allMakers.length,
+        linked: linkedMakers.length,
+        unlinked: unlinkedMakers.length,
+      },
+      dataQuality: {
+        componentsWithoutMaker: componentsWithoutMaker.length,
+        jobsWithInvalidComponent: jobsWithInvalidComponent.length,
+        sparesWithInvalidComponent: sparesWithInvalidComponent.length,
+        unlinkedMakers: unlinkedMakers.length,
+        totalIssues: componentsWithoutMaker.length + jobsWithInvalidComponent.length + sparesWithInvalidComponent.length + unlinkedMakers.length,
+      },
+      recentActivity: [...recentComponents, ...recentJobs, ...recentSpares]
+        .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+        .slice(0, 10),
+    });
+  } catch (error) {
+    console.error('Error fetching dashboard stats:', error);
+    res.status(500).json({ error: 'Failed to fetch dashboard stats' });
   }
 });
 
