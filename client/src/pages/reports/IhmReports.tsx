@@ -60,10 +60,19 @@ const IhmReports: React.FC<IhmReportsProps> = ({ onBack, globalFilters }) => {
     ? categoryFilters.vessel 
     : contextVesselId;
 
-  const { data: spares = [] } = useQuery<any[]>({
-    queryKey: ['/technical/api/spares', effectiveVesselId],
+  const { data: ihmData } = useQuery<any>({
+    queryKey: ['/technical/api/reports/ihm-inventory-status', effectiveVesselId, 'summary'],
+    queryFn: async () => {
+      const res = await fetch(`/technical/api/reports/ihm-inventory-status?vesselId=${effectiveVesselId}&page=1&pageSize=1`, {
+        credentials: 'include',
+      });
+      if (!res.ok) throw new Error('Failed to fetch IHM summary');
+      return res.json();
+    },
     enabled: !!effectiveVesselId && effectiveVesselId !== 'all',
   });
+
+  const ihmSummary = ihmData?.summary || { totalItems: 0, ihmPresent: 0, noIhm: 0, unknown: 0 };
 
   const reports: IhmReport[] = [
     {
@@ -109,35 +118,54 @@ const IhmReports: React.FC<IhmReportsProps> = ({ onBack, globalFilters }) => {
   const generateIhmPDF = async (reportId: string) => {
     const vesselName = vessels.find(v => v.id === effectiveVesselId)?.name || effectiveVesselId || 'All Vessels';
 
-    const ihmSpares = spares.filter((s: any) => s.ihm && s.ihm !== 'Unknown');
-
     switch (reportId) {
       case 'ihm-inventory-status': {
+        const res = await fetch(`/technical/api/reports/ihm-inventory-status?vesselId=${effectiveVesselId}&page=1&pageSize=10000&sortBy=itemCode&sortOrder=asc`, {
+          credentials: 'include',
+        });
+        if (!res.ok) throw new Error('Failed to fetch data for PDF');
+        const allData = await res.json();
+
+        if (allData.items.length === 0) {
+          toast({ title: "No Data", description: "No items to export.", variant: "destructive" });
+          return;
+        }
+
         const columns = [
-          { header: 'Part Code', field: 'partCode', width: 30 },
-          { header: 'Part Name', field: 'partName', width: 55 },
-          { header: 'Component', field: 'componentName', width: 45 },
-          { header: 'IHM Status', field: 'ihmStatus', width: 30 },
-          { header: 'Evidence', field: 'evidence', width: 30 }
+          { header: 'S.No', field: 'sno', width: 12 },
+          { header: 'Item Code', field: 'itemCode', width: 25 },
+          { header: 'Item Name', field: 'itemName', width: 45 },
+          { header: 'Item Type', field: 'itemType', width: 20 },
+          { header: 'Component / Category', field: 'componentOrCategory', width: 35 },
+          { header: 'IHM Status', field: 'ihmStatus', width: 22 },
+          { header: 'Evidence Type', field: 'evidenceType', width: 25 },
+          { header: 'Current ROB', field: 'currentROB', width: 20 },
+          { header: 'Location', field: 'location', width: 25 },
+          { header: 'UOM', field: 'uom', width: 15 },
         ];
 
-        const data = spares.map((s: any) => ({
-          partCode: s.partCode || '-',
-          partName: s.partName || '-',
-          componentName: s.componentName || '-',
-          ihmStatus: s.ihm || 'Unknown',
-          evidence: s.ihmEvidenceType || 'None'
+        const data = allData.items.map((item: any, idx: number) => ({
+          sno: idx + 1,
+          itemCode: item.itemCode || '-',
+          itemName: item.itemName || '-',
+          itemType: item.itemType === 'spare' ? 'Spare' : (item.storeCategory || 'Store'),
+          componentOrCategory: item.componentOrCategory || '-',
+          ihmStatus: item.ihmStatus === 'present' ? 'Present' : item.ihmStatus === 'not_present' ? 'Not Present' : 'Unknown',
+          evidenceType: item.evidenceType || '-',
+          currentROB: item.currentROB ?? '-',
+          location: item.location || '-',
+          uom: item.uom || '-',
         }));
 
         const summary = [
-          { label: 'Total Items', value: data.length },
-          { label: 'With IHM', value: data.filter((d: any) => d.ihmStatus === 'Present').length },
-          { label: 'Without IHM', value: data.filter((d: any) => d.ihmStatus === 'Not Present').length },
-          { label: 'Unknown', value: data.filter((d: any) => d.ihmStatus === 'Unknown').length }
+          { label: 'Total Items', value: allData.summary.totalItems },
+          { label: 'IHM Present', value: allData.summary.ihmPresent },
+          { label: 'No IHM', value: allData.summary.noIhm },
+          { label: 'Unknown', value: allData.summary.unknown }
         ];
 
         pdfReportGenerator.generateReport(
-          { title: 'IHM Inventory Status Report', subtitle: 'Hazardous materials inventory', vessel: vesselName },
+          { title: 'IHM Inventory Status Report', subtitle: 'Confirmed hazardous materials present on board', vessel: vesselName },
           columns,
           data,
           summary
@@ -146,10 +174,10 @@ const IhmReports: React.FC<IhmReportsProps> = ({ onBack, globalFilters }) => {
       }
 
       case 'ihm-compliance-summary': {
-        const withIhm = spares.filter((s: any) => s.ihm === 'Present').length;
-        const withoutIhm = spares.filter((s: any) => s.ihm === 'Not Present').length;
-        const unknown = spares.filter((s: any) => !s.ihm || s.ihm === 'Unknown').length;
-        const total = spares.length;
+        const total = ihmSummary.totalItems;
+        const withIhm = ihmSummary.ihmPresent;
+        const withoutIhm = ihmSummary.noIhm;
+        const unknown = ihmSummary.unknown;
 
         const columns = [
           { header: 'Category', field: 'category', width: 50 },
@@ -187,13 +215,40 @@ const IhmReports: React.FC<IhmReportsProps> = ({ onBack, globalFilters }) => {
     }
   };
 
+  const generateIhmExcel = async (reportId: string) => {
+    if (reportId !== 'ihm-inventory-status') {
+      toast({ title: "Excel Export", description: "Excel export is not available for this report.", variant: "destructive" });
+      return;
+    }
+
+    const res = await fetch('/technical/api/reports/ihm-inventory-status/excel', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify({ vesselId: effectiveVesselId }),
+    });
+    if (!res.ok) throw new Error('Failed to generate Excel');
+    const blob = await res.blob();
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `ihm-inventory-status-${new Date().toISOString().slice(0, 10)}.xlsx`;
+    link.style.display = 'none';
+    document.body.appendChild(link);
+    link.click();
+    setTimeout(() => {
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+    }, 1000);
+  };
+
   const handleGenerateReport = async (reportId: string, format: 'PDF' | 'Excel') => {
     const reportKey = `${reportId}-${format}`;
     
     if (generatingReports.has(reportKey)) return;
 
-    if (spares.length === 0) {
-      toast({ title: "No Data Available", description: "No IHM inventory data found for the selected vessel.", variant: "destructive" });
+    if (!effectiveVesselId || effectiveVesselId === 'all') {
+      toast({ title: "Select a Vessel", description: "Please select a specific vessel to generate this report.", variant: "destructive" });
       return;
     }
 
@@ -203,11 +258,10 @@ const IhmReports: React.FC<IhmReportsProps> = ({ onBack, globalFilters }) => {
 
       if (format === 'PDF') {
         await generateIhmPDF(reportId);
-        toast({ title: "Report Generated", description: `${format} report downloaded successfully!` });
       } else {
-        toast({ title: "Excel Export", description: "Excel export coming soon." });
+        await generateIhmExcel(reportId);
       }
-      
+      toast({ title: "Report Generated", description: `${format} report downloaded successfully!` });
     } catch (error) {
       console.error('Error generating report:', error);
       toast({ title: "Generation Failed", description: "Failed to generate report.", variant: "destructive" });
@@ -220,9 +274,9 @@ const IhmReports: React.FC<IhmReportsProps> = ({ onBack, globalFilters }) => {
     }
   };
 
-  const ihmPresent = spares.filter((s: any) => s.ihm === 'Present').length;
-  const ihmNotPresent = spares.filter((s: any) => s.ihm === 'Not Present').length;
-  const ihmUnknown = spares.filter((s: any) => !s.ihm || s.ihm === 'Unknown').length;
+  const ihmPresent = ihmSummary.ihmPresent;
+  const ihmNotPresent = ihmSummary.noIhm;
+  const ihmUnknown = ihmSummary.unknown;
 
   if (viewingReport === 'ihm-inventory-status') {
     return (
@@ -266,7 +320,7 @@ const IhmReports: React.FC<IhmReportsProps> = ({ onBack, globalFilters }) => {
               <Package className="w-4 h-4 text-gray-500" />
               Total Items
             </CardDescription>
-            <CardTitle className="text-3xl">{spares.length}</CardTitle>
+            <CardTitle className="text-3xl">{ihmSummary.totalItems}</CardTitle>
           </CardHeader>
         </Card>
         <Card className="border-l-4 border-l-red-500 bg-white">
@@ -364,8 +418,8 @@ const IhmReports: React.FC<IhmReportsProps> = ({ onBack, globalFilters }) => {
                     <Button 
                       size="icon" 
                       variant="ghost" 
-                      title={report.id === 'ihm-inventory-status' ? 'View Full Report' : 'Download PDF'}
-                      onClick={() => report.id === 'ihm-inventory-status' ? setViewingReport(report.id) : handleGenerateReport(report.id, 'PDF')}
+                      title="Download PDF"
+                      onClick={() => handleGenerateReport(report.id, 'PDF')}
                       disabled={generatingReports.has(`${report.id}-PDF`)}
                       data-testid={`button-pdf-${report.id}`}
                     >
@@ -380,11 +434,15 @@ const IhmReports: React.FC<IhmReportsProps> = ({ onBack, globalFilters }) => {
                         size="icon" 
                         variant="ghost" 
                         title="Download Excel"
-                        onClick={() => report.id === 'ihm-inventory-status' ? setViewingReport(report.id) : handleGenerateReport(report.id, 'Excel')}
+                        onClick={() => handleGenerateReport(report.id, 'Excel')}
                         disabled={generatingReports.has(`${report.id}-Excel`)}
                         data-testid={`button-excel-${report.id}`}
                       >
-                        <Download className="h-4 w-4" />
+                        {generatingReports.has(`${report.id}-Excel`) ? (
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : (
+                          <Download className="h-4 w-4" />
+                        )}
                       </Button>
                     )}
                   </div>
