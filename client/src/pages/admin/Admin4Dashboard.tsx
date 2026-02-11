@@ -70,7 +70,7 @@ export default function Admin4Dashboard({ onSubViewChange }: { onSubViewChange?:
   const totalMakers = Array.isArray(makersData) ? makersData.length : 0;
   const totalMasterLists = Array.isArray(masterListsData) ? masterListsData.length : 0;
   const totalMasterData = masterDataResponse?.total ?? 0;
-  const totalComponents = Array.isArray(componentsData) ? componentsData.length : 0;
+  const totalComponents = Array.isArray(componentsData) ? componentsData.filter((c: any) => c.fleetEquipmentCode?.length === 10).length : 0;
   const totalJobs = Array.isArray(jobsData) ? jobsData.length : 0;
   const totalSpares = Array.isArray(sparesData) ? sparesData.length : 0;
   const totalVessels = Array.isArray(vesselsData) ? vesselsData.length : 0;
