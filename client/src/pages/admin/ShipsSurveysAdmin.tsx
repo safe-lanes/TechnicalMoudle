@@ -567,12 +567,28 @@ export default function ShipsSurveysAdmin() {
       const oldSequence = currentSurvey.companySequence ?? currentSurvey.sequence;
       if (newSeq === oldSequence) return prevData;
       
-      return prevData.map(s => {
+      const companyItems = prevData.filter(s => s.applicableToCompany);
+      const nonCompanyItems = prevData.filter(s => !s.applicableToCompany);
+      
+      const updatedCompany = companyItems.map(s => {
+        const sSeq = s.companySequence ?? s.sequence;
         if (s.id === surveyId) {
           return { ...s, companySequence: newSeq };
         }
+        if (newSeq < oldSequence) {
+          if (sSeq >= newSeq && sSeq < oldSequence) {
+            return { ...s, companySequence: sSeq + 1 };
+          }
+        }
+        if (newSeq > oldSequence) {
+          if (sSeq > oldSequence && sSeq <= newSeq) {
+            return { ...s, companySequence: sSeq - 1 };
+          }
+        }
         return s;
       });
+      
+      return [...updatedCompany, ...nonCompanyItems];
     });
     setHasUnsavedChanges(true);
   };
@@ -833,7 +849,9 @@ export default function ShipsSurveysAdmin() {
     setHasUnsavedChanges(true);
   };
 
-  const filteredData = masterData.filter(survey => {
+  const sortedMasterData = [...masterData].sort((a, b) => a.sequence - b.sequence);
+
+  const filteredData = sortedMasterData.filter(survey => {
     const matchesSearch = searchTerm === "" || 
       survey.surveyName.toLowerCase().includes(searchTerm.toLowerCase()) ||
       survey.masterId.toLowerCase().includes(searchTerm.toLowerCase());
@@ -1218,7 +1236,9 @@ export default function ShipsSurveysAdmin() {
                     isCompanyOnly: false,
                   }));
 
-                const filteredData = companyDataFromMaster.filter(s => {
+                const sortedCompanyData = [...companyDataFromMaster].sort((a, b) => a.sequence - b.sequence);
+
+                const filteredData = sortedCompanyData.filter(s => {
                   const matchesSearch = companySearchTerm === "" || 
                     s.surveyLabel.toLowerCase().includes(companySearchTerm.toLowerCase()) ||
                     s.masterId.toLowerCase().includes(companySearchTerm.toLowerCase());
