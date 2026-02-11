@@ -122,9 +122,9 @@ interface MaintenancePlannerProps {
 
 export default function MaintenancePlanner({ onBack, globalFilters }: MaintenancePlannerProps) {
   const { vesselId: contextVesselId, setVesselId, vessels } = useVessel();
-  const vesselId = (globalFilters?.vessel && globalFilters.vessel !== 'all')
-    ? globalFilters.vessel
-    : contextVesselId;
+  const vesselId = globalFilters?.vessel === 'all'
+    ? 'all'
+    : (globalFilters?.vessel || contextVesselId);
   const [, setLocation] = useLocation();
   const { toast } = useToast();
   const { isSailAdmin, isClientAdmin } = useUIRole();
@@ -193,7 +193,7 @@ export default function MaintenancePlanner({ onBack, globalFilters }: Maintenanc
       if (!response.ok) throw new Error("Failed to fetch planner data");
       return response.json();
     },
-    enabled: !!vesselId,
+    enabled: !!vesselId && vesselId !== 'all',
     staleTime: 60000,
   });
 
@@ -364,7 +364,7 @@ export default function MaintenancePlanner({ onBack, globalFilters }: Maintenanc
             <div>
               <h1 className="text-2xl font-bold text-gray-900" data-testid="G21.1"><Marker id="G21.1" />Maintenance Planner</h1>
               <p className="text-sm text-gray-500" data-testid="G21.2">
-                <Marker id="G21.2" />Planning view for {vessels.find(v => v.id === vesselId)?.name || vesselId}
+                <Marker id="G21.2" />Planning view for {vesselId === 'all' ? 'All Vessels' : (vessels.find(v => v.id === vesselId)?.name || vesselId)}
               </p>
             </div>
           </div>

@@ -137,9 +137,9 @@ const ChangeRequestReports: React.FC<ChangeRequestReportsProps> = ({ onBack, glo
     }
   }, [globalFilters?.dateRange]);
 
-  const effectiveVesselId = (categoryFilters.vessel && categoryFilters.vessel !== 'all')
-    ? categoryFilters.vessel
-    : contextVesselId;
+  const effectiveVesselId = categoryFilters.vessel === 'all'
+    ? 'all'
+    : (categoryFilters.vessel || contextVesselId);
 
   const buildQueryString = () => {
     const params = new URLSearchParams();
@@ -204,7 +204,7 @@ const ChangeRequestReports: React.FC<ChangeRequestReportsProps> = ({ onBack, glo
       return;
     }
 
-    const vesselName = vessels.find(v => v.id === effectiveVesselId)?.name || effectiveVesselId || 'All Vessels';
+    const vesselName = effectiveVesselId === 'all' ? 'All Vessels' : (vessels.find(v => v.id === effectiveVesselId)?.name || effectiveVesselId || 'Unknown Vessel');
     const summary = reportData.summary;
 
     switch (reportId) {

@@ -74,13 +74,22 @@ const RunningHoursReports: React.FC<RunningHoursReportsProps> = ({ onBack, globa
     }
   }, [globalFilters?.dateRange]);
 
-  const effectiveVesselId = (categoryFilters.vessel && categoryFilters.vessel !== 'all') 
-    ? categoryFilters.vessel 
-    : contextVesselId;
+  const effectiveVesselId = categoryFilters.vessel === 'all' 
+    ? 'all' 
+    : (categoryFilters.vessel || contextVesselId);
 
   const { data: components = [] } = useQuery<any[]>({
     queryKey: ['/technical/api/components', effectiveVesselId],
-    enabled: !!effectiveVesselId && effectiveVesselId !== 'all',
+    queryFn: async () => {
+      const params = new URLSearchParams();
+      if (effectiveVesselId && effectiveVesselId !== 'all') {
+        params.set('vesselId', effectiveVesselId);
+      }
+      const url = `/technical/api/components${params.toString() ? `?${params}` : ''}`;
+      const res = await fetch(url, { credentials: 'include' });
+      if (!res.ok) throw new Error('Failed to fetch components');
+      return res.json();
+    },
   });
 
   const { data: runningHours = [] } = useQuery<any[]>({
@@ -136,7 +145,7 @@ const RunningHoursReports: React.FC<RunningHoursReportsProps> = ({ onBack, globa
       throw new Error('Please select a specific vessel to generate the PDF report. "All Vessels" is not supported for PDF exports.');
     }
     
-    const vesselName = vessels.find(v => v.id === effectiveVesselId)?.name || effectiveVesselId || 'Unknown Vessel';
+    const vesselName = effectiveVesselId === 'all' ? 'All Vessels' : (vessels.find(v => v.id === effectiveVesselId)?.name || effectiveVesselId || 'Unknown Vessel');
 
     switch (reportId) {
       case 'rh-utilization-summary': {

@@ -79,17 +79,36 @@ const AlertsApprovalsAdminReports: React.FC<AlertsApprovalsAdminReportsProps> = 
     }
   }, [globalFilters?.dateRange]);
 
-  const effectiveVesselId = (categoryFilters.vessel && categoryFilters.vessel !== 'all') 
-    ? categoryFilters.vessel 
-    : contextVesselId;
+  const effectiveVesselId = categoryFilters.vessel === 'all' 
+    ? 'all' 
+    : (categoryFilters.vessel || contextVesselId);
 
   const { data: workOrders = [] } = useQuery<any[]>({
     queryKey: ['/technical/api/work-orders', effectiveVesselId],
+    queryFn: async () => {
+      const params = new URLSearchParams();
+      if (effectiveVesselId && effectiveVesselId !== 'all') {
+        params.set('vesselId', effectiveVesselId);
+      }
+      const url = `/technical/api/work-orders${params.toString() ? `?${params}` : ''}`;
+      const res = await fetch(url, { credentials: 'include' });
+      if (!res.ok) throw new Error('Failed to fetch work orders');
+      return res.json();
+    },
   });
 
   const { data: defects = [] } = useQuery<any[]>({
     queryKey: ['/technical/api/defects', effectiveVesselId],
-    enabled: !!effectiveVesselId && effectiveVesselId !== 'all',
+    queryFn: async () => {
+      const params = new URLSearchParams();
+      if (effectiveVesselId && effectiveVesselId !== 'all') {
+        params.set('vesselId', effectiveVesselId);
+      }
+      const url = `/technical/api/defects${params.toString() ? `?${params}` : ''}`;
+      const res = await fetch(url, { credentials: 'include' });
+      if (!res.ok) throw new Error('Failed to fetch defects');
+      return res.json();
+    },
   });
 
   const reports: AdminReport[] = [
@@ -189,7 +208,7 @@ const AlertsApprovalsAdminReports: React.FC<AlertsApprovalsAdminReportsProps> = 
   };
 
   const generateAlertsPDF = async (reportId: string) => {
-    const vesselName = vessels.find(v => v.id === effectiveVesselId)?.name || effectiveVesselId || 'All Vessels';
+    const vesselName = effectiveVesselId === 'all' ? 'All Vessels' : (vessels.find(v => v.id === effectiveVesselId)?.name || effectiveVesselId || 'Unknown Vessel');
     const now = new Date();
 
     switch (reportId) {

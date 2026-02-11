@@ -77,13 +77,22 @@ const SparesReports: React.FC<SparesReportsProps> = ({ onBack, globalFilters }) 
     }
   }, [globalFilters?.dateRange]);
 
-  const effectiveVesselId = (categoryFilters.vessel && categoryFilters.vessel !== 'all') 
-    ? categoryFilters.vessel 
-    : contextVesselId;
+  const effectiveVesselId = categoryFilters.vessel === 'all' 
+    ? 'all' 
+    : (categoryFilters.vessel || contextVesselId);
 
   const { data: spares = [] } = useQuery<any[]>({
     queryKey: ['/technical/api/spares', effectiveVesselId],
-    enabled: !!effectiveVesselId && effectiveVesselId !== 'all',
+    queryFn: async () => {
+      if (effectiveVesselId && effectiveVesselId !== 'all') {
+        const res = await fetch(`/technical/api/spares/${effectiveVesselId}`, { credentials: 'include' });
+        if (!res.ok) throw new Error('Failed to fetch spares');
+        return res.json();
+      }
+      const res = await fetch('/technical/api/spares', { credentials: 'include' });
+      if (!res.ok) throw new Error('Failed to fetch spares');
+      return res.json();
+    },
   });
 
   const { data: spareHistory = [] } = useQuery<any[]>({
@@ -158,7 +167,7 @@ const SparesReports: React.FC<SparesReportsProps> = ({ onBack, globalFilters }) 
   };
 
   const generateSparesPDF = async (reportId: string) => {
-    const vesselName = vessels.find(v => v.id === effectiveVesselId)?.name || effectiveVesselId || 'All Vessels';
+    const vesselName = effectiveVesselId === 'all' ? 'All Vessels' : (vessels.find(v => v.id === effectiveVesselId)?.name || effectiveVesselId || 'Unknown Vessel');
 
     switch (reportId) {
       case 'spares-low-stock': {

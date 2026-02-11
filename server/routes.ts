@@ -6718,9 +6718,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/technical/api/components", async (req, res) => {
     try {
       const vesselId = req.query.vesselId as string | undefined;
-      // getComponents requires vesselId - use default 'V001' if not provided
-      const components = await storage.getComponents(vesselId || 'V001');
-      res.json(components);
+      if (vesselId) {
+        const components = await storage.getComponents(vesselId);
+        res.json(components);
+      } else {
+        const allVessels = await storage.getVessels();
+        const allComponents: any[] = [];
+        for (const vessel of allVessels) {
+          const vesselComponents = await storage.getComponents(vessel.id);
+          allComponents.push(...vesselComponents);
+        }
+        res.json(allComponents);
+      }
     } catch (error) {
       res.status(500).json({ error: "Failed to fetch components" });
     }
@@ -9594,6 +9603,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Stores endpoints - ZERO PMS linkages (isolated from Components/Jobs/Work Orders per Global Business Rule Section 7.2)
   // Note: Auth removed to match spares endpoint pattern for development
+  app.get("/technical/api/stores", async (req, res) => {
+    try {
+      const allVessels = await storage.getVessels();
+      const allStores: any[] = [];
+      for (const vessel of allVessels) {
+        const vesselStores = await storage.getStoresItems(vessel.id, req.query.itemType as string | undefined);
+        allStores.push(...vesselStores);
+      }
+      res.json(allStores);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch stores" });
+    }
+  });
+
   app.get("/technical/api/stores/:vesselId", async (req, res) => {
     try {
       const { itemType } = req.query;
@@ -17971,10 +17994,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // ═══════════════════════════════════════════════════════════════════════════
   app.get("/technical/api/reports/ihm-inventory-status", async (req, res) => {
     try {
-      const vesselId = req.query.vesselId as string;
-      if (!vesselId) {
-        return res.status(400).json({ error: "vesselId is required" });
-      }
+      const vesselId = req.query.vesselId as string | undefined;
 
       const ihmStatusFilter = (req.query.ihmStatus as string) || 'all';
       const itemTypeFilter = (req.query.itemType as string) || 'all';
@@ -18011,8 +18031,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return 'unknown';
       };
 
-      const sparesData = await storage.getSpares(vesselId);
-      const storesData = await storage.getStoresItems(vesselId);
+      let sparesData: any[] = [];
+      let storesData: any[] = [];
+      if (vesselId) {
+        sparesData = await storage.getSpares(vesselId);
+        storesData = await storage.getStoresItems(vesselId);
+      } else {
+        const allVessels = await storage.getVessels();
+        for (const vessel of allVessels) {
+          const vSpares = await storage.getSpares(vessel.id);
+          sparesData.push(...vSpares);
+          const vStores = await storage.getStoresItems(vessel.id);
+          storesData.push(...vStores);
+        }
+      }
 
       interface IhmItem {
         id: number;

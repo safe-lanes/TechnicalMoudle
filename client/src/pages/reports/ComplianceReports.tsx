@@ -74,18 +74,36 @@ const ComplianceReports: React.FC<ComplianceReportsProps> = ({ onBack, globalFil
     }
   }, [globalFilters?.dateRange]);
 
-  const effectiveVesselId = (categoryFilters.vessel && categoryFilters.vessel !== 'all') 
-    ? categoryFilters.vessel 
-    : contextVesselId;
+  const effectiveVesselId = categoryFilters.vessel === 'all' 
+    ? 'all' 
+    : (categoryFilters.vessel || contextVesselId);
 
   const { data: certificates = [] } = useQuery<any[]>({
     queryKey: ['/technical/api/certificates', effectiveVesselId],
-    enabled: !!effectiveVesselId && effectiveVesselId !== 'all',
+    queryFn: async () => {
+      const params = new URLSearchParams();
+      if (effectiveVesselId && effectiveVesselId !== 'all') {
+        params.set('vesselId', effectiveVesselId);
+      }
+      const url = `/technical/api/certificates${params.toString() ? `?${params}` : ''}`;
+      const res = await fetch(url, { credentials: 'include' });
+      if (!res.ok) throw new Error('Failed to fetch certificates');
+      return res.json();
+    },
   });
 
   const { data: surveys = [] } = useQuery<any[]>({
     queryKey: ['/technical/api/surveys', effectiveVesselId],
-    enabled: !!effectiveVesselId && effectiveVesselId !== 'all',
+    queryFn: async () => {
+      const params = new URLSearchParams();
+      if (effectiveVesselId && effectiveVesselId !== 'all') {
+        params.set('vesselId', effectiveVesselId);
+      }
+      const url = `/technical/api/surveys${params.toString() ? `?${params}` : ''}`;
+      const res = await fetch(url, { credentials: 'include' });
+      if (!res.ok) throw new Error('Failed to fetch surveys');
+      return res.json();
+    },
   });
 
   const reports: ComplianceReport[] = [
@@ -181,7 +199,7 @@ const ComplianceReports: React.FC<ComplianceReportsProps> = ({ onBack, globalFil
   };
 
   const generateCompliancePDF = async (reportId: string) => {
-    const vesselName = vessels.find(v => v.id === effectiveVesselId)?.name || effectiveVesselId || 'All Vessels';
+    const vesselName = effectiveVesselId === 'all' ? 'All Vessels' : (vessels.find(v => v.id === effectiveVesselId)?.name || effectiveVesselId || 'Unknown Vessel');
 
     switch (reportId) {
       case 'certificates-status': {

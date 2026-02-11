@@ -79,9 +79,9 @@ const MaintenanceReports: React.FC<MaintenanceReportsProps> = ({ onBack, globalF
     }
   }, [globalFilters?.dateRange]);
   
-  const effectiveVesselId = (categoryFilters.vessel && categoryFilters.vessel !== 'all') 
-    ? categoryFilters.vessel 
-    : contextVesselId;
+  const effectiveVesselId = categoryFilters.vessel === 'all' 
+    ? 'all' 
+    : (categoryFilters.vessel || contextVesselId);
 
   const { data: workOrders = [] } = useQuery<any[]>({
     queryKey: ['/technical/api/work-orders', effectiveVesselId],
@@ -91,7 +91,7 @@ const MaintenanceReports: React.FC<MaintenanceReportsProps> = ({ onBack, globalF
         params.set('vesselId', effectiveVesselId);
       }
       const url = `/technical/api/work-orders${params.toString() ? `?${params}` : ''}`;
-      const response = await fetch(url);
+      const response = await fetch(url, { credentials: 'include' });
       if (!response.ok) throw new Error('Failed to fetch work orders');
       return response.json();
     },
@@ -99,6 +99,16 @@ const MaintenanceReports: React.FC<MaintenanceReportsProps> = ({ onBack, globalF
 
   const { data: jobs = [] } = useQuery<any[]>({
     queryKey: ['/technical/api/jobs', effectiveVesselId],
+    queryFn: async () => {
+      const params = new URLSearchParams();
+      if (effectiveVesselId && effectiveVesselId !== 'all') {
+        params.set('vesselId', effectiveVesselId);
+      }
+      const url = `/technical/api/jobs${params.toString() ? `?${params}` : ''}`;
+      const res = await fetch(url, { credentials: 'include' });
+      if (!res.ok) throw new Error('Failed to fetch jobs');
+      return res.json();
+    },
   });
 
   const reports: MaintenanceReport[] = [
@@ -294,7 +304,7 @@ const MaintenanceReports: React.FC<MaintenanceReportsProps> = ({ onBack, globalF
   };
 
   const generateMaintenancePDF = async (reportId: string) => {
-    const vesselName = vessels.find(v => v.id === effectiveVesselId)?.name || effectiveVesselId || 'All Vessels';
+    const vesselName = effectiveVesselId === 'all' ? 'All Vessels' : (vessels.find(v => v.id === effectiveVesselId)?.name || effectiveVesselId || 'Unknown Vessel');
     const now = new Date();
     const sevenDaysFromNow = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
     

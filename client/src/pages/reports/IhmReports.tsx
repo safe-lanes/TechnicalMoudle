@@ -67,20 +67,23 @@ const IhmReports: React.FC<IhmReportsProps> = ({ onBack, globalFilters }) => {
     }
   }, [globalFilters?.dateRange]);
 
-  const effectiveVesselId = (categoryFilters.vessel && categoryFilters.vessel !== 'all') 
-    ? categoryFilters.vessel 
-    : contextVesselId;
+  const effectiveVesselId = categoryFilters.vessel === 'all' 
+    ? 'all' 
+    : (categoryFilters.vessel || contextVesselId);
 
   const { data: ihmData } = useQuery<any>({
     queryKey: ['/technical/api/reports/ihm-inventory-status', effectiveVesselId, 'summary'],
     queryFn: async () => {
-      const res = await fetch(`/technical/api/reports/ihm-inventory-status?vesselId=${effectiveVesselId}&page=1&pageSize=1`, {
+      const params = new URLSearchParams({ page: '1', pageSize: '1' });
+      if (effectiveVesselId && effectiveVesselId !== 'all') {
+        params.set('vesselId', effectiveVesselId);
+      }
+      const res = await fetch(`/technical/api/reports/ihm-inventory-status?${params}`, {
         credentials: 'include',
       });
       if (!res.ok) throw new Error('Failed to fetch IHM summary');
       return res.json();
     },
-    enabled: !!effectiveVesselId && effectiveVesselId !== 'all',
   });
 
   const ihmSummary = ihmData?.summary || { totalItems: 0, ihmPresent: 0, noIhm: 0, unknown: 0 };
@@ -115,7 +118,7 @@ const IhmReports: React.FC<IhmReportsProps> = ({ onBack, globalFilters }) => {
   };
 
   const generateIhmPDF = async (reportId: string) => {
-    const vesselName = vessels.find(v => v.id === effectiveVesselId)?.name || effectiveVesselId || 'All Vessels';
+    const vesselName = effectiveVesselId === 'all' ? 'All Vessels' : (vessels.find(v => v.id === effectiveVesselId)?.name || effectiveVesselId || 'Unknown Vessel');
 
     switch (reportId) {
       case 'ihm-inventory-status': {

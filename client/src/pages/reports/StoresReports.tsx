@@ -80,13 +80,22 @@ const StoresReports: React.FC<StoresReportsProps> = ({ onBack, globalFilters }) 
     }
   }, [globalFilters?.dateRange]);
 
-  const effectiveVesselId = (categoryFilters.vessel && categoryFilters.vessel !== 'all') 
-    ? categoryFilters.vessel 
-    : contextVesselId;
+  const effectiveVesselId = categoryFilters.vessel === 'all' 
+    ? 'all' 
+    : (categoryFilters.vessel || contextVesselId);
 
   const { data: storesItems = [] } = useQuery<any[]>({
-    queryKey: [`/technical/api/stores/${effectiveVesselId}`],
-    enabled: !!effectiveVesselId && effectiveVesselId !== 'all',
+    queryKey: ['/technical/api/stores', effectiveVesselId],
+    queryFn: async () => {
+      if (effectiveVesselId && effectiveVesselId !== 'all') {
+        const res = await fetch(`/technical/api/stores/${effectiveVesselId}`, { credentials: 'include' });
+        if (!res.ok) throw new Error('Failed to fetch stores');
+        return res.json();
+      }
+      const res = await fetch('/technical/api/stores', { credentials: 'include' });
+      if (!res.ok) throw new Error('Failed to fetch stores');
+      return res.json();
+    },
   });
 
   const reports: StoresReport[] = [
@@ -179,7 +188,7 @@ const StoresReports: React.FC<StoresReportsProps> = ({ onBack, globalFilters }) 
   };
 
   const generateStoresPDF = async (reportId: string) => {
-    const vesselName = vessels.find(v => v.id === effectiveVesselId)?.name || effectiveVesselId || 'All Vessels';
+    const vesselName = effectiveVesselId === 'all' ? 'All Vessels' : (vessels.find(v => v.id === effectiveVesselId)?.name || effectiveVesselId || 'Unknown Vessel');
 
     switch (reportId) {
       case 'stores-inventory-status': {
