@@ -493,7 +493,7 @@ export default function ShipsSurveysAdmin() {
       const oldSequence = currentSurvey.sequence;
       if (newSequence === oldSequence) return prevData;
       
-      const updatedData = prevData.map(s => {
+      return prevData.map(s => {
         if (s.id === surveyId) {
           return { ...s, sequence: newSequence };
         }
@@ -504,9 +504,8 @@ export default function ShipsSurveysAdmin() {
             return { ...s, sequence: s.sequence + 1 };
           }
         }
-        
         // Moving down (e.g., 2 → 4): shift items in [oldSequence+1, newSequence] up by 1
-        if (newSequence > oldSequence) {
+        else {
           if (s.sequence > oldSequence && s.sequence <= newSequence) {
             return { ...s, sequence: s.sequence - 1 };
           }
@@ -514,8 +513,6 @@ export default function ShipsSurveysAdmin() {
         
         return s;
       });
-      
-      return recomputeMasterIds(updatedData);
     });
     setHasUnsavedChanges(true);
   };
@@ -559,36 +556,43 @@ export default function ShipsSurveysAdmin() {
     setHasUnsavedChanges(true);
   };
 
-  const updateCompanySequence = (surveyId: number, newSeq: number) => {
+  const updateCompanySequence = (surveyId: number, newSequence: number) => {
     setMasterData(prevData => {
-      const currentSurvey = prevData.find(s => s.id === surveyId);
+      const companySurveys = prevData.filter(s => s.applicableToCompany);
+      const currentSurvey = companySurveys.find(s => s.id === surveyId);
       if (!currentSurvey) return prevData;
-      
+
       const oldSequence = currentSurvey.companySequence ?? currentSurvey.sequence;
-      if (newSeq === oldSequence) return prevData;
-      
-      const companyItems = prevData.filter(s => s.applicableToCompany);
-      const nonCompanyItems = prevData.filter(s => !s.applicableToCompany);
-      
-      const updatedCompany = companyItems.map(s => {
-        const sSeq = s.companySequence ?? s.sequence;
+      if (newSequence === oldSequence) return prevData;
+
+      const companyIds = new Set(companySurveys.map(s => s.id));
+
+      return prevData.map(s => {
+        if (!companyIds.has(s.id)) return s;
+
+        const surveyOldSeq = s.companySequence ?? s.sequence;
+
         if (s.id === surveyId) {
-          return { ...s, companySequence: newSeq };
+          return { ...s, companySequence: newSequence };
         }
-        if (newSeq < oldSequence) {
-          if (sSeq >= newSeq && sSeq < oldSequence) {
-            return { ...s, companySequence: sSeq + 1 };
+
+        if (newSequence < oldSequence) {
+          if (surveyOldSeq >= newSequence && surveyOldSeq < oldSequence) {
+            return { ...s, companySequence: surveyOldSeq + 1 };
           }
         }
-        if (newSeq > oldSequence) {
-          if (sSeq > oldSequence && sSeq <= newSeq) {
-            return { ...s, companySequence: sSeq - 1 };
+        else {
+          if (surveyOldSeq > oldSequence && surveyOldSeq <= newSequence) {
+            return { ...s, companySequence: surveyOldSeq - 1 };
           }
         }
+
+        if (s.companySequence === undefined) {
+          return { ...s, companySequence: surveyOldSeq };
+        }
+
         return s;
       });
-      
-      return [...updatedCompany, ...nonCompanyItems];
     });
     setHasUnsavedChanges(true);
   };
