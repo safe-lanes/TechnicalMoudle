@@ -11,7 +11,7 @@ interface FleetComponent {
   id: number;
   fleetEquipmentCode: string;
   fleetEquipmentName: string;
-  maker?: string | null;
+  makerName?: string | null;
   makerCode?: string | null;
   model?: string | null;
   modelCode?: string | null;
@@ -36,7 +36,7 @@ export default function MasterDataTableView({ onBack }: { onBack?: () => void })
     return leafComponents.filter((item) =>
       item.fleetEquipmentCode?.toLowerCase().includes(query) ||
       item.fleetEquipmentName?.toLowerCase().includes(query) ||
-      item.maker?.toLowerCase().includes(query) ||
+      item.makerName?.toLowerCase().includes(query) ||
       item.makerCode?.toLowerCase().includes(query) ||
       item.model?.toLowerCase().includes(query) ||
       item.modelCode?.toLowerCase().includes(query)
@@ -57,7 +57,7 @@ export default function MasterDataTableView({ onBack }: { onBack?: () => void })
         index + 1,
         `"${item.fleetEquipmentCode || ''}"`,
         `"${item.fleetEquipmentName || ''}"`,
-        `"${item.maker || ''}"`,
+        `"${item.makerName || ''}"`,
         `"${item.makerCode || ''}"`,
         `"${item.model || ''}"`,
         `"${item.modelCode || ''}"`
@@ -167,7 +167,7 @@ export default function MasterDataTableView({ onBack }: { onBack?: () => void })
                         <TableCell className="text-sm text-gray-500">{index + 1}</TableCell>
                         <TableCell className="text-sm font-mono">{item.fleetEquipmentCode || '-'}</TableCell>
                         <TableCell className="text-sm">{item.fleetEquipmentName || '-'}</TableCell>
-                        <TableCell className="text-sm">{item.maker || '-'}</TableCell>
+                        <TableCell className="text-sm">{item.makerName || '-'}</TableCell>
                         <TableCell className="text-sm">{item.makerCode || '-'}</TableCell>
                         <TableCell className="text-sm">{item.model || '-'}</TableCell>
                         <TableCell className="text-sm">{item.modelCode || '-'}</TableCell>
