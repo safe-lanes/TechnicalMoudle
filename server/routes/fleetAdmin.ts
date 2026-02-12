@@ -910,6 +910,14 @@ router.get('/dashboard-stats', async (req, res) => {
     const sparesWithValidComponent = allSpares.filter(s => componentEquipCodes.has(s.fleetEquipmentCode));
     const sparesWithInvalidComponent = allSpares.filter(s => !componentEquipCodes.has(s.fleetEquipmentCode));
 
+    const jobEquipCodes = new Set(allJobs.map(j => j.fleetEquipmentCode));
+    const componentsWithJobs = leafComponents.filter(c => jobEquipCodes.has(c.fleetEquipmentCode)).length;
+    const componentsWithoutJobs = leafComponents.length - componentsWithJobs;
+
+    const spareEquipCodes = new Set(allSpares.map(s => s.fleetEquipmentCode));
+    const componentsWithSpares = leafComponents.filter(c => spareEquipCodes.has(c.fleetEquipmentCode)).length;
+    const componentsWithoutSpares = leafComponents.length - componentsWithSpares;
+
     const recentComponents = [...leafComponents]
       .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
       .slice(0, 5)
@@ -931,6 +939,10 @@ router.get('/dashboard-stats', async (req, res) => {
         withoutMaker: componentsWithoutMaker.length,
         active: activeComponents.length,
         inactive: inactiveComponents.length,
+        withJobs: componentsWithJobs,
+        withoutJobs: componentsWithoutJobs,
+        withSpares: componentsWithSpares,
+        withoutSpares: componentsWithoutSpares,
         categoryBreakdown,
         deptBreakdown,
       },

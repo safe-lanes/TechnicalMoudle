@@ -5,6 +5,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Building2, List, ArrowRight, Box, Wrench, Package, Ship, Clock, FileCode2, Anchor, Database, Layers, AlertTriangle, CheckCircle2, X, Bell, LayoutDashboard } from "lucide-react";
+import { AgCharts } from "ag-charts-react";
+import type { AgChartOptions } from "ag-charts-community";
 import { Marker } from "@/components/Marker";
 import MakerManagement from "./MakerManagement";
 import MasterListsManagement from "./MasterListsManagement";
@@ -407,6 +409,143 @@ export default function Admin4Dashboard({ onSubViewChange }: { onSubViewChange?:
               </div>
             </CardContent>
           </Card>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <Card className="border border-gray-200" data-testid="card-maker-utilization-chart">
+              <CardHeader className="pb-2">
+                <div className="flex items-center gap-2">
+                  <Building2 className="h-4 w-4 text-blue-600" />
+                  <CardTitle className="text-sm font-medium text-gray-700" data-testid="text-maker-utilization-title">Maker Utilization</CardTitle>
+                </div>
+              </CardHeader>
+              <CardContent>
+                {isStatsLoading ? (
+                  <div className="flex items-center justify-center h-48">
+                    <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600"></div>
+                  </div>
+                ) : (dashboardStats?.makers?.linked > 0 || dashboardStats?.makers?.unlinked > 0) ? (
+                  <div>
+                    <div className="h-48">
+                      <AgCharts options={{
+                        data: [
+                          { label: 'Used', value: dashboardStats?.makers?.linked || 0, color: '#3b82f6' },
+                          { label: 'Unused', value: dashboardStats?.makers?.unlinked || 0, color: '#e5e7eb' },
+                        ],
+                        series: [{
+                          type: 'donut',
+                          angleKey: 'value',
+                          calloutLabelKey: 'label',
+                          sectorLabelKey: 'value',
+                          innerRadiusRatio: 0.6,
+                          fills: ['#3b82f6', '#e5e7eb'],
+                          strokes: ['#3b82f6', '#d1d5db'],
+                        } as any],
+                        legend: { enabled: true, position: 'bottom' },
+                        padding: { top: 5, bottom: 5, left: 5, right: 5 },
+                      } as AgChartOptions} />
+                    </div>
+                    <div className="flex items-center justify-center gap-4 mt-2 text-xs text-gray-600">
+                      <span>Total: <strong>{dashboardStats?.makers?.total || 0}</strong></span>
+                      <span className="text-blue-600">Used: <strong>{dashboardStats?.makers?.linked || 0}</strong></span>
+                      <span className="text-gray-400">Unused: <strong>{dashboardStats?.makers?.unlinked || 0}</strong></span>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="flex items-center justify-center h-48 text-gray-400 text-sm">No maker data available</div>
+                )}
+              </CardContent>
+            </Card>
+
+            <Card className="border border-gray-200" data-testid="card-components-jobs-chart">
+              <CardHeader className="pb-2">
+                <div className="flex items-center gap-2">
+                  <Wrench className="h-4 w-4 text-orange-600" />
+                  <CardTitle className="text-sm font-medium text-gray-700" data-testid="text-components-jobs-title">Components with Jobs</CardTitle>
+                </div>
+              </CardHeader>
+              <CardContent>
+                {isStatsLoading ? (
+                  <div className="flex items-center justify-center h-48">
+                    <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-orange-600"></div>
+                  </div>
+                ) : (dashboardStats?.components?.withJobs > 0 || dashboardStats?.components?.withoutJobs > 0) ? (
+                  <div>
+                    <div className="h-48">
+                      <AgCharts options={{
+                        data: [
+                          { label: 'Linked', value: dashboardStats?.components?.withJobs || 0, color: '#f97316' },
+                          { label: 'Not Linked', value: dashboardStats?.components?.withoutJobs || 0, color: '#e5e7eb' },
+                        ],
+                        series: [{
+                          type: 'donut',
+                          angleKey: 'value',
+                          calloutLabelKey: 'label',
+                          sectorLabelKey: 'value',
+                          innerRadiusRatio: 0.6,
+                          fills: ['#f97316', '#e5e7eb'],
+                          strokes: ['#f97316', '#d1d5db'],
+                        } as any],
+                        legend: { enabled: true, position: 'bottom' },
+                        padding: { top: 5, bottom: 5, left: 5, right: 5 },
+                      } as AgChartOptions} />
+                    </div>
+                    <div className="flex items-center justify-center gap-4 mt-2 text-xs text-gray-600">
+                      <span>Total: <strong>{dashboardStats?.components?.total || 0}</strong></span>
+                      <span className="text-orange-600">Linked: <strong>{dashboardStats?.components?.withJobs || 0}</strong></span>
+                      <span className="text-gray-400">Not Linked: <strong>{dashboardStats?.components?.withoutJobs || 0}</strong></span>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="flex items-center justify-center h-48 text-gray-400 text-sm">No component data available</div>
+                )}
+              </CardContent>
+            </Card>
+
+            <Card className="border border-gray-200" data-testid="card-components-spares-chart">
+              <CardHeader className="pb-2">
+                <div className="flex items-center gap-2">
+                  <Package className="h-4 w-4 text-teal-600" />
+                  <CardTitle className="text-sm font-medium text-gray-700" data-testid="text-components-spares-title">Components with Spares</CardTitle>
+                </div>
+              </CardHeader>
+              <CardContent>
+                {isStatsLoading ? (
+                  <div className="flex items-center justify-center h-48">
+                    <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-teal-600"></div>
+                  </div>
+                ) : (dashboardStats?.components?.withSpares > 0 || dashboardStats?.components?.withoutSpares > 0) ? (
+                  <div>
+                    <div className="h-48">
+                      <AgCharts options={{
+                        data: [
+                          { label: 'Linked', value: dashboardStats?.components?.withSpares || 0, color: '#14b8a6' },
+                          { label: 'Not Linked', value: dashboardStats?.components?.withoutSpares || 0, color: '#e5e7eb' },
+                        ],
+                        series: [{
+                          type: 'donut',
+                          angleKey: 'value',
+                          calloutLabelKey: 'label',
+                          sectorLabelKey: 'value',
+                          innerRadiusRatio: 0.6,
+                          fills: ['#14b8a6', '#e5e7eb'],
+                          strokes: ['#14b8a6', '#d1d5db'],
+                        } as any],
+                        legend: { enabled: true, position: 'bottom' },
+                        padding: { top: 5, bottom: 5, left: 5, right: 5 },
+                      } as AgChartOptions} />
+                    </div>
+                    <div className="flex items-center justify-center gap-4 mt-2 text-xs text-gray-600">
+                      <span>Total: <strong>{dashboardStats?.components?.total || 0}</strong></span>
+                      <span className="text-teal-600">Linked: <strong>{dashboardStats?.components?.withSpares || 0}</strong></span>
+                      <span className="text-gray-400">Not Linked: <strong>{dashboardStats?.components?.withoutSpares || 0}</strong></span>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="flex items-center justify-center h-48 text-gray-400 text-sm">No component data available</div>
+                )}
+              </CardContent>
+            </Card>
+          </div>
         </div>
       </Card>
     </div>
