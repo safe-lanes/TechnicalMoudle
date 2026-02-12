@@ -24,10 +24,16 @@ export default function MasterDataTableView({ onBack }: { onBack?: () => void })
     queryKey: ['/technical/api/fleet-admin/fleet-components'],
   });
 
-  const filteredData = useMemo(() => {
-    if (!searchQuery) return fleetComponents;
-    const query = searchQuery.toLowerCase();
+  const leafComponents = useMemo(() => {
     return fleetComponents.filter((item) =>
+      item.fleetEquipmentCode && item.fleetEquipmentCode.length === 10
+    );
+  }, [fleetComponents]);
+
+  const filteredData = useMemo(() => {
+    if (!searchQuery) return leafComponents;
+    const query = searchQuery.toLowerCase();
+    return leafComponents.filter((item) =>
       item.fleetEquipmentCode?.toLowerCase().includes(query) ||
       item.fleetEquipmentName?.toLowerCase().includes(query) ||
       item.maker?.toLowerCase().includes(query) ||
@@ -35,7 +41,7 @@ export default function MasterDataTableView({ onBack }: { onBack?: () => void })
       item.model?.toLowerCase().includes(query) ||
       item.modelCode?.toLowerCase().includes(query)
     );
-  }, [fleetComponents, searchQuery]);
+  }, [leafComponents, searchQuery]);
 
   const handleExport = () => {
     if (!filteredData.length) return;
