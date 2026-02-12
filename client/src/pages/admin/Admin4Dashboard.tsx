@@ -410,22 +410,22 @@ export default function Admin4Dashboard({ onSubViewChange }: { onSubViewChange?:
             </CardContent>
           </Card>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
             <Card className="border border-gray-200" data-testid="card-maker-utilization-chart">
-              <CardHeader className="pb-2">
+              <CardHeader className="py-2 px-4">
                 <div className="flex items-center gap-2">
-                  <Building2 className="h-4 w-4 text-blue-600" />
-                  <CardTitle className="text-sm font-medium text-gray-700" data-testid="text-maker-utilization-title">Maker Utilization</CardTitle>
+                  <Building2 className="h-3.5 w-3.5 text-blue-600" />
+                  <CardTitle className="text-xs font-medium text-gray-700" data-testid="text-maker-utilization-title">Maker Utilization</CardTitle>
                 </div>
               </CardHeader>
-              <CardContent className="pt-0 pb-3">
+              <CardContent className="pt-0 pb-2 px-4">
                 {isStatsLoading ? (
-                  <div className="flex items-center justify-center h-36">
-                    <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600"></div>
+                  <div className="flex items-center justify-center h-24">
+                    <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-blue-600"></div>
                   </div>
                 ) : (dashboardStats?.makers?.linked > 0 || dashboardStats?.makers?.unlinked > 0) ? (
                   <div>
-                    <div className="h-40">
+                    <div style={{ height: '120px' }}>
                       <AgCharts options={{
                         data: [
                           { label: 'Used', value: dashboardStats?.makers?.linked || 0 },
@@ -434,45 +434,44 @@ export default function Admin4Dashboard({ onSubViewChange }: { onSubViewChange?:
                         series: [{
                           type: 'donut',
                           angleKey: 'value',
-                          calloutLabelKey: 'label',
                           sectorLabelKey: 'value',
-                          innerRadiusRatio: 0.65,
+                          innerRadiusRatio: 0.6,
+                          outerRadiusRatio: 0.85,
                           fills: ['#3b82f6', '#e5e7eb'],
                           strokes: ['#3b82f6', '#d1d5db'],
-                          calloutLabel: { fontSize: 10 },
-                          sectorLabel: { fontSize: 10 },
+                          calloutLabel: { enabled: false },
+                          sectorLabel: { fontSize: 9 },
                         } as any],
                         legend: { enabled: false },
-                        padding: { top: 2, bottom: 2, left: 2, right: 2 },
+                        padding: { top: 0, bottom: 0, left: 0, right: 0 },
                       } as AgChartOptions} />
                     </div>
-                    <div className="flex items-center justify-center gap-4 text-xs text-gray-600">
-                      <span>Total: <strong>{dashboardStats?.makers?.total || 0}</strong></span>
-                      <span className="text-blue-600">Used: <strong>{dashboardStats?.makers?.linked || 0}</strong></span>
-                      <span className="text-gray-400">Unused: <strong>{dashboardStats?.makers?.unlinked || 0}</strong></span>
+                    <div className="flex items-center justify-center gap-3 text-[10px] text-gray-600 mt-1">
+                      <span className="flex items-center gap-1"><span className="inline-block w-2 h-2 rounded-full bg-blue-500"></span> Used: <strong>{dashboardStats?.makers?.linked || 0}</strong></span>
+                      <span className="flex items-center gap-1"><span className="inline-block w-2 h-2 rounded-full bg-gray-200"></span> Unused: <strong>{dashboardStats?.makers?.unlinked || 0}</strong></span>
                     </div>
                   </div>
                 ) : (
-                  <div className="flex items-center justify-center h-36 text-gray-400 text-sm">No maker data available</div>
+                  <div className="flex items-center justify-center h-24 text-gray-400 text-xs">No data</div>
                 )}
               </CardContent>
             </Card>
 
             <Card className="border border-gray-200" data-testid="card-components-jobs-chart">
-              <CardHeader className="pb-2">
+              <CardHeader className="py-2 px-4">
                 <div className="flex items-center gap-2">
-                  <Wrench className="h-4 w-4 text-orange-600" />
-                  <CardTitle className="text-sm font-medium text-gray-700" data-testid="text-components-jobs-title">Components with Jobs</CardTitle>
+                  <Wrench className="h-3.5 w-3.5 text-orange-600" />
+                  <CardTitle className="text-xs font-medium text-gray-700" data-testid="text-components-jobs-title">Components with Jobs</CardTitle>
                 </div>
               </CardHeader>
-              <CardContent className="pt-0 pb-3">
+              <CardContent className="pt-0 pb-2 px-4">
                 {isStatsLoading ? (
-                  <div className="flex items-center justify-center h-36">
-                    <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-orange-600"></div>
+                  <div className="flex items-center justify-center h-24">
+                    <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-orange-600"></div>
                   </div>
                 ) : (dashboardStats?.components?.withJobs > 0 || dashboardStats?.components?.withoutJobs > 0) ? (
                   <div>
-                    <div className="h-40">
+                    <div style={{ height: '120px' }}>
                       <AgCharts options={{
                         data: [
                           { label: 'Linked', value: dashboardStats?.components?.withJobs || 0 },
@@ -481,45 +480,44 @@ export default function Admin4Dashboard({ onSubViewChange }: { onSubViewChange?:
                         series: [{
                           type: 'donut',
                           angleKey: 'value',
-                          calloutLabelKey: 'label',
                           sectorLabelKey: 'value',
-                          innerRadiusRatio: 0.65,
+                          innerRadiusRatio: 0.6,
+                          outerRadiusRatio: 0.85,
                           fills: ['#f97316', '#e5e7eb'],
                           strokes: ['#f97316', '#d1d5db'],
-                          calloutLabel: { fontSize: 10 },
-                          sectorLabel: { fontSize: 10 },
+                          calloutLabel: { enabled: false },
+                          sectorLabel: { fontSize: 9 },
                         } as any],
                         legend: { enabled: false },
-                        padding: { top: 2, bottom: 2, left: 2, right: 2 },
+                        padding: { top: 0, bottom: 0, left: 0, right: 0 },
                       } as AgChartOptions} />
                     </div>
-                    <div className="flex items-center justify-center gap-4 text-xs text-gray-600">
-                      <span>Total: <strong>{dashboardStats?.components?.total || 0}</strong></span>
-                      <span className="text-orange-600">Linked: <strong>{dashboardStats?.components?.withJobs || 0}</strong></span>
-                      <span className="text-gray-400">Not Linked: <strong>{dashboardStats?.components?.withoutJobs || 0}</strong></span>
+                    <div className="flex items-center justify-center gap-3 text-[10px] text-gray-600 mt-1">
+                      <span className="flex items-center gap-1"><span className="inline-block w-2 h-2 rounded-full bg-orange-500"></span> Linked: <strong>{dashboardStats?.components?.withJobs || 0}</strong></span>
+                      <span className="flex items-center gap-1"><span className="inline-block w-2 h-2 rounded-full bg-gray-200"></span> Not Linked: <strong>{dashboardStats?.components?.withoutJobs || 0}</strong></span>
                     </div>
                   </div>
                 ) : (
-                  <div className="flex items-center justify-center h-36 text-gray-400 text-sm">No component data available</div>
+                  <div className="flex items-center justify-center h-24 text-gray-400 text-xs">No data</div>
                 )}
               </CardContent>
             </Card>
 
             <Card className="border border-gray-200" data-testid="card-components-spares-chart">
-              <CardHeader className="pb-2">
+              <CardHeader className="py-2 px-4">
                 <div className="flex items-center gap-2">
-                  <Package className="h-4 w-4 text-teal-600" />
-                  <CardTitle className="text-sm font-medium text-gray-700" data-testid="text-components-spares-title">Components with Spares</CardTitle>
+                  <Package className="h-3.5 w-3.5 text-teal-600" />
+                  <CardTitle className="text-xs font-medium text-gray-700" data-testid="text-components-spares-title">Components with Spares</CardTitle>
                 </div>
               </CardHeader>
-              <CardContent className="pt-0 pb-3">
+              <CardContent className="pt-0 pb-2 px-4">
                 {isStatsLoading ? (
-                  <div className="flex items-center justify-center h-36">
-                    <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-teal-600"></div>
+                  <div className="flex items-center justify-center h-24">
+                    <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-teal-600"></div>
                   </div>
                 ) : (dashboardStats?.components?.withSpares > 0 || dashboardStats?.components?.withoutSpares > 0) ? (
                   <div>
-                    <div className="h-40">
+                    <div style={{ height: '120px' }}>
                       <AgCharts options={{
                         data: [
                           { label: 'Linked', value: dashboardStats?.components?.withSpares || 0 },
@@ -528,26 +526,25 @@ export default function Admin4Dashboard({ onSubViewChange }: { onSubViewChange?:
                         series: [{
                           type: 'donut',
                           angleKey: 'value',
-                          calloutLabelKey: 'label',
                           sectorLabelKey: 'value',
-                          innerRadiusRatio: 0.65,
+                          innerRadiusRatio: 0.6,
+                          outerRadiusRatio: 0.85,
                           fills: ['#14b8a6', '#e5e7eb'],
                           strokes: ['#14b8a6', '#d1d5db'],
-                          calloutLabel: { fontSize: 10 },
-                          sectorLabel: { fontSize: 10 },
+                          calloutLabel: { enabled: false },
+                          sectorLabel: { fontSize: 9 },
                         } as any],
                         legend: { enabled: false },
-                        padding: { top: 2, bottom: 2, left: 2, right: 2 },
+                        padding: { top: 0, bottom: 0, left: 0, right: 0 },
                       } as AgChartOptions} />
                     </div>
-                    <div className="flex items-center justify-center gap-4 text-xs text-gray-600">
-                      <span>Total: <strong>{dashboardStats?.components?.total || 0}</strong></span>
-                      <span className="text-teal-600">Linked: <strong>{dashboardStats?.components?.withSpares || 0}</strong></span>
-                      <span className="text-gray-400">Not Linked: <strong>{dashboardStats?.components?.withoutSpares || 0}</strong></span>
+                    <div className="flex items-center justify-center gap-3 text-[10px] text-gray-600 mt-1">
+                      <span className="flex items-center gap-1"><span className="inline-block w-2 h-2 rounded-full bg-teal-500"></span> Linked: <strong>{dashboardStats?.components?.withSpares || 0}</strong></span>
+                      <span className="flex items-center gap-1"><span className="inline-block w-2 h-2 rounded-full bg-gray-200"></span> Not Linked: <strong>{dashboardStats?.components?.withoutSpares || 0}</strong></span>
                     </div>
                   </div>
                 ) : (
-                  <div className="flex items-center justify-center h-36 text-gray-400 text-sm">No component data available</div>
+                  <div className="flex items-center justify-center h-24 text-gray-400 text-xs">No data</div>
                 )}
               </CardContent>
             </Card>
