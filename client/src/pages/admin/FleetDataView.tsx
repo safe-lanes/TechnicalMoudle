@@ -1969,7 +1969,7 @@ export default function FleetDataView({ onBack }: { onBack?: () => void }) {
 
                     <div className="space-y-1">
                       <Label className="text-sm text-[#8798ad]">Brief Work Description</Label>
-                      <div className="text-sm font-medium text-gray-900 bg-gray-50 px-3 py-3 rounded-md border border-gray-200 min-h-[60px]" data-testid="field-brief-work-description">
+                      <div className="text-sm font-medium text-gray-900 bg-gray-50 px-3 py-3 rounded-md border border-gray-200 min-h-[60px] whitespace-pre-wrap" data-testid="field-brief-work-description">
                         {selectedJobForDetail.briefWorkDescription || '-'}
                       </div>
                     </div>
