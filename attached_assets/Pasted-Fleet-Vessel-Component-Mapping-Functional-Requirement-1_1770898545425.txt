@@ -1,0 +1,84 @@
+Fleet ↔ Vessel Component Mapping – Functional Requirement
+1. UI Layout & Structure
+The Fleet Vessel Mapping screen should be divided into three sections:
+•	Left Section – Fleet Equipment Tree View
+•	Middle Section – Mapping Status Panel
+•	Right Section – Vessel Component Tree View
+Layout Ratio
+•	Left Section: 40%
+•	Middle Section: 20%
+•	Right Section: 40%
+________________________________________
+2. Data Display Requirements
+Fleet Equipment Tree View (Left Side)
+Each node should display:
+•	Fleet Equipment Code
+•	Fleet Equipment Name
+Vessel Component Tree View (Right Side)
+Each node should display:
+•	Component Code
+•	Component Name
+•	Component Status
+________________________________________
+3. Mapping Logic – Frontend Flow
+Initial Load
+•	Data should load without any automatic linkage.
+•	Mapping must be performed manually or through Auto Match.
+________________________________________
+Auto Match Functionality
+When the Auto Match button is clicked:
+A popup window should open with the following functionality:
+1.	Load all Vessel Components.
+2.	Match vessel components using:
+o	Fleet Equipment Code from Component Table
+o	Fleet Equipment Code from Fleet Equipment Table
+________________________________________
+Auto Match Status Indication
+•	If a match is found:
+o	Status should be marked as Matched
+o	Highlight in Green
+•	If no match is found:
+o	Status should be marked as No Match
+o	Highlight in Red
+________________________________________
+Create Mapping Action
+When the user clicks Create Mapping:
+•	The system should create linkage between:
+o	Fleet Equipment
+o	Vessel Component
+•	After mapping, the system should generate a detailed summary, including:
+o	Successfully Linked Components
+o	Components Not Linked
+o	Reason for Non-Linking (if applicable)
+________________________________________
+4. Vessel Component Eligibility Rules
+Mapping should only be allowed for vessel components where:
+•	IS Parent = No
+If:
+•	IS Parent = Yes
+o	That component must be excluded from Fleet mapping.
+________________________________________
+5. Mapping Visual Behaviour
+Fleet → Vessel Selection
+When a Fleet Equipment is selected:
+•	Linked Vessel Component should be:
+o	Highlighted in Green
+o	Status shown as Matched
+•	Fleet Equipment should also be highlighted.
+________________________________________
+Vessel → Fleet Selection
+When a Vessel Component is selected:
+•	Linked Fleet Equipment should be:
+o	Highlighted in Green
+o	Status shown as Matched
+________________________________________
+6. Backend Mapping Logic
+Component linkage must be stored using:
+•	fleet_equipment_uuid
+•	component_uuid
+These two fields should be used as the primary reference keys for maintaining mapping relationships.
+________________________________________
+7. Validation Rules
+•	Mapping must not allow duplicate linkage.
+•	Only eligible components should be mapped.
+•	Mapping changes must be transaction-safe.
