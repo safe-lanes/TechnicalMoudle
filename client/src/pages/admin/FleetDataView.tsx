@@ -1782,45 +1782,52 @@ export default function FleetDataView({ onBack }: { onBack?: () => void }) {
 
       {/* Job Vessel Mapping Dialog */}
       <Dialog open={isJobVesselMappingDialogOpen} onOpenChange={setIsJobVesselMappingDialogOpen}>
-        <DialogContent className="max-w-md max-h-[80vh]">
-          <DialogHeader className="flex flex-row items-center justify-between pb-3">
-            <DialogTitle className="text-base font-semibold text-gray-800">
-              Vessel Mapping
-            </DialogTitle>
-            <div className="flex items-center gap-2">
-              <Button
-                variant="outline"
-                size="sm"
-                disabled={selectedJobVesselIds.size === 0}
-                className="text-blue-600 border-blue-600 hover:bg-blue-50"
-                data-testid="btn-job-remove-vessel"
-              >
-                Remove Mapping
-              </Button>
-              <Button
-                size="sm"
-                className="bg-blue-600 hover:bg-blue-700 text-white"
-                disabled={selectedJobVesselIds.size === 0}
-                data-testid="btn-job-map-vessel"
-              >
-                Map
-              </Button>
+        <DialogContent className="p-0 gap-0" style={{ width: '40vw', maxWidth: '40vw', maxHeight: '85vh' }}>
+          <div className="bg-gradient-to-r from-cyan-600 to-blue-600 pl-4 pr-10 py-2.5 rounded-t-lg">
+            <div className="flex items-center justify-between gap-2">
+              <div className="flex items-center gap-2">
+                <Ship className="h-3.5 w-3.5 text-white" />
+                <DialogTitle className="text-xs font-semibold text-white">
+                  Vessel Mapping
+                </DialogTitle>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={selectedJobVesselIds.size === 0}
+                  className="h-6 px-2 text-[10px] bg-white/10 border-white/30 text-white hover:bg-white/20"
+                  data-testid="btn-job-remove-vessel"
+                >
+                  Remove
+                </Button>
+                <Button
+                  size="sm"
+                  className="h-6 px-3 text-[10px] bg-white text-blue-700 hover:bg-blue-50"
+                  disabled={selectedJobVesselIds.size === 0}
+                  data-testid="btn-job-map-vessel"
+                >
+                  Map
+                </Button>
+              </div>
             </div>
-          </DialogHeader>
-          <ScrollArea className="h-[300px]">
-            <table className="w-full text-sm">
-              <thead className="sticky top-0 bg-white">
-                <tr className="border-b text-gray-500 text-xs">
-                  <th className="text-left py-2 px-2 font-normal w-12">Select</th>
-                  <th className="text-left py-2 px-2 font-normal">Vessel Code</th>
-                  <th className="text-left py-2 px-2 font-normal">Vessel Name</th>
+          </div>
+          <ScrollArea className="h-[400px]">
+            <table className="w-full text-xs">
+              <thead className="sticky top-0 bg-gray-50 z-10">
+                <tr className="border-b text-gray-500">
+                  <th className="text-left py-1.5 px-2 font-medium w-10">
+                    <span className="text-gray-500 text-[10px]">Select</span>
+                  </th>
+                  <th className="text-left py-1.5 px-2 font-medium">Vessel Code</th>
+                  <th className="text-left py-1.5 px-2 font-medium">Vessel Name</th>
                 </tr>
               </thead>
               <tbody>
                 {relatedVessels.length > 0 ? (
                   relatedVessels.map((vessel, index) => (
-                    <tr key={index} className="border-b last:border-0 hover:bg-gray-50">
-                      <td className="py-2 px-2">
+                    <tr key={index} className="border-b last:border-0 hover:bg-blue-50/50">
+                      <td className="py-1.5 px-2">
                         <Checkbox
                           checked={selectedJobVesselIds.has(vessel.id)}
                           onCheckedChange={(checked) => {
@@ -1831,16 +1838,17 @@ export default function FleetDataView({ onBack }: { onBack?: () => void }) {
                               return newSet;
                             });
                           }}
+                          className="h-3.5 w-3.5"
                           data-testid={`checkbox-job-vessel-${vessel.id}`}
                         />
                       </td>
-                      <td className="py-2 px-2">{vessel.id}</td>
-                      <td className="py-2 px-2">{vessel.name}</td>
+                      <td className="py-1.5 px-2 text-gray-600">{vessel.id}</td>
+                      <td className="py-1.5 px-2 text-gray-600">{vessel.name}</td>
                     </tr>
                   ))
                 ) : (
                   <tr>
-                    <td colSpan={3} className="py-8 text-center text-gray-500">
+                    <td colSpan={3} className="py-6 text-center text-gray-400 text-xs">
                       No vessels linked to this equipment
                     </td>
                   </tr>
@@ -3097,45 +3105,52 @@ export default function FleetDataView({ onBack }: { onBack?: () => void }) {
 
       {/* Spare Vessel Mapping Dialog */}
       <Dialog open={isSpareVesselMappingDialogOpen} onOpenChange={setIsSpareVesselMappingDialogOpen}>
-        <DialogContent className="max-w-md max-h-[80vh]">
-          <DialogHeader className="flex flex-row items-center justify-between pb-3">
-            <DialogTitle className="text-base font-semibold text-gray-800">
-              Vessel Mapping
-            </DialogTitle>
-            <div className="flex items-center gap-2">
-              <Button
-                variant="outline"
-                size="sm"
-                disabled={selectedSpareVesselIds.size === 0}
-                className="text-blue-600 border-blue-600 hover:bg-blue-50"
-                data-testid="btn-spare-remove-vessel"
-              >
-                Remove Mapping
-              </Button>
-              <Button
-                size="sm"
-                className="bg-blue-600 hover:bg-blue-700 text-white"
-                disabled={selectedSpareVesselIds.size === 0}
-                data-testid="btn-spare-map-vessel"
-              >
-                Map
-              </Button>
+        <DialogContent className="p-0 gap-0" style={{ width: '40vw', maxWidth: '40vw', maxHeight: '85vh' }}>
+          <div className="bg-gradient-to-r from-cyan-600 to-blue-600 pl-4 pr-10 py-2.5 rounded-t-lg">
+            <div className="flex items-center justify-between gap-2">
+              <div className="flex items-center gap-2">
+                <Ship className="h-3.5 w-3.5 text-white" />
+                <DialogTitle className="text-xs font-semibold text-white">
+                  Vessel Mapping
+                </DialogTitle>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={selectedSpareVesselIds.size === 0}
+                  className="h-6 px-2 text-[10px] bg-white/10 border-white/30 text-white hover:bg-white/20"
+                  data-testid="btn-spare-remove-vessel"
+                >
+                  Remove
+                </Button>
+                <Button
+                  size="sm"
+                  className="h-6 px-3 text-[10px] bg-white text-blue-700 hover:bg-blue-50"
+                  disabled={selectedSpareVesselIds.size === 0}
+                  data-testid="btn-spare-map-vessel"
+                >
+                  Map
+                </Button>
+              </div>
             </div>
-          </DialogHeader>
-          <ScrollArea className="h-[300px]">
-            <table className="w-full text-sm">
-              <thead className="sticky top-0 bg-white">
-                <tr className="border-b text-gray-500 text-xs">
-                  <th className="text-left py-2 px-2 font-normal w-12">Select</th>
-                  <th className="text-left py-2 px-2 font-normal">Vessel Code</th>
-                  <th className="text-left py-2 px-2 font-normal">Vessel Name</th>
+          </div>
+          <ScrollArea className="h-[400px]">
+            <table className="w-full text-xs">
+              <thead className="sticky top-0 bg-gray-50 z-10">
+                <tr className="border-b text-gray-500">
+                  <th className="text-left py-1.5 px-2 font-medium w-10">
+                    <span className="text-gray-500 text-[10px]">Select</span>
+                  </th>
+                  <th className="text-left py-1.5 px-2 font-medium">Vessel Code</th>
+                  <th className="text-left py-1.5 px-2 font-medium">Vessel Name</th>
                 </tr>
               </thead>
               <tbody>
                 {relatedVessels.length > 0 ? (
                   relatedVessels.map((vessel, index) => (
-                    <tr key={index} className="border-b last:border-0 hover:bg-gray-50">
-                      <td className="py-2 px-2">
+                    <tr key={index} className="border-b last:border-0 hover:bg-blue-50/50">
+                      <td className="py-1.5 px-2">
                         <Checkbox
                           checked={selectedSpareVesselIds.has(vessel.id)}
                           onCheckedChange={(checked) => {
@@ -3146,16 +3161,17 @@ export default function FleetDataView({ onBack }: { onBack?: () => void }) {
                               return newSet;
                             });
                           }}
+                          className="h-3.5 w-3.5"
                           data-testid={`checkbox-spare-vessel-${vessel.id}`}
                         />
                       </td>
-                      <td className="py-2 px-2">{vessel.id}</td>
-                      <td className="py-2 px-2">{vessel.name}</td>
+                      <td className="py-1.5 px-2 text-gray-600">{vessel.id}</td>
+                      <td className="py-1.5 px-2 text-gray-600">{vessel.name}</td>
                     </tr>
                   ))
                 ) : (
                   <tr>
-                    <td colSpan={3} className="py-8 text-center text-gray-500">
+                    <td colSpan={3} className="py-6 text-center text-gray-400 text-xs">
                       No vessels linked to this equipment
                     </td>
                   </tr>

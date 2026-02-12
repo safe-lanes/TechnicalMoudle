@@ -91,6 +91,7 @@ The application employs a modern full-stack architecture with a mobile-first, re
 - Work Order forms are single-page, scrollable designs with numbered subsections.
 - Standardized UI layout includes `p-6` padding for main content, `<div className="space-y-6">` for vertical spacing, consistent header patterns, and specific color codes for action buttons.
 - Menu items have fixed widths, and tabs use a specific background and active state styling.
+- **Delta UI Pattern (Dialog Standard)**: All mapping/selection dialogs use this pattern — gradient header (`bg-gradient-to-r from-cyan-600 to-blue-600`, `pl-4 pr-10 py-2.5`), ship/anchor icons (`h-3.5 w-3.5 text-white`), white title text (`text-xs font-semibold`), compact buttons (`h-6 px-2 text-[10px]`, white solid for primary action, `bg-white/10 border-white/30` for secondary), inline search in header (`h-6 w-28 bg-white/10 border-white/30 text-white`), `p-0 gap-0` on DialogContent, `bg-gray-50 z-10` sticky table headers, `hover:bg-blue-50/50` row hovers, `h-3.5 w-3.5` checkboxes, `text-xs` table body, `text-gray-600` cell text. Standard sizes: 40vw for simple mapping dialogs, 50vw for overview dialogs, 85vh max-height, 400px scroll area.
 
 **Technical Implementations**:
 - **Core PMS Logic**: Distinguishes between immutable Job templates and executable Work Order records with defined lifecycles.
