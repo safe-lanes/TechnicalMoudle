@@ -282,8 +282,6 @@ export default function ShipsSurveysAdmin() {
         setMasterSnapshot(committedData.map(s => ({ ...s })));
         setDraftMasterData(committedData.map(s => ({ ...s })));
         setDeletedDraftIds([]);
-      } else {
-        setViewModes(prev => ({ ...prev, [activeTab]: "view" }));
       }
       setHasUnsavedChanges(false);
       setHasSavedInSession(prev => ({ ...prev, [activeTab]: true }));
