@@ -2093,7 +2093,7 @@ export default function ShipsCertificatesAdmin() {
                       </div>
                     </td>
                   </tr>
-                ) : companyCertificates.length === 0 ? (
+                ) : (companyCertificates.length === 0 && companyOnlyCerts.length === 0) ? (
                   <tr>
                     <td colSpan={7} className="px-6 py-12 text-center">
                       <div className="flex flex-col items-center gap-2">
@@ -2142,6 +2142,47 @@ export default function ShipsCertificatesAdmin() {
                   );
                 })}
                 
+                {/* Company-only certificates (inherited from Company tab) */}
+                {selectedVessels.length > 0 && companyOnlyCerts.map((cert, idx) => {
+                  const companyGroupLabel = companyGroupLabels.find(g => g.key === cert.companyGroup)?.label || "";
+                  const displayCompanyGroup = cert.companyGroup ? `${cert.companyGroup}. ${companyGroupLabel}` : "";
+                  const applicability = getCertificateApplicability(cert.masterId);
+                  const isMixed = applicability === 'mixed';
+                  const isChecked = applicability === true;
+                  
+                  return (
+                    <tr key={`company-inherited-${cert.id}`} className={cn("hover:bg-gray-50 bg-green-50", isMixed && "bg-amber-50")}>
+                      <td className="px-3 py-3 text-center">
+                        <div className="flex flex-col items-center gap-1">
+                          <Checkbox 
+                            checked={isMixed ? false : isChecked}
+                            onCheckedChange={(checked) => {
+                              if (!conflictCheck.hasConflict && viewModes.vessel === "edit") {
+                                handleApplicabilityChange(cert.masterId, !!checked);
+                              }
+                            }}
+                            disabled={conflictCheck.hasConflict || viewModes.vessel !== "edit"}
+                            className={cn(
+                              "border-blue-500 data-[state=checked]:bg-blue-500",
+                              isMixed && "border-amber-500 bg-amber-100"
+                            )}
+                            data-testid={`checkbox-vessel-company-applicable-${cert.id}`}
+                          />
+                          {isMixed && (
+                            <span className="text-xs text-amber-600">Mixed</span>
+                          )}
+                        </div>
+                      </td>
+                      <td className="px-3 py-3 text-sm">{companyCertificates.length + idx + 1}</td>
+                      <td className="px-3 py-3 text-sm font-medium text-blue-600">{cert.masterId && /^CMP-/.test(cert.masterId) ? cert.masterId : "-"}</td>
+                      <td className="px-3 py-3 text-sm">{cert.companyId || "-"}</td>
+                      <td className="px-3 py-3 text-sm">{cert.certificateLabel}</td>
+                      <td className="px-3 py-3 text-sm">{cert.requirementRef}</td>
+                      <td className="px-3 py-3 text-sm">{displayCompanyGroup}</td>
+                    </tr>
+                  );
+                })}
+                
                 {/* Vessel-only certificates (not from Company) */}
                 {selectedVessels.length > 0 && vesselOnlyCerts.map((cert, idx) => {
                   const companyGroupLabel = companyGroupLabels.find(g => g.key === cert.companyGroup)?.label || "";
@@ -2164,7 +2205,7 @@ export default function ShipsCertificatesAdmin() {
                           data-testid={`checkbox-vessel-only-applicable-${cert.id}`}
                         />
                       </td>
-                      <td className="px-3 py-3 text-sm">{companyCertificates.length + idx + 1}</td>
+                      <td className="px-3 py-3 text-sm">{companyCertificates.length + companyOnlyCerts.length + idx + 1}</td>
                       <td className="px-3 py-3 text-sm font-medium text-gray-400">-</td>
                       <td className="px-3 py-3 text-sm text-gray-400">-</td>
                       <td className="px-3 py-3 text-sm">
