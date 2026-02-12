@@ -156,7 +156,7 @@ export default function Admin4Dashboard({ onSubViewChange }: { onSubViewChange?:
 
   return (
     <div className="p-6">
-      <Card className="overflow-visible">
+      <Card>
         <div className="bg-gradient-to-r from-cyan-600 to-blue-600 px-6 py-3">
           <div className="flex items-center justify-between gap-4">
             <div className="flex items-center gap-3">
