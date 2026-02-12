@@ -425,7 +425,7 @@ export default function Admin4Dashboard({ onSubViewChange }: { onSubViewChange?:
                   </div>
                 ) : (dashboardStats?.makers?.linked > 0 || dashboardStats?.makers?.unlinked > 0) ? (
                   <div>
-                    <div style={{ height: '120px' }}>
+                    <div style={{ height: '150px' }}>
                       <AgCharts options={{
                         data: [
                           { label: 'Used', value: dashboardStats?.makers?.linked || 0 },
@@ -435,20 +435,16 @@ export default function Admin4Dashboard({ onSubViewChange }: { onSubViewChange?:
                           type: 'donut',
                           angleKey: 'value',
                           sectorLabelKey: 'value',
-                          innerRadiusRatio: 0.6,
-                          outerRadiusRatio: 0.85,
+                          innerRadiusRatio: 0.55,
+                          outerRadiusRatio: 0.75,
                           fills: ['#3b82f6', '#e5e7eb'],
                           strokes: ['#3b82f6', '#d1d5db'],
                           calloutLabel: { enabled: false },
                           sectorLabel: { fontSize: 9 },
                         } as any],
-                        legend: { enabled: false },
-                        padding: { top: 0, bottom: 0, left: 0, right: 0 },
+                        legend: { enabled: true, position: 'bottom', item: { label: { fontSize: 9 } } },
+                        padding: { top: 5, bottom: 5, left: 5, right: 5 },
                       } as AgChartOptions} />
-                    </div>
-                    <div className="flex items-center justify-center gap-3 text-[10px] text-gray-600 mt-1">
-                      <span className="flex items-center gap-1"><span className="inline-block w-2 h-2 rounded-full bg-blue-500"></span> Used: <strong>{dashboardStats?.makers?.linked || 0}</strong></span>
-                      <span className="flex items-center gap-1"><span className="inline-block w-2 h-2 rounded-full bg-gray-200"></span> Unused: <strong>{dashboardStats?.makers?.unlinked || 0}</strong></span>
                     </div>
                   </div>
                 ) : (
@@ -471,7 +467,7 @@ export default function Admin4Dashboard({ onSubViewChange }: { onSubViewChange?:
                   </div>
                 ) : (dashboardStats?.components?.withJobs > 0 || dashboardStats?.components?.withoutJobs > 0) ? (
                   <div>
-                    <div style={{ height: '120px' }}>
+                    <div style={{ height: '150px' }}>
                       <AgCharts options={{
                         data: [
                           { label: 'Linked', value: dashboardStats?.components?.withJobs || 0 },
@@ -481,20 +477,16 @@ export default function Admin4Dashboard({ onSubViewChange }: { onSubViewChange?:
                           type: 'donut',
                           angleKey: 'value',
                           sectorLabelKey: 'value',
-                          innerRadiusRatio: 0.6,
-                          outerRadiusRatio: 0.85,
+                          innerRadiusRatio: 0.55,
+                          outerRadiusRatio: 0.75,
                           fills: ['#f97316', '#e5e7eb'],
                           strokes: ['#f97316', '#d1d5db'],
                           calloutLabel: { enabled: false },
                           sectorLabel: { fontSize: 9 },
                         } as any],
-                        legend: { enabled: false },
-                        padding: { top: 0, bottom: 0, left: 0, right: 0 },
+                        legend: { enabled: true, position: 'bottom', item: { label: { fontSize: 9 } } },
+                        padding: { top: 5, bottom: 5, left: 5, right: 5 },
                       } as AgChartOptions} />
-                    </div>
-                    <div className="flex items-center justify-center gap-3 text-[10px] text-gray-600 mt-1">
-                      <span className="flex items-center gap-1"><span className="inline-block w-2 h-2 rounded-full bg-orange-500"></span> Linked: <strong>{dashboardStats?.components?.withJobs || 0}</strong></span>
-                      <span className="flex items-center gap-1"><span className="inline-block w-2 h-2 rounded-full bg-gray-200"></span> Not Linked: <strong>{dashboardStats?.components?.withoutJobs || 0}</strong></span>
                     </div>
                   </div>
                 ) : (
@@ -517,7 +509,7 @@ export default function Admin4Dashboard({ onSubViewChange }: { onSubViewChange?:
                   </div>
                 ) : (dashboardStats?.components?.withSpares > 0 || dashboardStats?.components?.withoutSpares > 0) ? (
                   <div>
-                    <div style={{ height: '120px' }}>
+                    <div style={{ height: '150px' }}>
                       <AgCharts options={{
                         data: [
                           { label: 'Linked', value: dashboardStats?.components?.withSpares || 0 },
@@ -527,20 +519,16 @@ export default function Admin4Dashboard({ onSubViewChange }: { onSubViewChange?:
                           type: 'donut',
                           angleKey: 'value',
                           sectorLabelKey: 'value',
-                          innerRadiusRatio: 0.6,
-                          outerRadiusRatio: 0.85,
+                          innerRadiusRatio: 0.55,
+                          outerRadiusRatio: 0.75,
                           fills: ['#14b8a6', '#e5e7eb'],
                           strokes: ['#14b8a6', '#d1d5db'],
                           calloutLabel: { enabled: false },
                           sectorLabel: { fontSize: 9 },
                         } as any],
-                        legend: { enabled: false },
-                        padding: { top: 0, bottom: 0, left: 0, right: 0 },
+                        legend: { enabled: true, position: 'bottom', item: { label: { fontSize: 9 } } },
+                        padding: { top: 5, bottom: 5, left: 5, right: 5 },
                       } as AgChartOptions} />
-                    </div>
-                    <div className="flex items-center justify-center gap-3 text-[10px] text-gray-600 mt-1">
-                      <span className="flex items-center gap-1"><span className="inline-block w-2 h-2 rounded-full bg-teal-500"></span> Linked: <strong>{dashboardStats?.components?.withSpares || 0}</strong></span>
-                      <span className="flex items-center gap-1"><span className="inline-block w-2 h-2 rounded-full bg-gray-200"></span> Not Linked: <strong>{dashboardStats?.components?.withoutSpares || 0}</strong></span>
                     </div>
                   </div>
                 ) : (
