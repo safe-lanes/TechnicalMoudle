@@ -278,27 +278,57 @@ export default function ShipsCertificatesAdmin() {
   // Load saved certificates from database on mount
   useEffect(() => {
     if (savedCertificates && Array.isArray(savedCertificates) && savedCertificates.length > 0) {
-      // Map database fields to component interface (camelCase to our format)
-      const mappedCerts = savedCertificates.map((cert: any) => {
+      const masterRecords: MasterCertificate[] = [];
+      const companyRecords: CompanyCertificate[] = [];
+      const vesselRecords: VesselCertificate[] = [];
+
+      for (const cert of savedCertificates) {
         const masterId = cert.masterId || cert.master_id;
         const storedCompanyId = cert.companyId || cert.company_id;
-        return {
-          id: cert.id,
-          sequence: cert.sequence,
-          masterId,
-          certificateName: cert.certificateName || cert.certificate_name,
-          category: cert.category,
-          group: cert.group,
-          requirementRef: cert.requirementRef || cert.requirement_ref || "",
-          applicableToCompany: cert.applicableToCompany || cert.applicable_to_company || false,
-          certificateLabel: cert.certificateLabel || cert.certificate_label || "",
-          isSystemDefined: cert.isSystemDefined || cert.is_system_defined || false,
-          companyId: storedCompanyId || ("C" + masterId),
-          companyGroup: cert.companyGroup || cert.company_group || "",
-          companySequence: cert.companySequence || cert.company_sequence || undefined,
-        };
-      });
-      setMasterData(mappedCerts);
+        const category = cert.category;
+
+        if (category === 'Company') {
+          companyRecords.push({
+            id: cert.id,
+            masterId: masterId,
+            companyId: storedCompanyId || "",
+            certificateLabel: cert.certificateLabel || cert.certificate_label || "",
+            requirementRef: cert.requirementRef || cert.requirement_ref || "",
+            companyGroup: cert.companyGroup || cert.company_group || "",
+            ranking: "-",
+          });
+        } else if (category === 'Vessel') {
+          vesselRecords.push({
+            id: cert.id,
+            masterId: masterId,
+            companyId: storedCompanyId || "",
+            certificateLabel: cert.certificateLabel || cert.certificate_label || "",
+            requirementRef: cert.requirementRef || cert.requirement_ref || "",
+            companyGroup: cert.companyGroup || cert.company_group || "",
+            applicable: true,
+          });
+        } else {
+          masterRecords.push({
+            id: cert.id,
+            sequence: cert.sequence,
+            masterId,
+            certificateName: cert.certificateName || cert.certificate_name,
+            category,
+            group: cert.group,
+            requirementRef: cert.requirementRef || cert.requirement_ref || "",
+            applicableToCompany: cert.applicableToCompany || cert.applicable_to_company || false,
+            certificateLabel: cert.certificateLabel || cert.certificate_label || "",
+            isSystemDefined: cert.isSystemDefined || cert.is_system_defined || false,
+            companyId: storedCompanyId || ("C" + masterId),
+            companyGroup: cert.companyGroup || cert.company_group || "",
+            companySequence: cert.companySequence || cert.company_sequence || undefined,
+          });
+        }
+      }
+
+      setMasterData(masterRecords);
+      setCompanyOnlyCerts(companyRecords);
+      setVesselOnlyCerts(vesselRecords);
       setHasUnsavedChanges(false);
     }
   }, [savedCertificates]);
@@ -377,40 +407,57 @@ export default function ShipsCertificatesAdmin() {
 
   // Handle save button click
   const handleSave = () => {
-    // Find the highest existing CMP- sequence number from masterData
-    let maxCmpSeq = 0;
+    // Find the highest existing VES- sequence number from both masterData and vesselOnlyCerts
     let maxVesSeq = 0;
     for (const cert of masterData) {
-      const cmpMatch = cert.masterId.match(/^CMP-(\d+)$/);
-      if (cmpMatch) {
-        const seq = parseInt(cmpMatch[1], 10);
-        if (seq > maxCmpSeq) maxCmpSeq = seq;
-      }
       const vesMatch = cert.masterId.match(/^VES-(\d+)$/);
       if (vesMatch) {
         const seq = parseInt(vesMatch[1], 10);
         if (seq > maxVesSeq) maxVesSeq = seq;
       }
     }
-    
-    // Convert company-only certificates to master format with generated IDs
-    // Use incremental counter starting from maxCmpSeq + 1
+    for (const cert of vesselOnlyCerts) {
+      const vesMatch = cert.masterId.match(/^VES-(\d+)$/);
+      if (vesMatch) {
+        const seq = parseInt(vesMatch[1], 10);
+        if (seq > maxVesSeq) maxVesSeq = seq;
+      }
+    }
+
+    // Find the highest existing CMP- sequence number from both masterData and companyOnlyCerts
+    let maxCmpSeq = 0;
+    for (const cert of masterData) {
+      const cmpMatch = cert.masterId.match(/^CMP-(\d+)$/);
+      if (cmpMatch) {
+        const seq = parseInt(cmpMatch[1], 10);
+        if (seq > maxCmpSeq) maxCmpSeq = seq;
+      }
+    }
+    for (const cert of companyOnlyCerts) {
+      const cmpMatch = cert.masterId.match(/^CMP-(\d+)$/);
+      if (cmpMatch) {
+        const seq = parseInt(cmpMatch[1], 10);
+        if (seq > maxCmpSeq) maxCmpSeq = seq;
+      }
+    }
+
+    // Convert new company-only certificates (ones without CMP- masterId) to save format
     let nextCmpSeq = maxCmpSeq + 1;
-    const companyOnlyCertsWithIds: MasterCertificate[] = companyOnlyCerts.map((cert, idx) => {
-      const newMasterId = `CMP-${String(nextCmpSeq++).padStart(3, '0')}`;
-      
+    const companyCertsForSave: MasterCertificate[] = companyOnlyCerts.map((cert, idx) => {
+      const hasCmpId = /^CMP-\d+$/.test(cert.masterId);
+      const newMasterId = hasCmpId ? cert.masterId : `CMP-${String(nextCmpSeq++).padStart(3, '0')}`;
+
       return {
         id: cert.id,
         sequence: masterData.length + idx + 1,
         masterId: newMasterId,
-        certificateName: cert.certificateLabel, // Use label as name
-        category: 'Company', // Mark as company-added
+        certificateName: cert.certificateLabel,
+        category: 'Company',
         group: cert.companyGroup || 'Company Specific',
         requirementRef: cert.requirementRef || '',
-        applicableToCompany: true, // Always true for company-added certs
+        applicableToCompany: true,
         certificateLabel: cert.certificateLabel,
         isActive: true,
-        // Preserve user-entered company fields, default companyId from masterId if empty
         companyId: cert.companyId || newMasterId.replace('CMP-', 'CV'),
         companyGroup: cert.companyGroup || '',
         companySequence: masterData.length + idx + 1,
@@ -418,32 +465,32 @@ export default function ShipsCertificatesAdmin() {
     });
     
     // Convert vessel-only certificates to master format with VES- IDs
-    // Use incremental counter starting from maxVesSeq + 1
     let nextVesSeq = maxVesSeq + 1;
-    const baseSequence = masterData.length + companyOnlyCertsWithIds.length;
+    const baseSequence = masterData.length + companyCertsForSave.length;
     const vesselOnlyCertsWithIds: MasterCertificate[] = vesselOnlyCerts.map((cert, idx) => {
-      const newMasterId = `VES-${String(nextVesSeq++).padStart(3, '0')}`;
+      const hasVesId = /^VES-\d+$/.test(cert.masterId);
+      const newMasterId = hasVesId ? cert.masterId : `VES-${String(nextVesSeq++).padStart(3, '0')}`;
       
       return {
         id: cert.id,
         sequence: baseSequence + idx + 1,
         masterId: newMasterId,
-        certificateName: cert.certificateLabel, // Use label as name
-        category: 'Vessel', // Mark as vessel-added
+        certificateName: cert.certificateLabel,
+        category: 'Vessel',
         group: cert.companyGroup || 'Vessel Specific',
         requirementRef: cert.requirementRef || '',
-        applicableToCompany: true, // Vessel certs show in Vessel tab (filtered by applicability records)
+        applicableToCompany: true,
         certificateLabel: cert.certificateLabel,
         isActive: true,
-        // Vessel certs use VES- prefix for company ID
         companyId: cert.companyId || newMasterId.replace('VES-', 'VV'),
         companyGroup: cert.companyGroup || '',
         companySequence: baseSequence + idx + 1,
       };
     });
     
-    // Combine masterData with company-only and vessel-only certificates
-    const allCertificates = [...masterData, ...companyOnlyCertsWithIds, ...vesselOnlyCertsWithIds];
+    // Send Master data + Company certs + Vessel certs as separate items but in one payload
+    // Company certs have category='Company' — on reload they route to companyOnlyCerts, not masterData
+    const allCertificates = [...masterData, ...companyCertsForSave, ...vesselOnlyCertsWithIds];
     
     // Get selected vessel info (ID and name) for vessel-specific certificate applicability
     const targetVessels = vesselMasterData
@@ -1739,7 +1786,7 @@ export default function ShipsCertificatesAdmin() {
                       <td className="px-3 py-3 text-sm text-center">-</td>
                     )}
                     <td className="px-3 py-3 text-sm">{filteredData.length + idx + 1}</td>
-                    <td className="px-3 py-3 text-sm font-medium text-gray-400">-</td>
+                    <td className="px-3 py-3 text-sm font-medium text-gray-400">{cert.masterId && /^CMP-/.test(cert.masterId) ? cert.masterId : "-"}</td>
                     <td className="px-3 py-3 text-sm">
                       {viewModes.company === "edit" ? (
                         <Input 
