@@ -21,7 +21,7 @@ import {
   FileText,
   Download
 } from "lucide-react";
-import { pdfReportGenerator } from "@/lib/pdfReportGenerator";
+import { pdfReportGenerator, formatReportDateRange } from "@/lib/pdfReportGenerator";
 import ReportPreviewModal, { ReportPreviewData } from "@/components/reports/ReportPreviewModal";
 import { useToast } from "@/hooks/use-toast";
 import { useVessels } from "@/hooks/useVessels";
@@ -201,6 +201,7 @@ const RunningHoursReports: React.FC<RunningHoursReportsProps> = ({ onBack, globa
             title: 'Equipment Utilization Summary',
             subtitle: `Running hours analysis for ${summary.periodDays} days (${summary.periodStart} to ${summary.periodEnd})`,
             vessel: vesselName,
+            dateRange: formatReportDateRange(categoryFilters.dateRange?.from, categoryFilters.dateRange?.to),
             columns,
             data: utilizationData,
             summary: summaryItems
@@ -212,7 +213,8 @@ const RunningHoursReports: React.FC<RunningHoursReportsProps> = ({ onBack, globa
           { 
             title: 'Equipment Utilization Summary', 
             subtitle: `Running hours analysis for ${summary.periodDays} days (${summary.periodStart} to ${summary.periodEnd})`, 
-            vessel: vesselName 
+            vessel: vesselName,
+            dateRange: formatReportDateRange(categoryFilters.dateRange?.from, categoryFilters.dateRange?.to)
           },
           columns,
           utilizationData,
@@ -286,6 +288,7 @@ const RunningHoursReports: React.FC<RunningHoursReportsProps> = ({ onBack, globa
             title: 'Running Hours Anomaly Detection',
             subtitle: `Period: ${summaryData.periodStart || 'N/A'} to ${summaryData.periodEnd || 'N/A'}`,
             vessel: vesselName,
+            dateRange: formatReportDateRange(categoryFilters.dateRange?.from, categoryFilters.dateRange?.to),
             columns,
             data: formattedData,
             summary: summaryItems
@@ -297,7 +300,8 @@ const RunningHoursReports: React.FC<RunningHoursReportsProps> = ({ onBack, globa
           { 
             title: 'Running Hours Anomaly Detection', 
             subtitle: `Period: ${summaryData.periodStart || 'N/A'} to ${summaryData.periodEnd || 'N/A'}`, 
-            vessel: vesselName 
+            vessel: vesselName,
+            dateRange: formatReportDateRange(categoryFilters.dateRange?.from, categoryFilters.dateRange?.to)
           },
           columns,
           formattedData,

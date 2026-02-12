@@ -27,7 +27,7 @@ import {
   Package,
 } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
-import { pdfReportGenerator } from "@/lib/pdfReportGenerator";
+import { pdfReportGenerator, formatReportDateRange } from "@/lib/pdfReportGenerator";
 import { useToast } from "@/hooks/use-toast";
 import { useVessel } from "@/contexts/VesselContext";
 
@@ -478,7 +478,7 @@ const StoresInventoryStatusReport: React.FC<StoresInventoryStatusReportProps> = 
       ];
 
       pdfReportGenerator.generateReport(
-        { title, subtitle },
+        { title, subtitle, dateRange: 'All Time' },
         columns,
         exportData,
         summaryData

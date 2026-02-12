@@ -24,7 +24,7 @@ import {
   XCircle,
 } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
-import { pdfReportGenerator } from "@/lib/pdfReportGenerator";
+import { pdfReportGenerator, formatReportDateRange } from "@/lib/pdfReportGenerator";
 import { useToast } from "@/hooks/use-toast";
 import { useVessel } from "@/contexts/VesselContext";
 
@@ -224,7 +224,7 @@ const CriticalSparesReport: React.FC<CriticalSparesReportProps> = ({ onBack, ves
       ];
 
       pdfReportGenerator.generateReport(
-        { title: 'Critical Spares Report', subtitle: 'Status of Critical and Essential Spare Parts Inventory', vessel: data.reportMeta.vesselName, orientation: 'landscape' },
+        { title: 'Critical Spares Report', subtitle: 'Status of Critical and Essential Spare Parts Inventory', vessel: data.reportMeta.vesselName, orientation: 'landscape', dateRange: 'All Time' },
         columns,
         exportData,
         summaryData

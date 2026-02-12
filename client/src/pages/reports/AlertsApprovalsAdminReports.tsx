@@ -25,7 +25,7 @@ import {
   FileText,
   Download
 } from "lucide-react";
-import { pdfReportGenerator, formatDate } from "@/lib/pdfReportGenerator";
+import { pdfReportGenerator, formatDate, formatReportDateRange } from "@/lib/pdfReportGenerator";
 import ReportPreviewModal, { ReportPreviewData } from "@/components/reports/ReportPreviewModal";
 import { useToast } from "@/hooks/use-toast";
 import { useVessels } from "@/hooks/useVessels";
@@ -248,10 +248,10 @@ const AlertsApprovalsAdminReports: React.FC<AlertsApprovalsAdminReportsProps> = 
         const finalData = alerts.length > 0 ? alerts : [{ type: 'No Alerts', description: 'All systems normal', priority: '-', status: 'OK' }];
 
         if (mode === 'preview') {
-          setPreviewData({ title: 'System Alerts & Notifications', subtitle: 'Active alerts and warnings', vessel: vesselName, columns, data: finalData, summary });
+          setPreviewData({ title: 'System Alerts & Notifications', subtitle: 'Active alerts and warnings', vessel: vesselName, dateRange: formatReportDateRange(categoryFilters.dateRange?.from, categoryFilters.dateRange?.to), columns, data: finalData, summary });
           return;
         }
-        pdfReportGenerator.generateReport({ title: 'System Alerts & Notifications', subtitle: 'Active alerts and warnings', vessel: vesselName }, columns, finalData, summary);
+        pdfReportGenerator.generateReport({ title: 'System Alerts & Notifications', subtitle: 'Active alerts and warnings', vessel: vesselName, dateRange: formatReportDateRange(categoryFilters.dateRange?.from, categoryFilters.dateRange?.to) }, columns, finalData, summary);
         break;
       }
 
@@ -288,10 +288,10 @@ const AlertsApprovalsAdminReports: React.FC<AlertsApprovalsAdminReportsProps> = 
         const finalData = pendingItems.length > 0 ? pendingItems : [{ type: 'None', id: '-', description: 'No pending approvals', status: 'Clear' }];
 
         if (mode === 'preview') {
-          setPreviewData({ title: 'Pending Approvals Report', subtitle: 'Items awaiting approval', vessel: vesselName, columns, data: finalData, summary });
+          setPreviewData({ title: 'Pending Approvals Report', subtitle: 'Items awaiting approval', vessel: vesselName, dateRange: formatReportDateRange(categoryFilters.dateRange?.from, categoryFilters.dateRange?.to), columns, data: finalData, summary });
           return;
         }
-        pdfReportGenerator.generateReport({ title: 'Pending Approvals Report', subtitle: 'Items awaiting approval', vessel: vesselName }, columns, finalData, summary);
+        pdfReportGenerator.generateReport({ title: 'Pending Approvals Report', subtitle: 'Items awaiting approval', vessel: vesselName, dateRange: formatReportDateRange(categoryFilters.dateRange?.from, categoryFilters.dateRange?.to) }, columns, finalData, summary);
         break;
       }
 
@@ -313,10 +313,10 @@ const AlertsApprovalsAdminReports: React.FC<AlertsApprovalsAdminReportsProps> = 
         const data = [{ item: 'Report Generated', details: formatDate(new Date().toISOString()), status: 'OK' }];
 
         if (mode === 'preview') {
-          setPreviewData({ title: reportTitles[reportId], subtitle: 'System administration report', vessel: vesselName, columns, data });
+          setPreviewData({ title: reportTitles[reportId], subtitle: 'System administration report', vessel: vesselName, dateRange: formatReportDateRange(categoryFilters.dateRange?.from, categoryFilters.dateRange?.to), columns, data });
           return;
         }
-        pdfReportGenerator.generateReport({ title: reportTitles[reportId], subtitle: 'System administration report', vessel: vesselName }, columns, data);
+        pdfReportGenerator.generateReport({ title: reportTitles[reportId], subtitle: 'System administration report', vessel: vesselName, dateRange: formatReportDateRange(categoryFilters.dateRange?.from, categoryFilters.dateRange?.to) }, columns, data);
         break;
       }
 
@@ -353,10 +353,10 @@ const AlertsApprovalsAdminReports: React.FC<AlertsApprovalsAdminReportsProps> = 
         const finalData = overdueItems.length > 0 ? overdueItems : [{ type: 'None', id: '-', description: 'No overdue items', daysOverdue: 0, priority: '-' }];
 
         if (mode === 'preview') {
-          setPreviewData({ title: 'Overdue Items Alert Report', subtitle: 'All overdue items requiring attention', vessel: vesselName, columns, data: finalData, summary });
+          setPreviewData({ title: 'Overdue Items Alert Report', subtitle: 'All overdue items requiring attention', vessel: vesselName, dateRange: formatReportDateRange(categoryFilters.dateRange?.from, categoryFilters.dateRange?.to), columns, data: finalData, summary });
           return;
         }
-        pdfReportGenerator.generateReport({ title: 'Overdue Items Alert Report', subtitle: 'All overdue items requiring attention', vessel: vesselName }, columns, finalData, summary);
+        pdfReportGenerator.generateReport({ title: 'Overdue Items Alert Report', subtitle: 'All overdue items requiring attention', vessel: vesselName, dateRange: formatReportDateRange(categoryFilters.dateRange?.from, categoryFilters.dateRange?.to) }, columns, finalData, summary);
         break;
       }
 

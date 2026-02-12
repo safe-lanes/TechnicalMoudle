@@ -25,7 +25,7 @@ import {
   FlaskConical,
 } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
-import { pdfReportGenerator } from "@/lib/pdfReportGenerator";
+import { pdfReportGenerator, formatReportDateRange } from "@/lib/pdfReportGenerator";
 import { useToast } from "@/hooks/use-toast";
 import { useVessel } from "@/contexts/VesselContext";
 import { format } from "date-fns";
@@ -360,7 +360,7 @@ const ChemicalsExpiryReport: React.FC<ChemicalsExpiryReportProps> = ({ onBack, v
       ];
 
       pdfReportGenerator.generateReport(
-        { title: 'Chemicals Inventory & Expiry Report', subtitle: 'Expiry tracking & SDS compliance' },
+        { title: 'Chemicals Inventory & Expiry Report', subtitle: 'Expiry tracking & SDS compliance', dateRange: 'All Time' },
         columns,
         exportData,
         summaryData

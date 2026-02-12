@@ -21,7 +21,7 @@ import {
   FileText,
   Download
 } from "lucide-react";
-import { pdfReportGenerator, formatDate } from "@/lib/pdfReportGenerator";
+import { pdfReportGenerator, formatDate, formatReportDateRange } from "@/lib/pdfReportGenerator";
 import ReportPreviewModal, { ReportPreviewData } from "@/components/reports/ReportPreviewModal";
 import { useToast } from "@/hooks/use-toast";
 import { useVessels } from "@/hooks/useVessels";
@@ -227,11 +227,11 @@ const StoresReports: React.FC<StoresReportsProps> = ({ onBack, globalFilters }) 
         ];
 
         if (mode === 'preview') {
-          setPreviewData({ title: 'Stores Inventory Status', subtitle: 'Complete inventory listing', vessel: vesselName, columns, data, summary });
+          setPreviewData({ title: 'Stores Inventory Status', subtitle: 'Complete inventory listing', vessel: vesselName, dateRange: formatReportDateRange(categoryFilters.dateRange?.from, categoryFilters.dateRange?.to), columns, data, summary });
           return;
         }
         pdfReportGenerator.generateReport(
-          { title: 'Stores Inventory Status', subtitle: 'Complete inventory listing', vessel: vesselName },
+          { title: 'Stores Inventory Status', subtitle: 'Complete inventory listing', vessel: vesselName, dateRange: formatReportDateRange(categoryFilters.dateRange?.from, categoryFilters.dateRange?.to) },
           columns, data, summary
         );
         break;
@@ -268,11 +268,11 @@ const StoresReports: React.FC<StoresReportsProps> = ({ onBack, globalFilters }) 
         ];
 
         if (mode === 'preview') {
-          setPreviewData({ title: 'Lubricants & Oil Analysis', subtitle: 'Stock levels and status', vessel: vesselName, columns, data, summary });
+          setPreviewData({ title: 'Lubricants & Oil Analysis', subtitle: 'Stock levels and status', vessel: vesselName, dateRange: formatReportDateRange(categoryFilters.dateRange?.from, categoryFilters.dateRange?.to), columns, data, summary });
           return;
         }
         pdfReportGenerator.generateReport(
-          { title: 'Lubricants & Oil Analysis', subtitle: 'Stock levels and status', vessel: vesselName },
+          { title: 'Lubricants & Oil Analysis', subtitle: 'Stock levels and status', vessel: vesselName, dateRange: formatReportDateRange(categoryFilters.dateRange?.from, categoryFilters.dateRange?.to) },
           columns, data, summary
         );
         break;
@@ -331,11 +331,11 @@ const StoresReports: React.FC<StoresReportsProps> = ({ onBack, globalFilters }) 
         ];
 
         if (mode === 'preview') {
-          setPreviewData({ title: 'Chemicals Inventory & Expiry', subtitle: 'Chemical stock tracking with expiry & SDS compliance', vessel: vesselName, columns, data, summary });
+          setPreviewData({ title: 'Chemicals Inventory & Expiry', subtitle: 'Chemical stock tracking with expiry & SDS compliance', vessel: vesselName, dateRange: formatReportDateRange(categoryFilters.dateRange?.from, categoryFilters.dateRange?.to), columns, data, summary });
           return;
         }
         pdfReportGenerator.generateReport(
-          { title: 'Chemicals Inventory & Expiry', subtitle: 'Chemical stock tracking with expiry & SDS compliance', vessel: vesselName },
+          { title: 'Chemicals Inventory & Expiry', subtitle: 'Chemical stock tracking with expiry & SDS compliance', vessel: vesselName, dateRange: formatReportDateRange(categoryFilters.dateRange?.from, categoryFilters.dateRange?.to) },
           columns, data, summary
         );
         break;
@@ -391,11 +391,11 @@ const StoresReports: React.FC<StoresReportsProps> = ({ onBack, globalFilters }) 
         ];
 
         if (mode === 'preview') {
-          setPreviewData({ title: 'Low Stock Alert Report', subtitle: 'Items requiring reorder', vessel: vesselName, columns, data, summary });
+          setPreviewData({ title: 'Low Stock Alert Report', subtitle: 'Items requiring reorder', vessel: vesselName, dateRange: formatReportDateRange(categoryFilters.dateRange?.from, categoryFilters.dateRange?.to), columns, data, summary });
           return;
         }
         pdfReportGenerator.generateReport(
-          { title: 'Low Stock Alert Report', subtitle: 'Items requiring reorder', vessel: vesselName, orientation: 'landscape' },
+          { title: 'Low Stock Alert Report', subtitle: 'Items requiring reorder', vessel: vesselName, orientation: 'landscape', dateRange: formatReportDateRange(categoryFilters.dateRange?.from, categoryFilters.dateRange?.to) },
           columns, data, summary
         );
         break;
@@ -432,7 +432,7 @@ const StoresReports: React.FC<StoresReportsProps> = ({ onBack, globalFilters }) 
             { label: 'Total Consumption', value: summaryInfo.totalConsumed || 0 },
             { label: 'Categories', value: (freshData.categoryBreakdown || []).length },
           ];
-          setPreviewData({ title: 'Consumption Pattern Analysis', subtitle: 'Stores consumption patterns and trends', vessel: vesselName, columns, data, summary });
+          setPreviewData({ title: 'Consumption Pattern Analysis', subtitle: 'Stores consumption patterns and trends', vessel: vesselName, dateRange: formatReportDateRange(categoryFilters.dateRange?.from, categoryFilters.dateRange?.to), columns, data, summary });
           return;
         }
 

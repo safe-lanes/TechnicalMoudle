@@ -25,6 +25,7 @@ export interface ReportPreviewData {
   title: string;
   subtitle?: string;
   vessel?: string;
+  dateRange?: string;
   columns: ReportColumn[];
   data: Record<string, any>[];
   summary?: ReportSummaryItem[];
@@ -53,6 +54,9 @@ const ReportPreviewModal: React.FC<ReportPreviewModalProps> = ({ open, onClose, 
               )}
               {vessel && (
                 <p className="text-xs text-muted-foreground mt-1">Vessel: {vessel}</p>
+              )}
+              {reportData.dateRange && (
+                <p className="text-xs text-muted-foreground mt-1" data-testid="text-report-date-range">Report Period: {reportData.dateRange}</p>
               )}
             </div>
             <Badge variant="secondary" className="flex-shrink-0">

@@ -2,6 +2,14 @@ import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { format } from 'date-fns';
 
+export function formatReportDateRange(dateFrom?: Date | null, dateTo?: Date | null): string {
+  if (!dateFrom && !dateTo) return 'All Time';
+  if (dateFrom && dateTo) return `${format(dateFrom, 'dd MMM yyyy')} - ${format(dateTo, 'dd MMM yyyy')}`;
+  if (dateFrom) return `From ${format(dateFrom, 'dd MMM yyyy')}`;
+  if (dateTo) return `Up to ${format(dateTo, 'dd MMM yyyy')}`;
+  return 'All Time';
+}
+
 // ═══════════════════════════════════════════════════════════════
 // PROFESSIONAL MARITIME THEME - STANDARD COLOR PALETTE
 // Matches the PMS application UI theme and Excel reports
@@ -40,8 +48,9 @@ export interface PDFReportConfig {
   generatedBy?: string;
   orientation?: 'portrait' | 'landscape';
   pageSize?: 'a4' | 'a3' | 'letter';
-  headerColor?: [number, number, number]; // RGB color for header
-  colorScheme?: 'blue' | 'red'; // For table headers
+  headerColor?: [number, number, number];
+  colorScheme?: 'blue' | 'red';
+  dateRange?: string;
 }
 
 export interface TableColumn {
@@ -127,7 +136,7 @@ class PDFReportGenerator {
 
     this.addHeader(config, pageWidth, margin);
 
-    let startY = 32;
+    let startY = config.dateRange ? (config.subtitle ? 37 : 31) : 32;
 
     if (summaryData && summaryData.length > 0) {
       startY = this.addSummarySection(summaryData, startY, margin);
@@ -151,21 +160,35 @@ class PDFReportGenerator {
     this.doc.setFont('helvetica', 'bold');
     this.doc.text(config.title, margin, 15);
 
+    let currentY = 15;
+
     if (config.subtitle) {
       this.doc.setFontSize(11);
       this.doc.setFont('helvetica', 'normal');
       this.doc.setTextColor(...PDF_COLORS.textDark);
       this.doc.text(config.subtitle, margin, 22);
+      currentY = 22;
     }
 
+    if (config.dateRange) {
+      const dateRangeY = config.subtitle ? 28 : 22;
+      this.doc.setFontSize(9);
+      this.doc.setFont('helvetica', 'bold');
+      this.doc.setTextColor(...PDF_COLORS.textLight);
+      this.doc.text(`Report Period: ${config.dateRange}`, margin, dateRangeY);
+      currentY = dateRangeY;
+    }
+
+    const lineY = currentY + 3;
     this.doc.setDrawColor(headerColor[0], headerColor[1], headerColor[2]);
     this.doc.setLineWidth(0.8);
-    this.doc.line(margin, config.subtitle ? 25 : 19, pageWidth - margin, config.subtitle ? 25 : 19);
+    this.doc.line(margin, lineY, pageWidth - margin, lineY);
 
     this.doc.setFontSize(9);
     this.doc.setFont('helvetica', 'normal');
     this.doc.setTextColor(...PDF_COLORS.textDark);
     this.doc.text(`Vessel: ${config.vessel || 'All Vessels'}`, pageWidth - margin, 15, { align: 'right' });
+    this.doc.text(`Generated: ${format(new Date(), 'dd MMM yyyy HH:mm')}`, pageWidth - margin, 20, { align: 'right' });
   }
 
   private addSummarySection(
@@ -379,6 +402,11 @@ class PDFReportGenerator {
       this.doc.text(config.subtitle, margin, 24);
     }
 
+    if (config.dateRange) {
+      this.doc.setFontSize(9);
+      this.doc.text(`Report Period: ${config.dateRange}`, margin, 31);
+    }
+
     this.doc.setFontSize(9);
     this.doc.setFont('helvetica', 'normal');
     const rightInfo = [
@@ -393,7 +421,7 @@ class PDFReportGenerator {
       yPos += 5;
     });
 
-    let startY = 42;
+    let startY = config.dateRange ? 47 : 42;
 
     // Summary section - simplified, no severity-based colors
     // Only highlight critical equipment count
@@ -866,6 +894,11 @@ class PDFReportGenerator {
       this.doc.text(config.subtitle, margin, 20);
     }
 
+    if (config.dateRange) {
+      this.doc.setFontSize(9);
+      this.doc.text(`Report Period: ${config.dateRange}`, margin, 26);
+    }
+
     // Right side info
     this.doc.setFontSize(9);
     this.doc.setFont('helvetica', 'normal');
@@ -881,7 +914,7 @@ class PDFReportGenerator {
       yPos += 5;
     });
 
-    let startY = 38;
+    let startY = config.dateRange ? 43 : 38;
 
     // SUMMARY SECTION
     if (summaryData && summaryData.length > 0) {
@@ -1098,6 +1131,11 @@ class PDFReportGenerator {
       this.doc.text(config.subtitle, margin, 20);
     }
 
+    if (config.dateRange) {
+      this.doc.setFontSize(9);
+      this.doc.text(`Report Period: ${config.dateRange}`, margin, 26);
+    }
+
     // Right side info
     this.doc.setFontSize(9);
     this.doc.setFont('helvetica', 'normal');
@@ -1113,7 +1151,7 @@ class PDFReportGenerator {
       yPos += 5;
     });
 
-    let startY = 38;
+    let startY = config.dateRange ? 43 : 38;
 
     // SUMMARY SECTION
     if (summaryData && summaryData.length > 0) {

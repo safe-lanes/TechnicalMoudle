@@ -12,7 +12,7 @@ import {
   Loader2,
   Download
 } from 'lucide-react';
-import { pdfReportGenerator } from "@/lib/pdfReportGenerator";
+import { pdfReportGenerator, formatReportDateRange } from "@/lib/pdfReportGenerator";
 import { useToast } from "@/hooks/use-toast";
 import { useVessels } from "@/hooks/useVessels";
 import { useVessel } from "@/contexts/VesselContext";
@@ -167,7 +167,7 @@ const IhmReports: React.FC<IhmReportsProps> = ({ onBack, globalFilters }) => {
         ];
 
         pdfReportGenerator.generateReport(
-          { title: 'IHM Inventory Status Report', subtitle: 'Confirmed hazardous materials present on board', vessel: vesselName },
+          { title: 'IHM Inventory Status Report', subtitle: 'Confirmed hazardous materials present on board', vessel: vesselName, dateRange: formatReportDateRange(categoryFilters.dateRange?.from, categoryFilters.dateRange?.to) },
           columns,
           data,
           summary

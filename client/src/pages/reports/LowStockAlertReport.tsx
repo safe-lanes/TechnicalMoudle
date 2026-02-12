@@ -36,7 +36,7 @@ import {
   Eye,
 } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
-import { pdfReportGenerator } from "@/lib/pdfReportGenerator";
+import { pdfReportGenerator, formatReportDateRange } from "@/lib/pdfReportGenerator";
 import { useToast } from "@/hooks/use-toast";
 import { useVessel } from "@/contexts/VesselContext";
 import { format } from "date-fns";
@@ -387,6 +387,7 @@ const LowStockAlertReport: React.FC<LowStockAlertReportProps> = ({ onBack, vesse
           subtitle: `Vessel: ${vesselName || 'Unknown'} | Generated: ${format(new Date(), 'dd MMM yyyy HH:mm')}`,
           vessel: vesselName || 'Unknown',
           orientation: 'landscape',
+          dateRange: 'All Time',
         },
         columns,
         exportData,

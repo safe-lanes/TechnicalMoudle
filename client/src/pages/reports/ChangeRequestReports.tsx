@@ -23,7 +23,7 @@ import {
   Send,
   CornerDownLeft
 } from "lucide-react";
-import { pdfReportGenerator, formatDate } from "@/lib/pdfReportGenerator";
+import { pdfReportGenerator, formatDate, formatReportDateRange } from "@/lib/pdfReportGenerator";
 import ReportPreviewModal, { ReportPreviewData } from "@/components/reports/ReportPreviewModal";
 import { useToast } from "@/hooks/use-toast";
 import { useVessels } from "@/hooks/useVessels";
@@ -266,6 +266,7 @@ const ChangeRequestReports: React.FC<ChangeRequestReportsProps> = ({ onBack, glo
             title: 'Change Requests Status & Tracking',
             subtitle: `Comprehensive tracking report - ${reportData.requests.length} requests`,
             vessel: vesselName,
+            dateRange: formatReportDateRange(categoryFilters.dateRange?.from, categoryFilters.dateRange?.to),
             columns,
             data: finalData,
             summary: summaryItems
@@ -278,7 +279,8 @@ const ChangeRequestReports: React.FC<ChangeRequestReportsProps> = ({ onBack, glo
             title: 'Change Requests Status & Tracking',
             subtitle: `Comprehensive tracking report - ${reportData.requests.length} requests`,
             vessel: vesselName,
-            orientation: 'landscape'
+            orientation: 'landscape',
+            dateRange: formatReportDateRange(categoryFilters.dateRange?.from, categoryFilters.dateRange?.to)
           },
           columns,
           finalData,
@@ -314,6 +316,7 @@ const ChangeRequestReports: React.FC<ChangeRequestReportsProps> = ({ onBack, glo
             title: 'Change Request Analytics',
             subtitle: 'Statistical analysis and trends',
             vessel: vesselName,
+            dateRange: formatReportDateRange(categoryFilters.dateRange?.from, categoryFilters.dateRange?.to),
             columns,
             data
           });
@@ -321,7 +324,7 @@ const ChangeRequestReports: React.FC<ChangeRequestReportsProps> = ({ onBack, glo
         }
 
         pdfReportGenerator.generateReport(
-          { title: 'Change Request Analytics', subtitle: 'Statistical analysis and trends', vessel: vesselName },
+          { title: 'Change Request Analytics', subtitle: 'Statistical analysis and trends', vessel: vesselName, dateRange: formatReportDateRange(categoryFilters.dateRange?.from, categoryFilters.dateRange?.to) },
           columns,
           data
         );

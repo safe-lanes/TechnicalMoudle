@@ -24,7 +24,7 @@ import {
   Download,
   Activity
 } from "lucide-react";
-import { pdfReportGenerator, fetchReportData, formatDate } from "@/lib/pdfReportGenerator";
+import { pdfReportGenerator, fetchReportData, formatDate, formatReportDateRange } from "@/lib/pdfReportGenerator";
 import { useToast } from "@/hooks/use-toast";
 import { useVessels } from "@/hooks/useVessels";
 import { useVessel } from "@/contexts/VesselContext";
@@ -388,10 +388,10 @@ const MaintenanceReports: React.FC<MaintenanceReportsProps> = ({ onBack, globalF
           { label: 'Critical Priority', value: criticalPriorityCount }
         ];
 
-        if (mode === 'preview') return { title: 'Due Jobs (7 Days)', subtitle: 'Work orders due in the next 7 days (including overdue)', vessel: vesselName, columns, data, summary } as ReportPreviewData;
+        if (mode === 'preview') return { title: 'Due Jobs (7 Days)', subtitle: 'Work orders due in the next 7 days (including overdue)', vessel: vesselName, dateRange: formatReportDateRange(categoryFilters.dateRange?.from, categoryFilters.dateRange?.to), columns, data, summary } as ReportPreviewData;
 
         pdfReportGenerator.generateReport(
-          { title: 'Due Jobs (7 Days)', subtitle: 'Work orders due in the next 7 days (including overdue)', vessel: vesselName },
+          { title: 'Due Jobs (7 Days)', subtitle: 'Work orders due in the next 7 days (including overdue)', vessel: vesselName, dateRange: formatReportDateRange(categoryFilters.dateRange?.from, categoryFilters.dateRange?.to) },
           columns,
           data,
           summary
@@ -515,14 +515,15 @@ const MaintenanceReports: React.FC<MaintenanceReportsProps> = ({ onBack, globalF
           { label: 'Calendar/RH', value: `${calendarOverdueCount}/${rhOverdueCount}` }
         ];
 
-        if (mode === 'preview') return { title: 'OVERDUE JOBS REPORT', subtitle: 'Work orders past grace period (7 days calendar / 168 RH overdue)', vessel: vesselName, columns, data, summary } as ReportPreviewData;
+        if (mode === 'preview') return { title: 'OVERDUE JOBS REPORT', subtitle: 'Work orders past grace period (7 days calendar / 168 RH overdue)', vessel: vesselName, dateRange: formatReportDateRange(categoryFilters.dateRange?.from, categoryFilters.dateRange?.to), columns, data, summary } as ReportPreviewData;
 
         // Use specialized overdue report generator
         pdfReportGenerator.generateOverdueJobsReport(
           { 
             title: 'OVERDUE JOBS REPORT', 
             subtitle: 'Work orders past grace period (7 days calendar / 168 RH overdue)', 
-            vessel: vesselName 
+            vessel: vesselName,
+            dateRange: formatReportDateRange(categoryFilters.dateRange?.from, categoryFilters.dateRange?.to)
           },
           columns,
           data,
@@ -696,7 +697,7 @@ const MaintenanceReports: React.FC<MaintenanceReportsProps> = ({ onBack, globalF
             { label: 'Total Jobs', value: data.length },
             { label: 'Total Man-Hours', value: totalManHours.toFixed(1) }
           ];
-          return { title: 'COMPLETED JOBS REGISTER', subtitle: `Vessel: ${vesselName}`, vessel: vesselName, columns: completedColumns, data, summary: completedSummary } as ReportPreviewData;
+          return { title: 'COMPLETED JOBS REGISTER', subtitle: `Vessel: ${vesselName}`, vessel: vesselName, dateRange: formatReportDateRange(categoryFilters.dateRange?.from, categoryFilters.dateRange?.to), columns: completedColumns, data, summary: completedSummary } as ReportPreviewData;
         }
 
         pdfReportGenerator.generateCompletedJobsRegisterReport(
@@ -849,10 +850,10 @@ const MaintenanceReports: React.FC<MaintenanceReportsProps> = ({ onBack, globalF
           { label: 'Cumulative Overdue', value: totalOverdue }
         ];
 
-        if (mode === 'preview') return { title: 'Monthly Maintenance Summary', subtitle: `Performance metrics for ${periodLabel}`, vessel: vesselName, columns, data, summary } as ReportPreviewData;
+        if (mode === 'preview') return { title: 'Monthly Maintenance Summary', subtitle: `Performance metrics for ${periodLabel}`, vessel: vesselName, dateRange: periodLabel, columns, data, summary } as ReportPreviewData;
 
         pdfReportGenerator.generateReport(
-          { title: 'Monthly Maintenance Summary', subtitle: `Performance metrics for ${periodLabel}`, vessel: vesselName },
+          { title: 'Monthly Maintenance Summary', subtitle: `Performance metrics for ${periodLabel}`, vessel: vesselName, dateRange: periodLabel },
           columns,
           data,
           summary
@@ -903,14 +904,15 @@ const MaintenanceReports: React.FC<MaintenanceReportsProps> = ({ onBack, globalF
           { label: 'Due Soon (7 days)', value: metadata.equipmentDueSoon }
         ];
 
-        if (mode === 'preview') return { title: 'CRITICAL EQUIPMENT STATUS REPORT', subtitle: 'SOLAS-critical and class-critical equipment', vessel: vesselName, columns, data, summary } as ReportPreviewData;
+        if (mode === 'preview') return { title: 'CRITICAL EQUIPMENT STATUS REPORT', subtitle: 'SOLAS-critical and class-critical equipment', vessel: vesselName, dateRange: formatReportDateRange(categoryFilters.dateRange?.from, categoryFilters.dateRange?.to), columns, data, summary } as ReportPreviewData;
 
         // Use specialized critical equipment report generator
         pdfReportGenerator.generateCriticalEquipmentReport(
           { 
             title: 'CRITICAL EQUIPMENT STATUS REPORT', 
             subtitle: 'SOLAS-critical and class-critical equipment', 
-            vessel: vesselName 
+            vessel: vesselName,
+            dateRange: formatReportDateRange(categoryFilters.dateRange?.from, categoryFilters.dateRange?.to)
           },
           columns,
           data,
@@ -960,14 +962,15 @@ const MaintenanceReports: React.FC<MaintenanceReportsProps> = ({ onBack, globalF
           { label: 'Date Range', value: `${startDate} to ${endDate}` }
         ];
 
-        if (mode === 'preview') return { title: 'UNPLANNED/BREAKDOWN JOBS REPORT', subtitle: 'Analysis of breakdown maintenance and unplanned work', vessel: vesselName, columns, data: unplannedData, summary } as ReportPreviewData;
+        if (mode === 'preview') return { title: 'UNPLANNED/BREAKDOWN JOBS REPORT', subtitle: 'Analysis of breakdown maintenance and unplanned work', vessel: vesselName, dateRange: formatReportDateRange(globalFilters?.dateRange?.from, globalFilters?.dateRange?.to), columns, data: unplannedData, summary } as ReportPreviewData;
 
         // Use specialized unplanned breakdown report generator (same styling as Report 1.5)
         pdfReportGenerator.generateUnplannedBreakdownReport(
           { 
             title: 'UNPLANNED/BREAKDOWN JOBS REPORT', 
             subtitle: 'Analysis of breakdown maintenance and unplanned work', 
-            vessel: vesselName 
+            vessel: vesselName,
+            dateRange: formatReportDateRange(globalFilters?.dateRange?.from, globalFilters?.dateRange?.to)
           },
           columns,
           unplannedData,
@@ -1024,14 +1027,15 @@ const MaintenanceReports: React.FC<MaintenanceReportsProps> = ({ onBack, globalF
           { label: 'Total Postponed Jobs', value: data.length }
         ];
 
-        if (mode === 'preview') return { title: 'Job Postponement Log Report', subtitle: 'Audit trail of all postponed jobs with approvals and justifications', vessel: vesselName, columns, data, summary } as ReportPreviewData;
+        if (mode === 'preview') return { title: 'Job Postponement Log Report', subtitle: 'Audit trail of all postponed jobs with approvals and justifications', vessel: vesselName, dateRange: formatReportDateRange(categoryFilters.dateRange?.from, categoryFilters.dateRange?.to), columns, data, summary } as ReportPreviewData;
 
         pdfReportGenerator.generateReport(
           { 
             title: 'Job Postponement Log Report', 
             subtitle: 'Audit trail of all postponed jobs with approvals and justifications', 
             vessel: vesselName,
-            orientation: 'landscape'
+            orientation: 'landscape',
+            dateRange: formatReportDateRange(categoryFilters.dateRange?.from, categoryFilters.dateRange?.to)
           },
           columns,
           data,
@@ -1071,10 +1075,10 @@ const MaintenanceReports: React.FC<MaintenanceReportsProps> = ({ onBack, globalF
           overdue: stats.overdue
         }));
 
-        if (mode === 'preview') return { title: 'Work Priority Performance', subtitle: 'Performance analysis by priority levels', vessel: vesselName, columns, data } as ReportPreviewData;
+        if (mode === 'preview') return { title: 'Work Priority Performance', subtitle: 'Performance analysis by priority levels', vessel: vesselName, dateRange: formatReportDateRange(categoryFilters.dateRange?.from, categoryFilters.dateRange?.to), columns, data } as ReportPreviewData;
 
         pdfReportGenerator.generateReport(
-          { title: 'Work Priority Performance', subtitle: 'Performance analysis by priority levels', vessel: vesselName },
+          { title: 'Work Priority Performance', subtitle: 'Performance analysis by priority levels', vessel: vesselName, dateRange: formatReportDateRange(categoryFilters.dateRange?.from, categoryFilters.dateRange?.to) },
           columns,
           data
         );
@@ -1104,10 +1108,10 @@ const MaintenanceReports: React.FC<MaintenanceReportsProps> = ({ onBack, globalF
             };
           });
 
-        if (mode === 'preview') return { title: 'Man-Hours Analysis', subtitle: 'Planned vs Actual hours comparison', vessel: vesselName, columns, data } as ReportPreviewData;
+        if (mode === 'preview') return { title: 'Man-Hours Analysis', subtitle: 'Planned vs Actual hours comparison', vessel: vesselName, dateRange: formatReportDateRange(categoryFilters.dateRange?.from, categoryFilters.dateRange?.to), columns, data } as ReportPreviewData;
 
         pdfReportGenerator.generateReport(
-          { title: 'Man-Hours Analysis', subtitle: 'Planned vs Actual hours comparison', vessel: vesselName },
+          { title: 'Man-Hours Analysis', subtitle: 'Planned vs Actual hours comparison', vessel: vesselName, dateRange: formatReportDateRange(categoryFilters.dateRange?.from, categoryFilters.dateRange?.to) },
           columns,
           data
         );
@@ -1221,10 +1225,10 @@ const MaintenanceReports: React.FC<MaintenanceReportsProps> = ({ onBack, globalF
           { label: 'Total Manhours', value: totalManhours.toFixed(1) }
         ];
 
-        if (mode === 'preview') return { title: 'Crew Workload Distribution', subtitle: 'Task distribution across crew ranks and assignments', vessel: vesselName, columns, data, summary } as ReportPreviewData;
+        if (mode === 'preview') return { title: 'Crew Workload Distribution', subtitle: 'Task distribution across crew ranks and assignments', vessel: vesselName, dateRange: formatReportDateRange(categoryFilters.dateRange?.from, categoryFilters.dateRange?.to), columns, data, summary } as ReportPreviewData;
 
         pdfReportGenerator.generateReport(
-          { title: 'Crew Workload Distribution', subtitle: 'Task distribution across crew ranks and assignments', vessel: vesselName },
+          { title: 'Crew Workload Distribution', subtitle: 'Task distribution across crew ranks and assignments', vessel: vesselName, dateRange: formatReportDateRange(categoryFilters.dateRange?.from, categoryFilters.dateRange?.to) },
           columns,
           data,
           summary
@@ -1275,13 +1279,14 @@ const MaintenanceReports: React.FC<MaintenanceReportsProps> = ({ onBack, globalF
             { label: 'Avg Utilization', value: `${summary.avgUtilization}%` }
           ];
           
-          if (mode === 'preview') return { title: 'Equipment Utilization Summary', subtitle: `Running hours analysis for ${summary.periodDays} days (${summary.periodStart} to ${summary.periodEnd})`, vessel: vesselName, columns, data: utilizationData, summary: summaryItems } as ReportPreviewData;
+          if (mode === 'preview') return { title: 'Equipment Utilization Summary', subtitle: `Running hours analysis for ${summary.periodDays} days (${summary.periodStart} to ${summary.periodEnd})`, vessel: vesselName, dateRange: formatReportDateRange(categoryFilters.dateRange?.from, categoryFilters.dateRange?.to), columns, data: utilizationData, summary: summaryItems } as ReportPreviewData;
 
           pdfReportGenerator.generateReport(
             { 
               title: 'Equipment Utilization Summary', 
               subtitle: `Running hours analysis for ${summary.periodDays} days (${summary.periodStart} to ${summary.periodEnd})`, 
-              vessel: vesselName 
+              vessel: vesselName,
+              dateRange: formatReportDateRange(categoryFilters.dateRange?.from, categoryFilters.dateRange?.to)
             },
             columns,
             utilizationData,
@@ -1347,13 +1352,14 @@ const MaintenanceReports: React.FC<MaintenanceReportsProps> = ({ onBack, globalF
             deltaRh: Number(a.deltaRh).toFixed(1)
           }));
           
-          if (mode === 'preview') return { title: 'Running Hours Anomaly Detection', subtitle: `Anomalies detected from ${summary.periodStart?.split('T')[0] || 'N/A'} to ${summary.periodEnd?.split('T')[0] || 'N/A'}`, vessel: vesselName, columns, data: formattedData, summary: summaryItems } as ReportPreviewData;
+          if (mode === 'preview') return { title: 'Running Hours Anomaly Detection', subtitle: `Anomalies detected from ${summary.periodStart?.split('T')[0] || 'N/A'} to ${summary.periodEnd?.split('T')[0] || 'N/A'}`, vessel: vesselName, dateRange: formatReportDateRange(categoryFilters.dateRange?.from, categoryFilters.dateRange?.to), columns, data: formattedData, summary: summaryItems } as ReportPreviewData;
 
           pdfReportGenerator.generateReport(
             { 
               title: 'Running Hours Anomaly Detection', 
               subtitle: `Anomalies detected from ${summary.periodStart?.split('T')[0] || 'N/A'} to ${summary.periodEnd?.split('T')[0] || 'N/A'}`, 
-              vessel: vesselName 
+              vessel: vesselName,
+              dateRange: formatReportDateRange(categoryFilters.dateRange?.from, categoryFilters.dateRange?.to)
             },
             columns,
             formattedData,

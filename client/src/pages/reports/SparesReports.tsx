@@ -19,7 +19,7 @@ import {
   Loader2,
   Download
 } from "lucide-react";
-import { pdfReportGenerator, formatDate } from "@/lib/pdfReportGenerator";
+import { pdfReportGenerator, formatDate, formatReportDateRange } from "@/lib/pdfReportGenerator";
 import ReportPreviewModal, { ReportPreviewData } from "@/components/reports/ReportPreviewModal";
 import { useToast } from "@/hooks/use-toast";
 import { useVessels } from "@/hooks/useVessels";
@@ -216,7 +216,7 @@ const SparesReports: React.FC<SparesReportsProps> = ({ onBack, globalFilters }) 
         ];
 
         pdfReportGenerator.generateReport(
-          { title: 'Low Stock Alert Report', subtitle: 'Items requiring immediate attention', vessel: vesselName },
+          { title: 'Low Stock Alert Report', subtitle: 'Items requiring immediate attention', vessel: vesselName, dateRange: formatReportDateRange(categoryFilters.dateRange?.from, categoryFilters.dateRange?.to) },
           columns,
           data,
           summary
@@ -265,7 +265,7 @@ const SparesReports: React.FC<SparesReportsProps> = ({ onBack, globalFilters }) 
         ];
 
         pdfReportGenerator.generateReport(
-          { title: 'Critical Spares Report', subtitle: 'Status of Critical and Essential Spare Parts Inventory', vessel: vesselName, orientation: 'landscape' },
+          { title: 'Critical Spares Report', subtitle: 'Status of Critical and Essential Spare Parts Inventory', vessel: vesselName, orientation: 'landscape', dateRange: formatReportDateRange(categoryFilters.dateRange?.from, categoryFilters.dateRange?.to) },
           columns,
           data,
           summary
@@ -321,11 +321,11 @@ const SparesReports: React.FC<SparesReportsProps> = ({ onBack, globalFilters }) 
         ];
 
         if (mode === 'preview') {
-          setPreviewData({ title: 'Consumption Pattern Analysis', subtitle: 'Spare parts consumption patterns and trends', vessel: vesselName, columns, data, summary });
+          setPreviewData({ title: 'Consumption Pattern Analysis', subtitle: 'Spare parts consumption patterns and trends', vessel: vesselName, dateRange: formatReportDateRange(categoryFilters.dateRange?.from, categoryFilters.dateRange?.to), columns, data, summary });
           return;
         }
         pdfReportGenerator.generateReport(
-          { title: 'Consumption Pattern Analysis', subtitle: 'Spare parts consumption patterns and trends', vessel: vesselName, orientation: 'landscape' },
+          { title: 'Consumption Pattern Analysis', subtitle: 'Spare parts consumption patterns and trends', vessel: vesselName, orientation: 'landscape', dateRange: formatReportDateRange(categoryFilters.dateRange?.from, categoryFilters.dateRange?.to) },
           columns,
           data,
           summary

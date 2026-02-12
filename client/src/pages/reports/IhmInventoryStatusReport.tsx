@@ -26,7 +26,7 @@ import {
   ChevronRight,
 } from "lucide-react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { pdfReportGenerator } from "@/lib/pdfReportGenerator";
+import { pdfReportGenerator, formatReportDateRange } from "@/lib/pdfReportGenerator";
 import { useToast } from "@/hooks/use-toast";
 import { useVessel } from "@/contexts/VesselContext";
 
@@ -244,7 +244,7 @@ const IhmInventoryStatusReport: React.FC<IhmInventoryStatusReportProps> = ({ onB
       ];
 
       pdfReportGenerator.generateReport(
-        { title: 'IHM Inventory Status Report', subtitle: 'Confirmed hazardous materials present on board', vessel: vesselName },
+        { title: 'IHM Inventory Status Report', subtitle: 'Confirmed hazardous materials present on board', vessel: vesselName, dateRange: 'All Time' },
         columns,
         exportData,
         summaryData

@@ -5659,7 +5659,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         `Analysis of breakdown maintenance and unplanned work (${startDate} to ${endDate})`,
         vesselName,
         reportData.length,
-        lastColLetter
+        lastColLetter,
+        `${startDate} to ${endDate}`
       );
 
       // Apply table headers at row 7
@@ -8263,7 +8264,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const uniqueItems = new Set(consumeEvents.map((h: any) => h.itemId)).size;
       const totalQty = consumeEvents.reduce((sum: number, h: any) => sum + Math.abs(parseFloat(String(h.qtyChangeBase)) || 0), 0);
       const summaryLastCol = getLastColumnLetter(4);
-      applyStandardHeader(summarySheet, 'STORES CONSUMPTION PATTERN ANALYSIS - SUMMARY', `Data Period: ${datePeriod} (${daysOfData} days)`, vesselName, uniqueItems, summaryLastCol);
+      applyStandardHeader(summarySheet, 'STORES CONSUMPTION PATTERN ANALYSIS - SUMMARY', `Data Period: ${datePeriod} (${daysOfData} days)`, vesselName, uniqueItems, summaryLastCol, datePeriod);
 
       const summaryData = [
         ['Metric', 'Value'],
@@ -8314,7 +8315,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         { key: 'others', header: 'Others', width: 14, type: 'number', align: 'center' },
       ];
       const trendsLastCol = getLastColumnLetter(trendsCols.length);
-      applyStandardHeader(trendsSheet, 'MONTHLY CONSUMPTION TRENDS', `Data Period: ${datePeriod}`, vesselName, Object.keys(monthlyMap).length, trendsLastCol);
+      applyStandardHeader(trendsSheet, 'MONTHLY CONSUMPTION TRENDS', `Data Period: ${datePeriod}`, vesselName, Object.keys(monthlyMap).length, trendsLastCol, datePeriod);
       applyStandardTableHeader(trendsSheet, trendsCols, 7);
 
       Object.entries(monthlyMap).sort(([a], [b]) => a.localeCompare(b)).forEach(([month, data], idx) => {
@@ -8374,7 +8375,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         { key: 'lastConsumed', header: 'Last Consumed', width: 14, type: 'string', align: 'center' },
       ];
       const itemLastCol = getLastColumnLetter(itemCols.length);
-      applyStandardHeader(itemSheet, 'ITEM-WISE CONSUMPTION ANALYSIS', `Data Period: ${datePeriod} | ${itemRows.length} items consumed`, vesselName, itemRows.length, itemLastCol);
+      applyStandardHeader(itemSheet, 'ITEM-WISE CONSUMPTION ANALYSIS', `Data Period: ${datePeriod} | ${itemRows.length} items consumed`, vesselName, itemRows.length, itemLastCol, datePeriod);
       applyStandardTableHeader(itemSheet, itemCols, 7);
 
       itemRows.forEach((item, idx) => {
@@ -8415,7 +8416,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         { key: 'percentage', header: '% Share', width: 12, type: 'number', align: 'center' },
       ];
       const catLastCol = getLastColumnLetter(catCols.length);
-      applyStandardHeader(catSheet, 'CATEGORY-WISE CONSUMPTION BREAKDOWN', `Data Period: ${datePeriod}`, vesselName, catRows.length, catLastCol);
+      applyStandardHeader(catSheet, 'CATEGORY-WISE CONSUMPTION BREAKDOWN', `Data Period: ${datePeriod}`, vesselName, catRows.length, catLastCol, datePeriod);
       applyStandardTableHeader(catSheet, catCols, 7);
 
       catRows.forEach((item, idx) => {
@@ -8494,7 +8495,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         { key: 'movementNote', header: 'Note', width: 24, type: 'string' },
       ];
       const effLastCol = getLastColumnLetter(effCols.length);
-      applyStandardHeader(effSheet, 'STOCK EFFICIENCY ANALYSIS', `Data Period: ${datePeriod} | Movement thresholds adjusted for ${daysOfData}-day sample`, vesselName, effItems.length, effLastCol);
+      applyStandardHeader(effSheet, 'STOCK EFFICIENCY ANALYSIS', `Data Period: ${datePeriod} | Movement thresholds adjusted for ${daysOfData}-day sample`, vesselName, effItems.length, effLastCol, datePeriod);
       applyStandardTableHeader(effSheet, effCols, 7);
 
       effItems.forEach((item: any, idx: number) => {
@@ -8571,7 +8572,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         { key: 'confidence', header: 'Confidence', width: 14, type: 'string', align: 'center' },
       ];
       const fcLastCol = getLastColumnLetter(fcCols.length);
-      applyStandardHeader(forecastSheet, 'CONSUMPTION FORECAST & REORDER PROJECTIONS', `Data Period: ${datePeriod} | Confidence: ${daysOfData > 90 ? 'High' : daysOfData >= 30 ? 'Medium' : 'Low'}`, vesselName, forecastItems.length, fcLastCol);
+      applyStandardHeader(forecastSheet, 'CONSUMPTION FORECAST & REORDER PROJECTIONS', `Data Period: ${datePeriod} | Confidence: ${daysOfData > 90 ? 'High' : daysOfData >= 30 ? 'Medium' : 'Low'}`, vesselName, forecastItems.length, fcLastCol, datePeriod);
       applyStandardTableHeader(forecastSheet, fcCols, 7);
 
       forecastItems.forEach((item, idx) => {
@@ -16869,7 +16870,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
           `Analysis of task distribution across crew ranks (${periodStr})`,
           vesselName,
           filteredWOs.length,
-          lastColLetter
+          lastColLetter,
+          periodStr
         );
         
         // Apply table header at row 7
@@ -17035,7 +17037,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
           `Analysis of task distribution by rank (${periodStr})`,
           vesselName,
           summaryData.length,
-          lastColLetter
+          lastColLetter,
+          periodStr
         );
         
         // Apply table header at row 7
@@ -17548,7 +17551,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         `Running hours analysis for ${daysInPeriod} days (${periodStr})`,
         vesselName,
         utilizationData.length,
-        lastColLetter
+        lastColLetter,
+        periodStr
       );
       
       // Apply table header at row 7
@@ -18106,7 +18110,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const warningCount = anomalies.filter(a => a.severity === 'Warning').length;
       const infoCount = anomalies.filter(a => a.severity === 'Info').length;
       const subtitle = `Critical: ${criticalCount} | Warning: ${warningCount} | Info: ${infoCount} | Period: ${formatDateDisplay(periodStart)} to ${formatDateDisplay(periodEnd)}`;
-      applyStandardHeader(worksheet, reportTitle, subtitle, vesselName, anomalies.length, lastColLetter);
+      const periodDisplay = `${formatDateDisplay(periodStart)} to ${formatDateDisplay(periodEnd)}`;
+      applyStandardHeader(worksheet, reportTitle, subtitle, vesselName, anomalies.length, lastColLetter, periodDisplay);
       
       // Apply table header
       applyStandardTableHeader(worksheet, columns, 7);
