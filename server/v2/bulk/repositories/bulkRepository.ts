@@ -45,10 +45,10 @@ export class BulkRepository {
     return results[0] || null;
   }
 
-  async getComponent(id: string) {
+  async getComponent(cuuid: string) {
     const db = await getDb();
     const results = await db.select().from(bulkComponents)
-      .where(eq(bulkComponents.id, id));
+      .where(eq(bulkComponents.cuuid, cuuid));
     return results[0] || null;
   }
 
@@ -58,20 +58,20 @@ export class BulkRepository {
     return results[0];
   }
 
-  async updateComponent(id: string, data: any) {
+  async updateComponent(cuuid: string, data: any) {
     const db = await getDb();
     const results = await db.update(bulkComponents)
       .set({ ...data, updatedAt: new Date() })
-      .where(eq(bulkComponents.id, id))
+      .where(eq(bulkComponents.cuuid, cuuid))
       .returning();
     return results[0] || null;
   }
 
-  async archiveComponent(id: string) {
+  async archiveComponent(cuuid: string) {
     const db = await getDb();
     const results = await db.update(bulkComponents)
       .set({ isActive: false, updatedAt: new Date() })
-      .where(eq(bulkComponents.id, id))
+      .where(eq(bulkComponents.cuuid, cuuid))
       .returning();
     return results[0] || null;
   }

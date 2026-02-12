@@ -932,7 +932,7 @@ export class BulkImportService {
             id: uuidv4(),
             importHistoryId,
             entityType: 'component',
-            entityId: newComp.id,
+            entityId: newComp.cuuid,
             operation: 'created',
             previousData: null,
             newData: { componentCode: code, name: newComp.name },
@@ -945,7 +945,7 @@ export class BulkImportService {
           continue;
         }
         const { checksum: beforeChecksum } = createRecordSnapshot(existing);
-        const updated = await this.updateComponentFromRow(existing.id, row);
+        const updated = await this.updateComponentFromRow(existing.cuuid, row);
         if (updated) {
           existingMap.set(code, updated);
           result.updated++;
@@ -954,7 +954,7 @@ export class BulkImportService {
             id: uuidv4(),
             importHistoryId,
             entityType: 'component',
-            entityId: existing.id,
+            entityId: existing.cuuid,
             operation: 'updated',
             previousData: existing,
             newData: { componentCode: code },
@@ -964,7 +964,7 @@ export class BulkImportService {
       } else if (mode === 'upsert') {
         if (existing) {
           const { checksum: beforeChecksum } = createRecordSnapshot(existing);
-          const updated = await this.updateComponentFromRow(existing.id, row);
+          const updated = await this.updateComponentFromRow(existing.cuuid, row);
           if (updated) {
             existingMap.set(code, updated);
             result.updated++;
@@ -973,7 +973,7 @@ export class BulkImportService {
               id: uuidv4(),
               importHistoryId,
               entityType: 'component',
-              entityId: existing.id,
+              entityId: existing.cuuid,
               operation: 'updated',
               previousData: existing,
               newData: { componentCode: code },
@@ -990,7 +990,7 @@ export class BulkImportService {
               id: uuidv4(),
               importHistoryId,
               entityType: 'component',
-              entityId: newComp.id,
+              entityId: newComp.cuuid,
               operation: 'created',
               previousData: null,
               newData: { componentCode: code, name: newComp.name },
@@ -1007,15 +1007,15 @@ export class BulkImportService {
       for (const comp of allComponents) {
         if (comp.isActive && comp.componentCode && !importedCodes.has(comp.componentCode.toLowerCase())) {
           const { checksum: beforeChecksum } = createRecordSnapshot(comp);
-          await this.repository.archiveComponent(comp.id);
+          await this.repository.archiveComponent(comp.cuuid);
           result.archived++;
-          const archived = await this.repository.getComponent(comp.id);
+          const archived = await this.repository.getComponent(comp.cuuid);
           const { checksum: afterChecksum } = createRecordSnapshot(archived);
           await this.repository.createImportChangeLog({
             id: uuidv4(),
             importHistoryId,
             entityType: 'component',
-            entityId: comp.id,
+            entityId: comp.cuuid,
             operation: 'archived',
             previousData: comp,
             newData: { isActive: false },
@@ -1192,10 +1192,8 @@ export class BulkImportService {
     const lastUpdated = row['Last Updated']
       ? normalizeDateToDDMMMYYYY(row['Last Updated']) : null;
 
-    const id = uuidv4();
     const cuuid = uuidv4();
     const data: any = {
-      id,
       cuuid,
       componentCode: code,
       name: row['Component Name'] || null,
@@ -1238,7 +1236,7 @@ export class BulkImportService {
     return await this.repository.createComponent(data);
   }
 
-  private async updateComponentFromRow(id: string, row: any): Promise<any> {
+  private async updateComponentFromRow(cuuid: string, row: any): Promise<any> {
     const updates: any = {};
 
     if (row['Component Name'] !== undefined && row['Component Name'] !== '') {
@@ -1330,7 +1328,7 @@ export class BulkImportService {
 
     if (Object.keys(updates).length === 0) return null;
 
-    return await this.repository.updateComponent(id, updates);
+    return await this.repository.updateComponent(cuuid, updates);
   }
 
   private async importStores(
