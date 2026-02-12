@@ -382,7 +382,7 @@ export type FormVersionUsage = typeof formVersionUsage.$inferSelect;
 // IHM (Inventory of Hazardous Materials) Tables
 export const ihmItems = pgTable("ihm_items", {
   id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
-  componentId: text("component_id").notNull(),
+  componentId: text("component_id").notNull().references(() => components.cuuid, { onDelete: "restrict", onUpdate: "cascade" }),
   spareId: text("spare_id"),
   presence: text("presence").notNull(), // Unknown | Present | Not Present
   materials: text("materials").array(), // Asbestos, PCB, PFOS, etc.
@@ -1884,7 +1884,7 @@ export const fleetComponentMapping = pgTable("fleet_component_mapping", {
   fleetEquipmentCode: text("fleet_equipment_code").notNull(), // Fleet equipment identifier
   vesselCode: text("vessel_code").notNull(), // Vessel identifier
   componentCode: text("component_code").notNull(), // Vessel-specific component code
-  componentId: text("component_id"), // Reference to components table
+  componentId: text("component_id").notNull().references(() => components.cuuid, { onDelete: "restrict", onUpdate: "cascade" }),
   componentName: text("component_name"), // Display name
   mappedBy: text("mapped_by").notNull(), // User who created mapping
   mappedAt: timestamp("mapped_at").notNull().defaultNow(),

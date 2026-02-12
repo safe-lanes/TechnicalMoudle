@@ -1,0 +1,3 @@
+ALTER TABLE "fleet_component_mapping" ALTER COLUMN "component_id" SET NOT NULL;--> statement-breakpoint
+ALTER TABLE "fleet_component_mapping" ADD CONSTRAINT "fleet_component_mapping_component_id_components_cuuid_fk" FOREIGN KEY ("component_id") REFERENCES "public"."components"("cuuid") ON DELETE restrict ON UPDATE cascade;--> statement-breakpoint
+ALTER TABLE "ihm_items" ADD CONSTRAINT "ihm_items_component_id_components_cuuid_fk" FOREIGN KEY ("component_id") REFERENCES "public"."components"("cuuid") ON DELETE restrict ON UPDATE cascade;
