@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Search, Download, ArrowLeft, Table2 } from "lucide-react";
+import { Search, Download, ArrowLeft, Table2, Ship, Info } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 
 interface FleetComponent {
@@ -17,11 +17,27 @@ interface FleetComponent {
   modelCode?: string | null;
 }
 
+interface VesselMapping {
+  id: number;
+  fleetEquipmentCode: string;
+  vesselCode: string;
+  vesselName?: string | null;
+  mappedBy: string;
+  mappedAt: string;
+  isActive: boolean;
+}
+
 export default function MasterDataTableView({ onBack }: { onBack?: () => void }) {
   const [searchQuery, setSearchQuery] = useState("");
+  const [selectedComponent, setSelectedComponent] = useState<FleetComponent | null>(null);
 
   const { data: fleetComponents = [], isLoading } = useQuery<FleetComponent[]>({
     queryKey: ['/technical/api/fleet-admin/fleet-components'],
+  });
+
+  const { data: vesselMappings = [], isLoading: isMappingsLoading } = useQuery<VesselMapping[]>({
+    queryKey: [`/technical/api/fleet-admin/fleet-vessel-mappings/by-equipment/${encodeURIComponent(selectedComponent?.fleetEquipmentCode ?? '')}`, selectedComponent?.fleetEquipmentCode],
+    enabled: !!selectedComponent?.fleetEquipmentCode,
   });
 
   const leafComponents = useMemo(() => {
@@ -70,6 +86,127 @@ export default function MasterDataTableView({ onBack }: { onBack?: () => void })
     link.download = 'master-data-export.csv';
     link.click();
   };
+
+  const handleRowDoubleClick = (item: FleetComponent) => {
+    setSelectedComponent(item);
+  };
+
+  const handleBackToList = () => {
+    setSelectedComponent(null);
+  };
+
+  if (selectedComponent) {
+    return (
+      <div className="p-6">
+        <Card className="overflow-hidden">
+          <div className="bg-gradient-to-r from-cyan-600 to-blue-600 px-6 py-3">
+            <div className="flex items-center justify-between gap-4">
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-white/20 rounded-lg">
+                  <Info className="h-5 w-5 text-white" />
+                </div>
+                <div>
+                  <h1 className="text-xl font-bold text-white" data-testid="text-detail-title">Equipment Detail</h1>
+                  <p className="text-cyan-100 text-sm mt-0.5">{selectedComponent.fleetEquipmentCode} - {selectedComponent.fleetEquipmentName}</p>
+                </div>
+              </div>
+              <button
+                onClick={handleBackToList}
+                className="flex items-center gap-1 text-cyan-100 hover:text-white text-sm transition-colors"
+                data-testid="button-back-to-list"
+              >
+                <ArrowLeft className="h-4 w-4" />
+                Back to List
+              </button>
+            </div>
+          </div>
+
+          <CardContent className="pt-6">
+            <div className="space-y-6">
+              <div>
+                <h2 className="text-lg font-semibold text-gray-900 mb-4" data-testid="text-component-details-heading">Component Details</h2>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  <div className="bg-gray-50 rounded-md p-3">
+                    <p className="text-xs text-gray-500 mb-1">Fleet Equipment Code</p>
+                    <p className="text-sm font-mono font-medium text-gray-900" data-testid="text-detail-equipment-code">{selectedComponent.fleetEquipmentCode}</p>
+                  </div>
+                  <div className="bg-gray-50 rounded-md p-3">
+                    <p className="text-xs text-gray-500 mb-1">Fleet Equipment Name</p>
+                    <p className="text-sm font-medium text-gray-900" data-testid="text-detail-equipment-name">{selectedComponent.fleetEquipmentName}</p>
+                  </div>
+                  <div className="bg-gray-50 rounded-md p-3">
+                    <p className="text-xs text-gray-500 mb-1">Maker</p>
+                    <p className="text-sm font-medium text-gray-900" data-testid="text-detail-maker">{selectedComponent.makerName || '-'}</p>
+                  </div>
+                  <div className="bg-gray-50 rounded-md p-3">
+                    <p className="text-xs text-gray-500 mb-1">Maker Code</p>
+                    <p className="text-sm font-medium text-gray-900" data-testid="text-detail-maker-code">{selectedComponent.makerCode || '-'}</p>
+                  </div>
+                  <div className="bg-gray-50 rounded-md p-3">
+                    <p className="text-xs text-gray-500 mb-1">Model</p>
+                    <p className="text-sm font-medium text-gray-900" data-testid="text-detail-model">{selectedComponent.model || '-'}</p>
+                  </div>
+                  <div className="bg-gray-50 rounded-md p-3">
+                    <p className="text-xs text-gray-500 mb-1">Model Code</p>
+                    <p className="text-sm font-medium text-gray-900" data-testid="text-detail-model-code">{selectedComponent.modelCode || '-'}</p>
+                  </div>
+                </div>
+              </div>
+
+              <div>
+                <div className="flex items-center gap-3 mb-4">
+                  <Ship className="h-5 w-5 text-cyan-600" />
+                  <h2 className="text-lg font-semibold text-gray-900" data-testid="text-linked-vessels-heading">Linked Vessels</h2>
+                  <Badge variant="secondary" data-testid="badge-vessel-count">
+                    {vesselMappings.length} {vesselMappings.length === 1 ? 'Vessel' : 'Vessels'}
+                  </Badge>
+                </div>
+
+                {isMappingsLoading ? (
+                  <div className="flex items-center justify-center py-8">
+                    <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600"></div>
+                  </div>
+                ) : (
+                  <div className="overflow-x-auto">
+                    <Table>
+                      <TableHeader>
+                        <TableRow className="bg-[#52baf3] hover:bg-[#52baf3]">
+                          <TableHead className="text-white font-semibold text-xs whitespace-nowrap w-16">Sl No</TableHead>
+                          <TableHead className="text-white font-semibold text-xs whitespace-nowrap">Vessel Name</TableHead>
+                          <TableHead className="text-white font-semibold text-xs whitespace-nowrap">Vessel Code</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {vesselMappings.length === 0 ? (
+                          <TableRow>
+                            <TableCell colSpan={3} className="text-center py-8 text-gray-500" data-testid="text-no-vessels">
+                              No vessels linked to this equipment code.
+                            </TableCell>
+                          </TableRow>
+                        ) : (
+                          vesselMappings.map((mapping, index) => (
+                            <TableRow
+                              key={mapping.id}
+                              className="hover:bg-gray-50"
+                              data-testid={`row-vessel-mapping-${mapping.id}`}
+                            >
+                              <TableCell className="text-sm text-gray-500">{index + 1}</TableCell>
+                              <TableCell className="text-sm font-medium">{mapping.vesselName || '-'}</TableCell>
+                              <TableCell className="text-sm font-mono">{mapping.vesselCode}</TableCell>
+                            </TableRow>
+                          ))
+                        )}
+                      </TableBody>
+                    </Table>
+                  </div>
+                )}
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
 
   return (
     <div className="p-6">
@@ -161,7 +298,8 @@ export default function MasterDataTableView({ onBack }: { onBack?: () => void })
                     filteredData.map((item, index) => (
                       <TableRow
                         key={item.id}
-                        className="hover:bg-gray-50"
+                        className="hover:bg-gray-50 cursor-pointer"
+                        onDoubleClick={() => handleRowDoubleClick(item)}
                         data-testid={`row-master-data-${item.id}`}
                       >
                         <TableCell className="text-sm text-gray-500">{index + 1}</TableCell>
