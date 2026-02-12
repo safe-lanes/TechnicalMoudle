@@ -26,6 +26,7 @@ import {
   Download
 } from "lucide-react";
 import { pdfReportGenerator, formatDate } from "@/lib/pdfReportGenerator";
+import ReportPreviewModal, { ReportPreviewData } from "@/components/reports/ReportPreviewModal";
 import { useToast } from "@/hooks/use-toast";
 import { useVessels } from "@/hooks/useVessels";
 import { useVessel } from "@/contexts/VesselContext";
@@ -63,6 +64,7 @@ const AlertsApprovalsAdminReports: React.FC<AlertsApprovalsAdminReportsProps> = 
     dateRange: globalFilters?.dateRange || { from: null, to: null }
   });
   const [generatingReports, setGeneratingReports] = useState<Set<string>>(new Set());
+  const [previewData, setPreviewData] = useState<ReportPreviewData | null>(null);
   const { toast } = useToast();
   const { data: vessels = [] } = useVessels();
   const { vesselId: contextVesselId } = useVessel();
@@ -207,7 +209,7 @@ const AlertsApprovalsAdminReports: React.FC<AlertsApprovalsAdminReportsProps> = 
     }
   };
 
-  const generateAlertsPDF = async (reportId: string) => {
+  const generateAlertsReport = async (reportId: string, mode: 'preview' | 'download' = 'download') => {
     const vesselName = effectiveVesselId === 'all' ? 'All Vessels' : (vessels.find(v => v.id === effectiveVesselId)?.name || effectiveVesselId || 'Unknown Vessel');
     const now = new Date();
 
@@ -243,12 +245,13 @@ const AlertsApprovalsAdminReports: React.FC<AlertsApprovalsAdminReportsProps> = 
           { label: 'High Priority', value: alerts.filter(a => a.priority === 'High').length }
         ];
 
-        pdfReportGenerator.generateReport(
-          { title: 'System Alerts & Notifications', subtitle: 'Active alerts and warnings', vessel: vesselName },
-          columns,
-          alerts.length > 0 ? alerts : [{ type: 'No Alerts', description: 'All systems normal', priority: '-', status: 'OK' }],
-          summary
-        );
+        const finalData = alerts.length > 0 ? alerts : [{ type: 'No Alerts', description: 'All systems normal', priority: '-', status: 'OK' }];
+
+        if (mode === 'preview') {
+          setPreviewData({ title: 'System Alerts & Notifications', subtitle: 'Active alerts and warnings', vessel: vesselName, columns, data: finalData, summary });
+          return;
+        }
+        pdfReportGenerator.generateReport({ title: 'System Alerts & Notifications', subtitle: 'Active alerts and warnings', vessel: vesselName }, columns, finalData, summary);
         break;
       }
 
@@ -282,12 +285,13 @@ const AlertsApprovalsAdminReports: React.FC<AlertsApprovalsAdminReportsProps> = 
           { label: 'Pending Items', value: pendingItems.length }
         ];
 
-        pdfReportGenerator.generateReport(
-          { title: 'Pending Approvals Report', subtitle: 'Items awaiting approval', vessel: vesselName },
-          columns,
-          pendingItems.length > 0 ? pendingItems : [{ type: 'None', id: '-', description: 'No pending approvals', status: 'Clear' }],
-          summary
-        );
+        const finalData = pendingItems.length > 0 ? pendingItems : [{ type: 'None', id: '-', description: 'No pending approvals', status: 'Clear' }];
+
+        if (mode === 'preview') {
+          setPreviewData({ title: 'Pending Approvals Report', subtitle: 'Items awaiting approval', vessel: vesselName, columns, data: finalData, summary });
+          return;
+        }
+        pdfReportGenerator.generateReport({ title: 'Pending Approvals Report', subtitle: 'Items awaiting approval', vessel: vesselName }, columns, finalData, summary);
         break;
       }
 
@@ -306,11 +310,13 @@ const AlertsApprovalsAdminReports: React.FC<AlertsApprovalsAdminReportsProps> = 
           'system-performance': 'System Performance Report'
         };
 
-        pdfReportGenerator.generateReport(
-          { title: reportTitles[reportId], subtitle: 'System administration report', vessel: vesselName },
-          columns,
-          [{ item: 'Report Generated', details: formatDate(new Date().toISOString()), status: 'OK' }]
-        );
+        const data = [{ item: 'Report Generated', details: formatDate(new Date().toISOString()), status: 'OK' }];
+
+        if (mode === 'preview') {
+          setPreviewData({ title: reportTitles[reportId], subtitle: 'System administration report', vessel: vesselName, columns, data });
+          return;
+        }
+        pdfReportGenerator.generateReport({ title: reportTitles[reportId], subtitle: 'System administration report', vessel: vesselName }, columns, data);
         break;
       }
 
@@ -344,17 +350,28 @@ const AlertsApprovalsAdminReports: React.FC<AlertsApprovalsAdminReportsProps> = 
           { label: 'Critical', value: overdueItems.filter(i => i.daysOverdue > 30).length }
         ];
 
-        pdfReportGenerator.generateReport(
-          { title: 'Overdue Items Alert Report', subtitle: 'All overdue items requiring attention', vessel: vesselName },
-          columns,
-          overdueItems.length > 0 ? overdueItems : [{ type: 'None', id: '-', description: 'No overdue items', daysOverdue: 0, priority: '-' }],
-          summary
-        );
+        const finalData = overdueItems.length > 0 ? overdueItems : [{ type: 'None', id: '-', description: 'No overdue items', daysOverdue: 0, priority: '-' }];
+
+        if (mode === 'preview') {
+          setPreviewData({ title: 'Overdue Items Alert Report', subtitle: 'All overdue items requiring attention', vessel: vesselName, columns, data: finalData, summary });
+          return;
+        }
+        pdfReportGenerator.generateReport({ title: 'Overdue Items Alert Report', subtitle: 'All overdue items requiring attention', vessel: vesselName }, columns, finalData, summary);
         break;
       }
 
       default:
         toast({ title: "Report Not Available", description: "This report is not yet implemented", variant: "destructive" });
+    }
+  };
+
+  const handlePreviewReport = async (reportId: string) => {
+    try {
+      toast({ title: "Loading Preview", description: "Preparing report data..." });
+      await generateAlertsReport(reportId, 'preview');
+    } catch (error: any) {
+      console.error('Error generating preview:', error);
+      toast({ title: "Preview Failed", description: error.message || "Failed to load report preview.", variant: "destructive" });
     }
   };
 
@@ -368,7 +385,7 @@ const AlertsApprovalsAdminReports: React.FC<AlertsApprovalsAdminReportsProps> = 
       toast({ title: "Generating Report", description: `Creating ${format} report...` });
 
       if (format === 'PDF') {
-        await generateAlertsPDF(reportId);
+        await generateAlertsReport(reportId, 'download');
         toast({ title: "Report Generated", description: `${format} report downloaded successfully!` });
       } else {
         toast({ title: "Excel Export", description: "Excel export coming soon." });
@@ -500,15 +517,10 @@ const AlertsApprovalsAdminReports: React.FC<AlertsApprovalsAdminReportsProps> = 
                       size="icon" 
                       variant="ghost" 
                       title="Preview"
-                      onClick={() => handleGenerateReport(report.id, 'PDF')}
-                      disabled={generatingReports.has(`${report.id}-PDF`)}
+                      onClick={() => handlePreviewReport(report.id)}
                       data-testid={`button-preview-${report.id}`}
                     >
-                      {generatingReports.has(`${report.id}-PDF`) ? (
-                        <Loader2 className="h-4 w-4 animate-spin" />
-                      ) : (
-                        <Eye className="h-4 w-4" />
-                      )}
+                      <Eye className="h-4 w-4" />
                     </Button>
                     <Button 
                       size="icon" 
@@ -547,6 +559,12 @@ const AlertsApprovalsAdminReports: React.FC<AlertsApprovalsAdminReportsProps> = 
           <p className="text-gray-500">Try adjusting your search criteria or filters</p>
         </div>
       )}
+
+      <ReportPreviewModal
+        open={!!previewData}
+        onClose={() => setPreviewData(null)}
+        reportData={previewData}
+      />
     </div>
   );
 };

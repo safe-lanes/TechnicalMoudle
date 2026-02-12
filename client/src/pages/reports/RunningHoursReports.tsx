@@ -22,6 +22,7 @@ import {
   Download
 } from "lucide-react";
 import { pdfReportGenerator } from "@/lib/pdfReportGenerator";
+import ReportPreviewModal, { ReportPreviewData } from "@/components/reports/ReportPreviewModal";
 import { useToast } from "@/hooks/use-toast";
 import { useVessels } from "@/hooks/useVessels";
 import { useVessel } from "@/contexts/VesselContext";
@@ -58,6 +59,7 @@ const RunningHoursReports: React.FC<RunningHoursReportsProps> = ({ onBack, globa
     dateRange: globalFilters?.dateRange || { from: null, to: null }
   });
   const [generatingReports, setGeneratingReports] = useState<Set<string>>(new Set());
+  const [previewData, setPreviewData] = useState<ReportPreviewData | null>(null);
   const { toast } = useToast();
   const { data: vessels = [] } = useVessels();
   const { vesselId: contextVesselId } = useVessel();
@@ -139,17 +141,15 @@ const RunningHoursReports: React.FC<RunningHoursReportsProps> = ({ onBack, globa
     }
   };
 
-  const generateRunningHoursPDF = async (reportId: string) => {
-    // Check if a vessel is selected
+  const generateRunningHoursReport = async (reportId: string, mode: 'preview' | 'download' = 'download') => {
     if (!effectiveVesselId || effectiveVesselId === 'all') {
-      throw new Error('Please select a specific vessel to generate the PDF report. "All Vessels" is not supported for PDF exports.');
+      throw new Error('Please select a specific vessel to generate the report. "All Vessels" is not supported for exports.');
     }
     
     const vesselName = effectiveVesselId === 'all' ? 'All Vessels' : (vessels.find(v => v.id === effectiveVesselId)?.name || effectiveVesselId || 'Unknown Vessel');
 
     switch (reportId) {
       case 'rh-utilization-summary': {
-        // Fetch from API
         const params = new URLSearchParams({ vesselId: effectiveVesselId });
         if (categoryFilters.dateRange?.from) {
           params.append('startDate', categoryFilters.dateRange.from.toISOString().split('T')[0]);
@@ -158,23 +158,19 @@ const RunningHoursReports: React.FC<RunningHoursReportsProps> = ({ onBack, globa
           params.append('endDate', categoryFilters.dateRange.to.toISOString().split('T')[0]);
         }
         
-        console.log('[PDF] Fetching equipment utilization data for vessel:', effectiveVesselId);
         const response = await fetch(`/technical/api/reports/equipment-utilization-summary?${params}`);
         const result = await response.json();
         
         if (!response.ok || result.error) {
-          console.error('[PDF] API error:', result.error);
           throw new Error(result.error || `Failed to fetch data (status ${response.status})`);
         }
         
         if (!result.success || !result.data) {
-          console.error('[PDF] No data in response:', result);
           throw new Error('No equipment utilization data returned. Please ensure the vessel has components with running hours.');
         }
         
         const utilizationData = result.data;
         const summary = result.summary;
-        console.log('[PDF] Generating PDF with', utilizationData.length, 'equipment items');
         
         const columns = [
           { header: 'S.No', field: 'sNo', width: 12 },
@@ -200,27 +196,32 @@ const RunningHoursReports: React.FC<RunningHoursReportsProps> = ({ onBack, globa
           { label: 'No Data', value: summary.noData || 0 }
         ];
         
-        try {
-          pdfReportGenerator.generateReport(
-            { 
-              title: 'Equipment Utilization Summary', 
-              subtitle: `Running hours analysis for ${summary.periodDays} days (${summary.periodStart} to ${summary.periodEnd})`, 
-              vessel: vesselName 
-            },
+        if (mode === 'preview') {
+          setPreviewData({
+            title: 'Equipment Utilization Summary',
+            subtitle: `Running hours analysis for ${summary.periodDays} days (${summary.periodStart} to ${summary.periodEnd})`,
+            vessel: vesselName,
             columns,
-            utilizationData,
-            summaryItems
-          );
-          console.log('[PDF] PDF generated successfully');
-        } catch (pdfError) {
-          console.error('[PDF] Error generating PDF:', pdfError);
-          throw pdfError;
+            data: utilizationData,
+            summary: summaryItems
+          });
+          return;
         }
+
+        pdfReportGenerator.generateReport(
+          { 
+            title: 'Equipment Utilization Summary', 
+            subtitle: `Running hours analysis for ${summary.periodDays} days (${summary.periodStart} to ${summary.periodEnd})`, 
+            vessel: vesselName 
+          },
+          columns,
+          utilizationData,
+          summaryItems
+        );
         break;
       }
 
       case 'rh-anomaly-detection': {
-        // Fetch from API
         const params = new URLSearchParams({ vesselId: effectiveVesselId || '' });
         if (categoryFilters.dateRange?.from) {
           params.append('startDate', categoryFilters.dateRange.from.toISOString().split('T')[0]);
@@ -229,12 +230,10 @@ const RunningHoursReports: React.FC<RunningHoursReportsProps> = ({ onBack, globa
           params.append('endDate', categoryFilters.dateRange.to.toISOString().split('T')[0]);
         }
         
-        console.log('[PDF] Fetching anomaly detection data for vessel:', effectiveVesselId);
         const response = await fetch(`/technical/api/reports/running-hours-anomaly-detection?${params}`);
         const result = await response.json();
         
         if (!response.ok || result.error) {
-          console.error('[PDF] API error:', result.error);
           throw new Error(result.error || `Failed to fetch data (status ${response.status})`);
         }
         
@@ -242,7 +241,6 @@ const RunningHoursReports: React.FC<RunningHoursReportsProps> = ({ onBack, globa
           throw new Error('Failed to fetch anomaly data');
         }
         
-        // API returns 'data' array, not 'anomalies'
         const anomalies = result.data || [];
         const summaryData = result.summary || {};
         
@@ -269,7 +267,6 @@ const RunningHoursReports: React.FC<RunningHoursReportsProps> = ({ onBack, globa
           { label: 'Components', value: summaryData.componentsAnalyzed || 0 }
         ];
         
-        // Format data for PDF - field names from API are already correct
         const formattedData = anomalies.map((a: any) => ({
           sNo: a.sNo,
           componentCode: a.componentCode,
@@ -284,24 +281,28 @@ const RunningHoursReports: React.FC<RunningHoursReportsProps> = ({ onBack, globa
           description: a.description
         }));
         
-        console.log('[PDF] Generating anomaly detection PDF with', formattedData.length, 'anomalies');
-        
-        try {
-          pdfReportGenerator.generateReport(
-            { 
-              title: 'Running Hours Anomaly Detection', 
-              subtitle: `Period: ${summaryData.periodStart || 'N/A'} to ${summaryData.periodEnd || 'N/A'}`, 
-              vessel: vesselName 
-            },
+        if (mode === 'preview') {
+          setPreviewData({
+            title: 'Running Hours Anomaly Detection',
+            subtitle: `Period: ${summaryData.periodStart || 'N/A'} to ${summaryData.periodEnd || 'N/A'}`,
+            vessel: vesselName,
             columns,
-            formattedData,
-            summaryItems
-          );
-          console.log('[PDF] Anomaly detection PDF generated successfully');
-        } catch (pdfError) {
-          console.error('[PDF] Error generating anomaly PDF:', pdfError);
-          throw pdfError;
+            data: formattedData,
+            summary: summaryItems
+          });
+          return;
         }
+
+        pdfReportGenerator.generateReport(
+          { 
+            title: 'Running Hours Anomaly Detection', 
+            subtitle: `Period: ${summaryData.periodStart || 'N/A'} to ${summaryData.periodEnd || 'N/A'}`, 
+            vessel: vesselName 
+          },
+          columns,
+          formattedData,
+          summaryItems
+        );
         break;
       }
 
@@ -311,6 +312,30 @@ const RunningHoursReports: React.FC<RunningHoursReportsProps> = ({ onBack, globa
           description: "This report type is not yet implemented",
           variant: "destructive"
         });
+    }
+  };
+
+  const handlePreviewReport = async (reportId: string) => {
+    const isAllVessels = !effectiveVesselId || 
+                         effectiveVesselId === 'all' || 
+                         effectiveVesselId === 'all-vessels' ||
+                         effectiveVesselId.toLowerCase().includes('all');
+    
+    if (isAllVessels) {
+      toast({ 
+        title: "Vessel Required", 
+        description: "Please select a specific vessel from the dropdown to preview this report.",
+        variant: "destructive" 
+      });
+      return;
+    }
+
+    try {
+      toast({ title: "Loading Preview", description: "Fetching report data..." });
+      await generateRunningHoursReport(reportId, 'preview');
+    } catch (error: any) {
+      console.error('Error generating preview:', error);
+      toast({ title: "Preview Failed", description: error.message || "Failed to load report preview.", variant: "destructive" });
     }
   };
 
@@ -340,7 +365,7 @@ const RunningHoursReports: React.FC<RunningHoursReportsProps> = ({ onBack, globa
       toast({ title: "Generating Report", description: `Creating ${format} report...` });
 
       if (format === 'PDF') {
-        await generateRunningHoursPDF(reportId);
+        await generateRunningHoursReport(reportId, 'download');
         toast({ title: "Report Generated", description: `${format} report downloaded successfully!` });
       } else if (format === 'Excel') {
         await generateRunningHoursExcel(reportId);
@@ -519,15 +544,10 @@ const RunningHoursReports: React.FC<RunningHoursReportsProps> = ({ onBack, globa
                       size="icon" 
                       variant="ghost" 
                       title="Preview"
-                      onClick={() => handleGenerateReport(report.id, 'PDF')}
-                      disabled={generatingReports.has(`${report.id}-PDF`)}
+                      onClick={() => handlePreviewReport(report.id)}
                       data-testid={`button-preview-${report.id}`}
                     >
-                      {generatingReports.has(`${report.id}-PDF`) ? (
-                        <Loader2 className="h-4 w-4 animate-spin" />
-                      ) : (
-                        <Eye className="h-4 w-4" />
-                      )}
+                      <Eye className="h-4 w-4" />
                     </Button>
                     <Button 
                       size="icon" 
@@ -566,6 +586,12 @@ const RunningHoursReports: React.FC<RunningHoursReportsProps> = ({ onBack, globa
           <p className="text-gray-500">Try adjusting your search criteria or filters</p>
         </div>
       )}
+
+      <ReportPreviewModal
+        open={!!previewData}
+        onClose={() => setPreviewData(null)}
+        reportData={previewData}
+      />
     </div>
   );
 };

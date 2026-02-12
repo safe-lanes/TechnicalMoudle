@@ -24,6 +24,7 @@ import {
   CornerDownLeft
 } from "lucide-react";
 import { pdfReportGenerator, formatDate } from "@/lib/pdfReportGenerator";
+import ReportPreviewModal, { ReportPreviewData } from "@/components/reports/ReportPreviewModal";
 import { useToast } from "@/hooks/use-toast";
 import { useVessels } from "@/hooks/useVessels";
 import { useVessel } from "@/contexts/VesselContext";
@@ -121,6 +122,7 @@ const ChangeRequestReports: React.FC<ChangeRequestReportsProps> = ({ onBack, glo
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [categoryFilter, setCategoryFilter] = useState<string>("all");
   const [generatingReports, setGeneratingReports] = useState<Set<string>>(new Set());
+  const [previewData, setPreviewData] = useState<ReportPreviewData | null>(null);
   const { toast } = useToast();
   const { data: vessels = [] } = useVessels();
   const { vesselId: contextVesselId } = useVessel();
@@ -198,7 +200,7 @@ const ChangeRequestReports: React.FC<ChangeRequestReportsProps> = ({ onBack, glo
     return String(val);
   };
 
-  const generateChangeRequestPDF = async (reportId: string) => {
+  const generateChangeRequestReport = async (reportId: string, mode: 'preview' | 'download' = 'download') => {
     if (!reportData) {
       toast({ title: "No Data", description: "No report data available to export.", variant: "destructive" });
       return;
@@ -257,6 +259,20 @@ const ChangeRequestReports: React.FC<ChangeRequestReportsProps> = ({ onBack, glo
           { label: 'Stores', value: summary.byCategory.stores }
         ];
 
+        const finalData = tableData.length > 0 ? tableData : [{ id: '-', title: 'No change requests found', category: '-', status: '-', requestedBy: '-', vessel: '-', submittedAt: '-', reviewedBy: '-', reviewedAt: '-', cycleTime: '-', target: '-', changesCount: '-', reason: '-' }];
+
+        if (mode === 'preview') {
+          setPreviewData({
+            title: 'Change Requests Status & Tracking',
+            subtitle: `Comprehensive tracking report - ${reportData.requests.length} requests`,
+            vessel: vesselName,
+            columns,
+            data: finalData,
+            summary: summaryItems
+          });
+          return;
+        }
+
         pdfReportGenerator.generateReport(
           {
             title: 'Change Requests Status & Tracking',
@@ -265,7 +281,7 @@ const ChangeRequestReports: React.FC<ChangeRequestReportsProps> = ({ onBack, glo
             orientation: 'landscape'
           },
           columns,
-          tableData.length > 0 ? tableData : [{ id: '-', title: 'No change requests found', category: '-', status: '-', requestedBy: '-', vessel: '-', submittedAt: '-', reviewedBy: '-', reviewedAt: '-', cycleTime: '-', target: '-', changesCount: '-', reason: '-' }],
+          finalData,
           summaryItems
         );
         break;
@@ -293,6 +309,17 @@ const ChangeRequestReports: React.FC<ChangeRequestReportsProps> = ({ onBack, glo
           { metric: 'Stores Changes', value: summary.byCategory.stores, notes: 'Stores modifications' }
         ];
 
+        if (mode === 'preview') {
+          setPreviewData({
+            title: 'Change Request Analytics',
+            subtitle: 'Statistical analysis and trends',
+            vessel: vesselName,
+            columns,
+            data
+          });
+          return;
+        }
+
         pdfReportGenerator.generateReport(
           { title: 'Change Request Analytics', subtitle: 'Statistical analysis and trends', vessel: vesselName },
           columns,
@@ -303,6 +330,16 @@ const ChangeRequestReports: React.FC<ChangeRequestReportsProps> = ({ onBack, glo
 
       default:
         toast({ title: "Report Not Available", description: "This report is not yet implemented", variant: "destructive" });
+    }
+  };
+
+  const handlePreviewReport = async (reportId: string) => {
+    try {
+      toast({ title: "Loading Preview", description: "Preparing report data..." });
+      await generateChangeRequestReport(reportId, 'preview');
+    } catch (error: any) {
+      console.error('Error generating preview:', error);
+      toast({ title: "Preview Failed", description: error.message || "Failed to load report preview.", variant: "destructive" });
     }
   };
 
@@ -350,7 +387,7 @@ const ChangeRequestReports: React.FC<ChangeRequestReportsProps> = ({ onBack, glo
       toast({ title: "Generating Report", description: `Creating ${format} report...` });
 
       if (format === 'PDF') {
-        await generateChangeRequestPDF(reportId);
+        await generateChangeRequestReport(reportId, 'download');
         toast({ title: "Report Generated", description: `${format} report downloaded successfully!` });
       } else {
         await handleExcelExport(reportId);
@@ -524,16 +561,12 @@ const ChangeRequestReports: React.FC<ChangeRequestReportsProps> = ({ onBack, glo
                     <Button
                       size="icon"
                       variant="ghost"
-                      title="Preview (PDF)"
-                      onClick={() => handleGenerateReport(report.id, 'PDF')}
-                      disabled={generatingReports.has(`${report.id}-PDF`) || isLoading}
+                      title="Preview"
+                      onClick={() => handlePreviewReport(report.id)}
+                      disabled={isLoading}
                       data-testid={`button-preview-${report.id}`}
                     >
-                      {generatingReports.has(`${report.id}-PDF`) ? (
-                        <Loader2 className="h-4 w-4 animate-spin" />
-                      ) : (
-                        <Eye className="h-4 w-4" />
-                      )}
+                      <Eye className="h-4 w-4" />
                     </Button>
                     <Button
                       size="icon"
@@ -572,6 +605,12 @@ const ChangeRequestReports: React.FC<ChangeRequestReportsProps> = ({ onBack, glo
           <p className="text-gray-500 dark:text-muted-foreground">Try adjusting your search criteria</p>
         </div>
       )}
+
+      <ReportPreviewModal
+        open={!!previewData}
+        onClose={() => setPreviewData(null)}
+        reportData={previewData}
+      />
     </div>
   );
 };

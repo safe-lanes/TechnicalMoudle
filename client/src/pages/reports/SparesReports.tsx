@@ -20,6 +20,7 @@ import {
   Download
 } from "lucide-react";
 import { pdfReportGenerator, formatDate } from "@/lib/pdfReportGenerator";
+import ReportPreviewModal, { ReportPreviewData } from "@/components/reports/ReportPreviewModal";
 import { useToast } from "@/hooks/use-toast";
 import { useVessels } from "@/hooks/useVessels";
 import { useVessel } from "@/contexts/VesselContext";
@@ -61,6 +62,7 @@ const SparesReports: React.FC<SparesReportsProps> = ({ onBack, globalFilters }) 
   });
   const [generatingReports, setGeneratingReports] = useState<Set<string>>(new Set());
   const [activeDetailReport, setActiveDetailReport] = useState<string | null>(null);
+  const [previewData, setPreviewData] = useState<ReportPreviewData | null>(null);
   const { toast } = useToast();
   const { data: vessels = [] } = useVessels();
   const { vesselId: contextVesselId } = useVessel();
@@ -166,7 +168,17 @@ const SparesReports: React.FC<SparesReportsProps> = ({ onBack, globalFilters }) 
     return 'OK';
   };
 
-  const generateSparesPDF = async (reportId: string) => {
+  const handlePreviewReport = async (reportId: string) => {
+    try {
+      toast({ title: "Loading Preview", description: "Preparing report data..." });
+      await generateSparesReport(reportId, 'preview');
+    } catch (error: any) {
+      console.error('Error generating preview:', error);
+      toast({ title: "Preview Failed", description: error.message || "Failed to load report preview.", variant: "destructive" });
+    }
+  };
+
+  const generateSparesReport = async (reportId: string, mode: 'preview' | 'download' = 'download') => {
     const vesselName = effectiveVesselId === 'all' ? 'All Vessels' : (vessels.find(v => v.id === effectiveVesselId)?.name || effectiveVesselId || 'Unknown Vessel');
 
     switch (reportId) {
@@ -308,6 +320,10 @@ const SparesReports: React.FC<SparesReportsProps> = ({ onBack, globalFilters }) 
           { label: 'Critical Items', value: apiData.summary?.criticalItems || 0 },
         ];
 
+        if (mode === 'preview') {
+          setPreviewData({ title: 'Consumption Pattern Analysis', subtitle: 'Spare parts consumption patterns and trends', vessel: vesselName, columns, data, summary });
+          return;
+        }
         pdfReportGenerator.generateReport(
           { title: 'Consumption Pattern Analysis', subtitle: 'Spare parts consumption patterns and trends', vessel: vesselName, orientation: 'landscape' },
           columns,
@@ -349,7 +365,7 @@ const SparesReports: React.FC<SparesReportsProps> = ({ onBack, globalFilters }) 
       });
 
       if (format === 'PDF') {
-        await generateSparesPDF(reportId);
+        await generateSparesReport(reportId, 'download');
         toast({
           title: "Report Generated",
           description: `${format} report downloaded successfully!`,
@@ -564,7 +580,7 @@ const SparesReports: React.FC<SparesReportsProps> = ({ onBack, globalFilters }) 
                         if (report.id === 'spares-low-stock' || report.id === 'spares-critical-parts') {
                           setActiveDetailReport(report.id);
                         } else {
-                          handleGenerateReport(report.id, 'PDF');
+                          handlePreviewReport(report.id);
                         }
                       }}
                       disabled={generatingReports.has(`${report.id}-PDF`)}
@@ -615,6 +631,12 @@ const SparesReports: React.FC<SparesReportsProps> = ({ onBack, globalFilters }) 
           <p className="text-gray-500">Try adjusting your search criteria or filters</p>
         </div>
       )}
+
+      <ReportPreviewModal
+        open={!!previewData}
+        onClose={() => setPreviewData(null)}
+        reportData={previewData}
+      />
     </div>
   );
 };

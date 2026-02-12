@@ -22,6 +22,7 @@ import {
   Download
 } from "lucide-react";
 import { pdfReportGenerator, formatDate } from "@/lib/pdfReportGenerator";
+import ReportPreviewModal, { ReportPreviewData } from "@/components/reports/ReportPreviewModal";
 import { useToast } from "@/hooks/use-toast";
 import { useVessels } from "@/hooks/useVessels";
 import { useVessel } from "@/contexts/VesselContext";
@@ -58,6 +59,7 @@ const ComplianceReports: React.FC<ComplianceReportsProps> = ({ onBack, globalFil
     dateRange: globalFilters?.dateRange || { from: null, to: null }
   });
   const [generatingReports, setGeneratingReports] = useState<Set<string>>(new Set());
+  const [previewData, setPreviewData] = useState<ReportPreviewData | null>(null);
   const { toast } = useToast();
   const { data: vessels = [] } = useVessels();
   const { vesselId: contextVesselId } = useVessel();
@@ -198,7 +200,7 @@ const ComplianceReports: React.FC<ComplianceReportsProps> = ({ onBack, globalFil
     return 'Valid';
   };
 
-  const generateCompliancePDF = async (reportId: string) => {
+  const generateComplianceReport = async (reportId: string, mode: 'preview' | 'download' = 'download') => {
     const vesselName = effectiveVesselId === 'all' ? 'All Vessels' : (vessels.find(v => v.id === effectiveVesselId)?.name || effectiveVesselId || 'Unknown Vessel');
 
     switch (reportId) {
@@ -229,12 +231,11 @@ const ComplianceReports: React.FC<ComplianceReportsProps> = ({ onBack, globalFil
           { label: 'Expired', value: data.filter((d: any) => d.status === 'Expired').length }
         ];
 
-        pdfReportGenerator.generateReport(
-          { title: 'Certificates Status Report', subtitle: 'Certificate validity overview', vessel: vesselName },
-          columns,
-          data,
-          summary
-        );
+        if (mode === 'preview') {
+          setPreviewData({ title: 'Certificates Status Report', subtitle: 'Certificate validity overview', vessel: vesselName, columns, data, summary });
+          return;
+        }
+        pdfReportGenerator.generateReport({ title: 'Certificates Status Report', subtitle: 'Certificate validity overview', vessel: vesselName }, columns, data, summary);
         break;
       }
 
@@ -262,12 +263,11 @@ const ComplianceReports: React.FC<ComplianceReportsProps> = ({ onBack, globalFil
           { label: 'Overdue', value: data.filter((d: any) => d.daysToDue < 0).length }
         ];
 
-        pdfReportGenerator.generateReport(
-          { title: 'Surveys Due Report', subtitle: 'Upcoming and overdue surveys', vessel: vesselName },
-          columns,
-          data,
-          summary
-        );
+        if (mode === 'preview') {
+          setPreviewData({ title: 'Surveys Due Report', subtitle: 'Upcoming and overdue surveys', vessel: vesselName, columns, data, summary });
+          return;
+        }
+        pdfReportGenerator.generateReport({ title: 'Surveys Due Report', subtitle: 'Upcoming and overdue surveys', vessel: vesselName }, columns, data, summary);
         break;
       }
 
@@ -299,12 +299,11 @@ const ComplianceReports: React.FC<ComplianceReportsProps> = ({ onBack, globalFil
           { label: 'Critical (<30 days)', value: data.filter((d: any) => d.daysRemaining <= 30).length }
         ];
 
-        pdfReportGenerator.generateReport(
-          { title: 'Expiring Certificates Alert', subtitle: 'Certificates requiring urgent attention', vessel: vesselName },
-          columns,
-          data,
-          summary
-        );
+        if (mode === 'preview') {
+          setPreviewData({ title: 'Expiring Certificates Alert', subtitle: 'Certificates requiring urgent attention', vessel: vesselName, columns, data, summary });
+          return;
+        }
+        pdfReportGenerator.generateReport({ title: 'Expiring Certificates Alert', subtitle: 'Certificates requiring urgent attention', vessel: vesselName }, columns, data, summary);
         break;
       }
 
@@ -349,12 +348,11 @@ const ComplianceReports: React.FC<ComplianceReportsProps> = ({ onBack, globalFil
           { label: 'Non-Compliant', value: expiredCerts + expiredSurveys }
         ];
 
-        pdfReportGenerator.generateReport(
-          { title: 'Compliance Summary Report', subtitle: 'Overall compliance status', vessel: vesselName },
-          columns,
-          data,
-          summary
-        );
+        if (mode === 'preview') {
+          setPreviewData({ title: 'Compliance Summary Report', subtitle: 'Overall compliance status', vessel: vesselName, columns, data, summary });
+          return;
+        }
+        pdfReportGenerator.generateReport({ title: 'Compliance Summary Report', subtitle: 'Overall compliance status', vessel: vesselName }, columns, data, summary);
         break;
       }
 
@@ -373,16 +371,30 @@ const ComplianceReports: React.FC<ComplianceReportsProps> = ({ onBack, globalFil
           status: getExpiryStatus(getDaysToExpiry(c.expiryDate))
         }));
 
-        pdfReportGenerator.generateReport(
-          { title: 'Certificate Renewal History', subtitle: 'Historical record of certificates', vessel: vesselName },
-          columns,
-          data
-        );
+        if (mode === 'preview') {
+          setPreviewData({ title: 'Certificate Renewal History', subtitle: 'Historical record of certificates', vessel: vesselName, columns, data });
+          return;
+        }
+        pdfReportGenerator.generateReport({ title: 'Certificate Renewal History', subtitle: 'Historical record of certificates', vessel: vesselName }, columns, data);
         break;
       }
 
       default:
         toast({ title: "Report Not Available", description: "This report is not yet implemented", variant: "destructive" });
+    }
+  };
+
+  const handlePreviewReport = async (reportId: string) => {
+    if (certificates.length === 0 && surveys.length === 0) {
+      toast({ title: "No Data Available", description: "No certificates or surveys data found for the selected vessel.", variant: "destructive" });
+      return;
+    }
+    try {
+      toast({ title: "Loading Preview", description: "Preparing report data..." });
+      await generateComplianceReport(reportId, 'preview');
+    } catch (error: any) {
+      console.error('Error generating preview:', error);
+      toast({ title: "Preview Failed", description: error.message || "Failed to load report preview.", variant: "destructive" });
     }
   };
 
@@ -401,7 +413,7 @@ const ComplianceReports: React.FC<ComplianceReportsProps> = ({ onBack, globalFil
       toast({ title: "Generating Report", description: `Creating ${format} report...` });
 
       if (format === 'PDF') {
-        await generateCompliancePDF(reportId);
+        await generateComplianceReport(reportId, 'download');
         toast({ title: "Report Generated", description: `${format} report downloaded successfully!` });
       } else {
         toast({ title: "Excel Export", description: "Excel export coming soon." });
@@ -533,15 +545,10 @@ const ComplianceReports: React.FC<ComplianceReportsProps> = ({ onBack, globalFil
                       size="icon" 
                       variant="ghost" 
                       title="Preview"
-                      onClick={() => handleGenerateReport(report.id, 'PDF')}
-                      disabled={generatingReports.has(`${report.id}-PDF`)}
+                      onClick={() => handlePreviewReport(report.id)}
                       data-testid={`button-preview-${report.id}`}
                     >
-                      {generatingReports.has(`${report.id}-PDF`) ? (
-                        <Loader2 className="h-4 w-4 animate-spin" />
-                      ) : (
-                        <Eye className="h-4 w-4" />
-                      )}
+                      <Eye className="h-4 w-4" />
                     </Button>
                     {report.outputs.includes('PDF') && (
                       <Button 
@@ -582,6 +589,12 @@ const ComplianceReports: React.FC<ComplianceReportsProps> = ({ onBack, globalFil
           <p className="text-gray-500">Try adjusting your search criteria or filters</p>
         </div>
       )}
+
+      <ReportPreviewModal
+        open={!!previewData}
+        onClose={() => setPreviewData(null)}
+        reportData={previewData}
+      />
     </div>
   );
 };

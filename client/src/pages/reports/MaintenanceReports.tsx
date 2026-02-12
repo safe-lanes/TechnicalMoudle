@@ -30,6 +30,7 @@ import { useVessels } from "@/hooks/useVessels";
 import { useVessel } from "@/contexts/VesselContext";
 import { useQuery } from "@tanstack/react-query";
 import CategoryFilters, { CategoryFilterValues } from "@/components/reports/CategoryFilters";
+import ReportPreviewModal, { ReportPreviewData } from "@/components/reports/ReportPreviewModal";
 
 interface MaintenanceReport {
   id: string;
@@ -63,6 +64,8 @@ const MaintenanceReports: React.FC<MaintenanceReportsProps> = ({ onBack, globalF
     dateRange: globalFilters?.dateRange || { from: null, to: null }
   });
   const [generatingReports, setGeneratingReports] = useState<Set<string>>(new Set());
+  const [previewData, setPreviewData] = useState<ReportPreviewData | null>(null);
+  const [previewOpen, setPreviewOpen] = useState(false);
   const { toast } = useToast();
   const { data: vessels = [] } = useVessels();
   const { vesselId: contextVesselId } = useVessel();
@@ -303,7 +306,7 @@ const MaintenanceReports: React.FC<MaintenanceReportsProps> = ({ onBack, globalF
     }
   };
 
-  const generateMaintenancePDF = async (reportId: string) => {
+  const generateMaintenancePDF = async (reportId: string, mode: 'download' | 'preview' = 'download'): Promise<ReportPreviewData | void> => {
     const vesselName = effectiveVesselId === 'all' ? 'All Vessels' : (vessels.find(v => v.id === effectiveVesselId)?.name || effectiveVesselId || 'Unknown Vessel');
     const now = new Date();
     const sevenDaysFromNow = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
@@ -384,6 +387,8 @@ const MaintenanceReports: React.FC<MaintenanceReportsProps> = ({ onBack, globalF
           { label: 'Urgent (≤2d)', value: urgentCount },
           { label: 'Critical Priority', value: criticalPriorityCount }
         ];
+
+        if (mode === 'preview') return { title: 'Due Jobs (7 Days)', subtitle: 'Work orders due in the next 7 days (including overdue)', vessel: vesselName, columns, data, summary } as ReportPreviewData;
 
         pdfReportGenerator.generateReport(
           { title: 'Due Jobs (7 Days)', subtitle: 'Work orders due in the next 7 days (including overdue)', vessel: vesselName },
@@ -509,6 +514,8 @@ const MaintenanceReports: React.FC<MaintenanceReportsProps> = ({ onBack, globalF
           { label: 'Max Days Overdue', value: `${maxDaysOverdue}d` },
           { label: 'Calendar/RH', value: `${calendarOverdueCount}/${rhOverdueCount}` }
         ];
+
+        if (mode === 'preview') return { title: 'OVERDUE JOBS REPORT', subtitle: 'Work orders past grace period (7 days calendar / 168 RH overdue)', vessel: vesselName, columns, data, summary } as ReportPreviewData;
 
         // Use specialized overdue report generator
         pdfReportGenerator.generateOverdueJobsReport(
@@ -677,6 +684,21 @@ const MaintenanceReports: React.FC<MaintenanceReportsProps> = ({ onBack, globalF
           avgCompletionTime: completedJobs.length > 0 ? totalDuration / completedJobs.length : 0
         };
 
+        if (mode === 'preview') {
+          const completedColumns = [
+            { header: 'S.No', field: 'sNo' }, { header: 'WO No', field: 'workOrderNo' }, { header: 'Component', field: 'componentName' },
+            { header: 'Job Title', field: 'jobTitle' }, { header: 'Job Type', field: 'jobType' }, { header: 'Dept', field: 'department' },
+            { header: 'Priority', field: 'priority' }, { header: 'Assigned To', field: 'assignedTo' },
+            { header: 'Start Date', field: 'startDate' }, { header: 'Completion Date', field: 'completionDate' },
+            { header: 'Man Hours', field: 'manHours' }
+          ];
+          const completedSummary = [
+            { label: 'Total Jobs', value: data.length },
+            { label: 'Total Man-Hours', value: totalManHours.toFixed(1) }
+          ];
+          return { title: 'COMPLETED JOBS REGISTER', subtitle: `Vessel: ${vesselName}`, vessel: vesselName, columns: completedColumns, data, summary: completedSummary } as ReportPreviewData;
+        }
+
         pdfReportGenerator.generateCompletedJobsRegisterReport(
           { 
             title: 'COMPLETED JOBS REGISTER', 
@@ -827,6 +849,8 @@ const MaintenanceReports: React.FC<MaintenanceReportsProps> = ({ onBack, globalF
           { label: 'Cumulative Overdue', value: totalOverdue }
         ];
 
+        if (mode === 'preview') return { title: 'Monthly Maintenance Summary', subtitle: `Performance metrics for ${periodLabel}`, vessel: vesselName, columns, data, summary } as ReportPreviewData;
+
         pdfReportGenerator.generateReport(
           { title: 'Monthly Maintenance Summary', subtitle: `Performance metrics for ${periodLabel}`, vessel: vesselName },
           columns,
@@ -878,6 +902,8 @@ const MaintenanceReports: React.FC<MaintenanceReportsProps> = ({ onBack, globalF
           { label: 'With Overdue Jobs', value: metadata.equipmentWithOverdue, color: 'highlight' },
           { label: 'Due Soon (7 days)', value: metadata.equipmentDueSoon }
         ];
+
+        if (mode === 'preview') return { title: 'CRITICAL EQUIPMENT STATUS REPORT', subtitle: 'SOLAS-critical and class-critical equipment', vessel: vesselName, columns, data, summary } as ReportPreviewData;
 
         // Use specialized critical equipment report generator
         pdfReportGenerator.generateCriticalEquipmentReport(
@@ -933,6 +959,8 @@ const MaintenanceReports: React.FC<MaintenanceReportsProps> = ({ onBack, globalF
           { label: 'Avg Time Taken (hrs)', value: metadata.avgTimeTaken },
           { label: 'Date Range', value: `${startDate} to ${endDate}` }
         ];
+
+        if (mode === 'preview') return { title: 'UNPLANNED/BREAKDOWN JOBS REPORT', subtitle: 'Analysis of breakdown maintenance and unplanned work', vessel: vesselName, columns, data: unplannedData, summary } as ReportPreviewData;
 
         // Use specialized unplanned breakdown report generator (same styling as Report 1.5)
         pdfReportGenerator.generateUnplannedBreakdownReport(
@@ -996,6 +1024,8 @@ const MaintenanceReports: React.FC<MaintenanceReportsProps> = ({ onBack, globalF
           { label: 'Total Postponed Jobs', value: data.length }
         ];
 
+        if (mode === 'preview') return { title: 'Job Postponement Log Report', subtitle: 'Audit trail of all postponed jobs with approvals and justifications', vessel: vesselName, columns, data, summary } as ReportPreviewData;
+
         pdfReportGenerator.generateReport(
           { 
             title: 'Job Postponement Log Report', 
@@ -1041,6 +1071,8 @@ const MaintenanceReports: React.FC<MaintenanceReportsProps> = ({ onBack, globalF
           overdue: stats.overdue
         }));
 
+        if (mode === 'preview') return { title: 'Work Priority Performance', subtitle: 'Performance analysis by priority levels', vessel: vesselName, columns, data } as ReportPreviewData;
+
         pdfReportGenerator.generateReport(
           { title: 'Work Priority Performance', subtitle: 'Performance analysis by priority levels', vessel: vesselName },
           columns,
@@ -1071,6 +1103,8 @@ const MaintenanceReports: React.FC<MaintenanceReportsProps> = ({ onBack, globalF
               variance: actual - planned
             };
           });
+
+        if (mode === 'preview') return { title: 'Man-Hours Analysis', subtitle: 'Planned vs Actual hours comparison', vessel: vesselName, columns, data } as ReportPreviewData;
 
         pdfReportGenerator.generateReport(
           { title: 'Man-Hours Analysis', subtitle: 'Planned vs Actual hours comparison', vessel: vesselName },
@@ -1187,6 +1221,8 @@ const MaintenanceReports: React.FC<MaintenanceReportsProps> = ({ onBack, globalF
           { label: 'Total Manhours', value: totalManhours.toFixed(1) }
         ];
 
+        if (mode === 'preview') return { title: 'Crew Workload Distribution', subtitle: 'Task distribution across crew ranks and assignments', vessel: vesselName, columns, data, summary } as ReportPreviewData;
+
         pdfReportGenerator.generateReport(
           { title: 'Crew Workload Distribution', subtitle: 'Task distribution across crew ranks and assignments', vessel: vesselName },
           columns,
@@ -1239,6 +1275,8 @@ const MaintenanceReports: React.FC<MaintenanceReportsProps> = ({ onBack, globalF
             { label: 'Avg Utilization', value: `${summary.avgUtilization}%` }
           ];
           
+          if (mode === 'preview') return { title: 'Equipment Utilization Summary', subtitle: `Running hours analysis for ${summary.periodDays} days (${summary.periodStart} to ${summary.periodEnd})`, vessel: vesselName, columns, data: utilizationData, summary: summaryItems } as ReportPreviewData;
+
           pdfReportGenerator.generateReport(
             { 
               title: 'Equipment Utilization Summary', 
@@ -1309,6 +1347,8 @@ const MaintenanceReports: React.FC<MaintenanceReportsProps> = ({ onBack, globalF
             deltaRh: Number(a.deltaRh).toFixed(1)
           }));
           
+          if (mode === 'preview') return { title: 'Running Hours Anomaly Detection', subtitle: `Anomalies detected from ${summary.periodStart?.split('T')[0] || 'N/A'} to ${summary.periodEnd?.split('T')[0] || 'N/A'}`, vessel: vesselName, columns, data: formattedData, summary: summaryItems } as ReportPreviewData;
+
           pdfReportGenerator.generateReport(
             { 
               title: 'Running Hours Anomaly Detection', 
@@ -1492,8 +1532,27 @@ const MaintenanceReports: React.FC<MaintenanceReportsProps> = ({ onBack, globalF
     }
   };
 
-  const handlePreviewReport = (reportId: string) => {
-    handleGenerateReport(reportId, 'PDF');
+  const handlePreviewReport = async (reportId: string) => {
+    try {
+      setGeneratingReports(prev => new Set(prev).add(`${reportId}-PDF`));
+      const data = await generateMaintenancePDF(reportId, 'preview');
+      if (data) {
+        setPreviewData(data);
+        setPreviewOpen(true);
+      }
+    } catch (error: any) {
+      toast({
+        title: "Preview Failed",
+        description: error.message || "Failed to generate report preview.",
+        variant: "destructive",
+      });
+    } finally {
+      setGeneratingReports(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(`${reportId}-PDF`);
+        return newSet;
+      });
+    }
   };
 
   const highPriorityCount = reports.filter(r => r.priority === 'high').length;
@@ -1655,6 +1714,11 @@ const MaintenanceReports: React.FC<MaintenanceReportsProps> = ({ onBack, globalF
           <p className="text-gray-500">Try adjusting your search criteria or filters</p>
         </div>
       )}
+      <ReportPreviewModal
+        open={previewOpen}
+        onClose={() => { setPreviewOpen(false); setPreviewData(null); }}
+        reportData={previewData}
+      />
     </div>
   );
 };

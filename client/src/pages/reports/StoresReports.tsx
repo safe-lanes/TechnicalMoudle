@@ -22,6 +22,7 @@ import {
   Download
 } from "lucide-react";
 import { pdfReportGenerator, formatDate } from "@/lib/pdfReportGenerator";
+import ReportPreviewModal, { ReportPreviewData } from "@/components/reports/ReportPreviewModal";
 import { useToast } from "@/hooks/use-toast";
 import { useVessels } from "@/hooks/useVessels";
 import { useVessel } from "@/contexts/VesselContext";
@@ -64,6 +65,7 @@ const StoresReports: React.FC<StoresReportsProps> = ({ onBack, globalFilters }) 
   });
   const [generatingReports, setGeneratingReports] = useState<Set<string>>(new Set());
   const [selectedReport, setSelectedReport] = useState<string | null>(null);
+  const [previewData, setPreviewData] = useState<ReportPreviewData | null>(null);
   const { toast } = useToast();
   const { data: vessels = [] } = useVessels();
   const { vesselId: contextVesselId } = useVessel();
@@ -187,7 +189,7 @@ const StoresReports: React.FC<StoresReportsProps> = ({ onBack, globalFilters }) 
     return 'OK';
   };
 
-  const generateStoresPDF = async (reportId: string) => {
+  const generateStoresReport = async (reportId: string, mode: 'preview' | 'download' = 'download') => {
     const vesselName = effectiveVesselId === 'all' ? 'All Vessels' : (vessels.find(v => v.id === effectiveVesselId)?.name || effectiveVesselId || 'Unknown Vessel');
 
     switch (reportId) {
@@ -224,11 +226,13 @@ const StoresReports: React.FC<StoresReportsProps> = ({ onBack, globalFilters }) 
           { label: 'OK', value: data.filter((d: any) => d.status === 'OK').length }
         ];
 
+        if (mode === 'preview') {
+          setPreviewData({ title: 'Stores Inventory Status', subtitle: 'Complete inventory listing', vessel: vesselName, columns, data, summary });
+          return;
+        }
         pdfReportGenerator.generateReport(
           { title: 'Stores Inventory Status', subtitle: 'Complete inventory listing', vessel: vesselName },
-          columns,
-          data,
-          summary
+          columns, data, summary
         );
         break;
       }
@@ -263,11 +267,13 @@ const StoresReports: React.FC<StoresReportsProps> = ({ onBack, globalFilters }) 
           { label: 'Low Stock', value: data.filter((d: any) => d.status === 'Low').length }
         ];
 
+        if (mode === 'preview') {
+          setPreviewData({ title: 'Lubricants & Oil Analysis', subtitle: 'Stock levels and status', vessel: vesselName, columns, data, summary });
+          return;
+        }
         pdfReportGenerator.generateReport(
           { title: 'Lubricants & Oil Analysis', subtitle: 'Stock levels and status', vessel: vesselName },
-          columns,
-          data,
-          summary
+          columns, data, summary
         );
         break;
       }
@@ -324,11 +330,13 @@ const StoresReports: React.FC<StoresReportsProps> = ({ onBack, globalFilters }) 
           { label: 'SDS Compliance', value: data.length > 0 ? `${Math.round((withSds / data.length) * 100)}%` : '0%' }
         ];
 
+        if (mode === 'preview') {
+          setPreviewData({ title: 'Chemicals Inventory & Expiry', subtitle: 'Chemical stock tracking with expiry & SDS compliance', vessel: vesselName, columns, data, summary });
+          return;
+        }
         pdfReportGenerator.generateReport(
           { title: 'Chemicals Inventory & Expiry', subtitle: 'Chemical stock tracking with expiry & SDS compliance', vessel: vesselName },
-          columns,
-          data,
-          summary
+          columns, data, summary
         );
         break;
       }
@@ -382,11 +390,13 @@ const StoresReports: React.FC<StoresReportsProps> = ({ onBack, globalFilters }) 
           { label: 'Est. Total Cost', value: reportSummary.estimatedTotalCost ? `$${reportSummary.estimatedTotalCost}` : '$0' },
         ];
 
+        if (mode === 'preview') {
+          setPreviewData({ title: 'Low Stock Alert Report', subtitle: 'Items requiring reorder', vessel: vesselName, columns, data, summary });
+          return;
+        }
         pdfReportGenerator.generateReport(
           { title: 'Low Stock Alert Report', subtitle: 'Items requiring reorder', vessel: vesselName, orientation: 'landscape' },
-          columns,
-          data,
-          summary
+          columns, data, summary
         );
         break;
       }
@@ -395,6 +405,37 @@ const StoresReports: React.FC<StoresReportsProps> = ({ onBack, globalFilters }) 
         const apiRes = await fetch(`/technical/api/reports/stores-consumption-analysis/${effectiveVesselId}`, { credentials: 'include' });
         if (!apiRes.ok) throw new Error('Failed to fetch consumption analysis data');
         const freshData = await apiRes.json();
+
+        if (mode === 'preview') {
+          const topItems = freshData.topConsumedItems || [];
+          const columns = [
+            { header: 'S.No', field: 'sno', width: 12 },
+            { header: 'Item Code', field: 'itemCode', width: 25 },
+            { header: 'Item Name', field: 'itemName', width: 45 },
+            { header: 'Category', field: 'category', width: 25 },
+            { header: 'Total Consumed', field: 'totalConsumed', width: 25 },
+            { header: 'Events', field: 'events', width: 15 },
+            { header: 'Current ROB', field: 'rob', width: 20 },
+          ];
+          const data = topItems.map((i: any, idx: number) => ({
+            sno: idx + 1,
+            itemCode: i.itemCode || '-',
+            itemName: i.itemName || '-',
+            category: i.category || '-',
+            totalConsumed: i.totalConsumed || 0,
+            events: i.consumptionEvents || i.events || 0,
+            rob: i.currentRob || i.rob || 0,
+          }));
+          const summaryInfo = freshData.summary || {};
+          const summary = [
+            { label: 'Total Items Analyzed', value: summaryInfo.totalItems || data.length },
+            { label: 'Total Consumption', value: summaryInfo.totalConsumed || 0 },
+            { label: 'Categories', value: (freshData.categoryBreakdown || []).length },
+          ];
+          setPreviewData({ title: 'Consumption Pattern Analysis', subtitle: 'Stores consumption patterns and trends', vessel: vesselName, columns, data, summary });
+          return;
+        }
+
         const daysOfData = freshData.summary?.dataQuality?.daysOfData || 0;
         const confidence = daysOfData > 90 ? 'High' : daysOfData >= 30 ? 'Medium' : 'Low';
         pdfReportGenerator.generateConsumptionAnalysisPDF(
@@ -428,6 +469,16 @@ const StoresReports: React.FC<StoresReportsProps> = ({ onBack, globalFilters }) 
     }
   };
 
+  const handlePreviewReport = async (reportId: string) => {
+    try {
+      toast({ title: "Loading Preview", description: "Preparing report data..." });
+      await generateStoresReport(reportId, 'preview');
+    } catch (error: any) {
+      console.error('Error generating preview:', error);
+      toast({ title: "Preview Failed", description: error.message || "Failed to load report preview.", variant: "destructive" });
+    }
+  };
+
   const handleGenerateReport = async (reportId: string, format: 'PDF' | 'Excel') => {
     const reportKey = `${reportId}-${format}`;
     
@@ -443,7 +494,7 @@ const StoresReports: React.FC<StoresReportsProps> = ({ onBack, globalFilters }) 
       toast({ title: "Generating Report", description: `Creating ${format} report...` });
 
       if (format === 'PDF') {
-        await generateStoresPDF(reportId);
+        await generateStoresReport(reportId, 'download');
         toast({ title: "Report Generated", description: `${format} report downloaded successfully!` });
       } else {
         if (reportId === 'stores-inventory-status') {
@@ -671,17 +722,12 @@ const StoresReports: React.FC<StoresReportsProps> = ({ onBack, globalFilters }) 
                         if (report.id === 'stores-inventory-status' || report.id === 'chemicals-tracking' || report.id === 'low-stock-alert' || report.id === 'stores-consumption-analysis') {
                           setSelectedReport(report.id);
                         } else {
-                          handleGenerateReport(report.id, 'PDF');
+                          handlePreviewReport(report.id);
                         }
                       }}
-                      disabled={generatingReports.has(`${report.id}-PDF`)}
                       data-testid={`button-preview-${report.id}`}
                     >
-                      {generatingReports.has(`${report.id}-PDF`) ? (
-                        <Loader2 className="h-4 w-4 animate-spin" />
-                      ) : (
-                        <Eye className="h-4 w-4" />
-                      )}
+                      <Eye className="h-4 w-4" />
                     </Button>
                     {report.outputs.includes('PDF') && (
                       <Button 
@@ -722,6 +768,12 @@ const StoresReports: React.FC<StoresReportsProps> = ({ onBack, globalFilters }) 
           <p className="text-gray-500">Try adjusting your search criteria or filters</p>
         </div>
       )}
+
+      <ReportPreviewModal
+        open={!!previewData}
+        onClose={() => setPreviewData(null)}
+        reportData={previewData}
+      />
     </div>
   );
 };
