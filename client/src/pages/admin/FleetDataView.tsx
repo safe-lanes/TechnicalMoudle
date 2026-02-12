@@ -4,7 +4,7 @@ import { useVessels } from "@/hooks/useVessels";
 import { useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { ChevronRight, ChevronDown, Plus, Search, Pencil, X, FileSpreadsheet, Trash2, Anchor, Briefcase, Info, ArrowLeft } from "lucide-react";
+import { ChevronRight, ChevronDown, Plus, Search, Pencil, X, FileSpreadsheet, Trash2, Anchor, Briefcase, Info, ArrowLeft, Ship } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Label } from "@/components/ui/label";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -1213,71 +1213,78 @@ export default function FleetDataView({ onBack }: { onBack?: () => void }) {
           }
         }}
       >
-        <DialogContent className="max-w-md max-h-[80vh]">
-          <DialogHeader className="flex flex-row items-center justify-between pb-3">
-            <DialogTitle className="text-base font-semibold text-gray-800">
-              Vessel Mapping Overview
-            </DialogTitle>
-            <div className="flex items-center gap-2">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={handleRemoveMappings}
-                disabled={selectedMappingIds.size === 0 || removeMappingsMutation.isPending}
-                className="text-blue-600 border-blue-600 hover:bg-blue-50"
-                data-testid="btn-remove-mapping"
-              >
-                Remove Mapping
-              </Button>
-              <Button
-                size="sm"
-                className="bg-blue-600 hover:bg-blue-700 text-white"
-                onClick={() => {
-                  setSelectedVesselsToMap(new Set());
-                  setVesselMappingSearchQuery("");
-                  setIsVesselMappingDialogOpen(true);
-                }}
-                data-testid="btn-vessel-mapping"
-              >
-                Vessel Mapping
-              </Button>
+        <DialogContent className="max-w-sm max-h-[70vh] p-0 gap-0">
+          <div className="bg-gradient-to-r from-cyan-600 to-blue-600 px-4 py-2.5 rounded-t-lg">
+            <div className="flex items-center justify-between gap-2">
+              <div className="flex items-center gap-2">
+                <Ship className="h-3.5 w-3.5 text-white" />
+                <DialogTitle className="text-xs font-semibold text-white">
+                  Vessel Mapping Overview
+                </DialogTitle>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleRemoveMappings}
+                  disabled={selectedMappingIds.size === 0 || removeMappingsMutation.isPending}
+                  className="h-6 px-2 text-[10px] bg-white/10 border-white/30 text-white hover:bg-white/20"
+                  data-testid="btn-remove-mapping"
+                >
+                  Remove
+                </Button>
+                <Button
+                  size="sm"
+                  className="h-6 px-2 text-[10px] bg-white text-blue-700 hover:bg-blue-50"
+                  onClick={() => {
+                    setSelectedVesselsToMap(new Set());
+                    setVesselMappingSearchQuery("");
+                    setIsVesselMappingDialogOpen(true);
+                  }}
+                  data-testid="btn-vessel-mapping"
+                >
+                  Add Vessel
+                </Button>
+              </div>
             </div>
-          </DialogHeader>
+          </div>
 
-          <ScrollArea className="h-[300px]">
-            <table className="w-full text-sm">
-              <thead className="sticky top-0 bg-white">
-                <tr className="border-b text-gray-500 text-xs">
-                  <th className="text-left py-2 px-2 font-normal w-12">
+          <ScrollArea className="h-[250px]">
+            <table className="w-full text-xs">
+              <thead className="sticky top-0 bg-gray-50 z-10">
+                <tr className="border-b text-gray-500">
+                  <th className="text-left py-1.5 px-2 font-medium w-10">
                     <Checkbox
                       checked={
                         filteredMappingsForDialog.length > 0 &&
                         filteredMappingsForDialog.every((m) => selectedMappingIds.has(m.id))
                       }
                       onCheckedChange={handleSelectAllMappings}
+                      className="h-3.5 w-3.5"
                       data-testid="checkbox-select-all"
                     />
                   </th>
-                  <th className="text-left py-2 px-2 font-normal">Vessel Code</th>
-                  <th className="text-left py-2 px-2 font-normal">Vessel Name</th>
+                  <th className="text-left py-1.5 px-2 font-medium">Vessel Code</th>
+                  <th className="text-left py-1.5 px-2 font-medium">Vessel Name</th>
                 </tr>
               </thead>
               <tbody>
                 {filteredMappingsForDialog.length > 0 ? (
                   filteredMappingsForDialog.map((mapping) => (
-                    <tr key={mapping.id} className="border-b last:border-0 hover:bg-gray-50">
-                      <td className="py-2 px-2">
+                    <tr key={mapping.id} className="border-b last:border-0 hover:bg-blue-50/50">
+                      <td className="py-1.5 px-2">
                         <Checkbox
                           checked={selectedMappingIds.has(mapping.id)}
                           onCheckedChange={(checked) =>
                             handleMappingCheckboxChange(mapping.id, checked as boolean)
                           }
+                          className="h-3.5 w-3.5"
                           data-testid={`checkbox-mapping-${mapping.id}`}
                         />
                       </td>
-                      <td className="py-2 px-2">{mapping.vesselCode || mapping.vesselId}</td>
+                      <td className="py-1.5 px-2 text-gray-600">{mapping.vesselCode || mapping.vesselId}</td>
                       <td 
-                        className="py-2 px-2 cursor-pointer text-blue-600 hover:underline"
+                        className="py-1.5 px-2 cursor-pointer text-blue-600 hover:underline font-medium"
                         onClick={() => {
                           setSelectedVesselForDetail(mapping);
                           setSelectedDetailMappingIds(new Set());
@@ -1292,7 +1299,7 @@ export default function FleetDataView({ onBack }: { onBack?: () => void }) {
                   ))
                 ) : (
                   <tr>
-                    <td colSpan={3} className="py-8 text-center text-gray-500">
+                    <td colSpan={3} className="py-6 text-center text-gray-400 text-xs">
                       No vessel mappings found for this component
                     </td>
                   </tr>
