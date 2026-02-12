@@ -56,7 +56,7 @@ export class RunningHoursService {
 
   async getChildren(parentCode: string, vesselId: string) {
     const allComponents = await runningHoursRepository.getComponents(vesselId);
-    const parent = allComponents.find(c => c.componentCode === parentCode || c.id === parentCode);
+    const parent = allComponents.find(c => c.componentCode === parentCode || c.cuuid === parentCode);
 
     if (!parent) {
       return null;

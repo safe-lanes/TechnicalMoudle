@@ -83,14 +83,14 @@ export function registerRunningHoursRoutes(app: Express) {
       // Get all components for the vessel to find parent
       const allComponents = await storage.getComponents(vesselId);
       
-      // Find the parent component by code or id
-      const parent = allComponents.find(c => c.componentCode === parentCode || c.id === parentCode);
+      // Find the parent component by code or cuuid
+      const parent = allComponents.find(c => c.componentCode === parentCode || c.cuuid === parentCode);
       if (!parent) {
         return res.status(404).json({ error: "Parent component not found" });
       }
       
       // Use storage layer method which handles all ID formats (composite, code, uuid)
-      const children = await storage.getInheritedComponents(parent.id, vesselId);
+      const children = await storage.getInheritedComponents(parent.cuuid, vesselId);
       
       // Format response with RH data for each child
       const childrenWithRH = children.map(child => {
@@ -586,7 +586,7 @@ export function registerRunningHoursRoutes(app: Express) {
         if (currentRH > 0) {
           try {
             const result = await storage.updateMasterRunningHours({
-              componentId: master.id,
+              componentId: master.cuuid,
               newRHValue: currentRH,
               updateSource: 'AUTOMATION',
               userId: userId,
