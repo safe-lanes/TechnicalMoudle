@@ -333,11 +333,11 @@ export default function Admin4Dashboard({ onSubViewChange }: { onSubViewChange?:
                   <div className="p-2 bg-indigo-100 rounded-lg">
                     <FileCode2 className="h-4 w-4 text-indigo-600" />
                   </div>
-                  <Button variant="ghost" size="sm" onClick={() => setCurrentView('master-data')} className="text-cyan-600 text-xs" data-testid="button-view-master-data">
+                  <Button variant="ghost" size="sm" onClick={() => setCurrentView('master-data-table')} className="text-cyan-600 text-xs" data-testid="button-view-master-data">
                     View <ArrowRight className="ml-1 h-3 w-3" />
                   </Button>
                 </div>
-                <div className="text-2xl font-bold text-gray-900" data-testid="widget-total-master-data">{isMasterDataLoading ? '...' : totalMasterData}</div>
+                <div className="text-2xl font-bold text-gray-900" data-testid="widget-total-master-data">{isComponentsLoading ? '...' : totalComponents}</div>
                 <p className="text-xs text-gray-500 mt-0.5">Equipment Codes</p>
               </CardContent>
             </Card>
