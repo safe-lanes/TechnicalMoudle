@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import {
@@ -47,6 +48,8 @@ const GlobalFilters: React.FC<GlobalFiltersProps> = ({
   className
 }) => {
   const { data: vessels = [] } = useVessels();
+  const [datePopoverOpen, setDatePopoverOpen] = useState(false);
+  const [pendingRange, setPendingRange] = useState<{ from?: Date; to?: Date }>({});
 
   const handleVesselChange = (value: string) => {
     onFiltersChange({ ...filters, vessel: value });
@@ -117,7 +120,15 @@ const GlobalFilters: React.FC<GlobalFiltersProps> = ({
           <Label className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-1 block" data-testid="G14">
             Date Range
           </Label>
-          <Popover>
+          <Popover open={datePopoverOpen} onOpenChange={(isOpen) => {
+            setDatePopoverOpen(isOpen);
+            if (isOpen) {
+              setPendingRange({
+                from: filters.dateRange.from || undefined,
+                to: filters.dateRange.to || undefined,
+              });
+            }
+          }}>
             <PopoverTrigger asChild>
               <Button
                 variant="outline"
@@ -136,30 +147,56 @@ const GlobalFilters: React.FC<GlobalFiltersProps> = ({
                 initialFocus
                 mode="range"
                 selected={{
-                  from: filters.dateRange.from || undefined,
-                  to: filters.dateRange.to || undefined,
+                  from: pendingRange.from,
+                  to: pendingRange.to,
                 }}
                 onSelect={(range) => {
-                  handleDateRangeChange(
-                    range?.from || null,
-                    range?.to || null
-                  );
+                  setPendingRange({
+                    from: range?.from || undefined,
+                    to: range?.to || undefined,
+                  });
                 }}
                 numberOfMonths={2}
               />
-              {(filters.dateRange.from || filters.dateRange.to) && (
-                <div className="p-3 border-t">
+              <div className="flex items-center justify-between gap-2 p-3 border-t">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    handleDateRangeChange(null, null);
+                    setDatePopoverOpen(false);
+                  }}
+                  className="text-xs"
+                  data-testid="button-clear-date-range"
+                >
+                  Clear
+                </Button>
+                <div className="flex items-center gap-2">
                   <Button
                     variant="outline"
                     size="sm"
-                    onClick={clearDateRange}
-                    className="w-full"
-                    data-testid="button-clear-date-range"
+                    onClick={() => setDatePopoverOpen(false)}
+                    className="text-xs"
+                    data-testid="button-date-range-cancel"
                   >
-                    Clear Date Range
+                    Cancel
+                  </Button>
+                  <Button
+                    size="sm"
+                    className="text-xs"
+                    onClick={() => {
+                      handleDateRangeChange(
+                        pendingRange.from || null,
+                        pendingRange.to || null
+                      );
+                      setDatePopoverOpen(false);
+                    }}
+                    data-testid="button-date-range-ok"
+                  >
+                    OK
                   </Button>
                 </div>
-              )}
+              </div>
             </PopoverContent>
           </Popover>
         </div>

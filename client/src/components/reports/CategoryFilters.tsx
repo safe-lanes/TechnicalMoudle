@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -44,6 +45,8 @@ const CategoryFilters: React.FC<CategoryFiltersProps> = ({
   className
 }) => {
   const { data: vessels = [] } = useVessels();
+  const [catDatePopoverOpen, setCatDatePopoverOpen] = useState(false);
+  const [catPendingRange, setCatPendingRange] = useState<{ from?: Date; to?: Date }>({});
 
   const handleSearchChange = (value: string) => {
     onFiltersChange({ ...filters, searchQuery: value });
@@ -126,7 +129,15 @@ const CategoryFilters: React.FC<CategoryFiltersProps> = ({
           <Label className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-1 block">
             Date Range
           </Label>
-          <Popover>
+          <Popover open={catDatePopoverOpen} onOpenChange={(isOpen) => {
+            setCatDatePopoverOpen(isOpen);
+            if (isOpen) {
+              setCatPendingRange({
+                from: filters.dateRange.from || undefined,
+                to: filters.dateRange.to || undefined,
+              });
+            }
+          }}>
             <PopoverTrigger asChild>
               <Button
                 variant="outline"
@@ -145,30 +156,56 @@ const CategoryFilters: React.FC<CategoryFiltersProps> = ({
                 initialFocus
                 mode="range"
                 selected={{
-                  from: filters.dateRange.from || undefined,
-                  to: filters.dateRange.to || undefined,
+                  from: catPendingRange.from,
+                  to: catPendingRange.to,
                 }}
                 onSelect={(range) => {
-                  handleDateRangeChange(
-                    range?.from || null,
-                    range?.to || null
-                  );
+                  setCatPendingRange({
+                    from: range?.from || undefined,
+                    to: range?.to || undefined,
+                  });
                 }}
                 numberOfMonths={2}
               />
-              {(filters.dateRange.from || filters.dateRange.to) && (
-                <div className="p-3 border-t">
+              <div className="flex items-center justify-between gap-2 p-3 border-t">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    handleDateRangeChange(null, null);
+                    setCatDatePopoverOpen(false);
+                  }}
+                  className="text-xs"
+                  data-testid="button-clear-category-date-range"
+                >
+                  Clear
+                </Button>
+                <div className="flex items-center gap-2">
                   <Button
                     variant="outline"
                     size="sm"
-                    onClick={() => handleDateRangeChange(null, null)}
-                    className="w-full"
-                    data-testid="button-clear-category-date-range"
+                    onClick={() => setCatDatePopoverOpen(false)}
+                    className="text-xs"
+                    data-testid="button-cat-date-range-cancel"
                   >
-                    Clear Date Range
+                    Cancel
+                  </Button>
+                  <Button
+                    size="sm"
+                    className="text-xs"
+                    onClick={() => {
+                      handleDateRangeChange(
+                        catPendingRange.from || null,
+                        catPendingRange.to || null
+                      );
+                      setCatDatePopoverOpen(false);
+                    }}
+                    data-testid="button-cat-date-range-ok"
+                  >
+                    OK
                   </Button>
                 </div>
-              )}
+              </div>
             </PopoverContent>
           </Popover>
         </div>
