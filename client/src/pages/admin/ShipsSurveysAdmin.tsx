@@ -120,7 +120,10 @@ export default function ShipsSurveysAdmin() {
   const [selectedGroup, setSelectedGroup] = useState("All Groups");
   
   const [masterData, setMasterData] = useState<MasterSurvey[]>([]);
+  const [draftMasterData, setDraftMasterData] = useState<MasterSurvey[] | null>(null);
+  const [masterSnapshot, setMasterSnapshot] = useState<MasterSurvey[] | null>(null);
   const [deletedMasterIds, setDeletedMasterIds] = useState<string[]>([]);
+  const [deletedDraftIds, setDeletedDraftIds] = useState<string[]>([]);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const [masterValidationError, setMasterValidationError] = useState("");
   const [invalidSurveyIds, setInvalidSurveyIds] = useState<Set<number>>(new Set());
@@ -273,12 +276,19 @@ export default function ShipsSurveysAdmin() {
         title: "Saved successfully",
         description: `${data.inserted || 0} new surveys added, ${data.updated || 0} updated`,
       });
+      if (activeTab === "master" && draftMasterData) {
+        setMasterData(draftMasterData);
+        setDraftMasterData(null);
+        setMasterSnapshot(null);
+        setDeletedDraftIds([]);
+      }
       setHasUnsavedChanges(false);
       setHasSavedInSession(prev => ({ ...prev, [activeTab]: true }));
-      setCompanyOnlySurveys([]); // Clear company-only surveys after save - they'll be in masterData on reload
-      setVesselOnlySurveys([]); // Clear vessel-only surveys after save - they'll be in masterData on reload
+      setCompanyOnlySurveys([]);
+      setVesselOnlySurveys([]);
       queryClient.invalidateQueries({ queryKey: ['/technical/api/admin/ship-surveys-master'] });
       queryClient.invalidateQueries({ queryKey: ['/technical/api/admin/vessel-survey-applicability', selectedVesselIds] });
+      setViewModes(prev => ({ ...prev, [activeTab]: "view" }));
     },
     onError: (error: any) => {
       toast({
@@ -307,8 +317,11 @@ export default function ShipsSurveysAdmin() {
   });
 
   const handleSave = async () => {
-    // Validate mandatory fields for all surveys in masterData
-    const invalidSurveys = masterData.filter(s => 
+    if (activeTab === "master" && !draftMasterData) return;
+    const dataToSave = activeTab === "master" ? draftMasterData! : masterData;
+    const idsToDelete = activeTab === "master" ? deletedDraftIds : deletedMasterIds;
+    
+    const invalidSurveys = dataToSave.filter(s => 
       !s.surveyName?.trim() || !s.category?.trim() || !s.group?.trim()
     );
     
@@ -318,13 +331,11 @@ export default function ShipsSurveysAdmin() {
       return;
     }
     
-    // Clear validation errors
     setMasterValidationError("");
     setInvalidSurveyIds(new Set());
     
-    // First, delete any surveys that were removed
     let deleteErrors = 0;
-    for (const masterId of deletedMasterIds) {
+    for (const masterId of idsToDelete) {
       try {
         await apiRequest('DELETE', `/technical/api/admin/ship-surveys-master/${masterId}`);
       } catch (err) {
@@ -342,12 +353,15 @@ export default function ShipsSurveysAdmin() {
       return;
     }
     
-    setDeletedMasterIds([]);
+    if (activeTab === "master") {
+      setDeletedDraftIds([]);
+    } else {
+      setDeletedMasterIds([]);
+    }
     
-    // Find max sequence numbers for CMP- and VES- IDs
     let maxCmpSeq = 0;
     let maxVesSeq = 0;
-    for (const survey of masterData) {
+    for (const survey of dataToSave) {
       const cmpMatch = survey.masterId.match(/^CMP-(\d+)$/);
       if (cmpMatch) {
         const seq = parseInt(cmpMatch[1], 10);
@@ -370,13 +384,12 @@ export default function ShipsSurveysAdmin() {
       return {
         ...survey,
         masterId: newMasterId,
-        sequence: masterData.length + idx + 1,
+        sequence: dataToSave.length + idx + 1,
       };
     });
     
-    // Convert vessel-only surveys to master format with VES- IDs
     let nextVesSeq = maxVesSeq + 1;
-    const baseSequence = masterData.length + companyOnlySurveysWithIds.length;
+    const baseSequence = dataToSave.length + companyOnlySurveysWithIds.length;
     const vesselOnlySurveysWithIds: MasterSurvey[] = vesselOnlySurveys.map((survey, idx) => {
       const newMasterId = survey.masterId.startsWith('VES-') 
         ? survey.masterId 
@@ -398,8 +411,7 @@ export default function ShipsSurveysAdmin() {
       };
     });
     
-    // Merge all surveys for saving
-    const allSurveys = [...masterData, ...companyOnlySurveysWithIds, ...vesselOnlySurveysWithIds];
+    const allSurveys = [...dataToSave, ...companyOnlySurveysWithIds, ...vesselOnlySurveysWithIds];
     
     // Get selected vessel info for vessel-specific survey applicability
     const targetVessels = vesselMasterData
@@ -416,6 +428,15 @@ export default function ShipsSurveysAdmin() {
   };
 
   const toggleViewMode = () => {
+    const enteringEdit = viewModes[activeTab] === "view";
+    if (enteringEdit && activeTab === "master") {
+      setMasterSnapshot(masterData.map(s => ({ ...s })));
+      setDraftMasterData(masterData.map(s => ({ ...s })));
+      setDeletedDraftIds([]);
+      setHasUnsavedChanges(false);
+      setMasterValidationError("");
+      setInvalidSurveyIds(new Set());
+    }
     setViewModes(prev => ({
       ...prev,
       [activeTab]: prev[activeTab] === "view" ? "edit" : "view"
@@ -423,11 +444,18 @@ export default function ShipsSurveysAdmin() {
   };
 
   const exitEditMode = () => {
-    // Clear validation errors
     setMasterValidationError("");
     setInvalidSurveyIds(new Set());
     
-    // Always reload from server to discard any unsaved/incomplete entries
+    if (activeTab === "master") {
+      if (masterSnapshot) {
+        setMasterData(masterSnapshot);
+      }
+      setDraftMasterData(null);
+      setMasterSnapshot(null);
+      setDeletedDraftIds([]);
+    }
+    
     queryClient.invalidateQueries({ queryKey: ['/technical/api/admin/ship-surveys-master'] });
     setDeletedMasterIds([]);
     
@@ -436,8 +464,10 @@ export default function ShipsSurveysAdmin() {
   };
 
   const addNewRow = () => {
-    const nextSeq = masterData.length > 0 ? Math.max(...masterData.map(s => s.sequence)) + 1 : 1;
-    const nextId = masterData.length > 0 ? Math.max(...masterData.map(s => s.id)) + 1 : 1;
+    if (!draftMasterData) return;
+    const currentData = draftMasterData;
+    const nextSeq = currentData.length > 0 ? Math.max(...currentData.map(s => s.sequence)) + 1 : 1;
+    const nextId = currentData.length > 0 ? Math.max(...currentData.map(s => s.id)) + 1 : 1;
     const newMasterId = `A1-${String(nextSeq).padStart(3, '0')}`;
     
     const newSurvey: MasterSurvey = {
@@ -452,7 +482,7 @@ export default function ShipsSurveysAdmin() {
       surveyLabel: "",
     };
     
-    setMasterData(prev => [...prev, newSurvey]);
+    setDraftMasterData(prev => prev ? [...prev, newSurvey] : [newSurvey]);
     setHasUnsavedChanges(true);
   };
 
@@ -465,11 +495,13 @@ export default function ShipsSurveysAdmin() {
   };
 
   const deleteRow = (id: number) => {
-    const surveyToDelete = masterData.find(s => s.id === id);
+    if (!draftMasterData) return;
+    const surveyToDelete = draftMasterData.find(s => s.id === id);
     if (surveyToDelete && surveyToDelete.masterId) {
-      setDeletedMasterIds(prev => [...prev, surveyToDelete.masterId]);
+      setDeletedDraftIds(prev => [...prev, surveyToDelete.masterId]);
     }
-    setMasterData(prev => {
+    setDraftMasterData(prev => {
+      if (!prev) return prev;
       const filtered = prev.filter(s => s.id !== id);
       return recomputeMasterIds(filtered);
     });
@@ -477,7 +509,8 @@ export default function ShipsSurveysAdmin() {
   };
 
   const updateField = (id: number, field: keyof MasterSurvey, value: any) => {
-    setMasterData(prev => {
+    setDraftMasterData(prev => {
+      if (!prev) return prev;
       const updatedData = prev.map(s => {
         if (s.id === id) {
           const updated = { ...s, [field]: value };
@@ -491,7 +524,6 @@ export default function ShipsSurveysAdmin() {
         return s;
       });
       
-      // Clear validation errors when editing - revalidate based on updated data
       if (field === "surveyName" || field === "category" || field === "group") {
         const invalidSurveys = updatedData.filter(s => 
           !s.surveyName?.trim() || !s.category?.trim() || !s.group?.trim()
@@ -510,7 +542,8 @@ export default function ShipsSurveysAdmin() {
   };
 
   const updateSequence = (surveyId: number, newSequence: number) => {
-    setMasterData(prevData => {
+    setDraftMasterData(prevData => {
+      if (!prevData) return prevData;
       const currentSurvey = prevData.find(s => s.id === surveyId);
       if (!currentSurvey) return prevData;
       
@@ -522,13 +555,11 @@ export default function ShipsSurveysAdmin() {
           return { ...s, sequence: newSequence };
         }
         
-        // Moving up (e.g., 4 → 2): shift items in [newSequence, oldSequence-1] down by 1
         if (newSequence < oldSequence) {
           if (s.sequence >= newSequence && s.sequence < oldSequence) {
             return { ...s, sequence: s.sequence + 1 };
           }
         }
-        // Moving down (e.g., 2 → 4): shift items in [oldSequence+1, newSequence] up by 1
         else {
           if (s.sequence > oldSequence && s.sequence <= newSequence) {
             return { ...s, sequence: s.sequence - 1 };
@@ -877,7 +908,8 @@ export default function ShipsSurveysAdmin() {
     setHasUnsavedChanges(true);
   };
 
-  const sortedMasterData = [...masterData].sort((a, b) => a.sequence - b.sequence);
+  const activeMasterData = (isEditMode && activeTab === "master" && draftMasterData) ? draftMasterData : masterData;
+  const sortedMasterData = [...activeMasterData].sort((a, b) => a.sequence - b.sequence);
 
   const filteredData = sortedMasterData.filter(survey => {
     const matchesSearch = searchTerm === "" || 
@@ -896,7 +928,21 @@ export default function ShipsSurveysAdmin() {
             Ship Surveys Admin
           </h1>
         
-          <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as TabType)} className="absolute left-1/2 -translate-x-1/2">
+          <Tabs value={activeTab} onValueChange={(v) => {
+                    if (activeTab === "master" && viewModes.master === "edit") {
+                      if (masterSnapshot) {
+                        setMasterData(masterSnapshot);
+                      }
+                      setDraftMasterData(null);
+                      setMasterSnapshot(null);
+                      setDeletedDraftIds([]);
+                      setHasUnsavedChanges(false);
+                      setMasterValidationError("");
+                      setInvalidSurveyIds(new Set());
+                      setViewModes(prev => ({ ...prev, master: "view" }));
+                    }
+                    setActiveTab(v as TabType);
+                  }} className="absolute left-1/2 -translate-x-1/2">
             <TabsList className="bg-gray-100">
               <TabsTrigger 
                 value="master" 
