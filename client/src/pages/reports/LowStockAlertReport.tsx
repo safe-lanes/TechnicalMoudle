@@ -82,6 +82,7 @@ interface LowStockAlertResponse {
 interface LowStockAlertReportProps {
   onBack: () => void;
   vesselId?: string;
+  source?: 'spares' | 'stores';
 }
 
 type SortField = 'priority' | 'itemCode' | 'itemName' | 'itemType' | 'category' | 'rob' | 'minStock' | 'deficit' | 'deficitPercent' | 'uom' | 'avgMonthlyConsumption' | 'daysUntilStockout' | 'estimatedCost' | 'supplier' | 'leadTime';
@@ -127,11 +128,13 @@ function getDaysUntilStockoutDisplay(days: number | null) {
   return <span className="text-green-600">{days} days</span>;
 }
 
-const LowStockAlertReport: React.FC<LowStockAlertReportProps> = ({ onBack, vesselId: propVesselId }) => {
+const LowStockAlertReport: React.FC<LowStockAlertReportProps> = ({ onBack, vesselId: propVesselId, source = 'stores' }) => {
   const { vesselId: contextVesselId, vessels } = useVessel();
   const effectiveVesselId = propVesselId || contextVesselId;
   const vesselName = effectiveVesselId === 'all' ? 'All Vessels' : (vessels?.find((v: any) => v.id === effectiveVesselId)?.name || effectiveVesselId);
   const { toast } = useToast();
+  const isSpares = source === 'spares';
+  const apiBase = isSpares ? '/technical/api/reports/low-stock-alert' : '/technical/api/reports/stores-low-stock-alert';
 
   const [searchQuery, setSearchQuery] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("all");
@@ -144,13 +147,55 @@ const LowStockAlertReport: React.FC<LowStockAlertReportProps> = ({ onBack, vesse
   const [viewingSnapshotId, setViewingSnapshotId] = useState<number | null>(null);
 
   const { data, isLoading, error } = useQuery<LowStockAlertResponse>({
-    queryKey: ['/technical/api/reports/stores-low-stock-alert', effectiveVesselId],
+    queryKey: [apiBase, effectiveVesselId, source],
     queryFn: async () => {
-      const res = await fetch(`/technical/api/reports/stores-low-stock-alert/${effectiveVesselId}`, {
+      const res = await fetch(`${apiBase}/${effectiveVesselId}`, {
         credentials: 'include',
       });
       if (!res.ok) throw new Error(`${res.status}: ${res.statusText}`);
-      return res.json();
+      const raw = await res.json();
+      if (isSpares) {
+        const mappedItems: LowStockItem[] = (raw.items || []).map((s: any) => ({
+          id: s.id,
+          itemCode: s.partCode || '-',
+          itemName: s.partName || '-',
+          itemType: 'spare',
+          category: s.componentName || '-',
+          rob: s.currentQty ?? 0,
+          minStock: s.minQty ?? 0,
+          maxStock: 0,
+          deficit: s.shortage ?? 0,
+          deficitPercent: s.minQty ? Math.round((s.shortage / s.minQty) * 100) : 0,
+          uom: s.uom || '-',
+          location: s.location || '-',
+          priority: s.status === 'Critical' ? 'Critical' : s.status === 'At Minimum' ? 'Medium' : 'High',
+          lastConsumedDate: null,
+          avgMonthlyConsumption: 0,
+          daysUntilStockout: null,
+          estimatedCost: null,
+          supplier: null,
+          leadTime: null,
+          lastOrderDate: null,
+          unitCost: null,
+        }));
+        const criticalCount = mappedItems.filter(i => i.priority === 'Critical').length;
+        const highCount = mappedItems.filter(i => i.priority === 'High').length;
+        const mediumCount = mappedItems.filter(i => i.priority === 'Medium').length;
+        return {
+          summary: {
+            totalLowStock: raw.summary?.totalLowStock ?? mappedItems.length,
+            criticalItems: raw.summary?.criticalCount ?? criticalCount,
+            highPriorityItems: highCount,
+            mediumPriorityItems: raw.summary?.atMinCount ?? mediumCount,
+            storesCount: 0,
+            lubesCount: 0,
+            chemicalsCount: 0,
+            estimatedTotalCost: 0,
+          },
+          items: mappedItems,
+        };
+      }
+      return raw;
     },
     enabled: !!effectiveVesselId,
   });
@@ -277,7 +322,16 @@ const LowStockAlertReport: React.FC<LowStockAlertReportProps> = ({ onBack, vesse
   const handlePdfExport = async () => {
     setGeneratingPdf(true);
     try {
-      const columns = [
+      const columns = isSpares ? [
+        { header: 'S.No', field: 'sno', width: 12 },
+        { header: 'Priority', field: 'priority', width: 20 },
+        { header: 'Part Code', field: 'itemCode', width: 28 },
+        { header: 'Part Name', field: 'itemName', width: 45 },
+        { header: 'Component', field: 'category', width: 40 },
+        { header: 'Current Qty', field: 'rob', width: 18 },
+        { header: 'Min Qty', field: 'minStock', width: 18 },
+        { header: 'Shortage', field: 'deficit', width: 18 },
+      ] : [
         { header: 'S.No', field: 'sno', width: 12 },
         { header: 'Priority', field: 'priority', width: 20 },
         { header: 'Item Code', field: 'itemCode', width: 22 },
@@ -315,7 +369,11 @@ const LowStockAlertReport: React.FC<LowStockAlertReportProps> = ({ onBack, vesse
         return;
       }
 
-      const summaryData = [
+      const summaryData = isSpares ? [
+        { label: 'Total Low Stock', value: summary.totalLowStock },
+        { label: 'Critical', value: summary.criticalItems },
+        { label: 'At Minimum', value: summary.mediumPriorityItems },
+      ] : [
         { label: 'Total Low Stock', value: summary.totalLowStock },
         { label: 'Critical', value: summary.criticalItems },
         { label: 'High Priority', value: summary.highPriorityItems },
@@ -325,7 +383,7 @@ const LowStockAlertReport: React.FC<LowStockAlertReportProps> = ({ onBack, vesse
 
       pdfReportGenerator.generateReport(
         {
-          title: 'Low Stock Alert Report',
+          title: isSpares ? 'Spares Low Stock Alert Report' : 'Low Stock Alert Report',
           subtitle: `Vessel: ${vesselName || 'Unknown'} | Generated: ${format(new Date(), 'dd MMM yyyy HH:mm')}`,
           vessel: vesselName || 'Unknown',
           orientation: 'landscape',
@@ -375,19 +433,19 @@ const LowStockAlertReport: React.FC<LowStockAlertReportProps> = ({ onBack, vesse
         <table className="w-full" data-testid={`table-${label.toLowerCase()}`}>
           <thead>
             <tr className="bg-gray-50 border-b border-gray-200">
-              <th className="text-left py-3 px-3 font-medium text-xs uppercase text-gray-600">Item Code</th>
-              <th className="text-left py-3 px-3 font-medium text-xs uppercase text-gray-600">Item Name</th>
-              <th className="text-left py-3 px-3 font-medium text-xs uppercase text-gray-600">Category</th>
-              <th className="text-left py-3 px-3 font-medium text-xs uppercase text-gray-600">Type</th>
-              <th className="text-right py-3 px-3 font-medium text-xs uppercase text-gray-600">ROB</th>
-              <th className="text-right py-3 px-3 font-medium text-xs uppercase text-gray-600">Min</th>
-              <th className="text-right py-3 px-3 font-medium text-xs uppercase text-gray-600">Deficit</th>
-              <th className="text-left py-3 px-3 font-medium text-xs uppercase text-gray-600">UOM</th>
-              <th className="text-right py-3 px-3 font-medium text-xs uppercase text-gray-600">Avg Monthly</th>
-              <th className="text-right py-3 px-3 font-medium text-xs uppercase text-gray-600">Days to Stockout</th>
-              <th className="text-right py-3 px-3 font-medium text-xs uppercase text-gray-600">Est. Cost</th>
-              <th className="text-left py-3 px-3 font-medium text-xs uppercase text-gray-600">Supplier</th>
-              <th className="text-left py-3 px-3 font-medium text-xs uppercase text-gray-600">Lead Time</th>
+              <th className="text-left py-3 px-3 font-medium text-xs uppercase text-gray-600">{isSpares ? 'Part Code' : 'Item Code'}</th>
+              <th className="text-left py-3 px-3 font-medium text-xs uppercase text-gray-600">{isSpares ? 'Part Name' : 'Item Name'}</th>
+              <th className="text-left py-3 px-3 font-medium text-xs uppercase text-gray-600">{isSpares ? 'Component' : 'Category'}</th>
+              {!isSpares && <th className="text-left py-3 px-3 font-medium text-xs uppercase text-gray-600">Type</th>}
+              <th className="text-right py-3 px-3 font-medium text-xs uppercase text-gray-600">{isSpares ? 'Current Qty' : 'ROB'}</th>
+              <th className="text-right py-3 px-3 font-medium text-xs uppercase text-gray-600">{isSpares ? 'Min Qty' : 'Min'}</th>
+              <th className="text-right py-3 px-3 font-medium text-xs uppercase text-gray-600">{isSpares ? 'Shortage' : 'Deficit'}</th>
+              {!isSpares && <th className="text-left py-3 px-3 font-medium text-xs uppercase text-gray-600">UOM</th>}
+              {!isSpares && <th className="text-right py-3 px-3 font-medium text-xs uppercase text-gray-600">Avg Monthly</th>}
+              {!isSpares && <th className="text-right py-3 px-3 font-medium text-xs uppercase text-gray-600">Days to Stockout</th>}
+              {!isSpares && <th className="text-right py-3 px-3 font-medium text-xs uppercase text-gray-600">Est. Cost</th>}
+              {!isSpares && <th className="text-left py-3 px-3 font-medium text-xs uppercase text-gray-600">Supplier</th>}
+              {!isSpares && <th className="text-left py-3 px-3 font-medium text-xs uppercase text-gray-600">Lead Time</th>}
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-100">
@@ -396,16 +454,16 @@ const LowStockAlertReport: React.FC<LowStockAlertReportProps> = ({ onBack, vesse
                 <td className="py-3 px-3 font-mono text-gray-700">{item.itemCode || '-'}</td>
                 <td className="py-3 px-3 font-medium text-gray-900">{item.itemName || '-'}</td>
                 <td className="py-3 px-3 text-gray-600">{item.category || '-'}</td>
-                <td className="py-3 px-3">{getTypeBadge(item.itemType)}</td>
+                {!isSpares && <td className="py-3 px-3">{getTypeBadge(item.itemType)}</td>}
                 <td className="py-3 px-3 text-right font-semibold text-gray-900">{item.rob}</td>
                 <td className="py-3 px-3 text-right text-gray-600">{item.minStock}</td>
                 <td className="py-3 px-3 text-right font-semibold text-red-600">{item.deficit}</td>
-                <td className="py-3 px-3 text-gray-600">{item.uom || '-'}</td>
-                <td className="py-3 px-3 text-right text-gray-600">{item.avgMonthlyConsumption}</td>
-                <td className="py-3 px-3 text-right">{getDaysUntilStockoutDisplay(item.daysUntilStockout)}</td>
-                <td className="py-3 px-3 text-right text-gray-700">{formatCurrency(item.estimatedCost)}</td>
-                <td className="py-3 px-3 text-gray-600">{item.supplier || '-'}</td>
-                <td className="py-3 px-3 text-gray-600">{item.leadTime || '-'}</td>
+                {!isSpares && <td className="py-3 px-3 text-gray-600">{item.uom || '-'}</td>}
+                {!isSpares && <td className="py-3 px-3 text-right text-gray-600">{item.avgMonthlyConsumption}</td>}
+                {!isSpares && <td className="py-3 px-3 text-right">{getDaysUntilStockoutDisplay(item.daysUntilStockout)}</td>}
+                {!isSpares && <td className="py-3 px-3 text-right text-gray-700">{formatCurrency(item.estimatedCost)}</td>}
+                {!isSpares && <td className="py-3 px-3 text-gray-600">{item.supplier || '-'}</td>}
+                {!isSpares && <td className="py-3 px-3 text-gray-600">{item.leadTime || '-'}</td>}
               </tr>
             ))}
           </tbody>
@@ -419,9 +477,9 @@ const LowStockAlertReport: React.FC<LowStockAlertReportProps> = ({ onBack, vesse
       <div className="p-6 bg-white min-h-screen">
         <div className="flex items-center gap-4 mb-6">
           <Button variant="ghost" onClick={onBack} data-testid="button-back-low-stock">
-            <ArrowLeft className="h-4 w-4 mr-2" /> Back to Stores Reports
+            <ArrowLeft className="h-4 w-4 mr-2" /> {isSpares ? 'Back to Spares Reports' : 'Back to Stores Reports'}
           </Button>
-          <h1 className="text-2xl font-bold text-gray-900">Low Stock Alert Report</h1>
+          <h1 className="text-2xl font-bold text-gray-900">{isSpares ? 'Spares Low Stock Alert Report' : 'Low Stock Alert Report'}</h1>
         </div>
         <div className="text-center py-16">
           <Package className="h-12 w-12 text-gray-400 mx-auto mb-4" />
@@ -439,11 +497,11 @@ const LowStockAlertReport: React.FC<LowStockAlertReportProps> = ({ onBack, vesse
       <div className="flex items-center justify-between gap-4 mb-6 flex-wrap">
         <div className="flex items-center gap-4">
           <Button variant="ghost" onClick={onBack} data-testid="button-back-low-stock">
-            <ArrowLeft className="h-4 w-4 mr-2" /> Back to Stores Reports
+            <ArrowLeft className="h-4 w-4 mr-2" /> {isSpares ? 'Back to Spares Reports' : 'Back to Stores Reports'}
           </Button>
           <div>
-            <h1 className="text-2xl font-bold text-gray-900">Low Stock Alert Report</h1>
-            <p className="text-sm text-gray-500">Items below minimum stock levels requiring attention</p>
+            <h1 className="text-2xl font-bold text-gray-900">{isSpares ? 'Spares Low Stock Alert Report' : 'Low Stock Alert Report'}</h1>
+            <p className="text-sm text-gray-500">{isSpares ? 'Spare parts below minimum stock levels requiring attention' : 'Items below minimum stock levels requiring attention'}</p>
           </div>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
@@ -456,15 +514,17 @@ const LowStockAlertReport: React.FC<LowStockAlertReportProps> = ({ onBack, vesse
             {generatingPdf ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <FileText className="h-4 w-4 mr-2" />}
             Export PDF
           </Button>
-          <Button
-            variant="outline"
-            onClick={handleExcelExport}
-            disabled={generatingExcel || isLoading}
-            data-testid="button-export-excel"
-          >
-            {generatingExcel ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <ShoppingCart className="h-4 w-4 mr-2" />}
-            Export Excel
-          </Button>
+          {!isSpares && (
+            <Button
+              variant="outline"
+              onClick={handleExcelExport}
+              disabled={generatingExcel || isLoading}
+              data-testid="button-export-excel"
+            >
+              {generatingExcel ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <ShoppingCart className="h-4 w-4 mr-2" />}
+              Export Excel
+            </Button>
+          )}
         </div>
       </div>
 
@@ -472,24 +532,26 @@ const LowStockAlertReport: React.FC<LowStockAlertReportProps> = ({ onBack, vesse
         <div className="relative flex-1 min-w-[200px] max-w-sm">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
           <Input
-            placeholder="Search by code, name, category, supplier..."
+            placeholder={isSpares ? "Search by code, name, component..." : "Search by code, name, category, supplier..."}
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             className="pl-9"
             data-testid="input-search-low-stock"
           />
         </div>
-        <Select value={categoryFilter} onValueChange={setCategoryFilter}>
-          <SelectTrigger className="w-[180px]" data-testid="select-category-filter">
-            <SelectValue placeholder="Category" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All Categories</SelectItem>
-            <SelectItem value="stores">Stores</SelectItem>
-            <SelectItem value="lubricants">Lubricants</SelectItem>
-            <SelectItem value="chemicals">Chemicals</SelectItem>
-          </SelectContent>
-        </Select>
+        {!isSpares && (
+          <Select value={categoryFilter} onValueChange={setCategoryFilter}>
+            <SelectTrigger className="w-[180px]" data-testid="select-category-filter">
+              <SelectValue placeholder="Category" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Categories</SelectItem>
+              <SelectItem value="stores">Stores</SelectItem>
+              <SelectItem value="lubricants">Lubricants</SelectItem>
+              <SelectItem value="chemicals">Chemicals</SelectItem>
+            </SelectContent>
+          </Select>
+        )}
         <Select value={priorityFilter} onValueChange={setPriorityFilter}>
           <SelectTrigger className="w-[180px]" data-testid="select-priority-filter">
             <SelectValue placeholder="Priority" />
@@ -555,44 +617,46 @@ const LowStockAlertReport: React.FC<LowStockAlertReportProps> = ({ onBack, vesse
             </Card>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-            <Card className="bg-purple-50 border-purple-200" data-testid="card-stores-count">
-              <CardHeader className="pb-2">
-                <CardDescription className="flex items-center gap-1">
-                  <Package className="w-4 h-4 text-purple-500" />
-                  Stores Items
-                </CardDescription>
-                <CardTitle className="text-3xl text-purple-700">{summary.storesCount}</CardTitle>
-              </CardHeader>
-            </Card>
-            <Card className="bg-blue-50 border-blue-200" data-testid="card-lubes-count">
-              <CardHeader className="pb-2">
-                <CardDescription className="flex items-center gap-1">
-                  <Droplets className="w-4 h-4 text-blue-500" />
-                  Lubricants
-                </CardDescription>
-                <CardTitle className="text-3xl text-blue-700">{summary.lubesCount}</CardTitle>
-              </CardHeader>
-            </Card>
-            <Card className="bg-green-50 border-green-200" data-testid="card-chemicals-count">
-              <CardHeader className="pb-2">
-                <CardDescription className="flex items-center gap-1">
-                  <FlaskConical className="w-4 h-4 text-green-500" />
-                  Chemicals
-                </CardDescription>
-                <CardTitle className="text-3xl text-green-700">{summary.chemicalsCount}</CardTitle>
-              </CardHeader>
-            </Card>
-            <Card className="bg-gray-50 border-gray-200" data-testid="card-estimated-cost">
-              <CardHeader className="pb-2">
-                <CardDescription className="flex items-center gap-1">
-                  <DollarSign className="w-4 h-4 text-gray-500" />
-                  Est. Total Cost
-                </CardDescription>
-                <CardTitle className="text-2xl text-gray-700">{formatCurrency(summary.estimatedTotalCost)}</CardTitle>
-              </CardHeader>
-            </Card>
-          </div>
+          {!isSpares && (
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+              <Card className="bg-purple-50 border-purple-200" data-testid="card-stores-count">
+                <CardHeader className="pb-2">
+                  <CardDescription className="flex items-center gap-1">
+                    <Package className="w-4 h-4 text-purple-500" />
+                    Stores Items
+                  </CardDescription>
+                  <CardTitle className="text-3xl text-purple-700">{summary.storesCount}</CardTitle>
+                </CardHeader>
+              </Card>
+              <Card className="bg-blue-50 border-blue-200" data-testid="card-lubes-count">
+                <CardHeader className="pb-2">
+                  <CardDescription className="flex items-center gap-1">
+                    <Droplets className="w-4 h-4 text-blue-500" />
+                    Lubricants
+                  </CardDescription>
+                  <CardTitle className="text-3xl text-blue-700">{summary.lubesCount}</CardTitle>
+                </CardHeader>
+              </Card>
+              <Card className="bg-green-50 border-green-200" data-testid="card-chemicals-count">
+                <CardHeader className="pb-2">
+                  <CardDescription className="flex items-center gap-1">
+                    <FlaskConical className="w-4 h-4 text-green-500" />
+                    Chemicals
+                  </CardDescription>
+                  <CardTitle className="text-3xl text-green-700">{summary.chemicalsCount}</CardTitle>
+                </CardHeader>
+              </Card>
+              <Card className="bg-gray-50 border-gray-200" data-testid="card-estimated-cost">
+                <CardHeader className="pb-2">
+                  <CardDescription className="flex items-center gap-1">
+                    <DollarSign className="w-4 h-4 text-gray-500" />
+                    Est. Total Cost
+                  </CardDescription>
+                  <CardTitle className="text-2xl text-gray-700">{formatCurrency(summary.estimatedTotalCost)}</CardTitle>
+                </CardHeader>
+              </Card>
+            </div>
+          )}
 
           {criticalItems.length > 0 && (
             <Card className="mb-6 border-red-300 bg-red-50/30" data-testid="section-critical-alert">
@@ -654,26 +718,26 @@ const LowStockAlertReport: React.FC<LowStockAlertReportProps> = ({ onBack, vesse
                     <thead>
                       <tr className="bg-gray-50 border-b border-gray-200">
                         <th className="text-left py-3 px-3"><SortButton field="priority" label="Priority" /></th>
-                        <th className="text-left py-3 px-3"><SortButton field="itemCode" label="Item Code" /></th>
-                        <th className="text-left py-3 px-3"><SortButton field="itemName" label="Item Name" /></th>
-                        <th className="text-left py-3 px-3"><SortButton field="itemType" label="Type" /></th>
-                        <th className="text-left py-3 px-3"><SortButton field="category" label="Category" /></th>
-                        <th className="text-right py-3 px-3"><SortButton field="rob" label="ROB" /></th>
-                        <th className="text-right py-3 px-3"><SortButton field="minStock" label="Min Stock" /></th>
-                        <th className="text-right py-3 px-3"><SortButton field="deficit" label="Deficit" /></th>
-                        <th className="text-right py-3 px-3"><SortButton field="deficitPercent" label="Deficit %" /></th>
-                        <th className="text-left py-3 px-3"><SortButton field="uom" label="UOM" /></th>
-                        <th className="text-right py-3 px-3"><SortButton field="avgMonthlyConsumption" label="Avg Monthly" /></th>
-                        <th className="text-right py-3 px-3"><SortButton field="daysUntilStockout" label="Days to Stockout" /></th>
-                        <th className="text-right py-3 px-3"><SortButton field="estimatedCost" label="Est. Cost" /></th>
-                        <th className="text-left py-3 px-3"><SortButton field="supplier" label="Supplier" /></th>
-                        <th className="text-left py-3 px-3"><SortButton field="leadTime" label="Lead Time" /></th>
+                        <th className="text-left py-3 px-3"><SortButton field="itemCode" label={isSpares ? "Part Code" : "Item Code"} /></th>
+                        <th className="text-left py-3 px-3"><SortButton field="itemName" label={isSpares ? "Part Name" : "Item Name"} /></th>
+                        {!isSpares && <th className="text-left py-3 px-3"><SortButton field="itemType" label="Type" /></th>}
+                        <th className="text-left py-3 px-3"><SortButton field="category" label={isSpares ? "Component" : "Category"} /></th>
+                        <th className="text-right py-3 px-3"><SortButton field="rob" label={isSpares ? "Current Qty" : "ROB"} /></th>
+                        <th className="text-right py-3 px-3"><SortButton field="minStock" label={isSpares ? "Min Qty" : "Min Stock"} /></th>
+                        <th className="text-right py-3 px-3"><SortButton field="deficit" label={isSpares ? "Shortage" : "Deficit"} /></th>
+                        <th className="text-right py-3 px-3"><SortButton field="deficitPercent" label={isSpares ? "Shortage %" : "Deficit %"} /></th>
+                        {!isSpares && <th className="text-left py-3 px-3"><SortButton field="uom" label="UOM" /></th>}
+                        {!isSpares && <th className="text-right py-3 px-3"><SortButton field="avgMonthlyConsumption" label="Avg Monthly" /></th>}
+                        {!isSpares && <th className="text-right py-3 px-3"><SortButton field="daysUntilStockout" label="Days to Stockout" /></th>}
+                        {!isSpares && <th className="text-right py-3 px-3"><SortButton field="estimatedCost" label="Est. Cost" /></th>}
+                        {!isSpares && <th className="text-left py-3 px-3"><SortButton field="supplier" label="Supplier" /></th>}
+                        {!isSpares && <th className="text-left py-3 px-3"><SortButton field="leadTime" label="Lead Time" /></th>}
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-200">
                       {sortedItems.length === 0 ? (
                         <tr>
-                          <td colSpan={15} className="text-center py-12">
+                          <td colSpan={isSpares ? 8 : 15} className="text-center py-12">
                             <Package className="h-10 w-10 text-gray-400 mx-auto mb-3" />
                             <p className="text-gray-500 font-medium">No low stock items found</p>
                             <p className="text-sm text-gray-400 mt-1">Try adjusting your filters</p>
@@ -694,7 +758,7 @@ const LowStockAlertReport: React.FC<LowStockAlertReportProps> = ({ onBack, vesse
                             <td className="py-3 px-3">
                               <div className="font-medium text-gray-900">{item.itemName || '-'}</div>
                             </td>
-                            <td className="py-3 px-3">{getTypeBadge(item.itemType)}</td>
+                            {!isSpares && <td className="py-3 px-3">{getTypeBadge(item.itemType)}</td>}
                             <td className="py-3 px-3 text-gray-600">{item.category || '-'}</td>
                             <td className="py-3 px-3 text-right">
                               <span className={`font-semibold ${item.rob === 0 ? 'text-red-600' : 'text-gray-900'}`}>
@@ -717,12 +781,12 @@ const LowStockAlertReport: React.FC<LowStockAlertReportProps> = ({ onBack, vesse
                                 <span className="text-gray-600 w-10 text-right">{item.deficitPercent}%</span>
                               </div>
                             </td>
-                            <td className="py-3 px-3 text-gray-600">{item.uom || '-'}</td>
-                            <td className="py-3 px-3 text-right text-gray-600">{item.avgMonthlyConsumption}</td>
-                            <td className="py-3 px-3 text-right">{getDaysUntilStockoutDisplay(item.daysUntilStockout)}</td>
-                            <td className="py-3 px-3 text-right text-gray-700">{formatCurrency(item.estimatedCost)}</td>
-                            <td className="py-3 px-3 text-gray-600">{item.supplier || '-'}</td>
-                            <td className="py-3 px-3 text-gray-600">{item.leadTime || '-'}</td>
+                            {!isSpares && <td className="py-3 px-3 text-gray-600">{item.uom || '-'}</td>}
+                            {!isSpares && <td className="py-3 px-3 text-right text-gray-600">{item.avgMonthlyConsumption}</td>}
+                            {!isSpares && <td className="py-3 px-3 text-right">{getDaysUntilStockoutDisplay(item.daysUntilStockout)}</td>}
+                            {!isSpares && <td className="py-3 px-3 text-right text-gray-700">{formatCurrency(item.estimatedCost)}</td>}
+                            {!isSpares && <td className="py-3 px-3 text-gray-600">{item.supplier || '-'}</td>}
+                            {!isSpares && <td className="py-3 px-3 text-gray-600">{item.leadTime || '-'}</td>}
                           </tr>
                         ))
                       )}
@@ -738,81 +802,82 @@ const LowStockAlertReport: React.FC<LowStockAlertReportProps> = ({ onBack, vesse
             </CardContent>
           </Card>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
-            <Card data-testid="section-category-breakdown">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Package className="h-5 w-5 text-gray-600" />
-                  Category Breakdown
-                </CardTitle>
-                <CardDescription>Distribution of low stock items by category</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-4">
-                  <div>
-                    <div className="flex items-center justify-between mb-1">
-                      <span className="text-sm font-medium text-purple-700">Stores</span>
-                      <span className="text-sm font-semibold text-purple-700">{summary.storesCount}</span>
+          {!isSpares && (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+              <Card data-testid="section-category-breakdown">
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Package className="h-5 w-5 text-gray-600" />
+                    Category Breakdown
+                  </CardTitle>
+                  <CardDescription>Distribution of low stock items by category</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-4">
+                    <div>
+                      <div className="flex items-center justify-between mb-1">
+                        <span className="text-sm font-medium text-purple-700">Stores</span>
+                        <span className="text-sm font-semibold text-purple-700">{summary.storesCount}</span>
+                      </div>
+                      <div className="w-full bg-gray-200 rounded-full h-3">
+                        <div
+                          className="bg-purple-500 h-3 rounded-full transition-all duration-500"
+                          style={{ width: `${(summary.storesCount / totalForBars) * 100}%` }}
+                          data-testid="bar-stores"
+                        />
+                      </div>
                     </div>
-                    <div className="w-full bg-gray-200 rounded-full h-3">
-                      <div
-                        className="bg-purple-500 h-3 rounded-full transition-all duration-500"
-                        style={{ width: `${(summary.storesCount / totalForBars) * 100}%` }}
-                        data-testid="bar-stores"
-                      />
+                    <div>
+                      <div className="flex items-center justify-between mb-1">
+                        <span className="text-sm font-medium text-blue-700">Lubricants</span>
+                        <span className="text-sm font-semibold text-blue-700">{summary.lubesCount}</span>
+                      </div>
+                      <div className="w-full bg-gray-200 rounded-full h-3">
+                        <div
+                          className="bg-blue-500 h-3 rounded-full transition-all duration-500"
+                          style={{ width: `${(summary.lubesCount / totalForBars) * 100}%` }}
+                          data-testid="bar-lubricants"
+                        />
+                      </div>
+                    </div>
+                    <div>
+                      <div className="flex items-center justify-between mb-1">
+                        <span className="text-sm font-medium text-green-700">Chemicals</span>
+                        <span className="text-sm font-semibold text-green-700">{summary.chemicalsCount}</span>
+                      </div>
+                      <div className="w-full bg-gray-200 rounded-full h-3">
+                        <div
+                          className="bg-green-500 h-3 rounded-full transition-all duration-500"
+                          style={{ width: `${(summary.chemicalsCount / totalForBars) * 100}%` }}
+                          data-testid="bar-chemicals"
+                        />
+                      </div>
                     </div>
                   </div>
-                  <div>
-                    <div className="flex items-center justify-between mb-1">
-                      <span className="text-sm font-medium text-blue-700">Lubricants</span>
-                      <span className="text-sm font-semibold text-blue-700">{summary.lubesCount}</span>
-                    </div>
-                    <div className="w-full bg-gray-200 rounded-full h-3">
-                      <div
-                        className="bg-blue-500 h-3 rounded-full transition-all duration-500"
-                        style={{ width: `${(summary.lubesCount / totalForBars) * 100}%` }}
-                        data-testid="bar-lubricants"
-                      />
-                    </div>
-                  </div>
-                  <div>
-                    <div className="flex items-center justify-between mb-1">
-                      <span className="text-sm font-medium text-green-700">Chemicals</span>
-                      <span className="text-sm font-semibold text-green-700">{summary.chemicalsCount}</span>
-                    </div>
-                    <div className="w-full bg-gray-200 rounded-full h-3">
-                      <div
-                        className="bg-green-500 h-3 rounded-full transition-all duration-500"
-                        style={{ width: `${(summary.chemicalsCount / totalForBars) * 100}%` }}
-                        data-testid="bar-chemicals"
-                      />
-                    </div>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
+                </CardContent>
+              </Card>
 
-            <Card data-testid="section-recommended-actions">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <ShoppingCart className="h-5 w-5 text-gray-600" />
-                  Recommended Actions
-                </CardTitle>
-                <CardDescription>Summary of required actions based on stock analysis</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-3">
-                  <div className="flex items-center justify-between py-2 border-b border-gray-100">
-                    <span className="text-sm text-gray-600">Total items requiring attention</span>
-                    <span className="text-sm font-semibold text-gray-900">{summary.totalLowStock}</span>
-                  </div>
-                  <div className="flex items-center justify-between py-2 border-b border-gray-100">
-                    <span className="text-sm text-gray-600">Estimated reorder cost</span>
-                    <span className="text-sm font-semibold text-gray-900">{formatCurrency(summary.estimatedTotalCost)}</span>
-                  </div>
-                  <div className="flex items-center justify-between py-2 border-b border-gray-100">
-                    <span className="text-sm text-gray-600">Critical items</span>
-                    <span className="text-sm font-semibold text-red-600">{summary.criticalItems}</span>
+              <Card data-testid="section-recommended-actions">
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <ShoppingCart className="h-5 w-5 text-gray-600" />
+                    Recommended Actions
+                  </CardTitle>
+                  <CardDescription>Summary of required actions based on stock analysis</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between py-2 border-b border-gray-100">
+                      <span className="text-sm text-gray-600">Total items requiring attention</span>
+                      <span className="text-sm font-semibold text-gray-900">{summary.totalLowStock}</span>
+                    </div>
+                    <div className="flex items-center justify-between py-2 border-b border-gray-100">
+                      <span className="text-sm text-gray-600">Estimated reorder cost</span>
+                      <span className="text-sm font-semibold text-gray-900">{formatCurrency(summary.estimatedTotalCost)}</span>
+                    </div>
+                    <div className="flex items-center justify-between py-2 border-b border-gray-100">
+                      <span className="text-sm text-gray-600">Critical items</span>
+                      <span className="text-sm font-semibold text-red-600">{summary.criticalItems}</span>
                   </div>
                   <div className="mt-4 p-3 rounded-lg bg-gray-50 border border-gray-200">
                     {summary.criticalItems > 0 ? (
@@ -831,6 +896,7 @@ const LowStockAlertReport: React.FC<LowStockAlertReportProps> = ({ onBack, vesse
               </CardContent>
             </Card>
           </div>
+          )}
 
           <Card data-testid="section-report-history">
             <Collapsible open={historyOpen} onOpenChange={setHistoryOpen}>

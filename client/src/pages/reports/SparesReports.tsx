@@ -451,6 +451,7 @@ const SparesReports: React.FC<SparesReportsProps> = ({ onBack, globalFilters }) 
       <LowStockAlertReport
         onBack={() => setActiveDetailReport(null)}
         vesselId={effectiveVesselId}
+        source="spares"
       />
     );
   }

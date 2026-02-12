@@ -593,6 +593,7 @@ const StoresReports: React.FC<StoresReportsProps> = ({ onBack, globalFilters }) 
       <LowStockAlertReport
         onBack={() => setSelectedReport(null)}
         vesselId={effectiveVesselId}
+        source="stores"
       />
     );
   }
