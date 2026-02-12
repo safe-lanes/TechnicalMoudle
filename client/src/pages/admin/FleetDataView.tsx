@@ -1321,91 +1321,95 @@ export default function FleetDataView({ onBack }: { onBack?: () => void }) {
           }
         }}
       >
-        <DialogContent className="max-w-3xl max-h-[80vh]">
-          <DialogHeader className="flex flex-row items-center justify-between border-b pb-3">
-            <DialogTitle className="text-base font-semibold text-gray-700 border border-gray-300 px-3 py-1 rounded">
-              Vessel Component Mapping Overview
-            </DialogTitle>
-            <div className="flex items-center gap-2">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={handleRemoveDetailMappings}
-                disabled={selectedDetailMappingIds.size === 0 || removeMappingsMutation.isPending}
-                className="text-blue-600 border-blue-600 hover:bg-blue-50"
-                data-testid="btn-detail-remove-mapping"
-              >
-                Remove Mapping
-              </Button>
-              <Button
-                size="sm"
-                className="bg-blue-600 hover:bg-blue-700 text-white"
-                onClick={() => {
-                  setSelectedComponentsToMap(new Set());
-                  setComponentMappingSearchQuery("");
-                  setIsComponentMappingDialogOpen(true);
-                }}
-                data-testid="btn-detail-component-mapping"
-              >
-                ComponentMapping
-              </Button>
-            </div>
-          </DialogHeader>
-          
-          <div className="py-3">
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-              <Input
-                type="text"
-                placeholder="Search components..."
-                value={detailSearchQuery}
-                onChange={(e) => setDetailSearchQuery(e.target.value)}
-                className="pl-9"
-                data-testid="input-detail-search"
-              />
+        <DialogContent className="p-0 gap-0" style={{ width: '50vw', maxWidth: '50vw', maxHeight: '85vh' }}>
+          <div className="bg-gradient-to-r from-cyan-600 to-blue-600 pl-4 pr-10 py-2.5 rounded-t-lg">
+            <div className="flex items-center justify-between gap-2">
+              <div className="flex items-center gap-2">
+                <Anchor className="h-3.5 w-3.5 text-white" />
+                <DialogTitle className="text-xs font-semibold text-white">
+                  Vessel Component Mapping Overview
+                </DialogTitle>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <div className="relative">
+                  <Search className="absolute left-2 top-1/2 transform -translate-y-1/2 h-3 w-3 text-white/60" />
+                  <Input
+                    type="text"
+                    placeholder="Search..."
+                    value={detailSearchQuery}
+                    onChange={(e) => setDetailSearchQuery(e.target.value)}
+                    className="h-6 w-28 pl-6 pr-2 text-[10px] bg-white/10 border-white/30 text-white placeholder:text-white/50"
+                    data-testid="input-detail-search"
+                  />
+                </div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleRemoveDetailMappings}
+                  disabled={selectedDetailMappingIds.size === 0 || removeMappingsMutation.isPending}
+                  className="h-6 px-2 text-[10px] bg-white/10 border-white/30 text-white hover:bg-white/20"
+                  data-testid="btn-detail-remove-mapping"
+                >
+                  Remove
+                </Button>
+                <Button
+                  size="sm"
+                  className="h-6 px-2 text-[10px] bg-white text-blue-700 hover:bg-blue-50"
+                  onClick={() => {
+                    setSelectedComponentsToMap(new Set());
+                    setComponentMappingSearchQuery("");
+                    setIsComponentMappingDialogOpen(true);
+                  }}
+                  data-testid="btn-detail-component-mapping"
+                >
+                  Map Component
+                </Button>
+              </div>
             </div>
           </div>
 
           <ScrollArea className="h-[400px]">
-            <table className="w-full text-sm">
-              <thead className="sticky top-0 bg-white">
-                <tr className="border-b text-gray-500 text-xs">
-                  <th className="text-left py-2 px-2 font-normal w-12">
+            <table className="w-full text-xs">
+              <thead className="sticky top-0 bg-gray-50 z-10">
+                <tr className="border-b text-gray-500">
+                  <th className="text-left py-1.5 px-2 font-medium w-10">
                     <Checkbox
                       checked={
                         filteredDetailMappings.length > 0 &&
                         filteredDetailMappings.every((m) => selectedDetailMappingIds.has(m.id))
                       }
                       onCheckedChange={handleSelectAllDetailMappings}
+                      className="h-3.5 w-3.5"
                       data-testid="checkbox-detail-select-all"
                     />
                   </th>
-                  <th className="text-left py-2 px-2 font-normal">Vessel Name</th>
-                  <th className="text-left py-2 px-2 font-normal">Component Code</th>
-                  <th className="text-left py-2 px-2 font-normal">Component Name</th>
+                  <th className="text-left py-1.5 px-2 font-medium">Vessel Name</th>
+                  <th className="text-left py-1.5 px-2 font-medium">Component Code</th>
+                  <th className="text-left py-1.5 px-2 font-medium">Component Name</th>
                 </tr>
               </thead>
               <tbody>
                 {filteredDetailMappings.length > 0 ? (
                   filteredDetailMappings.map((mapping) => (
-                    <tr key={mapping.id} className="border-b last:border-0 hover:bg-gray-50">
-                      <td className="py-2 px-2">
+                    <tr key={mapping.id} className="border-b last:border-0 hover:bg-blue-50/50">
+                      <td className="py-1.5 px-2">
                         <Checkbox
                           checked={selectedDetailMappingIds.has(mapping.id)}
                           onCheckedChange={(checked) =>
                             handleDetailMappingCheckboxChange(mapping.id, checked as boolean)
                           }
+                          className="h-3.5 w-3.5"
                           data-testid={`checkbox-detail-row-${mapping.id}`}
                         />
                       </td>
-                      <td className="py-2 px-2">{mapping.vesselName}</td>
-                      <td className="py-2 px-2">{mapping.componentCode || mapping.fleetEquipmentCode || selectedComponent?.fleetEquipmentCode}</td>
-                      <td className="py-2 px-2">{mapping.componentName || selectedComponent?.fleetEquipmentName || "Main Engine"}</td>
+                      <td className="py-1.5 px-2 text-gray-600">{mapping.vesselName}</td>
+                      <td className="py-1.5 px-2 text-gray-600">{mapping.componentCode || mapping.fleetEquipmentCode || selectedComponent?.fleetEquipmentCode}</td>
+                      <td className="py-1.5 px-2 text-gray-600">{mapping.componentName || selectedComponent?.fleetEquipmentName || "Main Engine"}</td>
                     </tr>
                   ))
                 ) : (
                   <tr>
-                    <td colSpan={4} className="py-8 text-center text-gray-500">
+                    <td colSpan={4} className="py-6 text-center text-gray-400 text-xs">
                       No matching components found
                     </td>
                   </tr>
@@ -1426,66 +1430,72 @@ export default function FleetDataView({ onBack }: { onBack?: () => void }) {
           }
         }}
       >
-        <DialogContent className="max-w-md max-h-[80vh]">
-          <DialogHeader className="flex flex-row items-center justify-between pb-3">
-            <DialogTitle className="text-base font-semibold text-gray-800">
-              Vessel Mapping
-            </DialogTitle>
-            <div className="flex items-center gap-2">
-              <div className="relative">
-                <Input
-                  type="text"
-                  placeholder="Search..."
-                  value={vesselMappingSearchQuery}
-                  onChange={(e) => setVesselMappingSearchQuery(e.target.value)}
-                  className="w-32 pr-8"
-                  data-testid="input-vessel-mapping-search"
-                />
-                <Search className="absolute right-2 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+        <DialogContent className="p-0 gap-0" style={{ width: '40vw', maxWidth: '40vw', maxHeight: '85vh' }}>
+          <div className="bg-gradient-to-r from-cyan-600 to-blue-600 pl-4 pr-10 py-2.5 rounded-t-lg">
+            <div className="flex items-center justify-between gap-2">
+              <div className="flex items-center gap-2">
+                <Ship className="h-3.5 w-3.5 text-white" />
+                <DialogTitle className="text-xs font-semibold text-white">
+                  Vessel Mapping
+                </DialogTitle>
               </div>
-              <Button
-                size="sm"
-                className="bg-blue-600 hover:bg-blue-700 text-white px-6"
-                onClick={handleMapVessels}
-                disabled={selectedVesselsToMap.size === 0 || addMappingMutation.isPending}
-                data-testid="btn-map-vessels"
-              >
-                Map
-              </Button>
+              <div className="flex items-center gap-1.5">
+                <div className="relative">
+                  <Search className="absolute left-2 top-1/2 transform -translate-y-1/2 h-3 w-3 text-white/60" />
+                  <Input
+                    type="text"
+                    placeholder="Search..."
+                    value={vesselMappingSearchQuery}
+                    onChange={(e) => setVesselMappingSearchQuery(e.target.value)}
+                    className="h-6 w-28 pl-6 pr-2 text-[10px] bg-white/10 border-white/30 text-white placeholder:text-white/50"
+                    data-testid="input-vessel-mapping-search"
+                  />
+                </div>
+                <Button
+                  size="sm"
+                  className="h-6 px-3 text-[10px] bg-white text-blue-700 hover:bg-blue-50"
+                  onClick={handleMapVessels}
+                  disabled={selectedVesselsToMap.size === 0 || addMappingMutation.isPending}
+                  data-testid="btn-map-vessels"
+                >
+                  Map
+                </Button>
+              </div>
             </div>
-          </DialogHeader>
+          </div>
 
-          <ScrollArea className="h-[300px]">
-            <table className="w-full text-sm">
-              <thead className="sticky top-0 bg-white">
-                <tr className="border-b text-gray-500 text-xs">
-                  <th className="text-left py-2 px-2 font-normal w-12">
-                    <span className="text-gray-600">Select</span>
+          <ScrollArea className="h-[400px]">
+            <table className="w-full text-xs">
+              <thead className="sticky top-0 bg-gray-50 z-10">
+                <tr className="border-b text-gray-500">
+                  <th className="text-left py-1.5 px-2 font-medium w-10">
+                    <span className="text-gray-500 text-[10px]">Select</span>
                   </th>
-                  <th className="text-left py-2 px-2 font-normal text-blue-600">Vessel Code</th>
-                  <th className="text-left py-2 px-2 font-normal">Vessel Name</th>
+                  <th className="text-left py-1.5 px-2 font-medium">Vessel Code</th>
+                  <th className="text-left py-1.5 px-2 font-medium">Vessel Name</th>
                 </tr>
               </thead>
               <tbody>
                 {unmappedVessels.length > 0 ? (
                   unmappedVessels.map((vessel) => (
-                    <tr key={vessel.code || vessel.id} className="border-b last:border-0 hover:bg-gray-50">
-                      <td className="py-2 px-2">
+                    <tr key={vessel.code || vessel.id} className="border-b last:border-0 hover:bg-blue-50/50">
+                      <td className="py-1.5 px-2">
                         <Checkbox
                           checked={selectedVesselsToMap.has(vessel.code || vessel.id)}
                           onCheckedChange={(checked) =>
                             handleVesselMappingCheckboxChange(vessel.code || vessel.id, checked as boolean)
                           }
+                          className="h-3.5 w-3.5"
                           data-testid={`checkbox-vessel-map-${vessel.code || vessel.id}`}
                         />
                       </td>
-                      <td className="py-2 px-2">{vessel.code || vessel.id}</td>
-                      <td className="py-2 px-2">{vessel.name}</td>
+                      <td className="py-1.5 px-2 text-gray-600">{vessel.code || vessel.id}</td>
+                      <td className="py-1.5 px-2 text-gray-600">{vessel.name}</td>
                     </tr>
                   ))
                 ) : (
                   <tr>
-                    <td colSpan={3} className="py-8 text-center text-gray-500">
+                    <td colSpan={3} className="py-6 text-center text-gray-400 text-xs">
                       No vessels available to map
                     </td>
                   </tr>
@@ -1506,66 +1516,72 @@ export default function FleetDataView({ onBack }: { onBack?: () => void }) {
           }
         }}
       >
-        <DialogContent className="max-w-md max-h-[80vh]">
-          <DialogHeader className="flex flex-row items-center justify-between pb-3">
-            <DialogTitle className="text-base font-semibold text-gray-800">
-              Component Mapping
-            </DialogTitle>
-            <div className="flex items-center gap-2">
-              <div className="relative">
-                <Input
-                  type="text"
-                  placeholder={selectedComponent?.fleetEquipmentCode || "Search..."}
-                  value={componentMappingSearchQuery}
-                  onChange={(e) => setComponentMappingSearchQuery(e.target.value)}
-                  className="w-32 pr-8"
-                  data-testid="input-component-mapping-search"
-                />
-                <Search className="absolute right-2 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+        <DialogContent className="p-0 gap-0" style={{ width: '40vw', maxWidth: '40vw', maxHeight: '85vh' }}>
+          <div className="bg-gradient-to-r from-cyan-600 to-blue-600 pl-4 pr-10 py-2.5 rounded-t-lg">
+            <div className="flex items-center justify-between gap-2">
+              <div className="flex items-center gap-2">
+                <Anchor className="h-3.5 w-3.5 text-white" />
+                <DialogTitle className="text-xs font-semibold text-white">
+                  Component Mapping
+                </DialogTitle>
               </div>
-              <Button
-                size="sm"
-                className="bg-blue-600 hover:bg-blue-700 text-white px-6"
-                onClick={handleMapComponents}
-                disabled={selectedComponentsToMap.size === 0 || addMappingMutation.isPending}
-                data-testid="btn-map-components"
-              >
-                Map
-              </Button>
+              <div className="flex items-center gap-1.5">
+                <div className="relative">
+                  <Search className="absolute left-2 top-1/2 transform -translate-y-1/2 h-3 w-3 text-white/60" />
+                  <Input
+                    type="text"
+                    placeholder={selectedComponent?.fleetEquipmentCode || "Search..."}
+                    value={componentMappingSearchQuery}
+                    onChange={(e) => setComponentMappingSearchQuery(e.target.value)}
+                    className="h-6 w-28 pl-6 pr-2 text-[10px] bg-white/10 border-white/30 text-white placeholder:text-white/50"
+                    data-testid="input-component-mapping-search"
+                  />
+                </div>
+                <Button
+                  size="sm"
+                  className="h-6 px-3 text-[10px] bg-white text-blue-700 hover:bg-blue-50"
+                  onClick={handleMapComponents}
+                  disabled={selectedComponentsToMap.size === 0 || addMappingMutation.isPending}
+                  data-testid="btn-map-components"
+                >
+                  Map
+                </Button>
+              </div>
             </div>
-          </DialogHeader>
+          </div>
 
-          <ScrollArea className="h-[300px]">
-            <table className="w-full text-sm">
-              <thead className="sticky top-0 bg-white">
-                <tr className="border-b text-gray-500 text-xs">
-                  <th className="text-left py-2 px-2 font-normal w-12">
-                    <span className="text-gray-600">Select</span>
+          <ScrollArea className="h-[400px]">
+            <table className="w-full text-xs">
+              <thead className="sticky top-0 bg-gray-50 z-10">
+                <tr className="border-b text-gray-500">
+                  <th className="text-left py-1.5 px-2 font-medium w-10">
+                    <span className="text-gray-500 text-[10px]">Select</span>
                   </th>
-                  <th className="text-left py-2 px-2 font-normal">Component Code</th>
-                  <th className="text-left py-2 px-2 font-normal">Component Name</th>
+                  <th className="text-left py-1.5 px-2 font-medium">Component Code</th>
+                  <th className="text-left py-1.5 px-2 font-medium">Component Name</th>
                 </tr>
               </thead>
               <tbody>
                 {unmappedComponentsForVessel.length > 0 ? (
                   unmappedComponentsForVessel.map((component) => (
-                    <tr key={component.fleetEquipmentCode} className="border-b last:border-0 hover:bg-gray-50">
-                      <td className="py-2 px-2">
+                    <tr key={component.fleetEquipmentCode} className="border-b last:border-0 hover:bg-blue-50/50">
+                      <td className="py-1.5 px-2">
                         <Checkbox
                           checked={selectedComponentsToMap.has(component.fleetEquipmentCode)}
                           onCheckedChange={(checked) =>
                             handleComponentMappingCheckboxChange(component.fleetEquipmentCode, checked as boolean)
                           }
+                          className="h-3.5 w-3.5"
                           data-testid={`checkbox-component-map-${component.fleetEquipmentCode}`}
                         />
                       </td>
-                      <td className="py-2 px-2">{component.fleetEquipmentCode}</td>
-                      <td className="py-2 px-2">{component.fleetEquipmentName}</td>
+                      <td className="py-1.5 px-2 text-gray-600">{component.fleetEquipmentCode}</td>
+                      <td className="py-1.5 px-2 text-gray-600">{component.fleetEquipmentName}</td>
                     </tr>
                   ))
                 ) : (
                   <tr>
-                    <td colSpan={3} className="py-8 text-center text-gray-500">
+                    <td colSpan={3} className="py-6 text-center text-gray-400 text-xs">
                       No sub-components available to map
                     </td>
                   </tr>
