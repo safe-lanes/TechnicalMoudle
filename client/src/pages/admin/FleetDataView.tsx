@@ -1213,7 +1213,7 @@ export default function FleetDataView({ onBack }: { onBack?: () => void }) {
           }
         }}
       >
-        <DialogContent className="max-w-2xl max-h-[70vh] p-0 gap-0">
+        <DialogContent className="max-h-[70vh] p-0 gap-0" style={{ width: '40vw', maxWidth: '40vw' }}>
           <div className="bg-gradient-to-r from-cyan-600 to-blue-600 px-4 py-2.5 rounded-t-lg">
             <div className="flex items-center justify-between gap-2">
               <div className="flex items-center gap-2">
