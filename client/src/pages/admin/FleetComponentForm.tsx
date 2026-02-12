@@ -114,7 +114,7 @@ export default function FleetComponentForm({ open, onOpenChange, component }: Fl
 
   // Update mutation
   const updateMutation = useMutation({
-    mutationFn: async (data: FleetComponentFormData & { id: string }) => {
+    mutationFn: async (data: FleetComponentFormData & { id: number }) => {
       const { id, ...updateData } = data;
       return apiRequest('PATCH', `/technical/api/fleet/components/${id}`, { ...updateData, dataScope: 'fleet' });
     },

@@ -50,11 +50,9 @@ export class ComponentRepository {
 
   async create(data: InsertComponent): Promise<Component> {
     const db = await getDb();
-    const id = (data as any).id || `COMP-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
     const cuuid = (data as any).cuuid || crypto.randomUUID();
     const result = await db.insert(v2Components).values({
       ...data,
-      id,
       cuuid,
       dataScope: data.dataScope || 'vessel',
     } as any).returning();

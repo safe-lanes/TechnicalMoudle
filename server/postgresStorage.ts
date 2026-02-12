@@ -698,11 +698,9 @@ export class PostgresStorage {
 
   async createComponent(component: InsertComponent): Promise<Component> {
     const db = await getDb();
-    const id = component.id || `COMP-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
     const cuuid = (component as any).cuuid || crypto.randomUUID();
     const result = await db.insert(components).values({
       ...component,
-      id,
       cuuid,
       dataScope: component.dataScope || 'vessel',
     }).returning();
@@ -5579,7 +5577,6 @@ export class PostgresStorage {
     const db = await getDb();
     const withIds = componentsData.map(c => ({
       ...c,
-      id: (c as any).id || `COMP-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
       cuuid: (c as any).cuuid || crypto.randomUUID(),
     }));
     const result = await db.insert(components).values(withIds as any).returning();
@@ -5610,20 +5607,19 @@ export class PostgresStorage {
     let updated = 0;
     
     for (const comp of componentsData) {
-      const compId = (comp as any).id;
-      const existing = compId ? await db.select().from(components)
-        .where(eq(components.cuuid, compId))
+      const compCuuid = (comp as any).cuuid;
+      const existing = compCuuid ? await db.select().from(components)
+        .where(eq(components.cuuid, compCuuid))
         .limit(1) : [];
       
       if (existing.length > 0) {
         await db.update(components)
           .set(comp)
-          .where(eq(components.cuuid, compId));
+          .where(eq(components.cuuid, compCuuid));
         updated++;
       } else {
-        const id = compId || `COMP-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-        const cuuid = (comp as any).cuuid || crypto.randomUUID();
-        await db.insert(components).values({ ...comp, id, cuuid } as any);
+        const cuuid = compCuuid || crypto.randomUUID();
+        await db.insert(components).values({ ...comp, cuuid } as any);
         created++;
       }
     }

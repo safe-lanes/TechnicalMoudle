@@ -1,9 +1,9 @@
-import { pgTable, text, integer, boolean, timestamp, decimal, index, json, unique } from "drizzle-orm/pg-core";
+import { pgTable, text, integer, boolean, timestamp, decimal, index, json, unique, serial } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
 export const v2Components = pgTable("components", {
-  id: text("id").primaryKey(),
+  id: serial("id").primaryKey(),
   cuuid: text("cuuid").notNull().unique(),
   fleetEquipmentCode: text("fleet_equipment_code"),
   fleetEquipmentName: text("fleet_equipment_name"),

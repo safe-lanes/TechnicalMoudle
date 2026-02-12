@@ -4,7 +4,7 @@ import type { ComponentRepository } from "../repositories/componentRepository";
 import { ValidationError } from "./errors";
 
 const fieldMapping: { [key: string]: string } = {
-  'Component ID': 'id',
+  'Component ID': 'componentCode',
   'Component Name': 'name',
   'Component Code': 'componentCode',
   'Parent ID': 'parentId',
@@ -188,11 +188,11 @@ export class ComponentUploadService {
         }
       }
 
-      if (!component.id) {
+      if (!component.componentCode) {
         errors.push({
           row: rowNum,
-          field: 'Component ID',
-          message: 'Component ID is required',
+          field: 'Component Code',
+          message: 'Component Code is required',
           data: row
         });
         continue;

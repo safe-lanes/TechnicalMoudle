@@ -190,7 +190,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Supports multiple variations of each column name for flexible Excel import
       const fieldMapping: { [key: string]: string } = {
         // Core identifiers
-        'Component ID': 'id',
+        'Component ID': 'componentCode',
         'Component Name': 'name',
         'Component Code': 'componentCode',
         'Parent ID': 'parentId',
@@ -353,11 +353,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
 
         // Validate required fields
-        if (!component.id) {
+        if (!component.componentCode) {
           errors.push({
             row: rowNum,
-            field: 'Component ID',
-            message: 'Component ID is required',
+            field: 'Component Code',
+            message: 'Component Code is required',
             data: row
           });
           continue;

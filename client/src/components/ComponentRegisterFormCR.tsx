@@ -188,7 +188,7 @@ const generateMockComponentData = (component: ComponentNode): ComponentData => {
     modelCode: isEngine ? "6S60ME" : isDeck ? "TTS2400" : isHull ? "TANK500" : "FXMQ200",
     serialNo: `SN-${component.code.replace(/\./g, "")}-2024-${Math.floor(Math.random() * 9000) + 1000}`,
     drawingNo: `DRW-${component.code.replace(/\./g, "")}-001`,
-    componentCategory: getComponentCategory(component.id),
+    componentCategory: getComponentCategory(String(component.id)),
     location: isEngine ? "Engine Room" : isDeck ? "Main Deck" : isHull ? "Double Bottom" : "Accommodation Block",
     critical: Math.random() > 0.5 ? "Yes" : "No",
     installation: "2020-03-15",

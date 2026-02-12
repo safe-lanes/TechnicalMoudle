@@ -146,7 +146,7 @@ const UnplannedWorkOrderForm: React.FC<UnplannedWorkOrderFormProps> = ({
 
   // Component selection handler
   const handleComponentSelect = (componentId: string) => {
-    const selectedComponent = components.find(c => c.id === componentId);
+    const selectedComponent = components.find(c => String(c.id) === componentId);
     if (selectedComponent) {
       setFormData(prev => ({
         ...prev,
@@ -294,7 +294,7 @@ const UnplannedWorkOrderForm: React.FC<UnplannedWorkOrderFormProps> = ({
                         </SelectTrigger>
                         <SelectContent>
                           {components.map((component) => (
-                            <SelectItem key={component.id} value={component.id}>
+                            <SelectItem key={component.id} value={String(component.id)}>
                               {component.componentCode} - {component.name}
                             </SelectItem>
                           ))}
