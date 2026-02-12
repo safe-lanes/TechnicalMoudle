@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef, useEffect } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { Calendar as CalendarIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
@@ -70,6 +70,8 @@ export function PeriodPicker({ value, onChange, className }: PeriodPickerProps) 
   const [dateTo, setDateTo] = useState<Date | undefined>(undefined);
   const [showDateFromCal, setShowDateFromCal] = useState(false);
   const [showDateToCal, setShowDateToCal] = useState(false);
+  const [pendingDateFrom, setPendingDateFrom] = useState<Date | undefined>(undefined);
+  const [pendingDateTo, setPendingDateTo] = useState<Date | undefined>(undefined);
 
   useEffect(() => {
     if (open) {
@@ -247,7 +249,10 @@ export function PeriodPicker({ value, onChange, className }: PeriodPickerProps) 
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <div className="text-xs font-medium text-muted-foreground mb-1.5">Date From</div>
-                <Popover open={showDateFromCal} onOpenChange={setShowDateFromCal}>
+                <Popover open={showDateFromCal} onOpenChange={(isOpen) => {
+                  setShowDateFromCal(isOpen);
+                  if (isOpen) setPendingDateFrom(dateFrom);
+                }}>
                   <PopoverTrigger asChild>
                     <button
                       type="button"
@@ -263,19 +268,41 @@ export function PeriodPicker({ value, onChange, className }: PeriodPickerProps) 
                   <PopoverContent className="w-auto p-0" align="start">
                     <Calendar
                       mode="single"
-                      selected={dateFrom}
-                      onSelect={(d) => {
-                        setDateFrom(d || undefined);
-                        setShowDateFromCal(false);
-                      }}
+                      selected={pendingDateFrom}
+                      onSelect={(d) => setPendingDateFrom(d || undefined)}
                       initialFocus
                     />
+                    <div className="flex justify-end gap-2 p-3 pt-0 border-t mt-2">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="text-xs"
+                        onClick={() => setShowDateFromCal(false)}
+                        data-testid="button-date-from-cancel"
+                      >
+                        Cancel
+                      </Button>
+                      <Button
+                        size="sm"
+                        className="text-xs"
+                        onClick={() => {
+                          setDateFrom(pendingDateFrom);
+                          setShowDateFromCal(false);
+                        }}
+                        data-testid="button-date-from-ok"
+                      >
+                        OK
+                      </Button>
+                    </div>
                   </PopoverContent>
                 </Popover>
               </div>
               <div>
                 <div className="text-xs font-medium text-muted-foreground mb-1.5">Date To</div>
-                <Popover open={showDateToCal} onOpenChange={setShowDateToCal}>
+                <Popover open={showDateToCal} onOpenChange={(isOpen) => {
+                  setShowDateToCal(isOpen);
+                  if (isOpen) setPendingDateTo(dateTo);
+                }}>
                   <PopoverTrigger asChild>
                     <button
                       type="button"
@@ -291,13 +318,32 @@ export function PeriodPicker({ value, onChange, className }: PeriodPickerProps) 
                   <PopoverContent className="w-auto p-0" align="start">
                     <Calendar
                       mode="single"
-                      selected={dateTo}
-                      onSelect={(d) => {
-                        setDateTo(d || undefined);
-                        setShowDateToCal(false);
-                      }}
+                      selected={pendingDateTo}
+                      onSelect={(d) => setPendingDateTo(d || undefined)}
                       initialFocus
                     />
+                    <div className="flex justify-end gap-2 p-3 pt-0 border-t mt-2">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="text-xs"
+                        onClick={() => setShowDateToCal(false)}
+                        data-testid="button-date-to-cancel"
+                      >
+                        Cancel
+                      </Button>
+                      <Button
+                        size="sm"
+                        className="text-xs"
+                        onClick={() => {
+                          setDateTo(pendingDateTo);
+                          setShowDateToCal(false);
+                        }}
+                        data-testid="button-date-to-ok"
+                      >
+                        OK
+                      </Button>
+                    </div>
                   </PopoverContent>
                 </Popover>
               </div>

@@ -1,11 +1,97 @@
 import * as React from "react"
 import { ChevronLeft, ChevronRight } from "lucide-react"
-import { DayPicker } from "react-day-picker"
+import { DayPicker, CaptionProps, useNavigation } from "react-day-picker"
+import { setMonth, setYear } from "date-fns"
 
 import { cn } from "@/lib/utils"
 import { buttonVariants } from "@/components/ui/button"
 
 export type CalendarProps = React.ComponentProps<typeof DayPicker>
+
+const MONTHS = [
+  "January", "February", "March", "April", "May", "June",
+  "July", "August", "September", "October", "November", "December",
+]
+
+function CustomCaption({ displayMonth }: CaptionProps) {
+  const { goToMonth } = useNavigation()
+
+  const currentYear = new Date().getFullYear()
+  const yearRange: number[] = []
+  for (let y = currentYear - 10; y <= currentYear + 10; y++) {
+    yearRange.push(y)
+  }
+
+  const handleMonthChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const newMonth = parseInt(e.target.value, 10)
+    goToMonth(setMonth(displayMonth, newMonth))
+  }
+
+  const handleYearChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const newYear = parseInt(e.target.value, 10)
+    goToMonth(setYear(displayMonth, newYear))
+  }
+
+  return (
+    <div className="flex items-center justify-between gap-1 px-1">
+      <button
+        type="button"
+        onClick={() => {
+          const prev = new Date(displayMonth)
+          prev.setMonth(prev.getMonth() - 1)
+          goToMonth(prev)
+        }}
+        className={cn(
+          buttonVariants({ variant: "outline" }),
+          "h-7 w-7 bg-transparent p-0 opacity-50 hover:opacity-100"
+        )}
+        data-testid="button-calendar-prev-month"
+      >
+        <ChevronLeft className="h-4 w-4" />
+      </button>
+
+      <div className="flex items-center gap-1">
+        <select
+          value={displayMonth.getMonth()}
+          onChange={handleMonthChange}
+          className="h-7 rounded-md border border-input bg-background px-1.5 text-sm font-medium focus:outline-none focus:ring-1 focus:ring-ring cursor-pointer"
+          data-testid="select-calendar-month"
+        >
+          {MONTHS.map((month, i) => (
+            <option key={month} value={i}>{month}</option>
+          ))}
+        </select>
+
+        <select
+          value={displayMonth.getFullYear()}
+          onChange={handleYearChange}
+          className="h-7 rounded-md border border-input bg-background px-1.5 text-sm font-medium focus:outline-none focus:ring-1 focus:ring-ring cursor-pointer"
+          data-testid="select-calendar-year"
+        >
+          {yearRange.map((year) => (
+            <option key={year} value={year}>{year}</option>
+          ))}
+        </select>
+      </div>
+
+      <button
+        type="button"
+        onClick={() => {
+          const next = new Date(displayMonth)
+          next.setMonth(next.getMonth() + 1)
+          goToMonth(next)
+        }}
+        className={cn(
+          buttonVariants({ variant: "outline" }),
+          "h-7 w-7 bg-transparent p-0 opacity-50 hover:opacity-100"
+        )}
+        data-testid="button-calendar-next-month"
+      >
+        <ChevronRight className="h-4 w-4" />
+      </button>
+    </div>
+  )
+}
 
 function Calendar({
   className,
@@ -21,8 +107,8 @@ function Calendar({
         months: "flex flex-col sm:flex-row space-y-4 sm:space-x-4 sm:space-y-0",
         month: "space-y-4",
         caption: "flex justify-center pt-1 relative items-center",
-        caption_label: "text-sm font-medium",
-        nav: "space-x-1 flex items-center",
+        caption_label: "hidden",
+        nav: "hidden",
         nav_button: cn(
           buttonVariants({ variant: "outline" }),
           "h-7 w-7 bg-transparent p-0 opacity-50 hover:opacity-100"
@@ -52,6 +138,7 @@ function Calendar({
         ...classNames,
       }}
       components={{
+        Caption: CustomCaption,
         IconLeft: ({ className, ...props }) => (
           <ChevronLeft className={cn("h-4 w-4", className)} {...props} />
         ),
