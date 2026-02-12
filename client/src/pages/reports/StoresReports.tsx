@@ -19,8 +19,10 @@ import {
   Eye,
   Loader2,
   FileText,
-  Download
+  Download,
+  Calendar as CalendarIcon
 } from "lucide-react";
+import { format } from "date-fns";
 import { pdfReportGenerator, formatDate, formatReportDateRange } from "@/lib/pdfReportGenerator";
 import ReportPreviewModal, { ReportPreviewData } from "@/components/reports/ReportPreviewModal";
 import { useToast } from "@/hooks/use-toast";
@@ -631,6 +633,18 @@ const StoresReports: React.FC<StoresReportsProps> = ({ onBack, globalFilters }) 
           onFiltersChange={setCategoryFilters}
           searchPlaceholder="Search stores reports..."
         />
+
+        {(categoryFilters.dateRange?.from || categoryFilters.dateRange?.to) && (
+          <div className="flex items-center gap-2 px-3 py-2 mt-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-md text-sm text-blue-700 dark:text-blue-300">
+            <CalendarIcon className="h-4 w-4 flex-shrink-0" />
+            <span>
+              Date range active: {categoryFilters.dateRange.from ? format(categoryFilters.dateRange.from, "MMM dd, yyyy") : "Start"}
+              {" - "}
+              {categoryFilters.dateRange.to ? format(categoryFilters.dateRange.to, "MMM dd, yyyy") : "End"}
+              {" — applied when generating reports"}
+            </span>
+          </div>
+        )}
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">

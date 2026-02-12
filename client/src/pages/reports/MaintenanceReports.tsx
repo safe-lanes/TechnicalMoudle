@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -24,6 +24,7 @@ import {
   Download,
   Activity
 } from "lucide-react";
+import { format } from "date-fns";
 import { pdfReportGenerator, fetchReportData, formatDate, formatReportDateRange } from "@/lib/pdfReportGenerator";
 import { useToast } from "@/hooks/use-toast";
 import { useVessels } from "@/hooks/useVessels";
@@ -1561,6 +1562,23 @@ const MaintenanceReports: React.FC<MaintenanceReportsProps> = ({ onBack, globalF
     }
   };
 
+  const filteredWorkOrders = useMemo(() => {
+    if (!categoryFilters.dateRange?.from && !categoryFilters.dateRange?.to) return workOrders;
+    return workOrders.filter((wo: any) => {
+      if (!wo.dueDate) return false;
+      const dueDate = new Date(wo.dueDate);
+      if (categoryFilters.dateRange.from && dueDate < categoryFilters.dateRange.from) return false;
+      if (categoryFilters.dateRange.to) {
+        const endOfDay = new Date(categoryFilters.dateRange.to);
+        endOfDay.setHours(23, 59, 59, 999);
+        if (dueDate > endOfDay) return false;
+      }
+      return true;
+    });
+  }, [workOrders, categoryFilters.dateRange]);
+
+  const isDateRangeActive = !!(categoryFilters.dateRange?.from || categoryFilters.dateRange?.to);
+
   const highPriorityCount = reports.filter(r => r.priority === 'high').length;
   const dailyReportsCount = reports.filter(r => r.frequency.toLowerCase().includes('daily')).length;
 
@@ -1588,6 +1606,18 @@ const MaintenanceReports: React.FC<MaintenanceReportsProps> = ({ onBack, globalF
           onFiltersChange={setCategoryFilters}
           searchPlaceholder="Search maintenance reports..."
         />
+
+        {(categoryFilters.dateRange?.from || categoryFilters.dateRange?.to) && (
+          <div className="flex items-center gap-2 px-3 py-2 mt-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-md text-sm text-blue-700 dark:text-blue-300">
+            <Calendar className="h-4 w-4 flex-shrink-0" />
+            <span>
+              Date range active: {categoryFilters.dateRange.from ? format(categoryFilters.dateRange.from, "MMM dd, yyyy") : "Start"}
+              {" - "}
+              {categoryFilters.dateRange.to ? format(categoryFilters.dateRange.to, "MMM dd, yyyy") : "End"}
+              {" — applied when generating reports"}
+            </span>
+          </div>
+        )}
 
       </div>
 
@@ -1623,9 +1653,12 @@ const MaintenanceReports: React.FC<MaintenanceReportsProps> = ({ onBack, globalF
           <CardHeader className="pb-2">
             <CardDescription className="flex items-center gap-1">
               <TrendingUp className="w-4 h-4 text-purple-500" />
-              Work Orders
+              {isDateRangeActive ? "Work Orders (Filtered)" : "Work Orders"}
             </CardDescription>
-            <CardTitle className="text-3xl text-purple-600" data-testid="text-maintenance-work-orders">{workOrders.length}</CardTitle>
+            <CardTitle className="text-3xl text-purple-600" data-testid="text-maintenance-work-orders">{filteredWorkOrders.length}</CardTitle>
+            {isDateRangeActive && (
+              <p className="text-xs text-blue-600 mt-1">Filtered by date range</p>
+            )}
           </CardHeader>
         </Card>
       </div>
