@@ -10,7 +10,6 @@ import JobUpload from "./JobUpload";
 import SparesUpload from "./bulk/SparesUpload";
 import StoresUpload from "./bulk/StoresUpload";
 import MakerListUpload from "./bulk/MakerListUpload";
-import MasterDataUpload from "./bulk/MasterDataUpload";
 import FleetComponentUpload from "./bulk/FleetComponentUpload";
 import FleetJobsUpload from "./bulk/FleetJobsUpload";
 import FleetSparesUpload from "./bulk/FleetSparesUpload";
@@ -20,7 +19,7 @@ import { useExternalVessels } from "@/hooks/useExternalMasterData";
 import { useUIRole } from "@/contexts/UIRoleContext";
 
 type VesselTemplateType = 'machinery' | 'stores' | 'spares' | 'jobs';
-type FleetTemplateType = 'maker-list' | 'master-data' | 'fleet-component' | 'fleet-jobs' | 'fleet-spares' | 'master-list';
+type FleetTemplateType = 'maker-list' | 'fleet-component' | 'fleet-jobs' | 'fleet-spares' | 'master-list';
 type ViewMode = 'upload' | 'history';
 
 // Complete marker configurations per template tab
@@ -218,11 +217,10 @@ export default function BulkDataImport() {
 
   const fleetTemplates = [
     { id: 'maker-list' as FleetTemplateType, number: 1, name: 'Maker List' },
-    { id: 'master-data' as FleetTemplateType, number: 2, name: 'Master Data' },
-    { id: 'fleet-component' as FleetTemplateType, number: 3, name: 'Fleet Component' },
-    { id: 'fleet-jobs' as FleetTemplateType, number: 4, name: 'Fleet Jobs' },
-    { id: 'fleet-spares' as FleetTemplateType, number: 5, name: 'Fleet Spares' },
-    { id: 'master-list' as FleetTemplateType, number: 6, name: 'Master List' },
+    { id: 'fleet-component' as FleetTemplateType, number: 2, name: 'Fleet Component' },
+    { id: 'fleet-jobs' as FleetTemplateType, number: 3, name: 'Fleet Jobs' },
+    { id: 'fleet-spares' as FleetTemplateType, number: 4, name: 'Fleet Spares' },
+    { id: 'master-list' as FleetTemplateType, number: 5, name: 'Master List' },
   ];
 
   const currentTemplates = isFleetMode ? fleetTemplates : vesselTemplates;
@@ -350,8 +348,6 @@ export default function BulkDataImport() {
           ) : isFleetMode ? (
             selectedFleetTemplate === 'maker-list' ? (
               <MakerListUpload />
-            ) : selectedFleetTemplate === 'master-data' ? (
-              <MasterDataUpload />
             ) : selectedFleetTemplate === 'fleet-component' ? (
               <FleetComponentUpload />
             ) : selectedFleetTemplate === 'fleet-jobs' ? (
