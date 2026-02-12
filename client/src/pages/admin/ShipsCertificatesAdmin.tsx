@@ -91,7 +91,7 @@ interface MasterCertificate {
   requirementRef: string;
   applicableToCompany: boolean;
   certificateLabel: string;
-  // Company-specific fields (only used when applicableToCompany is true)
+  isSystemDefined?: boolean;
   companyId?: string;
   companyGroup?: string;
   companySequence?: number;
@@ -234,6 +234,7 @@ export default function ShipsCertificatesAdmin() {
   // Master data state with sequence management
   const [masterData, setMasterData] = useState<MasterCertificate[]>(STARTER_KIT_MASTER_DATA);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+  const [deletedMasterIds, setDeletedMasterIds] = useState<string[]>([]);
   
   // Track if save was performed (to show Exit instead of Cancel)
   const [hasSavedInSession, setHasSavedInSession] = useState<Record<string, boolean>>({
@@ -291,7 +292,7 @@ export default function ShipsCertificatesAdmin() {
           requirementRef: cert.requirementRef || cert.requirement_ref || "",
           applicableToCompany: cert.applicableToCompany || cert.applicable_to_company || false,
           certificateLabel: cert.certificateLabel || cert.certificate_label || "",
-          // Company-specific fields - use stored value or generate default
+          isSystemDefined: cert.isSystemDefined || cert.is_system_defined || false,
           companyId: storedCompanyId || ("C" + masterId),
           companyGroup: cert.companyGroup || cert.company_group || "",
           companySequence: cert.companySequence || cert.company_sequence || undefined,
@@ -306,6 +307,7 @@ export default function ShipsCertificatesAdmin() {
   const saveMutation = useMutation({
     mutationFn: async (payload: { 
       certificates: MasterCertificate[]; 
+      deletedMasterIds?: string[];
       vesselSpecificCerts?: string[];
       targetVessels?: Array<{ id: string; name: string }>;
     }) => {
@@ -315,11 +317,11 @@ export default function ShipsCertificatesAdmin() {
     onSuccess: (data) => {
       toast({
         title: "Saved successfully",
-        description: `${data.inserted || 0} new certificates added, ${data.updated || 0} updated`,
+        description: `${data.inserted || 0} new certificates added, ${data.updated || 0} updated${data.deleted ? `, ${data.deleted} deleted` : ''}`,
       });
       setHasUnsavedChanges(false);
+      setDeletedMasterIds([]);
       setHasSavedInSession(prev => ({ ...prev, [activeTab]: true }));
-      // Clear company-only and vessel-only certificates since they're now saved to master
       setCompanyOnlyCerts([]);
       setVesselOnlyCerts([]);
       queryClient.invalidateQueries({ queryKey: ['/technical/api/admin/ship-certificates-master'] });
@@ -357,6 +359,22 @@ export default function ShipsCertificatesAdmin() {
     },
   });
   
+  const deleteCertificateRow = (id: number) => {
+    const cert = masterData.find(c => c.id === id);
+    if (!cert || cert.isSystemDefined) return;
+    if (cert.masterId) {
+      setDeletedMasterIds(prev => [...prev, cert.masterId]);
+    }
+    setMasterData(prev => {
+      const filtered = prev.filter(c => c.id !== id);
+      return filtered.map((c, idx) => ({
+        ...c,
+        sequence: idx + 1,
+      }));
+    });
+    setHasUnsavedChanges(true);
+  };
+
   // Handle save button click
   const handleSave = () => {
     // Find the highest existing CMP- sequence number from masterData
@@ -433,9 +451,9 @@ export default function ShipsCertificatesAdmin() {
       .map(v => ({ id: String(v.id), name: v.name }));
     const vesselMasterIds = vesselOnlyCertsWithIds.map(c => c.masterId);
     
-    // Pass vessel-specific info along with certificates
     saveMutation.mutate({ 
       certificates: allCertificates,
+      deletedMasterIds: deletedMasterIds.length > 0 ? deletedMasterIds : undefined,
       vesselSpecificCerts: vesselMasterIds,
       targetVessels: targetVessels,
     });
@@ -1371,9 +1389,15 @@ export default function ShipsCertificatesAdmin() {
                     {viewModes.master === "edit" && (
                       <td className="px-3 py-3">
                         <div className="flex items-center justify-center gap-1">
-                          <Button size="icon" variant="ghost" className="h-8 w-8 text-destructive" data-testid={`button-delete-${cert.id}`}>
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
+                          {cert.isSystemDefined ? (
+                            <Button size="icon" variant="ghost" className="h-8 w-8 text-muted-foreground opacity-30 cursor-not-allowed" disabled data-testid={`button-delete-disabled-${cert.id}`}>
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          ) : (
+                            <Button size="icon" variant="ghost" className="h-8 w-8 text-destructive" onClick={() => deleteCertificateRow(cert.id)} data-testid={`button-delete-${cert.id}`}>
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          )}
                         </div>
                       </td>
                     )}

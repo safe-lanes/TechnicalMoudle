@@ -13107,6 +13107,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       const { db } = postgres;
       const certificates = req.body.certificates;
+      const deletedMasterIds: string[] = req.body.deletedMasterIds || [];
       // Optional: vessel-specific certificate master IDs and their target vessels
       const vesselSpecificCerts: string[] = req.body.vesselSpecificCerts || [];
       const targetVessels: Array<{ id: string; name: string }> = req.body.targetVessels || [];
@@ -13116,6 +13117,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       console.log(`💾 Saving ${certificates.length} ship certificates master entries...`);
+      
+      let deletedCount = 0;
+      if (deletedMasterIds.length > 0) {
+        for (const masterId of deletedMasterIds) {
+          const existing = await db.select({ id: shipCertificatesMaster.id, isSystemDefined: shipCertificatesMaster.isSystemDefined })
+            .from(shipCertificatesMaster)
+            .where(eq(shipCertificatesMaster.masterId, masterId))
+            .limit(1);
+          if (existing.length > 0 && existing[0].isSystemDefined) {
+            console.log(`⛔ Skipped deletion of system-defined certificate: ${masterId}`);
+            continue;
+          }
+          await db.delete(shipCertificatesMaster)
+            .where(eq(shipCertificatesMaster.masterId, masterId));
+          deletedCount++;
+          console.log(`🗑️ Deleted certificate: ${masterId}`);
+        }
+      }
       
       // Validate: if vessel-specific certs are provided, targetVessels must not be empty
       if (vesselSpecificCerts.length > 0 && targetVessels.length === 0) {
@@ -13263,13 +13282,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
       
-      console.log(`✅ Ship certificates master saved: ${insertedCount} inserted, ${updatedCount} updated`);
+      console.log(`✅ Ship certificates master saved: ${insertedCount} inserted, ${updatedCount} updated, ${deletedCount} deleted`);
       
       res.json({ 
         success: true, 
         message: `Saved ${certificates.length} certificates`,
         inserted: insertedCount,
-        updated: updatedCount
+        updated: updatedCount,
+        deleted: deletedCount
       });
     } catch (error: any) {
       console.error("Error saving ship certificates master:", error);
@@ -13287,6 +13307,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       const { db } = postgres;
       const { masterId } = req.params;
+      
+      const existing = await db.select({ isSystemDefined: shipCertificatesMaster.isSystemDefined })
+        .from(shipCertificatesMaster)
+        .where(eq(shipCertificatesMaster.masterId, masterId))
+        .limit(1);
+      
+      if (existing.length > 0 && existing[0].isSystemDefined) {
+        return res.status(403).json({ error: "System-defined certificates cannot be deleted" });
+      }
       
       await db.delete(shipCertificatesMaster)
         .where(eq(shipCertificatesMaster.masterId, masterId));

@@ -2557,6 +2557,7 @@ export const shipCertificatesMaster = pgTable("ship_certificates_master", {
   applicableToCompany: boolean("applicable_to_company").notNull().default(false),
   certificateLabel: text("certificate_label"), // Custom label when applicable to company
   isActive: boolean("is_active").notNull().default(true),
+  isSystemDefined: boolean("is_system_defined").notNull().default(false),
   // Company-specific fields (only used when applicableToCompany is true)
   companyId: text("company_id"), // Default: "C" + masterId, but user-editable
   companyGroup: text("company_group"), // A-I company group key
@@ -2571,6 +2572,7 @@ export const shipCertificatesMaster = pgTable("ship_certificates_master", {
 
 export const insertShipCertificateMasterSchema = createInsertSchema(shipCertificatesMaster).omit({
   id: true,
+  isSystemDefined: true,
   createdAt: true,
   updatedAt: true,
 });

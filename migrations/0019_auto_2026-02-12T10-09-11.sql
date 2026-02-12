@@ -1,0 +1,1 @@
+ALTER TABLE "ship_certificates_master" ADD COLUMN "is_system_defined" boolean DEFAULT false NOT NULL;
