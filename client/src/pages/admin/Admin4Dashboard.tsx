@@ -156,7 +156,7 @@ export default function Admin4Dashboard({ onSubViewChange }: { onSubViewChange?:
 
   return (
     <div className="p-6">
-      <Card className="overflow-hidden">
+      <Card className="overflow-visible">
         <div className="bg-gradient-to-r from-cyan-600 to-blue-600 px-6 py-3">
           <div className="flex items-center justify-between gap-4">
             <div className="flex items-center gap-3">
@@ -424,8 +424,8 @@ export default function Admin4Dashboard({ onSubViewChange }: { onSubViewChange?:
                     <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-blue-600"></div>
                   </div>
                 ) : (dashboardStats?.makers?.linked > 0 || dashboardStats?.makers?.unlinked > 0) ? (
-                  <div>
-                    <div style={{ height: '150px' }}>
+                  <div className="flex justify-center">
+                    <div style={{ height: '140px', width: '180px' }}>
                       <AgCharts options={{
                         data: [
                           { label: 'Used', value: dashboardStats?.makers?.linked || 0 },
@@ -436,14 +436,13 @@ export default function Admin4Dashboard({ onSubViewChange }: { onSubViewChange?:
                           angleKey: 'value',
                           sectorLabelKey: 'value',
                           innerRadiusRatio: 0.55,
-                          outerRadiusRatio: 0.75,
                           fills: ['#3b82f6', '#e5e7eb'],
                           strokes: ['#3b82f6', '#d1d5db'],
                           calloutLabel: { enabled: false },
                           sectorLabel: { fontSize: 9 },
                         } as any],
                         legend: { enabled: true, position: 'bottom', item: { label: { fontSize: 9 } } },
-                        padding: { top: 5, bottom: 5, left: 5, right: 5 },
+                        padding: { top: 2, bottom: 2, left: 2, right: 2 },
                       } as AgChartOptions} />
                     </div>
                   </div>
@@ -466,8 +465,8 @@ export default function Admin4Dashboard({ onSubViewChange }: { onSubViewChange?:
                     <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-orange-600"></div>
                   </div>
                 ) : (dashboardStats?.components?.withJobs > 0 || dashboardStats?.components?.withoutJobs > 0) ? (
-                  <div>
-                    <div style={{ height: '150px' }}>
+                  <div className="flex justify-center">
+                    <div style={{ height: '140px', width: '180px' }}>
                       <AgCharts options={{
                         data: [
                           { label: 'Linked', value: dashboardStats?.components?.withJobs || 0 },
@@ -478,14 +477,13 @@ export default function Admin4Dashboard({ onSubViewChange }: { onSubViewChange?:
                           angleKey: 'value',
                           sectorLabelKey: 'value',
                           innerRadiusRatio: 0.55,
-                          outerRadiusRatio: 0.75,
                           fills: ['#f97316', '#e5e7eb'],
                           strokes: ['#f97316', '#d1d5db'],
                           calloutLabel: { enabled: false },
                           sectorLabel: { fontSize: 9 },
                         } as any],
                         legend: { enabled: true, position: 'bottom', item: { label: { fontSize: 9 } } },
-                        padding: { top: 5, bottom: 5, left: 5, right: 5 },
+                        padding: { top: 2, bottom: 2, left: 2, right: 2 },
                       } as AgChartOptions} />
                     </div>
                   </div>
@@ -508,8 +506,8 @@ export default function Admin4Dashboard({ onSubViewChange }: { onSubViewChange?:
                     <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-teal-600"></div>
                   </div>
                 ) : (dashboardStats?.components?.withSpares > 0 || dashboardStats?.components?.withoutSpares > 0) ? (
-                  <div>
-                    <div style={{ height: '150px' }}>
+                  <div className="flex justify-center">
+                    <div style={{ height: '140px', width: '180px' }}>
                       <AgCharts options={{
                         data: [
                           { label: 'Linked', value: dashboardStats?.components?.withSpares || 0 },
@@ -520,14 +518,13 @@ export default function Admin4Dashboard({ onSubViewChange }: { onSubViewChange?:
                           angleKey: 'value',
                           sectorLabelKey: 'value',
                           innerRadiusRatio: 0.55,
-                          outerRadiusRatio: 0.75,
                           fills: ['#14b8a6', '#e5e7eb'],
                           strokes: ['#14b8a6', '#d1d5db'],
                           calloutLabel: { enabled: false },
                           sectorLabel: { fontSize: 9 },
                         } as any],
                         legend: { enabled: true, position: 'bottom', item: { label: { fontSize: 9 } } },
-                        padding: { top: 5, bottom: 5, left: 5, right: 5 },
+                        padding: { top: 2, bottom: 2, left: 2, right: 2 },
                       } as AgChartOptions} />
                     </div>
                   </div>
