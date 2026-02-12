@@ -774,17 +774,17 @@ export class PostgresStorage {
     
     // Cascade inactivate children if requested
     if (options?.cascadeInactivate && activeChildren.length > 0) {
-      const childIds = activeChildren.map(c => c.id);
+      const childCuuids = activeChildren.map(c => c.cuuid);
       await db.update(components)
         .set({ isActive: false })
-        .where(inArray(components.id, childIds));
-      componentsInactivated += childIds.length;
+        .where(inArray(components.cuuid, childCuuids));
+      componentsInactivated += childCuuids.length;
       
       // Inactivate jobs linked to children (via direct componentId and jobComponentLinks)
       // Collect all unique job IDs to avoid duplicate updates/counts
       const childJobIdsToInactivate = new Set<string>();
       
-      for (const childId of childIds) {
+      for (const childId of childCuuids) {
         // Jobs linked via deprecated componentId field
         const directJobs = await db.select().from(jobs)
           .where(eq(jobs.componentId, childId));
@@ -5636,7 +5636,7 @@ export class PostgresStorage {
     const db = await getDb();
     const result = await db.update(components)
       .set({ isActive: false })
-      .where(inArray(components.id, ids))
+      .where(inArray(components.cuuid, ids))
       .returning();
     return result.length;
   }
@@ -6356,7 +6356,7 @@ export class PostgresStorage {
       componentName: components.name,
     })
     .from(spareComponentLinks)
-    .innerJoin(components, eq(spareComponentLinks.componentId, components.id))
+    .innerJoin(components, eq(spareComponentLinks.componentId, components.cuuid))
     .where(eq(spareComponentLinks.spareId, spareId));
     
     return links.map(l => ({
@@ -6449,7 +6449,7 @@ export class PostgresStorage {
       componentName: components.name,
     })
     .from(jobComponentLinks)
-    .innerJoin(components, eq(jobComponentLinks.componentId, components.id))
+    .innerJoin(components, eq(jobComponentLinks.componentId, components.cuuid))
     .where(eq(jobComponentLinks.jobId, jobId));
     
     return links.map(l => ({
@@ -6976,7 +6976,7 @@ export class PostgresStorage {
       spareId: spareComponentLinks.spareId
     })
     .from(spareComponentLinks)
-    .innerJoin(components, eq(spareComponentLinks.componentId, components.id))
+    .innerJoin(components, eq(spareComponentLinks.componentId, components.cuuid))
     .where(
       and(
         eq(components.componentCode, componentCode),

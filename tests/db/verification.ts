@@ -350,7 +350,7 @@ export class DatabaseVerification {
         // Verify component link
         const component = await this.db.select()
           .from(components)
-          .where(eq(components.id, event.componentId))
+          .where(eq(components.cuuid, event.componentId))
           .limit(1);
         
         if (component.length === 0) {
