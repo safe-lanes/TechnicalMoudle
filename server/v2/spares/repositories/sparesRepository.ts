@@ -46,16 +46,16 @@ export class SparesRepository {
 
     const componentIdsSet = new Set(allLinks.map(l => l.componentId));
     const componentIds = Array.from(componentIdsSet);
-    const componentsMap = new Map<string, { id: string; componentCode: string | null; name: string | null }>();
+    const componentsMap = new Map<string, { cuuid: string; componentCode: string | null; name: string | null }>();
     if (componentIds.length > 0) {
       const components = await db.select({
-        id: v2Components.id,
+        cuuid: v2Components.cuuid,
         componentCode: v2Components.componentCode,
         name: v2Components.name,
       }).from(v2Components)
-        .where(sql`${v2Components.id} IN ${componentIds}`);
+        .where(sql`${v2Components.cuuid} IN ${componentIds}`);
       for (const c of components) {
-        componentsMap.set(c.id, c);
+        componentsMap.set(c.cuuid, c);
       }
     }
 
