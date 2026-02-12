@@ -87,8 +87,8 @@ interface LowStockAlertReportProps {
 type SortField = 'priority' | 'itemCode' | 'itemName' | 'itemType' | 'category' | 'rob' | 'minStock' | 'deficit' | 'deficitPercent' | 'uom' | 'avgMonthlyConsumption' | 'daysUntilStockout' | 'estimatedCost' | 'supplier' | 'leadTime';
 type SortDirection = 'asc' | 'desc';
 
-function formatCurrency(val: number | null): string {
-  if (val === null || val === 0) return 'N/A';
+function formatCurrency(val: number | null | undefined): string {
+  if (val == null || val === 0) return 'N/A';
   return `$${val.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }
 
