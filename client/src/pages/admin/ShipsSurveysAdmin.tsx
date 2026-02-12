@@ -277,18 +277,22 @@ export default function ShipsSurveysAdmin() {
         description: `${data.inserted || 0} new surveys added, ${data.updated || 0} updated`,
       });
       if (activeTab === "master" && draftMasterData) {
-        setMasterData(draftMasterData);
-        setDraftMasterData(null);
-        setMasterSnapshot(null);
+        const committedData = [...draftMasterData];
+        setMasterData(committedData);
+        setMasterSnapshot(committedData.map(s => ({ ...s })));
+        setDraftMasterData(committedData.map(s => ({ ...s })));
         setDeletedDraftIds([]);
+      } else {
+        setViewModes(prev => ({ ...prev, [activeTab]: "view" }));
       }
       setHasUnsavedChanges(false);
       setHasSavedInSession(prev => ({ ...prev, [activeTab]: true }));
       setCompanyOnlySurveys([]);
       setVesselOnlySurveys([]);
+      setMasterValidationError("");
+      setInvalidSurveyIds(new Set());
       queryClient.invalidateQueries({ queryKey: ['/technical/api/admin/ship-surveys-master'] });
       queryClient.invalidateQueries({ queryKey: ['/technical/api/admin/vessel-survey-applicability', selectedVesselIds] });
-      setViewModes(prev => ({ ...prev, [activeTab]: "view" }));
     },
     onError: (error: any) => {
       toast({
@@ -929,18 +933,6 @@ export default function ShipsSurveysAdmin() {
           </h1>
         
           <Tabs value={activeTab} onValueChange={(v) => {
-                    if (activeTab === "master" && viewModes.master === "edit") {
-                      if (masterSnapshot) {
-                        setMasterData(masterSnapshot);
-                      }
-                      setDraftMasterData(null);
-                      setMasterSnapshot(null);
-                      setDeletedDraftIds([]);
-                      setHasUnsavedChanges(false);
-                      setMasterValidationError("");
-                      setInvalidSurveyIds(new Set());
-                      setViewModes(prev => ({ ...prev, master: "view" }));
-                    }
                     setActiveTab(v as TabType);
                   }} className="absolute left-1/2 -translate-x-1/2">
             <TabsList className="bg-gray-100">
