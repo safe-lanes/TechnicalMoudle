@@ -1213,7 +1213,7 @@ export default function FleetDataView({ onBack }: { onBack?: () => void }) {
           }
         }}
       >
-        <DialogContent className="max-h-[70vh] p-0 gap-0" style={{ width: '40vw', maxWidth: '40vw' }}>
+        <DialogContent className="p-0 gap-0" style={{ width: '40vw', maxWidth: '40vw', maxHeight: '85vh' }}>
           <div className="bg-gradient-to-r from-cyan-600 to-blue-600 px-4 py-2.5 rounded-t-lg">
             <div className="flex items-center justify-between gap-2">
               <div className="flex items-center gap-2">
@@ -1249,7 +1249,7 @@ export default function FleetDataView({ onBack }: { onBack?: () => void }) {
             </div>
           </div>
 
-          <ScrollArea className="h-[250px]">
+          <ScrollArea className="h-[400px]">
             <table className="w-full text-xs">
               <thead className="sticky top-0 bg-gray-50 z-10">
                 <tr className="border-b text-gray-500">
