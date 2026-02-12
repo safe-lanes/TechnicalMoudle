@@ -130,7 +130,7 @@ function getDaysUntilStockoutDisplay(days: number | null) {
 const LowStockAlertReport: React.FC<LowStockAlertReportProps> = ({ onBack, vesselId: propVesselId }) => {
   const { vesselId: contextVesselId, vessels } = useVessel();
   const effectiveVesselId = propVesselId || contextVesselId;
-  const vesselName = vessels?.find((v: any) => v.id === effectiveVesselId)?.name || effectiveVesselId;
+  const vesselName = effectiveVesselId === 'all' ? 'All Vessels' : (vessels?.find((v: any) => v.id === effectiveVesselId)?.name || effectiveVesselId);
   const { toast } = useToast();
 
   const [searchQuery, setSearchQuery] = useState("");
@@ -152,7 +152,7 @@ const LowStockAlertReport: React.FC<LowStockAlertReportProps> = ({ onBack, vesse
       if (!res.ok) throw new Error(`${res.status}: ${res.statusText}`);
       return res.json();
     },
-    enabled: !!effectiveVesselId && effectiveVesselId !== 'all',
+    enabled: !!effectiveVesselId,
   });
 
   const { data: snapshotsData, isLoading: snapshotsLoading } = useQuery<any[]>({
@@ -414,7 +414,7 @@ const LowStockAlertReport: React.FC<LowStockAlertReportProps> = ({ onBack, vesse
     </div>
   );
 
-  if (!effectiveVesselId || effectiveVesselId === 'all') {
+  if (!effectiveVesselId) {
     return (
       <div className="p-6 bg-white min-h-screen">
         <div className="flex items-center gap-4 mb-6">

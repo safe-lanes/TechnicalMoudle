@@ -4535,12 +4535,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const allVessels = await storage.getVessels();
       const vessel = allVessels.find(v => v.id === vesselId);
-      const vesselName = vessel?.name || vesselId;
+      const vesselName = vesselId === 'all' ? 'All Vessels' : (vessel?.name || vesselId);
 
-      const sparesData = await storage.getSpares(vesselId);
-      const jobsData = await storage.getJobs(vesselId);
-      const componentsData = await storage.getComponents(vesselId);
-      const jobComponentLinks = await storage.getJobComponentLinks(vesselId);
+      let sparesData: any[];
+      let jobsData: any[];
+      let componentsData: any[];
+      let jobComponentLinks: any[];
+      if (vesselId === 'all') {
+        sparesData = []; jobsData = []; componentsData = []; jobComponentLinks = [];
+        for (const v of allVessels) {
+          sparesData = sparesData.concat(await storage.getSpares(v.id));
+          jobsData = jobsData.concat(await storage.getJobs(v.id));
+          componentsData = componentsData.concat(await storage.getComponents(v.id));
+          jobComponentLinks = jobComponentLinks.concat(await storage.getJobComponentLinks(v.id));
+        }
+      } else {
+        sparesData = await storage.getSpares(vesselId);
+        jobsData = await storage.getJobs(vesselId);
+        componentsData = await storage.getComponents(vesselId);
+        jobComponentLinks = await storage.getJobComponentLinks(vesselId);
+      }
 
       const componentMap = new Map(componentsData.map(c => [c.id, c]));
 
@@ -4744,12 +4758,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const allVessels = await storage.getVessels();
       const vessel = allVessels.find(v => v.id === vesselId);
-      const vesselName = vessel?.name || vesselId;
+      const vesselName = vesselId === 'all' ? 'All Vessels' : (vessel?.name || vesselId);
 
-      const sparesData = await storage.getSpares(vesselId);
-      const jobsData = await storage.getJobs(vesselId);
-      const componentsData = await storage.getComponents(vesselId);
-      const jobComponentLinks = await storage.getJobComponentLinks(vesselId);
+      let sparesData: any[];
+      let jobsData: any[];
+      let componentsData: any[];
+      let jobComponentLinks: any[];
+      if (vesselId === 'all') {
+        sparesData = []; jobsData = []; componentsData = []; jobComponentLinks = [];
+        for (const v of allVessels) {
+          sparesData = sparesData.concat(await storage.getSpares(v.id));
+          jobsData = jobsData.concat(await storage.getJobs(v.id));
+          componentsData = componentsData.concat(await storage.getComponents(v.id));
+          jobComponentLinks = jobComponentLinks.concat(await storage.getJobComponentLinks(v.id));
+        }
+      } else {
+        sparesData = await storage.getSpares(vesselId);
+        jobsData = await storage.getJobs(vesselId);
+        componentsData = await storage.getComponents(vesselId);
+        jobComponentLinks = await storage.getJobComponentLinks(vesselId);
+      }
 
       const componentMap = new Map(componentsData.map(c => [c.id, c]));
 
@@ -7101,7 +7129,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Get spares for a vessel
   app.get("/technical/api/spares/:vesselId", async (req, res) => {
     try {
-      const spares = await storage.getSpares(req.params.vesselId);
+      let spares: any[];
+      if (req.params.vesselId === 'all') {
+        spares = [];
+        const allVessels = await storage.getVessels();
+        for (const v of allVessels) {
+          const vSpares = await storage.getSpares(v.id);
+          spares.push(...vSpares);
+        }
+      } else {
+        spares = await storage.getSpares(req.params.vesselId);
+      }
       res.json(spares);
     } catch (error: any) {
       console.error("Error fetching spares:", error);
@@ -7326,7 +7364,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { vesselId } = req.params;
       const { criticality, componentCategory, sortBy } = req.query;
 
-      const allSpares = await storage.getSpares(vesselId);
+      let allSpares: any[];
+      if (vesselId === 'all') {
+        const allVessels = await storage.getVessels();
+        allSpares = [];
+        for (const vessel of allVessels) {
+          const vesselSpares = await storage.getSpares(vessel.id);
+          allSpares = allSpares.concat(vesselSpares);
+        }
+      } else {
+        allSpares = await storage.getSpares(vesselId);
+      }
       const activeSparesRaw = allSpares.filter((s: any) => !s.deleted && s.dataScope !== 'fleet');
 
       let lowStockItems = activeSparesRaw.filter((s: any) => {
@@ -7418,10 +7466,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { vesselId } = req.params;
       const { criticality, sortBy } = req.body;
 
-      const allSpares = await storage.getSpares(vesselId);
       const allVessels = await storage.getVessels();
+      let allSpares: any[];
+      if (vesselId === 'all') {
+        allSpares = [];
+        for (const vessel of allVessels) {
+          const vesselSpares = await storage.getSpares(vessel.id);
+          allSpares = allSpares.concat(vesselSpares);
+        }
+      } else {
+        allSpares = await storage.getSpares(vesselId);
+      }
       const vessel = allVessels.find((v: any) => v.id === vesselId);
-      const vesselName = vessel?.name || vesselId;
+      const vesselName = vesselId === 'all' ? 'All Vessels' : (vessel?.name || vesselId);
 
       const activeSparesRaw = allSpares.filter((s: any) => !s.deleted && s.dataScope !== 'fleet');
 
@@ -7555,10 +7612,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { vesselId } = req.params;
       const { tab, categoryFilter, statusFilter } = req.body;
 
-      const allItems = await storage.getStoresItems(vesselId);
       const allVessels = await storage.getVessels();
+      let allItems: any[];
+      if (vesselId === 'all') {
+        allItems = [];
+        for (const vessel of allVessels) {
+          allItems = allItems.concat(await storage.getStoresItems(vessel.id));
+        }
+      } else {
+        allItems = await storage.getStoresItems(vesselId);
+      }
       const vessel = allVessels.find((v: any) => v.id === vesselId);
-      const vesselName = vessel?.name || vesselId;
+      const vesselName = vesselId === 'all' ? 'All Vessels' : (vessel?.name || vesselId);
 
       let items = allItems.filter((item: any) => item.deleted !== true && item.isActive !== false);
 
@@ -7594,7 +7659,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return a || b || '-';
       };
 
-      const ledger = await storage.getStoresTransactionHistory(vesselId);
+      let ledger: any[];
+      if (vesselId === 'all') {
+        ledger = [];
+        for (const v of allVessels) {
+          ledger = ledger.concat(await storage.getStoresTransactionHistory(v.id));
+        }
+      } else {
+        ledger = await storage.getStoresTransactionHistory(vesselId);
+      }
 
       const now = new Date();
       const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
@@ -7796,11 +7869,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { vesselId } = req.params;
       const { startDate, endDate, itemType, category } = req.query;
 
-      const allHistory = await storage.getStoresTransactionHistory(vesselId);
-      const allItems = await storage.getStoresItems(vesselId);
       const allVessels = await storage.getVessels();
+      let allHistory: any[];
+      let allItems: any[];
+      if (vesselId === 'all') {
+        allHistory = []; allItems = [];
+        for (const vessel of allVessels) {
+          allHistory = allHistory.concat(await storage.getStoresTransactionHistory(vessel.id));
+          allItems = allItems.concat(await storage.getStoresItems(vessel.id));
+        }
+      } else {
+        allHistory = await storage.getStoresTransactionHistory(vesselId);
+        allItems = await storage.getStoresItems(vesselId);
+      }
       const vessel = allVessels.find((v: any) => v.id === vesselId);
-      const vesselName = vessel?.name || vesselId;
+      const vesselName = vesselId === 'all' ? 'All Vessels' : (vessel?.name || vesselId);
       const itemsMap = new Map(allItems.map((item: any) => [item.id, item]));
 
       let consumeEvents = allHistory.filter((h: any) => h.eventType === 'CONSUME');
@@ -8129,11 +8212,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { vesselId } = req.params;
       const { startDate, endDate, itemType, category } = req.body;
 
-      const allHistory = await storage.getStoresTransactionHistory(vesselId);
-      const allItems = await storage.getStoresItems(vesselId);
       const allVessels = await storage.getVessels();
+      let allHistory: any[];
+      let allItems: any[];
+      if (vesselId === 'all') {
+        allHistory = []; allItems = [];
+        for (const vessel of allVessels) {
+          allHistory = allHistory.concat(await storage.getStoresTransactionHistory(vessel.id));
+          allItems = allItems.concat(await storage.getStoresItems(vessel.id));
+        }
+      } else {
+        allHistory = await storage.getStoresTransactionHistory(vesselId);
+        allItems = await storage.getStoresItems(vesselId);
+      }
       const vessel = allVessels.find((v: any) => v.id === vesselId);
-      const vesselName = vessel?.name || vesselId;
+      const vesselName = vesselId === 'all' ? 'All Vessels' : (vessel?.name || vesselId);
       const itemsMap = new Map(allItems.map((item: any) => [item.id, item]));
 
       let consumeEvents = allHistory.filter((h: any) => h.eventType === 'CONSUME');
@@ -8521,8 +8614,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/technical/api/reports/consumption-analysis/:vesselId", async (req, res) => {
     try {
       const { vesselId } = req.params;
-      const history = await storage.getSpareHistory(vesselId);
-      const allSpares = await storage.getSpares(vesselId);
+      let history: any[];
+      let allSpares: any[];
+      if (vesselId === 'all') {
+        const allVessels = await storage.getVessels();
+        history = []; allSpares = [];
+        for (const vessel of allVessels) {
+          history = history.concat(await storage.getSpareHistory(vessel.id));
+          allSpares = allSpares.concat(await storage.getSpares(vessel.id));
+        }
+      } else {
+        history = await storage.getSpareHistory(vesselId);
+        allSpares = await storage.getSpares(vesselId);
+      }
 
       const consumeEvents = history.filter((h: any) => h.eventType === 'CONSUME');
 
@@ -8593,11 +8697,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/technical/api/reports/consumption-analysis/:vesselId/excel", async (req, res) => {
     try {
       const { vesselId } = req.params;
-      const history = await storage.getSpareHistory(vesselId);
-      const allSpares = await storage.getSpares(vesselId);
       const allVessels = await storage.getVessels();
+      let history: any[];
+      let allSpares: any[];
+      if (vesselId === 'all') {
+        history = []; allSpares = [];
+        for (const vessel of allVessels) {
+          history = history.concat(await storage.getSpareHistory(vessel.id));
+          allSpares = allSpares.concat(await storage.getSpares(vessel.id));
+        }
+      } else {
+        history = await storage.getSpareHistory(vesselId);
+        allSpares = await storage.getSpares(vesselId);
+      }
       const vessel = allVessels.find((v: any) => v.id === vesselId);
-      const vesselName = vessel?.name || vesselId;
+      const vesselName = vesselId === 'all' ? 'All Vessels' : (vessel?.name || vesselId);
 
       const consumeEvents = history.filter((h: any) => h.eventType === 'CONSUME');
 
@@ -9382,7 +9496,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { vesselId } = req.params;
       const { expired, expiring_soon, hazard_class, stock_status } = req.query;
       
-      let chemicals = await storage.getStoresItems(vesselId, 'chemicals');
+      let chemicals: any[];
+      if (vesselId === 'all') {
+        chemicals = [];
+        const allVessels = await storage.getVessels();
+        for (const v of allVessels) {
+          const vChemicals = await storage.getStoresItems(v.id, 'chemicals');
+          chemicals.push(...vChemicals);
+        }
+      } else {
+        chemicals = await storage.getStoresItems(vesselId, 'chemicals');
+      }
       
       const today = new Date();
       today.setHours(0, 0, 0, 0);
@@ -9477,7 +9601,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
         location: location as string | undefined,
       };
 
-      const result = await lowStockReportService.computeReport(vesselId, filters);
+      let result: any;
+      if (vesselId === 'all') {
+        const allVessels = await storage.getVessels();
+        let mergedItems: any[] = [];
+        let mergedSummary: any = { totalItems: 0, criticalCount: 0, highCount: 0, mediumCount: 0, lowCount: 0, totalDeficit: 0, estimatedCost: 0 };
+        for (const vessel of allVessels) {
+          const vesselResult = await lowStockReportService.computeReport(vessel.id, filters);
+          mergedItems = mergedItems.concat(vesselResult.items);
+          if (vesselResult.summary) {
+            mergedSummary.totalItems += vesselResult.summary.totalItems || 0;
+            mergedSummary.criticalCount += vesselResult.summary.criticalCount || 0;
+            mergedSummary.highCount += vesselResult.summary.highCount || 0;
+            mergedSummary.mediumCount += vesselResult.summary.mediumCount || 0;
+            mergedSummary.lowCount += vesselResult.summary.lowCount || 0;
+            mergedSummary.totalDeficit += vesselResult.summary.totalDeficit || 0;
+            mergedSummary.estimatedCost += vesselResult.summary.estimatedCost || 0;
+          }
+        }
+        result = { summary: mergedSummary, items: mergedItems };
+      } else {
+        result = await lowStockReportService.computeReport(vesselId, filters);
+      }
 
       lowStockReportService.saveSnapshot(
         vesselId, 'low-stock-alert', 'json', result.summary, result.items, filters
@@ -9494,7 +9639,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/technical/api/reports/stores-low-stock-alert/:vesselId/excel", async (req, res) => {
     try {
       const { vesselId } = req.params;
-      const result = await lowStockReportService.computeReport(vesselId);
+      let result: any;
+      if (vesselId === 'all') {
+        const allVessels = await storage.getVessels();
+        let mergedItems: any[] = [];
+        let mergedSummary: any = { totalItems: 0, criticalCount: 0, highCount: 0, mediumCount: 0, lowCount: 0, totalDeficit: 0, estimatedCost: 0 };
+        for (const vessel of allVessels) {
+          const vesselResult = await lowStockReportService.computeReport(vessel.id);
+          mergedItems = mergedItems.concat(vesselResult.items);
+          if (vesselResult.summary) {
+            mergedSummary.totalItems += vesselResult.summary.totalItems || 0;
+            mergedSummary.criticalCount += vesselResult.summary.criticalCount || 0;
+            mergedSummary.highCount += vesselResult.summary.highCount || 0;
+            mergedSummary.mediumCount += vesselResult.summary.mediumCount || 0;
+            mergedSummary.lowCount += vesselResult.summary.lowCount || 0;
+            mergedSummary.totalDeficit += vesselResult.summary.totalDeficit || 0;
+            mergedSummary.estimatedCost += vesselResult.summary.estimatedCost || 0;
+          }
+        }
+        result = { summary: mergedSummary, items: mergedItems };
+      } else {
+        result = await lowStockReportService.computeReport(vesselId);
+      }
       const lowStockItems = result.items;
 
       lowStockReportService.saveSnapshot(
@@ -9620,10 +9786,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/technical/api/stores/:vesselId", async (req, res) => {
     try {
       const { itemType } = req.query;
-      const stores = await storage.getStoresItems(
-        req.params.vesselId,
-        itemType as string | undefined
-      );
+      let stores: any[];
+      if (req.params.vesselId === 'all') {
+        stores = [];
+        const allVessels = await storage.getVessels();
+        for (const v of allVessels) {
+          const vStores = await storage.getStoresItems(v.id, itemType as string | undefined);
+          stores.push(...vStores);
+        }
+      } else {
+        stores = await storage.getStoresItems(
+          req.params.vesselId,
+          itemType as string | undefined
+        );
+      }
       res.json(stores);
     } catch (error) {
       res.status(500).json({ error: "Failed to fetch stores" });
@@ -9634,10 +9810,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { vesselId } = req.params;
       const { itemType } = req.query;
-      const history = await storage.getStoresTransactionHistory(
-        vesselId,
-        itemType as string | undefined
-      );
+      let history: any[];
+      if (vesselId === 'all') {
+        history = [];
+        const allVessels = await storage.getVessels();
+        for (const v of allVessels) {
+          const vHistory = await storage.getStoresTransactionHistory(v.id, itemType as string | undefined);
+          history.push(...vHistory);
+        }
+      } else {
+        history = await storage.getStoresTransactionHistory(
+          vesselId,
+          itemType as string | undefined
+        );
+      }
       res.json(history);
     } catch (error) {
       res.status(500).json({ error: "Failed to fetch stores history" });
@@ -18062,7 +18248,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       let sparesData: any[] = [];
       let storesData: any[] = [];
-      if (vesselId) {
+      if (vesselId && vesselId !== 'all') {
         sparesData = await storage.getSpares(vesselId);
         storesData = await storage.getStoresItems(vesselId);
       } else {
@@ -18237,10 +18423,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const vessels = await storage.getVessels();
       const vessel = vessels.find(v => v.id === vesselId || v.vesselCode === vesselId);
-      const vesselName = vessel?.name || vessel?.vesselName || String(vesselId);
+      const vesselName = vesselId === 'all' ? 'All Vessels' : (vessel?.name || vessel?.vesselName || String(vesselId));
 
-      const sparesData = await storage.getSpares(vesselId);
-      const storesData = await storage.getStoresItems(vesselId);
+      let sparesData: any[] = [];
+      let storesData: any[] = [];
+      if (vesselId === 'all') {
+        for (const v of vessels) {
+          const vSpares = await storage.getSpares(v.id);
+          sparesData.push(...vSpares);
+          const vStores = await storage.getStoresItems(v.id);
+          storesData.push(...vStores);
+        }
+      } else {
+        sparesData = await storage.getSpares(vesselId);
+        storesData = await storage.getStoresItems(vesselId);
+      }
 
       const normalizeSpareIhm = (ihm: string | null | undefined, ihmPresence: string | null | undefined): string => {
         if (ihmPresence) {

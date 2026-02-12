@@ -180,7 +180,7 @@ const ChemicalsExpiryReport: React.FC<ChemicalsExpiryReportProps> = ({ onBack, v
 
   const { data, isLoading, error } = useQuery<ChemicalsExpiryResponse>({
     queryKey: [`/technical/api/reports/chemicals-expiry/${effectiveVesselId}`],
-    enabled: !!effectiveVesselId && effectiveVesselId !== 'all',
+    enabled: !!effectiveVesselId,
   });
 
   const items = data?.items || [];
@@ -374,7 +374,7 @@ const ChemicalsExpiryReport: React.FC<ChemicalsExpiryReportProps> = ({ onBack, v
   };
 
 
-  if (!effectiveVesselId || effectiveVesselId === 'all') {
+  if (!effectiveVesselId) {
     return (
       <div className="p-6 bg-white min-h-screen">
         <div className="flex items-center gap-4 mb-6">

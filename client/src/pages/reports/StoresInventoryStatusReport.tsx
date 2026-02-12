@@ -123,12 +123,12 @@ const StoresInventoryStatusReport: React.FC<StoresInventoryStatusReportProps> = 
 
   const { data: rawStoresItems = [], isLoading: loadingItems, error: errorItems } = useQuery<StoresItem[]>({
     queryKey: [`/technical/api/stores/${effectiveVesselId}`],
-    enabled: !!effectiveVesselId && effectiveVesselId !== 'all',
+    enabled: !!effectiveVesselId,
   });
 
   const { data: rawLedger = [], isLoading: loadingLedger, error: errorLedger } = useQuery<StoresLedger[]>({
     queryKey: [`/technical/api/stores/${effectiveVesselId}/history`],
-    enabled: !!effectiveVesselId && effectiveVesselId !== 'all',
+    enabled: !!effectiveVesselId,
   });
 
   const isLoading = loadingItems || loadingLedger;
@@ -524,7 +524,7 @@ const StoresInventoryStatusReport: React.FC<StoresInventoryStatusReportProps> = 
     }
   };
 
-  if (!effectiveVesselId || effectiveVesselId === 'all') {
+  if (!effectiveVesselId) {
     return (
       <div className="p-6 bg-white min-h-screen">
         <div className="flex items-center gap-4 mb-6">

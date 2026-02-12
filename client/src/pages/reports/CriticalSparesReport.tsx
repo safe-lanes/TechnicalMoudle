@@ -102,7 +102,7 @@ const CriticalSparesReport: React.FC<CriticalSparesReportProps> = ({ onBack, ves
       if (!res.ok) throw new Error('Failed to fetch report');
       return res.json();
     },
-    enabled: !!effectiveVesselId && effectiveVesselId !== 'all',
+    enabled: !!effectiveVesselId,
   });
 
   const filteredAndSortedItems = useMemo(() => {
@@ -283,7 +283,7 @@ const CriticalSparesReport: React.FC<CriticalSparesReportProps> = ({ onBack, ves
     </button>
   );
 
-  if (!effectiveVesselId || effectiveVesselId === 'all') {
+  if (!effectiveVesselId) {
     return (
       <div className="p-6 bg-white min-h-screen">
         <div className="flex items-center gap-4 mb-6">

@@ -126,7 +126,7 @@ const IhmInventoryStatusReport: React.FC<IhmInventoryStatusReportProps> = ({ onB
       if (!res.ok) throw new Error('Failed to fetch IHM inventory status');
       return res.json();
     },
-    enabled: !!effectiveVesselId && effectiveVesselId !== 'all',
+    enabled: !!effectiveVesselId,
   });
 
   const summary = data?.summary || { totalItems: 0, ihmPresent: 0, noIhm: 0, unknown: 0 };
@@ -296,7 +296,7 @@ const IhmInventoryStatusReport: React.FC<IhmInventoryStatusReportProps> = ({ onB
   const startItem = (pagination.currentPage - 1) * pagination.pageSize + 1;
   const endItem = Math.min(pagination.currentPage * pagination.pageSize, pagination.totalItems);
 
-  if (!effectiveVesselId || effectiveVesselId === 'all') {
+  if (!effectiveVesselId) {
     return (
       <div className="p-6 bg-white min-h-screen">
         <div className="flex items-center gap-4 mb-6">

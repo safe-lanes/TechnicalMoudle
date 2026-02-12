@@ -71,7 +71,7 @@ const ConsumptionPatternReport: React.FC<ConsumptionPatternReportProps> = ({ onB
       if (!res.ok) throw new Error(`${res.status}: ${res.statusText}`);
       return res.json();
     },
-    enabled: !!vesselId && vesselId !== "all",
+    enabled: !!vesselId,
   });
 
   const summary = data?.summary;
@@ -213,7 +213,7 @@ const ConsumptionPatternReport: React.FC<ConsumptionPatternReportProps> = ({ onB
     </th>
   );
 
-  if (!vesselId || vesselId === "all") {
+  if (!vesselId) {
     return (
       <div className="bg-white min-h-screen p-6">
         <div className="flex items-center gap-3 mb-6">
