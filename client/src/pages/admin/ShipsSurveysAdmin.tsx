@@ -987,7 +987,7 @@ export default function ShipsSurveysAdmin() {
                   onClick={exitEditMode}
                   data-testid="button-cancel"
                 >
-                  {hasSavedInSession[activeTab] ? "Exit" : "Cancel"}
+                  Cancel
                 </Button>
                 {activeTab === "master" && (
                   <>
