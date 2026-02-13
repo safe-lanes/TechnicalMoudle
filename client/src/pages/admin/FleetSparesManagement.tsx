@@ -255,7 +255,7 @@ export default function FleetSparesManagement({ onBack }: { onBack?: () => void 
     }
   };
 
-  const equipmentOptions = components?.filter(c => c.fleetEquipmentCode) || [];
+  const equipmentOptions = components?.filter(c => c.fleetEquipmentCode && c.fleetEquipmentCode.length === 10) || [];
   const totalSpares = spares?.length || 0;
 
   const renderSpareFormSections = (formData: Partial<FleetSpares>, setFormData: (fn: (prev: Partial<FleetSpares>) => Partial<FleetSpares>) => void) => (
@@ -316,7 +316,7 @@ export default function FleetSparesManagement({ onBack }: { onBack?: () => void 
                   <SelectValue placeholder="Select equipment" />
                 </SelectTrigger>
                 <SelectContent>
-                  {components?.map((comp) => (
+                  {components?.filter(c => c.fleetEquipmentCode && c.fleetEquipmentCode.length === 10).map((comp) => (
                     <SelectItem key={comp.id} value={comp.fleetEquipmentCode || ""}>
                       {comp.fleetEquipmentCode} - {comp.fleetEquipmentName}
                     </SelectItem>

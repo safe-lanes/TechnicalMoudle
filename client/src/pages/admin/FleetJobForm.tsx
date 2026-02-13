@@ -192,7 +192,7 @@ export default function FleetJobForm({ open, onOpenChange, job }: FleetJobFormPr
                 <SelectValue placeholder="Select equipment" />
               </SelectTrigger>
               <SelectContent>
-                {components?.filter(c => c.fleetEquipmentCode).map((comp) => (
+                {components?.filter(c => c.fleetEquipmentCode && c.fleetEquipmentCode.length === 10).map((comp) => (
                   <SelectItem key={comp.id} value={comp.fleetEquipmentCode!}>
                     {comp.fleetEquipmentCode} - {comp.fleetEquipmentName}
                   </SelectItem>

@@ -320,7 +320,7 @@ export default function FleetJobsManagement({ onBack }: { onBack?: () => void })
     }
   };
 
-  const equipmentOptions = components?.filter(c => c.fleetEquipmentCode) || [];
+  const equipmentOptions = components?.filter(c => c.fleetEquipmentCode && c.fleetEquipmentCode.length === 10) || [];
   const totalJobs = jobs?.length || 0;
 
   const renderDetailField = (label: string, value: string | null | undefined, testId?: string) => (
@@ -588,7 +588,7 @@ export default function FleetJobsManagement({ onBack }: { onBack?: () => void })
                         <SelectValue placeholder="Select equipment" />
                       </SelectTrigger>
                       <SelectContent>
-                        {components?.map((comp) => (
+                        {components?.filter(c => c.fleetEquipmentCode && c.fleetEquipmentCode.length === 10).map((comp) => (
                           <SelectItem key={comp.id} value={comp.fleetEquipmentCode || ""}>
                             {comp.fleetEquipmentCode} - {comp.fleetEquipmentName}
                           </SelectItem>
