@@ -4507,7 +4507,7 @@ async function performImport(
       } else if (mode === 'update') {
         if (existingWorkOrder) {
           const previousSnapshot = createRecordSnapshot(existingWorkOrder);
-          const updatedWorkOrder = await updateWorkOrderFromRow(existingWorkOrder.id, row);
+          const updatedWorkOrder = await updateWorkOrderFromRow(existingWorkOrder.wouuid, row);
           workOrdersByTemplateCode.set(templateCode, updatedWorkOrder);
           result.updated++;
           
@@ -4521,7 +4521,7 @@ async function performImport(
       } else if (mode === 'upsert') {
         if (existingWorkOrder) {
           const previousSnapshot = createRecordSnapshot(existingWorkOrder);
-          const updatedWorkOrder = await updateWorkOrderFromRow(existingWorkOrder.id, row);
+          const updatedWorkOrder = await updateWorkOrderFromRow(existingWorkOrder.wouuid, row);
           workOrdersByTemplateCode.set(templateCode, updatedWorkOrder);
           result.updated++;
           
