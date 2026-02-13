@@ -36,7 +36,8 @@ export function useVessels() {
       code: String(entry.vuid || entry.vesselId || entry.code || entry.id),
       imoNumber: String(entry.imoNumber || entry.imo_number || ''),
       vesselType: String(entry.vesselType || entry.vessel_type || ''),
-    }));
+    }))
+    .sort((a: Vessel, b: Vessel) => a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: 'base' }));
 
   return { data: vessels, isLoading, error };
 }
