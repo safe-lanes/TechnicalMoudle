@@ -1219,7 +1219,7 @@ export default function FleetVesselMapping({ onBack }: { onBack?: () => void }) 
                       <table className="w-full" data-testid="table-vessel-jobs">
                         <thead>
                           <tr className="border-b">
-                            <th className="sticky top-0 bg-gray-50 z-10 text-left px-3 py-2 text-xs font-medium text-gray-500">Fleet Equipment Code</th>
+                            <th className="sticky top-0 bg-gray-50 z-10 text-left px-3 py-2 text-xs font-medium text-gray-500">Component Code</th>
                             <th className="sticky top-0 bg-gray-50 z-10 text-left px-3 py-2 text-xs font-medium text-gray-500">Job Code</th>
                             <th className="sticky top-0 bg-gray-50 z-10 text-left px-3 py-2 text-xs font-medium text-gray-500">Job Title</th>
                           </tr>
@@ -1235,7 +1235,7 @@ export default function FleetVesselMapping({ onBack }: { onBack?: () => void }) 
                                 onClick={() => setSelectedVesselJob(job.id)}
                                 data-testid={`row-vessel-job-${job.id}`}
                               >
-                                <td className="px-3 py-2 font-mono text-gray-600">{job.fleetEquipmentCode || "-"}</td>
+                                <td className="px-3 py-2 font-mono text-gray-600">{job.componentCode || "-"}</td>
                                 <td className="px-3 py-2 font-mono text-gray-600">{job.fleetJobCode || job.jobNo}</td>
                                 <td className="px-3 py-2 text-gray-600">{job.jobTitle}</td>
                               </tr>
