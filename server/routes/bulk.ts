@@ -4862,7 +4862,7 @@ async function performImport(
           
           // Track job creation with canonical state (refetch for accuracy)
           if (importHistoryId) {
-            const canonicalJob = await storage.getJob(createdJob.id);
+            const canonicalJob = await storage.getJob(createdJob.juuid);
             await trackChange(importHistoryId, 'created', 'job', createdJob.juuid, null, canonicalJob);
           }
         } else {
@@ -4874,7 +4874,7 @@ async function performImport(
         if (existingJob) {
           // MANY-TO-MANY: Create link if it doesn't exist
           try {
-            const existingLinks = await storage.getJobComponentLinksByJob(existingJob.id);
+            const existingLinks = await storage.getJobComponentLinksByJob(existingJob.juuid);
             const linkAlreadyExists = existingLinks.some(link => link.componentId === component.cuuid);
             
             if (!linkAlreadyExists) {
@@ -4893,7 +4893,7 @@ async function performImport(
           }
           
           const previousSnapshot = createRecordSnapshot(existingJob);
-          const updatedJob = await storage.updateJob(existingJob.id, jobData);
+          const updatedJob = await storage.updateJob(existingJob.juuid, jobData);
           // FIX: Store in map using composite key
           const updateKey = getJobUniqueKey(canonicalVesselId, componentCode, updatedJob.jobNo);
           jobsByCompositeKey.set(updateKey, updatedJob);
@@ -4901,7 +4901,7 @@ async function performImport(
           
           // Track job update with canonical state (refetch for accuracy)
           if (importHistoryId) {
-            const canonicalJob = await storage.getJob(updatedJob.id);
+            const canonicalJob = await storage.getJob(updatedJob.juuid);
             await trackChange(importHistoryId, 'updated', 'job', updatedJob.juuid, existingJob, canonicalJob);
           }
         } else {
@@ -4912,7 +4912,7 @@ async function performImport(
           // MANY-TO-MANY SUPPORT: Check if we need to create/update link to this component
           try {
             // Check if link already exists before creating
-            const existingLinks = await storage.getJobComponentLinksByJob(existingJob.id);
+            const existingLinks = await storage.getJobComponentLinksByJob(existingJob.juuid);
             const linkAlreadyExists = existingLinks.some(link => link.componentId === component.cuuid);
             
             if (!linkAlreadyExists) {
@@ -4929,7 +4929,7 @@ async function performImport(
             
             // Update the job master record with latest data
             const previousSnapshot = createRecordSnapshot(existingJob);
-            const updatedJob = await storage.updateJob(existingJob.id, jobData);
+            const updatedJob = await storage.updateJob(existingJob.juuid, jobData);
             // FIX: Store in map using composite key
             const upsertKey = getJobUniqueKey(canonicalVesselId, componentCode, updatedJob.jobNo);
             jobsByCompositeKey.set(upsertKey, updatedJob);
@@ -4937,7 +4937,7 @@ async function performImport(
             
             // Track job update with canonical state (refetch for accuracy)
             if (importHistoryId) {
-              const canonicalJob = await storage.getJob(updatedJob.id);
+              const canonicalJob = await storage.getJob(updatedJob.juuid);
               await trackChange(importHistoryId, 'updated', 'job', updatedJob.juuid, existingJob, canonicalJob);
             }
           } catch (linkError: any) {
@@ -4970,7 +4970,7 @@ async function performImport(
           
           // Track job creation with canonical state (refetch for accuracy)
           if (importHistoryId) {
-            const canonicalJob = await storage.getJob(createdJob.id);
+            const canonicalJob = await storage.getJob(createdJob.juuid);
             await trackChange(importHistoryId, 'created', 'job', createdJob.juuid, null, canonicalJob);
           }
         }

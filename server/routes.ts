@@ -2708,9 +2708,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
           if (matchingJob) {
             workOrderData = {
               ...workOrderData,
-              jobId: matchingJob.id
+              jobId: matchingJob.juuid
             };
-            console.log(`Auto-resolved jobId: ${matchingJob.id} for component ${workOrderData.component} and job "${workOrderData.jobTitle}"`);
+            console.log(`Auto-resolved jobId: ${matchingJob.juuid} for component ${workOrderData.component} and job "${workOrderData.jobTitle}"`);
           }
         } catch (error) {
           console.error('Failed to auto-resolve jobId:', error);
@@ -4421,14 +4421,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
         );
         
         if (matchingJob) {
-          await storage.updateWorkOrder(wo.id, { jobId: matchingJob.id });
+          await storage.updateWorkOrder(wo.id, { jobId: matchingJob.juuid });
           updated++;
           updateResults.push({
             workOrderId: wo.id,
-            jobId: matchingJob.id,
+            jobId: matchingJob.juuid,
             reason: `Matched by component (${wo.component}) + jobTitle ("${wo.jobTitle}")`
           });
-          console.log(`✅ Backfilled jobId ${matchingJob.id} for work order ${wo.id}`);
+          console.log(`✅ Backfilled jobId ${matchingJob.juuid} for work order ${wo.id}`);
         } else {
           updateResults.push({
             workOrderId: wo.id,
