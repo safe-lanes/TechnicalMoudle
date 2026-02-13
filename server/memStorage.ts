@@ -592,16 +592,16 @@ class MemStorage {
         (link: any) => link.componentId === componentId
       );
       const linkedJobIds = new Set(links.map((link: any) => link.jobId));
-      const linkedJobs = result.filter((j: any) => linkedJobIds.has(j.id));
+      const linkedJobs = result.filter((j: any) => linkedJobIds.has(j.juuid));
       
       // Combine and deduplicate
       const jobMap = new Map<string, any>();
       for (const job of directJobs) {
-        jobMap.set(job.id, job);
+        jobMap.set(job.juuid, job);
       }
       for (const job of linkedJobs) {
-        if (!jobMap.has(job.id)) {
-          jobMap.set(job.id, job);
+        if (!jobMap.has(job.juuid)) {
+          jobMap.set(job.juuid, job);
         }
       }
       
@@ -614,20 +614,23 @@ class MemStorage {
   }
   async getJob(id: string): Promise<any> { 
     if (this.data.jobs && this.data.jobs[id]) return this.data.jobs[id];
-    return toArray(this.data.jobs).find((j: any) => j.id === id); 
+    return toArray(this.data.jobs).find((j: any) => j.juuid === id); 
   }
   async createJob(job: any): Promise<any> {
     if (!this.data.jobs) this.data.jobs = {};
-    const newJob = { ...job, id: job.id || this.getNextId('jobs') };
-    this.data.jobs[newJob.id] = newJob;
+    const juuid = job.juuid || randomUUID();
+    const newJob = { ...job, id: job.id || this.getNextId('jobs'), juuid };
+    this.data.jobs[newJob.juuid] = newJob;
     this.saveData();
     return newJob;
   }
   async updateJob(id: string, data: any): Promise<any> {
-    if (this.data.jobs && this.data.jobs[id]) {
-      this.data.jobs[id] = { ...this.data.jobs[id], ...data };
+    const job = this.data.jobs && this.data.jobs[id] ? this.data.jobs[id] : toArray(this.data.jobs).find((j: any) => j.juuid === id);
+    if (job) {
+      const key = job.juuid || id;
+      this.data.jobs[key] = { ...job, ...data };
       this.saveData();
-      return this.data.jobs[id];
+      return this.data.jobs[key];
     }
     return undefined;
   }
@@ -635,6 +638,13 @@ class MemStorage {
     if (this.data.jobs && this.data.jobs[id]) {
       delete this.data.jobs[id];
       this.saveData();
+    } else {
+      const jobsArray = toArray(this.data.jobs);
+      const job = jobsArray.find((j: any) => j.juuid === id);
+      if (job && this.data.jobs) {
+        delete this.data.jobs[job.juuid];
+        this.saveData();
+      }
     }
   }
 

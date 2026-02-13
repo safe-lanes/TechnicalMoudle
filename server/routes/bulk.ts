@@ -4849,7 +4849,7 @@ async function performImport(
           try {
             await storage.createJobComponentLink({
               vesselId: canonicalVesselId,
-              jobId: createdJob.id,
+              jobId: createdJob.juuid,
               componentId: component.cuuid,
               componentCode: componentCode,
               linkedBy: 'system-bulk-import',
@@ -4863,7 +4863,7 @@ async function performImport(
           // Track job creation with canonical state (refetch for accuracy)
           if (importHistoryId) {
             const canonicalJob = await storage.getJob(createdJob.id);
-            await trackChange(importHistoryId, 'created', 'job', createdJob.id, null, canonicalJob);
+            await trackChange(importHistoryId, 'created', 'job', createdJob.juuid, null, canonicalJob);
           }
         } else {
           // Job with same vesselId + componentCode + jobNo already exists - skip duplicate
@@ -4880,7 +4880,7 @@ async function performImport(
             if (!linkAlreadyExists) {
               await storage.createJobComponentLink({
                 vesselId: canonicalVesselId,
-                jobId: existingJob.id,
+                jobId: existingJob.juuid,
                 componentId: component.cuuid,
                 componentCode: componentCode,
                 linkedBy: 'system-bulk-import',
@@ -4902,7 +4902,7 @@ async function performImport(
           // Track job update with canonical state (refetch for accuracy)
           if (importHistoryId) {
             const canonicalJob = await storage.getJob(updatedJob.id);
-            await trackChange(importHistoryId, 'updated', 'job', updatedJob.id, existingJob, canonicalJob);
+            await trackChange(importHistoryId, 'updated', 'job', updatedJob.juuid, existingJob, canonicalJob);
           }
         } else {
           result.skipped++;
@@ -4918,7 +4918,7 @@ async function performImport(
             if (!linkAlreadyExists) {
               await storage.createJobComponentLink({
                 vesselId: canonicalVesselId,
-                jobId: existingJob.id,
+                jobId: existingJob.juuid,
                 componentId: component.cuuid,
                 componentCode: componentCode,
                 linkedBy: 'system-bulk-import',
@@ -4938,7 +4938,7 @@ async function performImport(
             // Track job update with canonical state (refetch for accuracy)
             if (importHistoryId) {
               const canonicalJob = await storage.getJob(updatedJob.id);
-              await trackChange(importHistoryId, 'updated', 'job', updatedJob.id, existingJob, canonicalJob);
+              await trackChange(importHistoryId, 'updated', 'job', updatedJob.juuid, existingJob, canonicalJob);
             }
           } catch (linkError: any) {
             console.warn(`⚠️ Failed to process job-component link for ${jobData.jobNo} -> ${componentCode}: ${linkError.message}`);
@@ -4957,7 +4957,7 @@ async function performImport(
           try {
             await storage.createJobComponentLink({
               vesselId: canonicalVesselId,
-              jobId: createdJob.id,
+              jobId: createdJob.juuid,
               componentId: component.cuuid,
               componentCode: componentCode,
               linkedBy: 'system-bulk-import',
@@ -4971,7 +4971,7 @@ async function performImport(
           // Track job creation with canonical state (refetch for accuracy)
           if (importHistoryId) {
             const canonicalJob = await storage.getJob(createdJob.id);
-            await trackChange(importHistoryId, 'created', 'job', createdJob.id, null, canonicalJob);
+            await trackChange(importHistoryId, 'created', 'job', createdJob.juuid, null, canonicalJob);
           }
         }
       }
@@ -4998,12 +4998,12 @@ async function performImport(
           const jobKey = getJobUniqueKey(job.vesselId || vesselId || '', job.componentCode, job.jobNo);
           if (!importedCompositeKeys.has(jobKey)) {
             const previousSnapshot = createRecordSnapshot(job);
-            const archivedJob = await storage.archiveJob(job.id);
+            const archivedJob = await storage.archiveJob(job.juuid);
             result.archived++;
             
             // Track job archive with authoritative before/after snapshots
             if (importHistoryId) {
-              await trackChange(importHistoryId, 'archived', 'job', job.id, job, archivedJob);
+              await trackChange(importHistoryId, 'archived', 'job', job.juuid, job, archivedJob);
             }
             
             console.log(`📦 Archived job: ${job.jobNo} for component ${job.componentCode}`);
@@ -5341,8 +5341,8 @@ async function createWorkOrderFromRow(row: any, templateCode: string, vesselId?:
         j.jobTitle === jobTitle
       );
       if (matchingJob) {
-        jobId = matchingJob.id;
-        console.log(`Auto-resolved jobId: ${matchingJob.id} for imported work order with component ${componentCode} and job "${jobTitle}"`);
+        jobId = matchingJob.juuid;
+        console.log(`Auto-resolved jobId: ${matchingJob.juuid} for imported work order with component ${componentCode} and job "${jobTitle}"`);
       }
     } catch (error) {
       console.error('Failed to auto-resolve jobId during bulk import:', error);

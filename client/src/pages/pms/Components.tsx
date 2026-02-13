@@ -827,7 +827,7 @@ const JobRow: React.FC<{
 
   const generateWOMutation = useMutation({
     mutationFn: async (reason: 'Planning' | 'Breakdown' | 'Other') => {
-      const response = await fetch(getGenerateWoUrl(job.id), {
+      const response = await fetch(getGenerateWoUrl(job.juuid), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         // Pass activeComponentCode to ensure work order is created with correct component context
@@ -998,9 +998,9 @@ const WorkOrdersSection: React.FC<{ componentCode: string; componentName: string
     
     if (openJobId) {
       // Find the job and navigate to the Jobs Form page
-      const jobToOpen = allJobs.find((job: any) => job.id === openJobId);
+      const jobToOpen = allJobs.find((job: any) => job.juuid === openJobId);
       if (jobToOpen) {
-        setLocation(`/pms/job/${jobToOpen.id}`);
+        setLocation(`/pms/job/${jobToOpen.juuid}`);
       }
       
       // Always clean up the openJobId parameter after data has loaded
@@ -1040,7 +1040,7 @@ const WorkOrdersSection: React.FC<{ componentCode: string; componentName: string
   const handleRowClick = (job: any) => {
     // Navigate to Jobs Form page with activeComponentCode context
     // This ensures when a job is viewed from a specific component, that component context is preserved
-    setLocation(`/pms/job/${job.id}?activeComponentCode=${encodeURIComponent(componentCode)}`);
+    setLocation(`/pms/job/${job.juuid}?activeComponentCode=${encodeURIComponent(componentCode)}`);
   };
 
   return (

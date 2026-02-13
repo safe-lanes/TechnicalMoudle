@@ -77,7 +77,7 @@ export async function autoGenerate(body: any) {
       const dueDateStr = dueDate.toISOString().split('T')[0];
       const generateDateStr = generateDate.toISOString().split('T')[0];
 
-      let linkedComponents = jobLinksMap.get(job.id) || [];
+      let linkedComponents = jobLinksMap.get(job.juuid) || [];
       if (linkedComponents.length === 0 && job.componentId) {
         const primaryComp = componentMap.get(job.componentId);
         if (primaryComp) {
@@ -90,7 +90,7 @@ export async function autoGenerate(body: any) {
       }
 
       if (linkedComponents.length === 0) {
-        skipped.push({ jobId: job.id, reason: 'No linked components' });
+        skipped.push({ jobId: job.juuid, reason: 'No linked components' });
         continue;
       }
 
@@ -98,23 +98,23 @@ export async function autoGenerate(body: any) {
         if (!linkedComp.componentCode) continue;
 
         const existingActiveWO = existingWOs.find(wo =>
-          wo.jobId === job.id &&
+          wo.jobId === job.juuid &&
           wo.componentCode === linkedComp.componentCode &&
           isBlockingStatus(wo.status)
         );
         if (existingActiveWO) {
-          skipped.push({ jobId: job.id, componentCode: linkedComp.componentCode, reason: 'Active WO already exists' });
+          skipped.push({ jobId: job.juuid, componentCode: linkedComp.componentCode, reason: 'Active WO already exists' });
           continue;
         }
 
         const componentCycleKey = existingWOs.find(wo =>
-          wo.jobId === job.id &&
+          wo.jobId === job.juuid &&
           wo.componentCode === linkedComp.componentCode &&
           wo.cycleDueDateSnapshot === dueDateStr &&
           !isCompletedCancelled(wo.status)
         );
         if (componentCycleKey) {
-          skipped.push({ jobId: job.id, componentCode: linkedComp.componentCode, reason: 'Cycle duplicate exists' });
+          skipped.push({ jobId: job.juuid, componentCode: linkedComp.componentCode, reason: 'Cycle duplicate exists' });
           continue;
         }
 
@@ -125,7 +125,7 @@ export async function autoGenerate(body: any) {
           vesselId,
           component: linkedComp.componentName,
           componentCode: linkedComp.componentCode,
-          jobId: job.id,
+          jobId: job.juuid,
           workOrderNo,
           workOrderType: 'Planned',
           templateCode: workOrderNo,
@@ -160,13 +160,13 @@ export async function autoGenerate(body: any) {
           generated.push(result);
           existingWOs.push(result);
         } catch (err: any) {
-          skipped.push({ jobId: job.id, componentCode: linkedComp.componentCode, reason: err.message });
+          skipped.push({ jobId: job.juuid, componentCode: linkedComp.componentCode, reason: err.message });
         }
       }
     } else if (job.maintenanceBasis === 'Running Hours') {
       if (!job.nextDueRH) continue;
 
-      let linkedComponents = jobLinksMap.get(job.id) || [];
+      let linkedComponents = jobLinksMap.get(job.juuid) || [];
       if (linkedComponents.length === 0 && job.componentId) {
         const primaryComp = componentMap.get(job.componentId);
         if (primaryComp) {
@@ -179,7 +179,7 @@ export async function autoGenerate(body: any) {
       }
 
       if (linkedComponents.length === 0) {
-        skipped.push({ jobId: job.id, reason: 'No linked components for RH job' });
+        skipped.push({ jobId: job.juuid, reason: 'No linked components for RH job' });
         continue;
       }
 
@@ -197,24 +197,24 @@ export async function autoGenerate(body: any) {
         if (currentRH < generateRH) continue;
 
         const existingActiveWO = existingWOs.find(wo =>
-          wo.jobId === job.id &&
+          wo.jobId === job.juuid &&
           wo.componentCode === linkedComp.componentCode &&
           isBlockingStatus(wo.status)
         );
         if (existingActiveWO) {
-          skipped.push({ jobId: job.id, componentCode: linkedComp.componentCode, reason: 'Active WO already exists' });
+          skipped.push({ jobId: job.juuid, componentCode: linkedComp.componentCode, reason: 'Active WO already exists' });
           continue;
         }
 
         const hasCycleDuplicate = existingWOs.find(wo =>
-          wo.jobId === job.id &&
+          wo.jobId === job.juuid &&
           wo.componentCode === linkedComp.componentCode &&
           wo.cycleDueRhSnapshot !== null &&
           parseFloat(wo.cycleDueRhSnapshot || '0') === dueRH &&
           !isCompletedCancelled(wo.status)
         );
         if (hasCycleDuplicate) {
-          skipped.push({ jobId: job.id, componentCode: linkedComp.componentCode, reason: 'Cycle duplicate exists' });
+          skipped.push({ jobId: job.juuid, componentCode: linkedComp.componentCode, reason: 'Cycle duplicate exists' });
           continue;
         }
 
@@ -225,7 +225,7 @@ export async function autoGenerate(body: any) {
           vesselId,
           component: linkedComp.componentName,
           componentCode: linkedComp.componentCode,
-          jobId: job.id,
+          jobId: job.juuid,
           workOrderNo,
           workOrderType: 'Planned',
           templateCode: workOrderNo,
@@ -260,7 +260,7 @@ export async function autoGenerate(body: any) {
           generated.push(result);
           existingWOs.push(result);
         } catch (err: any) {
-          skipped.push({ jobId: job.id, componentCode: linkedComp.componentCode, reason: err.message });
+          skipped.push({ jobId: job.juuid, componentCode: linkedComp.componentCode, reason: err.message });
         }
       }
     }
@@ -311,7 +311,7 @@ export async function recalculateStatuses(body: any) {
     repo.getComponents(vesselId),
   ]);
 
-  const jobsMap = new Map(jobsList.map(j => [j.id, j]));
+  const jobsMap = new Map(jobsList.map(j => [j.juuid, j]));
   const componentsByCodeMap = new Map(componentsList.map(c => [c.componentCode, c]));
   const componentsMap = new Map(componentsList.map(c => [c.id, c]));
 

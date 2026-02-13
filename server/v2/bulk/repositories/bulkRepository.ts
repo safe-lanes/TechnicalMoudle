@@ -173,7 +173,7 @@ export class BulkRepository {
     const db = await getDb();
     const results = await db.update(v2Jobs)
       .set({ ...data, updatedAt: new Date() })
-      .where(eq(v2Jobs.id, id))
+      .where(eq(v2Jobs.juuid, id))
       .returning();
     return results[0] || null;
   }

@@ -360,7 +360,7 @@ export default function FleetEquipmentTreeView() {
                     ) : (
                       <div className="space-y-2">
                         {relatedJobs.map((job) => (
-                          <Card key={job.id} className="p-3" data-testid={`job-card-${job.id}`}>
+                          <Card key={job.juuid} className="p-3" data-testid={`job-card-${job.juuid}`}>
                             <div className="flex items-center justify-between">
                               <div>
                                 <p className="font-medium">{job.jobTitle}</p>

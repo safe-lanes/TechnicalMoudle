@@ -130,7 +130,7 @@ export class ComponentRepository {
         const directJobs = await db.select().from(v2Jobs)
           .where(eq(v2Jobs.componentId, childId));
         for (const job of directJobs) {
-          childJobIdsToInactivate.add(job.id);
+          childJobIdsToInactivate.add(job.juuid);
         }
         const linkedJobs = await db.select().from(v2JobComponentLinks)
           .where(eq(v2JobComponentLinks.componentId, childId));
@@ -143,7 +143,7 @@ export class ComponentRepository {
       for (const jobId of childJobIds) {
         await db.update(v2Jobs)
           .set({ isActive: false })
-          .where(eq(v2Jobs.id, jobId));
+          .where(eq(v2Jobs.juuid, jobId));
       }
       jobsInactivated += childJobIdsToInactivate.size;
     }
@@ -158,7 +158,7 @@ export class ComponentRepository {
     const directJobs = await db.select().from(v2Jobs)
       .where(eq(v2Jobs.componentId, id));
     for (const job of directJobs) {
-      mainJobIdsToInactivate.add(job.id);
+      mainJobIdsToInactivate.add(job.juuid);
     }
     const linkedJobs = await db.select().from(v2JobComponentLinks)
       .where(eq(v2JobComponentLinks.componentId, id));
@@ -170,7 +170,7 @@ export class ComponentRepository {
     for (const jobId of mainJobIds) {
       await db.update(v2Jobs)
         .set({ isActive: false })
-        .where(eq(v2Jobs.id, jobId));
+        .where(eq(v2Jobs.juuid, jobId));
     }
     jobsInactivated += mainJobIdsToInactivate.size;
 

@@ -129,7 +129,7 @@ export async function completeWorkOrder(id: string, body: any) {
           }
         }
         if (Object.keys(jobUpdate).length > 0) {
-          await repo.updateJob(job.id, jobUpdate);
+          await repo.updateJob(job.juuid, jobUpdate);
         }
       }
     } catch (err) {

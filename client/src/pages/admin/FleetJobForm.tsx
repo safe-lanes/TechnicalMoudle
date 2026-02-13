@@ -145,7 +145,7 @@ export default function FleetJobForm({ open, onOpenChange, job }: FleetJobFormPr
 
   const onSubmit = (data: FleetJobFormData) => {
     if (job?.id) {
-      updateMutation.mutate({ ...data, id: job.id });
+      updateMutation.mutate({ ...data, id: job.juuid });
     } else {
       createMutation.mutate(data);
     }

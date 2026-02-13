@@ -391,7 +391,7 @@ export class BulkImportService {
             try {
               await this.repository.createJobComponentLink({
                 vesselId,
-                jobId: created.id,
+                jobId: created.juuid,
                 componentId: component.cuuid,
                 componentCode,
                 linkedBy: 'system-bulk-import',
@@ -450,8 +450,8 @@ export class BulkImportService {
             result.skipped++;
             continue;
           }
-          await ensureJobComponentLink(existingJob.id);
-          const updated = await this.repository.updateJob(existingJob.id, jobData);
+          await ensureJobComponentLink(existingJob.juuid);
+          const updated = await this.repository.updateJob(existingJob.juuid, jobData);
           if (updated) {
             jobsByCompositeKey.set(compositeKey, updated);
             result.updated++;
@@ -460,7 +460,7 @@ export class BulkImportService {
               id: uuidv4(),
               importHistoryId,
               entityType: 'job',
-              entityId: existingJob.id,
+              entityId: existingJob.juuid,
               operation: 'updated',
               previousData: existingJob,
               newData: { jobNo, jobTitle: woTitle, componentCode },
@@ -469,8 +469,8 @@ export class BulkImportService {
           }
         } else if (mode === 'upsert') {
           if (existingJob) {
-            await ensureJobComponentLink(existingJob.id);
-            const updated = await this.repository.updateJob(existingJob.id, jobData);
+            await ensureJobComponentLink(existingJob.juuid);
+            const updated = await this.repository.updateJob(existingJob.juuid, jobData);
             if (updated) {
               jobsByCompositeKey.set(compositeKey, updated);
               result.updated++;
@@ -479,7 +479,7 @@ export class BulkImportService {
                 id: uuidv4(),
                 importHistoryId,
                 entityType: 'job',
-                entityId: existingJob.id,
+                entityId: existingJob.juuid,
                 operation: 'updated',
                 previousData: existingJob,
                 newData: { jobNo, jobTitle: woTitle, componentCode },

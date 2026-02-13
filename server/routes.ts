@@ -493,7 +493,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // 3. Component-specific tracking dates (lastDoneDate, nextDueDate, etc.) for ALL linked components
       const hydratedJobs = await Promise.all(jobs.map(async (job) => {
         // MANY-TO-MANY: Get all linked component codes from batched map
-        const linkedComponentCodes = jobLinksMap.get(job.id) || [];
+        const linkedComponentCodes = jobLinksMap.get(job.juuid) || [];
         
         // Include the deprecated componentCode if not already in linked list (backwards compatibility)
         if (job.componentCode && !linkedComponentCodes.includes(job.componentCode)) {
@@ -504,7 +504,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         // Key: componentCode, Value: { lastDoneDate, nextDueDate, lastDoneRH, nextDueRH }
         const componentTracking: Record<string, any> = {};
         for (const [linkKey, link] of jobLinkTrackingMap.entries()) {
-          if (linkKey.startsWith(`${job.id}:`)) {
+          if (linkKey.startsWith(`${job.juuid}:`)) {
             const compCode = (link as any).componentCode;
             if (compCode) {
               componentTracking[compCode] = {
@@ -535,7 +535,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           hydratedJob.nextDueRH = null;
         } else if (componentId) {
           // Single component filter: override with component-specific dates if they exist
-          const linkKey = `${job.id}:${componentId}`;
+          const linkKey = `${job.juuid}:${componentId}`;
           const componentLink = jobLinkTrackingMap.get(linkKey);
           if (componentLink) {
             if (componentLink.lastDoneDate) {
@@ -1082,7 +1082,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const jobComponentPairs: JobComponentPair[] = [];
       
       for (const job of activeJobs) {
-        const linkedComponentIds = jobToComponentsMap.get(job.id);
+        const linkedComponentIds = jobToComponentsMap.get(job.juuid);
         
         if (linkedComponentIds && linkedComponentIds.size > 0) {
           // Job has entries in jobComponentLinks - use those (many-to-many)
@@ -1277,7 +1277,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
         // Find work orders for this job - include both open AND completed WOs
         // Priority: open WO > most recent completed WO
-        const jobWOs = allWorkOrders.filter(wo => wo.jobId === job.id);
+        const jobWOs = allWorkOrders.filter(wo => wo.jobId === job.juuid);
         const openWO = jobWOs.find(wo => 
           wo.status !== 'Completed' && 
           wo.status !== 'Rejected'
@@ -1318,7 +1318,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         // Build planner item using the component from the job-component pair
         // This ensures multi-component jobs appear as separate rows
         plannerItems.push({
-          jobId: job.id,
+          jobId: job.juuid,
           jobCode: job.jobNo,
           jobTitle: job.jobTitle,
           jobType: isCalendarJob ? 'CALENDAR' : 'RH',
@@ -2177,7 +2177,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // Fetch jobs to hydrate lead time data
       const jobs = await storage.getJobs(vesselId);
-      const jobsMap = new Map(jobs.map(job => [job.id, job]));
+      const jobsMap = new Map(jobs.map(job => [job.juuid, job]));
       
       // Fetch all components to hydrate currentRH for RH-based status computation
       const components = await storage.getComponents(vesselId);
@@ -3297,12 +3297,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
                   // VESSEL ISOLATION: Pass vesselId to ensure updates are vessel-scoped
                   const updateVesselId = freshWorkOrder.vesselId || job.vesselId;
                   if (component.cuuid && updateVesselId) {
-                    await storage.updateJobComponentLinkTracking(updateVesselId, job.id, component.cuuid, linkUpdates);
+                    await storage.updateJobComponentLinkTracking(updateVesselId, job.juuid, component.cuuid, linkUpdates);
                     console.log(`✅ Updated component-specific tracking for vessel ${updateVesselId}, job ${job.jobNo} + component ${component.cuuid} with lastDoneDate: ${dateOfCompletion}`);
                   }
                   
                   // Also update global job record for backward compatibility (SECONDARY)
-                  await storage.updateJob(job.id, calendarUpdates);
+                  await storage.updateJob(job.juuid, calendarUpdates);
                 }
                 
                 // Handle Running Hours-based jobs (separate update to avoid key leakage)
@@ -3322,12 +3322,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
                     // VESSEL ISOLATION: Pass vesselId to ensure updates are vessel-scoped
                     const rhUpdateVesselId = freshWorkOrder.vesselId || job.vesselId;
                     if (component.cuuid && rhUpdateVesselId) {
-                      await storage.updateJobComponentLinkTracking(rhUpdateVesselId, job.id, component.cuuid, rhLinkUpdates);
+                      await storage.updateJobComponentLinkTracking(rhUpdateVesselId, job.juuid, component.cuuid, rhLinkUpdates);
                       console.log(`✅ Updated component-specific RH tracking for vessel ${rhUpdateVesselId}, job ${job.jobNo} + component ${component.cuuid} with lastDoneRH: ${currentRH}`);
                     }
                     
                     // Also update global job record for backward compatibility (SECONDARY)
-                    await storage.updateJob(job.id, rhUpdates);
+                    await storage.updateJob(job.juuid, rhUpdates);
                     
                     // UPDATE COMPONENT RUNNING HOURS on work order approval
                     // IMPORTANT: For INHERITED components, we update the component's OWN record only
@@ -3999,12 +3999,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
             // VESSEL ISOLATION: Pass vesselId to ensure updates are vessel-scoped
             const updateVesselId = workOrder.vesselId || job.vesselId;
             if (woComponentId && updateVesselId) {
-              await storage.updateJobComponentLinkTracking(updateVesselId, job.id, woComponentId, linkUpdates);
+              await storage.updateJobComponentLinkTracking(updateVesselId, job.juuid, woComponentId, linkUpdates);
               console.log(`✅ Updated component-specific tracking for vessel ${updateVesselId}, job ${job.jobNo} + component ${woComponentId} with lastDoneDate: ${dateOfCompletion}`);
             }
             
             // Also update global job record for backward compatibility (SECONDARY)
-            await storage.updateJob(job.id, jobUpdates);
+            await storage.updateJob(job.juuid, jobUpdates);
             console.log(`✅ Updated calendar job ${job.jobNo} with lastDoneDate: ${dateOfCompletion}`);
           }
           
@@ -4029,12 +4029,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
               // VESSEL ISOLATION: Pass vesselId to ensure updates are vessel-scoped
               const rhUpdateVesselId = workOrder.vesselId || job.vesselId;
               if (woComponentId && rhUpdateVesselId) {
-                await storage.updateJobComponentLinkTracking(rhUpdateVesselId, job.id, woComponentId, linkUpdates);
+                await storage.updateJobComponentLinkTracking(rhUpdateVesselId, job.juuid, woComponentId, linkUpdates);
                 console.log(`✅ Updated component-specific RH tracking for vessel ${rhUpdateVesselId}, job ${job.jobNo} + component ${woComponentId} with lastDoneRH: ${currentRH}`);
               }
               
               // Also update global job record for backward compatibility (SECONDARY)
-              await storage.updateJob(job.id, jobUpdates);
+              await storage.updateJob(job.juuid, jobUpdates);
               console.log(`✅ Updated RH job ${job.jobNo} with lastDoneRH: ${currentRH}`);
             }
           }
@@ -4277,7 +4277,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
               vesselId: job.vesselId,
               component: job.componentId,
               componentCode: componentCode,
-              jobId: job.id, // Store job ID for reliable lead time hydration
+              jobId: job.juuid, // Store job ID for reliable lead time hydration
               workOrderNo: workOrderNo,
               workOrderType: 'Planned' as const,
               templateCode: workOrderNo,
@@ -4349,7 +4349,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
               vesselId: job.vesselId,
               component: job.componentId,
               componentCode: componentCode, // Use resolved componentCode
-              jobId: job.id, // Store job ID for reliable lead time hydration
+              jobId: job.juuid, // Store job ID for reliable lead time hydration
               workOrderNo: workOrderNo,
               workOrderType: 'Planned' as const,
               templateCode: workOrderNo,
@@ -10786,7 +10786,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         
         // Apply updates if needed
         if (needsUpdate) {
-          await storage.updateJob(job.id, updates);
+          await storage.updateJob(job.juuid, updates);
         }
       }
       

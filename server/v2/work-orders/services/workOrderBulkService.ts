@@ -136,7 +136,7 @@ export async function bulkApprove(body: any) {
                 }
               }
             }
-            await repo.updateJob(job.id, jobUpdate);
+            await repo.updateJob(job.juuid, jobUpdate);
           }
         } catch (err) {
           console.error(`Failed to update job cycle dates for WO ${woId}:`, err);

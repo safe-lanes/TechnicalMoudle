@@ -76,13 +76,13 @@ export async function getJobs(vesselId?: string): Promise<Job[]> {
 
 export async function getJob(id: string): Promise<Job | undefined> {
   const db = await getDb();
-  const [result] = await db.select().from(jobs).where(eq(jobs.id, id));
+  const [result] = await db.select().from(jobs).where(eq(jobs.juuid, id));
   return result;
 }
 
 export async function updateJob(id: string, data: Partial<any>): Promise<Job> {
   const db = await getDb();
-  const [result] = await db.update(jobs).set({ ...data, updatedAt: new Date() }).where(eq(jobs.id, id)).returning();
+  const [result] = await db.update(jobs).set({ ...data, updatedAt: new Date() }).where(eq(jobs.juuid, id)).returning();
   return result;
 }
 

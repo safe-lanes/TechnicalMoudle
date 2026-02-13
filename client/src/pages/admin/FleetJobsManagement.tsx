@@ -160,7 +160,7 @@ export default function FleetJobsManagement() {
 
   const handleDeleteConfirm = () => {
     if (jobToDelete) {
-      deleteMutation.mutate(jobToDelete.id);
+      deleteMutation.mutate(jobToDelete.juuid);
     }
   };
 
@@ -172,7 +172,7 @@ export default function FleetJobsManagement() {
 
   const handleGenerateWOConfirm = () => {
     if (jobForWO) {
-      generateWOMutation.mutate({ jobId: jobForWO.id, reason: woReason });
+      generateWOMutation.mutate({ jobId: jobForWO.juuid, reason: woReason });
     }
   };
 
@@ -307,7 +307,7 @@ export default function FleetJobsManagement() {
                       const equipment = components?.find(c => c.fleetEquipmentCode === job.fleetEquipmentCode);
                       const isFirstRow = index === 0;
                       return (
-                        <TableRow key={job.id} data-testid={`row-job-${job.id}`}>
+                        <TableRow key={job.juuid} data-testid={`row-job-${job.juuid}`}>
                           <TableCell className="font-mono text-sm" data-testid={isFirstRow ? "I4.QL.4.21" : undefined}>
                             {isFirstRow && <Marker id="I4.QL.4.21" />}
                             {job.fleetJobCode}
@@ -338,7 +338,7 @@ export default function FleetJobsManagement() {
                                 onClick={() => handleGenerateWOClick(job)}
                                 className="text-green-600 hover:text-green-700 hover:bg-green-50 border-green-200"
                                 title="Create Work Order Now"
-                                data-testid={isFirstRow ? "I4.QL.4.26" : `button-generate-wo-${job.id}`}
+                                data-testid={isFirstRow ? "I4.QL.4.26" : `button-generate-wo-${job.juuid}`}
                               >
                                 {isFirstRow && <Marker id="I4.QL.4.26" />}
                                 <PlayCircle className="h-4 w-4 mr-1" />
@@ -348,7 +348,7 @@ export default function FleetJobsManagement() {
                                 variant="ghost"
                                 size="sm"
                                 onClick={() => handleEdit(job)}
-                                data-testid={isFirstRow ? "I4.QL.4.27" : `button-edit-${job.id}`}
+                                data-testid={isFirstRow ? "I4.QL.4.27" : `button-edit-${job.juuid}`}
                               >
                                 {isFirstRow && <Marker id="I4.QL.4.27" />}
                                 <Pencil className="h-4 w-4" />
@@ -358,7 +358,7 @@ export default function FleetJobsManagement() {
                                 size="sm"
                                 onClick={() => handleDeleteClick(job)}
                                 className="text-red-600 hover:text-red-700 hover:bg-red-50"
-                                data-testid={isFirstRow ? "I4.QL.4.28" : `button-delete-${job.id}`}
+                                data-testid={isFirstRow ? "I4.QL.4.28" : `button-delete-${job.juuid}`}
                               >
                                 {isFirstRow && <Marker id="I4.QL.4.28" />}
                                 <Trash2 className="h-4 w-4" />

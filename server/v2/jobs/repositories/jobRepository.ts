@@ -23,27 +23,28 @@ export class JobRepository {
 
   async findById(id: string): Promise<Job | undefined> {
     const db = await getDb();
-    const [job] = await db.select().from(v2Jobs).where(eq(v2Jobs.id, id));
+    const [job] = await db.select().from(v2Jobs).where(eq(v2Jobs.juuid, id));
     return job;
   }
 
   async create(data: InsertJob): Promise<Job> {
     const db = await getDb();
     const id = data.id || uuidv4();
-    const [job] = await db.insert(v2Jobs).values({ ...data, id }).returning();
+    const juuid = crypto.randomUUID();
+    const [job] = await db.insert(v2Jobs).values({ ...data, id, juuid }).returning();
     return job;
   }
 
   async update(id: string, data: Partial<InsertJob>): Promise<Job> {
     const db = await getDb();
-    const [job] = await db.update(v2Jobs).set({ ...data, updatedAt: new Date() }).where(eq(v2Jobs.id, id)).returning();
+    const [job] = await db.update(v2Jobs).set({ ...data, updatedAt: new Date() }).where(eq(v2Jobs.juuid, id)).returning();
     if (!job) throw new Error('Job not found');
     return job;
   }
 
   async remove(id: string): Promise<void> {
     const db = await getDb();
-    await db.delete(v2Jobs).where(eq(v2Jobs.id, id));
+    await db.delete(v2Jobs).where(eq(v2Jobs.juuid, id));
   }
 
   async findLinksByVessel(vesselId: string): Promise<JobComponentLink[]> {

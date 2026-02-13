@@ -787,7 +787,7 @@ export class PostgresStorage {
         const directJobs = await db.select().from(jobs)
           .where(eq(jobs.componentId, childId));
         for (const job of directJobs) {
-          childJobIdsToInactivate.add(job.id);
+          childJobIdsToInactivate.add(job.juuid);
         }
         // Jobs linked via jobComponentLinks table (many-to-many)
         const linkedJobIds = await this.getJobComponentLinksByComponent(childId);
@@ -800,7 +800,7 @@ export class PostgresStorage {
       for (const jobId of childJobIdsToInactivate) {
         await db.update(jobs)
           .set({ isActive: false })
-          .where(eq(jobs.id, jobId));
+          .where(eq(jobs.juuid, jobId));
       }
       jobsInactivated += childJobIdsToInactivate.size;
     }
@@ -818,7 +818,7 @@ export class PostgresStorage {
     const directJobs = await db.select().from(jobs)
       .where(eq(jobs.componentId, id));
     for (const job of directJobs) {
-      mainJobIdsToInactivate.add(job.id);
+      mainJobIdsToInactivate.add(job.juuid);
     }
     // Jobs linked via jobComponentLinks table (many-to-many)
     const linkedJobIds = await this.getJobComponentLinksByComponent(id);
@@ -830,7 +830,7 @@ export class PostgresStorage {
     for (const jobId of mainJobIdsToInactivate) {
       await db.update(jobs)
         .set({ isActive: false })
-        .where(eq(jobs.id, jobId));
+        .where(eq(jobs.juuid, jobId));
     }
     jobsInactivated += mainJobIdsToInactivate.size;
     
@@ -1485,14 +1485,14 @@ export class PostgresStorage {
         }
       }
       
-      // Combine and deduplicate by job ID
+      // Combine and deduplicate by job juuid
       const jobMap = new Map<string, Job>();
       for (const job of directJobs) {
-        jobMap.set(job.id, job);
+        jobMap.set(job.juuid, job);
       }
       for (const job of linkedJobs) {
-        if (!jobMap.has(job.id)) {
-          jobMap.set(job.id, job);
+        if (!jobMap.has(job.juuid)) {
+          jobMap.set(job.juuid, job);
         }
       }
       
@@ -1518,7 +1518,7 @@ export class PostgresStorage {
 
   async getJob(id: string): Promise<Job | undefined> {
     const db = await getDb();
-    const result = await db.select().from(jobs).where(eq(jobs.id, id));
+    const result = await db.select().from(jobs).where(eq(jobs.juuid, id));
     return result[0];
   }
 
@@ -1531,9 +1531,11 @@ export class PostgresStorage {
   async createJob(job: InsertJob): Promise<Job> {
     const db = await getDb();
     const id = `JOB-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+    const juuid = crypto.randomUUID();
     const result = await db.insert(jobs).values({
       ...job,
       id,
+      juuid,
       dataScope: job.dataScope || 'vessel',
     }).returning();
     return result[0];
@@ -1543,7 +1545,7 @@ export class PostgresStorage {
     const db = await getDb();
     const result = await db.update(jobs)
       .set({ ...data, updatedAt: new Date() })
-      .where(eq(jobs.id, id))
+      .where(eq(jobs.juuid, id))
       .returning();
     if (!result[0]) {
       throw new Error(`Job ${id} not found`);
@@ -1553,7 +1555,7 @@ export class PostgresStorage {
 
   async deleteJob(id: string): Promise<void> {
     const db = await getDb();
-    await db.delete(jobs).where(eq(jobs.id, id));
+    await db.delete(jobs).where(eq(jobs.juuid, id));
   }
 
   async bulkCreateJobs(jobList: InsertJob[]): Promise<Job[]> {
@@ -1563,9 +1565,11 @@ export class PostgresStorage {
     
     for (const job of jobList) {
       const id = `JOB-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+      const juuid = crypto.randomUUID();
       const result = await db.insert(jobs).values({
         ...job,
         id,
+        juuid,
         dataScope: job.dataScope || 'vessel',
       }).returning();
       results.push(result[0]);
@@ -1602,13 +1606,15 @@ export class PostgresStorage {
       if (existing) {
         await db.update(jobs)
           .set({ ...job, updatedAt: new Date() })
-          .where(eq(jobs.id, existing.id));
+          .where(eq(jobs.juuid, existing.juuid));
         updated++;
       } else {
         const id = `JOB-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+        const juuid = crypto.randomUUID();
         await db.insert(jobs).values({
           ...job,
           id,
+          juuid,
           dataScope: job.dataScope || 'vessel',
         });
         created++;
@@ -1653,7 +1659,7 @@ export class PostgresStorage {
     const db = await getDb();
     const result = await db.select().from(jobs)
       .where(and(
-        eq(jobs.id, id),
+        eq(jobs.juuid, id),
         eq(jobs.dataScope, 'fleet')
       ));
     return result[0];
@@ -1662,9 +1668,11 @@ export class PostgresStorage {
   async createFleetJob(job: InsertJob): Promise<Job> {
     const db = await getDb();
     const id = `FJ-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+    const juuid = crypto.randomUUID();
     const result = await db.insert(jobs).values({
       ...job,
       id,
+      juuid,
       dataScope: 'fleet',
     }).returning();
     return result[0];
@@ -4280,7 +4288,7 @@ export class PostgresStorage {
    */
   private async applyJobChangesInTx(tx: any, jobId: string, updateData: Record<string, any>): Promise<void> {
     // Verify job exists and capture before state
-    const existing = await tx.select().from(jobs).where(eq(jobs.id, jobId));
+    const existing = await tx.select().from(jobs).where(eq(jobs.juuid, jobId));
     if (!existing[0]) {
       throw new Error(`Job ${jobId} not found`);
     }
@@ -4329,7 +4337,7 @@ export class PostgresStorage {
     
     const result = await tx.update(jobs)
       .set({ ...safeUpdateData, updatedAt: new Date() })
-      .where(eq(jobs.id, jobId))
+      .where(eq(jobs.juuid, jobId))
       .returning();
     
     if (!result[0]) {
@@ -5688,7 +5696,7 @@ export class PostgresStorage {
     const db = await getDb();
     const result = await db.update(jobs)
       .set({ isActive: false })
-      .where(eq(jobs.id, id))
+      .where(eq(jobs.juuid, id))
       .returning();
     if (result.length === 0) {
       throw new Error(`Job not found: ${id}`);
@@ -5867,7 +5875,7 @@ export class PostgresStorage {
     
     // Get the job
     const jobResult = await db.select().from(jobs)
-      .where(eq(jobs.id, jobId))
+      .where(eq(jobs.juuid, jobId))
       .limit(1);
     
     if (jobResult.length === 0) {
@@ -6085,7 +6093,7 @@ export class PostgresStorage {
       vesselName: job.vesselName || '',
       workOrderNo,
       templateCode: workOrderNo,
-      jobId: job.id,
+      jobId: job.juuid,
       jobTitle: job.jobTitle,
       component: effectiveComponentName,
       componentCode: effectiveComponentCode,
@@ -6390,7 +6398,7 @@ export class PostgresStorage {
     
     // Fallback: Match by jobNo in work_order_no (for legacy records without jobId)
     // WO format: "MKR-IN-00063-601.004.03-2026-001" -> jobNo is "MKR-IN-00063"
-    const job = await db.select().from(jobs).where(eq(jobs.id, jobId)).limit(1);
+    const job = await db.select().from(jobs).where(eq(jobs.juuid, jobId)).limit(1);
     if (job.length === 0 || !job[0].jobNo) return [];
     
     const jobNo = job[0].jobNo;
@@ -6463,7 +6471,7 @@ export class PostgresStorage {
       jobTitle: jobs.jobTitle,
     })
     .from(jobComponentLinks)
-    .innerJoin(jobs, eq(jobComponentLinks.jobId, jobs.id))
+    .innerJoin(jobs, eq(jobComponentLinks.jobId, jobs.juuid))
     .where(eq(jobComponentLinks.componentId, componentId));
     
     return links.map(l => ({

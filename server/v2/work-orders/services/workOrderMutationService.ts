@@ -315,7 +315,7 @@ async function updateJobCycleDates(wo: any, updateData: any) {
   }
 
   if (Object.keys(jobUpdate).length > 0) {
-    await repo.updateJob(job.id, jobUpdate);
+    await repo.updateJob(job.juuid, jobUpdate);
   }
 }
 

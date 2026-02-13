@@ -251,7 +251,7 @@ export class JobDueScannerService {
         if (wo.componentCode && wo.componentCode !== '') return false; // Not a legacy WO
         
         // Match by jobId (modern WOs)
-        if (wo.jobId === job.id) return true;
+        if (wo.jobId === job.juuid) return true;
         
         // Match by vessel-scoped jobNo (legacy WOs without jobId)
         const woJobNo = extractJobNoFromWorkOrderNo(wo.workOrderNo);
@@ -267,7 +267,7 @@ export class JobDueScannerService {
       
       // All RH timing checks passed - now get ALL linked components for this job
       // FIX: Get linked components from job_component_links table (many-to-many relationship)
-      const linkedComponents = await storage.getLinkedComponentsForJob(job.id);
+      const linkedComponents = await storage.getLinkedComponentsForJob(job.juuid);
       
       // If no linked components found, fall back to job's primary component
       if (linkedComponents.length === 0 && job.componentId) {
@@ -295,7 +295,7 @@ export class JobDueScannerService {
         
         // COMPONENT-LEVEL CHECK: Check if WO already exists for this job + component combination
         const existingWOForComponent = allWorkOrders.find(wo => 
-          wo.jobId === job.id &&
+          wo.jobId === job.juuid &&
           wo.componentCode === componentCode &&
           isBlockingStatus(wo.status)
         );
@@ -316,7 +316,7 @@ export class JobDueScannerService {
           vesselId: job.vesselId,
           component: componentName,
           componentCode: componentCode, // Use linked component's code
-          jobId: job.id, // Link to job for cycle tracking
+          jobId: job.juuid, // Link to job for cycle tracking
           workOrderNo: workOrderNo,
           templateCode: workOrderNo,
           jobTitle: job.jobTitle,
@@ -438,7 +438,7 @@ export class JobDueScannerService {
       if (wo.componentCode && wo.componentCode !== '') return false; // Not a legacy WO
       
       // Must match this specific job
-      if (wo.jobId === job.id) return true;
+      if (wo.jobId === job.juuid) return true;
       const woJobNo = extractJobNoFromWorkOrderNo(wo.workOrderNo) || (wo as any).jobNo;
       if (woJobNo === job.jobNo && wo.vesselId === job.vesselId) return true;
       
@@ -461,7 +461,7 @@ export class JobDueScannerService {
     // Step 2: COMPONENT-LEVEL CHECK using blocking sets (direct lookup)
     // Check if this job already has an active WO (any component)
     const vesselJobNoKey = `${job.vesselId || 'unknown'}|${job.jobNo}`;
-    const isJobBlockedByJobId = activeWOSets.byJobId.has(job.id);
+    const isJobBlockedByJobId = activeWOSets.byJobId.has(job.juuid);
     const isJobBlockedByJobNo = activeWOSets.byJobNo.has(vesselJobNoKey);
     
     if (isJobBlockedByJobId || isJobBlockedByJobNo) {
@@ -469,7 +469,7 @@ export class JobDueScannerService {
       const existingWOForComponent = allWorkOrders.find(wo => {
         if (!isBlockingStatus(wo.status)) return false;
         if (wo.componentCode !== effectiveComponentCode) return false;
-        if (wo.jobId === job.id) return true;
+        if (wo.jobId === job.juuid) return true;
         const woJobNo = extractJobNoFromWorkOrderNo(wo.workOrderNo) || (wo as any).jobNo;
         return woJobNo === job.jobNo && wo.vesselId === job.vesselId;
       });
@@ -502,7 +502,7 @@ export class JobDueScannerService {
       }
     } else if (!componentData && job.vesselId) {
       // Try linked components lookup
-      const linkedComponents = await storage.getLinkedComponentsForJob(job.id);
+      const linkedComponents = await storage.getLinkedComponentsForJob(job.juuid);
       if (linkedComponents.length > 0) {
         // Use the first linked component (should match effectiveComponentCode)
         const linkedComponent = linkedComponents.find(lc => lc.componentCode === effectiveComponentCode);
@@ -689,7 +689,7 @@ export class JobDueScannerService {
       vesselId: job.vesselId,
       component: effectiveComponentName,
       componentCode: effectiveComponentCode,
-      jobId: job.id,
+      jobId: job.juuid,
       workOrderNo: workOrderNo,
       templateCode: workOrderNo,
       jobTitle: job.jobTitle,

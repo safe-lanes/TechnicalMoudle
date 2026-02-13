@@ -355,7 +355,7 @@ export class WorkOrderService {
       
       // FIX: Get ALL linked components for this job (many-to-many relationship)
       // Each linked component should get its own work order
-      const linkedComponents = await storage.getLinkedComponentsForJob(job.id);
+      const linkedComponents = await storage.getLinkedComponentsForJob(job.juuid);
       
       // If no linked components found, fall back to job's primary component
       if (linkedComponents.length === 0 && job.componentId) {
@@ -391,7 +391,7 @@ export class WorkOrderService {
         
         // Check if WO already exists for this job + component + cycle
         const existingWOForComponent = allWorkOrders.find(wo => 
-          wo.jobId === job.id &&
+          wo.jobId === job.juuid &&
           wo.componentCode === componentCode &&
           isBlockingStatus(wo.status)
         );
@@ -411,7 +411,7 @@ export class WorkOrderService {
           vesselId: job.vesselId,
           component: componentName,
           componentCode: componentCode,
-          jobId: job.id,
+          jobId: job.juuid,
           workOrderNo: workOrderNo,
           templateCode: workOrderNo,
           jobTitle: job.jobTitle,

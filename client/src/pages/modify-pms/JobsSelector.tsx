@@ -10,6 +10,7 @@ import { getJobsListQueryKey } from "@/modules/components/api/jobsApiV2";
 
 interface Job {
   id: string;
+  juuid: string;
   jobNo: string;
   jobTitle: string;
   componentCode: string;
@@ -54,7 +55,7 @@ const JobsSelector: React.FC = () => {
   };
 
   const handleJobSelect = (job: Job) => {
-    setLocation(`/pms/job/${job.id}?modify=1`);
+    setLocation(`/pms/job/${job.juuid}?modify=1`);
   };
 
   const uniqueDepartments = Array.from(new Set(jobs.map(job => job.department).filter(Boolean)));
@@ -143,14 +144,14 @@ const JobsSelector: React.FC = () => {
           ) : (
             filteredJobs.map((job) => (
               <div 
-                key={job.id} 
+                key={job.juuid} 
                 className="px-6 py-4 hover:bg-gray-50 cursor-pointer"
                 onClick={() => handleJobSelect(job)}
-                data-testid={`job-row-${job.id}`}
+                data-testid={`job-row-${job.juuid}`}
               >
                 <div className="grid grid-cols-7 gap-4 items-center text-sm">
                   <div className="text-gray-900 font-medium">
-                    {job.jobNo || job.id}
+                    {job.jobNo || job.juuid}
                   </div>
                   <div className="col-span-2 text-gray-700">
                     {job.jobTitle}
@@ -185,7 +186,7 @@ const JobsSelector: React.FC = () => {
                         e.stopPropagation();
                         handleJobSelect(job);
                       }}
-                      data-testid={`button-modify-job-${job.id}`}
+                      data-testid={`button-modify-job-${job.juuid}`}
                     >
                       <Wrench className="h-3 w-3 mr-1" />
                       Modify

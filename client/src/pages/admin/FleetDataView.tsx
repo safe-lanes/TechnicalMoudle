@@ -441,7 +441,7 @@ export default function FleetDataView() {
     if (!jobSearchQuery.trim()) return relatedJobs;
     const query = jobSearchQuery.toLowerCase();
     return relatedJobs.filter((job: FleetJob) => {
-      const jobNo = (job.fleetJobCode || job.jobNo || job.id || "").toString().toLowerCase();
+      const jobNo = (job.fleetJobCode || job.jobNo || job.juuid || "").toString().toLowerCase();
       const jobTitle = (job.jobTitle || "").toLowerCase();
       const taskType = (job.maintenanceType || "").toLowerCase();
       return jobNo.includes(query) || jobTitle.includes(query) || taskType.includes(query);
@@ -943,7 +943,7 @@ export default function FleetDataView() {
                           }}
                           data-testid={`job-row-${index}`}
                         >
-                          <td className="py-2">{job.fleetJobCode || job.jobNo || job.id}</td>
+                          <td className="py-2">{job.fleetJobCode || job.jobNo || job.juuid}</td>
                           <td className="py-2">
                             {job.jobTitle || "—"}
                           </td>
@@ -1563,7 +1563,7 @@ export default function FleetDataView() {
               <tbody>
                 {filteredRelatedJobs.length > 0 ? (
                   filteredRelatedJobs.map((job: FleetJob, index: number) => {
-                    const jobId = job.fleetJobCode || job.jobNo || job.id;
+                    const jobId = job.fleetJobCode || job.jobNo || job.juuid;
                     return (
                       <tr 
                         key={index} 
@@ -1588,7 +1588,7 @@ export default function FleetDataView() {
                             data-testid={`checkbox-job-${index}`}
                           />
                         </td>
-                        <td className="py-2 px-2">{job.fleetJobCode || job.jobNo || job.id}</td>
+                        <td className="py-2 px-2">{job.fleetJobCode || job.jobNo || job.juuid}</td>
                         <td 
                           className="py-2 px-2 text-blue-600 hover:text-blue-800 hover:underline cursor-pointer"
                           onClick={(e) => {

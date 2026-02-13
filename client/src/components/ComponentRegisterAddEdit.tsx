@@ -450,8 +450,8 @@ export default function ComponentRegisterAddEdit({
 
       const componentJobs = allJobs.filter(j => j.componentCode === comp.componentCode);
       setWorkOrders(componentJobs.map(job => ({
-        id: job.id,
-        woNo: job.jobNo || job.id,
+        id: job.juuid,
+        woNo: job.jobNo || job.juuid,
         jobTitle: job.jobTitle || job.title,
         assignedTo: job.assignedTo || "Chief Engineer",
         dueDate: job.nextDueDate || "",
@@ -813,8 +813,8 @@ export default function ComponentRegisterAddEdit({
     
     const componentJobs = allJobs.filter(j => j.componentCode === comp.componentCode);
     setWorkOrders(componentJobs.map(job => ({
-      id: job.id,
-      woNo: job.jobNo || job.id,
+      id: job.juuid,
+      woNo: job.jobNo || job.juuid,
       jobTitle: job.jobTitle || job.title,
       assignedTo: job.assignedTo || "Chief Engineer",
       dueDate: job.nextDueDate || "",
