@@ -410,7 +410,7 @@ export type IhmItem = typeof ihmItems.$inferSelect;
 // IHM Maintenance Log Table
 export const ihmMaintenanceLog = pgTable("ihm_maintenance_log", {
   id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
-  workOrderId: text("work_order_id").notNull(),
+  workOrderId: text("work_order_id").notNull().references(() => workOrders.wouuid), // FK → work_orders.wouuid
   action: text("action").notNull(), // Installed | Removed | Replaced
   targetComponent: text("target_component"),
   targetSpare: text("target_spare"),
@@ -1027,7 +1027,7 @@ export type WorkOrderWithLeadTime = WorkOrder & {
 // Work Order Executions Table - for tracking historical maintenance records
 export const workOrderExecutions = pgTable("work_order_executions", {
   id: text("id").primaryKey(),
-  templateId: text("template_id").notNull(), // Reference to work_orders (template)
+  templateId: text("template_id").notNull().references(() => workOrders.wouuid), // FK → work_orders.wouuid
   componentId: text("component_id").notNull().references(() => components.cuuid, { onDelete: "restrict", onUpdate: "cascade" }), // Component this execution belongs to
   vesselId: text("vessel_id").notNull().references(() => vessels.vuuid), // Vessel identifier
   executionId: text("execution_id").notNull().unique(), // Unique execution code (WOE-XXXXXXX)
@@ -1645,7 +1645,7 @@ export const componentMaintenanceHistory = pgTable("component_maintenance_histor
   vesselId: text("vessel_id").notNull().references(() => vessels.vuuid),
   jobId: text("job_id").references(() => jobs.juuid), // FK → jobs.juuid
   jobCode: text("job_code"), // Job number for querying (e.g., MKR-IN-00001)
-  workOrderId: text("work_order_id").notNull(), // Link to completed work order
+  workOrderId: text("work_order_id").notNull().references(() => workOrders.wouuid), // FK → work_orders.wouuid
   workOrderNo: text("work_order_no").notNull(),
   jobTitle: text("job_title").notNull(),
   maintenanceType: text("maintenance_type").notNull(), // 'Inspection' | 'Overhaul' | 'Servicing' | 'Testing' | 'Cleaning' | 'Lubrication' | 'Replacement'
@@ -2108,7 +2108,7 @@ export type Survey = typeof surveys.$inferSelect;
 // =====================================================
 export const workOrderExecutionDetails = pgTable("work_order_execution_details", {
   id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
-  workOrderId: text("work_order_id").notNull(), // Reference to work_orders
+  workOrderId: text("work_order_id").notNull().references(() => workOrders.wouuid), // FK → work_orders.wouuid
   vesselId: text("vessel_id").notNull().references(() => vessels.vuuid),
   executedBy: text("executed_by"), // User who performed the work
   executedDate: text("executed_date"), // DD-MMM-YYYY format

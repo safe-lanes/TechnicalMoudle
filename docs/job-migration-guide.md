@@ -247,12 +247,14 @@ All 4 child tables' `job_id` columns reference `jobs(juuid)` with ON DELETE NO A
 
 ## Migration Pattern Reference
 
-This jobs migration followed the same proven 3-phase pattern used for vessels (0008-0014) and components (0016-0022):
+This jobs migration followed the same proven 4-phase pattern used for vessels (0008-0014), components (0016-0022), and now work orders (0028-0030+):
 
-| Phase | Vessel Migration | Component Migration | Jobs Migration |
-|-------|-----------------|--------------------|--------------------|
-| 1. Add UUID column with backfill | 0008 (vuuid) | 0016-0017 (cuuid) | 0025 (juuid) |
-| 2. Add FK constraints to child tables | 0009-0013 (31 tables) | 0018-0021 (15 tables) | 0026 (4 tables) |
-| 3. Refactor server/frontend code | Multiple commits | Multiple commits | `16c996c0`, `83248f4e` |
-| 4. Convert id TEXT → SERIAL | 0014 | 0022 | 0027 |
-| Total child tables constrained | 43 (including 0024) | 15 | 4 |
+| Phase | Vessel Migration | Component Migration | Jobs Migration | Work Orders Migration |
+|-------|-----------------|--------------------|--------------------|----------------------|
+| 1. Add UUID column with backfill | 0008 (vuuid) | 0016-0017 (cuuid) | 0025 (juuid) | 0028 (wouuid) |
+| 2. Add FK constraints to child tables | 0009-0013 (31 tables) | 0018-0021 (15 tables) | 0026 (4 tables) | 0029-0030 (4 tables) |
+| 3. Refactor server/frontend code | Multiple commits | Multiple commits | `16c996c0`, `83248f4e` | PENDING |
+| 4. Convert id TEXT → SERIAL | 0014 | 0022 | 0027 | PENDING |
+| Total child tables constrained | 43 (including 0024) | 15 | 4 | 4 |
+
+> See `docs/work-order-migration-guide.md` for the complete work orders migration guide.

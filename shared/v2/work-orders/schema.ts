@@ -146,7 +146,7 @@ export type WorkOrder = typeof v2WorkOrders.$inferSelect;
 
 export const v2WorkOrderExecutions = pgTable("work_order_executions", {
   id: text("id").primaryKey(),
-  templateId: text("template_id").notNull(),
+  templateId: text("template_id").notNull().references(() => v2WorkOrders.wouuid), // FK → work_orders.wouuid
   componentId: text("component_id").notNull().references(() => v2Components.cuuid, { onDelete: "restrict", onUpdate: "cascade" }),
   vesselId: text("vessel_id").notNull(),
   executionId: text("execution_id").notNull().unique(),
@@ -180,7 +180,7 @@ export type WorkOrderExecution = typeof v2WorkOrderExecutions.$inferSelect;
 
 export const v2WorkOrderExecutionDetails = pgTable("work_order_execution_details", {
   id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
-  workOrderId: text("work_order_id").notNull(),
+  workOrderId: text("work_order_id").notNull().references(() => v2WorkOrders.wouuid), // FK → work_orders.wouuid
   vesselId: text("vessel_id").notNull(),
   executedBy: text("executed_by"),
   executedDate: text("executed_date"),

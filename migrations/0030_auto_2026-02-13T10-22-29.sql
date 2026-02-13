@@ -1,0 +1,2 @@
+ALTER TABLE "ihm_maintenance_log" ADD CONSTRAINT "ihm_maintenance_log_work_order_id_work_orders_wouuid_fk" FOREIGN KEY ("work_order_id") REFERENCES "public"."work_orders"("wouuid") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "work_order_execution_details" ADD CONSTRAINT "work_order_execution_details_work_order_id_work_orders_wouuid_fk" FOREIGN KEY ("work_order_id") REFERENCES "public"."work_orders"("wouuid") ON DELETE no action ON UPDATE no action;

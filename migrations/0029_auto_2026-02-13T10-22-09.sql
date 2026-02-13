@@ -1,0 +1,2 @@
+ALTER TABLE "component_maintenance_history" ADD CONSTRAINT "component_maintenance_history_work_order_id_work_orders_wouuid_fk" FOREIGN KEY ("work_order_id") REFERENCES "public"."work_orders"("wouuid") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "work_order_executions" ADD CONSTRAINT "work_order_executions_template_id_work_orders_wouuid_fk" FOREIGN KEY ("template_id") REFERENCES "public"."work_orders"("wouuid") ON DELETE no action ON UPDATE no action;
