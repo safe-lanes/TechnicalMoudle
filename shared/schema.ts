@@ -816,6 +816,7 @@ export type AlertConfig = typeof alertConfig.$inferSelect;
 // NOTE: componentId/componentCode/componentName are DEPRECATED - use jobComponentLinks table for many-to-many relationships
 export const jobs = pgTable("jobs", {
   id: text("id").primaryKey(),
+  juuid: text("juuid").notNull().unique(),
   vesselId: text("vessel_id").references(() => vessels.vuuid),
   componentId: text("component_id").notNull().references(() => components.cuuid, { onDelete: "restrict", onUpdate: "cascade" }),
   componentCode: text("component_code"), // DEPRECATED: Use jobComponentLinks for many-to-many
@@ -871,6 +872,7 @@ export const jobs = pgTable("jobs", {
 
 export const insertJobSchema = createInsertSchema(jobs).omit({
   id: true,
+  juuid: true,
   createdAt: true,
   updatedAt: true,
 });

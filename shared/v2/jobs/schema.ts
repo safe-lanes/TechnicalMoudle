@@ -8,7 +8,7 @@ export type { Component } from "../components/schema";
 import { v2Jobs } from "../components/schema";
 import { v2JobComponentLinks } from "../components/schema";
 
-export const insertJobSchema = createInsertSchema(v2Jobs).omit({ createdAt: true, updatedAt: true });
+export const insertJobSchema = createInsertSchema(v2Jobs).omit({ juuid: true, createdAt: true, updatedAt: true });
 export type InsertJob = z.infer<typeof insertJobSchema>;
 export type Job = typeof v2Jobs.$inferSelect;
 
