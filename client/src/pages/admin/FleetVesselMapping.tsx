@@ -10,7 +10,8 @@ import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Ship, Box, Wrench, Package, Search, Link2, ArrowLeft, RefreshCw, Zap, CheckCircle2, Anchor, ChevronRight, ChevronDown, FolderTree } from "lucide-react";
+import { Ship, Box, Wrench, Package, Search, Link2, ArrowLeft, RefreshCw, Zap, CheckCircle2, Anchor, ChevronRight, ChevronDown, FolderTree, Trash2, Download, AlertTriangle } from "lucide-react";
+import { Progress } from "@/components/ui/progress";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import type { Component, FleetComponents, FleetJobs, FleetSpares, FleetSpareVesselMapping } from "@shared/schema";
@@ -76,6 +77,7 @@ export default function FleetVesselMapping({ onBack }: { onBack?: () => void }) 
   const [selectedFleetItem, setSelectedFleetItem] = useState<string | null>(null);
   const [selectedVesselItem, setSelectedVesselItem] = useState<string | null>(null);
   const [autoMatchDialogOpen, setAutoMatchDialogOpen] = useState(false);
+  const [autoMatchProgress, setAutoMatchProgress] = useState<{ current: number; total: number; linked: number; failed: number } | null>(null);
   const [summaryDialogOpen, setSummaryDialogOpen] = useState(false);
   const [summaryData, setSummaryData] = useState<{ linked: number; notLinked: number }>({ linked: 0, notLinked: 0 });
   const [expandedFleetNodes, setExpandedFleetNodes] = useState<Set<string>>(new Set());
@@ -443,6 +445,14 @@ export default function FleetVesselMapping({ onBack }: { onBack?: () => void }) 
     return new Set(mappings.map((m) => m.fleetEquipmentCode));
   }, [selectedVesselItem, vesselComponentsData, mappingsByComponentCode]);
 
+  const vesselComponentConflictMap = useMemo(() => {
+    const map = new Map<string, string>();
+    mappingsData.forEach((m) => {
+      map.set(m.componentCode, m.fleetEquipmentCode);
+    });
+    return map;
+  }, [mappingsData]);
+
   const leafFleetCount = useMemo(() => {
     let count = 0;
     const countLeaves = (nodes: FleetTreeNode[]) => {
@@ -707,6 +717,8 @@ export default function FleetVesselMapping({ onBack }: { onBack?: () => void }) 
       const isMapped = mappedComponentCodes.has(node.code);
       const isParentNode = node.isParent;
       const canSelect = !isParentNode;
+      const conflictFleetCode = vesselComponentConflictMap.get(node.code);
+      const hasConflict = canSelect && isMapped && selectedFleetItem && conflictFleetCode && conflictFleetCode !== selectedFleetItem;
 
       return (
         <div key={node.code}>
@@ -761,7 +773,12 @@ export default function FleetVesselMapping({ onBack }: { onBack?: () => void }) 
             <span className="font-mono text-[11px] text-gray-500 mr-2 flex-shrink-0">{node.code}</span>
             <span className={`truncate py-1.5 ${isParentNode ? "font-medium text-gray-700" : ""}`} title={node.name}>{node.name}</span>
             {canSelect && (
-              <div className="ml-auto mr-2 flex-shrink-0">
+              <div className="ml-auto mr-2 flex-shrink-0 flex items-center gap-1">
+                {hasConflict && (
+                  <span title={`Already linked to ${conflictFleetCode}`}>
+                    <AlertTriangle className="h-3 w-3 text-amber-500" data-testid={`conflict-${node.code}`} />
+                  </span>
+                )}
                 {isMapped ? (
                   <div className="w-2.5 h-2.5 rounded-full bg-green-500" data-testid={`status-mapped-${node.code}`} />
                 ) : (
@@ -845,6 +862,15 @@ export default function FleetVesselMapping({ onBack }: { onBack?: () => void }) 
         >
           <RefreshCw className={`h-4 w-4 mr-2 ${isLoading ? "animate-spin" : ""}`} />
           Re-sync
+        </Button>
+        <Button
+          variant="outline"
+          disabled={!selectedVessel}
+          className="border-green-500 text-green-600"
+          data-testid="button-export-mappings"
+        >
+          <Download className="h-4 w-4 mr-2" />
+          Export
         </Button>
       </div>
 
@@ -933,7 +959,20 @@ export default function FleetVesselMapping({ onBack }: { onBack?: () => void }) 
 
                       {selectedFleetMappings.length > 0 ? (
                         <div className="space-y-2">
-                          <div className="text-xs font-medium text-gray-500">Linked Components ({selectedFleetMappings.length})</div>
+                          <div className="flex items-center justify-between gap-2">
+                            <div className="text-xs font-medium text-gray-500">Linked Components ({selectedFleetMappings.length})</div>
+                            {selectedFleetMappings.length > 1 && (
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="h-6 px-2 text-[10px] text-red-500"
+                                data-testid="button-remove-all-mappings"
+                              >
+                                <Trash2 className="h-3 w-3 mr-1" />
+                                Remove All
+                              </Button>
+                            )}
+                          </div>
                           {selectedFleetMappings.map((m) => (
                             <div key={`${m.fleetEquipmentCode}-${m.componentCode}`} className="p-2 border rounded-md flex items-center justify-between gap-2">
                               <div className="min-w-0">
@@ -1353,6 +1392,29 @@ export default function FleetVesselMapping({ onBack }: { onBack?: () => void }) 
               Create Mapping
             </Button>
           </div>
+          {autoMatchProgress && (
+            <div className="px-4 py-3 border-b bg-blue-50/50" data-testid="auto-match-progress">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-xs font-medium text-gray-600">
+                  Processing {autoMatchProgress.current} of {autoMatchProgress.total}...
+                </span>
+                <span className="text-xs text-gray-500">
+                  {Math.round((autoMatchProgress.current / autoMatchProgress.total) * 100)}%
+                </span>
+              </div>
+              <Progress value={(autoMatchProgress.current / autoMatchProgress.total) * 100} className="h-2" />
+              <div className="flex items-center gap-4 mt-2">
+                <div className="flex items-center gap-1.5">
+                  <div className="w-2 h-2 rounded-full bg-green-500" />
+                  <span className="text-[10px] text-gray-500">Linked: {autoMatchProgress.linked}</span>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <div className="w-2 h-2 rounded-full bg-red-500" />
+                  <span className="text-[10px] text-gray-500">Failed: {autoMatchProgress.failed}</span>
+                </div>
+              </div>
+            </div>
+          )}
           <ScrollArea className="max-h-[70vh]">
             <table className="w-full">
               <thead>
