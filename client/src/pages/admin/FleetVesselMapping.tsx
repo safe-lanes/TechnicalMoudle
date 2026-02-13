@@ -75,7 +75,7 @@ export default function FleetVesselMapping({ onBack }: { onBack?: () => void }) 
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedVessel, setSelectedVessel] = useState<string>("");
   const [selectedFleetItem, setSelectedFleetItem] = useState<string | null>(null);
-  const [selectedVesselItem, setSelectedVesselItem] = useState<string | null>(null);
+  const [selectedVesselItems, setSelectedVesselItems] = useState<Set<string>>(new Set());
   const [autoMatchDialogOpen, setAutoMatchDialogOpen] = useState(false);
   const [autoMatchProgress, setAutoMatchProgress] = useState<{ current: number; total: number; linked: number; failed: number } | null>(null);
   const [summaryDialogOpen, setSummaryDialogOpen] = useState(false);
@@ -437,13 +437,14 @@ export default function FleetVesselMapping({ onBack }: { onBack?: () => void }) 
   }, [selectedFleetItem, mappingsByFleetCode]);
 
   const linkedFleetCodes = useMemo(() => {
-    if (!selectedVesselItem) return new Set<string>();
-    const vc = vesselComponentsData.find((c) => (c.componentCode || c.id) === selectedVesselItem);
-    if (!vc) return new Set<string>();
-    const code = vc.componentCode || vc.id;
-    const mappings = mappingsByComponentCode.get(code) || [];
-    return new Set(mappings.map((m) => m.fleetEquipmentCode));
-  }, [selectedVesselItem, vesselComponentsData, mappingsByComponentCode]);
+    if (selectedVesselItems.size === 0) return new Set<string>();
+    const codes = new Set<string>();
+    selectedVesselItems.forEach((itemCode) => {
+      const mappings = mappingsByComponentCode.get(itemCode) || [];
+      mappings.forEach((m) => codes.add(m.fleetEquipmentCode));
+    });
+    return codes;
+  }, [selectedVesselItems, mappingsByComponentCode]);
 
   const vesselComponentConflictMap = useMemo(() => {
     const map = new Map<string, string>();
@@ -530,33 +531,44 @@ export default function FleetVesselMapping({ onBack }: { onBack?: () => void }) 
     },
   });
 
-  const handleManualMap = () => {
-    if (!selectedFleetItem || !selectedVesselItem || !selectedVessel) {
-      toast({ title: "Error", description: "Select both a fleet item and a vessel component", variant: "destructive" });
+  const handleManualMap = async () => {
+    if (!selectedFleetItem || selectedVesselItems.size === 0 || !selectedVessel) {
+      toast({ title: "Error", description: "Select a fleet item and one or more vessel components", variant: "destructive" });
       return;
     }
-    const vc = vesselComponentsNonParent.find((c) => (c.componentCode || c.id) === selectedVesselItem);
-    if (!vc) return;
 
-    createMappingMutation.mutate(
-      {
-        fleetEquipmentCode: selectedFleetItem,
-        vesselCode: selectedVessel,
-        componentCode: vc.componentCode || "",
-        componentName: vc.name || "",
-        componentId: vc.id,
-        mappedBy: "admin",
-        isActive: true,
-      },
-      {
-        onSuccess: () => {
-          toast({ title: "Success", description: "Mapping created successfully" });
-        },
-        onError: (error: any) => {
-          toast({ title: "Error", description: error.message || "Failed to create mapping", variant: "destructive" });
-        },
+    const itemsToMap = Array.from(selectedVesselItems);
+    let successCount = 0;
+    let failCount = 0;
+
+    for (const itemCode of itemsToMap) {
+      const vc = vesselComponentsNonParent.find((c) => (c.componentCode || c.id) === itemCode);
+      if (!vc) { failCount++; continue; }
+
+      try {
+        await apiRequest("POST", "/technical/api/fleet-admin/fleet-component-mappings", {
+          fleetEquipmentCode: selectedFleetItem,
+          vesselCode: selectedVessel,
+          componentCode: vc.componentCode || "",
+          componentName: vc.name || "",
+          componentId: vc.id,
+          mappedBy: "admin",
+          isActive: true,
+        });
+        successCount++;
+      } catch {
+        failCount++;
       }
-    );
+    }
+
+    queryClient.invalidateQueries({ queryKey: ["/technical/api/fleet-admin/fleet-component-mappings", { vesselCode: selectedVessel }] });
+    setSelectedVesselItems(new Set());
+
+    if (successCount > 0) {
+      toast({ title: "Success", description: `${successCount} mapping(s) created successfully${failCount > 0 ? `, ${failCount} failed` : ""}` });
+    } else {
+      toast({ title: "Error", description: "Failed to create mappings", variant: "destructive" });
+    }
   };
 
   const handleRemoveMapping = (m: FleetComponentMapping) => {
@@ -712,7 +724,7 @@ export default function FleetVesselMapping({ onBack }: { onBack?: () => void }) 
     return nodes.map((node) => {
       const hasChildren = node.children.length > 0;
       const isExpanded = expandedVesselNodes.has(node.code);
-      const isSelected = selectedVesselItem === node.code;
+      const isSelected = selectedVesselItems.has(node.code);
       const isLinkedFromLeft = linkedComponentCodes.has(node.code);
       const isMapped = mappedComponentCodes.has(node.code);
       const isParentNode = node.isParent;
@@ -740,7 +752,15 @@ export default function FleetVesselMapping({ onBack }: { onBack?: () => void }) 
                 toggleVesselNode(node.code);
               }
               if (canSelect) {
-                setSelectedVesselItem(node.code);
+                setSelectedVesselItems((prev) => {
+                  const next = new Set(prev);
+                  if (next.has(node.code)) {
+                    next.delete(node.code);
+                  } else {
+                    next.add(node.code);
+                  }
+                  return next;
+                });
               }
             }}
             data-testid={`row-vessel-${node.code}`}
@@ -765,11 +785,30 @@ export default function FleetVesselMapping({ onBack }: { onBack?: () => void }) 
                 <span className="inline-block w-3.5" />
               )}
             </button>
+            {canSelect && (
+              <Checkbox
+                checked={isSelected}
+                className="h-3.5 w-3.5 mr-1.5 flex-shrink-0"
+                onClick={(e) => e.stopPropagation()}
+                onCheckedChange={() => {
+                  setSelectedVesselItems((prev) => {
+                    const next = new Set(prev);
+                    if (next.has(node.code)) {
+                      next.delete(node.code);
+                    } else {
+                      next.add(node.code);
+                    }
+                    return next;
+                  });
+                }}
+                data-testid={`checkbox-vessel-${node.code}`}
+              />
+            )}
             {isParentNode ? (
               <FolderTree className="h-3 w-3 text-cyan-500 mr-1.5 flex-shrink-0" />
-            ) : (
+            ) : !canSelect ? (
               <Box className="h-3 w-3 text-gray-400 mr-1.5 flex-shrink-0" />
-            )}
+            ) : null}
             <span className="font-mono text-[11px] text-gray-500 mr-2 flex-shrink-0">{node.code}</span>
             <span className={`truncate py-1.5 ${isParentNode ? "font-medium text-gray-700" : ""}`} title={node.name}>{node.name}</span>
             {canSelect && (
@@ -832,7 +871,7 @@ export default function FleetVesselMapping({ onBack }: { onBack?: () => void }) 
             data-testid="input-search-mappings"
           />
         </div>
-        <Select value={selectedVessel} onValueChange={(v) => { setSelectedVessel(v); setSelectedFleetItem(null); setSelectedVesselItem(null); setSelectedFleetJob(null); setSelectedVesselJob(null); setSelectedFleetSpare(null); setSelectedVesselSpare(null); }}>
+        <Select value={selectedVessel} onValueChange={(v) => { setSelectedVessel(v); setSelectedFleetItem(null); setSelectedVesselItems(new Set()); setSelectedFleetJob(null); setSelectedVesselJob(null); setSelectedFleetSpare(null); setSelectedVesselSpare(null); }}>
           <SelectTrigger className="w-64" data-testid="select-vessel-filter">
             <SelectValue placeholder="Select a vessel..." />
           </SelectTrigger>
@@ -998,15 +1037,20 @@ export default function FleetVesselMapping({ onBack }: { onBack?: () => void }) 
                         </div>
                       )}
 
-                      {selectedVesselItem && selectedFleetItem && (
-                        <Button
-                          onClick={handleManualMap}
-                          disabled={createMappingMutation.isPending}
-                          className="w-full bg-cyan-600 hover:bg-cyan-700 text-white"
-                          data-testid="button-create-mapping"
-                        >
-                          {createMappingMutation.isPending ? "Creating..." : "Link Selected"}
-                        </Button>
+                      {selectedVesselItems.size > 0 && selectedFleetItem && (
+                        <div className="space-y-2">
+                          <div className="text-xs text-gray-500 text-center">
+                            {selectedVesselItems.size} vessel component{selectedVesselItems.size > 1 ? "s" : ""} selected
+                          </div>
+                          <Button
+                            onClick={handleManualMap}
+                            disabled={createMappingMutation.isPending}
+                            className="w-full bg-cyan-600 hover:bg-cyan-700 text-white"
+                            data-testid="button-create-mapping"
+                          >
+                            {createMappingMutation.isPending ? "Creating..." : `Link ${selectedVesselItems.size} Selected`}
+                          </Button>
+                        </div>
                       )}
                     </div>
                   )}
