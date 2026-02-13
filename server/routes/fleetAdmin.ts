@@ -229,6 +229,54 @@ router.get('/fleet-components', async (req, res) => {
   }
 });
 
+// Export fleet components to Excel (13-column format matching import template)
+router.get('/fleet-components/export', async (req, res) => {
+  try {
+    const XLSX = await import('xlsx');
+    const allComponents = await storage.getFleetComponents();
+
+    const headers = [
+      'Parent Fleet Equipment Code', 'Fleet Equipment Code', 'Fleet Equipment Name',
+      'Component Category', 'Maker Name', 'Maker Code', 'Model', 'Model Code',
+      'Location', 'Rating', 'Eqpt / System Department', 'Notes', 'IS Active'
+    ];
+
+    const rows = allComponents.map((c: any) => [
+      c.parentFleetEquipmentCode || '',
+      c.fleetEquipmentCode || '',
+      c.fleetEquipmentName || '',
+      c.componentCategory || '',
+      c.makerName || '',
+      c.makerCode || '',
+      c.model || '',
+      c.modelCode || '',
+      c.location || '',
+      c.rating || '',
+      c.eqptSystemDept || '',
+      c.notes || '',
+      c.isActive === false ? 'No' : 'Yes',
+    ]);
+
+    const wsData = [headers, ...rows];
+    const ws = XLSX.utils.aoa_to_sheet(wsData);
+
+    const colWidths = [25, 25, 40, 20, 25, 15, 20, 15, 20, 15, 25, 30, 10];
+    ws['!cols'] = colWidths.map(w => ({ wch: w }));
+
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Fleet Components');
+
+    const buffer = XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' });
+
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.setHeader('Content-Disposition', `attachment; filename=fleet-components-${new Date().toISOString().split('T')[0]}.xlsx`);
+    res.send(buffer);
+  } catch (error: any) {
+    console.error('Error exporting fleet components:', error);
+    res.status(500).json({ error: 'Failed to export fleet components' });
+  }
+});
+
 // Get single fleet component
 router.get('/fleet-components/:id', async (req, res) => {
   try {
