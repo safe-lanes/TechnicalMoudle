@@ -2011,6 +2011,24 @@ router.get('/template', async (req, res) => {
       example = [];
       break;
 
+    case 'fleet-components':
+      headers = [
+        'Parent Fleet Equipment Code', 'Fleet Equipment Code', 'Fleet Equipment Name',
+        'Component Category', 'Maker Name', 'Maker Code', 'Model', 'Model Code',
+        'Location', 'Rating', 'Eqpt / System Department', 'Notes', 'IS Active'
+      ];
+
+      validValues = [
+        'Text (Parent code for hierarchy)', 'Required (Unique code, e.g., 601.002.01)', 'Required (Equipment name)',
+        'Text (Category from Master List)', 'Text (Manufacturer name)', 'Text (Manufacturer code)',
+        'Text (Equipment model)', 'Text (Model code)',
+        'Text (Installation location)', 'Text (Power/capacity rating)',
+        'Text (Engine/Deck/Electrical)', 'Text (Additional notes)', 'Yes/No (defaults to Yes)'
+      ];
+
+      example = [];
+      break;
+
     case 'fleet-jobs':
       headers = [
         'Job Code', 'Fleet Equipment Code', 'Fleet Equipment Name', 'WO Title',
