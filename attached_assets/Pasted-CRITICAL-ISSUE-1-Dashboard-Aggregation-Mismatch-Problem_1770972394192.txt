@@ -1,0 +1,394 @@
+CRITICAL ISSUE #1: Dashboard Aggregation Mismatch
+Problem: The PMS Dashboard for Vessel 3 currently shows:
+
+Overdue Work Orders: 0 (incorrect)
+
+Due Work Orders: 0 (incorrect)
+
+Pending Approval: 0
+
+However, the Work Orders page correctly shows:
+
+Overdue: 202
+
+Due (Grace Period): 36
+
+Planned: 1
+
+Root Cause: The dashboard KPI calculation queries are not correctly aggregating work order statuses for Vessel 3, or there's a caching/view refresh issue.
+
+Required Fix:
+
+Verify the SQL query used in the dashboard to count overdue work orders. It should be:
+
+sql
+SELECT COUNT(*) FROM work_orders 
+WHERE vessel_id = '[Vessel 3 UUID]'
+AND status NOT IN ('COMPLETED', 'CANCELLED')
+AND due_date < CURRENT_DATE
+Verify the "Due Work Orders" query counts jobs where:
+
+sql
+due_date BETWEEN CURRENT_DATE AND CURRENT_DATE + INTERVAL '7 days'
+AND status IN ('OPEN', 'PLANNED')
+Check if there's a materialized view or cached aggregation table that needs to be refreshed. If so, run the refresh command.
+
+Verify that work orders have status field populated correctly (not NULL).
+
+After fixing, the dashboard should show 202 overdue and 36 due to match the Work Orders page.
+
+DEFICIENCY #2: Insufficient Work Order Volume
+Current State: 972 work orders generated over 3 years for 270 components.
+
+This averages to only 3.6 work orders per component over 3 years
+
+Many components likely have zero or very few maintenance records
+
+Target State: Generate an additional 600-800 work orders to reach 1,600-1,800 total work orders.
+
+Specific Requirements:
+
+Ensure Every Component Has Maintenance History:
+
+Query to identify components with 0 or 1 work orders in 3 years
+
+Generate at least 2-4 routine maintenance jobs per component over the period
+
+Focus on components that are SOLAS-critical or have Class requirements
+
+Add More Breakdown/Unplanned Jobs (Currently seems low):
+
+Current: Estimate ~100-150 breakdown jobs
+
+Target: 200-250 breakdown jobs over 3 years (20-25% of total workload)
+
+Breakdown job characteristics:
+
+Random distribution across 3 years
+
+Higher frequency during sea passages (not port)
+
+Must have linked spare parts consumption (80-90% of breakdowns use spares)
+
+Priority = HIGH
+
+Created and completed within 1-5 days
+
+Generate More Inspection Jobs:
+
+Weekly safety equipment inspections (Fire extinguishers, Life rafts, Emergency equipment)
+
+Monthly SOLAS equipment inspections
+
+These are quick jobs (0.5-2 man-hours) but are numerous and regular
+
+Increase Running Hours-Based Jobs:
+
+For the 19 MASTER running hours components
+
+With 20,928 RH entries showing 22,000+ hours on some equipment, there should be:
+
+More 250h interval jobs
+
+More 500h interval jobs
+
+Regular 1000h overhauls
+
+Calculate: If Main Engine accumulated 20,000+ hours, it should have:
+
+~80 jobs at 250h intervals
+
+~40 jobs at 500h intervals
+
+~20 jobs at 1000h intervals
+
+Verify this logic is being applied
+
+DEFICIENCY #3: Sparse Spare Parts Consumption Linkage
+Current State: 1,861 spare parts transactions generated, but linkage to work orders is unclear.
+
+Required Enhancement:
+
+Verify Work Order to Spares Consumption Linkage:
+
+Query the database to check: How many completed work orders have associated spare parts consumption records?
+
+Target: 60-70% of completed work orders should have spare parts consumption (excluding simple inspections)
+
+Specifically:
+
+90%+ of breakdown jobs must consume spares
+
+70%+ of overhaul jobs must consume spares
+
+40-50% of routine maintenance jobs consume spares
+
+10-20% of inspection jobs consume minor items (gaskets, O-rings, cleaning materials)
+
+Generate Missing Consumption Records:
+
+For work orders that completed but have no spare parts consumption, add realistic consumption entries
+
+Link consumption records using proper foreign keys:
+
+spare_consumption.work_order_id → work_orders.id
+
+spare_consumption.component_id → should match work order's component
+
+spare_consumption.consumed_by → should match work order's completed_by user
+
+spare_consumption.consumption_date → should match or be within ±1 day of work order completion date
+
+Validate Stock Balance Integrity:
+
+Run this validation query for every spare part:
+
+sql
+SELECT 
+  spare_id,
+  opening_stock,
+  SUM(CASE WHEN transaction_type = 'RECEIVE' THEN quantity ELSE 0 END) as total_received,
+  SUM(CASE WHEN transaction_type = 'CONSUME' THEN quantity ELSE 0 END) as total_consumed,
+  current_stock,
+  (opening_stock + total_received - total_consumed) as calculated_stock
+FROM spare_transactions
+GROUP BY spare_id, opening_stock, current_stock
+HAVING (opening_stock + total_received - total_consumed) != current_stock
+Expected result: 0 rows (all stock balances should be mathematically correct)
+
+If there are mismatches, adjust current_stock or generate adjustment transactions
+
+DEFICIENCY #4: Missing Condition Monitoring Data
+Current State: Running hours entries exist (20,928 records) but no evidence of condition monitoring parameters.
+
+Required Addition: Generate Condition Monitoring Log Entries
+
+Target: 1,200-1,500 condition monitoring entries over 3 years
+
+Specifications:
+
+For Main Engine (most critical):
+
+Weekly readings (156 weeks over 3 years = 156 entries)
+
+Parameters to log:
+
+Exhaust Gas Temperature (each cylinder): 320-450°C normal, flag if >480°C
+
+Jacket Cooling Water Temp: 75-85°C normal
+
+Lube Oil Inlet Pressure: 3.5-4.5 bar normal
+
+Lube Oil Temperature: 45-55°C normal
+
+Turbocharger RPM: varies by load
+
+Fuel consumption rate: L/hr or g/kWh
+
+Power output: kW
+
+Scavenge Air Pressure: bar
+
+For Auxiliary Engines (3-4 units):
+
+Bi-weekly readings per unit (78 weeks × 4 units = 312 entries)
+
+Similar parameters as Main Engine but scaled down
+
+For Generators:
+
+Monthly readings (36 months × 3 generators = 108 entries)
+
+Voltage, Frequency, Load %, Temperature, Vibration
+
+For Critical Pumps:
+
+Monthly readings (36 months × 6-8 pumps = 216-288 entries)
+
+Discharge pressure, Suction pressure, Vibration, Temperature, Flow rate
+
+Data Realism Requirements:
+
+98% of readings should be within normal range
+
+2% of readings should be flagged as "out of spec" or "approaching limits"
+
+Anomalous readings should trigger investigation work orders
+
+Create linkage: condition_monitoring_log.id → work_orders.triggered_by_condition_monitoring_id (for cases where monitoring revealed an issue)
+
+DEFICIENCY #5: Incomplete Stores/Lubes Consumption Pattern
+Current State: Claimed 2,692 stores ledger entries, but consumption patterns need verification.
+
+Required Validation and Enhancement:
+
+Verify Daily Lube Oil Consumption:
+
+Main Engine cylinder oil consumption should be daily entries (1,096 days over 3 years)
+
+Formula: Consumption = Running Hours × Cylinder Oil Rate (0.8-1.2 g/kWh converted to liters)
+
+Link to running hours: stores_consumption.linked_running_hours_log_id
+
+Current status: Verify if daily lube consumption entries exist
+
+If missing: Generate 1,096 cylinder oil consumption entries linked to Main Engine running hours
+
+Verify System Oil Top-ups:
+
+Main Engine system oil: monthly top-ups + 2-3 full oil changes over 3 years
+
+Target: 40-45 entries for Main Engine system oil
+
+Aux Engine oils: quarterly top-ups
+
+Target: 40-50 entries per aux engine
+
+Verify Chemical Consumption:
+
+Boiler water treatment: bi-weekly usage (156 entries over 3 years)
+
+Cooling water treatment: monthly usage (36 entries)
+
+Current status: Verify these exist
+
+If missing: Generate accordingly
+
+Generate Receipt Transactions Aligned with Port Visits:
+
+Stores/lubes/chemicals should be received during port visits (approximately 30 port days over 3 years)
+
+Each port visit should have 3-8 receipt transactions (bulk oil, chemicals, stores, paints, etc.)
+
+Target: 90-150 receipt transactions distributed across ~30 port visits
+
+Ensure temporal logic: Receipt date must be a date when vessel was identified as "in port" (Main Engine hours = 0-2 hours that day)
+
+DEFICIENCY #6: Crew Workload Distribution Verification
+Current State: Work orders assigned to crew, but distribution pattern unclear.
+
+Required Verification and Adjustment:
+
+Query Current Workload Distribution:
+
+sql
+SELECT 
+  assigned_to_user.name,
+  assigned_to_user.rank,
+  COUNT(*) as work_orders_assigned,
+  SUM(man_hours_actual) as total_man_hours,
+  ROUND(SUM(man_hours_actual) / 36, 2) as avg_hours_per_month
+FROM work_orders
+JOIN users ON work_orders.assigned_to = users.id
+WHERE vessel_id = '[Vessel 3 UUID]'
+GROUP BY assigned_to_user.name, assigned_to_user.rank
+ORDER BY work_orders_assigned DESC
+Target Distribution (for 1,600-1,800 total work orders):
+
+Chief Engineer: 15% of work orders (~240-270 WOs), Avg 50-60 man-hours/month
+
+2nd Engineer: 30% (~480-540 WOs), Avg 100-120 man-hours/month
+
+3rd Engineer: 25% (~400-450 WOs), Avg 80-100 man-hours/month
+
+4th Engineer: 20% (~320-360 WOs), Avg 60-80 man-hours/month
+
+Electrician: 10% (~160-180 WOs), Avg 40-50 man-hours/month
+
+Man-Hours Reality Check:
+
+Technical crew typically works 400-800 man-hours per month collectively
+
+No single crew member should exceed 200 man-hours in any month (unrealistic overload)
+
+Verify no months have 0 maintenance work (vessel was operational)
+
+If Distribution is Skewed:
+
+Reassign work orders to balance workload
+
+Update work_orders.assigned_to field
+
+Ensure electrical jobs go to Electrician
+
+Ensure Main Engine jobs go to Chief or 2nd Engineer
+
+DEFICIENCY #7: Anomaly Detection Records Missing
+Current State: No evidence of running hours anomalies being flagged in the system.
+
+Required Addition: Generate Running Hours Anomaly Records
+
+Target: 350-500 anomaly entries over 20,928 running hours entries (2-2.5% anomaly rate)
+
+Specifications:
+
+Anomaly Types to Generate:
+
+Unusual spike in hours (15% of anomalies): Daily hours logged >24 hours (data entry error or meter issue)
+
+Hours decreased (10% of anomalies): Meter reset due to equipment replacement or counter rollover
+
+Excessive running without maintenance (30% of anomalies): Component ran >200 hours beyond due maintenance interval
+
+Gap in logging (25% of anomalies): Missing entries for 2-5 consecutive days
+
+Rapid accumulation (20% of anomalies): Hours increased by >50% compared to typical daily rate (unusual operations)
+
+Create Anomaly Table Entries:
+
+text
+running_hours_anomaly:
+- anomaly_id (PK)
+- running_hours_log_id (FK to specific RH entry that's anomalous)
+- component_id (FK)
+- vessel_id (FK to Vessel 3)
+- anomaly_type (enum: SPIKE, DECREASE, GAP, EXCESSIVE_RUN, RAPID_ACCUMULATION)
+- detected_date
+- severity (LOW, MEDIUM, HIGH)
+- description (text explaining the anomaly)
+- investigated_by (user_id - typically Chief Engineer)
+- resolution_notes (text - how it was resolved)
+- resolved_date
+- status (OPEN, UNDER_INVESTIGATION, RESOLVED, FALSE_POSITIVE)
+Linkage Requirements:
+
+50% of anomalies should have status = RESOLVED with resolution_notes
+
+30% should be status = FALSE_POSITIVE (normal operation, just looked unusual)
+
+20% should be status = OPEN or UNDER_INVESTIGATION (recent anomalies)
+
+Some HIGH severity anomalies should have linked investigation work orders created
+
+DEFICIENCY #8: Missing Work Order Justification Documentation
+Current State: Postponements exist (713 records), but work order completion notes may be sparse.
+
+Required Enhancement:
+
+Populate Completion Notes for all completed work orders:
+
+70% of completed work orders should have brief completion_notes: "Job completed satisfactorily. Equipment tested and operational."
+
+15% should have detailed notes explaining challenges: "Job required additional time due to seized bolt. Penetrating oil applied. Completed successfully."
+
+10% should note spare parts used: "Replaced fuel pump diaphragm (Part #FP-123-456). Old part showing wear. New part tested OK."
+
+5% should note findings: "During inspection, discovered slight oil leak from gasket. Gasket replaced as additional work. ROB gasket stock now at minimum level."
+
+Populate Postponement Justifications:
+
+All 713 postponement records must have proper justification_details text field populated
+
+Distribution of reasons:
+
+35%: "Spare parts not available on board. Ordered via requisition. ETA next port."
+
+25%: "Vessel in critical operation period. Job rescheduled to port arrival."
+
+15%: "Weather conditions unfavorable for deck work. Postponed until weather improves."
+
+10%: "Manpower shortage due to crew illness/leave. Rescheduled."
+
+10%: "Equipment in continuous use. Cannot be stopped until port arrival."
+
+5%: "Awaiting technical clarification from shore superintendent/manufacturer."
