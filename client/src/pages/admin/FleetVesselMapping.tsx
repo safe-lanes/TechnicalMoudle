@@ -56,6 +56,18 @@ interface VesselTreeNode {
   data?: Component;
 }
 
+interface FleetJobMapping {
+  id: number;
+  fleetEquipmentCode: string;
+  jobCode: string;
+  jobId?: string;
+  vesselCode: string;
+  vesselName?: string;
+  mappedBy: string;
+  mappedAt: string;
+  isActive: boolean;
+}
+
 export default function FleetVesselMapping({ onBack }: { onBack?: () => void }) {
   const { toast } = useToast();
   const [activeTab, setActiveTab] = useState<MappingTab>("components");
@@ -68,6 +80,8 @@ export default function FleetVesselMapping({ onBack }: { onBack?: () => void }) 
   const [summaryData, setSummaryData] = useState<{ linked: number; notLinked: number }>({ linked: 0, notLinked: 0 });
   const [expandedFleetNodes, setExpandedFleetNodes] = useState<Set<string>>(new Set());
   const [expandedVesselNodes, setExpandedVesselNodes] = useState<Set<string>>(new Set());
+  const [selectedFleetJob, setSelectedFleetJob] = useState<string | null>(null);
+  const [selectedVesselJob, setSelectedVesselJob] = useState<string | null>(null);
 
   const { data: vessels = [] } = useVessels();
 
@@ -115,6 +129,56 @@ export default function FleetVesselMapping({ onBack }: { onBack?: () => void }) 
     },
     enabled: !!selectedVessel && activeTab === "jobs",
   });
+
+  const { data: jobMappingsData = [], isLoading: isLoadingJobMappings } = useQuery<FleetJobMapping[]>({
+    queryKey: ["/technical/api/fleet-admin/fleet-job-mappings", { vesselCode: selectedVessel }],
+    queryFn: async () => {
+      const res = await fetch(`/technical/api/fleet-admin/fleet-job-mappings?vesselCode=${selectedVessel}`, { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to fetch job mappings");
+      return res.json();
+    },
+    enabled: !!selectedVessel && activeTab === "jobs",
+  });
+
+  const selectedFleetJobData = useMemo(() => {
+    if (!selectedFleetJob) return null;
+    return fleetJobsData.find((j) => j.jobCode === selectedFleetJob) || null;
+  }, [selectedFleetJob, fleetJobsData]);
+
+  const selectedFleetJobMappings = useMemo(() => {
+    if (!selectedFleetJob) return [];
+    return jobMappingsData.filter((m) => m.jobCode === selectedFleetJob);
+  }, [selectedFleetJob, jobMappingsData]);
+
+  const jobMappedCount = useMemo(() => {
+    const mappedJobCodes = new Set(jobMappingsData.map((m) => m.jobCode));
+    return mappedJobCodes.size;
+  }, [jobMappingsData]);
+
+  const jobUnmappedCount = useMemo(() => {
+    const mappedJobCodes = new Set(jobMappingsData.map((m) => m.jobCode));
+    return fleetJobsData.filter((j) => !mappedJobCodes.has(j.jobCode)).length;
+  }, [fleetJobsData, jobMappingsData]);
+
+  const jobLinkedVesselJobIds = useMemo(() => {
+    const ids = new Set<string>();
+    jobMappingsData.forEach((m) => {
+      if (m.jobId) ids.add(m.jobId);
+    });
+    return ids;
+  }, [jobMappingsData]);
+
+  const selectedFleetJobLinkedDetails = useMemo(() => {
+    if (!selectedFleetJob) return [];
+    return selectedFleetJobMappings.map((m) => {
+      const vesselJob = m.jobId ? vesselJobsData.find((vj: any) => vj.id === m.jobId) : null;
+      return {
+        ...m,
+        vesselJobNo: vesselJob?.jobNo || m.jobId || "-",
+        vesselJobTitle: vesselJob?.jobTitle || "-",
+      };
+    });
+  }, [selectedFleetJobMappings, vesselJobsData]);
 
   const fleetComponents = useMemo(() => fleetComponentsData, [fleetComponentsData]);
 
@@ -869,6 +933,17 @@ export default function FleetVesselMapping({ onBack }: { onBack?: () => void }) 
         </TabsContent>
 
         <TabsContent value="jobs">
+          <div className="mb-4 flex items-center gap-4 text-sm">
+            <div className="flex items-center gap-2">
+              <div className="w-3 h-3 rounded-full bg-green-500" />
+              <span data-testid="text-job-mapped-count">Mapped: {jobMappedCount}</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="w-3 h-3 rounded-full bg-gray-400" />
+              <span data-testid="text-job-unmapped-count">Not Mapped: {jobUnmappedCount}</span>
+            </div>
+          </div>
+
           {!selectedVessel ? (
             <Card>
               <CardContent className="py-12">
@@ -880,7 +955,7 @@ export default function FleetVesselMapping({ onBack }: { onBack?: () => void }) 
               </CardContent>
             </Card>
           ) : (
-            <div className="grid gap-4" style={{ gridTemplateColumns: "1fr 1fr" }}>
+            <div className="grid gap-4" style={{ gridTemplateColumns: "2fr 1fr 2fr" }}>
               <Card>
                 <CardHeader className="pb-3">
                   <CardTitle className="text-base flex items-center gap-2 flex-wrap">
@@ -906,17 +981,72 @@ export default function FleetVesselMapping({ onBack }: { onBack?: () => void }) 
                           </tr>
                         </thead>
                         <tbody>
-                          {fleetJobsData.map((job) => (
-                            <tr key={job.id} className="border-b text-xs hover:bg-blue-50/50" data-testid={`row-fleet-job-${job.id}`}>
-                              <td className="px-3 py-2 font-mono text-gray-600">{job.fleetEquipmentCode}</td>
-                              <td className="px-3 py-2 font-mono text-gray-600">{job.jobCode}</td>
-                              <td className="px-3 py-2 text-gray-600">{job.woTitle}</td>
-                            </tr>
-                          ))}
+                          {fleetJobsData.map((job) => {
+                            const isSelected = selectedFleetJob === job.jobCode;
+                            const isMapped = jobMappingsData.some((m) => m.jobCode === job.jobCode);
+                            return (
+                              <tr
+                                key={job.id}
+                                className={`border-b text-xs cursor-pointer ${isSelected ? "bg-cyan-50 border-l-2 border-l-cyan-500" : isMapped ? "bg-green-50/50 hover:bg-green-50" : "hover:bg-blue-50/50"}`}
+                                onClick={() => setSelectedFleetJob(job.jobCode)}
+                                data-testid={`row-fleet-job-${job.id}`}
+                              >
+                                <td className="px-3 py-2 font-mono text-gray-600">{job.fleetEquipmentCode}</td>
+                                <td className="px-3 py-2 font-mono text-gray-600">{job.jobCode}</td>
+                                <td className="px-3 py-2 text-gray-600">{job.woTitle}</td>
+                              </tr>
+                            );
+                          })}
                         </tbody>
                       </table>
                     )}
                   </ScrollArea>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-base flex items-center gap-2 flex-wrap">
+                    <Link2 className="h-4 w-4 text-gray-500" />
+                    Mapping Status
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  {!selectedFleetJob ? (
+                    <div className="text-center py-8 text-gray-400">
+                      <Link2 className="h-10 w-10 mx-auto mb-3 opacity-40" />
+                      <p className="text-sm">Select a fleet job to view or create mappings</p>
+                    </div>
+                  ) : (
+                    <div className="space-y-3">
+                      <div className="p-3 bg-gray-50 rounded-lg">
+                        <div className="text-xs text-gray-500 mb-1">Selected Fleet Job</div>
+                        <div className="font-medium text-sm">{selectedFleetJobData?.jobCode}</div>
+                        <div className="text-xs text-gray-600 truncate">{selectedFleetJobData?.woTitle}</div>
+                        <div className="text-xs text-gray-400 mt-1 font-mono">{selectedFleetJobData?.fleetEquipmentCode}</div>
+                      </div>
+
+                      {selectedFleetJobLinkedDetails.length > 0 ? (
+                        <div className="space-y-2">
+                          <div className="text-xs font-medium text-gray-500">Linked Vessel Jobs ({selectedFleetJobLinkedDetails.length})</div>
+                          {selectedFleetJobLinkedDetails.map((m) => (
+                            <div key={`${m.jobCode}-${m.vesselCode}`} className="p-2 border rounded-md">
+                              <div className="min-w-0">
+                                <div className="text-xs font-medium truncate">{m.vesselJobNo}</div>
+                                <div className="text-xs text-gray-500 truncate">{m.vesselJobTitle}</div>
+                                <div className="text-xs text-gray-400 truncate mt-0.5">{m.vesselName || m.vesselCode}</div>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <div className="text-center py-4">
+                          <Badge variant="secondary" className="text-xs">Not Mapped</Badge>
+                          <p className="text-xs text-gray-500 mt-2">No vessel jobs linked to this fleet job</p>
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </CardContent>
               </Card>
 
@@ -945,13 +1075,22 @@ export default function FleetVesselMapping({ onBack }: { onBack?: () => void }) 
                           </tr>
                         </thead>
                         <tbody>
-                          {vesselJobsData.map((job) => (
-                            <tr key={job.id} className="border-b text-xs hover:bg-blue-50/50" data-testid={`row-vessel-job-${job.id}`}>
-                              <td className="px-3 py-2 font-mono text-gray-600">{job.fleetEquipmentCode || "-"}</td>
-                              <td className="px-3 py-2 font-mono text-gray-600">{job.fleetJobCode || job.jobNo}</td>
-                              <td className="px-3 py-2 text-gray-600">{job.jobTitle}</td>
-                            </tr>
-                          ))}
+                          {vesselJobsData.map((job: any) => {
+                            const isSelected = selectedVesselJob === job.id;
+                            const isLinked = jobLinkedVesselJobIds.has(job.id);
+                            return (
+                              <tr
+                                key={job.id}
+                                className={`border-b text-xs cursor-pointer ${isSelected ? "bg-cyan-50 border-l-2 border-l-cyan-500" : isLinked ? "bg-green-50/50 hover:bg-green-50" : "hover:bg-blue-50/50"}`}
+                                onClick={() => setSelectedVesselJob(job.id)}
+                                data-testid={`row-vessel-job-${job.id}`}
+                              >
+                                <td className="px-3 py-2 font-mono text-gray-600">{job.fleetEquipmentCode || "-"}</td>
+                                <td className="px-3 py-2 font-mono text-gray-600">{job.fleetJobCode || job.jobNo}</td>
+                                <td className="px-3 py-2 text-gray-600">{job.jobTitle}</td>
+                              </tr>
+                            );
+                          })}
                         </tbody>
                       </table>
                     )}
