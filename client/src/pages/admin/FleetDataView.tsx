@@ -16,7 +16,7 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import type { Component, Job, Spare, FleetComponents, FleetJobs, FleetSpares } from "@shared/schema";
+import type { Component, Job, Spare, FleetComponents, FleetJobs, FleetSpares, Maker } from "@shared/schema";
 
 interface MappedFleetComponent {
   id: string | number;
@@ -264,6 +264,8 @@ export default function FleetDataView({ onBack }: { onBack?: () => void }) {
   const [spareFormData, setSpareFormData] = useState<Partial<FleetSpare>>({});
   const [spareSearchQuery, setSpareSearchQuery] = useState("");
   const [selectedSpareIds, setSelectedSpareIds] = useState<Set<string>>(new Set());
+  const [makerSearchText, setMakerSearchText] = useState("");
+  const [showMakerSuggestions, setShowMakerSuggestions] = useState(false);
   
   const { toast } = useToast();
 
@@ -278,6 +280,10 @@ export default function FleetDataView({ onBack }: { onBack?: () => void }) {
 
   const { data: fleetSpares } = useQuery<FleetSpare[]>({
     queryKey: ["/technical/api/fleet/spares"],
+  });
+
+  const { data: makers = [] } = useQuery<Maker[]>({
+    queryKey: ['/technical/api/fleet/makers'],
   });
 
   const { data: vessels } = useVessels();
@@ -391,6 +397,37 @@ export default function FleetDataView({ onBack }: { onBack?: () => void }) {
       });
     },
   });
+
+  const filteredMakers = useMemo(() => {
+    if (!makerSearchText.trim()) return [];
+    return makers.filter(m =>
+      m.makerName?.toLowerCase().includes(makerSearchText.toLowerCase())
+    );
+  }, [makerSearchText, makers]);
+
+  const handleMakerSearchChange = (value: string) => {
+    setMakerSearchText(value);
+    setShowMakerSuggestions(true);
+    if (!value.trim()) {
+      setSpareFormData(prev => ({ ...prev, maker: "", makerCode: "" }));
+    }
+  };
+
+  const handleMakerSelect = (maker: Maker) => {
+    setMakerSearchText(maker.makerName || "");
+    setSpareFormData(prev => ({
+      ...prev,
+      maker: maker.makerName || "",
+      makerCode: maker.makerCode || "",
+    }));
+    setShowMakerSuggestions(false);
+  };
+
+  const handleClearMaker = () => {
+    setMakerSearchText("");
+    setSpareFormData(prev => ({ ...prev, maker: "", makerCode: "" }));
+    setShowMakerSuggestions(false);
+  };
 
   useEffect(() => {
     if (jobFormData.maintenanceBasis === 'Running Hours') {
@@ -3026,6 +3063,7 @@ export default function FleetDataView({ onBack }: { onBack?: () => void }) {
                   className="bg-cyan-600 whitespace-nowrap"
                   onClick={() => {
                     setSpareFormData({});
+                    setMakerSearchText("");
                     setIsAddSpareDialogOpen(true);
                   }}
                   data-testid="btn-add-new-spare"
@@ -3249,6 +3287,7 @@ export default function FleetDataView({ onBack }: { onBack?: () => void }) {
                 className="bg-white text-blue-600"
                 onClick={() => {
                   setSpareFormData(selectedSpareForDetail || {});
+                  setMakerSearchText(selectedSpareForDetail?.maker || "");
                   setIsEditSpareDialogOpen(true);
                 }}
                 data-testid="btn-edit-spare"
@@ -3538,19 +3577,54 @@ export default function FleetDataView({ onBack }: { onBack?: () => void }) {
 
               <SectionBlock id="edit-spare-technical" number="A3" title="Technical Details" description="Maker and technical specifications">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
+                  <div className="relative">
                     <label className="text-gray-500 text-xs font-medium mb-1 block">Maker</label>
-                    <Input
-                      value={spareFormData.maker || ""}
-                      onChange={(e) => setSpareFormData(prev => ({ ...prev, maker: e.target.value }))}
-                      data-testid="input-edit-maker"
-                    />
+                    <div className="relative">
+                      <Input
+                        placeholder="Type to search makers..."
+                        value={makerSearchText}
+                        onChange={(e) => handleMakerSearchChange(e.target.value)}
+                        onFocus={() => { if (makerSearchText.trim()) setShowMakerSuggestions(true); }}
+                        onBlur={() => setTimeout(() => setShowMakerSuggestions(false), 200)}
+                        className="pr-8"
+                        data-testid="input-edit-maker"
+                      />
+                      {makerSearchText && (
+                        <button
+                          type="button"
+                          onClick={handleClearMaker}
+                          className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                          data-testid="button-clear-edit-maker"
+                        >
+                          <X className="h-4 w-4" />
+                        </button>
+                      )}
+                    </div>
+                    {showMakerSuggestions && filteredMakers.length > 0 && (
+                      <div className="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-md shadow-lg max-h-48 overflow-y-auto">
+                        {filteredMakers.map((maker) => (
+                          <div
+                            key={maker.id}
+                            className="px-3 py-2 text-sm cursor-pointer hover:bg-cyan-50 hover:text-cyan-700 border-b border-gray-100 last:border-b-0"
+                            onMouseDown={() => handleMakerSelect(maker)}
+                            data-testid={`edit-maker-suggestion-${maker.id}`}
+                          >
+                            <span className="font-medium">{maker.makerName}</span>
+                            {maker.makerCode && (
+                              <span className="text-gray-400 ml-2 text-xs">({maker.makerCode})</span>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    )}
                   </div>
                   <div>
                     <label className="text-gray-500 text-xs font-medium mb-1 block">Maker Code</label>
                     <Input
+                      placeholder="Auto-filled from maker selection"
                       value={spareFormData.makerCode || ""}
-                      onChange={(e) => setSpareFormData(prev => ({ ...prev, makerCode: e.target.value }))}
+                      readOnly
+                      className="bg-gray-100 text-gray-600"
                       data-testid="input-edit-maker-code"
                     />
                   </div>
@@ -3749,19 +3823,54 @@ export default function FleetDataView({ onBack }: { onBack?: () => void }) {
 
               <SectionBlock id="add-spare-technical" number="A3" title="Technical Details" description="Maker and technical specifications">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
+                  <div className="relative">
                     <label className="text-gray-500 text-xs font-medium mb-1 block">Maker</label>
-                    <Input
-                      value={spareFormData.maker || ""}
-                      onChange={(e) => setSpareFormData(prev => ({ ...prev, maker: e.target.value }))}
-                      data-testid="input-new-maker"
-                    />
+                    <div className="relative">
+                      <Input
+                        placeholder="Type to search makers..."
+                        value={makerSearchText}
+                        onChange={(e) => handleMakerSearchChange(e.target.value)}
+                        onFocus={() => { if (makerSearchText.trim()) setShowMakerSuggestions(true); }}
+                        onBlur={() => setTimeout(() => setShowMakerSuggestions(false), 200)}
+                        className="pr-8"
+                        data-testid="input-new-maker"
+                      />
+                      {makerSearchText && (
+                        <button
+                          type="button"
+                          onClick={handleClearMaker}
+                          className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                          data-testid="button-clear-new-maker"
+                        >
+                          <X className="h-4 w-4" />
+                        </button>
+                      )}
+                    </div>
+                    {showMakerSuggestions && filteredMakers.length > 0 && (
+                      <div className="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-md shadow-lg max-h-48 overflow-y-auto">
+                        {filteredMakers.map((maker) => (
+                          <div
+                            key={maker.id}
+                            className="px-3 py-2 text-sm cursor-pointer hover:bg-cyan-50 hover:text-cyan-700 border-b border-gray-100 last:border-b-0"
+                            onMouseDown={() => handleMakerSelect(maker)}
+                            data-testid={`new-maker-suggestion-${maker.id}`}
+                          >
+                            <span className="font-medium">{maker.makerName}</span>
+                            {maker.makerCode && (
+                              <span className="text-gray-400 ml-2 text-xs">({maker.makerCode})</span>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    )}
                   </div>
                   <div>
                     <label className="text-gray-500 text-xs font-medium mb-1 block">Maker Code</label>
                     <Input
+                      placeholder="Auto-filled from maker selection"
                       value={spareFormData.makerCode || ""}
-                      onChange={(e) => setSpareFormData(prev => ({ ...prev, makerCode: e.target.value }))}
+                      readOnly
+                      className="bg-gray-100 text-gray-600"
                       data-testid="input-new-maker-code"
                     />
                   </div>
