@@ -21,8 +21,7 @@ import {
   Settings,
   Eye,
   Loader2,
-  Download,
-  Activity
+  Download
 } from "lucide-react";
 import { format } from "date-fns";
 import { pdfReportGenerator, fetchReportData, formatDate, formatReportDateRange } from "@/lib/pdfReportGenerator";
@@ -257,34 +256,6 @@ const MaintenanceReports: React.FC<MaintenanceReportsProps> = ({ onBack, globalF
       priority: "low",
       lastGenerated: "1 week ago",
       estimatedTime: "2-3 min"
-    },
-    {
-      id: "equipment-utilization",
-      name: "Equipment Utilization Summary",
-      description: "Running hours analysis showing equipment utilization rates and bands",
-      purpose: "Identify equipment operating patterns and utilization levels",
-      frequency: "Weekly/Monthly",
-      fields: ["Current Hours", "Period Hours", "Avg Daily Hours", "Utilization Band", "Utilization %"],
-      filters: ["Vessel", "Category", "Department", "Date Range"],
-      outputs: ["PDF", "Excel"],
-      icon: Activity,
-      priority: "high",
-      lastGenerated: "Never",
-      estimatedTime: "2-3 min"
-    },
-    {
-      id: "rh-anomaly-detection",
-      name: "Running Hours Anomaly Detection",
-      description: "Detects unusual patterns in running hours: spikes, corrections, and zero changes",
-      purpose: "Identify equipment with abnormal running hour patterns for investigation",
-      frequency: "Weekly/Monthly",
-      fields: ["Component", "Previous RH", "New RH", "Delta", "Anomaly Type", "Severity", "Description"],
-      filters: ["Vessel", "Date Range", "Anomaly Type"],
-      outputs: ["PDF", "Excel"],
-      icon: AlertTriangle,
-      priority: "high",
-      lastGenerated: "Never",
-      estimatedTime: "1-2 min"
     }
   ];
 
@@ -1237,145 +1208,6 @@ const MaintenanceReports: React.FC<MaintenanceReportsProps> = ({ onBack, globalF
         break;
       }
 
-      case 'equipment-utilization': {
-        // Fetch equipment utilization data from API
-        try {
-          const params = new URLSearchParams({ vesselId: effectiveVesselId || '' });
-          
-          // Add date range if available
-          if (categoryFilters.dateRange?.from) {
-            params.append('startDate', categoryFilters.dateRange.from.toISOString().split('T')[0]);
-          }
-          if (categoryFilters.dateRange?.to) {
-            params.append('endDate', categoryFilters.dateRange.to.toISOString().split('T')[0]);
-          }
-          
-          const response = await fetch(`/technical/api/reports/equipment-utilization-summary?${params}`);
-          const result = await response.json();
-          
-          if (!result.success || !result.data) {
-            throw new Error(result.error || 'Failed to fetch equipment utilization data');
-          }
-          
-          const utilizationData = result.data;
-          const summary = result.summary;
-          
-          const columns = [
-            { header: 'S.No', field: 'sNo', width: 15 },
-            { header: 'Code', field: 'componentCode', width: 35 },
-            { header: 'Component Name', field: 'componentName', width: 60 },
-            { header: 'Category', field: 'category', width: 40 },
-            { header: 'Current Hrs', field: 'currentHours', width: 30 },
-            { header: 'Period Hrs', field: 'periodHours', width: 30 },
-            { header: 'Avg Daily', field: 'avgDailyHours', width: 28 },
-            { header: 'Utilization', field: 'utilizationBand', width: 28 },
-            { header: 'Util %', field: 'utilizationPercent', width: 22 }
-          ];
-          
-          const summaryItems = [
-            { label: 'Total Equipment', value: summary.totalEquipment },
-            { label: 'High Utilization', value: summary.highUtilization },
-            { label: 'Normal Utilization', value: summary.normalUtilization },
-            { label: 'Low Utilization', value: summary.lowUtilization },
-            { label: 'Avg Utilization', value: `${summary.avgUtilization}%` }
-          ];
-          
-          if (mode === 'preview') return { title: 'Equipment Utilization Summary', subtitle: `Running hours analysis for ${summary.periodDays} days (${summary.periodStart} to ${summary.periodEnd})`, vessel: vesselName, dateRange: formatReportDateRange(categoryFilters.dateRange?.from, categoryFilters.dateRange?.to), columns, data: utilizationData, summary: summaryItems } as ReportPreviewData;
-
-          pdfReportGenerator.generateReport(
-            { 
-              title: 'Equipment Utilization Summary', 
-              subtitle: `Running hours analysis for ${summary.periodDays} days (${summary.periodStart} to ${summary.periodEnd})`, 
-              vessel: vesselName,
-              dateRange: formatReportDateRange(categoryFilters.dateRange?.from, categoryFilters.dateRange?.to)
-            },
-            columns,
-            utilizationData,
-            summaryItems
-          );
-        } catch (error: any) {
-          toast({
-            title: "Error",
-            description: error.message || "Failed to generate equipment utilization report",
-            variant: "destructive"
-          });
-        }
-        break;
-      }
-
-      case 'rh-anomaly-detection': {
-        // Fetch anomaly detection data from API
-        try {
-          const params = new URLSearchParams({ vesselId: effectiveVesselId || '' });
-          
-          // Add date range if available
-          if (categoryFilters.dateRange?.from) {
-            params.append('startDate', categoryFilters.dateRange.from.toISOString().split('T')[0]);
-          }
-          if (categoryFilters.dateRange?.to) {
-            params.append('endDate', categoryFilters.dateRange.to.toISOString().split('T')[0]);
-          }
-          
-          const response = await fetch(`/technical/api/reports/running-hours-anomaly-detection?${params}`);
-          const result = await response.json();
-          
-          if (result.error) {
-            throw new Error(result.error);
-          }
-          
-          const anomalies = result.anomalies || [];
-          const summary = result.summary || {};
-          
-          const columns = [
-            { header: 'Component Code', field: 'componentCode', width: 35 },
-            { header: 'Component Name', field: 'componentName', width: 55 },
-            { header: 'Category', field: 'category', width: 35 },
-            { header: 'Previous RH', field: 'previousRh', width: 28 },
-            { header: 'New RH', field: 'newRh', width: 25 },
-            { header: 'Delta', field: 'deltaRh', width: 22 },
-            { header: 'Anomaly Type', field: 'anomalyType', width: 35 },
-            { header: 'Severity', field: 'severity', width: 25 },
-            { header: 'Description', field: 'description', width: 70 }
-          ];
-          
-          const summaryItems = [
-            { label: 'Total Anomalies', value: summary.totalAnomalies || 0 },
-            { label: 'Critical', value: summary.criticalCount || 0 },
-            { label: 'Warning', value: summary.warningCount || 0 },
-            { label: 'Info', value: summary.infoCount || 0 },
-            { label: 'Logs Analyzed', value: summary.totalLogsAnalyzed || 0 }
-          ];
-          
-          const formattedData = anomalies.map((a: any, idx: number) => ({
-            ...a,
-            previousRh: Number(a.previousRh).toFixed(1),
-            newRh: Number(a.newRh).toFixed(1),
-            deltaRh: Number(a.deltaRh).toFixed(1)
-          }));
-          
-          if (mode === 'preview') return { title: 'Running Hours Anomaly Detection', subtitle: `Anomalies detected from ${summary.periodStart?.split('T')[0] || 'N/A'} to ${summary.periodEnd?.split('T')[0] || 'N/A'}`, vessel: vesselName, dateRange: formatReportDateRange(categoryFilters.dateRange?.from, categoryFilters.dateRange?.to), columns, data: formattedData, summary: summaryItems } as ReportPreviewData;
-
-          pdfReportGenerator.generateReport(
-            { 
-              title: 'Running Hours Anomaly Detection', 
-              subtitle: `Anomalies detected from ${summary.periodStart?.split('T')[0] || 'N/A'} to ${summary.periodEnd?.split('T')[0] || 'N/A'}`, 
-              vessel: vesselName,
-              dateRange: formatReportDateRange(categoryFilters.dateRange?.from, categoryFilters.dateRange?.to)
-            },
-            columns,
-            formattedData,
-            summaryItems
-          );
-        } catch (error: any) {
-          toast({
-            title: "Error",
-            description: error.message || "Failed to generate anomaly detection report",
-            variant: "destructive"
-          });
-        }
-        break;
-      }
-
       default:
         toast({
           title: "Report Not Available",
@@ -1404,8 +1236,6 @@ const MaintenanceReports: React.FC<MaintenanceReportsProps> = ({ onBack, globalF
       'monthly-summary': '/technical/api/reports/maintenance/monthly-summary/excel',
       'critical-equipment': '/technical/api/reports/critical-equipment-status/excel',
       'workload-distribution': '/technical/api/reports/crew-workload-distribution/excel',
-      'equipment-utilization': '/technical/api/reports/equipment-utilization-summary/excel',
-      'rh-anomaly-detection': '/technical/api/reports/running-hours-anomaly-detection/excel',
     };
 
     const endpoint = reportEndpoints[reportId];
@@ -1420,7 +1250,7 @@ const MaintenanceReports: React.FC<MaintenanceReportsProps> = ({ onBack, globalF
     let requestBody: any = { vesselId: effectiveVesselId };
     
     // Add date range for reports that support it
-    if (reportId === 'monthly-summary' || reportId === 'completed-jobs' || reportId === 'unplanned-jobs' || reportId === 'workload-distribution' || reportId === 'equipment-utilization' || reportId === 'rh-anomaly-detection') {
+    if (reportId === 'monthly-summary' || reportId === 'completed-jobs' || reportId === 'unplanned-jobs' || reportId === 'workload-distribution') {
       // Use category filters date range for completed-jobs, unplanned-jobs, and workload-distribution
       const dateFrom = categoryFilters.dateRange?.from;
       const dateTo = categoryFilters.dateRange?.to;
@@ -1433,7 +1263,7 @@ const MaintenanceReports: React.FC<MaintenanceReportsProps> = ({ onBack, globalF
       }
       
       // Also support startDate/endDate for monthly-summary, unplanned-jobs, workload-distribution, equipment-utilization, and rh-anomaly-detection
-      if (reportId === 'monthly-summary' || reportId === 'unplanned-jobs' || reportId === 'workload-distribution' || reportId === 'equipment-utilization' || reportId === 'rh-anomaly-detection') {
+      if (reportId === 'monthly-summary' || reportId === 'unplanned-jobs' || reportId === 'workload-distribution') {
         let startDate: Date;
         let endDate: Date;
         
