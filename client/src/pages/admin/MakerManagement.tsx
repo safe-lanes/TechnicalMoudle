@@ -174,7 +174,7 @@ export default function MakerManagement({ onBack }: { onBack?: () => void }) {
 
   const handleExport = async () => {
     try {
-      const response = await fetch('/technical/api/fleet/makers/export');
+      const response = await fetch('/technical/api/bulk/makers/export');
       const blob = await response.blob();
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement('a');
