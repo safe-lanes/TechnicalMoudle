@@ -220,7 +220,7 @@ export default function FleetSpareForm({ open, onOpenChange, spare }: FleetSpare
           <div className="space-y-2">
             <Label htmlFor="fleetEquipmentCode" data-testid={m("I4.QL5.5.14.5", "I4.QL5.5.28.5")}>
               <Marker id={m("I4.QL5.5.14.5", "I4.QL5.5.28.5")} />
-              Equipment <span className="text-red-500">*</span>
+              Fleet Equipment Code <span className="text-red-500">*</span>
             </Label>
             <Select
               value={form.watch("fleetEquipmentCode") || ""}

@@ -182,7 +182,7 @@ export default function FleetJobForm({ open, onOpenChange, job }: FleetJobFormPr
           {/* Fleet Equipment */}
           <div className="space-y-2">
             <Label htmlFor="fleetEquipmentCode">
-              Equipment <span className="text-red-500">*</span>
+              Fleet Equipment Code <span className="text-red-500">*</span>
             </Label>
             <Select
               value={form.watch("fleetEquipmentCode") || ""}

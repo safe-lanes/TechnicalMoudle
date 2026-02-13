@@ -300,7 +300,7 @@ export default function FleetSparesManagement({ onBack }: { onBack?: () => void 
               />
             </div>
             <div className="space-y-1">
-              <Label className="text-sm text-[#8798ad]">Equipment *</Label>
+              <Label className="text-sm text-[#8798ad]">Fleet Equipment Code *</Label>
               <Select
                 value={formData.fleetEquipmentCode || ""}
                 onValueChange={(val) => {
@@ -325,9 +325,9 @@ export default function FleetSparesManagement({ onBack }: { onBack?: () => void 
               </Select>
             </div>
             <div className="space-y-1">
-              <Label className="text-sm text-[#8798ad]">Equipment Code</Label>
+              <Label className="text-sm text-[#8798ad]">Equipment Name</Label>
               <div className="text-sm font-medium text-gray-900 bg-gray-50 px-3 py-2 rounded-md border border-gray-200 min-h-[38px] flex items-center" data-testid="field-spare-equipment-code">
-                {formData.fleetEquipmentCode || '-'}
+                {formData.fleetEquipmentName || '-'}
               </div>
             </div>
           </div>
