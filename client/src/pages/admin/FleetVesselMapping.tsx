@@ -1300,7 +1300,7 @@ export default function FleetVesselMapping({ onBack }: { onBack?: () => void }) 
                           </tr>
                         </thead>
                         <tbody>
-                          {fleetSparesData.map((spare) => {
+                          {[...fleetSparesData].sort((a, b) => (a.fleetEquipmentCode || "").localeCompare(b.fleetEquipmentCode || "")).map((spare) => {
                             const isSelected = selectedFleetSpare === spare.partCode;
                             const isMapped = spareMappingsData.some((m) => m.partCode === spare.partCode);
                             return (
@@ -1388,13 +1388,13 @@ export default function FleetVesselMapping({ onBack }: { onBack?: () => void }) 
                       <table className="w-full" data-testid="table-vessel-spares">
                         <thead>
                           <tr className="border-b">
-                            <th className="sticky top-0 bg-gray-50 z-10 text-left px-3 py-2 text-xs font-medium text-gray-500">Fleet Equipment Code</th>
+                            <th className="sticky top-0 bg-gray-50 z-10 text-left px-3 py-2 text-xs font-medium text-gray-500">Component Code</th>
                             <th className="sticky top-0 bg-gray-50 z-10 text-left px-3 py-2 text-xs font-medium text-gray-500">Part Code</th>
                             <th className="sticky top-0 bg-gray-50 z-10 text-left px-3 py-2 text-xs font-medium text-gray-500">Part Name</th>
                           </tr>
                         </thead>
                         <tbody>
-                          {vesselSparesData.map((spare: any) => {
+                          {[...vesselSparesData].sort((a: any, b: any) => (a.componentCode || "").localeCompare(b.componentCode || "")).map((spare: any) => {
                             const isSelected = selectedVesselSpare === String(spare.id);
                             const isLinked = spareLinkedVesselSpareIds.has(String(spare.id));
                             return (
