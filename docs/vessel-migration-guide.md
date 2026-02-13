@@ -1,6 +1,6 @@
 # Vessel Identity Restructure - Migration Guide
 
-> Complete chronological record of every prompt-based task step executed during the vessel identity migration. This migration converted `vessels.id` from TEXT (UUID format) to SERIAL INTEGER, introduced `vessels.vuuid` as the canonical UUID identity, and established DB-level FK constraints across all 31 child tables. This was the first identity restructure and became the proven pattern later followed by the component migration (migrations 0016-0022).
+> Complete chronological record of every prompt-based task step executed during the vessel identity migration. This migration converted `vessels.id` from TEXT (UUID format) to SERIAL INTEGER, introduced `vessels.vuuid` as the canonical UUID identity, established DB-level FK constraints across all 43 child tables (31 original + 12 migrated from `vessel_code`), and eliminated all `vessel_code` columns. This was the first identity restructure and became the proven pattern later followed by the component migration (migrations 0016-0022).
 
 ---
 
@@ -10,7 +10,8 @@
 |--------|-------|
 | `vessels.id` = TEXT PRIMARY KEY (UUID format) | `vessels.id` = INTEGER SERIAL PRIMARY KEY (auto-increment) |
 | No dedicated UUID column | `vessels.vuuid` = TEXT NOT NULL UNIQUE (canonical UUID identity) |
-| No FK constraints on child tables | 31 child tables have DB-level FK constraints to `vessels(vuuid)` |
+| No FK constraints on child tables | 43 child tables have DB-level FK constraints to `vessels(vuuid)` |
+| 12 tables used `vessel_code` with no FK | All `vessel_code` columns renamed to `vessel_id` with FK constraints |
 | Server code used `vessels.id` (TEXT) for lookups | Server code uses `eq(vessels.vuuid, ...)` for all lookups |
 | Frontend used `vessel.id` (TEXT UUID) | Frontend maps `vuuid` to `id` (string) for backward compatibility |
 
@@ -206,7 +207,7 @@
 **Date**: 2026-02-11 ~08:37  
 **Migration**: `0014_auto_2026-02-11T08-37-10.sql`  
 **Commit**: `e947f98b` — *Update vessel identification to use sequential integers*  
-**Prompt**: *Convert vessels.id from TEXT to INTEGER SERIAL PRIMARY KEY. This is safe because all 31 FK constraints reference vessels(vuuid), not vessels(id). Also set vuuid to NOT NULL.*
+**Prompt**: *Convert vessels.id from TEXT to INTEGER SERIAL PRIMARY KEY. This is safe because all 31 FK constraints (at the time) reference vessels(vuuid), not vessels(id). Also set vuuid to NOT NULL.*
 
 **What was done**:
 1. Updated `shared/schema.ts` — changed `id` from `text("id")` to `serial("id").primaryKey()`
@@ -214,7 +215,7 @@
 3. Generated migration `0014`:
    ```sql
    -- Phase 4: Convert vessels.id from TEXT to INTEGER auto-increment
-   -- Safe because: All 31 FK constraints reference vessels(vuuid), NOT vessels(id)
+   -- Safe because: All 31 FK constraints (at the time) reference vessels(vuuid), NOT vessels(id)
    -- All server/frontend code uses vessels.vuuid for UUID lookups (Phase 3 complete)
 
    -- Step 1: Drop primary key constraint on old TEXT id column
@@ -250,89 +251,85 @@
 ### Task 10: Create Vessel Migration Guide Document
 **Date**: 2026-02-11 ~09:28  
 **Commit**: `d5663b42` — *Create guide for future vessel migration documentation*  
-**Prompt**: *Create a reference document for anyone writing future database migrations involving the vessels table or any of the 31 child tables.*
+**Prompt**: *Create a reference document for anyone writing future database migrations involving the vessels table or any of its child tables (31 at the time, now 43 after Task 11).*
 
 **What was done**: Created `docs/vessel-migration-guide.md` with table structure, FK relationships, rules for future migrations, server/frontend code patterns, and migration history.
 
 ---
 
-## Complete FK Constraint Summary
-
-All 31 child tables' `vessel_id` columns reference `vessels(vuuid)` with ON DELETE NO ACTION, ON UPDATE NO ACTION.
-
-| #  | Child Table                        | Migration | Constraint Name                                              |
-|----|------------------------------------|-----------|--------------------------------------------------------------|
-| 1  | defect_sequences                   | 0009      | defect_sequences_vessel_id_vessels_vuuid_fk                  |
-| 2  | users                              | 0009      | users_vessel_id_vessels_vuuid_fk                             |
-| 3  | running_hours_audit                | 0010      | running_hours_audit_vessel_id_vessels_vuuid_fk               |
-| 4  | change_request                     | 0011      | change_request_vessel_id_vessels_vuuid_fk                    |
-| 5  | components                         | 0011      | components_vessel_id_vessels_vuuid_fk                        |
-| 6  | ihm_items                          | 0011      | ihm_items_vessel_id_vessels_vuuid_fk                         |
-| 7  | ihm_maintenance_log                | 0011      | ihm_maintenance_log_vessel_id_vessels_vuuid_fk               |
-| 8  | spares                             | 0011      | spares_vessel_id_vessels_vuuid_fk                            |
-| 9  | spares_history                     | 0011      | spares_history_vessel_id_vessels_vuuid_fk                    |
-| 10 | stores_items                       | 0011      | stores_items_vessel_id_vessels_vuuid_fk                      |
-| 11 | stores_ledger                      | 0011      | stores_ledger_vessel_id_vessels_vuuid_fk                     |
-| 12 | alert_config                       | 0012      | alert_config_vessel_id_vessels_vuuid_fk                      |
-| 13 | alert_events                       | 0012      | alert_events_vessel_id_vessels_vuuid_fk                      |
-| 14 | certificates                       | 0012      | certificates_vessel_id_vessels_vuuid_fk                      |
-| 15 | defects                            | 0012      | defects_vessel_id_vessels_vuuid_fk                           |
-| 16 | import_history                     | 0012      | import_history_vessel_id_vessels_vuuid_fk                    |
-| 17 | jobs                               | 0012      | jobs_vessel_id_vessels_vuuid_fk                              |
-| 18 | pms_vessel_settings                | 0012      | pms_vessel_settings_vessel_id_vessels_vuuid_fk               |
-| 19 | surveys                            | 0012      | surveys_vessel_id_vessels_vuuid_fk                           |
-| 20 | work_order_execution_details       | 0012      | work_order_execution_details_vessel_id_vessels_vuuid_fk      |
-| 21 | work_order_executions              | 0012      | work_order_executions_vessel_id_vessels_vuuid_fk             |
-| 22 | work_orders                        | 0012      | work_orders_vessel_id_vessels_vuuid_fk                       |
-| 23 | inventory_transactions             | 0013      | inventory_transactions_vessel_id_vessels_vuuid_fk            |
-| 24 | job_component_links                | 0013      | job_component_links_vessel_id_vessels_vuuid_fk               |
-| 25 | locations                          | 0013      | locations_vessel_id_vessels_vuuid_fk                         |
-| 26 | spare_component_links              | 0013      | spare_component_links_vessel_id_vessels_vuuid_fk             |
-| 27 | spare_location_stock               | 0013      | spare_location_stock_vessel_id_vessels_vuuid_fk              |
-| 28 | vessel_certificate_applicability   | 0013      | vessel_certificate_applicability_vessel_id_vessels_vuuid_fk  |
-| 29 | vessel_certificate_data            | 0013      | vessel_certificate_data_vessel_id_vessels_vuuid_fk           |
-| 30 | vessel_survey_applicability        | 0013      | vessel_survey_applicability_vessel_id_vessels_vuuid_fk       |
-| 31 | vessel_survey_data                 | 0013      | vessel_survey_data_vessel_id_vessels_vuuid_fk                |
-
----
-
-## Completed: `vessel_code` → `vessel_id` FK Migration (Task 11)
-
+### Task 11: Rename `vessel_code` → `vessel_id` and Add FK Constraints (12 Tables)
 **Date**: 2026-02-13  
 **Migration**: `0024_superb_oracle.sql`  
 **Prompt**: *Rename `vessel_code` to `vessel_id` in 12 tables, add FK constraints to `vessels(vuuid)`, remove redundant `vessel_code` from components, and refactor all server/frontend code.*
 
-### What Was Done
+**Background**: 12 tables previously linked to vessels through a `vessel_code` column with no FK constraint. The `vessel_code` column stored the same UUID value as `vessels.vuuid`, but without any database-level protection. Renaming to `vessel_id` first was the foundational step that unified the column naming convention across all vessel-linked tables, making FK constraint addition straightforward and consistent with the 31 child tables already constrained by migrations 0009-0013.
 
-12 tables previously linked to vessels through a `vessel_code` column with no FK constraint. This migration:
+**What was done**:
 
 1. **Renamed `vessel_code` → `vessel_id`** in all 12 tables (preserving existing data)
 2. **Added FK constraints** on `vessel_id` referencing `vessels(vuuid)` with ON DELETE NO ACTION, ON UPDATE NO ACTION
 3. **Recreated indexes** with new column name (`idx_*_vessel_id`)
 4. **Recreated unique constraints** with new column name for fleet mapping tables
-5. **Removed redundant `vessel_code`** from `components` table (already had `vessel_id` with FK)
+5. **Removed redundant `vessel_code`** from `components` table (already had `vessel_id` with FK from migration 0011)
 6. **Refactored all server code** (~18 files): replaced `vesselCode`/`vessel_code` with `vesselId`/`vessel_id`
 7. **Refactored all frontend code** (~12 files): replaced `vesselCode`/`vessel_code` with `vesselId`/`vessel_id`
 8. **Updated V2 schemas** (`shared/v2/components/schema.ts`, `shared/v2/running-hours/schema.ts`)
 
-### Tables Migrated
+**Tables migrated**: audit_log, bulk_import_history, component_class_regulatory, component_documents, component_maintenance_history, component_requisitions, component_running_hours_log, fleet_component_mapping, fleet_job_vessel_mapping, fleet_spare_vessel_mapping, fleet_vessel_mapping, master_data
 
-| #  | Table                          | Nullable | FK Constraint Name |
-|----|--------------------------------|:---:|--------------------------------------------------------------|
-| 1  | `audit_log`                    | YES | `audit_log_vessel_id_vessels_vuuid_fk` |
-| 2  | `bulk_import_history`          | YES | `bulk_import_history_vessel_id_vessels_vuuid_fk` |
-| 3  | `component_class_regulatory`   | NO  | `component_class_regulatory_vessel_id_vessels_vuuid_fk` |
-| 4  | `component_documents`          | NO  | `component_documents_vessel_id_vessels_vuuid_fk` |
-| 5  | `component_maintenance_history`| NO  | `component_maintenance_history_vessel_id_vessels_vuuid_fk` |
-| 6  | `component_requisitions`       | NO  | `component_requisitions_vessel_id_vessels_vuuid_fk` |
-| 7  | `component_running_hours_log`  | NO  | `component_running_hours_log_vessel_id_vessels_vuuid_fk` |
-| 8  | `fleet_component_mapping`      | NO  | `fleet_component_mapping_vessel_id_vessels_vuuid_fk` |
-| 9  | `fleet_job_vessel_mapping`     | NO  | `fleet_job_vessel_mapping_vessel_id_vessels_vuuid_fk` |
-| 10 | `fleet_spare_vessel_mapping`   | NO  | `fleet_spare_vessel_mapping_vessel_id_vessels_vuuid_fk` |
-| 11 | `fleet_vessel_mapping`         | NO  | `fleet_vessel_mapping_vessel_id_vessels_vuuid_fk` |
-| 12 | `master_data`                  | YES | `master_data_vessel_id_vessels_vuuid_fk` |
+**Result**: All 43 vessel-linked tables now use `vessel_id` with proper FK constraints to `vessels(vuuid)`. No `vessel_code` columns remain in the database.
 
-**Result**: All vessel-linked tables now use `vessel_id` with proper FK constraints to `vessels(vuuid)`. The total number of tables with vessel FK constraints is now **43** (31 original + 12 newly constrained). No `vessel_code` columns remain in the database.
+---
+
+## Complete FK Constraint Summary (All 43 Tables)
+
+All 43 child tables' `vessel_id` columns reference `vessels(vuuid)` with ON DELETE NO ACTION, ON UPDATE NO ACTION.
+
+| #  | Child Table                        | Migration | Constraint Name                                              |
+|----|------------------------------------|-----------|--------------------------------------------------------------|
+| 1  | alert_config                       | 0012      | alert_config_vessel_id_vessels_vuuid_fk                      |
+| 2  | alert_events                       | 0012      | alert_events_vessel_id_vessels_vuuid_fk                      |
+| 3  | audit_log                          | 0024      | audit_log_vessel_id_vessels_vuuid_fk                         |
+| 4  | bulk_import_history                | 0024      | bulk_import_history_vessel_id_vessels_vuuid_fk               |
+| 5  | certificates                       | 0012      | certificates_vessel_id_vessels_vuuid_fk                      |
+| 6  | change_request                     | 0011      | change_request_vessel_id_vessels_vuuid_fk                    |
+| 7  | component_class_regulatory         | 0024      | component_class_regulatory_vessel_id_vessels_vuuid_fk        |
+| 8  | component_documents                | 0024      | component_documents_vessel_id_vessels_vuuid_fk               |
+| 9  | component_maintenance_history      | 0024      | component_maintenance_history_vessel_id_vessels_vuuid_fk     |
+| 10 | component_requisitions             | 0024      | component_requisitions_vessel_id_vessels_vuuid_fk            |
+| 11 | component_running_hours_log        | 0024      | component_running_hours_log_vessel_id_vessels_vuuid_fk       |
+| 12 | components                         | 0011      | components_vessel_id_vessels_vuuid_fk                        |
+| 13 | defect_sequences                   | 0009      | defect_sequences_vessel_id_vessels_vuuid_fk                  |
+| 14 | defects                            | 0012      | defects_vessel_id_vessels_vuuid_fk                           |
+| 15 | fleet_component_mapping            | 0024      | fleet_component_mapping_vessel_id_vessels_vuuid_fk           |
+| 16 | fleet_job_vessel_mapping           | 0024      | fleet_job_vessel_mapping_vessel_id_vessels_vuuid_fk          |
+| 17 | fleet_spare_vessel_mapping         | 0024      | fleet_spare_vessel_mapping_vessel_id_vessels_vuuid_fk        |
+| 18 | fleet_vessel_mapping               | 0024      | fleet_vessel_mapping_vessel_id_vessels_vuuid_fk              |
+| 19 | ihm_items                          | 0011      | ihm_items_vessel_id_vessels_vuuid_fk                         |
+| 20 | ihm_maintenance_log                | 0011      | ihm_maintenance_log_vessel_id_vessels_vuuid_fk               |
+| 21 | import_history                     | 0012      | import_history_vessel_id_vessels_vuuid_fk                    |
+| 22 | inventory_transactions             | 0013      | inventory_transactions_vessel_id_vessels_vuuid_fk            |
+| 23 | job_component_links                | 0013      | job_component_links_vessel_id_vessels_vuuid_fk               |
+| 24 | jobs                               | 0012      | jobs_vessel_id_vessels_vuuid_fk                              |
+| 25 | locations                          | 0013      | locations_vessel_id_vessels_vuuid_fk                         |
+| 26 | master_data                        | 0024      | master_data_vessel_id_vessels_vuuid_fk                       |
+| 27 | pms_vessel_settings                | 0012      | pms_vessel_settings_vessel_id_vessels_vuuid_fk               |
+| 28 | running_hours_audit                | 0010      | running_hours_audit_vessel_id_vessels_vuuid_fk               |
+| 29 | spare_component_links              | 0013      | spare_component_links_vessel_id_vessels_vuuid_fk             |
+| 30 | spare_location_stock               | 0013      | spare_location_stock_vessel_id_vessels_vuuid_fk              |
+| 31 | spares                             | 0011      | spares_vessel_id_vessels_vuuid_fk                            |
+| 32 | spares_history                     | 0011      | spares_history_vessel_id_vessels_vuuid_fk                    |
+| 33 | stores_items                       | 0011      | stores_items_vessel_id_vessels_vuuid_fk                      |
+| 34 | stores_ledger                      | 0011      | stores_ledger_vessel_id_vessels_vuuid_fk                     |
+| 35 | surveys                            | 0012      | surveys_vessel_id_vessels_vuuid_fk                           |
+| 36 | users                              | 0009      | users_vessel_id_vessels_vuuid_fk                             |
+| 37 | vessel_certificate_applicability   | 0013      | vessel_certificate_applicability_vessel_id_vessels_vuuid_fk  |
+| 38 | vessel_certificate_data            | 0013      | vessel_certificate_data_vessel_id_vessels_vuuid_fk           |
+| 39 | vessel_survey_applicability        | 0013      | vessel_survey_applicability_vessel_id_vessels_vuuid_fk       |
+| 40 | vessel_survey_data                 | 0013      | vessel_survey_data_vessel_id_vessels_vuuid_fk                |
+| 41 | work_order_execution_details       | 0012      | work_order_execution_details_vessel_id_vessels_vuuid_fk      |
+| 42 | work_order_executions              | 0012      | work_order_executions_vessel_id_vessels_vuuid_fk             |
+| 43 | work_orders                        | 0012      | work_orders_vessel_id_vessels_vuuid_fk                       |
 
 ---
 
@@ -356,7 +353,7 @@ All 31 child tables' `vessel_id` columns reference `vessels(vuuid)` with ON DELE
 ### Key Identity Rules
 
 - **`id` (INTEGER SERIAL)**: Auto-generated internal identifier. Never set manually. Never referenced by any child table.
-- **`vuuid` (TEXT UNIQUE)**: The canonical UUID identity. All 31 child tables reference this column via their `vessel_id` foreign key. This is the **only** value used throughout server code and frontend for vessel identification.
+- **`vuuid` (TEXT UNIQUE)**: The canonical UUID identity. All 43 child tables reference this column via their `vessel_id` foreign key. This is the **only** value used throughout server code and frontend for vessel identification.
 - **`code` (TEXT)**: A separate business identifier. Currently happens to contain the same UUID as `vuuid`, but **must never be used for vessel identity, lookups, or relational logic**. Only `vuuid` serves that purpose.
 
 ---
@@ -367,7 +364,7 @@ All 31 child tables' `vessel_id` columns reference `vessels(vuuid)` with ON DELE
 The `vessels.id` column is now `INTEGER SERIAL PRIMARY KEY`. Do not change it back to TEXT, UUID, or any other type. Changing primary key column types generates destructive ALTER TABLE statements that break existing data.
 
 ### 2. Never Change the `vuuid` Column Type
-The `vessels.vuuid` column is `TEXT NOT NULL UNIQUE`. All 31 child tables depend on it via foreign keys. Changing its type would require simultaneously migrating all 31 child tables.
+The `vessels.vuuid` column is `TEXT NOT NULL UNIQUE`. All 43 child tables depend on it via foreign keys. Changing its type would require simultaneously migrating all 43 child tables.
 
 ### 3. Never Use `vessels.code` in Application Logic
 The `vessels.code` column currently happens to contain the same UUID as `vessels.vuuid`, but this is coincidental. **`vessels.code` must never be used for vessel identification, lookups, filtering, or relational joins.** Always use `vessels.vuuid` as the sole canonical vessel identity column. Any existing code that references `vessels.code` for vessel identity purposes must be refactored to use `vessels.vuuid`.
@@ -497,7 +494,7 @@ This vessel migration established the proven pattern later followed by the compo
 | Step | Vessel Migration | Component Migration |
 |------|-----------------|---------------------|
 | Add UUID column | `vuuid` added in 0008 | `cuuid` added in 0016 |
-| FK constraints to UUID | 31 child tables in 0009-0013 | 15 child tables in 0018-0021 |
+| FK constraints to UUID | 43 child tables in 0009-0013 + 0024 | 15 child tables in 0018-0021 |
 | Server code refactor | All queries to `eq(vessels.vuuid, ...)` | All queries to `eq(components.cuuid, ...)` |
 | Convert id to SERIAL | Migration 0014 | Migration 0022 |
 | FK policy | ON DELETE NO ACTION, ON UPDATE NO ACTION | ON DELETE RESTRICT, ON UPDATE CASCADE |
