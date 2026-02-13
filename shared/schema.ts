@@ -815,7 +815,7 @@ export type AlertConfig = typeof alertConfig.$inferSelect;
 // Jobs Table - Templates/Blueprints for maintenance jobs linked to components
 // NOTE: componentId/componentCode/componentName are DEPRECATED - use jobComponentLinks table for many-to-many relationships
 export const jobs = pgTable("jobs", {
-  id: text("id").primaryKey(),
+  id: serial("id").primaryKey(),
   juuid: text("juuid").notNull().unique(),
   vesselId: text("vessel_id").references(() => vessels.vuuid),
   componentId: text("component_id").notNull().references(() => components.cuuid, { onDelete: "restrict", onUpdate: "cascade" }),

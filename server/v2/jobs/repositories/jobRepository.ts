@@ -4,8 +4,6 @@ import { v2WorkOrders } from '@shared/v2/work-orders/schema';
 import type { Job, InsertJob, JobComponentLink } from '@shared/v2/jobs/schema';
 import type { WorkOrder } from '@shared/v2/work-orders/schema';
 import { eq, and, sql, inArray, like, desc, asc } from 'drizzle-orm';
-import { v4 as uuidv4 } from 'uuid';
-
 export class JobRepository {
   async findJobs(vesselId?: string, componentId?: string): Promise<Job[]> {
     const db = await getDb();
@@ -29,9 +27,8 @@ export class JobRepository {
 
   async create(data: InsertJob): Promise<Job> {
     const db = await getDb();
-    const id = data.id || uuidv4();
     const juuid = crypto.randomUUID();
-    const [job] = await db.insert(v2Jobs).values({ ...data, id, juuid }).returning();
+    const [job] = await db.insert(v2Jobs).values({ ...data, juuid }).returning();
     return job;
   }
 

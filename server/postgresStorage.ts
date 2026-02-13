@@ -1530,11 +1530,9 @@ export class PostgresStorage {
 
   async createJob(job: InsertJob): Promise<Job> {
     const db = await getDb();
-    const id = `JOB-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
     const juuid = crypto.randomUUID();
     const result = await db.insert(jobs).values({
       ...job,
-      id,
       juuid,
       dataScope: job.dataScope || 'vessel',
     }).returning();
@@ -1564,11 +1562,9 @@ export class PostgresStorage {
     const results: Job[] = [];
     
     for (const job of jobList) {
-      const id = `JOB-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
       const juuid = crypto.randomUUID();
       const result = await db.insert(jobs).values({
         ...job,
-        id,
         juuid,
         dataScope: job.dataScope || 'vessel',
       }).returning();
@@ -1609,11 +1605,9 @@ export class PostgresStorage {
           .where(eq(jobs.juuid, existing.juuid));
         updated++;
       } else {
-        const id = `JOB-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
         const juuid = crypto.randomUUID();
         await db.insert(jobs).values({
           ...job,
-          id,
           juuid,
           dataScope: job.dataScope || 'vessel',
         });
@@ -1667,11 +1661,9 @@ export class PostgresStorage {
 
   async createFleetJob(job: InsertJob): Promise<Job> {
     const db = await getDb();
-    const id = `FJ-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
     const juuid = crypto.randomUUID();
     const result = await db.insert(jobs).values({
       ...job,
-      id,
       juuid,
       dataScope: 'fleet',
     }).returning();

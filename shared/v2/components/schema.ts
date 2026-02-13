@@ -230,7 +230,7 @@ export type InsertComponentRequisition = z.infer<typeof insertComponentRequisiti
 export type ComponentRequisition = typeof v2ComponentRequisitions.$inferSelect;
 
 export const v2Jobs = pgTable("jobs", {
-  id: text("id").primaryKey(),
+  id: serial("id").primaryKey(),
   juuid: text("juuid").notNull().unique(),
   vesselId: text("vessel_id"),
   componentId: text("component_id").notNull().references(() => v2Components.cuuid, { onDelete: "restrict", onUpdate: "cascade" }),
