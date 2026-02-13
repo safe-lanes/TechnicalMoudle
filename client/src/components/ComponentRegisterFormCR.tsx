@@ -91,7 +91,7 @@ interface ComponentData {
   avgDailyUsage: string;
   fleetEquipmentCode: string;
   fleetEquipmentName: string;
-  vesselCode: string;
+  vesselId: string;
   isActive: string;
   workOrders: WorkOrder[];
   spares: Spare[];
@@ -201,7 +201,7 @@ const generateMockComponentData = (component: ComponentNode): ComponentData => {
     runningHours: String(Math.floor(Math.random() * 50000) + 10000),
     fleetEquipmentCode: `FLEET-${component.code.split(".")[0]}`,
     fleetEquipmentName: isEngine ? "Main Propulsion System" : isDeck ? "Cargo Handling System" : "Ship Structure",
-    vesselCode: "V001",
+    vesselId: "V001",
     isActive: "Yes",
     utilizationRate: `${Math.floor(Math.random() * 30) + 70}%`,
     avgDailyUsage: `${Math.floor(Math.random() * 8) + 16} hrs`,
@@ -1004,11 +1004,11 @@ export default function ComponentRegisterFormCR({
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label className={getLabelClass('A.vesselCode')}>Vessel Code</Label>
+                    <Label className={getLabelClass('A.vesselId')}>Vessel Code</Label>
                     <Input 
-                      value={componentData.vesselCode}
-                      onChange={(e) => handleInputChange('vesselCode', e.target.value, 'A')}
-                      className={getFieldClass('A.vesselCode', "border-[#52baf3] border-2")}
+                      value={componentData.vesselId}
+                      onChange={(e) => handleInputChange('vesselId', e.target.value, 'A')}
+                      className={getFieldClass('A.vesselId', "border-[#52baf3] border-2")}
                     />
                   </div>
                 </div>

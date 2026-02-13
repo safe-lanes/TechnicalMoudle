@@ -804,7 +804,7 @@ async function generateFleetMasterTemplate(): Promise<Buffer> {
     { header: 'Equipment / System Department', key: 'equipmentDepartment', width: 28 },
     { header: 'Class item', key: 'classItem', width: 12 },
     { header: 'IS Active', key: 'isActive', width: 12 },
-    { header: 'Vessel Code', key: 'vesselCode', width: 12 },
+    { header: 'Vessel Code', key: 'vesselId', width: 12 },
     { header: 'IS Parent', key: 'isParent', width: 12 },
     { header: 'Notes', key: 'notes', width: 40 },
     { header: 'RH Counter Type', key: 'rhCounterType', width: 18 },
@@ -870,7 +870,7 @@ async function generateFleetMasterTemplate(): Promise<Buffer> {
     { header: 'Estimated Hours', key: 'estimatedHours', width: 15 },
     { header: 'Spare Parts Required', key: 'sparePartsRequired', width: 30 },
     { header: 'IS Active', key: 'isActive', width: 12 },
-    { header: 'Vessel Code', key: 'vesselCode', width: 12 },
+    { header: 'Vessel Code', key: 'vesselId', width: 12 },
     { header: 'Maker Code', key: 'makerCode', width: 15 },
     { header: 'Class Survey Code', key: 'classSurveyCode', width: 18 }
   ];
@@ -1438,7 +1438,7 @@ async function generateJobsTemplate(vesselId: string): Promise<Buffer> {
     { header: 'Department', key: 'department', width: 20 },
     { header: 'Criticality', key: 'criticality', width: 15 },
     { header: 'Is Active', key: 'isActive', width: 12 },
-    { header: 'Vessel Code', key: 'vesselCode', width: 15 },
+    { header: 'Vessel Code', key: 'vesselId', width: 15 },
     // Part A fields - Work Order Form fields
     // Required Spare Parts format: "PartCode1:Qty1, PartCode2:Qty2" or "PartCode1:Qty1; PartCode2:Qty2" (e.g., "PC-001:2, PC-002:1, PC-003:4")
     { header: 'Required Spare Parts', key: 'requiredSpareParts', width: 40 },
@@ -1470,7 +1470,7 @@ async function generateJobsTemplate(vesselId: string): Promise<Buffer> {
       department: '',
       criticality: '',
       isActive: 'Yes',
-      vesselCode: vesselId,
+      vesselId: vesselId,
       // Part A fields - empty by default, users fill with semicolon-separated lists
       requiredSpareParts: '',
       requiredTools: '',
@@ -3287,11 +3287,11 @@ async function validateData(type: string, data: any[], mode: string, vesselId?: 
         normalized['Component Code'] = componentCode;
         
         // Validate that Component Code exists in the vessel
-        const vesselCode = row['Vessel Code'] ? String(row['Vessel Code']).trim() : null;
-        if (vesselCode) {
-          const component = await storage.getComponentByCode(componentCode, vesselCode);
+        const vesselIdFromRow = row['Vessel Code'] ? String(row['Vessel Code']).trim() : null;
+        if (vesselIdFromRow) {
+          const component = await storage.getComponentByCode(componentCode, vesselIdFromRow);
           if (!component) {
-            errors.push(`Row ${rowNum}: Component Code '${componentCode}' not found in vessel '${vesselCode}'. Job cannot be linked.`);
+            errors.push(`Row ${rowNum}: Component Code '${componentCode}' not found in vessel '${vesselIdFromRow}'. Job cannot be linked.`);
           }
         }
       }
@@ -4601,7 +4601,7 @@ async function performImport(
     // Step 2: Process each row individually with authoritative state capture
     for (const row of data) {
       const componentCode = String(row['Component Code']).trim();
-      const vesselCodeFromExcel = String(row['Vessel Code']).trim();
+      const vesselIdFromExcel = String(row['Vessel Code']).trim();
       
       // Resolve actual component from prefetched map
       const component = componentsByCode.get(componentCode);
@@ -4612,8 +4612,7 @@ async function performImport(
       }
       
       // Use canonical vesselId from request parameter (FK reference)
-      // vesselCode is for display/tracking only
-      const canonicalVesselId = vesselId || vesselCodeFromExcel;
+      const canonicalVesselId = vesselId || vesselIdFromExcel;
       
       // Map Excel columns to job schema fields (21-column specification)
       // Normalize Last Done date from Excel (handles various formats including Excel serials)
@@ -4781,7 +4780,6 @@ async function performImport(
       
       const jobData: any = {
         vesselId: canonicalVesselId,        // FK reference to vessel
-        vesselCode: vesselCodeFromExcel,    // Display/tracking field from Excel
         fleetEquipmentCode: row['Fleet Equipment Code'] || null,
         fleetEquipmentName: row['Fleet Equipment Name'] || null,
         jobTitle: row['WO Title'],          // Job title from WO Title column
@@ -5092,7 +5090,6 @@ async function createComponentFromRow(row: any, vesselId?: string) {
     // Use Parent Component Code (auto-calculated from SFI)
     parentId: row['Parent Component Code'] ? String(row['Parent Component Code']).trim() : null,
     vesselId: vesselId || row['Vessel Code'] || 'V001',  // Vessel FK/reference (fallback to Vessel Code from Excel)
-    vesselCode: row['Vessel Code'] || null,  // CRITICAL: Vessel identification code for tracking/display
     // Fleet Equipment fields
     fleetEquipmentCode: row['Fleet Equipment Code'] || null,
     fleetEquipmentName: row['Fleet Equipment Name'] || null,
@@ -5279,10 +5276,9 @@ async function updateComponentFromRow(componentCode: string, row: any, vesselId?
   if (rhCounterSource) updateData.rhCounterSource = rhCounterSource;
   // Last Updated
   if (row['Last Updated']) updateData.lastUpdated = normalizeDateToDDMMMYYYY(row['Last Updated']);
-  // Vessel Code - CRITICAL: Update BOTH vesselId and vesselCode for consistency
+  // Vessel Code - Update vesselId for consistency
   if (row['Vessel Code']) {
     updateData.vesselId = row['Vessel Code'];  // FK/reference
-    updateData.vesselCode = row['Vessel Code'];  // Display value
   }
 
   // Use existing component if provided (from map), otherwise look up

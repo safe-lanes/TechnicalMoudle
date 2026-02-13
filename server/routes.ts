@@ -205,7 +205,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         
         // Vessel identification
         'Vessel ID': 'vesselId',
-        'Vessel Code': 'vesselCode',
+        'Vessel Code': 'vesselId',
         
         // Fleet equipment fields
         'Fleet Equipment Code': 'fleetEquipmentCode',
@@ -380,7 +380,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           });
           continue;
         }
-        if (!component.vesselCode) {
+        if (!component.vesselId) {
           errors.push({
             row: rowNum,
             field: 'Vessel Code',
@@ -1518,11 +1518,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // For Ship users, enforce vessel scoping
       if (req.user!.role === "Ship" && req.user!.vesselId) {
-        if (component.vesselCode !== req.user!.vesselId) {
+        if (component.vesselId !== req.user!.vesselId) {
           return res.status(403).json({ 
             error: "Cannot access documents for components from other vessels",
             assignedVessel: req.user!.vesselId,
-            requestedVessel: component.vesselCode
+            requestedVessel: component.vesselId
           });
         }
       }
@@ -1576,12 +1576,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
       
-      // Verify vesselCode matches component
-      if (component.vesselCode !== req.body.vesselCode) {
+      // Verify vesselId matches component
+      if (component.vesselId !== req.body.vesselId) {
         return res.status(400).json({ 
-          error: "vesselCode mismatch - does not match component's vessel",
-          componentVessel: component.vesselCode,
-          providedVessel: req.body.vesselCode
+          error: "vesselId mismatch - does not match component's vessel",
+          componentVessel: component.vesselId,
+          providedVessel: req.body.vesselId
         });
       }
       
@@ -1621,7 +1621,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const coercedBody = {
         componentId: component.cuuid, // Use validated component cuuid for child table FK
         componentCode: component.componentCode, // Use validated component data
-        vesselCode: component.vesselCode, // Use validated component data
+        vesselId: component.vesselId, // Use validated component data
         fleetEquipmentCode: req.body.fleetEquipmentCode || null,
         fileName: req.body.fileName,
         fileType: req.body.fileType,
@@ -1746,7 +1746,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Now safely access document properties after existence verified
       // Verify vessel access for Ship users
       if (req.user!.role === "Ship" && req.user!.vesselId) {
-        if (req.user!.vesselId !== document.vesselCode) {
+        if (req.user!.vesselId !== document.vesselId) {
           return res.status(403).json({ error: "Cannot access documents from other vessels" });
         }
       }
@@ -1802,11 +1802,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // For Ship users, enforce vessel scoping (read-only access)
       if (req.user!.role === "Ship" && req.user!.vesselId) {
-        if (component.vesselCode !== req.user!.vesselId) {
+        if (component.vesselId !== req.user!.vesselId) {
           return res.status(403).json({ 
             error: "Cannot access classification data for components from other vessels",
             assignedVessel: req.user!.vesselId,
-            requestedVessel: component.vesselCode
+            requestedVessel: component.vesselId
           });
         }
       }
@@ -1881,11 +1881,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // For Ship users, enforce vessel scoping
       if (req.user!.role === "Ship" && req.user!.vesselId) {
-        if (component.vesselCode !== req.user!.vesselId) {
+        if (component.vesselId !== req.user!.vesselId) {
           return res.status(403).json({ 
             error: "Cannot access requisitions for components from other vessels",
             assignedVessel: req.user!.vesselId,
-            requestedVessel: component.vesselCode
+            requestedVessel: component.vesselId
           });
         }
       }
@@ -1906,7 +1906,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             priority: "Normal",
             status: "PO Raised",
             requestedBy: "Chief Engineer",
-            vesselCode: component.vesselCode
+            vesselId: component.vesselId
           },
           {
             id: 1002,
@@ -1919,7 +1919,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             priority: "Urgent",
             status: "Delivered On Board",
             requestedBy: "2nd Engineer",
-            vesselCode: component.vesselCode
+            vesselId: component.vesselId
           }
         ];
       }
@@ -1934,14 +1934,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Get all requisitions (optionally filtered by vessel, with vessel scoping for Ship users)
   app.get("/technical/api/component-requisitions", requireAuth, async (req: AuthenticatedRequest, res) => {
     try {
-      let vesselCode = req.query.vesselCode as string | undefined;
+      let vesselId = req.query.vesselId as string | undefined;
       
       // For Ship users, enforce vessel scoping
       if (req.user!.role === "Ship" && req.user!.vesselId) {
-        vesselCode = req.user!.vesselId;
+        vesselId = req.user!.vesselId;
       }
       
-      const requisitions = await storage.getAllComponentRequisitions(vesselCode);
+      const requisitions = await storage.getAllComponentRequisitions(vesselId);
       res.json(requisitions);
     } catch (error) {
       console.error("Failed to get all component requisitions:", error);
@@ -1959,11 +1959,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // For Ship users, enforce vessel scoping
       if (req.user!.role === "Ship" && req.user!.vesselId) {
-        if (item.vesselCode !== req.user!.vesselId) {
+        if (item.vesselId !== req.user!.vesselId) {
           return res.status(403).json({ 
             error: "Cannot access requisitions from other vessels",
             assignedVessel: req.user!.vesselId,
-            requestedVessel: item.vesselCode
+            requestedVessel: item.vesselId
           });
         }
       }
@@ -1980,14 +1980,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       // Ship users can only create requisitions for their assigned vessel
       if (req.user!.role === "Ship" && req.user!.vesselId) {
-        if (req.body.vesselCode && req.body.vesselCode !== req.user!.vesselId) {
+        if (req.body.vesselId && req.body.vesselId !== req.user!.vesselId) {
           return res.status(403).json({ 
             error: "Cannot create requisitions for other vessels",
             assignedVessel: req.user!.vesselId,
-            requestedVessel: req.body.vesselCode
+            requestedVessel: req.body.vesselId
           });
         }
-        req.body.vesselCode = req.user!.vesselId;
+        req.body.vesselId = req.user!.vesselId;
       }
       
       // Validate request body with Zod schema
@@ -2018,11 +2018,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // For Ship users, enforce vessel scoping
       if (req.user!.role === "Ship" && req.user!.vesselId) {
-        if (existing.vesselCode !== req.user!.vesselId) {
+        if (existing.vesselId !== req.user!.vesselId) {
           return res.status(403).json({ 
             error: "Cannot update requisitions from other vessels",
             assignedVessel: req.user!.vesselId,
-            requestedVessel: existing.vesselCode
+            requestedVessel: existing.vesselId
           });
         }
       }
@@ -2030,10 +2030,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Validate with partial schema for updates
       const validatedData = insertComponentRequisitionSchema.partial().parse(req.body);
       
-      // SECURITY: Prevent vesselCode modification - only PMS Admin can reassign vessels
+      // SECURITY: Prevent vesselId modification - only PMS Admin can reassign vessels
       // This prevents Ship users from transferring requisitions to other vessels
       if (req.user!.role !== "PMS Admin") {
-        delete (validatedData as any).vesselCode;
+        delete (validatedData as any).vesselId;
         delete (validatedData as any).componentId;  // Also prevent component reassignment
       }
       
@@ -2082,11 +2082,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // For Ship users, enforce vessel scoping
       if (req.user!.role === "Ship" && req.user!.vesselId) {
-        if (component.vesselCode !== req.user!.vesselId) {
+        if (component.vesselId !== req.user!.vesselId) {
           return res.status(403).json({ 
             error: "Cannot access maintenance history for components from other vessels",
             assignedVessel: req.user!.vesselId,
-            requestedVessel: component.vesselCode
+            requestedVessel: component.vesselId
           });
         }
       }
@@ -2094,12 +2094,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // First try to get history by componentId
       let history = await storage.getComponentMaintenanceHistory(req.params.componentId);
       
-      // If no history found by ID, try fallback by componentCode + vesselCode
+      // If no history found by ID, try fallback by componentCode + vesselId
       // This handles cases where legacy records used different componentId format
-      if (history.length === 0 && component.componentCode && component.vesselCode) {
+      if (history.length === 0 && component.componentCode && component.vesselId) {
         history = await storage.getComponentMaintenanceHistoryByCode(
           component.componentCode,
-          component.vesselCode
+          component.vesselId
         );
       }
       
@@ -2151,11 +2151,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // For Ship users, enforce vessel scoping
       if (req.user!.role === "Ship" && req.user!.vesselId) {
-        if (item.vesselCode !== req.user!.vesselId) {
+        if (item.vesselId !== req.user!.vesselId) {
           return res.status(403).json({ 
             error: "Cannot access maintenance history from other vessels",
             assignedVessel: req.user!.vesselId,
-            requestedVessel: item.vesselCode
+            requestedVessel: item.vesselId
           });
         }
       }
@@ -3199,7 +3199,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
                     const historyPayload = {
                       componentId: component.cuuid,
                       componentCode: freshWorkOrder.componentCode || component.componentCode,
-                      vesselCode: freshWorkOrder.vesselId,
+                      vesselId: freshWorkOrder.vesselId,
                       workOrderId: freshWorkOrder.id,
                       workOrderNo: freshWorkOrder.workOrderNo || `WO-${freshWorkOrder.id}`,
                       jobTitle: freshWorkOrder.jobTitle,
@@ -3894,7 +3894,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           const historyPayload = {
             componentId: component.cuuid,
             componentCode: workOrder.componentCode || component.componentCode,
-            vesselCode: workOrder.vesselId,
+            vesselId: workOrder.vesselId,
             jobId: parentJob?.id || workOrder.jobId || null,
             jobCode: parentJobNo || null,
             workOrderId: workOrder.id,

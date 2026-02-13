@@ -616,7 +616,7 @@ export class PostgresStorage {
       sfiCode: data.sfiCode,
       assignedSubCode: data.assignedSubCode ?? null,
       vesselName: data.vesselName ?? null,
-      vesselCode: data.vesselCode ?? null,
+      vesselId: data.vesselId ?? null,
       equipmentName: data.equipmentName,
       isActive: data.isActive ?? true,
     }).returning();
@@ -1310,11 +1310,11 @@ export class PostgresStorage {
 
   // ============= MODULE 3: COMPONENT MAINTENANCE HISTORY (IMMUTABLE) =============
 
-  async getAllComponentMaintenanceHistory(vesselCode?: string): Promise<ComponentMaintenanceHistory[]> {
+  async getAllComponentMaintenanceHistory(vesselId?: string): Promise<ComponentMaintenanceHistory[]> {
     const db = await getDb();
-    if (vesselCode) {
+    if (vesselId) {
       return await db.select().from(componentMaintenanceHistory)
-        .where(eq(componentMaintenanceHistory.vesselCode, vesselCode))
+        .where(eq(componentMaintenanceHistory.vesselId, vesselId))
         .orderBy(desc(componentMaintenanceHistory.createdAt));
     }
     return await db.select().from(componentMaintenanceHistory)
@@ -1328,12 +1328,12 @@ export class PostgresStorage {
       .orderBy(desc(componentMaintenanceHistory.dateCompleted));
   }
 
-  async getComponentMaintenanceHistoryByCode(componentCode: string, vesselCode: string): Promise<ComponentMaintenanceHistory[]> {
+  async getComponentMaintenanceHistoryByCode(componentCode: string, vesselId: string): Promise<ComponentMaintenanceHistory[]> {
     const db = await getDb();
     return await db.select().from(componentMaintenanceHistory)
       .where(and(
         eq(componentMaintenanceHistory.componentCode, componentCode),
-        eq(componentMaintenanceHistory.vesselCode, vesselCode)
+        eq(componentMaintenanceHistory.vesselId, vesselId)
       ))
       .orderBy(desc(componentMaintenanceHistory.dateCompleted));
   }
@@ -1382,11 +1382,11 @@ export class PostgresStorage {
       .orderBy(desc(componentRequisitions.createdAt));
   }
 
-  async getAllComponentRequisitions(vesselCode?: string): Promise<ComponentRequisition[]> {
+  async getAllComponentRequisitions(vesselId?: string): Promise<ComponentRequisition[]> {
     const db = await getDb();
-    if (vesselCode) {
+    if (vesselId) {
       return await db.select().from(componentRequisitions)
-        .where(eq(componentRequisitions.vesselCode, vesselCode))
+        .where(eq(componentRequisitions.vesselId, vesselId))
         .orderBy(desc(componentRequisitions.createdAt));
     }
     return await db.select().from(componentRequisitions)
@@ -4664,11 +4664,11 @@ export class PostgresStorage {
       .where(eq(fleetVesselMapping.isActive, true));
   }
 
-  async getFleetVesselMappingsByVessel(vesselCode: string): Promise<FleetVesselMapping[]> {
+  async getFleetVesselMappingsByVessel(vesselId: string): Promise<FleetVesselMapping[]> {
     const db = await getDb();
     return await db.select().from(fleetVesselMapping)
       .where(and(
-        eq(fleetVesselMapping.vesselCode, vesselCode),
+        eq(fleetVesselMapping.vesselId, vesselId),
         eq(fleetVesselMapping.isActive, true)
       ));
   }
@@ -4677,7 +4677,7 @@ export class PostgresStorage {
     const db = await getDb();
     const result = await db.insert(fleetVesselMapping).values({
       fleetEquipmentCode: mapping.fleetEquipmentCode,
-      vesselCode: mapping.vesselCode,
+      vesselId: mapping.vesselId,
       vesselName: mapping.vesselName ?? null,
       mappedBy: mapping.mappedBy,
       isActive: mapping.isActive ?? true,
@@ -4685,13 +4685,13 @@ export class PostgresStorage {
     return result[0];
   }
 
-  async removeFleetVesselMappingRecord(fleetEquipmentCode: string, vesselCode: string): Promise<void> {
+  async removeFleetVesselMappingRecord(fleetEquipmentCode: string, vesselId: string): Promise<void> {
     const db = await getDb();
     await db.update(fleetVesselMapping)
       .set({ isActive: false })
       .where(and(
         eq(fleetVesselMapping.fleetEquipmentCode, fleetEquipmentCode),
-        eq(fleetVesselMapping.vesselCode, vesselCode)
+        eq(fleetVesselMapping.vesselId, vesselId)
       ));
   }
 
@@ -4706,11 +4706,11 @@ export class PostgresStorage {
       ));
   }
 
-  async getFleetComponentMappingsByVessel(vesselCode: string): Promise<FleetComponentMapping[]> {
+  async getFleetComponentMappingsByVessel(vesselId: string): Promise<FleetComponentMapping[]> {
     const db = await getDb();
     return await db.select().from(fleetComponentMapping)
       .where(and(
-        eq(fleetComponentMapping.vesselCode, vesselCode),
+        eq(fleetComponentMapping.vesselId, vesselId),
         eq(fleetComponentMapping.isActive, true)
       ));
   }
@@ -4719,7 +4719,7 @@ export class PostgresStorage {
     const db = await getDb();
     const result = await db.insert(fleetComponentMapping).values({
       fleetEquipmentCode: mapping.fleetEquipmentCode,
-      vesselCode: mapping.vesselCode,
+      vesselId: mapping.vesselId,
       componentCode: mapping.componentCode,
       componentId: mapping.componentId ?? null,
       componentName: mapping.componentName ?? null,
@@ -4729,13 +4729,13 @@ export class PostgresStorage {
     return result[0];
   }
 
-  async removeFleetComponentMappingRecord(fleetEquipmentCode: string, vesselCode: string, componentCode: string): Promise<void> {
+  async removeFleetComponentMappingRecord(fleetEquipmentCode: string, vesselId: string, componentCode: string): Promise<void> {
     const db = await getDb();
     await db.update(fleetComponentMapping)
       .set({ isActive: false })
       .where(and(
         eq(fleetComponentMapping.fleetEquipmentCode, fleetEquipmentCode),
-        eq(fleetComponentMapping.vesselCode, vesselCode),
+        eq(fleetComponentMapping.vesselId, vesselId),
         eq(fleetComponentMapping.componentCode, componentCode)
       ));
   }
@@ -4763,7 +4763,7 @@ export class PostgresStorage {
       fleetEquipmentCode: mapping.fleetEquipmentCode,
       jobCode: mapping.jobCode,
       jobId: mapping.jobId ?? null,
-      vesselCode: mapping.vesselCode,
+      vesselId: mapping.vesselId,
       vesselName: mapping.vesselName ?? null,
       mappedBy: mapping.mappedBy,
       isActive: mapping.isActive ?? true,
@@ -4771,13 +4771,13 @@ export class PostgresStorage {
     return result[0];
   }
 
-  async removeFleetJobVesselMappingRecord(jobCode: string, vesselCode: string): Promise<void> {
+  async removeFleetJobVesselMappingRecord(jobCode: string, vesselId: string): Promise<void> {
     const db = await getDb();
     await db.update(fleetJobVesselMapping)
       .set({ isActive: false })
       .where(and(
         eq(fleetJobVesselMapping.jobCode, jobCode),
-        eq(fleetJobVesselMapping.vesselCode, vesselCode)
+        eq(fleetJobVesselMapping.vesselId, vesselId)
       ));
   }
 
@@ -4804,7 +4804,7 @@ export class PostgresStorage {
       fleetEquipmentCode: mapping.fleetEquipmentCode,
       partCode: mapping.partCode,
       spareId: mapping.spareId ?? null,
-      vesselCode: mapping.vesselCode,
+      vesselId: mapping.vesselId,
       vesselName: mapping.vesselName ?? null,
       mappedBy: mapping.mappedBy,
       isActive: mapping.isActive ?? true,
@@ -4812,13 +4812,13 @@ export class PostgresStorage {
     return result[0];
   }
 
-  async removeFleetSpareVesselMappingRecord(partCode: string, vesselCode: string): Promise<void> {
+  async removeFleetSpareVesselMappingRecord(partCode: string, vesselId: string): Promise<void> {
     const db = await getDb();
     await db.update(fleetSpareVesselMapping)
       .set({ isActive: false })
       .where(and(
         eq(fleetSpareVesselMapping.partCode, partCode),
-        eq(fleetSpareVesselMapping.vesselCode, vesselCode)
+        eq(fleetSpareVesselMapping.vesselId, vesselId)
       ));
   }
 
@@ -4918,12 +4918,12 @@ export class PostgresStorage {
 
   // ============= MODULE 16: BULK IMPORT =============
 
-  async getBulkImportHistory(vesselCode?: string, moduleType?: string): Promise<BulkImportHistory[]> {
+  async getBulkImportHistory(vesselId?: string, moduleType?: string): Promise<BulkImportHistory[]> {
     const db = await getDb();
     let conditions: any[] = [];
     
-    if (vesselCode) {
-      conditions.push(eq(bulkImportHistory.vesselCode, vesselCode));
+    if (vesselId) {
+      conditions.push(eq(bulkImportHistory.vesselId, vesselId));
     }
     if (moduleType) {
       conditions.push(eq(bulkImportHistory.moduleType, moduleType));
@@ -4949,7 +4949,7 @@ export class PostgresStorage {
   async createBulkImportHistory(history: InsertBulkImportHistory): Promise<BulkImportHistory> {
     const db = await getDb();
     const result = await db.insert(bulkImportHistory).values({
-      vesselCode: history.vesselCode ?? null,
+      vesselId: history.vesselId ?? null,
       vesselName: history.vesselName ?? null,
       moduleType: history.moduleType,
       sheetName: history.sheetName ?? null,
@@ -5024,7 +5024,7 @@ export class PostgresStorage {
     const db = await getDb();
     const result = await db.insert(auditLog).values({
       userId: data.userId,
-      vesselCode: data.vesselCode ?? null,
+      vesselId: data.vesselId ?? null,
       componentCode: data.componentCode ?? null,
       entityType: data.entityType,
       entityId: data.entityId,
@@ -5039,7 +5039,7 @@ export class PostgresStorage {
   }
 
   async getAuditLogs(filters?: {
-    vesselCode?: string;
+    vesselId?: string;
     componentCode?: string;
     entityType?: string;
     entityId?: string;
@@ -5053,8 +5053,8 @@ export class PostgresStorage {
     let conditions: any[] = [];
     
     if (filters) {
-      if (filters.vesselCode) {
-        conditions.push(eq(auditLog.vesselCode, filters.vesselCode));
+      if (filters.vesselId) {
+        conditions.push(eq(auditLog.vesselId, filters.vesselId));
       }
       if (filters.componentCode) {
         conditions.push(eq(auditLog.componentCode, filters.componentCode));
@@ -5838,7 +5838,7 @@ export class PostgresStorage {
     for (const fleetEntityId of data.fleetEntityIds) {
       const result = await db.insert(fleetVesselMapping).values({
         fleetEquipmentCode: fleetEntityId,
-        vesselCode: data.vesselId,
+        vesselId: data.vesselId,
         vesselComponentCode: data.vesselEntityCode,
         createdBy: data.mappedBy,
       }).returning();
@@ -6176,7 +6176,7 @@ export class PostgresStorage {
 
   async createComponentVesselMapping(data: { 
     fleetEquipmentCode: string; 
-    vesselCode: string; 
+    vesselId: string; 
     vesselName: string; 
     componentCode?: string; 
     componentName?: string;
@@ -6184,7 +6184,7 @@ export class PostgresStorage {
     const db = await getDb();
     const result = await db.insert(fleetComponentMapping).values({
       fleetEquipmentCode: data.fleetEquipmentCode,
-      vesselCode: data.vesselCode,
+      vesselId: data.vesselId,
       vesselComponentCode: data.componentCode,
     }).returning();
     return result[0];

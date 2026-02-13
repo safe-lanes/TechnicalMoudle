@@ -1,6 +1,7 @@
 import { pgTable, text, integer, boolean, timestamp, decimal, index, json, unique, serial } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
+import { vessels } from "../../schema";
 
 export const v2Components = pgTable("components", {
   id: serial("id").primaryKey(),
@@ -25,7 +26,6 @@ export const v2Components = pgTable("components", {
   rating: text("rating"),
   eqptSystemDept: text("eqpt_system_dept"),
   isActive: boolean("is_active").default(true),
-  vesselCode: text("vessel_code"),
   isParent: boolean("is_parent").default(false),
   notes: text("notes"),
   vesselId: text("vessel_id"),
@@ -80,7 +80,7 @@ export const v2ComponentDocuments = pgTable("component_documents", {
   id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
   componentId: text("component_id").notNull().references(() => v2Components.cuuid, { onDelete: "restrict", onUpdate: "cascade" }),
   componentCode: text("component_code").notNull(),
-  vesselCode: text("vessel_code").notNull(),
+  vesselId: text("vessel_id").notNull().references(() => vessels.vuuid),
   fleetEquipmentCode: text("fleet_equipment_code"),
   fileName: text("file_name").notNull(),
   fileKey: text("file_key").notNull(),
@@ -97,7 +97,7 @@ export const v2ComponentDocuments = pgTable("component_documents", {
 }, (table) => ({
   componentIdIdx: index("idx_doc_component_id").on(table.componentId),
   componentCodeIdx: index("idx_doc_component_code").on(table.componentCode),
-  vesselCodeIdx: index("idx_doc_vessel_code").on(table.vesselCode),
+  vesselIdIdx: index("idx_doc_vessel_id").on(table.vesselId),
   fleetEquipmentCodeIdx: index("idx_doc_fleet_equipment_code").on(table.fleetEquipmentCode),
   fileTypeIdx: index("idx_doc_file_type").on(table.fileType),
 }));
@@ -114,7 +114,7 @@ export const v2ComponentClassRegulatory = pgTable("component_class_regulatory", 
   id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
   componentId: text("component_id").notNull().references(() => v2Components.cuuid, { onDelete: "restrict", onUpdate: "cascade" }),
   componentCode: text("component_code").notNull(),
-  vesselCode: text("vessel_code").notNull(),
+  vesselId: text("vessel_id").notNull().references(() => vessels.vuuid),
   classificationSociety: text("classification_society").notNull(),
   surveyType: text("survey_type").notNull(),
   certificateNumber: text("certificate_number"),
@@ -132,7 +132,7 @@ export const v2ComponentClassRegulatory = pgTable("component_class_regulatory", 
 }, (table) => ({
   componentIdIdx: index("idx_class_component_id").on(table.componentId),
   componentCodeIdx: index("idx_class_component_code").on(table.componentCode),
-  vesselCodeIdx: index("idx_class_vessel_code").on(table.vesselCode),
+  vesselIdIdx: index("idx_class_vessel_id").on(table.vesselId),
   surveyTypeIdx: index("idx_class_survey_type").on(table.surveyType),
   expiryDateIdx: index("idx_class_expiry_date").on(table.expiryDate),
 }));
@@ -150,7 +150,7 @@ export const v2ComponentMaintenanceHistory = pgTable("component_maintenance_hist
   id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
   componentId: text("component_id").notNull().references(() => v2Components.cuuid, { onDelete: "restrict", onUpdate: "cascade" }),
   componentCode: text("component_code").notNull(),
-  vesselCode: text("vessel_code").notNull(),
+  vesselId: text("vessel_id").notNull().references(() => vessels.vuuid),
   jobId: text("job_id"),
   jobCode: text("job_code"),
   workOrderId: text("work_order_id").notNull(),
@@ -171,7 +171,7 @@ export const v2ComponentMaintenanceHistory = pgTable("component_maintenance_hist
 }, (table) => ({
   componentIdIdx: index("idx_history_component_id").on(table.componentId),
   componentCodeIdx: index("idx_history_component_code").on(table.componentCode),
-  vesselCodeIdx: index("idx_history_vessel_code").on(table.vesselCode),
+  vesselIdIdx: index("idx_history_vessel_id").on(table.vesselId),
   jobIdIdx: index("idx_history_job_id").on(table.jobId),
   jobCodeIdx: index("idx_history_job_code").on(table.jobCode),
   workOrderIdIdx: index("idx_history_work_order_id").on(table.workOrderId),
@@ -191,7 +191,7 @@ export const v2ComponentRequisitions = pgTable("component_requisitions", {
   requisitionNo: text("requisition_no").notNull().unique(),
   componentId: text("component_id").notNull().references(() => v2Components.cuuid, { onDelete: "restrict", onUpdate: "cascade" }),
   componentCode: text("component_code").notNull(),
-  vesselCode: text("vessel_code").notNull(),
+  vesselId: text("vessel_id").notNull().references(() => vessels.vuuid),
   raisedOn: text("raised_on").notNull(),
   itemOrService: text("item_or_service").notNull(),
   relatedPartCode: text("related_part_code"),
@@ -215,7 +215,7 @@ export const v2ComponentRequisitions = pgTable("component_requisitions", {
 }, (table) => ({
   componentIdIdx: index("idx_req_component_id").on(table.componentId),
   componentCodeIdx: index("idx_req_component_code").on(table.componentCode),
-  vesselCodeIdx: index("idx_req_vessel_code").on(table.vesselCode),
+  vesselIdIdx: index("idx_req_vessel_id").on(table.vesselId),
   statusIdx: index("idx_req_status").on(table.status),
   requisitionNoIdx: index("idx_req_no").on(table.requisitionNo),
 }));

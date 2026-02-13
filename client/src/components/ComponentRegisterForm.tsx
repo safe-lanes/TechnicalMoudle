@@ -178,7 +178,7 @@ const ComponentRegisterForm: React.FC<ComponentRegisterFormProps> = ({
     installationDate: "",
     fleetEquipmentCode: "",
     fleetEquipmentName: "",
-    vesselCode: "",
+    vesselId: "",
     isActive: "",
     isParent: "",
     // Section B: Running Hours
@@ -397,7 +397,7 @@ const ComponentRegisterForm: React.FC<ComponentRegisterFormProps> = ({
       installationDate: "",
       fleetEquipmentCode: "",
       fleetEquipmentName: "",
-      vesselCode: "",
+      vesselId: "",
       isActive: "",
       isParent: "",
       // Section B: Running Hours
@@ -1094,8 +1094,8 @@ const ComponentRegisterForm: React.FC<ComponentRegisterFormProps> = ({
                     <div className="space-y-2">
                       <Label className="text-sm text-[#8798ad]">Vessel Code</Label>
                       <Input 
-                        value={componentData.vesselCode || ''}
-                        onChange={(e) => handleInputChange('vesselCode', e.target.value)}
+                        value={componentData.vesselId || ''}
+                        onChange={(e) => handleInputChange('vesselId', e.target.value)}
                         className="border-[#52baf3] border-2 focus:border-[#52baf3]"
                         data-testid="input-vessel-code"
                       />

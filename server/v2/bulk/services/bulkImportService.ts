@@ -1127,7 +1127,6 @@ export class BulkImportService {
           parentId: parentOfParent || null,
           parentComponent: parentOfParent || null,
           vesselId,
-          vesselCode: null,
           isActive: true,
           isParent: true,
           dataScope: 'vessel',
@@ -1202,7 +1201,6 @@ export class BulkImportService {
       parentId: parentCode,
       parentComponent: parentCode,
       vesselId,
-      vesselCode: row['Vessel Code'] || null,
       fleetEquipmentCode: row['Fleet Equipment Code'] || null,
       fleetEquipmentName: row['Fleet Equipment Name'] || null,
       maker: row['Maker'] || null,
@@ -1300,7 +1298,7 @@ export class BulkImportService {
       updates.eqptSystemDept = row['Equipment / System Department'];
     }
     if (row['Vessel Code'] !== undefined && row['Vessel Code'] !== '') {
-      updates.vesselCode = row['Vessel Code'];
+      updates.vesselId = row['Vessel Code'];
     }
     if (row['Notes'] !== undefined && row['Notes'] !== '') {
       updates.notes = row['Notes'];

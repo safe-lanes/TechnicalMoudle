@@ -4,6 +4,7 @@ import { z } from "zod";
 
 export { v2Components, type Component } from "../components/schema";
 import { v2Components } from "../components/schema";
+import { vessels } from "../../schema";
 
 export const v2RunningHoursAudit = pgTable("running_hours_audit", {
   id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
@@ -44,7 +45,7 @@ export type RunningHoursAudit = typeof v2RunningHoursAudit.$inferSelect;
 
 export const v2ComponentRunningHoursLog = pgTable("component_running_hours_log", {
   id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
-  vesselCode: text("vessel_code").notNull(),
+  vesselId: text("vessel_id").notNull().references(() => vessels.vuuid),
   componentCode: text("component_code").notNull(),
   componentId: text("component_id").notNull().references(() => v2Components.cuuid, { onDelete: "restrict", onUpdate: "cascade" }),
   previousRh: decimal("previous_rh", { precision: 10, scale: 2 }).notNull(),
@@ -57,7 +58,7 @@ export const v2ComponentRunningHoursLog = pgTable("component_running_hours_log",
   createdAt: timestamp("created_at").notNull().defaultNow(),
 }, (table) => ({
   componentCodeIdx: index("idx_rh_log_component_code").on(table.componentCode),
-  vesselCodeIdx: index("idx_rh_log_vessel_code").on(table.vesselCode),
+  vesselIdIdx: index("idx_rh_log_vessel_id").on(table.vesselId),
   updatedAtIdx: index("idx_rh_log_updated_at").on(table.updatedAt),
   updateSourceIdx: index("idx_rh_log_update_source").on(table.updateSource),
 }));

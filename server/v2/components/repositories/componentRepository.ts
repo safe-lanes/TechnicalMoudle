@@ -413,11 +413,11 @@ export class ComponentRepository {
       .orderBy(desc(v2ComponentRequisitions.createdAt));
   }
 
-  async findAllRequisitions(vesselCode?: string): Promise<ComponentRequisition[]> {
+  async findAllRequisitions(vesselId?: string): Promise<ComponentRequisition[]> {
     const db = await getDb();
-    if (vesselCode) {
+    if (vesselId) {
       return await db.select().from(v2ComponentRequisitions)
-        .where(eq(v2ComponentRequisitions.vesselCode, vesselCode))
+        .where(eq(v2ComponentRequisitions.vesselId, vesselId))
         .orderBy(desc(v2ComponentRequisitions.createdAt));
     }
     return await db.select().from(v2ComponentRequisitions)
@@ -461,12 +461,12 @@ export class ComponentRepository {
       .orderBy(desc(v2ComponentMaintenanceHistory.dateCompleted));
   }
 
-  async findMaintenanceHistoryByCode(componentCode: string, vesselCode: string): Promise<ComponentMaintenanceHistory[]> {
+  async findMaintenanceHistoryByCode(componentCode: string, vesselId: string): Promise<ComponentMaintenanceHistory[]> {
     const db = await getDb();
     return await db.select().from(v2ComponentMaintenanceHistory)
       .where(and(
         eq(v2ComponentMaintenanceHistory.componentCode, componentCode),
-        eq(v2ComponentMaintenanceHistory.vesselCode, vesselCode)
+        eq(v2ComponentMaintenanceHistory.vesselId, vesselId)
       ))
       .orderBy(desc(v2ComponentMaintenanceHistory.dateCompleted));
   }

@@ -84,7 +84,7 @@ const AddEditComponentForm: React.FC<AddEditComponentFormProps> = ({
     notes: "",
     runningHours: "",
     isActive: "Yes",
-    vesselCode: "",
+    vesselId: "",
     isParent: "No",
     classItem: "No",
     // Section B: Running Hours & Condition Monitoring
@@ -291,7 +291,7 @@ const AddEditComponentForm: React.FC<AddEditComponentFormProps> = ({
         notes: existingComponent.notes || "",
         runningHours: existingComponent.runningHours?.toString() || existingComponent.currentCumulativeRH?.toString() || "",
         isActive: toBoolString(existingComponent.isActive),
-        vesselCode: existingComponent.vesselCode || vesselId || "",
+        vesselId: existingComponent.vesselId || vesselId || "",
         isParent: toBoolString(existingComponent.isParent),
         classItem: toBoolString(existingComponent.classItem),
         // Section B: Running Hours & Condition Monitoring
@@ -305,7 +305,7 @@ const AddEditComponentForm: React.FC<AddEditComponentFormProps> = ({
         ...prev,
         parentComponent: parentComponent.code,
         componentCategory: getComponentCategory(parentComponent.code),
-        vesselCode: vesselId || "",
+        vesselId: vesselId || "",
       }));
       setIsDataLoaded(true);
     } else if (!isEditMode) {
@@ -357,10 +357,9 @@ const AddEditComponentForm: React.FC<AddEditComponentFormProps> = ({
         notes: componentData.notes || null,
         runningHours: componentData.runningHours ? parseFloat(componentData.runningHours) : null,
         isActive: toBool(componentData.isActive),
-        vesselCode: componentData.vesselCode || vesselId || null,
         isParent: toBool(componentData.isParent),
         classItem: toBool(componentData.classItem),
-        vesselId: vesselId || "V001",
+        vesselId: componentData.vesselId || vesselId || "V001",
       };
 
       if (isEditMode && componentId) {
@@ -758,8 +757,8 @@ const AddEditComponentForm: React.FC<AddEditComponentFormProps> = ({
                               <label className="text-xs font-medium text-gray-600 block mb-1">Vessel Code</label>
                               <input
                                 type="text"
-                                value={componentData.vesselCode}
-                                onChange={(e) => handleFieldChange('vesselCode', e.target.value)}
+                                value={componentData.vesselId}
+                                onChange={(e) => handleFieldChange('vesselId', e.target.value)}
                                 className="text-sm w-full px-2 py-1 border rounded text-[#52BAF3] border-[#52BAF3]"
                                 data-testid="input-vessel-code"
                               />

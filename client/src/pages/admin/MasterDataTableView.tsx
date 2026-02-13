@@ -30,7 +30,7 @@ interface MasterDataEntry {
   sfiCode: string;
   assignedSubCode?: string;
   vesselName?: string;
-  vesselCode?: string;
+  vesselId?: string;
   equipmentName: string;
   isActive: boolean;
 }

@@ -58,7 +58,7 @@ export default function AddComponentForm({ open, onOpenChange }: AddComponentFor
     supplier2: '',
     fleetEquipmentCode: '',
     fleetEquipmentName: '',
-    vesselCode: '',
+    vesselId: '',
     isActive: 'Yes',
     rating: '',
     department: '',
@@ -133,10 +133,9 @@ export default function AddComponentForm({ open, onOpenChange }: AddComponentFor
         notes: formData.notes || null,
         runningHours: formData.runningHours ? parseFloat(formData.runningHours) : null,
         isActive: formData.isActive === 'Yes',
-        vesselCode: formData.vesselCode,
         fleetEquipmentCode: formData.fleetEquipmentCode,
         fleetEquipmentName: formData.fleetEquipmentName,
-        vesselId: 'V001', // Default vessel
+        vesselId: formData.vesselId || 'V001',
         parentId: null, // Set this if you have parent component selection
         ihmPresence: formData.ihmPresence,
         ihmEvidenceType: formData.ihmEvidenceType
@@ -415,8 +414,8 @@ export default function AddComponentForm({ open, onOpenChange }: AddComponentFor
                     <Input 
                       id="vessel-code" 
                       className="h-8 text-sm"
-                      value={formData.vesselCode}
-                      onChange={(e) => handleInputChange('vesselCode', e.target.value)}
+                      value={formData.vesselId}
+                      onChange={(e) => handleInputChange('vesselId', e.target.value)}
                     />
                   </div>
                   <div>

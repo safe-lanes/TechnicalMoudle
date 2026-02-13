@@ -42,7 +42,7 @@ export default function BulkImportHistory({ vesselId, moduleType }: BulkImportHi
   const pageSize = 20;
 
   const queryParams = new URLSearchParams();
-  if (selectedVessel && selectedVessel !== 'all') queryParams.set('vesselCode', selectedVessel);
+  if (selectedVessel && selectedVessel !== 'all') queryParams.set('vesselId', selectedVessel);
   if (selectedModule && selectedModule !== 'all') queryParams.set('moduleType', selectedModule);
   if (selectedStatus && selectedStatus !== 'all') queryParams.set('status', selectedStatus);
   queryParams.set('limit', pageSize.toString());
@@ -70,7 +70,7 @@ export default function BulkImportHistory({ vesselId, moduleType }: BulkImportHi
   const filteredHistory = (historyData?.items || []).filter(item =>
     searchTerm === '' ||
     item.fileName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    (item.vesselCode && item.vesselCode.toLowerCase().includes(searchTerm.toLowerCase()))
+    (item.vesselId && item.vesselId.toLowerCase().includes(searchTerm.toLowerCase()))
   );
 
   const moduleTypes = [
@@ -232,8 +232,8 @@ export default function BulkImportHistory({ vesselId, moduleType }: BulkImportHi
                           {item.fileName}
                         </TableCell>
                         <TableCell>
-                          {item.vesselCode ? (
-                            <span className="text-sm">{item.vesselCode}</span>
+                          {item.vesselId ? (
+                            <span className="text-sm">{item.vesselId}</span>
                           ) : (
                             <span className="text-gray-400 text-sm">Fleet</span>
                           )}
@@ -276,7 +276,7 @@ export default function BulkImportHistory({ vesselId, moduleType }: BulkImportHi
                                   </div>
                                   <div>
                                     <p className="text-xs text-gray-500 uppercase">Vessel</p>
-                                    <p className="font-medium">{item.vesselCode || 'Fleet-wide'}</p>
+                                    <p className="font-medium">{item.vesselId || 'Fleet-wide'}</p>
                                   </div>
                                   <div>
                                     <p className="text-xs text-gray-500 uppercase">Uploaded By</p>

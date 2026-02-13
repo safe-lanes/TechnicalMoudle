@@ -476,7 +476,7 @@ export interface IStorage {
   // Component Maintenance History methods
   getAllComponentMaintenanceHistory(): Promise<any[]>;
   getComponentMaintenanceHistory(componentId: string): Promise<any[]>;
-  getComponentMaintenanceHistoryByCode(componentCode: string, vesselCode: string): Promise<any[]>;
+  getComponentMaintenanceHistoryByCode(componentCode: string, vesselId: string): Promise<any[]>;
   getMaintenanceHistoryByJobId(jobId: string): Promise<any[]>;
   getMaintenanceHistoryByJobCode(jobCode: string): Promise<any[]>;
   getComponentMaintenanceHistoryItem(id: number): Promise<any | undefined>;
@@ -485,7 +485,7 @@ export interface IStorage {
   
   // Component Requisitions methods (Section H)
   getComponentRequisitions(componentId: string): Promise<any[]>;
-  getAllComponentRequisitions(vesselCode?: string): Promise<any[]>;
+  getAllComponentRequisitions(vesselId?: string): Promise<any[]>;
   getComponentRequisitionItem(id: number): Promise<any | undefined>;
   createComponentRequisition(item: any): Promise<any>;
   updateComponentRequisition(id: number, data: any): Promise<any>;
@@ -693,15 +693,15 @@ export interface IStorage {
   
   // Fleet Vessel Mapping - Links Fleet Equipment to Vessels
   getFleetVesselMappings(fleetEquipmentCode?: string): Promise<FleetVesselMapping[]>;
-  getFleetVesselMappingsByVessel(vesselCode: string): Promise<FleetVesselMapping[]>;
+  getFleetVesselMappingsByVessel(vesselId: string): Promise<FleetVesselMapping[]>;
   createFleetVesselMappingRecord(mapping: InsertFleetVesselMapping): Promise<FleetVesselMapping>;
-  removeFleetVesselMappingRecord(fleetEquipmentCode: string, vesselCode: string): Promise<void>;
+  removeFleetVesselMappingRecord(fleetEquipmentCode: string, vesselId: string): Promise<void>;
   
   // Component Vessel Mapping - For Fleet Data View vessel mappings
   getComponentVesselMappings(): Promise<any[]>;
   createComponentVesselMapping(data: { 
     fleetEquipmentCode: string; 
-    vesselCode: string; 
+    vesselId: string; 
     vesselName: string; 
     componentCode?: string; 
     componentName?: string;
@@ -710,22 +710,22 @@ export interface IStorage {
   
   // Fleet Component Mapping - Links Fleet Equipment to Vessel Components
   getFleetComponentMappings(fleetEquipmentCode?: string): Promise<FleetComponentMapping[]>;
-  getFleetComponentMappingsByVessel(vesselCode?: string): Promise<FleetComponentMapping[]>;
+  getFleetComponentMappingsByVessel(vesselId?: string): Promise<FleetComponentMapping[]>;
   createFleetComponentMappingRecord(mapping: InsertFleetComponentMapping): Promise<FleetComponentMapping>;
-  removeFleetComponentMappingRecord(fleetEquipmentCode: string, vesselCode: string, componentCode: string): Promise<void>;
+  removeFleetComponentMappingRecord(fleetEquipmentCode: string, vesselId: string, componentCode: string): Promise<void>;
   
   // Fleet Job Vessel Mapping - Links Fleet Jobs to Vessels  
   getFleetJobVesselMappings(fleetEquipmentCode?: string, jobCode?: string): Promise<FleetJobVesselMapping[]>;
   createFleetJobVesselMappingRecord(mapping: InsertFleetJobVesselMapping): Promise<FleetJobVesselMapping>;
-  removeFleetJobVesselMappingRecord(jobCode: string, vesselCode: string): Promise<void>;
+  removeFleetJobVesselMappingRecord(jobCode: string, vesselId: string): Promise<void>;
   
   // Fleet Spare Vessel Mapping - Links Fleet Spares to Vessels
   getFleetSpareVesselMappings(fleetEquipmentCode?: string, partCode?: string): Promise<FleetSpareVesselMapping[]>;
   createFleetSpareVesselMappingRecord(mapping: InsertFleetSpareVesselMapping): Promise<FleetSpareVesselMapping>;
-  removeFleetSpareVesselMappingRecord(partCode: string, vesselCode: string): Promise<void>;
+  removeFleetSpareVesselMappingRecord(partCode: string, vesselId: string): Promise<void>;
   
   // Bulk Import History - Tracking all bulk imports
-  getBulkImportHistory(vesselCode?: string, moduleType?: string): Promise<BulkImportHistory[]>;
+  getBulkImportHistory(vesselId?: string, moduleType?: string): Promise<BulkImportHistory[]>;
   getBulkImportHistoryItem(id: number): Promise<BulkImportHistory | undefined>;
   createBulkImportHistory(history: InsertBulkImportHistory): Promise<BulkImportHistory>;
   updateBulkImportHistory(id: number, data: Partial<BulkImportHistory>): Promise<BulkImportHistory>;

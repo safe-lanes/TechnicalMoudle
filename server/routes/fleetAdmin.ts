@@ -191,7 +191,7 @@ router.get('/generate-fleet-equipment-code/:sfiCode', async (req, res) => {
 // Get all fleet-vessel mappings with optional filtering
 router.get('/fleet-vessel-mappings', async (req, res) => {
   try {
-    const { fleetEquipmentCode, vesselCode } = req.query;
+    const { fleetEquipmentCode, vesselId } = req.query;
     
     let mappings: any[] = [];
     
@@ -201,8 +201,8 @@ router.get('/fleet-vessel-mappings', async (req, res) => {
       mappings = await storage.getFleetVesselMappings();
     }
     
-    if (vesselCode) {
-      mappings = mappings.filter((m: any) => m.vesselCode === vesselCode);
+    if (vesselId) {
+      mappings = mappings.filter((m: any) => m.vesselId === vesselId);
     }
     
     res.json(mappings);
@@ -225,10 +225,10 @@ router.get('/fleet-vessel-mappings/by-equipment/:code', async (req, res) => {
 });
 
 // Get mappings for a specific vessel
-router.get('/fleet-vessel-mappings/by-vessel/:vesselCode', async (req, res) => {
+router.get('/fleet-vessel-mappings/by-vessel/:vesselId', async (req, res) => {
   try {
-    const vesselCode = req.params.vesselCode;
-    const mappings = await storage.getFleetVesselMappingsByVessel(vesselCode);
+    const vesselId = req.params.vesselId;
+    const mappings = await storage.getFleetVesselMappingsByVessel(vesselId);
     res.json(mappings);
   } catch (error) {
     console.error('Error fetching mappings by vessel:', error);
@@ -281,7 +281,7 @@ router.get('/component-vessel-mappings', async (req, res) => {
 // Create new component-vessel mapping
 const createComponentVesselMappingSchema = z.object({
   fleetEquipmentCode: z.string(),
-  vesselCode: z.string(),
+  vesselId: z.string(),
   vesselName: z.string(),
   componentCode: z.string().optional(),
   componentName: z.string().optional(),
@@ -320,12 +320,12 @@ router.delete('/component-vessel-mappings/:id', async (req, res) => {
 // Get all fleet-component mappings with optional filtering
 router.get('/fleet-component-mappings', async (req, res) => {
   try {
-    const { fleetEquipmentCode, vesselCode, componentCode } = req.query;
+    const { fleetEquipmentCode, vesselId, componentCode } = req.query;
     
     let mappings: any[] = [];
     
-    if (vesselCode) {
-      mappings = await storage.getFleetComponentMappingsByVessel(vesselCode as string);
+    if (vesselId) {
+      mappings = await storage.getFleetComponentMappingsByVessel(vesselId as string);
       if (fleetEquipmentCode) {
         mappings = mappings.filter((m: any) => m.fleetEquipmentCode === fleetEquipmentCode);
       }
@@ -360,10 +360,10 @@ router.get('/fleet-component-mappings/by-equipment/:code', async (req, res) => {
 });
 
 // Get mappings for a specific vessel
-router.get('/fleet-component-mappings/by-vessel/:vesselCode', async (req, res) => {
+router.get('/fleet-component-mappings/by-vessel/:vesselId', async (req, res) => {
   try {
-    const vesselCode = req.params.vesselCode;
-    const mappings = await storage.getFleetComponentMappingsByVessel(vesselCode);
+    const vesselId = req.params.vesselId;
+    const mappings = await storage.getFleetComponentMappingsByVessel(vesselId);
     res.json(mappings);
   } catch (error) {
     console.error('Error fetching component mappings by vessel:', error);
@@ -389,17 +389,17 @@ router.post('/fleet-component-mappings', async (req, res) => {
 // Delete fleet-component mapping
 router.delete('/fleet-component-mappings', async (req, res) => {
   try {
-    const { fleetEquipmentCode, vesselCode, componentCode } = req.query;
+    const { fleetEquipmentCode, vesselId, componentCode } = req.query;
     
-    if (!fleetEquipmentCode || !vesselCode || !componentCode) {
+    if (!fleetEquipmentCode || !vesselId || !componentCode) {
       return res.status(400).json({ 
-        error: 'Missing required parameters: fleetEquipmentCode, vesselCode, componentCode' 
+        error: 'Missing required parameters: fleetEquipmentCode, vesselId, componentCode' 
       });
     }
     
     await storage.removeFleetComponentMappingRecord(
       fleetEquipmentCode as string, 
-      vesselCode as string, 
+      vesselId as string, 
       componentCode as string
     );
     res.json({ success: true, message: 'Mapping deleted' });
@@ -416,15 +416,15 @@ router.delete('/fleet-component-mappings', async (req, res) => {
 // Get all fleet-job-vessel mappings
 router.get('/fleet-job-mappings', async (req, res) => {
   try {
-    const { fleetEquipmentCode, jobCode, vesselCode } = req.query;
+    const { fleetEquipmentCode, jobCode, vesselId } = req.query;
     
     let mappings = await storage.getFleetJobVesselMappings(
       fleetEquipmentCode as string | undefined,
       jobCode as string | undefined
     );
     
-    if (vesselCode) {
-      mappings = mappings.filter((m: any) => m.vesselCode === vesselCode);
+    if (vesselId) {
+      mappings = mappings.filter((m: any) => m.vesselId === vesselId);
     }
     
     res.json(mappings);
@@ -447,11 +447,11 @@ router.get('/fleet-job-mappings/by-job/:jobCode', async (req, res) => {
 });
 
 // Get mappings by vessel
-router.get('/fleet-job-mappings/by-vessel/:vesselCode', async (req, res) => {
+router.get('/fleet-job-mappings/by-vessel/:vesselId', async (req, res) => {
   try {
-    const vesselCode = req.params.vesselCode;
+    const vesselId = req.params.vesselId;
     const allMappings = await storage.getFleetJobVesselMappings();
-    const mappings = allMappings.filter((m: any) => m.vesselCode === vesselCode);
+    const mappings = allMappings.filter((m: any) => m.vesselId === vesselId);
     res.json(mappings);
   } catch (error) {
     console.error('Error fetching job mappings by vessel:', error);
@@ -477,17 +477,17 @@ router.post('/fleet-job-mappings', async (req, res) => {
 // Delete fleet-job-vessel mapping
 router.delete('/fleet-job-mappings', async (req, res) => {
   try {
-    const { jobCode, vesselCode } = req.query;
+    const { jobCode, vesselId } = req.query;
     
-    if (!jobCode || !vesselCode) {
+    if (!jobCode || !vesselId) {
       return res.status(400).json({ 
-        error: 'Missing required parameters: jobCode, vesselCode' 
+        error: 'Missing required parameters: jobCode, vesselId' 
       });
     }
     
     await storage.removeFleetJobVesselMappingRecord(
       jobCode as string, 
-      vesselCode as string
+      vesselId as string
     );
     res.json({ success: true, message: 'Mapping deleted' });
   } catch (error) {
@@ -503,15 +503,15 @@ router.delete('/fleet-job-mappings', async (req, res) => {
 // Get all fleet-spare-vessel mappings
 router.get('/fleet-spare-mappings', async (req, res) => {
   try {
-    const { fleetEquipmentCode, partCode, vesselCode } = req.query;
+    const { fleetEquipmentCode, partCode, vesselId } = req.query;
     
     let mappings = await storage.getFleetSpareVesselMappings(
       fleetEquipmentCode as string | undefined,
       partCode as string | undefined
     );
     
-    if (vesselCode) {
-      mappings = mappings.filter((m: any) => m.vesselCode === vesselCode);
+    if (vesselId) {
+      mappings = mappings.filter((m: any) => m.vesselId === vesselId);
     }
     
     res.json(mappings);
@@ -534,11 +534,11 @@ router.get('/fleet-spare-mappings/by-spare/:partCode', async (req, res) => {
 });
 
 // Get mappings by vessel
-router.get('/fleet-spare-mappings/by-vessel/:vesselCode', async (req, res) => {
+router.get('/fleet-spare-mappings/by-vessel/:vesselId', async (req, res) => {
   try {
-    const vesselCode = req.params.vesselCode;
+    const vesselId = req.params.vesselId;
     const allMappings = await storage.getFleetSpareVesselMappings();
-    const mappings = allMappings.filter((m: any) => m.vesselCode === vesselCode);
+    const mappings = allMappings.filter((m: any) => m.vesselId === vesselId);
     res.json(mappings);
   } catch (error) {
     console.error('Error fetching spare mappings by vessel:', error);
@@ -564,17 +564,17 @@ router.post('/fleet-spare-mappings', async (req, res) => {
 // Delete fleet-spare-vessel mapping
 router.delete('/fleet-spare-mappings', async (req, res) => {
   try {
-    const { partCode, vesselCode } = req.query;
+    const { partCode, vesselId } = req.query;
     
-    if (!partCode || !vesselCode) {
+    if (!partCode || !vesselId) {
       return res.status(400).json({ 
-        error: 'Missing required parameters: partCode, vesselCode' 
+        error: 'Missing required parameters: partCode, vesselId' 
       });
     }
     
     await storage.removeFleetSpareVesselMappingRecord(
       partCode as string, 
-      vesselCode as string
+      vesselId as string
     );
     res.json({ success: true, message: 'Mapping deleted' });
   } catch (error) {
@@ -590,10 +590,10 @@ router.delete('/fleet-spare-mappings', async (req, res) => {
 // Get bulk import history with pagination and filtering
 router.get('/import-history', async (req, res) => {
   try {
-    const { vesselCode, moduleType, status, limit, offset } = req.query;
+    const { vesselId, moduleType, status, limit, offset } = req.query;
     
     let history = await storage.getBulkImportHistory(
-      vesselCode as string | undefined,
+      vesselId as string | undefined,
       moduleType as string | undefined
     );
     

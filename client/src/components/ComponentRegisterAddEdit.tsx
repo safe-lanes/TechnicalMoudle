@@ -96,7 +96,7 @@ export default function ComponentRegisterAddEdit({
     // Row 6: Running Hours, IS Active, Vessel Code, IS Parent
     runningHours: "",
     isActive: "Yes",
-    vesselCode: "",
+    vesselId: "",
     isParent: "No",
     // Row 7: Class Item
     classItem: "No",
@@ -255,7 +255,7 @@ export default function ComponentRegisterAddEdit({
 
     const compId = activeComponentId;
     const compCode = componentData.componentCode;
-    const compVessel = componentData.vesselCode || vesselId;
+    const compVessel = componentData.vesselId || vesselId;
 
     if (!compId || !compCode) {
       toast({
@@ -296,7 +296,7 @@ export default function ComponentRegisterAddEdit({
       formData.append('file', file);
       formData.append('componentId', compId);
       formData.append('componentCode', compCode);
-      formData.append('vesselCode', compVessel);
+      formData.append('vesselId', compVessel);
       formData.append('fileName', `${docType} - ${file.name}`);
       formData.append('fileType', fileType);
       formData.append('version', '1.0');
@@ -408,7 +408,7 @@ export default function ComponentRegisterAddEdit({
         // Row 6
         runningHours: comp.runningHours?.toString() || comp.currentCumulativeRH?.toString() || "",
         isActive: comp.isActive === false ? "No" : "Yes",
-        vesselCode: comp.vesselCode || "",
+        vesselId: comp.vesselId || "",
         isParent: comp.isParent ? "Yes" : "No",
         classItem: comp.classItem ? "Yes" : "No",
         // Row 7
@@ -713,9 +713,8 @@ export default function ComponentRegisterAddEdit({
         eqptSystemDept: componentData.eqptSystemDept || null,
         notes: componentData.notes || null,
         runningHours: componentData.runningHours ? parseFloat(componentData.runningHours) : null,
-        vesselId: vesselId || "V001",
+        vesselId: componentData.vesselId || vesselId || "V001",
         isActive: componentData.isActive === "Yes",
-        vesselCode: componentData.vesselCode || null,
         isParent: componentData.isParent === "Yes",
         classItem: componentData.classItem === "Yes",
       };
@@ -801,7 +800,7 @@ export default function ComponentRegisterAddEdit({
       // Row 6
       runningHours: comp.runningHours?.toString() || comp.currentCumulativeRH?.toString() || "",
       isActive: comp.isActive === false ? "No" : "Yes",
-      vesselCode: comp.vesselCode || "",
+      vesselId: comp.vesselId || "",
       isParent: comp.isParent ? "Yes" : "No",
       classItem: comp.classItem ? "Yes" : "No",
       // Row 7
@@ -949,7 +948,7 @@ export default function ComponentRegisterAddEdit({
                 // Row 6
                 runningHours: "",
                 isActive: "Yes",
-                vesselCode: "",
+                vesselId: "",
                 isParent: "No",
                 classItem: "No",
                 // Row 7
@@ -1295,8 +1294,8 @@ export default function ComponentRegisterAddEdit({
                   <div>
                     <label className="text-xs text-gray-500 mb-1 block">Vessel Code</label>
                     <Input
-                      value={componentData.vesselCode}
-                      onChange={(e) => handleFieldChange('vesselCode', e.target.value)}
+                      value={componentData.vesselId}
+                      onChange={(e) => handleFieldChange('vesselId', e.target.value)}
                       className="h-8 text-sm"
                       placeholder="e.g., V001"
                       data-testid="input-vessel-code"

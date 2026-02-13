@@ -15,7 +15,7 @@ const fieldMapping: { [key: string]: string } = {
   'Department Category': 'deptCategory',
   'Dept Category': 'deptCategory',
   'Vessel ID': 'vesselId',
-  'Vessel Code': 'vesselCode',
+  'Vessel Code': 'vesselId',
   'Fleet Equipment Code': 'fleetEquipmentCode',
   'Fleet Eqpt Code': 'fleetEquipmentCode',
   'Fleet Equipment Name': 'fleetEquipmentName',
@@ -215,7 +215,7 @@ export class ComponentUploadService {
         });
         continue;
       }
-      if (!component.vesselCode) {
+      if (!component.vesselId) {
         errors.push({
           row: rowNum,
           field: 'Vessel Code',

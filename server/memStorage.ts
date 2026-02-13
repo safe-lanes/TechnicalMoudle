@@ -943,7 +943,7 @@ class MemStorage {
   // Component Maintenance History
   async getComponentMaintenanceHistory(componentId: string): Promise<any[]> { return []; }
   async getAllComponentMaintenanceHistory(): Promise<any[]> { return []; }
-  async getComponentMaintenanceHistoryByCode(componentCode: string, vesselCode: string): Promise<any[]> { return []; }
+  async getComponentMaintenanceHistoryByCode(componentCode: string, vesselId: string): Promise<any[]> { return []; }
   async getMaintenanceHistoryByJobId(jobId: string): Promise<any[]> { return []; }
   async getMaintenanceHistoryByJobCode(jobCode: string): Promise<any[]> { return []; }
   async getComponentMaintenanceHistoryItem(id: number): Promise<any> { return undefined; }

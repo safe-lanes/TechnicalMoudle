@@ -118,11 +118,11 @@ export class ComponentController {
       return;
     }
 
-    if (component.vesselCode !== req.body.vesselCode) {
+    if (component.vesselId !== req.body.vesselId) {
       res.status(400).json({
-        error: "vesselCode mismatch - does not match component's vessel",
-        componentVessel: component.vesselCode,
-        providedVessel: req.body.vesselCode
+        error: "vesselId mismatch - does not match component's vessel",
+        componentVessel: component.vesselId,
+        providedVessel: req.body.vesselId
       });
       return;
     }
@@ -148,7 +148,7 @@ export class ComponentController {
     const coercedBody = {
       componentId: component.cuuid,
       componentCode: component.componentCode,
-      vesselCode: component.vesselCode,
+      vesselId: component.vesselId,
       fleetEquipmentCode: req.body.fleetEquipmentCode || null,
       fileName: req.body.fileName,
       fileType: req.body.fileType,
@@ -234,7 +234,7 @@ export class ComponentController {
     }
 
     if (req.user!.role === "Ship" && req.user!.vesselId) {
-      if (req.user!.vesselId !== document.vesselCode) {
+      if (req.user!.vesselId !== document.vesselId) {
         res.status(403).json({ error: "Cannot access documents from other vessels" });
         return;
       }
@@ -300,11 +300,11 @@ export class ComponentController {
   }
 
   async listAllRequisitions(req: AuthenticatedRequest, res: Response): Promise<void> {
-    let vesselCode = req.query.vesselCode as string | undefined;
+    let vesselId = req.query.vesselId as string | undefined;
     if (req.user!.role === "Ship" && req.user!.vesselId) {
-      vesselCode = req.user!.vesselId;
+      vesselId = req.user!.vesselId;
     }
-    const requisitions = await this.service.getAllRequisitions(vesselCode);
+    const requisitions = await this.service.getAllRequisitions(vesselId);
     res.json(requisitions);
   }
 
@@ -318,15 +318,15 @@ export class ComponentController {
 
   async createRequisition(req: AuthenticatedRequest, res: Response): Promise<void> {
     if (req.user!.role === "Ship" && req.user!.vesselId) {
-      if (req.body.vesselCode && req.body.vesselCode !== req.user!.vesselId) {
+      if (req.body.vesselId && req.body.vesselId !== req.user!.vesselId) {
         res.status(403).json({
           error: "Cannot create requisitions for other vessels",
           assignedVessel: req.user!.vesselId,
-          requestedVessel: req.body.vesselCode
+          requestedVessel: req.body.vesselId
         });
         return;
       }
-      req.body.vesselCode = req.user!.vesselId;
+      req.body.vesselId = req.user!.vesselId;
     }
 
     const validatedData = insertComponentRequisitionSchema.parse({
@@ -347,7 +347,7 @@ export class ComponentController {
     const validatedData = insertComponentRequisitionSchema.partial().parse(req.body);
 
     if (req.user!.role !== "PMS Admin") {
-      delete (validatedData as any).vesselCode;
+      delete (validatedData as any).vesselId;
       delete (validatedData as any).componentId;
     }
 

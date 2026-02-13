@@ -120,7 +120,7 @@ const ComponentInformationSection: React.FC<{ isExpanded: boolean; selectedCompo
     notes: "",
     runningHours: "",
     isActive: "",
-    vesselCode: "",
+    vesselId: "",
     isParent: "",
     // Legacy fields kept for compatibility
     classItem: "",
@@ -170,7 +170,7 @@ const ComponentInformationSection: React.FC<{ isExpanded: boolean; selectedCompo
         notes: comp.notes || "",
         runningHours: comp.runningHours || comp.currentCumulativeRH || "",
         isActive: toBoolString(comp.isActive !== undefined ? comp.isActive : true),
-        vesselCode: comp.vesselCode || "",
+        vesselId: comp.vesselId || "",
         isParent: toBoolString(comp.isParent),
         // Legacy fields
         classItem: toBoolString(comp.classItem),
@@ -656,16 +656,16 @@ const ComponentInformationSection: React.FC<{ isExpanded: boolean; selectedCompo
           {isChangeMode ? (
             <input
               type="text"
-              value={componentData.vesselCode}
-              onChange={(e) => handleFieldChange('vesselCode', e.target.value)}
+              value={componentData.vesselId}
+              onChange={(e) => handleFieldChange('vesselId', e.target.value)}
               className={`text-sm w-full px-2 py-1 border rounded ${
-                changedFields.has('vesselCode') ? 'text-red-600 border-red-300' : 'text-[#52BAF3] border-[#52BAF3]'
+                changedFields.has('vesselId') ? 'text-red-600 border-red-300' : 'text-[#52BAF3] border-[#52BAF3]'
               }`}
               data-testid="B7.A.44"
             />
           ) : (
             <div className="text-sm text-gray-900" data-testid="B7.A.44">
-              <Marker id="B7.A.44" /> {componentData.vesselCode}
+              <Marker id="B7.A.44" /> {componentData.vesselId}
             </div>
           )}
         </div>
@@ -1360,7 +1360,7 @@ const SparesSection: React.FC<{ selectedComponent: ComponentNode | null }> = ({ 
   const COLLAPSED_ROWS = 2;
   const ROWS_PER_PAGE = 10;
   
-  const vesselId = selectedComponent?.vesselId || selectedComponent?.vesselCode || 'V001';
+  const vesselId = selectedComponent?.vesselId || 'V001';
   const { mode: detailApiMode } = useApiVersion();
   
   const detailComponentListUrl = getComponentListUrl(vesselId);
@@ -2546,7 +2546,7 @@ const Components: React.FC = () => {
         fleetEquipmentCode: originalComponentData.fleetEquipmentCode,
         fleetEquipmentName: originalComponentData.fleetEquipmentName,
         parentComponent: originalComponentData.parentComponent,
-        vesselCode: originalComponentData.vesselCode,
+        vesselId: originalComponentData.vesselId,
         isParent: originalComponentData.isParent,
         isActive: originalComponentData.isActive,
         runningHours: originalComponentData.runningHours,
@@ -2862,7 +2862,7 @@ const Components: React.FC = () => {
           notes: comp.notes || "",
           runningHours: comp.runningHours || comp.currentCumulativeRH || "",
           isActive: comp.isActive !== undefined ? (comp.isActive ? "Yes" : "No") : "",
-          vesselCode: comp.vesselCode || "",
+          vesselId: comp.vesselId || "",
           isParent: comp.isParent !== undefined ? (comp.isParent ? "Yes" : "No") : "",
           classItem: comp.classItem === true || comp.classItem === "Yes" ? "Yes" : (comp.classItem === false || comp.classItem === "No" ? "No" : ""),
           noOfUnits: comp.noOfUnits || "",

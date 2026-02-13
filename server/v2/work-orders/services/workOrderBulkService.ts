@@ -52,7 +52,7 @@ export async function bulkApprove(body: any) {
           await repo.createMaintenanceHistory({
             componentId: component.cuuid,
             componentCode: wo.componentCode || component.componentCode,
-            vesselCode: wo.vesselId || '',
+            vesselId: wo.vesselId || '',
             workOrderId: wo.id,
             workOrderNo: wo.workOrderNo,
             jobTitle: wo.jobTitle,

@@ -65,7 +65,7 @@ export function createComponentRouter(
   router.delete('/class-regulatory/:id', requirePMSAdmin, asyncHandler((req, res) => controller.removeClassRegulatory(req as any, res)));
 
   // ─── Requisition sub-resources (by item ID + collection) ───
-  // GET    /requisitions           → list all requisitions (optional ?vesselCode= filter)
+  // GET    /requisitions           → list all requisitions (optional ?vesselId= filter)
   // GET    /requisitions/:id       → get single requisition
   // PUT    /requisitions/:id       → update requisition
   // DELETE /requisitions/:id       → delete requisition

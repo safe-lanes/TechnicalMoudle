@@ -147,7 +147,7 @@ export class ComponentService {
     }
 
     if (user.role === "Ship" && user.vesselId) {
-      if (component.vesselCode !== user.vesselId) {
+      if (component.vesselId !== user.vesselId) {
         throw new ValidationError("Cannot access documents for components from other vessels");
       }
     }
@@ -172,7 +172,7 @@ export class ComponentService {
     }
 
     if (user.role === "Ship" && user.vesselId) {
-      if (component.vesselCode !== user.vesselId) {
+      if (component.vesselId !== user.vesselId) {
         throw new ValidationError("Cannot access classification data for components from other vessels");
       }
     }
@@ -187,7 +187,7 @@ export class ComponentService {
     }
 
     if (user.role === "Ship" && user.vesselId) {
-      if (component.vesselCode !== user.vesselId) {
+      if (component.vesselId !== user.vesselId) {
         throw new ValidationError("Cannot access requisitions for components from other vessels");
       }
     }
@@ -207,7 +207,7 @@ export class ComponentService {
           priority: "Normal",
           status: "PO Raised",
           requestedBy: "Chief Engineer",
-          vesselCode: component.vesselCode || ''
+          vesselId: component.vesselId || ''
         },
         {
           id: 1002,
@@ -220,7 +220,7 @@ export class ComponentService {
           priority: "Urgent",
           status: "Delivered On Board",
           requestedBy: "2nd Engineer",
-          vesselCode: component.vesselCode || ''
+          vesselId: component.vesselId || ''
         }
       ];
     }
@@ -235,17 +235,17 @@ export class ComponentService {
     }
 
     if (user.role === "Ship" && user.vesselId) {
-      if (component.vesselCode !== user.vesselId) {
+      if (component.vesselId !== user.vesselId) {
         throw new ValidationError("Cannot access maintenance history for components from other vessels");
       }
     }
 
     let history = await this.repository.findMaintenanceHistory(componentId);
 
-    if (history.length === 0 && component.componentCode && component.vesselCode) {
+    if (history.length === 0 && component.componentCode && component.vesselId) {
       history = await this.repository.findMaintenanceHistoryByCode(
         component.componentCode,
-        component.vesselCode
+        component.vesselId
       );
     }
 
@@ -259,7 +259,7 @@ export class ComponentService {
     }
 
     if (user.role === "Ship" && user.vesselId) {
-      if (item.vesselCode !== user.vesselId) {
+      if (item.vesselId !== user.vesselId) {
         throw new ValidationError("Cannot access maintenance history from other vessels");
       }
     }
@@ -295,8 +295,8 @@ export class ComponentService {
     return this.repository.removeClassRegulatory(id);
   }
 
-  async getAllRequisitions(vesselCode?: string): Promise<any[]> {
-    return this.repository.findAllRequisitions(vesselCode);
+  async getAllRequisitions(vesselId?: string): Promise<any[]> {
+    return this.repository.findAllRequisitions(vesselId);
   }
 
   async getRequisitionItemById(id: number, user: { role: string; vesselId: string | null }): Promise<any> {
@@ -306,7 +306,7 @@ export class ComponentService {
     }
 
     if (user.role === "Ship" && user.vesselId) {
-      if (item.vesselCode !== user.vesselId) {
+      if (item.vesselId !== user.vesselId) {
         throw new ValidationError("Cannot access requisitions from other vessels");
       }
     }

@@ -17,7 +17,7 @@ import { Marker } from "@/components/Marker";
 interface Vessel {
   id: string;
   name: string;
-  vesselCode?: string;
+  vesselId?: string;
 }
 
 export default function PmsVesselSettingsManagement() {

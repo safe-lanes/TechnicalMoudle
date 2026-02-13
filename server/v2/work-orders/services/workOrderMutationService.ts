@@ -211,7 +211,7 @@ async function processApproval(existingWO: any, updateData: any) {
         await repo.createMaintenanceHistory({
           componentId: component.cuuid,
           componentCode: existingWO.componentCode || component.componentCode,
-          vesselCode: existingWO.vesselId,
+          vesselId: existingWO.vesselId,
           workOrderId: existingWO.id,
           workOrderNo: existingWO.workOrderNo || `WO-${existingWO.id}`,
           jobTitle: existingWO.jobTitle,

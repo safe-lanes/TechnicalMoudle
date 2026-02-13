@@ -24,7 +24,7 @@ const masterDataFormSchema = z.object({
   sfiCode: z.string().min(1, "Component code is required"),
   equipmentName: z.string().min(1, "Equipment name is required"),
   vesselName: z.string().optional(),
-  vesselCode: z.string().optional(),
+  vesselId: z.string().optional(),
   assignedSubCode: z.string().optional(),
 });
 
@@ -71,7 +71,7 @@ export default function MasterDataManagement() {
       sfiCode: "",
       equipmentName: "",
       vesselName: "",
-      vesselCode: "",
+      vesselId: "",
       assignedSubCode: "",
     },
   });
@@ -165,7 +165,7 @@ export default function MasterDataManagement() {
       sfiCode: "",
       equipmentName: "",
       vesselName: "",
-      vesselCode: "",
+      vesselId: "",
       assignedSubCode: "",
     });
     setIsFormOpen(true);
@@ -181,7 +181,7 @@ export default function MasterDataManagement() {
       sfiCode: item.sfiCode || "",
       equipmentName: item.equipmentName || "",
       vesselName: item.vesselName || "",
-      vesselCode: item.vesselCode || "",
+      vesselId: item.vesselId || "",
       assignedSubCode: item.assignedSubCode || "",
     });
     setIsFormOpen(true);
@@ -546,10 +546,10 @@ export default function MasterDataManagement() {
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="vesselCode">Vessel Code</Label>
+                <Label htmlFor="vesselId">Vessel Code</Label>
                 <Input
-                  id="vesselCode"
-                  {...form.register("vesselCode")}
+                  id="vesselId"
+                  {...form.register("vesselId")}
                   placeholder="e.g., PACSTAR"
                   data-testid="input-vessel-code"
                 />

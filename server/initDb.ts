@@ -285,7 +285,6 @@ export async function initializeDatabase() {
         current_cumulative_rh DECIMAL(10, 2) NOT NULL DEFAULT 0,
         last_updated TEXT,
         vessel_id TEXT,
-        vessel_code TEXT,
         data_scope TEXT NOT NULL DEFAULT 'vessel',
         fleet_equipment_code TEXT,
         fleet_equipment_name TEXT,

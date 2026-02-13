@@ -108,7 +108,7 @@ export const FLEET_ADMIN_RULES = {
     source: "VESSEL_EXCEL_UPLOAD", // Ship uploads own Component Excel
     codeFormat: {
       fleetCode: "331.001.AA", // Fleet Equipment Code format
-      vesselCode: "331.001.01", // First 7 digits same as Fleet Code
+      vesselId: "331.001.01", // First 7 digits same as Fleet Code
       multipleChildren: ".01, .02, .03..." // Numbered sequence for multiple children
     }
   },
@@ -247,7 +247,7 @@ export const COMPONENTS_RULES = {
     installationDate: { ship: false, office: true, admin: true },
     runningHours: { ship: "Only via RH Module", office: "No direct edit", admin: true },
     isActive: { ship: false, office: true, admin: true },
-    vesselCode: { ship: false, office: false, admin: "System" },
+    vesselId: { ship: false, office: false, admin: "System" },
     isParent: { ship: false, office: false, admin: true },
     notes: { ship: false, office: true, admin: true }
   }

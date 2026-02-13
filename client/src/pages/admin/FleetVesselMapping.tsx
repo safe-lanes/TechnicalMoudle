@@ -81,7 +81,7 @@ export default function FleetVesselMapping() {
   const [autoMatchDialogOpen, setAutoMatchDialogOpen] = useState(false);
   const [selectedFleetItem, setSelectedFleetItem] = useState<EntityWithStatus | null>(null);
   const [selectedVesselItem, setSelectedVesselItem] = useState<string>("");
-  const [autoMatchResults, setAutoMatchResults] = useState<Array<{fleetId: string, fleetCode: string, vesselId: string, vesselCode: string, matchReason: string}>>([]);
+  const [autoMatchResults, setAutoMatchResults] = useState<Array<{fleetId: string, fleetCode: string, vesselId: string, vesselEntityCode: string, matchReason: string}>>([]);
   const [selectedAutoMatches, setSelectedAutoMatches] = useState<string[]>([]);
 
   const { data: fleetComponents = [], isLoading: isLoadingFleetComponents } = useQuery<Component[]>({
@@ -267,7 +267,7 @@ export default function FleetVesselMapping() {
       return;
     }
 
-    const results: Array<{fleetId: string, fleetCode: string, vesselId: string, vesselCode: string, matchReason: string}> = [];
+    const results: Array<{fleetId: string, fleetCode: string, vesselId: string, vesselEntityCode: string, matchReason: string}> = [];
     const entityType = activeTab === 'components' ? 'component' : activeTab === 'jobs' ? 'job' : 'spare';
 
     fleetItems.forEach(fleetItem => {
@@ -288,7 +288,7 @@ export default function FleetVesselMapping() {
           fleetId: fleetItem.id,
           fleetCode: fleetItem.code,
           vesselId: matchingVesselItem.id,
-          vesselCode: matchingVesselItem.code,
+          vesselEntityCode: matchingVesselItem.code,
           matchReason
         });
       }
@@ -314,7 +314,7 @@ export default function FleetVesselMapping() {
         fleetEntityIds: [r.fleetId],
         vesselId: selectedVessel,
         vesselEntityId: r.vesselId,
-        vesselEntityCode: r.vesselCode
+        vesselEntityCode: r.vesselEntityCode
       }));
 
     if (mappingsToCreate.length > 0) {
@@ -696,7 +696,7 @@ export default function FleetVesselMapping() {
                     </TableCell>
                     <TableCell className="font-mono text-sm">{result.fleetCode}</TableCell>
                     <TableCell className="text-center"><ArrowRight className="h-4 w-4 mx-auto text-gray-400" /></TableCell>
-                    <TableCell className="font-mono text-sm">{result.vesselCode}</TableCell>
+                    <TableCell className="font-mono text-sm">{result.vesselEntityCode}</TableCell>
                     <TableCell>
                       <Badge variant="outline" className="text-xs">{result.matchReason}</Badge>
                     </TableCell>

@@ -296,54 +296,43 @@ All 31 child tables' `vessel_id` columns reference `vessels(vuuid)` with ON DELE
 
 ---
 
-## Outstanding Issue: `vessel_code` Implicit Relationships (No FK Constraints)
+## Completed: `vessel_code` → `vessel_id` FK Migration (Task 11)
 
-The vessel identity migration (Tasks 2-6) added FK constraints for all 31 child tables that use a `vessel_id` column referencing `vessels(vuuid)`. However, there are **12 additional tables** that link to vessels through a `vessel_code` column instead. These have **no FK constraint** at the database level — the relationship is purely implicit, maintained only by application code.
+**Date**: 2026-02-13  
+**Migration**: `0024_superb_oracle.sql`  
+**Prompt**: *Rename `vessel_code` to `vessel_id` in 12 tables, add FK constraints to `vessels(vuuid)`, remove redundant `vessel_code` from components, and refactor all server/frontend code.*
 
-### Affected Tables
+### What Was Done
 
-| #  | Table                          | `vessel_code` | `vessel_id` (with FK) | Vessel Link Status |
-|----|--------------------------------|:---:|:---:|---------------------|
-| 1  | `component_documents`          | YES | NO  | `vessel_code` is the **only** vessel link — no FK protection |
-| 2  | `component_class_regulatory`   | YES | NO  | `vessel_code` is the **only** vessel link — no FK protection |
-| 3  | `component_maintenance_history`| YES | NO  | `vessel_code` is the **only** vessel link — no FK protection |
-| 4  | `component_requisitions`       | YES | NO  | `vessel_code` is the **only** vessel link — no FK protection |
-| 5  | `component_running_hours_log`  | YES | NO  | `vessel_code` is the **only** vessel link — no FK protection |
-| 6  | `audit_log`                    | YES | NO  | `vessel_code` is the **only** vessel link — no FK protection |
-| 7  | `bulk_import_history`          | YES | NO  | `vessel_code` is the **only** vessel link — no FK protection (nullable) |
-| 8  | `master_data`                  | YES | NO  | `vessel_code` is the **only** vessel link — no FK protection |
-| 9  | `fleet_component_mapping`      | YES | NO  | `vessel_code` is the **only** vessel link — no FK protection |
-| 10 | `fleet_job_vessel_mapping`     | YES | NO  | `vessel_code` is the **only** vessel link — no FK protection |
-| 11 | `fleet_spare_vessel_mapping`   | YES | NO  | `vessel_code` is the **only** vessel link — no FK protection |
-| 12 | `fleet_vessel_mapping`         | YES | NO  | `vessel_code` is the **only** vessel link — no FK protection |
+12 tables previously linked to vessels through a `vessel_code` column with no FK constraint. This migration:
 
-**Note**: The `components` table has **both** columns — `vessel_code` and `vessel_id` (with FK). The `vessel_code` column in `components` is redundant since `vessel_id` already has a proper FK constraint to `vessels(vuuid)`.
+1. **Renamed `vessel_code` → `vessel_id`** in all 12 tables (preserving existing data)
+2. **Added FK constraints** on `vessel_id` referencing `vessels(vuuid)` with ON DELETE NO ACTION, ON UPDATE NO ACTION
+3. **Recreated indexes** with new column name (`idx_*_vessel_id`)
+4. **Recreated unique constraints** with new column name for fleet mapping tables
+5. **Removed redundant `vessel_code`** from `components` table (already had `vessel_id` with FK)
+6. **Refactored all server code** (~18 files): replaced `vesselCode`/`vessel_code` with `vesselId`/`vessel_id`
+7. **Refactored all frontend code** (~12 files): replaced `vesselCode`/`vessel_code` with `vesselId`/`vessel_id`
+8. **Updated V2 schemas** (`shared/v2/components/schema.ts`, `shared/v2/running-hours/schema.ts`)
 
-### What `vessel_code` Stores
+### Tables Migrated
 
-The `vessel_code` column in all these tables stores the vessel's UUID value — the same value as `vessels.vuuid`. In the current data, `vessels.code` also happens to contain the same UUID, but **`vessels.code` must not be used in any application logic**. Only `vessels.vuuid` is the canonical vessel identity column. The implicit relationship is: `table.vessel_code = vessels.vuuid`.
+| #  | Table                          | Nullable | FK Constraint Name |
+|----|--------------------------------|:---:|--------------------------------------------------------------|
+| 1  | `audit_log`                    | YES | `audit_log_vessel_id_vessels_vuuid_fk` |
+| 2  | `bulk_import_history`          | YES | `bulk_import_history_vessel_id_vessels_vuuid_fk` |
+| 3  | `component_class_regulatory`   | NO  | `component_class_regulatory_vessel_id_vessels_vuuid_fk` |
+| 4  | `component_documents`          | NO  | `component_documents_vessel_id_vessels_vuuid_fk` |
+| 5  | `component_maintenance_history`| NO  | `component_maintenance_history_vessel_id_vessels_vuuid_fk` |
+| 6  | `component_requisitions`       | NO  | `component_requisitions_vessel_id_vessels_vuuid_fk` |
+| 7  | `component_running_hours_log`  | NO  | `component_running_hours_log_vessel_id_vessels_vuuid_fk` |
+| 8  | `fleet_component_mapping`      | NO  | `fleet_component_mapping_vessel_id_vessels_vuuid_fk` |
+| 9  | `fleet_job_vessel_mapping`     | NO  | `fleet_job_vessel_mapping_vessel_id_vessels_vuuid_fk` |
+| 10 | `fleet_spare_vessel_mapping`   | NO  | `fleet_spare_vessel_mapping_vessel_id_vessels_vuuid_fk` |
+| 11 | `fleet_vessel_mapping`         | NO  | `fleet_vessel_mapping_vessel_id_vessels_vuuid_fk` |
+| 12 | `master_data`                  | YES | `master_data_vessel_id_vessels_vuuid_fk` |
 
-### Risk
-
-Without FK constraints, these 12 tables have no database-level protection:
-- If a vessel is deleted, these tables will have orphaned records
-- If a vessel's `vuuid` is changed, these tables will point to a non-existent vessel
-- Data integrity relies entirely on application code, not the database
-- Using `vessels.code` instead of `vessels.vuuid` in logic creates a hidden dependency on coincidental data equality
-
-### Required Future Migration: Add `vessel_id` FK and Retire `vessel_code`
-
-These 12 tables need to be migrated to use a proper `vessel_id` column with an FK constraint to `vessels(vuuid)`, and all application logic must shift from `vessel_code` to `vessel_id`. The recommended steps are:
-
-1. **Add `vessel_id` column** to each of the 12 tables (TEXT, nullable initially)
-2. **Populate `vessel_id`** by copying the value from `vessel_code` (since `vessel_code` already stores the `vuuid` value, the data is identical)
-3. **Add FK constraint** on `vessel_id` referencing `vessels(vuuid)` with ON DELETE NO ACTION, ON UPDATE NO ACTION (consistent with the existing 31 vessel FK constraints)
-4. **Make `vessel_id` NOT NULL** (after confirming all rows are populated)
-5. **Refactor server code** to use `vessel_id` instead of `vessel_code` in all queries, inserts, and filters for these tables
-6. **Refactor frontend code** if any pages directly reference `vessel_code` from these tables
-7. **Drop `vessel_code` column** from each table once all code has been migrated and verified (optional — can keep for backward compatibility if needed)
-
-Follow the Drizzle-only migration policy: update `shared/schema.ts` first, then run `drizzle-kit generate` for each step. One logical change per migration file.
+**Result**: All vessel-linked tables now use `vessel_id` with proper FK constraints to `vessels(vuuid)`. The total number of tables with vessel FK constraints is now **43** (31 original + 12 newly constrained). No `vessel_code` columns remain in the database.
 
 ---
 
@@ -485,16 +474,19 @@ Follow the project's Drizzle-only migration policy:
 | `0012_auto_2026-02-11T07-14-00.sql` | 2026-02-11 | FK constraints: 11 child tables (alert_*, certificates, defects, import_history, jobs, pms_*, surveys, work_order*) |
 | `0013_auto_2026-02-11T07-14-20.sql` | 2026-02-11 | FK constraints: 9 child tables (inventory_transactions, job_component_links, locations, spare_*, vessel_certificate_*, vessel_survey_*) |
 | `0014_auto_2026-02-11T08-37-10.sql` | 2026-02-11 | Convert `id` from TEXT to INTEGER SERIAL PRIMARY KEY; set `vuuid` NOT NULL |
+| `0024_superb_oracle.sql` | 2026-02-13 | Rename `vessel_code` → `vessel_id` in 12 tables, add FK constraints, drop redundant `vessel_code` from components |
 
 ---
 
 ## Important Notes
 
-- **Child tables were NOT migrated during the id conversion**: The 31 child tables' `vessel_id TEXT` columns and their FK constraints to `vessels(vuuid)` remained completely unchanged. No child table migration was needed because they never referenced `vessels.id` — they always referenced `vessels.vuuid`.
-- **Design choice**: Keeping child tables on TEXT UUIDs referencing `vuuid` (rather than migrating to integer FKs referencing `id`) was intentional. It avoids a massive refactor across 31 tables and 149+ files while maintaining full referential integrity.
+- **All 43 vessel-linked tables now have FK constraints**: The original 31 child tables (migrations 0009-0013) plus the 12 tables migrated from `vessel_code` (migration 0024) all reference `vessels(vuuid)` via proper FK constraints.
+- **No `vessel_code` columns remain**: Migration 0024 renamed all `vessel_code` columns to `vessel_id` and removed the redundant `vessel_code` from the `components` table.
+- **`vessels.code` must never be used for vessel identity**: Only `vessels.vuuid` is the canonical vessel identity column. `vessels.code` is a separate business field.
+- **Design choice**: Keeping child tables on TEXT UUIDs referencing `vuuid` (rather than migrating to integer FKs referencing `id`) was intentional. It avoids a massive refactor across 43 tables while maintaining full referential integrity.
 - **The `vessels.id` integer is for internal database use only**. It is never used as a foreign key by any table. All cross-table vessel relationships use the UUID in `vuuid`.
 - **Never use `db:push --force`** for vessel-related schema changes. Always use `drizzle-kit generate` to create proper migration files, following the project's Drizzle-only migration policy.
-- **Migration tracking is unified in `schema_migrations`**: Both code-based migrations (001-026) and Drizzle file-based migrations (0000-0014) are tracked in the single `schema_migrations` table. Drizzle migrations are stored with a `drizzle_` prefix (e.g., `drizzle_0014_auto_2026-02-11T08-37-10`).
+- **Migration tracking is unified in `schema_migrations`**: Both code-based migrations (001-026) and Drizzle file-based migrations (0000-0024) are tracked in the single `schema_migrations` table. Drizzle migrations are stored with a `drizzle_` prefix.
 
 ---
 

@@ -262,7 +262,6 @@ export const components = pgTable("components", {
   eqptSystemDept: text("eqpt_system_dept"), // Equipment/System Department
   // === UI Row 6: IS Active, Vessel Code, IS Parent ===
   isActive: boolean("is_active").default(true), // IS Active (Yes/No)
-  vesselCode: text("vessel_code"), // Vessel identification code
   isParent: boolean("is_parent").default(false), // IS Parent (Yes/No) - indicates if component has children
   // === UI Row 7: Notes ===
   notes: text("notes"), // Specifications or additional information
@@ -1504,7 +1503,7 @@ export type FleetEquipmentMaster = typeof fleetEquipmentMaster.$inferSelect;
 // Component Running Hours Log - Detailed audit trail for all running hours updates
 export const componentRunningHoursLog = pgTable("component_running_hours_log", {
   id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
-  vesselCode: text("vessel_code").notNull(),
+  vesselId: text("vessel_id").notNull().references(() => vessels.vuuid),
   componentCode: text("component_code").notNull(),
   componentId: text("component_id").notNull().references(() => components.cuuid, { onDelete: "restrict", onUpdate: "cascade" }),
   previousRh: decimal("previous_rh", { precision: 10, scale: 2 }).notNull(),
@@ -1517,7 +1516,7 @@ export const componentRunningHoursLog = pgTable("component_running_hours_log", {
   createdAt: timestamp("created_at").notNull().defaultNow(),
 }, (table) => ({
   componentCodeIdx: index("idx_rh_log_component_code").on(table.componentCode),
-  vesselCodeIdx: index("idx_rh_log_vessel_code").on(table.vesselCode),
+  vesselIdIdx: index("idx_rh_log_vessel_id").on(table.vesselId),
   updatedAtIdx: index("idx_rh_log_updated_at").on(table.updatedAt),
   updateSourceIdx: index("idx_rh_log_update_source").on(table.updateSource),
 }));
@@ -1536,7 +1535,7 @@ export const auditLog = pgTable("audit_log", {
   id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
   timestamp: timestamp("timestamp").notNull().defaultNow(),
   userId: text("user_id").notNull(), // User who made the change
-  vesselCode: text("vessel_code"), // Vessel context (nullable for fleet-level changes)
+  vesselId: text("vessel_id").references(() => vessels.vuuid), // Vessel context (nullable for fleet-level changes)
   componentCode: text("component_code"), // Component context (nullable)
   entityType: text("entity_type").notNull(), // 'component' | 'job' | 'work_order' | 'spare' | 'document' | 'survey' | 'maintenance_history'
   entityId: text("entity_id").notNull(), // ID of the affected entity
@@ -1549,7 +1548,7 @@ export const auditLog = pgTable("audit_log", {
 }, (table) => ({
   timestampIdx: index("idx_audit_timestamp").on(table.timestamp),
   userIdIdx: index("idx_audit_user_id").on(table.userId),
-  vesselCodeIdx: index("idx_audit_vessel_code").on(table.vesselCode),
+  vesselIdIdx: index("idx_audit_vessel_id").on(table.vesselId),
   entityTypeIdx: index("idx_audit_entity_type").on(table.entityType),
   entityIdIdx: index("idx_audit_entity_id").on(table.entityId),
   actionTypeIdx: index("idx_audit_action_type").on(table.actionType),
@@ -1568,7 +1567,7 @@ export const componentDocuments = pgTable("component_documents", {
   id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
   componentId: text("component_id").notNull().references(() => components.cuuid, { onDelete: "restrict", onUpdate: "cascade" }),
   componentCode: text("component_code").notNull(),
-  vesselCode: text("vessel_code").notNull(),
+  vesselId: text("vessel_id").notNull().references(() => vessels.vuuid),
   fleetEquipmentCode: text("fleet_equipment_code"), // Link to fleet equipment for auto-preloading
   fileName: text("file_name").notNull(),
   fileKey: text("file_key").notNull(), // Object storage key
@@ -1585,7 +1584,7 @@ export const componentDocuments = pgTable("component_documents", {
 }, (table) => ({
   componentIdIdx: index("idx_doc_component_id").on(table.componentId),
   componentCodeIdx: index("idx_doc_component_code").on(table.componentCode),
-  vesselCodeIdx: index("idx_doc_vessel_code").on(table.vesselCode),
+  vesselIdIdx: index("idx_doc_vessel_id").on(table.vesselId),
   fleetEquipmentCodeIdx: index("idx_doc_fleet_equipment_code").on(table.fleetEquipmentCode),
   fileTypeIdx: index("idx_doc_file_type").on(table.fileType),
 }));
@@ -1603,7 +1602,7 @@ export const componentClassRegulatory = pgTable("component_class_regulatory", {
   id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
   componentId: text("component_id").notNull().references(() => components.cuuid, { onDelete: "restrict", onUpdate: "cascade" }),
   componentCode: text("component_code").notNull(),
-  vesselCode: text("vessel_code").notNull(),
+  vesselId: text("vessel_id").notNull().references(() => vessels.vuuid),
   classificationSociety: text("classification_society").notNull(), // 'DNV' | 'ABS' | 'Lloyd\'s Register' | 'ClassNK' | 'RINA' | 'IRS'
   surveyType: text("survey_type").notNull(), // 'Annual Survey' | '5-Year Survey' | 'Intermediate Survey' | 'Damage Survey' | 'OEM Test' | 'Statutory Requirement' | 'Internal Company Requirement'
   certificateNumber: text("certificate_number"),
@@ -1621,7 +1620,7 @@ export const componentClassRegulatory = pgTable("component_class_regulatory", {
 }, (table) => ({
   componentIdIdx: index("idx_class_component_id").on(table.componentId),
   componentCodeIdx: index("idx_class_component_code").on(table.componentCode),
-  vesselCodeIdx: index("idx_class_vessel_code").on(table.vesselCode),
+  vesselIdIdx: index("idx_class_vessel_id").on(table.vesselId),
   surveyTypeIdx: index("idx_class_survey_type").on(table.surveyType),
   expiryDateIdx: index("idx_class_expiry_date").on(table.expiryDate),
 }));
@@ -1640,7 +1639,7 @@ export const componentMaintenanceHistory = pgTable("component_maintenance_histor
   id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
   componentId: text("component_id").notNull().references(() => components.cuuid, { onDelete: "restrict", onUpdate: "cascade" }),
   componentCode: text("component_code").notNull(),
-  vesselCode: text("vessel_code").notNull(),
+  vesselId: text("vessel_id").notNull().references(() => vessels.vuuid),
   jobId: text("job_id"), // Link to parent job for Jobs Form A5 history
   jobCode: text("job_code"), // Job number for querying (e.g., MKR-IN-00001)
   workOrderId: text("work_order_id").notNull(), // Link to completed work order
@@ -1661,7 +1660,7 @@ export const componentMaintenanceHistory = pgTable("component_maintenance_histor
 }, (table) => ({
   componentIdIdx: index("idx_history_component_id").on(table.componentId),
   componentCodeIdx: index("idx_history_component_code").on(table.componentCode),
-  vesselCodeIdx: index("idx_history_vessel_code").on(table.vesselCode),
+  vesselIdIdx: index("idx_history_vessel_id").on(table.vesselId),
   jobIdIdx: index("idx_history_job_id").on(table.jobId),
   jobCodeIdx: index("idx_history_job_code").on(table.jobCode),
   workOrderIdIdx: index("idx_history_work_order_id").on(table.workOrderId),
@@ -1682,7 +1681,7 @@ export const componentRequisitions = pgTable("component_requisitions", {
   requisitionNo: text("requisition_no").notNull().unique(), // REQ-V001-2024-001 format
   componentId: text("component_id").notNull().references(() => components.cuuid, { onDelete: "restrict", onUpdate: "cascade" }),
   componentCode: text("component_code").notNull(),
-  vesselCode: text("vessel_code").notNull(),
+  vesselId: text("vessel_id").notNull().references(() => vessels.vuuid),
   raisedOn: text("raised_on").notNull(), // DD-MMM-YYYY format
   itemOrService: text("item_or_service").notNull(), // Description of item or service requested
   relatedPartCode: text("related_part_code"), // Link to spare part code from Section E
@@ -1706,7 +1705,7 @@ export const componentRequisitions = pgTable("component_requisitions", {
 }, (table) => ({
   componentIdIdx: index("idx_req_component_id").on(table.componentId),
   componentCodeIdx: index("idx_req_component_code").on(table.componentCode),
-  vesselCodeIdx: index("idx_req_vessel_code").on(table.vesselCode),
+  vesselIdIdx: index("idx_req_vessel_id").on(table.vesselId),
   statusIdx: index("idx_req_status").on(table.status),
   requisitionNoIdx: index("idx_req_no").on(table.requisitionNo),
 }));
@@ -1827,7 +1826,7 @@ export const masterData = pgTable("master_data", {
   sfiCode: text("sfi_code").notNull(), // 7-digit SFI classification code
   assignedSubCode: text("assigned_sub_code"), // Sub-code under SFI for finer grouping
   vesselName: text("vessel_name"), // Vessel where equipment was first created
-  vesselCode: text("vessel_code"), // Vessel code
+  vesselId: text("vessel_id").references(() => vessels.vuuid), // Vessel ID
   equipmentName: text("equipment_name").notNull(), // Descriptive name of equipment
   isActive: boolean("is_active").notNull().default(true),
   createdAt: timestamp("created_at").notNull().defaultNow(),
@@ -1856,15 +1855,15 @@ export type MasterData = typeof masterData.$inferSelect;
 export const fleetVesselMapping = pgTable("fleet_vessel_mapping", {
   id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
   fleetEquipmentCode: text("fleet_equipment_code").notNull(), // From masterData or components
-  vesselCode: text("vessel_code").notNull(), // Vessel identifier
+  vesselId: text("vessel_id").notNull().references(() => vessels.vuuid), // Vessel identifier
   vesselName: text("vessel_name"), // Vessel display name
   mappedBy: text("mapped_by").notNull(), // User who created mapping
   mappedAt: timestamp("mapped_at").notNull().defaultNow(),
   isActive: boolean("is_active").notNull().default(true),
 }, (table) => ({
   fleetCodeIdx: index("idx_fleet_vessel_mapping_fleet").on(table.fleetEquipmentCode),
-  vesselCodeIdx: index("idx_fleet_vessel_mapping_vessel").on(table.vesselCode),
-  uniqueMapping: unique("unique_fleet_vessel_mapping").on(table.fleetEquipmentCode, table.vesselCode),
+  vesselIdIdx: index("idx_fleet_vessel_mapping_vessel_id").on(table.vesselId),
+  uniqueMapping: unique("unique_fleet_vessel_mapping").on(table.fleetEquipmentCode, table.vesselId),
 }));
 
 export const insertFleetVesselMappingSchema = createInsertSchema(fleetVesselMapping).omit({
@@ -1882,7 +1881,7 @@ export type FleetVesselMapping = typeof fleetVesselMapping.$inferSelect;
 export const fleetComponentMapping = pgTable("fleet_component_mapping", {
   id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
   fleetEquipmentCode: text("fleet_equipment_code").notNull(), // Fleet equipment identifier
-  vesselCode: text("vessel_code").notNull(), // Vessel identifier
+  vesselId: text("vessel_id").notNull().references(() => vessels.vuuid), // Vessel identifier
   componentCode: text("component_code").notNull(), // Vessel-specific component code
   componentId: text("component_id").notNull().references(() => components.cuuid, { onDelete: "restrict", onUpdate: "cascade" }),
   componentName: text("component_name"), // Display name
@@ -1891,9 +1890,9 @@ export const fleetComponentMapping = pgTable("fleet_component_mapping", {
   isActive: boolean("is_active").notNull().default(true),
 }, (table) => ({
   fleetCodeIdx: index("idx_fleet_comp_mapping_fleet").on(table.fleetEquipmentCode),
-  vesselCodeIdx: index("idx_fleet_comp_mapping_vessel").on(table.vesselCode),
+  vesselIdIdx: index("idx_fleet_comp_mapping_vessel_id").on(table.vesselId),
   componentCodeIdx: index("idx_fleet_comp_mapping_component").on(table.componentCode),
-  uniqueMapping: unique("unique_fleet_component_mapping").on(table.fleetEquipmentCode, table.vesselCode, table.componentCode),
+  uniqueMapping: unique("unique_fleet_component_mapping").on(table.fleetEquipmentCode, table.vesselId, table.componentCode),
 }));
 
 export const insertFleetComponentMappingSchema = createInsertSchema(fleetComponentMapping).omit({
@@ -1913,7 +1912,7 @@ export const fleetJobVesselMapping = pgTable("fleet_job_vessel_mapping", {
   fleetEquipmentCode: text("fleet_equipment_code").notNull(), // Equipment the job belongs to
   jobCode: text("job_code").notNull(), // Fleet job code
   jobId: text("job_id"), // Reference to jobs table
-  vesselCode: text("vessel_code").notNull(), // Vessel identifier
+  vesselId: text("vessel_id").notNull().references(() => vessels.vuuid), // Vessel identifier
   vesselName: text("vessel_name"), // Vessel display name
   mappedBy: text("mapped_by").notNull(), // User who created mapping
   mappedAt: timestamp("mapped_at").notNull().defaultNow(),
@@ -1921,8 +1920,8 @@ export const fleetJobVesselMapping = pgTable("fleet_job_vessel_mapping", {
 }, (table) => ({
   fleetCodeIdx: index("idx_fleet_job_mapping_fleet").on(table.fleetEquipmentCode),
   jobCodeIdx: index("idx_fleet_job_mapping_job").on(table.jobCode),
-  vesselCodeIdx: index("idx_fleet_job_mapping_vessel").on(table.vesselCode),
-  uniqueMapping: unique("unique_fleet_job_vessel_mapping").on(table.jobCode, table.vesselCode),
+  vesselIdIdx: index("idx_fleet_job_mapping_vessel_id").on(table.vesselId),
+  uniqueMapping: unique("unique_fleet_job_vessel_mapping").on(table.jobCode, table.vesselId),
 }));
 
 export const insertFleetJobVesselMappingSchema = createInsertSchema(fleetJobVesselMapping).omit({
@@ -1942,7 +1941,7 @@ export const fleetSpareVesselMapping = pgTable("fleet_spare_vessel_mapping", {
   fleetEquipmentCode: text("fleet_equipment_code").notNull(), // Equipment the spare belongs to
   partCode: text("part_code").notNull(), // Fleet spare part code
   spareId: text("spare_id"), // Reference to spares table
-  vesselCode: text("vessel_code").notNull(), // Vessel identifier
+  vesselId: text("vessel_id").notNull().references(() => vessels.vuuid), // Vessel identifier
   vesselName: text("vessel_name"), // Vessel display name
   mappedBy: text("mapped_by").notNull(), // User who created mapping
   mappedAt: timestamp("mapped_at").notNull().defaultNow(),
@@ -1950,8 +1949,8 @@ export const fleetSpareVesselMapping = pgTable("fleet_spare_vessel_mapping", {
 }, (table) => ({
   fleetCodeIdx: index("idx_fleet_spare_mapping_fleet").on(table.fleetEquipmentCode),
   partCodeIdx: index("idx_fleet_spare_mapping_part").on(table.partCode),
-  vesselCodeIdx: index("idx_fleet_spare_mapping_vessel").on(table.vesselCode),
-  uniqueMapping: unique("unique_fleet_spare_vessel_mapping").on(table.partCode, table.vesselCode),
+  vesselIdIdx: index("idx_fleet_spare_mapping_vessel_id").on(table.vesselId),
+  uniqueMapping: unique("unique_fleet_spare_vessel_mapping").on(table.partCode, table.vesselId),
 }));
 
 export const insertFleetSpareVesselMappingSchema = createInsertSchema(fleetSpareVesselMapping).omit({
@@ -1968,7 +1967,7 @@ export type FleetSpareVesselMapping = typeof fleetSpareVesselMapping.$inferSelec
 // =====================================================
 export const bulkImportHistory = pgTable("bulk_import_history", {
   id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
-  vesselCode: text("vessel_code"), // Null for fleet-level imports
+  vesselId: text("vessel_id").references(() => vessels.vuuid), // Null for fleet-level imports
   vesselName: text("vessel_name"),
   moduleType: text("module_type").notNull(), // 'Machinery' | 'Jobs' | 'Spares' | 'Stores' | 'Fleet_Component' | 'Fleet_Job' | 'Fleet_Spare'
   sheetName: text("sheet_name"), // Which sheet was imported (for multi-sheet templates)
@@ -1987,7 +1986,7 @@ export const bulkImportHistory = pgTable("bulk_import_history", {
   templateVersion: text("template_version"), // Version of template used
   processingTimeMs: integer("processing_time_ms"), // How long import took
 }, (table) => ({
-  vesselCodeIdx: index("idx_bulk_import_vessel").on(table.vesselCode),
+  vesselIdIdx: index("idx_bulk_import_vessel_id").on(table.vesselId),
   moduleTypeIdx: index("idx_bulk_import_module").on(table.moduleType),
   uploadedAtIdx: index("idx_bulk_import_date").on(table.uploadedAt),
   statusIdx: index("idx_bulk_import_status").on(table.status),

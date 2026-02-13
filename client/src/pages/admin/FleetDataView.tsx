@@ -35,7 +35,6 @@ interface MappedFleetComponent {
   sfiCode?: string | null;
   vesselId?: string | null;
   vesselName?: string | null;
-  vesselCode?: string | null;
   assignedSubCode?: string | null;
 }
 
@@ -64,9 +63,8 @@ function mapMasterDataToFleetComponent(item: MasterData): MappedFleetComponent {
     department: null,
     eqptSystemDept: null,
     parentFleetEquipmentCode: parentCode,
-    vesselId: item.vesselCode || null,
+    vesselId: item.vesselId || null,
     vesselName: item.vesselName || null,
-    vesselCode: item.vesselCode || null,
     assignedSubCode: item.assignedSubCode || null,
   };
 }
@@ -247,7 +245,6 @@ interface ComponentVesselMapping {
   componentId: string;
   fleetEquipmentCode: string;
   vesselId: string;
-  vesselCode: string;
   vesselName: string;
   componentCode?: string;
   componentName?: string;
@@ -346,7 +343,7 @@ export default function FleetDataView() {
   });
 
   const addMappingMutation = useMutation({
-    mutationFn: async (data: { fleetEquipmentCode: string; vesselCode: string; vesselName: string; componentCode?: string; componentName?: string }) => {
+    mutationFn: async (data: { fleetEquipmentCode: string; vesselId: string; vesselName: string; componentCode?: string; componentName?: string }) => {
       return apiRequest("POST", "/technical/api/fleet-admin/component-vessel-mappings", data);
     },
     onSuccess: () => {
@@ -462,7 +459,7 @@ export default function FleetDataView() {
       );
       if (mappings.length > 0) {
         return mappings.map(m => ({
-          id: m.vesselCode,
+          id: m.vesselId,
           name: m.vesselName,
           mapping: m
         }));
@@ -473,7 +470,7 @@ export default function FleetDataView() {
     if (selectedComponent.vesselId && vessels) {
       const vessel = vessels.find((v) => v.id === selectedComponent.vesselId);
       if (vessel) {
-        return [{ id: vessel.code || vessel.id, name: vessel.name, mapping: null }];
+        return [{ id: vessel.id, name: vessel.name, mapping: null }];
       }
     }
     
@@ -493,7 +490,7 @@ export default function FleetDataView() {
       mappings = mappings.filter(
         (m) => 
           m.vesselName?.toLowerCase().includes(query) ||
-          m.vesselCode?.toLowerCase().includes(query) ||
+          m.vesselId?.toLowerCase().includes(query) ||
           m.componentCode?.toLowerCase().includes(query) ||
           m.componentName?.toLowerCase().includes(query)
       );
@@ -506,8 +503,7 @@ export default function FleetDataView() {
     if (!selectedVesselForDetail || !selectedComponent || !componentVesselMappings) return [];
     
     let mappings = componentVesselMappings.filter(
-      (m) => (m.vesselCode === selectedVesselForDetail.vesselCode || 
-              m.vesselId === selectedVesselForDetail.vesselId) &&
+      (m) => (m.vesselId === selectedVesselForDetail.vesselId) &&
              (m.fleetEquipmentCode === selectedComponent.fleetEquipmentCode ||
               m.componentId === String(selectedComponent.id))
     );
@@ -532,7 +528,7 @@ export default function FleetDataView() {
       (componentVesselMappings || [])
         .filter(m => m.fleetEquipmentCode === selectedComponent.fleetEquipmentCode ||
                      m.componentId === String(selectedComponent.id))
-        .map(m => m.vesselCode)
+        .map(m => m.vesselId)
     );
     
     let available = vessels.filter(v => !mappedVesselCodes.has(v.code || v.id));
@@ -548,13 +544,13 @@ export default function FleetDataView() {
     return available;
   }, [selectedComponent, vessels, componentVesselMappings, vesselMappingSearchQuery]);
 
-  const handleVesselMappingCheckboxChange = (vesselCode: string, checked: boolean) => {
+  const handleVesselMappingCheckboxChange = (vesselId: string, checked: boolean) => {
     setSelectedVesselsToMap((prev) => {
       const newSet = new Set(prev);
       if (checked) {
-        newSet.add(vesselCode);
+        newSet.add(vesselId);
       } else {
-        newSet.delete(vesselCode);
+        newSet.delete(vesselId);
       }
       return newSet;
     });
@@ -577,7 +573,7 @@ export default function FleetDataView() {
       vesselsToMap.map(vessel => 
         addMappingMutation.mutateAsync({
           fleetEquipmentCode: selectedComponent.fleetEquipmentCode,
-          vesselCode: vessel.code || vessel.id,
+          vesselId: vessel.id,
           vesselName: vessel.name,
           componentCode: selectedComponent.fleetEquipmentCode,
           componentName: selectedComponent.fleetEquipmentName,
@@ -606,8 +602,7 @@ export default function FleetDataView() {
     
     const mappedComponentCodes = new Set(
       (componentVesselMappings || [])
-        .filter(m => m.vesselCode === selectedVesselForDetail.vesselCode || 
-                     m.vesselId === selectedVesselForDetail.vesselId)
+        .filter(m => m.vesselId === selectedVesselForDetail.vesselId)
         .map(m => m.fleetEquipmentCode || m.componentCode)
     );
     
@@ -662,7 +657,7 @@ export default function FleetDataView() {
       componentsToMap.map(component => 
         addMappingMutation.mutateAsync({
           fleetEquipmentCode: component.fleetEquipmentCode,
-          vesselCode: selectedVesselForDetail.vesselCode,
+          vesselId: selectedVesselForDetail.vesselId,
           vesselName: selectedVesselForDetail.vesselName,
           componentCode: component.fleetEquipmentCode,
           componentName: component.fleetEquipmentName,
@@ -1192,7 +1187,7 @@ export default function FleetDataView() {
                           data-testid={`checkbox-mapping-${mapping.id}`}
                         />
                       </td>
-                      <td className="py-2 px-2">{mapping.vesselCode || mapping.vesselId}</td>
+                      <td className="py-2 px-2">{mapping.vesselId}</td>
                       <td 
                         className="py-2 px-2 cursor-pointer text-blue-600 hover:underline"
                         onClick={() => {
@@ -1379,17 +1374,17 @@ export default function FleetDataView() {
               <tbody>
                 {unmappedVessels.length > 0 ? (
                   unmappedVessels.map((vessel) => (
-                    <tr key={vessel.code || vessel.id} className="border-b last:border-0 hover:bg-gray-50">
+                    <tr key={vessel.id} className="border-b last:border-0 hover:bg-gray-50">
                       <td className="py-2 px-2">
                         <Checkbox
-                          checked={selectedVesselsToMap.has(vessel.code || vessel.id)}
+                          checked={selectedVesselsToMap.has(vessel.id)}
                           onCheckedChange={(checked) =>
-                            handleVesselMappingCheckboxChange(vessel.code || vessel.id, checked as boolean)
+                            handleVesselMappingCheckboxChange(vessel.id, checked as boolean)
                           }
-                          data-testid={`checkbox-vessel-map-${vessel.code || vessel.id}`}
+                          data-testid={`checkbox-vessel-map-${vessel.id}`}
                         />
                       </td>
-                      <td className="py-2 px-2">{vessel.code || vessel.id}</td>
+                      <td className="py-2 px-2">{vessel.id}</td>
                       <td className="py-2 px-2">{vessel.name}</td>
                     </tr>
                   ))
