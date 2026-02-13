@@ -30,6 +30,7 @@ export type {
 
 export const v2WorkOrders = pgTable("work_orders", {
   id: text("id").primaryKey(),
+  wouuid: text("wouuid").notNull().unique(),
   vesselId: text("vessel_id"),
   component: text("component").notNull(),
   componentCode: text("component_code"),
