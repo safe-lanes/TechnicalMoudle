@@ -242,7 +242,17 @@ export default function MasterDataTableView({ onBack }: { onBack?: () => void })
                 {filteredData.length} Records
               </Badge>
             </div>
-            <div className="flex flex-wrap gap-2">
+            <div className="flex flex-wrap items-center gap-2">
+              <div className="relative min-w-[220px] sm:min-w-[280px]">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+                <Input
+                  placeholder="Search master data..."
+                  className="pl-10"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  data-testid="input-search-master-data"
+                />
+              </div>
               <Button
                 variant="outline"
                 size="sm"
@@ -253,18 +263,6 @@ export default function MasterDataTableView({ onBack }: { onBack?: () => void })
                 <Download className="h-4 w-4 mr-2" />
                 Export
               </Button>
-            </div>
-          </div>
-          <div className="flex items-center gap-4 mt-4">
-            <div className="relative flex-1 max-w-md">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
-              <Input
-                placeholder="Search master data..."
-                className="pl-10"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                data-testid="input-search-master-data"
-              />
             </div>
           </div>
         </CardHeader>
