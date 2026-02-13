@@ -13,7 +13,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Ship, Box, Wrench, Package, Search, Link2, ArrowLeft, RefreshCw, Zap, CheckCircle2, Anchor, ChevronRight, ChevronDown, FolderTree } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import type { Component, FleetComponents } from "@shared/schema";
+import type { Component, FleetComponents, FleetJobs } from "@shared/schema";
 
 type MappingTab = "components" | "jobs" | "spares";
 
@@ -100,6 +100,21 @@ export default function FleetVesselMapping({ onBack }: { onBack?: () => void }) 
     () => vesselComponentsData.filter((c) => c.isParent !== true),
     [vesselComponentsData]
   );
+
+  const { data: fleetJobsData = [], isLoading: isLoadingFleetJobs } = useQuery<FleetJobs[]>({
+    queryKey: ["/technical/api/fleet/jobs"],
+    enabled: activeTab === "jobs",
+  });
+
+  const { data: vesselJobsData = [], isLoading: isLoadingVesselJobs } = useQuery<any[]>({
+    queryKey: ["/technical/api/jobs", { vesselId: selectedVessel }],
+    queryFn: async () => {
+      const res = await fetch(`/technical/api/jobs?vesselId=${selectedVessel}`, { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to fetch vessel jobs");
+      return res.json();
+    },
+    enabled: !!selectedVessel && activeTab === "jobs",
+  });
 
   const fleetComponents = useMemo(() => fleetComponentsData, [fleetComponentsData]);
 
@@ -718,7 +733,7 @@ export default function FleetVesselMapping({ onBack }: { onBack?: () => void }) 
           </TabsTrigger>
         </TabsList>
 
-        <TabsContent value={activeTab}>
+        <TabsContent value="components">
           <div className="mb-4 flex items-center gap-4 text-sm">
             <div className="flex items-center gap-2">
               <div className="w-3 h-3 rounded-full bg-green-500" />
@@ -850,6 +865,124 @@ export default function FleetVesselMapping({ onBack }: { onBack?: () => void }) 
                 </CardContent>
               </Card>
             </div>
+          )}
+        </TabsContent>
+
+        <TabsContent value="jobs">
+          {!selectedVessel ? (
+            <Card>
+              <CardContent className="py-12">
+                <div className="text-center text-gray-500">
+                  <Ship className="h-16 w-16 mx-auto mb-4 opacity-30" />
+                  <h3 className="text-lg font-medium mb-2">Select a Vessel</h3>
+                  <p className="text-sm">Choose a vessel from the dropdown above to view and manage job mappings</p>
+                </div>
+              </CardContent>
+            </Card>
+          ) : (
+            <div className="grid gap-4" style={{ gridTemplateColumns: "1fr 1fr" }}>
+              <Card>
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-base flex items-center gap-2 flex-wrap">
+                    <Wrench className="h-4 w-4 text-cyan-600" />
+                    Fleet Jobs
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="p-0">
+                  <ScrollArea className="h-[500px]">
+                    {isLoadingFleetJobs ? (
+                      <div className="text-center py-8">
+                        <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-cyan-500 mx-auto" />
+                      </div>
+                    ) : fleetJobsData.length === 0 ? (
+                      <div className="text-center py-8 text-gray-500 text-xs">No fleet jobs found</div>
+                    ) : (
+                      <table className="w-full" data-testid="table-fleet-jobs">
+                        <thead>
+                          <tr className="border-b">
+                            <th className="sticky top-0 bg-gray-50 z-10 text-left px-3 py-2 text-xs font-medium text-gray-500">Fleet Equipment Code</th>
+                            <th className="sticky top-0 bg-gray-50 z-10 text-left px-3 py-2 text-xs font-medium text-gray-500">Job Code</th>
+                            <th className="sticky top-0 bg-gray-50 z-10 text-left px-3 py-2 text-xs font-medium text-gray-500">Job Title</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {fleetJobsData.map((job) => (
+                            <tr key={job.id} className="border-b text-xs hover:bg-blue-50/50" data-testid={`row-fleet-job-${job.id}`}>
+                              <td className="px-3 py-2 font-mono text-gray-600">{job.fleetEquipmentCode}</td>
+                              <td className="px-3 py-2 font-mono text-gray-600">{job.jobCode}</td>
+                              <td className="px-3 py-2 text-gray-600">{job.woTitle}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    )}
+                  </ScrollArea>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-base flex items-center gap-2 flex-wrap">
+                    <Anchor className="h-4 w-4 text-cyan-600" />
+                    Vessel Jobs
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="p-0">
+                  <ScrollArea className="h-[500px]">
+                    {isLoadingVesselJobs ? (
+                      <div className="text-center py-8">
+                        <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-cyan-500 mx-auto" />
+                      </div>
+                    ) : vesselJobsData.length === 0 ? (
+                      <div className="text-center py-8 text-gray-500 text-xs">No vessel jobs found</div>
+                    ) : (
+                      <table className="w-full" data-testid="table-vessel-jobs">
+                        <thead>
+                          <tr className="border-b">
+                            <th className="sticky top-0 bg-gray-50 z-10 text-left px-3 py-2 text-xs font-medium text-gray-500">Fleet Equipment Code</th>
+                            <th className="sticky top-0 bg-gray-50 z-10 text-left px-3 py-2 text-xs font-medium text-gray-500">Job Code</th>
+                            <th className="sticky top-0 bg-gray-50 z-10 text-left px-3 py-2 text-xs font-medium text-gray-500">Job Title</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {vesselJobsData.map((job) => (
+                            <tr key={job.id} className="border-b text-xs hover:bg-blue-50/50" data-testid={`row-vessel-job-${job.id}`}>
+                              <td className="px-3 py-2 font-mono text-gray-600">{job.fleetEquipmentCode || "-"}</td>
+                              <td className="px-3 py-2 font-mono text-gray-600">{job.fleetJobCode || job.jobNo}</td>
+                              <td className="px-3 py-2 text-gray-600">{job.jobTitle}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    )}
+                  </ScrollArea>
+                </CardContent>
+              </Card>
+            </div>
+          )}
+        </TabsContent>
+
+        <TabsContent value="spares">
+          {!selectedVessel ? (
+            <Card>
+              <CardContent className="py-12">
+                <div className="text-center text-gray-500">
+                  <Ship className="h-16 w-16 mx-auto mb-4 opacity-30" />
+                  <h3 className="text-lg font-medium mb-2">Select a Vessel</h3>
+                  <p className="text-sm">Choose a vessel from the dropdown above to view and manage spares mappings</p>
+                </div>
+              </CardContent>
+            </Card>
+          ) : (
+            <Card>
+              <CardContent className="py-12">
+                <div className="text-center text-gray-500">
+                  <Package className="h-16 w-16 mx-auto mb-4 opacity-30" />
+                  <h3 className="text-lg font-medium mb-2">Spares Mapping</h3>
+                  <p className="text-sm">Spares mapping functionality coming soon</p>
+                </div>
+              </CardContent>
+            </Card>
           )}
         </TabsContent>
       </Tabs>
