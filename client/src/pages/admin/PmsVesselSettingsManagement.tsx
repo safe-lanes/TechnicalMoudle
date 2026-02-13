@@ -10,7 +10,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient, apiRequest } from "@/lib/queryClient";
-import { Clock, Settings, Ship, Save, X, Calendar, Gauge, AlertCircle, CheckCircle2, ArrowLeft } from "lucide-react";
+import { Clock, Settings, Ship, Save, X, Calendar, Gauge, AlertCircle, CheckCircle2, ArrowLeft, Search } from "lucide-react";
 import type { PmsVesselSettings } from "@shared/schema";
 import { Marker } from "@/components/Marker";
 
@@ -24,6 +24,7 @@ export default function PmsVesselSettingsManagement({ onBack }: { onBack?: () =>
   const { toast } = useToast();
   const [selectedVessel, setSelectedVessel] = useState<Vessel | null>(null);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+  const [vesselSearch, setVesselSearch] = useState("");
   
   const [formData, setFormData] = useState({
     calendarLeadDaysCritical: 7,
@@ -124,6 +125,12 @@ export default function PmsVesselSettingsManagement({ onBack }: { onBack?: () =>
   const configuredCount = vessels.filter(v => isConfigured(v.id)).length;
   const notSetCount = vessels.length - configuredCount;
 
+  const filteredVessels = vessels.filter((v) => {
+    if (!vesselSearch.trim()) return true;
+    const query = vesselSearch.toLowerCase().trim();
+    return v.name.toLowerCase().includes(query) || v.id.toLowerCase().includes(query);
+  });
+
   return (
     <div className="p-6">
       <Card className="overflow-hidden">
@@ -167,6 +174,16 @@ export default function PmsVesselSettingsManagement({ onBack }: { onBack?: () =>
                 </Badge>
               </div>
             </div>
+            <div className="relative min-w-[200px] sm:min-w-[260px]">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+              <Input
+                placeholder="Search by vessel name or ID..."
+                className="pl-10 bg-white border-gray-300"
+                value={vesselSearch}
+                onChange={(e) => setVesselSearch(e.target.value)}
+                data-testid="input-search-vessels"
+              />
+            </div>
           </div>
         </div>
 
@@ -185,7 +202,7 @@ export default function PmsVesselSettingsManagement({ onBack }: { onBack?: () =>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        {vessels.map((vessel) => {
+        {filteredVessels.map((vessel) => {
           const configured = isConfigured(vessel.id);
           const summary = formatSettingsSummary(vessel.id);
           
