@@ -5,15 +5,13 @@ import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
-import { Plus, Search, Pencil, Trash2, Download, Wrench, Package, ArrowLeft, Info, Save, X } from "lucide-react";
+import { Plus, Search, Pencil, Trash2, Download, Wrench, Package, ArrowLeft, Info, X } from "lucide-react";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { Marker } from "@/components/Marker";
-import { SectionBlock } from "@/components/SectionBlock";
 
 export default function FleetSparesManagement({ onBack }: { onBack?: () => void }) {
   const { toast } = useToast();
@@ -302,12 +300,13 @@ export default function FleetSparesManagement({ onBack }: { onBack?: () => void 
   const totalSpares = spares?.length || 0;
 
   const renderSpareFormSections = (formData: Partial<FleetSpares>, setFormData: (fn: (prev: Partial<FleetSpares>) => Partial<FleetSpares>) => void) => (
-    <div className="max-w-5xl mx-auto space-y-6">
-      <SectionBlock id="spare-basic-info" number="A1" title="Basic Information" description="Core identification and classification details">
-        <div className="space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div className="space-y-1">
-              <Label className="text-sm text-[#8798ad]">Part Code *</Label>
+    <div className="space-y-4">
+      <div className="mb-4">
+        <h3 className="text-sm font-bold text-gray-800 mb-3">Basic Information</h3>
+        <div className="bg-green-50/70 rounded-lg p-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label className="text-xs text-gray-500 mb-1 block">Part Code *</label>
               <Input
                 placeholder="Enter part code"
                 value={formData.partCode || ""}
@@ -315,8 +314,8 @@ export default function FleetSparesManagement({ onBack }: { onBack?: () => void 
                 data-testid="input-spare-part-code"
               />
             </div>
-            <div className="space-y-1">
-              <Label className="text-sm text-[#8798ad]">Part Name *</Label>
+            <div>
+              <label className="text-xs text-gray-500 mb-1 block">Part Name *</label>
               <Input
                 placeholder="Enter part name"
                 value={formData.partName || ""}
@@ -324,8 +323,8 @@ export default function FleetSparesManagement({ onBack }: { onBack?: () => void 
                 data-testid="input-spare-part-name"
               />
             </div>
-            <div className="space-y-1">
-              <Label className="text-sm text-[#8798ad]">Part Number</Label>
+            <div>
+              <label className="text-xs text-gray-500 mb-1 block">Part Number</label>
               <Input
                 placeholder="Enter part number"
                 value={formData.partNumber || ""}
@@ -333,8 +332,8 @@ export default function FleetSparesManagement({ onBack }: { onBack?: () => void 
                 data-testid="input-spare-part-number"
               />
             </div>
-            <div className="space-y-1">
-              <Label className="text-sm text-[#8798ad]">UOM *</Label>
+            <div>
+              <label className="text-xs text-gray-500 mb-1 block">Unit Of Measurement *</label>
               <Input
                 placeholder="Enter unit of measurement"
                 value={formData.unitOfMeasurement || ""}
@@ -342,8 +341,8 @@ export default function FleetSparesManagement({ onBack }: { onBack?: () => void 
                 data-testid="input-spare-uom"
               />
             </div>
-            <div className="space-y-1">
-              <Label className="text-sm text-[#8798ad]">Fleet Equipment Code *</Label>
+            <div>
+              <label className="text-xs text-gray-500 mb-1 block">Fleet Equipment Code *</label>
               <div className="relative">
                 <div className="relative">
                   <Input
@@ -385,420 +384,200 @@ export default function FleetSparesManagement({ onBack }: { onBack?: () => void 
                 )}
               </div>
             </div>
-            <div className="space-y-1">
-              <Label className="text-sm text-[#8798ad]">Equipment Name</Label>
+            <div>
+              <label className="text-xs text-gray-500 mb-1 block">Equipment Name</label>
               <div className="text-sm font-medium text-gray-900 bg-gray-50 px-3 py-2 rounded-md border border-gray-200 min-h-[38px] flex items-center" data-testid="field-spare-equipment-code">
                 {formData.fleetEquipmentName || '-'}
               </div>
             </div>
           </div>
         </div>
-      </SectionBlock>
+      </div>
 
-      <SectionBlock id="spare-status" number="A2" title="Status & Classification" description="Status flags and classification details">
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <div className="space-y-1">
-            <Label className="text-sm text-[#8798ad]">Criticality</Label>
-            <Select
-              value={formData.criticality || ""}
-              onValueChange={(val) => setFormData(prev => ({ ...prev, criticality: val }))}
-            >
-              <SelectTrigger data-testid="input-spare-criticality">
-                <SelectValue placeholder="Select" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="Yes">Yes</SelectItem>
-                <SelectItem value="No">No</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="space-y-1">
-            <Label className="text-sm text-[#8798ad]">Is Active</Label>
-            <Select
-              value={formData.isActive === true ? "Yes" : formData.isActive === false ? "No" : ""}
-              onValueChange={(val) => setFormData(prev => ({ ...prev, isActive: val === "Yes" }))}
-            >
-              <SelectTrigger data-testid="input-spare-is-active">
-                <SelectValue placeholder="Select" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="Yes">Yes</SelectItem>
-                <SelectItem value="No">No</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="space-y-1">
-            <Label className="text-sm text-[#8798ad]">IHM</Label>
-            <Select
-              value={formData.ihm || ""}
-              onValueChange={(val) => setFormData(prev => ({ ...prev, ihm: val }))}
-            >
-              <SelectTrigger data-testid="input-spare-ihm">
-                <SelectValue placeholder="Select" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="Yes">Yes</SelectItem>
-                <SelectItem value="No">No</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="space-y-1">
-            <Label className="text-sm text-[#8798ad]">Evidence Type</Label>
-            <Input
-              placeholder="Enter evidence type"
-              value={formData.evidenceType || ""}
-              onChange={(e) => setFormData(prev => ({ ...prev, evidenceType: e.target.value }))}
-              data-testid="input-spare-evidence-type"
-            />
+      <div className="mb-4">
+        <h3 className="text-sm font-bold text-gray-800 mb-3">Status & Classification</h3>
+        <div className="bg-green-50/70 rounded-lg p-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label className="text-xs text-gray-500 mb-1 block">Criticality</label>
+              <Select
+                value={formData.criticality || ""}
+                onValueChange={(val) => setFormData(prev => ({ ...prev, criticality: val }))}
+              >
+                <SelectTrigger data-testid="input-spare-criticality">
+                  <SelectValue placeholder="Select" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="Yes">Yes</SelectItem>
+                  <SelectItem value="No">No</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <label className="text-xs text-gray-500 mb-1 block">Is Active</label>
+              <Select
+                value={formData.isActive === true ? "Yes" : formData.isActive === false ? "No" : ""}
+                onValueChange={(val) => setFormData(prev => ({ ...prev, isActive: val === "Yes" }))}
+              >
+                <SelectTrigger data-testid="input-spare-is-active">
+                  <SelectValue placeholder="Select" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="Yes">Yes</SelectItem>
+                  <SelectItem value="No">No</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <label className="text-xs text-gray-500 mb-1 block">IHM</label>
+              <Select
+                value={formData.ihm || ""}
+                onValueChange={(val) => setFormData(prev => ({ ...prev, ihm: val }))}
+              >
+                <SelectTrigger data-testid="input-spare-ihm">
+                  <SelectValue placeholder="Select" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="Yes">Yes</SelectItem>
+                  <SelectItem value="No">No</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <label className="text-xs text-gray-500 mb-1 block">Evidence Type</label>
+              <Input
+                placeholder="Enter evidence type"
+                value={formData.evidenceType || ""}
+                onChange={(e) => setFormData(prev => ({ ...prev, evidenceType: e.target.value }))}
+                data-testid="input-spare-evidence-type"
+              />
+            </div>
           </div>
         </div>
-      </SectionBlock>
+      </div>
 
-      <SectionBlock id="spare-technical" number="A3" title="Technical Details" description="Maker and technical specifications">
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <div className="space-y-1 relative">
-            <Label className="text-sm text-[#8798ad]">Maker</Label>
+      <div className="mb-4">
+        <h3 className="text-sm font-bold text-gray-800 mb-3">Technical Details</h3>
+        <div className="bg-green-50/70 rounded-lg p-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="relative">
-              <Input
-                placeholder="Type to search makers..."
-                value={makerSearchText}
-                onChange={(e) => handleMakerSearchChange(e.target.value)}
-                onFocus={() => { if (makerSearchText.trim()) setShowMakerSuggestions(true); }}
-                onBlur={() => setTimeout(() => setShowMakerSuggestions(false), 200)}
-                className="pr-8"
-                data-testid="input-spare-maker"
-              />
-              {makerSearchText && (
-                <button
-                  type="button"
-                  onClick={handleClearMaker}
-                  className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
-                  data-testid="button-clear-spare-maker"
-                >
-                  <X className="h-4 w-4" />
-                </button>
+              <label className="text-xs text-gray-500 mb-1 block">Maker</label>
+              <div className="relative">
+                <Input
+                  placeholder="Type to search makers..."
+                  value={makerSearchText}
+                  onChange={(e) => handleMakerSearchChange(e.target.value)}
+                  onFocus={() => { if (makerSearchText.trim()) setShowMakerSuggestions(true); }}
+                  onBlur={() => setTimeout(() => setShowMakerSuggestions(false), 200)}
+                  className="pr-8"
+                  data-testid="input-spare-maker"
+                />
+                {makerSearchText && (
+                  <button
+                    type="button"
+                    onClick={handleClearMaker}
+                    className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                    data-testid="button-clear-spare-maker"
+                  >
+                    <X className="h-4 w-4" />
+                  </button>
+                )}
+              </div>
+              {showMakerSuggestions && filteredMakers.length > 0 && (
+                <div className="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-md shadow-lg max-h-48 overflow-y-auto">
+                  {filteredMakers.map((maker) => (
+                    <div
+                      key={maker.id}
+                      className="px-3 py-2 text-sm cursor-pointer hover:bg-cyan-50 hover:text-cyan-700 border-b border-gray-100 last:border-b-0"
+                      onMouseDown={() => handleMakerSelect(maker)}
+                      data-testid={`spare-maker-suggestion-${maker.id}`}
+                    >
+                      <span className="font-medium">{maker.makerName}</span>
+                      {maker.makerCode && (
+                        <span className="text-gray-400 ml-2 text-xs">({maker.makerCode})</span>
+                      )}
+                    </div>
+                  ))}
+                </div>
               )}
             </div>
-            {showMakerSuggestions && filteredMakers.length > 0 && (
-              <div className="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-md shadow-lg max-h-48 overflow-y-auto">
-                {filteredMakers.map((maker) => (
-                  <div
-                    key={maker.id}
-                    className="px-3 py-2 text-sm cursor-pointer hover:bg-cyan-50 hover:text-cyan-700 border-b border-gray-100 last:border-b-0"
-                    onMouseDown={() => handleMakerSelect(maker)}
-                    data-testid={`spare-maker-suggestion-${maker.id}`}
-                  >
-                    <span className="font-medium">{maker.makerName}</span>
-                    {maker.makerCode && (
-                      <span className="text-gray-400 ml-2 text-xs">({maker.makerCode})</span>
-                    )}
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-          <div className="space-y-1">
-            <Label className="text-sm text-[#8798ad]">Maker Code</Label>
-            <Input
-              placeholder="Auto-filled from maker selection"
-              value={formData.makerCode || ""}
-              readOnly
-              className="bg-gray-100 text-gray-600"
-              data-testid="input-spare-maker-code"
-            />
-          </div>
-          <div className="space-y-1">
-            <Label className="text-sm text-[#8798ad]">Drawing Number</Label>
-            <Input
-              placeholder="Enter drawing number"
-              value={formData.drawingNumber || ""}
-              onChange={(e) => setFormData(prev => ({ ...prev, drawingNumber: e.target.value }))}
-              data-testid="input-spare-drawing-number"
-            />
-          </div>
-          <div className="space-y-1">
-            <Label className="text-sm text-[#8798ad]">Position Number</Label>
-            <Input
-              placeholder="Enter position number"
-              value={formData.positionNumber || ""}
-              onChange={(e) => setFormData(prev => ({ ...prev, positionNumber: e.target.value }))}
-              data-testid="input-spare-position-number"
-            />
-          </div>
-          <div className="space-y-1 md:col-span-2">
-            <Label className="text-sm text-[#8798ad]">Specification</Label>
-            <Input
-              placeholder="Enter specification"
-              value={formData.specification || ""}
-              onChange={(e) => setFormData(prev => ({ ...prev, specification: e.target.value }))}
-              data-testid="input-spare-specification"
-            />
+            <div>
+              <label className="text-xs text-gray-500 mb-1 block">Maker Code</label>
+              <Input
+                placeholder="Auto-filled from maker selection"
+                value={formData.makerCode || ""}
+                readOnly
+                className="bg-gray-100 text-gray-600"
+                data-testid="input-spare-maker-code"
+              />
+            </div>
+            <div>
+              <label className="text-xs text-gray-500 mb-1 block">Drawing Number</label>
+              <Input
+                placeholder="Enter drawing number"
+                value={formData.drawingNumber || ""}
+                onChange={(e) => setFormData(prev => ({ ...prev, drawingNumber: e.target.value }))}
+                data-testid="input-spare-drawing-number"
+              />
+            </div>
+            <div>
+              <label className="text-xs text-gray-500 mb-1 block">Position Number</label>
+              <Input
+                placeholder="Enter position number"
+                value={formData.positionNumber || ""}
+                onChange={(e) => setFormData(prev => ({ ...prev, positionNumber: e.target.value }))}
+                data-testid="input-spare-position-number"
+              />
+            </div>
+            <div className="md:col-span-2">
+              <label className="text-xs text-gray-500 mb-1 block">Specification</label>
+              <Input
+                placeholder="Enter specification"
+                value={formData.specification || ""}
+                onChange={(e) => setFormData(prev => ({ ...prev, specification: e.target.value }))}
+                data-testid="input-spare-specification"
+              />
+            </div>
           </div>
         </div>
-      </SectionBlock>
+      </div>
 
-      <SectionBlock id="spare-manual" number="A4" title="Manual Reference" description="Manual and documentation references">
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <div className="space-y-1">
-            <Label className="text-sm text-[#8798ad]">Manual Name</Label>
-            <Input
-              placeholder="Enter manual name"
-              value={formData.manualName || ""}
-              onChange={(e) => setFormData(prev => ({ ...prev, manualName: e.target.value }))}
-              data-testid="input-spare-manual-name"
-            />
+      <div className="mb-4">
+        <h3 className="text-sm font-bold text-gray-800 mb-3">Manual Reference</h3>
+        <div className="bg-green-50/70 rounded-lg p-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label className="text-xs text-gray-500 mb-1 block">Manual Name</label>
+              <Input
+                placeholder="Enter manual name"
+                value={formData.manualName || ""}
+                onChange={(e) => setFormData(prev => ({ ...prev, manualName: e.target.value }))}
+                data-testid="input-spare-manual-name"
+              />
+            </div>
+            <div>
+              <label className="text-xs text-gray-500 mb-1 block">Page Number</label>
+              <Input
+                placeholder="Enter page number"
+                value={formData.pageNumber || ""}
+                onChange={(e) => setFormData(prev => ({ ...prev, pageNumber: e.target.value }))}
+                data-testid="input-spare-page-number"
+              />
+            </div>
           </div>
-          <div className="space-y-1">
-            <Label className="text-sm text-[#8798ad]">Page Number</Label>
+          <div className="mt-4">
+            <label className="text-xs text-gray-500 mb-1 block">Note</label>
             <Input
-              placeholder="Enter page number"
-              value={formData.pageNumber || ""}
-              onChange={(e) => setFormData(prev => ({ ...prev, pageNumber: e.target.value }))}
-              data-testid="input-spare-page-number"
+              placeholder="Enter notes"
+              value={formData.note || ""}
+              onChange={(e) => setFormData(prev => ({ ...prev, note: e.target.value }))}
+              data-testid="input-spare-note"
             />
           </div>
         </div>
-        <div className="mt-4 space-y-1">
-          <Label className="text-sm text-[#8798ad]">Note</Label>
-          <Input
-            placeholder="Enter notes"
-            value={formData.note || ""}
-            onChange={(e) => setFormData(prev => ({ ...prev, note: e.target.value }))}
-            data-testid="input-spare-note"
-          />
-        </div>
-      </SectionBlock>
+      </div>
     </div>
   );
-
-  if (isAddMode) {
-    return (
-      <div className="flex flex-col h-full">
-        <div className="bg-gradient-to-r from-cyan-600 to-blue-600 px-6 py-4 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="p-2 bg-white/20 rounded-lg">
-              <Plus className="h-5 w-5 text-white" />
-            </div>
-            <div>
-              <h1 className="text-xl font-bold text-white" data-testid="title-add-spare">Add New Spare</h1>
-              <p className="text-cyan-100 text-sm mt-0.5">
-                {spareFormData.partName || "Create a new fleet spare part"}
-              </p>
-            </div>
-          </div>
-          <div className="flex items-center gap-2">
-            <Button
-              className="bg-white/20 text-white border-white/30"
-              variant="outline"
-              onClick={handleCancelAdd}
-              data-testid="btn-cancel-add-spare"
-            >
-              Cancel
-            </Button>
-            <Button
-              className="bg-white text-blue-600"
-              onClick={handleSaveAdd}
-              disabled={createSpareMutation.isPending}
-              data-testid="btn-save-add-spare"
-            >
-              {createSpareMutation.isPending ? "Saving..." : "Save"}
-            </Button>
-          </div>
-        </div>
-
-        <div className="flex-1 overflow-auto px-6 py-6">
-          {renderSpareFormSections(spareFormData, setSpareFormData)}
-        </div>
-      </div>
-    );
-  }
-
-  if (detailSpare && isEditMode) {
-    return (
-      <div className="flex flex-col h-full">
-        <div className="bg-gradient-to-r from-cyan-600 to-blue-600 px-6 py-4 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="p-2 bg-white/20 rounded-lg">
-              <Pencil className="h-5 w-5 text-white" />
-            </div>
-            <div>
-              <h1 className="text-xl font-bold text-white" data-testid="title-edit-spare">Edit Spare Details</h1>
-              <p className="text-cyan-100 text-sm mt-0.5">
-                {spareFormData.partName || detailSpare.partName || "Edit spare information"}
-              </p>
-            </div>
-          </div>
-          <div className="flex items-center gap-2">
-            <Button
-              className="bg-white/20 text-white border-white/30"
-              variant="outline"
-              onClick={handleCancelEdit}
-              data-testid="btn-cancel-edit-spare"
-            >
-              Cancel
-            </Button>
-            <Button
-              className="bg-white text-blue-600"
-              onClick={handleSaveEdit}
-              disabled={updateSpareMutation.isPending}
-              data-testid="btn-save-edit-spare"
-            >
-              {updateSpareMutation.isPending ? "Saving..." : "Save"}
-            </Button>
-          </div>
-        </div>
-
-        <div className="flex-1 overflow-auto px-6 py-6">
-          {renderSpareFormSections(spareFormData, setSpareFormData)}
-        </div>
-      </div>
-    );
-  }
-
-  if (detailSpare) {
-    return (
-      <div className="flex flex-col h-full">
-        <div className="bg-gradient-to-r from-cyan-600 to-blue-600 px-6 py-4 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="p-2 bg-white/20 rounded-lg">
-              <Info className="h-5 w-5 text-white" />
-            </div>
-            <div>
-              <h1 className="text-xl font-bold text-white" data-testid="title-spare-details">Spare Details</h1>
-              <p className="text-cyan-100 text-sm mt-0.5">{detailSpare.partName || "View spare information"}</p>
-            </div>
-          </div>
-          <div className="flex items-center gap-2">
-            <Button
-              className="bg-white/20 text-white border-white/30"
-              variant="outline"
-              onClick={handleBackToList}
-              data-testid="btn-back-spare-list"
-            >
-              <ArrowLeft className="h-4 w-4 mr-1" />
-              Back
-            </Button>
-            <Button
-              className="bg-white text-blue-600"
-              onClick={() => handleEdit(detailSpare)}
-              data-testid="btn-edit-spare"
-            >
-              <Pencil className="h-4 w-4 mr-1" />
-              Edit
-            </Button>
-          </div>
-        </div>
-
-        <div className="flex-1 overflow-auto px-6 py-6">
-          <div className="max-w-5xl mx-auto space-y-6">
-            <SectionBlock id="detail-basic-info" number="A1" title="Basic Information" description="Core identification and classification details">
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div className="space-y-1">
-                  <Label className="text-sm text-[#8798ad]">Part Code</Label>
-                  <div className="text-sm font-medium text-gray-900" data-testid="detail-part-code">{detailSpare.partCode || '-'}</div>
-                </div>
-                <div className="space-y-1">
-                  <Label className="text-sm text-[#8798ad]">Part Name</Label>
-                  <div className="text-sm font-medium text-gray-900" data-testid="detail-part-name">{detailSpare.partName || '-'}</div>
-                </div>
-                <div className="space-y-1">
-                  <Label className="text-sm text-[#8798ad]">Part Number</Label>
-                  <div className="text-sm font-medium text-gray-900" data-testid="detail-part-number">{detailSpare.partNumber || '-'}</div>
-                </div>
-                <div className="space-y-1">
-                  <Label className="text-sm text-[#8798ad]">UOM</Label>
-                  <div className="text-sm font-medium text-gray-900" data-testid="detail-uom">{detailSpare.unitOfMeasurement || '-'}</div>
-                </div>
-                <div className="space-y-1">
-                  <Label className="text-sm text-[#8798ad]">Equipment</Label>
-                  <div className="text-sm font-medium text-gray-900" data-testid="detail-equipment">{detailSpare.fleetEquipmentName || '-'}</div>
-                </div>
-                <div className="space-y-1">
-                  <Label className="text-sm text-[#8798ad]">Equipment Code</Label>
-                  <div className="text-sm font-medium text-gray-900" data-testid="detail-equipment-code">{detailSpare.fleetEquipmentCode || '-'}</div>
-                </div>
-              </div>
-            </SectionBlock>
-
-            <SectionBlock id="detail-status" number="A2" title="Status & Classification" description="Status flags and classification details">
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div className="space-y-1">
-                  <Label className="text-sm text-[#8798ad]">Criticality</Label>
-                  <div className="text-sm font-medium text-gray-900" data-testid="detail-criticality">
-                    {detailSpare.criticality ? (
-                      <Badge variant="secondary" className={`no-default-hover-elevate no-default-active-elevate ${detailSpare.criticality === 'Yes' ? 'bg-red-100 text-red-700' : 'bg-gray-100 text-gray-700'}`}>{detailSpare.criticality}</Badge>
-                    ) : '-'}
-                  </div>
-                </div>
-                <div className="space-y-1">
-                  <Label className="text-sm text-[#8798ad]">Is Active</Label>
-                  <div className="text-sm font-medium text-gray-900" data-testid="detail-is-active">
-                    <Badge variant="secondary" className={`no-default-hover-elevate no-default-active-elevate ${detailSpare.isActive ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
-                      {detailSpare.isActive ? 'Yes' : 'No'}
-                    </Badge>
-                  </div>
-                </div>
-                <div className="space-y-1">
-                  <Label className="text-sm text-[#8798ad]">IHM</Label>
-                  <div className="text-sm font-medium text-gray-900" data-testid="detail-ihm">
-                    {detailSpare.ihm ? (
-                      <Badge variant="secondary" className={`no-default-hover-elevate no-default-active-elevate ${detailSpare.ihm === 'Yes' ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-700'}`}>{detailSpare.ihm}</Badge>
-                    ) : '-'}
-                  </div>
-                </div>
-                <div className="space-y-1">
-                  <Label className="text-sm text-[#8798ad]">Evidence Type</Label>
-                  <div className="text-sm font-medium text-gray-900" data-testid="detail-evidence-type">{detailSpare.evidenceType || '-'}</div>
-                </div>
-              </div>
-            </SectionBlock>
-
-            <SectionBlock id="detail-technical" number="A3" title="Technical Details" description="Maker and technical specifications">
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div className="space-y-1">
-                  <Label className="text-sm text-[#8798ad]">Maker</Label>
-                  <div className="text-sm font-medium text-gray-900" data-testid="detail-maker">{detailSpare.maker || '-'}</div>
-                </div>
-                <div className="space-y-1">
-                  <Label className="text-sm text-[#8798ad]">Maker Code</Label>
-                  <div className="text-sm font-medium text-gray-900" data-testid="detail-maker-code">{detailSpare.makerCode || '-'}</div>
-                </div>
-                <div className="space-y-1">
-                  <Label className="text-sm text-[#8798ad]">Drawing Number</Label>
-                  <div className="text-sm font-medium text-gray-900" data-testid="detail-drawing-number">{detailSpare.drawingNumber || '-'}</div>
-                </div>
-                <div className="space-y-1">
-                  <Label className="text-sm text-[#8798ad]">Position Number</Label>
-                  <div className="text-sm font-medium text-gray-900" data-testid="detail-position-number">{detailSpare.positionNumber || '-'}</div>
-                </div>
-                <div className="space-y-1 md:col-span-2">
-                  <Label className="text-sm text-[#8798ad]">Specification</Label>
-                  <div className="text-sm font-medium text-gray-900" data-testid="detail-specification">{detailSpare.specification || '-'}</div>
-                </div>
-              </div>
-            </SectionBlock>
-
-            <SectionBlock id="detail-manual" number="A4" title="Manual Reference" description="Manual and documentation references">
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div className="space-y-1">
-                  <Label className="text-sm text-[#8798ad]">Manual Name</Label>
-                  <div className="text-sm font-medium text-gray-900" data-testid="detail-manual-name">{detailSpare.manualName || '-'}</div>
-                </div>
-                <div className="space-y-1">
-                  <Label className="text-sm text-[#8798ad]">Page Number</Label>
-                  <div className="text-sm font-medium text-gray-900" data-testid="detail-page-number">{detailSpare.pageNumber || '-'}</div>
-                </div>
-              </div>
-              <div className="mt-4 space-y-1">
-                <Label className="text-sm text-[#8798ad]">Note</Label>
-                <div className="text-sm font-medium text-gray-900" data-testid="detail-note">{detailSpare.note || '-'}</div>
-              </div>
-            </SectionBlock>
-          </div>
-        </div>
-      </div>
-    );
-  }
 
   return (
     <div className="p-6">
@@ -1025,6 +804,217 @@ export default function FleetSparesManagement({ onBack }: { onBack?: () => void 
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {isAddMode && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-lg shadow-xl w-full max-w-2xl max-h-[85vh] flex flex-col">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200">
+              <div className="flex items-center gap-2">
+                <Plus className="h-5 w-5 text-gray-600" />
+                <h2 className="text-lg font-semibold text-gray-900" data-testid="title-add-spare">Add New Spare Information</h2>
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={handleCancelAdd}
+                  className="text-sm text-gray-600 hover:text-gray-800"
+                  data-testid="btn-cancel-add-spare"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleSaveAdd}
+                  disabled={createSpareMutation.isPending}
+                  className="bg-blue-600 text-white text-sm px-4 py-1.5 rounded-md hover:bg-blue-700 disabled:opacity-50"
+                  data-testid="btn-save-add-spare"
+                >
+                  {createSpareMutation.isPending ? "Saving..." : "Save"}
+                </button>
+                <button onClick={handleCancelAdd} className="text-gray-400 hover:text-gray-600">
+                  <X className="h-5 w-5" />
+                </button>
+              </div>
+            </div>
+            <div className="flex-1 overflow-auto px-6 py-4">
+              {renderSpareFormSections(spareFormData, setSpareFormData)}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {detailSpare && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-lg shadow-xl w-full max-w-2xl max-h-[85vh] flex flex-col">
+            {isEditMode ? (
+              <>
+                <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200">
+                  <div className="flex items-center gap-2">
+                    <Pencil className="h-5 w-5 text-gray-600" />
+                    <h2 className="text-lg font-semibold text-gray-900" data-testid="title-edit-spare">Edit Spare Details</h2>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={handleCancelEdit}
+                      className="text-sm text-gray-600 hover:text-gray-800"
+                      data-testid="btn-cancel-edit-spare"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      onClick={handleSaveEdit}
+                      disabled={updateSpareMutation.isPending}
+                      className="bg-blue-600 text-white text-sm px-4 py-1.5 rounded-md hover:bg-blue-700 disabled:opacity-50"
+                      data-testid="btn-save-edit-spare"
+                    >
+                      {updateSpareMutation.isPending ? "Saving..." : "Save"}
+                    </button>
+                    <button onClick={handleCancelEdit} className="text-gray-400 hover:text-gray-600">
+                      <X className="h-5 w-5" />
+                    </button>
+                  </div>
+                </div>
+                <div className="flex-1 overflow-auto px-6 py-4">
+                  {renderSpareFormSections(spareFormData, setSpareFormData)}
+                </div>
+              </>
+            ) : (
+              <>
+                <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200">
+                  <div className="flex items-center gap-2">
+                    <Info className="h-5 w-5 text-gray-600" />
+                    <h2 className="text-lg font-semibold text-gray-900" data-testid="title-spare-details">Spare Details</h2>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => handleEdit(detailSpare)}
+                      className="bg-green-600 text-white text-sm px-4 py-1.5 rounded-md hover:bg-green-700 flex items-center gap-1"
+                      data-testid="btn-edit-spare"
+                    >
+                      <Pencil className="h-3.5 w-3.5" />
+                      Edit
+                    </button>
+                    <button onClick={handleBackToList} className="text-gray-400 hover:text-gray-600">
+                      <X className="h-5 w-5" />
+                    </button>
+                  </div>
+                </div>
+                <div className="flex-1 overflow-auto px-6 py-4">
+                  <div className="space-y-4">
+                    <div className="mb-4">
+                      <h3 className="text-sm font-bold text-gray-800 mb-3">Basic Information</h3>
+                      <div className="bg-green-50/70 rounded-lg p-4">
+                        <div className="grid grid-cols-2 gap-3">
+                          <div>
+                            <span className="text-xs text-gray-500">Part Code:</span>
+                            <span className="ml-2 text-sm font-semibold text-gray-900" data-testid="detail-part-code">{detailSpare.partCode || '-'}</span>
+                          </div>
+                          <div>
+                            <span className="text-xs text-gray-500">Part Name:</span>
+                            <span className="ml-2 text-sm font-semibold text-gray-900" data-testid="detail-part-name">{detailSpare.partName || '-'}</span>
+                          </div>
+                          <div>
+                            <span className="text-xs text-gray-500">Part Number:</span>
+                            <span className="ml-2 text-sm font-semibold text-gray-900" data-testid="detail-part-number">{detailSpare.partNumber || '-'}</span>
+                          </div>
+                          <div>
+                            <span className="text-xs text-gray-500">Unit Of Measurement:</span>
+                            <span className="ml-2 text-sm font-semibold text-gray-900" data-testid="detail-uom">{detailSpare.unitOfMeasurement || '-'}</span>
+                          </div>
+                          <div>
+                            <span className="text-xs text-gray-500">Equipment:</span>
+                            <span className="ml-2 text-sm font-semibold text-gray-900" data-testid="detail-equipment">{detailSpare.fleetEquipmentName || '-'}</span>
+                          </div>
+                          <div>
+                            <span className="text-xs text-gray-500">Equipment Code:</span>
+                            <span className="ml-2 text-sm font-semibold text-gray-900" data-testid="detail-equipment-code">{detailSpare.fleetEquipmentCode || '-'}</span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="mb-4">
+                      <h3 className="text-sm font-bold text-gray-800 mb-3">Status & Classification</h3>
+                      <div className="bg-green-50/70 rounded-lg p-4">
+                        <div className="grid grid-cols-2 gap-3">
+                          <div>
+                            <span className="text-xs text-gray-500">Criticality:</span>
+                            <span className={`ml-2 text-sm font-semibold ${detailSpare.criticality === 'Yes' ? 'text-green-600' : detailSpare.criticality === 'No' ? 'text-red-600' : 'text-gray-900'}`} data-testid="detail-criticality">
+                              {detailSpare.criticality || '-'}
+                            </span>
+                          </div>
+                          <div>
+                            <span className="text-xs text-gray-500">Is Active:</span>
+                            <span className={`ml-2 text-sm font-semibold ${detailSpare.isActive ? 'text-green-600' : 'text-red-600'}`} data-testid="detail-is-active">
+                              {detailSpare.isActive ? 'Yes' : 'No'}
+                            </span>
+                          </div>
+                          <div>
+                            <span className="text-xs text-gray-500">IHM:</span>
+                            <span className={`ml-2 text-sm font-semibold ${detailSpare.ihm === 'Yes' ? 'text-green-600' : detailSpare.ihm === 'No' ? 'text-red-600' : 'text-gray-900'}`} data-testid="detail-ihm">
+                              {detailSpare.ihm || '-'}
+                            </span>
+                          </div>
+                          <div>
+                            <span className="text-xs text-gray-500">Evidence Type:</span>
+                            <span className="ml-2 text-sm font-semibold text-gray-900" data-testid="detail-evidence-type">{detailSpare.evidenceType || '-'}</span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="mb-4">
+                      <h3 className="text-sm font-bold text-gray-800 mb-3">Technical Details</h3>
+                      <div className="bg-green-50/70 rounded-lg p-4">
+                        <div className="grid grid-cols-2 gap-3">
+                          <div>
+                            <span className="text-xs text-gray-500">Maker:</span>
+                            <span className="ml-2 text-sm font-semibold text-gray-900" data-testid="detail-maker">{detailSpare.maker || '-'}</span>
+                          </div>
+                          <div>
+                            <span className="text-xs text-gray-500">Maker Code:</span>
+                            <span className="ml-2 text-sm font-semibold text-gray-900" data-testid="detail-maker-code">{detailSpare.makerCode || '-'}</span>
+                          </div>
+                          <div>
+                            <span className="text-xs text-gray-500">Drawing Number:</span>
+                            <span className="ml-2 text-sm font-semibold text-gray-900" data-testid="detail-drawing-number">{detailSpare.drawingNumber || '-'}</span>
+                          </div>
+                          <div>
+                            <span className="text-xs text-gray-500">Position Number:</span>
+                            <span className="ml-2 text-sm font-semibold text-gray-900" data-testid="detail-position-number">{detailSpare.positionNumber || '-'}</span>
+                          </div>
+                          <div className="col-span-2">
+                            <span className="text-xs text-gray-500">Specification:</span>
+                            <span className="ml-2 text-sm font-semibold text-gray-900" data-testid="detail-specification">{detailSpare.specification || '-'}</span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="mb-4">
+                      <h3 className="text-sm font-bold text-gray-800 mb-3">Manual Reference</h3>
+                      <div className="bg-green-50/70 rounded-lg p-4">
+                        <div className="grid grid-cols-2 gap-3">
+                          <div>
+                            <span className="text-xs text-gray-500">Manual Name:</span>
+                            <span className="ml-2 text-sm font-semibold text-gray-900" data-testid="detail-manual-name">{detailSpare.manualName || '-'}</span>
+                          </div>
+                          <div>
+                            <span className="text-xs text-gray-500">Page Number:</span>
+                            <span className="ml-2 text-sm font-semibold text-gray-900" data-testid="detail-page-number">{detailSpare.pageNumber || '-'}</span>
+                          </div>
+                        </div>
+                        <div className="mt-3">
+                          <span className="text-xs text-gray-500">Note:</span>
+                          <span className="ml-2 text-sm font-semibold text-gray-900" data-testid="detail-note">{detailSpare.note || '-'}</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
