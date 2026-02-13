@@ -1,0 +1,4 @@
+ALTER TABLE "component_maintenance_history" ADD CONSTRAINT "component_maintenance_history_job_id_jobs_juuid_fk" FOREIGN KEY ("job_id") REFERENCES "public"."jobs"("juuid") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "fleet_job_vessel_mapping" ADD CONSTRAINT "fleet_job_vessel_mapping_job_id_jobs_juuid_fk" FOREIGN KEY ("job_id") REFERENCES "public"."jobs"("juuid") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "job_component_links" ADD CONSTRAINT "job_component_links_job_id_jobs_juuid_fk" FOREIGN KEY ("job_id") REFERENCES "public"."jobs"("juuid") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "work_orders" ADD CONSTRAINT "work_orders_job_id_jobs_juuid_fk" FOREIGN KEY ("job_id") REFERENCES "public"."jobs"("juuid") ON DELETE no action ON UPDATE no action;

@@ -3,7 +3,7 @@ import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
 export { v2Components, v2ComponentMaintenanceHistory, v2Jobs, v2JobComponentLinks } from "../components/schema";
-import { v2Components } from "../components/schema";
+import { v2Components, v2Jobs } from "../components/schema";
 export type { Component, ComponentMaintenanceHistory, InsertComponentMaintenanceHistory } from "../components/schema";
 
 export { v2Spares } from "../jobs/schema";
@@ -33,7 +33,7 @@ export const v2WorkOrders = pgTable("work_orders", {
   vesselId: text("vessel_id"),
   component: text("component").notNull(),
   componentCode: text("component_code"),
-  jobId: text("job_id"),
+  jobId: text("job_id").references(() => v2Jobs.juuid),
   workOrderNo: text("work_order_no").notNull(),
   workOrderType: text("work_order_type").notNull().default("Planned"),
   templateCode: text("template_code"),

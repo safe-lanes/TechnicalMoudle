@@ -151,7 +151,7 @@ export const v2ComponentMaintenanceHistory = pgTable("component_maintenance_hist
   componentId: text("component_id").notNull().references(() => v2Components.cuuid, { onDelete: "restrict", onUpdate: "cascade" }),
   componentCode: text("component_code").notNull(),
   vesselId: text("vessel_id").notNull().references(() => vessels.vuuid),
-  jobId: text("job_id"),
+  jobId: text("job_id").references(() => v2Jobs.juuid),
   jobCode: text("job_code"),
   workOrderId: text("work_order_id").notNull(),
   workOrderNo: text("work_order_no").notNull(),
@@ -283,7 +283,7 @@ export const v2Jobs = pgTable("jobs", {
 export const v2JobComponentLinks = pgTable("job_component_links", {
   id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
   vesselId: text("vessel_id").notNull(),
-  jobId: text("job_id").notNull(),
+  jobId: text("job_id").notNull().references(() => v2Jobs.juuid),
   componentId: text("component_id").notNull().references(() => v2Components.cuuid, { onDelete: "restrict", onUpdate: "cascade" }),
   componentCode: text("component_code"),
   linkedBy: text("linked_by").notNull(),

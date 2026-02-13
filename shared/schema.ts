@@ -886,7 +886,7 @@ export const workOrders = pgTable("work_orders", {
   vesselId: text("vessel_id").references(() => vessels.vuuid), // Nullable - only required when dataScope='vessel'
   component: text("component").notNull(),
   componentCode: text("component_code"),
-  jobId: text("job_id"), // Reference to jobs.id for reliable lead time hydration
+  jobId: text("job_id").references(() => jobs.juuid), // FK → jobs.juuid
   workOrderNo: text("work_order_no").notNull(),
   workOrderType: text("work_order_type").notNull().default("Planned"), // 'Planned' | 'Unplanned'
   templateCode: text("template_code"),
@@ -1642,7 +1642,7 @@ export const componentMaintenanceHistory = pgTable("component_maintenance_histor
   componentId: text("component_id").notNull().references(() => components.cuuid, { onDelete: "restrict", onUpdate: "cascade" }),
   componentCode: text("component_code").notNull(),
   vesselId: text("vessel_id").notNull().references(() => vessels.vuuid),
-  jobId: text("job_id"), // Link to parent job for Jobs Form A5 history
+  jobId: text("job_id").references(() => jobs.juuid), // FK → jobs.juuid
   jobCode: text("job_code"), // Job number for querying (e.g., MKR-IN-00001)
   workOrderId: text("work_order_id").notNull(), // Link to completed work order
   workOrderNo: text("work_order_no").notNull(),
@@ -1913,7 +1913,7 @@ export const fleetJobVesselMapping = pgTable("fleet_job_vessel_mapping", {
   id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
   fleetEquipmentCode: text("fleet_equipment_code").notNull(), // Equipment the job belongs to
   jobCode: text("job_code").notNull(), // Fleet job code
-  jobId: text("job_id"), // Reference to jobs table
+  jobId: text("job_id").references(() => jobs.juuid), // FK → jobs.juuid
   vesselId: text("vessel_id").notNull().references(() => vessels.vuuid), // Vessel identifier
   vesselName: text("vessel_name"), // Vessel display name
   mappedBy: text("mapped_by").notNull(), // User who created mapping
@@ -2312,7 +2312,7 @@ export type SpareWithInventory = {
 export const jobComponentLinks = pgTable("job_component_links", {
   id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
   vesselId: text("vessel_id").notNull().references(() => vessels.vuuid),
-  jobId: text("job_id").notNull(), // FK → jobs.id (UUID)
+  jobId: text("job_id").notNull().references(() => jobs.juuid), // FK → jobs.juuid
   componentId: text("component_id").notNull().references(() => components.cuuid, { onDelete: "restrict", onUpdate: "cascade" }),
   componentCode: text("component_code"), // Denormalized for faster lookups
   linkedBy: text("linked_by").notNull(),
