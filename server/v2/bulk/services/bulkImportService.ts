@@ -386,7 +386,7 @@ export class BulkImportService {
         };
 
         const createJobAndLink = async (jobId: string): Promise<any> => {
-          const created = await this.repository.createJob({ id: jobId, ...jobData });
+          const created = await this.repository.createJob({ juuid: jobId, ...jobData });
           if (created) {
             try {
               await this.repository.createJobComponentLink({
@@ -428,8 +428,8 @@ export class BulkImportService {
             result.skipped++;
             continue;
           }
-          const id = uuidv4();
-          const created = await createJobAndLink(id);
+          const juuid = uuidv4();
+          const created = await createJobAndLink(juuid);
           if (created) {
             jobsByCompositeKey.set(compositeKey, created);
             result.created++;
@@ -438,7 +438,7 @@ export class BulkImportService {
               id: uuidv4(),
               importHistoryId,
               entityType: 'job',
-              entityId: id,
+              entityId: created.juuid,
               operation: 'created',
               previousData: null,
               newData: { jobNo, jobTitle: woTitle, componentCode },
@@ -487,8 +487,8 @@ export class BulkImportService {
               });
             }
           } else {
-            const id = uuidv4();
-            const created = await createJobAndLink(id);
+            const juuid = uuidv4();
+            const created = await createJobAndLink(juuid);
             if (created) {
               jobsByCompositeKey.set(compositeKey, created);
               result.created++;
@@ -497,7 +497,7 @@ export class BulkImportService {
                 id: uuidv4(),
                 importHistoryId,
                 entityType: 'job',
-                entityId: id,
+                entityId: created.juuid,
                 operation: 'created',
                 previousData: null,
                 newData: { jobNo, jobTitle: woTitle, componentCode },
