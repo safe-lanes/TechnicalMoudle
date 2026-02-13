@@ -10817,6 +10817,64 @@ export async function registerRoutes(app: Express): Promise<Server> {
   
   // Fleet Admin - Jobs Routes
   
+  // Export fleet jobs to Excel (21-column format matching import template)
+  app.get("/technical/api/fleet/jobs/export", async (req, res) => {
+    try {
+      const jobs = await storage.getFleetJobs();
+
+      const headers = [
+        'Job Code', 'Fleet Equipment Code', 'Fleet Equipment Name', 'WO Title',
+        'Task Type', 'Assigned To', 'Approver', 'Job Priority',
+        'Class Related', 'Brief Work Description', 'Department', 'Criticality',
+        'Is Active', 'Maintenance Basis', 'Interval Value', 'Unit',
+        'Required Spare Parts', 'Required Tools', 'PPE Requirements',
+        'Permit Requirements', 'Other Safety Requirements'
+      ];
+
+      const rows = jobs.map((j: any) => [
+        j.jobCode || '',
+        j.fleetEquipmentCode || '',
+        j.fleetEquipmentName || '',
+        j.woTitle || '',
+        j.taskType || '',
+        j.assignedTo || '',
+        j.approver || '',
+        j.jobPriority || '',
+        j.classRelated || '',
+        j.briefWorkDescription || '',
+        j.department || '',
+        j.criticality || '',
+        j.isActive === false ? 'No' : 'Yes',
+        j.maintenanceBasis || '',
+        j.intervalValue || '',
+        j.unit || '',
+        Array.isArray(j.requiredSpareParts) ? j.requiredSpareParts.join(', ') : (j.requiredSpareParts || ''),
+        Array.isArray(j.requiredTools) ? j.requiredTools.join(', ') : (j.requiredTools || ''),
+        j.ppeRequirements || '',
+        j.permitRequirements || '',
+        j.otherSafetyRequirements || '',
+      ]);
+
+      const wsData = [headers, ...rows];
+      const ws = XLSX.utils.aoa_to_sheet(wsData);
+
+      const colWidths = [18, 22, 35, 30, 15, 18, 18, 12, 12, 40, 15, 12, 10, 18, 12, 12, 30, 25, 20, 20, 25];
+      ws['!cols'] = colWidths.map(w => ({ wch: w }));
+
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, 'Fleet Jobs');
+
+      const buffer = XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' });
+
+      res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+      res.setHeader('Content-Disposition', `attachment; filename=fleet-jobs-${new Date().toISOString().split('T')[0]}.xlsx`);
+      res.send(buffer);
+    } catch (error: any) {
+      console.error('Error exporting fleet jobs:', error);
+      res.status(500).json({ error: 'Failed to export fleet jobs' });
+    }
+  });
+
   // Get all fleet jobs
   app.get("/technical/api/fleet/jobs", async (req, res) => {
     try {
@@ -10957,6 +11015,60 @@ export async function registerRoutes(app: Express): Promise<Server> {
   
   // Fleet Admin - Spares Routes (using dedicated fleet_spares table)
   
+  // Export fleet spares to Excel (18-column format matching import template)
+  app.get("/technical/api/fleet/spares/export", async (req, res) => {
+    try {
+      const spares = await storage.getFleetSparesFromTable();
+
+      const headers = [
+        'Part Code', 'Fleet Equipment Code', 'Fleet Equipment Name', 'Part Name',
+        'Part Number', 'Unit Of Measurement', 'Drawing Number', 'Position Number',
+        'Note', 'Specification', 'Maker', 'Maker Code',
+        'Manual Name', 'Page Number', 'Criticality', 'Is Active',
+        'IHM (Inventory of Hazardous Materials)', 'Evidence Type'
+      ];
+
+      const rows = spares.map((s: any) => [
+        s.partCode || '',
+        s.fleetEquipmentCode || '',
+        s.fleetEquipmentName || '',
+        s.partName || '',
+        s.partNumber || '',
+        s.unitOfMeasurement || '',
+        s.drawingNumber || '',
+        s.positionNumber || '',
+        s.note || '',
+        s.specification || '',
+        s.maker || '',
+        s.makerCode || '',
+        s.manualName || '',
+        s.pageNumber || '',
+        s.criticality || '',
+        s.isActive === false ? 'No' : 'Yes',
+        s.ihm || '',
+        s.evidenceType || '',
+      ]);
+
+      const wsData = [headers, ...rows];
+      const ws = XLSX.utils.aoa_to_sheet(wsData);
+
+      const colWidths = [18, 22, 35, 30, 18, 18, 18, 15, 25, 25, 25, 15, 20, 12, 12, 10, 15, 15];
+      ws['!cols'] = colWidths.map(w => ({ wch: w }));
+
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, 'Fleet Spares');
+
+      const buffer = XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' });
+
+      res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+      res.setHeader('Content-Disposition', `attachment; filename=fleet-spares-${new Date().toISOString().split('T')[0]}.xlsx`);
+      res.send(buffer);
+    } catch (error: any) {
+      console.error('Error exporting fleet spares:', error);
+      res.status(500).json({ error: 'Failed to export fleet spares' });
+    }
+  });
+
   // Get all fleet spares
   app.get("/technical/api/fleet/spares", async (req, res) => {
     try {
