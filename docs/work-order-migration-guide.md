@@ -8,25 +8,25 @@
 
 | Before | After |
 |--------|-------|
-| `work_orders.id` = TEXT PRIMARY KEY (WO-xxx format) | `work_orders.id` = TEXT PRIMARY KEY (unchanged — Phase 4 pending) |
+| `work_orders.id` = TEXT PRIMARY KEY (WO-xxx format) | `work_orders.id` = SERIAL PRIMARY KEY (auto-increment integer, Phase 4 complete) |
 | No UUID column | `work_orders.wouuid` = TEXT NOT NULL UNIQUE (canonical UUID identity) |
 | No FK constraints on child tables for work order identity | 4 child tables have DB-level FK constraints to `work_orders(wouuid)` |
 | Server code uses `workOrders.id` (TEXT) for lookups | Server code uses `eq(workOrders.wouuid, ...)` for all lookups (Phase 3 complete) |
 | Frontend uses `workOrder.id` for navigation/keys | Frontend uses `workOrder.wouuid` for URLs, React keys, API calls (Phase 3 complete) |
-| WO-xxx ID generated in creation paths | WO-xxx generation preserved (Phase 4 pending — SERIAL conversion) |
+| WO-xxx ID generated in creation paths | WO-xxx generation removed; `id` is SERIAL auto-increment (Phase 4 complete) |
 
 ---
 
-## Current Status: Phase 3 Complete (Code Refactoring Done)
+## Current Status: All 4 Phases Complete
 
-Phases 1, 2, and 3 are complete. Phase 4 is pending:
+All phases of the work order identity restructuring are complete:
 
 | Phase | Status | Description |
 |-------|--------|-------------|
 | 1. Add UUID column with backfill | COMPLETE | Migration 0028 — `wouuid` TEXT NOT NULL UNIQUE |
 | 2. Add FK constraints to child tables | COMPLETE | Migrations 0029-0030 — 4 child tables constrained |
 | 3. Refactor server/frontend code | COMPLETE | All lookups use `workOrders.wouuid`, frontend uses `wouuid` for navigation/keys |
-| 4. Convert id TEXT to SERIAL | PENDING | Remove WO-xxx generation, convert to auto-increment |
+| 4. Convert id TEXT to SERIAL | COMPLETE | Migration 0031 — WO-xxx generation removed, `id` is now SERIAL PRIMARY KEY |
 
 ---
 
@@ -178,19 +178,28 @@ All server and frontend code has been refactored from `workOrders.id` to `workOr
 
 ---
 
-## Pending Phase 4: Convert id TEXT to SERIAL
+## Completed Phase 4: Convert id TEXT to SERIAL
 
-After Phase 3 code refactoring is complete:
+**Date**: 2026-02-13
+**Migration**: `0031_auto_2026-02-13T11-20-28.sql`
 
-1. Update `shared/schema.ts` — change `id` from `text("id").primaryKey()` to `serial("id").primaryKey()`
-2. Remove all WO-xxx ID generation from server creation paths
-3. Generate migration to:
+**What was done**:
+1. Updated `shared/schema.ts` — changed `id` from `text("id").primaryKey()` to `serial("id").primaryKey()`
+2. Updated `shared/v2/work-orders/schema.ts` — same change for V2 schema
+3. Removed all WO-xxx/FWO-xxx ID generation from 8 creation paths:
+   - `server/postgresStorage.ts` — 5 locations (createWorkOrder, bulkCreateWorkOrders, upsert, createFleetWorkOrder, auto-generation)
+   - `server/v2/work-orders/services/workOrderMutationService.ts` — 1 location
+   - `server/v2/work-orders/services/workOrderAutomationService.ts` — 2 locations
+   - `server/memStorage.ts` — 1 location (uses getNextId instead)
+4. Applied migration 0031 with the proven 3-step pattern:
    ```sql
    ALTER TABLE "work_orders" DROP CONSTRAINT "work_orders_pkey";
    ALTER TABLE "work_orders" DROP COLUMN "id";
    ALTER TABLE "work_orders" ADD COLUMN "id" SERIAL PRIMARY KEY;
    ```
-4. Update insert schemas to omit `id` (auto-generated)
+5. Insert schemas already had `id: true` in `.omit()` — no change needed
+
+**Database verification**: `work_orders.id` is now `integer` with `nextval('work_orders_id_seq')` auto-increment
 
 ---
 
@@ -215,5 +224,5 @@ This work orders migration follows the same proven 4-phase pattern:
 | 1. Add UUID column with backfill | 0008 (vuuid) | 0016-0017 (cuuid) | 0025 (juuid) | 0028 (wouuid) |
 | 2. Add FK constraints to child tables | 0009-0013 (31 tables) | 0018-0021 (15 tables) | 0026 (4 tables) | 0029-0030 (4 tables) |
 | 3. Refactor server/frontend code | Multiple commits | Multiple commits | `16c996c0`, `83248f4e` | COMPLETE (2026-02-13) |
-| 4. Convert id TEXT to SERIAL | 0014 | 0022 | 0027 | PENDING |
+| 4. Convert id TEXT to SERIAL | 0014 | 0022 | 0027 | 0031 — COMPLETE (2026-02-13) |
 | Total child tables constrained | 43 (including 0024) | 15 | 4 | 4 |

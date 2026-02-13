@@ -23,7 +23,6 @@ function normalizeDateToISO(dateStr: string | undefined | null): string | null {
 
 export async function createWorkOrderHandler(body: any) {
   const wouuid = body.wouuid || uuidv4();
-  const id = body.id || `WO-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
 
   if (!body.vesselId) {
     throw new Error('Vessel ID is required');
@@ -32,7 +31,8 @@ export async function createWorkOrderHandler(body: any) {
     throw new Error('Job title is required');
   }
 
-  let data: any = { ...body, id, wouuid };
+  let data: any = { ...body, wouuid };
+  delete data.id;
 
   if (body.jobId) {
     const existingWOs = await repo.getWorkOrdersByVessel(body.vesselId);

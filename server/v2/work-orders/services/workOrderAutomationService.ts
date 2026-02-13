@@ -121,7 +121,6 @@ export async function autoGenerate(body: any) {
         const workOrderNo = await generatePlannedWorkOrderNumber(job.jobNo, linkedComp.componentCode, vesselId);
 
         const woData: any = {
-          id: `WO-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
           wouuid: uuidv4(),
           vesselId,
           component: linkedComp.componentName,
@@ -222,7 +221,6 @@ export async function autoGenerate(body: any) {
         const workOrderNo = await generatePlannedWorkOrderNumber(job.jobNo, linkedComp.componentCode, vesselId);
 
         const woData: any = {
-          id: `WO-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
           wouuid: uuidv4(),
           vesselId,
           component: linkedComp.componentName,

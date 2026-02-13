@@ -1718,11 +1718,9 @@ export class PostgresStorage {
 
   async createWorkOrder(wo: InsertWorkOrder): Promise<WorkOrder> {
     const db = await getDb();
-    const id = wo.id || `WO-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
     const wouuid = (wo as any).wouuid || crypto.randomUUID();
     const result = await db.insert(workOrders).values({
       ...wo,
-      id,
       wouuid,
       dataScope: wo.dataScope || 'vessel',
     }).returning();
@@ -1764,11 +1762,9 @@ export class PostgresStorage {
     const results: WorkOrder[] = [];
     
     for (const wo of woList) {
-      const id = wo.id || `WO-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
       const wouuid = (wo as any).wouuid || crypto.randomUUID();
       const result = await db.insert(workOrders).values({
         ...wo,
-        id,
         wouuid,
         dataScope: wo.dataScope || 'vessel',
       }).returning();
@@ -1809,11 +1805,9 @@ export class PostgresStorage {
           .where(eq(workOrders.wouuid, existing.wouuid));
         updated++;
       } else {
-        const id = wo.id || `WO-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
         const wouuid = (wo as any).wouuid || crypto.randomUUID();
         await db.insert(workOrders).values({
           ...wo,
-          id,
           wouuid,
           dataScope: wo.dataScope || 'vessel',
         });
@@ -1869,11 +1863,9 @@ export class PostgresStorage {
 
   async createFleetWorkOrder(wo: InsertWorkOrder): Promise<WorkOrder> {
     const db = await getDb();
-    const id = wo.id || `FWO-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
     const wouuid = (wo as any).wouuid || crypto.randomUUID();
     const result = await db.insert(workOrders).values({
       ...wo,
-      id,
       wouuid,
       dataScope: 'fleet',
     }).returning();
@@ -6088,7 +6080,6 @@ export class PostgresStorage {
     
     // Create the work order with proper status and cycle snapshots
     const newWorkOrder: InsertWorkOrder = {
-      id: `WO-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
       vesselId: job.vesselId,
       vesselName: job.vesselName || '',
       workOrderNo,

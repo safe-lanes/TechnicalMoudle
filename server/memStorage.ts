@@ -663,7 +663,7 @@ class MemStorage {
   async createWorkOrder(workOrder: any): Promise<any> {
     if (!this.data.workOrders) this.data.workOrders = {};
     const wouuid = workOrder.wouuid || crypto.randomUUID();
-    const newWO = { ...workOrder, id: workOrder.id || this.getNextId('workOrders'), wouuid };
+    const newWO = { ...workOrder, id: this.getNextId('workOrders'), wouuid };
     this.data.workOrders[newWO.wouuid] = newWO;
     this.saveData();
     return newWO;

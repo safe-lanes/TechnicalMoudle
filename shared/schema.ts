@@ -882,7 +882,7 @@ export type Job = typeof jobs.$inferSelect;
 
 // Work Orders Table
 export const workOrders = pgTable("work_orders", {
-  id: text("id").primaryKey(),
+  id: serial("id").primaryKey(),
   wouuid: text("wouuid").notNull().unique(),
   vesselId: text("vessel_id").references(() => vessels.vuuid), // Nullable - only required when dataScope='vessel'
   component: text("component").notNull(),

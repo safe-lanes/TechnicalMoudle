@@ -1,4 +1,4 @@
-import { pgTable, text, integer, boolean, timestamp, decimal, index, json, unique } from "drizzle-orm/pg-core";
+import { pgTable, text, integer, boolean, timestamp, decimal, index, json, unique, serial } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
@@ -29,7 +29,7 @@ export type {
 } from "../spares/schema";
 
 export const v2WorkOrders = pgTable("work_orders", {
-  id: text("id").primaryKey(),
+  id: serial("id").primaryKey(),
   wouuid: text("wouuid").notNull().unique(),
   vesselId: text("vessel_id"),
   component: text("component").notNull(),
