@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation, useQuery } from "@tanstack/react-query";
@@ -14,6 +14,7 @@ import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { z } from "zod";
 import { Marker } from "@/components/Marker";
+import { X } from "lucide-react";
 
 const fleetSpareFormSchema = z.object({
   partName: z.string().min(1, "Part name is required"),
@@ -45,12 +46,24 @@ interface FleetSpareFormProps {
 
 export default function FleetSpareForm({ open, onOpenChange, spare }: FleetSpareFormProps) {
   const { toast } = useToast();
+  const [equipSearchText, setEquipSearchText] = useState("");
+  const [showEquipSuggestions, setShowEquipSuggestions] = useState(false);
 
   // Fetch fleet components for equipment selection
   const { data: components } = useQuery<FleetComponents[]>({
     queryKey: ['/technical/api/fleet-admin/fleet-components'],
     enabled: open,
   });
+
+  const filteredEquipment = useMemo(() => {
+    if (!equipSearchText.trim()) return [];
+    return (components || []).filter(c => 
+      c.fleetEquipmentCode && 
+      c.fleetEquipmentCode.length === 10 &&
+      (c.fleetEquipmentCode.toLowerCase().includes(equipSearchText.toLowerCase()) ||
+       c.fleetEquipmentName?.toLowerCase().includes(equipSearchText.toLowerCase()))
+    );
+  }, [equipSearchText, components]);
 
   const form = useForm<FleetSpareFormData>({
     resolver: zodResolver(fleetSpareFormSchema),
@@ -97,6 +110,7 @@ export default function FleetSpareForm({ open, onOpenChange, spare }: FleetSpare
         pageNumber: spare.pageNumber || "",
         isActive: spare.isActive ?? true,
       });
+      setEquipSearchText(spare.fleetEquipmentCode || "");
     } else {
       form.reset({
         partName: "",
@@ -117,8 +131,29 @@ export default function FleetSpareForm({ open, onOpenChange, spare }: FleetSpare
         pageNumber: "",
         isActive: true,
       });
+      setEquipSearchText("");
     }
   }, [spare, form]);
+
+  const handleEquipSearchChange = (value: string) => {
+    setEquipSearchText(value);
+    setShowEquipSuggestions(true);
+    if (!value.trim()) {
+      form.setValue("fleetEquipmentCode", "");
+    }
+  };
+
+  const handleEquipSelect = (comp: FleetComponents) => {
+    setEquipSearchText(comp.fleetEquipmentCode || "");
+    form.setValue("fleetEquipmentCode", comp.fleetEquipmentCode || "");
+    setShowEquipSuggestions(false);
+  };
+
+  const handleClearEquip = () => {
+    setEquipSearchText("");
+    form.setValue("fleetEquipmentCode", "");
+    setShowEquipSuggestions(false);
+  };
 
   // Create mutation
   const createMutation = useMutation({
@@ -222,22 +257,46 @@ export default function FleetSpareForm({ open, onOpenChange, spare }: FleetSpare
               <Marker id={m("I4.QL5.5.14.5", "I4.QL5.5.28.5")} />
               Fleet Equipment Code <span className="text-red-500">*</span>
             </Label>
-            <Select
-              value={form.watch("fleetEquipmentCode") || ""}
-              onValueChange={(value) => form.setValue("fleetEquipmentCode", value)}
-            >
-              <SelectTrigger data-testid={m("I4.QL5.5.14.6", "I4.QL5.5.28.6")}>
-                <Marker id={m("I4.QL5.5.14.6", "I4.QL5.5.28.6")} />
-                <SelectValue placeholder="Select equipment" />
-              </SelectTrigger>
-              <SelectContent>
-                {components?.filter(c => c.fleetEquipmentCode && c.fleetEquipmentCode.length === 10).map((comp) => (
-                  <SelectItem key={comp.id} value={comp.fleetEquipmentCode!}>
-                    {comp.fleetEquipmentCode} - {comp.fleetEquipmentName}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <div className="relative">
+              <div className="relative">
+                <Input
+                  value={equipSearchText}
+                  onChange={(e) => handleEquipSearchChange(e.target.value)}
+                  onFocus={() => { if (equipSearchText.trim()) setShowEquipSuggestions(true); }}
+                  onBlur={() => setTimeout(() => setShowEquipSuggestions(false), 200)}
+                  placeholder="Type to search equipment..."
+                  className="text-sm pr-8"
+                  data-testid={m("I4.QL5.5.14.6", "I4.QL5.5.28.6")}
+                />
+                {equipSearchText && (
+                  <button
+                    type="button"
+                    onClick={handleClearEquip}
+                    className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                    data-testid="button-clear-equipment"
+                  >
+                    <X className="h-4 w-4" />
+                  </button>
+                )}
+              </div>
+              {showEquipSuggestions && filteredEquipment.length > 0 && (
+                <div className="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-md shadow-lg max-h-48 overflow-y-auto">
+                  {filteredEquipment.map((comp) => (
+                    <div
+                      key={comp.id}
+                      className="px-3 py-2 text-sm cursor-pointer hover:bg-cyan-50 hover:text-cyan-700 border-b border-gray-100 last:border-b-0"
+                      onMouseDown={() => handleEquipSelect(comp)}
+                      data-testid={`equipment-suggestion-${comp.id}`}
+                    >
+                      <span className="font-medium">{comp.fleetEquipmentCode}</span>
+                      {comp.fleetEquipmentName && (
+                        <span className="text-gray-400 ml-2 text-xs">({comp.fleetEquipmentName})</span>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
             {form.formState.errors.fleetEquipmentCode && (
               <p className="text-sm text-red-500">{form.formState.errors.fleetEquipmentCode.message}</p>
             )}

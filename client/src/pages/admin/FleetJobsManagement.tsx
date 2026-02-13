@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { type FleetJobs, type FleetComponents } from "@shared/schema";
 import { Card } from "@/components/ui/card";
@@ -18,7 +18,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import { Plus, Search, Pencil, Trash2, Download, PlayCircle, Briefcase, Package, ArrowLeft, Info, Settings, Users, FileText, Shield, CheckCircle, XCircle, Wrench, MapPin, Clock } from "lucide-react";
+import { Plus, Search, Pencil, Trash2, Download, PlayCircle, Briefcase, Package, ArrowLeft, Info, Settings, Users, FileText, Shield, CheckCircle, XCircle, Wrench, MapPin, Clock, X } from "lucide-react";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { Marker } from "@/components/Marker";
@@ -39,6 +39,8 @@ export default function FleetJobsManagement({ onBack }: { onBack?: () => void })
   const [editingJob, setEditingJob] = useState<FleetJobs | null>(null);
   const [jobFormData, setJobFormData] = useState<Partial<FleetJobs>>({});
   const [detailJob, setDetailJob] = useState<FleetJobs | null>(null);
+  const [equipSearchText, setEquipSearchText] = useState("");
+  const [showEquipSuggestions, setShowEquipSuggestions] = useState(false);
 
   const { data: jobs, isLoading, error } = useQuery<FleetJobs[]>({
     queryKey: ['/technical/api/fleet/jobs'],
@@ -190,6 +192,7 @@ export default function FleetJobsManagement({ onBack }: { onBack?: () => void })
     setIsAddMode(true);
     setDetailJob(null);
     setEditingJob(null);
+    setEquipSearchText("");
   };
 
   const handleSaveAdd = () => {
@@ -213,6 +216,7 @@ export default function FleetJobsManagement({ onBack }: { onBack?: () => void })
   const handleCancelAdd = () => {
     setIsAddMode(false);
     setJobFormData({});
+    setEquipSearchText("");
   };
 
   const normalizeJobPriority = (val: string | null | undefined): string => {
@@ -227,6 +231,7 @@ export default function FleetJobsManagement({ onBack }: { onBack?: () => void })
   const handleEdit = (job: FleetJobs) => {
     setEditingJob(job);
     setJobFormData({ ...job, jobPriority: normalizeJobPriority(job.jobPriority) });
+    setEquipSearchText(job.fleetEquipmentCode || "");
   };
 
   const handleCancelEdit = () => {
@@ -322,6 +327,40 @@ export default function FleetJobsManagement({ onBack }: { onBack?: () => void })
 
   const equipmentOptions = components?.filter(c => c.fleetEquipmentCode && c.fleetEquipmentCode.length === 10) || [];
   const totalJobs = jobs?.length || 0;
+
+  const filteredEquipment = useMemo(() => {
+    if (!equipSearchText.trim()) return [];
+    return (components || []).filter(c =>
+      c.fleetEquipmentCode &&
+      c.fleetEquipmentCode.length === 10 &&
+      (c.fleetEquipmentCode.toLowerCase().includes(equipSearchText.toLowerCase()) ||
+       c.fleetEquipmentName?.toLowerCase().includes(equipSearchText.toLowerCase()))
+    );
+  }, [equipSearchText, components]);
+
+  const handleEquipSearchChange = (value: string) => {
+    setEquipSearchText(value);
+    setShowEquipSuggestions(true);
+    if (!value.trim()) {
+      setJobFormData(prev => ({ ...prev, fleetEquipmentCode: "", fleetEquipmentName: "" }));
+    }
+  };
+
+  const handleEquipSelect = (comp: any) => {
+    setEquipSearchText(comp.fleetEquipmentCode || "");
+    setJobFormData(prev => ({
+      ...prev,
+      fleetEquipmentCode: comp.fleetEquipmentCode || "",
+      fleetEquipmentName: comp.fleetEquipmentName || "",
+    }));
+    setShowEquipSuggestions(false);
+  };
+
+  const handleClearEquip = () => {
+    setEquipSearchText("");
+    setJobFormData(prev => ({ ...prev, fleetEquipmentCode: "", fleetEquipmentName: "" }));
+    setShowEquipSuggestions(false);
+  };
 
   const renderDetailField = (label: string, value: string | null | undefined, testId?: string) => (
     <div className="space-y-1" data-testid={testId}>
@@ -573,28 +612,46 @@ export default function FleetJobsManagement({ onBack }: { onBack?: () => void })
                   </div>
                   <div className="space-y-1">
                     <Label className="text-sm text-[#8798ad]">Fleet Equipment Code *</Label>
-                    <Select
-                      value={jobFormData.fleetEquipmentCode || ""}
-                      onValueChange={(val) => {
-                        const comp = components?.find(c => c.fleetEquipmentCode === val);
-                        setJobFormData(prev => ({
-                          ...prev,
-                          fleetEquipmentCode: val,
-                          fleetEquipmentName: comp?.fleetEquipmentName || "",
-                        }));
-                      }}
-                    >
-                      <SelectTrigger data-testid="input-add-equipment-code">
-                        <SelectValue placeholder="Select equipment" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {components?.filter(c => c.fleetEquipmentCode && c.fleetEquipmentCode.length === 10).map((comp) => (
-                          <SelectItem key={comp.id} value={comp.fleetEquipmentCode || ""}>
-                            {comp.fleetEquipmentCode} - {comp.fleetEquipmentName}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                    <div className="relative">
+                      <div className="relative">
+                        <Input
+                          value={equipSearchText}
+                          onChange={(e) => handleEquipSearchChange(e.target.value)}
+                          onFocus={() => { if (equipSearchText.trim()) setShowEquipSuggestions(true); }}
+                          onBlur={() => setTimeout(() => setShowEquipSuggestions(false), 200)}
+                          placeholder="Type to search equipment..."
+                          className="text-sm pr-8"
+                          data-testid="input-add-equipment-code"
+                        />
+                        {equipSearchText && (
+                          <button
+                            type="button"
+                            onClick={handleClearEquip}
+                            className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                            data-testid="button-clear-job-equipment"
+                          >
+                            <X className="h-4 w-4" />
+                          </button>
+                        )}
+                      </div>
+                      {showEquipSuggestions && filteredEquipment.length > 0 && (
+                        <div className="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-md shadow-lg max-h-48 overflow-y-auto">
+                          {filteredEquipment.map((comp) => (
+                            <div
+                              key={comp.id}
+                              className="px-3 py-2 text-sm cursor-pointer hover:bg-cyan-50 hover:text-cyan-700 border-b border-gray-100 last:border-b-0"
+                              onMouseDown={() => handleEquipSelect(comp)}
+                              data-testid={`equipment-suggestion-${comp.id}`}
+                            >
+                              <span className="font-medium">{comp.fleetEquipmentCode}</span>
+                              {comp.fleetEquipmentName && (
+                                <span className="text-gray-400 ml-2 text-xs">({comp.fleetEquipmentName})</span>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
                   </div>
                   <div className="space-y-1">
                     <Label className="text-sm text-[#8798ad]">Component Name</Label>

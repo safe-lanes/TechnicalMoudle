@@ -28,6 +28,8 @@ export default function FleetSparesManagement({ onBack }: { onBack?: () => void 
   const [spareFormData, setSpareFormData] = useState<Partial<FleetSpares>>({});
   const [makerSearchText, setMakerSearchText] = useState("");
   const [showMakerSuggestions, setShowMakerSuggestions] = useState(false);
+  const [equipSearchText, setEquipSearchText] = useState("");
+  const [showEquipSuggestions, setShowEquipSuggestions] = useState(false);
 
   const { data: spares, isLoading, error } = useQuery<FleetSpares[]>({
     queryKey: ['/technical/api/fleet/spares'],
@@ -68,6 +70,7 @@ export default function FleetSparesManagement({ onBack }: { onBack?: () => void 
       setDetailSpare(null);
       setSpareFormData({});
       setMakerSearchText("");
+      setEquipSearchText("");
     },
     onError: (error: Error) => {
       toast({ title: "Error", description: error.message || "Failed to update spare", variant: "destructive" });
@@ -85,6 +88,7 @@ export default function FleetSparesManagement({ onBack }: { onBack?: () => void 
       setIsAddMode(false);
       setSpareFormData({});
       setMakerSearchText("");
+      setEquipSearchText("");
     },
     onError: (error: Error) => {
       toast({ title: "Error", description: error.message || "Failed to create spare", variant: "destructive" });
@@ -136,9 +140,44 @@ export default function FleetSparesManagement({ onBack }: { onBack?: () => void 
     setShowMakerSuggestions(false);
   };
 
+  const filteredEquipment = useMemo(() => {
+    if (!equipSearchText.trim()) return [];
+    return (components || []).filter(c =>
+      c.fleetEquipmentCode &&
+      c.fleetEquipmentCode.length === 10 &&
+      (c.fleetEquipmentCode.toLowerCase().includes(equipSearchText.toLowerCase()) ||
+       c.fleetEquipmentName?.toLowerCase().includes(equipSearchText.toLowerCase()))
+    );
+  }, [equipSearchText, components]);
+
+  const handleEquipSearchChange = (value: string) => {
+    setEquipSearchText(value);
+    setShowEquipSuggestions(true);
+    if (!value.trim()) {
+      setSpareFormData(prev => ({ ...prev, fleetEquipmentCode: "", fleetEquipmentName: "" }));
+    }
+  };
+
+  const handleEquipSelect = (comp: any) => {
+    setEquipSearchText(comp.fleetEquipmentCode || "");
+    setSpareFormData(prev => ({
+      ...prev,
+      fleetEquipmentCode: comp.fleetEquipmentCode || "",
+      fleetEquipmentName: comp.fleetEquipmentName || "",
+    }));
+    setShowEquipSuggestions(false);
+  };
+
+  const handleClearEquip = () => {
+    setEquipSearchText("");
+    setSpareFormData(prev => ({ ...prev, fleetEquipmentCode: "", fleetEquipmentName: "" }));
+    setShowEquipSuggestions(false);
+  };
+
   const handleAddNew = () => {
     setSpareFormData({ isActive: true });
     setMakerSearchText("");
+    setEquipSearchText("");
     setIsAddMode(true);
     setDetailSpare(null);
     setIsEditMode(false);
@@ -148,6 +187,7 @@ export default function FleetSparesManagement({ onBack }: { onBack?: () => void 
     setDetailSpare(spare);
     setSpareFormData({ ...spare });
     setMakerSearchText(spare.maker || "");
+    setEquipSearchText(spare.fleetEquipmentCode || "");
     setIsEditMode(true);
   };
 
@@ -222,12 +262,14 @@ export default function FleetSparesManagement({ onBack }: { onBack?: () => void 
     setIsEditMode(false);
     setSpareFormData({});
     setMakerSearchText("");
+    setEquipSearchText("");
   };
 
   const handleCancelAdd = () => {
     setIsAddMode(false);
     setSpareFormData({});
     setMakerSearchText("");
+    setEquipSearchText("");
   };
 
   const handleBackToList = () => {
@@ -235,6 +277,7 @@ export default function FleetSparesManagement({ onBack }: { onBack?: () => void 
     setIsEditMode(false);
     setSpareFormData({});
     setMakerSearchText("");
+    setEquipSearchText("");
   };
 
   const handleExport = async () => {
@@ -301,28 +344,46 @@ export default function FleetSparesManagement({ onBack }: { onBack?: () => void 
             </div>
             <div className="space-y-1">
               <Label className="text-sm text-[#8798ad]">Fleet Equipment Code *</Label>
-              <Select
-                value={formData.fleetEquipmentCode || ""}
-                onValueChange={(val) => {
-                  const comp = components?.find(c => c.fleetEquipmentCode === val);
-                  setFormData(prev => ({
-                    ...prev,
-                    fleetEquipmentCode: val,
-                    fleetEquipmentName: comp?.fleetEquipmentName || "",
-                  }));
-                }}
-              >
-                <SelectTrigger data-testid="input-spare-equipment">
-                  <SelectValue placeholder="Select equipment" />
-                </SelectTrigger>
-                <SelectContent>
-                  {components?.filter(c => c.fleetEquipmentCode && c.fleetEquipmentCode.length === 10).map((comp) => (
-                    <SelectItem key={comp.id} value={comp.fleetEquipmentCode || ""}>
-                      {comp.fleetEquipmentCode} - {comp.fleetEquipmentName}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <div className="relative">
+                <div className="relative">
+                  <Input
+                    value={equipSearchText}
+                    onChange={(e) => handleEquipSearchChange(e.target.value)}
+                    onFocus={() => { if (equipSearchText.trim()) setShowEquipSuggestions(true); }}
+                    onBlur={() => setTimeout(() => setShowEquipSuggestions(false), 200)}
+                    placeholder="Type to search equipment..."
+                    className="text-sm pr-8"
+                    data-testid="input-spare-equipment"
+                  />
+                  {equipSearchText && (
+                    <button
+                      type="button"
+                      onClick={handleClearEquip}
+                      className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                      data-testid="button-clear-spare-equipment"
+                    >
+                      <X className="h-4 w-4" />
+                    </button>
+                  )}
+                </div>
+                {showEquipSuggestions && filteredEquipment.length > 0 && (
+                  <div className="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-md shadow-lg max-h-48 overflow-y-auto">
+                    {filteredEquipment.map((comp) => (
+                      <div
+                        key={comp.id}
+                        className="px-3 py-2 text-sm cursor-pointer hover:bg-cyan-50 hover:text-cyan-700 border-b border-gray-100 last:border-b-0"
+                        onMouseDown={() => handleEquipSelect(comp)}
+                        data-testid={`equipment-suggestion-${comp.id}`}
+                      >
+                        <span className="font-medium">{comp.fleetEquipmentCode}</span>
+                        {comp.fleetEquipmentName && (
+                          <span className="text-gray-400 ml-2 text-xs">({comp.fleetEquipmentName})</span>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
             </div>
             <div className="space-y-1">
               <Label className="text-sm text-[#8798ad]">Equipment Name</Label>
