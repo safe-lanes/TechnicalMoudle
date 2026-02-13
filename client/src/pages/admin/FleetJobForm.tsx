@@ -2,7 +2,7 @@ import { useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation, useQuery } from "@tanstack/react-query";
-import { type WorkOrder, type Component, insertWorkOrderSchema } from "@shared/schema";
+import { type WorkOrder, type Component, type FleetComponents, insertWorkOrderSchema } from "@shared/schema";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -40,8 +40,8 @@ export default function FleetJobForm({ open, onOpenChange, job }: FleetJobFormPr
   const { toast } = useToast();
 
   // Fetch fleet components for equipment selection
-  const { data: components } = useQuery<Component[]>({
-    queryKey: ['/technical/api/fleet/components'],
+  const { data: components } = useQuery<FleetComponents[]>({
+    queryKey: ['/technical/api/fleet-admin/fleet-components'],
     enabled: open,
   });
 

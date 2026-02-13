@@ -45,7 +45,7 @@ export default function FleetJobsManagement({ onBack }: { onBack?: () => void })
   });
 
   const { data: components } = useQuery<FleetComponents[]>({
-    queryKey: ['/technical/api/fleet/components'],
+    queryKey: ['/technical/api/fleet-admin/fleet-components'],
   });
 
   const deleteMutation = useMutation({

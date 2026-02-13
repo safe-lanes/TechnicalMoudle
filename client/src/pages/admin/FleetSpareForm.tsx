@@ -48,7 +48,7 @@ export default function FleetSpareForm({ open, onOpenChange, spare }: FleetSpare
 
   // Fetch fleet components for equipment selection
   const { data: components } = useQuery<FleetComponents[]>({
-    queryKey: ['/technical/api/fleet/components'],
+    queryKey: ['/technical/api/fleet-admin/fleet-components'],
     enabled: open,
   });
 
