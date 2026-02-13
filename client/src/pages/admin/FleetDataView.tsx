@@ -2675,30 +2675,50 @@ export default function FleetDataView({ onBack }: { onBack?: () => void }) {
                     </div>
                     <div className="space-y-1">
                       <Label className="text-sm text-[#8798ad]">Maintenance Basis</Label>
-                      <Input
-                        placeholder="Enter maintenance basis"
+                      <Select
                         value={newJobFormData.maintenanceBasis || ""}
-                        onChange={(e) => setNewJobFormData(prev => ({ ...prev, maintenanceBasis: e.target.value }))}
-                        data-testid="input-new-maint-basis"
-                      />
+                        onValueChange={(val) => setNewJobFormData(prev => ({ ...prev, maintenanceBasis: val, unit: val === 'Running Hours' ? 'Hours' : prev.unit === 'Hours' ? '' : prev.unit }))}
+                      >
+                        <SelectTrigger data-testid="input-new-maint-basis">
+                          <SelectValue placeholder="Select maintenance basis" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="Calendar">Calendar</SelectItem>
+                          <SelectItem value="Running Hours">Running Hours</SelectItem>
+                        </SelectContent>
+                      </Select>
                     </div>
                     <div className="space-y-1">
                       <Label className="text-sm text-[#8798ad]">Frequency</Label>
                       <div className="flex gap-2">
                         <Input
                           placeholder="Value"
+                          type="number"
                           value={newJobFormData.intervalValue || ""}
                           onChange={(e) => setNewJobFormData(prev => ({ ...prev, intervalValue: e.target.value }))}
                           className="flex-1"
                           data-testid="input-new-interval-value"
                         />
-                        <Input
-                          placeholder="Unit"
-                          value={newJobFormData.unit || ""}
-                          onChange={(e) => setNewJobFormData(prev => ({ ...prev, unit: e.target.value }))}
-                          className="flex-1"
-                          data-testid="input-new-unit"
-                        />
+                        {newJobFormData.maintenanceBasis === 'Running Hours' ? (
+                          <div className="flex-1 text-sm font-medium text-gray-900 bg-gray-50 px-3 py-2 rounded-md border border-gray-200 min-h-[38px] flex items-center" data-testid="input-new-unit">
+                            Hours
+                          </div>
+                        ) : (
+                          <Select
+                            value={newJobFormData.unit || ""}
+                            onValueChange={(val) => setNewJobFormData(prev => ({ ...prev, unit: val }))}
+                          >
+                            <SelectTrigger className="flex-1" data-testid="input-new-unit">
+                              <SelectValue placeholder="Unit" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="Months">Months</SelectItem>
+                              <SelectItem value="Years">Years</SelectItem>
+                              <SelectItem value="Weeks">Weeks</SelectItem>
+                              <SelectItem value="Days">Days</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        )}
                       </div>
                     </div>
                     <div className="space-y-1">
@@ -2730,21 +2750,34 @@ export default function FleetDataView({ onBack }: { onBack?: () => void }) {
                     </div>
                     <div className="space-y-1">
                       <Label className="text-sm text-[#8798ad]">Job Priority</Label>
-                      <Input
-                        placeholder="Enter priority"
+                      <Select
                         value={newJobFormData.jobPriority || ""}
-                        onChange={(e) => setNewJobFormData(prev => ({ ...prev, jobPriority: e.target.value }))}
-                        data-testid="input-new-priority"
-                      />
+                        onValueChange={(val) => setNewJobFormData(prev => ({ ...prev, jobPriority: val }))}
+                      >
+                        <SelectTrigger data-testid="input-new-priority">
+                          <SelectValue placeholder="Select priority" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="High">High</SelectItem>
+                          <SelectItem value="Medium">Medium</SelectItem>
+                          <SelectItem value="Low">Low</SelectItem>
+                        </SelectContent>
+                      </Select>
                     </div>
                     <div className="space-y-1">
                       <Label className="text-sm text-[#8798ad]">Class Related</Label>
-                      <Input
-                        placeholder="Yes / No"
+                      <Select
                         value={newJobFormData.classRelated || ""}
-                        onChange={(e) => setNewJobFormData(prev => ({ ...prev, classRelated: e.target.value }))}
-                        data-testid="input-new-class-related"
-                      />
+                        onValueChange={(val) => setNewJobFormData(prev => ({ ...prev, classRelated: val }))}
+                      >
+                        <SelectTrigger data-testid="input-new-class-related">
+                          <SelectValue placeholder="Select" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="Yes">Yes</SelectItem>
+                          <SelectItem value="No">No</SelectItem>
+                        </SelectContent>
+                      </Select>
                     </div>
                     <div className="space-y-1">
                       <Label className="text-sm text-[#8798ad]">Interval Running Hour</Label>
@@ -2763,27 +2796,33 @@ export default function FleetDataView({ onBack }: { onBack?: () => void }) {
                     </div>
                     <div className="space-y-1">
                       <Label className="text-sm text-[#8798ad]">Criticality</Label>
-                      <Input
-                        placeholder="Enter criticality"
+                      <Select
                         value={newJobFormData.criticality || ""}
-                        onChange={(e) => setNewJobFormData(prev => ({ ...prev, criticality: e.target.value }))}
-                        data-testid="input-new-criticality"
-                      />
+                        onValueChange={(val) => setNewJobFormData(prev => ({ ...prev, criticality: val }))}
+                      >
+                        <SelectTrigger data-testid="input-new-criticality">
+                          <SelectValue placeholder="Select" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="Yes">Yes</SelectItem>
+                          <SelectItem value="No">No</SelectItem>
+                        </SelectContent>
+                      </Select>
                     </div>
                     <div className="space-y-1">
                       <Label className="text-sm text-[#8798ad]">Is Active</Label>
-                      <Input
-                        placeholder="Yes / No"
+                      <Select
                         value={newJobFormData.isActive === true ? "Yes" : newJobFormData.isActive === false ? "No" : ""}
-                        onChange={(e) => {
-                          const val = e.target.value.toLowerCase();
-                          setNewJobFormData(prev => ({ 
-                            ...prev, 
-                            isActive: val === 'yes' || val === 'true' ? true : val === 'no' || val === 'false' ? false : undefined 
-                          }));
-                        }}
-                        data-testid="input-new-is-active"
-                      />
+                        onValueChange={(val) => setNewJobFormData(prev => ({ ...prev, isActive: val === "Yes" }))}
+                      >
+                        <SelectTrigger data-testid="input-new-is-active">
+                          <SelectValue placeholder="Select" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="Yes">Yes</SelectItem>
+                          <SelectItem value="No">No</SelectItem>
+                        </SelectContent>
+                      </Select>
                     </div>
                   </div>
 
