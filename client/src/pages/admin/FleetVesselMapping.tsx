@@ -73,6 +73,7 @@ export default function FleetVesselMapping({ onBack }: { onBack?: () => void }) 
 
   const { data: fleetComponentsData = [], isLoading: isLoadingFleet } = useQuery<FleetComponents[]>({
     queryKey: ["/technical/api/fleet-admin/fleet-components"],
+    enabled: activeTab === "components",
   });
 
   const { data: vesselComponentsData = [], isLoading: isLoadingVessel } = useQuery<Component[]>({
@@ -82,7 +83,7 @@ export default function FleetVesselMapping({ onBack }: { onBack?: () => void }) 
       if (!res.ok) throw new Error("Failed to fetch vessel components");
       return res.json();
     },
-    enabled: !!selectedVessel,
+    enabled: !!selectedVessel && activeTab === "components",
   });
 
   const { data: mappingsData = [], isLoading: isLoadingMappings } = useQuery<FleetComponentMapping[]>({
@@ -92,7 +93,7 @@ export default function FleetVesselMapping({ onBack }: { onBack?: () => void }) 
       if (!res.ok) throw new Error("Failed to fetch mappings");
       return res.json();
     },
-    enabled: !!selectedVessel,
+    enabled: !!selectedVessel && activeTab === "components",
   });
 
   const vesselComponentsNonParent = useMemo(
