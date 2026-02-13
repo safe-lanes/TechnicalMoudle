@@ -655,150 +655,137 @@ export default function FleetSparesManagement({ onBack }: { onBack?: () => void 
     );
   }
 
-  if (detailSpare) {
+  const renderSpareDetailsDialog = () => {
+    if (!detailSpare) return null;
     return (
-      <div className="flex flex-col h-full">
-        <div className="bg-gradient-to-r from-cyan-600 to-blue-600 px-6 py-4 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="p-2 bg-white/20 rounded-lg">
-              <Info className="h-5 w-5 text-white" />
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" onClick={handleBackToList}>
+        <div className="bg-white rounded-lg shadow-xl w-[700px] max-h-[85vh] flex flex-col" onClick={(e) => e.stopPropagation()}>
+          <div className="flex items-center justify-between gap-4 px-6 py-4 border-b border-gray-200 flex-wrap">
+            <div className="flex items-center gap-2">
+              <Info className="h-5 w-5 text-gray-500" />
+              <h2 className="text-lg font-semibold text-gray-900" data-testid="title-spare-details">Spare Details</h2>
             </div>
-            <div>
-              <h1 className="text-xl font-bold text-white" data-testid="title-spare-details">Spare Details</h1>
-              <p className="text-cyan-100 text-sm mt-0.5">{detailSpare.partName || "View spare information"}</p>
+            <div className="flex items-center gap-2">
+              <Button
+                className="bg-green-600 text-white border-green-700"
+                onClick={() => handleEdit(detailSpare)}
+                data-testid="btn-edit-spare"
+              >
+                <Pencil className="h-3.5 w-3.5 mr-1" />
+                Edit
+              </Button>
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={handleBackToList}
+                data-testid="btn-back-spare-list"
+              >
+                <X className="h-5 w-5" />
+              </Button>
             </div>
           </div>
-          <div className="flex items-center gap-2">
-            <Button
-              className="bg-white/20 text-white border-white/30"
-              variant="outline"
-              onClick={handleBackToList}
-              data-testid="btn-back-spare-list"
-            >
-              <ArrowLeft className="h-4 w-4 mr-1" />
-              Back
-            </Button>
-            <Button
-              className="bg-white text-blue-600"
-              onClick={() => handleEdit(detailSpare)}
-              data-testid="btn-edit-spare"
-            >
-              <Pencil className="h-4 w-4 mr-1" />
-              Edit
-            </Button>
-          </div>
-        </div>
 
-        <div className="flex-1 overflow-auto px-6 py-6">
-          <div className="max-w-5xl mx-auto space-y-6">
-            <SectionBlock id="detail-basic-info" number="A1" title="Basic Information" description="Core identification and classification details">
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div className="space-y-1">
-                  <Label className="text-sm text-[#8798ad]">Part Code</Label>
-                  <div className="text-sm font-medium text-gray-900" data-testid="detail-part-code">{detailSpare.partCode || '-'}</div>
+          <div className="flex-1 overflow-y-auto px-6 py-4 space-y-4">
+            <div className="bg-green-50 rounded-lg p-4" data-testid="section-basic-info">
+              <h3 className="text-sm font-bold text-gray-800 mb-3">Basic Information</h3>
+              <div className="grid grid-cols-2 gap-x-8 gap-y-2">
+                <div className="flex items-baseline gap-2 text-sm">
+                  <span className="text-gray-500 whitespace-nowrap">Part Code:</span>
+                  <span className="font-semibold text-gray-900" data-testid="detail-part-code">{detailSpare.partCode || '-'}</span>
                 </div>
-                <div className="space-y-1">
-                  <Label className="text-sm text-[#8798ad]">Part Name</Label>
-                  <div className="text-sm font-medium text-gray-900" data-testid="detail-part-name">{detailSpare.partName || '-'}</div>
+                <div className="flex items-baseline gap-2 text-sm">
+                  <span className="text-gray-500 whitespace-nowrap">Part Name:</span>
+                  <span className="font-semibold text-gray-900" data-testid="detail-part-name">{detailSpare.partName || '-'}</span>
                 </div>
-                <div className="space-y-1">
-                  <Label className="text-sm text-[#8798ad]">Part Number</Label>
-                  <div className="text-sm font-medium text-gray-900" data-testid="detail-part-number">{detailSpare.partNumber || '-'}</div>
+                <div className="flex items-baseline gap-2 text-sm">
+                  <span className="text-gray-500 whitespace-nowrap">Part Number:</span>
+                  <span className="font-semibold text-gray-900" data-testid="detail-part-number">{detailSpare.partNumber || '-'}</span>
                 </div>
-                <div className="space-y-1">
-                  <Label className="text-sm text-[#8798ad]">UOM</Label>
-                  <div className="text-sm font-medium text-gray-900" data-testid="detail-uom">{detailSpare.unitOfMeasurement || '-'}</div>
+                <div className="flex items-baseline gap-2 text-sm">
+                  <span className="text-gray-500 whitespace-nowrap">UOM:</span>
+                  <span className="font-semibold text-gray-900" data-testid="detail-uom">{detailSpare.unitOfMeasurement || '-'}</span>
                 </div>
-                <div className="space-y-1">
-                  <Label className="text-sm text-[#8798ad]">Equipment</Label>
-                  <div className="text-sm font-medium text-gray-900" data-testid="detail-equipment">{detailSpare.fleetEquipmentName || '-'}</div>
+                <div className="flex items-baseline gap-2 text-sm">
+                  <span className="text-gray-500 whitespace-nowrap">Equipment:</span>
+                  <span className="font-semibold text-gray-900" data-testid="detail-equipment">{detailSpare.fleetEquipmentName || '-'}</span>
                 </div>
-                <div className="space-y-1">
-                  <Label className="text-sm text-[#8798ad]">Equipment Code</Label>
-                  <div className="text-sm font-medium text-gray-900" data-testid="detail-equipment-code">{detailSpare.fleetEquipmentCode || '-'}</div>
+                <div className="flex items-baseline gap-2 text-sm">
+                  <span className="text-gray-500 whitespace-nowrap">Equipment Code:</span>
+                  <span className="font-semibold text-gray-900" data-testid="detail-equipment-code">{detailSpare.fleetEquipmentCode || '-'}</span>
                 </div>
               </div>
-            </SectionBlock>
+            </div>
 
-            <SectionBlock id="detail-status" number="A2" title="Status & Classification" description="Status flags and classification details">
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div className="space-y-1">
-                  <Label className="text-sm text-[#8798ad]">Criticality</Label>
-                  <div className="text-sm font-medium text-gray-900" data-testid="detail-criticality">
-                    {detailSpare.criticality ? (
-                      <Badge variant="secondary" className={`no-default-hover-elevate no-default-active-elevate ${detailSpare.criticality === 'Yes' ? 'bg-red-100 text-red-700' : 'bg-gray-100 text-gray-700'}`}>{detailSpare.criticality}</Badge>
-                    ) : '-'}
-                  </div>
+            <div className="bg-green-50 rounded-lg p-4" data-testid="section-status">
+              <h3 className="text-sm font-bold text-gray-800 mb-3">Status & Classification</h3>
+              <div className="grid grid-cols-2 gap-x-8 gap-y-2">
+                <div className="flex items-baseline gap-2 text-sm">
+                  <span className="text-gray-500 whitespace-nowrap">Criticality:</span>
+                  <span className={`font-semibold ${detailSpare.criticality === 'Yes' ? 'text-red-600' : detailSpare.criticality === 'No' ? 'text-red-500' : 'text-gray-900'}`} data-testid="detail-criticality">{detailSpare.criticality || '-'}</span>
                 </div>
-                <div className="space-y-1">
-                  <Label className="text-sm text-[#8798ad]">Is Active</Label>
-                  <div className="text-sm font-medium text-gray-900" data-testid="detail-is-active">
-                    <Badge variant="secondary" className={`no-default-hover-elevate no-default-active-elevate ${detailSpare.isActive ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
-                      {detailSpare.isActive ? 'Yes' : 'No'}
-                    </Badge>
-                  </div>
+                <div className="flex items-baseline gap-2 text-sm">
+                  <span className="text-gray-500 whitespace-nowrap">Is Active:</span>
+                  <span className={`font-semibold ${detailSpare.isActive ? 'text-green-600' : 'text-red-500'}`} data-testid="detail-is-active">{detailSpare.isActive ? 'Yes' : 'No'}</span>
                 </div>
-                <div className="space-y-1">
-                  <Label className="text-sm text-[#8798ad]">IHM</Label>
-                  <div className="text-sm font-medium text-gray-900" data-testid="detail-ihm">
-                    {detailSpare.ihm ? (
-                      <Badge variant="secondary" className={`no-default-hover-elevate no-default-active-elevate ${detailSpare.ihm === 'Yes' ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-700'}`}>{detailSpare.ihm}</Badge>
-                    ) : '-'}
-                  </div>
+                <div className="flex items-baseline gap-2 text-sm">
+                  <span className="text-gray-500 whitespace-nowrap">IHM:</span>
+                  <span className={`font-semibold ${detailSpare.ihm === 'Yes' ? 'text-green-600' : detailSpare.ihm === 'No' ? 'text-red-500' : 'text-gray-900'}`} data-testid="detail-ihm">{detailSpare.ihm || '-'}</span>
                 </div>
-                <div className="space-y-1">
-                  <Label className="text-sm text-[#8798ad]">Evidence Type</Label>
-                  <div className="text-sm font-medium text-gray-900" data-testid="detail-evidence-type">{detailSpare.evidenceType || '-'}</div>
+                <div className="flex items-baseline gap-2 text-sm">
+                  <span className="text-gray-500 whitespace-nowrap">Evidence Type:</span>
+                  <span className="font-semibold text-gray-900" data-testid="detail-evidence-type">{detailSpare.evidenceType || '-'}</span>
                 </div>
               </div>
-            </SectionBlock>
+            </div>
 
-            <SectionBlock id="detail-technical" number="A3" title="Technical Details" description="Maker and technical specifications">
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div className="space-y-1">
-                  <Label className="text-sm text-[#8798ad]">Maker</Label>
-                  <div className="text-sm font-medium text-gray-900" data-testid="detail-maker">{detailSpare.maker || '-'}</div>
+            <div className="bg-green-50 rounded-lg p-4" data-testid="section-technical">
+              <h3 className="text-sm font-bold text-gray-800 mb-3">Technical Details</h3>
+              <div className="grid grid-cols-2 gap-x-8 gap-y-2">
+                <div className="flex items-baseline gap-2 text-sm">
+                  <span className="text-gray-500 whitespace-nowrap">Maker:</span>
+                  <span className="font-semibold text-gray-900" data-testid="detail-maker">{detailSpare.maker || '-'}</span>
                 </div>
-                <div className="space-y-1">
-                  <Label className="text-sm text-[#8798ad]">Maker Code</Label>
-                  <div className="text-sm font-medium text-gray-900" data-testid="detail-maker-code">{detailSpare.makerCode || '-'}</div>
+                <div className="flex items-baseline gap-2 text-sm">
+                  <span className="text-gray-500 whitespace-nowrap">Maker Code:</span>
+                  <span className="font-semibold text-gray-900" data-testid="detail-maker-code">{detailSpare.makerCode || '-'}</span>
                 </div>
-                <div className="space-y-1">
-                  <Label className="text-sm text-[#8798ad]">Drawing Number</Label>
-                  <div className="text-sm font-medium text-gray-900" data-testid="detail-drawing-number">{detailSpare.drawingNumber || '-'}</div>
+                <div className="flex items-baseline gap-2 text-sm">
+                  <span className="text-gray-500 whitespace-nowrap">Drawing Number:</span>
+                  <span className="font-semibold text-gray-900" data-testid="detail-drawing-number">{detailSpare.drawingNumber || '-'}</span>
                 </div>
-                <div className="space-y-1">
-                  <Label className="text-sm text-[#8798ad]">Position Number</Label>
-                  <div className="text-sm font-medium text-gray-900" data-testid="detail-position-number">{detailSpare.positionNumber || '-'}</div>
-                </div>
-                <div className="space-y-1 md:col-span-2">
-                  <Label className="text-sm text-[#8798ad]">Specification</Label>
-                  <div className="text-sm font-medium text-gray-900" data-testid="detail-specification">{detailSpare.specification || '-'}</div>
+                <div className="flex items-baseline gap-2 text-sm">
+                  <span className="text-gray-500 whitespace-nowrap">Position Number:</span>
+                  <span className="font-semibold text-gray-900" data-testid="detail-position-number">{detailSpare.positionNumber || '-'}</span>
                 </div>
               </div>
-            </SectionBlock>
+              <div className="flex items-baseline gap-2 text-sm mt-2">
+                <span className="text-gray-500 whitespace-nowrap">Specification:</span>
+                <span className="font-semibold text-gray-900" data-testid="detail-specification">{detailSpare.specification || '-'}</span>
+              </div>
+            </div>
 
-            <SectionBlock id="detail-manual" number="A4" title="Manual Reference" description="Manual and documentation references">
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div className="space-y-1">
-                  <Label className="text-sm text-[#8798ad]">Manual Name</Label>
-                  <div className="text-sm font-medium text-gray-900" data-testid="detail-manual-name">{detailSpare.manualName || '-'}</div>
+            <div className="bg-green-50 rounded-lg p-4" data-testid="section-manual">
+              <h3 className="text-sm font-bold text-gray-800 mb-3">Manual Reference</h3>
+              <div className="grid grid-cols-2 gap-x-8 gap-y-2">
+                <div className="flex items-baseline gap-2 text-sm">
+                  <span className="text-gray-500 whitespace-nowrap">Manual Name:</span>
+                  <span className="font-semibold text-gray-900" data-testid="detail-manual-name">{detailSpare.manualName || '-'}</span>
                 </div>
-                <div className="space-y-1">
-                  <Label className="text-sm text-[#8798ad]">Page Number</Label>
-                  <div className="text-sm font-medium text-gray-900" data-testid="detail-page-number">{detailSpare.pageNumber || '-'}</div>
+                <div className="flex items-baseline gap-2 text-sm">
+                  <span className="text-gray-500 whitespace-nowrap">Page Number:</span>
+                  <span className="font-semibold text-gray-900" data-testid="detail-page-number">{detailSpare.pageNumber || '-'}</span>
                 </div>
               </div>
-              <div className="mt-4 space-y-1">
-                <Label className="text-sm text-[#8798ad]">Note</Label>
-                <div className="text-sm font-medium text-gray-900" data-testid="detail-note">{detailSpare.note || '-'}</div>
+              <div className="flex items-baseline gap-2 text-sm mt-2">
+                <span className="text-gray-500 whitespace-nowrap">Note:</span>
+                <span className="font-semibold text-gray-900" data-testid="detail-note">{detailSpare.note || '-'}</span>
               </div>
-            </SectionBlock>
+            </div>
           </div>
         </div>
       </div>
     );
-  }
+  };
 
   return (
     <div className="p-6">
@@ -1025,6 +1012,8 @@ export default function FleetSparesManagement({ onBack }: { onBack?: () => void 
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {detailSpare && !isEditMode && renderSpareDetailsDialog()}
     </div>
   );
 }
