@@ -33,6 +33,7 @@ interface MenuItem {
   label: string;
   sublabel?: string;
   icon: React.ElementType;
+  hidden?: boolean;
 }
 
 const menuConfigs: Record<string, MenuItem[]> = {
@@ -61,7 +62,7 @@ const menuConfigs: Record<string, MenuItem[]> = {
     { id: "defect-log", label: "Defect Log", icon: List },
     { id: "coc", label: "CoC", icon: Flag },
     { id: "recurring", label: "Recurring Defects", icon: RefreshCw },
-    { id: "reports", label: "Reports", icon: FileText },
+    { id: "reports", label: "Reports", icon: FileText, hidden: true },
   ],
   admin: [
     // { id: "alerts", label: "Alerts", icon: AlertTriangle },
@@ -116,7 +117,7 @@ export const SideMenuBar: React.FC<SideMenuBarProps> = ({
 
   return (
     <div className="sticky top-[68px] h-[calc(100vh-68px)] flex flex-col items-center pb-4 w-full overflow-y-auto">
-      {menuItems.map((item) => {
+      {menuItems.filter((item) => !item.hidden).map((item) => {
         const Icon = item.icon;
         const isSelected = item.id === selectedItem || 
           (item.id === "modify-pms" && selectedItem?.startsWith("modify-pms/"));
