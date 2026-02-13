@@ -658,26 +658,30 @@ class MemStorage {
   }
   async getWorkOrder(id: string): Promise<any> { 
     if (this.data.workOrders && this.data.workOrders[id]) return this.data.workOrders[id];
-    return toArray(this.data.workOrders).find((w: any) => w.id === id); 
+    return toArray(this.data.workOrders).find((w: any) => w.wouuid === id); 
   }
   async createWorkOrder(workOrder: any): Promise<any> {
     if (!this.data.workOrders) this.data.workOrders = {};
-    const newWO = { ...workOrder, id: workOrder.id || this.getNextId('workOrders') };
-    this.data.workOrders[newWO.id] = newWO;
+    const wouuid = workOrder.wouuid || crypto.randomUUID();
+    const newWO = { ...workOrder, id: workOrder.id || this.getNextId('workOrders'), wouuid };
+    this.data.workOrders[newWO.wouuid] = newWO;
     this.saveData();
     return newWO;
   }
   async updateWorkOrder(id: string, data: any): Promise<any> {
-    if (this.data.workOrders && this.data.workOrders[id]) {
-      this.data.workOrders[id] = { ...this.data.workOrders[id], ...data };
+    const wo = await this.getWorkOrder(id);
+    if (wo) {
+      const updated = { ...wo, ...data };
+      this.data.workOrders[wo.wouuid] = updated;
       this.saveData();
-      return this.data.workOrders[id];
+      return updated;
     }
     return undefined;
   }
   async deleteWorkOrder(id: string): Promise<void> {
-    if (this.data.workOrders && this.data.workOrders[id]) {
-      delete this.data.workOrders[id];
+    const wo = await this.getWorkOrder(id);
+    if (wo) {
+      delete this.data.workOrders[wo.wouuid];
       this.saveData();
     }
   }

@@ -639,7 +639,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const formDataRemarks = (wo.formData as any)?.sectionB2?.remarks || 
                                 (wo.formData as any)?.remarks || '';
         return {
-          woNo: wo.workOrderNo || wo.woExecutionId || wo.id || '-',
+          woNo: wo.workOrderNo || wo.woExecutionId || wo.wouuid || '-',
           assignedTo: wo.assignedTo || '-',
           performedBy: wo.performedBy || wo.assignedTo || '-',
           workDate: wo.startDateTime || wo.dueDate || '',
@@ -3448,7 +3448,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
                         eventType: 'CONSUME',
                         qtyChange: -Math.abs(qtyConsumed), // Negative for consumption
                         referenceType: 'WORK_ORDER',
-                        referenceId: workOrder.id,
+                        referenceId: workOrder.wouuid,
                         referenceNote: `WO Approval: ${workOrder.workOrderNo} - ${consumedSpare.comments || 'Consumed during work approval'}`,
                         userId: workOrder.approver || 'system'
                       });
@@ -3841,9 +3841,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Auto-populate component_maintenance_history when work order is completed
       try {
         // DUPLICATE CHECK: Only create if no record exists for this work order
-        const existingHistory = await storage.getMaintenanceHistoryByWorkOrderId(workOrder.id);
+        const existingHistory = await storage.getMaintenanceHistoryByWorkOrderId(workOrder.wouuid);
         if (existingHistory) {
-          console.log(`⚠️ Maintenance history already exists for work order ${workOrder.id}, skipping duplicate creation`);
+          console.log(`⚠️ Maintenance history already exists for work order ${workOrder.wouuid}, skipping duplicate creation`);
         } else {
           // Normalize date to ISO format (YYYY-MM-DD) for proper chronological sorting
           const normalizeToISO = (isoDate: string | undefined): string => {
@@ -3897,8 +3897,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
             vesselId: workOrder.vesselId,
             jobId: parentJob?.id || workOrder.jobId || null,
             jobCode: parentJobNo || null,
-            workOrderId: workOrder.id,
-            workOrderNo: workOrder.templateCode || `WO-${workOrder.id}`,
+            workOrderId: workOrder.wouuid,
+            workOrderNo: workOrder.templateCode || `WO-${workOrder.wouuid}`,
             jobTitle: workOrder.jobTitle,
             maintenanceType: workOrder.taskType || 'Servicing',
             dateCompleted: normalizeToISO(dateOfCompletion),
@@ -3914,7 +3914,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           };
 
           await storage.createComponentMaintenanceHistory(historyPayload);
-          console.log(`✅ Auto-populated maintenance history for work order ${workOrder.id} (componentId: ${component.id}, jobId: ${historyPayload.jobId}, jobCode: ${historyPayload.jobCode})`);
+          console.log(`✅ Auto-populated maintenance history for work order ${workOrder.wouuid} (componentId: ${component.id}, jobId: ${historyPayload.jobId}, jobCode: ${historyPayload.jobCode})`);
         }
       } catch (historyError) {
         console.error('Failed to create maintenance history record:', historyError);
@@ -4116,7 +4116,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
                       eventType: 'CONSUME',
                       qtyChange: -Math.abs(qtyConsumed), // Negative for consumption
                       referenceType: 'WORK_ORDER',
-                      referenceId: workOrder.id,
+                      referenceId: workOrder.wouuid,
                       referenceNote: `WO: ${workOrder.workOrderNo} - ${consumedSpare.comments || 'Consumed during work completion'}`
                     });
                     console.log(`✅ [Inventory Transaction] Consumed ${qtyConsumed} units of ${consumedSpare.partNo} from location ${resolvedLocationId} (WO: ${workOrder.workOrderNo})`);
@@ -4421,17 +4421,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
         );
         
         if (matchingJob) {
-          await storage.updateWorkOrder(wo.id, { jobId: matchingJob.juuid });
+          await storage.updateWorkOrder(wo.wouuid, { jobId: matchingJob.juuid });
           updated++;
           updateResults.push({
-            workOrderId: wo.id,
+            workOrderId: wo.wouuid,
             jobId: matchingJob.juuid,
             reason: `Matched by component (${wo.component}) + jobTitle ("${wo.jobTitle}")`
           });
-          console.log(`✅ Backfilled jobId ${matchingJob.juuid} for work order ${wo.id}`);
+          console.log(`✅ Backfilled jobId ${matchingJob.juuid} for work order ${wo.wouuid}`);
         } else {
           updateResults.push({
-            workOrderId: wo.id,
+            workOrderId: wo.wouuid,
             jobId: null,
             reason: `No matching job found for component (${wo.component}) + jobTitle ("${wo.jobTitle}")`
           });
@@ -8712,14 +8712,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
           // Check if status needs updating
           if (wo.status !== computedStatus) {
             stats.changes.push({
-              id: wo.id,
+              id: wo.wouuid,
               workOrderNo: wo.workOrderNo,
               oldStatus: wo.status || 'null',
               newStatus: computedStatus
             });
             
             if (!dryRun) {
-              await storage.updateWorkOrder(wo.id, { status: computedStatus });
+              await storage.updateWorkOrder(wo.wouuid, { status: computedStatus });
               stats.statusUpdated++;
             } else {
               stats.statusUpdated++;

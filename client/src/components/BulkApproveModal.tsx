@@ -137,7 +137,7 @@ export function BulkApproveModal({
     if (selectedIds.size === filteredWOs.length) {
       setSelectedIds(new Set());
     } else {
-      setSelectedIds(new Set(filteredWOs.map(wo => wo.id)));
+      setSelectedIds(new Set(filteredWOs.map(wo => wo.wouuid)));
     }
   };
 
@@ -261,15 +261,15 @@ export function BulkApproveModal({
               ) : (
                 filteredWOs.map((wo) => (
                   <TableRow 
-                    key={wo.id} 
-                    className={`${selectedIds.has(wo.id) ? 'bg-blue-50' : ''} ${wo.wasRejected ? 'text-red-600' : ''}`}
-                    data-testid={`row-pending-wo-${wo.id}`}
+                    key={wo.wouuid} 
+                    className={`${selectedIds.has(wo.wouuid) ? 'bg-blue-50' : ''} ${wo.wasRejected ? 'text-red-600' : ''}`}
+                    data-testid={`row-pending-wo-${wo.wouuid}`}
                   >
                     <TableCell>
                       <Checkbox
-                        checked={selectedIds.has(wo.id)}
-                        onCheckedChange={() => handleToggleSelect(wo.id)}
-                        data-testid={`checkbox-wo-${wo.id}`}
+                        checked={selectedIds.has(wo.wouuid)}
+                        onCheckedChange={() => handleToggleSelect(wo.wouuid)}
+                        data-testid={`checkbox-wo-${wo.wouuid}`}
                       />
                     </TableCell>
                     <TableCell className={`font-medium ${wo.wasRejected ? 'text-red-600' : ''}`}>
@@ -294,8 +294,8 @@ export function BulkApproveModal({
                       <Button
                         variant="ghost"
                         size="icon"
-                        onClick={() => handleViewWorkOrder(wo.id)}
-                        data-testid={`button-view-wo-${wo.id}`}
+                        onClick={() => handleViewWorkOrder(wo.wouuid)}
+                        data-testid={`button-view-wo-${wo.wouuid}`}
                       >
                         <Eye className="h-4 w-4" />
                       </Button>

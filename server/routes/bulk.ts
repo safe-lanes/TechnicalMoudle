@@ -4499,7 +4499,7 @@ async function performImport(
           
           // Track work order creation with authoritative state
           if (importHistoryId) {
-            await trackChange(importHistoryId, 'created', 'workOrder', newWorkOrder.id, null, newWorkOrder);
+            await trackChange(importHistoryId, 'created', 'workOrder', newWorkOrder.wouuid, null, newWorkOrder);
           }
         } else {
           result.skipped++;
@@ -4513,7 +4513,7 @@ async function performImport(
           
           // Track work order update with authoritative before/after snapshots
           if (importHistoryId) {
-            await trackChange(importHistoryId, 'updated', 'workOrder', updatedWorkOrder.id, existingWorkOrder, updatedWorkOrder);
+            await trackChange(importHistoryId, 'updated', 'workOrder', updatedWorkOrder.wouuid, existingWorkOrder, updatedWorkOrder);
           }
         } else {
           result.skipped++;
@@ -4527,7 +4527,7 @@ async function performImport(
           
           // Track work order update with authoritative before/after snapshots
           if (importHistoryId) {
-            await trackChange(importHistoryId, 'updated', 'workOrder', updatedWorkOrder.id, existingWorkOrder, updatedWorkOrder);
+            await trackChange(importHistoryId, 'updated', 'workOrder', updatedWorkOrder.wouuid, existingWorkOrder, updatedWorkOrder);
           }
         } else {
           const newWorkOrder = await createWorkOrderFromRow(row, templateCode, vesselId);
@@ -4537,7 +4537,7 @@ async function performImport(
           
           // Track work order creation with authoritative state
           if (importHistoryId) {
-            await trackChange(importHistoryId, 'created', 'workOrder', newWorkOrder.id, null, newWorkOrder);
+            await trackChange(importHistoryId, 'created', 'workOrder', newWorkOrder.wouuid, null, newWorkOrder);
           }
         }
       }
@@ -4550,12 +4550,12 @@ async function performImport(
       for (const workOrder of allWorkOrders) {
         if (workOrder.templateCode && !importedTemplateCodes.has(workOrder.templateCode)) {
           const previousSnapshot = createRecordSnapshot(workOrder);
-          const archivedWorkOrder = await storage.archiveWorkOrder(workOrder.id);
+          const archivedWorkOrder = await storage.archiveWorkOrder(workOrder.wouuid);
           result.archived++;
           
           // Track work order archive with authoritative before/after snapshots
           if (importHistoryId) {
-            await trackChange(importHistoryId, 'archived', 'workOrder', workOrder.id, workOrder, archivedWorkOrder);
+            await trackChange(importHistoryId, 'archived', 'workOrder', workOrder.wouuid, workOrder, archivedWorkOrder);
           }
           
           console.log(`📦 Archived work order: ${workOrder.templateCode}`);

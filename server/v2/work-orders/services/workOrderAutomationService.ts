@@ -121,7 +121,8 @@ export async function autoGenerate(body: any) {
         const workOrderNo = await generatePlannedWorkOrderNumber(job.jobNo, linkedComp.componentCode, vesselId);
 
         const woData: any = {
-          id: uuidv4(),
+          id: `WO-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+          wouuid: uuidv4(),
           vesselId,
           component: linkedComp.componentName,
           componentCode: linkedComp.componentCode,
@@ -221,7 +222,8 @@ export async function autoGenerate(body: any) {
         const workOrderNo = await generatePlannedWorkOrderNumber(job.jobNo, linkedComp.componentCode, vesselId);
 
         const woData: any = {
-          id: uuidv4(),
+          id: `WO-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+          wouuid: uuidv4(),
           vesselId,
           component: linkedComp.componentName,
           componentCode: linkedComp.componentCode,
@@ -370,7 +372,7 @@ export async function recalculateStatuses(body: any) {
     });
 
     if (newStatus !== wo.status) {
-      await repo.updateWorkOrder(wo.id, { status: newStatus });
+      await repo.updateWorkOrder(wo.wouuid, { status: newStatus });
       updated++;
     }
   }
@@ -394,7 +396,7 @@ export async function checkPostponements(body: any) {
     endDate.setHours(0, 0, 0, 0);
 
     if (today > endDate) {
-      await repo.updateWorkOrder(wo.id, { status: 'Due' });
+      await repo.updateWorkOrder(wo.wouuid, { status: 'Due' });
       reverted++;
     }
   }

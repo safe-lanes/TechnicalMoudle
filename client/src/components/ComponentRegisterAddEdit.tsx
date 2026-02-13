@@ -1413,7 +1413,7 @@ export default function ComponentRegisterAddEdit({
                     </thead>
                     <tbody>
                       {workOrders.length > 0 ? workOrders.map((wo) => (
-                        <tr key={wo.id} className="border-t">
+                        <tr key={wo.wouuid} className="border-t">
                           <td className="px-3 py-2 text-gray-700">{wo.woNo}</td>
                           <td className="px-3 py-2 text-gray-700">{wo.jobTitle}</td>
                           <td className="px-3 py-2 text-gray-700">{wo.assignedTo}</td>

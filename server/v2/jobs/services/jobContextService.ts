@@ -38,7 +38,7 @@ export class JobContextService {
       const formDataRemarks = (wo.formData as any)?.sectionB2?.remarks ||
                               (wo.formData as any)?.remarks || '';
       return {
-        woNo: wo.workOrderNo || wo.woExecutionId || wo.id || '-',
+        woNo: wo.workOrderNo || wo.woExecutionId || wo.wouuid || '-',
         assignedTo: wo.assignedTo || '-',
         performedBy: wo.performedBy || wo.assignedTo || '-',
         workDate: wo.startDateTime || wo.dueDate || '',

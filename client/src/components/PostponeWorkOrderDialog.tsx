@@ -23,6 +23,7 @@ interface PostponeWorkOrderDialogProps {
   onClose: () => void;
   workOrder: {
     id?: string | null;
+    wouuid?: string | null;
     workOrderNo?: string | null;
     templateCode?: string | null;
     component?: string | null;
@@ -106,7 +107,7 @@ const PostponeWorkOrderDialog: React.FC<PostponeWorkOrderDialogProps> = ({
     if (onConfirm && workOrder) {
       const postponementEndDate = calculatePostponementEndDate(formData.durationOfPostponement);
       
-      onConfirm(workOrder.id || "", {
+      onConfirm(workOrder.wouuid || "", {
         nextDueDate: formData.nextDueDate,
         reason: formData.reasonForPostponement,
         authorizedBy: formData.authorizedBy,

@@ -53,7 +53,7 @@ export async function bulkApprove(body: any) {
             componentId: component.cuuid,
             componentCode: wo.componentCode || component.componentCode,
             vesselId: wo.vesselId || '',
-            workOrderId: wo.id,
+            workOrderId: wo.wouuid,
             workOrderNo: wo.workOrderNo,
             jobTitle: wo.jobTitle,
             maintenanceType: wo.maintenanceType || 'Servicing',

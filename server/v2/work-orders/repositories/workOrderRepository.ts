@@ -35,7 +35,7 @@ export async function getWorkOrders(vesselId?: string): Promise<WorkOrder[]> {
 
 export async function getWorkOrder(id: string): Promise<WorkOrder | undefined> {
   const db = await getDb();
-  const [result] = await db.select().from(workOrders).where(eq(workOrders.id, id));
+  const [result] = await db.select().from(workOrders).where(eq(workOrders.wouuid, id));
   return result;
 }
 
@@ -47,13 +47,13 @@ export async function createWorkOrder(data: any): Promise<WorkOrder> {
 
 export async function updateWorkOrder(id: string, data: Partial<any>): Promise<WorkOrder> {
   const db = await getDb();
-  const [result] = await db.update(workOrders).set({ ...data, updatedAt: new Date() }).where(eq(workOrders.id, id)).returning();
+  const [result] = await db.update(workOrders).set({ ...data, updatedAt: new Date() }).where(eq(workOrders.wouuid, id)).returning();
   return result;
 }
 
 export async function deleteWorkOrder(id: string): Promise<void> {
   const db = await getDb();
-  await db.delete(workOrders).where(eq(workOrders.id, id));
+  await db.delete(workOrders).where(eq(workOrders.wouuid, id));
 }
 
 export async function getWorkOrdersByVessel(vesselId: string): Promise<WorkOrder[]> {

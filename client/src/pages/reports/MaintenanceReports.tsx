@@ -266,7 +266,7 @@ const MaintenanceReports: React.FC<MaintenanceReportsProps> = ({ onBack, globalF
         ];
 
         const data = dueJobs.map((wo: any) => ({
-          workOrderNumber: wo.workOrderNumber || wo.id,
+          workOrderNumber: wo.workOrderNumber || wo.wouuid,
           title: wo.title || wo.jobTitle || '-',
           component: wo.component || wo.componentName || '-',
           priority: wo.priority || 'Normal',
@@ -308,7 +308,7 @@ const MaintenanceReports: React.FC<MaintenanceReportsProps> = ({ onBack, globalF
           const dueDate = new Date(wo.dueDate);
           const daysOverdue = Math.floor((now.getTime() - dueDate.getTime()) / (1000 * 60 * 60 * 24));
           return {
-            workOrderNumber: wo.workOrderNumber || wo.id,
+            workOrderNumber: wo.workOrderNumber || wo.wouuid,
             component: wo.component || wo.componentName || '-',
             daysOverdue: daysOverdue,
             priority: wo.priority || 'Normal',
@@ -344,7 +344,7 @@ const MaintenanceReports: React.FC<MaintenanceReportsProps> = ({ onBack, globalF
         ];
 
         const data = completedJobs.map((wo: any) => ({
-          workOrderNumber: wo.workOrderNumber || wo.id,
+          workOrderNumber: wo.workOrderNumber || wo.wouuid,
           title: wo.title || wo.jobTitle || '-',
           component: wo.component || wo.componentName || '-',
           formattedCompletedDate: formatDate(wo.completedDate || wo.updatedAt),
@@ -424,7 +424,7 @@ const MaintenanceReports: React.FC<MaintenanceReportsProps> = ({ onBack, globalF
           priority: wo.priority || 'High',
           status: wo.status || 'Open',
           formattedDueDate: formatDate(wo.dueDate),
-          workOrderNumber: wo.workOrderNumber || wo.id
+          workOrderNumber: wo.workOrderNumber || wo.wouuid
         }));
 
         const summary = [
@@ -456,7 +456,7 @@ const MaintenanceReports: React.FC<MaintenanceReportsProps> = ({ onBack, globalF
         ];
 
         const data = unplannedWOs.map((wo: any) => ({
-          workOrderNumber: wo.workOrderNumber || wo.id,
+          workOrderNumber: wo.workOrderNumber || wo.wouuid,
           title: wo.title || wo.jobTitle || '-',
           component: wo.component || wo.componentName || '-',
           type: wo.type || 'Unplanned',
@@ -490,7 +490,7 @@ const MaintenanceReports: React.FC<MaintenanceReportsProps> = ({ onBack, globalF
         ];
 
         const data = postponedWOs.map((wo: any) => ({
-          workOrderNumber: wo.workOrderNumber || wo.id,
+          workOrderNumber: wo.workOrderNumber || wo.wouuid,
           title: wo.title || wo.jobTitle || '-',
           originalDue: formatDate(wo.originalDueDate || wo.dueDate),
           newDue: formatDate(wo.postponedDate || wo.newDueDate),
@@ -564,7 +564,7 @@ const MaintenanceReports: React.FC<MaintenanceReportsProps> = ({ onBack, globalF
             const planned = wo.plannedHours || wo.estimatedHours || 0;
             const actual = wo.actualHours || wo.hoursSpent || planned;
             return {
-              workOrderNumber: wo.workOrderNumber || wo.id,
+              workOrderNumber: wo.workOrderNumber || wo.wouuid,
               title: wo.title || wo.jobTitle || '-',
               plannedHours: planned,
               actualHours: actual,

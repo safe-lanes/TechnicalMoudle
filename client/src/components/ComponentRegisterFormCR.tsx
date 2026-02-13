@@ -408,13 +408,13 @@ export default function ComponentRegisterFormCR({
     setComponentData(prev => ({
       ...prev!,
       workOrders: prev!.workOrders.map(wo => 
-        wo.id === woId ? { ...wo, isEditing: true, originalData: { ...wo } } : wo
+        wo.wouuid === woId ? { ...wo, isEditing: true, originalData: { ...wo } } : wo
       )
     }));
   };
 
   const handleSaveWorkOrderEdit = (woId: string) => {
-    const wo = componentData?.workOrders.find(w => w.id === woId);
+    const wo = componentData?.workOrders.find(w => w.wouuid === woId);
     if (!wo) return;
 
     // Validate
@@ -432,7 +432,7 @@ export default function ComponentRegisterFormCR({
     setComponentData(prev => ({
       ...prev!,
       workOrders: prev!.workOrders.map(w => 
-        w.id === woId ? { ...w, isEditing: false } : w
+        w.wouuid === woId ? { ...w, isEditing: false } : w
       )
     }));
     
@@ -450,9 +450,9 @@ export default function ComponentRegisterFormCR({
     setComponentData(prev => ({
       ...prev!,
       workOrders: prev!.workOrders.map(wo => {
-        if (wo.id === woId && wo.originalData) {
+        if (wo.wouuid === woId && wo.originalData) {
           const { originalData, isEditing, ...rest } = wo;
-          return { ...originalData, id: wo.id };
+          return { ...originalData, wouuid: wo.wouuid };
         }
         return wo;
       })
@@ -466,7 +466,7 @@ export default function ComponentRegisterFormCR({
     setComponentData(prev => ({
       ...prev!,
       workOrders: prev!.workOrders.map(wo => 
-        wo.id === woId ? { ...wo, pendingDelete: true } : wo
+        wo.wouuid === woId ? { ...wo, pendingDelete: true } : wo
       )
     }));
     updateSectionChangeCount();
@@ -474,7 +474,7 @@ export default function ComponentRegisterFormCR({
 
   const handleAddWorkOrder = () => {
     const newWO: WorkOrder = {
-      id: `new-wo-${Date.now()}`,
+      wouuid: `new-wo-${Date.now()}`,
       jobTitle: "",
       assignedTo: "",
       frequencyType: "Calendar",
@@ -490,7 +490,7 @@ export default function ComponentRegisterFormCR({
       workOrders: [...prev!.workOrders, newWO]
     }));
     
-    setEditingWorkOrders(prev => new Set(prev).add(newWO.id!));
+    setEditingWorkOrders(prev => new Set(prev).add(newWO.wouuid!));
     updateSectionChangeCount();
   };
 
@@ -498,7 +498,7 @@ export default function ComponentRegisterFormCR({
     setComponentData(prev => ({
       ...prev!,
       workOrders: prev!.workOrders.map(wo => 
-        wo.id === woId ? { ...wo, [field]: value } : wo
+        wo.wouuid === woId ? { ...wo, [field]: value } : wo
       )
     }));
   };
@@ -596,7 +596,7 @@ export default function ComponentRegisterFormCR({
     componentData.workOrders.forEach(wo => {
       if (wo.isNew && !wo.pendingDelete) {
         woAdded.push({
-          tempId: wo.id,
+          tempId: wo.wouuid,
           jobTitle: wo.jobTitle,
           assignedTo: wo.assignedTo,
           frequencyType: wo.frequencyType,
@@ -1132,7 +1132,7 @@ export default function ComponentRegisterFormCR({
                     <tbody>
                       {componentData.workOrders.map((wo) => (
                         <tr 
-                          key={wo.id} 
+                          key={wo.wouuid} 
                           className={`
                             ${wo.pendingDelete ? 'strike-removed cr-changed-row' : ''}
                             ${wo.isNew ? 'cr-new-item' : ''}
@@ -1144,15 +1144,15 @@ export default function ComponentRegisterFormCR({
                               <td className="px-4 py-2">
                                 <Input 
                                   value={wo.jobTitle}
-                                  onChange={(e) => handleWorkOrderFieldChange(wo.id!, 'jobTitle', e.target.value)}
-                                  className={`h-8 ${workOrderErrors[wo.id!] && !wo.jobTitle ? 'border-red-500' : ''}`}
+                                  onChange={(e) => handleWorkOrderFieldChange(wo.wouuid!, 'jobTitle', e.target.value)}
+                                  className={`h-8 ${workOrderErrors[wo.wouuid!] && !wo.jobTitle ? 'border-red-500' : ''}`}
                                   placeholder="Job Title"
                                 />
                               </td>
                               <td className="px-4 py-2">
                                 <Input 
                                   value={wo.assignedTo}
-                                  onChange={(e) => handleWorkOrderFieldChange(wo.id!, 'assignedTo', e.target.value)}
+                                  onChange={(e) => handleWorkOrderFieldChange(wo.wouuid!, 'assignedTo', e.target.value)}
                                   className="h-8"
                                   placeholder="Assigned To"
                                 />
@@ -1160,7 +1160,7 @@ export default function ComponentRegisterFormCR({
                               <td className="px-4 py-2">
                                 <Select 
                                   value={wo.frequencyType}
-                                  onValueChange={(value) => handleWorkOrderFieldChange(wo.id!, 'frequencyType', value)}
+                                  onValueChange={(value) => handleWorkOrderFieldChange(wo.wouuid!, 'frequencyType', value)}
                                 >
                                   <SelectTrigger className="h-8">
                                     <SelectValue />
@@ -1175,8 +1175,8 @@ export default function ComponentRegisterFormCR({
                                 <Input 
                                   type="number"
                                   value={wo.frequencyValue}
-                                  onChange={(e) => handleWorkOrderFieldChange(wo.id!, 'frequencyValue', parseInt(e.target.value))}
-                                  className={`h-8 ${workOrderErrors[wo.id!] && wo.frequencyValue <= 0 ? 'border-red-500' : ''}`}
+                                  onChange={(e) => handleWorkOrderFieldChange(wo.wouuid!, 'frequencyValue', parseInt(e.target.value))}
+                                  className={`h-8 ${workOrderErrors[wo.wouuid!] && wo.frequencyValue <= 0 ? 'border-red-500' : ''}`}
                                   placeholder="Value"
                                 />
                               </td>
@@ -1184,14 +1184,14 @@ export default function ComponentRegisterFormCR({
                                 <Input 
                                   type="date"
                                   value={wo.initialNextDue}
-                                  onChange={(e) => handleWorkOrderFieldChange(wo.id!, 'initialNextDue', e.target.value)}
+                                  onChange={(e) => handleWorkOrderFieldChange(wo.wouuid!, 'initialNextDue', e.target.value)}
                                   className="h-8"
                                 />
                               </td>
                               <td className="px-4 py-2">
                                 <Input 
                                   value={wo.notes || ''}
-                                  onChange={(e) => handleWorkOrderFieldChange(wo.id!, 'notes', e.target.value)}
+                                  onChange={(e) => handleWorkOrderFieldChange(wo.wouuid!, 'notes', e.target.value)}
                                   className="h-8"
                                   placeholder="Notes"
                                 />
@@ -1200,7 +1200,7 @@ export default function ComponentRegisterFormCR({
                                 <div className="flex gap-2">
                                   <Button 
                                     size="sm"
-                                    onClick={() => handleSaveWorkOrderEdit(wo.id!)}
+                                    onClick={() => handleSaveWorkOrderEdit(wo.wouuid!)}
                                     className="bg-green-600 hover:bg-green-700 text-white h-8"
                                   >
                                     <Save className="h-4 w-4" />
@@ -1208,7 +1208,7 @@ export default function ComponentRegisterFormCR({
                                   <Button 
                                     size="sm"
                                     variant="outline"
-                                    onClick={() => handleCancelWorkOrderEdit(wo.id!)}
+                                    onClick={() => handleCancelWorkOrderEdit(wo.wouuid!)}
                                     className="h-8"
                                   >
                                     <X className="h-4 w-4" />
@@ -1233,8 +1233,8 @@ export default function ComponentRegisterFormCR({
                                       onClick={(e) => {
                                         e.preventDefault();
                                         e.stopPropagation();
-                                        console.log('Edit button actually clicked for:', wo.id);
-                                        handleEditWorkOrder(wo.id!);
+                                        console.log('Edit button actually clicked for:', wo.wouuid);
+                                        handleEditWorkOrder(wo.wouuid!);
                                       }}
                                       className="h-8"
                                       type="button"
@@ -1247,8 +1247,8 @@ export default function ComponentRegisterFormCR({
                                       onClick={(e) => {
                                         e.preventDefault();
                                         e.stopPropagation();
-                                        console.log('Delete button actually clicked for:', wo.id);
-                                        handleDeleteWorkOrder(wo.id!);
+                                        console.log('Delete button actually clicked for:', wo.wouuid);
+                                        handleDeleteWorkOrder(wo.wouuid!);
                                       }}
                                       className="h-8 text-red-600 hover:text-red-700"
                                       type="button"

@@ -77,7 +77,7 @@ export async function completeWorkOrder(id: string, body: any) {
         componentId: component.cuuid,
         componentCode: wo.componentCode || component.componentCode,
         vesselId: wo.vesselId || '',
-        workOrderId: wo.id,
+        workOrderId: wo.wouuid,
         workOrderNo: wo.workOrderNo,
         jobTitle: wo.jobTitle,
         maintenanceType: wo.maintenanceType || body.maintenanceType || 'Servicing',
@@ -213,7 +213,7 @@ async function processSpareConsumption(wo: any, spareData: any) {
     robLocationBefore: stock?.qty ?? 0,
     robLocationAfter: Math.max(0, (stock?.qty ?? 0) - qty),
     referenceType: 'WORK_ORDER',
-    referenceId: wo.workOrderNo || wo.id,
+    referenceId: wo.workOrderNo || wo.wouuid,
     referenceNote: `Consumed during WO completion: ${wo.workOrderNo}`,
     userId: 'system',
   });

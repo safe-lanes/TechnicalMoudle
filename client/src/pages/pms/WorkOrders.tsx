@@ -156,9 +156,9 @@ const WorkOrders: React.FC = () => {
     
     // Auto-navigate to work order page if navigating from "View Changes"
     if (previewChanges === '1' && targetType === 'workOrder' && previewTargetId) {
-      const targetWorkOrder = safeWorkOrdersList.find(wo => wo.id === previewTargetId);
+      const targetWorkOrder = safeWorkOrdersList.find(wo => wo.wouuid === previewTargetId);
       if (targetWorkOrder) {
-        setLocation(`/pms/work-order/${targetWorkOrder.id}`);
+        setLocation(`/pms/work-order/${targetWorkOrder.wouuid}`);
       }
     }
   }, [location, workOrdersList, setLocation]);
@@ -360,12 +360,12 @@ const WorkOrders: React.FC = () => {
 
   const handleWorkOrderClick = (workOrder: WorkOrder) => {
     // Navigate to work order detail page (full-screen)
-    setLocation(`/pms/work-order/${workOrder.id}`);
+    setLocation(`/pms/work-order/${workOrder.wouuid}`);
   };
 
   const handlePencilClick = (workOrder: WorkOrder) => {
     // Navigate to work order detail page (full-screen)
-    setLocation(`/pms/work-order/${workOrder.id}`);
+    setLocation(`/pms/work-order/${workOrder.wouuid}`);
   };
 
   const handleTimerClick = (workOrder: WorkOrder) => {
@@ -374,7 +374,7 @@ const WorkOrders: React.FC = () => {
   };
 
   const handleApprove = (workOrderId: string, approverRemarks?: string) => {
-    const workOrder = safeWorkOrdersList.find(wo => wo.executionId === workOrderId || wo.id === workOrderId);
+    const workOrder = safeWorkOrdersList.find(wo => wo.executionId === workOrderId || wo.wouuid === workOrderId);
     if (!workOrder) return;
     
     // Use the actual completion date from the work order (user-entered date when work was completed)
@@ -420,11 +420,11 @@ const WorkOrders: React.FC = () => {
       updateData.dateCompleted = actualCompletionDate;
     }
     
-    updateWorkOrderMutation.mutate({ id: workOrder.id, data: updateData });
+    updateWorkOrderMutation.mutate({ id: workOrder.wouuid, data: updateData });
   };
 
   const handleReject = (workOrderId: string, rejectionComments: string) => {
-    const workOrder = safeWorkOrdersList.find(wo => wo.executionId === workOrderId || wo.id === workOrderId);
+    const workOrder = safeWorkOrdersList.find(wo => wo.executionId === workOrderId || wo.wouuid === workOrderId);
     if (!workOrder) return;
     
     const updateData = {
@@ -434,7 +434,7 @@ const WorkOrders: React.FC = () => {
       rejectionDate: new Date().toISOString()
     };
     
-    updateWorkOrderMutation.mutate({ id: workOrder.id, data: updateData });
+    updateWorkOrderMutation.mutate({ id: workOrder.wouuid, data: updateData });
   };
 
   const handlePostponeConfirm = (workOrderId: string, postponeData: any) => {
@@ -633,10 +633,10 @@ const WorkOrders: React.FC = () => {
               
               return (
               <tr 
-                key={workOrder.id} 
+                key={workOrder.wouuid} 
                 className={`${index % 2 === 0 ? "bg-gray-50" : "bg-white"} ${isRejectedWO ? "bg-red-50" : ""} cursor-pointer hover:bg-gray-100`}
                 onClick={() => handleWorkOrderClick(workOrder)}
-                data-testid={`row-work-order-${workOrder.id}`}
+                data-testid={`row-work-order-${workOrder.wouuid}`}
               >
                 <td className={`py-3 px-4 ${textColorClass}`} data-testid={index === 0 ? "C24" : undefined}>
                   {index === 0 && <Marker id="C24" />}
@@ -690,7 +690,7 @@ const WorkOrders: React.FC = () => {
                                 leadTimeStatus.daysUntilDue !== null && leadTimeStatus.daysUntilDue <= 7 ? 'text-orange-500' : 
                                 'text-yellow-500'
                               }`}
-                              data-testid={`icon-lead-time-warning-${workOrder.id}`}
+                              data-testid={`icon-lead-time-warning-${workOrder.wouuid}`}
                             />
                             <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2 py-1 bg-gray-900 text-white text-xs rounded whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10">
                               {leadTimeStatus.daysUntilDue} day{leadTimeStatus.daysUntilDue !== 1 ? 's' : ''} until due
@@ -743,7 +743,7 @@ const WorkOrders: React.FC = () => {
                             handlePencilClick(workOrder);
                           }}
                           title="Edit Template"
-                          data-testid={index === 0 ? "C31" : `button-edit-wo-${workOrder.id}`}
+                          data-testid={index === 0 ? "C31" : `button-edit-wo-${workOrder.wouuid}`}
                         >
                           {index === 0 && <Marker id="C31" />}
                           <Pen className="h-4 w-4 text-gray-600" />
@@ -757,7 +757,7 @@ const WorkOrders: React.FC = () => {
                               handleTimerClick(workOrder);
                             }}
                             title="Postpone Work Order"
-                            data-testid={index === 0 ? "C32" : `button-postpone-wo-${workOrder.id}`}
+                            data-testid={index === 0 ? "C32" : `button-postpone-wo-${workOrder.wouuid}`}
                           >
                             {index === 0 && <Marker id="C32" />}
                             <Timer className="h-4 w-4 text-gray-600" />
@@ -774,7 +774,7 @@ const WorkOrders: React.FC = () => {
                           handleWorkOrderClick(workOrder);
                         }}
                         title="View Work Order"
-                        data-testid={`button-view-wo-${workOrder.id}`}
+                        data-testid={`button-view-wo-${workOrder.wouuid}`}
                       >
                         <Eye className="h-4 w-4 text-gray-600" />
                       </button>

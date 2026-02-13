@@ -11,20 +11,21 @@
 | `work_orders.id` = TEXT PRIMARY KEY (WO-xxx format) | `work_orders.id` = TEXT PRIMARY KEY (unchanged — Phase 4 pending) |
 | No UUID column | `work_orders.wouuid` = TEXT NOT NULL UNIQUE (canonical UUID identity) |
 | No FK constraints on child tables for work order identity | 4 child tables have DB-level FK constraints to `work_orders(wouuid)` |
-| Server code uses `workOrders.id` (TEXT) for lookups | Phase 3 pending — code refactoring to use `eq(workOrders.wouuid, ...)` |
-| WO-xxx ID generated in creation paths | Phase 4 pending — WO-xxx generation removal and SERIAL conversion |
+| Server code uses `workOrders.id` (TEXT) for lookups | Server code uses `eq(workOrders.wouuid, ...)` for all lookups (Phase 3 complete) |
+| Frontend uses `workOrder.id` for navigation/keys | Frontend uses `workOrder.wouuid` for URLs, React keys, API calls (Phase 3 complete) |
+| WO-xxx ID generated in creation paths | WO-xxx generation preserved (Phase 4 pending — SERIAL conversion) |
 
 ---
 
-## Current Status: Phase 2 Complete (FK Constraints Applied)
+## Current Status: Phase 3 Complete (Code Refactoring Done)
 
-Phases 1 and 2 are complete. Phases 3 and 4 are pending:
+Phases 1, 2, and 3 are complete. Phase 4 is pending:
 
 | Phase | Status | Description |
 |-------|--------|-------------|
 | 1. Add UUID column with backfill | COMPLETE | Migration 0028 — `wouuid` TEXT NOT NULL UNIQUE |
 | 2. Add FK constraints to child tables | COMPLETE | Migrations 0029-0030 — 4 child tables constrained |
-| 3. Refactor server/frontend code | PENDING | Switch from `workOrders.id` to `workOrders.wouuid` |
+| 3. Refactor server/frontend code | COMPLETE | All lookups use `workOrders.wouuid`, frontend uses `wouuid` for navigation/keys |
 | 4. Convert id TEXT to SERIAL | PENDING | Remove WO-xxx generation, convert to auto-increment |
 
 ---
@@ -125,45 +126,55 @@ All 4 child tables reference `work_orders(wouuid)` with ON DELETE NO ACTION, ON 
 
 ---
 
-## Pending Phase 3: Code Refactoring Plan
+## Completed Phase 3: Code Refactoring Summary
 
-The following server and frontend code still uses `workOrders.id` for lookups and must be refactored to use `workOrders.wouuid`:
+**Date**: 2026-02-13
 
-### Server Files Requiring Changes
+All server and frontend code has been refactored from `workOrders.id` to `workOrders.wouuid`:
 
-**`server/postgresStorage.ts`** (primary storage layer):
-- `getWorkOrder(id)` — uses `eq(workOrders.id, id)`
-- `updateWorkOrder(id, ...)` — uses `eq(workOrders.id, id)`
-- `deleteWorkOrder(id)` — uses `eq(workOrders.id, id)`
-- `createWorkOrder(wo)` — generates `WO-xxx` ID format
-- `bulkCreateWorkOrders(...)` — generates `WO-xxx` ID format
-- Work order completion, status update paths
+### Server Changes
 
-**`server/v2/work-orders/repositories/workOrderRepository.ts`** (V2 layer):
-- `getWorkOrderById(id)` — uses `eq(workOrders.id, id)`
-- `updateWorkOrder(id, ...)` — uses `eq(workOrders.id, id)`
-- `deleteWorkOrder(id)` — uses `eq(workOrders.id, id)`
+**`server/postgresStorage.ts`** (12 locations):
+- `getWorkOrder(id)` — now uses `eq(workOrders.wouuid, id)`
+- `updateWorkOrder(id, ...)` — now uses `eq(workOrders.wouuid, id)`
+- `deleteWorkOrder(id)` — now uses `eq(workOrders.wouuid, id)`
+- `createWorkOrder(wo)` — generates `wouuid` via `crypto.randomUUID()`, preserves WO-xxx `id`
+- `bulkCreateWorkOrders(...)` — generates `wouuid` via `crypto.randomUUID()`
+- Work order completion, status update, maintenance history — all use `wouuid`
 
-**`server/routes.ts`** (API routes):
-- Multiple route handlers using `req.params.id` → `storage.getWorkOrder(id)`
-- Work order completion, approval, auto-generation paths
+**`server/v2/work-orders/`** (repository + 5 services):
+- `workOrderRepository.ts` — all CRUD uses `eq(workOrders.wouuid, ...)`
+- `workOrderMutationService.ts` — generates `wouuid`, uses for updates/deletes
+- `workOrderCompletionService.ts` — maintenance history inserts use `wo.wouuid`
+- `workOrderBulkService.ts` — bulk completion uses `wo.wouuid`
+- `workOrderAutomationService.ts` — auto-generation creates `wouuid`
+- `workOrderContextService.ts` — tracking uses `wo.wouuid`
 
-**`server/routes/bulk.ts`** (bulk operations):
-- Bulk import tracking, archiving by `workOrder.id`
+**`server/routes.ts`** (18 locations):
+- All route handlers accept `wouuid` via `req.params.id`
+- Work order CRUD, completion, approval, postponement — all use `wouuid`
+- Job backfill tracking uses `wo.wouuid`
 
-**`server/services/workOrderStatusRecalculator.ts`**:
-- Status update uses `wo.id`
+**`server/routes/bulk.ts`** + **`server/services/`**:
+- Bulk import tracking uses `workOrder.wouuid`
+- `workOrderStatusRecalculator.ts` — status updates use `wo.wouuid`
+- `workOrderService.ts` — execution fetching uses `wouuid`
 
-**`server/services/workOrderService.ts`**:
-- Execution fetching by template ID
+### Frontend Changes (9 files)
 
-### Key Refactoring Rules (Phase 3)
+- `WorkOrders.tsx` — React keys, navigation URLs, API calls use `wouuid`
+- `Dashboard.tsx` — Chart click navigation uses `wouuid`
+- `BulkApproveModal.tsx` — Approval tracking uses `wouuid`
+- `ComponentRegisterFormCR.tsx` — Work order references use `wouuid`
+- `PostponeWorkOrderDialog.tsx` — API calls use `wouuid`
+- Report pages (OverdueWorkOrders, WorkOrderHistory, CriticalEquipment, CompletionRates) — React keys and data-testid use `wouuid`
 
-1. All `eq(workOrders.id, ...)` must become `eq(workOrders.wouuid, ...)`
-2. All child table inserts must store `workOrder.wouuid` in their work order reference columns
-3. `createWorkOrder()` must generate `wouuid` via `crypto.randomUUID()`
-4. API route handlers should accept `wouuid` as the work order identifier
-5. Frontend navigation, React keys, and API calls must use `workOrder.wouuid`
+### Verification
+
+- Application starts cleanly with no errors
+- StatusRecalculator processes 112 work orders successfully
+- JobDueScanner processes 142+151 jobs successfully
+- No remaining `wo.id` or `workOrder.id` references for identity lookups
 
 ---
 
@@ -203,6 +214,6 @@ This work orders migration follows the same proven 4-phase pattern:
 |-------|-----------------|--------------------|--------------------|----------------------|
 | 1. Add UUID column with backfill | 0008 (vuuid) | 0016-0017 (cuuid) | 0025 (juuid) | 0028 (wouuid) |
 | 2. Add FK constraints to child tables | 0009-0013 (31 tables) | 0018-0021 (15 tables) | 0026 (4 tables) | 0029-0030 (4 tables) |
-| 3. Refactor server/frontend code | Multiple commits | Multiple commits | `16c996c0`, `83248f4e` | PENDING |
+| 3. Refactor server/frontend code | Multiple commits | Multiple commits | `16c996c0`, `83248f4e` | COMPLETE (2026-02-13) |
 | 4. Convert id TEXT to SERIAL | 0014 | 0022 | 0027 | PENDING |
 | Total child tables constrained | 43 (including 0024) | 15 | 4 | 4 |

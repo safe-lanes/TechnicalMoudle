@@ -84,7 +84,7 @@ export function TargetPicker({
   };
 
   const getItemId = (item: any, cat: string) => {
-    if (cat === 'work_orders') return item.id || item.woNo;
+    if (cat === 'work_orders') return item.wouuid || item.woNo;
     if (cat === 'spares') return String(item.id || item.partCode);
     if (cat === 'stores') return String(item.id || item.itemCode);
     return item.id || item.componentId;

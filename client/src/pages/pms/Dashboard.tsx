@@ -744,16 +744,16 @@ const Dashboard = () => {
               <div className="space-y-2">
                 {workOrderKPIs.pendingApprovalList.map((wo: any) => (
                   <div 
-                    key={wo.id}
+                    key={wo.wouuid}
                     className={`flex items-center justify-between p-3 rounded-lg border ${wo.wasRejected ? 'bg-red-50 border-red-200' : 'bg-blue-50 border-blue-200'}`}
-                    data-testid={`row-pending-approval-wo-${wo.id}`}
+                    data-testid={`row-pending-approval-wo-${wo.wouuid}`}
                   >
                     <div 
                       className="flex-1 cursor-pointer"
-                      onClick={() => navigateToWorkOrder(wo.id)}
+                      onClick={() => navigateToWorkOrder(wo.wouuid)}
                     >
                       <div className={`font-medium text-sm ${wo.wasRejected ? 'text-red-700' : ''}`}>
-                        {wo.workOrderNo || `WO-${wo.id}`}
+                        {wo.workOrderNo || `WO-${wo.wouuid}`}
                         {wo.wasRejected && (
                           <Badge variant="destructive" className="ml-2 text-xs">Resubmitted</Badge>
                         )}
@@ -769,8 +769,8 @@ const Dashboard = () => {
                       <Button
                         variant="ghost"
                         size="icon"
-                        onClick={() => navigateToWorkOrder(wo.id)}
-                        data-testid={`button-view-pending-wo-${wo.id}`}
+                        onClick={() => navigateToWorkOrder(wo.wouuid)}
+                        data-testid={`button-view-pending-wo-${wo.wouuid}`}
                       >
                         <Eye className="w-4 h-4" />
                       </Button>
@@ -780,22 +780,22 @@ const Dashboard = () => {
                         onClick={() => {
                           const reason = window.prompt("Enter rejection reason:");
                           if (reason) {
-                            rejectMutation.mutate({ workOrderId: wo.id, comments: reason });
+                            rejectMutation.mutate({ workOrderId: wo.wouuid, comments: reason });
                           }
                         }}
                         className="text-red-600 hover:bg-red-50"
                         disabled={rejectMutation.isPending}
-                        data-testid={`button-reject-wo-${wo.id}`}
+                        data-testid={`button-reject-wo-${wo.wouuid}`}
                       >
                         <XCircle className="w-4 h-4 mr-1" />
                         Reject
                       </Button>
                       <Button
                         size="sm"
-                        onClick={() => approveMutation.mutate(wo.id)}
+                        onClick={() => approveMutation.mutate(wo.wouuid)}
                         className="bg-green-600 hover:bg-green-700"
                         disabled={approveMutation.isPending}
-                        data-testid={`button-approve-wo-${wo.id}`}
+                        data-testid={`button-approve-wo-${wo.wouuid}`}
                       >
                         <CheckCircle className="w-4 h-4 mr-1" />
                         Approve
@@ -845,13 +845,13 @@ const Dashboard = () => {
                 <div className="space-y-2">
                   {workOrderKPIs.overdueList.map((wo: any) => (
                     <div 
-                      key={wo.id}
+                      key={wo.wouuid}
                       className="flex items-center justify-between p-3 bg-red-50 rounded-lg cursor-pointer hover:bg-red-100 transition-colors"
-                      onClick={() => navigateToWorkOrder(wo.id)}
-                      data-testid={`row-overdue-wo-${wo.id}`}
+                      onClick={() => navigateToWorkOrder(wo.wouuid)}
+                      data-testid={`row-overdue-wo-${wo.wouuid}`}
                     >
                       <div className="flex-1">
-                        <div className="font-medium text-sm">{wo.workOrderNumber || `WO-${wo.id}`}</div>
+                        <div className="font-medium text-sm">{wo.workOrderNumber || `WO-${wo.wouuid}`}</div>
                         <div className="text-xs text-gray-600">{wo.taskDescription || wo.jobTitle || 'No description'}</div>
                       </div>
                       <div className="flex items-center gap-2">

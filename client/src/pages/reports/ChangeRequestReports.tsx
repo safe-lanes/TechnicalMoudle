@@ -121,7 +121,7 @@ const ChangeRequestReports: React.FC<ChangeRequestReportsProps> = ({ onBack }) =
           .filter((wo: any) => wo.type === 'Unplanned' || wo.workOrderNumber?.startsWith('UWO'))
           .forEach((wo: any) => changes.push({
             type: 'Unplanned WO',
-            id: wo.workOrderNumber || wo.id,
+            id: wo.workOrderNumber || wo.wouuid,
             title: wo.title || wo.jobTitle || '-',
             status: wo.status || 'Open',
             date: formatDate(wo.createdAt || wo.dueDate)

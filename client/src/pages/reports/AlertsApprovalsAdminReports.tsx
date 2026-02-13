@@ -182,7 +182,7 @@ const AlertsApprovalsAdminReports: React.FC<AlertsApprovalsAdminReportsProps> = 
         workOrders.filter((wo: any) => wo.status === 'Overdue' || (wo.dueDate && new Date(wo.dueDate) < now && wo.status !== 'Completed'))
           .forEach((wo: any) => alerts.push({
             type: 'Overdue Work Order',
-            description: wo.workOrderNumber || wo.title || wo.id,
+            description: wo.workOrderNumber || wo.title || wo.wouuid,
             priority: 'High',
             status: 'Active'
           }));
@@ -222,7 +222,7 @@ const AlertsApprovalsAdminReports: React.FC<AlertsApprovalsAdminReportsProps> = 
         workOrders.filter((wo: any) => wo.status === 'Pending Approval')
           .forEach((wo: any) => pendingItems.push({
             type: 'Work Order',
-            id: wo.workOrderNumber || wo.id,
+            id: wo.workOrderNumber || wo.wouuid,
             description: wo.title || wo.jobTitle || '-',
             status: 'Awaiting Approval'
           }));
@@ -289,7 +289,7 @@ const AlertsApprovalsAdminReports: React.FC<AlertsApprovalsAdminReportsProps> = 
           const daysOverdue = Math.floor((now.getTime() - new Date(wo.dueDate).getTime()) / (1000 * 60 * 60 * 24));
           overdueItems.push({
             type: 'Work Order',
-            id: wo.workOrderNumber || wo.id,
+            id: wo.workOrderNumber || wo.wouuid,
             description: wo.title || wo.jobTitle || '-',
             daysOverdue,
             priority: wo.priority || 'Normal'
