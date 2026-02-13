@@ -13,8 +13,9 @@ const MONTHS = [
   "July", "August", "September", "October", "November", "December",
 ]
 
-function CustomCaption({ displayMonth }: CaptionProps) {
+function CustomCaption({ displayMonth, displayIndex }: CaptionProps) {
   const { goToMonth } = useNavigation()
+  const index = displayIndex ?? 0
 
   const currentYear = new Date().getFullYear()
   const yearRange: number[] = []
@@ -22,14 +23,20 @@ function CustomCaption({ displayMonth }: CaptionProps) {
     yearRange.push(y)
   }
 
+  const navigateToMonth = (targetDate: Date) => {
+    const adjusted = new Date(targetDate)
+    adjusted.setMonth(adjusted.getMonth() - index)
+    goToMonth(adjusted)
+  }
+
   const handleMonthChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     const newMonth = parseInt(e.target.value, 10)
-    goToMonth(setMonth(displayMonth, newMonth))
+    navigateToMonth(setMonth(displayMonth, newMonth))
   }
 
   const handleYearChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     const newYear = parseInt(e.target.value, 10)
-    goToMonth(setYear(displayMonth, newYear))
+    navigateToMonth(setYear(displayMonth, newYear))
   }
 
   return (
@@ -39,7 +46,7 @@ function CustomCaption({ displayMonth }: CaptionProps) {
         onClick={() => {
           const prev = new Date(displayMonth)
           prev.setMonth(prev.getMonth() - 1)
-          goToMonth(prev)
+          navigateToMonth(prev)
         }}
         className={cn(
           buttonVariants({ variant: "outline" }),
@@ -79,7 +86,7 @@ function CustomCaption({ displayMonth }: CaptionProps) {
         onClick={() => {
           const next = new Date(displayMonth)
           next.setMonth(next.getMonth() + 1)
-          goToMonth(next)
+          navigateToMonth(next)
         }}
         className={cn(
           buttonVariants({ variant: "outline" }),
