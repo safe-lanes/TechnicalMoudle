@@ -1131,7 +1131,7 @@ export default function FleetVesselMapping({ onBack }: { onBack?: () => void }) 
                           </tr>
                         </thead>
                         <tbody>
-                          {fleetJobsData.map((job) => {
+                          {[...fleetJobsData].sort((a, b) => (a.fleetEquipmentCode || "").localeCompare(b.fleetEquipmentCode || "")).map((job) => {
                             const isSelected = selectedFleetJob === job.jobCode;
                             const isMapped = jobMappingsData.some((m) => m.jobCode === job.jobCode);
                             return (
@@ -1225,7 +1225,7 @@ export default function FleetVesselMapping({ onBack }: { onBack?: () => void }) 
                           </tr>
                         </thead>
                         <tbody>
-                          {vesselJobsData.map((job: any) => {
+                          {[...vesselJobsData].sort((a: any, b: any) => (a.componentCode || "").localeCompare(b.componentCode || "")).map((job: any) => {
                             const isSelected = selectedVesselJob === job.id;
                             const isLinked = jobLinkedVesselJobIds.has(job.id);
                             return (
