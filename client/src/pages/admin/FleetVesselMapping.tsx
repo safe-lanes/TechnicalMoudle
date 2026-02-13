@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useCallback, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useVessels } from "@/hooks/useVessels";
 import { Button } from "@/components/ui/button";
@@ -10,7 +10,7 @@ import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Ship, Box, Wrench, Package, Search, Link2, ArrowLeft, RefreshCw, Zap, CheckCircle2, Anchor } from "lucide-react";
+import { Ship, Box, Wrench, Package, Search, Link2, ArrowLeft, RefreshCw, Zap, CheckCircle2, Anchor, ChevronRight, ChevronDown, FolderTree } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import type { Component, FleetComponents } from "@shared/schema";
@@ -38,6 +38,24 @@ interface AutoMatchEntry {
   matched: boolean;
 }
 
+interface FleetTreeNode {
+  code: string;
+  name: string;
+  parentCode: string | null;
+  children: FleetTreeNode[];
+  isLeaf: boolean;
+  data?: FleetComponents;
+}
+
+interface VesselTreeNode {
+  code: string;
+  name: string;
+  parentId: string | null;
+  children: VesselTreeNode[];
+  isParent: boolean;
+  data?: Component;
+}
+
 export default function FleetVesselMapping({ onBack }: { onBack?: () => void }) {
   const { toast } = useToast();
   const [activeTab, setActiveTab] = useState<MappingTab>("components");
@@ -48,6 +66,8 @@ export default function FleetVesselMapping({ onBack }: { onBack?: () => void }) 
   const [autoMatchDialogOpen, setAutoMatchDialogOpen] = useState(false);
   const [summaryDialogOpen, setSummaryDialogOpen] = useState(false);
   const [summaryData, setSummaryData] = useState<{ linked: number; notLinked: number }>({ linked: 0, notLinked: 0 });
+  const [expandedFleetNodes, setExpandedFleetNodes] = useState<Set<string>>(new Set());
+  const [expandedVesselNodes, setExpandedVesselNodes] = useState<Set<string>>(new Set());
 
   const { data: vessels = [] } = useVessels();
 
@@ -75,12 +95,168 @@ export default function FleetVesselMapping({ onBack }: { onBack?: () => void }) 
     enabled: !!selectedVessel,
   });
 
-  const vesselComponents = useMemo(
+  const vesselComponentsNonParent = useMemo(
     () => vesselComponentsData.filter((c) => c.isParent !== true),
     [vesselComponentsData]
   );
 
   const fleetComponents = useMemo(() => fleetComponentsData, [fleetComponentsData]);
+
+  const fleetTree = useMemo((): FleetTreeNode[] => {
+    if (!fleetComponents.length) return [];
+
+    const nodeMap = new Map<string, FleetTreeNode>();
+
+    fleetComponents.forEach((fc) => {
+      nodeMap.set(fc.fleetEquipmentCode, {
+        code: fc.fleetEquipmentCode,
+        name: fc.fleetEquipmentName,
+        parentCode: fc.parentFleetEquipmentCode || null,
+        children: [],
+        isLeaf: true,
+        data: fc,
+      });
+    });
+
+    const roots: FleetTreeNode[] = [];
+
+    nodeMap.forEach((node) => {
+      if (node.parentCode && nodeMap.has(node.parentCode)) {
+        const parent = nodeMap.get(node.parentCode)!;
+        parent.children.push(node);
+        parent.isLeaf = false;
+      } else {
+        roots.push(node);
+      }
+    });
+
+    const sortNodes = (nodes: FleetTreeNode[]) => {
+      nodes.sort((a, b) => a.code.localeCompare(b.code));
+      nodes.forEach((n) => sortNodes(n.children));
+    };
+    sortNodes(roots);
+
+    return roots;
+  }, [fleetComponents]);
+
+  const vesselTree = useMemo((): VesselTreeNode[] => {
+    if (!vesselComponentsData.length) return [];
+
+    const nodeMap = new Map<string, VesselTreeNode>();
+
+    vesselComponentsData.forEach((vc) => {
+      const code = vc.componentCode || vc.id;
+      nodeMap.set(code, {
+        code,
+        name: vc.name || "",
+        parentId: vc.parentId || null,
+        children: [],
+        isParent: vc.isParent === true,
+        data: vc,
+      });
+    });
+
+    const roots: VesselTreeNode[] = [];
+
+    nodeMap.forEach((node) => {
+      if (node.parentId) {
+        let parent = nodeMap.get(node.parentId);
+        if (!parent) {
+          const parentComp = vesselComponentsData.find((c: any) => c.id === node.parentId || c.componentCode === node.parentId);
+          if (parentComp) {
+            parent = nodeMap.get(parentComp.componentCode || parentComp.id);
+          }
+        }
+        if (parent) {
+          parent.children.push(node);
+        } else {
+          roots.push(node);
+        }
+      } else {
+        roots.push(node);
+      }
+    });
+
+    const sortNodes = (nodes: VesselTreeNode[]) => {
+      nodes.sort((a, b) => a.code.localeCompare(b.code));
+      nodes.forEach((n) => sortNodes(n.children));
+    };
+    sortNodes(roots);
+
+    return roots;
+  }, [vesselComponentsData]);
+
+  const { filtered: filteredFleetTree, expandCodes: fleetExpandCodes } = useMemo(() => {
+    if (!searchTerm) return { filtered: fleetTree, expandCodes: new Set<string>() };
+    const term = searchTerm.toLowerCase();
+    const expandCodes = new Set<string>();
+
+    const filterTree = (nodes: FleetTreeNode[], ancestors: string[]): FleetTreeNode[] => {
+      return nodes.reduce<FleetTreeNode[]>((acc, node) => {
+        const selfMatch =
+          node.code.toLowerCase().includes(term) ||
+          node.name.toLowerCase().includes(term);
+        const filteredChildren = filterTree(node.children, [...ancestors, node.code]);
+        if (selfMatch || filteredChildren.length > 0) {
+          ancestors.forEach((a) => expandCodes.add(a));
+          if (filteredChildren.length > 0) expandCodes.add(node.code);
+          acc.push({
+            ...node,
+            children: selfMatch ? node.children : filteredChildren,
+          });
+        }
+        return acc;
+      }, []);
+    };
+    return { filtered: filterTree(fleetTree, []), expandCodes };
+  }, [fleetTree, searchTerm]);
+
+  useEffect(() => {
+    if (fleetExpandCodes.size > 0) {
+      setExpandedFleetNodes((prev) => {
+        const next = new Set(prev);
+        let changed = false;
+        fleetExpandCodes.forEach((c) => { if (!next.has(c)) { next.add(c); changed = true; } });
+        return changed ? next : prev;
+      });
+    }
+  }, [fleetExpandCodes]);
+
+  const { filtered: filteredVesselTree, expandCodes: vesselExpandCodes } = useMemo(() => {
+    if (!searchTerm) return { filtered: vesselTree, expandCodes: new Set<string>() };
+    const term = searchTerm.toLowerCase();
+    const expandCodes = new Set<string>();
+
+    const filterTree = (nodes: VesselTreeNode[], ancestors: string[]): VesselTreeNode[] => {
+      return nodes.reduce<VesselTreeNode[]>((acc, node) => {
+        const selfMatch =
+          node.code.toLowerCase().includes(term) ||
+          node.name.toLowerCase().includes(term);
+        const filteredChildren = filterTree(node.children, [...ancestors, node.code]);
+        if (selfMatch || filteredChildren.length > 0) {
+          ancestors.forEach((a) => expandCodes.add(a));
+          if (filteredChildren.length > 0) expandCodes.add(node.code);
+          acc.push({
+            ...node,
+            children: selfMatch ? node.children : filteredChildren,
+          });
+        }
+        return acc;
+      }, []);
+    };
+    return { filtered: filterTree(vesselTree, []), expandCodes };
+  }, [vesselTree, searchTerm]);
+
+  useEffect(() => {
+    if (vesselExpandCodes.size > 0) {
+      setExpandedVesselNodes((prev) => {
+        const next = new Set(prev);
+        let changed = false;
+        vesselExpandCodes.forEach((c) => { if (!next.has(c)) { next.add(c); changed = true; } });
+        return changed ? next : prev;
+      });
+    }
+  }, [vesselExpandCodes]);
 
   const mappingsByFleetCode = useMemo(() => {
     const map = new Map<string, FleetComponentMapping[]>();
@@ -105,28 +281,6 @@ export default function FleetVesselMapping({ onBack }: { onBack?: () => void }) 
   const mappedFleetCodes = useMemo(() => new Set(mappingsData.map((m) => m.fleetEquipmentCode)), [mappingsData]);
   const mappedComponentCodes = useMemo(() => new Set(mappingsData.map((m) => m.componentCode)), [mappingsData]);
 
-  const filteredFleetComponents = useMemo(
-    () =>
-      fleetComponents.filter(
-        (fc) =>
-          !searchTerm ||
-          fc.fleetEquipmentCode.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          fc.fleetEquipmentName.toLowerCase().includes(searchTerm.toLowerCase())
-      ),
-    [fleetComponents, searchTerm]
-  );
-
-  const filteredVesselComponents = useMemo(
-    () =>
-      vesselComponents.filter(
-        (vc) =>
-          !searchTerm ||
-          (vc.componentCode || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
-          (vc.name || "").toLowerCase().includes(searchTerm.toLowerCase())
-      ),
-    [vesselComponents, searchTerm]
-  );
-
   const linkedComponentCodes = useMemo(() => {
     if (!selectedFleetItem) return new Set<string>();
     const mappings = mappingsByFleetCode.get(selectedFleetItem) || [];
@@ -135,14 +289,27 @@ export default function FleetVesselMapping({ onBack }: { onBack?: () => void }) 
 
   const linkedFleetCodes = useMemo(() => {
     if (!selectedVesselItem) return new Set<string>();
-    const vc = vesselComponents.find((c) => c.componentCode === selectedVesselItem);
+    const vc = vesselComponentsData.find((c) => (c.componentCode || c.id) === selectedVesselItem);
     if (!vc) return new Set<string>();
-    const mappings = mappingsByComponentCode.get(vc.componentCode || "") || [];
+    const code = vc.componentCode || vc.id;
+    const mappings = mappingsByComponentCode.get(code) || [];
     return new Set(mappings.map((m) => m.fleetEquipmentCode));
-  }, [selectedVesselItem, vesselComponents, mappingsByComponentCode]);
+  }, [selectedVesselItem, vesselComponentsData, mappingsByComponentCode]);
+
+  const leafFleetCount = useMemo(() => {
+    let count = 0;
+    const countLeaves = (nodes: FleetTreeNode[]) => {
+      nodes.forEach((n) => {
+        if (n.isLeaf) count++;
+        countLeaves(n.children);
+      });
+    };
+    countLeaves(fleetTree);
+    return count;
+  }, [fleetTree]);
 
   const mappedCount = useMemo(() => mappedFleetCodes.size, [mappedFleetCodes]);
-  const unmappedCount = useMemo(() => fleetComponents.length - mappedCount, [fleetComponents.length, mappedCount]);
+  const unmappedCount = useMemo(() => Math.max(0, leafFleetCount - mappedCount), [leafFleetCount, mappedCount]);
 
   const selectedFleetData = useMemo(() => {
     if (!selectedFleetItem) return null;
@@ -158,7 +325,7 @@ export default function FleetVesselMapping({ onBack }: { onBack?: () => void }) 
     const fleetCodeSet = new Set(fleetComponents.map((fc) => fc.fleetEquipmentCode));
     const fleetCodeToName = new Map(fleetComponents.map((fc) => [fc.fleetEquipmentCode, fc.fleetEquipmentName]));
 
-    return vesselComponents.map((vc) => {
+    return vesselComponentsNonParent.map((vc) => {
       const vcFleetCode = vc.fleetEquipmentCode || "";
       const matched = !!vcFleetCode && fleetCodeSet.has(vcFleetCode);
       return {
@@ -170,7 +337,7 @@ export default function FleetVesselMapping({ onBack }: { onBack?: () => void }) 
         matched,
       };
     });
-  }, [vesselComponents, fleetComponents]);
+  }, [vesselComponentsNonParent, fleetComponents]);
 
   const createMappingMutation = useMutation({
     mutationFn: async (data: {
@@ -211,7 +378,7 @@ export default function FleetVesselMapping({ onBack }: { onBack?: () => void }) 
       toast({ title: "Error", description: "Select both a fleet item and a vessel component", variant: "destructive" });
       return;
     }
-    const vc = vesselComponents.find((c) => c.componentCode === selectedVesselItem);
+    const vc = vesselComponentsNonParent.find((c) => (c.componentCode || c.id) === selectedVesselItem);
     if (!vc) return;
 
     createMappingMutation.mutate(
@@ -286,7 +453,183 @@ export default function FleetVesselMapping({ onBack }: { onBack?: () => void }) 
     toast({ title: "Re-syncing", description: "Refreshing all data..." });
   };
 
+  const toggleFleetNode = useCallback((code: string) => {
+    setExpandedFleetNodes((prev) => {
+      const next = new Set(prev);
+      if (next.has(code)) {
+        next.delete(code);
+      } else {
+        next.add(code);
+      }
+      return next;
+    });
+  }, []);
+
+  const toggleVesselNode = useCallback((code: string) => {
+    setExpandedVesselNodes((prev) => {
+      const next = new Set(prev);
+      if (next.has(code)) {
+        next.delete(code);
+      } else {
+        next.add(code);
+      }
+      return next;
+    });
+  }, []);
+
   const isLoading = isLoadingFleet || isLoadingVessel || isLoadingMappings;
+
+  const renderFleetTree = (nodes: FleetTreeNode[], level: number = 0) => {
+    return nodes.map((node) => {
+      const hasChildren = node.children.length > 0;
+      const isExpanded = expandedFleetNodes.has(node.code);
+      const isSelected = node.isLeaf && selectedFleetItem === node.code;
+      const isLinkedFromRight = node.isLeaf && linkedFleetCodes.has(node.code);
+      const isMapped = mappedFleetCodes.has(node.code);
+
+      return (
+        <div key={node.code}>
+          <div
+            className={`flex items-center border-b border-gray-100 transition-colors text-xs ${
+              node.isLeaf ? "cursor-pointer" : "cursor-default"
+            } ${
+              isSelected
+                ? "bg-blue-100"
+                : isLinkedFromRight
+                ? "bg-green-50"
+                : node.isLeaf
+                ? "hover:bg-blue-50/50"
+                : ""
+            }`}
+            style={{ paddingLeft: `${level * 16 + 8}px` }}
+            onClick={() => {
+              if (hasChildren) {
+                toggleFleetNode(node.code);
+              }
+              if (node.isLeaf) {
+                setSelectedFleetItem(node.code);
+              }
+            }}
+            data-testid={`row-fleet-${node.code}`}
+          >
+            <button
+              className="mr-1 flex-shrink-0 p-0.5"
+              onClick={(e) => {
+                e.stopPropagation();
+                if (hasChildren) {
+                  toggleFleetNode(node.code);
+                }
+              }}
+              data-testid={`toggle-fleet-${node.code}`}
+            >
+              {hasChildren ? (
+                isExpanded ? (
+                  <ChevronDown className="h-3.5 w-3.5 text-gray-500" />
+                ) : (
+                  <ChevronRight className="h-3.5 w-3.5 text-gray-500" />
+                )
+              ) : (
+                <span className="inline-block w-3.5" />
+              )}
+            </button>
+            {hasChildren ? (
+              <FolderTree className="h-3 w-3 text-cyan-500 mr-1.5 flex-shrink-0" />
+            ) : (
+              <Box className="h-3 w-3 text-gray-400 mr-1.5 flex-shrink-0" />
+            )}
+            <span className="font-mono text-[11px] text-gray-500 mr-2 flex-shrink-0">{node.code}</span>
+            <span className="truncate py-1.5" title={node.name}>{node.name}</span>
+            {!hasChildren && isMapped && (
+              <div className="w-2 h-2 rounded-full bg-green-500 ml-auto mr-2 flex-shrink-0" />
+            )}
+          </div>
+          {hasChildren && isExpanded && (
+            <div>{renderFleetTree(node.children, level + 1)}</div>
+          )}
+        </div>
+      );
+    });
+  };
+
+  const renderVesselTree = (nodes: VesselTreeNode[], level: number = 0) => {
+    return nodes.map((node) => {
+      const hasChildren = node.children.length > 0;
+      const isExpanded = expandedVesselNodes.has(node.code);
+      const isSelected = selectedVesselItem === node.code;
+      const isLinkedFromLeft = linkedComponentCodes.has(node.code);
+      const isMapped = mappedComponentCodes.has(node.code);
+      const isParentNode = node.isParent;
+      const canSelect = !isParentNode;
+
+      return (
+        <div key={node.code}>
+          <div
+            className={`flex items-center border-b border-gray-100 transition-colors text-xs ${
+              canSelect ? "cursor-pointer" : "cursor-default"
+            } ${
+              isSelected && canSelect
+                ? "bg-blue-100"
+                : isLinkedFromLeft && canSelect
+                ? "bg-green-50"
+                : canSelect
+                ? "hover:bg-blue-50/50"
+                : "bg-gray-50/50"
+            }`}
+            style={{ paddingLeft: `${level * 16 + 8}px` }}
+            onClick={() => {
+              if (hasChildren) {
+                toggleVesselNode(node.code);
+              }
+              if (canSelect) {
+                setSelectedVesselItem(node.code);
+              }
+            }}
+            data-testid={`row-vessel-${node.code}`}
+          >
+            <button
+              className="mr-1 flex-shrink-0 p-0.5"
+              onClick={(e) => {
+                e.stopPropagation();
+                if (hasChildren) {
+                  toggleVesselNode(node.code);
+                }
+              }}
+              data-testid={`toggle-vessel-${node.code}`}
+            >
+              {hasChildren ? (
+                isExpanded ? (
+                  <ChevronDown className="h-3.5 w-3.5 text-gray-500" />
+                ) : (
+                  <ChevronRight className="h-3.5 w-3.5 text-gray-500" />
+                )
+              ) : (
+                <span className="inline-block w-3.5" />
+              )}
+            </button>
+            {isParentNode ? (
+              <FolderTree className="h-3 w-3 text-cyan-500 mr-1.5 flex-shrink-0" />
+            ) : (
+              <Box className="h-3 w-3 text-gray-400 mr-1.5 flex-shrink-0" />
+            )}
+            <span className="font-mono text-[11px] text-gray-500 mr-2 flex-shrink-0">{node.code}</span>
+            <span className={`truncate py-1.5 ${isParentNode ? "font-medium text-gray-700" : ""}`} title={node.name}>{node.name}</span>
+            {canSelect && (
+              <div className="ml-auto mr-2 flex-shrink-0">
+                {isMapped ? (
+                  <div className="w-2.5 h-2.5 rounded-full bg-green-500" data-testid={`status-mapped-${node.code}`} />
+                ) : (
+                  <div className="w-2.5 h-2.5 rounded-full border border-gray-300" data-testid={`status-unmapped-${node.code}`} />
+                )}
+              </div>
+            )}
+          </div>
+          {hasChildren && isExpanded && (
+            <div>{renderVesselTree(node.children, level + 1)}</div>
+          )}
+        </div>
+      );
+    });
+  };
 
   return (
     <div className="space-y-4">
@@ -401,57 +744,21 @@ export default function FleetVesselMapping({ onBack }: { onBack?: () => void }) 
               <Card>
                 <CardHeader className="pb-3">
                   <CardTitle className="text-base flex items-center gap-2 flex-wrap">
-                    <Ship className="h-4 w-4 text-cyan-600" />
+                    <FolderTree className="h-4 w-4 text-cyan-600" />
                     Fleet Equipment
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="p-0">
                   <ScrollArea className="h-[500px]">
-                    <table className="w-full">
-                      <thead>
-                        <tr className="border-b">
-                          <th className="sticky top-0 bg-gray-50 z-10 text-left px-3 py-2 text-xs font-medium text-gray-500">Code</th>
-                          <th className="sticky top-0 bg-gray-50 z-10 text-left px-3 py-2 text-xs font-medium text-gray-500">Name</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {isLoadingFleet ? (
-                          <tr>
-                            <td colSpan={2} className="text-center py-8">
-                              <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-cyan-500 mx-auto" />
-                            </td>
-                          </tr>
-                        ) : filteredFleetComponents.length === 0 ? (
-                          <tr>
-                            <td colSpan={2} className="text-center py-8 text-gray-500 text-xs">No fleet components found</td>
-                          </tr>
-                        ) : (
-                          filteredFleetComponents.map((fc) => {
-                            const isSelected = selectedFleetItem === fc.fleetEquipmentCode;
-                            const isLinkedFromRight = linkedFleetCodes.has(fc.fleetEquipmentCode);
-                            return (
-                              <tr
-                                key={fc.id}
-                                className={`cursor-pointer border-b transition-colors text-xs ${
-                                  isSelected
-                                    ? "bg-blue-100"
-                                    : isLinkedFromRight
-                                    ? "bg-green-100"
-                                    : "hover:bg-blue-50/50"
-                                }`}
-                                onClick={() => {
-                                  setSelectedFleetItem(fc.fleetEquipmentCode);
-                                }}
-                                data-testid={`row-fleet-${fc.fleetEquipmentCode}`}
-                              >
-                                <td className="px-3 py-2 font-mono">{fc.fleetEquipmentCode}</td>
-                                <td className="px-3 py-2 truncate max-w-[200px]" title={fc.fleetEquipmentName}>{fc.fleetEquipmentName}</td>
-                              </tr>
-                            );
-                          })
-                        )}
-                      </tbody>
-                    </table>
+                    {isLoadingFleet ? (
+                      <div className="text-center py-8">
+                        <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-cyan-500 mx-auto" />
+                      </div>
+                    ) : filteredFleetTree.length === 0 ? (
+                      <div className="text-center py-8 text-gray-500 text-xs">No fleet components found</div>
+                    ) : (
+                      renderFleetTree(filteredFleetTree)
+                    )}
                   </ScrollArea>
                 </CardContent>
               </Card>
@@ -523,67 +830,21 @@ export default function FleetVesselMapping({ onBack }: { onBack?: () => void }) 
               <Card>
                 <CardHeader className="pb-3">
                   <CardTitle className="text-base flex items-center gap-2 flex-wrap">
-                    <Ship className="h-4 w-4 text-cyan-600" />
+                    <Anchor className="h-4 w-4 text-cyan-600" />
                     Vessel Components
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="p-0">
                   <ScrollArea className="h-[500px]">
-                    <table className="w-full">
-                      <thead>
-                        <tr className="border-b">
-                          <th className="sticky top-0 bg-gray-50 z-10 text-left px-3 py-2 text-xs font-medium text-gray-500">Code</th>
-                          <th className="sticky top-0 bg-gray-50 z-10 text-left px-3 py-2 text-xs font-medium text-gray-500">Name</th>
-                          <th className="sticky top-0 bg-gray-50 z-10 text-center px-3 py-2 text-xs font-medium text-gray-500">Status</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {isLoadingVessel ? (
-                          <tr>
-                            <td colSpan={3} className="text-center py-8">
-                              <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-cyan-500 mx-auto" />
-                            </td>
-                          </tr>
-                        ) : filteredVesselComponents.length === 0 ? (
-                          <tr>
-                            <td colSpan={3} className="text-center py-8 text-gray-500 text-xs">No vessel components found</td>
-                          </tr>
-                        ) : (
-                          filteredVesselComponents.map((vc) => {
-                            const code = vc.componentCode || "";
-                            const isMapped = mappedComponentCodes.has(code);
-                            const isSelected = selectedVesselItem === code;
-                            const isLinkedFromLeft = linkedComponentCodes.has(code);
-                            return (
-                              <tr
-                                key={vc.id}
-                                className={`cursor-pointer border-b transition-colors text-xs ${
-                                  isSelected
-                                    ? "bg-blue-100"
-                                    : isLinkedFromLeft
-                                    ? "bg-green-100"
-                                    : "hover:bg-blue-50/50"
-                                }`}
-                                onClick={() => {
-                                  setSelectedVesselItem(code);
-                                }}
-                                data-testid={`row-vessel-${vc.id}`}
-                              >
-                                <td className="px-3 py-2 font-mono">{code}</td>
-                                <td className="px-3 py-2 truncate max-w-[200px]" title={vc.name || ""}>{vc.name}</td>
-                                <td className="px-3 py-2 text-center">
-                                  {isMapped ? (
-                                    <div className="w-3 h-3 rounded-full bg-green-500 mx-auto" data-testid={`status-mapped-${vc.id}`} />
-                                  ) : (
-                                    <div className="w-3 h-3 rounded-full border-2 border-gray-300 mx-auto" data-testid={`status-unmapped-${vc.id}`} />
-                                  )}
-                                </td>
-                              </tr>
-                            );
-                          })
-                        )}
-                      </tbody>
-                    </table>
+                    {isLoadingVessel ? (
+                      <div className="text-center py-8">
+                        <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-cyan-500 mx-auto" />
+                      </div>
+                    ) : filteredVesselTree.length === 0 ? (
+                      <div className="text-center py-8 text-gray-500 text-xs">No vessel components found</div>
+                    ) : (
+                      renderVesselTree(filteredVesselTree)
+                    )}
                   </ScrollArea>
                 </CardContent>
               </Card>
@@ -597,7 +858,7 @@ export default function FleetVesselMapping({ onBack }: { onBack?: () => void }) 
           <div className="bg-gradient-to-r from-cyan-600 to-blue-600 pl-4 pr-10 py-2.5 flex items-center justify-between gap-2 rounded-t-lg flex-wrap">
             <div className="flex items-center gap-2">
               <Ship className="h-3.5 w-3.5 text-white" />
-              <DialogTitle className="text-xs font-semibold text-white m-0">Auto-Match Results</DialogTitle>
+              <DialogTitle className="text-xs font-semibold text-white m-0">Auto-Match Results (Is Parent = No only)</DialogTitle>
             </div>
             <Button
               onClick={handleCreateAutoMappings}
