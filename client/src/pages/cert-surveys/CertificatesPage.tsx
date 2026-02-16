@@ -816,7 +816,7 @@ export default function CertificatesPage() {
 
   return (
     <div className="h-full flex flex-col bg-gray-50 overflow-hidden">
-      <div className="flex items-center justify-between flex-shrink-0 mb-6">
+      <div className="flex items-center justify-between flex-shrink-0 mb-2">
         <h1 className="text-2xl font-bold text-gray-900">Certificates</h1>
         <div className="flex items-center gap-2">
           <Button
@@ -865,9 +865,9 @@ export default function CertificatesPage() {
         </div>
       )}
 
-      <div className="px-6 py-4 flex-1 flex flex-col min-h-0">
+      <div className="px-6 py-2 flex-1 flex flex-col min-h-0">
         <Card className="border-0 shadow-none bg-[#f7fafc] rounded-lg flex-1 flex flex-col min-h-0">
-          <CardContent className="p-4 bg-[#f7fafc] flex-1 flex flex-col min-h-0">
+          <CardContent className="p-2 bg-[#f7fafc] flex-1 flex flex-col min-h-0">
             {isLoadingCertificates ? (
               <div className="flex items-center justify-center h-64">
                 <div className="text-gray-500">Loading certificates...</div>
@@ -887,7 +887,7 @@ export default function CertificatesPage() {
                   width="100%"
                   enableExport={true}
                   enableSideBar={true}
-                  enableStatusBar={true}
+                  enableStatusBar={false}
                   enableRowGrouping={true}
                   enablePivoting={true}
                   enableAdvancedFilter={false}
