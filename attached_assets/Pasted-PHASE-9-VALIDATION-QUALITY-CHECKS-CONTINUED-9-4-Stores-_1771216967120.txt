@@ -1,0 +1,166 @@
+PHASE 9: VALIDATION & QUALITY CHECKS (CONTINUED)
+9.4: Stores Consumption Completeness
+sql
+-- Verify daily lube oil entries exist
+SELECT COUNT(*) as daily_entries
+FROM stores_consumption
+WHERE vessel_id = '[Vessel 3 UUID]'
+AND item_id IN (SELECT id FROM stores_items WHERE item_name ILIKE '%Cylinder Oil%')
+AND consumption_date BETWEEN '2023-02-13' AND '2026-02-13';
+-- Expected: ~1,096 (one per day)
+PHASE 10: FRONTEND DISPLAY FIXES
+10.1: Ensure Job Form Work History Query is Correct
+The frontend query for A5. Work History in job forms should be:
+
+sql
+SELECT 
+  wo.completed_date as date,
+  wo.work_order_number,
+  wo.job_title as description,
+  u.name as performed_by,
+  wo.status,
+  wo.completion_notes as remarks
+FROM work_orders wo
+LEFT JOIN users u ON wo.completed_by = u.id
+WHERE wo.job_id = :current_job_id
+AND wo.status IN ('COMPLETED', 'CANCELLED')
+AND wo.vessel_id = :vessel_id
+ORDER BY wo.completed_date DESC
+LIMIT 100;
+10.2: Work Order Form - Spare Parts Section
+Ensure the work order form displays spare parts from work_order_spares table:
+
+sql
+SELECT 
+  sp.part_number,
+  sp.part_name,
+  wos.quantity_used,
+  sp.unit,
+  wos.issued_date,
+  u.name as issued_by
+FROM work_order_spares wos
+JOIN spare_parts sp ON wos.spare_part_id = sp.id
+LEFT JOIN users u ON wos.issued_by = u.id
+WHERE wos.work_order_id = :work_order_id;
+FINAL SUCCESS CRITERIA - MUST BE MET
+After completing all phases, verify:
+
+✅ Work Orders (1,672 total)
+ 100% have job_id populated (linked to job templates)
+
+ 100% of completed WOs (1,233) have completion notes
+
+ 100% have man-hours recorded
+
+ 100% have proper approval chain (completed_by, approved_by)
+
+ 60-70% of maintenance WOs have linked spare parts consumption
+
+✅ Job Forms - Work History (A5)
+ Every job form shows 5-50 historical executions (depending on frequency)
+
+ Work history spans full 3-year period (2023-2026)
+
+ Each entry shows: Date, WO#, Performer, Status, Remarks
+
+✅ Spare Parts
+ 1,500-2,000 consumption records exist
+
+ Each consumption linked to specific work order
+
+ Stock balance calculation: Opening + Receipts - Consumption = Current Stock
+
+✅ Stores/Lubes
+ 1,096 daily cylinder oil consumption entries
+
+ 40-50 monthly system oil top-up entries
+
+ 100-200 receipt transactions at port visits
+
+ All consumption linked to running hours or work orders
+
+✅ Certificates & Surveys
+ 20 certificates with 2-3 renewal cycles each
+
+ 15 surveys with findings
+
+ 100% of survey findings have rectification WO linkage
+
+ All current certificates show VALID status
+
+✅ Change Requests (46 total)
+ 100% have complete approval workflow
+
+ 75% status = APPROVED_AND_IMPLEMENTED
+
+ 15% status = APPROVED_PENDING_IMPLEMENTATION
+
+ 10% status = UNDER_REVIEW or REJECTED
+
+✅ Postponements (713 total)
+ 100% have postponement_reason populated
+
+ 100% have detailed justification_details
+
+ 100% have approval chain (postponed_by, approved_by, dates)
+
+EXECUTION SUMMARY
+Total Time Estimate: 45-60 minutes to execute all phases
+
+Execution Order:
+
+Phase 1: Job linkage (15 min)
+
+Phase 2: Work order form completion (20 min)
+
+Phase 3: Related transactions (10 min)
+
+Phase 4: Postponement details (5 min)
+
+Phase 5: Cancellation records (5 min)
+
+Phase 6: Stores/lubes consumption (15 min)
+
+Phase 7: Certificate/survey linkage (10 min)
+
+Phase 8: Change request completion (5 min)
+
+Phase 9: Validation queries (10 min)
+
+Phase 10: Frontend query verification (5 min)
+
+CRITICAL INSTRUCTION
+This is NOT about generating new data. The 1,672 work orders already exist. This is about COMPLETING the existing data by:
+
+Filling NULL values
+
+Creating proper linkages between tables
+
+Populating related transaction tables
+
+Ensuring every record tells a complete story
+
+Think of this as completing a 3-year maintenance logbook where the index exists (work orders list) but the individual pages (work order details, spare parts used, crew assignments, approval signatures) need to be filled in.
+
+POST-COMPLETION VERIFICATION TEST
+After all fixes, perform this manual UI test:
+
+Navigate to Components > Any Component > Section C Jobs > Open any Job
+
+Scroll to A5. Work History
+
+Expected: Should see 10-50 rows of historical work orders
+
+Navigate to Work Orders > Click any completed work order
+
+Expected: Should see complete data in all sections:
+
+Part A: Job details ✓
+
+Part B: Work performed, findings, actions ✓
+
+Part C: Spare parts used (if applicable) ✓
+
+Part D: Completion details, approval signatures ✓
+
+PLEASE PROCEED WITH IMPLEMENTING ALL 10 PHASES AND CONFIRM COMPLETION WITH VALIDATION RESULTS.
