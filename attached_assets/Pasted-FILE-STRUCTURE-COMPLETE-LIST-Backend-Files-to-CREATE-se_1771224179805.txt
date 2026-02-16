@@ -1,0 +1,340 @@
+FILE STRUCTURE - COMPLETE LIST
+Backend Files to CREATE:
+✅ server/services/chatbotService.ts - OpenAI integration, tools, system prompt
+
+✅ server/routes/chatbot.ts - POST /technical/api/chat endpoint
+
+Backend Files to EDIT:
+✅ server/routes.ts - Add app.use(chatbotRouter);
+
+Frontend Files to CREATE:
+✅ client/src/hooks/useChat.ts - Chat state management
+
+✅ client/src/components/chat/SuggestedPrompts.tsx - Prompt chips
+
+✅ client/src/components/chat/ChatMessage.tsx - Message rendering with react-markdown
+
+✅ client/src/components/chat/ChatPanel.tsx - Side panel UI
+
+✅ client/src/components/chat/ChatButton.tsx - Floating button
+
+Frontend Files to EDIT:
+✅ client/src/App.tsx - Add <ChatButton /> at root level
+
+DETAILED IMPLEMENTATION SPECIFICATIONS
+A. Tool Definitions (OpenAI Function Format)
+Each tool must have this structure:
+
+typescript
+const CHATBOT_TOOLS = [
+  {
+    type: "function",
+    function: {
+      name: "getworkorders",
+      description: "Get list of work orders with optional filters. Use this for queries about maintenance tasks, jobs, or work order lists.",
+      parameters: {
+        type: "object",
+        properties: {
+          vesselId: { type: "string", description: "Vessel ID (required)" },
+          status: { 
+            type: "string", 
+            enum: ["OVERDUE", "DUE_GRACE_PERIOD", "OPEN", "COMPLETED", "CANCELLED"],
+            description: "Filter by work order status"
+          },
+          componentCode: { type: "string", description: "Filter by component code" },
+          dateRange: { 
+            type: "string",
+            enum: ["week", "month", "quarter"],
+            description: "Filter by date range from today"
+          },
+          limit: { type: "number", description: "Maximum number of results (default: 50)" }
+        },
+        required: ["vesselId"]
+      }
+    }
+  },
+  {
+    type: "function",
+    function: {
+      name: "getworkordercounts",
+      description: "Get count of work orders by status. Use this for dashboard summaries and KPI queries.",
+      parameters: {
+        type: "object",
+        properties: {
+          vesselId: { type: "string", description: "Vessel ID (required)" }
+        },
+        required: ["vesselId"]
+      }
+    }
+  },
+  {
+    type: "function",
+    function: {
+      name: "getlowstockspares",
+      description: "Get list of spare parts that are below minimum stock level. Critical for supply planning.",
+      parameters: {
+        type: "object",
+        properties: {
+          vesselId: { type: "string", description: "Vessel ID (required)" },
+          criticalOnly: { type: "boolean", description: "Show only critical spares (default: false)" }
+        },
+        required: ["vesselId"]
+      }
+    }
+  },
+  {
+    type: "function",
+    function: {
+      name: "generatedeeplink",
+      description: "Generate a deep link URL to a specific filtered view in the PMS dashboard. Use when user asks to 'show me', 'take me to', or 'open'.",
+      parameters: {
+        type: "object",
+        properties: {
+          page: { 
+            type: "string",
+            enum: ["work-orders", "components", "spares", "stores", "reports"],
+            description: "Target page"
+          },
+          filters: { 
+            type: "object",
+            description: "Query parameters as key-value pairs (e.g., {status: 'overdue', vesselId: 'xxx'})"
+          }
+        },
+        required: ["page"]
+      }
+    }
+  }
+  // Add remaining 7 tools following same pattern
+];
+B. Tool Execution Logic
+In chatbotService.ts, implement:
+
+typescript
+async function executeTool(
+  toolName: string, 
+  args: any, 
+  storage: any
+): Promise<any> {
+  
+  switch (toolName) {
+    case 'getworkorders':
+      const workOrders = await storage.getWorkOrders(args.vesselId);
+      let filtered = workOrders;
+      
+      // Apply status filter
+      if (args.status) {
+        filtered = filtered.filter(wo => wo.status === args.status);
+      }
+      
+      // Apply component filter
+      if (args.componentCode) {
+        filtered = filtered.filter(wo => 
+          wo.componentCode?.includes(args.componentCode)
+        );
+      }
+      
+      // Apply date range filter
+      if (args.dateRange) {
+        const now = new Date();
+        let cutoffDate = new Date();
+        
+        if (args.dateRange === 'week') {
+          cutoffDate.setDate(now.getDate() + 7);
+        } else if (args.dateRange === 'month') {
+          cutoffDate.setDate(now.getDate() + 30);
+        } else if (args.dateRange === 'quarter') {
+          cutoffDate.setDate(now.getDate() + 90);
+        }
+        
+        filtered = filtered.filter(wo => {
+          const dueDate = new Date(wo.dueDate);
+          return dueDate <= cutoffDate;
+        });
+      }
+      
+      // Apply limit
+      const limit = args.limit || 50;
+      return filtered.slice(0, limit);
+
+    case 'getworkordercounts':
+      const allWOs = await storage.getWorkOrders(args.vesselId);
+      return {
+        total: allWOs.length,
+        overdue: allWOs.filter(wo => wo.status === 'OVERDUE').length,
+        due: allWOs.filter(wo => wo.status === 'DUE_GRACE_PERIOD').length,
+        completed: allWOs.filter(wo => wo.status === 'COMPLETED').length,
+        open: allWOs.filter(wo => wo.status === 'OPEN').length
+      };
+
+    case 'getlowstockspares':
+      const spares = await storage.getSpares(args.vesselId);
+      const lowStock = spares.filter(sp => 
+        sp.rob !== null && sp.min !== null && sp.rob < sp.min
+      );
+      
+      if (args.criticalOnly) {
+        return lowStock.filter(sp => sp.critical === true);
+      }
+      return lowStock;
+
+    case 'generatedeeplink':
+      const baseUrl = '/pms';
+      const queryParams = new URLSearchParams(args.filters || {}).toString();
+      return {
+        url: `${baseUrl}/${args.page}${queryParams ? '?' + queryParams : ''}`,
+        displayText: `View ${args.page.replace('-', ' ')}`
+      };
+
+    // Add remaining cases for other 7 tools
+    
+    default:
+      throw new Error(`Unknown tool: ${toolName}`);
+  }
+}
+C. Response Format Requirements
+Assistant responses should follow this markdown template:
+
+text
+## [Summary Title]
+
+[Brief overview paragraph]
+
+### Work Orders
+| WO Number | Component | Job Title | Status | Due Date |
+|-----------|-----------|-----------|--------|----------|
+| WO-123    | Main Engine | Inspection | **OVERDUE** | 2026-01-15 |
+| WO-124    | AE #1     | Overhaul  | DUE    | 2026-02-20 |
+
+**Critical Items:** 3 overdue work orders require immediate attention.
+
+### Recommended Actions
+1. Prioritize Main Engine inspection (overdue 32 days)
+2. Prepare spares for AE #1 overhaul
+3. Schedule crew assignments
+
+[Deep link button/text]
+
+---
+
+**Would you like me to:**
+- Show details for a specific work order?
+- Check spare parts availability?
+- Draft a maintenance briefing?
+D. Error Handling Patterns
+typescript
+// In chatbotService.ts
+try {
+  const response = await openai.chat.completions.create({...});
+  // Process response
+} catch (error) {
+  console.error('OpenAI API error:', error);
+  
+  if (error.code === 'insufficient_quota') {
+    return {
+      response: "I'm unable to process your request due to API quota limits. Please contact your system administrator.",
+      toolsUsed: []
+    };
+  }
+  
+  return {
+    response: "I'm having trouble connecting to my AI service right now. Please try again in a moment, or contact support if this persists.",
+    toolsUsed: []
+  };
+}
+
+// In chatbot.ts route
+try {
+  const result = await processChatMessage(...);
+  res.json(result);
+} catch (error) {
+  console.error('Chat endpoint error:', error);
+  res.status(500).json({ 
+    error: 'Failed to process chat message',
+    message: error.message 
+  });
+}
+E. Frontend Styling Requirements
+ChatButton.tsx:
+
+typescript
+className="fixed bottom-6 right-6 z-50 w-14 h-14 rounded-full bg-primary hover:bg-primary/90 shadow-lg flex items-center justify-center text-white transition-all hover:scale-110"
+ChatPanel.tsx:
+
+typescript
+// Container
+className="fixed inset-y-0 right-0 w-full sm:w-[400px] bg-background border-l shadow-xl z-40 flex flex-col transform transition-transform duration-300"
+style={{ transform: isOpen ? 'translateX(0)' : 'translateX(100%)' }}
+
+// Header
+className="flex items-center justify-between p-4 border-b bg-primary text-primary-foreground"
+
+// Messages container
+className="flex-1 overflow-y-auto p-4 space-y-4"
+
+// Input area
+className="border-t p-4 flex gap-2"
+ACCEPTANCE CRITERIA
+Backend Must:
+✅ POST /technical/api/chat endpoint returns 200 with valid response
+
+✅ All 11 tools execute without errors
+
+✅ System prompt includes vessel context
+
+✅ Tool calls are properly logged for debugging
+
+✅ Error responses are user-friendly
+
+Frontend Must:
+✅ Floating chat button visible on PMS dashboard
+
+✅ Chat panel slides in when button clicked
+
+✅ Messages display with proper markdown formatting
+
+✅ Deep links are clickable and navigate correctly
+
+✅ Suggested prompts send messages when clicked
+
+✅ Loading indicator shows during API call
+
+✅ Error messages display in chat panel
+
+Integration Must:
+✅ Chatbot respects vessel selection from context
+
+✅ Chatbot respects user authentication
+
+✅ Tool calls return data matching existing API format
+
+✅ Conversation history persists during session
+
+✅ Works on both desktop and mobile viewports
+
+EXECUTION COMMAND
+Switch to Build mode and execute this plan sequentially:
+
+bash
+# Step 1: Install dependencies
+npm install openai react-markdown
+
+# Step 2: Create backend files
+# - server/services/chatbotService.ts (complete implementation)
+# - server/routes/chatbot.ts (POST endpoint)
+
+# Step 3: Edit backend routing
+# - server/routes.ts (mount chatbot router)
+
+# Step 4: Create frontend files
+# - client/src/hooks/useChat.ts
+# - client/src/components/chat/SuggestedPrompts.tsx
+# - client/src/components/chat/ChatMessage.tsx
+# - client/src/components/chat/ChatPanel.tsx
+# - client/src/components/chat/ChatButton.tsx
+
+# Step 5: Edit frontend app
+# - client/src/App.tsx (add ChatButton)
+
+# Step 6: Test
+# - Backend: curl test the /technical/api/chat endpoint
+# - Frontend: Open PMS dashboard, verify chat button appears and works
