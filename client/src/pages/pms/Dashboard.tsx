@@ -894,10 +894,10 @@ const Dashboard = () => {
                 <div className="space-y-2">
                   {sparesKPIs.lowStockList.map((spare: Spare) => (
                     <div 
-                      key={spare.id}
+                      key={spare.suuid || spare.id}
                       className="flex items-center justify-between p-3 bg-amber-50 rounded-lg cursor-pointer hover:bg-amber-100 transition-colors"
                       onClick={() => navigateToSpares('Low')}
-                      data-testid={`row-low-stock-spare-${spare.id}`}
+                      data-testid={`row-low-stock-spare-${spare.suuid || spare.id}`}
                     >
                       <div className="flex-1">
                         <div className="font-medium text-sm">{spare.partName}</div>

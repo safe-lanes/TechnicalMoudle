@@ -8,10 +8,10 @@ export function createSparesRouter(): Router {
   router.post('/bulk-update', ctrl.bulkUpdateHandler);
   router.get('/history/:vesselId', ctrl.historyByVessel);
 
-  router.post('/:id/consume', ctrl.consume);
-  router.post('/:id/receive', ctrl.receive);
-  router.post('/:id/consume-from-location', ctrl.consumeFromLocation);
-  router.post('/:id/receive-to-location', ctrl.receiveToLocation);
+  router.post('/:suuid/consume', ctrl.consume);
+  router.post('/:suuid/receive', ctrl.receive);
+  router.post('/:suuid/consume-from-location', ctrl.consumeFromLocation);
+  router.post('/:suuid/receive-to-location', ctrl.receiveToLocation);
 
   router.get('/:vesselId', ctrl.listByVessel);
   router.post('/:vesselId', ctrl.create);
@@ -20,11 +20,11 @@ export function createSparesRouter(): Router {
   router.post('/:vesselId/batch-consume', ctrl.batchConsumeHandler);
   router.post('/:vesselId/batch-receive', ctrl.batchReceiveHandler);
 
-  router.get('/:vesselId/:id', ctrl.getById);
-  router.patch('/:vesselId/:id', ctrl.update);
-  router.delete('/:vesselId/:id', ctrl.remove);
-  router.post('/:vesselId/:id/adjustment', ctrl.adjustment);
-  router.post('/:vesselId/:id/adjust', ctrl.adjust);
+  router.get('/:vesselId/:suuid', ctrl.getById);
+  router.patch('/:vesselId/:suuid', ctrl.update);
+  router.delete('/:vesselId/:suuid', ctrl.remove);
+  router.post('/:vesselId/:suuid/adjustment', ctrl.adjustment);
+  router.post('/:vesselId/:suuid/adjust', ctrl.adjust);
 
   return router;
 }

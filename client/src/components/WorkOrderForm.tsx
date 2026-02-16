@@ -296,7 +296,7 @@ const WorkOrderForm: React.FC<WorkOrderFormProps> = ({
     currentReading: "",
     uploadedDocuments: [] as Array<{type: string, fileName: string, fileKey: string, uploadedAt: string, uploadedBy: string}>,
     consumedSpareParts: [] as Array<{
-      spareId: number | null;
+      spareId: number | string | null;
       partNo: string;
       description: string;
       quantityConsumed: string;
@@ -787,7 +787,7 @@ const WorkOrderForm: React.FC<WorkOrderFormProps> = ({
     }
     
     const newPart = {
-      spareId: selectedBomSpare.id,
+      spareId: selectedBomSpare.suuid || selectedBomSpare.id,
       partNo: selectedBomSpare.partCode || "",
       description: selectedBomSpare.name || "",
       quantityConsumed: qty.toString(),
@@ -1583,7 +1583,7 @@ const WorkOrderForm: React.FC<WorkOrderFormProps> = ({
                             {componentSpareBom.map((spare: any) => {
                               const stockStatus = spare.rob >= spare.min ? 'OK' : spare.rob > 0 ? 'Low' : 'Critical';
                               return (
-                                <div key={spare.id} className="px-4 py-2">
+                                <div key={spare.suuid || spare.id} className="px-4 py-2">
                                   <div className="grid grid-cols-[2fr_3fr_1fr_1.5fr] gap-4 items-center text-sm">
                                     <div className="text-gray-900 font-medium">{spare.partCode || '-'}</div>
                                     <div className="text-gray-700">{spare.partName || '-'}</div>
@@ -2448,7 +2448,7 @@ const WorkOrderForm: React.FC<WorkOrderFormProps> = ({
                                                 'bg-red-100 text-red-700';
                             return (
                               <button
-                                key={spare.id}
+                                key={spare.suuid || spare.id}
                                 type="button"
                                 onClick={() => handleOpenConsumeDialog(spare)}
                                 disabled={spare.rob <= 0}
@@ -2457,7 +2457,7 @@ const WorkOrderForm: React.FC<WorkOrderFormProps> = ({
                                     ? 'bg-white border-gray-300 text-gray-700 hover:bg-blue-100 hover:border-blue-300' 
                                     : 'bg-gray-100 border-gray-200 text-gray-400 cursor-not-allowed'
                                 }`}
-                                data-testid={`button-consume-spare-${spare.id}`}
+                                data-testid={`button-consume-spare-${spare.suuid || spare.id}`}
                               >
                                 <span className="font-medium">{spare.partCode}</span>
                                 <span className={`px-1.5 py-0.5 rounded-full text-[10px] ${statusColor}`}>

@@ -365,7 +365,7 @@ const Spares: React.FC = () => {
   const [stockFilter, setStockFilter] = useState("");
   const [isAddSpareModalOpen, setIsAddSpareModalOpen] = useState(false);
   const [isBulkUpdateModalOpen, setIsBulkUpdateModalOpen] = useState(false);
-  const [bulkUpdateData, setBulkUpdateData] = useState<{[key: number]: {consumed: number, received: number}}>({});
+  const [bulkUpdateData, setBulkUpdateData] = useState<{[key: string]: {consumed: number, received: number}}>({});
   const [placeReceived, setPlaceReceived] = useState("");
   const [dateReceived, setDateReceived] = useState("");
   const [isBulkUpdating, setIsBulkUpdating] = useState(false);
@@ -412,7 +412,7 @@ const Spares: React.FC = () => {
   // Inventory transaction mutation (uses proper location-based tracking)
   const inventoryTransactionMutation = useMutation({
     mutationFn: async (data: {
-      spareId: number;
+      spareId: number | string;
       locationId: number;
       eventType: 'RECEIVE' | 'CONSUME' | 'ADJUST_OPENING_BALANCE' | 'ADJUST_CORRECTION';
       qtyChange: number;
@@ -492,7 +492,7 @@ const Spares: React.FC = () => {
       return;
     }
     inventoryTransactionMutation.mutate({
-      spareId: selectedSpareForTransaction.id,
+      spareId: selectedSpareForTransaction.suuid || selectedSpareForTransaction.id,
       locationId: parseInt(transactionLocationId),
       eventType: 'CONSUME',
       qtyChange: -Math.abs(transactionQty), // Consume is always negative
@@ -513,7 +513,7 @@ const Spares: React.FC = () => {
       return;
     }
     inventoryTransactionMutation.mutate({
-      spareId: selectedSpareForTransaction.id,
+      spareId: selectedSpareForTransaction.suuid || selectedSpareForTransaction.id,
       locationId: parseInt(transactionLocationId),
       eventType: 'RECEIVE',
       qtyChange: Math.abs(transactionQty), // Receive is always positive
@@ -617,15 +617,15 @@ const Spares: React.FC = () => {
     }
     setIsBulkUpdateModalOpen(true);
     // Initialize bulk update data
-    const initialData: {[key: number]: {consumed: number, received: number}} = {};
+    const initialData: {[key: string]: {consumed: number, received: number}} = {};
     filteredSpares.forEach(spare => {
-      initialData[spare.id] = { consumed: 0, received: 0 };
+      initialData[spare.suuid || spare.id] = { consumed: 0, received: 0 };
     });
     setBulkUpdateData(initialData);
   };
 
   // Handle bulk update input changes
-  const handleBulkUpdateChange = (spareId: number, field: 'consumed' | 'received', value: string) => {
+  const handleBulkUpdateChange = (spareId: string | number, field: 'consumed' | 'received', value: string) => {
     const numValue = parseInt(value) || 0;
     setBulkUpdateData(prev => ({
       ...prev,
@@ -645,7 +645,7 @@ const Spares: React.FC = () => {
       const itemsToConsume = Object.entries(bulkUpdateData)
         .filter(([_, data]) => data.consumed > 0)
         .map(([spareId, data]) => ({
-          spareId: parseInt(spareId),
+          spareUuid: spareId,
           quantity: data.consumed,
           notes: `Bulk consumption on ${dateReceived || new Date().toISOString().split('T')[0]}`
         }));
@@ -654,7 +654,7 @@ const Spares: React.FC = () => {
       const itemsToReceive = Object.entries(bulkUpdateData)
         .filter(([_, data]) => data.received > 0)
         .map(([spareId, data]) => ({
-          spareId: parseInt(spareId),
+          spareUuid: spareId,
           quantity: data.received,
           notes: `Bulk receipt at ${placeReceived || 'Unknown location'} on ${dateReceived || new Date().toISOString().split('T')[0]}`
         }));
@@ -919,7 +919,7 @@ const Spares: React.FC = () => {
                     const isFirstRow = rowIndex === 0;
                     
                     return (
-                      <div key={spare.id} className="px-4 py-3" data-testid={isFirstRow ? "E24-row" : undefined}>
+                      <div key={spare.suuid || spare.id} className="px-4 py-3" data-testid={isFirstRow ? "E24-row" : undefined}>
                         <div className="grid grid-cols-10 gap-4 text-sm items-center">
                           <div className="text-gray-900" data-testid={isFirstRow ? "E24" : undefined}>
                             {isFirstRow && <Marker id="E24" />}
@@ -1001,7 +1001,7 @@ const Spares: React.FC = () => {
                               className="h-8 w-8 p-0 hover:bg-red-50"
                               onClick={() => openConsumeDialog(spare)}
                               disabled={spare.rob <= 0}
-                              data-testid={`button-consume-${spare.id}`}
+                              data-testid={`button-consume-${spare.suuid || spare.id}`}
                               title="Consume from location"
                             >
                               <Minus className="h-4 w-4 text-red-600" />
@@ -1011,7 +1011,7 @@ const Spares: React.FC = () => {
                               size="sm" 
                               className="h-8 w-8 p-0 hover:bg-green-50"
                               onClick={() => openReceiveDialog(spare)}
-                              data-testid={isFirstRow ? "E36" : `button-receive-${spare.id}`}
+                              data-testid={isFirstRow ? "E36" : `button-receive-${spare.suuid || spare.id}`}
                               title="Receive to location"
                             >
                               {isFirstRow && <Marker id="E36" />}
@@ -1443,12 +1443,12 @@ const Spares: React.FC = () => {
               {/* Table Body */}
               <div className="border border-t-0 rounded-b max-h-[400px] overflow-y-auto">
                 {filteredSpares.map((spare) => {
-                  const consumed = bulkUpdateData[spare.id]?.consumed || 0;
-                  const received = bulkUpdateData[spare.id]?.received || 0;
+                  const consumed = bulkUpdateData[spare.suuid || spare.id]?.consumed || 0;
+                  const received = bulkUpdateData[spare.suuid || spare.id]?.received || 0;
                   const newRob = spare.rob - consumed + received;
                   
                   return (
-                    <div key={spare.id} className="grid grid-cols-8 gap-3 p-3 border-b bg-white items-center">
+                    <div key={spare.suuid || spare.id} className="grid grid-cols-8 gap-3 p-3 border-b bg-white items-center">
                       <div className="text-gray-900 text-sm">{spare.partCode}</div>
                       <div className="text-gray-900 text-sm">{spare.partName}</div>
                       <div className="text-gray-700 text-sm">{spare.componentName || '-'}</div>
@@ -1460,7 +1460,7 @@ const Spares: React.FC = () => {
                           className="text-sm h-8" 
                           placeholder="0"
                           value={consumed || ''}
-                          onChange={(e) => handleBulkUpdateChange(spare.id, 'consumed', e.target.value)}
+                          onChange={(e) => handleBulkUpdateChange(spare.suuid || spare.id, 'consumed', e.target.value)}
                         />
                       </div>
                       <div>
@@ -1470,7 +1470,7 @@ const Spares: React.FC = () => {
                           className="text-sm h-8" 
                           placeholder="0"
                           value={received || ''}
-                          onChange={(e) => handleBulkUpdateChange(spare.id, 'received', e.target.value)}
+                          onChange={(e) => handleBulkUpdateChange(spare.suuid || spare.id, 'received', e.target.value)}
                         />
                       </div>
                       <div className={`text-sm font-medium ${newRob < spare.min ? 'text-red-600' : 'text-gray-900'}`}>

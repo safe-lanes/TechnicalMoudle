@@ -437,6 +437,7 @@ export type IhmMaintenanceLog = typeof ihmMaintenanceLog.$inferSelect;
 // Spares Table
 export const spares = pgTable("spares", {
   id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
+  suuid: text("suuid").notNull().unique().$defaultFn(() => crypto.randomUUID()),
   partCode: text("part_code").notNull(),
   partName: text("part_name").notNull(),
   componentId: text("component_id").references(() => components.cuuid, { onDelete: "restrict", onUpdate: "cascade" }), // Nullable for fleet spares
@@ -499,6 +500,7 @@ export const spares = pgTable("spares", {
 
 export const insertSpareSchema = createInsertSchema(spares).omit({
   id: true,
+  suuid: true,
   deleted: true,
   createdAt: true,
   updatedAt: true,
@@ -513,6 +515,7 @@ export const sparesHistory = pgTable("spares_history", {
   timestampUTC: timestamp("timestamp_utc").notNull(),
   vesselId: text("vessel_id").notNull().references(() => vessels.vuuid),
   spareId: integer("spare_id").notNull(),
+  spareUuid: text("spare_uuid").notNull().references(() => spares.suuid),
   partCode: text("part_code").notNull(),
   partName: text("part_name").notNull(),
   componentId: text("component_id").notNull().references(() => components.cuuid, { onDelete: "restrict", onUpdate: "cascade" }),
@@ -2190,7 +2193,8 @@ export type Location = typeof locations.$inferSelect;
 export const spareComponentLinks = pgTable("spare_component_links", {
   id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
   vesselId: text("vessel_id").notNull().references(() => vessels.vuuid),
-  spareId: integer("spare_id").notNull(), // FK → spares.id
+  spareId: integer("spare_id").notNull(),
+  spareUuid: text("spare_uuid").notNull().references(() => spares.suuid),
   componentId: text("component_id").notNull().references(() => components.cuuid, { onDelete: "restrict", onUpdate: "cascade" }),
   linkedBy: text("linked_by").notNull(),
   linkedAt: timestamp("linked_at").notNull().defaultNow(),
@@ -2213,9 +2217,10 @@ export type SpareComponentLink = typeof spareComponentLinks.$inferSelect;
 export const spareLocationStock = pgTable("spare_location_stock", {
   id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
   vesselId: text("vessel_id").notNull().references(() => vessels.vuuid),
-  spareId: integer("spare_id").notNull(), // FK → spares.id
-  locationId: integer("location_id").notNull(), // FK → locations.id
-  qty: integer("qty").notNull().default(0), // Must never go negative
+  spareId: integer("spare_id").notNull(),
+  spareUuid: text("spare_uuid").notNull().references(() => spares.suuid),
+  locationId: integer("location_id").notNull(),
+  qty: integer("qty").notNull().default(0),
 }, (table) => ({
   spareIdIdx: index("idx_spare_location_stock_spare").on(table.spareId),
   locationIdIdx: index("idx_spare_location_stock_location").on(table.locationId),
@@ -2235,8 +2240,9 @@ export const inventoryTransactions = pgTable("inventory_transactions", {
   id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
   vesselId: text("vessel_id").notNull().references(() => vessels.vuuid),
   txnDatetime: timestamp("txn_datetime").notNull().defaultNow(),
-  spareId: integer("spare_id").notNull(), // FK → spares.id
-  locationId: integer("location_id"), // Nullable only if non-location specific; for consume/receive MUST set
+  spareId: integer("spare_id").notNull(),
+  spareUuid: text("spare_uuid").notNull().references(() => spares.suuid),
+  locationId: integer("location_id"),
   eventType: text("event_type").notNull(), // RECEIVE | CONSUME | ADJUST_OPENING_BALANCE | ADJUST_CORRECTION
   qtyChange: integer("qty_change").notNull(), // Positive for receive, negative for consume
   robTotalBefore: integer("rob_total_before").notNull(),

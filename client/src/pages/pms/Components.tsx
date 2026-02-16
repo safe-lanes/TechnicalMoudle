@@ -1511,7 +1511,7 @@ const SparesSection: React.FC<{ selectedComponent: ComponentNode | null }> = ({ 
             const spare = spareData.spare;
             const isCritical = spare.critical === 'Critical' || spare.critical === 'Yes' || spare.criticality === 'Yes';
             return (
-            <tr key={spare.id || index} className="border-b border-gray-100 hover:bg-gray-50 cursor-pointer" onClick={() => handleViewSpareDetails(spareData)}>
+            <tr key={spare.suuid || spare.id || index} className="border-b border-gray-100 hover:bg-gray-50 cursor-pointer" onClick={() => handleViewSpareDetails(spareData)}>
               <td className="py-3 px-3 text-gray-900 text-blue-600 hover:underline" data-testid={index === 0 ? "B7.E.10" : undefined}>
                 {index === 0 && <Marker id="B7.E.10" />}
                 {spare.partCode}
@@ -1609,7 +1609,7 @@ const SparesSection: React.FC<{ selectedComponent: ComponentNode | null }> = ({ 
                 </td>
               )}
               <td className="py-3 px-3" onClick={(e) => e.stopPropagation()}>
-                <Button variant="ghost" size="sm" onClick={() => handleViewSpareDetails(spareData)} data-testid={`view-spare-details-${spare.id}`}>
+                <Button variant="ghost" size="sm" onClick={() => handleViewSpareDetails(spareData)} data-testid={`view-spare-details-${spare.suuid || spare.id}`}>
                   <FileText className="h-4 w-4" />
                 </Button>
               </td>

@@ -311,32 +311,32 @@ export interface IStorage {
   // Spares methods
   getAllSpares(): Promise<Spare[]>;
   getSpares(vesselId: string): Promise<Spare[]>;
-  getSpare(id: number): Promise<Spare | undefined>;
+  getSpare(suuid: string): Promise<Spare | undefined>;
   createSpare(spare: InsertSpare): Promise<Spare>;
-  updateSpare(id: number, data: Partial<Spare>): Promise<Spare>;
-  deleteSpare(id: number): Promise<void>;
-  consumeSpare(id: number, quantity: number, userId: string, remarks?: string, place?: string, dateLocal?: string, tz?: string): Promise<Spare>;
-  consumeSpareFromLocation(id: number, quantity: number, location: 'A' | 'B', userId: string, remarks?: string, workOrderRef?: string, dateLocal?: string): Promise<{
+  updateSpare(suuid: string, data: Partial<Spare>): Promise<Spare>;
+  deleteSpare(suuid: string): Promise<void>;
+  consumeSpare(suuid: string, quantity: number, userId: string, remarks?: string, place?: string, dateLocal?: string, tz?: string): Promise<Spare>;
+  consumeSpareFromLocation(suuid: string, quantity: number, location: 'A' | 'B', userId: string, remarks?: string, workOrderRef?: string, dateLocal?: string): Promise<{
     spare: Spare;
     deducted: number;
     requested: number;
     shortageQty: number;
   }>;
-  receiveSpare(id: number, quantity: number, userId: string, remarks?: string, supplierPO?: string, place?: string, dateLocal?: string, tz?: string): Promise<Spare>;
-  receiveSpareToLocation(id: number, quantity: number, location: 'A' | 'B', userId: string, remarks?: string, supplierPO?: string, dateLocal?: string): Promise<{
+  receiveSpare(suuid: string, quantity: number, userId: string, remarks?: string, supplierPO?: string, place?: string, dateLocal?: string, tz?: string): Promise<Spare>;
+  receiveSpareToLocation(suuid: string, quantity: number, location: 'A' | 'B', userId: string, remarks?: string, supplierPO?: string, dateLocal?: string): Promise<{
     spare: Spare;
     received: number;
   }>;
-  bulkUpdateSpares(updates: Array<{id: number, consumed?: number, received?: number, receivedDate?: string, receivedPlace?: string}>, userId: string, remarks?: string): Promise<Spare[]>;
+  bulkUpdateSpares(updates: Array<{suuid: string, consumed?: number, received?: number, receivedDate?: string, receivedPlace?: string}>, userId: string, remarks?: string): Promise<Spare[]>;
   adjustSpareQuantity(
-    spareId: number,
+    suuid: string,
     qtyChange: number,
     eventType: 'CONSUME' | 'RECEIVE' | 'ADJUST',
     reference?: string,
     notes?: string
   ): Promise<Spare>;
   adjustSpareAtLocation(
-    id: number,
+    suuid: string,
     newRob: number,
     location: 'A' | 'B',
     userId: string,
@@ -346,7 +346,7 @@ export interface IStorage {
     tz?: string
   ): Promise<Spare>;
   transferSpareLocation(
-    id: number,
+    suuid: string,
     newRobLocationA: number,
     newRobLocationB: number,
     userId: string,
@@ -358,10 +358,10 @@ export interface IStorage {
   
   // Fleet Spares methods
   getFleetSpares(): Promise<Spare[]>;
-  getFleetSpare(id: number): Promise<Spare | undefined>;
+  getFleetSpare(suuid: string): Promise<Spare | undefined>;
   createFleetSpare(spare: InsertSpare): Promise<Spare>;
-  updateFleetSpare(id: number, data: Partial<Spare>): Promise<Spare>;
-  deleteFleetSpare(id: number): Promise<void>;
+  updateFleetSpare(suuid: string, data: Partial<Spare>): Promise<Spare>;
+  deleteFleetSpare(suuid: string): Promise<void>;
   
   // Spares History methods
   getSpareHistory(vesselId: string): Promise<SpareHistory[]>;
@@ -837,7 +837,7 @@ export interface IStorage {
   }): Promise<InventoryTransaction[]>;
   performInventoryTransaction(input: {
     vesselId: string;
-    spareId: number;
+    spareId: string;
     locationId: number;
     eventType: InventoryEventType;
     qtyChange: number;
@@ -848,7 +848,7 @@ export interface IStorage {
   }): Promise<{ transaction: InventoryTransaction; newLocationQty: number; newTotalRob: number }>;
   
   // Enhanced Spare Data Methods
-  getSpareWithInventory(spareId: number): Promise<SpareWithInventory | null>;
+  getSpareWithInventory(suuid: string): Promise<SpareWithInventory | null>;
   getSparesWithInventoryByVessel(vesselId: string): Promise<SpareWithInventory[]>;
   getSparesWithInventoryByComponent(componentId: string): Promise<SpareWithInventory[]>;
   getSparesWithInventoryByComponentCode(vesselId: string, componentCode: string): Promise<SpareWithInventory[]>;

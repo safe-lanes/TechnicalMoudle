@@ -3800,7 +3800,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                                           Math.max(robLocationA, robLocationB); // Default to max single location
                     
                     return (
-                      <tr key={item.spare.id || index} className="border-b hover:bg-gray-50 dark:hover:bg-gray-800">
+                      <tr key={item.spare.suuid || item.spare.id || index} className="border-b hover:bg-gray-50 dark:hover:bg-gray-800">
                         <td className="py-2 px-2">
                           <Checkbox
                             checked={item.selected}

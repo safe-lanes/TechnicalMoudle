@@ -150,8 +150,8 @@ export default function FleetSpareForm({ open, onOpenChange, spare }: FleetSpare
   });
 
   const onSubmit = (data: FleetSpareFormData) => {
-    if (spare?.id) {
-      updateMutation.mutate({ ...data, id: spare.id });
+    if (spare?.suuid) {
+      updateMutation.mutate({ ...data, suuid: spare.suuid });
     } else {
       createMutation.mutate(data);
     }
@@ -159,7 +159,7 @@ export default function FleetSpareForm({ open, onOpenChange, spare }: FleetSpare
 
   const isPending = createMutation.isPending || updateMutation.isPending;
 
-  const isEditMode = !!spare?.id;
+  const isEditMode = !!spare?.suuid;
   const m = (addId: string, editId: string) => isEditMode ? editId : addId;
 
   return (

@@ -393,7 +393,7 @@ export default function FleetEquipmentTreeView() {
                     ) : (
                       <div className="space-y-2">
                         {relatedSpares.map((spare) => (
-                          <Card key={spare.id} className="p-3" data-testid={`spare-card-${spare.id}`}>
+                          <Card key={spare.suuid || spare.id} className="p-3" data-testid={`spare-card-${spare.suuid || spare.id}`}>
                             <div className="flex items-center justify-between">
                               <div>
                                 <p className="font-medium">{spare.partName}</p>

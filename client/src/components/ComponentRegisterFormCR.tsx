@@ -508,7 +508,7 @@ export default function ComponentRegisterFormCR({
     setComponentData(prev => ({
       ...prev!,
       spares: prev!.spares.map(spare => 
-        spare.id === spareId 
+        (spare.suuid || spare.id) === spareId 
           ? { ...spare, [field]: value, isEditing: true } 
           : spare
       )
@@ -521,7 +521,7 @@ export default function ComponentRegisterFormCR({
     setComponentData(prev => ({
       ...prev!,
       spares: prev!.spares.map(spare => 
-        spare.id === spareId ? { ...spare, pendingUnlink: true } : spare
+        (spare.suuid || spare.id) === spareId ? { ...spare, pendingUnlink: true } : spare
       )
     }));
     updateSectionChangeCount();
@@ -647,7 +647,7 @@ export default function ComponentRegisterFormCR({
       } else if (spare.pendingUnlink && !spare.isLinkedNew) {
         sparesRemoved.push({ partCode: spare.partCode });
       } else if (spare.isEditing && !spare.pendingUnlink && !spare.isLinkedNew) {
-        const original = originalData.spares.find(s => s.id === spare.id);
+        const original = originalData.spares.find(s => (s.suuid || s.id) === (spare.suuid || spare.id));
         if (original) {
           const fields: any = {};
           if (spare.min !== original.min) fields.min = { from: original.min, to: spare.min };
@@ -1318,7 +1318,7 @@ export default function ComponentRegisterFormCR({
                     <tbody>
                       {componentData.spares.map((spare) => (
                         <tr 
-                          key={spare.id} 
+                          key={spare.suuid || spare.id} 
                           className={`
                             ${spare.pendingUnlink ? 'strike-removed cr-changed-row' : ''}
                             ${spare.isLinkedNew ? 'cr-new-item' : ''}
@@ -1331,7 +1331,7 @@ export default function ComponentRegisterFormCR({
                             <Input 
                               type="number"
                               value={spare.min}
-                              onChange={(e) => handleEditSpare(spare.id!, 'min', parseInt(e.target.value))}
+                              onChange={(e) => handleEditSpare((spare.suuid || spare.id)!, 'min', parseInt(e.target.value))}
                               className={`h-8 w-20 ${spare.isEditing ? 'cr-changed' : ''}`}
                               disabled={spare.pendingUnlink}
                             />
@@ -1339,7 +1339,7 @@ export default function ComponentRegisterFormCR({
                           <td className="px-4 py-2">
                             <Select 
                               value={spare.critical}
-                              onValueChange={(value) => handleEditSpare(spare.id!, 'critical', value)}
+                              onValueChange={(value) => handleEditSpare((spare.suuid || spare.id)!, 'critical', value)}
                               disabled={spare.pendingUnlink}
                             >
                               <SelectTrigger className={`h-8 w-24 ${spare.isEditing ? 'cr-changed' : ''}`}>
@@ -1354,7 +1354,7 @@ export default function ComponentRegisterFormCR({
                           <td className="px-4 py-2">
                             <Input 
                               value={spare.location}
-                              onChange={(e) => handleEditSpare(spare.id!, 'location', e.target.value)}
+                              onChange={(e) => handleEditSpare((spare.suuid || spare.id)!, 'location', e.target.value)}
                               className={`h-8 ${spare.isEditing ? 'cr-changed' : ''}`}
                               disabled={spare.pendingUnlink}
                             />
@@ -1367,8 +1367,8 @@ export default function ComponentRegisterFormCR({
                                 onClick={(e) => {
                                   e.preventDefault();
                                   e.stopPropagation();
-                                  console.log('Unlink spare clicked:', spare.id);
-                                  handleUnlinkSpare(spare.id!);
+                                  console.log('Unlink spare clicked:', spare.suuid || spare.id);
+                                  handleUnlinkSpare((spare.suuid || spare.id)!);
                                 }}
                                 className="h-8 text-red-600 hover:text-red-700"
                                 type="button"

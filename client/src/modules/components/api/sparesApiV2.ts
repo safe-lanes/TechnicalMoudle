@@ -42,9 +42,9 @@ export function getSparesListUrl(vesselId: string): string {
   return `${getBase()}/${vesselId}`;
 }
 
-// Get spare by ID
-export function getSpareByIdUrl(vesselId: string, spareId: number | string): string {
-  return `${getBase()}/${vesselId}/${spareId}`;
+// Get spare by suuid
+export function getSpareByIdUrl(vesselId: string, suuid: string): string {
+  return `${getBase()}/${vesselId}/${suuid}`;
 }
 
 // Create spare
@@ -53,23 +53,23 @@ export function getCreateSpareUrl(vesselId: string): string {
 }
 
 // Update spare (PATCH)
-export function getUpdateSpareUrl(vesselId: string, spareId: number | string): string {
-  return `${getBase()}/${vesselId}/${spareId}`;
+export function getUpdateSpareUrl(vesselId: string, suuid: string): string {
+  return `${getBase()}/${vesselId}/${suuid}`;
 }
 
 // Delete spare
-export function getDeleteSpareUrl(vesselId: string, spareId: number | string): string {
-  return `${getBase()}/${vesselId}/${spareId}`;
+export function getDeleteSpareUrl(vesselId: string, suuid: string): string {
+  return `${getBase()}/${vesselId}/${suuid}`;
 }
 
 // Adjustment (POST)
-export function getAdjustmentUrl(vesselId: string, spareId: number | string): string {
-  return `${getBase()}/${vesselId}/${spareId}/adjustment`;
+export function getAdjustmentUrl(vesselId: string, suuid: string): string {
+  return `${getBase()}/${vesselId}/${suuid}/adjustment`;
 }
 
 // Adjust quantity (POST)
-export function getAdjustUrl(vesselId: string, spareId: number | string): string {
-  return `${getBase()}/${vesselId}/${spareId}/adjust`;
+export function getAdjustUrl(vesselId: string, suuid: string): string {
+  return `${getBase()}/${vesselId}/${suuid}/adjust`;
 }
 
 // History by vessel - two formats for compatibility
@@ -97,23 +97,23 @@ export function getBatchReceiveUrl(vesselId: string): string {
 }
 
 // Simple consume (no vessel prefix)
-export function getConsumeUrl(spareId: number | string): string {
-  return `${getBase()}/${spareId}/consume`;
+export function getConsumeUrl(suuid: string): string {
+  return `${getBase()}/${suuid}/consume`;
 }
 
 // Simple receive (no vessel prefix)
-export function getReceiveUrl(spareId: number | string): string {
-  return `${getBase()}/${spareId}/receive`;
+export function getReceiveUrl(suuid: string): string {
+  return `${getBase()}/${suuid}/receive`;
 }
 
 // Location-aware consume
-export function getConsumeFromLocationUrl(spareId: number | string): string {
-  return `${getBase()}/${spareId}/consume-from-location`;
+export function getConsumeFromLocationUrl(suuid: string): string {
+  return `${getBase()}/${suuid}/consume-from-location`;
 }
 
 // Location-aware receive
-export function getReceiveToLocationUrl(spareId: number | string): string {
-  return `${getBase()}/${spareId}/receive-to-location`;
+export function getReceiveToLocationUrl(suuid: string): string {
+  return `${getBase()}/${suuid}/receive-to-location`;
 }
 
 // Bulk update

@@ -68,7 +68,7 @@ interface SpareHistory {
   id: number;
   timestampUTC: string;
   vesselId: string;
-  spareId: number;
+  spareId: string;
   partCode: string;
   partName: string;
   componentId: string;
@@ -212,12 +212,12 @@ const Spares: React.FC = () => {
   });
   
   const { toast } = useToast();
-  const [adjustingSpares, setAdjustingSpares] = useState<Set<number>>(new Set());
-  const [pendingAdjustments, setPendingAdjustments] = useState<Map<number, number>>(new Map());
+  const [adjustingSpares, setAdjustingSpares] = useState<Set<string>>(new Set());
+  const [pendingAdjustments, setPendingAdjustments] = useState<Map<string, number>>(new Map());
   
   // Location dropdown state
-  const [openLocationDropdown, setOpenLocationDropdown] = useState<number | null>(null);
-  const [editingLocations, setEditingLocations] = useState<{[key: number]: {locationA: string, locationB: string, nameA?: string, nameB?: string}}>({});
+  const [openLocationDropdown, setOpenLocationDropdown] = useState<string | null>(null);
+  const [editingLocations, setEditingLocations] = useState<{[key: string]: {locationA: string, locationB: string, nameA?: string, nameB?: string}}>({});
   const locationDropdownRef = useRef<HTMLDivElement>(null);
   const [dropdownPosition, setDropdownPosition] = useState<'below' | 'above'>('below');
   
@@ -242,7 +242,7 @@ const Spares: React.FC = () => {
     };
   }, [openLocationDropdown, editingLocations]);
   
-  const [originalLocationValues, setOriginalLocationValues] = useState<{[key: number]: {locationA: number, locationB: number, nameA: string, nameB: string}}>({});
+  const [originalLocationValues, setOriginalLocationValues] = useState<{[key: string]: {locationA: number, locationB: number, nameA: string, nameB: string}}>({});
   
   const handleOpenLocationDropdown = (spare: Spare, event: React.MouseEvent) => {
     // Calculate if dropdown should open above or below based on viewport position
@@ -258,7 +258,7 @@ const Spares: React.FC = () => {
       setDropdownPosition('below');
     }
     
-    setOpenLocationDropdown(spare.id);
+    setOpenLocationDropdown(spare.suuid);
     const origA = spare.robLocationA ?? 0;
     const origB = spare.robLocationB ?? 0;
     // Use spare-specific location names directly - these are the actual ROB locations
@@ -267,12 +267,12 @@ const Spares: React.FC = () => {
     const origNameB = spare.location2 || 'Location B';
     setOriginalLocationValues(prev => ({
       ...prev,
-      [spare.id]: { locationA: origA, locationB: origB, nameA: origNameA, nameB: origNameB }
+      [spare.suuid]: { locationA: origA, locationB: origB, nameA: origNameA, nameB: origNameB }
     }));
     // Initialize with both stock values AND location names from the spare record
     setEditingLocations(prev => ({
       ...prev,
-      [spare.id]: {
+      [spare.suuid]: {
         locationA: String(origA),
         locationB: String(origB),
         nameA: spare.location || 'Location A',
@@ -281,13 +281,13 @@ const Spares: React.FC = () => {
     }));
   };
   
-  const handleSaveLocation = async (spareId: number) => {
+  const handleSaveLocation = async (spareId: string) => {
     const locations = editingLocations[spareId];
     const original = originalLocationValues[spareId];
     if (!locations) return;
 
     // Find the spare to check current names
-    const spare = (Array.isArray(sparesData) ? sparesData : []).find((s: Spare) => s.id === spareId);
+    const spare = (Array.isArray(sparesData) ? sparesData : []).find((s: Spare) => s.suuid === spareId);
     if (!spare) return;
     
     const newRobA = parseInt(locations.locationA) || 0;
@@ -396,7 +396,7 @@ const Spares: React.FC = () => {
 
   // Quick adjust mutation (for +/- buttons) with optimistic updates
   const adjustMutation = useMutation({
-    mutationFn: async ({ spareId, qtyChange, eventType, notes }: { spareId: number, qtyChange: number, eventType: 'CONSUME' | 'RECEIVE', notes?: string }) => {
+    mutationFn: async ({ spareId, qtyChange, eventType, notes }: { spareId: string, qtyChange: number, eventType: 'CONSUME' | 'RECEIVE', notes?: string }) => {
       const response = await fetch(getAdjustUrl(vesselId!, spareId), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -464,10 +464,10 @@ const Spares: React.FC = () => {
     }
   });
 
-  const handleQuickAdjust = async (spareId: number, qtyChange: number, eventType: 'CONSUME' | 'RECEIVE') => {
+  const handleQuickAdjust = async (spareId: string, qtyChange: number, eventType: 'CONSUME' | 'RECEIVE') => {
     // Validate stock availability using effective ROB (actual + pending adjustments)
     if (eventType === 'CONSUME') {
-      const spare = (Array.isArray(sparesData) ? sparesData : []).find((s: Spare) => s.id === spareId);
+      const spare = (Array.isArray(sparesData) ? sparesData : []).find((s: Spare) => s.suuid === spareId);
       const pendingDelta = pendingAdjustments.get(spareId) || 0;
       const effectiveRob = (spare?.rob || 0) + pendingDelta;
       
@@ -616,7 +616,7 @@ const Spares: React.FC = () => {
         title: `Spare Change: ${originalSpareData.partCode} - ${originalSpareData.partName}`,
         reason: `Modification request for spare part ${originalSpareData.partCode}`,
         targetType: 'spare',
-        targetId: String(originalSpareData.id),
+        targetId: originalSpareData.suuid,
         snapshotBeforeJson: originalSpareData,
         proposedChangesJson: changes,
         status: 'submitted',
@@ -668,7 +668,7 @@ const Spares: React.FC = () => {
   };
 
   // Handle delete spare
-  const handleDeleteSpare = (spareId: number) => {
+  const handleDeleteSpare = (spareId: string) => {
     if (confirm("Are you sure you want to delete this spare? This action cannot be undone.")) {
       deleteSpareMutation.mutate(spareId);
     }
@@ -1015,7 +1015,7 @@ const Spares: React.FC = () => {
   const updateSpareMutation = useMutation({
     mutationFn: async (data: any) => {
       if (!selectedSpare) throw new Error('No spare selected');
-      return apiRequest('PATCH', getUpdateSpareUrl(vesselId!, selectedSpare.id), data);
+      return apiRequest('PATCH', getUpdateSpareUrl(vesselId!, selectedSpare.suuid), data);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: getSparesWithInventoryQueryKey(vesselId!) });
@@ -1065,7 +1065,7 @@ const Spares: React.FC = () => {
   // Bulk update mutation
   const bulkUpdateMutation = useMutation({
     mutationFn: async (data: { vesselId: string, tz: string, rows: Array<{
-      componentSpareId: number,
+      componentSpareUuid: string,
       consumedA: number,
       consumedB: number,
       receivedA: number,
@@ -1096,7 +1096,7 @@ const Spares: React.FC = () => {
       queryClient.setQueryData(getSparesWithInventoryQueryKey(vesselId!), (old: any) => {
         if (!old) return old;
         return old.map((spare: any) => {
-          const result = results.find((r: any) => r.componentSpareId === spare.id && r.success);
+          const result = results.find((r: any) => r.componentSpareUuid === spare.suuid && r.success);
           if (result && result.robAfter !== undefined) {
             return { ...spare, rob: result.robAfter };
           }
@@ -1129,7 +1129,7 @@ const Spares: React.FC = () => {
 
   // Delete spare mutation
   const deleteSpareMutation = useMutation({
-    mutationFn: async (spareId: number) => {
+    mutationFn: async (spareId: string) => {
       const response = await fetch(getUpdateSpareUrl(vesselId!, spareId), {
         method: 'DELETE',
       });
@@ -1686,7 +1686,7 @@ const Spares: React.FC = () => {
   });
 
   // Handle bulk update input changes
-  const handleBulkUpdateChange = (spareId: number, field: 'consumedA' | 'consumedB' | 'receivedA' | 'receivedB' | 'receivedDate' | 'receivedPlace' | 'comments', value: string | number) => {
+  const handleBulkUpdateChange = (spareId: string, field: 'consumedA' | 'consumedB' | 'receivedA' | 'receivedB' | 'receivedDate' | 'receivedPlace' | 'comments', value: string | number) => {
     if (field === 'consumedA' || field === 'consumedB' || field === 'receivedA' || field === 'receivedB') {
       const numValue = parseInt(value as string) || 0;
       setBulkUpdateData(prev => ({
@@ -1749,8 +1749,8 @@ const Spares: React.FC = () => {
   const saveBulkUpdates = () => {
     // Validate all rows first
     const sparesArrayLocal = Array.isArray(sparesData) ? sparesData : [];
-    const hasErrors = Object.entries(bulkUpdateData).some(([id, data]) => {
-      const spare = sparesArrayLocal.find((s: Spare) => s.id === parseInt(id));
+    const hasErrors = Object.entries(bulkUpdateData).some(([suuid, data]) => {
+      const spare = sparesArrayLocal.find((s: Spare) => s.suuid === suuid);
       if (!spare) return false;
       
       const totalConsumed = (data.consumedA || 0) + (data.consumedB || 0);
@@ -1773,8 +1773,8 @@ const Spares: React.FC = () => {
     
     const rows = Object.entries(bulkUpdateData)
       .filter(([_, data]) => (data.consumedA || 0) > 0 || (data.consumedB || 0) > 0 || (data.receivedA || 0) > 0 || (data.receivedB || 0) > 0)
-      .map(([id, data]) => ({
-        componentSpareId: parseInt(id),
+      .map(([suuid, data]) => ({
+        componentSpareUuid: suuid,
         consumedA: data.consumedA || 0,
         consumedB: data.consumedB || 0,
         receivedA: data.receivedA || 0,
@@ -2034,13 +2034,13 @@ const Spares: React.FC = () => {
                 ) : (
                   paginatedSpares.map((spare: Spare, rowIndex: number) => {
                     const stockStatus = getStockStatus(spare.rob, spare.min);
-                    const isDropdownOpen = openLocationDropdown === spare.id;
+                    const isDropdownOpen = openLocationDropdown === spare.suuid;
                     const robA = spare.robLocationA ?? 0;
                     const robB = spare.robLocationB ?? 0;
                     const locationDisplay = `${robA} / ${robB}`;
                     const isFirstRow = rowIndex === 0;
                     return (
-                    <div key={spare.id} className="px-4 py-3 border-b border-gray-100 hover:bg-gray-50">
+                    <div key={spare.suuid} className="px-4 py-3 border-b border-gray-100 hover:bg-gray-50">
                       <div className="grid text-sm items-center min-w-max" style={{ gridTemplateColumns: FEATURES.IHM ? '110px 180px 220px 120px 80px 60px 60px 80px 100px 40px 160px' : '110px 180px 220px 120px 80px 60px 60px 80px 100px 160px', minWidth: 'max-content', gap: '12px' }}>
                         <div className="px-2 text-gray-900" data-testid={isFirstRow ? "E24" : undefined}>{isFirstRow && <Marker id="E24" />}{spare.partCode}</div>
                         <div className="px-2 text-gray-700" data-testid={isFirstRow ? "E25" : undefined}>{isFirstRow && <Marker id="E25" />}{spare.partName}</div>
@@ -2070,7 +2070,7 @@ const Spares: React.FC = () => {
                           <button
                             onClick={(e) => handleOpenLocationDropdown(spare, e)}
                             className="flex items-center gap-1 text-gray-700 hover:text-blue-600 cursor-pointer w-full text-left"
-                            data-testid={`button-location-${spare.id}`}
+                            data-testid={`button-location-${spare.suuid}`}
                           >
                             <MapPin className="h-3 w-3 flex-shrink-0" />
                             <span className="truncate text-sm">{locationDisplay}</span>
@@ -2091,65 +2091,65 @@ const Spares: React.FC = () => {
                                   <div className="text-[10px] font-semibold text-blue-600 mb-1" data-testid="label-dropdown-location-a">Location A</div>
                                   <Input
                                     type="text"
-                                    value={editingLocations[spare.id]?.nameA ?? spare.location ?? 'Location A'}
+                                    value={editingLocations[spare.suuid]?.nameA ?? spare.location ?? 'Location A'}
                                     onChange={(e) => setEditingLocations(prev => ({
                                       ...prev,
-                                      [spare.id]: { ...prev[spare.id], nameA: e.target.value }
+                                      [spare.suuid]: { ...prev[spare.suuid], nameA: e.target.value }
                                     }))}
                                     className="h-6 text-xs font-medium text-gray-600 mb-1 border-dashed"
                                     placeholder="Location A name"
-                                    data-testid={`input-nameA-${spare.id}`}
+                                    data-testid={`input-nameA-${spare.suuid}`}
                                   />
                                   <Input
                                     type="number"
                                     min="0"
-                                    value={editingLocations[spare.id]?.locationA || '0'}
+                                    value={editingLocations[spare.suuid]?.locationA || '0'}
                                     onChange={(e) => setEditingLocations(prev => ({
                                       ...prev,
-                                      [spare.id]: { ...prev[spare.id], locationA: e.target.value }
+                                      [spare.suuid]: { ...prev[spare.suuid], locationA: e.target.value }
                                     }))}
                                     className="h-8 text-sm"
                                     placeholder="0"
-                                    data-testid={`input-locationA-${spare.id}`}
+                                    data-testid={`input-locationA-${spare.suuid}`}
                                   />
                                 </div>
                                 <div>
                                   <div className="text-[10px] font-semibold text-blue-600 mb-1" data-testid="label-dropdown-location-b">Location B</div>
                                   <Input
                                     type="text"
-                                    value={editingLocations[spare.id]?.nameB ?? spare.location2 ?? 'Location B'}
+                                    value={editingLocations[spare.suuid]?.nameB ?? spare.location2 ?? 'Location B'}
                                     onChange={(e) => setEditingLocations(prev => ({
                                       ...prev,
-                                      [spare.id]: { ...prev[spare.id], nameB: e.target.value }
+                                      [spare.suuid]: { ...prev[spare.suuid], nameB: e.target.value }
                                     }))}
                                     className="h-6 text-xs font-medium text-gray-600 mb-1 border-dashed"
                                     placeholder="Location B name"
-                                    data-testid={`input-nameB-${spare.id}`}
+                                    data-testid={`input-nameB-${spare.suuid}`}
                                   />
                                   <Input
                                     type="number"
                                     min="0"
-                                    value={editingLocations[spare.id]?.locationB || '0'}
+                                    value={editingLocations[spare.suuid]?.locationB || '0'}
                                     onChange={(e) => setEditingLocations(prev => ({
                                       ...prev,
-                                      [spare.id]: { ...prev[spare.id], locationB: e.target.value }
+                                      [spare.suuid]: { ...prev[spare.suuid], locationB: e.target.value }
                                     }))}
                                     className="h-8 text-sm"
                                     placeholder="0"
-                                    data-testid={`input-locationB-${spare.id}`}
+                                    data-testid={`input-locationB-${spare.suuid}`}
                                   />
                                 </div>
                                 <div className="text-xs text-gray-500 text-center border-t pt-2">
-                                  Total ROB: {(parseInt(editingLocations[spare.id]?.locationA) || 0) + (parseInt(editingLocations[spare.id]?.locationB) || 0)}
+                                  Total ROB: {(parseInt(editingLocations[spare.suuid]?.locationA) || 0) + (parseInt(editingLocations[spare.suuid]?.locationB) || 0)}
                                 </div>
                                 <Button
                                   size="sm"
                                   className="w-full h-7 text-xs"
                                   onClick={() => {
-                                    handleSaveLocation(spare.id);
+                                    handleSaveLocation(spare.suuid);
                                     setOpenLocationDropdown(null);
                                   }}
-                                  data-testid={`button-save-location-${spare.id}`}
+                                  data-testid={`button-save-location-${spare.suuid}`}
                                 >
                                   Save
                                 </Button>
@@ -2176,7 +2176,7 @@ const Spares: React.FC = () => {
                             variant="ghost"
                             onClick={() => openInfoModal(spare)}
                             title="View Details"
-                            data-testid={isFirstRow ? "E34" : `button-info-${spare.id}`}
+                            data-testid={isFirstRow ? "E34" : `button-info-${spare.suuid}`}
                           >
                             {isFirstRow && <Marker id="E34" />}
                             <Info className="h-4 w-4 text-blue-600" />
@@ -2187,7 +2187,7 @@ const Spares: React.FC = () => {
                               variant="ghost"
                               onClick={() => openEditModal(spare)}
                               title="Edit"
-                              data-testid={isFirstRow ? "E35" : `button-edit-${spare.id}`}
+                              data-testid={isFirstRow ? "E35" : `button-edit-${spare.suuid}`}
                             >
                               {isFirstRow && <Marker id="E35" />}
                               <Edit2 className="h-4 w-4" />
@@ -2198,7 +2198,7 @@ const Spares: React.FC = () => {
                             variant="ghost"
                             onClick={() => openConsumeReceiveModal(spare)}
                             title="Consume/Receive"
-                            data-testid={`button-plus-${spare.id}`}
+                            data-testid={`button-plus-${spare.suuid}`}
                           >
                             <PlusCircle className="h-4 w-4" />
                           </Button>
@@ -2207,7 +2207,7 @@ const Spares: React.FC = () => {
                             variant="ghost"
                             onClick={() => openAdjustModal(spare)}
                             title="Adjust ROB"
-                            data-testid={`button-adjust-${spare.id}`}
+                            data-testid={`button-adjust-${spare.suuid}`}
                           >
                             <Settings2 className="h-4 w-4 text-orange-500" />
                           </Button>
@@ -2215,9 +2215,9 @@ const Spares: React.FC = () => {
                             <Button 
                               size="sm" 
                               variant="ghost"
-                              onClick={() => handleDeleteSpare(spare.id)}
+                              onClick={() => handleDeleteSpare(spare.suuid)}
                               title="Delete"
-                              data-testid={isFirstRow ? "E36" : `button-delete-${spare.id}`}
+                              data-testid={isFirstRow ? "E36" : `button-delete-${spare.suuid}`}
                             >
                               {isFirstRow && <Marker id="E36" />}
                               <Trash2 className="h-4 w-4 text-red-500" />
@@ -2412,8 +2412,8 @@ const Spares: React.FC = () => {
                     const date = e.target.value;
                     setBulkUpdateData(prev => {
                       const updated = { ...prev };
-                      Object.keys(updated).forEach(id => {
-                        updated[Number(id)] = { ...updated[Number(id)], receivedDate: date };
+                      Object.keys(updated).forEach(suuid => {
+                        updated[suuid] = { ...updated[suuid], receivedDate: date };
                       });
                       return updated;
                     });
@@ -2431,8 +2431,8 @@ const Spares: React.FC = () => {
                     const place = e.target.value;
                     setBulkUpdateData(prev => {
                       const updated = { ...prev };
-                      Object.keys(updated).forEach(id => {
-                        updated[Number(id)] = { ...updated[Number(id)], receivedPlace: place };
+                      Object.keys(updated).forEach(suuid => {
+                        updated[suuid] = { ...updated[suuid], receivedPlace: place };
                       });
                       return updated;
                     });
@@ -2450,8 +2450,8 @@ const Spares: React.FC = () => {
                     const comments = e.target.value;
                     setBulkUpdateData(prev => {
                       const updated = { ...prev };
-                      Object.keys(updated).forEach(id => {
-                        updated[Number(id)] = { ...updated[Number(id)], comments: comments };
+                      Object.keys(updated).forEach(suuid => {
+                        updated[suuid] = { ...updated[suuid], comments: comments };
                       });
                       return updated;
                     });
@@ -2493,10 +2493,10 @@ const Spares: React.FC = () => {
                   </thead>
                   <tbody>
                     {bulkModalFilteredSpares.map((spare: Spare) => {
-                      const consumedA = bulkUpdateData[spare.id]?.consumedA || 0;
-                      const consumedB = bulkUpdateData[spare.id]?.consumedB || 0;
-                      const receivedA = bulkUpdateData[spare.id]?.receivedA || 0;
-                      const receivedB = bulkUpdateData[spare.id]?.receivedB || 0;
+                      const consumedA = bulkUpdateData[spare.suuid]?.consumedA || 0;
+                      const consumedB = bulkUpdateData[spare.suuid]?.consumedB || 0;
+                      const receivedA = bulkUpdateData[spare.suuid]?.receivedA || 0;
+                      const receivedB = bulkUpdateData[spare.suuid]?.receivedB || 0;
                       const robA = spare.robLocationA ?? 0;
                       const robB = spare.robLocationB ?? 0;
                       const newRobA = robA - consumedA + receivedA;
@@ -2505,7 +2505,7 @@ const Spares: React.FC = () => {
                       const hasInsufficientStockA = consumedA > robA;
                       const hasInsufficientStockB = consumedB > robB;
                       const totalReceived = receivedA + receivedB;
-                      const needsReceivedDate = totalReceived > 0 && !bulkUpdateData[spare.id]?.receivedDate;
+                      const needsReceivedDate = totalReceived > 0 && !bulkUpdateData[spare.suuid]?.receivedDate;
                       const hasError = hasInsufficientStockA || hasInsufficientStockB || needsReceivedDate;
                       
                       // Get spare-specific location names - use actual ROB locations stored on the spare
@@ -2514,7 +2514,7 @@ const Spares: React.FC = () => {
                       const spareLocB = spare.location2 || 'Location B';
                       
                       return (
-                        <tr key={spare.id} className={`border-t ${hasError ? 'bg-red-50 dark:bg-red-900/20' : ''}`}>
+                        <tr key={spare.suuid} className={`border-t ${hasError ? 'bg-red-50 dark:bg-red-900/20' : ''}`}>
                           <td className="px-3 py-2 text-sm">{spare.partCode}</td>
                           <td className="px-3 py-2 text-sm max-w-[150px] truncate" title={spare.partName}>{spare.partName}</td>
                           {/* ROB cells with location names */}
@@ -2533,10 +2533,10 @@ const Spares: React.FC = () => {
                               type="number"
                               min="0"
                               max={robA}
-                              value={bulkUpdateData[spare.id]?.consumedA || ""}
-                              onChange={(e) => handleBulkUpdateChange(spare.id, 'consumedA', e.target.value)}
+                              value={bulkUpdateData[spare.suuid]?.consumedA || ""}
+                              onChange={(e) => handleBulkUpdateChange(spare.suuid, 'consumedA', e.target.value)}
                               className={`w-14 h-7 text-sm text-center ${hasInsufficientStockA ? 'border-red-500' : ''}`}
-                              data-testid={`input-consume-a-${spare.id}`}
+                              data-testid={`input-consume-a-${spare.suuid}`}
                             />
                           </td>
                           <td className="px-1 py-2">
@@ -2545,10 +2545,10 @@ const Spares: React.FC = () => {
                               type="number"
                               min="0"
                               max={robB}
-                              value={bulkUpdateData[spare.id]?.consumedB || ""}
-                              onChange={(e) => handleBulkUpdateChange(spare.id, 'consumedB', e.target.value)}
+                              value={bulkUpdateData[spare.suuid]?.consumedB || ""}
+                              onChange={(e) => handleBulkUpdateChange(spare.suuid, 'consumedB', e.target.value)}
                               className={`w-14 h-7 text-sm text-center ${hasInsufficientStockB ? 'border-red-500' : ''}`}
-                              data-testid={`input-consume-b-${spare.id}`}
+                              data-testid={`input-consume-b-${spare.suuid}`}
                             />
                           </td>
                           {/* Received cells with location names */}
@@ -2557,10 +2557,10 @@ const Spares: React.FC = () => {
                             <Input
                               type="number"
                               min="0"
-                              value={bulkUpdateData[spare.id]?.receivedA || ""}
-                              onChange={(e) => handleBulkUpdateChange(spare.id, 'receivedA', e.target.value)}
+                              value={bulkUpdateData[spare.suuid]?.receivedA || ""}
+                              onChange={(e) => handleBulkUpdateChange(spare.suuid, 'receivedA', e.target.value)}
                               className="w-14 h-7 text-sm text-center"
-                              data-testid={`input-receive-a-${spare.id}`}
+                              data-testid={`input-receive-a-${spare.suuid}`}
                             />
                           </td>
                           <td className="px-1 py-2">
@@ -2568,10 +2568,10 @@ const Spares: React.FC = () => {
                             <Input
                               type="number"
                               min="0"
-                              value={bulkUpdateData[spare.id]?.receivedB || ""}
-                              onChange={(e) => handleBulkUpdateChange(spare.id, 'receivedB', e.target.value)}
+                              value={bulkUpdateData[spare.suuid]?.receivedB || ""}
+                              onChange={(e) => handleBulkUpdateChange(spare.suuid, 'receivedB', e.target.value)}
                               className="w-14 h-7 text-sm text-center"
-                              data-testid={`input-receive-b-${spare.id}`}
+                              data-testid={`input-receive-b-${spare.suuid}`}
                             />
                           </td>
                           <td className="px-2 py-2 text-center border-l">

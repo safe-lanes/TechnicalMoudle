@@ -8,6 +8,7 @@ export type { Component } from "../components/schema";
 
 export const v2Spares = pgTable("spares", {
   id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
+  suuid: text("suuid").notNull().unique().$defaultFn(() => crypto.randomUUID()),
   partCode: text("part_code").notNull(),
   partName: text("part_name").notNull(),
   componentId: text("component_id").references(() => v2Components.cuuid, { onDelete: "restrict", onUpdate: "cascade" }),
@@ -69,6 +70,7 @@ export const v2Spares = pgTable("spares", {
 
 export const insertSpareSchema = createInsertSchema(v2Spares).omit({
   id: true,
+  suuid: true,
   deleted: true,
   createdAt: true,
   updatedAt: true,
@@ -82,6 +84,7 @@ export const v2SparesHistory = pgTable("spares_history", {
   timestampUTC: timestamp("timestamp_utc").notNull(),
   vesselId: text("vessel_id").notNull(),
   spareId: integer("spare_id").notNull(),
+  spareUuid: text("spare_uuid").notNull().references(() => v2Spares.suuid),
   partCode: text("part_code").notNull(),
   partName: text("part_name").notNull(),
   componentId: text("component_id").notNull().references(() => v2Components.cuuid, { onDelete: "restrict", onUpdate: "cascade" }),
@@ -134,6 +137,7 @@ export const v2SpareLocationStock = pgTable("spare_location_stock", {
   id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
   vesselId: text("vessel_id").notNull(),
   spareId: integer("spare_id").notNull(),
+  spareUuid: text("spare_uuid").notNull().references(() => v2Spares.suuid),
   locationId: integer("location_id").notNull(),
   qty: integer("qty").notNull().default(0),
 }, (table) => ({
@@ -154,6 +158,7 @@ export const v2SpareComponentLinks = pgTable("spare_component_links", {
   id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
   vesselId: text("vessel_id").notNull(),
   spareId: integer("spare_id").notNull(),
+  spareUuid: text("spare_uuid").notNull().references(() => v2Spares.suuid),
   componentId: text("component_id").notNull().references(() => v2Components.cuuid, { onDelete: "restrict", onUpdate: "cascade" }),
   linkedBy: text("linked_by").notNull(),
   linkedAt: timestamp("linked_at").notNull().defaultNow(),
@@ -171,6 +176,7 @@ export const v2InventoryTransactions = pgTable("inventory_transactions", {
   vesselId: text("vessel_id").notNull(),
   txnDatetime: timestamp("txn_datetime").notNull().defaultNow(),
   spareId: integer("spare_id").notNull(),
+  spareUuid: text("spare_uuid").notNull().references(() => v2Spares.suuid),
   locationId: integer("location_id"),
   eventType: text("event_type").notNull(),
   qtyChange: integer("qty_change").notNull(),

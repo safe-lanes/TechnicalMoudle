@@ -1590,15 +1590,15 @@ const ComponentRegisterForm: React.FC<ComponentRegisterFormProps> = ({
                             </div>
                           ) : linkedSpares && linkedSpares.length > 0 ? (
                             linkedSpares.map((item: any) => (
-                              <div key={item.spare.id} className="px-4 py-3 hover:bg-gray-50">
+                              <div key={item.spare.suuid || item.spare.id} className="px-4 py-3 hover:bg-gray-50">
                                 <div className="grid grid-cols-6 gap-4 text-sm items-center">
-                                  <div className="font-medium text-gray-900" data-testid={`text-spare-partno-${item.spare.id}`}>
+                                  <div className="font-medium text-gray-900" data-testid={`text-spare-partno-${item.spare.suuid || item.spare.id}`}>
                                     {item.spare.partNumber}
                                   </div>
                                   <div className="text-gray-600 truncate" title={item.spare.description}>
                                     {item.spare.description}
                                   </div>
-                                  <div className="text-center font-semibold" data-testid={`text-spare-rob-${item.spare.id}`}>
+                                  <div className="text-center font-semibold" data-testid={`text-spare-rob-${item.spare.suuid || item.spare.id}`}>
                                     {item.robTotal}
                                   </div>
                                   <div className="text-xs text-gray-500">
@@ -1620,7 +1620,7 @@ const ComponentRegisterForm: React.FC<ComponentRegisterFormProps> = ({
                                           ? 'bg-green-100 text-green-800' 
                                           : 'bg-red-100 text-red-800'
                                       }`}
-                                      data-testid={`status-spare-${item.spare.id}`}
+                                      data-testid={`status-spare-${item.spare.suuid || item.spare.id}`}
                                     >
                                       {item.stockStatus === 'OK' ? 'OK' : 'Low Stock'}
                                     </span>
@@ -1630,7 +1630,7 @@ const ComponentRegisterForm: React.FC<ComponentRegisterFormProps> = ({
                                       size="sm"
                                       variant="ghost"
                                       onClick={() => setSelectedSpareDetail(item)}
-                                      data-testid={`button-view-spare-${item.spare.id}`}
+                                      data-testid={`button-view-spare-${item.spare.suuid || item.spare.id}`}
                                     >
                                       <Eye className="h-4 w-4 text-[#52baf3]" />
                                     </Button>
@@ -1663,7 +1663,7 @@ const ComponentRegisterForm: React.FC<ComponentRegisterFormProps> = ({
                       </div>
                       <div className="divide-y divide-gray-100">
                         {linkedSpares.slice(0, 2).map((item: any) => (
-                          <div key={item.spare.id} className="px-4 py-3">
+                          <div key={item.spare.suuid || item.spare.id} className="px-4 py-3">
                             <div className="grid grid-cols-6 gap-4 text-sm items-center">
                               <div className="font-medium text-gray-900">{item.spare.partNumber}</div>
                               <div className="text-gray-600 truncate">{item.spare.description}</div>

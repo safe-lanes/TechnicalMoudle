@@ -15,24 +15,24 @@ export async function getSparesWithInventory(vesselId: string) {
   return repo.getSparesWithInventory(vesselId);
 }
 
-export async function getSpare(id: number): Promise<Spare | undefined> {
-  return repo.getSpare(id);
+export async function getSpare(suuid: string): Promise<Spare | undefined> {
+  return repo.getSpare(suuid);
 }
 
 export async function createSpare(data: InsertSpare): Promise<Spare> {
   return repo.createSpare(data);
 }
 
-export async function updateSpare(id: number, data: Partial<Spare>): Promise<Spare> {
-  return repo.updateSpare(id, data);
+export async function updateSpare(suuid: string, data: Partial<Spare>): Promise<Spare> {
+  return repo.updateSpare(suuid, data);
 }
 
-export async function deleteSpare(id: number): Promise<void> {
-  return repo.deleteSpare(id);
+export async function deleteSpare(suuid: string): Promise<void> {
+  return repo.deleteSpare(suuid);
 }
 
 export async function consumeSpare(
-  id: number,
+  suuid: string,
   quantity: number,
   userId: string,
   remarks?: string,
@@ -40,11 +40,11 @@ export async function consumeSpare(
   dateLocal?: string,
   tz?: string
 ): Promise<Spare> {
-  return repo.consumeSpare(id, quantity, userId, remarks, place, dateLocal, tz);
+  return repo.consumeSpare(suuid, quantity, userId, remarks, place, dateLocal, tz);
 }
 
 export async function consumeSpareFromLocation(
-  id: number,
+  suuid: string,
   quantity: number,
   location: 'A' | 'B',
   userId: string,
@@ -52,11 +52,11 @@ export async function consumeSpareFromLocation(
   workOrderRef?: string,
   dateLocal?: string
 ) {
-  return repo.consumeSpareFromLocation(id, quantity, location, userId, remarks, workOrderRef, dateLocal);
+  return repo.consumeSpareFromLocation(suuid, quantity, location, userId, remarks, workOrderRef, dateLocal);
 }
 
 export async function receiveSpareToLocation(
-  id: number,
+  suuid: string,
   quantity: number,
   location: 'A' | 'B',
   userId: string,
@@ -64,11 +64,11 @@ export async function receiveSpareToLocation(
   supplierPO?: string,
   dateLocal?: string
 ) {
-  return repo.receiveSpareToLocation(id, quantity, location, userId, remarks, supplierPO, dateLocal);
+  return repo.receiveSpareToLocation(suuid, quantity, location, userId, remarks, supplierPO, dateLocal);
 }
 
 export async function receiveSpare(
-  id: number,
+  suuid: string,
   quantity: number,
   userId: string,
   remarks?: string,
@@ -77,11 +77,11 @@ export async function receiveSpare(
   dateLocal?: string,
   tz?: string
 ): Promise<Spare> {
-  return repo.receiveSpare(id, quantity, userId, remarks, supplierPO, place, dateLocal, tz);
+  return repo.receiveSpare(suuid, quantity, userId, remarks, supplierPO, place, dateLocal, tz);
 }
 
 export async function adjustSpareAtLocation(
-  id: number,
+  suuid: string,
   newRob: number,
   location: 'A' | 'B',
   userId: string,
@@ -90,21 +90,21 @@ export async function adjustSpareAtLocation(
   dateLocal?: string,
   tz?: string
 ): Promise<Spare> {
-  return repo.adjustSpareAtLocation(id, newRob, location, userId, remarks, place, dateLocal, tz);
+  return repo.adjustSpareAtLocation(suuid, newRob, location, userId, remarks, place, dateLocal, tz);
 }
 
 export async function adjustSpareQuantity(
-  spareId: number,
+  suuid: string,
   qtyChange: number,
   eventType: 'CONSUME' | 'RECEIVE' | 'ADJUST',
   reference?: string,
   notes?: string
 ): Promise<Spare> {
-  return repo.adjustSpareQuantity(spareId, qtyChange, eventType, reference, notes);
+  return repo.adjustSpareQuantity(suuid, qtyChange, eventType, reference, notes);
 }
 
 export async function transferSpareLocation(
-  id: number,
+  suuid: string,
   newRobA: number,
   newRobB: number,
   userId: string,
@@ -113,7 +113,7 @@ export async function transferSpareLocation(
   dateLocal?: string,
   tz?: string
 ) {
-  return repo.transferSpareLocation(id, newRobA, newRobB, userId, remarks, place, dateLocal, tz);
+  return repo.transferSpareLocation(suuid, newRobA, newRobB, userId, remarks, place, dateLocal, tz);
 }
 
 export async function bulkUpdate(
@@ -157,7 +157,7 @@ export async function getLowStockSpares(vesselId: string): Promise<Spare[]> {
 
 export async function batchConsume(
   vesselId: string,
-  items: Array<{ spareId: number; quantity: number; location?: 'A' | 'B' }>,
+  items: Array<{ spareUuid: string; quantity: number; location?: 'A' | 'B' }>,
   workOrderId?: string,
   consumedBy?: string
 ): Promise<Spare[]> {
@@ -166,7 +166,7 @@ export async function batchConsume(
 
 export async function batchReceive(
   vesselId: string,
-  items: Array<{ spareId: number; quantity: number; location?: 'A' | 'B' }>,
+  items: Array<{ spareUuid: string; quantity: number; location?: 'A' | 'B' }>,
   purchaseOrderRef?: string,
   receivedBy?: string
 ): Promise<Spare[]> {

@@ -460,8 +460,8 @@ export default function ComponentRegisterAddEdit({
 
       const componentSpares = allSpares.filter(s => s.componentId === componentId);
       setSpares(componentSpares.map(spare => ({
-        id: spare.id,
-        partCode: spare.partNumber || spare.id,
+        id: spare.suuid || spare.id,
+        partCode: spare.partNumber || spare.suuid || spare.id,
         partName: spare.name || spare.description,
         min: spare.minQuantity || 1,
         critical: spare.critical ? "Yes" : "No",
@@ -823,8 +823,8 @@ export default function ComponentRegisterAddEdit({
     
     const componentSpares = allSpares.filter(s => s.componentId === comp.id);
     setSpares(componentSpares.map(spare => ({
-      id: spare.id,
-      partCode: spare.partNumber || spare.id,
+      id: spare.suuid || spare.id,
+      partCode: spare.partNumber || spare.suuid || spare.id,
       partName: spare.name || spare.description,
       min: spare.minQuantity || 1,
       critical: spare.critical ? "Yes" : "No",
@@ -1530,7 +1530,7 @@ export default function ComponentRegisterAddEdit({
                     </thead>
                     <tbody>
                       {spares.length > 0 ? spares.map((spare) => (
-                        <tr key={spare.id} className="border-t">
+                        <tr key={spare.id || spare.partCode} className="border-t">
                           <td className="px-3 py-2">
                             <Input value={spare.partCode || ""} className="h-7 text-xs" />
                           </td>

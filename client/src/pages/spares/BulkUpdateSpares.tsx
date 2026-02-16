@@ -12,6 +12,7 @@ import { getSparesWithInventoryUrl, getSparesWithInventoryQueryKey, getBulkUpdat
 
 interface Spare {
   id: number;
+  suuid: string;
   partCode: string;
   partName: string;
   component?: string;
@@ -31,7 +32,7 @@ export default function BulkUpdateSpares() {
   const { toast } = useToast();
   
   const [bulkSearchQuery, setBulkSearchQuery] = useState("");
-  const [bulkUpdateData, setBulkUpdateData] = useState<{[key: number]: {consumedA: number, consumedB: number, receivedA: number, receivedB: number, receivedDate?: string, receivedPlace?: string, comments?: string}}>({});
+  const [bulkUpdateData, setBulkUpdateData] = useState<{[key: string]: {consumedA: number, consumedB: number, receivedA: number, receivedB: number, receivedDate?: string, receivedPlace?: string, comments?: string}}>({});
   
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(25);
@@ -82,10 +83,10 @@ export default function BulkUpdateSpares() {
   }, [filteredSpares, currentPage, itemsPerPage]);
 
   useEffect(() => {
-    const initialData: {[key: number]: {consumedA: number, consumedB: number, receivedA: number, receivedB: number}} = {};
+    const initialData: {[key: string]: {consumedA: number, consumedB: number, receivedA: number, receivedB: number}} = {};
     const spares = Array.isArray(sparesData) ? sparesData : [];
     spares.forEach((spare: Spare) => {
-      initialData[spare.id] = { consumedA: 0, consumedB: 0, receivedA: 0, receivedB: 0 };
+      initialData[spare.suuid] = { consumedA: 0, consumedB: 0, receivedA: 0, receivedB: 0 };
     });
     setBulkUpdateData(initialData);
   }, [sparesData]);
@@ -94,7 +95,7 @@ export default function BulkUpdateSpares() {
     setCurrentPage(1);
   }, [bulkSearchQuery, itemsPerPage]);
 
-  const handleBulkUpdateChange = (spareId: number, field: 'consumedA' | 'consumedB' | 'receivedA' | 'receivedB' | 'receivedDate' | 'receivedPlace' | 'comments', value: string | number) => {
+  const handleBulkUpdateChange = (spareId: string, field: 'consumedA' | 'consumedB' | 'receivedA' | 'receivedB' | 'receivedDate' | 'receivedPlace' | 'comments', value: string | number) => {
     if (field === 'receivedDate' || field === 'receivedPlace' || field === 'comments') {
       setBulkUpdateData(prev => ({
         ...prev,
@@ -126,8 +127,8 @@ export default function BulkUpdateSpares() {
 
   const handleSaveBulkUpdates = async () => {
     const sparesArray = Array.isArray(sparesData) ? sparesData : [];
-    const hasErrors = Object.entries(bulkUpdateData).some(([id, data]) => {
-      const spare = sparesArray.find((s: Spare) => s.id === Number(id));
+    const hasErrors = Object.entries(bulkUpdateData).some(([suuid, data]) => {
+      const spare = sparesArray.find((s: Spare) => s.suuid === suuid);
       if (!spare) return false;
       const robA = spare.robLocationA ?? 0;
       const robB = spare.robLocationB ?? 0;
@@ -144,11 +145,11 @@ export default function BulkUpdateSpares() {
 
     const rows = Object.entries(bulkUpdateData)
       .filter(([_, data]) => data.consumedA > 0 || data.consumedB > 0 || data.receivedA > 0 || data.receivedB > 0)
-      .map(([id, data]) => {
-        const spare = (sparesData as Spare[]).find(s => s.id === Number(id));
+      .map(([suuid, data]) => {
+        const spare = (sparesData as Spare[]).find(s => s.suuid === suuid);
         return {
-          componentSpareId: Number(id),
-          spareId: spare?.id,
+          componentSpareUuid: suuid,
+          spareUuid: spare?.suuid,
           partCode: spare?.partCode,
           consumedA: data.consumedA || 0,
           consumedB: data.consumedB || 0,
@@ -240,8 +241,8 @@ export default function BulkUpdateSpares() {
                   const date = e.target.value;
                   setBulkUpdateData(prev => {
                     const updated = { ...prev };
-                    Object.keys(updated).forEach(id => {
-                      updated[Number(id)] = { ...updated[Number(id)], receivedDate: date };
+                    Object.keys(updated).forEach(suuid => {
+                      updated[suuid] = { ...updated[suuid], receivedDate: date };
                     });
                     return updated;
                   });
@@ -259,8 +260,8 @@ export default function BulkUpdateSpares() {
                   const place = e.target.value;
                   setBulkUpdateData(prev => {
                     const updated = { ...prev };
-                    Object.keys(updated).forEach(id => {
-                      updated[Number(id)] = { ...updated[Number(id)], receivedPlace: place };
+                    Object.keys(updated).forEach(suuid => {
+                      updated[suuid] = { ...updated[suuid], receivedPlace: place };
                     });
                     return updated;
                   });
@@ -278,8 +279,8 @@ export default function BulkUpdateSpares() {
                   const comments = e.target.value;
                   setBulkUpdateData(prev => {
                     const updated = { ...prev };
-                    Object.keys(updated).forEach(id => {
-                      updated[Number(id)] = { ...updated[Number(id)], comments: comments };
+                    Object.keys(updated).forEach(suuid => {
+                      updated[suuid] = { ...updated[suuid], comments: comments };
                     });
                     return updated;
                   });
@@ -321,10 +322,10 @@ export default function BulkUpdateSpares() {
                 </thead>
                 <tbody>
                   {paginatedSpares.map((spare: Spare) => {
-                    const consumedA = bulkUpdateData[spare.id]?.consumedA || 0;
-                    const consumedB = bulkUpdateData[spare.id]?.consumedB || 0;
-                    const receivedA = bulkUpdateData[spare.id]?.receivedA || 0;
-                    const receivedB = bulkUpdateData[spare.id]?.receivedB || 0;
+                    const consumedA = bulkUpdateData[spare.suuid]?.consumedA || 0;
+                    const consumedB = bulkUpdateData[spare.suuid]?.consumedB || 0;
+                    const receivedA = bulkUpdateData[spare.suuid]?.receivedA || 0;
+                    const receivedB = bulkUpdateData[spare.suuid]?.receivedB || 0;
                     const robA = spare.robLocationA ?? 0;
                     const robB = spare.robLocationB ?? 0;
                     const newRobA = robA - consumedA + receivedA;
@@ -335,14 +336,14 @@ export default function BulkUpdateSpares() {
                     const totalReceived = receivedA + receivedB;
                     const totalConsumed = consumedA + consumedB;
                     const hasAnyTransaction = totalReceived > 0 || totalConsumed > 0;
-                    const needsTransactionDate = hasAnyTransaction && !bulkUpdateData[spare.id]?.receivedDate;
+                    const needsTransactionDate = hasAnyTransaction && !bulkUpdateData[spare.suuid]?.receivedDate;
                     const hasError = hasInsufficientStockA || hasInsufficientStockB || needsTransactionDate;
                     
                     const spareLocA = spare.location || locationNames.locationA;
                     const spareLocB = spare.location2 || locationNames.locationB;
                     
                     return (
-                      <tr key={spare.id} className={`border-t ${hasError ? 'bg-red-50 dark:bg-red-900/20' : ''}`}>
+                      <tr key={spare.suuid} className={`border-t ${hasError ? 'bg-red-50 dark:bg-red-900/20' : ''}`}>
                         <td className="px-3 py-2 text-sm">{spare.partCode}</td>
                         <td className="px-3 py-2 text-sm max-w-[150px] truncate" title={spare.partName}>{spare.partName}</td>
                         <td className="px-2 py-2 text-center">
@@ -359,10 +360,10 @@ export default function BulkUpdateSpares() {
                             type="number"
                             min="0"
                             max={robA}
-                            value={bulkUpdateData[spare.id]?.consumedA || ""}
-                            onChange={(e) => handleBulkUpdateChange(spare.id, 'consumedA', e.target.value)}
+                            value={bulkUpdateData[spare.suuid]?.consumedA || ""}
+                            onChange={(e) => handleBulkUpdateChange(spare.suuid, 'consumedA', e.target.value)}
                             className={`w-14 h-7 text-sm text-center ${hasInsufficientStockA ? 'border-red-500' : ''}`}
-                            data-testid={`input-consume-a-${spare.id}`}
+                            data-testid={`input-consume-a-${spare.suuid}`}
                           />
                         </td>
                         <td className="px-1 py-2">
@@ -371,10 +372,10 @@ export default function BulkUpdateSpares() {
                             type="number"
                             min="0"
                             max={robB}
-                            value={bulkUpdateData[spare.id]?.consumedB || ""}
-                            onChange={(e) => handleBulkUpdateChange(spare.id, 'consumedB', e.target.value)}
+                            value={bulkUpdateData[spare.suuid]?.consumedB || ""}
+                            onChange={(e) => handleBulkUpdateChange(spare.suuid, 'consumedB', e.target.value)}
                             className={`w-14 h-7 text-sm text-center ${hasInsufficientStockB ? 'border-red-500' : ''}`}
-                            data-testid={`input-consume-b-${spare.id}`}
+                            data-testid={`input-consume-b-${spare.suuid}`}
                           />
                         </td>
                         <td className="px-1 py-2 border-l">
@@ -382,10 +383,10 @@ export default function BulkUpdateSpares() {
                           <Input
                             type="number"
                             min="0"
-                            value={bulkUpdateData[spare.id]?.receivedA || ""}
-                            onChange={(e) => handleBulkUpdateChange(spare.id, 'receivedA', e.target.value)}
+                            value={bulkUpdateData[spare.suuid]?.receivedA || ""}
+                            onChange={(e) => handleBulkUpdateChange(spare.suuid, 'receivedA', e.target.value)}
                             className="w-14 h-7 text-sm text-center"
-                            data-testid={`input-receive-a-${spare.id}`}
+                            data-testid={`input-receive-a-${spare.suuid}`}
                           />
                         </td>
                         <td className="px-1 py-2">
@@ -393,10 +394,10 @@ export default function BulkUpdateSpares() {
                           <Input
                             type="number"
                             min="0"
-                            value={bulkUpdateData[spare.id]?.receivedB || ""}
-                            onChange={(e) => handleBulkUpdateChange(spare.id, 'receivedB', e.target.value)}
+                            value={bulkUpdateData[spare.suuid]?.receivedB || ""}
+                            onChange={(e) => handleBulkUpdateChange(spare.suuid, 'receivedB', e.target.value)}
                             className="w-14 h-7 text-sm text-center"
-                            data-testid={`input-receive-b-${spare.id}`}
+                            data-testid={`input-receive-b-${spare.suuid}`}
                           />
                         </td>
                         <td className="px-2 py-2 text-center border-l">

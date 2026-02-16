@@ -3443,7 +3443,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
                     try {
                       await storage.performInventoryTransaction({
                         vesselId: vesselId,
-                        spareId: spare.id,
+                        spareId: spare.suuid,
                         locationId: resolvedLocationId,
                         eventType: 'CONSUME',
                         qtyChange: -Math.abs(qtyConsumed), // Negative for consumption
@@ -4111,7 +4111,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
                   try {
                     await storage.performInventoryTransaction({
                       vesselId: vesselId,
-                      spareId: spare.id,
+                      spareId: spare.suuid,
                       locationId: resolvedLocationId,
                       eventType: 'CONSUME',
                       qtyChange: -Math.abs(qtyConsumed), // Negative for consumption
@@ -5760,7 +5760,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.log('[BULK UPDATE] Processing', rows.length, 'rows for vessel', vesselId);
       
       const results: Array<{
-        componentSpareId: number;
+        componentSpareId: number | string;
         success: boolean;
         message?: string;
         robAfter?: number;
@@ -5913,7 +5913,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Get spare by ID (optional - useful for detail views)
   app.get("/technical/api/spares/:vesselId/:id", async (req, res) => {
     try {
-      const spare = await storage.getSpare(parseInt(req.params.id));
+      const spare = await storage.getSpare(req.params.id);
       if (!spare) {
         return res.status(404).json({ error: "Spare not found" });
       }
@@ -5940,7 +5940,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.patch("/technical/api/spares/:vesselId/:id", async (req, res) => {
     try {
       console.log('[PATCH Spare] Updating spare', req.params.id, 'with data:', JSON.stringify(req.body));
-      const spareId = parseInt(req.params.id);
+      const spareId = req.params.id;
       const { robLocationA, robLocationB, remarks, place, dateLocal, tz, ...otherUpdates } = req.body;
       const userId = (req as any).user?.id?.toString() || 'System';
       
@@ -6000,7 +6000,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Delete spare
   app.delete("/technical/api/spares/:vesselId/:id", async (req, res) => {
     try {
-      await storage.deleteSpare(parseInt(req.params.id));
+      await storage.deleteSpare(req.params.id);
       res.json({ success: true });
     } catch (error: any) {
       if (error.message?.includes('not found')) {
@@ -6025,7 +6025,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const payload = adjustmentPayloadSchema.parse(req.body);
       const userId = (req as any).user?.id?.toString() || 'System';
       const vesselId = req.params.vesselId;
-      const spareId = parseInt(req.params.id);
+      const spareId = req.params.id;
       
       // Security check: Verify spare belongs to the specified vessel
       const existingSpare = await storage.getSpare(spareId);
@@ -6074,7 +6074,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       const payload = adjustPayloadSchema.parse(req.body);
       const spare = await storage.adjustSpareQuantity(
-        parseInt(req.params.id),
+        req.params.id,
         payload.qtyChange,
         payload.eventType,
         payload.reference,
@@ -6179,10 +6179,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Simple consume endpoint (legacy - consumes from Location A by default)
   app.post("/technical/api/spares/:id/consume", async (req, res) => {
     try {
-      const spareId = parseInt(req.params.id);
-      if (isNaN(spareId)) {
-        return res.status(400).json({ error: "Invalid spare ID" });
-      }
+      const spareId = req.params.id;
       
       const { qty, dateLocal, place, remarks, userId, workOrder } = req.body;
       
@@ -6214,10 +6211,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Simple receive endpoint (legacy - receives to Location A by default)
   app.post("/technical/api/spares/:id/receive", async (req, res) => {
     try {
-      const spareId = parseInt(req.params.id);
-      if (isNaN(spareId)) {
-        return res.status(400).json({ error: "Invalid spare ID" });
-      }
+      const spareId = req.params.id;
       
       const { qty, dateLocal, supplierPO, remarks, userId } = req.body;
       
@@ -6258,7 +6252,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
   
   const consumeFromLocationParamsSchema = z.object({
-    id: z.coerce.number().int().positive('Spare ID must be a positive integer')
+    id: z.string().min(1, 'Spare ID is required')
   });
   
   app.post("/technical/api/spares/:id/consume-from-location", async (req, res) => {
@@ -6351,7 +6345,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
   
   const receiveToLocationParamsSchema = z.object({
-    id: z.coerce.number().int().positive('Spare ID must be a positive integer')
+    id: z.string().min(1, 'Spare ID is required')
   });
   
   app.post("/technical/api/spares/:id/receive-to-location", async (req, res) => {
@@ -6613,7 +6607,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   
   const inventoryTransactionSchema = z.object({
     vesselId: z.string(),
-    spareId: z.coerce.number().int().positive(),
+    spareId: z.string(),
     locationId: z.coerce.number().int().positive(),
     eventType: z.enum(['RECEIVE', 'CONSUME', 'ADJUST_OPENING_BALANCE', 'ADJUST_CORRECTION']),
     qtyChange: z.coerce.number().int(),
@@ -6694,7 +6688,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // Hydrate transactions with spare data including linkedComponents
       const hydratedTransactions = await Promise.all(transactions.map(async (txn) => {
-        const spare = await storage.getSpare(txn.spareId);
+        const spare = txn.spareUuid ? await storage.getSpare(txn.spareUuid) : null;
         const linkedComponents = spare ? await storage.getLinkedComponentsForSpare(spare.id) : [];
         const location = txn.locationId ? await storage.getLocationById(txn.locationId) : null;
         return {
@@ -6728,7 +6722,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.get("/technical/api/inventory/spare-with-inventory/:spareId", async (req, res) => {
     try {
-      const spareId = parseInt(req.params.spareId);
+      const spareId = req.params.spareId;
       const spareWithInventory = await storage.getSpareWithInventory(spareId);
       
       if (!spareWithInventory) {
@@ -7522,7 +7516,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Get fleet spare by ID
   app.get("/technical/api/fleet/spares/:id", async (req, res) => {
     try {
-      const spare = await storage.getFleetSpare(parseInt(req.params.id));
+      const spare = await storage.getFleetSpare(req.params.id);
       if (!spare) {
         return res.status(404).json({ error: "Fleet spare not found" });
       }
@@ -7556,7 +7550,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const partialSpareSchema = insertSpareSchema.partial();
       const validatedData = partialSpareSchema.parse(req.body);
-      const spare = await storage.updateFleetSpare(parseInt(req.params.id), validatedData);
+      const spare = await storage.updateFleetSpare(req.params.id, validatedData);
       res.json(spare);
     } catch (error: any) {
       if (error.name === 'ZodError') {
@@ -7576,7 +7570,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Delete fleet spare
   app.delete("/technical/api/fleet/spares/:id", async (req, res) => {
     try {
-      await storage.deleteFleetSpare(parseInt(req.params.id));
+      await storage.deleteFleetSpare(req.params.id);
       res.json({ success: true });
     } catch (error: any) {
       if (error.message?.includes('not found')) {

@@ -60,24 +60,26 @@ export class SparesRepository {
     }
 
     const locationsMap = new Map(allLocations.map(l => [l.id, l]));
-    const linksBySpare = new Map<number, typeof allLinks>();
+    const linksBySpare = new Map<string, typeof allLinks>();
     for (const link of allLinks) {
-      const existing = linksBySpare.get(link.spareId) || [];
+      const key = link.spareUuid;
+      const existing = linksBySpare.get(key) || [];
       existing.push(link);
-      linksBySpare.set(link.spareId, existing);
+      linksBySpare.set(key, existing);
     }
-    const stockBySpare = new Map<number, typeof allStock>();
+    const stockBySpare = new Map<string, typeof allStock>();
     for (const stock of allStock) {
-      const existing = stockBySpare.get(stock.spareId) || [];
+      const key = stock.spareUuid;
+      const existing = stockBySpare.get(key) || [];
       existing.push(stock);
-      stockBySpare.set(stock.spareId, existing);
+      stockBySpare.set(key, existing);
     }
 
     return spares.map(spare => {
       const robTotal = (spare.robLocationA ?? 0) + (spare.robLocationB ?? 0);
       const stockStatus: 'OK' | 'At Min' = (spare.rob ?? 0) <= (spare.min ?? 0) ? 'At Min' : 'OK';
 
-      const spareStock = stockBySpare.get(spare.id) || [];
+      const spareStock = stockBySpare.get(spare.suuid) || [];
       const locations = spareStock.map(s => {
         const loc = locationsMap.get(s.locationId);
         return {
@@ -87,7 +89,7 @@ export class SparesRepository {
         };
       });
 
-      const spareLinks = linksBySpare.get(spare.id) || [];
+      const spareLinks = linksBySpare.get(spare.suuid) || [];
       const linkedComponents = spareLinks.map(link => {
         const comp = componentsMap.get(link.componentId);
         return {
@@ -101,9 +103,9 @@ export class SparesRepository {
     });
   }
 
-  async getSpare(id: number): Promise<Spare | undefined> {
+  async getSpare(suuid: string): Promise<Spare | undefined> {
     const db = await getDb();
-    const result = await db.select().from(v2Spares).where(eq(v2Spares.id, id));
+    const result = await db.select().from(v2Spares).where(eq(v2Spares.suuid, suuid));
     return result[0];
   }
 
@@ -131,27 +133,27 @@ export class SparesRepository {
       try {
         const locationAObj = await this.findOrCreateLocation(vesselId, locationAName, userId);
         const locationBObj = await this.findOrCreateLocation(vesselId, locationBName, userId);
-        await this.upsertSpareLocationStock({ vesselId, spareId: createdSpare.id, locationId: locationAObj.id, qty: robA });
-        await this.upsertSpareLocationStock({ vesselId, spareId: createdSpare.id, locationId: locationBObj.id, qty: robB });
+        await this.upsertSpareLocationStock({ vesselId, spareId: createdSpare.id, spareUuid: createdSpare.suuid, locationId: locationAObj.id, qty: robA });
+        await this.upsertSpareLocationStock({ vesselId, spareId: createdSpare.id, spareUuid: createdSpare.suuid, locationId: locationBObj.id, qty: robB });
       } catch (syncError: any) {
-        console.warn(`[createSpare] Failed to sync spare_location_stock for new spare ${createdSpare.id}: ${syncError.message}`);
+        console.warn(`[createSpare] Failed to sync spare_location_stock for new spare ${createdSpare.suuid}: ${syncError.message}`);
       }
     }
 
     return createdSpare;
   }
 
-  async updateSpare(id: number, data: Partial<Spare>): Promise<Spare> {
+  async updateSpare(suuid: string, data: Partial<Spare>): Promise<Spare> {
     const db = await getDb();
     const { partCode, ...restData } = data;
     const updateData = partCode != null ? { ...restData, partCode, updatedAt: new Date() } : { ...restData, updatedAt: new Date() };
 
     const result = await db.update(v2Spares)
       .set(updateData)
-      .where(eq(v2Spares.id, id))
+      .where(eq(v2Spares.suuid, suuid))
       .returning();
     if (!result[0]) {
-      throw new Error(`Spare ${id} not found`);
+      throw new Error(`Spare ${suuid} not found`);
     }
 
     const updatedSpare = result[0];
@@ -169,25 +171,25 @@ export class SparesRepository {
       try {
         const locationAObj = await this.findOrCreateLocation(vesselId, locationAName, userId);
         const locationBObj = await this.findOrCreateLocation(vesselId, locationBName, userId);
-        await this.upsertSpareLocationStock({ vesselId, spareId: id, locationId: locationAObj.id, qty: robA });
-        await this.upsertSpareLocationStock({ vesselId, spareId: id, locationId: locationBObj.id, qty: robB });
+        await this.upsertSpareLocationStock({ vesselId, spareId: updatedSpare.id, spareUuid: updatedSpare.suuid, locationId: locationAObj.id, qty: robA });
+        await this.upsertSpareLocationStock({ vesselId, spareId: updatedSpare.id, spareUuid: updatedSpare.suuid, locationId: locationBObj.id, qty: robB });
       } catch (syncError: any) {
-        console.warn(`[updateSpare] Failed to sync spare_location_stock for spare ${id}: ${syncError.message}`);
+        console.warn(`[updateSpare] Failed to sync spare_location_stock for spare ${suuid}: ${syncError.message}`);
       }
     }
 
     return updatedSpare;
   }
 
-  async deleteSpare(id: number): Promise<void> {
+  async deleteSpare(suuid: string): Promise<void> {
     const db = await getDb();
     await db.update(v2Spares)
       .set({ deleted: true, updatedAt: new Date() })
-      .where(eq(v2Spares.id, id));
+      .where(eq(v2Spares.suuid, suuid));
   }
 
   async consumeSpare(
-    id: number,
+    suuid: string,
     quantity: number,
     userId: string,
     remarks?: string,
@@ -196,9 +198,9 @@ export class SparesRepository {
     tz?: string
   ): Promise<Spare> {
     const db = await getDb();
-    const spare = await this.getSpare(id);
+    const spare = await this.getSpare(suuid);
     if (!spare) {
-      throw new Error(`Spare ${id} not found`);
+      throw new Error(`Spare ${suuid} not found`);
     }
 
     const newRob = (spare.rob ?? 0) - quantity;
@@ -210,13 +212,14 @@ export class SparesRepository {
         robLocationA: newRobA < 0 ? 0 : newRobA,
         updatedAt: new Date()
       })
-      .where(eq(v2Spares.id, id))
+      .where(eq(v2Spares.suuid, suuid))
       .returning();
 
     await this.createSpareHistory({
       timestampUTC: new Date(),
       vesselId: spare.vesselId || 'V001',
       spareId: spare.id,
+      spareUuid: spare.suuid,
       partCode: spare.partCode ?? spare.componentSpareCode ?? `SP-${spare.id}`,
       partName: spare.partName,
       componentId: spare.componentId || '',
@@ -240,19 +243,20 @@ export class SparesRepository {
       const locationA = await this.findOrCreateLocation(vesselId, locationAName, userId);
       await this.upsertSpareLocationStock({
         vesselId,
-        spareId: id,
+        spareId: spare.id,
+        spareUuid: spare.suuid,
         locationId: locationA.id,
         qty: newRobA < 0 ? 0 : newRobA,
       });
     } catch (syncError: any) {
-      console.warn(`[consumeSpare] Failed to sync spare_location_stock for spare ${id}: ${syncError.message}`);
+      console.warn(`[consumeSpare] Failed to sync spare_location_stock for spare ${suuid}: ${syncError.message}`);
     }
 
     return updated[0];
   }
 
   async consumeSpareFromLocation(
-    id: number,
+    suuid: string,
     quantity: number,
     location: 'A' | 'B',
     userId: string,
@@ -261,9 +265,9 @@ export class SparesRepository {
     dateLocal?: string
   ): Promise<{ spare: Spare; deducted: number; requested: number; shortageQty: number }> {
     const db = await getDb();
-    const spare = await this.getSpare(id);
+    const spare = await this.getSpare(suuid);
     if (!spare) {
-      throw new Error(`Spare ${id} not found`);
+      throw new Error(`Spare ${suuid} not found`);
     }
 
     const currentRobA = spare.robLocationA ?? 0;
@@ -292,13 +296,14 @@ export class SparesRepository {
         robLocationB: newRobB,
         updatedAt: new Date()
       })
-      .where(eq(v2Spares.id, id))
+      .where(eq(v2Spares.suuid, suuid))
       .returning();
 
     await this.createSpareHistory({
       timestampUTC: new Date(),
       vesselId: spare.vesselId || 'V001',
       spareId: spare.id,
+      spareUuid: spare.suuid,
       partCode: spare.partCode ?? spare.componentSpareCode ?? `SP-${spare.id}`,
       partName: spare.partName,
       componentId: spare.componentId || '',
@@ -322,10 +327,10 @@ export class SparesRepository {
     try {
       const locationAObj = await this.findOrCreateLocation(vesselId, locationAName, userId);
       const locationBObj = await this.findOrCreateLocation(vesselId, locationBName, userId);
-      await this.upsertSpareLocationStock({ vesselId, spareId: id, locationId: locationAObj.id, qty: newRobA });
-      await this.upsertSpareLocationStock({ vesselId, spareId: id, locationId: locationBObj.id, qty: newRobB });
+      await this.upsertSpareLocationStock({ vesselId, spareId: spare.id, spareUuid: spare.suuid, locationId: locationAObj.id, qty: newRobA });
+      await this.upsertSpareLocationStock({ vesselId, spareId: spare.id, spareUuid: spare.suuid, locationId: locationBObj.id, qty: newRobB });
     } catch (syncError: any) {
-      console.warn(`[consumeSpareFromLocation] Failed to sync spare_location_stock for spare ${id}: ${syncError.message}`);
+      console.warn(`[consumeSpareFromLocation] Failed to sync spare_location_stock for spare ${suuid}: ${syncError.message}`);
     }
 
     return {
@@ -337,7 +342,7 @@ export class SparesRepository {
   }
 
   async receiveSpareToLocation(
-    id: number,
+    suuid: string,
     quantity: number,
     location: 'A' | 'B',
     userId: string,
@@ -346,9 +351,9 @@ export class SparesRepository {
     dateLocal?: string
   ): Promise<{ spare: Spare; received: number }> {
     const db = await getDb();
-    const spare = await this.getSpare(id);
+    const spare = await this.getSpare(suuid);
     if (!spare) {
-      throw new Error(`Spare ${id} not found`);
+      throw new Error(`Spare ${suuid} not found`);
     }
 
     const currentRobA = spare.robLocationA ?? 0;
@@ -374,13 +379,14 @@ export class SparesRepository {
         lastOrderDate: dateLocal ?? null,
         updatedAt: new Date()
       })
-      .where(eq(v2Spares.id, id))
+      .where(eq(v2Spares.suuid, suuid))
       .returning();
 
     await this.createSpareHistory({
       timestampUTC: new Date(),
       vesselId: spare.vesselId || 'V001',
       spareId: spare.id,
+      spareUuid: spare.suuid,
       partCode: spare.partCode ?? spare.componentSpareCode ?? `SP-${spare.id}`,
       partName: spare.partName,
       componentId: spare.componentId || '',
@@ -404,10 +410,10 @@ export class SparesRepository {
     try {
       const locationAObj = await this.findOrCreateLocation(vesselId, locationAName, userId);
       const locationBObj = await this.findOrCreateLocation(vesselId, locationBName, userId);
-      await this.upsertSpareLocationStock({ vesselId, spareId: id, locationId: locationAObj.id, qty: newRobA });
-      await this.upsertSpareLocationStock({ vesselId, spareId: id, locationId: locationBObj.id, qty: newRobB });
+      await this.upsertSpareLocationStock({ vesselId, spareId: spare.id, spareUuid: spare.suuid, locationId: locationAObj.id, qty: newRobA });
+      await this.upsertSpareLocationStock({ vesselId, spareId: spare.id, spareUuid: spare.suuid, locationId: locationBObj.id, qty: newRobB });
     } catch (syncError: any) {
-      console.warn(`[receiveSpareToLocation] Failed to sync spare_location_stock for spare ${id}: ${syncError.message}`);
+      console.warn(`[receiveSpareToLocation] Failed to sync spare_location_stock for spare ${suuid}: ${syncError.message}`);
     }
 
     return {
@@ -417,7 +423,7 @@ export class SparesRepository {
   }
 
   async adjustSpareAtLocation(
-    id: number,
+    suuid: string,
     newRob: number,
     location: 'A' | 'B',
     userId: string,
@@ -427,9 +433,9 @@ export class SparesRepository {
     tz?: string
   ): Promise<Spare> {
     const db = await getDb();
-    const spare = await this.getSpare(id);
+    const spare = await this.getSpare(suuid);
     if (!spare) {
-      throw new Error(`Spare ${id} not found`);
+      throw new Error(`Spare ${suuid} not found`);
     }
 
     if (isNaN(newRob) || newRob < 0) {
@@ -463,7 +469,7 @@ export class SparesRepository {
         robLocationB: newLocB,
         updatedAt: new Date()
       })
-      .where(eq(v2Spares.id, id))
+      .where(eq(v2Spares.suuid, suuid))
       .returning();
 
     const adjustmentRemarks = remarks || `Adjustment at Location ${location}: ${location === 'A' ? oldLocA : oldLocB}→${newRob}`;
@@ -472,6 +478,7 @@ export class SparesRepository {
       timestampUTC: new Date(),
       vesselId: spare.vesselId || 'V001',
       spareId: spare.id,
+      spareUuid: spare.suuid,
       partCode: spare.partCode ?? spare.componentSpareCode ?? `SP-${spare.id}`,
       partName: spare.partName,
       componentId: spare.componentId || '',
@@ -495,26 +502,26 @@ export class SparesRepository {
     try {
       const locationAObj = await this.findOrCreateLocation(vesselId, locationAName, userId);
       const locationBObj = await this.findOrCreateLocation(vesselId, locationBName, userId);
-      await this.upsertSpareLocationStock({ vesselId, spareId: id, locationId: locationAObj.id, qty: newLocA });
-      await this.upsertSpareLocationStock({ vesselId, spareId: id, locationId: locationBObj.id, qty: newLocB });
+      await this.upsertSpareLocationStock({ vesselId, spareId: spare.id, spareUuid: spare.suuid, locationId: locationAObj.id, qty: newLocA });
+      await this.upsertSpareLocationStock({ vesselId, spareId: spare.id, spareUuid: spare.suuid, locationId: locationBObj.id, qty: newLocB });
     } catch (syncError: any) {
-      console.warn(`[adjustSpareAtLocation] Failed to sync spare_location_stock for spare ${id}: ${syncError.message}`);
+      console.warn(`[adjustSpareAtLocation] Failed to sync spare_location_stock for spare ${suuid}: ${syncError.message}`);
     }
 
     return updated[0];
   }
 
   async adjustSpareQuantity(
-    spareId: number,
+    suuid: string,
     qtyChange: number,
     eventType: 'CONSUME' | 'RECEIVE' | 'ADJUST',
     reference?: string,
     notes?: string
   ): Promise<Spare> {
     const db = await getDb();
-    const spare = await this.getSpare(spareId);
+    const spare = await this.getSpare(suuid);
     if (!spare) {
-      throw new Error(`Spare ${spareId} not found`);
+      throw new Error(`Spare ${suuid} not found`);
     }
 
     const currentRob = spare.rob ?? 0;
@@ -529,13 +536,14 @@ export class SparesRepository {
         robLocationA: newRobA,
         updatedAt: new Date()
       })
-      .where(eq(v2Spares.id, spareId))
+      .where(eq(v2Spares.suuid, suuid))
       .returning();
 
     await this.createSpareHistory({
       timestampUTC: new Date(),
       vesselId: spare.vesselId || 'V001',
       spareId: spare.id,
+      spareUuid: spare.suuid,
       partCode: spare.partCode ?? spare.componentSpareCode ?? `SP-${spare.id}`,
       partName: spare.partName,
       componentId: spare.componentId || '',
@@ -557,7 +565,7 @@ export class SparesRepository {
   }
 
   async transferSpareLocation(
-    id: number,
+    suuid: string,
     newRobLocationA: number,
     newRobLocationB: number,
     userId: string,
@@ -567,9 +575,9 @@ export class SparesRepository {
     tz?: string
   ): Promise<{ spare: Spare; isTransfer: boolean }> {
     const db = await getDb();
-    const spare = await this.getSpare(id);
+    const spare = await this.getSpare(suuid);
     if (!spare) {
-      throw new Error(`Spare ${id} not found`);
+      throw new Error(`Spare ${suuid} not found`);
     }
 
     const oldLocA = spare.robLocationA ?? 0;
@@ -600,7 +608,7 @@ export class SparesRepository {
         robLocationB: newLocB,
         updatedAt: new Date()
       })
-      .where(eq(v2Spares.id, id))
+      .where(eq(v2Spares.suuid, suuid))
       .returning();
 
     const vesselId = spare.vesselId || 'V001';
@@ -613,22 +621,24 @@ export class SparesRepository {
 
       await this.upsertSpareLocationStock({
         vesselId,
-        spareId: id,
+        spareId: spare.id,
+        spareUuid: spare.suuid,
         locationId: locationA.id,
         qty: newLocA,
       });
 
       await this.upsertSpareLocationStock({
         vesselId,
-        spareId: id,
+        spareId: spare.id,
+        spareUuid: spare.suuid,
         locationId: locationB.id,
         qty: newLocB,
       });
 
-      console.log(`[transferSpareLocation] Synced spare_location_stock for spare ${id}: ` +
+      console.log(`[transferSpareLocation] Synced spare_location_stock for spare ${suuid}: ` +
         `${locationAName}=${newLocA}, ${locationBName}=${newLocB}`);
     } catch (syncError: any) {
-      console.warn(`[transferSpareLocation] Failed to sync spare_location_stock for spare ${id}: ${syncError.message}`);
+      console.warn(`[transferSpareLocation] Failed to sync spare_location_stock for spare ${suuid}: ${syncError.message}`);
     }
 
     const oldTotalRob = oldLocA + oldLocB;
@@ -644,6 +654,7 @@ export class SparesRepository {
         timestampUTC: new Date(),
         vesselId: spare.vesselId || 'V001',
         spareId: spare.id,
+        spareUuid: spare.suuid,
         partCode: spare.partCode ?? spare.componentSpareCode ?? `SP-${spare.id}`,
         partName: spare.partName,
         componentId: spare.componentId || '',
@@ -673,6 +684,7 @@ export class SparesRepository {
       timestampUTC: new Date(),
       vesselId: spare.vesselId || 'V001',
       spareId: spare.id,
+      spareUuid: spare.suuid,
       partCode: spare.partCode ?? spare.componentSpareCode ?? `SP-${spare.id}`,
       partName: spare.partName,
       componentId: spare.componentId || '',
@@ -694,7 +706,7 @@ export class SparesRepository {
   }
 
   async receiveSpare(
-    id: number,
+    suuid: string,
     quantity: number,
     userId: string,
     remarks?: string,
@@ -704,9 +716,9 @@ export class SparesRepository {
     tz?: string
   ): Promise<Spare> {
     const db = await getDb();
-    const spare = await this.getSpare(id);
+    const spare = await this.getSpare(suuid);
     if (!spare) {
-      throw new Error(`Spare ${id} not found`);
+      throw new Error(`Spare ${suuid} not found`);
     }
 
     const newRob = (spare.rob ?? 0) + quantity;
@@ -719,13 +731,14 @@ export class SparesRepository {
         lastOrderDate: dateLocal ?? null,
         updatedAt: new Date()
       })
-      .where(eq(v2Spares.id, id))
+      .where(eq(v2Spares.suuid, suuid))
       .returning();
 
     await this.createSpareHistory({
       timestampUTC: new Date(),
       vesselId: spare.vesselId || 'V001',
       spareId: spare.id,
+      spareUuid: spare.suuid,
       partCode: spare.partCode ?? spare.componentSpareCode ?? `SP-${spare.id}`,
       partName: spare.partName,
       componentId: spare.componentId || '',
@@ -792,12 +805,21 @@ export class SparesRepository {
         : ((dateLocal && dateLocal.trim()) ? dateLocal.trim() : undefined);
 
       try {
+        const db = await getDb();
+        const spareResult = await db.select().from(v2Spares).where(eq(v2Spares.id, componentSpareId));
+        const spareLookup = spareResult[0];
+        if (!spareLookup) {
+          results.push({ componentSpareId, success: false, message: `Spare with id ${componentSpareId} not found` });
+          continue;
+        }
+        const spareSuuid = spareLookup.suuid;
+
         const errors: string[] = [];
 
         if (consumedA > 0) {
           try {
             await this.consumeSpareFromLocation(
-              componentSpareId, consumedA, 'A', rowUserId, remarks, undefined, transactionDate
+              spareSuuid, consumedA, 'A', rowUserId, remarks, undefined, transactionDate
             );
           } catch (e: any) {
             errors.push(`Consume A: ${e.message}`);
@@ -807,7 +829,7 @@ export class SparesRepository {
         if (consumedB > 0) {
           try {
             await this.consumeSpareFromLocation(
-              componentSpareId, consumedB, 'B', rowUserId, remarks, undefined, transactionDate
+              spareSuuid, consumedB, 'B', rowUserId, remarks, undefined, transactionDate
             );
           } catch (e: any) {
             errors.push(`Consume B: ${e.message}`);
@@ -817,7 +839,7 @@ export class SparesRepository {
         if (receivedA > 0) {
           try {
             await this.receiveSpareToLocation(
-              componentSpareId, receivedA, 'A', rowUserId, remarks, receivedPlace, transactionDate
+              spareSuuid, receivedA, 'A', rowUserId, remarks, receivedPlace, transactionDate
             );
           } catch (e: any) {
             errors.push(`Receive A: ${e.message}`);
@@ -827,14 +849,14 @@ export class SparesRepository {
         if (receivedB > 0) {
           try {
             await this.receiveSpareToLocation(
-              componentSpareId, receivedB, 'B', rowUserId, remarks, receivedPlace, transactionDate
+              spareSuuid, receivedB, 'B', rowUserId, remarks, receivedPlace, transactionDate
             );
           } catch (e: any) {
             errors.push(`Receive B: ${e.message}`);
           }
         }
 
-        const spare = await this.getSpare(componentSpareId);
+        const spare = await this.getSpare(spareSuuid);
 
         if (errors.length > 0) {
           results.push({
@@ -894,7 +916,7 @@ export class SparesRepository {
 
   async batchConsume(
     vesselId: string,
-    items: Array<{ spareId: number; quantity: number; location?: 'A' | 'B' }>,
+    items: Array<{ spareUuid: string; quantity: number; location?: 'A' | 'B' }>,
     workOrderId?: string,
     consumedBy?: string
   ): Promise<Spare[]> {
@@ -904,7 +926,7 @@ export class SparesRepository {
     for (const item of items) {
       const location = item.location || 'A';
       const result = await this.consumeSpareFromLocation(
-        item.spareId, item.quantity, location, userId, undefined, workOrderId
+        item.spareUuid, item.quantity, location, userId, undefined, workOrderId
       );
       results.push(result.spare);
     }
@@ -914,7 +936,7 @@ export class SparesRepository {
 
   async batchReceive(
     vesselId: string,
-    items: Array<{ spareId: number; quantity: number; location?: 'A' | 'B' }>,
+    items: Array<{ spareUuid: string; quantity: number; location?: 'A' | 'B' }>,
     purchaseOrderRef?: string,
     receivedBy?: string
   ): Promise<Spare[]> {
@@ -924,7 +946,7 @@ export class SparesRepository {
     for (const item of items) {
       const location = item.location || 'A';
       const result = await this.receiveSpareToLocation(
-        item.spareId, item.quantity, location, userId, undefined, purchaseOrderRef
+        item.spareUuid, item.quantity, location, userId, undefined, purchaseOrderRef
       );
       results.push(result.spare);
     }
@@ -956,6 +978,7 @@ export class SparesRepository {
   private async upsertSpareLocationStock(data: {
     vesselId: string;
     spareId: number;
+    spareUuid: string;
     locationId: number;
     qty: number;
   }): Promise<SpareLocationStock> {
@@ -976,6 +999,7 @@ export class SparesRepository {
       const result = await db.insert(v2SpareLocationStock).values({
         vesselId: data.vesselId,
         spareId: data.spareId,
+        spareUuid: data.spareUuid,
         locationId: data.locationId,
         qty: data.qty,
       }).returning();

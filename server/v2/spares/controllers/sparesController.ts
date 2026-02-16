@@ -12,7 +12,7 @@ export async function listAll(req: Request, res: Response) {
 }
 
 const vesselIdSchema = z.object({ vesselId: z.string().min(1, 'vesselId is required') });
-const spareIdSchema = z.object({ id: z.coerce.number().int().positive('Spare ID must be a positive integer') });
+const spareIdSchema = z.object({ suuid: z.string().min(1, 'Spare UUID is required') });
 const vesselAndSpareSchema = vesselIdSchema.merge(spareIdSchema);
 
 export async function listByVessel(req: Request, res: Response) {
@@ -30,7 +30,7 @@ export async function getById(req: Request, res: Response) {
   try {
     const params = spareIdSchema.safeParse(req.params);
     if (!params.success) return res.status(400).json({ error: params.error.errors[0]?.message });
-    const spare = await sparesService.getSpare(params.data.id);
+    const spare = await sparesService.getSpare(params.data.suuid);
     if (!spare) {
       return res.status(404).json({ error: "Spare not found" });
     }
@@ -105,7 +105,7 @@ export async function update(req: Request, res: Response) {
   try {
     const params = spareIdSchema.safeParse(req.params);
     if (!params.success) return res.status(400).json({ error: params.error.errors[0]?.message });
-    const spareId = params.data.id;
+    const suuid = params.data.suuid;
 
     const body = updateSpareSchema.safeParse(req.body);
     if (!body.success) {
@@ -117,7 +117,7 @@ export async function update(req: Request, res: Response) {
 
     if (robLocationA !== undefined || robLocationB !== undefined) {
 
-      const currentSpare = await sparesService.getSpare(spareId);
+      const currentSpare = await sparesService.getSpare(suuid);
       if (!currentSpare) {
         return res.status(404).json({ error: "Spare not found" });
       }
@@ -126,7 +126,7 @@ export async function update(req: Request, res: Response) {
       const newLocB = robLocationB !== undefined ? Number(robLocationB) : (currentSpare.robLocationB ?? 0);
 
       const result = await sparesService.transferSpareLocation(
-        spareId,
+        suuid,
         newLocA,
         newLocB,
         userId,
@@ -137,14 +137,14 @@ export async function update(req: Request, res: Response) {
       );
 
       if (Object.keys(otherUpdates).length > 0) {
-        const updatedSpare = await sparesService.updateSpare(spareId, otherUpdates);
+        const updatedSpare = await sparesService.updateSpare(suuid, otherUpdates);
         return res.json(updatedSpare);
       }
 
       return res.json(result.spare);
     }
 
-    const spare = await sparesService.updateSpare(spareId, otherUpdates);
+    const spare = await sparesService.updateSpare(suuid, otherUpdates);
     res.json(spare);
   } catch (error: any) {
     if (error.message?.includes('not found')) {
@@ -158,7 +158,7 @@ export async function remove(req: Request, res: Response) {
   try {
     const params = spareIdSchema.safeParse(req.params);
     if (!params.success) return res.status(400).json({ error: params.error.errors[0]?.message });
-    await sparesService.deleteSpare(params.data.id);
+    await sparesService.deleteSpare(params.data.suuid);
     res.json({ success: true });
   } catch (error: any) {
     if (error.message?.includes('not found')) {
@@ -186,18 +186,18 @@ export async function adjustment(req: Request, res: Response) {
 
     const payload = adjustmentPayloadSchema.parse(req.body);
     const userId = (req as any).user?.id?.toString() || 'System';
-    const { vesselId, id: spareId } = paramsResult.data;
+    const { vesselId, suuid } = paramsResult.data;
 
-    const existingSpare = await sparesService.getSpare(spareId);
+    const existingSpare = await sparesService.getSpare(suuid);
     if (!existingSpare) {
-      return res.status(404).json({ error: `Spare with ID ${spareId} not found` });
+      return res.status(404).json({ error: `Spare with UUID ${suuid} not found` });
     }
     if (existingSpare.vesselId !== vesselId) {
       return res.status(403).json({ error: "Access denied: Spare does not belong to this vessel" });
     }
 
     const spare = await sparesService.adjustSpareAtLocation(
-      spareId,
+      suuid,
       payload.newRob,
       payload.location,
       userId,
@@ -236,7 +236,7 @@ export async function adjust(req: Request, res: Response) {
 
     const payload = adjustPayloadSchema.parse(req.body);
     const spare = await sparesService.adjustSpareQuantity(
-      params.data.id,
+      params.data.suuid,
       payload.qtyChange,
       payload.eventType,
       payload.reference,
@@ -293,7 +293,7 @@ export async function lowStock(req: Request, res: Response) {
 
 const batchConsumeSchema = z.object({
   items: z.array(z.object({
-    spareId: z.coerce.number().int().positive(),
+    spareUuid: z.string().min(1),
     quantity: z.coerce.number().positive(),
     location: z.enum(['A', 'B']).optional(),
   })).min(1, 'Items array must have at least one item'),
@@ -326,7 +326,7 @@ export async function batchConsumeHandler(req: Request, res: Response) {
 
 const batchReceiveSchema = z.object({
   items: z.array(z.object({
-    spareId: z.coerce.number().int().positive(),
+    spareUuid: z.string().min(1),
     quantity: z.coerce.number().positive(),
     location: z.enum(['A', 'B']).optional(),
   })).min(1, 'Items array must have at least one item'),
@@ -379,7 +379,7 @@ export async function consume(req: Request, res: Response) {
     const { qty, dateLocal, place, remarks, userId, workOrder } = body.data;
 
     const result = await sparesService.consumeSpareFromLocation(
-      params.data.id,
+      params.data.suuid,
       qty,
       'A',
       userId || 'User',
@@ -421,7 +421,7 @@ export async function receive(req: Request, res: Response) {
     const { qty, dateLocal, supplierPO, remarks, userId } = body.data;
 
     const result = await sparesService.receiveSpareToLocation(
-      params.data.id,
+      params.data.suuid,
       qty,
       'A',
       userId || 'User',
@@ -454,7 +454,7 @@ export async function consumeFromLocation(req: Request, res: Response) {
     });
 
     const paramsSchema = z.object({
-      id: z.coerce.number().int().positive('Spare ID must be a positive integer'),
+      suuid: z.string().min(1, 'Spare UUID is required'),
     });
 
     const paramsResult = paramsSchema.safeParse(req.params);
@@ -463,8 +463,8 @@ export async function consumeFromLocation(req: Request, res: Response) {
         success: false,
         error: {
           code: 'VALIDATION_ERROR',
-          message: paramsResult.error.errors[0]?.message || 'Invalid spare ID',
-          field: 'id',
+          message: paramsResult.error.errors[0]?.message || 'Invalid spare UUID',
+          field: 'suuid',
         },
       });
     }
@@ -481,11 +481,11 @@ export async function consumeFromLocation(req: Request, res: Response) {
       });
     }
 
-    const { id: spareId } = paramsResult.data;
+    const { suuid } = paramsResult.data;
     const { quantity, location, userId, remarks, workOrderRef } = bodyResult.data;
 
     const result = await sparesService.consumeSpareFromLocation(
-      spareId,
+      suuid,
       quantity,
       location,
       userId || 'system',
@@ -532,7 +532,7 @@ export async function receiveToLocation(req: Request, res: Response) {
     });
 
     const paramsSchema = z.object({
-      id: z.coerce.number().int().positive('Spare ID must be a positive integer'),
+      suuid: z.string().min(1, 'Spare UUID is required'),
     });
 
     const paramsResult = paramsSchema.safeParse(req.params);
@@ -541,8 +541,8 @@ export async function receiveToLocation(req: Request, res: Response) {
         success: false,
         error: {
           code: 'VALIDATION_ERROR',
-          message: paramsResult.error.errors[0]?.message || 'Invalid spare ID',
-          field: 'id',
+          message: paramsResult.error.errors[0]?.message || 'Invalid spare UUID',
+          field: 'suuid',
         },
       });
     }
@@ -559,11 +559,11 @@ export async function receiveToLocation(req: Request, res: Response) {
       });
     }
 
-    const { id: spareId } = paramsResult.data;
+    const { suuid } = paramsResult.data;
     const { quantity, location, userId, remarks, supplierPO, dateLocal } = bodyResult.data;
 
     const result = await sparesService.receiveSpareToLocation(
-      spareId,
+      suuid,
       quantity,
       location,
       userId || 'system',

@@ -226,7 +226,7 @@ export default function FleetSparesManagement() {
                       const equipment = components?.find(c => c.fleetEquipmentCode === spare.fleetEquipmentCode);
                       const isFirstRow = index === 0;
                       return (
-                        <TableRow key={spare.id} data-testid={`row-spare-${spare.id}`}>
+                        <TableRow key={spare.suuid || spare.id} data-testid={`row-spare-${spare.suuid || spare.id}`}>
                           <TableCell className="font-mono text-sm" data-testid={isFirstRow ? "I4.QL5.5.22" : undefined}>
                             {isFirstRow && <Marker id="I4.QL5.5.22" />}
                             {spare.fleetPartCode}
@@ -257,7 +257,7 @@ export default function FleetSparesManagement() {
                                 variant="ghost"
                                 size="sm"
                                 onClick={() => handleEdit(spare)}
-                                data-testid={isFirstRow ? "I4.QL5.5.28" : `button-edit-${spare.id}`}
+                                data-testid={isFirstRow ? "I4.QL5.5.28" : `button-edit-${spare.suuid || spare.id}`}
                               >
                                 {isFirstRow && <Marker id="I4.QL5.5.28" />}
                                 <Pencil className="h-4 w-4" />
@@ -267,7 +267,7 @@ export default function FleetSparesManagement() {
                                 size="sm"
                                 onClick={() => handleDeleteClick(spare)}
                                 className="text-red-600 hover:text-red-700 hover:bg-red-50"
-                                data-testid={isFirstRow ? "I4.QL5.5.29" : `button-delete-${spare.id}`}
+                                data-testid={isFirstRow ? "I4.QL5.5.29" : `button-delete-${spare.suuid || spare.id}`}
                               >
                                 {isFirstRow && <Marker id="I4.QL5.5.29" />}
                                 <Trash2 className="h-4 w-4" />
