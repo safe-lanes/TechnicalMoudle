@@ -67,6 +67,16 @@ interface VesselTreeNode {
   data?: Component;
 }
 
+interface SpareAutoMatchEntry {
+  fleetEquipmentCode: string;
+  partCode: string;
+  partName: string;
+  vesselPartCode: string;
+  vesselPartName: string;
+  vesselSpareId: string;
+  matched: boolean;
+}
+
 interface FleetJobMapping {
   id: number;
   fleetEquipmentCode: string;
@@ -90,6 +100,8 @@ export default function FleetVesselMapping({ onBack }: { onBack?: () => void }) 
   const [autoMatchProgress, setAutoMatchProgress] = useState<{ current: number; total: number; linked: number; failed: number } | null>(null);
   const [jobAutoMatchDialogOpen, setJobAutoMatchDialogOpen] = useState(false);
   const [jobAutoMatchProgress, setJobAutoMatchProgress] = useState<{ current: number; total: number; linked: number; failed: number } | null>(null);
+  const [spareAutoMatchDialogOpen, setSpareAutoMatchDialogOpen] = useState(false);
+  const [spareAutoMatchProgress, setSpareAutoMatchProgress] = useState<{ current: number; total: number; linked: number; failed: number } | null>(null);
   const [summaryDialogOpen, setSummaryDialogOpen] = useState(false);
   const [summaryData, setSummaryData] = useState<{ linked: number; notLinked: number }>({ linked: 0, notLinked: 0 });
   const [expandedFleetNodes, setExpandedFleetNodes] = useState<Set<string>>(new Set());
@@ -548,6 +560,37 @@ export default function FleetVesselMapping({ onBack }: { onBack?: () => void }) 
     return new Set(jobMappingsData.map((m) => `${m.jobCode}|${m.fleetEquipmentCode}`));
   }, [jobMappingsData]);
 
+  const spareAutoMatchEntries = useMemo((): SpareAutoMatchEntry[] => {
+    const fleetSpareCompositeKeys = new Set(
+      fleetSparesData.map((fs) => `${fs.fleetEquipmentCode}|${fs.partCode}`)
+    );
+    const fleetSpareLookup = new Map(
+      fleetSparesData.map((fs) => [`${fs.fleetEquipmentCode}|${fs.partCode}`, fs])
+    );
+
+    return vesselSparesData.map((vs: any) => {
+      const vsFleetEquipCode = vs.fleetEquipmentCode || "";
+      const vsPartCode = vs.partCode || "";
+      const compositeKey = `${vsFleetEquipCode}|${vsPartCode}`;
+      const matched = !!vsFleetEquipCode && !!vsPartCode && fleetSpareCompositeKeys.has(compositeKey);
+      const fleetSpare = matched ? fleetSpareLookup.get(compositeKey) : null;
+
+      return {
+        fleetEquipmentCode: vsFleetEquipCode,
+        partCode: fleetSpare?.partCode || vsPartCode,
+        partName: fleetSpare?.partName || "",
+        vesselPartCode: vsPartCode,
+        vesselPartName: vs.partName || "",
+        vesselSpareId: String(vs.id),
+        matched,
+      };
+    });
+  }, [vesselSparesData, fleetSparesData]);
+
+  const spareMappedPartCodes = useMemo(() => {
+    return new Set(spareMappingsData.map((m) => m.partCode));
+  }, [spareMappingsData]);
+
   const createMappingMutation = useMutation({
     mutationFn: async (data: {
       fleetEquipmentCode: string;
@@ -785,6 +828,53 @@ export default function FleetVesselMapping({ onBack }: { onBack?: () => void }) 
     } else {
       toast({ title: "Error", description: "Failed to create spare mappings", variant: "destructive" });
     }
+  };
+
+  const handleSpareAutoMatch = () => {
+    if (!selectedVessel) {
+      toast({ title: "Error", description: "Please select a vessel first", variant: "destructive" });
+      return;
+    }
+    setSpareAutoMatchDialogOpen(true);
+  };
+
+  const handleCreateSpareAutoMappings = async () => {
+    const matchedEntries = spareAutoMatchEntries.filter(
+      (e) => e.matched && !spareMappedPartCodes.has(e.partCode)
+    );
+
+    if (matchedEntries.length === 0) {
+      toast({ title: "Info", description: "No new spare mappings to create" });
+      return;
+    }
+
+    let linked = 0;
+    let failed = 0;
+    setSpareAutoMatchProgress({ current: 0, total: matchedEntries.length, linked: 0, failed: 0 });
+
+    for (let i = 0; i < matchedEntries.length; i++) {
+      const entry = matchedEntries[i];
+      try {
+        await apiRequest("POST", "/technical/api/fleet-admin/fleet-spare-mappings", {
+          fleetEquipmentCode: entry.fleetEquipmentCode,
+          partCode: entry.partCode,
+          spareId: entry.vesselSpareId,
+          vesselCode: selectedVessel,
+          mappedBy: "auto-match",
+          isActive: true,
+        });
+        linked++;
+      } catch {
+        failed++;
+      }
+      setSpareAutoMatchProgress({ current: i + 1, total: matchedEntries.length, linked, failed });
+    }
+
+    queryClient.invalidateQueries({ queryKey: ["/technical/api/fleet-admin/fleet-spare-mappings", { vesselCode: selectedVessel }] });
+    setSpareAutoMatchDialogOpen(false);
+    setSpareAutoMatchProgress(null);
+    setSummaryData({ linked, notLinked: failed });
+    setSummaryDialogOpen(true);
   };
 
   const handleRemoveMapping = (m: FleetComponentMapping) => {
@@ -1665,7 +1755,7 @@ export default function FleetVesselMapping({ onBack }: { onBack?: () => void }) 
                 size="sm"
                 disabled={!selectedVessel || isLoading}
                 className="border-cyan-500 text-cyan-600"
-                onClick={() => toast({ title: "Coming Soon", description: "Auto-Match for Spares Mapping is under development" })}
+                onClick={handleSpareAutoMatch}
                 data-testid="button-spare-auto-match"
               >
                 <Zap className="h-3.5 w-3.5 mr-1.5" />
@@ -2051,6 +2141,84 @@ export default function FleetVesselMapping({ onBack }: { onBack?: () => void }) 
                 {jobAutoMatchEntries.length === 0 && (
                   <tr>
                     <td colSpan={6} className="text-center py-8 text-gray-500 text-xs">No vessel jobs to match</td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </ScrollArea>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={spareAutoMatchDialogOpen} onOpenChange={setSpareAutoMatchDialogOpen}>
+        <DialogContent className="p-0 gap-0" style={{ width: "60vw", maxWidth: "60vw", maxHeight: "85vh" }}>
+          <div className="bg-gradient-to-r from-cyan-600 to-blue-600 pl-4 pr-10 py-2.5 flex items-center justify-between gap-2 rounded-t-lg flex-wrap">
+            <div className="flex items-center gap-2">
+              <Package className="h-3.5 w-3.5 text-white" />
+              <DialogTitle className="text-xs font-semibold text-white m-0">Auto-Match Results — Spares Mapping</DialogTitle>
+            </div>
+            <Button
+              onClick={handleCreateSpareAutoMappings}
+              className="h-6 px-2 text-[10px] bg-white text-blue-700"
+              data-testid="button-create-spare-auto-mappings"
+            >
+              Create Mapping
+            </Button>
+          </div>
+          {spareAutoMatchProgress && (
+            <div className="px-4 py-3 border-b bg-blue-50/50" data-testid="spare-auto-match-progress">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-xs font-medium text-gray-600">
+                  Processing {spareAutoMatchProgress.current} of {spareAutoMatchProgress.total}...
+                </span>
+                <span className="text-xs text-gray-500">
+                  {Math.round((spareAutoMatchProgress.current / spareAutoMatchProgress.total) * 100)}%
+                </span>
+              </div>
+              <Progress value={(spareAutoMatchProgress.current / spareAutoMatchProgress.total) * 100} className="h-2" />
+              <div className="flex items-center gap-4 mt-2">
+                <div className="flex items-center gap-1.5">
+                  <div className="w-2 h-2 rounded-full bg-green-500" />
+                  <span className="text-[10px] text-gray-500">Linked: {spareAutoMatchProgress.linked}</span>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <div className="w-2 h-2 rounded-full bg-red-500" />
+                  <span className="text-[10px] text-gray-500">Failed: {spareAutoMatchProgress.failed}</span>
+                </div>
+              </div>
+            </div>
+          )}
+          <ScrollArea className="max-h-[70vh]">
+            <table className="w-full">
+              <thead>
+                <tr className="border-b">
+                  <th className="sticky top-0 bg-gray-50 z-10 text-left px-3 py-2 text-xs font-medium text-gray-500">Fleet Equipment Code</th>
+                  <th className="sticky top-0 bg-gray-50 z-10 text-left px-3 py-2 text-xs font-medium text-gray-500">Part Code</th>
+                  <th className="sticky top-0 bg-gray-50 z-10 text-left px-3 py-2 text-xs font-medium text-gray-500">Part Name</th>
+                  <th className="sticky top-0 bg-gray-50 z-10 text-left px-3 py-2 text-xs font-medium text-gray-500">Vessel Part Code</th>
+                  <th className="sticky top-0 bg-gray-50 z-10 text-left px-3 py-2 text-xs font-medium text-gray-500">Vessel Part Name</th>
+                  <th className="sticky top-0 bg-gray-50 z-10 text-center px-3 py-2 text-xs font-medium text-gray-500">Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                {spareAutoMatchEntries.map((entry, idx) => (
+                  <tr key={`${entry.partCode}-${entry.fleetEquipmentCode}-${idx}`} className="border-b text-xs hover:bg-blue-50/50">
+                    <td className="px-3 py-2 font-mono">{entry.fleetEquipmentCode || "-"}</td>
+                    <td className="px-3 py-2 font-mono">{entry.partCode || "-"}</td>
+                    <td className="px-3 py-2 truncate max-w-[180px]">{entry.partName || "-"}</td>
+                    <td className="px-3 py-2 font-mono">{entry.vesselPartCode || "-"}</td>
+                    <td className="px-3 py-2 truncate max-w-[200px]">{entry.vesselPartName || "-"}</td>
+                    <td className="px-3 py-2 text-center">
+                      {entry.matched ? (
+                        <Badge className="bg-green-100 text-green-800 border-green-200 text-[10px]">Matched</Badge>
+                      ) : (
+                        <Badge className="bg-red-100 text-red-800 border-red-200 text-[10px]">No Match</Badge>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+                {spareAutoMatchEntries.length === 0 && (
+                  <tr>
+                    <td colSpan={6} className="text-center py-8 text-gray-500 text-xs">No vessel spares to match</td>
                   </tr>
                 )}
               </tbody>
