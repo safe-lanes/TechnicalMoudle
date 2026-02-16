@@ -120,6 +120,8 @@ The application employs a modern full-stack architecture with a mobile-first, re
 - **Consumption Pattern Analysis Report**: Aggregates `spares_history` CONSUME events, providing a 10-column PDF/Excel report.
 - **IHM Inventory Status Report**: Interactive report combining `spares` and `stores_items` data, with summary cards, filters, and PDF/Excel export.
 
+- **AI Chatbot Assistant**: Floating chat panel (bottom-right) powered by OpenAI GPT-4o with function calling. Features 11 tools for querying work orders, spares, components, jobs, and generating maintenance reports. Uses lazy-initialized OpenAI client (requires OPENAI_API_KEY env var). Frontend uses react-markdown for safe rendering. Files: `server/services/chatbotService.ts`, `server/routes/chatbot.ts`, `client/src/hooks/useChat.ts`, `client/src/components/chat/`.
+
 ## External Dependencies
 *   **Frontend**: `@radix-ui/*`, `@tanstack/react-query`, `wouter`, `tailwindcss`, `lucide-react`
 *   **Backend**: `express`, `drizzle-orm`, `@neondatabase/serverless`, `connect-pg-simple`

@@ -62,6 +62,7 @@ import fleetAdminRouter from "./routes/fleetAdmin";
 import createChangeRequestsRouter from "./routes/changeRequests";
 import { ObjectStorageService, objectStorageClient, parseObjectPath, ObjectNotFoundError } from "./objectStorage";
 import { registerRunningHoursRoutes } from "./runningHoursRoutes";
+import chatbotRouter from "./routes/chatbot";
 import { requireAuth, requireRole, requirePMSAdmin, requireOfficeOrAdmin, requireVesselAccess, mockAuthMiddleware, type AuthenticatedRequest } from "./middleware/auth";
 import { ensureMaintenanceHistoryImmutability } from "./initDb";
 import { validateRunningHoursIncrease, canAdminOverride } from "./utils/rhValidation";
@@ -10156,6 +10157,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(500).json({ error: "Failed to fetch users" });
     }
   });
+
+  // Register chatbot routes
+  app.use(chatbotRouter);
 
   // Register bulk routes
   app.use("/technical/api/bulk", bulkRouter);
