@@ -1,3 +1,4 @@
+import { useState, useEffect } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -7,6 +8,7 @@ import {
   DialogTitle,
   DialogDescription,
 } from "@/components/ui/dialog";
+import { TablePagination, usePagination } from "@/components/reports/TablePagination";
 import { X } from "lucide-react";
 
 export interface ReportColumn {
@@ -38,9 +40,16 @@ interface ReportPreviewModalProps {
 }
 
 const ReportPreviewModal: React.FC<ReportPreviewModalProps> = ({ open, onClose, reportData }) => {
+  const { currentPage, pageSize, handlePageChange, handlePageSizeChange, resetPage, paginateItems } = usePagination(50);
+
+  useEffect(() => {
+    resetPage();
+  }, [reportData]);
+
   if (!reportData) return null;
 
   const { title, subtitle, vessel, columns, data, summary } = reportData;
+  const paginatedData = paginateItems(data);
 
   return (
     <Dialog open={open} onOpenChange={(isOpen) => { if (!isOpen) onClose(); }}>
@@ -102,30 +111,51 @@ const ReportPreviewModal: React.FC<ReportPreviewModalProps> = ({ open, onClose, 
                 </tr>
               </thead>
               <tbody>
-                {data.map((row, rowIdx) => (
-                  <tr
-                    key={rowIdx}
-                    className="border-b last:border-b-0 hover:bg-muted/30"
-                    data-testid={`report-preview-row-${rowIdx}`}
-                  >
-                    {columns.map((col, colIdx) => {
-                      const value = row[col.field];
-                      const displayValue = value === null || value === undefined ? '-' : String(value);
-                      return (
-                        <td
-                          key={colIdx}
-                          className="py-2 px-3 text-foreground whitespace-nowrap"
-                        >
-                          {displayValue}
-                        </td>
-                      );
-                    })}
-                  </tr>
-                ))}
+                {paginatedData.map((row, rowIdx) => {
+                  const globalIdx = (currentPage - 1) * pageSize + rowIdx;
+                  return (
+                    <tr
+                      key={globalIdx}
+                      className="border-b last:border-b-0 hover:bg-muted/30"
+                      data-testid={`report-preview-row-${globalIdx}`}
+                    >
+                      {columns.map((col, colIdx) => {
+                        const value = row[col.field];
+                        let displayValue: string;
+                        if (col.field === 'sNo') {
+                          displayValue = String(globalIdx + 1);
+                        } else {
+                          displayValue = value === null || value === undefined ? '-' : String(value);
+                        }
+                        return (
+                          <td
+                            key={colIdx}
+                            className="py-2 px-3 text-foreground whitespace-nowrap"
+                          >
+                            {displayValue}
+                          </td>
+                        );
+                      })}
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           )}
         </div>
+
+        {data.length > 0 && (
+          <div className="flex-shrink-0 border-t px-4 py-2 bg-muted/20">
+            <TablePagination
+              totalItems={data.length}
+              pageSize={pageSize}
+              currentPage={currentPage}
+              onPageChange={handlePageChange}
+              onPageSizeChange={handlePageSizeChange}
+              pageSizeOptions={[25, 50, 100, 200]}
+            />
+          </div>
+        )}
 
         <div className="flex-shrink-0 border-t p-3 flex justify-end">
           <Button variant="outline" onClick={onClose} data-testid="button-close-preview">
