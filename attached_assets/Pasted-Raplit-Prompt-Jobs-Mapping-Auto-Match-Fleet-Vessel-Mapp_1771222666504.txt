@@ -1,0 +1,126 @@
+Raplit Prompt — Jobs Mapping Auto Match (Fleet Vessel Mapping)
+Module
+
+PMS → Fleet Vessel Mapping → Jobs Mapping → Auto Match
+
+Change Type
+
+UI + Matching Logic (Scoped to Jobs Mapping Auto Match Only)
+
+🎯 Objective
+
+When clicking Auto Match under Jobs Mapping, the system must:
+
+Load all Vessel Jobs that match corresponding Fleet Jobs
+
+Display matched records in a structured Auto Match screen
+
+Follow the same UI pattern as Component Mapping → Auto Match screen
+
+🔎 Matching Logic
+Uniqueness Rule
+
+Matching must be done using the composite key:
+
+job_code + fleet_equipment_code
+
+
+This combination is unique on:
+
+Fleet Jobs side
+
+Vessel Jobs side
+
+Matching Condition
+
+A match occurs when:
+
+Fleet.job_code = Vessel.job_code
+AND
+Fleet.fleet_equipment_code = Vessel.fleet_equipment_code
+
+
+No other field should be used for matching.
+
+📊 Auto Match Screen — Required Columns
+
+The following columns must be displayed:
+
+Fleet Equipment Code
+
+Component Code
+
+Component Name
+
+Job Code
+
+Job Title
+
+Status
+
+Column Meaning
+Column	Source
+Fleet Equipment Code	fleet_jobs
+Component Code	vessel component reference
+Component Name	vessel component name
+Job Code	fleet & vessel job_code
+Job Title	fleet job title
+Status	Matched / Not Matched
+🎨 UI Requirement
+
+The Auto Match screen must be:
+
+Structurally identical to Component Mapping → Auto Match screen
+
+Same layout
+
+Same spacing
+
+Same table design
+
+Same button alignment
+
+Same visual hierarchy
+
+No Excel-like table.
+
+No edit capability inside Auto Match screen.
+
+⚙️ Behavior Rules
+
+Clicking Auto Match triggers matching logic
+
+Load results dynamically
+
+Display match status clearly
+
+No global impact outside Jobs Mapping
+
+No changes to Component or Spares mapping logic
+
+⚠️ Constraints
+
+Matching only by:
+
+job_code + fleet_equipment_code
+
+
+Do not modify database schema
+
+Do not change Fleet Job Management logic
+
+Do not affect Vessel Job creation
+
+Scope limited to Jobs Mapping → Auto Match
+
+📌 Expected Outcome
+
+Accurate job matching between Fleet and Vessel
+
+Clean Auto Match UI aligned with Component Auto Match
+
+Proper match identification using composite key
+
+Clear match status display
+
+No cross-module impact
