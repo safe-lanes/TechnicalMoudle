@@ -82,8 +82,8 @@ export default function FleetVesselMapping({ onBack }: { onBack?: () => void }) 
   const [summaryData, setSummaryData] = useState<{ linked: number; notLinked: number }>({ linked: 0, notLinked: 0 });
   const [expandedFleetNodes, setExpandedFleetNodes] = useState<Set<string>>(new Set());
   const [expandedVesselNodes, setExpandedVesselNodes] = useState<Set<string>>(new Set());
-  const [selectedFleetJob, setSelectedFleetJob] = useState<string | null>(null);
-  const [selectedVesselJob, setSelectedVesselJob] = useState<string | null>(null);
+  const [selectedFleetJob, setSelectedFleetJob] = useState<string | null>(null); // composite key: jobCode|fleetEquipmentCode
+  const [selectedVesselJobs, setSelectedVesselJobs] = useState<Set<string>>(new Set());
   const [selectedFleetSpare, setSelectedFleetSpare] = useState<string | null>(null);
   const [selectedVesselSpare, setSelectedVesselSpare] = useState<string | null>(null);
 
@@ -209,24 +209,32 @@ export default function FleetVesselMapping({ onBack }: { onBack?: () => void }) 
     return ids;
   }, [spareMappingsData]);
 
+  const selectedFleetJobParts = useMemo(() => {
+    if (!selectedFleetJob) return { jobCode: "", fleetEquipmentCode: "" };
+    const [jobCode, fleetEquipmentCode] = selectedFleetJob.split("|");
+    return { jobCode, fleetEquipmentCode };
+  }, [selectedFleetJob]);
+
   const selectedFleetJobData = useMemo(() => {
     if (!selectedFleetJob) return null;
-    return fleetJobsData.find((j) => j.jobCode === selectedFleetJob) || null;
-  }, [selectedFleetJob, fleetJobsData]);
+    const { jobCode, fleetEquipmentCode } = selectedFleetJobParts;
+    return fleetJobsData.find((j) => j.jobCode === jobCode && j.fleetEquipmentCode === fleetEquipmentCode) || null;
+  }, [selectedFleetJob, fleetJobsData, selectedFleetJobParts]);
 
   const selectedFleetJobMappings = useMemo(() => {
     if (!selectedFleetJob) return [];
-    return jobMappingsData.filter((m) => m.jobCode === selectedFleetJob);
-  }, [selectedFleetJob, jobMappingsData]);
+    const { jobCode, fleetEquipmentCode } = selectedFleetJobParts;
+    return jobMappingsData.filter((m) => m.jobCode === jobCode && m.fleetEquipmentCode === fleetEquipmentCode);
+  }, [selectedFleetJob, jobMappingsData, selectedFleetJobParts]);
 
   const jobMappedCount = useMemo(() => {
-    const mappedJobCodes = new Set(jobMappingsData.map((m) => m.jobCode));
-    return mappedJobCodes.size;
+    const mappedKeys = new Set(jobMappingsData.map((m) => `${m.jobCode}|${m.fleetEquipmentCode}`));
+    return mappedKeys.size;
   }, [jobMappingsData]);
 
   const jobUnmappedCount = useMemo(() => {
-    const mappedJobCodes = new Set(jobMappingsData.map((m) => m.jobCode));
-    return fleetJobsData.filter((j) => !mappedJobCodes.has(j.jobCode)).length;
+    const mappedKeys = new Set(jobMappingsData.map((m) => `${m.jobCode}|${m.fleetEquipmentCode}`));
+    return fleetJobsData.filter((j) => !mappedKeys.has(`${j.jobCode}|${j.fleetEquipmentCode}`)).length;
   }, [fleetJobsData, jobMappingsData]);
 
   const jobLinkedVesselJobIds = useMemo(() => {
@@ -871,7 +879,7 @@ export default function FleetVesselMapping({ onBack }: { onBack?: () => void }) 
             data-testid="input-search-mappings"
           />
         </div>
-        <Select value={selectedVessel} onValueChange={(v) => { setSelectedVessel(v); setSelectedFleetItem(null); setSelectedVesselItems(new Set()); setSelectedFleetJob(null); setSelectedVesselJob(null); setSelectedFleetSpare(null); setSelectedVesselSpare(null); }}>
+        <Select value={selectedVessel} onValueChange={(v) => { setSelectedVessel(v); setSelectedFleetItem(null); setSelectedVesselItems(new Set()); setSelectedFleetJob(null); setSelectedVesselJobs(new Set()); setSelectedFleetSpare(null); setSelectedVesselSpare(null); }}>
           <SelectTrigger className="w-64" data-testid="select-vessel-filter">
             <SelectValue placeholder="Select a vessel..." />
           </SelectTrigger>
@@ -1132,13 +1140,14 @@ export default function FleetVesselMapping({ onBack }: { onBack?: () => void }) 
                         </thead>
                         <tbody>
                           {[...fleetJobsData].sort((a, b) => (a.fleetEquipmentCode || "").localeCompare(b.fleetEquipmentCode || "")).map((job) => {
-                            const isSelected = selectedFleetJob === job.jobCode;
-                            const isMapped = jobMappingsData.some((m) => m.jobCode === job.jobCode);
+                            const compositeKey = `${job.jobCode}|${job.fleetEquipmentCode}`;
+                            const isSelected = selectedFleetJob === compositeKey;
+                            const isMapped = jobMappingsData.some((m) => m.jobCode === job.jobCode && m.fleetEquipmentCode === job.fleetEquipmentCode);
                             return (
                               <tr
-                                key={job.id}
+                                key={compositeKey}
                                 className={`border-b text-xs cursor-pointer ${isSelected ? "bg-cyan-50 border-l-2 border-l-cyan-500" : isMapped ? "bg-green-50/50 hover:bg-green-50" : "hover:bg-blue-50/50"}`}
-                                onClick={() => setSelectedFleetJob(job.jobCode)}
+                                onClick={() => setSelectedFleetJob(compositeKey)}
                                 data-testid={`row-fleet-job-${job.id}`}
                               >
                                 <td className="px-3 py-2 font-mono text-gray-600">{job.fleetEquipmentCode}</td>
@@ -1219,6 +1228,21 @@ export default function FleetVesselMapping({ onBack }: { onBack?: () => void }) 
                       <table className="w-full" data-testid="table-vessel-jobs">
                         <thead>
                           <tr className="border-b">
+                            <th className="sticky top-0 bg-gray-50 z-10 w-8 px-3 py-2">
+                              <Checkbox
+                                checked={vesselJobsData.length > 0 && selectedVesselJobs.size === vesselJobsData.length}
+                                className="h-3.5 w-3.5"
+                                onCheckedChange={(checked) => {
+                                  if (checked) {
+                                    const allKeys = new Set(vesselJobsData.map((j: any) => `${j.jobNo || j.id}|${j.componentCode || ""}`));
+                                    setSelectedVesselJobs(allKeys);
+                                  } else {
+                                    setSelectedVesselJobs(new Set());
+                                  }
+                                }}
+                                data-testid="checkbox-vessel-jobs-select-all"
+                              />
+                            </th>
                             <th className="sticky top-0 bg-gray-50 z-10 text-left px-3 py-2 text-xs font-medium text-gray-500">Component Code</th>
                             <th className="sticky top-0 bg-gray-50 z-10 text-left px-3 py-2 text-xs font-medium text-gray-500">Job Code</th>
                             <th className="sticky top-0 bg-gray-50 z-10 text-left px-3 py-2 text-xs font-medium text-gray-500">Job Title</th>
@@ -1226,15 +1250,39 @@ export default function FleetVesselMapping({ onBack }: { onBack?: () => void }) 
                         </thead>
                         <tbody>
                           {[...vesselJobsData].sort((a: any, b: any) => (a.componentCode || "").localeCompare(b.componentCode || "")).map((job: any) => {
-                            const isSelected = selectedVesselJob === job.id;
+                            const vesselJobKey = `${job.jobNo || job.id}|${job.componentCode || ""}`;
+                            const isSelected = selectedVesselJobs.has(vesselJobKey);
                             const isLinked = jobLinkedVesselJobIds.has(job.id);
                             return (
                               <tr
-                                key={job.id}
+                                key={vesselJobKey}
                                 className={`border-b text-xs cursor-pointer ${isSelected ? "bg-cyan-50 border-l-2 border-l-cyan-500" : isLinked ? "bg-green-50/50 hover:bg-green-50" : "hover:bg-blue-50/50"}`}
-                                onClick={() => setSelectedVesselJob(job.id)}
+                                onClick={() => {
+                                  setSelectedVesselJobs((prev) => {
+                                    const next = new Set(prev);
+                                    if (next.has(vesselJobKey)) next.delete(vesselJobKey);
+                                    else next.add(vesselJobKey);
+                                    return next;
+                                  });
+                                }}
                                 data-testid={`row-vessel-job-${job.id}`}
                               >
+                                <td className="px-3 py-1.5 w-8">
+                                  <Checkbox
+                                    checked={isSelected}
+                                    className="h-3.5 w-3.5"
+                                    onClick={(e) => e.stopPropagation()}
+                                    onCheckedChange={() => {
+                                      setSelectedVesselJobs((prev) => {
+                                        const next = new Set(prev);
+                                        if (next.has(vesselJobKey)) next.delete(vesselJobKey);
+                                        else next.add(vesselJobKey);
+                                        return next;
+                                      });
+                                    }}
+                                    data-testid={`checkbox-vessel-job-${job.id}`}
+                                  />
+                                </td>
                                 <td className="px-3 py-2 font-mono text-gray-600">{job.componentCode || "-"}</td>
                                 <td className="px-3 py-2 font-mono text-gray-600">{job.fleetJobCode || job.jobNo}</td>
                                 <td className="px-3 py-2 text-gray-600">{job.jobTitle}</td>
