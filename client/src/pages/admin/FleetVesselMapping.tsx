@@ -582,6 +582,91 @@ export default function FleetVesselMapping({ onBack }: { onBack?: () => void }) 
     },
   });
 
+  const deleteJobMappingMutation = useMutation({
+    mutationFn: async (params: { jobCode: string; vesselCode: string }) => {
+      await apiRequest(
+        "DELETE",
+        `/technical/api/fleet-admin/fleet-job-mappings?jobCode=${encodeURIComponent(params.jobCode)}&vesselCode=${encodeURIComponent(params.vesselCode)}`
+      );
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/technical/api/fleet-admin/fleet-job-mappings", { vesselCode: selectedVessel }] });
+      toast({ title: "Success", description: "Job mapping removed successfully" });
+    },
+    onError: (error: any) => {
+      toast({ title: "Error", description: error.message || "Failed to remove job mapping", variant: "destructive" });
+    },
+  });
+
+  const handleRemoveJobMapping = (m: any) => {
+    deleteJobMappingMutation.mutate({
+      jobCode: m.jobCode,
+      vesselCode: m.vesselCode || selectedVessel || "",
+    });
+  };
+
+  const handleRemoveAllJobMappings = async () => {
+    for (const m of selectedFleetJobMappings) {
+      try {
+        await apiRequest(
+          "DELETE",
+          `/technical/api/fleet-admin/fleet-job-mappings?jobCode=${encodeURIComponent(m.jobCode)}&vesselCode=${encodeURIComponent(m.vesselCode || selectedVessel || "")}`
+        );
+      } catch {}
+    }
+    queryClient.invalidateQueries({ queryKey: ["/technical/api/fleet-admin/fleet-job-mappings", { vesselCode: selectedVessel }] });
+    toast({ title: "Success", description: "All job mappings removed" });
+  };
+
+  const handleManualJobMap = async () => {
+    if (!selectedFleetJob || selectedVesselJobs.size === 0 || !selectedVessel) {
+      toast({ title: "Error", description: "Select a fleet job and one or more vessel jobs", variant: "destructive" });
+      return;
+    }
+
+    const selectedFleetJobObj = fleetJobsData.find(
+      (fj) => `${fj.jobCode}|${fj.fleetEquipmentCode}` === selectedFleetJob
+    );
+    if (!selectedFleetJobObj) {
+      toast({ title: "Error", description: "Fleet job not found", variant: "destructive" });
+      return;
+    }
+
+    let successCount = 0;
+    let failCount = 0;
+
+    for (const vesselJobKey of Array.from(selectedVesselJobs)) {
+      const [jobNo, componentCode] = vesselJobKey.split("|");
+      const vesselJob = vesselJobsData.find((vj: any) =>
+        (vj.jobNo || vj.id) === jobNo && (vj.componentCode || "") === (componentCode || "")
+      );
+      if (!vesselJob) { failCount++; continue; }
+
+      try {
+        await apiRequest("POST", "/technical/api/fleet-admin/fleet-job-mappings", {
+          fleetEquipmentCode: selectedFleetJobObj.fleetEquipmentCode,
+          jobCode: selectedFleetJobObj.jobCode,
+          jobId: vesselJob.id,
+          vesselCode: selectedVessel,
+          mappedBy: "admin",
+          isActive: true,
+        });
+        successCount++;
+      } catch {
+        failCount++;
+      }
+    }
+
+    queryClient.invalidateQueries({ queryKey: ["/technical/api/fleet-admin/fleet-job-mappings", { vesselCode: selectedVessel }] });
+    setSelectedVesselJobs(new Set());
+
+    if (successCount > 0) {
+      toast({ title: "Success", description: `${successCount} job mapping(s) created successfully${failCount > 0 ? `, ${failCount} failed` : ""}` });
+    } else {
+      toast({ title: "Error", description: "Failed to create job mappings", variant: "destructive" });
+    }
+  };
+
   const handleManualMap = async () => {
     if (!selectedFleetItem || selectedVesselItems.size === 0 || !selectedVessel) {
       toast({ title: "Error", description: "Select a fleet item and one or more vessel components", variant: "destructive" });
@@ -1333,21 +1418,58 @@ export default function FleetVesselMapping({ onBack }: { onBack?: () => void }) 
 
                       {selectedFleetJobLinkedDetails.length > 0 ? (
                         <div className="space-y-2">
-                          <div className="text-xs font-medium text-gray-500">Linked Vessel Jobs ({selectedFleetJobLinkedDetails.length})</div>
+                          <div className="flex items-center justify-between gap-2">
+                            <div className="text-xs font-medium text-gray-500">Linked Vessel Jobs ({selectedFleetJobLinkedDetails.length})</div>
+                            {selectedFleetJobLinkedDetails.length > 1 && (
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="h-6 px-2 text-[10px] text-red-500"
+                                onClick={handleRemoveAllJobMappings}
+                                data-testid="button-remove-all-job-mappings"
+                              >
+                                <Trash2 className="h-3 w-3 mr-1" />
+                                Remove All
+                              </Button>
+                            )}
+                          </div>
                           {selectedFleetJobLinkedDetails.map((m) => (
-                            <div key={`${m.jobCode}-${m.vesselCode}`} className="p-2 border rounded-md">
+                            <div key={`${m.jobCode}-${m.vesselCode}`} className="p-2 border rounded-md flex items-center justify-between gap-2">
                               <div className="min-w-0">
                                 <div className="text-xs font-medium truncate">{m.vesselJobNo}</div>
                                 <div className="text-xs text-gray-500 truncate">{m.vesselJobTitle}</div>
-                                <div className="text-xs text-gray-400 truncate mt-0.5">{m.vesselName || m.vesselCode}</div>
                               </div>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={() => handleRemoveJobMapping(m)}
+                                className="text-red-500 shrink-0"
+                                data-testid={`button-remove-job-mapping-${m.jobCode}`}
+                              >
+                                <span className="text-xs">x</span>
+                              </Button>
                             </div>
                           ))}
                         </div>
                       ) : (
                         <div className="text-center py-4">
                           <Badge variant="secondary" className="text-xs">Not Mapped</Badge>
-                          <p className="text-xs text-gray-500 mt-2">No vessel jobs linked to this fleet job</p>
+                          <p className="text-xs text-gray-500 mt-2">Select a vessel job on the right to create a mapping</p>
+                        </div>
+                      )}
+
+                      {selectedVesselJobs.size > 0 && selectedFleetJob && (
+                        <div className="space-y-2">
+                          <div className="text-xs text-gray-500 text-center">
+                            {selectedVesselJobs.size} vessel job{selectedVesselJobs.size > 1 ? "s" : ""} selected
+                          </div>
+                          <Button
+                            onClick={handleManualJobMap}
+                            className="w-full bg-cyan-600 hover:bg-cyan-700 text-white"
+                            data-testid="button-create-job-mapping"
+                          >
+                            Link {selectedVesselJobs.size} Selected
+                          </Button>
                         </div>
                       )}
                     </div>
