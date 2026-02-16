@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { Card, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -27,6 +27,7 @@ import { useQuery } from "@tanstack/react-query";
 import { pdfReportGenerator, formatReportDateRange } from "@/lib/pdfReportGenerator";
 import { useToast } from "@/hooks/use-toast";
 import { useVessel } from "@/contexts/VesselContext";
+import { TablePagination, usePagination } from "@/components/reports/TablePagination";
 
 interface CriticalSpareRow {
   sNo: number;
@@ -87,6 +88,11 @@ const CriticalSparesReport: React.FC<CriticalSparesReportProps> = ({ onBack, ves
   const [sortDirection, setSortDirection] = useState<SortDirection>('asc');
   const [generatingPdf, setGeneratingPdf] = useState(false);
   const [generatingExcel, setGeneratingExcel] = useState(false);
+  const { currentPage, pageSize, handlePageChange, handlePageSizeChange, resetPage, paginateItems } = usePagination(25);
+
+  useEffect(() => {
+    resetPage();
+  }, [searchQuery, stockStatusFilter, criticalityFilter]);
 
   const queryUrl = useMemo(() => {
     const params = new URLSearchParams();
@@ -451,13 +457,15 @@ const CriticalSparesReport: React.FC<CriticalSparesReportProps> = ({ onBack, ves
                       </td>
                     </tr>
                   ) : (
-                    filteredAndSortedItems.map((item, idx) => (
+                    paginateItems(filteredAndSortedItems).map((item, idx) => {
+                      const globalIdx = (currentPage - 1) * pageSize + idx;
+                      return (
                       <tr
-                        key={`${item.partCode}-${idx}`}
+                        key={`${item.partCode}-${globalIdx}`}
                         className={`hover:bg-gray-50 ${getRowBg(item)}`}
-                        data-testid={`row-critical-spare-${idx}`}
+                        data-testid={`row-critical-spare-${globalIdx}`}
                       >
-                        <td className="py-3 px-3 text-center text-sm text-gray-500">{idx + 1}</td>
+                        <td className="py-3 px-3 text-center text-sm text-gray-500">{globalIdx + 1}</td>
                         <td className="py-3 px-3 text-sm text-gray-700 font-mono">{item.partCode}</td>
                         <td className="py-3 px-3">
                           <div className="font-medium text-gray-900 text-sm max-w-[200px] truncate" title={item.partName}>{item.partName}</div>
@@ -501,12 +509,25 @@ const CriticalSparesReport: React.FC<CriticalSparesReportProps> = ({ onBack, ves
                           </div>
                         </td>
                       </tr>
-                    ))
+                      );
+                    })
                   )}
                 </tbody>
               </table>
             </div>
           </div>
+
+          {filteredAndSortedItems.length > 0 && (
+            <div className="mt-4">
+              <TablePagination
+                totalItems={filteredAndSortedItems.length}
+                pageSize={pageSize}
+                currentPage={currentPage}
+                onPageChange={handlePageChange}
+                onPageSizeChange={handlePageSizeChange}
+              />
+            </div>
+          )}
 
           {filteredAndSortedItems.length > 0 && (
             <div className="flex items-center justify-between mt-4 flex-wrap gap-4">

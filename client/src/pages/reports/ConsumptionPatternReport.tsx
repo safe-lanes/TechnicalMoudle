@@ -1,4 +1,4 @@
-import { useState, useMemo, Fragment } from "react";
+import { useState, useMemo, useEffect, Fragment } from "react";
 import { Card, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -27,6 +27,7 @@ import {
   AlertTriangle, FileText, Download, Loader2, ArrowUpDown,
   ChevronDown, ChevronUp, Info,
 } from "lucide-react";
+import { TablePagination, usePagination } from "@/components/reports/TablePagination";
 
 interface ConsumptionPatternReportProps {
   onBack: () => void;
@@ -53,6 +54,11 @@ const ConsumptionPatternReport: React.FC<ConsumptionPatternReportProps> = ({ onB
   const [expandedItemId, setExpandedItemId] = useState<number | null>(null);
   const [nonMovingOpen, setNonMovingOpen] = useState(false);
   const [generatingExcel, setGeneratingExcel] = useState(false);
+  const { currentPage, pageSize, handlePageChange, handlePageSizeChange, resetPage, paginateItems } = usePagination(25);
+
+  useEffect(() => {
+    resetPage();
+  }, [activeTab, appliedFilters]);
 
   const queryUrl = useMemo(() => {
     const params = new URLSearchParams();
@@ -456,7 +462,8 @@ const ConsumptionPatternReport: React.FC<ConsumptionPatternReportProps> = ({ onB
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-200">
-                      {sortedItems.map((item: any, idx: number) => {
+                      {paginateItems(sortedItems).map((item: any, idx: number) => {
+                        const globalIdx = (currentPage - 1) * pageSize + idx;
                         const itemTxns = recentTransactions.filter((t: any) => t.itemId === item.itemId);
                         return (
                           <Fragment key={item.itemId}>
@@ -465,7 +472,7 @@ const ConsumptionPatternReport: React.FC<ConsumptionPatternReportProps> = ({ onB
                               onClick={() => setExpandedItemId(expandedItemId === item.itemId ? null : item.itemId)}
                               data-testid={`row-item-${item.itemId}`}
                             >
-                              <td className="px-3 py-2">{idx + 1}</td>
+                              <td className="px-3 py-2">{globalIdx + 1}</td>
                               <td className="px-3 py-2 font-medium">{item.itemCode}</td>
                               <td className="px-3 py-2">
                                 {item.itemName}
@@ -526,6 +533,15 @@ const ConsumptionPatternReport: React.FC<ConsumptionPatternReportProps> = ({ onB
                 </div>
               ) : (
                 <p className="text-gray-500 text-center py-8">No item data available</p>
+              )}
+              {sortedItems.length > 0 && (
+                <TablePagination
+                  totalItems={sortedItems.length}
+                  pageSize={pageSize}
+                  currentPage={currentPage}
+                  onPageChange={handlePageChange}
+                  onPageSizeChange={handlePageSizeChange}
+                />
               )}
             </div>
           )}
@@ -603,9 +619,11 @@ const ConsumptionPatternReport: React.FC<ConsumptionPatternReportProps> = ({ onB
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-gray-200">
-                        {stockEfficiency.map((item: any, idx: number) => (
-                          <tr key={item.itemId || idx} className="text-sm" data-testid={`row-efficiency-${item.itemId}`}>
-                            <td className="px-3 py-2">{idx + 1}</td>
+                        {paginateItems(stockEfficiency).map((item: any, idx: number) => {
+                          const globalIdx = (currentPage - 1) * pageSize + idx;
+                          return (
+                          <tr key={item.itemId || globalIdx} className="text-sm" data-testid={`row-efficiency-${item.itemId}`}>
+                            <td className="px-3 py-2">{globalIdx + 1}</td>
                             <td className="px-3 py-2 font-medium">{item.itemCode}</td>
                             <td className="px-3 py-2">
                               {item.itemName}
@@ -639,10 +657,20 @@ const ConsumptionPatternReport: React.FC<ConsumptionPatternReportProps> = ({ onB
                               {item.belowMinStock ? <Badge className="bg-red-100 text-red-700 border-red-300">Yes</Badge> : <Badge className="bg-green-100 text-green-700 border-green-300">No</Badge>}
                             </td>
                           </tr>
-                        ))}
+                          );
+                        })}
                       </tbody>
                     </table>
                   </div>
+                  {stockEfficiency.length > 0 && (
+                    <TablePagination
+                      totalItems={stockEfficiency.length}
+                      pageSize={pageSize}
+                      currentPage={currentPage}
+                      onPageChange={handlePageChange}
+                      onPageSizeChange={handlePageSizeChange}
+                    />
+                  )}
                   <p className="text-xs text-gray-500 italic">Movement classification based on {summary?.dataQuality?.daysOfData || "N/A"}-day sample period</p>
                 </>
               ) : (
@@ -671,19 +699,31 @@ const ConsumptionPatternReport: React.FC<ConsumptionPatternReportProps> = ({ onB
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-gray-200">
-                          {nonMovingItems.map((item: any, idx: number) => (
-                            <tr key={item.itemId || idx} className="text-sm">
-                              <td className="px-3 py-2">{idx + 1}</td>
+                          {paginateItems(nonMovingItems).map((item: any, idx: number) => {
+                            const globalIdx = (currentPage - 1) * pageSize + idx;
+                            return (
+                            <tr key={item.itemId || globalIdx} className="text-sm">
+                              <td className="px-3 py-2">{globalIdx + 1}</td>
                               <td className="px-3 py-2 font-medium">{item.itemCode}</td>
                               <td className="px-3 py-2">{item.itemName}</td>
                               <td className="px-3 py-2">{item.itemType}</td>
                               <td className="px-3 py-2">{item.currentRob}</td>
                               <td className="px-3 py-2">{item.minStock}</td>
                             </tr>
-                          ))}
+                            );
+                          })}
                         </tbody>
                       </table>
                     </div>
+                    {nonMovingItems.length > 0 && (
+                      <TablePagination
+                        totalItems={nonMovingItems.length}
+                        pageSize={pageSize}
+                        currentPage={currentPage}
+                        onPageChange={handlePageChange}
+                        onPageSizeChange={handlePageSizeChange}
+                      />
+                    )}
                   </CollapsibleContent>
                 </Collapsible>
               )}
@@ -701,6 +741,7 @@ const ConsumptionPatternReport: React.FC<ConsumptionPatternReportProps> = ({ onB
                 </Card>
               )}
               {forecastData.length > 0 ? (
+                <>
                 <div className="overflow-x-auto">
                   <table className="w-full rounded-lg border border-gray-200 overflow-hidden bg-white" data-testid="table-forecast">
                     <thead className="bg-gray-50">
@@ -721,9 +762,11 @@ const ConsumptionPatternReport: React.FC<ConsumptionPatternReportProps> = ({ onB
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-200">
-                      {forecastData.map((f: any, idx: number) => (
-                        <tr key={f.itemId || idx} className="text-sm" data-testid={`row-forecast-${f.itemId}`}>
-                          <td className="px-3 py-2">{idx + 1}</td>
+                      {paginateItems(forecastData).map((f: any, idx: number) => {
+                        const globalIdx = (currentPage - 1) * pageSize + idx;
+                        return (
+                        <tr key={f.itemId || globalIdx} className="text-sm" data-testid={`row-forecast-${f.itemId}`}>
+                          <td className="px-3 py-2">{globalIdx + 1}</td>
                           <td className="px-3 py-2 font-medium">{f.itemCode}</td>
                           <td className="px-3 py-2">
                             {f.itemName}
@@ -754,10 +797,19 @@ const ConsumptionPatternReport: React.FC<ConsumptionPatternReportProps> = ({ onB
                             {!f.confidenceLevel && <span className="text-gray-400">-</span>}
                           </td>
                         </tr>
-                      ))}
+                        );
+                      })}
                     </tbody>
                   </table>
                 </div>
+                <TablePagination
+                  totalItems={forecastData.length}
+                  pageSize={pageSize}
+                  currentPage={currentPage}
+                  onPageChange={handlePageChange}
+                  onPageSizeChange={handlePageSizeChange}
+                />
+                </>
               ) : (
                 <p className="text-gray-500 text-center py-8">No forecast data available</p>
               )}

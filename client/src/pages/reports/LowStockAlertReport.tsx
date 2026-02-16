@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -35,6 +35,7 @@ import {
   ChevronUp,
   Eye,
 } from "lucide-react";
+import { TablePagination, usePagination } from "@/components/reports/TablePagination";
 import { useQuery } from "@tanstack/react-query";
 import { pdfReportGenerator, formatReportDateRange } from "@/lib/pdfReportGenerator";
 import { useToast } from "@/hooks/use-toast";
@@ -145,6 +146,11 @@ const LowStockAlertReport: React.FC<LowStockAlertReportProps> = ({ onBack, vesse
   const [generatingExcel, setGeneratingExcel] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(false);
   const [viewingSnapshotId, setViewingSnapshotId] = useState<number | null>(null);
+
+  const criticalPagination = usePagination(10);
+  const highPagination = usePagination(10);
+  const mediumPagination = usePagination(10);
+  const allItemsPagination = usePagination(25);
 
   const { data, isLoading, error } = useQuery<LowStockAlertResponse>({
     queryKey: [apiBase, effectiveVesselId, source],
@@ -299,6 +305,13 @@ const LowStockAlertReport: React.FC<LowStockAlertReportProps> = ({ onBack, vesse
   const highPriorityItems = useMemo(() => filteredItems.filter(i => i.priority === 'High'), [filteredItems]);
   const mediumPriorityItems = useMemo(() => filteredItems.filter(i => i.priority === 'Medium'), [filteredItems]);
 
+  useEffect(() => {
+    criticalPagination.resetPage();
+    highPagination.resetPage();
+    mediumPagination.resetPage();
+    allItemsPagination.resetPage();
+  }, [searchQuery, categoryFilter, priorityFilter]);
+
   const handleSort = (field: SortField) => {
     if (sortField === field) {
       setSortDirection(d => (d === 'asc' ? 'desc' : 'asc'));
@@ -428,50 +441,64 @@ const LowStockAlertReport: React.FC<LowStockAlertReportProps> = ({ onBack, vesse
     }
   };
 
-  const renderPriorityTable = (priorityItems: LowStockItem[], label: string) => (
-    <div className="rounded-lg border overflow-hidden bg-white">
-      <div className="overflow-x-auto">
-        <table className="w-full" data-testid={`table-${label.toLowerCase()}`}>
-          <thead>
-            <tr className="bg-gray-50 border-b border-gray-200">
-              <th className="text-left py-3 px-3 font-medium text-xs uppercase text-gray-600">{isSpares ? 'Part Code' : 'Item Code'}</th>
-              <th className="text-left py-3 px-3 font-medium text-xs uppercase text-gray-600">{isSpares ? 'Part Name' : 'Item Name'}</th>
-              <th className="text-left py-3 px-3 font-medium text-xs uppercase text-gray-600">{isSpares ? 'Component' : 'Category'}</th>
-              {!isSpares && <th className="text-left py-3 px-3 font-medium text-xs uppercase text-gray-600">Type</th>}
-              <th className="text-right py-3 px-3 font-medium text-xs uppercase text-gray-600">{isSpares ? 'Current Qty' : 'ROB'}</th>
-              <th className="text-right py-3 px-3 font-medium text-xs uppercase text-gray-600">{isSpares ? 'Min Qty' : 'Min'}</th>
-              <th className="text-right py-3 px-3 font-medium text-xs uppercase text-gray-600">{isSpares ? 'Shortage' : 'Deficit'}</th>
-              {!isSpares && <th className="text-left py-3 px-3 font-medium text-xs uppercase text-gray-600">UOM</th>}
-              {!isSpares && <th className="text-right py-3 px-3 font-medium text-xs uppercase text-gray-600">Avg Monthly</th>}
-              {!isSpares && <th className="text-right py-3 px-3 font-medium text-xs uppercase text-gray-600">Days to Stockout</th>}
-              {!isSpares && <th className="text-right py-3 px-3 font-medium text-xs uppercase text-gray-600">Est. Cost</th>}
-              {!isSpares && <th className="text-left py-3 px-3 font-medium text-xs uppercase text-gray-600">Supplier</th>}
-              {!isSpares && <th className="text-left py-3 px-3 font-medium text-xs uppercase text-gray-600">Lead Time</th>}
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-gray-100">
-            {priorityItems.map(item => (
-              <tr key={item.id} className="hover:bg-gray-50/50 text-sm" data-testid={`row-${label.toLowerCase()}-${item.id}`}>
-                <td className="py-3 px-3 font-mono text-gray-700">{item.itemCode || '-'}</td>
-                <td className="py-3 px-3 font-medium text-gray-900">{item.itemName || '-'}</td>
-                <td className="py-3 px-3 text-gray-600">{item.category || '-'}</td>
-                {!isSpares && <td className="py-3 px-3">{getTypeBadge(item.itemType)}</td>}
-                <td className="py-3 px-3 text-right font-semibold text-gray-900">{item.rob}</td>
-                <td className="py-3 px-3 text-right text-gray-600">{item.minStock}</td>
-                <td className="py-3 px-3 text-right font-semibold text-red-600">{item.deficit}</td>
-                {!isSpares && <td className="py-3 px-3 text-gray-600">{item.uom || '-'}</td>}
-                {!isSpares && <td className="py-3 px-3 text-right text-gray-600">{item.avgMonthlyConsumption}</td>}
-                {!isSpares && <td className="py-3 px-3 text-right">{getDaysUntilStockoutDisplay(item.daysUntilStockout)}</td>}
-                {!isSpares && <td className="py-3 px-3 text-right text-gray-700">{formatCurrency(item.estimatedCost)}</td>}
-                {!isSpares && <td className="py-3 px-3 text-gray-600">{item.supplier || '-'}</td>}
-                {!isSpares && <td className="py-3 px-3 text-gray-600">{item.leadTime || '-'}</td>}
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-    </div>
-  );
+  const renderPriorityTable = (priorityItems: LowStockItem[], label: string, pagination: ReturnType<typeof usePagination>) => {
+    const paginatedItems = pagination.paginateItems(priorityItems);
+    return (
+      <>
+        <div className="rounded-lg border overflow-hidden bg-white">
+          <div className="overflow-x-auto">
+            <table className="w-full" data-testid={`table-${label.toLowerCase()}`}>
+              <thead>
+                <tr className="bg-gray-50 border-b border-gray-200">
+                  <th className="text-left py-3 px-3 font-medium text-xs uppercase text-gray-600">{isSpares ? 'Part Code' : 'Item Code'}</th>
+                  <th className="text-left py-3 px-3 font-medium text-xs uppercase text-gray-600">{isSpares ? 'Part Name' : 'Item Name'}</th>
+                  <th className="text-left py-3 px-3 font-medium text-xs uppercase text-gray-600">{isSpares ? 'Component' : 'Category'}</th>
+                  {!isSpares && <th className="text-left py-3 px-3 font-medium text-xs uppercase text-gray-600">Type</th>}
+                  <th className="text-right py-3 px-3 font-medium text-xs uppercase text-gray-600">{isSpares ? 'Current Qty' : 'ROB'}</th>
+                  <th className="text-right py-3 px-3 font-medium text-xs uppercase text-gray-600">{isSpares ? 'Min Qty' : 'Min'}</th>
+                  <th className="text-right py-3 px-3 font-medium text-xs uppercase text-gray-600">{isSpares ? 'Shortage' : 'Deficit'}</th>
+                  {!isSpares && <th className="text-left py-3 px-3 font-medium text-xs uppercase text-gray-600">UOM</th>}
+                  {!isSpares && <th className="text-right py-3 px-3 font-medium text-xs uppercase text-gray-600">Avg Monthly</th>}
+                  {!isSpares && <th className="text-right py-3 px-3 font-medium text-xs uppercase text-gray-600">Days to Stockout</th>}
+                  {!isSpares && <th className="text-right py-3 px-3 font-medium text-xs uppercase text-gray-600">Est. Cost</th>}
+                  {!isSpares && <th className="text-left py-3 px-3 font-medium text-xs uppercase text-gray-600">Supplier</th>}
+                  {!isSpares && <th className="text-left py-3 px-3 font-medium text-xs uppercase text-gray-600">Lead Time</th>}
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-100">
+                {paginatedItems.map(item => (
+                  <tr key={item.id} className="hover:bg-gray-50/50 text-sm" data-testid={`row-${label.toLowerCase()}-${item.id}`}>
+                    <td className="py-3 px-3 font-mono text-gray-700">{item.itemCode || '-'}</td>
+                    <td className="py-3 px-3 font-medium text-gray-900">{item.itemName || '-'}</td>
+                    <td className="py-3 px-3 text-gray-600">{item.category || '-'}</td>
+                    {!isSpares && <td className="py-3 px-3">{getTypeBadge(item.itemType)}</td>}
+                    <td className="py-3 px-3 text-right font-semibold text-gray-900">{item.rob}</td>
+                    <td className="py-3 px-3 text-right text-gray-600">{item.minStock}</td>
+                    <td className="py-3 px-3 text-right font-semibold text-red-600">{item.deficit}</td>
+                    {!isSpares && <td className="py-3 px-3 text-gray-600">{item.uom || '-'}</td>}
+                    {!isSpares && <td className="py-3 px-3 text-right text-gray-600">{item.avgMonthlyConsumption}</td>}
+                    {!isSpares && <td className="py-3 px-3 text-right">{getDaysUntilStockoutDisplay(item.daysUntilStockout)}</td>}
+                    {!isSpares && <td className="py-3 px-3 text-right text-gray-700">{formatCurrency(item.estimatedCost)}</td>}
+                    {!isSpares && <td className="py-3 px-3 text-gray-600">{item.supplier || '-'}</td>}
+                    {!isSpares && <td className="py-3 px-3 text-gray-600">{item.leadTime || '-'}</td>}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+        {priorityItems.length > pagination.pageSize && (
+          <TablePagination
+            totalItems={priorityItems.length}
+            pageSize={pagination.pageSize}
+            currentPage={pagination.currentPage}
+            onPageChange={pagination.handlePageChange}
+            onPageSizeChange={pagination.handlePageSizeChange}
+          />
+        )}
+      </>
+    );
+  };
 
   if (!effectiveVesselId) {
     return (
@@ -669,7 +696,7 @@ const LowStockAlertReport: React.FC<LowStockAlertReportProps> = ({ onBack, vesse
                 <CardDescription className="text-red-600">These items are completely depleted and require immediate ordering</CardDescription>
               </CardHeader>
               <CardContent>
-                {renderPriorityTable(criticalItems, 'critical')}
+                {renderPriorityTable(criticalItems, 'critical', criticalPagination)}
               </CardContent>
             </Card>
           )}
@@ -684,7 +711,7 @@ const LowStockAlertReport: React.FC<LowStockAlertReportProps> = ({ onBack, vesse
                 <CardDescription className="text-orange-600">These items need to be ordered soon</CardDescription>
               </CardHeader>
               <CardContent>
-                {renderPriorityTable(highPriorityItems, 'high')}
+                {renderPriorityTable(highPriorityItems, 'high', highPagination)}
               </CardContent>
             </Card>
           )}
@@ -699,7 +726,7 @@ const LowStockAlertReport: React.FC<LowStockAlertReportProps> = ({ onBack, vesse
                 <CardDescription className="text-yellow-600">These items are below minimum but not critical yet</CardDescription>
               </CardHeader>
               <CardContent>
-                {renderPriorityTable(mediumPriorityItems, 'medium')}
+                {renderPriorityTable(mediumPriorityItems, 'medium', mediumPagination)}
               </CardContent>
             </Card>
           )}
@@ -745,7 +772,7 @@ const LowStockAlertReport: React.FC<LowStockAlertReportProps> = ({ onBack, vesse
                           </td>
                         </tr>
                       ) : (
-                        sortedItems.map(item => (
+                        allItemsPagination.paginateItems(sortedItems).map(item => (
                           <tr
                             key={item.id}
                             className={`hover:bg-gray-50 text-sm ${
@@ -796,9 +823,13 @@ const LowStockAlertReport: React.FC<LowStockAlertReportProps> = ({ onBack, vesse
                 </div>
               </div>
               {sortedItems.length > 0 && (
-                <div className="flex items-center justify-between mt-4 text-sm text-gray-500">
-                  <span>Showing {sortedItems.length} of {items.length} items</span>
-                </div>
+                <TablePagination
+                  totalItems={sortedItems.length}
+                  pageSize={allItemsPagination.pageSize}
+                  currentPage={allItemsPagination.currentPage}
+                  onPageChange={allItemsPagination.handlePageChange}
+                  onPageSizeChange={allItemsPagination.handlePageSizeChange}
+                />
               )}
             </CardContent>
           </Card>

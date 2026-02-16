@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -29,6 +29,7 @@ import { pdfReportGenerator, formatReportDateRange } from "@/lib/pdfReportGenera
 import { useToast } from "@/hooks/use-toast";
 import { useVessel } from "@/contexts/VesselContext";
 import { format } from "date-fns";
+import { TablePagination, usePagination } from "@/components/reports/TablePagination";
 
 interface ChemicalItem {
   id: number;
@@ -177,6 +178,11 @@ const ChemicalsExpiryReport: React.FC<ChemicalsExpiryReportProps> = ({ onBack, v
   const [sortField, setSortField] = useState<SortField>('itemCode');
   const [sortDirection, setSortDirection] = useState<SortDirection>('asc');
   const [generatingPdf, setGeneratingPdf] = useState(false);
+  const { currentPage, pageSize, handlePageChange, handlePageSizeChange, resetPage, paginateItems } = usePagination(25);
+
+  useEffect(() => {
+    resetPage();
+  }, [searchQuery, expiryFilter, hazardFilter, stockFilter]);
 
   const { data, isLoading, error } = useQuery<ChemicalsExpiryResponse>({
     queryKey: [`/technical/api/reports/chemicals-expiry/${effectiveVesselId}`],
@@ -662,7 +668,7 @@ const ChemicalsExpiryReport: React.FC<ChemicalsExpiryReportProps> = ({ onBack, v
                           </td>
                         </tr>
                       ) : (
-                        sortedItems.map(item => {
+                        paginateItems(sortedItems).map((item, idx) => {
                           const rob = parseFloat(String(item.rob)) || 0;
                           const min = parseFloat(String(item.min)) || 0;
                           return (
@@ -712,9 +718,13 @@ const ChemicalsExpiryReport: React.FC<ChemicalsExpiryReportProps> = ({ onBack, v
                 </div>
               </div>
               {sortedItems.length > 0 && (
-                <div className="flex items-center justify-between mt-4 text-sm text-gray-500">
-                  <span>Showing {sortedItems.length} of {items.length} chemicals</span>
-                </div>
+                <TablePagination
+                  totalItems={sortedItems.length}
+                  pageSize={pageSize}
+                  currentPage={currentPage}
+                  onPageChange={handlePageChange}
+                  onPageSizeChange={handlePageSizeChange}
+                />
               )}
             </CardContent>
           </Card>

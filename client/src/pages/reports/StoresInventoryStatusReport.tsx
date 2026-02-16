@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { Card, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -30,6 +30,7 @@ import { useQuery } from "@tanstack/react-query";
 import { pdfReportGenerator, formatReportDateRange } from "@/lib/pdfReportGenerator";
 import { useToast } from "@/hooks/use-toast";
 import { useVessel } from "@/contexts/VesselContext";
+import { TablePagination, usePagination } from "@/components/reports/TablePagination";
 
 interface StoresItem {
   id: number;
@@ -120,6 +121,11 @@ const StoresInventoryStatusReport: React.FC<StoresInventoryStatusReportProps> = 
   const [sortField, setSortField] = useState<SortField>('itemCode');
   const [sortDirection, setSortDirection] = useState<SortDirection>('asc');
   const [generatingPdf, setGeneratingPdf] = useState(false);
+  const { currentPage, pageSize, handlePageChange, handlePageSizeChange, resetPage, paginateItems } = usePagination(25);
+
+  useEffect(() => {
+    resetPage();
+  }, [searchQuery, statusFilter, categoryTab, activeTab]);
 
   const { data: rawStoresItems = [], isLoading: loadingItems, error: errorItems } = useQuery<StoresItem[]>({
     queryKey: [`/technical/api/stores/${effectiveVesselId}`],
@@ -738,7 +744,8 @@ const StoresInventoryStatusReport: React.FC<StoresInventoryStatusReportProps> = 
                         </td>
                       </tr>
                     ) : (
-                      sortedStockItems.map((item, idx) => {
+                      paginateItems(sortedStockItems).map((item, idx) => {
+                        const globalIdx = (currentPage - 1) * pageSize + idx;
                         const rob = parseFloat(String(item.rob)) || 0;
                         const min = parseFloat(String(item.min)) || 0;
                         const status = getStockStatus(rob, min);
@@ -751,7 +758,7 @@ const StoresInventoryStatusReport: React.FC<StoresInventoryStatusReportProps> = 
                             }`}
                             data-testid={`row-stock-${item.id}`}
                           >
-                            <td className="py-3 px-3 text-center text-sm text-gray-500">{idx + 1}</td>
+                            <td className="py-3 px-3 text-center text-sm text-gray-500">{globalIdx + 1}</td>
                             <td className="py-3 px-3 text-sm text-gray-700 font-mono">{item.itemCode || '-'}</td>
                             <td className="py-3 px-3">
                               <div className="font-medium text-gray-900 text-sm">{item.itemName || '-'}</div>
@@ -775,6 +782,16 @@ const StoresInventoryStatusReport: React.FC<StoresInventoryStatusReportProps> = 
                 </table>
               </div>
             </div>
+          )}
+
+          {activeTab === 'stock-status' && sortedStockItems.length > 0 && (
+            <TablePagination
+              totalItems={sortedStockItems.length}
+              pageSize={pageSize}
+              currentPage={currentPage}
+              onPageChange={handlePageChange}
+              onPageSizeChange={handlePageSizeChange}
+            />
           )}
 
           {activeTab === 'consumption' && (
@@ -803,13 +820,15 @@ const StoresInventoryStatusReport: React.FC<StoresInventoryStatusReportProps> = 
                         </td>
                       </tr>
                     ) : (
-                      consumptionItems.map((item, idx) => (
+                      paginateItems(consumptionItems).map((item, idx) => {
+                        const globalIdx = (currentPage - 1) * pageSize + idx;
+                        return (
                         <tr
                           key={item.id}
                           className="hover:bg-gray-50"
                           data-testid={`row-consumption-${item.id}`}
                         >
-                          <td className="py-3 px-3 text-center text-sm text-gray-500">{idx + 1}</td>
+                          <td className="py-3 px-3 text-center text-sm text-gray-500">{globalIdx + 1}</td>
                           <td className="py-3 px-3 text-sm text-gray-700 font-mono">{item.itemCode || '-'}</td>
                           <td className="py-3 px-3">
                             <div className="font-medium text-gray-900 text-sm">{item.itemName || '-'}</div>
@@ -820,12 +839,23 @@ const StoresInventoryStatusReport: React.FC<StoresInventoryStatusReportProps> = 
                           <td className="py-3 px-3 text-right text-sm text-gray-700">{item.avgMonthly.toFixed(2)}</td>
                           <td className="py-3 px-3">{getTrendBadge(item.trend)}</td>
                         </tr>
-                      ))
+                        );
+                      })
                     )}
                   </tbody>
                 </table>
               </div>
             </div>
+          )}
+
+          {activeTab === 'consumption' && consumptionItems.length > 0 && (
+            <TablePagination
+              totalItems={consumptionItems.length}
+              pageSize={pageSize}
+              currentPage={currentPage}
+              onPageChange={handlePageChange}
+              onPageSizeChange={handlePageSizeChange}
+            />
           )}
 
           {activeTab === 'reorder' && (
@@ -855,7 +885,9 @@ const StoresInventoryStatusReport: React.FC<StoresInventoryStatusReportProps> = 
                         </td>
                       </tr>
                     ) : (
-                      reorderItems.map((item, idx) => (
+                      paginateItems(reorderItems).map((item, idx) => {
+                        const globalIdx = (currentPage - 1) * pageSize + idx;
+                        return (
                         <tr
                           key={item.id}
                           className={`hover:bg-gray-50 ${
@@ -864,7 +896,7 @@ const StoresInventoryStatusReport: React.FC<StoresInventoryStatusReportProps> = 
                           }`}
                           data-testid={`row-reorder-${item.id}`}
                         >
-                          <td className="py-3 px-3 text-center text-sm text-gray-500">{idx + 1}</td>
+                          <td className="py-3 px-3 text-center text-sm text-gray-500">{globalIdx + 1}</td>
                           <td className="py-3 px-3 text-sm text-gray-700 font-mono">{item.itemCode || '-'}</td>
                           <td className="py-3 px-3">
                             <div className="font-medium text-gray-900 text-sm">{item.itemName || '-'}</div>
@@ -876,7 +908,8 @@ const StoresInventoryStatusReport: React.FC<StoresInventoryStatusReportProps> = 
                           <td className="py-3 px-3">{getPriorityBadge(item.priority)}</td>
                           <td className="py-3 px-3 text-right text-sm font-semibold text-gray-900">{item.suggestedQty.toFixed(1)}</td>
                         </tr>
-                      ))
+                        );
+                      })
                     )}
                   </tbody>
                 </table>
@@ -884,16 +917,15 @@ const StoresInventoryStatusReport: React.FC<StoresInventoryStatusReportProps> = 
             </div>
           )}
 
-          {(() => {
-            const count = activeTab === 'stock-status' ? sortedStockItems.length :
-                          activeTab === 'consumption' ? consumptionItems.length :
-                          reorderItems.length;
-            return count > 0 ? (
-              <div className="flex items-center justify-between mt-4 text-sm text-gray-500">
-                <span>Showing {count} items</span>
-              </div>
-            ) : null;
-          })()}
+          {activeTab === 'reorder' && reorderItems.length > 0 && (
+            <TablePagination
+              totalItems={reorderItems.length}
+              pageSize={pageSize}
+              currentPage={currentPage}
+              onPageChange={handlePageChange}
+              onPageSizeChange={handlePageSizeChange}
+            />
+          )}
         </>
       )}
     </div>
