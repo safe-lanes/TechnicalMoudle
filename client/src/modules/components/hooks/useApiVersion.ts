@@ -40,7 +40,9 @@ export function useApiVersion() {
              key.startsWith('/technical/api/v2/work-orders') ||
              key.startsWith('/technical/api/spares') ||
              key.startsWith('/technical/api/v2/spares') ||
-             key.startsWith('/technical/api/inventory/spares-with-inventory');
+             key.startsWith('/technical/api/inventory/spares-with-inventory') ||
+             key.startsWith('/technical/api/vessels') ||
+             key.startsWith('/technical/api/v2/vessels');
     }});
   }, [mode]);
 

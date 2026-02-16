@@ -4,6 +4,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { queryClient, apiRequest } from "@/lib/queryClient";
+import { useApiVersion } from "@/modules/components/hooks/useApiVersion";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -82,6 +83,8 @@ type VesselAssignmentData = z.infer<typeof vesselAssignmentSchema>;
 
 export default function FleetVesselManager() {
   const { toast } = useToast();
+  const { isV2 } = useApiVersion();
+  const vesselApiBase = isV2 ? '/technical/api/v2/vessels' : '/technical/api/vessels';
   const [isFleetDialogOpen, setIsFleetDialogOpen] = useState(false);
   const [isVesselDialogOpen, setIsVesselDialogOpen] = useState(false);
   const [editingFleet, setEditingFleet] = useState<Fleet | null>(null);
@@ -120,8 +123,9 @@ export default function FleetVesselManager() {
     queryKey: ["/technical/api/fleets"],
   });
 
+  const vesselsWithFleetsUrl = isV2 ? `${vesselApiBase}/with-fleets` : '/technical/api/vessels-with-fleets';
   const { data: vessels = [], isLoading: isVesselsLoading } = useQuery<VesselWithFleet[]>({
-    queryKey: ["/technical/api/vessels-with-fleets"],
+    queryKey: [vesselsWithFleetsUrl],
   });
 
   const createFleetMutation = useMutation({
@@ -145,7 +149,7 @@ export default function FleetVesselManager() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/technical/api/fleets"] });
-      queryClient.invalidateQueries({ queryKey: ["/technical/api/vessels-with-fleets"] });
+      queryClient.invalidateQueries({ queryKey: [vesselsWithFleetsUrl] });
       toast({ title: "Fleet updated successfully" });
       setIsFleetDialogOpen(false);
       setEditingFleet(null);
@@ -171,7 +175,7 @@ export default function FleetVesselManager() {
 
   const createVesselMutation = useMutation({
     mutationFn: async (data: VesselFormData) => {
-      return await apiRequest("POST", "/technical/api/vessels", {
+      return await apiRequest("POST", vesselApiBase, {
         ...data,
         code: data.code || data.id,
         fleetId: data.fleetId || null,
@@ -181,8 +185,10 @@ export default function FleetVesselManager() {
       });
     },
     onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [vesselApiBase] });
+      queryClient.invalidateQueries({ queryKey: [vesselsWithFleetsUrl] });
       queryClient.invalidateQueries({ queryKey: ["/technical/api/vessels"] });
-      queryClient.invalidateQueries({ queryKey: ["/technical/api/vessels-with-fleets"] });
+      queryClient.invalidateQueries({ queryKey: ["/technical/api/v2/vessels"] });
       toast({ title: "Vessel created successfully" });
       setIsVesselDialogOpen(false);
       vesselForm.reset();
@@ -194,11 +200,13 @@ export default function FleetVesselManager() {
 
   const updateVesselFleetMutation = useMutation({
     mutationFn: async ({ id, fleetId }: { id: string; fleetId: string | null }) => {
-      return await apiRequest("PUT", `/technical/api/vessels/${id}/fleet`, { fleetId });
+      return await apiRequest("PUT", `${vesselApiBase}/${id}/fleet`, { fleetId });
     },
     onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [vesselApiBase] });
+      queryClient.invalidateQueries({ queryKey: [vesselsWithFleetsUrl] });
       queryClient.invalidateQueries({ queryKey: ["/technical/api/vessels"] });
-      queryClient.invalidateQueries({ queryKey: ["/technical/api/vessels-with-fleets"] });
+      queryClient.invalidateQueries({ queryKey: ["/technical/api/v2/vessels"] });
       toast({ title: "Vessel assignment updated successfully" });
       setIsVesselDialogOpen(false);
       setEditingVessel(null);

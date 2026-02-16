@@ -1,4 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
+import { getApiMode } from "@/modules/components/api/componentApiV2";
 
 const BASE_URL = "https://dev.sl-sail.com/b/api/v1/crewmasterdata/getallmasterdata";
 
@@ -7,10 +8,12 @@ interface UseExternalDataOptions {
 }
 
 export const useLocalVessels = (options?: UseExternalDataOptions) => {
+  const isV2 = getApiMode() === 'v2';
+  const url = isV2 ? '/technical/api/v2/vessels' : '/technical/api/vessels';
   return useQuery({
-    queryKey: ['/technical/api/vessels'],
+    queryKey: [url],
     queryFn: async () => {
-      const response = await fetch('/technical/api/vessels', {
+      const response = await fetch(url, {
         method: 'GET',
         headers: { 'accept': 'application/json' },
         credentials: 'include',
