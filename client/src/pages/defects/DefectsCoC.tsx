@@ -805,7 +805,7 @@ export default function DefectsCoC() {
               columnDefs={columnDefs}
               onGridReady={onGridReady}
               enableSideBar={true}
-              enableStatusBar={true}
+              enableStatusBar={false}
               enableRowGrouping={true}
               height="100%"
               getRowId={(params) => params.data?.id || ''}

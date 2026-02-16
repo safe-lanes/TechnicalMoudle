@@ -310,6 +310,8 @@ export default function DefectsLogWithTabs() {
     defectId: null 
   });
   const [showFilters, setShowFilters] = useState(true);
+  const [currentPage, setCurrentPage] = useState(1);
+  const pageSize = 100;
   const [deleteDialog, setDeleteDialog] = useState<{ open: boolean; defect: Defect | null }>({
     open: false,
     defect: null
@@ -510,6 +512,18 @@ export default function DefectsLogWithTabs() {
     
     return result;
   }, [defects, selectedVesselNames, filters.periodValue, filters.dueOverdue]);
+
+  const totalDefects = filteredDefects.length;
+  const totalPages = Math.max(1, Math.ceil(totalDefects / pageSize));
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [filteredDefects]);
+
+  const paginatedDefects = useMemo(() => {
+    const startIndex = (currentPage - 1) * pageSize;
+    return filteredDefects.slice(startIndex, startIndex + pageSize);
+  }, [filteredDefects, currentPage, pageSize]);
   
   const canEdit = () => {
     const role = currentUser?.role || '';
@@ -871,11 +885,11 @@ export default function DefectsLogWithTabs() {
           <>
             <div className="flex-1 min-h-0">
               <AgGridTable
-                rowData={filteredDefects}
+                rowData={paginatedDefects}
                 columnDefs={columnDefs}
                 onGridReady={onGridReady}
                 enableSideBar={true}
-                enableStatusBar={true}
+                enableStatusBar={false}
                 enableRowGrouping={true}
                 height="100%"
                 gridOptions={{
@@ -895,14 +909,50 @@ export default function DefectsLogWithTabs() {
               />
             </div>
             
-            <div className="flex-shrink-0 py-2">
-              <AgGridTableActions
-                gridApi={gridApi}
-                exportFilename="defects_log"
-                showExportButtons={true}
-                showFilterButtons={true}
-                showGroupButtons={true}
-              />
+            <div className="bg-white border-t border-gray-200 px-4 py-3 flex justify-between items-center flex-shrink-0 flex-wrap gap-2" style={{ marginTop: '-1px' }}>
+              <div className="text-xs font-normal text-black" data-testid="text-defects-pagination-info">
+                {totalDefects > 0 ? (
+                  <>Showing {((currentPage - 1) * pageSize) + 1}-{Math.min(currentPage * pageSize, totalDefects)} of {totalDefects}</>
+                ) : (
+                  <>Rows: 0</>
+                )}
+              </div>
+
+              {totalPages > 1 && (
+                <div className="flex items-center gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                    disabled={currentPage === 1}
+                    data-testid="button-defects-prev-page"
+                  >
+                    Previous
+                  </Button>
+                  <span className="text-xs text-gray-600" data-testid="text-defects-page-info">
+                    Page {currentPage} of {totalPages}
+                  </span>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                    disabled={currentPage === totalPages}
+                    data-testid="button-defects-next-page"
+                  >
+                    Next
+                  </Button>
+                </div>
+              )}
+
+              <div>
+                <AgGridTableActions
+                  gridApi={gridApi}
+                  exportFilename="defects_log"
+                  showExportButtons={true}
+                  showFilterButtons={true}
+                  showGroupButtons={true}
+                />
+              </div>
             </div>
           </>
         )}
