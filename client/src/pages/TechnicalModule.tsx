@@ -119,7 +119,7 @@ export const TechnicalModule = () => {
         onSubModuleChange={handleSubModuleChange}
       />
       
-      <div className="flex min-h-[calc(100vh-68px)]">
+      <div className="flex h-[calc(100vh-68px)] overflow-hidden">
         {/* Sidebar column with continuous dark blue background - wrapper provides full-height color */}
         <div className="w-20 min-w-[80px] flex-shrink-0 bg-[#16569e]">
           <SideMenuBar 
@@ -130,7 +130,7 @@ export const TechnicalModule = () => {
         </div>
         
         {/* Main Content Area */}
-        <div className="flex-1 p-6">
+        <div className="flex-1 p-6 min-h-0 overflow-auto">
           {selectedSubModule === "pms" && selectedMenuItem === "dashboard" ? (
             <Dashboard />
           ) : selectedSubModule === "pms" && selectedMenuItem === "components" ? (
