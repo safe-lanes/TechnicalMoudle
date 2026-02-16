@@ -1034,4 +1034,122 @@ router.get('/dashboard-stats', async (req, res) => {
   }
 });
 
+// ============================================================
+// COPY VESSEL - Replicate mapping data from one vessel to another
+// ============================================================
+router.post('/copy-vessel', async (req, res) => {
+  try {
+    const copySchema = z.object({
+      sourceVesselCode: z.string().min(1, "Source vessel code is required"),
+      targetVesselCode: z.string().min(1, "Target vessel code is required"),
+      targetVesselName: z.string().optional(),
+      copyComponents: z.boolean().default(true),
+      copyJobs: z.boolean().default(true),
+      copySpares: z.boolean().default(true),
+      mappedBy: z.string().default("system"),
+    });
+
+    const data = copySchema.parse(req.body);
+
+    if (data.sourceVesselCode === data.targetVesselCode) {
+      return res.status(400).json({ error: 'Source and target vessel cannot be the same' });
+    }
+
+    const results = { components: 0, jobs: 0, spares: 0, errors: [] as string[] };
+
+    if (data.copyComponents) {
+      const sourceMappings = await storage.getFleetComponentMappingsByVessel(data.sourceVesselCode);
+      const existingTarget = await storage.getFleetComponentMappingsByVessel(data.targetVesselCode);
+      const existingKeys = new Set(existingTarget.map((m: any) => `${m.fleetEquipmentCode}|${m.componentCode}`));
+
+      for (const mapping of sourceMappings) {
+        const key = `${mapping.fleetEquipmentCode}|${mapping.componentCode}`;
+        if (!existingKeys.has(key)) {
+          try {
+            await storage.createFleetComponentMappingRecord({
+              fleetEquipmentCode: mapping.fleetEquipmentCode,
+              vesselCode: data.targetVesselCode,
+              componentCode: mapping.componentCode,
+              componentId: mapping.componentId,
+              componentName: mapping.componentName,
+              mappedBy: data.mappedBy,
+              isActive: true,
+            });
+            results.components++;
+          } catch (e) {
+            // Skip duplicates from unique constraint
+          }
+        }
+      }
+    }
+
+    if (data.copyJobs) {
+      const sourceJobMappings = await storage.getFleetJobVesselMappings(undefined, undefined);
+      const sourceFiltered = sourceJobMappings.filter((m: any) => m.vesselCode === data.sourceVesselCode && m.isActive);
+      const existingTargetJobs = sourceJobMappings.filter((m: any) => m.vesselCode === data.targetVesselCode && m.isActive);
+      const existingJobKeys = new Set(existingTargetJobs.map((m: any) => `${m.jobCode}|${m.fleetEquipmentCode}`));
+
+      for (const mapping of sourceFiltered) {
+        const key = `${mapping.jobCode}|${mapping.fleetEquipmentCode}`;
+        if (!existingJobKeys.has(key)) {
+          try {
+            await storage.createFleetJobVesselMappingRecord({
+              fleetEquipmentCode: mapping.fleetEquipmentCode,
+              jobCode: mapping.jobCode,
+              jobId: mapping.jobId,
+              vesselCode: data.targetVesselCode,
+              vesselName: data.targetVesselName || mapping.vesselName,
+              mappedBy: data.mappedBy,
+              isActive: true,
+            });
+            results.jobs++;
+          } catch (e) {
+            // Skip duplicates from unique constraint
+          }
+        }
+      }
+    }
+
+    if (data.copySpares) {
+      const allSpareMappings = await storage.getFleetSpareVesselMappings();
+      const sourceSpares = allSpareMappings.filter((m: any) => m.vesselCode === data.sourceVesselCode && m.isActive);
+      const existingTargetSpares = allSpareMappings.filter((m: any) => m.vesselCode === data.targetVesselCode && m.isActive);
+      const existingSpareKeys = new Set(existingTargetSpares.map((m: any) => `${m.partCode}|${m.fleetEquipmentCode}`));
+
+      for (const mapping of sourceSpares) {
+        const key = `${mapping.partCode}|${mapping.fleetEquipmentCode}`;
+        if (!existingSpareKeys.has(key)) {
+          try {
+            await storage.createFleetSpareVesselMappingRecord({
+              fleetEquipmentCode: mapping.fleetEquipmentCode,
+              partCode: mapping.partCode,
+              spareId: mapping.spareId,
+              vesselCode: data.targetVesselCode,
+              vesselName: data.targetVesselName || mapping.vesselName,
+              mappedBy: data.mappedBy,
+              isActive: true,
+            });
+            results.spares++;
+          } catch (e) {
+            // Skip duplicates from unique constraint
+          }
+        }
+      }
+    }
+
+    const totalCopied = results.components + results.jobs + results.spares;
+    res.json({
+      success: true,
+      message: `Vessel data successfully replicated. ${totalCopied} mapping(s) copied.`,
+      results,
+    });
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({ error: 'Validation failed', details: error.errors });
+    }
+    console.error('Error copying vessel data:', error);
+    res.status(500).json({ error: 'Failed to copy vessel data' });
+  }
+});
+
 export default router;

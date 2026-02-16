@@ -46,7 +46,9 @@ import {
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
-import { Plus, Pencil, Trash2, Ship, Anchor, Building2, ArrowLeft } from "lucide-react";
+import { Plus, Pencil, Trash2, Ship, Anchor, Building2, ArrowLeft, Copy, CheckCircle2, AlertTriangle } from "lucide-react";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Label } from "@/components/ui/label";
 import type { Fleet, Vessel } from "@shared/schema";
 
 interface VesselWithFleet extends Vessel {
@@ -84,8 +86,14 @@ export default function FleetVesselManager({ onBack }: { onBack?: () => void }) 
   const { toast } = useToast();
   const [isFleetDialogOpen, setIsFleetDialogOpen] = useState(false);
   const [isVesselDialogOpen, setIsVesselDialogOpen] = useState(false);
+  const [isCopyVesselDialogOpen, setIsCopyVesselDialogOpen] = useState(false);
   const [editingFleet, setEditingFleet] = useState<Fleet | null>(null);
   const [editingVessel, setEditingVessel] = useState<Vessel | null>(null);
+  const [copySourceVessel, setCopySourceVessel] = useState("");
+  const [copyTargetVessel, setCopyTargetVessel] = useState("");
+  const [copyModules, setCopyModules] = useState({ components: true, jobs: true, spares: true });
+  const [copyStep, setCopyStep] = useState<"select" | "confirm" | "result">("select");
+  const [copyResult, setCopyResult] = useState<{ components: number; jobs: number; spares: number } | null>(null);
 
   const fleetForm = useForm<FleetFormData>({
     resolver: zodResolver(fleetFormSchema),
@@ -209,6 +217,56 @@ export default function FleetVesselManager({ onBack }: { onBack?: () => void }) 
     },
   });
 
+  const copyVesselMutation = useMutation({
+    mutationFn: async (data: {
+      sourceVesselCode: string;
+      targetVesselCode: string;
+      targetVesselName?: string;
+      copyComponents: boolean;
+      copyJobs: boolean;
+      copySpares: boolean;
+    }) => {
+      return await apiRequest("POST", "/technical/api/fleet-admin/copy-vessel", data);
+    },
+    onSuccess: async (response: any) => {
+      const result = await response.json();
+      setCopyResult(result.results);
+      setCopyStep("result");
+      queryClient.invalidateQueries({ queryKey: ["/technical/api/fleet-admin"] });
+      queryClient.invalidateQueries({ queryKey: ["/technical/api/vessels-with-fleets"] });
+      toast({ title: "Vessel data successfully replicated" });
+    },
+    onError: (error: any) => {
+      toast({ title: "Error copying vessel data", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const handleOpenCopyDialog = () => {
+    setCopySourceVessel("");
+    setCopyTargetVessel("");
+    setCopyModules({ components: true, jobs: true, spares: true });
+    setCopyStep("select");
+    setCopyResult(null);
+    setIsCopyVesselDialogOpen(true);
+  };
+
+  const handleConfirmCopy = () => {
+    const targetVessel = allVessels.find((v) => (v.code || v.id) === copyTargetVessel);
+    copyVesselMutation.mutate({
+      sourceVesselCode: copySourceVessel,
+      targetVesselCode: copyTargetVessel,
+      targetVesselName: targetVessel?.name,
+      copyComponents: copyModules.components,
+      copyJobs: copyModules.jobs,
+      copySpares: copyModules.spares,
+    });
+  };
+
+  const allVessels = vessels;
+  const sourceVesselName = allVessels.find((v) => (v.code || v.id) === copySourceVessel)?.name || "";
+  const targetVesselName = allVessels.find((v) => (v.code || v.id) === copyTargetVessel)?.name || "";
+  const canProceedToConfirm = copySourceVessel && copyTargetVessel && copySourceVessel !== copyTargetVessel && (copyModules.components || copyModules.jobs || copyModules.spares);
+
   const handleCreateFleet = () => {
     setEditingFleet(null);
     fleetForm.reset({ code: "", name: "", description: "" });
@@ -310,6 +368,14 @@ export default function FleetVesselManager({ onBack }: { onBack?: () => void }) 
       </div>
       <div className="flex items-center justify-end">
         <div className="flex gap-2">
+          <Button
+            onClick={handleOpenCopyDialog}
+            variant="outline"
+            data-testid="button-copy-vessel"
+          >
+            <Copy className="h-4 w-4 mr-2" />
+            Copy Vessel
+          </Button>
           <Button
             onClick={() => handleCreateVessel()}
             variant="outline"
@@ -755,6 +821,167 @@ export default function FleetVesselManager({ onBack }: { onBack?: () => void }) 
               </form>
             </Form>
           )}
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={isCopyVesselDialogOpen} onOpenChange={(open) => { if (!open) { setIsCopyVesselDialogOpen(false); } }}>
+        <DialogContent className="p-0 gap-0" style={{ width: "480px", maxWidth: "90vw" }}>
+          <div className="bg-gradient-to-r from-cyan-600 to-blue-600 px-5 py-3 rounded-t-lg">
+            <div className="flex items-center gap-2">
+              <Copy className="h-4 w-4 text-white" />
+              <h3 className="text-white font-semibold text-sm">Copy Vessel Configuration</h3>
+            </div>
+            <p className="text-cyan-100 text-xs mt-0.5">Replicate mapping data from one vessel to another</p>
+          </div>
+
+          <div className="p-5 space-y-5">
+            {copyStep === "select" && (
+              <>
+                <div className="space-y-3">
+                  <div className="space-y-1.5">
+                    <Label className="text-xs font-medium text-gray-600">Source Vessel</Label>
+                    <Select value={copySourceVessel} onValueChange={(v) => { setCopySourceVessel(v); if (v === copyTargetVessel) setCopyTargetVessel(""); }}>
+                      <SelectTrigger data-testid="select-copy-source-vessel">
+                        <SelectValue placeholder="Select source vessel..." />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {allVessels.map((v) => (
+                          <SelectItem key={v.id} value={v.code || v.id}>{v.name} {v.code ? `(${v.code})` : ""}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <Label className="text-xs font-medium text-gray-600">Target Vessel</Label>
+                    <Select value={copyTargetVessel} onValueChange={setCopyTargetVessel}>
+                      <SelectTrigger data-testid="select-copy-target-vessel">
+                        <SelectValue placeholder="Select target vessel..." />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {allVessels.filter((v) => (v.code || v.id) !== copySourceVessel).map((v) => (
+                          <SelectItem key={v.id} value={v.code || v.id}>{v.name} {v.code ? `(${v.code})` : ""}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    {copySourceVessel && copyTargetVessel && copySourceVessel === copyTargetVessel && (
+                      <p className="text-xs text-red-500 flex items-center gap-1"><AlertTriangle className="h-3 w-3" /> Source and target cannot be the same</p>
+                    )}
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <Label className="text-xs font-medium text-gray-600">Data Scope</Label>
+                  <div className="space-y-2 pl-1">
+                    <div className="flex items-center gap-2">
+                      <Checkbox
+                        id="copy-components"
+                        checked={copyModules.components}
+                        onCheckedChange={(c) => setCopyModules((p) => ({ ...p, components: !!c }))}
+                        data-testid="checkbox-copy-components"
+                      />
+                      <Label htmlFor="copy-components" className="text-sm cursor-pointer">Components Mapping</Label>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Checkbox
+                        id="copy-jobs"
+                        checked={copyModules.jobs}
+                        onCheckedChange={(c) => setCopyModules((p) => ({ ...p, jobs: !!c }))}
+                        data-testid="checkbox-copy-jobs"
+                      />
+                      <Label htmlFor="copy-jobs" className="text-sm cursor-pointer">Jobs Mapping</Label>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Checkbox
+                        id="copy-spares"
+                        checked={copyModules.spares}
+                        onCheckedChange={(c) => setCopyModules((p) => ({ ...p, spares: !!c }))}
+                        data-testid="checkbox-copy-spares"
+                      />
+                      <Label htmlFor="copy-spares" className="text-sm cursor-pointer">Spares Mapping</Label>
+                    </div>
+                  </div>
+                </div>
+
+                <DialogFooter>
+                  <Button variant="outline" onClick={() => setIsCopyVesselDialogOpen(false)} data-testid="button-cancel-copy">Cancel</Button>
+                  <Button
+                    disabled={!canProceedToConfirm}
+                    onClick={() => setCopyStep("confirm")}
+                    data-testid="button-proceed-copy"
+                  >
+                    Next
+                  </Button>
+                </DialogFooter>
+              </>
+            )}
+
+            {copyStep === "confirm" && (
+              <>
+                <div className="border border-amber-200 bg-amber-50 rounded-lg p-4 space-y-2">
+                  <div className="flex items-center gap-2 text-amber-700 font-medium text-sm">
+                    <AlertTriangle className="h-4 w-4" />
+                    Confirm Copy
+                  </div>
+                  <p className="text-sm text-gray-700">
+                    You are about to copy data from <span className="font-semibold">{sourceVesselName}</span> to <span className="font-semibold">{targetVesselName}</span>.
+                  </p>
+                  <p className="text-xs text-gray-500">This action may overwrite existing data. Existing duplicate mappings will be skipped.</p>
+                  <div className="flex flex-wrap gap-2 mt-2">
+                    {copyModules.components && <Badge variant="secondary">Components</Badge>}
+                    {copyModules.jobs && <Badge variant="secondary">Jobs</Badge>}
+                    {copyModules.spares && <Badge variant="secondary">Spares</Badge>}
+                  </div>
+                </div>
+
+                <DialogFooter>
+                  <Button variant="outline" onClick={() => setCopyStep("select")} data-testid="button-back-copy">Back</Button>
+                  <Button
+                    onClick={handleConfirmCopy}
+                    disabled={copyVesselMutation.isPending}
+                    data-testid="button-confirm-copy"
+                  >
+                    {copyVesselMutation.isPending ? "Copying..." : "Confirm Copy"}
+                  </Button>
+                </DialogFooter>
+              </>
+            )}
+
+            {copyStep === "result" && copyResult && (
+              <>
+                <div className="border border-green-200 bg-green-50 rounded-lg p-4 space-y-3" data-testid="copy-result-summary">
+                  <div className="flex items-center gap-2 text-green-700 font-medium text-sm">
+                    <CheckCircle2 className="h-4 w-4" />
+                    Copy Completed Successfully
+                  </div>
+                  <div className="grid grid-cols-3 gap-3 mt-2">
+                    {copyModules.components && (
+                      <div className="text-center p-2 bg-white rounded border" data-testid="copy-result-components">
+                        <div className="text-lg font-bold text-gray-800" data-testid="text-copy-count-components">{copyResult.components}</div>
+                        <div className="text-xs text-gray-500">Components</div>
+                      </div>
+                    )}
+                    {copyModules.jobs && (
+                      <div className="text-center p-2 bg-white rounded border" data-testid="copy-result-jobs">
+                        <div className="text-lg font-bold text-gray-800" data-testid="text-copy-count-jobs">{copyResult.jobs}</div>
+                        <div className="text-xs text-gray-500">Jobs</div>
+                      </div>
+                    )}
+                    {copyModules.spares && (
+                      <div className="text-center p-2 bg-white rounded border" data-testid="copy-result-spares">
+                        <div className="text-lg font-bold text-gray-800" data-testid="text-copy-count-spares">{copyResult.spares}</div>
+                        <div className="text-xs text-gray-500">Spares</div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                <DialogFooter>
+                  <Button onClick={() => setIsCopyVesselDialogOpen(false)} data-testid="button-close-copy">Done</Button>
+                </DialogFooter>
+              </>
+            )}
+          </div>
         </DialogContent>
       </Dialog>
     </div>
