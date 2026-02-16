@@ -1,0 +1,230 @@
+Raplit Prompt — Copy Vessel Feature
+Module
+
+PMS → Fleet & Vessel Manager
+
+🎯 Objective
+
+Add a Copy Vessel feature inside the Fleet & Vessel Manager screen.
+
+Purpose:
+Some fleets contain sister vessels (same vessel type, different vessel name).
+This feature should allow duplicating vessel-side configuration and mapping data from one vessel to another.
+
+🧩 Business Use Case
+
+Fleet has Vessel A (fully configured)
+
+New sister Vessel B is added
+
+Instead of configuring Vessel B from scratch
+
+User selects Vessel A → copies configuration → replicates to Vessel B
+
+This improves:
+
+Setup speed
+
+Data consistency
+
+User efficiency
+
+⚙️ Functional Requirements
+1️⃣ New Button
+
+Add button:
+
+[ Copy Vessel ]
+
+
+Placement:
+
+Top right area of Fleet & Vessel Manager screen
+
+Follow Alpha UI Pattern
+
+Same styling hierarchy as primary action buttons
+
+2️⃣ Copy Vessel Workflow
+
+When user clicks Copy Vessel, open a modal/dialog screen.
+
+Step 1: Select Source Vessel
+
+Dropdown:
+
+Select Source Vessel
+
+
+List all vessels under selected fleet
+
+Mandatory field
+
+Cannot select inactive vessel
+
+Step 2: Select Target Vessel
+
+Dropdown:
+
+Select Target Vessel
+
+
+Must be different from Source Vessel
+
+Cannot overwrite existing mapped live vessel without confirmation
+
+Validation required
+
+Step 3: Data Scope Selection
+
+Checkbox selection:
+
+☑ Components Mapping
+☑ Jobs Mapping
+☑ Spares Mapping
+☑ Equipment Structure
+☑ Maintenance Settings
+
+
+User can select which modules to replicate.
+
+Default: All selected.
+
+Step 4: Confirmation
+
+Before execution show confirmation:
+
+You are about to copy data from [Source Vessel]
+to [Target Vessel].
+
+This action may overwrite existing data.
+
+Do you want to continue?
+
+
+Buttons:
+
+Cancel
+
+Confirm Copy
+
+🔁 Copy Logic
+Copy Behavior Rules
+
+Copy vessel-side mapping data only
+
+Do NOT copy:
+
+Vessel name
+
+IMO number
+
+Registration details
+
+Audit logs
+
+Completed maintenance history
+
+Mapping Copy Logic
+
+For selected modules:
+
+Components Mapping
+
+Replicate component mapping records.
+
+Jobs Mapping
+
+Replicate mapped jobs based on:
+
+job_code + fleet_equipment_code
+
+Spares Mapping
+
+Replicate spare linking records.
+
+Data Integrity Rules
+
+Maintain referential integrity
+
+No duplicate key creation
+
+Validate existence of fleet-level master records
+
+Log copy activity in system log
+
+🎨 UI Requirement
+
+Must follow Alpha UI Pattern:
+
+Clean spacing
+
+Standard modal width
+
+Section-based layout
+
+Proper label alignment
+
+Clear button hierarchy
+
+No clutter
+
+No Excel-style UI
+
+🔐 Permission Control
+
+Only users with:
+
+Fleet Admin
+Super Admin
+
+
+Can access Copy Vessel feature.
+
+⚠️ Validation Rules
+
+Source and Target vessel cannot be same
+
+Cannot copy to archived vessel
+
+Show error if target vessel already has locked mappings
+
+Show success message after completion
+
+📊 Post Copy Behavior
+
+After successful copy:
+
+Show success toast:
+
+Vessel data successfully replicated.
+
+
+Auto refresh target vessel screen
+
+Highlight updated sections
+
+📌 Scope Limitation
+
+This feature is limited to:
+
+Fleet & Vessel Manager Screen
+
+
+No changes in:
+
+Fleet master structure
+
+Global system settings
+
+Vessel registration module
+
+✅ Expected Outcome
+
+Faster onboarding of sister vessels
+
+Consistent mapping across similar vessel types
+
+Reduced manual duplication effort
+
+Clean and user-friendly execution flow
