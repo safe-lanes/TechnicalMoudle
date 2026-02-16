@@ -69,10 +69,10 @@ interface VesselTreeNode {
 
 interface SpareAutoMatchEntry {
   fleetEquipmentCode: string;
+  componentCode: string;
+  componentName: string;
   partCode: string;
   partName: string;
-  vesselPartCode: string;
-  vesselPartName: string;
   vesselSpareId: string;
   matched: boolean;
 }
@@ -577,10 +577,10 @@ export default function FleetVesselMapping({ onBack }: { onBack?: () => void }) 
 
       return {
         fleetEquipmentCode: fs.fleetEquipmentCode,
+        componentCode: fs.fleetEquipmentCode || "",
+        componentName: fs.fleetEquipmentName || "",
         partCode: fs.partCode,
         partName: fs.partName || "",
-        vesselPartCode: vesselSpare?.partCode || "",
-        vesselPartName: vesselSpare?.partName || "",
         vesselSpareId: vesselSpare ? String(vesselSpare.id) : "",
         matched,
       };
@@ -2193,10 +2193,10 @@ export default function FleetVesselMapping({ onBack }: { onBack?: () => void }) 
               <thead>
                 <tr className="border-b">
                   <th className="sticky top-0 bg-gray-50 z-10 text-left px-3 py-2 text-xs font-medium text-gray-500">Fleet Equipment Code</th>
+                  <th className="sticky top-0 bg-gray-50 z-10 text-left px-3 py-2 text-xs font-medium text-gray-500">Component Code</th>
+                  <th className="sticky top-0 bg-gray-50 z-10 text-left px-3 py-2 text-xs font-medium text-gray-500">Component Name</th>
                   <th className="sticky top-0 bg-gray-50 z-10 text-left px-3 py-2 text-xs font-medium text-gray-500">Part Code</th>
                   <th className="sticky top-0 bg-gray-50 z-10 text-left px-3 py-2 text-xs font-medium text-gray-500">Part Name</th>
-                  <th className="sticky top-0 bg-gray-50 z-10 text-left px-3 py-2 text-xs font-medium text-gray-500">Vessel Part Code</th>
-                  <th className="sticky top-0 bg-gray-50 z-10 text-left px-3 py-2 text-xs font-medium text-gray-500">Vessel Part Name</th>
                   <th className="sticky top-0 bg-gray-50 z-10 text-center px-3 py-2 text-xs font-medium text-gray-500">Status</th>
                 </tr>
               </thead>
@@ -2204,10 +2204,10 @@ export default function FleetVesselMapping({ onBack }: { onBack?: () => void }) 
                 {spareAutoMatchEntries.map((entry, idx) => (
                   <tr key={`${entry.partCode}-${entry.fleetEquipmentCode}-${idx}`} className="border-b text-xs hover:bg-blue-50/50">
                     <td className="px-3 py-2 font-mono">{entry.fleetEquipmentCode || "-"}</td>
+                    <td className="px-3 py-2 font-mono">{entry.componentCode || "-"}</td>
+                    <td className="px-3 py-2 truncate max-w-[180px]">{entry.componentName || "-"}</td>
                     <td className="px-3 py-2 font-mono">{entry.partCode || "-"}</td>
-                    <td className="px-3 py-2 truncate max-w-[180px]">{entry.partName || "-"}</td>
-                    <td className="px-3 py-2 font-mono">{entry.vesselPartCode || "-"}</td>
-                    <td className="px-3 py-2 truncate max-w-[200px]">{entry.vesselPartName || "-"}</td>
+                    <td className="px-3 py-2 truncate max-w-[200px]">{entry.partName || "-"}</td>
                     <td className="px-3 py-2 text-center">
                       {entry.matched ? (
                         <Badge className="bg-green-100 text-green-800 border-green-200 text-[10px]">Matched</Badge>
@@ -2219,7 +2219,7 @@ export default function FleetVesselMapping({ onBack }: { onBack?: () => void }) 
                 ))}
                 {spareAutoMatchEntries.length === 0 && (
                   <tr>
-                    <td colSpan={6} className="text-center py-8 text-gray-500 text-xs">No vessel spares to match</td>
+                    <td colSpan={6} className="text-center py-8 text-gray-500 text-xs">No fleet spares to match</td>
                   </tr>
                 )}
               </tbody>
