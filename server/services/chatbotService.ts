@@ -48,6 +48,10 @@ TOOL USAGE GUIDELINES:
 - Use generate_deep_link when user asks to "show me" or "take me to"
 - Combine multiple tool calls for complex queries (e.g., overdue WOs + low stock spares)
 - After listing items, offer to show details or navigate
+- Use get_stores_items for stores/lubricants/chemicals inventory questions
+- Use get_defects for defect tracking, condition of class, and defect analysis
+- Use get_consumption_analysis for spares usage trends, consumption patterns, and ROB tracking
+- Use get_maintenance_calendar for scheduling, workload planning, and calendar views
 
 RESPONSE FORMAT:
 - Use markdown for formatting
@@ -298,6 +302,181 @@ const CHATBOT_TOOLS: OpenAI.Chat.Completions.ChatCompletionTool[] = [
           },
         },
         required: ["page"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "get_stores_items",
+      description:
+        "Get stores inventory including lubricants, chemicals, and general stores. Can filter for low stock, expiring items, and non-moving items.",
+      parameters: {
+        type: "object",
+        properties: {
+          vesselId: { type: "string", description: "Vessel ID (required)" },
+          itemType: {
+            type: "string",
+            enum: ["stores", "lubricants", "chemicals", "others"],
+            description: "Filter by item type category",
+          },
+          filter: {
+            type: "string",
+            enum: ["low_stock", "expiring_soon", "non_moving", "all"],
+            description:
+              "Filter preset: low_stock (ROB < minimum), expiring_soon (chemicals expiring within 90 days), non_moving (no transactions in 6+ months)",
+          },
+          search: {
+            type: "string",
+            description: "Search by item name or item code",
+          },
+          limit: {
+            type: "number",
+            description: "Maximum number of results (default: 50)",
+          },
+        },
+        required: ["vesselId"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "get_defects",
+      description:
+        "Get defects list with filters. Supports active/resolved views, priority, category (Defect, COC, Observation, NCR), date ranges, risk level, and recurring defect analysis.",
+      parameters: {
+        type: "object",
+        properties: {
+          vesselId: { type: "string", description: "Vessel ID (required)" },
+          statusView: {
+            type: "string",
+            enum: ["active", "resolved"],
+            description: "View active (open) or resolved (closed) defects",
+          },
+          category: {
+            type: "string",
+            enum: ["Defect", "COC", "Observation", "NCR"],
+            description: "Filter by defect category",
+          },
+          priority: {
+            type: "string",
+            enum: ["High", "Medium", "Low"],
+            description: "Filter by priority level",
+          },
+          critical: {
+            type: "boolean",
+            description: "Filter for critical defects only",
+          },
+          dateRange: {
+            type: "string",
+            enum: ["week", "month", "quarter", "year"],
+            description: "Filter by issue date range",
+          },
+          dueOverdue: {
+            type: "string",
+            enum: ["overdue", "due_this_week", "due_this_month"],
+            description: "Filter by target close date status",
+          },
+          includeRecurring: {
+            type: "boolean",
+            description:
+              "Also fetch recurring defect patterns (default: false)",
+          },
+          search: {
+            type: "string",
+            description: "Search by description or equipment",
+          },
+          limit: {
+            type: "number",
+            description: "Maximum number of results (default: 50)",
+          },
+        },
+        required: ["vesselId"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "get_consumption_analysis",
+      description:
+        "Analyze spare parts consumption patterns including usage history, consumption trends, high-consumption items, and ROB (Remaining on Board) tracking. Use for supply chain planning and inventory optimization questions.",
+      parameters: {
+        type: "object",
+        properties: {
+          vesselId: { type: "string", description: "Vessel ID (required)" },
+          analysisType: {
+            type: "string",
+            enum: [
+              "high_consumption",
+              "consumption_trend",
+              "rob_status",
+              "recent_activity",
+            ],
+            description:
+              "Type of analysis: high_consumption (most consumed items), consumption_trend (usage over time), rob_status (current stock vs history), recent_activity (latest consume/receive events)",
+          },
+          periodMonths: {
+            type: "number",
+            description:
+              "Analysis period in months (default: 6). Used for trend and high-consumption analysis.",
+          },
+          componentCode: {
+            type: "string",
+            description: "Filter by component code",
+          },
+          criticalOnly: {
+            type: "boolean",
+            description: "Analyze only critical spares (default: false)",
+          },
+          limit: {
+            type: "number",
+            description: "Maximum number of results (default: 30)",
+          },
+        },
+        required: ["vesselId"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "get_maintenance_calendar",
+      description:
+        "Get maintenance calendar data showing upcoming jobs, workload distribution, and scheduled maintenance by date range. Use for planning, scheduling, and workload questions.",
+      parameters: {
+        type: "object",
+        properties: {
+          vesselId: { type: "string", description: "Vessel ID (required)" },
+          dateRange: {
+            type: "string",
+            enum: ["week", "month", "quarter"],
+            description:
+              "Time horizon for calendar view (default: month)",
+          },
+          groupBy: {
+            type: "string",
+            enum: ["date", "component", "priority", "assignee", "department"],
+            description:
+              "How to group/aggregate the results (default: date)",
+          },
+          includeOverdue: {
+            type: "boolean",
+            description:
+              "Include overdue items in the calendar view (default: true)",
+          },
+          maintenanceType: {
+            type: "string",
+            enum: ["Planned", "Unplanned", "Condition Based"],
+            description: "Filter by maintenance type",
+          },
+          department: {
+            type: "string",
+            description: "Filter by department (e.g., Deck, Engine)",
+          },
+        },
+        required: ["vesselId"],
       },
     },
   },
@@ -607,6 +786,497 @@ async function executeTool(
             jobPriority: j.jobPriority,
             assignedTo: j.assignedTo,
           })),
+        };
+      }
+
+      case "get_stores_items": {
+        const items = await storage.getStoresItems(
+          args.vesselId,
+          args.itemType
+        );
+        let filtered = items.filter((item) => item.isActive !== false && !item.deleted);
+
+        if (args.search) {
+          const search = args.search.toLowerCase();
+          filtered = filtered.filter(
+            (item) =>
+              item.itemName?.toLowerCase().includes(search) ||
+              item.itemCode?.toLowerCase().includes(search)
+          );
+        }
+
+        if (args.filter === "low_stock") {
+          filtered = filtered.filter((item) => {
+            const rob = Number(item.rob) || 0;
+            const min = Number(item.min) || 0;
+            return min > 0 && rob < min;
+          });
+        } else if (args.filter === "expiring_soon") {
+          const now = new Date();
+          const cutoff = new Date();
+          cutoff.setDate(now.getDate() + 90);
+          filtered = filtered.filter((item) => {
+            if (!item.expiryDate) return false;
+            const expiry = new Date(item.expiryDate);
+            return expiry <= cutoff && expiry >= now;
+          });
+        } else if (args.filter === "non_moving") {
+          const sixMonthsAgo = new Date();
+          sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
+          filtered = filtered.filter((item) => {
+            if (!item.updatedAt) return true;
+            return new Date(item.updatedAt) < sixMonthsAgo;
+          });
+        }
+
+        const limit = args.limit || 50;
+        const results = filtered.slice(0, limit);
+
+        const summary = {
+          totalItems: filtered.length,
+          byType: {
+            stores: filtered.filter((i) => i.itemType === "stores").length,
+            lubricants: filtered.filter((i) => i.itemType === "lubricants").length,
+            chemicals: filtered.filter((i) => i.itemType === "chemicals").length,
+            others: filtered.filter((i) => i.itemType === "others").length,
+          },
+          lowStockCount: filtered.filter((i) => {
+            const rob = Number(i.rob) || 0;
+            const min = Number(i.min) || 0;
+            return min > 0 && rob < min;
+          }).length,
+        };
+
+        return {
+          summary,
+          showing: results.length,
+          items: results.map((item) => ({
+            id: item.id,
+            itemCode: item.itemCode,
+            itemName: item.itemName,
+            itemType: item.itemType,
+            category: item.category,
+            uom: item.uom,
+            rob: item.rob,
+            min: item.min,
+            max: item.max,
+            locationA: item.locationA,
+            locationB: item.locationB,
+            robLocationA: item.robLocationA,
+            robLocationB: item.robLocationB,
+            expiryDate: item.expiryDate,
+            batchNumber: item.batchNumber,
+            hazardClassification: item.hazardClassification,
+            supplier: item.supplier,
+            unitCost: item.unitCost,
+          })),
+        };
+      }
+
+      case "get_defects": {
+        const defects = await storage.getDefects({
+          vesselId: args.vesselId,
+          statusView: args.statusView,
+          category: args.category,
+          critical: args.critical,
+          search: args.search,
+          dueOverdue: args.dueOverdue,
+          includeClosedDefects: args.statusView === "resolved",
+        });
+
+        let filtered = defects;
+
+        if (args.priority) {
+          filtered = filtered.filter((d) => d.priority === args.priority);
+        }
+
+        if (args.dateRange) {
+          const now = new Date();
+          const cutoffDate = new Date();
+          if (args.dateRange === "week") cutoffDate.setDate(now.getDate() - 7);
+          else if (args.dateRange === "month") cutoffDate.setMonth(now.getMonth() - 1);
+          else if (args.dateRange === "quarter") cutoffDate.setMonth(now.getMonth() - 3);
+          else if (args.dateRange === "year") cutoffDate.setFullYear(now.getFullYear() - 1);
+
+          filtered = filtered.filter((d) => {
+            if (!d.issueDate) return false;
+            return new Date(d.issueDate) >= cutoffDate;
+          });
+        }
+
+        const limit = args.limit || 50;
+        const results = filtered.slice(0, limit);
+
+        const summary = {
+          totalDefects: filtered.length,
+          byCategory: {
+            Defect: filtered.filter((d) => d.category === "Defect").length,
+            COC: filtered.filter((d) => d.category === "COC").length,
+            Observation: filtered.filter((d) => d.category === "Observation").length,
+            NCR: filtered.filter((d) => d.category === "NCR").length,
+          },
+          byPriority: {
+            High: filtered.filter((d) => d.priority === "High").length,
+            Medium: filtered.filter((d) => d.priority === "Medium").length,
+            Low: filtered.filter((d) => d.priority === "Low").length,
+          },
+          criticalCount: filtered.filter((d) => d.critical === true || d.is_coc === true).length,
+          overdueCount: filtered.filter((d) => {
+            if (!d.targetCloseDate || d.status === "Closed") return false;
+            return new Date(d.targetCloseDate) < new Date();
+          }).length,
+        };
+
+        let recurringData = null;
+        if (args.includeRecurring) {
+          try {
+            const recurring = await storage.getRecurringDefects({});
+            recurringData = {
+              totalRecurring: recurring.length,
+              patterns: recurring.slice(0, 10).map((r) => ({
+                id: r.id,
+                equipmentKey: r.equipmentKey,
+                occurrenceCount: r.occurrenceCount,
+                lastOccurrenceDate: r.lastOccurrenceDate,
+                hasCoc: r.hasCoc,
+                openCount: r.openCount,
+                vesselsAffected: r.vesselsAffected,
+                mtbfDays: r.mtbfDays,
+              })),
+            };
+          } catch {
+            recurringData = { error: "Unable to fetch recurring defects" };
+          }
+        }
+
+        return {
+          summary,
+          showing: results.length,
+          recurringDefects: recurringData,
+          defects: results.map((d) => ({
+            id: d.id,
+            issueDate: d.issueDate,
+            category: d.category,
+            defectType: d.defectType,
+            description: d.description?.substring(0, 200),
+            status: d.status,
+            priority: d.priority,
+            critical: d.critical,
+            is_coc: d.is_coc,
+            severity: d.severity,
+            targetCloseDate: d.targetCloseDate,
+            dateCompleted: d.dateCompleted,
+            equipmentCategory: d.equipmentCategory,
+            equipmentType: d.equipmentType,
+            riskLevel: d.riskLevel,
+            assignedTo: d.assignedTo,
+            raisedByName: d.raisedByName,
+            source: d.source,
+          })),
+        };
+      }
+
+      case "get_consumption_analysis": {
+        const history = await storage.getSpareHistory(args.vesselId);
+        const spares = await storage.getSpares(args.vesselId);
+        const activeSpares = spares.filter((sp) => !sp.deleted);
+
+        const periodMonths = args.periodMonths || 6;
+        const cutoffDate = new Date();
+        cutoffDate.setMonth(cutoffDate.getMonth() - periodMonths);
+
+        const recentHistory = history.filter((h) => {
+          if (!h.timestampUTC) return false;
+          return new Date(h.timestampUTC) >= cutoffDate;
+        });
+
+        let filteredHistory = recentHistory;
+        if (args.componentCode) {
+          const code = args.componentCode.toLowerCase();
+          filteredHistory = filteredHistory.filter(
+            (h) => h.componentCode?.toLowerCase().includes(code)
+          );
+        }
+
+        const consumeEvents = filteredHistory.filter(
+          (h) => h.eventType === "CONSUME"
+        );
+        const receiveEvents = filteredHistory.filter(
+          (h) => h.eventType === "RECEIVE"
+        );
+
+        const limit = args.limit || 30;
+        const analysisType = args.analysisType || "high_consumption";
+
+        if (analysisType === "high_consumption") {
+          const consumptionMap = new Map<
+            number,
+            { spareId: number; partCode: string; partName: string; componentName: string; totalConsumed: number; eventCount: number }
+          >();
+
+          for (const event of consumeEvents) {
+            const existing = consumptionMap.get(event.spareId);
+            const qty = Math.abs(event.qtyChange || 0);
+            if (existing) {
+              existing.totalConsumed += qty;
+              existing.eventCount++;
+            } else {
+              consumptionMap.set(event.spareId, {
+                spareId: event.spareId,
+                partCode: event.partCode,
+                partName: event.partName,
+                componentName: event.componentName,
+                totalConsumed: qty,
+                eventCount: 1,
+              });
+            }
+          }
+
+          const sorted = Array.from(consumptionMap.values())
+            .sort((a, b) => b.totalConsumed - a.totalConsumed)
+            .slice(0, limit);
+
+          if (args.criticalOnly) {
+            const criticalIds = new Set(
+              activeSpares
+                .filter((sp) => sp.critical === "Critical" || sp.critical === "Yes")
+                .map((sp) => sp.id)
+            );
+            return {
+              periodMonths,
+              totalConsumeEvents: consumeEvents.length,
+              highConsumptionItems: sorted
+                .filter((item) => criticalIds.has(item.spareId))
+                .map((item) => {
+                  const spare = activeSpares.find((sp) => sp.id === item.spareId);
+                  return { ...item, currentRob: spare?.rob, minStock: spare?.min, critical: spare?.critical };
+                }),
+            };
+          }
+
+          return {
+            periodMonths,
+            totalConsumeEvents: consumeEvents.length,
+            totalReceiveEvents: receiveEvents.length,
+            highConsumptionItems: sorted.map((item) => {
+              const spare = activeSpares.find((sp) => sp.id === item.spareId);
+              return { ...item, currentRob: spare?.rob, minStock: spare?.min, critical: spare?.critical };
+            }),
+          };
+        }
+
+        if (analysisType === "consumption_trend") {
+          const monthlyData = new Map<string, { consumed: number; received: number; events: number }>();
+          for (const event of filteredHistory) {
+            if (event.eventType !== "CONSUME" && event.eventType !== "RECEIVE") continue;
+            const date = new Date(event.timestampUTC!);
+            const monthKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
+            const existing = monthlyData.get(monthKey) || { consumed: 0, received: 0, events: 0 };
+            if (event.eventType === "CONSUME") existing.consumed += Math.abs(event.qtyChange || 0);
+            else existing.received += Math.abs(event.qtyChange || 0);
+            existing.events++;
+            monthlyData.set(monthKey, existing);
+          }
+
+          const trendData = Array.from(monthlyData.entries())
+            .sort(([a], [b]) => a.localeCompare(b))
+            .map(([month, data]) => ({ month, ...data }));
+
+          return {
+            periodMonths,
+            trend: trendData,
+            totalConsumed: trendData.reduce((sum, d) => sum + d.consumed, 0),
+            totalReceived: trendData.reduce((sum, d) => sum + d.received, 0),
+            averageMonthlyConsumption:
+              trendData.length > 0
+                ? Math.round(trendData.reduce((sum, d) => sum + d.consumed, 0) / trendData.length)
+                : 0,
+          };
+        }
+
+        if (analysisType === "rob_status") {
+          const lowStockSpares = activeSpares.filter((sp) => {
+            const rob = sp.rob ?? 0;
+            const min = sp.min ?? 0;
+            return min > 0 && rob < min;
+          });
+
+          const zeroStockSpares = activeSpares.filter(
+            (sp) => (sp.rob ?? 0) === 0
+          );
+
+          return {
+            totalActiveSpares: activeSpares.length,
+            lowStockCount: lowStockSpares.length,
+            zeroStockCount: zeroStockSpares.length,
+            lowStockItems: lowStockSpares.slice(0, limit).map((sp) => ({
+              id: sp.id,
+              partCode: sp.partCode,
+              partName: sp.partName,
+              componentName: sp.componentName,
+              rob: sp.rob,
+              min: sp.min,
+              critical: sp.critical,
+              shortfall: (sp.min ?? 0) - (sp.rob ?? 0),
+            })),
+          };
+        }
+
+        if (analysisType === "recent_activity") {
+          const recent = filteredHistory
+            .filter((h) => h.eventType === "CONSUME" || h.eventType === "RECEIVE")
+            .sort((a, b) => new Date(b.timestampUTC!).getTime() - new Date(a.timestampUTC!).getTime())
+            .slice(0, limit);
+
+          return {
+            periodMonths,
+            totalEvents: recent.length,
+            events: recent.map((h) => ({
+              id: h.id,
+              date: h.timestampUTC,
+              eventType: h.eventType,
+              partCode: h.partCode,
+              partName: h.partName,
+              componentName: h.componentName,
+              qtyChange: h.qtyChange,
+              robAfter: h.robAfter,
+              remarks: h.remarks,
+              userId: h.userId,
+            })),
+          };
+        }
+
+        return { error: `Unknown analysis type: ${analysisType}` };
+      }
+
+      case "get_maintenance_calendar": {
+        const workOrders = await storage.getWorkOrders(args.vesselId);
+        const vesselWOs = workOrders.filter((wo) => wo.dataScope === "vessel");
+
+        const now = new Date();
+        const rangeEnd = new Date();
+        const dateRange = args.dateRange || "month";
+        if (dateRange === "week") rangeEnd.setDate(now.getDate() + 7);
+        else if (dateRange === "month") rangeEnd.setDate(now.getDate() + 30);
+        else if (dateRange === "quarter") rangeEnd.setDate(now.getDate() + 90);
+
+        let upcoming = vesselWOs.filter((wo) => {
+          if (!wo.dueDate) return false;
+          if (wo.status === "Completed") return false;
+          const dueDate = new Date(wo.dueDate);
+          return dueDate >= now && dueDate <= rangeEnd;
+        });
+
+        if (args.maintenanceType) {
+          upcoming = upcoming.filter(
+            (wo) => wo.maintenanceType === args.maintenanceType
+          );
+        }
+        if (args.department) {
+          const dept = args.department.toLowerCase();
+          upcoming = upcoming.filter(
+            (wo) => wo.department?.toLowerCase().includes(dept)
+          );
+        }
+
+        let overdueItems: any[] = [];
+        if (args.includeOverdue !== false) {
+          overdueItems = vesselWOs
+            .filter((wo) => wo.status === "Overdue")
+            .map((wo) => ({
+              id: wo.id,
+              workOrderNo: wo.workOrderNo,
+              component: wo.component,
+              componentCode: wo.componentCode,
+              jobTitle: wo.jobTitle,
+              dueDate: wo.dueDate,
+              assignedTo: wo.assignedTo,
+              jobPriority: wo.jobPriority,
+              status: "Overdue",
+            }));
+        }
+
+        const groupBy = args.groupBy || "date";
+        let groupedData: any = {};
+
+        if (groupBy === "date") {
+          const byDate = new Map<string, any[]>();
+          for (const wo of upcoming) {
+            const dateKey = wo.dueDate?.split("T")[0] || "Unknown";
+            if (!byDate.has(dateKey)) byDate.set(dateKey, []);
+            byDate.get(dateKey)!.push({
+              id: wo.id,
+              workOrderNo: wo.workOrderNo,
+              component: wo.component,
+              jobTitle: wo.jobTitle,
+              assignedTo: wo.assignedTo,
+              jobPriority: wo.jobPriority,
+              maintenanceType: wo.maintenanceType,
+            });
+          }
+          groupedData = Object.fromEntries(
+            Array.from(byDate.entries()).sort(([a], [b]) => a.localeCompare(b))
+          );
+        } else if (groupBy === "component") {
+          const byComp = new Map<string, any[]>();
+          for (const wo of upcoming) {
+            const key = wo.component || "Unknown";
+            if (!byComp.has(key)) byComp.set(key, []);
+            byComp.get(key)!.push({
+              id: wo.id,
+              workOrderNo: wo.workOrderNo,
+              jobTitle: wo.jobTitle,
+              dueDate: wo.dueDate,
+              jobPriority: wo.jobPriority,
+            });
+          }
+          groupedData = Object.fromEntries(byComp);
+        } else if (groupBy === "priority") {
+          const byPriority = new Map<string, number>();
+          for (const wo of upcoming) {
+            const key = wo.jobPriority || "Unassigned";
+            byPriority.set(key, (byPriority.get(key) || 0) + 1);
+          }
+          groupedData = Object.fromEntries(byPriority);
+        } else if (groupBy === "assignee") {
+          const byAssignee = new Map<string, number>();
+          for (const wo of upcoming) {
+            const key = wo.assignedTo || "Unassigned";
+            byAssignee.set(key, (byAssignee.get(key) || 0) + 1);
+          }
+          groupedData = Object.fromEntries(byAssignee);
+        } else if (groupBy === "department") {
+          const byDept = new Map<string, number>();
+          for (const wo of upcoming) {
+            const key = wo.department || "Unknown";
+            byDept.set(key, (byDept.get(key) || 0) + 1);
+          }
+          groupedData = Object.fromEntries(byDept);
+        }
+
+        return {
+          dateRange,
+          rangeStart: now.toISOString().split("T")[0],
+          rangeEnd: rangeEnd.toISOString().split("T")[0],
+          totalUpcoming: upcoming.length,
+          overdueCount: overdueItems.length,
+          groupedBy: groupBy,
+          data: groupedData,
+          overdueItems: overdueItems.slice(0, 20),
+          workloadSummary: {
+            totalPlanned: upcoming.length,
+            highPriority: upcoming.filter(
+              (wo) =>
+                wo.jobPriority === "Critical" || wo.jobPriority === "High"
+            ).length,
+            mediumPriority: upcoming.filter(
+              (wo) => wo.jobPriority === "Medium"
+            ).length,
+            lowPriority: upcoming.filter(
+              (wo) =>
+                wo.jobPriority === "Low" || !wo.jobPriority
+            ).length,
+          },
         };
       }
 
