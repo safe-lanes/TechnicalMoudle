@@ -38,7 +38,8 @@ import {
   componentRunningHoursLog,
   runningHoursAudit,
   storesLedger,                         // ✅ from HEAD
-  reportSnapshots                      // ✅ from HEAD
+  reportSnapshots,                      // ✅ from HEAD
+  fleetComponents
 } from "@shared/schema";
 
 import { lowStockReportService } from "./services/lowStockReportService";
@@ -10815,6 +10816,32 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
   
+  // Update sort order for fleet components
+  app.post("/technical/api/fleet/components/sort-order", async (req, res) => {
+    try {
+      const schema = z.object({
+        updates: z.array(z.object({
+          id: z.number(),
+          sortOrder: z.number(),
+        })),
+      });
+      const { updates } = schema.parse(req.body);
+      const db = getDb();
+      for (const update of updates) {
+        await db.update(fleetComponents)
+          .set({ sortOrder: update.sortOrder, updatedAt: new Date() })
+          .where(eq(fleetComponents.id, update.id));
+      }
+      res.json({ success: true, updated: updates.length });
+    } catch (error: any) {
+      if (error.name === 'ZodError') {
+        return res.status(400).json({ error: "Invalid request data", details: error.errors });
+      }
+      console.error("Error updating sort order:", error);
+      res.status(500).json({ error: "Failed to update sort order" });
+    }
+  });
+
   // Fleet Admin - Jobs Routes
   
   // Export fleet jobs to Excel (21-column format matching import template)

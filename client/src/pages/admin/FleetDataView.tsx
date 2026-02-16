@@ -4,7 +4,7 @@ import { useVessels } from "@/hooks/useVessels";
 import { useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { ChevronRight, ChevronDown, Plus, Search, Pencil, X, FileSpreadsheet, Trash2, Anchor, Briefcase, Info, ArrowLeft, Ship } from "lucide-react";
+import { ChevronRight, ChevronDown, Plus, Search, Pencil, X, FileSpreadsheet, Trash2, Anchor, Briefcase, Info, ArrowLeft, Ship, GripVertical, ChevronsUpDown, ChevronsDownUp, Save, RotateCcw } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Label } from "@/components/ui/label";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -41,6 +41,7 @@ interface MappedFleetComponent {
   vesselName?: string | null;
   vesselCode?: string | null;
   assignedSubCode?: string | null;
+  sortOrder?: number | null;
 }
 
 function mapFleetComponentsToFleetComponent(item: FleetComponents): MappedFleetComponent {
@@ -67,6 +68,7 @@ function mapFleetComponentsToFleetComponent(item: FleetComponents): MappedFleetC
     vesselName: null,
     vesselCode: null,
     assignedSubCode: null,
+    sortOrder: item.sortOrder,
   };
 }
 
@@ -119,7 +121,14 @@ function buildTree(components: FleetComponent[]): TreeNode[] {
   });
 
   const sortNodes = (nodes: TreeNode[]): TreeNode[] => {
-    nodes.sort((a, b) => a.code.localeCompare(b.code, undefined, { numeric: true }));
+    nodes.sort((a, b) => {
+      const aSortOrder = a.data?.sortOrder ?? 0;
+      const bSortOrder = b.data?.sortOrder ?? 0;
+      if (aSortOrder !== 0 || bSortOrder !== 0) {
+        if (aSortOrder !== bSortOrder) return aSortOrder - bSortOrder;
+      }
+      return a.code.localeCompare(b.code, undefined, { numeric: true });
+    });
     nodes.forEach((node) => {
       if (node.children.length > 0) {
         sortNodes(node.children);
@@ -138,6 +147,12 @@ function TreeItem({
   onSelect,
   expandedNodes,
   onToggle,
+  isEditMode,
+  dragOverCode,
+  onDragStart,
+  onDragOver,
+  onDrop,
+  onDragEnd,
 }: {
   node: TreeNode;
   level?: number;
@@ -145,21 +160,36 @@ function TreeItem({
   onSelect: (node: TreeNode) => void;
   expandedNodes: Set<string>;
   onToggle: (code: string) => void;
+  isEditMode?: boolean;
+  dragOverCode?: string | null;
+  onDragStart?: (e: React.DragEvent, code: string, parentCode: string | null | undefined) => void;
+  onDragOver?: (e: React.DragEvent, code: string, parentCode: string | null | undefined) => void;
+  onDrop?: (e: React.DragEvent, code: string, parentCode: string | null | undefined) => void;
+  onDragEnd?: (e: React.DragEvent) => void;
 }) {
   const isExpanded = expandedNodes.has(node.code);
   const hasChildren = node.children.length > 0;
   const isSelected = selectedCode === node.code;
+  const isDragOver = dragOverCode === node.code;
 
   return (
     <div>
       <div
-        className={`flex items-center px-3 py-2 cursor-pointer hover:bg-gray-50 border-b border-gray-100 ${
+        className={`flex items-center px-3 py-2 cursor-pointer border-b border-gray-100 ${
           isSelected ? "bg-blue-50" : ""
-        }`}
-        style={{ paddingLeft: `${level * 20 + 12}px` }}
-        onClick={() => onSelect(node)}
+        }${isDragOver ? " bg-blue-100 border-t-2 border-t-blue-400" : ""}`}
+        style={{ paddingLeft: `${level * 20 + (isEditMode ? 4 : 12)}px` }}
+        onClick={() => { if (!isEditMode) onSelect(node); }}
         data-testid={`tree-node-${node.code}`}
+        draggable={isEditMode}
+        onDragStart={isEditMode && onDragStart ? (e) => onDragStart(e, node.code, node.data?.parentFleetEquipmentCode) : undefined}
+        onDragOver={isEditMode && onDragOver ? (e) => onDragOver(e, node.code, node.data?.parentFleetEquipmentCode) : undefined}
+        onDrop={isEditMode && onDrop ? (e) => onDrop(e, node.code, node.data?.parentFleetEquipmentCode) : undefined}
+        onDragEnd={isEditMode && onDragEnd ? onDragEnd : undefined}
       >
+        {isEditMode && (
+          <GripVertical className="h-4 w-4 text-gray-400 mr-1 flex-shrink-0 cursor-grab" data-testid={`drag-handle-${node.code}`} />
+        )}
         <button
           className="mr-2 flex-shrink-0"
           onClick={(e) => {
@@ -193,6 +223,12 @@ function TreeItem({
             onSelect={onSelect}
             expandedNodes={expandedNodes}
             onToggle={onToggle}
+            isEditMode={isEditMode}
+            dragOverCode={dragOverCode}
+            onDragStart={onDragStart}
+            onDragOver={onDragOver}
+            onDrop={onDrop}
+            onDragEnd={onDragEnd}
           />
         ))}
     </div>
@@ -266,6 +302,13 @@ export default function FleetDataView({ onBack }: { onBack?: () => void }) {
   const [selectedSpareIds, setSelectedSpareIds] = useState<Set<string>>(new Set());
   const [makerSearchText, setMakerSearchText] = useState("");
   const [showMakerSuggestions, setShowMakerSuggestions] = useState(false);
+
+  const [isEditMode, setIsEditMode] = useState(false);
+  const [editTreeData, setEditTreeData] = useState<TreeNode[]>([]);
+  const [dragSourceCode, setDragSourceCode] = useState<string | null>(null);
+  const [dragSourceParent, setDragSourceParent] = useState<string | null | undefined>(null);
+  const [dragOverCode, setDragOverCode] = useState<string | null>(null);
+  const [isSavingSortOrder, setIsSavingSortOrder] = useState(false);
   
   const { toast } = useToast();
 
@@ -497,6 +540,180 @@ export default function FleetDataView({ onBack }: { onBack?: () => void }) {
       return newSet;
     });
   };
+
+  const collectAllCodes = (node: TreeNode): string[] => {
+    const codes = [node.code];
+    node.children.forEach((child) => {
+      codes.push(...collectAllCodes(child));
+    });
+    return codes;
+  };
+
+  const findNodeByCode = (nodes: TreeNode[], code: string): TreeNode | null => {
+    for (const node of nodes) {
+      if (node.code === code) return node;
+      const found = findNodeByCode(node.children, code);
+      if (found) return found;
+    }
+    return null;
+  };
+
+  const handleExpandSelected = () => {
+    if (!selectedNode) {
+      toast({
+        title: "No Selection",
+        description: "Please select a component to expand.",
+      });
+      return;
+    }
+    const codesToExpand = collectAllCodes(selectedNode);
+    setExpandedNodes((prev) => {
+      const newSet = new Set(prev);
+      codesToExpand.forEach((c) => newSet.add(c));
+      return newSet;
+    });
+  };
+
+  const handleCollapseAll = () => {
+    setExpandedNodes(new Set());
+  };
+
+  const deepCloneTree = (nodes: TreeNode[]): TreeNode[] => {
+    return nodes.map((node) => ({
+      ...node,
+      children: deepCloneTree(node.children),
+    }));
+  };
+
+  const handleEnterEditMode = () => {
+    setEditTreeData(deepCloneTree(treeData));
+    setIsEditMode(true);
+  };
+
+  const handleCancelEditMode = () => {
+    setEditTreeData([]);
+    setIsEditMode(false);
+    setDragSourceCode(null);
+    setDragSourceParent(null);
+    setDragOverCode(null);
+  };
+
+  const handleDragStart = (e: React.DragEvent, code: string, parentCode: string | null | undefined) => {
+    setDragSourceCode(code);
+    setDragSourceParent(parentCode);
+    e.dataTransfer.effectAllowed = "move";
+    e.dataTransfer.setData("text/plain", code);
+  };
+
+  const handleDragOver = (e: React.DragEvent, code: string, parentCode: string | null | undefined) => {
+    e.preventDefault();
+    if (dragSourceCode === code) return;
+    if (dragSourceParent !== parentCode) return;
+    setDragOverCode(code);
+    e.dataTransfer.dropEffect = "move";
+  };
+
+  const reorderSiblings = (nodes: TreeNode[], sourceCode: string, targetCode: string, parentCode: string | null | undefined): TreeNode[] => {
+    if (!parentCode) {
+      const sourceIndex = nodes.findIndex((n) => n.code === sourceCode);
+      const targetIndex = nodes.findIndex((n) => n.code === targetCode);
+      if (sourceIndex !== -1 && targetIndex !== -1) {
+        const newNodes = [...nodes];
+        const [moved] = newNodes.splice(sourceIndex, 1);
+        newNodes.splice(targetIndex, 0, moved);
+        return newNodes;
+      }
+      return nodes;
+    }
+
+    return nodes.map((node) => {
+      if (node.code === parentCode) {
+        const sourceIndex = node.children.findIndex((n) => n.code === sourceCode);
+        const targetIndex = node.children.findIndex((n) => n.code === targetCode);
+        if (sourceIndex !== -1 && targetIndex !== -1) {
+          const newChildren = [...node.children];
+          const [moved] = newChildren.splice(sourceIndex, 1);
+          newChildren.splice(targetIndex, 0, moved);
+          return { ...node, children: newChildren };
+        }
+        return node;
+      }
+
+      return {
+        ...node,
+        children: reorderSiblings(node.children, sourceCode, targetCode, parentCode),
+      };
+    });
+  };
+
+  const handleDrop = (e: React.DragEvent, targetCode: string, targetParentCode: string | null | undefined) => {
+    e.preventDefault();
+    setDragOverCode(null);
+    if (!dragSourceCode || dragSourceCode === targetCode) return;
+    if (dragSourceParent !== targetParentCode) return;
+
+    setEditTreeData((prev) => {
+      if (!dragSourceParent && !targetParentCode) {
+        const sourceIndex = prev.findIndex((n) => n.code === dragSourceCode);
+        const targetIndex = prev.findIndex((n) => n.code === targetCode);
+        if (sourceIndex !== -1 && targetIndex !== -1) {
+          const newNodes = [...prev];
+          const [moved] = newNodes.splice(sourceIndex, 1);
+          newNodes.splice(targetIndex, 0, moved);
+          return newNodes;
+        }
+        return prev;
+      }
+      return reorderSiblings(prev, dragSourceCode!, targetCode, dragSourceParent);
+    });
+
+    setDragSourceCode(null);
+    setDragSourceParent(null);
+  };
+
+  const handleDragEnd = (e: React.DragEvent) => {
+    setDragSourceCode(null);
+    setDragSourceParent(null);
+    setDragOverCode(null);
+  };
+
+  const collectSortUpdates = (nodes: TreeNode[]): { id: number; sortOrder: number }[] => {
+    const updates: { id: number; sortOrder: number }[] = [];
+    nodes.forEach((node, index) => {
+      if (node.data?.id && typeof node.data.id === "number") {
+        updates.push({ id: node.data.id, sortOrder: index + 1 });
+      }
+      if (node.children.length > 0) {
+        updates.push(...collectSortUpdates(node.children));
+      }
+    });
+    return updates;
+  };
+
+  const handleSaveEditMode = async () => {
+    setIsSavingSortOrder(true);
+    try {
+      const updates = collectSortUpdates(editTreeData);
+      await apiRequest("POST", "/technical/api/fleet/components/sort-order", { updates });
+      queryClient.invalidateQueries({ queryKey: ["/technical/api/fleet-admin/fleet-components"] });
+      setIsEditMode(false);
+      setEditTreeData([]);
+      toast({
+        title: "Success",
+        description: "Sort order saved successfully",
+      });
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to save sort order",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSavingSortOrder(false);
+    }
+  };
+
+  const activeTreeData = isEditMode ? editTreeData : treeData;
 
   const selectedComponent = selectedNode?.data;
 
@@ -874,6 +1091,62 @@ export default function FleetDataView({ onBack }: { onBack?: () => void }) {
                     </button>
                   )}
                 </div>
+                <div className="bg-gray-50 border-b border-gray-200 px-3 py-1.5 flex items-center gap-1.5">
+                  {isEditMode ? (
+                    <>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={handleSaveEditMode}
+                        disabled={isSavingSortOrder}
+                        data-testid="button-save-sort-order"
+                      >
+                        <Save className="h-3.5 w-3.5 mr-1" />
+                        {isSavingSortOrder ? "Saving..." : "Save"}
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={handleCancelEditMode}
+                        disabled={isSavingSortOrder}
+                        data-testid="button-cancel-edit-mode"
+                      >
+                        <RotateCcw className="h-3.5 w-3.5 mr-1" />
+                        Cancel
+                      </Button>
+                    </>
+                  ) : (
+                    <>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={handleEnterEditMode}
+                        data-testid="button-edit-tree-order"
+                      >
+                        <Pencil className="h-3.5 w-3.5 mr-1" />
+                        Edit
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={handleExpandSelected}
+                        data-testid="button-expand-selected"
+                      >
+                        <ChevronsUpDown className="h-3.5 w-3.5 mr-1" />
+                        Expand
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={handleCollapseAll}
+                        data-testid="button-collapse-all"
+                      >
+                        <ChevronsDownUp className="h-3.5 w-3.5 mr-1" />
+                        Collapse
+                      </Button>
+                    </>
+                  )}
+                </div>
                 <div>
                   {isComponentsLoading ? (
                     <div className="p-4 space-y-2">
@@ -886,7 +1159,7 @@ export default function FleetDataView({ onBack }: { onBack?: () => void }) {
                     </div>
                   ) : (
                     <div className="py-1">
-                      {treeData.map((node) => (
+                      {activeTreeData.map((node) => (
                         <TreeItem
                           key={node.code}
                           node={node}
@@ -894,6 +1167,12 @@ export default function FleetDataView({ onBack }: { onBack?: () => void }) {
                           onSelect={setSelectedNode}
                           expandedNodes={expandedNodes}
                           onToggle={handleToggle}
+                          isEditMode={isEditMode}
+                          dragOverCode={dragOverCode}
+                          onDragStart={handleDragStart}
+                          onDragOver={handleDragOver}
+                          onDrop={handleDrop}
+                          onDragEnd={handleDragEnd}
                         />
                       ))}
                     </div>
