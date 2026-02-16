@@ -46,9 +46,12 @@ import {
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
-import { Plus, Pencil, Trash2, Ship, Anchor, Building2, ArrowLeft, Copy, CheckCircle2, AlertTriangle } from "lucide-react";
+import { Plus, Pencil, Trash2, Ship, Anchor, Building2, ArrowLeft, Copy, CheckCircle2, AlertTriangle, ChevronsUpDown, Check } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
+import { cn } from "@/lib/utils";
 import type { Fleet, Vessel } from "@shared/schema";
 
 interface VesselWithFleet extends Vessel {
@@ -91,6 +94,8 @@ export default function FleetVesselManager({ onBack }: { onBack?: () => void }) 
   const [editingVessel, setEditingVessel] = useState<Vessel | null>(null);
   const [copySourceVessel, setCopySourceVessel] = useState("");
   const [copyTargetVessel, setCopyTargetVessel] = useState("");
+  const [sourcePopoverOpen, setSourcePopoverOpen] = useState(false);
+  const [targetPopoverOpen, setTargetPopoverOpen] = useState(false);
   const [copyModules, setCopyModules] = useState({ components: true, jobs: true, spares: true });
   const [copyStep, setCopyStep] = useState<"select" | "confirm" | "result">("select");
   const [copyResult, setCopyResult] = useState<{ components: number; jobs: number; spares: number } | null>(null);
@@ -840,30 +845,92 @@ export default function FleetVesselManager({ onBack }: { onBack?: () => void }) 
                 <div className="space-y-3">
                   <div className="space-y-1.5">
                     <Label className="text-xs font-medium text-gray-600">Source Vessel</Label>
-                    <Select value={copySourceVessel} onValueChange={(v) => { setCopySourceVessel(v); if (v === copyTargetVessel) setCopyTargetVessel(""); }}>
-                      <SelectTrigger data-testid="select-copy-source-vessel">
-                        <SelectValue placeholder="Select source vessel..." />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {allVessels.map((v) => (
-                          <SelectItem key={v.id} value={v.code || v.id}>{v.name} {v.code ? `(${v.code})` : ""}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                    <Popover open={sourcePopoverOpen} onOpenChange={setSourcePopoverOpen}>
+                      <PopoverTrigger asChild>
+                        <Button
+                          variant="outline"
+                          role="combobox"
+                          aria-expanded={sourcePopoverOpen}
+                          className="w-full justify-between font-normal"
+                          data-testid="select-copy-source-vessel"
+                        >
+                          {copySourceVessel
+                            ? (() => { const v = allVessels.find((v) => (v.code || v.id) === copySourceVessel); return v ? `${v.name}${v.code ? ` (${v.code})` : ""}` : copySourceVessel; })()
+                            : "Search source vessel..."}
+                          <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start">
+                        <Command>
+                          <CommandInput placeholder="Type vessel name or code..." data-testid="input-search-source-vessel" />
+                          <CommandList>
+                            <CommandEmpty>No vessel found.</CommandEmpty>
+                            <CommandGroup>
+                              {allVessels.map((v) => (
+                                <CommandItem
+                                  key={v.id}
+                                  value={`${v.name} ${v.code || v.id}`}
+                                  onSelect={() => {
+                                    const val = v.code || v.id;
+                                    setCopySourceVessel(val);
+                                    if (val === copyTargetVessel) setCopyTargetVessel("");
+                                    setSourcePopoverOpen(false);
+                                  }}
+                                  data-testid={`option-source-vessel-${v.id}`}
+                                >
+                                  <Check className={cn("mr-2 h-4 w-4", copySourceVessel === (v.code || v.id) ? "opacity-100" : "opacity-0")} />
+                                  {v.name} {v.code ? `(${v.code})` : ""}
+                                </CommandItem>
+                              ))}
+                            </CommandGroup>
+                          </CommandList>
+                        </Command>
+                      </PopoverContent>
+                    </Popover>
                   </div>
 
                   <div className="space-y-1.5">
                     <Label className="text-xs font-medium text-gray-600">Target Vessel</Label>
-                    <Select value={copyTargetVessel} onValueChange={setCopyTargetVessel}>
-                      <SelectTrigger data-testid="select-copy-target-vessel">
-                        <SelectValue placeholder="Select target vessel..." />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {allVessels.filter((v) => (v.code || v.id) !== copySourceVessel).map((v) => (
-                          <SelectItem key={v.id} value={v.code || v.id}>{v.name} {v.code ? `(${v.code})` : ""}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                    <Popover open={targetPopoverOpen} onOpenChange={setTargetPopoverOpen}>
+                      <PopoverTrigger asChild>
+                        <Button
+                          variant="outline"
+                          role="combobox"
+                          aria-expanded={targetPopoverOpen}
+                          className="w-full justify-between font-normal"
+                          data-testid="select-copy-target-vessel"
+                        >
+                          {copyTargetVessel
+                            ? (() => { const v = allVessels.find((v) => (v.code || v.id) === copyTargetVessel); return v ? `${v.name}${v.code ? ` (${v.code})` : ""}` : copyTargetVessel; })()
+                            : "Search target vessel..."}
+                          <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start">
+                        <Command>
+                          <CommandInput placeholder="Type vessel name or code..." data-testid="input-search-target-vessel" />
+                          <CommandList>
+                            <CommandEmpty>No vessel found.</CommandEmpty>
+                            <CommandGroup>
+                              {allVessels.filter((v) => (v.code || v.id) !== copySourceVessel).map((v) => (
+                                <CommandItem
+                                  key={v.id}
+                                  value={`${v.name} ${v.code || v.id}`}
+                                  onSelect={() => {
+                                    setCopyTargetVessel(v.code || v.id);
+                                    setTargetPopoverOpen(false);
+                                  }}
+                                  data-testid={`option-target-vessel-${v.id}`}
+                                >
+                                  <Check className={cn("mr-2 h-4 w-4", copyTargetVessel === (v.code || v.id) ? "opacity-100" : "opacity-0")} />
+                                  {v.name} {v.code ? `(${v.code})` : ""}
+                                </CommandItem>
+                              ))}
+                            </CommandGroup>
+                          </CommandList>
+                        </Command>
+                      </PopoverContent>
+                    </Popover>
                     {copySourceVessel && copyTargetVessel && copySourceVessel === copyTargetVessel && (
                       <p className="text-xs text-red-500 flex items-center gap-1"><AlertTriangle className="h-3 w-3" /> Source and target cannot be the same</p>
                     )}
