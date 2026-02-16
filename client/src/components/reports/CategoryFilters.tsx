@@ -37,6 +37,12 @@ interface CategoryFiltersProps {
   className?: string;
 }
 
+const MONTH_FULL = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+const formatDateForInput = (d: Date | undefined) => {
+  if (!d) return "";
+  return `${d.getDate().toString().padStart(2, "0")} ${MONTH_FULL[d.getMonth()]} ${d.getFullYear()}`;
+};
+
 const CategoryFilters: React.FC<CategoryFiltersProps> = ({
   filters,
   onFiltersChange,
@@ -46,7 +52,12 @@ const CategoryFilters: React.FC<CategoryFiltersProps> = ({
 }) => {
   const { data: vessels = [] } = useVessels();
   const [catDatePopoverOpen, setCatDatePopoverOpen] = useState(false);
-  const [catPendingRange, setCatPendingRange] = useState<{ from?: Date; to?: Date }>({});
+  const [pendingFrom, setPendingFrom] = useState<Date | undefined>(undefined);
+  const [pendingTo, setPendingTo] = useState<Date | undefined>(undefined);
+  const [showFromCal, setShowFromCal] = useState(false);
+  const [showToCal, setShowToCal] = useState(false);
+  const [pendingDateFrom, setPendingDateFrom] = useState<Date | undefined>(undefined);
+  const [pendingDateTo, setPendingDateTo] = useState<Date | undefined>(undefined);
 
   const handleSearchChange = (value: string) => {
     onFiltersChange({ ...filters, searchQuery: value });
@@ -132,10 +143,10 @@ const CategoryFilters: React.FC<CategoryFiltersProps> = ({
           <Popover open={catDatePopoverOpen} onOpenChange={(isOpen) => {
             setCatDatePopoverOpen(isOpen);
             if (isOpen) {
-              setCatPendingRange({
-                from: filters.dateRange.from || undefined,
-                to: filters.dateRange.to || undefined,
-              });
+              setPendingFrom(filters.dateRange.from || undefined);
+              setPendingTo(filters.dateRange.to || undefined);
+              setShowFromCal(false);
+              setShowToCal(false);
             }
           }}>
             <PopoverTrigger asChild>
@@ -151,23 +162,110 @@ const CategoryFilters: React.FC<CategoryFiltersProps> = ({
                 {formatDateRange()}
               </Button>
             </PopoverTrigger>
-            <PopoverContent className="w-auto p-0" align="start">
-              <Calendar
-                initialFocus
-                mode="range"
-                selected={{
-                  from: catPendingRange.from,
-                  to: catPendingRange.to,
-                }}
-                onSelect={(range) => {
-                  setCatPendingRange({
-                    from: range?.from || undefined,
-                    to: range?.to || undefined,
-                  });
-                }}
-                numberOfMonths={2}
-              />
-              <div className="flex items-center justify-between gap-2 p-3 border-t">
+            <PopoverContent className="w-auto p-4" align="start">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <div className="text-xs font-medium text-muted-foreground mb-1.5">From</div>
+                  <Popover open={showFromCal} onOpenChange={(isOpen) => {
+                    setShowFromCal(isOpen);
+                    if (isOpen) setPendingDateFrom(pendingFrom);
+                  }}>
+                    <PopoverTrigger asChild>
+                      <button
+                        type="button"
+                        className="flex items-center gap-2 w-full h-8 px-2 rounded-md border border-input bg-background text-xs cursor-pointer"
+                        data-testid="button-cat-date-from"
+                      >
+                        <CalendarIcon className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+                        <span className={pendingFrom ? "text-foreground" : "text-muted-foreground"}>
+                          {pendingFrom ? formatDateForInput(pendingFrom) : "Select date"}
+                        </span>
+                      </button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0" align="start">
+                      <Calendar
+                        mode="single"
+                        selected={pendingDateFrom}
+                        onSelect={(d) => setPendingDateFrom(d || undefined)}
+                        initialFocus
+                      />
+                      <div className="flex justify-end gap-2 p-3 pt-0 border-t mt-2">
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="text-xs"
+                          onClick={() => setShowFromCal(false)}
+                          data-testid="button-cat-date-from-cancel"
+                        >
+                          Cancel
+                        </Button>
+                        <Button
+                          size="sm"
+                          className="text-xs"
+                          onClick={() => {
+                            setPendingFrom(pendingDateFrom);
+                            setShowFromCal(false);
+                          }}
+                          data-testid="button-cat-date-from-ok"
+                        >
+                          OK
+                        </Button>
+                      </div>
+                    </PopoverContent>
+                  </Popover>
+                </div>
+                <div>
+                  <div className="text-xs font-medium text-muted-foreground mb-1.5">To</div>
+                  <Popover open={showToCal} onOpenChange={(isOpen) => {
+                    setShowToCal(isOpen);
+                    if (isOpen) setPendingDateTo(pendingTo);
+                  }}>
+                    <PopoverTrigger asChild>
+                      <button
+                        type="button"
+                        className="flex items-center gap-2 w-full h-8 px-2 rounded-md border border-input bg-background text-xs cursor-pointer"
+                        data-testid="button-cat-date-to"
+                      >
+                        <CalendarIcon className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+                        <span className={pendingTo ? "text-foreground" : "text-muted-foreground"}>
+                          {pendingTo ? formatDateForInput(pendingTo) : "Select date"}
+                        </span>
+                      </button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0" align="start">
+                      <Calendar
+                        mode="single"
+                        selected={pendingDateTo}
+                        onSelect={(d) => setPendingDateTo(d || undefined)}
+                        initialFocus
+                      />
+                      <div className="flex justify-end gap-2 p-3 pt-0 border-t mt-2">
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="text-xs"
+                          onClick={() => setShowToCal(false)}
+                          data-testid="button-cat-date-to-cancel"
+                        >
+                          Cancel
+                        </Button>
+                        <Button
+                          size="sm"
+                          className="text-xs"
+                          onClick={() => {
+                            setPendingTo(pendingDateTo);
+                            setShowToCal(false);
+                          }}
+                          data-testid="button-cat-date-to-ok"
+                        >
+                          OK
+                        </Button>
+                      </div>
+                    </PopoverContent>
+                  </Popover>
+                </div>
+              </div>
+              <div className="flex items-center justify-between gap-2 pt-3 mt-3 border-t">
                 <Button
                   variant="outline"
                   size="sm"
@@ -195,8 +293,8 @@ const CategoryFilters: React.FC<CategoryFiltersProps> = ({
                     className="text-xs"
                     onClick={() => {
                       handleDateRangeChange(
-                        catPendingRange.from || null,
-                        catPendingRange.to || null
+                        pendingFrom || null,
+                        pendingTo || null
                       );
                       setCatDatePopoverOpen(false);
                     }}
