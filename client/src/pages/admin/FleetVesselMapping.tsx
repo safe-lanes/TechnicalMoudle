@@ -527,13 +527,13 @@ export default function FleetVesselMapping({ onBack }: { onBack?: () => void }) 
 
     return vesselJobsData.map((vj: any) => {
       const vjJobCode = vj.jobNo || "";
-      const vjEquipCode = vj.componentCode || "";
-      const compositeKey = `${vjJobCode}|${vjEquipCode}`;
-      const matched = !!vjJobCode && !!vjEquipCode && fleetJobCompositeKeys.has(compositeKey);
+      const vjFleetEquipCode = vj.fleetEquipmentCode || "";
+      const compositeKey = `${vjJobCode}|${vjFleetEquipCode}`;
+      const matched = !!vjJobCode && !!vjFleetEquipCode && fleetJobCompositeKeys.has(compositeKey);
       const fleetJob = matched ? fleetJobLookup.get(compositeKey) : null;
 
       return {
-        fleetEquipmentCode: vjEquipCode,
+        fleetEquipmentCode: vjFleetEquipCode,
         componentCode: vj.componentCode || "",
         componentName: vj.componentName || "",
         jobCode: vjJobCode,
