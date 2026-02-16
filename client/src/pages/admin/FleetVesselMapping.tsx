@@ -39,6 +39,16 @@ interface AutoMatchEntry {
   matched: boolean;
 }
 
+interface JobAutoMatchEntry {
+  fleetEquipmentCode: string;
+  componentCode: string;
+  componentName: string;
+  jobCode: string;
+  jobTitle: string;
+  vesselJobId: string;
+  matched: boolean;
+}
+
 interface FleetTreeNode {
   code: string;
   name: string;
@@ -78,6 +88,8 @@ export default function FleetVesselMapping({ onBack }: { onBack?: () => void }) 
   const [selectedVesselItems, setSelectedVesselItems] = useState<Set<string>>(new Set());
   const [autoMatchDialogOpen, setAutoMatchDialogOpen] = useState(false);
   const [autoMatchProgress, setAutoMatchProgress] = useState<{ current: number; total: number; linked: number; failed: number } | null>(null);
+  const [jobAutoMatchDialogOpen, setJobAutoMatchDialogOpen] = useState(false);
+  const [jobAutoMatchProgress, setJobAutoMatchProgress] = useState<{ current: number; total: number; linked: number; failed: number } | null>(null);
   const [summaryDialogOpen, setSummaryDialogOpen] = useState(false);
   const [summaryData, setSummaryData] = useState<{ linked: number; notLinked: number }>({ linked: 0, notLinked: 0 });
   const [expandedFleetNodes, setExpandedFleetNodes] = useState<Set<string>>(new Set());
@@ -505,6 +517,37 @@ export default function FleetVesselMapping({ onBack }: { onBack?: () => void }) 
     });
   }, [vesselComponentsNonParent, fleetComponents]);
 
+  const jobAutoMatchEntries = useMemo((): JobAutoMatchEntry[] => {
+    const fleetJobCompositeKeys = new Set(
+      fleetJobsData.map((fj) => `${fj.jobCode}|${fj.fleetEquipmentCode}`)
+    );
+    const fleetJobLookup = new Map(
+      fleetJobsData.map((fj) => [`${fj.jobCode}|${fj.fleetEquipmentCode}`, fj])
+    );
+
+    return vesselJobsData.map((vj: any) => {
+      const vjJobCode = vj.fleetJobCode || "";
+      const vjEquipCode = vj.fleetEquipmentCode || "";
+      const compositeKey = `${vjJobCode}|${vjEquipCode}`;
+      const matched = !!vjJobCode && !!vjEquipCode && fleetJobCompositeKeys.has(compositeKey);
+      const fleetJob = matched ? fleetJobLookup.get(compositeKey) : null;
+
+      return {
+        fleetEquipmentCode: vjEquipCode,
+        componentCode: vj.componentCode || "",
+        componentName: vj.componentName || "",
+        jobCode: vjJobCode,
+        jobTitle: fleetJob?.woTitle || vj.jobTitle || "",
+        vesselJobId: vj.id || "",
+        matched,
+      };
+    });
+  }, [vesselJobsData, fleetJobsData]);
+
+  const jobMappedCompositeKeys = useMemo(() => {
+    return new Set(jobMappingsData.map((m) => `${m.jobCode}|${m.fleetEquipmentCode}`));
+  }, [jobMappingsData]);
+
   const createMappingMutation = useMutation({
     mutationFn: async (data: {
       fleetEquipmentCode: string;
@@ -620,6 +663,53 @@ export default function FleetVesselMapping({ onBack }: { onBack?: () => void }) 
     queryClient.invalidateQueries({ queryKey: ["/technical/api/fleet-admin/fleet-component-mappings", { vesselCode: selectedVessel }] });
     setAutoMatchDialogOpen(false);
     setSummaryData({ linked, notLinked });
+    setSummaryDialogOpen(true);
+  };
+
+  const handleJobAutoMatch = () => {
+    if (!selectedVessel) {
+      toast({ title: "Error", description: "Please select a vessel first", variant: "destructive" });
+      return;
+    }
+    setJobAutoMatchDialogOpen(true);
+  };
+
+  const handleCreateJobAutoMappings = async () => {
+    const matchedEntries = jobAutoMatchEntries.filter(
+      (e) => e.matched && !jobMappedCompositeKeys.has(`${e.jobCode}|${e.fleetEquipmentCode}`)
+    );
+
+    if (matchedEntries.length === 0) {
+      toast({ title: "Info", description: "No new job mappings to create" });
+      return;
+    }
+
+    let linked = 0;
+    let failed = 0;
+    setJobAutoMatchProgress({ current: 0, total: matchedEntries.length, linked: 0, failed: 0 });
+
+    for (let i = 0; i < matchedEntries.length; i++) {
+      const entry = matchedEntries[i];
+      try {
+        await apiRequest("POST", "/technical/api/fleet-admin/fleet-job-mappings", {
+          fleetEquipmentCode: entry.fleetEquipmentCode,
+          jobCode: entry.jobCode,
+          jobId: entry.vesselJobId,
+          vesselCode: selectedVessel,
+          mappedBy: "auto-match",
+          isActive: true,
+        });
+        linked++;
+      } catch {
+        failed++;
+      }
+      setJobAutoMatchProgress({ current: i + 1, total: matchedEntries.length, linked, failed });
+    }
+
+    queryClient.invalidateQueries({ queryKey: ["/technical/api/fleet-admin/fleet-job-mappings", { vesselCode: selectedVessel }] });
+    setJobAutoMatchDialogOpen(false);
+    setJobAutoMatchProgress(null);
+    setSummaryData({ linked, notLinked: failed });
     setSummaryDialogOpen(true);
   };
 
@@ -1129,7 +1219,7 @@ export default function FleetVesselMapping({ onBack }: { onBack?: () => void }) 
                 size="sm"
                 disabled={!selectedVessel || isLoading}
                 className="border-cyan-500 text-cyan-600"
-                onClick={() => toast({ title: "Coming Soon", description: "Auto-Match for Jobs Mapping is under development" })}
+                onClick={handleJobAutoMatch}
                 data-testid="button-job-auto-match"
               >
                 <Zap className="h-3.5 w-3.5 mr-1.5" />
@@ -1626,6 +1716,84 @@ export default function FleetVesselMapping({ onBack }: { onBack?: () => void }) 
                 {autoMatchEntries.length === 0 && (
                   <tr>
                     <td colSpan={4} className="text-center py-8 text-gray-500 text-xs">No vessel components to match</td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </ScrollArea>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={jobAutoMatchDialogOpen} onOpenChange={setJobAutoMatchDialogOpen}>
+        <DialogContent className="p-0 gap-0" style={{ width: "60vw", maxWidth: "60vw", maxHeight: "85vh" }}>
+          <div className="bg-gradient-to-r from-cyan-600 to-blue-600 pl-4 pr-10 py-2.5 flex items-center justify-between gap-2 rounded-t-lg flex-wrap">
+            <div className="flex items-center gap-2">
+              <Wrench className="h-3.5 w-3.5 text-white" />
+              <DialogTitle className="text-xs font-semibold text-white m-0">Auto-Match Results — Jobs Mapping</DialogTitle>
+            </div>
+            <Button
+              onClick={handleCreateJobAutoMappings}
+              className="h-6 px-2 text-[10px] bg-white text-blue-700 hover:bg-gray-100"
+              data-testid="button-create-job-auto-mappings"
+            >
+              Create Mapping
+            </Button>
+          </div>
+          {jobAutoMatchProgress && (
+            <div className="px-4 py-3 border-b bg-blue-50/50" data-testid="job-auto-match-progress">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-xs font-medium text-gray-600">
+                  Processing {jobAutoMatchProgress.current} of {jobAutoMatchProgress.total}...
+                </span>
+                <span className="text-xs text-gray-500">
+                  {Math.round((jobAutoMatchProgress.current / jobAutoMatchProgress.total) * 100)}%
+                </span>
+              </div>
+              <Progress value={(jobAutoMatchProgress.current / jobAutoMatchProgress.total) * 100} className="h-2" />
+              <div className="flex items-center gap-4 mt-2">
+                <div className="flex items-center gap-1.5">
+                  <div className="w-2 h-2 rounded-full bg-green-500" />
+                  <span className="text-[10px] text-gray-500">Linked: {jobAutoMatchProgress.linked}</span>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <div className="w-2 h-2 rounded-full bg-red-500" />
+                  <span className="text-[10px] text-gray-500">Failed: {jobAutoMatchProgress.failed}</span>
+                </div>
+              </div>
+            </div>
+          )}
+          <ScrollArea className="max-h-[70vh]">
+            <table className="w-full">
+              <thead>
+                <tr className="border-b">
+                  <th className="sticky top-0 bg-gray-50 z-10 text-left px-3 py-2 text-xs font-medium text-gray-500">Fleet Equipment Code</th>
+                  <th className="sticky top-0 bg-gray-50 z-10 text-left px-3 py-2 text-xs font-medium text-gray-500">Component Code</th>
+                  <th className="sticky top-0 bg-gray-50 z-10 text-left px-3 py-2 text-xs font-medium text-gray-500">Component Name</th>
+                  <th className="sticky top-0 bg-gray-50 z-10 text-left px-3 py-2 text-xs font-medium text-gray-500">Job Code</th>
+                  <th className="sticky top-0 bg-gray-50 z-10 text-left px-3 py-2 text-xs font-medium text-gray-500">Job Title</th>
+                  <th className="sticky top-0 bg-gray-50 z-10 text-center px-3 py-2 text-xs font-medium text-gray-500">Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                {jobAutoMatchEntries.map((entry, idx) => (
+                  <tr key={`${entry.jobCode}-${entry.fleetEquipmentCode}-${idx}`} className="border-b text-xs hover:bg-blue-50/50">
+                    <td className="px-3 py-2 font-mono">{entry.fleetEquipmentCode || "-"}</td>
+                    <td className="px-3 py-2 font-mono">{entry.componentCode || "-"}</td>
+                    <td className="px-3 py-2 truncate max-w-[180px]">{entry.componentName || "-"}</td>
+                    <td className="px-3 py-2 font-mono">{entry.jobCode}</td>
+                    <td className="px-3 py-2 truncate max-w-[200px]">{entry.jobTitle}</td>
+                    <td className="px-3 py-2 text-center">
+                      {entry.matched ? (
+                        <Badge className="bg-green-100 text-green-800 border-green-200 text-[10px]">Matched</Badge>
+                      ) : (
+                        <Badge className="bg-red-100 text-red-800 border-red-200 text-[10px]">No Match</Badge>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+                {jobAutoMatchEntries.length === 0 && (
+                  <tr>
+                    <td colSpan={6} className="text-center py-8 text-gray-500 text-xs">No vessel jobs to match</td>
                   </tr>
                 )}
               </tbody>
