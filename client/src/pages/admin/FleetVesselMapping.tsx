@@ -627,7 +627,21 @@ export default function FleetVesselMapping({ onBack }: { onBack?: () => void }) 
     queryClient.invalidateQueries({ queryKey: ["/technical/api/fleet-admin/fleet-components"] });
     queryClient.invalidateQueries({ queryKey: ["/technical/api/components", { vesselId: selectedVessel }] });
     queryClient.invalidateQueries({ queryKey: ["/technical/api/fleet-admin/fleet-component-mappings", { vesselCode: selectedVessel }] });
-    toast({ title: "Re-syncing", description: "Refreshing all data..." });
+    toast({ title: "Re-syncing", description: "Refreshing component mapping data..." });
+  };
+
+  const handleJobsResync = () => {
+    queryClient.invalidateQueries({ queryKey: ["/technical/api/fleet-admin/fleet-jobs"] });
+    queryClient.invalidateQueries({ queryKey: ["/technical/api/jobs", { vesselId: selectedVessel }] });
+    queryClient.invalidateQueries({ queryKey: ["/technical/api/fleet-admin/fleet-job-mappings", { vesselCode: selectedVessel }] });
+    toast({ title: "Re-syncing", description: "Refreshing job mapping data..." });
+  };
+
+  const handleSparesResync = () => {
+    queryClient.invalidateQueries({ queryKey: ["/technical/api/fleet-admin/fleet-spares"] });
+    queryClient.invalidateQueries({ queryKey: ["/technical/api/spares", { vesselId: selectedVessel }] });
+    queryClient.invalidateQueries({ queryKey: ["/technical/api/fleet-admin/fleet-spare-mappings", { vesselCode: selectedVessel }] });
+    toast({ title: "Re-syncing", description: "Refreshing spare mapping data..." });
   };
 
   const toggleFleetNode = useCallback((code: string) => {
@@ -891,34 +905,6 @@ export default function FleetVesselMapping({ onBack }: { onBack?: () => void }) 
             ))}
           </SelectContent>
         </Select>
-        <Button
-          variant="outline"
-          onClick={handleAutoMatch}
-          disabled={!selectedVessel || isLoading}
-          className="border-cyan-500 text-cyan-600"
-          data-testid="button-auto-match"
-        >
-          <Zap className="h-4 w-4 mr-2" />
-          Auto-Match
-        </Button>
-        <Button
-          variant="outline"
-          onClick={handleResync}
-          disabled={isLoading}
-          data-testid="button-resync"
-        >
-          <RefreshCw className={`h-4 w-4 mr-2 ${isLoading ? "animate-spin" : ""}`} />
-          Re-sync
-        </Button>
-        <Button
-          variant="outline"
-          disabled={!selectedVessel}
-          className="border-green-500 text-green-600"
-          data-testid="button-export-mappings"
-        >
-          <Download className="h-4 w-4 mr-2" />
-          Export
-        </Button>
       </div>
 
       <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as MappingTab)}>
@@ -938,14 +924,49 @@ export default function FleetVesselMapping({ onBack }: { onBack?: () => void }) 
         </TabsList>
 
         <TabsContent value="components">
-          <div className="mb-4 flex items-center gap-4 text-sm">
-            <div className="flex items-center gap-2">
-              <div className="w-3 h-3 rounded-full bg-green-500" />
-              <span data-testid="text-mapped-count">Mapped: {mappedCount}</span>
+          <div className="mb-4 flex items-center justify-between flex-wrap gap-2">
+            <div className="flex items-center gap-4 text-sm">
+              <div className="flex items-center gap-2">
+                <div className="w-3 h-3 rounded-full bg-green-500" />
+                <span data-testid="text-mapped-count">Mapped: {mappedCount}</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <div className="w-3 h-3 rounded-full bg-gray-400" />
+                <span data-testid="text-unmapped-count">Not Mapped: {unmappedCount}</span>
+              </div>
             </div>
             <div className="flex items-center gap-2">
-              <div className="w-3 h-3 rounded-full bg-gray-400" />
-              <span data-testid="text-unmapped-count">Not Mapped: {unmappedCount}</span>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleAutoMatch}
+                disabled={!selectedVessel || isLoading}
+                className="border-cyan-500 text-cyan-600"
+                data-testid="button-component-auto-match"
+              >
+                <Zap className="h-3.5 w-3.5 mr-1.5" />
+                Auto-Match
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleResync}
+                disabled={isLoading}
+                data-testid="button-component-resync"
+              >
+                <RefreshCw className={`h-3.5 w-3.5 mr-1.5 ${isLoading ? "animate-spin" : ""}`} />
+                Re-sync
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={!selectedVessel}
+                className="border-green-500 text-green-600"
+                data-testid="button-component-export"
+              >
+                <Download className="h-3.5 w-3.5 mr-1.5" />
+                Export
+              </Button>
             </div>
           </div>
 
@@ -1091,14 +1112,48 @@ export default function FleetVesselMapping({ onBack }: { onBack?: () => void }) 
         </TabsContent>
 
         <TabsContent value="jobs">
-          <div className="mb-4 flex items-center gap-4 text-sm">
-            <div className="flex items-center gap-2">
-              <div className="w-3 h-3 rounded-full bg-green-500" />
-              <span data-testid="text-job-mapped-count">Mapped: {jobMappedCount}</span>
+          <div className="mb-4 flex items-center justify-between flex-wrap gap-2">
+            <div className="flex items-center gap-4 text-sm">
+              <div className="flex items-center gap-2">
+                <div className="w-3 h-3 rounded-full bg-green-500" />
+                <span data-testid="text-job-mapped-count">Mapped: {jobMappedCount}</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <div className="w-3 h-3 rounded-full bg-gray-400" />
+                <span data-testid="text-job-unmapped-count">Not Mapped: {jobUnmappedCount}</span>
+              </div>
             </div>
             <div className="flex items-center gap-2">
-              <div className="w-3 h-3 rounded-full bg-gray-400" />
-              <span data-testid="text-job-unmapped-count">Not Mapped: {jobUnmappedCount}</span>
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={!selectedVessel || isLoading}
+                className="border-cyan-500 text-cyan-600"
+                data-testid="button-job-auto-match"
+              >
+                <Zap className="h-3.5 w-3.5 mr-1.5" />
+                Auto-Match
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleJobsResync}
+                disabled={isLoading}
+                data-testid="button-job-resync"
+              >
+                <RefreshCw className={`h-3.5 w-3.5 mr-1.5 ${isLoading ? "animate-spin" : ""}`} />
+                Re-sync
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={!selectedVessel}
+                className="border-green-500 text-green-600"
+                data-testid="button-job-export"
+              >
+                <Download className="h-3.5 w-3.5 mr-1.5" />
+                Export
+              </Button>
             </div>
           </div>
 
@@ -1300,14 +1355,48 @@ export default function FleetVesselMapping({ onBack }: { onBack?: () => void }) 
         </TabsContent>
 
         <TabsContent value="spares">
-          <div className="flex items-center gap-4 mb-4 text-sm flex-wrap">
-            <div className="flex items-center gap-2">
-              <div className="w-3 h-3 rounded-full bg-green-500" />
-              <span data-testid="text-spare-mapped-count">Mapped: {spareMappedCount}</span>
+          <div className="mb-4 flex items-center justify-between flex-wrap gap-2">
+            <div className="flex items-center gap-4 text-sm">
+              <div className="flex items-center gap-2">
+                <div className="w-3 h-3 rounded-full bg-green-500" />
+                <span data-testid="text-spare-mapped-count">Mapped: {spareMappedCount}</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <div className="w-3 h-3 rounded-full bg-gray-400" />
+                <span data-testid="text-spare-unmapped-count">Not Mapped: {spareUnmappedCount}</span>
+              </div>
             </div>
             <div className="flex items-center gap-2">
-              <div className="w-3 h-3 rounded-full bg-gray-400" />
-              <span data-testid="text-spare-unmapped-count">Not Mapped: {spareUnmappedCount}</span>
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={!selectedVessel || isLoading}
+                className="border-cyan-500 text-cyan-600"
+                data-testid="button-spare-auto-match"
+              >
+                <Zap className="h-3.5 w-3.5 mr-1.5" />
+                Auto-Match
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleSparesResync}
+                disabled={isLoading}
+                data-testid="button-spare-resync"
+              >
+                <RefreshCw className={`h-3.5 w-3.5 mr-1.5 ${isLoading ? "animate-spin" : ""}`} />
+                Re-sync
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={!selectedVessel}
+                className="border-green-500 text-green-600"
+                data-testid="button-spare-export"
+              >
+                <Download className="h-3.5 w-3.5 mr-1.5" />
+                Export
+              </Button>
             </div>
           </div>
 
