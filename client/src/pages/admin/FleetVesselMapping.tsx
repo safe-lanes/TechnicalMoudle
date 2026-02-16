@@ -631,15 +631,15 @@ export default function FleetVesselMapping({ onBack }: { onBack?: () => void }) 
   };
 
   const handleJobsResync = () => {
-    queryClient.invalidateQueries({ queryKey: ["/technical/api/fleet-admin/fleet-jobs"] });
+    queryClient.invalidateQueries({ queryKey: ["/technical/api/fleet/jobs"] });
     queryClient.invalidateQueries({ queryKey: ["/technical/api/jobs", { vesselId: selectedVessel }] });
     queryClient.invalidateQueries({ queryKey: ["/technical/api/fleet-admin/fleet-job-mappings", { vesselCode: selectedVessel }] });
     toast({ title: "Re-syncing", description: "Refreshing job mapping data..." });
   };
 
   const handleSparesResync = () => {
-    queryClient.invalidateQueries({ queryKey: ["/technical/api/fleet-admin/fleet-spares"] });
-    queryClient.invalidateQueries({ queryKey: ["/technical/api/spares", { vesselId: selectedVessel }] });
+    queryClient.invalidateQueries({ queryKey: ["/technical/api/fleet/spares"] });
+    queryClient.invalidateQueries({ queryKey: ["/technical/api/spares", selectedVessel] });
     queryClient.invalidateQueries({ queryKey: ["/technical/api/fleet-admin/fleet-spare-mappings", { vesselCode: selectedVessel }] });
     toast({ title: "Re-syncing", description: "Refreshing spare mapping data..." });
   };
@@ -1129,6 +1129,7 @@ export default function FleetVesselMapping({ onBack }: { onBack?: () => void }) 
                 size="sm"
                 disabled={!selectedVessel || isLoading}
                 className="border-cyan-500 text-cyan-600"
+                onClick={() => toast({ title: "Coming Soon", description: "Auto-Match for Jobs Mapping is under development" })}
                 data-testid="button-job-auto-match"
               >
                 <Zap className="h-3.5 w-3.5 mr-1.5" />
@@ -1372,6 +1373,7 @@ export default function FleetVesselMapping({ onBack }: { onBack?: () => void }) 
                 size="sm"
                 disabled={!selectedVessel || isLoading}
                 className="border-cyan-500 text-cyan-600"
+                onClick={() => toast({ title: "Coming Soon", description: "Auto-Match for Spares Mapping is under development" })}
                 data-testid="button-spare-auto-match"
               >
                 <Zap className="h-3.5 w-3.5 mr-1.5" />
