@@ -562,27 +562,26 @@ export default function FleetVesselMapping({ onBack }: { onBack?: () => void }) 
   }, [jobMappingsData]);
 
   const spareAutoMatchEntries = useMemo((): SpareAutoMatchEntry[] => {
-    const fleetSpareCompositeKeys = new Set(
-      fleetSparesData.map((fs) => `${fs.fleetEquipmentCode}|${fs.partCode}`)
-    );
-    const fleetSpareLookup = new Map(
-      fleetSparesData.map((fs) => [`${fs.fleetEquipmentCode}|${fs.partCode}`, fs])
-    );
+    const vesselSpareLookup = new Map<string, any>();
+    vesselSparesData.forEach((vs: any) => {
+      const key = `${vs.fleetEquipmentCode || ""}|${vs.partCode || ""}`;
+      if (vs.fleetEquipmentCode && vs.partCode && !vesselSpareLookup.has(key)) {
+        vesselSpareLookup.set(key, vs);
+      }
+    });
 
-    return vesselSparesData.map((vs: any) => {
-      const vsFleetEquipCode = vs.fleetEquipmentCode || "";
-      const vsPartCode = vs.partCode || "";
-      const compositeKey = `${vsFleetEquipCode}|${vsPartCode}`;
-      const matched = !!vsFleetEquipCode && !!vsPartCode && fleetSpareCompositeKeys.has(compositeKey);
-      const fleetSpare = matched ? fleetSpareLookup.get(compositeKey) : null;
+    return fleetSparesData.map((fs) => {
+      const compositeKey = `${fs.fleetEquipmentCode}|${fs.partCode}`;
+      const vesselSpare = vesselSpareLookup.get(compositeKey) || null;
+      const matched = !!vesselSpare;
 
       return {
-        fleetEquipmentCode: vsFleetEquipCode,
-        partCode: fleetSpare?.partCode || vsPartCode,
-        partName: fleetSpare?.partName || "",
-        vesselPartCode: vsPartCode,
-        vesselPartName: vs.partName || "",
-        vesselSpareId: String(vs.id),
+        fleetEquipmentCode: fs.fleetEquipmentCode,
+        partCode: fs.partCode,
+        partName: fs.partName || "",
+        vesselPartCode: vesselSpare?.partCode || "",
+        vesselPartName: vesselSpare?.partName || "",
+        vesselSpareId: vesselSpare ? String(vesselSpare.id) : "",
         matched,
       };
     });
