@@ -1,0 +1,19 @@
+{
+  "id": "48708599-4b28-450e-ac49-f07e8c0d66a6",
+  "type": "stores",
+  "mode": "upsert",
+  "vesselId": "743ef9d1-841a-11ed-aa7c-7003bca91a86",
+  "userId": 1,
+  "startedAt": "2026-02-16T09:54:00.968Z",
+  "completedAt": "2026-02-16T09:54:01.036Z",
+  "status": "complete",
+  "created": 10,
+  "updated": 0,
+  "skipped": 0,
+  "archived": 0,
+  "originalName": "Stores 4.xlsx",
+  "storedFilePath": "local:/home/runner/workspace/uploads/bulk-imports/stores/1771235641036_Stores_4.xlsx",
+  "errorReport": null,
+  "jobComponentLinksCreated": 0,
+  "spareComponentLinksCreated": 0
+}

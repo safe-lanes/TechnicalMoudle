@@ -1,0 +1,19 @@
+{
+  "id": "6170b67b-3f71-4d61-8d1e-afe7e5bea420",
+  "type": "stores",
+  "mode": "upsert",
+  "vesselId": "743ef9d1-841a-11ed-aa7c-7003bca91a86",
+  "userId": 1,
+  "startedAt": "2026-02-16T09:54:52.421Z",
+  "completedAt": "2026-02-16T09:54:52.591Z",
+  "status": "complete",
+  "created": 10,
+  "updated": 0,
+  "skipped": 0,
+  "archived": 0,
+  "originalName": "Stores - Others 4.xlsx",
+  "storedFilePath": "local:/home/runner/workspace/uploads/bulk-imports/stores/1771235692591_Stores_-_Others_4.xlsx",
+  "errorReport": null,
+  "jobComponentLinksCreated": 0,
+  "spareComponentLinksCreated": 0
+}
