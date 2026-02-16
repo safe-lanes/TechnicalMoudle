@@ -97,7 +97,7 @@ export default function FleetVesselMapping({ onBack }: { onBack?: () => void }) 
   const [selectedFleetJob, setSelectedFleetJob] = useState<string | null>(null); // composite key: jobCode|fleetEquipmentCode
   const [selectedVesselJobs, setSelectedVesselJobs] = useState<Set<string>>(new Set());
   const [selectedFleetSpare, setSelectedFleetSpare] = useState<string | null>(null);
-  const [selectedVesselSpare, setSelectedVesselSpare] = useState<string | null>(null);
+  const [selectedVesselSpares, setSelectedVesselSpares] = useState<Set<string>>(new Set());
 
   const { data: vessels = [] } = useVessels();
 
@@ -707,6 +707,86 @@ export default function FleetVesselMapping({ onBack }: { onBack?: () => void }) 
     }
   };
 
+  const deleteSpareMappingMutation = useMutation({
+    mutationFn: async (params: { partCode: string; vesselCode: string }) => {
+      await apiRequest(
+        "DELETE",
+        `/technical/api/fleet-admin/fleet-spare-mappings?partCode=${encodeURIComponent(params.partCode)}&vesselCode=${encodeURIComponent(params.vesselCode)}`
+      );
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/technical/api/fleet-admin/fleet-spare-mappings", { vesselCode: selectedVessel }] });
+      toast({ title: "Success", description: "Spare mapping removed successfully" });
+    },
+    onError: (error: any) => {
+      toast({ title: "Error", description: error.message || "Failed to remove spare mapping", variant: "destructive" });
+    },
+  });
+
+  const handleRemoveSpareMapping = (m: any) => {
+    deleteSpareMappingMutation.mutate({
+      partCode: m.partCode,
+      vesselCode: m.vesselCode || selectedVessel || "",
+    });
+  };
+
+  const handleRemoveAllSpareMappings = async () => {
+    for (const m of selectedFleetSpareLinkedDetails) {
+      try {
+        await apiRequest(
+          "DELETE",
+          `/technical/api/fleet-admin/fleet-spare-mappings?partCode=${encodeURIComponent(m.partCode)}&vesselCode=${encodeURIComponent(m.vesselCode || selectedVessel || "")}`
+        );
+      } catch {}
+    }
+    queryClient.invalidateQueries({ queryKey: ["/technical/api/fleet-admin/fleet-spare-mappings", { vesselCode: selectedVessel }] });
+    toast({ title: "Success", description: "All spare mappings removed" });
+  };
+
+  const handleManualSpareMap = async () => {
+    if (!selectedFleetSpare || selectedVesselSpares.size === 0 || !selectedVessel) {
+      toast({ title: "Error", description: "Select a fleet spare and one or more vessel spares", variant: "destructive" });
+      return;
+    }
+
+    const selectedFleetSpareObj = fleetSparesData.find((s) => s.partCode === selectedFleetSpare);
+    if (!selectedFleetSpareObj) {
+      toast({ title: "Error", description: "Fleet spare not found", variant: "destructive" });
+      return;
+    }
+
+    let successCount = 0;
+    let failCount = 0;
+
+    for (const vesselSpareId of Array.from(selectedVesselSpares)) {
+      const vesselSpare = vesselSparesData.find((vs: any) => String(vs.id) === vesselSpareId);
+      if (!vesselSpare) { failCount++; continue; }
+
+      try {
+        await apiRequest("POST", "/technical/api/fleet-admin/fleet-spare-mappings", {
+          fleetEquipmentCode: selectedFleetSpareObj.fleetEquipmentCode,
+          partCode: selectedFleetSpareObj.partCode,
+          spareId: String(vesselSpare.id),
+          vesselCode: selectedVessel,
+          mappedBy: "admin",
+          isActive: true,
+        });
+        successCount++;
+      } catch {
+        failCount++;
+      }
+    }
+
+    queryClient.invalidateQueries({ queryKey: ["/technical/api/fleet-admin/fleet-spare-mappings", { vesselCode: selectedVessel }] });
+    setSelectedVesselSpares(new Set());
+
+    if (successCount > 0) {
+      toast({ title: "Success", description: `${successCount} spare mapping(s) created successfully${failCount > 0 ? `, ${failCount} failed` : ""}` });
+    } else {
+      toast({ title: "Error", description: "Failed to create spare mappings", variant: "destructive" });
+    }
+  };
+
   const handleRemoveMapping = (m: FleetComponentMapping) => {
     deleteMappingMutation.mutate({
       fleetEquipmentCode: m.fleetEquipmentCode,
@@ -1068,7 +1148,7 @@ export default function FleetVesselMapping({ onBack }: { onBack?: () => void }) 
             data-testid="input-search-mappings"
           />
         </div>
-        <Select value={selectedVessel} onValueChange={(v) => { setSelectedVessel(v); setSelectedFleetItem(null); setSelectedVesselItems(new Set()); setSelectedFleetJob(null); setSelectedVesselJobs(new Set()); setSelectedFleetSpare(null); setSelectedVesselSpare(null); }}>
+        <Select value={selectedVessel} onValueChange={(v) => { setSelectedVessel(v); setSelectedFleetItem(null); setSelectedVesselItems(new Set()); setSelectedFleetJob(null); setSelectedVesselJobs(new Set()); setSelectedFleetSpare(null); setSelectedVesselSpares(new Set()); }}>
           <SelectTrigger className="w-64" data-testid="select-vessel-filter">
             <SelectValue placeholder="Select a vessel..." />
           </SelectTrigger>
@@ -1465,7 +1545,7 @@ export default function FleetVesselMapping({ onBack }: { onBack?: () => void }) 
                           </div>
                           <Button
                             onClick={handleManualJobMap}
-                            className="w-full bg-cyan-600 hover:bg-cyan-700 text-white"
+                            className="w-full bg-cyan-600 text-white"
                             data-testid="button-create-job-mapping"
                           >
                             Link {selectedVesselJobs.size} Selected
@@ -1698,21 +1778,58 @@ export default function FleetVesselMapping({ onBack }: { onBack?: () => void }) 
 
                       {selectedFleetSpareLinkedDetails.length > 0 ? (
                         <div className="space-y-2">
-                          <div className="text-xs font-medium text-gray-500">Linked Vessel Spares ({selectedFleetSpareLinkedDetails.length})</div>
+                          <div className="flex items-center justify-between gap-2">
+                            <div className="text-xs font-medium text-gray-500">Linked Vessel Spares ({selectedFleetSpareLinkedDetails.length})</div>
+                            {selectedFleetSpareLinkedDetails.length > 1 && (
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="h-6 px-2 text-[10px] text-red-500"
+                                onClick={handleRemoveAllSpareMappings}
+                                data-testid="button-remove-all-spare-mappings"
+                              >
+                                <Trash2 className="h-3 w-3 mr-1" />
+                                Remove All
+                              </Button>
+                            )}
+                          </div>
                           {selectedFleetSpareLinkedDetails.map((m) => (
-                            <div key={`${m.partCode}-${m.vesselCode}`} className="p-2 border rounded-md">
+                            <div key={`${m.partCode}-${m.vesselCode}`} className="p-2 border rounded-md flex items-center justify-between gap-2">
                               <div className="min-w-0">
                                 <div className="text-xs font-medium truncate">{m.vesselPartCode}</div>
                                 <div className="text-xs text-gray-500 truncate">{m.vesselPartName}</div>
-                                <div className="text-xs text-gray-400 truncate mt-0.5">{m.vesselName || m.vesselCode}</div>
                               </div>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={() => handleRemoveSpareMapping(m)}
+                                className="text-red-500 shrink-0"
+                                data-testid={`button-remove-spare-mapping-${m.partCode}`}
+                              >
+                                <span className="text-xs">x</span>
+                              </Button>
                             </div>
                           ))}
                         </div>
                       ) : (
                         <div className="text-center py-4">
                           <Badge variant="secondary" className="text-xs">Not Mapped</Badge>
-                          <p className="text-xs text-gray-500 mt-2">No vessel spares linked to this fleet spare</p>
+                          <p className="text-xs text-gray-500 mt-2">Select a vessel spare on the right to create a mapping</p>
+                        </div>
+                      )}
+
+                      {selectedVesselSpares.size > 0 && selectedFleetSpare && (
+                        <div className="space-y-2">
+                          <div className="text-xs text-gray-500 text-center">
+                            {selectedVesselSpares.size} vessel spare{selectedVesselSpares.size > 1 ? "s" : ""} selected
+                          </div>
+                          <Button
+                            onClick={handleManualSpareMap}
+                            className="w-full bg-cyan-600 text-white"
+                            data-testid="button-create-spare-mapping"
+                          >
+                            Link {selectedVesselSpares.size} Selected
+                          </Button>
                         </div>
                       )}
                     </div>
@@ -1739,6 +1856,7 @@ export default function FleetVesselMapping({ onBack }: { onBack?: () => void }) 
                       <table className="w-full" data-testid="table-vessel-spares">
                         <thead>
                           <tr className="border-b">
+                            <th className="sticky top-0 bg-gray-50 z-10 w-8 px-2 py-2"></th>
                             <th className="sticky top-0 bg-gray-50 z-10 text-left px-3 py-2 text-xs font-medium text-gray-500">Component Code</th>
                             <th className="sticky top-0 bg-gray-50 z-10 text-left px-3 py-2 text-xs font-medium text-gray-500">Part Code</th>
                             <th className="sticky top-0 bg-gray-50 z-10 text-left px-3 py-2 text-xs font-medium text-gray-500">Part Name</th>
@@ -1746,15 +1864,32 @@ export default function FleetVesselMapping({ onBack }: { onBack?: () => void }) 
                         </thead>
                         <tbody>
                           {[...vesselSparesData].sort((a: any, b: any) => (a.componentCode || "").localeCompare(b.componentCode || "")).map((spare: any) => {
-                            const isSelected = selectedVesselSpare === String(spare.id);
-                            const isLinked = spareLinkedVesselSpareIds.has(String(spare.id));
+                            const spareId = String(spare.id);
+                            const isChecked = selectedVesselSpares.has(spareId);
+                            const isLinked = spareLinkedVesselSpareIds.has(spareId);
                             return (
                               <tr
                                 key={spare.id}
-                                className={`border-b text-xs cursor-pointer ${isSelected ? "bg-cyan-50 border-l-2 border-l-cyan-500" : isLinked ? "bg-green-50/50 hover:bg-green-50" : "hover:bg-blue-50/50"}`}
-                                onClick={() => setSelectedVesselSpare(String(spare.id))}
+                                className={`border-b text-xs cursor-pointer ${isChecked ? "bg-cyan-50 border-l-2 border-l-cyan-500" : isLinked ? "bg-green-50/50 hover:bg-green-50" : "hover:bg-blue-50/50"}`}
+                                onClick={() => {
+                                  setSelectedVesselSpares((prev) => {
+                                    const next = new Set(prev);
+                                    if (next.has(spareId)) next.delete(spareId);
+                                    else next.add(spareId);
+                                    return next;
+                                  });
+                                }}
                                 data-testid={`row-vessel-spare-${spare.id}`}
                               >
+                                <td className="px-2 py-2 text-center">
+                                  <input
+                                    type="checkbox"
+                                    checked={isChecked}
+                                    onChange={() => {}}
+                                    className="h-3.5 w-3.5 rounded border-gray-300"
+                                    data-testid={`checkbox-vessel-spare-${spare.id}`}
+                                  />
+                                </td>
                                 <td className="px-3 py-2 font-mono text-gray-600">{spare.componentCode || "-"}</td>
                                 <td className="px-3 py-2 font-mono text-gray-600">{spare.partCode}</td>
                                 <td className="px-3 py-2 text-gray-600">{spare.partName}</td>
