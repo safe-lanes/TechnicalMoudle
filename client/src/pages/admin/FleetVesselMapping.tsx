@@ -108,7 +108,7 @@ export default function FleetVesselMapping({ onBack }: { onBack?: () => void }) 
   const [expandedVesselNodes, setExpandedVesselNodes] = useState<Set<string>>(new Set());
   const [selectedFleetJob, setSelectedFleetJob] = useState<string | null>(null); // composite key: jobCode|fleetEquipmentCode
   const [selectedVesselJobs, setSelectedVesselJobs] = useState<Set<string>>(new Set());
-  const [selectedFleetSpare, setSelectedFleetSpare] = useState<string | null>(null);
+  const [selectedFleetSpare, setSelectedFleetSpare] = useState<string | null>(null); // composite key: fleetEquipmentCode|partCode
   const [selectedVesselSpares, setSelectedVesselSpares] = useState<Set<string>>(new Set());
 
   const { data: vessels = [] } = useVessels();
@@ -195,12 +195,13 @@ export default function FleetVesselMapping({ onBack }: { onBack?: () => void }) 
 
   const selectedFleetSpareData = useMemo(() => {
     if (!selectedFleetSpare) return null;
-    return fleetSparesData.find((s) => s.partCode === selectedFleetSpare) || null;
+    return fleetSparesData.find((s) => `${s.fleetEquipmentCode}|${s.partCode}` === selectedFleetSpare) || null;
   }, [selectedFleetSpare, fleetSparesData]);
 
   const selectedFleetSpareMappings = useMemo(() => {
     if (!selectedFleetSpare) return [];
-    return spareMappingsData.filter((m) => m.partCode === selectedFleetSpare);
+    const [eqCode, pCode] = selectedFleetSpare.split("|");
+    return spareMappingsData.filter((m) => m.fleetEquipmentCode === eqCode && m.partCode === pCode);
   }, [selectedFleetSpare, spareMappingsData]);
 
   const selectedFleetSpareLinkedDetails = useMemo(() => {
@@ -216,13 +217,13 @@ export default function FleetVesselMapping({ onBack }: { onBack?: () => void }) 
   }, [selectedFleetSpareMappings, vesselSparesData]);
 
   const spareMappedCount = useMemo(() => {
-    const mappedPartCodes = new Set(spareMappingsData.map((m) => m.partCode));
-    return mappedPartCodes.size;
+    const mappedKeys = new Set(spareMappingsData.map((m) => `${m.fleetEquipmentCode}|${m.partCode}`));
+    return mappedKeys.size;
   }, [spareMappingsData]);
 
   const spareUnmappedCount = useMemo(() => {
-    const mappedPartCodes = new Set(spareMappingsData.map((m) => m.partCode));
-    return fleetSparesData.filter((s) => !mappedPartCodes.has(s.partCode)).length;
+    const mappedKeys = new Set(spareMappingsData.map((m) => `${m.fleetEquipmentCode}|${m.partCode}`));
+    return fleetSparesData.filter((s) => !mappedKeys.has(`${s.fleetEquipmentCode}|${s.partCode}`)).length;
   }, [fleetSparesData, spareMappingsData]);
 
   const spareLinkedVesselSpareIds = useMemo(() => {
@@ -587,8 +588,8 @@ export default function FleetVesselMapping({ onBack }: { onBack?: () => void }) 
     });
   }, [vesselSparesData, fleetSparesData]);
 
-  const spareMappedPartCodes = useMemo(() => {
-    return new Set(spareMappingsData.map((m) => m.partCode));
+  const spareMappedCompositeKeys = useMemo(() => {
+    return new Set(spareMappingsData.map((m) => `${m.fleetEquipmentCode}|${m.partCode}`));
   }, [spareMappingsData]);
 
   const createMappingMutation = useMutation({
@@ -792,7 +793,7 @@ export default function FleetVesselMapping({ onBack }: { onBack?: () => void }) 
       return;
     }
 
-    const selectedFleetSpareObj = fleetSparesData.find((s) => s.partCode === selectedFleetSpare);
+    const selectedFleetSpareObj = fleetSparesData.find((s) => `${s.fleetEquipmentCode}|${s.partCode}` === selectedFleetSpare);
     if (!selectedFleetSpareObj) {
       toast({ title: "Error", description: "Fleet spare not found", variant: "destructive" });
       return;
@@ -840,7 +841,7 @@ export default function FleetVesselMapping({ onBack }: { onBack?: () => void }) 
 
   const handleCreateSpareAutoMappings = async () => {
     const matchedEntries = spareAutoMatchEntries.filter(
-      (e) => e.matched && !spareMappedPartCodes.has(e.partCode)
+      (e) => e.matched && !spareMappedCompositeKeys.has(`${e.fleetEquipmentCode}|${e.partCode}`)
     );
 
     if (matchedEntries.length === 0) {
@@ -1822,13 +1823,14 @@ export default function FleetVesselMapping({ onBack }: { onBack?: () => void }) 
                         </thead>
                         <tbody>
                           {[...fleetSparesData].sort((a, b) => (a.fleetEquipmentCode || "").localeCompare(b.fleetEquipmentCode || "")).map((spare) => {
-                            const isSelected = selectedFleetSpare === spare.partCode;
-                            const isMapped = spareMappingsData.some((m) => m.partCode === spare.partCode);
+                            const compositeKey = `${spare.fleetEquipmentCode}|${spare.partCode}`;
+                            const isSelected = selectedFleetSpare === compositeKey;
+                            const isMapped = spareMappingsData.some((m) => m.fleetEquipmentCode === spare.fleetEquipmentCode && m.partCode === spare.partCode);
                             return (
                               <tr
                                 key={spare.id}
                                 className={`border-b text-xs cursor-pointer ${isSelected ? "bg-cyan-50 border-l-2 border-l-cyan-500" : isMapped ? "bg-green-50/50 hover:bg-green-50" : "hover:bg-blue-50/50"}`}
-                                onClick={() => setSelectedFleetSpare(spare.partCode)}
+                                onClick={() => setSelectedFleetSpare(compositeKey)}
                                 data-testid={`row-fleet-spare-${spare.id}`}
                               >
                                 <td className="px-3 py-2 font-mono text-gray-600">{spare.fleetEquipmentCode}</td>
