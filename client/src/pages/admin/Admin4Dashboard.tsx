@@ -4,7 +4,7 @@ import { useVessels } from "@/hooks/useVessels";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Building2, List, ArrowRight, Box, Wrench, Package, Ship, Clock, FileCode2, Anchor, Database, Layers, AlertTriangle, CheckCircle2, X, Bell, LayoutDashboard } from "lucide-react";
+import { Building2, List, ArrowRight, Box, Wrench, Package, Ship, Clock, FileCode2, Anchor, Database, Layers, AlertTriangle, CheckCircle2, X, Bell, LayoutDashboard, Settings } from "lucide-react";
 import { Marker } from "@/components/Marker";
 import MakerManagement from "./MakerManagement";
 import MasterListsManagement from "./MasterListsManagement";
@@ -376,37 +376,67 @@ export default function Admin4Dashboard({ onSubViewChange }: { onSubViewChange?:
             </Card>
           </div>
 
-          <Card className="border border-gray-200">
-            <CardHeader className="pb-3">
-              <CardTitle className="text-sm font-medium text-gray-700">Quick Links</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
-                {[
-                  { view: 'makers' as ViewType, icon: Building2, label: 'Makers', color: 'text-blue-600', bg: 'bg-blue-50' },
-                  { view: 'master-lists' as ViewType, icon: List, label: 'Master Lists', color: 'text-green-600', bg: 'bg-green-50' },
-                  { view: 'components' as ViewType, icon: Box, label: 'Components', color: 'text-purple-600', bg: 'bg-purple-50' },
-                  { view: 'jobs' as ViewType, icon: Wrench, label: 'Jobs', color: 'text-orange-600', bg: 'bg-orange-50' },
-                  { view: 'spares' as ViewType, icon: Package, label: 'Spares', color: 'text-teal-600', bg: 'bg-teal-50' },
-                  { view: 'vessel-mapping' as ViewType, icon: Ship, label: 'Vessel Mapping', color: 'text-indigo-600', bg: 'bg-indigo-50' },
-                  { view: 'pms-settings' as ViewType, icon: Clock, label: 'Lead Time & Grace', color: 'text-cyan-600', bg: 'bg-cyan-50' },
-                  { view: 'fleet-vessel-manager' as ViewType, icon: Anchor, label: 'Fleet & Vessel', color: 'text-rose-600', bg: 'bg-rose-50' },
-                  { view: 'master-data-table' as ViewType, icon: Database, label: 'Master Data', color: 'text-purple-600', bg: 'bg-purple-50' },
-                  { view: 'fleet-data' as ViewType, icon: Layers, label: 'Fleet Data', color: 'text-cyan-600', bg: 'bg-cyan-50' },
-                ].map(link => (
-                  <button
-                    key={link.view}
-                    onClick={() => setCurrentView(link.view)}
-                    className={`flex items-center gap-2 p-3 rounded-lg border border-gray-200 hover:border-cyan-300 hover:shadow-sm transition-all text-left ${link.bg}`}
-                    data-testid={`link-${link.view}`}
-                  >
-                    <link.icon className={`h-4 w-4 ${link.color} flex-shrink-0`} />
-                    <span className="text-xs font-medium text-gray-700 truncate">{link.label}</span>
-                  </button>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <Card className="border border-gray-200">
+              <CardHeader className="pb-2 pt-3 px-4">
+                <CardTitle className="text-xs font-semibold text-gray-500 uppercase tracking-wider flex items-center gap-2">
+                  <Layers className="h-3.5 w-3.5 text-cyan-500" />
+                  Fleet Data
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="px-4 pb-3 pt-1">
+                <div className="grid grid-cols-2 lg:grid-cols-3 gap-2">
+                  {[
+                    { view: 'makers' as ViewType, icon: Building2, label: 'Makers', color: 'text-blue-600', bg: 'bg-blue-50' },
+                    { view: 'components' as ViewType, icon: Box, label: 'Components', color: 'text-purple-600', bg: 'bg-purple-50' },
+                    { view: 'jobs' as ViewType, icon: Wrench, label: 'Jobs', color: 'text-orange-600', bg: 'bg-orange-50' },
+                    { view: 'spares' as ViewType, icon: Package, label: 'Spares', color: 'text-teal-600', bg: 'bg-teal-50' },
+                    { view: 'master-lists' as ViewType, icon: List, label: 'Master Lists', color: 'text-green-600', bg: 'bg-green-50' },
+                    { view: 'fleet-data' as ViewType, icon: Database, label: 'Fleet Data', color: 'text-cyan-600', bg: 'bg-cyan-50' },
+                  ].map(link => (
+                    <button
+                      key={link.view}
+                      onClick={() => setCurrentView(link.view)}
+                      className={`flex items-center gap-2 p-2.5 rounded-lg border border-gray-200 transition-all text-left hover-elevate active-elevate-2 ${link.bg}`}
+                      data-testid={`link-${link.view}`}
+                    >
+                      <link.icon className={`h-4 w-4 ${link.color} flex-shrink-0`} />
+                      <span className="text-xs font-medium text-gray-700 truncate">{link.label}</span>
+                    </button>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card className="border border-gray-200">
+              <CardHeader className="pb-2 pt-3 px-4">
+                <CardTitle className="text-xs font-semibold text-gray-500 uppercase tracking-wider flex items-center gap-2">
+                  <Settings className="h-3.5 w-3.5 text-gray-400" />
+                  Configuration & Mapping
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="px-4 pb-3 pt-1">
+                <div className="grid grid-cols-2 lg:grid-cols-2 gap-2">
+                  {[
+                    { view: 'vessel-mapping' as ViewType, icon: Ship, label: 'Vessel Mapping', color: 'text-indigo-600', bg: 'bg-indigo-50' },
+                    { view: 'fleet-vessel-manager' as ViewType, icon: Anchor, label: 'Fleet & Vessel', color: 'text-rose-600', bg: 'bg-rose-50' },
+                    { view: 'pms-settings' as ViewType, icon: Clock, label: 'Lead Time & Grace', color: 'text-cyan-600', bg: 'bg-cyan-50' },
+                    { view: 'master-data-table' as ViewType, icon: Database, label: 'Master Data', color: 'text-purple-600', bg: 'bg-purple-50' },
+                  ].map(link => (
+                    <button
+                      key={link.view}
+                      onClick={() => setCurrentView(link.view)}
+                      className={`flex items-center gap-2 p-2.5 rounded-lg border border-gray-200 transition-all text-left hover-elevate active-elevate-2 ${link.bg}`}
+                      data-testid={`link-${link.view}`}
+                    >
+                      <link.icon className={`h-4 w-4 ${link.color} flex-shrink-0`} />
+                      <span className="text-xs font-medium text-gray-700 truncate">{link.label}</span>
+                    </button>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          </div>
 
         </div>
       </Card>
