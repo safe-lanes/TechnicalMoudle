@@ -110,6 +110,7 @@ export default function FleetVesselMapping({ onBack }: { onBack?: () => void }) 
   const [selectedVesselJobs, setSelectedVesselJobs] = useState<Set<string>>(new Set());
   const [selectedFleetSpare, setSelectedFleetSpare] = useState<string | null>(null); // composite key: fleetEquipmentCode|partCode
   const [selectedVesselSpares, setSelectedVesselSpares] = useState<Set<string>>(new Set());
+  const [vesselSpareSearch, setVesselSpareSearch] = useState("");
 
   const { data: vessels = [] } = useVessels();
 
@@ -1930,10 +1931,22 @@ export default function FleetVesselMapping({ onBack }: { onBack?: () => void }) 
 
               <Card>
                 <CardHeader className="pb-3">
-                  <CardTitle className="text-base flex items-center gap-2 flex-wrap">
-                    <Anchor className="h-4 w-4 text-cyan-600" />
-                    Vessel Spares
-                  </CardTitle>
+                  <div className="flex items-center justify-between gap-2 flex-wrap">
+                    <CardTitle className="text-base flex items-center gap-2 flex-wrap">
+                      <Anchor className="h-4 w-4 text-cyan-600" />
+                      Vessel Spares
+                    </CardTitle>
+                    <div className="relative">
+                      <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-gray-400" />
+                      <Input
+                        placeholder="Search spares..."
+                        value={vesselSpareSearch}
+                        onChange={(e) => setVesselSpareSearch(e.target.value)}
+                        className="h-7 pl-7 pr-2 text-xs w-44"
+                        data-testid="input-vessel-spare-search"
+                      />
+                    </div>
+                  </div>
                 </CardHeader>
                 <CardContent className="p-0">
                   <ScrollArea className="h-[500px]">
@@ -1943,18 +1956,47 @@ export default function FleetVesselMapping({ onBack }: { onBack?: () => void }) 
                       </div>
                     ) : vesselSparesData.length === 0 ? (
                       <div className="text-center py-8 text-gray-500 text-xs">No vessel spares found</div>
-                    ) : (
+                    ) : (() => {
+                      const searchLower = vesselSpareSearch.toLowerCase();
+                      const filteredSpares = [...vesselSparesData]
+                        .filter((s: any) => !vesselSpareSearch || (s.componentCode || "").toLowerCase().includes(searchLower) || (s.partCode || "").toLowerCase().includes(searchLower) || (s.partName || "").toLowerCase().includes(searchLower))
+                        .sort((a: any, b: any) => (a.componentCode || "").localeCompare(b.componentCode || ""));
+                      const filteredIds = filteredSpares.map((s: any) => String(s.id));
+                      const allFilteredSelected = filteredIds.length > 0 && filteredIds.every((id) => selectedVesselSpares.has(id));
+                      return (
                       <table className="w-full" data-testid="table-vessel-spares">
                         <thead>
                           <tr className="border-b">
-                            <th className="sticky top-0 bg-gray-50 z-10 w-8 px-2 py-2"></th>
+                            <th className="sticky top-0 bg-gray-50 z-10 w-8 px-2 py-2">
+                              <input
+                                type="checkbox"
+                                checked={allFilteredSelected}
+                                onChange={() => {
+                                  if (allFilteredSelected) {
+                                    setSelectedVesselSpares((prev) => {
+                                      const next = new Set(prev);
+                                      filteredIds.forEach((id) => next.delete(id));
+                                      return next;
+                                    });
+                                  } else {
+                                    setSelectedVesselSpares((prev) => {
+                                      const next = new Set(prev);
+                                      filteredIds.forEach((id) => next.add(id));
+                                      return next;
+                                    });
+                                  }
+                                }}
+                                className="h-3.5 w-3.5 rounded border-gray-300"
+                                data-testid="checkbox-vessel-spare-select-all"
+                              />
+                            </th>
                             <th className="sticky top-0 bg-gray-50 z-10 text-left px-3 py-2 text-xs font-medium text-gray-500">Component Code</th>
                             <th className="sticky top-0 bg-gray-50 z-10 text-left px-3 py-2 text-xs font-medium text-gray-500">Part Code</th>
                             <th className="sticky top-0 bg-gray-50 z-10 text-left px-3 py-2 text-xs font-medium text-gray-500">Part Name</th>
                           </tr>
                         </thead>
                         <tbody>
-                          {[...vesselSparesData].sort((a: any, b: any) => (a.componentCode || "").localeCompare(b.componentCode || "")).map((spare: any) => {
+                          {filteredSpares.map((spare: any) => {
                             const spareId = String(spare.id);
                             const isChecked = selectedVesselSpares.has(spareId);
                             const isLinked = spareLinkedVesselSpareIds.has(spareId);
@@ -1989,7 +2031,8 @@ export default function FleetVesselMapping({ onBack }: { onBack?: () => void }) 
                           })}
                         </tbody>
                       </table>
-                    )}
+                      );
+                    })()}
                   </ScrollArea>
                 </CardContent>
               </Card>
