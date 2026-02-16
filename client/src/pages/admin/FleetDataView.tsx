@@ -855,53 +855,57 @@ export default function FleetDataView({ onBack }: { onBack?: () => void }) {
   };
 
   return (
-    <div className="flex h-[calc(100vh-140px)] bg-gray-50">
-      <div className="w-80 bg-white border-r flex flex-col">
-        <div className="bg-gradient-to-r from-cyan-600 to-blue-600 text-white px-4 py-3 font-semibold">
-          <div className="flex items-center justify-between gap-4">
-            <span>Fleet Components</span>
-            {onBack && (
-              <button
-                onClick={onBack}
-                className="flex items-center gap-1 text-cyan-100 hover:text-white text-sm transition-colors"
-                data-testid="button-back-to-dashboard"
-              >
-                <ArrowLeft className="h-4 w-4" />
-                Back to Dashboard
-              </button>
-            )}
+    <div className="flex flex-col" style={{ height: 'calc(100vh - 120px)' }}>
+      <div className="flex-1 overflow-y-auto min-h-0">
+        <div className="flex gap-6 h-full min-h-0">
+          <div className="w-[30%]" data-testid="fleet-tree-panel">
+            <div className="bg-white rounded-lg shadow-sm h-full flex flex-col">
+              <div className="flex-1 overflow-auto">
+                <div className="bg-[#52baf3] text-white px-4 py-2 font-semibold text-sm flex items-center justify-between gap-2">
+                  <span>FLEET COMPONENTS</span>
+                  {onBack && (
+                    <button
+                      onClick={onBack}
+                      className="flex items-center gap-1 text-cyan-100 text-xs transition-colors"
+                      data-testid="button-back-to-dashboard"
+                    >
+                      <ArrowLeft className="h-3.5 w-3.5" />
+                      Back to Dashboard
+                    </button>
+                  )}
+                </div>
+                <div>
+                  {isComponentsLoading ? (
+                    <div className="p-4 space-y-2">
+                      {[...Array(8)].map((_, i) => (
+                        <div
+                          key={i}
+                          className="h-8 bg-gray-100 animate-pulse rounded"
+                        />
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="py-1">
+                      {treeData.map((node) => (
+                        <TreeItem
+                          key={node.code}
+                          node={node}
+                          selectedCode={selectedNode?.code || null}
+                          onSelect={setSelectedNode}
+                          expandedNodes={expandedNodes}
+                          onToggle={handleToggle}
+                        />
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
           </div>
-        </div>
-        <ScrollArea className="flex-1">
-          {isComponentsLoading ? (
-            <div className="p-4 space-y-2">
-              {[...Array(8)].map((_, i) => (
-                <div
-                  key={i}
-                  className="h-8 bg-gray-100 animate-pulse rounded"
-                />
-              ))}
-            </div>
-          ) : (
-            <div className="py-2">
-              {treeData.map((node) => (
-                <TreeItem
-                  key={node.code}
-                  node={node}
-                  selectedCode={selectedNode?.code || null}
-                  onSelect={setSelectedNode}
-                  expandedNodes={expandedNodes}
-                  onToggle={handleToggle}
-                />
-              ))}
-            </div>
-          )}
-        </ScrollArea>
-      </div>
 
-      <div className="flex-1 overflow-auto p-6">
+          <div className="w-[70%]" data-testid="fleet-detail-panel">
         {selectedComponent ? (
-          <div className="flex flex-col h-full">
+          <div className="bg-white rounded-lg shadow-sm h-full flex flex-col">
             <div className="p-4 border-b-2 border-[#52baf3] flex-shrink-0">
               <div className="flex items-center justify-between gap-4 flex-wrap">
                 <h2 className="text-lg font-semibold text-[#15569e]" data-testid="text-selected-component-title">
@@ -1214,17 +1218,20 @@ export default function FleetDataView({ onBack }: { onBack?: () => void }) {
             </div>
           </div>
         ) : (
-          <div className="h-full flex flex-col">
-            <div className="flex justify-end mb-4">
-              <Button
-                variant="outline"
-                className="border-cyan-600 text-cyan-600"
-                onClick={() => setLocation("/admin/fleet-component-editor")}
-                data-testid="button-add-edit-fleet-component"
-              >
-                <Plus className="h-4 w-4 mr-1" />
-                Add / Edit Fleet Component
-              </Button>
+          <div className="bg-white rounded-lg shadow-sm h-full flex flex-col">
+            <div className="p-4 border-b-2 border-[#52baf3] flex-shrink-0">
+              <div className="flex items-center justify-end">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="text-[#52baf3] border-[#52baf3]"
+                  onClick={() => setLocation("/admin/fleet-component-editor")}
+                  data-testid="button-add-edit-fleet-component"
+                >
+                  <Plus className="h-4 w-4 mr-1" />
+                  Add / Edit Fleet Component
+                </Button>
+              </div>
             </div>
             <div className="flex-1 flex items-center justify-center text-gray-500">
               <div className="text-center">
@@ -1237,6 +1244,8 @@ export default function FleetDataView({ onBack }: { onBack?: () => void }) {
             </div>
           </div>
         )}
+          </div>
+        </div>
       </div>
 
       <Dialog 
