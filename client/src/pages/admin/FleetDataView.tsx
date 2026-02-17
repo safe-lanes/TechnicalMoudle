@@ -2000,6 +2000,28 @@ export default function FleetDataView({ onBack }: { onBack?: () => void }) {
                   variant="outline"
                   className="border-gray-300 text-gray-700"
                   data-testid="btn-export-jobs-excel"
+                  onClick={async () => {
+                    if (!selectedComponent?.fleetEquipmentCode) {
+                      toast({ title: "No equipment selected", description: "Please select a fleet equipment to export its jobs.", variant: "destructive" });
+                      return;
+                    }
+                    try {
+                      const response = await fetch(`/technical/api/fleet/jobs/export?fleetEquipmentCode=${encodeURIComponent(selectedComponent.fleetEquipmentCode)}`);
+                      if (!response.ok) throw new Error('Export failed');
+                      const blob = await response.blob();
+                      const url = URL.createObjectURL(blob);
+                      const a = document.createElement('a');
+                      a.href = url;
+                      a.download = `fleet-jobs-${selectedComponent.fleetEquipmentCode}.xlsx`;
+                      document.body.appendChild(a);
+                      a.click();
+                      document.body.removeChild(a);
+                      URL.revokeObjectURL(url);
+                      toast({ title: "Export successful", description: `Fleet jobs exported for ${selectedComponent.fleetEquipmentName || selectedComponent.fleetEquipmentCode}` });
+                    } catch (error) {
+                      toast({ title: "Export failed", description: "Could not export fleet jobs. Please try again.", variant: "destructive" });
+                    }
+                  }}
                 >
                   <FileSpreadsheet className="mr-2 h-4 w-4" />
                   Export
@@ -3371,6 +3393,28 @@ export default function FleetDataView({ onBack }: { onBack?: () => void }) {
                   variant="outline"
                   className="border-gray-300 text-gray-700"
                   data-testid="btn-export-spares-excel"
+                  onClick={async () => {
+                    if (!selectedComponent?.fleetEquipmentCode) {
+                      toast({ title: "No equipment selected", description: "Please select a fleet equipment to export its spares.", variant: "destructive" });
+                      return;
+                    }
+                    try {
+                      const response = await fetch(`/technical/api/fleet/spares/export?fleetEquipmentCode=${encodeURIComponent(selectedComponent.fleetEquipmentCode)}`);
+                      if (!response.ok) throw new Error('Export failed');
+                      const blob = await response.blob();
+                      const url = URL.createObjectURL(blob);
+                      const a = document.createElement('a');
+                      a.href = url;
+                      a.download = `fleet-spares-${selectedComponent.fleetEquipmentCode}.xlsx`;
+                      document.body.appendChild(a);
+                      a.click();
+                      document.body.removeChild(a);
+                      URL.revokeObjectURL(url);
+                      toast({ title: "Export successful", description: `Fleet spares exported for ${selectedComponent.fleetEquipmentName || selectedComponent.fleetEquipmentCode}` });
+                    } catch (error) {
+                      toast({ title: "Export failed", description: "Could not export fleet spares. Please try again.", variant: "destructive" });
+                    }
+                  }}
                 >
                   <FileSpreadsheet className="mr-2 h-4 w-4" />
                   Export
