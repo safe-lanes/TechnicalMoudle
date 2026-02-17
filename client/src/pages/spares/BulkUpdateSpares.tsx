@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
 import { Search, X, ArrowLeft, ChevronLeft, ChevronRight } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useQuery, useMutation } from "@tanstack/react-query";
@@ -35,6 +36,7 @@ export default function BulkUpdateSpares() {
   
   const [transactionMode, setTransactionMode] = useState<TransactionMode>("");
   const [bulkSearchQuery, setBulkSearchQuery] = useState("");
+  const [showConfirmDialog, setShowConfirmDialog] = useState(false);
   const [bulkUpdateData, setBulkUpdateData] = useState<{[key: number]: {consumedA: number, consumedB: number, receivedA: number, receivedB: number, receivedDate?: string, receivedPlace?: string, comments?: string}}>({});
   
   const [currentPage, setCurrentPage] = useState(1);
@@ -199,6 +201,24 @@ export default function BulkUpdateSpares() {
     return false;
   });
 
+  const modifiedCount = useMemo(() => {
+    if (!transactionMode) return 0;
+    return Object.values(bulkUpdateData).filter(data => {
+      if (transactionMode === "consume") return data.consumedA > 0 || data.consumedB > 0;
+      if (transactionMode === "receive") return data.receivedA > 0 || data.receivedB > 0;
+      return false;
+    }).length;
+  }, [bulkUpdateData, transactionMode]);
+
+  const totalTransactionQty = useMemo(() => {
+    if (!transactionMode) return 0;
+    return Object.values(bulkUpdateData).reduce((sum, data) => {
+      if (transactionMode === "consume") return sum + (data.consumedA || 0) + (data.consumedB || 0);
+      if (transactionMode === "receive") return sum + (data.receivedA || 0) + (data.receivedB || 0);
+      return sum;
+    }, 0);
+  }, [bulkUpdateData, transactionMode]);
+
   const transactionLabel = transactionMode === "consume" ? "Consumed" : "Received";
 
   if (isLoading) {
@@ -345,6 +365,13 @@ export default function BulkUpdateSpares() {
             )}
           </div>
 
+          {transactionMode && modifiedCount > 0 && (
+            <div className="flex items-center gap-4 px-3 py-2 bg-amber-50 dark:bg-amber-900/20 rounded-lg border border-amber-200 dark:border-amber-800 text-sm" data-testid="summary-bar">
+              <span className="font-medium text-amber-700 dark:text-amber-400">{modifiedCount} item(s) modified</span>
+              <span className="text-amber-600 dark:text-amber-500">Total {transactionLabel}: {totalTransactionQty}</span>
+            </div>
+          )}
+
           {!transactionMode ? (
             <div className="border rounded-lg overflow-hidden bg-white dark:bg-gray-800 flex flex-col flex-1 min-h-0 items-center justify-center">
               <div className="text-center p-8">
@@ -373,7 +400,7 @@ export default function BulkUpdateSpares() {
                   </tr>
                 </thead>
                 <tbody>
-                  {paginatedSpares.map((spare: Spare) => {
+                  {paginatedSpares.map((spare: Spare, index: number) => {
                     const consumedA = bulkUpdateData[spare.id]?.consumedA || 0;
                     const consumedB = bulkUpdateData[spare.id]?.consumedB || 0;
                     const receivedA = bulkUpdateData[spare.id]?.receivedA || 0;
@@ -403,7 +430,7 @@ export default function BulkUpdateSpares() {
                     const locNameB = spare.location2 || locationNames.locationB;
 
                     return (
-                      <tr key={spare.id} className={`border-t ${hasError ? 'bg-red-50 dark:bg-red-900/20' : ''}`}>
+                      <tr key={spare.id} className={`border-t transition-colors ${hasError ? 'bg-red-50 dark:bg-red-900/20' : 'hover:bg-gray-50 dark:hover:bg-gray-800'}`}>
                         <td className="px-3 py-2 text-sm">{spare.partCode}</td>
                         <td className="px-3 py-2 text-sm max-w-[150px] truncate" title={spare.partName}>{spare.partName}</td>
                         <td className="px-3 py-2 text-sm text-gray-500 max-w-[120px] truncate" title={spare.partNumber || ''}>{spare.partNumber || '-'}</td>
@@ -425,6 +452,7 @@ export default function BulkUpdateSpares() {
                                 value={bulkUpdateData[spare.id]?.consumedA || ""}
                                 onChange={(e) => handleBulkUpdateChange(spare.id, 'consumedA', e.target.value)}
                                 className={`w-16 h-7 text-sm text-center mx-auto ${hasInsufficientStockA ? 'border-red-500' : ''}`}
+                                tabIndex={index + 1}
                                 data-testid={`input-consume-a-${spare.id}`}
                               />
                             </td>
@@ -436,6 +464,7 @@ export default function BulkUpdateSpares() {
                                 value={bulkUpdateData[spare.id]?.consumedB || ""}
                                 onChange={(e) => handleBulkUpdateChange(spare.id, 'consumedB', e.target.value)}
                                 className={`w-16 h-7 text-sm text-center mx-auto ${hasInsufficientStockB ? 'border-red-500' : ''}`}
+                                tabIndex={paginatedSpares.length + index + 1}
                                 data-testid={`input-consume-b-${spare.id}`}
                               />
                             </td>
@@ -449,6 +478,7 @@ export default function BulkUpdateSpares() {
                                 value={bulkUpdateData[spare.id]?.receivedA || ""}
                                 onChange={(e) => handleBulkUpdateChange(spare.id, 'receivedA', e.target.value)}
                                 className="w-16 h-7 text-sm text-center mx-auto"
+                                tabIndex={index + 1}
                                 data-testid={`input-receive-a-${spare.id}`}
                               />
                             </td>
@@ -459,6 +489,7 @@ export default function BulkUpdateSpares() {
                                 value={bulkUpdateData[spare.id]?.receivedB || ""}
                                 onChange={(e) => handleBulkUpdateChange(spare.id, 'receivedB', e.target.value)}
                                 className="w-16 h-7 text-sm text-center mx-auto"
+                                tabIndex={paginatedSpares.length + index + 1}
                                 data-testid={`input-receive-b-${spare.id}`}
                               />
                             </td>
@@ -565,7 +596,7 @@ export default function BulkUpdateSpares() {
             Cancel
           </Button>
           <Button 
-            onClick={handleSaveBulkUpdates}
+            onClick={() => setShowConfirmDialog(true)}
             disabled={!transactionMode || !hasAnyChanges || bulkUpdateMutation.isPending}
             data-testid="button-save-updates"
           >
@@ -573,6 +604,37 @@ export default function BulkUpdateSpares() {
           </Button>
         </div>
       </div>
+
+      <Dialog open={showConfirmDialog} onOpenChange={setShowConfirmDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Confirm Bulk Update</DialogTitle>
+            <DialogDescription>Please review the changes before saving.</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3 py-4">
+            <div className="flex items-center justify-between text-sm">
+              <span className="text-gray-600 dark:text-gray-400">Mode</span>
+              <span className={`font-medium px-2 py-0.5 rounded ${transactionMode === "consume" ? "bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400" : "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400"}`}>
+                {transactionMode === "consume" ? "Consume" : "Receive"}
+              </span>
+            </div>
+            <div className="flex items-center justify-between text-sm">
+              <span className="text-gray-600 dark:text-gray-400">Items modified</span>
+              <span className="font-medium">{modifiedCount}</span>
+            </div>
+            <div className="flex items-center justify-between text-sm">
+              <span className="text-gray-600 dark:text-gray-400">Total quantity</span>
+              <span className="font-medium">{totalTransactionQty}</span>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowConfirmDialog(false)} data-testid="button-confirm-cancel">Cancel</Button>
+            <Button onClick={() => { setShowConfirmDialog(false); handleSaveBulkUpdates(); }} data-testid="button-confirm-save">
+              Confirm & Save
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
