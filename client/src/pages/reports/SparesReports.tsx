@@ -30,6 +30,7 @@ import { useQuery } from "@tanstack/react-query";
 import CategoryFilters, { CategoryFilterValues } from "@/components/reports/CategoryFilters";
 import LowStockAlertReport from "./LowStockAlertReport";
 import CriticalSparesReport from "./CriticalSparesReport";
+import SparesConsumptionPatternReport from "./SparesConsumptionPatternReport";
 
 interface SparesReport {
   id: string;
@@ -467,6 +468,15 @@ const SparesReports: React.FC<SparesReportsProps> = ({ onBack, globalFilters }) 
     );
   }
 
+  if (activeDetailReport === 'spares-consumption-analysis') {
+    return (
+      <SparesConsumptionPatternReport
+        onBack={() => setActiveDetailReport(null)}
+        vesselId={effectiveVesselId}
+      />
+    );
+  }
+
   return (
     <div className="p-6 bg-white min-h-screen">
       <div className="mb-6">
@@ -562,7 +572,7 @@ const SparesReports: React.FC<SparesReportsProps> = ({ onBack, globalFilters }) 
                 className="hover:bg-gray-50 cursor-pointer"
                 data-testid={`spares-report-row-${report.id}`}
                 onClick={() => {
-                  if (report.id === 'spares-low-stock' || report.id === 'spares-critical-parts') {
+                  if (report.id === 'spares-low-stock' || report.id === 'spares-critical-parts' || report.id === 'spares-consumption-analysis') {
                     setActiveDetailReport(report.id);
                   }
                 }}
@@ -592,7 +602,7 @@ const SparesReports: React.FC<SparesReportsProps> = ({ onBack, globalFilters }) 
                       title="Preview"
                       onClick={(e) => {
                         e.stopPropagation();
-                        if (report.id === 'spares-low-stock' || report.id === 'spares-critical-parts') {
+                        if (report.id === 'spares-low-stock' || report.id === 'spares-critical-parts' || report.id === 'spares-consumption-analysis') {
                           setActiveDetailReport(report.id);
                         } else {
                           handlePreviewReport(report.id);
