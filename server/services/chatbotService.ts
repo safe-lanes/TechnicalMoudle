@@ -8,12 +8,17 @@ let openaiClient: OpenAI | null = null;
 
 function getOpenAIClient(): OpenAI {
   if (!openaiClient) {
-    const apiKey = process.env.AI_INTEGRATIONS_OPENAI_API_KEY;
-    const baseURL = process.env.AI_INTEGRATIONS_OPENAI_BASE_URL;
-    if (!apiKey || !baseURL) {
-      throw new Error("Replit AI Integration is not configured. Please ensure the OpenAI AI Integration is installed.");
+    const integrationKey = process.env.AI_INTEGRATIONS_OPENAI_API_KEY;
+    const integrationBase = process.env.AI_INTEGRATIONS_OPENAI_BASE_URL;
+    const directKey = process.env.OPENAI_API_KEY;
+
+    if (integrationKey && integrationBase) {
+      openaiClient = new OpenAI({ apiKey: integrationKey, baseURL: integrationBase });
+    } else if (directKey) {
+      openaiClient = new OpenAI({ apiKey: directKey });
+    } else {
+      throw new Error("OpenAI is not configured. Please provide an OPENAI_API_KEY secret.");
     }
-    openaiClient = new OpenAI({ apiKey, baseURL });
   }
   return openaiClient;
 }
