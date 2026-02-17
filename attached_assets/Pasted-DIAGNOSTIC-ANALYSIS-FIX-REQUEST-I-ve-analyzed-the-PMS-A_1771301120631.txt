@@ -1,0 +1,72 @@
+DIAGNOSTIC ANALYSIS & FIX REQUEST:
+
+I've analyzed the PMS Assistant chatbot and identified the root cause of the "I'm having trouble connecting to my AI service" error.
+
+ROOT CAUSE CONFIRMED:
+The chatbot is failing because process.env.OPENAI_API_KEY is undefined or not properly configured in the Replit Secrets.
+
+DIAGNOSTIC EVIDENCE:
+
+Frontend: Chatbot UI is rendering correctly, messages are being sent to /technical/api/chat
+
+Backend: The POST /technical/api/chat endpoint exists in server/routes/chatbot.ts
+
+Error: The OpenAI API call in server/services/chatbotService.ts is failing with connection error
+
+REQUEST:
+
+Please perform the following analysis and provide actionable guidance:
+
+Check OpenAI Client Initialization:
+
+Locate the OpenAI client initialization code in server/services/chatbotService.ts
+
+Show me the exact code where new OpenAI() or similar is called
+
+Verify if it's checking for process.env.OPENAI_API_KEY
+
+Environment Variable Configuration:
+
+What is the EXACT environment variable name used in the code? (e.g., OPENAI_API_KEY, AI_INTEGRATIONS_OPENAI_API_KEY, etc.)
+
+Where should this be configured in Replit? (Secrets tab, .env file, etc.)
+
+Is there any fallback or alternative API key variable name?
+
+Error Handling Review:
+
+Show me the error handling code in chatbotService.ts where the OpenAI API call happens
+
+Is it catching and logging the specific OpenAI error before returning the generic "trouble connecting" message?
+
+Can we add more detailed error logging to identify API key vs network vs other issues?
+
+Verification Steps:
+
+After I set the API key, what specific test can I run to verify it's working?
+
+Should the server be restarted after adding the API key?
+
+Are there any console logs I should watch for?
+
+Alternative Issues (if API key is NOT the problem):
+
+Could there be a network/firewall issue preventing Replit from reaching OpenAI API?
+
+Is the OpenAI library (openai npm package) properly installed and at the correct version?
+
+Are there any CORS or authentication middleware issues blocking the chat endpoint?
+
+EXPECTED OUTPUT:
+
+Please provide:
+
+The exact environment variable name I need to set
+
+Step-by-step instructions for configuring it in Replit
+
+The specific error message from server logs (if available)
+
+Confirmation that NO code changes are needed once the API key is set
+
+DO NOT modify any code - just analyze and document the issue.
