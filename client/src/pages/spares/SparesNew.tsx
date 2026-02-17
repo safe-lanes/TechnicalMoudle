@@ -865,7 +865,10 @@ const Spares: React.FC = () => {
     const result: { id: string; code: string; name: string; fleetEquipmentCode?: string }[] = [];
     const flatten = (nodes: ComponentNode[]) => {
       for (const node of nodes) {
-        result.push({ id: node.id, code: node.code, name: node.name, fleetEquipmentCode: node.fleetEquipmentCode });
+        const hasChildren = node.children && node.children.length > 0;
+        if (!hasChildren) {
+          result.push({ id: node.id, code: node.code, name: node.name, fleetEquipmentCode: node.fleetEquipmentCode });
+        }
         if (node.children) flatten(node.children);
       }
     };
