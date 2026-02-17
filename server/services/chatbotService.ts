@@ -1,5 +1,8 @@
 import OpenAI from "openai";
 import type { IStorage } from "../storage";
+import { getDb } from "../db";
+import { vesselCertificateData, vesselSurveyData, shipCertificatesMaster, shipSurveysMaster } from "@shared/schema";
+import { eq } from "drizzle-orm";
 
 let openaiClient: OpenAI | null = null;
 
@@ -85,13 +88,24 @@ ANALYTICAL TOOLS (use for insight-driven questions):
 - get_component_health_score → For component condition, risk scoring, and reliability questions
 - get_performance_trends → For trend analysis, completion rates, and performance tracking
 
+SPECIALIZED ANALYTICAL TOOLS:
+- get_running_hours_analytics → For engine hours, running hours, RH anomalies, condition-based maintenance. Shows accumulation over 30/60/90 days with anomaly detection
+- get_maintenance_planner → For scheduling, planning horizon, workload forecast by week. Shows weekly breakdown with critical path items
+- get_rob_analysis → For ROB status, stockout risk, procurement needs. Includes consumption-based stockout date estimates
+- get_change_request_analysis → For PMS change requests, modification approvals, workflow tracking. Shows pending aging and approval metrics
+- get_recurring_defect_analysis → For repeat failures, MTBF analysis, equipment reliability patterns. Identifies COC items and multi-vessel issues
+- get_compliance_alerts → For certificate renewals, survey windows, regulatory compliance. Shows expired/critical/upcoming items with deadlines
+- get_equipment_comparison → For comparing similar equipment (e.g., all separators, all pumps). Side-by-side health scores with best/worst performers
+- get_cost_impact_estimate → For risk assessment of deferred maintenance, labor impact, budget planning. Scores items by safety/compliance/operational risk
+- get_workload_forecast → For future workload prediction, capacity planning, bottleneck identification. Uses 6-month historical patterns
+
 DATA TOOLS (use for specific queries):
 - get_work_orders / get_overdue_work_orders / get_due_work_orders → Specific work order lists
 - get_work_order_detail → Single work order deep dive
 - get_work_order_counts → Quick status counts
 - get_low_stock_spares / get_critical_spares → Spare inventory queries
 - get_components → Component lookups
-- get_running_hours → Running hours audit trail
+- get_running_hours → Running hours audit trail for specific components
 - get_jobs → Job template queries
 - get_stores_items → Stores/lubricants/chemicals inventory
 - get_defects → Defect tracking and analysis
@@ -103,13 +117,33 @@ TOOL CHAINING:
 - For complex queries, call multiple tools to build a complete picture
 - Always combine analytical tools with data tools when deeper detail is needed
 - After presenting analysis, offer to drill down into specific areas
+- When user asks about running hours, use get_running_hours_analytics (not get_running_hours) for analytical insights
+- When user asks about ROB or stock levels, use get_rob_analysis for analytical view, get_low_stock_spares for quick list
+
+═══════ NATURAL LANGUAGE DATE HANDLING ═══════
+
+Interpret relative dates based on current date (${new Date().toISOString().split("T")[0]}):
+- "next week" = next 7 days from today
+- "next month" = the calendar month after the current one
+- "last quarter" = previous 3-month period
+- "next 90 days" = 90 days from today
+- "this year" = current calendar year
+- "last 6 months" = 180 days before today
+
+When no time period is specified, use these defaults:
+- Upcoming/due items: next 30 days
+- Trends and history: last 90 days
+- Forecasting: next 3 months
+- Recurring analysis: last 12 months
 
 ═══════ TONE & STYLE ═══════
 
 - Speak like a senior technical superintendent — concise, data-driven, action-oriented
 - Use maritime terminology naturally (Main Engine, Chief Engineer, ROB, running hours, dry dock)
 - Crew are busy — get to the point fast, lead with what matters most
-- Be direct about risks and concerns — don't soften critical findings`;
+- Be direct about risks and concerns — don't soften critical findings
+- When no data is found, explain what's missing and suggest alternative queries
+- Never show empty tables — summarize with "No items found" and suggest what to check`;
 }
 
 const CHATBOT_TOOLS: OpenAI.Chat.Completions.ChatCompletionTool[] = [
@@ -610,6 +644,139 @@ const CHATBOT_TOOLS: OpenAI.Chat.Completions.ChatCompletionTool[] = [
             type: "number",
             description: "Analysis period in days (default: 90)",
           },
+        },
+        required: ["vesselId"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "get_running_hours_analytics",
+      description: "Analyze running hours data for components. Returns current RH readings, accumulation over 30/60/90 days, components approaching RH-based maintenance thresholds, anomalies (unusual spikes or drops), and condition-based maintenance recommendations. Use for any running hours, engine hours, or equipment usage questions.",
+      parameters: {
+        type: "object",
+        properties: {
+          vesselId: { type: "string", description: "Vessel ID (required)" },
+          componentFilter: { type: "string", description: "Optional component name/code filter (e.g., 'main engine', 'generator')" },
+        },
+        required: ["vesselId"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "get_maintenance_planner",
+      description: "Generate a maintenance planning view for a specified period. Shows work orders grouped by week/month, workload distribution by priority and department, critical path items that cannot be delayed, and resource allocation recommendations. Use for scheduling, planning, or workload distribution questions.",
+      parameters: {
+        type: "object",
+        properties: {
+          vesselId: { type: "string", description: "Vessel ID (required)" },
+          periodDays: { type: "number", description: "Planning horizon in days (default: 90)" },
+        },
+        required: ["vesselId"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "get_rob_analysis",
+      description: "Analyze Remaining On Board (ROB) spare parts status. Returns items with zero stock, items below minimum levels, overstocked items (ROB exceeding max), estimated stockout dates based on consumption rate, and urgent procurement recommendations. Use for ROB, stock level, inventory, or procurement questions.",
+      parameters: {
+        type: "object",
+        properties: {
+          vesselId: { type: "string", description: "Vessel ID (required)" },
+          includeOverstock: { type: "boolean", description: "Include overstocked items analysis (default: true)" },
+        },
+        required: ["vesselId"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "get_change_request_analysis",
+      description: "Analyze PMS change requests status and workflow. Returns requests grouped by status (draft/submitted/approved/rejected/returned), aging of pending requests, changes by category and component type, approved changes impact summary, and workflow efficiency recommendations.",
+      parameters: {
+        type: "object",
+        properties: {
+          vesselId: { type: "string", description: "Vessel ID (required)" },
+        },
+        required: ["vesselId"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "get_recurring_defect_analysis",
+      description: "Analyze recurring defect patterns and failure trends. Returns components with repeat failures, mean time between failures (MTBF), Condition of Class items, vessels affected, correlation with maintenance gaps, and recommendations for preventive measures.",
+      parameters: {
+        type: "object",
+        properties: {
+          vesselId: { type: "string", description: "Vessel ID (optional - omit for fleet-wide view)" },
+          windowMonths: { type: "number", description: "Analysis window in months (default: 12)" },
+        },
+        required: [],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "get_compliance_alerts",
+      description: "Check certificate and survey compliance status. Returns certificates expiring within specified period, overdue certifications, upcoming survey windows, regulatory compliance gaps, and action items with deadlines. Use for certification, survey, compliance, or regulatory questions.",
+      parameters: {
+        type: "object",
+        properties: {
+          vesselId: { type: "string", description: "Vessel ID (required)" },
+          periodDays: { type: "number", description: "Look-ahead period in days (default: 90)" },
+        },
+        required: ["vesselId"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "get_equipment_comparison",
+      description: "Compare health and performance across similar equipment types. Returns side-by-side comparison of components matching a filter, including overdue work counts, defect counts, running hours, and overall health scores. Identifies best/worst performers and outliers.",
+      parameters: {
+        type: "object",
+        properties: {
+          vesselId: { type: "string", description: "Vessel ID (required)" },
+          equipmentFilter: { type: "string", description: "Equipment type to compare (e.g., 'fuel oil separator', 'generator', 'pump')" },
+        },
+        required: ["vesselId", "equipmentFilter"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "get_cost_impact_estimate",
+      description: "Estimate operational risk and resource impact of overdue/deferred maintenance. Returns risk-scored items by criticality and age, estimated labor hours for backlog clearance, spare parts required for overdue items, risk categories (safety/compliance/operational), and priority recommendations for budget allocation.",
+      parameters: {
+        type: "object",
+        properties: {
+          vesselId: { type: "string", description: "Vessel ID (required)" },
+        },
+        required: ["vesselId"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "get_workload_forecast",
+      description: "Forecast maintenance workload for the upcoming period based on historical patterns and scheduled jobs. Returns predicted due jobs by month, seasonal/cyclical patterns, resource requirement estimates, potential bottleneck periods, and proactive scheduling recommendations.",
+      parameters: {
+        type: "object",
+        properties: {
+          vesselId: { type: "string", description: "Vessel ID (required)" },
+          forecastMonths: { type: "number", description: "Forecast horizon in months (default: 3)" },
         },
         required: ["vesselId"],
       },
@@ -1938,6 +2105,606 @@ async function executeTool(
             percent: overduePercent,
           },
           completedInPeriod: completedInPeriod.length,
+        };
+      }
+
+      case "get_running_hours_analytics": {
+        const components = await storage.getComponents(args.vesselId);
+        const vesselComps = components.filter((c) => c.dataScope === "vessel" && c.isActive !== false);
+        const rhComponents = vesselComps.filter((c) => c.rhCounterType === "MASTER" || c.rhCounterType === "INHERITED");
+        
+        let filteredComps = rhComponents;
+        if (args.componentFilter) {
+          const filter = args.componentFilter.toLowerCase();
+          filteredComps = rhComponents.filter((c) => 
+            (c.name || "").toLowerCase().includes(filter) || 
+            (c.componentCode || "").toLowerCase().includes(filter)
+          );
+        }
+
+        const now = new Date();
+        const analyticsResults: any[] = [];
+
+        for (const comp of filteredComps.slice(0, 20)) {
+          const audits = await storage.getRunningHoursAudits(comp.id, 100);
+          const sortedAudits = audits.sort((a, b) => new Date(b.enteredAtUTC).getTime() - new Date(a.enteredAtUTC).getTime());
+          
+          const currentRH = parseFloat(String(comp.currentCumulativeRH || "0"));
+          
+          const calcAccum = (days: number) => {
+            const cutoff = new Date(now.getTime() - days * 24 * 60 * 60 * 1000);
+            const periodAudits = sortedAudits.filter((a) => new Date(a.enteredAtUTC) >= cutoff);
+            if (periodAudits.length === 0) return 0;
+            const deltas = periodAudits.map((a) => parseFloat(String(a.newRH)) - parseFloat(String(a.previousRH)));
+            return Math.round(deltas.filter((d) => d > 0).reduce((s, d) => s + d, 0) * 100) / 100;
+          };
+
+          const accum30 = calcAccum(30);
+          const accum60 = calcAccum(60);
+          const accum90 = calcAccum(90);
+
+          let anomaly: string | null = null;
+          if (sortedAudits.length >= 3) {
+            const recentDeltas = sortedAudits.slice(0, 5).map((a) => parseFloat(String(a.newRH)) - parseFloat(String(a.previousRH)));
+            const avgDelta = recentDeltas.reduce((s, d) => s + d, 0) / recentDeltas.length;
+            const maxDelta = Math.max(...recentDeltas);
+            if (maxDelta > avgDelta * 3 && avgDelta > 0) anomaly = "SPIKE_DETECTED";
+            const negatives = recentDeltas.filter((d) => d < 0);
+            if (negatives.length > 0) anomaly = "NEGATIVE_READING";
+            if (accum30 === 0 && accum90 > 0) anomaly = "NO_RECENT_UPDATES";
+          }
+
+          analyticsResults.push({
+            componentName: comp.name,
+            componentCode: comp.componentCode,
+            counterType: comp.rhCounterType,
+            currentRH,
+            accumulation: { last30days: accum30, last60days: accum60, last90days: accum90 },
+            dailyAvg: accum90 > 0 ? Math.round((accum90 / 90) * 100) / 100 : 0,
+            totalAuditEntries: sortedAudits.length,
+            lastUpdated: sortedAudits[0]?.dateUpdatedLocal || "Never",
+            anomaly,
+          });
+        }
+
+        const allWOs = await storage.getWorkOrders(args.vesselId);
+        const rhBasedDue = allWOs.filter((wo) => wo.dataScope === "vessel" && (wo.status === "Due" || wo.status === "Overdue") && wo.driverType === "RH");
+
+        return {
+          totalRHComponents: rhComponents.length,
+          showing: analyticsResults.length,
+          components: analyticsResults,
+          rhBasedMaintenanceDue: rhBasedDue.length,
+          rhDueItems: rhBasedDue.slice(0, 5).map((wo) => ({
+            workOrderNo: wo.workOrderNo,
+            component: wo.component,
+            jobTitle: wo.jobTitle,
+            status: wo.status,
+          })),
+          anomaliesDetected: analyticsResults.filter((r) => r.anomaly !== null).length,
+        };
+      }
+
+      case "get_maintenance_planner": {
+        const periodDays = args.periodDays || 90;
+        const allWOs = await storage.getWorkOrders(args.vesselId);
+        const vesselWOs = allWOs.filter((wo) => wo.dataScope === "vessel");
+        const now = new Date();
+        const periodEnd = new Date(now.getTime() + periodDays * 24 * 60 * 60 * 1000);
+
+        const dueAndOverdue = vesselWOs.filter((wo) => {
+          if (wo.status === "Overdue") return true;
+          if ((wo.status === "Due" || wo.status === "Due (Grace P)") && wo.dueDate) {
+            return new Date(wo.dueDate) <= periodEnd;
+          }
+          return false;
+        });
+
+        const weekBuckets: Record<string, { total: number; critical: number; high: number; medium: number; low: number; overdue: number }> = {};
+        const overdueItems = dueAndOverdue.filter((wo) => wo.status === "Overdue");
+        weekBuckets["Overdue (Immediate)"] = {
+          total: overdueItems.length,
+          critical: overdueItems.filter((wo) => wo.jobPriority === "Critical").length,
+          high: overdueItems.filter((wo) => wo.jobPriority === "High").length,
+          medium: overdueItems.filter((wo) => wo.jobPriority === "Medium").length,
+          low: overdueItems.filter((wo) => !wo.jobPriority || wo.jobPriority === "Low").length,
+          overdue: overdueItems.length,
+        };
+
+        for (let weekStart = new Date(now); weekStart < periodEnd; weekStart = new Date(weekStart.getTime() + 7 * 24 * 60 * 60 * 1000)) {
+          const weekEnd = new Date(weekStart.getTime() + 7 * 24 * 60 * 60 * 1000);
+          const weekLabel = `Week of ${weekStart.toISOString().split("T")[0]}`;
+          const weekWOs = dueAndOverdue.filter((wo) => {
+            if (wo.status === "Overdue") return false;
+            if (!wo.dueDate) return false;
+            const due = new Date(wo.dueDate);
+            return due >= weekStart && due < weekEnd;
+          });
+          if (weekWOs.length > 0) {
+            weekBuckets[weekLabel] = {
+              total: weekWOs.length,
+              critical: weekWOs.filter((wo) => wo.jobPriority === "Critical").length,
+              high: weekWOs.filter((wo) => wo.jobPriority === "High").length,
+              medium: weekWOs.filter((wo) => wo.jobPriority === "Medium").length,
+              low: weekWOs.filter((wo) => !wo.jobPriority || wo.jobPriority === "Low").length,
+              overdue: 0,
+            };
+          }
+        }
+
+        const deptDistribution: Record<string, number> = {};
+        for (const wo of dueAndOverdue) {
+          const dept = wo.department || "Unassigned";
+          deptDistribution[dept] = (deptDistribution[dept] || 0) + 1;
+        }
+
+        const criticalPath = dueAndOverdue
+          .filter((wo) => wo.jobPriority === "Critical" || wo.status === "Overdue")
+          .slice(0, 10)
+          .map((wo) => ({
+            workOrderNo: wo.workOrderNo,
+            component: wo.component,
+            jobTitle: wo.jobTitle,
+            dueDate: wo.dueDate,
+            status: wo.status,
+            priority: wo.jobPriority,
+          }));
+
+        return {
+          periodDays,
+          totalItemsInPeriod: dueAndOverdue.length,
+          weeklyBreakdown: weekBuckets,
+          departmentDistribution: deptDistribution,
+          criticalPathItems: criticalPath.length,
+          criticalItems: criticalPath,
+          peakWeek: Object.entries(weekBuckets).sort((a, b) => b[1].total - a[1].total)[0]?.[0] || "None",
+        };
+      }
+
+      case "get_rob_analysis": {
+        const spares = await storage.getSpares(args.vesselId);
+        const activeSpares = spares.filter((sp) => !sp.deleted);
+        const includeOverstock = args.includeOverstock !== false;
+
+        const zeroStock = activeSpares.filter((sp) => (sp.rob ?? 0) === 0 && sp.min !== null && sp.min > 0);
+        const belowMin = activeSpares.filter((sp) => sp.rob !== null && sp.min !== null && sp.rob > 0 && sp.rob < sp.min);
+        const overstocked = includeOverstock ? activeSpares.filter((sp) => sp.rob !== null && sp.max !== null && sp.max > 0 && sp.rob > sp.max) : [];
+
+        let history: any[] = [];
+        try { history = await storage.getSpareHistory(args.vesselId); } catch (e) {}
+        const consumeEvents = history.filter((h: any) => h.eventType === "CONSUME");
+        
+        const consumptionBySpare = new Map<number, number>();
+        const now = new Date();
+        const sixMonthsAgo = new Date(now.getTime() - 180 * 24 * 60 * 60 * 1000);
+        for (const evt of consumeEvents) {
+          if (evt.timestampUTC && new Date(evt.timestampUTC) >= sixMonthsAgo) {
+            const qty = Math.abs(evt.qtyChange || 0);
+            consumptionBySpare.set(evt.spareId, (consumptionBySpare.get(evt.spareId) || 0) + qty);
+          }
+        }
+
+        const stockoutEstimates = belowMin.concat(zeroStock.filter((sp) => {
+          const consumed = consumptionBySpare.get(sp.id) || 0;
+          return consumed > 0;
+        })).slice(0, 10).map((sp) => {
+          const consumed6m = consumptionBySpare.get(sp.id) || 0;
+          const monthlyRate = consumed6m / 6;
+          const currentROB = sp.rob ?? 0;
+          const daysToStockout = monthlyRate > 0 ? Math.round((currentROB / (monthlyRate / 30))) : null;
+          return {
+            partCode: sp.partCode,
+            partName: sp.partName,
+            componentName: sp.componentName,
+            rob: currentROB,
+            min: sp.min,
+            critical: sp.critical,
+            monthlyConsumptionRate: Math.round(monthlyRate * 100) / 100,
+            estimatedDaysToStockout: daysToStockout,
+          };
+        }).sort((a, b) => (a.estimatedDaysToStockout ?? 999) - (b.estimatedDaysToStockout ?? 999));
+
+        return {
+          totalActiveSpares: activeSpares.length,
+          summary: {
+            zeroStockItems: zeroStock.length,
+            belowMinimum: belowMin.length,
+            overstocked: overstocked.length,
+            criticalZeroStock: zeroStock.filter((sp) => sp.critical === "Critical" || sp.critical === "Yes").length,
+          },
+          zeroStockCritical: zeroStock
+            .filter((sp) => sp.critical === "Critical" || sp.critical === "Yes")
+            .slice(0, 10)
+            .map((sp) => ({ partCode: sp.partCode, partName: sp.partName, componentName: sp.componentName, min: sp.min })),
+          stockoutRiskItems: stockoutEstimates,
+          overstockedItems: overstocked.slice(0, 5).map((sp) => ({
+            partCode: sp.partCode,
+            partName: sp.partName,
+            rob: sp.rob,
+            max: sp.max,
+            excess: (sp.rob ?? 0) - (sp.max ?? 0),
+          })),
+        };
+      }
+
+      case "get_change_request_analysis": {
+        const changeRequests = await storage.getChangeRequests({ vesselId: args.vesselId });
+        const now = new Date();
+
+        const byStatus: Record<string, number> = {};
+        for (const cr of changeRequests) {
+          byStatus[cr.status] = (byStatus[cr.status] || 0) + 1;
+        }
+
+        const pending = changeRequests.filter((cr) => cr.status === "submitted");
+        const pendingAging = pending.map((cr) => {
+          const submitted = cr.submittedAt ? new Date(cr.submittedAt) : new Date(cr.createdAt);
+          const ageDays = Math.floor((now.getTime() - submitted.getTime()) / (1000 * 60 * 60 * 24));
+          return {
+            id: cr.id,
+            title: cr.title,
+            category: cr.category,
+            targetType: cr.targetType,
+            submittedDaysAgo: ageDays,
+            requestedBy: cr.requestedByUserId,
+          };
+        }).sort((a, b) => b.submittedDaysAgo - a.submittedDaysAgo);
+
+        const byCategory: Record<string, number> = {};
+        for (const cr of changeRequests) {
+          const cat = cr.category || "Uncategorized";
+          byCategory[cat] = (byCategory[cat] || 0) + 1;
+        }
+
+        const byTargetType: Record<string, number> = {};
+        for (const cr of changeRequests) {
+          const tt = cr.targetType || "Unknown";
+          byTargetType[tt] = (byTargetType[tt] || 0) + 1;
+        }
+
+        const approved = changeRequests.filter((cr) => cr.status === "approved");
+        const recentApproved = approved
+          .filter((cr) => cr.reviewedAt && new Date(cr.reviewedAt) >= new Date(now.getTime() - 90 * 24 * 60 * 60 * 1000))
+          .slice(0, 5)
+          .map((cr) => ({ id: cr.id, title: cr.title, category: cr.category, targetType: cr.targetType, revisionNumber: cr.revisionNumber }));
+
+        return {
+          totalRequests: changeRequests.length,
+          byStatus,
+          pendingCount: pending.length,
+          oldestPendingDays: pendingAging.length > 0 ? pendingAging[0].submittedDaysAgo : 0,
+          pendingRequests: pendingAging.slice(0, 10),
+          byCategory,
+          byTargetType,
+          recentlyApproved: recentApproved,
+          avgApprovalTimeDays: approved.length > 0 ? Math.round(
+            approved.filter((cr) => cr.submittedAt && cr.reviewedAt).reduce((sum, cr) => {
+              const sub = new Date(cr.submittedAt!);
+              const rev = new Date(cr.reviewedAt!);
+              return sum + Math.floor((rev.getTime() - sub.getTime()) / (1000 * 60 * 60 * 24));
+            }, 0) / Math.max(approved.filter((cr) => cr.submittedAt && cr.reviewedAt).length, 1)
+          ) : null,
+        };
+      }
+
+      case "get_recurring_defect_analysis": {
+        const windowMonths = args.windowMonths || 12;
+        const recurringDefectsData = await storage.getRecurringDefects({ windowMonths });
+
+        const sorted = [...recurringDefectsData].sort((a, b) => b.occurrenceCount - a.occurrenceCount);
+
+        const results = [];
+        for (const rd of sorted.slice(0, 15)) {
+          let linkedDefects: any[] = [];
+          try { linkedDefects = await storage.getDefectsForRecurring(rd.id); } catch (e) {}
+
+          results.push({
+            equipmentKey: rd.equipmentKey,
+            occurrenceCount: rd.occurrenceCount,
+            openCount: rd.openCount,
+            vesselsAffected: rd.vesselsAffected,
+            hasCoc: rd.hasCoc,
+            mtbfDays: rd.mtbfDays ? parseFloat(String(rd.mtbfDays)) : null,
+            lastOccurrence: rd.lastOccurrenceDate,
+            linkedDefectCount: linkedDefects.length,
+            severity: rd.occurrenceCount >= 5 ? "HIGH" : rd.occurrenceCount >= 3 ? "MEDIUM" : "LOW",
+          });
+        }
+
+        const cocItems = recurringDefectsData.filter((rd) => rd.hasCoc);
+        const highFrequency = recurringDefectsData.filter((rd) => rd.occurrenceCount >= 5);
+
+        return {
+          windowMonths,
+          totalRecurringGroups: recurringDefectsData.length,
+          analysisSummary: {
+            highFrequencyItems: highFrequency.length,
+            conditionOfClassItems: cocItems.length,
+            multiVesselIssues: recurringDefectsData.filter((rd) => rd.vesselsAffected > 1).length,
+            avgOccurrences: recurringDefectsData.length > 0 ? Math.round(recurringDefectsData.reduce((s, rd) => s + rd.occurrenceCount, 0) / recurringDefectsData.length * 10) / 10 : 0,
+          },
+          topRecurringDefects: results,
+          cocAlerts: cocItems.slice(0, 5).map((rd) => ({
+            equipmentKey: rd.equipmentKey,
+            occurrences: rd.occurrenceCount,
+            openCount: rd.openCount,
+            lastOccurrence: rd.lastOccurrenceDate,
+          })),
+        };
+      }
+
+      case "get_compliance_alerts": {
+        const periodDays = args.periodDays || 90;
+        const now = new Date();
+
+        let certAlerts: any[] = [];
+        let surveyAlerts: any[] = [];
+        
+        try {
+          const db = await getDb();
+          const certData = await db.select().from(vesselCertificateData).where(eq(vesselCertificateData.vesselId, args.vesselId));
+          const certMasters = await db.select().from(shipCertificatesMaster);
+          const certMasterMap = new Map(certMasters.map((m) => [m.masterId, m]));
+
+          for (const cert of certData) {
+            if (!cert.expiryDate) continue;
+            const parts = cert.expiryDate.split(/[-/]/);
+            let expiryDate: Date | null = null;
+            if (parts.length === 3) {
+              expiryDate = new Date(cert.expiryDate);
+              if (isNaN(expiryDate.getTime())) {
+                const [d, m, y] = parts;
+                expiryDate = new Date(`${y}-${m}-${d}`);
+              }
+            }
+            if (!expiryDate || isNaN(expiryDate.getTime())) continue;
+
+            const daysUntilExpiry = Math.floor((expiryDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+            const master = certMasterMap.get(cert.masterId);
+
+            if (daysUntilExpiry <= periodDays) {
+              certAlerts.push({
+                certificateName: master?.certificateName || cert.masterId,
+                masterId: cert.masterId,
+                expiryDate: cert.expiryDate,
+                daysUntilExpiry,
+                status: daysUntilExpiry < 0 ? "EXPIRED" : daysUntilExpiry <= 30 ? "CRITICAL" : daysUntilExpiry <= 60 ? "WARNING" : "UPCOMING",
+                category: master?.category,
+              });
+            }
+          }
+
+          const surveyData = await db.select().from(vesselSurveyData).where(eq(vesselSurveyData.vesselId, args.vesselId));
+          const surveyMasters = await db.select().from(shipSurveysMaster);
+          const surveyMasterMap = new Map(surveyMasters.map((m) => [m.masterId, m]));
+
+          for (const survey of surveyData) {
+            if (!survey.dueDate) continue;
+            let dueDate = new Date(survey.dueDate);
+            if (isNaN(dueDate.getTime())) {
+              const parts = survey.dueDate.split(/[-/]/);
+              if (parts.length === 3) dueDate = new Date(`${parts[2]}-${parts[1]}-${parts[0]}`);
+            }
+            if (isNaN(dueDate.getTime())) continue;
+
+            const daysUntilDue = Math.floor((dueDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+            const master = surveyMasterMap.get(survey.masterId);
+
+            if (daysUntilDue <= periodDays) {
+              surveyAlerts.push({
+                surveyName: master?.surveyName || survey.masterId,
+                masterId: survey.masterId,
+                dueDate: survey.dueDate,
+                daysUntilDue,
+                status: daysUntilDue < 0 ? "OVERDUE" : daysUntilDue <= 30 ? "CRITICAL" : daysUntilDue <= 60 ? "WARNING" : "UPCOMING",
+                category: master?.category,
+              });
+            }
+          }
+        } catch (e: any) {
+          console.error("[Chatbot] Compliance alerts error:", e.message);
+        }
+
+        certAlerts.sort((a, b) => a.daysUntilExpiry - b.daysUntilExpiry);
+        surveyAlerts.sort((a, b) => a.daysUntilDue - b.daysUntilDue);
+
+        return {
+          periodDays,
+          certificates: {
+            total: certAlerts.length,
+            expired: certAlerts.filter((c) => c.status === "EXPIRED").length,
+            critical: certAlerts.filter((c) => c.status === "CRITICAL").length,
+            warning: certAlerts.filter((c) => c.status === "WARNING").length,
+            items: certAlerts.slice(0, 10),
+          },
+          surveys: {
+            total: surveyAlerts.length,
+            overdue: surveyAlerts.filter((s) => s.status === "OVERDUE").length,
+            critical: surveyAlerts.filter((s) => s.status === "CRITICAL").length,
+            warning: surveyAlerts.filter((s) => s.status === "WARNING").length,
+            items: surveyAlerts.slice(0, 10),
+          },
+          totalActionItems: certAlerts.filter((c) => c.status === "EXPIRED" || c.status === "CRITICAL").length +
+            surveyAlerts.filter((s) => s.status === "OVERDUE" || s.status === "CRITICAL").length,
+        };
+      }
+
+      case "get_equipment_comparison": {
+        const filter = (args.equipmentFilter || "").toLowerCase();
+        const eqComponents = await storage.getComponents(args.vesselId);
+        const matching = eqComponents.filter((c) => c.dataScope === "vessel" && c.isActive !== false && (
+          (c.name || "").toLowerCase().includes(filter) ||
+          (c.componentCode || "").toLowerCase().includes(filter) ||
+          (c.fleetEquipmentName || "").toLowerCase().includes(filter)
+        ));
+
+        if (matching.length === 0) {
+          return { error: `No equipment found matching "${args.equipmentFilter}". Try a broader search term.`, suggestions: ["pump", "separator", "generator", "compressor", "engine"] };
+        }
+
+        const allWOs = await storage.getWorkOrders(args.vesselId);
+        const vesselWOs = allWOs.filter((wo) => wo.dataScope === "vessel");
+        let defects: any[] = [];
+        try { defects = await storage.getDefects({ vesselId: args.vesselId }); } catch (e) {}
+
+        const comparison = matching.slice(0, 15).map((comp) => {
+          const compWOs = vesselWOs.filter((wo) => wo.componentCode === comp.componentCode || wo.component === comp.name);
+          const overdueCount = compWOs.filter((wo) => wo.status === "Overdue").length;
+          const completedCount = compWOs.filter((wo) => wo.status === "Completed").length;
+          const compDefects = defects.filter((d: any) => d.status !== "Closed" && (d.equipmentType?.includes(comp.name || "") || d.equipmentCategory?.includes(comp.componentCode || "")));
+          const currentRH = parseFloat(String(comp.currentCumulativeRH || "0"));
+          
+          let healthScore = 100;
+          healthScore -= overdueCount * 15;
+          healthScore -= compDefects.length * 20;
+          healthScore = Math.max(0, Math.min(100, healthScore));
+
+          return {
+            componentName: comp.name,
+            componentCode: comp.componentCode,
+            critical: comp.critical,
+            currentRH: currentRH > 0 ? currentRH : null,
+            totalWOs: compWOs.length,
+            overdueWOs: overdueCount,
+            completedWOs: completedCount,
+            activeDefects: compDefects.length,
+            healthScore,
+            status: healthScore >= 80 ? "GOOD" : healthScore >= 50 ? "FAIR" : "POOR",
+          };
+        }).sort((a, b) => a.healthScore - b.healthScore);
+
+        const scores = comparison.map((c) => c.healthScore);
+        const avg = scores.length > 0 ? Math.round(scores.reduce((s, v) => s + v, 0) / scores.length) : 0;
+
+        return {
+          equipmentFilter: args.equipmentFilter,
+          totalMatching: matching.length,
+          showing: comparison.length,
+          avgHealthScore: avg,
+          bestPerformer: comparison[comparison.length - 1]?.componentName || "N/A",
+          worstPerformer: comparison[0]?.componentName || "N/A",
+          equipment: comparison,
+          variance: scores.length > 1 ? Math.round(Math.sqrt(scores.reduce((s, v) => s + Math.pow(v - avg, 2), 0) / scores.length)) : 0,
+        };
+      }
+
+      case "get_cost_impact_estimate": {
+        const allWOs = await storage.getWorkOrders(args.vesselId);
+        const vesselWOs = allWOs.filter((wo) => wo.dataScope === "vessel");
+        const overdue = vesselWOs.filter((wo) => wo.status === "Overdue");
+        const now = new Date();
+
+        const riskItems = overdue.map((wo) => {
+          const daysOverdue = wo.dueDate ? Math.floor((now.getTime() - new Date(wo.dueDate).getTime()) / (1000 * 60 * 60 * 24)) : 0;
+          const isCritical = wo.jobPriority === "Critical";
+          const isHigh = wo.jobPriority === "High";
+          
+          let riskLevel = "LOW";
+          let riskScore = 0;
+          if (isCritical && daysOverdue > 30) { riskLevel = "CRITICAL"; riskScore = 90; }
+          else if (isCritical || (isHigh && daysOverdue > 60)) { riskLevel = "HIGH"; riskScore = 70; }
+          else if (isHigh || daysOverdue > 90) { riskLevel = "MEDIUM"; riskScore = 50; }
+          else { riskLevel = "LOW"; riskScore = 20; }
+
+          let riskCategory = "OPERATIONAL";
+          if (isCritical || wo.classRelated === "Yes") riskCategory = "SAFETY";
+
+          return {
+            workOrderNo: wo.workOrderNo,
+            component: wo.component,
+            jobTitle: wo.jobTitle,
+            priority: wo.jobPriority,
+            daysOverdue,
+            riskLevel,
+            riskScore,
+            riskCategory,
+            estimatedLaborHours: isCritical ? 8 : isHigh ? 6 : 4,
+          };
+        }).sort((a, b) => b.riskScore - a.riskScore);
+
+        const byCat: Record<string, number> = {};
+        for (const item of riskItems) { byCat[item.riskCategory] = (byCat[item.riskCategory] || 0) + 1; }
+
+        const totalEstimatedHours = riskItems.reduce((s, i) => s + i.estimatedLaborHours, 0);
+
+        return {
+          totalOverdueItems: overdue.length,
+          riskSummary: {
+            critical: riskItems.filter((i) => i.riskLevel === "CRITICAL").length,
+            high: riskItems.filter((i) => i.riskLevel === "HIGH").length,
+            medium: riskItems.filter((i) => i.riskLevel === "MEDIUM").length,
+            low: riskItems.filter((i) => i.riskLevel === "LOW").length,
+          },
+          byRiskCategory: byCat,
+          estimatedTotalLaborHours: totalEstimatedHours,
+          estimatedManDays: Math.ceil(totalEstimatedHours / 8),
+          topRiskItems: riskItems.slice(0, 10),
+          averageDaysOverdue: riskItems.length > 0 ? Math.round(riskItems.reduce((s, i) => s + i.daysOverdue, 0) / riskItems.length) : 0,
+        };
+      }
+
+      case "get_workload_forecast": {
+        const forecastMonths = args.forecastMonths || 3;
+        const allWOs = await storage.getWorkOrders(args.vesselId);
+        const vesselWOs = allWOs.filter((wo) => wo.dataScope === "vessel");
+        const now = new Date();
+
+        const historicalMonths: Record<string, { completed: number; created: number }> = {};
+        for (let i = 1; i <= 6; i++) {
+          const monthStart = new Date(now.getFullYear(), now.getMonth() - i, 1);
+          const monthEnd = new Date(now.getFullYear(), now.getMonth() - i + 1, 0);
+          const label = monthStart.toLocaleDateString("en-US", { month: "short", year: "numeric" });
+          const completed = vesselWOs.filter((wo) => wo.dateCompleted && new Date(wo.dateCompleted) >= monthStart && new Date(wo.dateCompleted) <= monthEnd).length;
+          const created = vesselWOs.filter((wo) => wo.dueDate && new Date(wo.dueDate) >= monthStart && new Date(wo.dueDate) <= monthEnd).length;
+          historicalMonths[label] = { completed, created };
+        }
+
+        const avgMonthlyCreated = Object.values(historicalMonths).reduce((s, v) => s + v.created, 0) / Math.max(Object.keys(historicalMonths).length, 1);
+        const avgMonthlyCompleted = Object.values(historicalMonths).reduce((s, v) => s + v.completed, 0) / Math.max(Object.keys(historicalMonths).length, 1);
+
+        const currentBacklog = vesselWOs.filter((wo) => wo.status === "Overdue" || wo.status === "Due" || wo.status === "Due (Grace P)").length;
+
+        const forecast: Record<string, { predictedDue: number; estimatedBacklog: number }> = {};
+        let runningBacklog = currentBacklog;
+        for (let i = 0; i < forecastMonths; i++) {
+          const monthDate = new Date(now.getFullYear(), now.getMonth() + i + 1, 1);
+          const label = monthDate.toLocaleDateString("en-US", { month: "short", year: "numeric" });
+          
+          const dueInMonth = vesselWOs.filter((wo) => {
+            if (!wo.dueDate) return false;
+            const due = new Date(wo.dueDate);
+            const monthEndDate = new Date(monthDate.getFullYear(), monthDate.getMonth() + 1, 0);
+            return due >= monthDate && due <= monthEndDate && wo.status !== "Completed";
+          }).length;
+          
+          const predicted = Math.max(dueInMonth, Math.round(avgMonthlyCreated));
+          runningBacklog = runningBacklog + predicted - Math.round(avgMonthlyCompleted);
+          if (runningBacklog < 0) runningBacklog = 0;
+          
+          forecast[label] = { predictedDue: predicted, estimatedBacklog: runningBacklog };
+        }
+
+        const byPriority: Record<string, number> = {};
+        const upcoming = vesselWOs.filter((wo) => {
+          if (!wo.dueDate || wo.status === "Completed") return false;
+          const due = new Date(wo.dueDate);
+          return due >= now && due <= new Date(now.getTime() + forecastMonths * 30 * 24 * 60 * 60 * 1000);
+        });
+        for (const wo of upcoming) {
+          const p = wo.jobPriority || "Unassigned";
+          byPriority[p] = (byPriority[p] || 0) + 1;
+        }
+
+        return {
+          forecastMonths,
+          currentBacklog,
+          avgMonthlyWorkOrders: Math.round(avgMonthlyCreated),
+          avgMonthlyCompletions: Math.round(avgMonthlyCompleted),
+          completionCapacityRatio: avgMonthlyCreated > 0 ? Math.round((avgMonthlyCompleted / avgMonthlyCreated) * 100) : 100,
+          historicalTrend: historicalMonths,
+          forecast,
+          upcomingByPriority: byPriority,
+          bottleneckRisk: runningBacklog > currentBacklog * 1.5 ? "HIGH" : runningBacklog > currentBacklog ? "MODERATE" : "LOW",
         };
       }
 
