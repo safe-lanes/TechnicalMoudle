@@ -1,0 +1,201 @@
+Replit Prompt: Chatbot Intelligence Enhancement - Requirements Analysis
+Current Status
+The fleet overview tool has been successfully added and the chatbot can now answer basic fleet queries. However, the chatbot still lacks the intelligence and sophistication expected from a senior maintenance analyst assistant.
+
+Request for Analysis
+Before implementing any changes, please analyze and document:
+
+1. Current AI Model & Configuration
+Which AI model are you using? (e.g., GPT-4, GPT-3.5, Claude, Gemini, Llama)
+
+What are the current model parameters?
+
+Temperature setting
+
+Max tokens
+
+Top-p / frequency penalty
+
+Context window size
+
+Is the model optimized for analytical/technical responses?
+
+2. System Prompt Quality Assessment
+Please review the current system prompt and answer:
+
+How detailed is the current system prompt? (word count / character count)
+
+Does it include:
+
+✅ Role definition (maintenance analyst persona)
+
+✅ Response structure guidelines (Summary, Insights, Recommendations)
+
+✅ Domain expertise (PMS terminology, marine operations)
+
+✅ Tone guidelines (professional, analytical, proactive)
+
+✅ Examples of good vs bad responses
+
+✅ Tool usage guidance (when to use which tool)
+
+3. Context Management
+Does the chatbot maintain conversation history?
+
+Can it reference previous queries in the same session?
+
+Does it remember vessel context across questions?
+
+Is there a memory/context limit affecting intelligence?
+
+4. Tool Integration Intelligence
+Does the AI automatically chain multiple tools for complex queries?
+
+Can it decide which tool to use based on query intent?
+
+Does it know when to NOT use a tool and just provide general guidance?
+
+5. Response Quality Issues
+Please identify what's making responses feel "not smart enough":
+
+Is it giving generic responses instead of specific insights?
+
+Is it failing to connect data points (cross-referencing)?
+
+Is it not providing proactive recommendations?
+
+Is it missing domain expertise (marine/PMS terminology)?
+
+Is it too verbose or too brief?
+
+Is it not asking clarifying questions when needed?
+
+6. Intelligence Improvement Options
+What are YOUR recommendations to make the chatbot smarter? Consider:
+
+Option A: Enhanced System Prompt
+
+Add more detailed persona instructions
+
+Include domain knowledge base
+
+Add response quality examples
+
+Define analytical thinking framework
+
+Option B: Model Upgrade
+
+Switch to a more capable AI model
+
+Increase context window
+
+Adjust temperature for more creative/analytical responses
+
+Option C: Retrieval-Augmented Generation (RAG)
+
+Add a knowledge base of PMS best practices
+
+Include maritime regulations reference
+
+Add equipment manuals context
+
+Include historical insights from similar vessels
+
+Option D: Advanced Tool Chaining
+
+Implement multi-step reasoning
+
+Auto-fetch related data before answering
+
+Cross-reference multiple data sources automatically
+
+Option E: Fine-tuning / Custom Training
+
+Train on PMS-specific conversations
+
+Include maintenance domain vocabulary
+
+Optimize for analytical responses
+
+7. Specific Intelligence Gaps
+Based on the current implementation, what specific capabilities are missing for "smart" responses:
+
+ Ability to detect urgency and prioritize
+
+ Cross-referencing data across tools automatically
+
+ Providing comparative analysis (month-over-month, vessel-to-vessel)
+
+ Predictive insights based on trends
+
+ Root cause analysis suggestions
+
+ Cost-benefit trade-off analysis
+
+ Risk assessment and mitigation strategies
+
+ Asking clarifying questions when query is ambiguous
+
+8. Benchmark Comparison
+What would you consider a "smart" response vs current response for this query:
+
+User Query: "What should I prioritize this week?"
+
+Current Response Type: [Please describe what it would say now]
+
+Smart Response Should Include:
+
+Analysis of overdue high-priority items
+
+Upcoming critical deadlines (certificates, surveys)
+
+Spare parts stockout risks blocking work orders
+
+Crew workload distribution
+
+Weather/port arrival considerations
+
+Specific numbered action plan for the week
+
+9. Technical Constraints
+What are the current technical limitations preventing smarter responses:
+
+API rate limits
+
+Response time constraints
+
+Token/cost limitations
+
+Database query performance
+
+Tool execution timeout
+
+10. Recommended Implementation Plan
+Please provide a prioritized plan:
+
+Phase 1 (Quick Wins - 1 hour):
+
+[List immediate improvements]
+
+Phase 2 (Medium Effort - 4 hours):
+
+[List moderate complexity improvements]
+
+Phase 3 (Long-term - 8+ hours):
+
+[List advanced intelligence features]
+
+Deliverable Required
+Please provide a detailed document/response covering:
+
+Current AI Configuration (model, parameters, prompt length)
+
+Intelligence Gap Analysis (what's missing specifically)
+
+Top 5 Recommendations (ranked by impact vs effort)
+
+Implementation Estimate (time/complexity for each recommendation)
+
+Expected Improvement (how much "smarter" will it get with each change)
+
+Do NOT start implementing yet - I want to review your analysis and recommendations first before deciding which improvements to prioritize.
