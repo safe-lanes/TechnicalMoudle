@@ -1,0 +1,79 @@
+Issue Identified
+The PMS Assistant chatbot cannot answer basic fleet-level questions like "how many vessels do we have". The chatbot responds that it "currently does not have access to the fleet-wide data" and can only work with Vessel 3 (ID: 7440571a-841a-11ed-aa7c-7003bca91a86).
+
+User Query That Failed
+Question: "how many vessels do we have"
+
+Expected Answer: "You have 3 vessels in your fleet" (or actual count with vessel names/IDs)
+
+Actual Response: "I currently do not have access to the fleet-wide data to determine the exact number of vessels"
+
+Required Fix
+1. Add Fleet-Level Data Access
+The chatbot needs to query the vessels/fleet table to answer:
+
+Total vessel count
+
+List of all vessels (names, IDs, status)
+
+Fleet-wide statistics
+
+2. Create "Fleet Overview" Tool
+Add a new tool that can answer:
+
+"How many vessels do we have?"
+
+"List all vessels"
+
+"Show fleet summary"
+
+"Which vessels are active?"
+
+Expected response format:
+
+text
+Summary: You manage 3 vessels in your fleet.
+
+Vessel List:
+1. Vessel 1 (ID: xxx) - Active
+2. Vessel 2 (ID: yyy) - Active  
+3. Vessel 3 (ID: zzz) - Active
+
+Would you like detailed information about any specific vessel?
+3. Update System Prompt
+The chatbot should:
+
+NOT say "I don't have access to fleet data" when vessel data clearly exists in the database
+
+ALWAYS try to query the vessels table first before claiming lack of access
+
+Provide helpful guidance if truly no data exists
+
+4. Verify Database Schema
+Check if:
+
+vessels table exists and is accessible
+
+Vessel count query works: SELECT COUNT(*) FROM vessels
+
+Vessel list query works: SELECT id, name, status FROM vessels
+
+Testing After Fix
+Please ensure these queries work:
+
+"How many vessels do we have?"
+
+"List all vessels"
+
+"Show me all active vessels"
+
+"What vessels are in the fleet?"
+
+"Give me fleet overview"
+
+Expected Behavior
+✅ Should answer confidently with actual data from the database
+✅ Should NOT claim lack of access when data is available
+✅ Should provide vessel count, names, and basic details
+✅ Should offer to dive deeper into specific vessel data
+
