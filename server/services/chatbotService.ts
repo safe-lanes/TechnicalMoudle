@@ -5,11 +5,12 @@ let openaiClient: OpenAI | null = null;
 
 function getOpenAIClient(): OpenAI {
   if (!openaiClient) {
-    const apiKey = process.env.OPENAI_API_KEY;
-    if (!apiKey) {
-      throw new Error("OPENAI_API_KEY environment variable is not set. Please configure it to use the PMS Assistant.");
+    const apiKey = process.env.AI_INTEGRATIONS_OPENAI_API_KEY;
+    const baseURL = process.env.AI_INTEGRATIONS_OPENAI_BASE_URL;
+    if (!apiKey || !baseURL) {
+      throw new Error("Replit AI Integration is not configured. Please ensure the OpenAI AI Integration is installed.");
     }
-    openaiClient = new OpenAI({ apiKey });
+    openaiClient = new OpenAI({ apiKey, baseURL });
   }
   return openaiClient;
 }
