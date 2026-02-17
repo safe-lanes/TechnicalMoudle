@@ -20,6 +20,7 @@ import {
   jobs,
   spares,
   spareComponentLinks,
+  storesItems,
 } from '@shared/schema';
 import { requireOfficeOrAdmin } from '../middleware/auth';
 
@@ -1050,6 +1051,7 @@ router.post('/copy-vessel', async (req, res) => {
       copyComponents: z.boolean().default(true),
       copyJobs: z.boolean().default(true),
       copySpares: z.boolean().default(true),
+      copyStores: z.boolean().default(true),
       mappedBy: z.string().default("system"),
     });
 
@@ -1060,7 +1062,7 @@ router.post('/copy-vessel', async (req, res) => {
     }
 
     const db = await getDb();
-    const copyResults = { components: 0, jobs: 0, spares: 0, spareComponentLinks: 0, errors: [] as string[] };
+    const copyResults = { components: 0, jobs: 0, spares: 0, spareComponentLinks: 0, stores: 0, errors: [] as string[] };
     const componentIdMap = new Map<string, string>();
     const spareIdMap = new Map<number, number>();
 
@@ -1288,8 +1290,73 @@ router.post('/copy-vessel', async (req, res) => {
       }
     }
 
-    const totalCopied = copyResults.components + copyResults.jobs + copyResults.spares + copyResults.spareComponentLinks;
-    console.log(`[Copy Vessel] ${data.sourceVesselCode} → ${data.targetVesselCode}: ${copyResults.components} components, ${copyResults.jobs} jobs, ${copyResults.spares} spares copied`);
+    if (data.copyStores) {
+      const sourceStoreList = await db.select().from(storesItems)
+        .where(and(
+          eq(storesItems.vesselId, data.sourceVesselCode),
+          eq(storesItems.deleted, false)
+        ));
+      const targetStoreList = await db.select().from(storesItems)
+        .where(eq(storesItems.vesselId, data.targetVesselCode));
+      const existingStoreCodes = new Set(
+        targetStoreList.map(s => `${s.itemCode}|${s.itemType}`)
+      );
+
+      for (const item of sourceStoreList) {
+        const storeKey = `${item.itemCode}|${item.itemType}`;
+        if (existingStoreCodes.has(storeKey)) continue;
+
+        try {
+          await db.insert(storesItems).values({
+            vesselId: data.targetVesselCode,
+            itemType: item.itemType,
+            itemCode: item.itemCode,
+            impaCode: item.impaCode,
+            itemName: item.itemName,
+            category: item.category,
+            specification: item.specification,
+            uom: item.uom,
+            rob: "0",
+            robLocationA: "0",
+            robLocationB: "0",
+            locationA: item.locationA,
+            locationB: item.locationB,
+            min: item.min,
+            max: item.max,
+            unitCost: item.unitCost,
+            supplier: item.supplier,
+            leadTime: item.leadTime,
+            ihm: item.ihm,
+            ihmDetails: item.ihmDetails,
+            ihmPresence: item.ihmPresence,
+            ihmEvidenceType: item.ihmEvidenceType,
+            manufactureDate: item.manufactureDate,
+            expiryDate: item.expiryDate,
+            batchNumber: item.batchNumber,
+            lotNumber: item.lotNumber,
+            shelfLifeMonths: item.shelfLifeMonths,
+            sdsReference: item.sdsReference,
+            sdsDocumentUrl: item.sdsDocumentUrl,
+            sdsLastUpdated: item.sdsLastUpdated,
+            hazardClassification: item.hazardClassification,
+            unNumber: item.unNumber,
+            flashPoint: item.flashPoint,
+            storageTempMin: item.storageTempMin,
+            storageTempMax: item.storageTempMax,
+            disposalInstructions: item.disposalInstructions,
+            ppeRequirements: item.ppeRequirements,
+            emergencyContact: item.emergencyContact,
+            remarks: item.remarks,
+          });
+          copyResults.stores++;
+        } catch (e: any) {
+          copyResults.errors.push(`Store ${item.itemCode}: ${e.message}`);
+        }
+      }
+    }
+
+    const totalCopied = copyResults.components + copyResults.jobs + copyResults.spares + copyResults.spareComponentLinks + copyResults.stores;
+    console.log(`[Copy Vessel] ${data.sourceVesselCode} → ${data.targetVesselCode}: ${copyResults.components} components, ${copyResults.jobs} jobs, ${copyResults.spares} spares, ${copyResults.stores} stores copied`);
     
     res.json({
       success: true,

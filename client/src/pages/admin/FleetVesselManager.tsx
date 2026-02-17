@@ -96,9 +96,9 @@ export default function FleetVesselManager({ onBack }: { onBack?: () => void }) 
   const [copyTargetVessel, setCopyTargetVessel] = useState("");
   const [sourcePopoverOpen, setSourcePopoverOpen] = useState(false);
   const [targetPopoverOpen, setTargetPopoverOpen] = useState(false);
-  const [copyModules, setCopyModules] = useState({ components: true, jobs: true, spares: true });
+  const [copyModules, setCopyModules] = useState({ components: true, jobs: true, spares: true, stores: true });
   const [copyStep, setCopyStep] = useState<"select" | "confirm" | "result">("select");
-  const [copyResult, setCopyResult] = useState<{ components: number; jobs: number; spares: number } | null>(null);
+  const [copyResult, setCopyResult] = useState<{ components: number; jobs: number; spares: number; stores: number } | null>(null);
 
   const fleetForm = useForm<FleetFormData>({
     resolver: zodResolver(fleetFormSchema),
@@ -230,6 +230,7 @@ export default function FleetVesselManager({ onBack }: { onBack?: () => void }) 
       copyComponents: boolean;
       copyJobs: boolean;
       copySpares: boolean;
+      copyStores: boolean;
     }) => {
       return await apiRequest("POST", "/technical/api/fleet-admin/copy-vessel", data);
     },
@@ -249,7 +250,7 @@ export default function FleetVesselManager({ onBack }: { onBack?: () => void }) 
   const handleOpenCopyDialog = () => {
     setCopySourceVessel("");
     setCopyTargetVessel("");
-    setCopyModules({ components: true, jobs: true, spares: true });
+    setCopyModules({ components: true, jobs: true, spares: true, stores: true });
     setCopyStep("select");
     setCopyResult(null);
     setIsCopyVesselDialogOpen(true);
@@ -264,13 +265,14 @@ export default function FleetVesselManager({ onBack }: { onBack?: () => void }) 
       copyComponents: copyModules.components,
       copyJobs: copyModules.jobs,
       copySpares: copyModules.spares,
+      copyStores: copyModules.stores,
     });
   };
 
   const allVessels = vessels;
   const sourceVesselName = allVessels.find((v) => (v.code || v.id) === copySourceVessel)?.name || "";
   const targetVesselName = allVessels.find((v) => (v.code || v.id) === copyTargetVessel)?.name || "";
-  const canProceedToConfirm = copySourceVessel && copyTargetVessel && copySourceVessel !== copyTargetVessel && (copyModules.components || copyModules.jobs || copyModules.spares);
+  const canProceedToConfirm = copySourceVessel && copyTargetVessel && copySourceVessel !== copyTargetVessel && (copyModules.components || copyModules.jobs || copyModules.spares || copyModules.stores);
 
   const handleCreateFleet = () => {
     setEditingFleet(null);
@@ -967,6 +969,15 @@ export default function FleetVesselManager({ onBack }: { onBack?: () => void }) 
                       />
                       <Label htmlFor="copy-spares" className="text-sm cursor-pointer">Spares Mapping</Label>
                     </div>
+                    <div className="flex items-center gap-2">
+                      <Checkbox
+                        id="copy-stores"
+                        checked={copyModules.stores}
+                        onCheckedChange={(c) => setCopyModules((p) => ({ ...p, stores: !!c }))}
+                        data-testid="checkbox-copy-stores"
+                      />
+                      <Label htmlFor="copy-stores" className="text-sm cursor-pointer">Stores / Lubricants / Chemicals</Label>
+                    </div>
                   </div>
                 </div>
 
@@ -998,6 +1009,7 @@ export default function FleetVesselManager({ onBack }: { onBack?: () => void }) 
                     {copyModules.components && <Badge variant="secondary">Components</Badge>}
                     {copyModules.jobs && <Badge variant="secondary">Jobs</Badge>}
                     {copyModules.spares && <Badge variant="secondary">Spares</Badge>}
+                    {copyModules.stores && <Badge variant="secondary">Stores</Badge>}
                   </div>
                 </div>
 
@@ -1021,7 +1033,7 @@ export default function FleetVesselManager({ onBack }: { onBack?: () => void }) 
                     <CheckCircle2 className="h-4 w-4" />
                     Copy Completed Successfully
                   </div>
-                  <div className="grid grid-cols-3 gap-3 mt-2">
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-2">
                     {copyModules.components && (
                       <div className="text-center p-2 bg-white rounded border" data-testid="copy-result-components">
                         <div className="text-lg font-bold text-gray-800" data-testid="text-copy-count-components">{copyResult.components}</div>
@@ -1038,6 +1050,12 @@ export default function FleetVesselManager({ onBack }: { onBack?: () => void }) 
                       <div className="text-center p-2 bg-white rounded border" data-testid="copy-result-spares">
                         <div className="text-lg font-bold text-gray-800" data-testid="text-copy-count-spares">{copyResult.spares}</div>
                         <div className="text-xs text-gray-500">Spares</div>
+                      </div>
+                    )}
+                    {copyModules.stores && (
+                      <div className="text-center p-2 bg-white rounded border" data-testid="copy-result-stores">
+                        <div className="text-lg font-bold text-gray-800" data-testid="text-copy-count-stores">{copyResult.stores}</div>
+                        <div className="text-xs text-gray-500">Stores</div>
                       </div>
                     )}
                   </div>
