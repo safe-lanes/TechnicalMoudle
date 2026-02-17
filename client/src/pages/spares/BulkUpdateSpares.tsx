@@ -14,6 +14,7 @@ interface Spare {
   id: number;
   partCode: string;
   partName: string;
+  partNumber?: string;
   component?: string;
   rob: number;
   min: number;
@@ -362,25 +363,32 @@ export default function BulkUpdateSpares() {
               <table className="w-full">
                 <thead className="bg-gray-50 dark:bg-gray-700">
                   <tr>
-                    <th className="px-3 py-2 text-left text-xs font-medium">Part Code</th>
-                    <th className="px-3 py-2 text-left text-xs font-medium">Part Name</th>
-                    <th className="px-2 py-2 text-center text-xs font-medium" colSpan={2}>
-                      <div className="text-center">Current Stock (ROB)</div>
-                      <div className="flex justify-center gap-4 text-[10px] mt-1">
-                        <span className="font-semibold text-blue-600" data-testid="label-rob-location-a">{locationNames.locationA} - ROB</span>
-                        <span className="font-semibold text-blue-600" data-testid="label-rob-location-b">{locationNames.locationB} - ROB</span>
-                      </div>
+                    <th className="px-3 py-2 text-left text-xs font-medium" rowSpan={2}>Part Code</th>
+                    <th className="px-3 py-2 text-left text-xs font-medium" rowSpan={2}>Part Name</th>
+                    <th className="px-3 py-2 text-left text-xs font-medium" rowSpan={2}>Part Number</th>
+                    <th className="px-2 py-2 text-center text-xs font-medium border-l" colSpan={2}>
+                      <div className="text-center font-semibold">Current Stock (ROB)</div>
                     </th>
                     <th className="px-2 py-2 text-center text-xs font-medium border-l" colSpan={2}>
-                      <div className={`text-center ${transactionMode === "consume" ? "text-orange-600" : "text-green-600"}`} data-testid="label-transaction-header">
+                      <div className={`text-center font-semibold ${transactionMode === "consume" ? "text-orange-600" : "text-green-600"}`} data-testid="label-transaction-header">
                         {transactionLabel}
                       </div>
-                      <div className="flex justify-center gap-4 text-[10px] mt-1">
-                        <span className="font-semibold text-blue-600" data-testid="label-transaction-location-a">{transactionLabel} - {locationNames.locationA} / ROB</span>
-                        <span className="font-semibold text-blue-600" data-testid="label-transaction-location-b">{transactionLabel} - {locationNames.locationB} / ROB</span>
-                      </div>
                     </th>
-                    <th className="px-2 py-2 text-center text-xs font-medium border-l">New ROB</th>
+                    <th className="px-2 py-2 text-center text-xs font-medium border-l" rowSpan={2}>New ROB</th>
+                  </tr>
+                  <tr>
+                    <th className="px-2 py-1 text-center border-l">
+                      <div className="text-[11px] font-semibold text-blue-600 whitespace-normal leading-tight" data-testid="label-rob-location-a">{locationNames.locationA} / ROB</div>
+                    </th>
+                    <th className="px-2 py-1 text-center">
+                      <div className="text-[11px] font-semibold text-blue-600 whitespace-normal leading-tight" data-testid="label-rob-location-b">{locationNames.locationB} / ROB</div>
+                    </th>
+                    <th className="px-2 py-1 text-center border-l">
+                      <div className="text-[11px] font-semibold text-blue-600 whitespace-normal leading-tight" data-testid="label-transaction-location-a">{transactionLabel} - {locationNames.locationA} / ROB</div>
+                    </th>
+                    <th className="px-2 py-1 text-center">
+                      <div className="text-[11px] font-semibold text-blue-600 whitespace-normal leading-tight" data-testid="label-transaction-location-b">{transactionLabel} - {locationNames.locationB} / ROB</div>
+                    </th>
                   </tr>
                 </thead>
                 <tbody>
@@ -410,44 +418,38 @@ export default function BulkUpdateSpares() {
                     const needsTransactionDate = hasAnyTransaction && !bulkUpdateData[spare.id]?.receivedDate;
                     const hasError = hasInsufficientStockA || hasInsufficientStockB || needsTransactionDate;
                     
-                    const spareLocA = spare.location || locationNames.locationA;
-                    const spareLocB = spare.location2 || locationNames.locationB;
-                    
                     return (
                       <tr key={spare.id} className={`border-t ${hasError ? 'bg-red-50 dark:bg-red-900/20' : ''}`}>
                         <td className="px-3 py-2 text-sm">{spare.partCode}</td>
                         <td className="px-3 py-2 text-sm max-w-[150px] truncate" title={spare.partName}>{spare.partName}</td>
-                        <td className="px-2 py-2 text-center">
-                          <div className="text-[9px] text-gray-500 truncate max-w-[60px]" title={spareLocA}>{spareLocA}</div>
+                        <td className="px-3 py-2 text-sm text-gray-500 max-w-[120px] truncate" title={spare.partNumber || ''}>{spare.partNumber || '-'}</td>
+                        <td className="px-2 py-2 text-center border-l">
                           <div className="text-xs text-gray-600 font-medium">{robA}</div>
                         </td>
                         <td className="px-2 py-2 text-center">
-                          <div className="text-[9px] text-gray-500 truncate max-w-[60px]" title={spareLocB}>{spareLocB}</div>
                           <div className="text-xs text-gray-600 font-medium">{robB}</div>
                         </td>
                         {transactionMode === "consume" ? (
                           <>
                             <td className="px-1 py-2 border-l">
-                              <div className="text-[9px] text-gray-500 truncate max-w-[56px] text-center" title={spareLocA}>{spareLocA}</div>
                               <Input
                                 type="number"
                                 min="0"
                                 max={robA}
                                 value={bulkUpdateData[spare.id]?.consumedA || ""}
                                 onChange={(e) => handleBulkUpdateChange(spare.id, 'consumedA', e.target.value)}
-                                className={`w-14 h-7 text-sm text-center ${hasInsufficientStockA ? 'border-red-500' : ''}`}
+                                className={`w-16 h-7 text-sm text-center ${hasInsufficientStockA ? 'border-red-500' : ''}`}
                                 data-testid={`input-consume-a-${spare.id}`}
                               />
                             </td>
                             <td className="px-1 py-2">
-                              <div className="text-[9px] text-gray-500 truncate max-w-[56px] text-center" title={spareLocB}>{spareLocB}</div>
                               <Input
                                 type="number"
                                 min="0"
                                 max={robB}
                                 value={bulkUpdateData[spare.id]?.consumedB || ""}
                                 onChange={(e) => handleBulkUpdateChange(spare.id, 'consumedB', e.target.value)}
-                                className={`w-14 h-7 text-sm text-center ${hasInsufficientStockB ? 'border-red-500' : ''}`}
+                                className={`w-16 h-7 text-sm text-center ${hasInsufficientStockB ? 'border-red-500' : ''}`}
                                 data-testid={`input-consume-b-${spare.id}`}
                               />
                             </td>
@@ -455,24 +457,22 @@ export default function BulkUpdateSpares() {
                         ) : (
                           <>
                             <td className="px-1 py-2 border-l">
-                              <div className="text-[9px] text-gray-500 truncate max-w-[56px] text-center" title={spareLocA}>{spareLocA}</div>
                               <Input
                                 type="number"
                                 min="0"
                                 value={bulkUpdateData[spare.id]?.receivedA || ""}
                                 onChange={(e) => handleBulkUpdateChange(spare.id, 'receivedA', e.target.value)}
-                                className="w-14 h-7 text-sm text-center"
+                                className="w-16 h-7 text-sm text-center"
                                 data-testid={`input-receive-a-${spare.id}`}
                               />
                             </td>
                             <td className="px-1 py-2">
-                              <div className="text-[9px] text-gray-500 truncate max-w-[56px] text-center" title={spareLocB}>{spareLocB}</div>
                               <Input
                                 type="number"
                                 min="0"
                                 value={bulkUpdateData[spare.id]?.receivedB || ""}
                                 onChange={(e) => handleBulkUpdateChange(spare.id, 'receivedB', e.target.value)}
-                                className="w-14 h-7 text-sm text-center"
+                                className="w-16 h-7 text-sm text-center"
                                 data-testid={`input-receive-b-${spare.id}`}
                               />
                             </td>
