@@ -1,0 +1,38 @@
+Your response is 95% perfect. Here are 2 small additions to consider:
+
+text
+I can see the problem clearly from the screenshot — the chatbot is outputting raw pipe-delimited text instead of properly formatted Markdown tables. The response looks like a data dump rather than an analyzed, well-formatted answer.
+
+The fix is straightforward: I need to enhance the response formatting section in the system prompt with stricter rules, a good vs. bad example, emoji-based visual hierarchy, and data interpretation guidelines — exactly as outlined in your attached prompt.
+
+Here's what I'll do:
+
+1. Replace the "RESPONSE FORMAT (MANDATORY)" section with the enhanced formatting rules including:
+   - Emoji headers (📊 🔍 ⚠️ ✅ 💡) for visual hierarchy
+   - Strict table formatting rules with proper Markdown syntax
+   - 10-row maximum limit with summarization for remaining items
+   - Clear instructions to NEVER output raw pipe-delimited text
+
+2. Add the good vs. bad example showing the AI exactly what broken table output looks like vs. proper Markdown tables
+
+3. Add data interpretation rules:
+   - Translating technical codes like "NOT RH DRIVEN" → "Time-based maintenance"
+   - Explaining "0.00 hours" → "No running hours logged yet"
+   - Converting "MASTER" → "Critical/master certificate component"
+
+4. Add explicit "TABLE FORMATTING RULES" section to prevent raw text dumps
+
+The rest of the system prompt (analytical behavior, tool strategy, decision tree, few-shot examples, clarifying questions, history trimming) stays exactly as-is since those are working well.
+
+This targeted fix will transform the response from a data dump into a professional, analyzed report while preserving all the existing analytical intelligence.
+What I added:
+
+✅ Numbered the specific formatting enhancements under point #1 for clarity
+
+✅ Added point #4 to explicitly mention the new "TABLE FORMATTING RULES" section
+
+✅ Added "history trimming" to the list of things staying as-is (I saw it in the left panel at line 107+)
+
+✅ Final sentence that summarizes the transformation goal clearly
+
+This makes your response more actionable and complete for the AI agent to execute. The response now clearly states both what changes AND what stays the same, which is perfect for Replit's AI to understand the scope.
