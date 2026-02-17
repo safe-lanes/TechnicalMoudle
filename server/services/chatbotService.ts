@@ -1,7 +1,7 @@
 import OpenAI from "openai";
 import type { IStorage } from "../storage";
 import { getDb } from "../db";
-import { vesselCertificateData, vesselSurveyData, shipCertificatesMaster, shipSurveysMaster } from "@shared/schema";
+import { vessels as vesselsTable, vesselCertificateData, vesselSurveyData, shipCertificatesMaster, shipSurveysMaster } from "@shared/schema";
 import { eq } from "drizzle-orm";
 
 let openaiClient: OpenAI | null = null;
@@ -79,7 +79,18 @@ FORMATTING RULES:
 - Always show counts AND percentages: "45 critical items (23% of total)"
 - Keep tables compact: short column names, abbreviated where sensible
 
+═══════ FLEET-LEVEL ACCESS ═══════
+
+You HAVE full access to fleet-wide data via the get_fleet_overview tool.
+- Use get_fleet_overview to answer questions about vessel count, vessel lists, fleet summary, or which vessels are active/inactive.
+- NEVER say "I don't have access to fleet data" — you DO have access.
+- When asked about the fleet, call get_fleet_overview first, then offer to drill into specific vessel data.
+- Default to showing all vessels with names and status, then offer detailed maintenance analysis per vessel.
+
 ═══════ TOOL USAGE STRATEGY ═══════
+
+FLEET TOOL:
+- get_fleet_overview → Use for any fleet-wide question: vessel count, vessel list, fleet summary, active/inactive vessels. No parameters needed.
 
 ANALYTICAL TOOLS (use for insight-driven questions):
 - get_maintenance_insights → Use FIRST for any "status", "overview", "how are we doing" questions. Returns pre-computed KPIs and risk analysis
@@ -779,6 +790,18 @@ const CHATBOT_TOOLS: OpenAI.Chat.Completions.ChatCompletionTool[] = [
           forecastMonths: { type: "number", description: "Forecast horizon in months (default: 3)" },
         },
         required: ["vesselId"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "get_fleet_overview",
+      description: "Get complete fleet information including vessel count, list of all vessels with their IDs, names, codes, and active status. Use this for questions like 'how many vessels', 'list all vessels', 'show fleet', 'which vessels are active', 'fleet overview', 'fleet summary'. No parameters needed since this returns fleet-wide data.",
+      parameters: {
+        type: "object",
+        properties: {},
+        required: [],
       },
     },
   },
@@ -2705,6 +2728,34 @@ async function executeTool(
           forecast,
           upcomingByPriority: byPriority,
           bottleneckRisk: runningBacklog > currentBacklog * 1.5 ? "HIGH" : runningBacklog > currentBacklog ? "MODERATE" : "LOW",
+        };
+      }
+
+      case "get_fleet_overview": {
+        const db = await getDb();
+        const allVessels = await db.select({
+          id: vesselsTable.id,
+          name: vesselsTable.name,
+          code: vesselsTable.code,
+          imoNumber: vesselsTable.imoNumber,
+          vesselType: vesselsTable.vesselType,
+          flag: vesselsTable.flag,
+          isActive: vesselsTable.isActive,
+        }).from(vesselsTable);
+        const activeVessels = allVessels.filter(v => v.isActive !== false);
+        return {
+          totalVessels: allVessels.length,
+          activeVessels: activeVessels.length,
+          inactiveVessels: allVessels.length - activeVessels.length,
+          vessels: allVessels.map(v => ({
+            id: v.id,
+            name: v.name || "Unnamed Vessel",
+            code: v.code || null,
+            imoNumber: v.imoNumber || null,
+            vesselType: v.vesselType || null,
+            flag: v.flag || null,
+            status: v.isActive === false ? "Inactive" : "Active",
+          })),
         };
       }
 
