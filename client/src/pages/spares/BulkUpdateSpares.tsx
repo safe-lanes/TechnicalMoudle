@@ -233,39 +233,35 @@ export default function BulkUpdateSpares() {
 
       <div className="flex-1 overflow-hidden px-6 py-4 flex flex-col">
         <div className="w-full flex flex-col flex-1 min-h-0 space-y-4">
-          <div className="p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800">
-            <div className="flex items-center gap-4">
-              <div className="w-64">
-                <Label htmlFor="transaction-mode" className="text-sm font-medium text-gray-700 dark:text-gray-300">Mode of Transaction</Label>
-                <Select
-                  value={transactionMode}
-                  onValueChange={(value: TransactionMode) => setTransactionMode(value)}
+          <div className="px-3 py-2 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800">
+            <div className="flex items-center gap-3">
+              <Label htmlFor="transaction-mode" className="text-xs font-medium text-gray-700 dark:text-gray-300 whitespace-nowrap">Mode of Transaction</Label>
+              <Select
+                value={transactionMode}
+                onValueChange={(value: TransactionMode) => setTransactionMode(value)}
+              >
+                <SelectTrigger 
+                  id="transaction-mode"
+                  className="w-40"
+                  data-testid="select-transaction-mode"
                 >
-                  <SelectTrigger 
-                    id="transaction-mode"
-                    className="mt-1"
-                    data-testid="select-transaction-mode"
-                  >
-                    <SelectValue placeholder="Select mode..." />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="consume">Consume</SelectItem>
-                    <SelectItem value="receive">Receive</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
+                  <SelectValue placeholder="Select mode..." />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="consume">Consume</SelectItem>
+                  <SelectItem value="receive">Receive</SelectItem>
+                </SelectContent>
+              </Select>
               {transactionMode && (
-                <div className="flex items-center mt-5">
-                  <span className={`text-sm font-medium px-3 py-1 rounded ${transactionMode === "consume" ? "bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400" : "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400"}`}>
-                    {transactionMode === "consume" ? "Consume Mode" : "Receive Mode"}
-                  </span>
-                </div>
+                <span className={`text-sm font-medium px-3 py-1 rounded ${transactionMode === "consume" ? "bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400" : "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400"}`}>
+                  {transactionMode === "consume" ? "Consume Mode" : "Receive Mode"}
+                </span>
               )}
             </div>
           </div>
 
-          <div className="flex items-center justify-between gap-4">
-            <div className="flex-1 max-w-md">
+          <div className="flex items-end gap-3 flex-wrap">
+            <div className="w-56">
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
                 <Input
@@ -287,68 +283,67 @@ export default function BulkUpdateSpares() {
                 )}
               </div>
             </div>
+            {transactionMode && (
+              <>
+                <div className="flex-1 min-w-[140px]">
+                  <Label htmlFor="bulk-received-date" className="text-xs">Transaction Date (Apply to all)</Label>
+                  <Input
+                    id="bulk-received-date"
+                    type="date"
+                    data-testid="input-bulk-transaction-date"
+                    onChange={(e) => {
+                      const date = e.target.value;
+                      setBulkUpdateData(prev => {
+                        const updated = { ...prev };
+                        Object.keys(updated).forEach(id => {
+                          updated[Number(id)] = { ...updated[Number(id)], receivedDate: date };
+                        });
+                        return updated;
+                      });
+                    }}
+                  />
+                </div>
+                <div className="flex-1 min-w-[140px]">
+                  <Label htmlFor="bulk-received-place" className="text-xs">Received Place (Apply to all)</Label>
+                  <Input
+                    id="bulk-received-place"
+                    type="text"
+                    placeholder="e.g., Singapore Port"
+                    data-testid="input-bulk-received-place"
+                    onChange={(e) => {
+                      const place = e.target.value;
+                      setBulkUpdateData(prev => {
+                        const updated = { ...prev };
+                        Object.keys(updated).forEach(id => {
+                          updated[Number(id)] = { ...updated[Number(id)], receivedPlace: place };
+                        });
+                        return updated;
+                      });
+                    }}
+                  />
+                </div>
+                <div className="flex-1 min-w-[140px]">
+                  <Label htmlFor="bulk-comments" className="text-xs">Comments (Apply to all)</Label>
+                  <Input
+                    id="bulk-comments"
+                    type="text"
+                    placeholder="Enter comments"
+                    data-testid="input-bulk-comments"
+                    onChange={(e) => {
+                      const comments = e.target.value;
+                      setBulkUpdateData(prev => {
+                        const updated = { ...prev };
+                        Object.keys(updated).forEach(id => {
+                          updated[Number(id)] = { ...updated[Number(id)], comments: comments };
+                        });
+                        return updated;
+                      });
+                    }}
+                  />
+                </div>
+              </>
+            )}
           </div>
-          
-          {transactionMode && (
-          <div className="grid grid-cols-3 gap-4 p-4 bg-gray-50 dark:bg-gray-800 rounded-lg">
-            <div>
-              <Label htmlFor="bulk-received-date">Transaction Date (Apply to all)</Label>
-              <Input
-                id="bulk-received-date"
-                type="date"
-                data-testid="input-bulk-transaction-date"
-                onChange={(e) => {
-                  const date = e.target.value;
-                  setBulkUpdateData(prev => {
-                    const updated = { ...prev };
-                    Object.keys(updated).forEach(id => {
-                      updated[Number(id)] = { ...updated[Number(id)], receivedDate: date };
-                    });
-                    return updated;
-                  });
-                }}
-              />
-            </div>
-            <div>
-              <Label htmlFor="bulk-received-place">Received Place (Apply to all)</Label>
-              <Input
-                id="bulk-received-place"
-                type="text"
-                placeholder="e.g., Singapore Port"
-                data-testid="input-bulk-received-place"
-                onChange={(e) => {
-                  const place = e.target.value;
-                  setBulkUpdateData(prev => {
-                    const updated = { ...prev };
-                    Object.keys(updated).forEach(id => {
-                      updated[Number(id)] = { ...updated[Number(id)], receivedPlace: place };
-                    });
-                    return updated;
-                  });
-                }}
-              />
-            </div>
-            <div>
-              <Label htmlFor="bulk-comments">Comments (Apply to all)</Label>
-              <Input
-                id="bulk-comments"
-                type="text"
-                placeholder="Enter comments"
-                data-testid="input-bulk-comments"
-                onChange={(e) => {
-                  const comments = e.target.value;
-                  setBulkUpdateData(prev => {
-                    const updated = { ...prev };
-                    Object.keys(updated).forEach(id => {
-                      updated[Number(id)] = { ...updated[Number(id)], comments: comments };
-                    });
-                    return updated;
-                  });
-                }}
-              />
-            </div>
-          </div>
-          )}
 
           {!transactionMode ? (
             <div className="border rounded-lg overflow-hidden bg-white dark:bg-gray-800 flex flex-col flex-1 min-h-0 items-center justify-center">
