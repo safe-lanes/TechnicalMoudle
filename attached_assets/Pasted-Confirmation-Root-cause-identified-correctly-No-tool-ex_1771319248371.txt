@@ -1,0 +1,86 @@
+Confirmation
+✅ Root cause identified correctly: No tool exists to call getVessels() method
+✅ Solution approach is correct: Add get_fleet_overview tool
+
+Implementation Requirements
+1. Tool Definition Specifications
+javascript
+{
+  name: "get_fleet_overview",
+  description: "Get complete fleet information including vessel count, list of all vessels with their IDs, names, and status. Use this for questions like 'how many vessels', 'list all vessels', 'show fleet', 'which vessels are active'.",
+  parameters: {
+    type: "object",
+    properties: {},
+    required: []
+  }
+}
+Important: No parameters needed since this is fleet-wide data.
+
+2. Tool Handler Implementation
+In executeToolCall function, add:
+
+javascript
+case 'get_fleet_overview':
+  const vessels = await storage.getVessels();
+  return {
+    totalVessels: vessels.length,
+    vessels: vessels.map(v => ({
+      id: v.id,
+      name: v.name,
+      status: v.status || 'Active'
+    }))
+  };
+3. System Prompt Update
+Add this to the chatbot's system instructions:
+
+text
+FLEET-LEVEL ACCESS:
+- You HAVE access to fleet-wide data via the get_fleet_overview tool
+- Use this tool to answer questions about vessel count, vessel lists, or fleet summary
+- NEVER say "I don't have access to fleet data" - you do have access
+- Default to showing all vessels, then offer to analyze specific vessel data
+4. Response Format Guidelines
+When the AI receives fleet data, it should respond like:
+
+text
+Summary: You manage [X] vessels in your fleet.
+
+Vessel List:
+1. [Vessel Name 1] (ID: [id]) - [Status]
+2. [Vessel Name 2] (ID: [id]) - [Status]
+...
+
+Critical Insights:
+- All vessels operational
+- Currently focused on Vessel 3
+
+Would you like detailed maintenance analysis for any specific vessel?
+Testing Checklist
+After implementation, verify these queries work correctly:
+
+✅ "How many vessels do we have?"
+✅ "List all vessels"
+✅ "Show fleet overview"
+✅ "Which vessels are active?"
+✅ "Give me fleet summary"
+✅ "Show all vessel names"
+
+Edge Cases to Handle
+Empty fleet: If vessels.length === 0, respond: "No vessels found in the database. Please contact your administrator."
+
+Single vessel: If vessels.length === 1, respond: "You have 1 vessel in your fleet: [name]"
+
+Missing vessel names: If vessel has no name, show: "Unnamed Vessel (ID: [id])"
+
+Expected Behavior After Fix
+BEFORE (Current):
+
+User: "How many vessels do we have?"
+
+Bot: "I don't have access to fleet-wide data..." ❌
+
+AFTER (Fixed):
+
+User: "How many vessels do we have?"
+
+Bot: "You manage 3 vessels in your fleet. [Lists them with details]" ✅
