@@ -21,7 +21,7 @@ function buildSystemPrompt(context: {
   userRole: string;
   currentPage: string;
 }) {
-  return `You are an AI assistant for a Planned Maintenance System (PMS) used on maritime vessels.
+  return `You are an intelligent maintenance analyst AI for a maritime Planned Maintenance System (PMS). You do NOT just dump data — you ANALYZE, INTERPRET, and ADVISE.
 
 CONTEXT:
 - Current Vessel: ${context.vesselName} (ID: ${context.vesselId})
@@ -29,36 +29,87 @@ CONTEXT:
 - Current Page: ${context.currentPage}
 - Current Date: ${new Date().toISOString().split("T")[0]}
 
-YOUR CAPABILITIES:
-- Query work orders (overdue, due, completed) with filters
-- Check spare parts inventory and low stock items
-- View component details and running hours
-- Generate maintenance status summaries and reports
-- Create deep links to filtered dashboard views
-- Provide maintenance prioritization recommendations
+═══════ ANALYTICAL BEHAVIOR (CRITICAL) ═══════
 
-TONE & STYLE:
-- Concise and action-oriented (crew are busy)
-- Use maritime terminology (Main Engine, Chief Engineer, ROB, running hours)
-- Highlight critical/urgent items clearly
-- Always offer follow-up actions or navigation options
-- Format lists and tables for easy scanning
+1. ALWAYS ANALYZE BEFORE PRESENTING DATA:
+   - Start with an executive summary — the most important takeaway in 1-2 sentences
+   - Identify patterns, trends, and anomalies in the data
+   - Prioritize by risk: Critical > High > Medium > Low. Show critical items first
+   - Group related items by component, department, or priority
+   - Use comparative language: "X% above normal", "trending up/down", "increased by Y since last period"
 
-TOOL USAGE GUIDELINES:
-- ALWAYS call get_work_order_counts first for summary questions
-- Use generate_deep_link when user asks to "show me" or "take me to"
-- Combine multiple tool calls for complex queries (e.g., overdue WOs + low stock spares)
-- After listing items, offer to show details or navigate
-- Use get_stores_items for stores/lubricants/chemicals inventory questions
-- Use get_defects for defect tracking, condition of class, and defect analysis
-- Use get_consumption_analysis for spares usage trends, consumption patterns, and ROB tracking
-- Use get_maintenance_calendar for scheduling, workload planning, and calendar views
+2. PROVIDE ACTIONABLE RECOMMENDATIONS, NOT JUST DATA:
+   - End with 2-3 specific next actions the user should take
+   - Connect findings to operational impact (safety, compliance, cost)
+   - Suggest related queries the user might want to explore
 
-RESPONSE FORMAT:
-- Use markdown for formatting
-- Use tables for multiple items
-- Highlight **critical** and **urgent** items
-- Always end with: "Would you like me to..." suggestions`;
+3. CROSS-REFERENCE DATA SOURCES:
+   - If user asks about overdue work orders, also check if critical spares are available for those jobs
+   - If user asks about low stock spares, check if pending work orders need those spares
+   - If user asks about components, correlate with defects and overdue maintenance
+   - Proactively surface connected insights across domains
+
+═══════ RESPONSE FORMAT (MANDATORY) ═══════
+
+Structure EVERY response as:
+
+**Summary**
+[High-level overview with key numbers, percentages, and the single most important insight]
+
+**Critical Insights**
+- [Top 3 most important findings with data]
+- [Patterns or trends identified]
+- [Risk areas highlighted with impact]
+
+**Top Priority Items** (showing X of Y total)
+[Table with top 10 items max, sorted by urgency/risk. Summarize remaining items below the table]
+
+**Recommendations**
+1. [Immediate action needed — what and why]
+2. [Short-term priority — timeline suggested]
+3. [Follow-up suggestion or related query]
+
+FORMATTING RULES:
+- Use markdown tables for structured data (max 10 rows, then "...and X more items")
+- Use bullet points for insights and recommendations
+- Highlight **critical** and **urgent** items with bold
+- Always show counts AND percentages: "45 critical items (23% of total)"
+- Keep tables compact: short column names, abbreviated where sensible
+
+═══════ TOOL USAGE STRATEGY ═══════
+
+ANALYTICAL TOOLS (use for insight-driven questions):
+- get_maintenance_insights → Use FIRST for any "status", "overview", "how are we doing" questions. Returns pre-computed KPIs and risk analysis
+- get_spare_coverage_analysis → For supply chain, inventory risk, and reorder questions
+- get_workload_analysis → For workload distribution, backlog aging, and scheduling questions
+- get_component_health_score → For component condition, risk scoring, and reliability questions
+- get_performance_trends → For trend analysis, completion rates, and performance tracking
+
+DATA TOOLS (use for specific queries):
+- get_work_orders / get_overdue_work_orders / get_due_work_orders → Specific work order lists
+- get_work_order_detail → Single work order deep dive
+- get_work_order_counts → Quick status counts
+- get_low_stock_spares / get_critical_spares → Spare inventory queries
+- get_components → Component lookups
+- get_running_hours → Running hours audit trail
+- get_jobs → Job template queries
+- get_stores_items → Stores/lubricants/chemicals inventory
+- get_defects → Defect tracking and analysis
+- get_consumption_analysis → Spares usage trends and ROB tracking
+- get_maintenance_calendar → Scheduling and workload calendar views
+- generate_deep_link → Navigation links ("show me", "take me to")
+
+TOOL CHAINING:
+- For complex queries, call multiple tools to build a complete picture
+- Always combine analytical tools with data tools when deeper detail is needed
+- After presenting analysis, offer to drill down into specific areas
+
+═══════ TONE & STYLE ═══════
+
+- Speak like a senior technical superintendent — concise, data-driven, action-oriented
+- Use maritime terminology naturally (Main Engine, Chief Engineer, ROB, running hours, dry dock)
+- Crew are busy — get to the point fast, lead with what matters most
+- Be direct about risks and concerns — don't soften critical findings`;
 }
 
 const CHATBOT_TOOLS: OpenAI.Chat.Completions.ChatCompletionTool[] = [
@@ -481,6 +532,89 @@ const CHATBOT_TOOLS: OpenAI.Chat.Completions.ChatCompletionTool[] = [
       },
     },
   },
+  {
+    type: "function",
+    function: {
+      name: "get_maintenance_insights",
+      description:
+        "Get comprehensive maintenance KPIs and risk analysis. Returns overdue counts by priority, top components with most overdue work, compliance rate, critical items needing immediate attention, and trend indicators. Use this FIRST for any overview, status, or 'how are we doing' questions.",
+      parameters: {
+        type: "object",
+        properties: {
+          vesselId: { type: "string", description: "Vessel ID (required)" },
+        },
+        required: ["vesselId"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "get_spare_coverage_analysis",
+      description:
+        "Analyze spare parts coverage and supply chain risk. Returns spares below minimum with urgency scoring, critical spares at risk, components affected by shortage, fast-moving consumption items, and reorder recommendations.",
+      parameters: {
+        type: "object",
+        properties: {
+          vesselId: { type: "string", description: "Vessel ID (required)" },
+        },
+        required: ["vesselId"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "get_workload_analysis",
+      description:
+        "Analyze maintenance workload distribution and backlog. Returns due work this week by priority, overdue backlog aging (30/60/90+ days), workload by department, and scheduling priority recommendations.",
+      parameters: {
+        type: "object",
+        properties: {
+          vesselId: { type: "string", description: "Vessel ID (required)" },
+        },
+        required: ["vesselId"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "get_component_health_score",
+      description:
+        "Calculate component health risk scores combining defects, overdue maintenance, and running hours data. Returns top components needing attention with risk scoring, recurring defect patterns, and maintenance gap analysis.",
+      parameters: {
+        type: "object",
+        properties: {
+          vesselId: { type: "string", description: "Vessel ID (required)" },
+          topN: {
+            type: "number",
+            description: "Number of top risk components to return (default: 10)",
+          },
+        },
+        required: ["vesselId"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "get_performance_trends",
+      description:
+        "Analyze maintenance performance trends over time. Returns work order completion rates (30/60/90 days), average completion time by priority, spare consumption patterns, defect resolution metrics, and compliance trend direction.",
+      parameters: {
+        type: "object",
+        properties: {
+          vesselId: { type: "string", description: "Vessel ID (required)" },
+          periodDays: {
+            type: "number",
+            description: "Analysis period in days (default: 90)",
+          },
+        },
+        required: ["vesselId"],
+      },
+    },
+  },
 ];
 
 async function executeTool(
@@ -580,12 +714,33 @@ async function executeTool(
         const overdue = workOrders.filter(
           (wo) => wo.status === "Overdue" && wo.dataScope === "vessel"
         );
-        const limit = args.limit || 50;
-        const results = overdue.slice(0, limit);
-        return {
-          totalOverdue: overdue.length,
-          showing: results.length,
-          workOrders: results.map((wo) => ({
+        const now = new Date();
+
+        const byPriority = {
+          Critical: overdue.filter((wo) => wo.jobPriority === "Critical").length,
+          High: overdue.filter((wo) => wo.jobPriority === "High").length,
+          Medium: overdue.filter((wo) => wo.jobPriority === "Medium").length,
+          Low: overdue.filter((wo) => wo.jobPriority === "Low" || !wo.jobPriority).length,
+        };
+
+        const componentCounts = new Map<string, number>();
+        for (const wo of overdue) {
+          const comp = wo.component || "Unknown";
+          componentCounts.set(comp, (componentCounts.get(comp) || 0) + 1);
+        }
+        const topComponents = Array.from(componentCounts.entries())
+          .sort((a, b) => b[1] - a[1])
+          .slice(0, 3)
+          .map(([component, count]) => ({ component, count }));
+
+        const agingDays = overdue.map((wo) => {
+          if (!wo.dueDate) return 0;
+          return Math.max(0, Math.floor((now.getTime() - new Date(wo.dueDate).getTime()) / (1000 * 60 * 60 * 24)));
+        });
+        const oldestDays = agingDays.length > 0 ? Math.max(...agingDays) : 0;
+
+        const sorted = overdue
+          .map((wo) => ({
             id: wo.id,
             workOrderNo: wo.workOrderNo,
             component: wo.component,
@@ -594,7 +749,28 @@ async function executeTool(
             dueDate: wo.dueDate,
             assignedTo: wo.assignedTo,
             jobPriority: wo.jobPriority,
-          })),
+            daysOverdue: wo.dueDate ? Math.max(0, Math.floor((now.getTime() - new Date(wo.dueDate).getTime()) / (1000 * 60 * 60 * 24))) : 0,
+          }))
+          .sort((a, b) => {
+            const priorityOrder: Record<string, number> = { Critical: 0, High: 1, Medium: 2, Low: 3 };
+            const pa = priorityOrder[a.jobPriority || "Low"] ?? 3;
+            const pb = priorityOrder[b.jobPriority || "Low"] ?? 3;
+            if (pa !== pb) return pa - pb;
+            return b.daysOverdue - a.daysOverdue;
+          });
+
+        const limit = Math.min(args.limit || 10, 10);
+        return {
+          totalOverdue: overdue.length,
+          showing: Math.min(limit, sorted.length),
+          remainingSummary: sorted.length > limit ? `...and ${sorted.length - limit} more overdue items` : null,
+          analysisSummary: {
+            byPriority,
+            topComponents,
+            oldestOverdueDays: oldestDays,
+            averageOverdueDays: agingDays.length > 0 ? Math.round(agingDays.reduce((a, b) => a + b, 0) / agingDays.length) : 0,
+          },
+          workOrders: sorted.slice(0, limit),
         };
       }
 
@@ -640,29 +816,35 @@ async function executeTool(
       case "get_work_order_counts": {
         const allWOs = await storage.getWorkOrders(args.vesselId);
         const vesselWOs = allWOs.filter((wo) => wo.dataScope === "vessel");
+        const overdueCount = vesselWOs.filter((wo) => wo.status === "Overdue").length;
+        const dueCount = vesselWOs.filter((wo) => wo.status === "Due" || wo.status === "Due (Grace P)").length;
+        const completedCount = vesselWOs.filter((wo) => wo.status === "Completed").length;
+        const activeCount = vesselWOs.filter((wo) => wo.status === "Active").length;
+        const postponedCount = vesselWOs.filter((wo) => wo.status === "Postponed").length;
+        const pendingCount = vesselWOs.filter((wo) => wo.status === "Pending Approval").length;
+        const totalActionable = overdueCount + dueCount + completedCount;
+        const completionRate = totalActionable > 0 ? Math.round((completedCount / totalActionable) * 100) : 0;
+        const overdueRate = vesselWOs.length > 0 ? Math.round((overdueCount / vesselWOs.length) * 100) : 0;
+
         return {
           total: vesselWOs.length,
-          overdue: vesselWOs.filter((wo) => wo.status === "Overdue").length,
-          due: vesselWOs.filter(
-            (wo) => wo.status === "Due" || wo.status === "Due (Grace P)"
-          ).length,
-          completed: vesselWOs.filter((wo) => wo.status === "Completed").length,
-          pendingApproval: vesselWOs.filter(
-            (wo) => wo.status === "Pending Approval"
-          ).length,
-          active: vesselWOs.filter((wo) => wo.status === "Active").length,
-          postponed: vesselWOs.filter((wo) => wo.status === "Postponed").length,
+          overdue: overdueCount,
+          overduePercent: overdueRate,
+          due: dueCount,
+          completed: completedCount,
+          completionRate,
+          pendingApproval: pendingCount,
+          active: activeCount,
+          postponed: postponedCount,
+          insight: overdueRate > 20 ? "HIGH_OVERDUE_RATE" : overdueRate > 10 ? "ELEVATED_OVERDUE_RATE" : "NORMAL",
         };
       }
 
       case "get_low_stock_spares": {
         const spares = await storage.getSpares(args.vesselId);
-        let lowStock = spares.filter(
-          (sp) =>
-            sp.rob !== null &&
-            sp.min !== null &&
-            sp.rob < sp.min &&
-            !sp.deleted
+        const activeSpares = spares.filter((sp) => !sp.deleted);
+        let lowStock = activeSpares.filter(
+          (sp) => sp.rob !== null && sp.min !== null && sp.rob < sp.min
         );
 
         if (args.criticalOnly) {
@@ -671,9 +853,12 @@ async function executeTool(
           );
         }
 
-        return {
-          totalLowStock: lowStock.length,
-          spares: lowStock.slice(0, 50).map((sp) => ({
+        const criticalLow = lowStock.filter((sp) => sp.critical === "Critical" || sp.critical === "Yes");
+        const nonCriticalLow = lowStock.length - criticalLow.length;
+        const zeroStock = lowStock.filter((sp) => (sp.rob ?? 0) === 0);
+
+        const sorted = lowStock
+          .map((sp) => ({
             id: sp.id,
             partCode: sp.partCode,
             partName: sp.partName,
@@ -681,9 +866,25 @@ async function executeTool(
             componentCode: sp.componentCode,
             rob: sp.rob,
             min: sp.min,
+            shortfall: (sp.min ?? 0) - (sp.rob ?? 0),
             critical: sp.critical,
             location: sp.location,
-          })),
+            urgencyScore: (sp.critical === "Critical" || sp.critical === "Yes" ? 100 : 0) + ((sp.min ?? 0) - (sp.rob ?? 0)) * 2 + ((sp.rob ?? 0) === 0 ? 50 : 0),
+          }))
+          .sort((a, b) => b.urgencyScore - a.urgencyScore);
+
+        return {
+          totalLowStock: lowStock.length,
+          totalActiveSpares: activeSpares.length,
+          lowStockPercent: Math.round((lowStock.length / Math.max(activeSpares.length, 1)) * 100),
+          analysisSummary: {
+            criticalLowStock: criticalLow.length,
+            nonCriticalLowStock: nonCriticalLow,
+            zeroStockItems: zeroStock.length,
+          },
+          showing: Math.min(10, sorted.length),
+          remainingSummary: sorted.length > 10 ? `...and ${sorted.length - 10} more low stock items` : null,
+          topUrgentSpares: sorted.slice(0, 10).map(({ urgencyScore, ...rest }) => rest),
         };
       }
 
@@ -1301,6 +1502,445 @@ async function executeTool(
         };
       }
 
+      case "get_maintenance_insights": {
+        const allWOs = await storage.getWorkOrders(args.vesselId);
+        const vesselWOs = allWOs.filter((wo) => wo.dataScope === "vessel");
+        const now = new Date();
+
+        const overdue = vesselWOs.filter((wo) => wo.status === "Overdue");
+        const due = vesselWOs.filter((wo) => wo.status === "Due" || wo.status === "Due (Grace P)");
+        const completed = vesselWOs.filter((wo) => wo.status === "Completed");
+        const active = vesselWOs.filter((wo) => wo.status === "Active");
+        const postponed = vesselWOs.filter((wo) => wo.status === "Postponed");
+
+        const overdueByPriority = {
+          Critical: overdue.filter((wo) => wo.jobPriority === "Critical").length,
+          High: overdue.filter((wo) => wo.jobPriority === "High").length,
+          Medium: overdue.filter((wo) => wo.jobPriority === "Medium").length,
+          Low: overdue.filter((wo) => wo.jobPriority === "Low" || !wo.jobPriority).length,
+        };
+
+        const componentOverdueMap = new Map<string, number>();
+        for (const wo of overdue) {
+          const comp = wo.component || "Unknown";
+          componentOverdueMap.set(comp, (componentOverdueMap.get(comp) || 0) + 1);
+        }
+        const topOverdueComponents = Array.from(componentOverdueMap.entries())
+          .sort((a, b) => b[1] - a[1])
+          .slice(0, 5)
+          .map(([component, count]) => ({ component, overdueCount: count, percentOfTotal: Math.round((count / Math.max(overdue.length, 1)) * 100) }));
+
+        const totalNonActive = completed.length + overdue.length + due.length;
+        const complianceRate = totalNonActive > 0 ? Math.round((completed.length / totalNonActive) * 100) : 0;
+
+        const overdueAging = overdue.map((wo) => {
+          const dueDate = wo.dueDate ? new Date(wo.dueDate) : now;
+          return Math.max(0, Math.floor((now.getTime() - dueDate.getTime()) / (1000 * 60 * 60 * 24)));
+        });
+        const oldestOverdueDays = overdueAging.length > 0 ? Math.max(...overdueAging) : 0;
+        const avgOverdueDays = overdueAging.length > 0 ? Math.round(overdueAging.reduce((a, b) => a + b, 0) / overdueAging.length) : 0;
+
+        const criticalItems = overdue
+          .filter((wo) => wo.jobPriority === "Critical" || wo.jobPriority === "High")
+          .sort((a, b) => {
+            const aDays = a.dueDate ? Math.floor((now.getTime() - new Date(a.dueDate).getTime()) / (1000 * 60 * 60 * 24)) : 0;
+            const bDays = b.dueDate ? Math.floor((now.getTime() - new Date(b.dueDate).getTime()) / (1000 * 60 * 60 * 24)) : 0;
+            return bDays - aDays;
+          })
+          .slice(0, 10)
+          .map((wo) => ({
+            workOrderNo: wo.workOrderNo,
+            component: wo.component,
+            jobTitle: wo.jobTitle,
+            priority: wo.jobPriority,
+            daysOverdue: wo.dueDate ? Math.max(0, Math.floor((now.getTime() - new Date(wo.dueDate).getTime()) / (1000 * 60 * 60 * 24))) : 0,
+            assignedTo: wo.assignedTo,
+          }));
+
+        return {
+          totalWorkOrders: vesselWOs.length,
+          statusBreakdown: {
+            overdue: overdue.length,
+            overduePercent: Math.round((overdue.length / Math.max(vesselWOs.length, 1)) * 100),
+            due: due.length,
+            completed: completed.length,
+            active: active.length,
+            postponed: postponed.length,
+          },
+          overdueByPriority,
+          topOverdueComponents,
+          complianceRate,
+          overdueAging: {
+            oldestDays: oldestOverdueDays,
+            averageDays: avgOverdueDays,
+            over30Days: overdueAging.filter((d) => d > 30).length,
+            over60Days: overdueAging.filter((d) => d > 60).length,
+            over90Days: overdueAging.filter((d) => d > 90).length,
+          },
+          criticalItemsNeedingAttention: criticalItems,
+        };
+      }
+
+      case "get_spare_coverage_analysis": {
+        const spares = await storage.getSpares(args.vesselId);
+        const activeSpares = spares.filter((sp) => !sp.deleted);
+        const history = await storage.getSpareHistory(args.vesselId);
+
+        const belowMin = activeSpares.filter((sp) => sp.rob !== null && sp.min !== null && sp.rob < sp.min);
+        const criticalBelowMin = belowMin.filter((sp) => sp.critical === "Critical" || sp.critical === "Yes");
+        const zeroStock = activeSpares.filter((sp) => (sp.rob ?? 0) === 0);
+
+        const componentAtRisk = new Map<string, number>();
+        for (const sp of belowMin) {
+          const comp = sp.componentName || "Unknown";
+          componentAtRisk.set(comp, (componentAtRisk.get(comp) || 0) + 1);
+        }
+        const componentsAffected = Array.from(componentAtRisk.entries())
+          .sort((a, b) => b[1] - a[1])
+          .slice(0, 10)
+          .map(([component, shortageCount]) => ({ component, shortageCount }));
+
+        const now = new Date();
+        const sixMonthsAgo = new Date();
+        sixMonthsAgo.setMonth(now.getMonth() - 6);
+        const recentConsume = history.filter((h) => h.eventType === "CONSUME" && h.timestampUTC && new Date(h.timestampUTC) >= sixMonthsAgo);
+
+        const consumeBySpare = new Map<number, { partCode: string; partName: string; totalConsumed: number; eventCount: number }>();
+        for (const event of recentConsume) {
+          const existing = consumeBySpare.get(event.spareId);
+          const qty = Math.abs(event.qtyChange || 0);
+          if (existing) {
+            existing.totalConsumed += qty;
+            existing.eventCount++;
+          } else {
+            consumeBySpare.set(event.spareId, {
+              partCode: event.partCode,
+              partName: event.partName,
+              totalConsumed: qty,
+              eventCount: 1,
+            });
+          }
+        }
+        const fastMoving = Array.from(consumeBySpare.entries())
+          .sort((a, b) => b[1].totalConsumed - a[1].totalConsumed)
+          .slice(0, 10)
+          .map(([spareId, data]) => {
+            const spare = activeSpares.find((sp) => sp.id === spareId);
+            const monthlyRate = data.totalConsumed / 6;
+            const currentRob = spare?.rob ?? 0;
+            const estimatedMonthsUntilStockout = monthlyRate > 0 ? Math.round((currentRob / monthlyRate) * 10) / 10 : null;
+            return {
+              ...data,
+              currentRob,
+              minStock: spare?.min,
+              critical: spare?.critical,
+              monthlyConsumptionRate: Math.round(monthlyRate * 10) / 10,
+              estimatedMonthsUntilStockout,
+            };
+          });
+
+        const urgentReorders = belowMin
+          .map((sp) => {
+            const shortfall = (sp.min ?? 0) - (sp.rob ?? 0);
+            const consumeData = consumeBySpare.get(sp.id);
+            const monthlyRate = consumeData ? consumeData.totalConsumed / 6 : 0;
+            const daysUntilStockout = monthlyRate > 0 && sp.rob !== null ? Math.round(((sp.rob ?? 0) / monthlyRate) * 30) : null;
+            return {
+              partCode: sp.partCode,
+              partName: sp.partName,
+              componentName: sp.componentName,
+              rob: sp.rob,
+              min: sp.min,
+              shortfall,
+              critical: sp.critical,
+              daysUntilStockout,
+              urgencyScore: (sp.critical === "Critical" || sp.critical === "Yes" ? 100 : 0) + shortfall * 2 + (daysUntilStockout !== null && daysUntilStockout < 30 ? 50 : 0),
+            };
+          })
+          .sort((a, b) => b.urgencyScore - a.urgencyScore)
+          .slice(0, 15);
+
+        return {
+          totalActiveSpares: activeSpares.length,
+          belowMinimumCount: belowMin.length,
+          belowMinimumPercent: Math.round((belowMin.length / Math.max(activeSpares.length, 1)) * 100),
+          criticalBelowMinCount: criticalBelowMin.length,
+          zeroStockCount: zeroStock.length,
+          componentsAffectedByShortage: componentsAffected,
+          fastMovingItems: fastMoving,
+          urgentReorderList: urgentReorders,
+        };
+      }
+
+      case "get_workload_analysis": {
+        const allWOs = await storage.getWorkOrders(args.vesselId);
+        const vesselWOs = allWOs.filter((wo) => wo.dataScope === "vessel");
+        const now = new Date();
+
+        const overdue = vesselWOs.filter((wo) => wo.status === "Overdue");
+        const dueWOs = vesselWOs.filter((wo) => wo.status === "Due" || wo.status === "Due (Grace P)");
+
+        const oneWeek = new Date();
+        oneWeek.setDate(now.getDate() + 7);
+        const dueThisWeek = dueWOs.filter((wo) => wo.dueDate && new Date(wo.dueDate) <= oneWeek);
+        const dueThisWeekByPriority = {
+          Critical: dueThisWeek.filter((wo) => wo.jobPriority === "Critical").length,
+          High: dueThisWeek.filter((wo) => wo.jobPriority === "High").length,
+          Medium: dueThisWeek.filter((wo) => wo.jobPriority === "Medium").length,
+          Low: dueThisWeek.filter((wo) => wo.jobPriority === "Low" || !wo.jobPriority).length,
+        };
+
+        const overdueAging = overdue.map((wo) => {
+          const dueDate = wo.dueDate ? new Date(wo.dueDate) : now;
+          return Math.max(0, Math.floor((now.getTime() - dueDate.getTime()) / (1000 * 60 * 60 * 24)));
+        });
+
+        const agingBuckets = {
+          under30Days: overdueAging.filter((d) => d < 30).length,
+          days30to60: overdueAging.filter((d) => d >= 30 && d < 60).length,
+          days60to90: overdueAging.filter((d) => d >= 60 && d < 90).length,
+          over90Days: overdueAging.filter((d) => d >= 90).length,
+        };
+
+        const deptMap = new Map<string, { overdue: number; due: number; active: number; total: number }>();
+        for (const wo of vesselWOs) {
+          if (wo.status === "Completed") continue;
+          const dept = wo.department || "Unknown";
+          const existing = deptMap.get(dept) || { overdue: 0, due: 0, active: 0, total: 0 };
+          existing.total++;
+          if (wo.status === "Overdue") existing.overdue++;
+          else if (wo.status === "Due" || wo.status === "Due (Grace P)") existing.due++;
+          else if (wo.status === "Active") existing.active++;
+          deptMap.set(dept, existing);
+        }
+        const workloadByDepartment = Array.from(deptMap.entries())
+          .sort((a, b) => b[1].total - a[1].total)
+          .map(([department, data]) => ({ department, ...data }));
+
+        const assigneeMap = new Map<string, number>();
+        for (const wo of [...overdue, ...dueThisWeek]) {
+          const assignee = wo.assignedTo || "Unassigned";
+          assigneeMap.set(assignee, (assigneeMap.get(assignee) || 0) + 1);
+        }
+        const workloadByAssignee = Array.from(assigneeMap.entries())
+          .sort((a, b) => b[1] - a[1])
+          .slice(0, 10)
+          .map(([assignee, count]) => ({ assignee, urgentItemCount: count }));
+
+        const highestPriorityOverdue = overdue
+          .filter((wo) => wo.jobPriority === "Critical" || wo.jobPriority === "High")
+          .sort((a, b) => {
+            const aDays = a.dueDate ? (now.getTime() - new Date(a.dueDate).getTime()) / (1000 * 60 * 60 * 24) : 0;
+            const bDays = b.dueDate ? (now.getTime() - new Date(b.dueDate).getTime()) / (1000 * 60 * 60 * 24) : 0;
+            return bDays - aDays;
+          })
+          .slice(0, 5)
+          .map((wo) => ({
+            workOrderNo: wo.workOrderNo,
+            component: wo.component,
+            jobTitle: wo.jobTitle,
+            priority: wo.jobPriority,
+            daysOverdue: wo.dueDate ? Math.floor((now.getTime() - new Date(wo.dueDate).getTime()) / (1000 * 60 * 60 * 24)) : 0,
+            assignedTo: wo.assignedTo,
+            department: wo.department,
+          }));
+
+        return {
+          dueThisWeek: {
+            total: dueThisWeek.length,
+            byPriority: dueThisWeekByPriority,
+          },
+          overdueBacklog: {
+            total: overdue.length,
+            agingBuckets,
+            oldestDays: overdueAging.length > 0 ? Math.max(...overdueAging) : 0,
+            averageDays: overdueAging.length > 0 ? Math.round(overdueAging.reduce((a, b) => a + b, 0) / overdueAging.length) : 0,
+          },
+          workloadByDepartment,
+          workloadByAssignee,
+          schedulingPriorities: highestPriorityOverdue,
+        };
+      }
+
+      case "get_component_health_score": {
+        const allWOs = await storage.getWorkOrders(args.vesselId);
+        const vesselWOs = allWOs.filter((wo) => wo.dataScope === "vessel");
+        const components = await storage.getComponents(args.vesselId);
+        const topN = args.topN || 10;
+
+        let defects: any[] = [];
+        try {
+          defects = await storage.getDefects({ vesselId: args.vesselId });
+        } catch (e) {}
+
+        let recurringDefects: any[] = [];
+        try {
+          recurringDefects = await storage.getRecurringDefects({});
+        } catch (e) {}
+
+        const now = new Date();
+        const componentScores = new Map<string, {
+          componentName: string;
+          componentCode: string;
+          critical: boolean;
+          overdueCount: number;
+          totalWOs: number;
+          activeDefects: number;
+          recurringDefectCount: number;
+          oldestOverdueDays: number;
+          riskScore: number;
+        }>();
+
+        for (const comp of components) {
+          const compName = comp.name || "";
+          const compCode = comp.componentCode || "";
+          const isCritical = comp.critical === true;
+
+          const compWOs = vesselWOs.filter((wo) => wo.componentCode === compCode || wo.component === compName);
+          const compOverdue = compWOs.filter((wo) => wo.status === "Overdue");
+          const compDefects = defects.filter((d) => d.status !== "Closed" && (d.equipmentType?.includes(compName) || d.equipmentCategory?.includes(compCode)));
+
+          let oldestOverdueDays = 0;
+          for (const wo of compOverdue) {
+            if (wo.dueDate) {
+              const days = Math.floor((now.getTime() - new Date(wo.dueDate).getTime()) / (1000 * 60 * 60 * 24));
+              oldestOverdueDays = Math.max(oldestOverdueDays, days);
+            }
+          }
+
+          let riskScore = 0;
+          riskScore += isCritical ? 30 : 0;
+          riskScore += Math.min(compOverdue.length * 10, 40);
+          riskScore += Math.min(compDefects.length * 15, 30);
+          riskScore += oldestOverdueDays > 90 ? 20 : oldestOverdueDays > 60 ? 15 : oldestOverdueDays > 30 ? 10 : 0;
+
+          if (riskScore > 0) {
+            componentScores.set(compCode || compName, {
+              componentName: compName,
+              componentCode: compCode,
+              critical: isCritical,
+              overdueCount: compOverdue.length,
+              totalWOs: compWOs.length,
+              activeDefects: compDefects.length,
+              recurringDefectCount: 0,
+              oldestOverdueDays,
+              riskScore,
+            });
+          }
+        }
+
+        for (const rd of recurringDefects) {
+          const key = rd.equipmentKey || "";
+          componentScores.forEach((score, compKey) => {
+            if (key && (compKey.includes(key) || score.componentName.includes(key))) {
+              score.recurringDefectCount++;
+              score.riskScore += 10;
+            }
+          });
+        }
+
+        const topRiskComponents = Array.from(componentScores.values())
+          .sort((a, b) => b.riskScore - a.riskScore)
+          .slice(0, topN);
+
+        const totalComponents = components.length;
+        const componentsWithOverdue = new Set(vesselWOs.filter((wo) => wo.status === "Overdue").map((wo) => wo.componentCode)).size;
+        const componentsWithDefects = new Set(defects.filter((d) => d.status !== "Closed").map((d) => d.equipmentType)).size;
+
+        return {
+          totalComponents,
+          componentsWithOverdueMaintenance: componentsWithOverdue,
+          componentsWithActiveDefects: componentsWithDefects,
+          topRiskComponents,
+          riskDistribution: {
+            highRisk: topRiskComponents.filter((c) => c.riskScore >= 60).length,
+            mediumRisk: topRiskComponents.filter((c) => c.riskScore >= 30 && c.riskScore < 60).length,
+            lowRisk: topRiskComponents.filter((c) => c.riskScore < 30).length,
+          },
+        };
+      }
+
+      case "get_performance_trends": {
+        const allWOs = await storage.getWorkOrders(args.vesselId);
+        const vesselWOs = allWOs.filter((wo) => wo.dataScope === "vessel");
+        const periodDays = args.periodDays || 90;
+        const now = new Date();
+        const periodStart = new Date();
+        periodStart.setDate(now.getDate() - periodDays);
+
+        const completedInPeriod = vesselWOs.filter((wo) => wo.status === "Completed" && wo.dateCompleted && new Date(wo.dateCompleted) >= periodStart);
+        const createdOrDueInPeriod = vesselWOs.filter((wo) => wo.dueDate && new Date(wo.dueDate) >= periodStart && new Date(wo.dueDate) <= now);
+
+        const completionRate = createdOrDueInPeriod.length > 0 ? Math.round((completedInPeriod.length / createdOrDueInPeriod.length) * 100) : 0;
+
+        const periods = [
+          { label: "Last 30 days", days: 30 },
+          { label: "Last 60 days", days: 60 },
+          { label: "Last 90 days", days: 90 },
+        ];
+        const completionByPeriod = periods.map((p) => {
+          const pStart = new Date();
+          pStart.setDate(now.getDate() - p.days);
+          const comp = vesselWOs.filter((wo) => wo.status === "Completed" && wo.dateCompleted && new Date(wo.dateCompleted) >= pStart).length;
+          const total = vesselWOs.filter((wo) => wo.dueDate && new Date(wo.dueDate) >= pStart && new Date(wo.dueDate) <= now).length;
+          return { period: p.label, completed: comp, totalDue: total, rate: total > 0 ? Math.round((comp / total) * 100) : 0 };
+        });
+
+        const avgCompletionByPriority: Record<string, { count: number; avgDays: number }> = {};
+        for (const wo of completedInPeriod) {
+          if (wo.dueDate && wo.dateCompleted) {
+            const dueDate = new Date(wo.dueDate);
+            const completedDate = new Date(wo.dateCompleted);
+            const days = Math.floor((completedDate.getTime() - dueDate.getTime()) / (1000 * 60 * 60 * 24));
+            const priority = wo.jobPriority || "Unassigned";
+            if (!avgCompletionByPriority[priority]) {
+              avgCompletionByPriority[priority] = { count: 0, avgDays: 0 };
+            }
+            avgCompletionByPriority[priority].count++;
+            avgCompletionByPriority[priority].avgDays += days;
+          }
+        }
+        for (const key in avgCompletionByPriority) {
+          const data = avgCompletionByPriority[key];
+          data.avgDays = data.count > 0 ? Math.round(data.avgDays / data.count) : 0;
+        }
+
+        let defects: any[] = [];
+        try {
+          defects = await storage.getDefects({ vesselId: args.vesselId });
+        } catch (e) {}
+
+        const resolvedDefects = defects.filter((d) => d.status === "Closed" && d.dateCompleted && new Date(d.dateCompleted) >= periodStart);
+        const activeDefects = defects.filter((d) => d.status !== "Closed");
+        const avgDefectResolutionDays = resolvedDefects.length > 0 ? Math.round(
+          resolvedDefects.reduce((sum, d) => {
+            const issued = d.issueDate ? new Date(d.issueDate) : now;
+            const closed = d.dateCompleted ? new Date(d.dateCompleted) : now;
+            return sum + Math.floor((closed.getTime() - issued.getTime()) / (1000 * 60 * 60 * 24));
+          }, 0) / resolvedDefects.length
+        ) : null;
+
+        const overdueCount = vesselWOs.filter((wo) => wo.status === "Overdue").length;
+        const overduePercent = vesselWOs.length > 0 ? Math.round((overdueCount / vesselWOs.length) * 100) : 0;
+
+        return {
+          periodDays,
+          overallCompletionRate: completionRate,
+          completionByPeriod,
+          avgCompletionTimeByPriority: avgCompletionByPriority,
+          defectMetrics: {
+            activeDefects: activeDefects.length,
+            resolvedInPeriod: resolvedDefects.length,
+            avgResolutionDays: avgDefectResolutionDays,
+          },
+          currentOverdueRate: {
+            count: overdueCount,
+            percent: overduePercent,
+          },
+          completedInPeriod: completedInPeriod.length,
+        };
+      }
+
       default:
         return { error: `Unknown tool: ${toolName}` };
     }
@@ -1357,13 +1997,13 @@ export async function processChatMessage(
       messages,
       tools: CHATBOT_TOOLS,
       tool_choice: "auto",
-      temperature: 0.3,
-      max_tokens: 2000,
+      temperature: 0.4,
+      max_tokens: 4000,
     });
 
     let assistantMessage = response.choices[0].message;
     let iterations = 0;
-    const maxIterations = 5;
+    const maxIterations = 8;
 
     while (
       assistantMessage.tool_calls &&
@@ -1394,8 +2034,8 @@ export async function processChatMessage(
         messages,
         tools: CHATBOT_TOOLS,
         tool_choice: "auto",
-        temperature: 0.3,
-        max_tokens: 2000,
+        temperature: 0.4,
+        max_tokens: 4000,
       });
 
       assistantMessage = response.choices[0].message;
