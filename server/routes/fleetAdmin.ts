@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { storage } from '../storage';
 import { z } from 'zod';
-import { eq } from 'drizzle-orm';
+import { eq, and } from 'drizzle-orm';
 import { getDb } from '../db';
 import { 
   insertMasterDataSchema, 
@@ -16,6 +16,9 @@ import {
   fleetJobs,
   fleetSpares,
   makerList,
+  components,
+  jobs,
+  spares,
 } from '@shared/schema';
 import { requireOfficeOrAdmin } from '../middleware/auth';
 
@@ -1035,7 +1038,7 @@ router.get('/dashboard-stats', async (req, res) => {
 });
 
 // ============================================================
-// COPY VESSEL - Replicate mapping data from one vessel to another
+// COPY VESSEL - Replicate actual vessel data (components, jobs, spares) from one vessel to another
 // ============================================================
 router.post('/copy-vessel', async (req, res) => {
   try {
@@ -1055,93 +1058,201 @@ router.post('/copy-vessel', async (req, res) => {
       return res.status(400).json({ error: 'Source and target vessel cannot be the same' });
     }
 
-    const results = { components: 0, jobs: 0, spares: 0, errors: [] as string[] };
+    const db = await getDb();
+    const copyResults = { components: 0, jobs: 0, spares: 0, errors: [] as string[] };
+    const componentIdMap = new Map<string, string>();
+
+    const generateId = (prefix: string) => {
+      return `${prefix}-${Date.now()}-${Math.random().toString(36).substring(2, 13)}`;
+    };
 
     if (data.copyComponents) {
-      const sourceMappings = await storage.getFleetComponentMappingsByVessel(data.sourceVesselCode);
-      const existingTarget = await storage.getFleetComponentMappingsByVessel(data.targetVesselCode);
-      const existingKeys = new Set(existingTarget.map((m: any) => `${m.fleetEquipmentCode}|${m.componentCode}`));
+      const sourceComps = await db.select().from(components)
+        .where(eq(components.vesselId, data.sourceVesselCode));
+      const targetComps = await db.select().from(components)
+        .where(eq(components.vesselId, data.targetVesselCode));
+      const existingCodes = new Set(targetComps.map(c => c.componentCode));
 
-      for (const mapping of sourceMappings) {
-        const key = `${mapping.fleetEquipmentCode}|${mapping.componentCode}`;
-        if (!existingKeys.has(key)) {
-          try {
-            await storage.createFleetComponentMappingRecord({
-              fleetEquipmentCode: mapping.fleetEquipmentCode,
-              vesselCode: data.targetVesselCode,
-              componentCode: mapping.componentCode,
-              componentId: mapping.componentId,
-              componentName: mapping.componentName,
-              mappedBy: data.mappedBy,
-              isActive: true,
-            });
-            results.components++;
-          } catch (e) {
-            // Skip duplicates from unique constraint
-          }
+      for (const comp of sourceComps) {
+        if (existingCodes.has(comp.componentCode)) {
+          componentIdMap.set(comp.id, comp.id);
+          continue;
+        }
+        const newId = generateId('COMP');
+        componentIdMap.set(comp.id, newId);
+
+        try {
+          await db.insert(components).values({
+            id: newId,
+            vesselId: data.targetVesselCode,
+            componentCode: comp.componentCode,
+            name: comp.name,
+            parentId: comp.parentId,
+            fleetEquipmentCode: comp.fleetEquipmentCode,
+            fleetEquipmentName: comp.fleetEquipmentName,
+            componentCategory: comp.componentCategory,
+            maker: comp.maker,
+            makerCode: comp.makerCode,
+            model: comp.model,
+            modelCode: comp.modelCode,
+            serialNo: comp.serialNo,
+            drawingNo: comp.drawingNo,
+            location: comp.location,
+            critical: comp.critical,
+            conditionBased: comp.conditionBased,
+            installationDate: comp.installationDate,
+            commissionedDate: comp.commissionedDate,
+            rating: comp.rating,
+            eqptSystemDept: comp.eqptSystemDept,
+            isActive: comp.isActive,
+            vesselCode: comp.vesselCode,
+            isParent: comp.isParent,
+            notes: comp.notes,
+            dataScope: comp.dataScope || 'vessel',
+            parentFleetEquipmentCode: comp.parentFleetEquipmentCode,
+            modelNumber: comp.modelNumber,
+            department: comp.department,
+            deptCategory: comp.deptCategory,
+            category: comp.category,
+            classItem: comp.classItem,
+            noOfUnits: comp.noOfUnits,
+            parentComponent: comp.parentComponent,
+            dimensionsSize: comp.dimensionsSize,
+            runningHours: comp.runningHours,
+            currentCumulativeRH: comp.currentCumulativeRH,
+            rhCounterType: comp.rhCounterType,
+            rhCounterSource: comp.rhCounterSource,
+          });
+          copyResults.components++;
+        } catch (e: any) {
+          copyResults.errors.push(`Component ${comp.componentCode}: ${e.message}`);
         }
       }
     }
 
     if (data.copyJobs) {
-      const sourceJobMappings = await storage.getFleetJobVesselMappings(undefined, undefined);
-      const sourceFiltered = sourceJobMappings.filter((m: any) => m.vesselCode === data.sourceVesselCode && m.isActive);
-      const existingTargetJobs = sourceJobMappings.filter((m: any) => m.vesselCode === data.targetVesselCode && m.isActive);
-      const existingJobKeys = new Set(existingTargetJobs.map((m: any) => `${m.jobCode}|${m.fleetEquipmentCode}`));
+      const sourceJobList = await db.select().from(jobs)
+        .where(eq(jobs.vesselId, data.sourceVesselCode));
+      const targetJobList = await db.select().from(jobs)
+        .where(eq(jobs.vesselId, data.targetVesselCode));
+      const existingJobNos = new Set(targetJobList.map(j => j.jobNo));
 
-      for (const mapping of sourceFiltered) {
-        const key = `${mapping.jobCode}|${mapping.fleetEquipmentCode}`;
-        if (!existingJobKeys.has(key)) {
-          try {
-            await storage.createFleetJobVesselMappingRecord({
-              fleetEquipmentCode: mapping.fleetEquipmentCode,
-              jobCode: mapping.jobCode,
-              jobId: mapping.jobId,
-              vesselCode: data.targetVesselCode,
-              vesselName: data.targetVesselName || mapping.vesselName,
-              mappedBy: data.mappedBy,
-              isActive: true,
-            });
-            results.jobs++;
-          } catch (e) {
-            // Skip duplicates from unique constraint
-          }
+      for (const job of sourceJobList) {
+        if (existingJobNos.has(job.jobNo)) continue;
+
+        const newId = generateId('JOB');
+        const newComponentId = componentIdMap.get(job.componentId || '') || job.componentId;
+
+        try {
+          await db.insert(jobs).values({
+            id: newId,
+            vesselId: data.targetVesselCode,
+            componentId: newComponentId,
+            componentCode: job.componentCode,
+            componentName: job.componentName,
+            jobNo: job.jobNo,
+            jobTitle: job.jobTitle,
+            assignedTo: job.assignedTo,
+            maintenanceType: job.maintenanceType,
+            maintenanceBasis: job.maintenanceBasis,
+            frequencyType: job.frequencyType,
+            frequencyValue: job.frequencyValue,
+            frequencyUnit: job.frequencyUnit,
+            intervalRunningHour: job.intervalRunningHour,
+            leadTimeValue: job.leadTimeValue,
+            leadTimeUnit: job.leadTimeUnit,
+            initialNextDue: job.initialNextDue,
+            lastDoneDate: job.lastDoneDate,
+            nextDueDate: job.nextDueDate,
+            lastDoneRH: job.lastDoneRH,
+            nextDueRH: job.nextDueRH,
+            jobPriority: job.jobPriority,
+            classRelated: job.classRelated,
+            briefWorkDescription: job.briefWorkDescription,
+            jobDescription: job.jobDescription,
+            approver: job.approver,
+            department: job.department,
+            requiredSpareParts: job.requiredSpareParts,
+            requiredTools: job.requiredTools,
+            safetyRequirements: job.safetyRequirements,
+            dataScope: job.dataScope || 'vessel',
+            fleetEquipmentCode: job.fleetEquipmentCode,
+            fleetJobCode: job.fleetJobCode,
+            sfiCode: job.sfiCode,
+            criticality: job.criticality,
+            isActive: job.isActive,
+            estimatedManHours: job.estimatedManHours,
+            createdBy: job.createdBy || 'system',
+          });
+          copyResults.jobs++;
+        } catch (e: any) {
+          copyResults.errors.push(`Job ${job.jobNo}: ${e.message}`);
         }
       }
     }
 
     if (data.copySpares) {
-      const allSpareMappings = await storage.getFleetSpareVesselMappings();
-      const sourceSpares = allSpareMappings.filter((m: any) => m.vesselCode === data.sourceVesselCode && m.isActive);
-      const existingTargetSpares = allSpareMappings.filter((m: any) => m.vesselCode === data.targetVesselCode && m.isActive);
-      const existingSpareKeys = new Set(existingTargetSpares.map((m: any) => `${m.partCode}|${m.fleetEquipmentCode}`));
+      const sourceSpareList = await db.select().from(spares)
+        .where(and(
+          eq(spares.vesselId, data.sourceVesselCode),
+          eq(spares.deleted, false)
+        ));
+      const targetSpareList = await db.select().from(spares)
+        .where(eq(spares.vesselId, data.targetVesselCode));
+      const existingSpareKeys = new Set(
+        targetSpareList.map(s => `${s.partCode}|${s.componentCode}`)
+      );
 
-      for (const mapping of sourceSpares) {
-        const key = `${mapping.partCode}|${mapping.fleetEquipmentCode}`;
-        if (!existingSpareKeys.has(key)) {
-          try {
-            await storage.createFleetSpareVesselMappingRecord({
-              fleetEquipmentCode: mapping.fleetEquipmentCode,
-              partCode: mapping.partCode,
-              spareId: mapping.spareId,
-              vesselCode: data.targetVesselCode,
-              vesselName: data.targetVesselName || mapping.vesselName,
-              mappedBy: data.mappedBy,
-              isActive: true,
-            });
-            results.spares++;
-          } catch (e) {
-            // Skip duplicates from unique constraint
-          }
+      for (const spare of sourceSpareList) {
+        const spareKey = `${spare.partCode}|${spare.componentCode}`;
+        if (existingSpareKeys.has(spareKey)) continue;
+
+        const newComponentId = componentIdMap.get(spare.componentId || '') || spare.componentId;
+
+        try {
+          await db.insert(spares).values({
+            partCode: spare.partCode,
+            partName: spare.partName,
+            componentId: newComponentId,
+            componentCode: spare.componentCode,
+            componentName: spare.componentName,
+            componentSpareCode: spare.componentSpareCode,
+            critical: spare.critical,
+            rob: 0,
+            robLocationA: 0,
+            robLocationB: 0,
+            min: spare.min,
+            max: spare.max,
+            unitCost: spare.unitCost,
+            stockingNumber: spare.stockingNumber,
+            leadTime: spare.leadTime,
+            supplier: spare.supplier,
+            location: spare.location,
+            vesselId: data.targetVesselCode,
+            dataScope: spare.dataScope || 'vessel',
+            fleetEquipmentCode: spare.fleetEquipmentCode,
+            fleetPartCode: spare.fleetPartCode,
+            partNumber: spare.partNumber,
+            uom: spare.uom,
+            drawingNumber: spare.drawingNumber,
+            drawingNo: spare.drawingNo,
+            location2: spare.location2,
+            remarks: spare.remarks,
+          });
+          copyResults.spares++;
+        } catch (e: any) {
+          copyResults.errors.push(`Spare ${spare.partCode}: ${e.message}`);
         }
       }
     }
 
-    const totalCopied = results.components + results.jobs + results.spares;
+    const totalCopied = copyResults.components + copyResults.jobs + copyResults.spares;
+    console.log(`[Copy Vessel] ${data.sourceVesselCode} → ${data.targetVesselCode}: ${copyResults.components} components, ${copyResults.jobs} jobs, ${copyResults.spares} spares copied`);
+    
     res.json({
       success: true,
-      message: `Vessel data successfully replicated. ${totalCopied} mapping(s) copied.`,
-      results,
+      message: `Vessel data successfully replicated. ${totalCopied} record(s) copied.`,
+      results: copyResults,
     });
   } catch (error) {
     if (error instanceof z.ZodError) {
