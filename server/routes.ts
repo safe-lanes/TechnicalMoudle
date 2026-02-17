@@ -11048,9 +11048,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Fleet Admin - Spares Routes (using dedicated fleet_spares table)
   
   // Export fleet spares to Excel (18-column format matching import template)
+  // Optional query param: fleetEquipmentCode - filters spares for a specific fleet equipment
   app.get("/technical/api/fleet/spares/export", async (req, res) => {
     try {
-      const spares = await storage.getFleetSparesFromTable();
+      const { fleetEquipmentCode } = req.query;
+      let spares = await storage.getFleetSparesFromTable();
+      if (fleetEquipmentCode && typeof fleetEquipmentCode === 'string') {
+        spares = spares.filter((s: any) => s.fleetEquipmentCode === fleetEquipmentCode);
+      }
 
       const headers = [
         'Part Code', 'Fleet Equipment Code', 'Fleet Equipment Name', 'Part Name',
