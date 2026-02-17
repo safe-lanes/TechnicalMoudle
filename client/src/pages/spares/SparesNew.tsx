@@ -8,7 +8,9 @@ import { Marker } from "@/components/Marker";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Search, ChevronRight, ChevronDown, Edit, Edit2, Trash2, Plus, PlusCircle, Square, FileSpreadsheet, X, Minus, AlertCircle, CheckCircle, HelpCircle, MapPin, Info, Download, Settings2 } from "lucide-react";
+import { Search, ChevronRight, ChevronDown, Edit, Edit2, Trash2, Plus, PlusCircle, Square, FileSpreadsheet, X, Minus, AlertCircle, CheckCircle, HelpCircle, MapPin, Info, Download, Settings2, Check, ChevronsUpDown } from "lucide-react";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import * as XLSX from "xlsx";
 import { ModifyStickyFooter } from "@/components/modify/ModifyStickyFooter";
 // ComponentNode interface - matches the one used in Components.tsx
@@ -150,6 +152,7 @@ const Spares: React.FC = () => {
   
   // Dialog states
   const [isAddSpareModalOpen, setIsAddSpareModalOpen] = useState(false);
+  const [componentCodePopoverOpen, setComponentCodePopoverOpen] = useState(false);
   const [isBulkUpdateModalOpen, setIsBulkUpdateModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isConsumeReceiveModalOpen, setIsConsumeReceiveModalOpen] = useState(false);
@@ -857,6 +860,18 @@ const Spares: React.FC = () => {
     
     return mainCategories;
   }, [fetchedComponents]);
+
+  const flattenedComponents = useMemo(() => {
+    const result: { id: string; code: string; name: string; fleetEquipmentCode?: string }[] = [];
+    const flatten = (nodes: ComponentNode[]) => {
+      for (const node of nodes) {
+        result.push({ id: node.id, code: node.code, name: node.name, fleetEquipmentCode: node.fleetEquipmentCode });
+        if (node.children) flatten(node.children);
+      }
+    };
+    flatten(componentTree);
+    return result;
+  }, [componentTree]);
 
   // Fetch vessel location names
   const { data: locationNamesData } = useQuery({
@@ -2722,58 +2737,65 @@ const Spares: React.FC = () => {
               </div>
 
               <div className="mt-4">
-                <Label htmlFor="add-component">Linked Component *</Label>
-                <Select value={addSpareForm.componentId} onValueChange={(value) => setAddSpareForm({...addSpareForm, componentId: value})}>
-                  <SelectTrigger id="add-component" data-testid="select-add-component">
-                    <SelectValue placeholder="Select a component" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {(() => {
-                      const renderOptions = (nodes: ComponentNode[], level = 0): React.ReactNode[] => {
-                        return nodes.flatMap(node => {
-                          const options: React.ReactNode[] = [
-                            <SelectItem key={node.id} value={node.id}>
-                              {'  '.repeat(level)}{node.name}
-                            </SelectItem>
-                          ];
-                          if (node.children) {
-                            options.push(...renderOptions(node.children, level + 1));
-                          }
-                          return options;
-                        });
-                      };
-                      return renderOptions(componentTree);
-                    })()}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              {addSpareForm.componentId && (() => {
-                const findComp = (nodes: ComponentNode[]): ComponentNode | null => {
-                  for (const node of nodes) {
-                    if (node.id === addSpareForm.componentId) return node;
-                    if (node.children) { const found = findComp(node.children); if (found) return found; }
-                  }
-                  return null;
-                };
-                const selectedComp = findComp(componentTree);
-                return selectedComp ? (
-                  <div className="grid grid-cols-3 gap-4 mt-4">
-                    <div>
-                      <Label>Component Name</Label>
-                      <Input value={selectedComp.name} readOnly className="bg-gray-100" data-testid="input-add-component-name" />
-                    </div>
-                    <div>
-                      <Label>Component Code</Label>
-                      <Input value={selectedComp.code} readOnly className="bg-gray-100" data-testid="input-add-component-code" />
-                    </div>
-                    <div>
-                      <Label>Fleet Equipment Code</Label>
-                      <Input value={selectedComp.fleetEquipmentCode || ''} readOnly className="bg-gray-100" data-testid="input-add-fleet-equipment-code" />
-                    </div>
+                <Label className="text-sm font-medium mb-1 block">Linked Component *</Label>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <Label htmlFor="add-component-code" className="text-xs text-muted-foreground">Component Code</Label>
+                    <Popover open={componentCodePopoverOpen} onOpenChange={setComponentCodePopoverOpen}>
+                      <PopoverTrigger asChild>
+                        <Button
+                          variant="outline"
+                          role="combobox"
+                          aria-expanded={componentCodePopoverOpen}
+                          className="w-full justify-between font-normal"
+                          data-testid="select-add-component-code"
+                        >
+                          {addSpareForm.componentId
+                            ? flattenedComponents.find(c => c.id === addSpareForm.componentId)?.code || "Select code"
+                            : "Search & select code"}
+                          <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-[350px] p-0" align="start">
+                        <Command>
+                          <CommandInput placeholder="Type to search component code..." data-testid="input-search-component-code" />
+                          <CommandList>
+                            <CommandEmpty>No component found.</CommandEmpty>
+                            <CommandGroup className="max-h-[250px] overflow-y-auto">
+                              {flattenedComponents.map((comp) => (
+                                <CommandItem
+                                  key={comp.id}
+                                  value={`${comp.code} ${comp.name}`}
+                                  onSelect={() => {
+                                    setAddSpareForm({...addSpareForm, componentId: comp.id});
+                                    setComponentCodePopoverOpen(false);
+                                  }}
+                                  data-testid={`component-option-${comp.code}`}
+                                >
+                                  <Check className={`mr-2 h-4 w-4 ${addSpareForm.componentId === comp.id ? "opacity-100" : "opacity-0"}`} />
+                                  <span className="font-medium mr-2">{comp.code}</span>
+                                  <span className="text-muted-foreground text-xs truncate">{comp.name}</span>
+                                </CommandItem>
+                              ))}
+                            </CommandGroup>
+                          </CommandList>
+                        </Command>
+                      </PopoverContent>
+                    </Popover>
                   </div>
-                ) : null;
-              })()}
+                  <div>
+                    <Label htmlFor="add-component-name" className="text-xs text-muted-foreground">Component Name</Label>
+                    <Input
+                      id="add-component-name"
+                      value={addSpareForm.componentId ? (flattenedComponents.find(c => c.id === addSpareForm.componentId)?.name || '') : ''}
+                      readOnly
+                      className="bg-gray-100"
+                      placeholder="Auto-filled from code"
+                      data-testid="input-add-component-name"
+                    />
+                  </div>
+                </div>
+              </div>
             </div>
 
             {/* Stock & Location Section */}
