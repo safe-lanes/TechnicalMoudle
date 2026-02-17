@@ -10845,9 +10845,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Fleet Admin - Jobs Routes
   
   // Export fleet jobs to Excel (21-column format matching import template)
+  // Optional query param: fleetEquipmentCode - filters jobs for a specific fleet equipment
   app.get("/technical/api/fleet/jobs/export", async (req, res) => {
     try {
-      const jobs = await storage.getFleetJobs();
+      const { fleetEquipmentCode } = req.query;
+      let jobs = await storage.getFleetJobs();
+      if (fleetEquipmentCode && typeof fleetEquipmentCode === 'string') {
+        jobs = jobs.filter((j: any) => j.fleetEquipmentCode === fleetEquipmentCode);
+      }
 
       const headers = [
         'Job Code', 'Fleet Equipment Code', 'Fleet Equipment Name', 'WO Title',
