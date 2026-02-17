@@ -1,0 +1,180 @@
+PROMPT 2: MAKE CHATBOT ANALYTICAL & INTELLIGENT
+text
+UPGRADE CHATBOT - From Data Dump to Intelligent Analysis
+
+Based on the architecture analysis, the chatbot works but lacks analytical intelligence. It's just querying and displaying raw data instead of providing insights.
+
+IMPROVEMENTS NEEDED:
+
+═══════════════════════════════════════════════════════════
+PHASE 1: ENHANCE SYSTEM PROMPT (chatbotService.ts)
+═══════════════════════════════════════════════════════════
+
+Update the system prompt to make the AI more analytical:
+
+ANALYTICAL INSTRUCTIONS TO ADD:
+• "Always analyze before presenting data. Start with executive summary."
+• "Identify patterns, trends, and anomalies in the data."
+• "Prioritize by risk: Critical > High > Medium. Show critical items first."
+• "Group related items by component, department, or priority."
+• "Provide actionable recommendations, not just data."
+• "Use comparative language: 'This is X% above normal', 'trending up', etc."
+• "End with 2-3 specific next actions the user should take."
+• "Format responses as: Summary → Key Insights → Prioritized Data (top 10) → Recommendations"
+
+RESPONSE FORMATTING RULES:
+• Use tables for structured data (max 10 rows, then summarize the rest)
+• Use bullet points for insights and recommendations
+• Highlight critical/urgent items with **bold** or emoji indicators
+• Show counts and percentages: "45 critical items (23% of total)"
+
+═══════════════════════════════════════════════════════════
+PHASE 2: ADD ANALYTICAL TOOLS (New Functions)
+═══════════════════════════════════════════════════════════
+
+Create these new tools in chatbotService.ts:
+
+1. **get_maintenance_insights** - Returns:
+   - Overdue work order count by priority
+   - Top 5 components with most overdue work
+   - Compliance rate (completed on time vs total)
+   - Trend: overdue count vs last month
+   - Critical items needing immediate attention
+
+2. **get_spare_coverage_analysis** - Returns:
+   - Spares below minimum: count + total value
+   - Critical spares at risk: list with ROB levels
+   - Components at risk due to spare shortage
+   - Consumption trend: fast-moving items
+   - Reorder recommendations with urgency
+
+3. **get_workload_analysis** - Returns:
+   - Due this week: count by priority
+   - Overdue backlog: aging analysis (>30 days, >60 days, >90 days)
+   - Workload by rank/department
+   - Capacity utilization estimate
+   - Recommended scheduling priorities
+
+4. **get_component_health_score** - Returns:
+   - Components with recurring defects
+   - Components with overdue maintenance
+   - Running hours vs planned maintenance ratio
+   - Risk score based on criticality + overdue + defects
+   - Top 5 components needing attention
+
+5. **get_performance_trends** - Returns:
+   - Work order completion rate (last 30/60/90 days)
+   - Average time to complete by priority
+   - Spare consumption patterns
+   - Defect resolution time
+   - Maintenance compliance trend
+
+═══════════════════════════════════════════════════════════
+PHASE 3: OPTIMIZE EXISTING TOOLS
+═══════════════════════════════════════════════════════════
+
+Modify these existing tools to return analytical summaries:
+
+**get_overdue_work_orders** - Add to response:
+• Total count by priority (Critical: X, High: Y, Medium: Z)
+• Top 3 components with most overdue items
+• Oldest overdue item (age in days)
+• Only return top 10 most critical, summarize the rest
+
+**get_low_stock_spares** - Add to response:
+• Count of critical vs non-critical low stock items
+• Total estimated value at risk
+• Average days until stockout (based on consumption)
+• Top 5 most urgent to reorder
+
+**get_work_order_counts** - Enhance with:
+• Completion rate percentage
+• Overdue percentage
+• Trend indicator (↑ ↓ compared to last period)
+
+═══════════════════════════════════════════════════════════
+PHASE 4: INCREASE TOKEN BUDGET & ITERATIONS
+═══════════════════════════════════════════════════════════
+
+In chatbotService.ts, update:
+• maxTokens: 2000 → 4000 (allow deeper analysis)
+• maxIterations: 5 → 8 (allow more tool chaining for complex queries)
+• temperature: 0.3 → 0.4 (slightly more analytical creativity)
+
+═══════════════════════════════════════════════════════════
+PHASE 5: IMPROVE RESPONSE FORMATTING
+═══════════════════════════════════════════════════════════
+
+Update system prompt response format template:
+
+"When user asks about work orders, respond in this structure:
+
+**📊 SUMMARY**
+[High-level overview with key numbers]
+
+**⚠️ CRITICAL INSIGHTS**
+• [Top 3 most important findings]
+• [Patterns or trends identified]
+• [Risk areas highlighted]
+
+**📋 TOP PRIORITY ITEMS** (showing X of Y total)
+[Table with top 10, sorted by urgency/risk]
+
+**💡 RECOMMENDATIONS**
+1. [Immediate action needed]
+2. [Short-term priority]
+3. [Follow-up suggestion]"
+
+═══════════════════════════════════════════════════════════
+PHASE 6: ADD CONTEXT AWARENESS
+═══════════════════════════════════════════════════════════
+
+Enhance the chatbot to remember context and be proactive:
+
+• If user asks about overdue work orders, automatically check if there are critical spares needed for those jobs
+• If user asks about low stock, check if any pending work orders require those spares
+• Cross-reference data sources to provide connected insights
+• Suggest related queries: "Would you like me to analyze the components affected by these overdue items?"
+
+═══════════════════════════════════════════════════════════
+IMPLEMENTATION PRIORITY
+═══════════════════════════════════════════════════════════
+
+Start with:
+1. Phase 1 (System Prompt) - Quick win, immediate improvement
+2. Phase 5 (Response Formatting) - Works with current architecture
+3. Phase 4 (Token Budget) - Simple config change
+4. Phase 2 (New Tools) - Higher impact, more development
+5. Phase 3 (Optimize Tools) - Polish existing functionality
+6. Phase 6 (Context Awareness) - Advanced feature
+
+═══════════════════════════════════════════════════════════
+EXPECTED OUTCOME
+═══════════════════════════════════════════════════════════
+
+BEFORE: "There are 289 overdue work orders. [long data dump]"
+
+AFTER: 
+"📊 **Maintenance Status Alert**
+
+You have **289 overdue work orders** (23% above normal). This requires immediate attention.
+
+⚠️ **Critical Insights:**
+• 45 Critical priority items - oldest is 127 days overdue
+• Main Engine has 78 overdue items (27% of total) - highest concentration
+• 15 work orders blocked due to spare parts shortage
+• Overdue rate increased 18% from last month - trending worse
+
+📋 **Top 10 Most Urgent** (Critical Priority)
+[Clean table with: Work Order | Component | Days Overdue | Assigned To | Blocking Issue]
+
+💡 **Recommended Actions:**
+1. Schedule emergency meeting for Main Engine overdue items (78 WOs)
+2. Expedite spare procurement for 15 blocked work orders
+3. Assign additional crew to clear 45 critical items this week
+
+Would you like me to generate a detailed action plan or analyze specific components?"
+
+═══════════════════════════════════════════════════════════
+
+Implement these improvements to transform the chatbot from a data query tool into an intelligent maintenance assistant.
