@@ -10823,18 +10823,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Update sort order for fleet components
   app.post("/technical/api/fleet/components/sort-order", async (req, res) => {
     try {
-      const schema = z.object({
+      const sortOrderSchema = z.object({
         updates: z.array(z.object({
           id: z.number(),
           sortOrder: z.number(),
         })),
       });
-      const { updates } = schema.parse(req.body);
-      const db = getDb();
+      const { updates } = sortOrderSchema.parse(req.body);
+      const pool = await getPool();
       for (const update of updates) {
-        await db.update(fleetComponents)
-          .set({ sortOrder: update.sortOrder, updatedAt: new Date() })
-          .where(eq(fleetComponents.id, update.id));
+        await pool.query(
+          `UPDATE fleet_components SET sort_order = $1, updated_at = NOW() WHERE id = $2`,
+          [update.sortOrder, update.id]
+        );
       }
       res.json({ success: true, updated: updates.length });
     } catch (error: any) {
