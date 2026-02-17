@@ -1283,18 +1283,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
           continue;
         }
 
-        // Find work orders for this job - include both open AND completed WOs
-        // Priority: open WO > most recent completed WO
+        // Find open/active work orders for this job only
+        // Completed/Rejected WOs are historical and not relevant for planning the current cycle
         const jobWOs = allWorkOrders.filter(wo => wo.jobId === job.id);
-        const openWO = jobWOs.find(wo => 
+        const relevantWO = jobWOs.find(wo => 
           wo.status !== 'Completed' && 
           wo.status !== 'Rejected'
-        );
-        // If no open WO, find the most recent completed or rejected one
-        const completedWO = !openWO ? jobWOs.find(wo => 
-          wo.status === 'Completed' || wo.status === 'Rejected'
-        ) : null;
-        const relevantWO = openWO || completedWO;
+        ) || null;
 
         // Calculate spare status
         let spareStatus: 'OK' | 'LOW' | 'ZERO' | 'NOT_SET' = 'NOT_SET';
