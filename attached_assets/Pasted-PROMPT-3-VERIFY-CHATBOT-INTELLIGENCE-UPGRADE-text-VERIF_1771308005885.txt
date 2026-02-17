@@ -1,0 +1,155 @@
+PROMPT 3: VERIFY CHATBOT INTELLIGENCE UPGRADE
+text
+VERIFICATION & TESTING - Chatbot Intelligence Upgrade
+
+Now that the upgrade is complete, let's verify that all improvements are working correctly.
+
+═══════════════════════════════════════════════════════════
+TEST PLAN
+═══════════════════════════════════════════════════════════
+
+Please run these verification checks:
+
+---
+**1. VERIFY NEW ANALYTICAL TOOLS EXIST**
+
+Show me the tool list from chatbotService.ts:
+• Confirm all 20 tools are registered
+• List the 5 new analytical tools:
+  - get_maintenance_insights
+  - get_spare_coverage_analysis  
+  - get_workload_analysis
+  - get_component_health_score
+  - get_performance_trends
+• Show the function signatures to confirm they return analytical summaries, not just raw data
+
+---
+**2. VERIFY SYSTEM PROMPT UPDATES**
+
+Show me the updated system prompt:
+• Check it includes analytical instructions ("Always analyze before presenting")
+• Verify response format template is present (Summary → Insights → Data → Recommendations)
+• Confirm it instructs the AI to prioritize by risk and show only top items
+• Check it includes comparative language instructions ("X% above normal", "trending up")
+
+---
+**3. VERIFY CONFIGURATION CHANGES**
+
+In chatbotService.ts, confirm:
+• maxTokens: increased from 2000 → 4000 ✓
+• maxIterations: increased from 5 → 8 ✓
+• temperature: adjusted from 0.3 → 0.4 ✓
+
+---
+**4. VERIFY ENHANCED EXISTING TOOLS**
+
+Check these specific tools have analytical enhancements:
+
+**get_overdue_work_orders:**
+• Returns priority breakdown summary (Critical: X, High: Y, Medium: Z)
+• Identifies top 3 components with most overdue items
+• Shows oldest overdue age
+• Limits results to top 10 with "showing X of Y total" message
+
+**get_low_stock_spares:**
+• Calculates urgency score for ranking
+• Groups by critical vs non-critical
+• Shows estimated value at risk
+• Recommends reorder priorities
+
+**get_work_order_counts:**
+• Includes completion rate percentage
+• Shows overdue percentage
+• Has trend indicators (↑ ↓ vs previous period)
+
+---
+**5. CODE REVIEW CHECKLIST**
+
+Verify implementation quality:
+• All new analytical tools properly integrated into the tools array
+• Each tool has clear descriptions for the AI model
+• Error handling present in new functions
+• TypeScript types are correct
+• No duplicate tool names
+• All tools properly connected to storage/database layer
+
+---
+**6. LIVE FUNCTIONALITY TEST**
+
+To truly verify the upgrade works, I should test the chatbot with real queries.
+
+Please test these questions IN THE ACTUAL CHATBOT and show me the responses:
+
+**Test Query 1:** "Show me overdue work orders"
+Expected: Should show Summary with counts, Critical Insights with patterns, top 10 prioritized table, and specific Recommendations. NOT a long data dump.
+
+**Test Query 2:** "What's our maintenance status?"  
+Expected: Should call get_maintenance_insights and show KPIs like compliance rate, overdue aging, critical items, with analysis.
+
+**Test Query 3:** "Analyze spare parts situation"
+Expected: Should use get_spare_coverage_analysis to show shortage risks, reorder urgency, and recommendations.
+
+**Test Query 4:** "Which components need attention?"
+Expected: Should use get_component_health_score to show risk-scored list with reasoning.
+
+**Test Query 5:** "How is our maintenance performance trending?"
+Expected: Should use get_performance_trends to show completion rates over time with trend direction.
+
+---
+═══════════════════════════════════════════════════════════
+DELIVERABLES
+═══════════════════════════════════════════════════════════
+
+Please provide:
+
+1. **Code Confirmation:**
+   - Screenshot or code snippet showing the 20 tools array
+   - Key sections of the updated system prompt
+   - Confirmation of config changes (maxTokens, maxIterations)
+
+2. **Implementation Review:**
+   - Show the signature of 2-3 new analytical tools
+   - Confirm they return structured analytical data
+
+3. **Live Test Results:**
+   - Run at least 3 of the test queries above in the actual chatbot
+   - Show screenshots or paste the chatbot's responses
+   - Compare: Is it now analytical or still data dumping?
+
+4. **Quality Assessment:**
+   - Are responses formatted with Summary/Insights/Recommendations?
+   - Does it show "top 10 of X total" instead of all items?
+   - Does it provide actionable recommendations?
+   - Are there emojis, bold text, and better formatting?
+
+---
+═══════════════════════════════════════════════════════════
+SUCCESS CRITERIA
+═══════════════════════════════════════════════════════════
+
+The upgrade is successful if:
+✓ All 20 tools exist and are properly registered
+✓ System prompt includes analytical instructions
+✓ Token budget increased to 4000
+✓ Live chatbot responses follow Summary → Insights → Data → Recommendations format
+✓ Responses are concise (top 10 items) with "showing X of Y total"
+✓ Actionable recommendations are provided
+✓ Critical items are highlighted and prioritized
+✓ No more raw data dumps - everything is analyzed first
+
+---
+
+Run these verifications and let me know the results. If any part failed, I'll help fix it.
+Why this verification prompt:
+
+✅ Checks code-level changes (tools, prompt, config)
+
+✅ Requires showing actual code to prove implementation
+
+✅ Demands live testing with real queries
+
+✅ Compares expected vs actual behavior
+
+✅ Has clear success criteria
+
+✅ Will expose if Replit just said it was done but didn't actually implement everything
