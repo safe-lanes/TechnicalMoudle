@@ -26,7 +26,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
-import { FEATURES, IHM_PRESENCE, IHM_EVIDENCE_TYPES } from '@/config/features';
+import { FEATURES } from '@/config/features';
 import { useVessels } from "@/hooks/useVessels";
 
 interface Spare {
@@ -168,14 +168,25 @@ const Spares: React.FC = () => {
   const [addSpareForm, setAddSpareForm] = useState({
     partCode: "",
     partName: "",
+    partNumber: "",
+    uom: "",
     componentId: "",
     critical: "No",
+    isActive: true,
     rob: "",
     min: "",
     location: "",
-    // IHM fields
-    ihmPresence: "Unknown" as typeof IHM_PRESENCE[number],
-    ihmEvidenceType: "None" as typeof IHM_EVIDENCE_TYPES[number]
+    location2: "",
+    maker: "",
+    makerCode: "",
+    drawingNumber: "",
+    positionNumber: "",
+    specification: "",
+    manualName: "",
+    pageNumber: "",
+    ihm: "No",
+    remarks: "",
+    note: ""
   });
   
   // Comprehensive edit spare form (includes all fields from Spare Part Details)
@@ -992,13 +1003,25 @@ const Spares: React.FC = () => {
       setAddSpareForm({
         partCode: "",
         partName: "",
+        partNumber: "",
+        uom: "",
         componentId: "",
         critical: "No",
+        isActive: true,
         rob: "",
         min: "",
         location: "",
-        ihmPresence: "Unknown" as typeof IHM_PRESENCE[number],
-        ihmEvidenceType: "None" as typeof IHM_EVIDENCE_TYPES[number]
+        location2: "",
+        maker: "",
+        makerCode: "",
+        drawingNumber: "",
+        positionNumber: "",
+        specification: "",
+        manualName: "",
+        pageNumber: "",
+        ihm: "No",
+        remarks: "",
+        note: ""
       });
     },
     onError: (error: any) => {
@@ -1733,13 +1756,28 @@ const Spares: React.FC = () => {
     createSpareMutation.mutate({
       partCode: addSpareForm.partCode,
       partName: addSpareForm.partName,
+      partNumber: addSpareForm.partNumber || undefined,
+      uom: addSpareForm.uom || undefined,
       componentId: addSpareForm.componentId,
       componentCode: component?.code || undefined,
       componentName: component?.name || "Unknown",
+      fleetEquipmentCode: component?.fleetEquipmentCode || undefined,
       critical: addSpareForm.critical,
+      isActive: addSpareForm.isActive,
       rob,
       min,
       location: addSpareForm.location || undefined,
+      location2: addSpareForm.location2 || undefined,
+      maker: addSpareForm.maker || undefined,
+      makerCode: addSpareForm.makerCode || undefined,
+      drawingNumber: addSpareForm.drawingNumber || undefined,
+      positionNumber: addSpareForm.positionNumber || undefined,
+      specification: addSpareForm.specification || undefined,
+      manualName: addSpareForm.manualName || undefined,
+      pageNumber: addSpareForm.pageNumber || undefined,
+      ihm: addSpareForm.ihm || undefined,
+      remarks: addSpareForm.remarks || undefined,
+      note: addSpareForm.note || undefined,
       vesselId
     });
   };
@@ -2626,187 +2664,338 @@ const Spares: React.FC = () => {
         </DialogContent>
       </Dialog>
       
-      {/* Add Spare Modal */}
+      {/* Add Spare Modal - Comprehensive form matching Edit Spare Part layout */}
       <Dialog open={isAddSpareModalOpen} onOpenChange={setIsAddSpareModalOpen}>
-        <DialogContent className="max-w-2xl">
+        <DialogContent className="max-w-3xl max-h-[85vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>Add New Spare</DialogTitle>
+            <DialogTitle className="flex items-center gap-2 text-[#52baf3]">
+              <PlusCircle className="h-5 w-5" />
+              Add New Spare
+            </DialogTitle>
           </DialogHeader>
-          <div className="space-y-4">
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <Label htmlFor="add-part-code">Part Code *</Label>
-                <Input
-                  id="add-part-code"
-                  value={addSpareForm.partCode}
-                  onChange={(e) => setAddSpareForm({...addSpareForm, partCode: e.target.value})}
-                  placeholder="e.g., SP-ME-001"
-                  required
-                />
+          
+          <div className="space-y-6">
+            {/* Basic Information Section */}
+            <div className="bg-gray-50 rounded-lg p-4">
+              <h3 className="text-sm font-semibold text-gray-700 mb-3 border-b pb-2">Basic Information</h3>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label htmlFor="add-part-code">Part Code *</Label>
+                  <Input
+                    id="add-part-code"
+                    value={addSpareForm.partCode}
+                    onChange={(e) => setAddSpareForm({...addSpareForm, partCode: e.target.value})}
+                    placeholder="e.g., MV0001-00006"
+                    data-testid="input-add-part-code"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="add-part-name">Part Name *</Label>
+                  <Input
+                    id="add-part-name"
+                    value={addSpareForm.partName}
+                    onChange={(e) => setAddSpareForm({...addSpareForm, partName: e.target.value})}
+                    placeholder="e.g., Volute Casing"
+                    data-testid="input-add-part-name"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="add-part-number">Part Number</Label>
+                  <Input
+                    id="add-part-number"
+                    value={addSpareForm.partNumber}
+                    onChange={(e) => setAddSpareForm({...addSpareForm, partNumber: e.target.value})}
+                    placeholder="e.g., Fig. CM-35001/1"
+                    data-testid="input-add-part-number"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="add-uom">UOM (Unit of Measure)</Label>
+                  <Input
+                    id="add-uom"
+                    value={addSpareForm.uom}
+                    onChange={(e) => setAddSpareForm({...addSpareForm, uom: e.target.value})}
+                    placeholder="e.g., PCS"
+                    data-testid="input-add-uom"
+                  />
+                </div>
               </div>
-              <div>
-                <Label htmlFor="add-part-name">Part Name *</Label>
-                <Input
-                  id="add-part-name"
-                  value={addSpareForm.partName}
-                  onChange={(e) => setAddSpareForm({...addSpareForm, partName: e.target.value})}
-                  placeholder="e.g., Fuel Injector"
-                  required
-                />
-              </div>
-            </div>
-            
-            <div>
-              <Label htmlFor="add-component">Linked Component *</Label>
-              <Select value={addSpareForm.componentId} onValueChange={(value) => setAddSpareForm({...addSpareForm, componentId: value})}>
-                <SelectTrigger id="add-component">
-                  <SelectValue placeholder="Select a component" />
-                </SelectTrigger>
-                <SelectContent>
-                  {(() => {
-                    const renderOptions = (nodes: ComponentNode[], level = 0): React.ReactNode[] => {
-                      return nodes.flatMap(node => {
-                        const options: React.ReactNode[] = [
-                          <SelectItem key={node.id} value={node.id}>
-                            {'  '.repeat(level)}{node.name}
-                          </SelectItem>
-                        ];
-                        if (node.children) {
-                          options.push(...renderOptions(node.children, level + 1));
-                        }
-                        return options;
-                      });
-                    };
-                    return renderOptions(componentTree);
-                  })()}
-                </SelectContent>
-              </Select>
-              {addSpareForm.componentId && (() => {
-                const findComponent = (nodes: ComponentNode[]): ComponentNode | null => {
-                  for (const node of nodes) {
-                    if (node.id === addSpareForm.componentId) return node;
-                    if (node.children) {
-                      const found = findComponent(node.children);
-                      if (found) return found;
-                    }
-                  }
-                  return null;
-                };
-                const component = findComponent(componentTree);
-                const spareCode = component ? `SP-${component.code}-XXX` : '';
-                return spareCode ? (
-                  <p className="text-sm text-blue-600 mt-1">
-                    Component Spare Code will be: {spareCode}
-                  </p>
-                ) : null;
-              })()}
-            </div>
-            
-            <div className="grid grid-cols-3 gap-4">
-              <div>
-                <Label htmlFor="add-critical">Critical</Label>
-                <Select value={addSpareForm.critical} onValueChange={(value) => setAddSpareForm({...addSpareForm, critical: value})}>
-                  <SelectTrigger id="add-critical">
-                    <SelectValue />
+
+              <div className="mt-4">
+                <Label htmlFor="add-component">Linked Component *</Label>
+                <Select value={addSpareForm.componentId} onValueChange={(value) => setAddSpareForm({...addSpareForm, componentId: value})}>
+                  <SelectTrigger id="add-component" data-testid="select-add-component">
+                    <SelectValue placeholder="Select a component" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="Yes">Yes</SelectItem>
-                    <SelectItem value="No">No</SelectItem>
+                    {(() => {
+                      const renderOptions = (nodes: ComponentNode[], level = 0): React.ReactNode[] => {
+                        return nodes.flatMap(node => {
+                          const options: React.ReactNode[] = [
+                            <SelectItem key={node.id} value={node.id}>
+                              {'  '.repeat(level)}{node.name}
+                            </SelectItem>
+                          ];
+                          if (node.children) {
+                            options.push(...renderOptions(node.children, level + 1));
+                          }
+                          return options;
+                        });
+                      };
+                      return renderOptions(componentTree);
+                    })()}
                   </SelectContent>
                 </Select>
               </div>
-              <div>
-                <Label htmlFor="add-rob">ROB (Remain on Board)</Label>
-                <Input
-                  id="add-rob"
-                  type="number"
-                  min="0"
-                  value={addSpareForm.rob}
-                  onChange={(e) => setAddSpareForm({...addSpareForm, rob: e.target.value})}
-                  placeholder="0"
-                />
-              </div>
-              <div>
-                <Label htmlFor="add-min">Minimum Stock</Label>
-                <Input
-                  id="add-min"
-                  type="number"
-                  min="0"
-                  value={addSpareForm.min}
-                  onChange={(e) => setAddSpareForm({...addSpareForm, min: e.target.value})}
-                  placeholder="0"
-                />
-              </div>
-            </div>
-            
-            <div>
-              <Label htmlFor="add-location">Location</Label>
-              <Input
-                id="add-location"
-                value={addSpareForm.location}
-                onChange={(e) => setAddSpareForm({...addSpareForm, location: e.target.value})}
-                placeholder="e.g., Store Room A"
-              />
-            </div>
-            
-            {/* IHM Section - only show if feature is enabled */}
-            {FEATURES.IHM && (
-              <div className="border border-gray-200 rounded-lg p-4 bg-blue-50/30">
-                <h4 className="text-sm font-medium mb-3 flex items-center gap-2">
-                  <AlertCircle className="h-4 w-4 text-blue-500" />
-                  IHM (Inventory of Hazardous Materials)
-                </h4>
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <Label htmlFor="add-ihm-presence">IHM Presence</Label>
-                    <Select 
-                      value={addSpareForm.ihmPresence} 
-                      onValueChange={(value: typeof IHM_PRESENCE[number]) => 
-                        setAddSpareForm({...addSpareForm, ihmPresence: value})
-                      }
-                    >
-                      <SelectTrigger id="add-ihm-presence">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {IHM_PRESENCE.map(presence => (
-                          <SelectItem key={presence} value={presence}>
-                            {presence}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+
+              {addSpareForm.componentId && (() => {
+                const findComp = (nodes: ComponentNode[]): ComponentNode | null => {
+                  for (const node of nodes) {
+                    if (node.id === addSpareForm.componentId) return node;
+                    if (node.children) { const found = findComp(node.children); if (found) return found; }
+                  }
+                  return null;
+                };
+                const selectedComp = findComp(componentTree);
+                return selectedComp ? (
+                  <div className="grid grid-cols-3 gap-4 mt-4">
+                    <div>
+                      <Label>Component Name</Label>
+                      <Input value={selectedComp.name} readOnly className="bg-gray-100" data-testid="input-add-component-name" />
+                    </div>
+                    <div>
+                      <Label>Component Code</Label>
+                      <Input value={selectedComp.code} readOnly className="bg-gray-100" data-testid="input-add-component-code" />
+                    </div>
+                    <div>
+                      <Label>Fleet Equipment Code</Label>
+                      <Input value={selectedComp.fleetEquipmentCode || ''} readOnly className="bg-gray-100" data-testid="input-add-fleet-equipment-code" />
+                    </div>
                   </div>
-                  <div>
-                    <Label htmlFor="add-ihm-evidence">Evidence Type</Label>
-                    <Select 
-                      value={addSpareForm.ihmEvidenceType} 
-                      onValueChange={(value: typeof IHM_EVIDENCE_TYPES[number]) => 
-                        setAddSpareForm({...addSpareForm, ihmEvidenceType: value})
-                      }
-                    >
-                      <SelectTrigger id="add-ihm-evidence">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {IHM_EVIDENCE_TYPES.map(type => (
-                          <SelectItem key={type} value={type}>
-                            {type}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
+                ) : null;
+              })()}
+            </div>
+
+            {/* Stock & Location Section */}
+            <div className="bg-blue-50 rounded-lg p-4">
+              <h3 className="text-sm font-semibold text-gray-700 mb-3 border-b pb-2">Stock & Location</h3>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label htmlFor="add-rob">ROB (Total)</Label>
+                  <Input
+                    id="add-rob"
+                    type="number"
+                    min="0"
+                    value={addSpareForm.rob}
+                    onChange={(e) => setAddSpareForm({...addSpareForm, rob: e.target.value})}
+                    placeholder="0"
+                    data-testid="input-add-rob"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="add-min">Minimum Stock</Label>
+                  <Input
+                    id="add-min"
+                    type="number"
+                    min="0"
+                    value={addSpareForm.min}
+                    onChange={(e) => setAddSpareForm({...addSpareForm, min: e.target.value})}
+                    placeholder="0"
+                    data-testid="input-add-min"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="add-location-a">Location A</Label>
+                  <Input
+                    id="add-location-a"
+                    value={addSpareForm.location}
+                    onChange={(e) => setAddSpareForm({...addSpareForm, location: e.target.value})}
+                    placeholder="e.g., AAA-BBB-CCC"
+                    data-testid="input-add-location-a"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="add-location-b">Location B</Label>
+                  <Input
+                    id="add-location-b"
+                    value={addSpareForm.location2}
+                    onChange={(e) => setAddSpareForm({...addSpareForm, location2: e.target.value})}
+                    placeholder="e.g., CCC-BB-XXX"
+                    data-testid="input-add-location-b"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="add-critical">Criticality</Label>
+                  <Select 
+                    value={addSpareForm.critical} 
+                    onValueChange={(value) => setAddSpareForm({...addSpareForm, critical: value})}
+                  >
+                    <SelectTrigger id="add-critical" data-testid="select-add-critical">
+                      <SelectValue placeholder="Select criticality" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="Yes">Yes</SelectItem>
+                      <SelectItem value="No">No</SelectItem>
+                      <SelectItem value="Critical">Critical</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <Label htmlFor="add-is-active">Is Active</Label>
+                  <Select 
+                    value={addSpareForm.isActive ? "Yes" : "No"} 
+                    onValueChange={(value) => setAddSpareForm({...addSpareForm, isActive: value === "Yes"})}
+                  >
+                    <SelectTrigger id="add-is-active" data-testid="select-add-is-active">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="Yes">Yes</SelectItem>
+                      <SelectItem value="No">No</SelectItem>
+                    </SelectContent>
+                  </Select>
                 </div>
               </div>
-            )}
+            </div>
+
+            {/* Technical Details Section */}
+            <div className="bg-green-50 rounded-lg p-4">
+              <h3 className="text-sm font-semibold text-gray-700 mb-3 border-b pb-2">Technical Details</h3>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label htmlFor="add-maker">Maker</Label>
+                  <Input
+                    id="add-maker"
+                    value={addSpareForm.maker}
+                    onChange={(e) => setAddSpareForm({...addSpareForm, maker: e.target.value})}
+                    placeholder="e.g., Shinko Ind Ltd"
+                    data-testid="input-add-maker"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="add-maker-code">Maker Code</Label>
+                  <Input
+                    id="add-maker-code"
+                    value={addSpareForm.makerCode}
+                    onChange={(e) => setAddSpareForm({...addSpareForm, makerCode: e.target.value})}
+                    placeholder="e.g., MKR-000018"
+                    data-testid="input-add-maker-code"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="add-drawing-number">Drawing Number</Label>
+                  <Input
+                    id="add-drawing-number"
+                    value={addSpareForm.drawingNumber}
+                    onChange={(e) => setAddSpareForm({...addSpareForm, drawingNumber: e.target.value})}
+                    placeholder="e.g., FIG. 11"
+                    data-testid="input-add-drawing-number"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="add-position-number">Position Number</Label>
+                  <Input
+                    id="add-position-number"
+                    value={addSpareForm.positionNumber}
+                    onChange={(e) => setAddSpareForm({...addSpareForm, positionNumber: e.target.value})}
+                    placeholder="e.g., 6"
+                    data-testid="input-add-position-number"
+                  />
+                </div>
+                <div className="col-span-2">
+                  <Label htmlFor="add-specification">Specification</Label>
+                  <Input
+                    id="add-specification"
+                    value={addSpareForm.specification}
+                    onChange={(e) => setAddSpareForm({...addSpareForm, specification: e.target.value})}
+                    placeholder="Enter specification details"
+                    data-testid="input-add-specification"
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* Manual Reference Section */}
+            <div className="bg-yellow-50 rounded-lg p-4">
+              <h3 className="text-sm font-semibold text-gray-700 mb-3 border-b pb-2">Manual Reference</h3>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label htmlFor="add-manual-name">Manual Name</Label>
+                  <Input
+                    id="add-manual-name"
+                    value={addSpareForm.manualName}
+                    onChange={(e) => setAddSpareForm({...addSpareForm, manualName: e.target.value})}
+                    placeholder="e.g., Manual Name-0006"
+                    data-testid="input-add-manual-name"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="add-page-number">Page Number</Label>
+                  <Input
+                    id="add-page-number"
+                    value={addSpareForm.pageNumber}
+                    onChange={(e) => setAddSpareForm({...addSpareForm, pageNumber: e.target.value})}
+                    placeholder="e.g., 6"
+                    data-testid="input-add-page-number"
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* IHM & Notes Section */}
+            <div className="bg-purple-50 rounded-lg p-4">
+              <h3 className="text-sm font-semibold text-gray-700 mb-3 border-b pb-2">IHM & Notes</h3>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label htmlFor="add-ihm">IHM (Inventory of Hazardous Materials)</Label>
+                  <Select 
+                    value={addSpareForm.ihm || "No"} 
+                    onValueChange={(value) => setAddSpareForm({...addSpareForm, ihm: value})}
+                  >
+                    <SelectTrigger id="add-ihm" data-testid="select-add-ihm">
+                      <SelectValue placeholder="Select IHM status" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="Yes">Yes</SelectItem>
+                      <SelectItem value="No">No</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <Label htmlFor="add-evidence-type">Evidence Type</Label>
+                  <Input
+                    id="add-evidence-type"
+                    value={addSpareForm.remarks}
+                    onChange={(e) => setAddSpareForm({...addSpareForm, remarks: e.target.value})}
+                    placeholder="e.g., 22"
+                    data-testid="input-add-evidence-type"
+                  />
+                </div>
+                <div className="col-span-2">
+                  <Label htmlFor="add-note">Note</Label>
+                  <Input
+                    id="add-note"
+                    value={addSpareForm.note}
+                    onChange={(e) => setAddSpareForm({...addSpareForm, note: e.target.value})}
+                    placeholder="e.g., Sample-XX-YY-0006"
+                    data-testid="input-add-note"
+                  />
+                </div>
+              </div>
+            </div>
           </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setIsAddSpareModalOpen(false)}>
+
+          <DialogFooter className="mt-4">
+            <Button variant="outline" onClick={() => setIsAddSpareModalOpen(false)} data-testid="button-cancel-add">
               Cancel
             </Button>
-            <Button onClick={handleAddSpareSubmit} disabled={createSpareMutation.isPending}>
-              Create Spare
+            <Button 
+              onClick={handleAddSpareSubmit} 
+              disabled={createSpareMutation.isPending}
+              className="bg-[#52baf3] hover:bg-[#40a8e0]"
+              data-testid="button-create-spare"
+            >
+              {createSpareMutation.isPending ? "Creating..." : "Create Spare"}
             </Button>
           </DialogFooter>
         </DialogContent>
