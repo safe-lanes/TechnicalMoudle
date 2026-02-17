@@ -19,6 +19,7 @@ import {
   components,
   jobs,
   spares,
+  spareComponentLinks,
 } from '@shared/schema';
 import { requireOfficeOrAdmin } from '../middleware/auth';
 
@@ -1059,8 +1060,9 @@ router.post('/copy-vessel', async (req, res) => {
     }
 
     const db = await getDb();
-    const copyResults = { components: 0, jobs: 0, spares: 0, errors: [] as string[] };
+    const copyResults = { components: 0, jobs: 0, spares: 0, spareComponentLinks: 0, errors: [] as string[] };
     const componentIdMap = new Map<string, string>();
+    const spareIdMap = new Map<number, number>();
 
     const generateId = (prefix: string) => {
       return `${prefix}-${Date.now()}-${Math.random().toString(36).substring(2, 13)}`;
@@ -1071,11 +1073,15 @@ router.post('/copy-vessel', async (req, res) => {
         .where(eq(components.vesselId, data.sourceVesselCode));
       const targetComps = await db.select().from(components)
         .where(eq(components.vesselId, data.targetVesselCode));
-      const existingCodes = new Set(targetComps.map(c => c.componentCode));
+      const existingCodeToId = new Map<string, string>();
+      for (const c of targetComps) {
+        if (c.componentCode) existingCodeToId.set(c.componentCode, c.id);
+      }
 
       for (const comp of sourceComps) {
-        if (existingCodes.has(comp.componentCode)) {
-          componentIdMap.set(comp.id, comp.id);
+        const existingTargetId = comp.componentCode ? existingCodeToId.get(comp.componentCode) : undefined;
+        if (existingTargetId) {
+          componentIdMap.set(comp.id, existingTargetId);
           continue;
         }
         const newId = generateId('COMP');
@@ -1199,18 +1205,23 @@ router.post('/copy-vessel', async (req, res) => {
         ));
       const targetSpareList = await db.select().from(spares)
         .where(eq(spares.vesselId, data.targetVesselCode));
-      const existingSpareKeys = new Set(
-        targetSpareList.map(s => `${s.partCode}|${s.componentCode}`)
-      );
+      const existingSpareKeyMap = new Map<string, number>();
+      for (const s of targetSpareList) {
+        existingSpareKeyMap.set(`${s.partCode}|${s.componentCode}`, s.id);
+      }
 
       for (const spare of sourceSpareList) {
         const spareKey = `${spare.partCode}|${spare.componentCode}`;
-        if (existingSpareKeys.has(spareKey)) continue;
+        const existingId = existingSpareKeyMap.get(spareKey);
+        if (existingId !== undefined) {
+          spareIdMap.set(spare.id, existingId);
+          continue;
+        }
 
         const newComponentId = componentIdMap.get(spare.componentId || '') || spare.componentId;
 
         try {
-          await db.insert(spares).values({
+          const [inserted] = await db.insert(spares).values({
             partCode: spare.partCode,
             partName: spare.partName,
             componentId: newComponentId,
@@ -1238,15 +1249,46 @@ router.post('/copy-vessel', async (req, res) => {
             drawingNo: spare.drawingNo,
             location2: spare.location2,
             remarks: spare.remarks,
-          });
+          }).returning({ id: spares.id });
+          spareIdMap.set(spare.id, inserted.id);
           copyResults.spares++;
         } catch (e: any) {
           copyResults.errors.push(`Spare ${spare.partCode}: ${e.message}`);
         }
       }
+
+      const sourceLinks = await db.select().from(spareComponentLinks)
+        .where(eq(spareComponentLinks.vesselId, data.sourceVesselCode));
+      const targetLinks = await db.select().from(spareComponentLinks)
+        .where(eq(spareComponentLinks.vesselId, data.targetVesselCode));
+      const existingLinkKeys = new Set(
+        targetLinks.map(l => `${l.spareId}|${l.componentId}`)
+      );
+
+      for (const link of sourceLinks) {
+        const newSpareId = spareIdMap.get(link.spareId);
+        const newComponentId = componentIdMap.get(link.componentId) || link.componentId;
+
+        if (newSpareId === undefined) continue;
+
+        const linkKey = `${newSpareId}|${newComponentId}`;
+        if (existingLinkKeys.has(linkKey)) continue;
+
+        try {
+          await db.insert(spareComponentLinks).values({
+            vesselId: data.targetVesselCode,
+            spareId: newSpareId,
+            componentId: newComponentId,
+            linkedBy: 'system-copy-vessel',
+          });
+          copyResults.spareComponentLinks++;
+        } catch (e: any) {
+          copyResults.errors.push(`SpareLink ${link.spareId}->${link.componentId}: ${e.message}`);
+        }
+      }
     }
 
-    const totalCopied = copyResults.components + copyResults.jobs + copyResults.spares;
+    const totalCopied = copyResults.components + copyResults.jobs + copyResults.spares + copyResults.spareComponentLinks;
     console.log(`[Copy Vessel] ${data.sourceVesselCode} → ${data.targetVesselCode}: ${copyResults.components} components, ${copyResults.jobs} jobs, ${copyResults.spares} spares copied`);
     
     res.json({
