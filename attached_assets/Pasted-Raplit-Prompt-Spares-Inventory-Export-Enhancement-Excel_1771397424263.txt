@@ -1,0 +1,219 @@
+Raplit Prompt — Spares Inventory Export Enhancement (Excel Options)
+Module
+
+PMS → Inventory → Spares Inventory
+
+🎯 Objective
+
+Enhance the Export functionality in the Spares Inventory section.
+
+When the user clicks Export, a popup must appear with two Excel export options:
+
+Unique Spare Master Entries
+
+Component–Spare Distribution Entries
+
+Export format must match the existing Spares Import Template structure.
+
+📌 Change Type
+
+UI Enhancement + Export Logic Extension
+
+No change in:
+
+Inventory calculation logic
+
+ROB logic
+
+Spare master structure
+
+Database schema
+
+🖥️ UI Requirement
+1️⃣ Export Button Behavior
+
+When user clicks:
+
+[ Export ]
+
+
+System must open a modal popup with:
+
+Title:
+Select Export Type
+
+Options (Radio Button Selection):
+◉ Unique Spare Master Entries
+◉ Component–Spare Distribution Entries
+
+
+Buttons:
+
+Cancel
+
+Download
+
+User must select one option before proceeding.
+
+📊 Export Option 1 — Unique Spare Master Entries
+Behavior
+
+If user selects:
+
+Unique Spare Master Entries
+
+
+System must:
+
+Export only distinct Part Code records
+
+No duplicate Part Codes
+
+One row per unique spare
+
+Data Rules
+
+Reference: Spares Master Table
+
+Do NOT expand by component linkage
+
+Do NOT repeat same spare across components
+
+Include fields exactly as per Spares Import Template
+
+Expected Output
+
+Excel containing:
+
+One row per unique Part Code
+
+Format identical to Import template
+
+Column order identical to Import template
+
+Header naming identical to Import template
+
+📊 Export Option 2 — Component–Spare Distribution Entries
+Behavior
+
+If user selects:
+
+Component–Spare Distribution Entries
+
+
+System must:
+
+Export all spare records linked to components
+
+Use spare_component_linkage table as reference
+
+Expand spares per component mapping
+
+Data Rules
+
+Join:
+
+spares table
++
+spare_component_linkage table
++
+components table (if required for component reference)
+
+
+Each row represents:
+
+One Spare + One Component Mapping
+
+
+If one spare is linked to 5 components → 5 rows must appear
+
+Expected Output
+
+Excel containing:
+
+All spare-to-component distribution entries
+
+Format aligned with Import template structure
+
+Include component reference columns (if present in template)
+
+No data aggregation
+
+📐 Export Format Standardization
+
+Both exports must:
+
+Follow Spares Import Template format
+
+Use same column naming
+
+Use same column sequence
+
+Maintain same data types
+
+Maintain same header styling
+
+Be downloadable in .xlsx format
+
+No redesign of template structure.
+
+⚙️ Technical Constraints
+
+This enhancement must NOT:
+
+Modify backend inventory logic
+
+Modify spare master schema
+
+Modify linkage logic
+
+Change existing import template format
+
+Add new database tables
+
+Impact performance negatively
+
+🧪 Validation Checklist
+
+Before completion confirm:
+
+Popup appears correctly
+
+User must select one option
+
+Unique export has no duplicate Part Codes
+
+Distribution export reflects linkage table accurately
+
+Excel format matches import template exactly
+
+Download works correctly
+
+📌 Scope
+
+Applies only to:
+
+Inventory → Spares Inventory → Export
+
+
+No changes to:
+
+Stores Export
+
+Bulk Update
+
+Consumption Reports
+
+Import Logic
+
+✅ Expected Outcome
+
+Clear separation of Master vs Distribution export
+
+Clean Excel output
+
+Standardized naming
+
+Improved usability
+
+Accurate component-level export
