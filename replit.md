@@ -1,7 +1,7 @@
 # Seafarer Technical Management System
 
 ## Overview
-This project is a full-stack Technical Module for a maritime Planned Maintenance System (PMS). Its primary purpose is to manage technical equipment maintenance, scheduling, and performance tracking within the maritime industry. Key capabilities include Certificate & Surveys management, Defect Reporting, and core PMS operations. The system aims to enhance operational efficiency, ensure compliance with maritime regulations, and provide a data-driven approach to maintenance, ultimately improving vessel operational readiness and safety.
+This project is a full-stack Technical Module for a maritime Planned Maintenance System (PMS). Its primary purpose is to manage technical equipment maintenance, scheduling, and performance tracking within the maritime industry. Key capabilities include Certificate & Surveys management, Defect Reporting, and core PMS operations. The system aims to enhance operational efficiency, ensure compliance with maritime regulations, and provide a data-driven approach to maintenance.
 
 ## User Preferences
 Preferred communication style: Simple, everyday language.
@@ -83,46 +83,55 @@ All future Fleet-related tables MUST include these mandatory columns with exact 
     -   `maker_list` - Updated Feb 2026 with all mandatory columns (maker_list_uuid, sortOrder, createdByUuid, updatedByUuid, isDeleted, isSync). All future FK references to this table MUST use `maker_list_uuid` column only (not the numeric `id`)
 
 ## System Architecture
-The application employs a modern full-stack architecture with a mobile-first, responsive design, using React (TypeScript, Vite, Tailwind CSS) for the frontend and Express.js (TypeScript) for the backend. PostgreSQL is the primary data store. All API endpoints use the `/technical/api` prefix.
+The application employs a modern full-stack architecture with a mobile-first, responsive design. The frontend is developed using React (TypeScript, Vite, Tailwind CSS, shadcn/ui, TanStack Query, Wouter), while the backend is powered by Express.js (TypeScript). PostgreSQL serves as the primary data store.
 
 **UI/UX Decisions**:
-- Mobile-first and responsive design.
-- Interactive data visualizations with AG Charts React and data grids with AG Grid Enterprise (custom styling, inline editing).
-- Single-page, scrollable Work Order forms with numbered subsections.
-- Standardized UI components: `p-6` padding, `space-y-6` for vertical spacing, consistent headers, and specific color codes for action buttons.
-- "Delta UI Pattern" for mapping/selection dialogs: gradient header, compact buttons, inline search, standardized table styling.
+- Emphasizes a mobile-first and responsive design philosophy.
+- Utilizes AG Charts React for interactive data visualizations and AG Grid Enterprise for tables, with custom styling and inline editing.
+- Work Order forms are single-page, scrollable designs with numbered subsections.
+- Standardized UI layout includes `p-6` padding for main content, `<div className="space-y-6">` for vertical spacing, consistent header patterns, and specific color codes for action buttons.
+- **Delta UI Pattern (Dialog Standard)**: All mapping/selection dialogs use a specific gradient header, compact buttons, inline search, and standardized table styling and sizing.
 
 **Technical Implementations**:
-- **Core PMS Logic**: Manages immutable Job templates and executable Work Orders with defined lifecycles.
+- **Core PMS Logic**: Distinguishes between immutable Job templates and executable Work Order records with defined lifecycles.
 - **Vessel Context**: Supports dynamic vessel selection and an "All Vessels" aggregate view.
-- **Modular Services**: Business logic organized into domain-specific services.
+- **Service Layer**: Business logic is organized into domain-specific services.
 - **PMS Modules**: Comprehensive CRUD for Components, Work Orders, Running Hours, Spares, Reports, Modify PMS, and Admin.
-- **Work Order Automation**: Real-time status computation, vessel-specific filtering, numbering, lead time warnings, and grace period logic.
+- **Work Order Automation**: Features real-time status computation, vessel-specific filtering, numbering, lead time warnings, and grace period logic.
 - **Running Hours Module**: Supports MASTER, INHERITED, and NOT_RH_DRIVEN counter types with delta propagation and safety validations.
-- **Defects Module**: Tracks Condition of Class and recurring defects, integrating with SIRE VIQ 7, with structured forms and target date extension.
-- **Spares Module**: Inventory management with many-to-many linking, location-based stock tracking, and audit trails for RECEIVE, CONSUME, and ADJUSTMENT events.
+- **Defects Module**: Tracks Condition of Class and recurring defects, integrating with SIRE VIQ 7, with a structured form and target date extension workflow.
+- **Spares Module**: Comprehensive inventory management with many-to-many linking, location-based stock tracking, and audit trails using RECEIVE, CONSUME, and ADJUSTMENT event types.
 - **Auto-Generation Scheduler**: Automates work order creation for calendar and RH-based jobs.
-- **Admin Module**: Features bulk data import, data purging, Fleet Admin Dashboard, On-Demand WO Generation, and Postponed WO Reappearance.
-- **Role-Based Access Control (RBAC)**: Authorization and data isolation for Ship, Office, and PMS Admin roles.
-- **Global Business Rules**: Enforces rules like Parent vs Sub-Component RH Authority, Stores Module Isolation, and Work Order naming conventions.
-- **Component Document Storage**: File uploads handled via Replit Object Storage.
+- **Admin Module**: Includes bulk data import, data purging, and a Fleet Admin Dashboard with Fleet Vessel Mapping, On-Demand WO Generation, and Postponed WO Reappearance.
+- **Role-Based Access Control (RBAC)**: Implements authorization and data isolation for Ship, Office, and PMS Admin roles.
+- **Global Business Rules**: Enforces critical rules like Parent vs Sub-Component RH Authority, Stores Module Isolation, and Work Order naming conventions.
+- **Component Document Storage**: Handles file uploads exclusively via Replit Object Storage.
+- **API Route Prefix**: All API endpoints use the `/technical/api` prefix.
 - **Change Request Workflow**: Implements an "Apply Approved Changes" step with atomic database transactions.
-- **Ship Certificates & Surveys Admin**: Manages requirements with 3-tab interfaces (Master, Company, Vessel), configurable categories/groups, and prefixed ID formats.
-- **Standard Sequencing Component**: Number input for sequence reordering in Admin tables.
-- **Fleet Component → Fleet Job Referential Integrity**: `fleet_jobs` links to `fleet_components_uuid`, validated during bulk import.
+- **Ship Certificates & Surveys Admin Modules**: Manage requirements with 3-tab interfaces (Master, Company, Vessel), configurable categories/groups, and prefixed ID formats.
+- **Standard Sequencing Component**: Admin tables use a number input for sequence reordering.
+- **Fleet Component → Fleet Job Referential Integrity**: `fleet_jobs` table links to `fleet_components_uuid` for integrity, validated during bulk import.
 - **Database Migration Strategy**: Exclusively uses Drizzle file-based SQL migrations.
-- **Vessel Data Source Strategy**: `useVessels()` hook prioritizes local PMS data, falling back to an external master-data API.
-- **ROB Location Stock Synchronization**: Dual-write sync between legacy ROB fields and `spare_location_stock` for inventory consistency. Location resolution is lookup-only.
-- **Pre-Registered Location Model**: Locations must be created via Location Admin before use; `findOrCreateLocation` replaced with `getLocationByName`. Location Admin UI at Admin > Locations with CRUD, bulk import, and template download.
-- **Excel Report Standardization**: Standardized 18-column template for Maintenance & Work Order Excel exports with status-based row highlighting.
-- **Job Postponement Log Report**: Tracks `work_order_postponements` history; 19-column Excel export.
-- **Running Hours Anomaly Detection Report**: Analyzes `running_hours_audit` for 5 anomaly types; severity-based row coloring in Excel export.
-- **Consumption Pattern Analysis Report**: Aggregates `spares_history` CONSUME events; 10-column PDF/Excel report.
-- **IHM Inventory Status Report**: Interactive report combining `spares` and `stores_items` data with summary cards, filters, and PDF/Excel export.
-- **AI Chatbot Assistant**: Floating chat panel using OpenAI GPT-4o with Replit AI Integration. Provides 29 function-calling tools for querying and analyzing work orders, spares, components, jobs, inventory, defects, and maintenance scheduling. Features structured analytical responses (Summary, Critical Insights, Priority Items, Recommendations), query classification, clarifying questions, and conversation history management.
-- **V2 Modular Architecture Refactor Plans**: Planning documents (`docs/` and `attached_assets/`) detail a modular refactor for 6 modules (Fleet, Reports, CertSurvey, Defects, ModifyPMS, Dashboard) with independent toggle-based migration, adhering to Repository/Service/Controller pattern.
+- **Vessel Data Source Strategy**: Employs a unified `useVessels()` hook prioritizing local PMS data with fallback to an external master-data API.
+- **ROB Location Stock Synchronization**: Dual-write synchronization between legacy ROB fields and `spare_location_stock` for inventory consistency.
+- **Excel Report Standardization**: All Maintenance & Work Order Excel exports use a standardized 18-column template with status-based full-row highlighting.
+- **Job Postponement Log Report**: Uses `work_order_postponements` history table for tracking, with a custom 19-column Excel export.
+- **Running Hours Anomaly Detection Report**: Analyzes `running_hours_audit` to identify 5 anomaly types, with severity-based row coloring in Excel export.
+- **Consumption Pattern Analysis Report**: Aggregates `spares_history` CONSUME events, providing a 10-column PDF/Excel report.
+- **IHM Inventory Status Report**: Interactive report combining `spares` and `stores_items` data, with summary cards, filters, and PDF/Excel export.
+
+- **AI Chatbot Assistant**: Floating chat panel (bottom-right) powered by OpenAI GPT-4o with function calling via Replit AI Integration (no external API key needed - uses AI_INTEGRATIONS_OPENAI_API_KEY and AI_INTEGRATIONS_OPENAI_BASE_URL). Features 15 tools for querying work orders, spares, components, jobs, stores/lubricants/chemicals inventory, defects (active/resolved/recurring), consumption pattern analysis, and maintenance calendar/scheduling. Uses lazy-initialized OpenAI client. Frontend uses react-markdown for safe rendering. Files: `server/services/chatbotService.ts`, `server/routes/chatbot.ts`, `client/src/hooks/useChat.ts`, `client/src/components/chat/`.
+- **Chatbot Analytical Upgrade (Feb 2026)**: Enhanced from data-dump to intelligent analyst. System prompt enforces structured responses (Summary → Critical Insights → Priority Items → Recommendations). 5 core analytical tools: `get_maintenance_insights` (KPIs, compliance rate, overdue aging), `get_spare_coverage_analysis` (shortage risk, reorder urgency, stockout estimates), `get_workload_analysis` (backlog aging buckets, department distribution), `get_component_health_score` (risk scoring combining defects + overdue + criticality), `get_performance_trends` (completion rates, resolution times, trend direction). 9 specialized analytical tools: `get_running_hours_analytics` (RH accumulation, anomaly detection), `get_maintenance_planner` (weekly breakdown, critical path), `get_rob_analysis` (stockout estimates, procurement), `get_change_request_analysis` (status/aging/approval metrics), `get_recurring_defect_analysis` (MTBF, COC, multi-vessel), `get_compliance_alerts` (certificate/survey expiry tracking), `get_equipment_comparison` (side-by-side health scoring), `get_cost_impact_estimate` (risk-scored deferred maintenance), `get_workload_forecast` (historical projection, bottleneck risk). Existing tools enhanced with analytical summaries. Natural language date handling in system prompt. Config: max_tokens=4000, maxIterations=8, temperature=0.4. Total: 29 function-calling tools.
+- **Chatbot Intelligence Phase 1 (Feb 2026)**: Added 3 few-shot example responses in system prompt (multi-tool prioritization, clarifying question for ambiguous queries, direct fleet answer). Added query classification decision tree mapping 8 question categories to specific multi-tool chain patterns (priorities, status, equipment, inventory, scheduling, compliance, ambiguous, simple). Added clarifying question behavior rules with examples of when to ask vs answer directly. Added conversation history trimming (MAX_HISTORY=20 messages) with context summary injection when older messages are trimmed.
+- **V2 Modular Architecture Refactor Plans (Feb 2026)**: Comprehensive planning documents for 6 modules covering 113+ route handlers, following Repository/Service/Controller pattern with independent toggle-based migration per module. All V2 plans stored in `docs/` folder (Fleet plan in `attached_assets/`):
+  - `attached_assets/V2-Fleet-Module-Refactor-Plan.md` (1,756 lines) — 85 routes across `routes.ts` and `fleetAdmin.ts`, toggle: `fleet_api_version`
+  - `docs/V2-Reports-Module-Refactor-Plan.md` (1,569 lines) — 38 routes, 7 sub-domains, cross-module storage consumption pattern, toggle: `reports_api_version`
+  - `docs/V2-CertSurvey-Module-Refactor-Plan.md` (1,302 lines) — 24 routes, 10 schema tables, 3-tab admin pattern, toggle: `cert_survey_api_version`
+  - `docs/V2-Defects-Module-Refactor-Plan.md` (1,225 lines) — 37 routes, 8 schema tables, 47+ storage methods, toggle: `defects_api_version`
+  - `docs/V2-ModifyPMS-ChangeRequests-Module-Refactor-Plan.md` (1,129 lines) — 14 routes, status state machine, cross-entity mutation, toggle: `change_requests_api_version`
+  - `docs/V2-Dashboard-Module-Refactor-Plan.md` (1,100 lines) — 0 legacy + 2 new V2 aggregation routes, toggle: `dashboard_api_version`
 
 ## External Dependencies
-*   **Frontend**: `@radix-ui/*`, `@tanstack/react-query`, `wouter`, `tailwindcss`, `lucide-react`, `AG Charts React`, `AG Grid Enterprise`
-*   **Backend**: `express`, `drizzle-orm`, `@neondatabase/serverless`, `connect-pg-simple`, `OpenAI`
+*   **Frontend**: `@radix-ui/*`, `@tanstack/react-query`, `wouter`, `tailwindcss`, `lucide-react`
+*   **Backend**: `express`, `drizzle-orm`, `@neondatabase/serverless`, `connect-pg-simple`
 *   **Development**: `vite`, `typescript`, `drizzle-kit`

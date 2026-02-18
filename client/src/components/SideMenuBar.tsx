@@ -67,7 +67,6 @@ const menuConfigs: Record<string, MenuItem[]> = {
   admin: [
     // { id: "alerts", label: "Alerts", icon: AlertTriangle },
     { id: "masters", label: "Masters", icon: FileSpreadsheet },
-    { id: "locations", label: "Locations", icon: Package },
     { id: "ships-certificates", label: "Ship's Certificates", icon: Shield },
     { id: "ships-surveys", label: "Ship's Surveys", icon: ClipboardCheck },
     // { id: "permissions", label: "Permissions", icon: Shield },
