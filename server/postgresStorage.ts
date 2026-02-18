@@ -2062,11 +2062,14 @@ export class PostgresStorage {
       const userId = spare.createdBy || 'System';
       
       try {
-        const locationAObj = await this.findOrCreateLocation(vesselId, locationAName, userId);
-        const locationBObj = await this.findOrCreateLocation(vesselId, locationBName, userId);
-        // Always create both location stock entries (even with zero qty) for consistent display
-        await this.upsertSpareLocationStock({ vesselId, spareId: createdSpare.id, locationId: locationAObj.id, qty: robA });
-        await this.upsertSpareLocationStock({ vesselId, spareId: createdSpare.id, locationId: locationBObj.id, qty: robB });
+        const locationAObj = await this.getLocationByName(vesselId, locationAName);
+        const locationBObj = await this.getLocationByName(vesselId, locationBName);
+        if (locationAObj) {
+          await this.upsertSpareLocationStock({ vesselId, spareId: createdSpare.id, locationId: locationAObj.id, qty: robA });
+        }
+        if (locationBObj) {
+          await this.upsertSpareLocationStock({ vesselId, spareId: createdSpare.id, locationId: locationBObj.id, qty: robB });
+        }
       } catch (syncError: any) {
         console.warn(`[createSpare] Failed to sync spare_location_stock for new spare ${createdSpare.id}: ${syncError.message}`);
       }
@@ -2103,10 +2106,14 @@ export class PostgresStorage {
       const userId = data.updatedBy || 'System';
       
       try {
-        const locationAObj = await this.findOrCreateLocation(vesselId, locationAName, userId);
-        const locationBObj = await this.findOrCreateLocation(vesselId, locationBName, userId);
-        await this.upsertSpareLocationStock({ vesselId, spareId: id, locationId: locationAObj.id, qty: robA });
-        await this.upsertSpareLocationStock({ vesselId, spareId: id, locationId: locationBObj.id, qty: robB });
+        const locationAObj = await this.getLocationByName(vesselId, locationAName);
+        const locationBObj = await this.getLocationByName(vesselId, locationBName);
+        if (locationAObj) {
+          await this.upsertSpareLocationStock({ vesselId, spareId: id, locationId: locationAObj.id, qty: robA });
+        }
+        if (locationBObj) {
+          await this.upsertSpareLocationStock({ vesselId, spareId: id, locationId: locationBObj.id, qty: robB });
+        }
       } catch (syncError: any) {
         console.warn(`[updateSpare] Failed to sync spare_location_stock for spare ${id}: ${syncError.message}`);
       }
@@ -2174,13 +2181,15 @@ export class PostgresStorage {
     const vesselId = spare.vesselId || 'V001';
     const locationAName = spare.location || 'Location A';
     try {
-      const locationA = await this.findOrCreateLocation(vesselId, locationAName, userId);
-      await this.upsertSpareLocationStock({
-        vesselId,
-        spareId: id,
-        locationId: locationA.id,
-        qty: newRobA < 0 ? 0 : newRobA,
-      });
+      const locationA = await this.getLocationByName(vesselId, locationAName);
+      if (locationA) {
+        await this.upsertSpareLocationStock({
+          vesselId,
+          spareId: id,
+          locationId: locationA.id,
+          qty: newRobA < 0 ? 0 : newRobA,
+        });
+      }
     } catch (syncError: any) {
       console.warn(`[consumeSpare] Failed to sync spare_location_stock for spare ${id}: ${syncError.message}`);
     }
@@ -2259,10 +2268,14 @@ export class PostgresStorage {
     const locationAName = spare.location || 'Location A';
     const locationBName = spare.location2 || 'Location B';
     try {
-      const locationAObj = await this.findOrCreateLocation(vesselId, locationAName, userId);
-      const locationBObj = await this.findOrCreateLocation(vesselId, locationBName, userId);
-      await this.upsertSpareLocationStock({ vesselId, spareId: id, locationId: locationAObj.id, qty: newRobA });
-      await this.upsertSpareLocationStock({ vesselId, spareId: id, locationId: locationBObj.id, qty: newRobB });
+      const locationAObj = await this.getLocationByName(vesselId, locationAName);
+      const locationBObj = await this.getLocationByName(vesselId, locationBName);
+      if (locationAObj) {
+        await this.upsertSpareLocationStock({ vesselId, spareId: id, locationId: locationAObj.id, qty: newRobA });
+      }
+      if (locationBObj) {
+        await this.upsertSpareLocationStock({ vesselId, spareId: id, locationId: locationBObj.id, qty: newRobB });
+      }
     } catch (syncError: any) {
       console.warn(`[consumeSpareFromLocation] Failed to sync spare_location_stock for spare ${id}: ${syncError.message}`);
     }
@@ -2342,10 +2355,14 @@ export class PostgresStorage {
     const locationAName = spare.location || 'Location A';
     const locationBName = spare.location2 || 'Location B';
     try {
-      const locationAObj = await this.findOrCreateLocation(vesselId, locationAName, userId);
-      const locationBObj = await this.findOrCreateLocation(vesselId, locationBName, userId);
-      await this.upsertSpareLocationStock({ vesselId, spareId: id, locationId: locationAObj.id, qty: newRobA });
-      await this.upsertSpareLocationStock({ vesselId, spareId: id, locationId: locationBObj.id, qty: newRobB });
+      const locationAObj = await this.getLocationByName(vesselId, locationAName);
+      const locationBObj = await this.getLocationByName(vesselId, locationBName);
+      if (locationAObj) {
+        await this.upsertSpareLocationStock({ vesselId, spareId: id, locationId: locationAObj.id, qty: newRobA });
+      }
+      if (locationBObj) {
+        await this.upsertSpareLocationStock({ vesselId, spareId: id, locationId: locationBObj.id, qty: newRobB });
+      }
     } catch (syncError: any) {
       console.warn(`[receiveSpareToLocation] Failed to sync spare_location_stock for spare ${id}: ${syncError.message}`);
     }
@@ -2434,10 +2451,14 @@ export class PostgresStorage {
     const locationAName = spare.location || 'Location A';
     const locationBName = spare.location2 || 'Location B';
     try {
-      const locationAObj = await this.findOrCreateLocation(vesselId, locationAName, userId);
-      const locationBObj = await this.findOrCreateLocation(vesselId, locationBName, userId);
-      await this.upsertSpareLocationStock({ vesselId, spareId: id, locationId: locationAObj.id, qty: newLocA });
-      await this.upsertSpareLocationStock({ vesselId, spareId: id, locationId: locationBObj.id, qty: newLocB });
+      const locationAObj = await this.getLocationByName(vesselId, locationAName);
+      const locationBObj = await this.getLocationByName(vesselId, locationBName);
+      if (locationAObj) {
+        await this.upsertSpareLocationStock({ vesselId, spareId: id, locationId: locationAObj.id, qty: newLocA });
+      }
+      if (locationBObj) {
+        await this.upsertSpareLocationStock({ vesselId, spareId: id, locationId: locationBObj.id, qty: newLocB });
+      }
     } catch (syncError: any) {
       console.warn(`[adjustSpareAtLocation] Failed to sync spare_location_stock for spare ${id}: ${syncError.message}`);
     }
@@ -2500,25 +2521,26 @@ export class PostgresStorage {
     const locationBName = spare.location2 || 'Location B';
     
     try {
-      // Find or create location entries for this vessel
-      const locationA = await this.findOrCreateLocation(vesselId, locationAName, userId);
-      const locationB = await this.findOrCreateLocation(vesselId, locationBName, userId);
+      const locationA = await this.getLocationByName(vesselId, locationAName);
+      const locationB = await this.getLocationByName(vesselId, locationBName);
       
-      // Upsert spare_location_stock for Location A
-      await this.upsertSpareLocationStock({
-        vesselId,
-        spareId: id,
-        locationId: locationA.id,
-        qty: newLocA,
-      });
+      if (locationA) {
+        await this.upsertSpareLocationStock({
+          vesselId,
+          spareId: id,
+          locationId: locationA.id,
+          qty: newLocA,
+        });
+      }
       
-      // Upsert spare_location_stock for Location B
-      await this.upsertSpareLocationStock({
-        vesselId,
-        spareId: id,
-        locationId: locationB.id,
-        qty: newLocB,
-      });
+      if (locationB) {
+        await this.upsertSpareLocationStock({
+          vesselId,
+          spareId: id,
+          locationId: locationB.id,
+          qty: newLocB,
+        });
+      }
       
       console.log(`[transferSpareLocation] Synced spare_location_stock for spare ${id}: ` +
         `${locationAName}=${newLocA}, ${locationBName}=${newLocB}`);
@@ -2854,11 +2876,14 @@ export class PostgresStorage {
         const userId = spare.createdBy || 'System';
         
         try {
-          const locationAObj = await this.findOrCreateLocation(vesselId, locationAName, userId);
-          const locationBObj = await this.findOrCreateLocation(vesselId, locationBName, userId);
-          // Always create both location stock entries (even with zero qty) for consistent display
-          await this.upsertSpareLocationStock({ vesselId, spareId: createdSpare.id, locationId: locationAObj.id, qty: robA });
-          await this.upsertSpareLocationStock({ vesselId, spareId: createdSpare.id, locationId: locationBObj.id, qty: robB });
+          const locationAObj = await this.getLocationByName(vesselId, locationAName);
+          const locationBObj = await this.getLocationByName(vesselId, locationBName);
+          if (locationAObj) {
+            await this.upsertSpareLocationStock({ vesselId, spareId: createdSpare.id, locationId: locationAObj.id, qty: robA });
+          }
+          if (locationBObj) {
+            await this.upsertSpareLocationStock({ vesselId, spareId: createdSpare.id, locationId: locationBObj.id, qty: robB });
+          }
         } catch (syncError: any) {
           console.warn(`[bulkCreateSpares] Failed to sync spare_location_stock for new spare ${createdSpare.id}: ${syncError.message}`);
         }
@@ -2926,10 +2951,14 @@ export class PostgresStorage {
           const locationBName = spare.location2 || existing.location2 || 'Location B';
           const userId = spare.updatedBy || 'System';
           try {
-            const locationAObj = await this.findOrCreateLocation(spare.vesselId, locationAName, userId);
-            const locationBObj = await this.findOrCreateLocation(spare.vesselId, locationBName, userId);
-            await this.upsertSpareLocationStock({ vesselId: spare.vesselId, spareId: existing.id, locationId: locationAObj.id, qty: newRobA });
-            await this.upsertSpareLocationStock({ vesselId: spare.vesselId, spareId: existing.id, locationId: locationBObj.id, qty: newRobB });
+            const locationAObj = await this.getLocationByName(spare.vesselId, locationAName);
+            const locationBObj = await this.getLocationByName(spare.vesselId, locationBName);
+            if (locationAObj) {
+              await this.upsertSpareLocationStock({ vesselId: spare.vesselId, spareId: existing.id, locationId: locationAObj.id, qty: newRobA });
+            }
+            if (locationBObj) {
+              await this.upsertSpareLocationStock({ vesselId: spare.vesselId, spareId: existing.id, locationId: locationBObj.id, qty: newRobB });
+            }
           } catch (syncError: any) {
             console.warn(`[bulkUpsertSpares] Failed to sync spare_location_stock for spare ${existing.id}: ${syncError.message}`);
           }
@@ -2959,11 +2988,14 @@ export class PostgresStorage {
           const locationBName = createdSpare.location2 || 'Location B';
           const userId = spare.createdBy || 'System';
           try {
-            const locationAObj = await this.findOrCreateLocation(vesselId, locationAName, userId);
-            const locationBObj = await this.findOrCreateLocation(vesselId, locationBName, userId);
-            // Always create both location stock entries (even with zero qty) for consistent display
-            await this.upsertSpareLocationStock({ vesselId, spareId: createdSpare.id, locationId: locationAObj.id, qty: robA });
-            await this.upsertSpareLocationStock({ vesselId, spareId: createdSpare.id, locationId: locationBObj.id, qty: robB });
+            const locationAObj = await this.getLocationByName(vesselId, locationAName);
+            const locationBObj = await this.getLocationByName(vesselId, locationBName);
+            if (locationAObj) {
+              await this.upsertSpareLocationStock({ vesselId, spareId: createdSpare.id, locationId: locationAObj.id, qty: robA });
+            }
+            if (locationBObj) {
+              await this.upsertSpareLocationStock({ vesselId, spareId: createdSpare.id, locationId: locationBObj.id, qty: robB });
+            }
           } catch (syncError: any) {
             console.warn(`[bulkUpsertSpares] Failed to sync spare_location_stock for new spare ${createdSpare.id}: ${syncError.message}`);
           }
@@ -7367,12 +7399,15 @@ export class PostgresStorage {
         // This ensures we don't accumulate stale entries from old location names
         await db.delete(spareLocationStock).where(eq(spareLocationStock.spareId, spare.id));
 
-        const locationAObj = await this.findOrCreateLocation(vesselId, locationAName, userId);
-        const locationBObj = await this.findOrCreateLocation(vesselId, locationBName, userId);
+        const locationAObj = await this.getLocationByName(vesselId, locationAName);
+        const locationBObj = await this.getLocationByName(vesselId, locationBName);
 
-        // Insert fresh entries with correct quantities
-        await db.insert(spareLocationStock).values({ vesselId, spareId: spare.id, locationId: locationAObj.id, qty: robA });
-        await db.insert(spareLocationStock).values({ vesselId, spareId: spare.id, locationId: locationBObj.id, qty: robB });
+        if (locationAObj) {
+          await db.insert(spareLocationStock).values({ vesselId, spareId: spare.id, locationId: locationAObj.id, qty: robA });
+        }
+        if (locationBObj) {
+          await db.insert(spareLocationStock).values({ vesselId, spareId: spare.id, locationId: locationBObj.id, qty: robB });
+        }
         synced++;
       } catch (err: any) {
         console.warn(`[reconcileSpareLocationStock] Failed to sync spare ${spare.id}: ${err.message}`);

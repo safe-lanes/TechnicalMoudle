@@ -91,7 +91,7 @@ function getColumnLetter(columnNumber: number): string {
 
 /**
  * Process spare inventory after spare creation/update:
- * 1. Get or create location entities from location text names using findOrCreateLocation
+ * 1. Look up location entities from location text names using getLocationByName (pre-registered model)
  * 2. Create spare_component_link for spare-to-component relationship
  * 3. Create spare_location_stock records with qty
  * 4. For NEW spares only: Create opening balance transactions using ADJUST event
@@ -130,8 +130,12 @@ async function processSpareInventory(params: {
     
     // 2. Process Location A if provided (always sync if location name is given)
     if (locationAName && locationAName.trim()) {
-      // Use findOrCreateLocation for proper normalization
-      const locationA = await storage.findOrCreateLocation(vesselId, locationAName.trim(), userId);
+      // Lookup only - locations must be pre-registered
+      const locationA = await storage.getLocationByName(vesselId, locationAName.trim());
+      if (!locationA) {
+        console.warn(`[syncSpareImport] Location A "${locationAName}" not found for vessel ${vesselId} - skipping location stock sync`);
+        return;
+      }
       
       // Get current stock to compute proper before/after values
       const currentTotalRobA = await storage.getSpareRobTotal(spareId);
@@ -172,8 +176,12 @@ async function processSpareInventory(params: {
     
     // 3. Process Location B if provided (always sync if location name is given)
     if (locationBName && locationBName.trim()) {
-      // Use findOrCreateLocation for proper normalization
-      const locationB = await storage.findOrCreateLocation(vesselId, locationBName.trim(), userId);
+      // Lookup only - locations must be pre-registered
+      const locationB = await storage.getLocationByName(vesselId, locationBName.trim());
+      if (!locationB) {
+        console.warn(`[syncSpareImport] Location B "${locationBName}" not found for vessel ${vesselId} - skipping location stock sync`);
+        return;
+      }
       
       // Get current stock AFTER location A processing to compute proper before/after
       const currentTotalRobB = await storage.getSpareRobTotal(spareId);
@@ -1896,8 +1904,8 @@ router.get('/template', async (req, res) => {
     }
   }
   
-  if (!['components', 'spares', 'stores', 'work-orders', 'jobs', 'makers', 'fleet-components', 'fleet-jobs', 'fleet-spares'].includes(type as string)) {
-    return res.status(400).json({ error: 'Invalid template type. Valid types: components, spares, stores, work-orders, jobs, makers, fleet-components, fleet-jobs, fleet-spares' });
+  if (!['components', 'spares', 'stores', 'work-orders', 'jobs', 'makers', 'fleet-components', 'fleet-jobs', 'fleet-spares', 'locations'].includes(type as string)) {
+    return res.status(400).json({ error: 'Invalid template type. Valid types: components, spares, stores, work-orders, jobs, makers, fleet-components, fleet-jobs, fleet-spares, locations' });
   }
   
   // Default to V001 if no vesselId provided
@@ -2051,6 +2059,15 @@ router.get('/template', async (req, res) => {
       ];
 
       example = [];
+      break;
+    case 'locations':
+      headers = [
+        'Location Name', 'Location Type'
+      ];
+      validValues = [
+        'Required (Unique per vessel)', 'Text (STORE/LOCKER/BOX/TANK/OTHER)'
+      ];
+      example = ['Engine Room Store', 'STORE'];
       break;
     case 'fleet-spares':
       headers = [
@@ -4674,6 +4691,11 @@ async function performImport(
     const componentsByCode = new Map(allComponents.map(c => [c.componentCode, c]));
     console.log(`📋 Loaded ${allComponents.length} components for validation`);
     
+    // Step 1b: Fetch all locations for validation (pre-registered location model)
+    const allLocations = await storage.getLocations(sparesVesselId);
+    const locationsByName = new Map(allLocations.map(l => [l.locationName.trim().toUpperCase(), l]));
+    console.log(`📍 Loaded ${allLocations.length} locations for validation`);
+    
     // Step 2: Fetch existing spares to check for duplicates and generate Part Codes
     const existingSpares = await storage.getSpares(sparesVesselId);
     const sparesByPartCode = new Map(existingSpares.map(s => [s.partCode, s]));
@@ -4701,6 +4723,21 @@ async function performImport(
         
         if (!component) {
           console.warn(`⚠️ Component ${componentCode} not found in system, skipping spare`);
+          result.skipped++;
+          continue;
+        }
+        
+        // Validate Location A and Location B exist in pre-registered locations
+        const locationAVal = row['Location A'] ? String(row['Location A']).trim() : '';
+        const locationBVal = row['Location B'] ? String(row['Location B']).trim() : '';
+        
+        if (locationAVal && !locationsByName.has(locationAVal.toUpperCase())) {
+          console.warn(`⚠️ Location A "${locationAVal}" not found in registered locations for vessel ${sparesVesselId}, skipping spare`);
+          result.skipped++;
+          continue;
+        }
+        if (locationBVal && !locationsByName.has(locationBVal.toUpperCase())) {
+          console.warn(`⚠️ Location B "${locationBVal}" not found in registered locations for vessel ${sparesVesselId}, skipping spare`);
           result.skipped++;
           continue;
         }
@@ -7456,6 +7493,71 @@ router.post('/sfi-details/import', upload.single('file'), async (req, res) => {
   } catch (error: any) {
     console.error('Error importing SFI details:', error);
     res.status(500).json({ error: 'Failed to import SFI details' });
+  }
+});
+
+router.post('/import-locations/:vesselId', upload.single('file'), async (req, res) => {
+  try {
+    const { vesselId } = req.params;
+    const userId = req.body?.userId || 'system';
+
+    if (!req.file) {
+      return res.status(400).json({ success: false, error: 'No file uploaded' });
+    }
+
+    const workbook = XLSX.read(req.file.buffer, { type: 'buffer' });
+    const sheetName = workbook.SheetNames[0];
+    const worksheet = workbook.Sheets[sheetName];
+    const data = XLSX.utils.sheet_to_json<any>(worksheet);
+
+    const results = {
+      created: 0,
+      skipped: 0,
+      errors: 0,
+      total: data.length,
+      details: [] as Array<{ row: number; locationName: string; status: string; message?: string }>,
+    };
+
+    for (let i = 0; i < data.length; i++) {
+      const row = data[i];
+      const rowNum = i + 2;
+
+      try {
+        const locationName = row['Location Name'] ? String(row['Location Name']).trim() : '';
+        const locationType = row['Location Type'] ? String(row['Location Type']).trim() : null;
+
+        if (!locationName) {
+          results.errors++;
+          results.details.push({ row: rowNum, locationName: '', status: 'error', message: 'Location Name is required' });
+          continue;
+        }
+
+        const existing = await storage.getLocationByName(vesselId, locationName);
+        if (existing) {
+          results.skipped++;
+          results.details.push({ row: rowNum, locationName, status: 'skipped', message: 'Duplicate - location already exists' });
+          continue;
+        }
+
+        await storage.createLocation({
+          vesselId,
+          locationName,
+          locationType,
+          createdBy: userId,
+        });
+        results.created++;
+        results.details.push({ row: rowNum, locationName, status: 'created' });
+      } catch (error: any) {
+        results.errors++;
+        results.details.push({ row: rowNum, locationName: row['Location Name'] || '', status: 'error', message: error.message });
+      }
+    }
+
+    console.log(`✅ Location import complete for vessel ${vesselId}: ${results.created} created, ${results.skipped} skipped, ${results.errors} errors`);
+    res.json({ success: true, data: results });
+  } catch (error: any) {
+    console.error('Error importing locations:', error);
+    res.status(500).json({ success: false, error: 'Failed to import locations: ' + error.message });
   }
 });
 

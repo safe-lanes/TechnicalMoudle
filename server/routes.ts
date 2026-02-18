@@ -3432,9 +3432,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
                   // Resolve locationId: try direct locationId first, then resolve from location name
                   let resolvedLocationId = consumedSpare.locationId ? parseInt(String(consumedSpare.locationId)) : null;
                   
-                  // If no locationId but location name is provided, resolve it (auto-create if doesn't exist)
+                  // If no locationId but location name is provided, resolve it (lookup only - locations must be pre-registered)
                   if ((!resolvedLocationId || isNaN(resolvedLocationId)) && consumedSpare.location) {
-                    const locationObj = await storage.findOrCreateLocation(vesselId, consumedSpare.location, workOrder.approver || 'system');
+                    const locationObj = await storage.getLocationByName(vesselId, consumedSpare.location);
                     if (locationObj) {
                       resolvedLocationId = locationObj.id;
                       console.log(`📍 [PATCH Approval] Resolved location name "${consumedSpare.location}" to ID ${resolvedLocationId}`);
@@ -4100,9 +4100,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 // Resolve locationId: try direct locationId first, then resolve from location name
                 let resolvedLocationId = consumedSpare.locationId ? parseInt(String(consumedSpare.locationId)) : null;
                 
-                // If no locationId but location name is provided, resolve it (auto-create if doesn't exist)
+                // If no locationId but location name is provided, resolve it (lookup only - locations must be pre-registered)
                 if ((!resolvedLocationId || isNaN(resolvedLocationId)) && consumedSpare.location) {
-                  const locationObj = await storage.findOrCreateLocation(vesselId, consumedSpare.location, 'system');
+                  const locationObj = await storage.getLocationByName(vesselId, consumedSpare.location);
                   if (locationObj) {
                     resolvedLocationId = locationObj.id;
                     console.log(`📍 [POST Complete] Resolved location name "${consumedSpare.location}" to ID ${resolvedLocationId}`);
@@ -7161,9 +7161,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Create a new spare
   app.post("/technical/api/spares/:vesselId", async (req, res) => {
     try {
+      const vesselId = req.params.vesselId;
+      const { location, location2 } = req.body;
+      
+      // Validate locations exist (pre-registered location model)
+      if (location && location.trim()) {
+        const locA = await storage.getLocationByName(vesselId, location.trim());
+        if (!locA) {
+          return res.status(400).json({ error: `Location A "${location}" is not registered. Please add it via Admin > Locations first.` });
+        }
+      }
+      if (location2 && location2.trim()) {
+        const locB = await storage.getLocationByName(vesselId, location2.trim());
+        if (!locB) {
+          return res.status(400).json({ error: `Location B "${location2}" is not registered. Please add it via Admin > Locations first.` });
+        }
+      }
+      
       const spare = await storage.createSpare({
         ...req.body,
-        vesselId: req.params.vesselId
+        vesselId
       });
       res.status(201).json(spare);
     } catch (error: any) {
@@ -7176,8 +7193,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       console.log('[PATCH Spare] Updating spare', req.params.id, 'with data:', JSON.stringify(req.body));
       const spareId = parseInt(req.params.id);
+      const vesselIdForPatch = req.params.vesselId;
       const { robLocationA, robLocationB, remarks, place, dateLocal, tz, ...otherUpdates } = req.body;
       const userId = (req as any).user?.id?.toString() || 'System';
+      
+      // Validate location names if being updated (pre-registered location model)
+      if (otherUpdates.location && otherUpdates.location.trim()) {
+        const locA = await storage.getLocationByName(vesselIdForPatch, otherUpdates.location.trim());
+        if (!locA) {
+          return res.status(400).json({ error: `Location A "${otherUpdates.location}" is not registered. Please add it via Admin > Locations first.` });
+        }
+      }
+      if (otherUpdates.location2 && otherUpdates.location2.trim()) {
+        const locB = await storage.getLocationByName(vesselIdForPatch, otherUpdates.location2.trim());
+        if (!locB) {
+          return res.status(400).json({ error: `Location B "${otherUpdates.location2}" is not registered. Please add it via Admin > Locations first.` });
+        }
+      }
       
       // Check if location ROB values are being changed - route to transfer/adjustment method
       if (robLocationA !== undefined || robLocationB !== undefined) {
@@ -9898,19 +9930,75 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/technical/api/inventory/locations/:vesselId", async (req, res) => {
     try {
-      const { locationName, createdBy } = req.body;
+      const { locationName, locationType, createdBy } = req.body;
       if (!locationName) {
         return res.status(400).json({ success: false, error: "locationName is required" });
       }
       
-      const location = await storage.findOrCreateLocation(
-        req.params.vesselId,
-        locationName,
-        createdBy || 'system'
-      );
+      const existing = await storage.getLocationByName(req.params.vesselId, locationName);
+      if (existing) {
+        return res.status(409).json({ success: false, error: `Location "${locationName}" already exists for this vessel` });
+      }
+      
+      const location = await storage.createLocation({
+        vesselId: req.params.vesselId,
+        locationName: locationName.trim(),
+        locationType: locationType || null,
+        createdBy: createdBy || 'system',
+      });
       res.json({ success: true, data: location });
     } catch (error: any) {
       console.error("Error creating location:", error);
+      res.status(500).json({ success: false, error: error.message });
+    }
+  });
+
+  app.put("/technical/api/inventory/locations/:vesselId/:id", async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const { locationName, locationType } = req.body;
+      
+      if (locationName) {
+        const existing = await storage.getLocationByName(req.params.vesselId, locationName);
+        if (existing && existing.id !== id) {
+          return res.status(409).json({ success: false, error: `Location "${locationName}" already exists for this vessel` });
+        }
+      }
+      
+      const updateData: any = {};
+      if (locationName !== undefined) updateData.locationName = locationName.trim();
+      if (locationType !== undefined) updateData.locationType = locationType;
+      
+      const location = await storage.updateLocation(id, updateData);
+      res.json({ success: true, data: location });
+    } catch (error: any) {
+      console.error("Error updating location:", error);
+      res.status(500).json({ success: false, error: error.message });
+    }
+  });
+
+  app.delete("/technical/api/inventory/locations/:vesselId/:id", async (req, res) => {
+    try {
+      const db = (await import('./db')).getDb();
+      const id = parseInt(req.params.id);
+      
+      const { spareLocationStock } = await import('../shared/schema');
+      const { eq } = await import('drizzle-orm');
+      const dbConn = await db;
+      const stockEntries = await dbConn.select().from(spareLocationStock).where(eq(spareLocationStock.locationId, id));
+      
+      if (stockEntries.length > 0) {
+        return res.status(400).json({ 
+          success: false, 
+          error: `Cannot delete location: it is referenced by ${stockEntries.length} spare stock record(s). Remove the stock references first.` 
+        });
+      }
+      
+      const { locations } = await import('../shared/schema');
+      await dbConn.delete(locations).where(eq(locations.id, id));
+      res.json({ success: true });
+    } catch (error: any) {
+      console.error("Error deleting location:", error);
       res.status(500).json({ success: false, error: error.message });
     }
   });
