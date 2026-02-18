@@ -15,7 +15,8 @@ import {
   Settings2,
   Search,
   Download,
-  Calendar
+  Calendar,
+  AlertTriangle
 } from "lucide-react";
 import MaintenanceReports from "./MaintenanceReports";
 import RunningHoursReports from "./RunningHoursReports";
@@ -131,6 +132,16 @@ const ReportsModule = () => {
       iconBg: "bg-blue-500",
       iconBgLight: "bg-blue-100 text-blue-600"
     },
+    {
+      id: "critical-equipment",
+      title: "Critical Equipment",
+      description: "Safety-critical components tracking, compliance reports, and maintenance oversight",
+      icon: AlertTriangle,
+      reportCount: 0,
+      color: "border-red-500",
+      iconBg: "bg-red-500",
+      iconBgLight: "bg-red-100 text-red-600"
+    },
   ];
 
   const handleCategoryClick = (categoryId: string) => {
@@ -197,7 +208,6 @@ const ReportsModule = () => {
   if (selectedCategory === "change-requests") {
     return <ChangeRequestReports onBack={handleBackToMain} globalFilters={globalFilters} />;
   }
-
 
   // TODO: Add other category components when implemented
 
@@ -320,7 +330,7 @@ const ReportsModule = () => {
             >
               <CardContent className="p-4">
                 <div className="flex items-start gap-3">
-                  <div className="p-2 rounded bg-blue-100 text-blue-600 flex-shrink-0">
+                  <div className={`p-2 rounded ${category.iconBgLight} flex-shrink-0`}>
                     <Marker id={markerId} />
                     <Icon className="h-5 w-5" />
                   </div>
