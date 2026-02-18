@@ -1108,8 +1108,8 @@ router.post('/copy-vessel', async (req, res) => {
             location: comp.location,
             critical: comp.critical,
             conditionBased: comp.conditionBased,
-            installationDate: comp.installationDate,
-            commissionedDate: comp.commissionedDate,
+            installationDate: null,
+            commissionedDate: null,
             rating: comp.rating,
             eqptSystemDept: comp.eqptSystemDept,
             isActive: comp.isActive,
@@ -1126,10 +1126,10 @@ router.post('/copy-vessel', async (req, res) => {
             noOfUnits: comp.noOfUnits,
             parentComponent: comp.parentComponent,
             dimensionsSize: comp.dimensionsSize,
-            runningHours: comp.runningHours,
-            currentCumulativeRH: comp.currentCumulativeRH,
+            runningHours: null,
+            currentCumulativeRH: 0,
             rhCounterType: comp.rhCounterType,
-            rhCounterSource: comp.rhCounterSource,
+            rhCounterSource: null,
           });
           copyResults.components++;
         } catch (e: any) {
