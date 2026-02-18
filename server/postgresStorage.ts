@@ -2062,8 +2062,8 @@ export class PostgresStorage {
       const userId = spare.createdBy || 'System';
       
       try {
-        const locationAObj = await this.findOrCreateLocation(vesselId, locationAName, userId);
-        const locationBObj = await this.findOrCreateLocation(vesselId, locationBName, userId);
+        const locationAObj = await this.findLocationStrict(vesselId, locationAName);
+        const locationBObj = await this.findLocationStrict(vesselId, locationBName);
         // Always create both location stock entries (even with zero qty) for consistent display
         await this.upsertSpareLocationStock({ vesselId, spareId: createdSpare.id, locationId: locationAObj.id, qty: robA });
         await this.upsertSpareLocationStock({ vesselId, spareId: createdSpare.id, locationId: locationBObj.id, qty: robB });
@@ -2103,8 +2103,8 @@ export class PostgresStorage {
       const userId = data.updatedBy || 'System';
       
       try {
-        const locationAObj = await this.findOrCreateLocation(vesselId, locationAName, userId);
-        const locationBObj = await this.findOrCreateLocation(vesselId, locationBName, userId);
+        const locationAObj = await this.findLocationStrict(vesselId, locationAName);
+        const locationBObj = await this.findLocationStrict(vesselId, locationBName);
         await this.upsertSpareLocationStock({ vesselId, spareId: id, locationId: locationAObj.id, qty: robA });
         await this.upsertSpareLocationStock({ vesselId, spareId: id, locationId: locationBObj.id, qty: robB });
       } catch (syncError: any) {
@@ -2174,7 +2174,7 @@ export class PostgresStorage {
     const vesselId = spare.vesselId || 'V001';
     const locationAName = spare.location || 'Location A';
     try {
-      const locationA = await this.findOrCreateLocation(vesselId, locationAName, userId);
+      const locationA = await this.findLocationStrict(vesselId, locationAName);
       await this.upsertSpareLocationStock({
         vesselId,
         spareId: id,
@@ -2259,8 +2259,8 @@ export class PostgresStorage {
     const locationAName = spare.location || 'Location A';
     const locationBName = spare.location2 || 'Location B';
     try {
-      const locationAObj = await this.findOrCreateLocation(vesselId, locationAName, userId);
-      const locationBObj = await this.findOrCreateLocation(vesselId, locationBName, userId);
+      const locationAObj = await this.findLocationStrict(vesselId, locationAName);
+      const locationBObj = await this.findLocationStrict(vesselId, locationBName);
       await this.upsertSpareLocationStock({ vesselId, spareId: id, locationId: locationAObj.id, qty: newRobA });
       await this.upsertSpareLocationStock({ vesselId, spareId: id, locationId: locationBObj.id, qty: newRobB });
     } catch (syncError: any) {
@@ -2342,8 +2342,8 @@ export class PostgresStorage {
     const locationAName = spare.location || 'Location A';
     const locationBName = spare.location2 || 'Location B';
     try {
-      const locationAObj = await this.findOrCreateLocation(vesselId, locationAName, userId);
-      const locationBObj = await this.findOrCreateLocation(vesselId, locationBName, userId);
+      const locationAObj = await this.findLocationStrict(vesselId, locationAName);
+      const locationBObj = await this.findLocationStrict(vesselId, locationBName);
       await this.upsertSpareLocationStock({ vesselId, spareId: id, locationId: locationAObj.id, qty: newRobA });
       await this.upsertSpareLocationStock({ vesselId, spareId: id, locationId: locationBObj.id, qty: newRobB });
     } catch (syncError: any) {
@@ -2434,8 +2434,8 @@ export class PostgresStorage {
     const locationAName = spare.location || 'Location A';
     const locationBName = spare.location2 || 'Location B';
     try {
-      const locationAObj = await this.findOrCreateLocation(vesselId, locationAName, userId);
-      const locationBObj = await this.findOrCreateLocation(vesselId, locationBName, userId);
+      const locationAObj = await this.findLocationStrict(vesselId, locationAName);
+      const locationBObj = await this.findLocationStrict(vesselId, locationBName);
       await this.upsertSpareLocationStock({ vesselId, spareId: id, locationId: locationAObj.id, qty: newLocA });
       await this.upsertSpareLocationStock({ vesselId, spareId: id, locationId: locationBObj.id, qty: newLocB });
     } catch (syncError: any) {
@@ -2501,8 +2501,8 @@ export class PostgresStorage {
     
     try {
       // Find or create location entries for this vessel
-      const locationA = await this.findOrCreateLocation(vesselId, locationAName, userId);
-      const locationB = await this.findOrCreateLocation(vesselId, locationBName, userId);
+      const locationA = await this.findLocationStrict(vesselId, locationAName);
+      const locationB = await this.findLocationStrict(vesselId, locationBName);
       
       // Upsert spare_location_stock for Location A
       await this.upsertSpareLocationStock({
@@ -2854,8 +2854,8 @@ export class PostgresStorage {
         const userId = spare.createdBy || 'System';
         
         try {
-          const locationAObj = await this.findOrCreateLocation(vesselId, locationAName, userId);
-          const locationBObj = await this.findOrCreateLocation(vesselId, locationBName, userId);
+          const locationAObj = await this.findLocationStrict(vesselId, locationAName);
+          const locationBObj = await this.findLocationStrict(vesselId, locationBName);
           // Always create both location stock entries (even with zero qty) for consistent display
           await this.upsertSpareLocationStock({ vesselId, spareId: createdSpare.id, locationId: locationAObj.id, qty: robA });
           await this.upsertSpareLocationStock({ vesselId, spareId: createdSpare.id, locationId: locationBObj.id, qty: robB });
@@ -2926,8 +2926,8 @@ export class PostgresStorage {
           const locationBName = spare.location2 || existing.location2 || 'Location B';
           const userId = spare.updatedBy || 'System';
           try {
-            const locationAObj = await this.findOrCreateLocation(spare.vesselId, locationAName, userId);
-            const locationBObj = await this.findOrCreateLocation(spare.vesselId, locationBName, userId);
+            const locationAObj = await this.findLocationStrict(spare.vesselId, locationAName);
+            const locationBObj = await this.findLocationStrict(spare.vesselId, locationBName);
             await this.upsertSpareLocationStock({ vesselId: spare.vesselId, spareId: existing.id, locationId: locationAObj.id, qty: newRobA });
             await this.upsertSpareLocationStock({ vesselId: spare.vesselId, spareId: existing.id, locationId: locationBObj.id, qty: newRobB });
           } catch (syncError: any) {
@@ -2959,8 +2959,8 @@ export class PostgresStorage {
           const locationBName = createdSpare.location2 || 'Location B';
           const userId = spare.createdBy || 'System';
           try {
-            const locationAObj = await this.findOrCreateLocation(vesselId, locationAName, userId);
-            const locationBObj = await this.findOrCreateLocation(vesselId, locationBName, userId);
+            const locationAObj = await this.findLocationStrict(vesselId, locationAName);
+            const locationBObj = await this.findLocationStrict(vesselId, locationBName);
             // Always create both location stock entries (even with zero qty) for consistent display
             await this.upsertSpareLocationStock({ vesselId, spareId: createdSpare.id, locationId: locationAObj.id, qty: robA });
             await this.upsertSpareLocationStock({ vesselId, spareId: createdSpare.id, locationId: locationBObj.id, qty: robB });
@@ -6552,6 +6552,14 @@ export class PostgresStorage {
     return result[0];
   }
 
+  async findLocationStrict(vesselId: string, locationName: string): Promise<Location> {
+    const existing = await this.getLocationByName(vesselId, locationName);
+    if (!existing) {
+      throw new Error(`Location "${locationName}" not found for this vessel. Please import or add the location first.`);
+    }
+    return existing;
+  }
+
   async findOrCreateLocation(vesselId: string, locationName: string, createdBy: string): Promise<Location> {
     const existing = await this.getLocationByName(vesselId, locationName);
     if (existing) {
@@ -6574,6 +6582,11 @@ export class PostgresStorage {
       throw new Error(`Location ${id} not found`);
     }
     return result[0];
+  }
+
+  async deleteLocation(id: number): Promise<void> {
+    const db = await getDb();
+    await db.delete(locations).where(eq(locations.id, id));
   }
 
   // ============= INVENTORY MANAGEMENT: SPARE-COMPONENT LINKS =============
@@ -7367,8 +7380,8 @@ export class PostgresStorage {
         // This ensures we don't accumulate stale entries from old location names
         await db.delete(spareLocationStock).where(eq(spareLocationStock.spareId, spare.id));
 
-        const locationAObj = await this.findOrCreateLocation(vesselId, locationAName, userId);
-        const locationBObj = await this.findOrCreateLocation(vesselId, locationBName, userId);
+        const locationAObj = await this.findLocationStrict(vesselId, locationAName);
+        const locationBObj = await this.findLocationStrict(vesselId, locationBName);
 
         // Insert fresh entries with correct quantities
         await db.insert(spareLocationStock).values({ vesselId, spareId: spare.id, locationId: locationAObj.id, qty: robA });

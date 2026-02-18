@@ -1092,6 +1092,11 @@ class MemStorage {
     console.log('[MemStorage] findOrCreateLocation called - stub in file mode');
     return { id: Date.now(), vesselId, locationName, createdBy, createdAt: new Date() };
   }
+
+  async findLocationStrict(vesselId: string, locationName: string): Promise<any> {
+    console.log('[MemStorage] findLocationStrict called - stub in file mode');
+    return { id: Date.now(), vesselId, locationName, createdAt: new Date() };
+  }
   
   async updateLocation(id: number, data: any): Promise<any> {
     console.log('[MemStorage] updateLocation called - stub in file mode');

@@ -825,7 +825,9 @@ export interface IStorage {
   getLocationByName(vesselId: string, locationName: string): Promise<Location | undefined>;
   createLocation(location: InsertLocation): Promise<Location>;
   findOrCreateLocation(vesselId: string, locationName: string, createdBy: string): Promise<Location>;
+  findLocationStrict(vesselId: string, locationName: string): Promise<Location>;
   updateLocation(id: number, data: Partial<Location>): Promise<Location>;
+  deleteLocation(id: number): Promise<void>;
   
   // Spare-Component Link Methods
   getSpareComponentLinks(vesselId: string): Promise<SpareComponentLink[]>;

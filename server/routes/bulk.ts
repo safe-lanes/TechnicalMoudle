@@ -7459,4 +7459,163 @@ router.post('/sfi-details/import', upload.single('file'), async (req, res) => {
   }
 });
 
+// ============= LOCATION BULK IMPORT & CRUD =============
+
+router.get('/locations/template', async (req, res) => {
+  try {
+    const workbook = new ExcelJS.Workbook();
+    const sheet = workbook.addWorksheet('Locations');
+    sheet.columns = [
+      { header: 'Location Name', key: 'locationName', width: 30 },
+      { header: 'Location Type', key: 'locationType', width: 20 },
+    ];
+    sheet.getRow(1).font = { bold: true };
+    sheet.getRow(1).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFD9EAD3' } };
+    sheet.addRow({ locationName: 'Engine Room Store', locationType: 'STORE' });
+    sheet.addRow({ locationName: 'Deck Locker', locationType: 'LOCKER' });
+    const buffer = await workbook.xlsx.writeBuffer();
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.setHeader('Content-Disposition', 'attachment; filename=locations_template.xlsx');
+    res.send(Buffer.from(buffer));
+  } catch (error: any) {
+    console.error('Error generating locations template:', error);
+    res.status(500).json({ error: 'Failed to generate locations template' });
+  }
+});
+
+router.post('/locations/import', upload.single('file'), async (req, res) => {
+  try {
+    const file = req.file;
+    if (!file) {
+      return res.status(400).json({ error: 'No file uploaded' });
+    }
+
+    const vesselId = req.query.vesselId as string;
+    if (!vesselId) {
+      return res.status(400).json({ error: 'vesselId query parameter is required' });
+    }
+
+    const userId = (req as any).user?.username || 'system';
+
+    const workbook = XLSX.read(file.buffer, { type: 'buffer' });
+    const sheetName = workbook.SheetNames.find(name =>
+      name.toLowerCase().includes('location')
+    ) || workbook.SheetNames[0];
+
+    const worksheet = workbook.Sheets[sheetName];
+    const data = XLSX.utils.sheet_to_json(worksheet);
+
+    const results = {
+      created: 0,
+      updated: 0,
+      skipped: 0,
+      errors: [] as string[]
+    };
+
+    const seenNames = new Set<string>();
+
+    for (let i = 0; i < data.length; i++) {
+      const row: any = data[i];
+      const rowNum = i + 2;
+
+      const locationName = row['Location Name'] || row['location_name'] || row['locationName'] || row['location name'] || row['Name'] || row['name'];
+      const locationType = row['Location Type'] || row['location_type'] || row['locationType'] || row['location type'] || row['Type'] || row['type'];
+
+      if (!locationName || String(locationName).trim() === '') {
+        results.errors.push(`Row ${rowNum}: Location Name is required`);
+        results.skipped++;
+        continue;
+      }
+
+      const trimmedName = String(locationName).trim();
+      const normalizedName = trimmedName.toLowerCase();
+
+      if (seenNames.has(normalizedName)) {
+        results.errors.push(`Row ${rowNum}: Duplicate location name "${trimmedName}" within file`);
+        results.skipped++;
+        continue;
+      }
+      seenNames.add(normalizedName);
+
+      try {
+        const existing = await storage.getLocationByName(vesselId, trimmedName);
+        const trimmedType = locationType ? String(locationType).trim() : null;
+
+        if (existing) {
+          if (trimmedType && trimmedType !== existing.locationType) {
+            await storage.updateLocation(existing.id, { locationType: trimmedType });
+            results.updated++;
+          } else {
+            results.skipped++;
+          }
+        } else {
+          await storage.createLocation({
+            vesselId,
+            locationName: trimmedName,
+            locationType: trimmedType,
+            createdBy: userId,
+          });
+          results.created++;
+        }
+      } catch (error: any) {
+        results.errors.push(`Row ${rowNum}: ${error.message}`);
+        results.skipped++;
+      }
+    }
+
+    console.log(`Locations import complete: ${results.created} created, ${results.updated} updated, ${results.skipped} skipped`);
+    res.json(results);
+  } catch (error: any) {
+    console.error('Error importing locations:', error);
+    res.status(500).json({ error: 'Failed to import locations' });
+  }
+});
+
+router.get('/locations', async (req, res) => {
+  try {
+    const vesselId = req.query.vesselId as string;
+    if (!vesselId) {
+      return res.status(400).json({ error: 'vesselId query parameter is required' });
+    }
+    const locations = await storage.getLocations(vesselId);
+    res.json(locations);
+  } catch (error: any) {
+    console.error('Error fetching locations:', error);
+    res.status(500).json({ error: 'Failed to fetch locations' });
+  }
+});
+
+router.put('/locations/:id', async (req, res) => {
+  try {
+    const id = parseInt(req.params.id, 10);
+    if (isNaN(id)) {
+      return res.status(400).json({ error: 'Invalid location ID' });
+    }
+    const { locationName, locationType } = req.body;
+    const updateData: any = {};
+    if (locationName !== undefined) updateData.locationName = String(locationName).trim();
+    if (locationType !== undefined) updateData.locationType = locationType ? String(locationType).trim() : null;
+
+    const updated = await storage.updateLocation(id, updateData);
+    res.json(updated);
+  } catch (error: any) {
+    console.error('Error updating location:', error);
+    res.status(500).json({ error: error.message || 'Failed to update location' });
+  }
+});
+
+router.delete('/locations/:id', async (req, res) => {
+  try {
+    const id = parseInt(req.params.id, 10);
+    if (isNaN(id)) {
+      return res.status(400).json({ error: 'Invalid location ID' });
+    }
+    await storage.deleteLocation(id);
+    res.json({ success: true });
+  } catch (error: any) {
+    console.error('Error deleting location:', error);
+    res.status(500).json({ error: error.message || 'Failed to delete location' });
+  }
+});
+
 export default router;

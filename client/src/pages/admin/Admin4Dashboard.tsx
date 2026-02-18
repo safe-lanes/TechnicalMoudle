@@ -4,7 +4,7 @@ import { useVessels } from "@/hooks/useVessels";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Building2, List, ArrowRight, Box, Wrench, Package, Ship, Clock, FileCode2, Anchor, Database, Layers, AlertTriangle, CheckCircle2, X, Bell, LayoutDashboard, Settings } from "lucide-react";
+import { Building2, List, ArrowRight, Box, Wrench, Package, Ship, Clock, FileCode2, Anchor, Database, Layers, AlertTriangle, CheckCircle2, X, Bell, LayoutDashboard, Settings, MapPin } from "lucide-react";
 import { Marker } from "@/components/Marker";
 import MakerManagement from "./MakerManagement";
 import MasterListsManagement from "./MasterListsManagement";
@@ -18,9 +18,10 @@ import PmsVesselSettingsManagement from "./PmsVesselSettingsManagement";
 import FleetEquipmentTreeView from "./FleetEquipmentTreeView";
 import FleetVesselManager from "./FleetVesselManager";
 import FleetDataView from "./FleetDataView";
+import LocationManagement from "./LocationManagement";
 import type { PmsVesselSettings, Fleet } from "@shared/schema";
 
-type ViewType = 'dashboard' | 'makers' | 'master-lists' | 'master-data' | 'master-data-table' | 'components' | 'jobs' | 'spares' | 'vessel-mapping' | 'pms-settings' | 'equipment-tree' | 'fleet-vessel-manager' | 'fleet-data';
+type ViewType = 'dashboard' | 'makers' | 'master-lists' | 'master-data' | 'master-data-table' | 'components' | 'jobs' | 'spares' | 'vessel-mapping' | 'pms-settings' | 'equipment-tree' | 'fleet-vessel-manager' | 'fleet-data' | 'locations';
 
 export default function Admin4Dashboard({ onSubViewChange }: { onSubViewChange?: (isSubView: boolean) => void }) {
   const [currentView, setCurrentView] = useState<ViewType>('dashboard');
@@ -133,6 +134,10 @@ export default function Admin4Dashboard({ onSubViewChange }: { onSubViewChange?:
 
   if (currentView === 'fleet-data') {
     return <FleetDataView onBack={handleBackToDashboard} />;
+  }
+
+  if (currentView === 'locations') {
+    return <LocationManagement onBack={handleBackToDashboard} />;
   }
 
   const ProgressBar = ({ value, max, color }: { value: number; max: number; color: string }) => {
@@ -422,6 +427,7 @@ export default function Admin4Dashboard({ onSubViewChange }: { onSubViewChange?:
                     { view: 'fleet-vessel-manager' as ViewType, icon: Anchor, label: 'Fleet & Vessel', color: 'text-rose-600', bg: 'bg-rose-50' },
                     { view: 'pms-settings' as ViewType, icon: Clock, label: 'Lead Time & Grace', color: 'text-cyan-600', bg: 'bg-cyan-50' },
                     { view: 'master-data-table' as ViewType, icon: Database, label: 'Master Data', color: 'text-purple-600', bg: 'bg-purple-50' },
+                    { view: 'locations' as ViewType, icon: MapPin, label: 'Locations', color: 'text-emerald-600', bg: 'bg-emerald-50' },
                   ].map(link => (
                     <button
                       key={link.view}

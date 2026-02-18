@@ -14,11 +14,12 @@ import FleetComponentUpload from "./bulk/FleetComponentUpload";
 import FleetJobsUpload from "./bulk/FleetJobsUpload";
 import FleetSparesUpload from "./bulk/FleetSparesUpload";
 import MasterListsUpload from "./bulk/MasterListsUpload";
+import LocationsUpload from "./bulk/LocationsUpload";
 import BulkImportHistory from "./bulk/BulkImportHistory";
 import { useExternalVessels } from "@/hooks/useExternalMasterData";
 import { useUIRole } from "@/contexts/UIRoleContext";
 
-type VesselTemplateType = 'machinery' | 'stores' | 'spares' | 'jobs';
+type VesselTemplateType = 'machinery' | 'stores' | 'spares' | 'jobs' | 'locations';
 type FleetTemplateType = 'maker-list' | 'fleet-component' | 'fleet-jobs' | 'fleet-spares' | 'master-list';
 type ViewMode = 'upload' | 'history';
 
@@ -178,12 +179,40 @@ const STORES_PAGE_MARKERS: PageMarkers = {
   dropZone: "I1.6D.28",
 };
 
-// Map template type to page markers
+const LOCATIONS_PAGE_MARKERS: PageMarkers = {
+  templatesHeader: "I1.6E.6",
+  templateMachinery: "I1.6E.6A",
+  templateJobs: "I1.6E.6B",
+  templateSpares: "I1.6E.6C",
+  templateStores: "I1.6E.6D",
+  vesselLabel: "I1.6E.7",
+  vesselDropdown: "I1.6E.8",
+  newVesselButton: "I1.6E.9",
+  fleetToggle: "I1.6E.10",
+  infoText: "I1.6E.11",
+  historyButton: "I1.6E.12",
+  uploadHeader: "I1.6E.13",
+  uploadDescription: "I1.6E.14",
+  downloadTemplate: "I1.6E.15",
+  tabUpload: "I1.6E.16",
+  tabMapping: "I1.6E.17",
+  tabHistory: "I1.6E.18",
+  importModeSection: "I1.6E.19",
+  importModeLabel: "I1.6E.20",
+  radioAddOnly: "I1.6E.21",
+  radioUpdateOnly: "I1.6E.22",
+  radioUpsert: "I1.6E.23",
+  uploadSection: "I1.6E.24",
+  uploadDescription2: "I1.6E.25",
+  dropZone: "I1.6E.26",
+};
+
 const PAGE_MARKERS_BY_TEMPLATE: Record<VesselTemplateType, PageMarkers> = {
   machinery: MACHINERY_PAGE_MARKERS,
   jobs: JOBS_PAGE_MARKERS,
   spares: SPARES_PAGE_MARKERS,
   stores: STORES_PAGE_MARKERS,
+  locations: LOCATIONS_PAGE_MARKERS,
 };
 
 // Helper to get Vessel Entry Id from vessel master entry
@@ -213,6 +242,7 @@ export default function BulkDataImport() {
     { id: 'jobs' as VesselTemplateType, number: 2, name: 'Jobs' },
     { id: 'spares' as VesselTemplateType, number: 3, name: 'Spares' },
     { id: 'stores' as VesselTemplateType, number: 4, name: 'Stores' },
+    { id: 'locations' as VesselTemplateType, number: 5, name: 'Locations' },
   ];
 
   const fleetTemplates = [
@@ -244,6 +274,7 @@ export default function BulkDataImport() {
                 'jobs': currentMarkers.templateJobs,
                 'spares': currentMarkers.templateSpares,
                 'stores': currentMarkers.templateStores,
+                'locations': `${currentMarkers.templatesHeader}-locations`,
               };
               const markerId = !isFleetMode ? templateMarkerMap[template.id as VesselTemplateType] : undefined;
               const isLast = index === currentTemplates.length - 1;
@@ -375,6 +406,8 @@ export default function BulkDataImport() {
               <SparesUpload vesselId={selectedVessel} markers={currentMarkers} />
             ) : selectedVesselTemplate === 'stores' ? (
               <StoresUpload vesselId={selectedVessel} markers={currentMarkers} />
+            ) : selectedVesselTemplate === 'locations' ? (
+              <LocationsUpload vesselId={selectedVessel} />
             ) : (
               <Card>
                 <CardContent className="flex flex-col items-center justify-center py-12">

@@ -9898,16 +9898,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/technical/api/inventory/locations/:vesselId", async (req, res) => {
     try {
-      const { locationName, createdBy } = req.body;
+      const { locationName, locationType, createdBy } = req.body;
       if (!locationName) {
         return res.status(400).json({ success: false, error: "locationName is required" });
       }
       
-      const location = await storage.findOrCreateLocation(
-        req.params.vesselId,
-        locationName,
-        createdBy || 'system'
-      );
+      const existing = await storage.getLocationByName(req.params.vesselId, locationName);
+      if (existing) {
+        return res.json({ success: true, data: existing });
+      }
+      
+      const location = await storage.createLocation({
+        vesselId: req.params.vesselId,
+        locationName: locationName.trim(),
+        locationType: locationType || null,
+        createdBy: createdBy || 'system',
+      });
       res.json({ success: true, data: location });
     } catch (error: any) {
       console.error("Error creating location:", error);
