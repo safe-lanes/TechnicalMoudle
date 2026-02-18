@@ -3067,30 +3067,30 @@ const Components: React.FC = () => {
         {/* Left Panel - Component Tree (30%) */}
         <div className="w-[30%]" data-testid="B6">
           <div className="bg-white rounded-lg shadow-sm h-full flex flex-col">
-            <div className="flex-1 overflow-auto">
-              <div className="bg-[#52baf3] text-white px-4 py-2 font-semibold text-sm flex items-center justify-between gap-2">
-                <div className="flex items-center gap-2">
-                  <Marker id="B6" /> COMPONENTS
-                </div>
-                <div className="flex items-center gap-1">
-                  <button
-                    onClick={expandAllNodes}
-                    className="flex items-center gap-1 px-2 py-0.5 text-xs rounded hover:bg-white/20 transition-colors"
-                    data-testid="button-expand-all-components"
-                  >
-                    <Expand className="h-3 w-3" />
-                    Expand
-                  </button>
-                  <button
-                    onClick={collapseAllNodes}
-                    className="flex items-center gap-1 px-2 py-0.5 text-xs rounded hover:bg-white/20 transition-colors"
-                    data-testid="button-collapse-all-components"
-                  >
-                    <Minimize2 className="h-3 w-3" />
-                    Collapse
-                  </button>
-                </div>
+            <div className="flex-shrink-0 bg-[#52baf3] text-white px-4 py-2 font-semibold text-sm flex items-center justify-between gap-2 rounded-t-lg">
+              <div className="flex items-center gap-2">
+                <Marker id="B6" /> COMPONENTS
               </div>
+              <div className="flex items-center gap-1">
+                <button
+                  onClick={expandAllNodes}
+                  className="flex items-center gap-1 px-2 py-0.5 text-xs rounded hover:bg-white/20 transition-colors"
+                  data-testid="button-expand-all-components"
+                >
+                  <Expand className="h-3 w-3" />
+                  Expand
+                </button>
+                <button
+                  onClick={collapseAllNodes}
+                  className="flex items-center gap-1 px-2 py-0.5 text-xs rounded hover:bg-white/20 transition-colors"
+                  data-testid="button-collapse-all-components"
+                >
+                  <Minimize2 className="h-3 w-3" />
+                  Collapse
+                </button>
+              </div>
+            </div>
+            <div className="flex-1 overflow-auto">
               <div>
                 {renderComponentTree(filteredComponentTree)}
               </div>

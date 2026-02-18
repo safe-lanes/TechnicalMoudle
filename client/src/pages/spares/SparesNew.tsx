@@ -2067,8 +2067,8 @@ const Spares: React.FC = () => {
       <div className="flex-1 overflow-y-auto flex gap-4 min-h-0">
         {/* Left Panel - Component Tree (only shown in inventory tab) */}
         {activeTab === 'inventory' && (
-          <div className="w-80 bg-white border border-gray-200 rounded-lg overflow-hidden" data-testid="E12">
-            <div className="text-white px-4 py-2 font-semibold bg-[#52baf3] flex items-center justify-between">
+          <div className="w-80 bg-white border border-gray-200 rounded-lg flex flex-col" data-testid="E12">
+            <div className="flex-shrink-0 text-white px-4 py-2 font-semibold bg-[#52baf3] flex items-center justify-between rounded-t-lg">
               <div className="flex items-center gap-2">
                 <Marker id="E12" />
                 COMPONENT SEARCH
@@ -2092,7 +2092,7 @@ const Spares: React.FC = () => {
                 </button>
               </div>
             </div>
-            <div className="overflow-y-auto h-[calc(100%-40px)]">
+            <div className="flex-1 overflow-y-auto">
               {renderComponentTree(componentTree)}
             </div>
           </div>
