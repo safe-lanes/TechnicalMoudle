@@ -8,7 +8,7 @@ import { Marker } from "@/components/Marker";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Search, ChevronRight, ChevronDown, Edit, Edit2, Trash2, Plus, PlusCircle, Square, FileSpreadsheet, X, Minus, AlertCircle, CheckCircle, HelpCircle, MapPin, Info, Download, Settings2, Check, ChevronsUpDown } from "lucide-react";
+import { Search, ChevronRight, ChevronDown, Edit, Edit2, Trash2, Plus, PlusCircle, Square, FileSpreadsheet, X, Minus, AlertCircle, CheckCircle, HelpCircle, MapPin, Info, Download, Settings2, Check, ChevronsUpDown, Expand, Minimize2 } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import * as XLSX from "xlsx";
@@ -1291,6 +1291,29 @@ const Spares: React.FC = () => {
     }
   }, [totalPages, currentPage, filteredSpares.length]);
 
+  const collectAllNodeIds = (nodes: ComponentNode[]): string[] => {
+    const ids: string[] = [];
+    const traverse = (nodeList: ComponentNode[]) => {
+      for (const node of nodeList) {
+        if (node.children && node.children.length > 0) {
+          ids.push(node.id);
+          traverse(node.children);
+        }
+      }
+    };
+    traverse(nodes);
+    return ids;
+  };
+
+  const expandAllNodes = () => {
+    const allIds = collectAllNodeIds(componentTree);
+    setExpandedNodes(new Set(allIds));
+  };
+
+  const collapseAllNodes = () => {
+    setExpandedNodes(new Set());
+  };
+
   // Toggle node expansion
   const toggleNode = (nodeId: string) => {
     setExpandedNodes(prev => {
@@ -2045,9 +2068,29 @@ const Spares: React.FC = () => {
         {/* Left Panel - Component Tree (only shown in inventory tab) */}
         {activeTab === 'inventory' && (
           <div className="w-80 bg-white border border-gray-200 rounded-lg overflow-hidden" data-testid="E12">
-            <div className="text-white px-4 py-2 font-semibold bg-[#52baf3]">
-              <Marker id="E12" />
-              COMPONENT SEARCH
+            <div className="text-white px-4 py-2 font-semibold bg-[#52baf3] flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Marker id="E12" />
+                COMPONENT SEARCH
+              </div>
+              <div className="flex items-center gap-1">
+                <button
+                  onClick={expandAllNodes}
+                  className="flex items-center gap-1 px-2 py-0.5 text-xs rounded hover:bg-white/20 transition-colors"
+                  data-testid="button-expand-all-spares"
+                >
+                  <Expand className="h-3 w-3" />
+                  Expand
+                </button>
+                <button
+                  onClick={collapseAllNodes}
+                  className="flex items-center gap-1 px-2 py-0.5 text-xs rounded hover:bg-white/20 transition-colors"
+                  data-testid="button-collapse-all-spares"
+                >
+                  <Minimize2 className="h-3 w-3" />
+                  Collapse
+                </button>
+              </div>
             </div>
             <div className="overflow-y-auto h-[calc(100%-40px)]">
               {renderComponentTree(componentTree)}
