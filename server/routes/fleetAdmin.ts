@@ -1240,7 +1240,7 @@ router.post('/copy-vessel', async (req, res) => {
             stockingNumber: spare.stockingNumber,
             leadTime: spare.leadTime,
             supplier: spare.supplier,
-            location: spare.location,
+            location: null,
             vesselId: data.targetVesselCode,
             dataScope: spare.dataScope || 'vessel',
             fleetEquipmentCode: spare.fleetEquipmentCode,
@@ -1249,7 +1249,7 @@ router.post('/copy-vessel', async (req, res) => {
             uom: spare.uom,
             drawingNumber: spare.drawingNumber,
             drawingNo: spare.drawingNo,
-            location2: spare.location2,
+            location2: null,
             remarks: spare.remarks,
           }).returning({ id: spares.id });
           spareIdMap.set(spare.id, inserted.id);
