@@ -1,4 +1,4 @@
-import { eq, and, desc, sql, inArray, or, ilike, asc, gte, lte, lt } from 'drizzle-orm';
+import { eq, and, desc, sql, inArray, or, ilike, asc, gte, lte, lt, gt } from 'drizzle-orm';
 import { getDb } from './db';
 import {
   users,
@@ -6882,6 +6882,49 @@ export class PostgresStorage {
     .from(spareLocationStock)
     .innerJoin(spares, eq(spareLocationStock.spareId, spares.id))
     .where(eq(spareLocationStock.locationId, locationId));
+    
+    return result;
+  }
+
+  async getFullSparesAtLocation(locationId: number): Promise<any[]> {
+    const db = await getDb();
+    const result = await db.select({
+      id: spares.id,
+      partCode: spares.partCode,
+      partName: spares.partName,
+      componentId: spares.componentId,
+      componentName: components.name,
+      componentCode: components.code,
+      partNumber: spares.partNumber,
+      critical: spares.critical,
+      rob: spares.rob,
+      min: spares.min,
+      max: spares.max,
+      location: spares.location,
+      location2: spares.location2,
+      robLocationA: spares.robLocationA,
+      robLocationB: spares.robLocationB,
+      vesselId: spares.vesselId,
+      uom: spares.uom,
+      ihm: spares.ihm,
+      remarks: spares.remarks,
+      criticality: spares.criticality,
+      specification: spares.specification,
+      maker: spares.maker,
+      makerCode: spares.makerCode,
+      drawingNumber: spares.drawingNumber,
+      positionNumber: spares.positionNumber,
+      note: spares.note,
+      isActive: spares.isActive,
+      locationQty: spareLocationStock.qty,
+    })
+    .from(spareLocationStock)
+    .innerJoin(spares, eq(spareLocationStock.spareId, spares.id))
+    .leftJoin(components, eq(spares.componentId, components.id))
+    .where(and(
+      eq(spareLocationStock.locationId, locationId),
+      gt(spareLocationStock.qty, 0)
+    ));
     
     return result;
   }

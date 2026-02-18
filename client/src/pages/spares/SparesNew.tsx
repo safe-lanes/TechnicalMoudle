@@ -95,7 +95,7 @@ interface SpareHistory {
 
 const Spares: React.FC = () => {
   const [, navigate] = useLocation();
-  const [activeTab, setActiveTab] = useState<"inventory" | "history">("inventory");
+  const [activeTab, setActiveTab] = useState<"inventory" | "by-location" | "history">("inventory");
   const [selectedComponentId, setSelectedComponentId] = useState<string | null>(null);
   const [expandedNodes, setExpandedNodes] = useState<Set<string>>(new Set());
   const [searchTerm, setSearchTerm] = useState("");
@@ -116,7 +116,17 @@ const Spares: React.FC = () => {
   // Pagination state - History
   const [historyPage, setHistoryPage] = useState(1);
   const [historyItemsPerPage, setHistoryItemsPerPage] = useState(10);
+  const [selectedLocationId, setSelectedLocationId] = useState<number | null>(null);
+  const [locationSearchTerm, setLocationSearchTerm] = useState("");
+  const [locationPage, setLocationPage] = useState(1);
+  const [locationItemsPerPage, setLocationItemsPerPage] = useState(10);
   const { data: vessels = [] } = useVessels();
+  
+  useEffect(() => {
+    setSelectedLocationId(null);
+    setLocationSearchTerm("");
+    setLocationPage(1);
+  }, [vesselId]);
   
   // Modify mode state - use proper hook for reactivity
   const { isModifyMode } = useModifyMode();
@@ -897,6 +907,62 @@ const Spares: React.FC = () => {
     enabled: !!vesselId
   });
   
+  const { data: vesselLocations = [], isLoading: isLocationsLoading } = useQuery({
+    queryKey: ['/technical/api/inventory/locations', vesselId],
+    enabled: vesselId !== 'all' && vesselId !== '' && activeTab === 'by-location',
+  });
+
+  const { data: locationSparesResponse, isLoading: isLocationSparesLoading } = useQuery({
+    queryKey: ['/technical/api/inventory/stock/full-by-location', selectedLocationId],
+    enabled: !!selectedLocationId && activeTab === 'by-location',
+  });
+
+  const locationSpares: Spare[] = useMemo(() => {
+    const raw = (locationSparesResponse as any)?.data || [];
+    return raw;
+  }, [locationSparesResponse]);
+
+  const filteredLocationSpares = useMemo(() => {
+    let result = locationSpares;
+    if (searchTerm) {
+      const term = searchTerm.toLowerCase();
+      result = result.filter((s: any) => 
+        s.partCode?.toLowerCase().includes(term) || 
+        s.partName?.toLowerCase().includes(term) || 
+        s.componentName?.toLowerCase().includes(term)
+      );
+    }
+    if (criticalityFilter && criticalityFilter !== 'All') {
+      result = result.filter((s: any) => s.critical === criticalityFilter || s.criticality === criticalityFilter);
+    }
+    if (stockFilter && stockFilter !== 'All') {
+      result = result.filter((s: any) => {
+        const status = getStockStatus(s.rob, s.min);
+        return status.label === stockFilter;
+      });
+    }
+    return result;
+  }, [locationSpares, searchTerm, criticalityFilter, stockFilter]);
+
+  const locationTotalPages = Math.max(1, Math.ceil(filteredLocationSpares.length / locationItemsPerPage));
+  const paginatedLocationSpares = filteredLocationSpares.slice(
+    (locationPage - 1) * locationItemsPerPage,
+    locationPage * locationItemsPerPage
+  );
+
+  const goToLocationPage = (page: number) => {
+    const p = Math.max(1, Math.min(page, locationTotalPages));
+    setLocationPage(p);
+  };
+
+  const allLocations = useMemo(() => {
+    const raw = (vesselLocations as any)?.data || vesselLocations || [];
+    const locs = Array.isArray(raw) ? raw : [];
+    if (!locationSearchTerm) return locs;
+    const term = locationSearchTerm.toLowerCase();
+    return locs.filter((l: any) => l.location_name?.toLowerCase().includes(term) || l.locationName?.toLowerCase().includes(term));
+  }, [vesselLocations, locationSearchTerm]);
+
   // Get default location labels from vessel settings (only used as column headers, NOT for value binding)
   // For actual ROB location values, always use spare-specific location/location2 fields
   const sparesArray = Array.isArray(sparesData) ? sparesData : [];
@@ -2039,9 +2105,9 @@ const Spares: React.FC = () => {
       <div className="flex-shrink-0 space-y-6 mb-4">
         <div className="flex items-center justify-between relative">
         <div className="flex items-center gap-4">
-          <h1 className="text-2xl font-bold text-gray-800" data-testid={activeTab === 'inventory' ? "E1" : "E3.1"}>
-            {activeTab === 'inventory' ? <Marker id="E1" /> : <Marker id="E3.1" />}
-            {activeTab === 'inventory' ? 'Spares Inventory' : 'Spares - History of Transactions'}
+          <h1 className="text-2xl font-bold text-gray-800" data-testid={activeTab === 'inventory' ? "E1" : activeTab === 'by-location' ? "E-LOC-1" : "E3.1"}>
+            {activeTab === 'inventory' ? <Marker id="E1" /> : activeTab === 'by-location' ? <Marker id="E-LOC-1" /> : <Marker id="E3.1" />}
+            {activeTab === 'inventory' ? 'Spares Inventory' : activeTab === 'by-location' ? 'Spares by Location' : 'Spares - History of Transactions'}
           </h1>
           {isModifyMode && (
             <span className="px-3 py-1 bg-blue-100 text-blue-800 text-sm font-medium rounded-full border border-blue-300">
@@ -2059,6 +2125,13 @@ const Spares: React.FC = () => {
           >
             <Marker id="E2" />
             Inventory
+          </button>
+          <button 
+            className={`px-4 py-1.5 rounded-md text-sm font-medium transition-colors ${activeTab === 'by-location' ? 'bg-[#52baf3] text-white' : 'text-gray-700 hover:bg-gray-200'}`}
+            onClick={() => setActiveTab('by-location')}
+            data-testid="tab-by-location"
+          >
+            Spares by Location
           </button>
           <button 
             className={`px-4 py-1.5 rounded-md text-sm font-medium transition-colors ${activeTab === 'history' ? 'bg-[#52baf3] text-white' : 'text-gray-700 hover:bg-gray-200'}`}
@@ -2203,10 +2276,62 @@ const Spares: React.FC = () => {
             </div>
           </div>
         )}
+        {activeTab === 'by-location' && (
+          <div className="w-80 bg-white border border-gray-200 rounded-lg overflow-hidden" data-testid="location-search-panel">
+            <div className="text-white px-4 py-2 font-semibold bg-[#52baf3]">
+              LOCATION SEARCH
+            </div>
+            <div className="p-2 border-b border-gray-200">
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+                <Input
+                  placeholder="Search locations..."
+                  value={locationSearchTerm}
+                  onChange={(e) => setLocationSearchTerm(e.target.value)}
+                  className="pl-10 h-8 text-sm"
+                  data-testid="input-location-search"
+                />
+              </div>
+            </div>
+            <div className="overflow-y-auto h-[calc(100%-80px)]">
+              {isLocationsLoading ? (
+                <div className="p-4 text-center text-gray-500 text-sm">Loading locations...</div>
+              ) : allLocations.length === 0 ? (
+                <div className="p-4 text-center text-gray-500 text-sm">
+                  {vesselId === 'all' || !vesselId ? 'Select a vessel first' : 'No locations found'}
+                </div>
+              ) : (
+                allLocations.map((loc: any) => {
+                  const locId = loc.id;
+                  const locName = loc.location_name || loc.locationName || 'Unknown';
+                  const locType = loc.location_type || loc.locationType || '';
+                  return (
+                    <button
+                      key={locId}
+                      onClick={() => { setSelectedLocationId(locId); setLocationPage(1); }}
+                      className={`w-full text-left px-4 py-2.5 text-sm border-b border-gray-100 transition-colors ${
+                        selectedLocationId === locId ? 'bg-blue-50 text-blue-700 font-medium' : 'text-gray-700 hover:bg-gray-50'
+                      }`}
+                      data-testid={`location-item-${locId}`}
+                    >
+                      <div className="flex items-center gap-2">
+                        <MapPin className="h-3.5 w-3.5 flex-shrink-0" />
+                        <div>
+                          <div>{locName}</div>
+                          {locType && <div className="text-xs text-gray-400">{locType}</div>}
+                        </div>
+                      </div>
+                    </button>
+                  );
+                })
+              )}
+            </div>
+          </div>
+        )}
 
         {/* Right Panel - Table */}
         <div className="flex-1 bg-white border border-gray-200 rounded-lg overflow-hidden flex flex-col">
-          {activeTab === 'inventory' ? (
+          {activeTab === 'inventory' && (
             <>
               {/* Inventory Table with Horizontal Scroll */}
               <div className="overflow-x-auto flex-1 flex flex-col">
@@ -2490,7 +2615,131 @@ const Spares: React.FC = () => {
               )}
               </div>
             </>
-          ) : (
+          )}
+          {activeTab === 'by-location' && (
+            <>
+              <div className="overflow-x-auto flex-1 flex flex-col">
+                <div className="px-4 py-3 border-b border-gray-200 bg-[#52baf3]">
+                  <div className="grid text-sm font-semibold text-[#ffffff] min-w-max" style={{ gridTemplateColumns: '110px 180px 220px 120px 80px 60px 60px 80px 100px 160px', minWidth: 'max-content', gap: '12px' }}>
+                    <div className="px-2 text-[#ffffff]" data-testid="loc-col-part-code">Part Code</div>
+                    <div className="px-2" data-testid="loc-col-part-name">Part Name</div>
+                    <div className="px-2" data-testid="loc-col-component">Component</div>
+                    <div className="px-2" data-testid="loc-col-part-number">Part Number</div>
+                    <div className="px-2" data-testid="loc-col-criticality">Criticality</div>
+                    <div className="px-2 text-center" data-testid="loc-col-rob">ROB</div>
+                    <div className="px-2 text-center" data-testid="loc-col-min">Min</div>
+                    <div className="px-2 text-center" data-testid="loc-col-stock">Stock</div>
+                    <div className="px-2 text-center" data-testid="loc-col-loc-qty">Loc Qty</div>
+                    <div className="px-2 text-center" data-testid="loc-col-actions">Actions</div>
+                  </div>
+                </div>
+                <div className="flex flex-col">
+                  {!selectedLocationId ? (
+                    <div className="p-8 text-center text-gray-500">Select a location from the left panel to view spares.</div>
+                  ) : isLocationSparesLoading ? (
+                    <div className="p-8 text-center text-gray-500">Loading...</div>
+                  ) : filteredLocationSpares.length === 0 ? (
+                    <div className="p-8 text-center text-gray-500">No spares found at this location.</div>
+                  ) : (
+                    paginatedLocationSpares.map((spare: any, rowIndex: number) => {
+                      const stockStatus = getStockStatus(spare.rob, spare.min);
+                      return (
+                        <div key={spare.id} className="px-4 py-3 border-b border-gray-100 hover:bg-gray-50">
+                          <div className="grid text-sm items-center min-w-max" style={{ gridTemplateColumns: '110px 180px 220px 120px 80px 60px 60px 80px 100px 160px', minWidth: 'max-content', gap: '12px' }}>
+                            <div className="px-2 text-gray-900">{spare.partCode}</div>
+                            <div className="px-2 text-gray-700">{spare.partName}</div>
+                            <div className="px-2 text-gray-700">{spare.componentName || '-'}</div>
+                            <div className="px-2 text-blue-600 font-medium">{spare.partNumber || '-'}</div>
+                            <div className="px-2">
+                              <span className={`px-2 py-1 rounded text-xs ${
+                                spare.critical === 'Critical' || spare.critical === 'Yes' 
+                                  ? 'bg-red-100 text-red-800' 
+                                  : 'bg-gray-100 text-gray-800'
+                              }`}>
+                                {spare.critical || 'No'}
+                              </span>
+                            </div>
+                            <div className="px-2 text-center">{spare.rob}</div>
+                            <div className="px-2 text-center">{spare.min}</div>
+                            <div className="px-2 text-center">
+                              <span className={`px-2 py-1 rounded text-xs ${stockStatus.color}`}>
+                                {stockStatus.label}
+                              </span>
+                            </div>
+                            <div className="px-2 text-center font-medium">{spare.locationQty}</div>
+                            <div className="px-2 flex gap-0.5 justify-center">
+                              <Button 
+                                size="sm" 
+                                variant="ghost"
+                                onClick={() => openInfoModal(spare)}
+                                title="View Details"
+                                data-testid={`button-loc-info-${spare.id}`}
+                              >
+                                <Info className="h-4 w-4 text-blue-600" />
+                              </Button>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })
+                  )}
+                </div>
+                {filteredLocationSpares.length > 0 && (
+                  <div className="p-4 bg-gray-50 border-t border-gray-200 flex items-center justify-between" data-testid="location-pagination-footer">
+                    <div className="flex items-center gap-2 text-sm text-gray-600">
+                      <span>Show</span>
+                      <Select value={String(locationItemsPerPage)} onValueChange={(val) => { setLocationItemsPerPage(Number(val)); setLocationPage(1); }}>
+                        <SelectTrigger className="w-20 h-8" data-testid="select-location-items-per-page">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="5">5</SelectItem>
+                          <SelectItem value="10">10</SelectItem>
+                          <SelectItem value="20">20</SelectItem>
+                          <SelectItem value="50">50</SelectItem>
+                          <SelectItem value="100">100</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <span>items per page</span>
+                    </div>
+                    <div className="flex items-center gap-2 text-sm text-gray-600" data-testid="location-pagination-info">
+                      <span>
+                        Showing {((locationPage - 1) * locationItemsPerPage) + 1} - {Math.min(locationPage * locationItemsPerPage, filteredLocationSpares.length)} of {filteredLocationSpares.length} spares
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <Button variant="outline" size="sm" onClick={() => goToLocationPage(1)} disabled={locationPage === 1} className="h-8 w-8 p-0" data-testid="location-pagination-first">
+                        <ChevronsLeft className="h-4 w-4" />
+                      </Button>
+                      <Button variant="outline" size="sm" onClick={() => goToLocationPage(locationPage - 1)} disabled={locationPage === 1} className="h-8 w-8 p-0" data-testid="location-pagination-prev">
+                        <ChevronLeft className="h-4 w-4" />
+                      </Button>
+                      <div className="flex items-center gap-1 px-2">
+                        <span className="text-sm text-gray-600">Page</span>
+                        <Input
+                          type="number"
+                          min={1}
+                          max={locationTotalPages || 1}
+                          value={locationPage}
+                          onChange={(e) => { const v = parseInt(e.target.value); if (!isNaN(v)) goToLocationPage(v); }}
+                          className="w-14 h-8 text-center"
+                          data-testid="input-location-page-number"
+                        />
+                        <span className="text-sm text-gray-600">of {locationTotalPages || 1}</span>
+                      </div>
+                      <Button variant="outline" size="sm" onClick={() => goToLocationPage(locationPage + 1)} disabled={locationPage >= locationTotalPages} className="h-8 w-8 p-0" data-testid="location-pagination-next">
+                        <ChevronRight className="h-4 w-4" />
+                      </Button>
+                      <Button variant="outline" size="sm" onClick={() => goToLocationPage(locationTotalPages)} disabled={locationPage >= locationTotalPages} className="h-8 w-8 p-0" data-testid="location-pagination-last">
+                        <ChevronsRight className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </>
+          )}
+          {activeTab === 'history' && (
             <>
               {/* History Table Header */}
               <div className="bg-[#52baf3] px-4 py-3">

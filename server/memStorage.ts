@@ -1171,6 +1171,11 @@ class MemStorage {
     console.log('[MemStorage] getSparesAtLocation called - stub in file mode');
     return [];
   }
+
+  async getFullSparesAtLocation(locationId: number): Promise<any[]> {
+    console.log('[MemStorage] getFullSparesAtLocation called - stub in file mode');
+    return [];
+  }
   
   async reconcileSpareLocationStock(vesselId: string, userId?: string): Promise<{ synced: number; errors: number }> {
     console.log('[MemStorage] reconcileSpareLocationStock called - stub in file mode');

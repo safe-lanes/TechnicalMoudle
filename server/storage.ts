@@ -869,6 +869,7 @@ export interface IStorage {
   getSpareRobTotal(spareId: number): Promise<number>;
   getSpareLocationsWithQty(spareId: number): Promise<Array<{ locationId: number; locationName: string; qty: number }>>;
   getSparesAtLocation(locationId: number): Promise<Array<{ spareId: number; partCode: string; partName: string; qty: number }>>;
+  getFullSparesAtLocation(locationId: number): Promise<any[]>;
   reconcileSpareLocationStock(vesselId: string, userId?: string): Promise<{ synced: number; errors: number }>;
   
   // Inventory Transaction Methods
