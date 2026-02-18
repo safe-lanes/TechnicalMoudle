@@ -16,7 +16,8 @@ import {
   Search,
   Download,
   Calendar,
-  AlertTriangle
+  AlertTriangle,
+  LifeBuoy
 } from "lucide-react";
 import MaintenanceReports from "./MaintenanceReports";
 import RunningHoursReports from "./RunningHoursReports";
@@ -25,6 +26,7 @@ import StoresReports from "./StoresReports";
 import IhmReports from "./IhmReports";
 import ChangeRequestReports from "./ChangeRequestReports";
 import CriticalEquipmentReports from "./CriticalEquipmentReports";
+import LsaFfaReports from "./LsaFfaReports";
 import MaintenancePlanner from "./MaintenancePlanner";
 import GlobalFilters, { FilterValues } from "@/components/reports/GlobalFilters";
 
@@ -143,6 +145,16 @@ const ReportsModule = () => {
       iconBg: "bg-red-500",
       iconBgLight: "bg-red-100 text-red-600"
     },
+    {
+      id: "lsa-ffa-equipment",
+      title: "LSA/FFA Equipment",
+      description: "Life-saving and fire-fighting equipment tracking, statutory compliance reports, and maintenance schedules",
+      icon: LifeBuoy,
+      reportCount: 0,
+      color: "border-orange-500",
+      iconBg: "bg-orange-500",
+      iconBgLight: "bg-orange-100 text-orange-600"
+    },
   ];
 
   const handleCategoryClick = (categoryId: string) => {
@@ -212,6 +224,10 @@ const ReportsModule = () => {
 
   if (selectedCategory === "critical-equipment") {
     return <CriticalEquipmentReports onBack={handleBackToMain} globalFilters={globalFilters} />;
+  }
+
+  if (selectedCategory === "lsa-ffa-equipment") {
+    return <LsaFfaReports onBack={handleBackToMain} globalFilters={globalFilters} />;
   }
 
   // TODO: Add other category components when implemented
