@@ -8,11 +8,7 @@ import { Marker } from "@/components/Marker";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-<<<<<<< HEAD
-import { Search, ChevronRight, ChevronDown, Edit, Edit2, Trash2, Plus, PlusCircle, Square, FileSpreadsheet, X, Minus, AlertCircle, CheckCircle, HelpCircle, MapPin, Info, Download, Settings2, Check, ChevronsUpDown, Expand, Minimize2 } from "lucide-react";
-=======
-import { Search, ChevronRight, ChevronLeft, ChevronDown, Edit, Edit2, Trash2, Plus, PlusCircle, Square, FileSpreadsheet, X, Minus, AlertCircle, CheckCircle, HelpCircle, MapPin, Info, Download, Settings2, Check, ChevronsUpDown, ChevronsLeft, ChevronsRight } from "lucide-react";
->>>>>>> 0bf1d8b6 (Add pagination and consistent action features to spares inventory and history)
+import { Search, ChevronRight, ChevronLeft, ChevronDown, Edit, Edit2, Trash2, Plus, PlusCircle, Square, FileSpreadsheet, X, Minus, AlertCircle, CheckCircle, HelpCircle, MapPin, Info, Download, Settings2, Check, ChevronsUpDown, ChevronsLeft, ChevronsRight, Expand, Minimize2 } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import * as XLSX from "xlsx";
@@ -1370,7 +1366,6 @@ const Spares: React.FC = () => {
     }
   }, [totalPages, currentPage, filteredSpares.length]);
 
-<<<<<<< HEAD
   const collectAllNodeIds = (nodes: ComponentNode[]): string[] => {
     const ids: string[] = [];
     const traverse = (nodeList: ComponentNode[]) => {
@@ -1392,7 +1387,8 @@ const Spares: React.FC = () => {
 
   const collapseAllNodes = () => {
     setExpandedNodes(new Set());
-=======
+  };
+
   // History pagination calculations
   const historyTotalPages = Math.ceil(historyData.length / historyItemsPerPage);
   const paginatedHistory = useMemo(() => {
@@ -1420,7 +1416,6 @@ const Spares: React.FC = () => {
   const goToHistoryPage = (page: number) => {
     const p = Math.max(1, Math.min(page, historyTotalPages || 1));
     setHistoryPage(p);
->>>>>>> 0bf1d8b6 (Add pagination and consistent action features to spares inventory and history)
   };
 
   // Toggle node expansion
