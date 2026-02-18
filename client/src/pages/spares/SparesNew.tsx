@@ -29,6 +29,7 @@ import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
 import { FEATURES } from '@/config/features';
+import { SPARES_TEMPLATE_FIELDS } from '@shared/sparesTemplateFields';
 import { useVessels } from "@/hooks/useVessels";
 
 interface Spare {
@@ -160,6 +161,8 @@ const Spares: React.FC = () => {
   const [isReceiveModalOpen, setIsReceiveModalOpen] = useState(false);
   const [isAdjustModalOpen, setIsAdjustModalOpen] = useState(false);
   const [isInfoModalOpen, setIsInfoModalOpen] = useState(false);
+  const [isExportModalOpen, setIsExportModalOpen] = useState(false);
+  const [exportType, setExportType] = useState<"unique" | "distribution">("unique");
   const [selectedSpare, setSelectedSpare] = useState<Spare | null>(null);
   
   // Form states
@@ -1340,13 +1343,50 @@ const Spares: React.FC = () => {
     setSelectedComponentId(null);
   };
 
-  // Export spares to Excel - supports both Inventory and History tabs
+  const mapSpareToTemplateRow = (spare: Spare, componentCode?: string, componentName?: string) => {
+    const row: Record<string, any> = {};
+    for (const field of SPARES_TEMPLATE_FIELDS) {
+      if (field.key === 'reserved') {
+        row[field.header] = '';
+        continue;
+      }
+      switch (field.key) {
+        case 'partCode': row[field.header] = spare.partCode || ''; break;
+        case 'fleetEquipmentCode': row[field.header] = (spare as any).fleetEquipmentCode || ''; break;
+        case 'fleetEquipmentName': row[field.header] = ''; break;
+        case 'componentCode': row[field.header] = componentCode || spare.componentCode || ''; break;
+        case 'componentName': row[field.header] = componentName || spare.componentName || ''; break;
+        case 'partName': row[field.header] = spare.partName || ''; break;
+        case 'partNumber': row[field.header] = spare.partNumber || ''; break;
+        case 'uom': row[field.header] = spare.uom || ''; break;
+        case 'drawingNumber': row[field.header] = spare.drawingNumber || ''; break;
+        case 'positionNumber': row[field.header] = spare.positionNumber || ''; break;
+        case 'note': row[field.header] = spare.note || ''; break;
+        case 'specification': row[field.header] = spare.specification || ''; break;
+        case 'maker': row[field.header] = spare.maker || ''; break;
+        case 'makerCode': row[field.header] = spare.makerCode || ''; break;
+        case 'manualName': row[field.header] = spare.manualName || ''; break;
+        case 'pageNumber': row[field.header] = spare.pageNumber || ''; break;
+        case 'criticality': row[field.header] = spare.critical || spare.criticality || ''; break;
+        case 'totalRob': row[field.header] = spare.rob ?? 0; break;
+        case 'locationA': row[field.header] = spare.location || ''; break;
+        case 'locationARob': row[field.header] = spare.robLocationA ?? 0; break;
+        case 'locationB': row[field.header] = spare.location2 || ''; break;
+        case 'locationBRob': row[field.header] = spare.robLocationB ?? 0; break;
+        case 'minimumStock': row[field.header] = spare.min ?? 0; break;
+        case 'isActive': row[field.header] = spare.isActive === false ? 'No' : 'Yes'; break;
+        case 'ihm': row[field.header] = spare.ihm || ''; break;
+        case 'evidenceType': row[field.header] = (spare as any).evidenceType || ''; break;
+        default: row[field.header] = ''; break;
+      }
+    }
+    return row;
+  };
+
   const exportSparesToExcel = () => {
-    const now = new Date();
-    const timestamp = now.toISOString().replace(/[-:]/g, '').replace('T', '_').slice(0, 15);
-    
     if (activeTab === 'history') {
-      // Export history data
+      const now = new Date();
+      const timestamp = now.toISOString().replace(/[-:]/g, '').replace('T', '_').slice(0, 15);
       const filename = `spares_history_${vesselId}_${timestamp}.xlsx`;
       
       const data = historyData.map((history: SpareHistory) => {
@@ -1392,39 +1432,68 @@ const Spares: React.FC = () => {
         description: `Exported ${data.length} history records to ${filename}` 
       });
     } else {
-      // Export inventory data
-      const filename = `spares_inventory_${vesselId}_${timestamp}.xlsx`;
-      
-      const data = filteredSpares.map((spare: Spare) => {
-        const stockStatus = getStockStatus(spare.rob, spare.min);
-        return {
-          'Part Code': spare.partCode,
-          'Part Name': spare.partName,
-          'Component': spare.componentName,
-          'Component Code': spare.componentCode || '-',
-          'Criticality': spare.critical,
-          'ROB': spare.rob,
-          'Min': spare.min,
-          'Stock Status': stockStatus.label,
-          'Location': spare.location || '-',
-          'Location 2': spare.location2 || '-',
-          'UOM': spare.uom || '-',
-          'Part Number': spare.partNumber || '-',
-          'Maker': spare.maker || '-',
-          'Remarks': spare.remarks || '-'
-        };
-      });
-      
-      const ws = XLSX.utils.json_to_sheet(data);
+      setExportType("unique");
+      setIsExportModalOpen(true);
+    }
+  };
+
+  const handleExportDownload = () => {
+    const now = new Date();
+    const timestamp = now.toISOString().replace(/[-:]/g, '').replace('T', '_').slice(0, 15);
+
+    if (exportType === "unique") {
+      const filename = `spares_master_${vesselId}_${timestamp}.xlsx`;
+      const seenPartCodes = new Set<string>();
+      const rows: Record<string, any>[] = [];
+
+      for (const spare of filteredSpares) {
+        if (seenPartCodes.has(spare.partCode)) continue;
+        seenPartCodes.add(spare.partCode);
+        rows.push(mapSpareToTemplateRow(spare));
+      }
+
+      const headers = SPARES_TEMPLATE_FIELDS.map(f => f.header);
+      const ws = XLSX.utils.json_to_sheet(rows, { header: headers });
+      const colWidths = SPARES_TEMPLATE_FIELDS.map(f => ({ wch: f.width }));
+      ws['!cols'] = colWidths;
       const wb = XLSX.utils.book_new();
-      XLSX.utils.book_append_sheet(wb, ws, 'Spares Inventory');
+      XLSX.utils.book_append_sheet(wb, ws, 'Unique Spare Master');
       XLSX.writeFile(wb, filename);
-      
-      toast({ 
-        title: "Export Successful", 
-        description: `Exported ${data.length} spares to ${filename}` 
+
+      toast({
+        title: "Export Successful",
+        description: `Exported ${rows.length} unique spare master entries to ${filename}`
+      });
+    } else {
+      const filename = `spares_distribution_${vesselId}_${timestamp}.xlsx`;
+      const rows: Record<string, any>[] = [];
+
+      for (const spare of filteredSpares) {
+        const linked = (spare as any).linkedComponents as Array<{ componentId: string; componentCode: string; componentName: string }> | undefined;
+        if (linked && linked.length > 0) {
+          for (const comp of linked) {
+            rows.push(mapSpareToTemplateRow(spare, comp.componentCode, comp.componentName));
+          }
+        } else {
+          rows.push(mapSpareToTemplateRow(spare));
+        }
+      }
+
+      const headers = SPARES_TEMPLATE_FIELDS.map(f => f.header);
+      const ws = XLSX.utils.json_to_sheet(rows, { header: headers });
+      const colWidths = SPARES_TEMPLATE_FIELDS.map(f => ({ wch: f.width }));
+      ws['!cols'] = colWidths;
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, 'Component-Spare Distribution');
+      XLSX.writeFile(wb, filename);
+
+      toast({
+        title: "Export Successful",
+        description: `Exported ${rows.length} component-spare distribution entries to ${filename}`
       });
     }
+
+    setIsExportModalOpen(false);
   };
 
   // Open consume modal
@@ -3889,6 +3958,54 @@ const Spares: React.FC = () => {
         </DialogContent>
       </Dialog>
       
+      {/* Export Type Selection Modal */}
+      <Dialog open={isExportModalOpen} onOpenChange={setIsExportModalOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Select Export Type</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <label className="flex items-center gap-3 p-3 rounded-md border cursor-pointer hover-elevate" data-testid="radio-unique-spare-master">
+              <input
+                type="radio"
+                name="exportType"
+                value="unique"
+                checked={exportType === "unique"}
+                onChange={() => setExportType("unique")}
+                className="h-4 w-4 text-blue-600"
+              />
+              <div>
+                <div className="font-medium text-sm">Unique Spare Master Entries</div>
+                <div className="text-xs text-muted-foreground">One row per unique Part Code, no duplicates</div>
+              </div>
+            </label>
+            <label className="flex items-center gap-3 p-3 rounded-md border cursor-pointer hover-elevate" data-testid="radio-component-spare-distribution">
+              <input
+                type="radio"
+                name="exportType"
+                value="distribution"
+                checked={exportType === "distribution"}
+                onChange={() => setExportType("distribution")}
+                className="h-4 w-4 text-blue-600"
+              />
+              <div>
+                <div className="font-medium text-sm">Component-Spare Distribution Entries</div>
+                <div className="text-xs text-muted-foreground">Expanded rows per component-spare mapping</div>
+              </div>
+            </label>
+          </div>
+          <DialogFooter className="flex gap-2">
+            <Button variant="outline" onClick={() => setIsExportModalOpen(false)} data-testid="button-cancel-export">
+              Cancel
+            </Button>
+            <Button onClick={handleExportDownload} data-testid="button-download-export">
+              <Download className="h-4 w-4 mr-1" />
+              Download
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       {/* Modify Mode Footer */}
       <ModifyStickyFooter
         isVisible={isModifyMode && showModifySubmitFooter}

@@ -1,7 +1,7 @@
 /**
  * Single Source of Truth: Vessel_Spare Template Fields
  * 
- * This file defines the canonical 28-column specification for the Spares template.
+ * This file defines the canonical 27-column specification for the Spares template.
  * Both frontend (field mappings display) and backend (Excel template generation)
  * MUST use these definitions to ensure consistency.
  * 
@@ -9,7 +9,7 @@
  * Component Name, Part Name, Part Number, UOM, Drawing Number, Position Number, Note,
  * Specification, Maker, Maker Code, Manual Name, Page Number, Criticality, Total ROB,
  * Location A, Location A - ROB, Location B, Location B - ROB, Minimum Stock, Is Active,
- * IHM (Inventory of Hazardous Materials), Evidence Type, Vessel Code
+ * IHM (Inventory of Hazardous Materials), Evidence Type
  */
 
 export interface SparesTemplateField {
@@ -21,7 +21,7 @@ export interface SparesTemplateField {
 }
 
 /**
- * Canonical 28-column Vessel_Spare specification
+ * Canonical 27-column Vessel_Spare specification
  * DO NOT modify the order - this matches the exact template specification
  * Note: Column B is reserved/empty to match the standard template format
  */
