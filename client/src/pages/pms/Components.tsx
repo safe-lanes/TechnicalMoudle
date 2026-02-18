@@ -2239,6 +2239,18 @@ const Components: React.FC = () => {
   const { data: vessels = [] } = useVessels();
   const { isSailAdmin, isClientAdmin } = useUIRole();
   
+  const prevVesselIdRef = React.useRef(vesselId);
+  React.useEffect(() => {
+    if (prevVesselIdRef.current !== vesselId) {
+      setSelectedComponent(null);
+      setEditingComponentId(null);
+      setEditingComponentCode(null);
+      setShowAddEditFullPage(false);
+      setShowReviewDrawer(false);
+      prevVesselIdRef.current = vesselId;
+    }
+  }, [vesselId]);
+  
   // Fetch components from API and build tree
   const { data: fetchedComponents = [], isLoading: isLoadingComponents } = useQuery<any[]>({
     queryKey: [`/technical/api/components/${vesselId}`],
