@@ -908,7 +908,7 @@ const Spares: React.FC = () => {
   });
   
   const { data: vesselLocationsResponse, isLoading: isLocationsLoading } = useQuery({
-    queryKey: ['/technical/api/inventory/stock/locations-with-stock', vesselId],
+    queryKey: [`/technical/api/inventory/stock/locations-with-stock/${vesselId}`],
     enabled: vesselId !== 'all' && vesselId !== '' && activeTab === 'by-location',
   });
 
@@ -917,7 +917,7 @@ const Spares: React.FC = () => {
   }, [vesselLocationsResponse]);
 
   const { data: locationSparesResponse, isLoading: isLocationSparesLoading } = useQuery({
-    queryKey: ['/technical/api/inventory/stock/full-by-location', selectedLocationId],
+    queryKey: [`/technical/api/inventory/stock/full-by-location/${selectedLocationId}`],
     enabled: !!selectedLocationId && activeTab === 'by-location',
   });
 
