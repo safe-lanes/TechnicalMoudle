@@ -6886,15 +6886,15 @@ export class PostgresStorage {
     return result;
   }
 
-  async getFullSparesAtLocation(locationId: number): Promise<any[]> {
+  async getFullSparesAtLocation(locationId: number, vesselId: string): Promise<any[]> {
     const db = await getDb();
     const result = await db.select({
       id: spares.id,
       partCode: spares.partCode,
       partName: spares.partName,
       componentId: spares.componentId,
-      componentName: components.name,
-      componentCode: components.code,
+      componentName: spares.componentName,
+      componentCode: spares.componentCode,
       partNumber: spares.partNumber,
       critical: spares.critical,
       rob: spares.rob,
@@ -6920,9 +6920,9 @@ export class PostgresStorage {
     })
     .from(spareLocationStock)
     .innerJoin(spares, eq(spareLocationStock.spareId, spares.id))
-    .leftJoin(components, eq(spares.componentId, components.id))
     .where(and(
       eq(spareLocationStock.locationId, locationId),
+      eq(spares.vesselId, vesselId),
       gt(spareLocationStock.qty, 0)
     ));
     

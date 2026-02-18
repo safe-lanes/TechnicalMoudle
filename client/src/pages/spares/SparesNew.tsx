@@ -917,8 +917,8 @@ const Spares: React.FC = () => {
   }, [vesselLocationsResponse]);
 
   const { data: locationSparesResponse, isLoading: isLocationSparesLoading } = useQuery({
-    queryKey: [`/technical/api/inventory/stock/full-by-location/${selectedLocationId}`],
-    enabled: !!selectedLocationId && activeTab === 'by-location',
+    queryKey: [`/technical/api/inventory/stock/full-by-location/${vesselId}/${selectedLocationId}`],
+    enabled: !!selectedLocationId && !!vesselId && vesselId !== 'all' && activeTab === 'by-location',
   });
 
   const locationSpares: Spare[] = useMemo(() => {

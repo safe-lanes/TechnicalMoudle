@@ -10050,10 +10050,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get("/technical/api/inventory/stock/full-by-location/:locationId", async (req, res) => {
+  app.get("/technical/api/inventory/stock/full-by-location/:vesselId/:locationId", async (req, res) => {
     try {
       const locationId = parseInt(req.params.locationId);
-      const spares = await storage.getFullSparesAtLocation(locationId);
+      const vesselId = req.params.vesselId;
+      const spares = await storage.getFullSparesAtLocation(locationId, vesselId);
       res.json({ success: true, data: spares });
     } catch (error: any) {
       console.error("Error fetching full spares at location:", error);

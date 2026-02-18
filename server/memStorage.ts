@@ -1172,7 +1172,7 @@ class MemStorage {
     return [];
   }
 
-  async getFullSparesAtLocation(locationId: number): Promise<any[]> {
+  async getFullSparesAtLocation(locationId: number, vesselId: string): Promise<any[]> {
     console.log('[MemStorage] getFullSparesAtLocation called - stub in file mode');
     return [];
   }
