@@ -6929,6 +6929,26 @@ export class PostgresStorage {
     return result;
   }
 
+  async getLocationsWithStock(vesselId: string): Promise<Array<{ id: number; locationName: string; sparesCount: number }>> {
+    const db = await getDb();
+    const result = await db.select({
+      id: locations.id,
+      locationName: locations.locationName,
+      sparesCount: sql<number>`count(distinct ${spareLocationStock.spareId})`.as('spares_count'),
+    })
+    .from(spareLocationStock)
+    .innerJoin(locations, eq(spareLocationStock.locationId, locations.id))
+    .innerJoin(spares, eq(spareLocationStock.spareId, spares.id))
+    .where(and(
+      eq(spares.vesselId, vesselId),
+      gt(spareLocationStock.qty, 0)
+    ))
+    .groupBy(locations.id, locations.locationName)
+    .orderBy(asc(locations.locationName));
+    
+    return result;
+  }
+
   // ============= INVENTORY MANAGEMENT: TRANSACTIONS =============
 
   async createInventoryTransaction(txn: InsertInventoryTransaction): Promise<InventoryTransaction> {

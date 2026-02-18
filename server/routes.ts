@@ -10040,6 +10040,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.get("/technical/api/inventory/stock/locations-with-stock/:vesselId", async (req, res) => {
+    try {
+      const locationsWithStock = await storage.getLocationsWithStock(req.params.vesselId);
+      res.json({ success: true, data: locationsWithStock });
+    } catch (error: any) {
+      console.error("Error fetching locations with stock:", error);
+      res.status(500).json({ success: false, error: error.message });
+    }
+  });
+
   app.get("/technical/api/inventory/stock/full-by-location/:locationId", async (req, res) => {
     try {
       const locationId = parseInt(req.params.locationId);

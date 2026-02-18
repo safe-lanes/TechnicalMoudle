@@ -907,10 +907,14 @@ const Spares: React.FC = () => {
     enabled: !!vesselId
   });
   
-  const { data: vesselLocations = [], isLoading: isLocationsLoading } = useQuery({
-    queryKey: ['/technical/api/inventory/locations', vesselId],
+  const { data: vesselLocationsResponse, isLoading: isLocationsLoading } = useQuery({
+    queryKey: ['/technical/api/inventory/stock/locations-with-stock', vesselId],
     enabled: vesselId !== 'all' && vesselId !== '' && activeTab === 'by-location',
   });
+
+  const vesselLocations = useMemo(() => {
+    return (vesselLocationsResponse as any)?.data || [];
+  }, [vesselLocationsResponse]);
 
   const { data: locationSparesResponse, isLoading: isLocationSparesLoading } = useQuery({
     queryKey: ['/technical/api/inventory/stock/full-by-location', selectedLocationId],
@@ -956,11 +960,10 @@ const Spares: React.FC = () => {
   };
 
   const allLocations = useMemo(() => {
-    const raw = (vesselLocations as any)?.data || vesselLocations || [];
-    const locs = Array.isArray(raw) ? raw : [];
+    const locs = Array.isArray(vesselLocations) ? vesselLocations : [];
     if (!locationSearchTerm) return locs;
     const term = locationSearchTerm.toLowerCase();
-    return locs.filter((l: any) => l.location_name?.toLowerCase().includes(term) || l.locationName?.toLowerCase().includes(term));
+    return locs.filter((l: any) => l.locationName?.toLowerCase().includes(term));
   }, [vesselLocations, locationSearchTerm]);
 
   // Get default location labels from vessel settings (only used as column headers, NOT for value binding)
@@ -2303,8 +2306,7 @@ const Spares: React.FC = () => {
               ) : (
                 allLocations.map((loc: any) => {
                   const locId = loc.id;
-                  const locName = loc.location_name || loc.locationName || 'Unknown';
-                  const locType = loc.location_type || loc.locationType || '';
+                  const locName = loc.locationName || 'Unknown';
                   return (
                     <button
                       key={locId}
@@ -2316,10 +2318,14 @@ const Spares: React.FC = () => {
                     >
                       <div className="flex items-center gap-2">
                         <MapPin className="h-3.5 w-3.5 flex-shrink-0" />
-                        <div>
-                          <div>{locName}</div>
-                          {locType && <div className="text-xs text-gray-400">{locType}</div>}
+                        <div className="flex-1 min-w-0">
+                          <div className="truncate">{locName}</div>
                         </div>
+                        {loc.sparesCount > 0 && (
+                          <span className="text-xs bg-gray-100 text-gray-600 px-1.5 py-0.5 rounded-full flex-shrink-0">
+                            {loc.sparesCount}
+                          </span>
+                        )}
                       </div>
                     </button>
                   );
