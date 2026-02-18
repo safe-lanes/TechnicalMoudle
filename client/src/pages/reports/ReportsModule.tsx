@@ -24,6 +24,7 @@ import SparesReports from "./SparesReports";
 import StoresReports from "./StoresReports";
 import IhmReports from "./IhmReports";
 import ChangeRequestReports from "./ChangeRequestReports";
+import CriticalEquipmentReports from "./CriticalEquipmentReports";
 import MaintenancePlanner from "./MaintenancePlanner";
 import GlobalFilters, { FilterValues } from "@/components/reports/GlobalFilters";
 
@@ -137,7 +138,7 @@ const ReportsModule = () => {
       title: "Critical Equipment",
       description: "Safety-critical components tracking, compliance reports, and maintenance oversight",
       icon: AlertTriangle,
-      reportCount: 0,
+      reportCount: 2,
       color: "border-red-500",
       iconBg: "bg-red-500",
       iconBgLight: "bg-red-100 text-red-600"
@@ -207,6 +208,10 @@ const ReportsModule = () => {
 
   if (selectedCategory === "change-requests") {
     return <ChangeRequestReports onBack={handleBackToMain} globalFilters={globalFilters} />;
+  }
+
+  if (selectedCategory === "critical-equipment") {
+    return <CriticalEquipmentReports onBack={handleBackToMain} globalFilters={globalFilters} />;
   }
 
   // TODO: Add other category components when implemented

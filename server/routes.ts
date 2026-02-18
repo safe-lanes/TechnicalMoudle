@@ -10801,7 +10801,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         'unplanned-breakdown-jobs',
         'crew-workload-distribution',
         'ihm-inventory-status',
-        'change-requests-status-tracking'
+        'change-requests-status-tracking',
+        'critical-components-list',
+        'critical-equipment-schedule'
       ];
       
       if (dedicatedReportRoutes.includes(reportType)) {
@@ -11231,7 +11233,392 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(500).json({ error: "Failed to fetch template" });
     }
   });
-  
+
+  // ═══════════════════════════════════════════════════════════════
+  // Critical Equipment Reports API routes
+  // ═══════════════════════════════════════════════════════════════
+
+  app.get("/technical/api/reports/critical-components-list", async (req, res) => {
+    try {
+      const vesselId = req.query.vesselId as string;
+      const category = req.query.category as string | undefined;
+      const classItemFilter = req.query.classItem as string | undefined;
+      const format = (req.query.format as string) || 'json';
+
+      if (!vesselId) {
+        return res.status(400).json({ error: "vesselId is required" });
+      }
+
+      const allVessels = await storage.getVessels();
+      let allComponents: any[] = [];
+      if (vesselId === 'all') {
+        for (const v of allVessels) {
+          allComponents = allComponents.concat(await storage.getComponents(v.id));
+        }
+      } else {
+        allComponents = await storage.getComponents(vesselId);
+      }
+
+      let filteredComponents = allComponents.filter((c: any) => c.critical === true);
+
+      if (category) {
+        filteredComponents = filteredComponents.filter((c: any) => c.category === category);
+      }
+
+      if (classItemFilter === 'class') {
+        filteredComponents = filteredComponents.filter((c: any) => c.classItem === true);
+      } else if (classItemFilter === 'non-class') {
+        filteredComponents = filteredComponents.filter((c: any) => c.classItem === false);
+      }
+
+      const data = filteredComponents.map((c: any, i: number) => {
+        const parent = allComponents.find((p: any) => p.id === c.parentId);
+        return {
+          sno: i + 1,
+          componentCode: c.componentCode || '-',
+          componentName: c.name || '-',
+          parentCode: parent?.componentCode || '-',
+          parentName: parent?.name || '-',
+          category: c.category || '-',
+          location: c.location || '-',
+          maker: c.maker || '-',
+          model: c.model || '-',
+          serialNo: c.serialNo || '-',
+          installationDate: c.installationDate || '-',
+          classItem: c.classItem ? 'Yes' : 'No',
+          conditionBased: c.conditionBased ? 'Yes' : 'No',
+          isActive: c.isActive !== false ? 'Yes' : 'No'
+        };
+      });
+
+      const classItemCount = filteredComponents.filter(c => c.classItem === true).length;
+      const nonClassCount = filteredComponents.filter(c => c.classItem !== true).length;
+      const activeCount = filteredComponents.filter(c => c.isActive !== false).length;
+      const inactiveCount = filteredComponents.filter(c => c.isActive === false).length;
+
+      const byCategory: Record<string, number> = {};
+      filteredComponents.forEach(c => {
+        const cat = c.category || 'Uncategorized';
+        byCategory[cat] = (byCategory[cat] || 0) + 1;
+      });
+
+      if (format === 'excel') {
+        const columns: ColumnDef[] = [
+          { key: 'sno', header: 'S.No', width: 6, type: 'number', align: 'center' },
+          { key: 'componentCode', header: 'Component Code', width: 18, type: 'text' },
+          { key: 'componentName', header: 'Component Name', width: 35, type: 'text' },
+          { key: 'parentCode', header: 'Parent Code', width: 18, type: 'text' },
+          { key: 'parentName', header: 'Parent Name', width: 30, type: 'text' },
+          { key: 'category', header: 'Category', width: 25, type: 'text' },
+          { key: 'location', header: 'Location', width: 20, type: 'text' },
+          { key: 'maker', header: 'Maker', width: 20, type: 'text' },
+          { key: 'model', header: 'Model', width: 20, type: 'text' },
+          { key: 'serialNo', header: 'Serial No', width: 18, type: 'text' },
+          { key: 'installationDate', header: 'Installation Date', width: 16, type: 'text' },
+          { key: 'classItem', header: 'Class Item', width: 12, type: 'text', align: 'center' },
+          { key: 'conditionBased', header: 'Condition Based', width: 14, type: 'text', align: 'center' },
+          { key: 'isActive', header: 'Active', width: 10, type: 'text', align: 'center' }
+        ];
+
+        const vesselName = vesselId !== 'all' ? (allVessels.find(v => v.id === vesselId)?.name || vesselId) : 'All Vessels';
+        const lastCol = getLastColumnLetter(columns.length);
+
+        const wb = new ExcelJS.Workbook();
+        const ws = wb.addWorksheet('Critical Components');
+
+        applyStandardHeader(ws, 'Critical Components Master List', `${data.length} critical components`, vesselName, data.length, lastCol);
+        applyStandardTableHeader(ws, columns);
+        applyStandardDataRows(ws, data, columns);
+
+        const summaryItems: SummaryItem[] = [
+          { label: 'Total Critical Components', value: data.length },
+          { label: 'Class Items', value: classItemCount },
+          { label: 'Non-Class Items', value: nonClassCount },
+          { label: 'Active', value: activeCount },
+          { label: 'Inactive', value: inactiveCount }
+        ];
+
+        const summaryStartRow = 8 + data.length + 1;
+        const lastRow = applyStandardSummary(ws, summaryItems, summaryStartRow, columns.length);
+        applyStandardPageSetup(ws, 7, columns.length, lastRow, vesselName);
+
+        const buffer = await wb.xlsx.writeBuffer();
+        const filename = generateFilename('Critical_Components_List', vesselName);
+        res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+        res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+        res.send(Buffer.from(buffer as ArrayBuffer));
+        return;
+      }
+
+      res.json({
+        components: data,
+        summary: {
+          total: filteredComponents.length,
+          byCategory,
+          classItems: classItemCount,
+          nonClassItems: nonClassCount,
+          activeCount,
+          inactiveCount
+        }
+      });
+    } catch (error: any) {
+      console.error("Error generating critical components report:", error);
+      res.status(500).json({ error: "Failed to generate report", details: error.message });
+    }
+  });
+
+  app.get("/technical/api/reports/critical-equipment-schedule", async (req, res) => {
+    try {
+      const vesselId = req.query.vesselId as string;
+      const statusFilter = req.query.status as string | undefined;
+      const category = req.query.category as string | undefined;
+      const format = (req.query.format as string) || 'json';
+
+      if (!vesselId) {
+        return res.status(400).json({ error: "vesselId is required" });
+      }
+
+      const allVessels = await storage.getVessels();
+      let allComponents: any[] = [];
+      if (vesselId === 'all') {
+        for (const v of allVessels) {
+          allComponents = allComponents.concat(await storage.getComponents(v.id));
+        }
+      } else {
+        allComponents = await storage.getComponents(vesselId);
+      }
+
+      let criticalComponents = allComponents.filter((c: any) => c.critical === true);
+      if (category) {
+        criticalComponents = criticalComponents.filter((c: any) => c.category === category);
+      }
+
+      const criticalComponentIds = new Set(criticalComponents.map((c: any) => c.id));
+      const criticalComponentMap = new Map(criticalComponents.map((c: any) => [c.id, c]));
+
+      let allJobs: any[] = [];
+      if (vesselId === 'all') {
+        for (const v of allVessels) {
+          const vJobs = await storage.getJobs(v.id);
+          allJobs = allJobs.concat(vJobs);
+        }
+      } else {
+        allJobs = await storage.getJobs(vesselId);
+      }
+      const jobMap = new Map(allJobs.map((j: any) => [j.id, j]));
+
+      let allLinks: any[] = [];
+      if (vesselId === 'all') {
+        for (const v of allVessels) {
+          const links = await storage.getJobComponentLinks(v.id);
+          allLinks.push(...links);
+        }
+      } else {
+        allLinks = await storage.getJobComponentLinks(vesselId);
+      }
+
+      let allWorkOrders: any[] = [];
+      if (vesselId === 'all') {
+        for (const v of allVessels) {
+          const wos = await storage.getWorkOrders(v.id);
+          allWorkOrders = allWorkOrders.concat(wos);
+        }
+      } else {
+        allWorkOrders = await storage.getWorkOrders(vesselId);
+      }
+      const woByJobId = new Map<string, any[]>();
+      for (const wo of allWorkOrders) {
+        const jobId = wo.jobId;
+        if (jobId) {
+          const existing = woByJobId.get(jobId) || [];
+          existing.push(wo);
+          woByJobId.set(jobId, existing);
+        }
+      }
+
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+
+      const formatDateStr = (d: string | null | undefined) => {
+        if (!d) return '-';
+        try {
+          const date = new Date(d);
+          if (isNaN(date.getTime())) return d;
+          const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+          return `${date.getDate().toString().padStart(2,'0')}-${months[date.getMonth()]}-${date.getFullYear()}`;
+        } catch { return d; }
+      };
+
+      const scheduleItems: any[] = [];
+
+      for (const link of allLinks) {
+        if (!criticalComponentIds.has(link.componentId)) continue;
+
+        const comp = criticalComponentMap.get(link.componentId);
+        const job = jobMap.get(link.jobId);
+        if (!comp || !job) continue;
+
+        const nextDueDateStr = link.nextDueDate || job.nextDueDate;
+        let daysUntilDue: number | null = null;
+        let status = 'On Schedule';
+
+        if (nextDueDateStr) {
+          const nextDueDate = new Date(nextDueDateStr);
+          if (!isNaN(nextDueDate.getTime())) {
+            nextDueDate.setHours(0, 0, 0, 0);
+            daysUntilDue = Math.ceil((nextDueDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+            if (daysUntilDue < 0) {
+              status = 'Overdue';
+            } else if (daysUntilDue <= 7) {
+              status = 'Due Soon';
+            } else {
+              status = 'On Schedule';
+            }
+          }
+        }
+
+        const jobWorkOrders = woByJobId.get(job.id) || [];
+        const sortedWOs = jobWorkOrders.sort((a: any, b: any) => {
+          const dateA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+          const dateB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+          return dateB - dateA;
+        });
+        const lastWO = sortedWOs[0];
+
+        const lastDoneDateStr = link.lastDoneDate || job.lastDoneDate;
+        const freq = job.frequencyValue ? `${job.frequencyValue} ${job.frequencyUnit || ''}`.trim() : '-';
+
+        scheduleItems.push({
+          componentId: comp.id,
+          jobId: job.id,
+          componentCode: comp.componentCode || '-',
+          componentName: comp.name || '-',
+          location: comp.location || '-',
+          jobCode: job.jobNo || '-',
+          jobTitle: job.jobTitle || '-',
+          taskType: job.maintenanceType || '-',
+          maintenanceBasis: job.maintenanceBasis || '-',
+          frequency: freq,
+          nextDueDate: formatDateStr(nextDueDateStr),
+          daysUntilDue: daysUntilDue !== null ? daysUntilDue : '-',
+          status,
+          lastDoneDate: formatDateStr(lastDoneDateStr),
+          lastWONumber: lastWO?.workOrderNo || '-',
+          lastWOStatus: lastWO?.status || '-',
+          assignedTo: job.assignedTo || '-',
+          estimatedManHours: '-',
+          runningHours: comp.currentCumulativeRH || '-'
+        });
+      }
+
+      if (statusFilter && statusFilter !== 'all') {
+        const statusMap: Record<string, string> = {
+          'on-schedule': 'On Schedule',
+          'due-soon': 'Due Soon',
+          'overdue': 'Overdue'
+        };
+        const filterValue = statusMap[statusFilter];
+        if (filterValue) {
+          const filtered = scheduleItems.filter(item => item.status === filterValue);
+          scheduleItems.length = 0;
+          scheduleItems.push(...filtered);
+        }
+      }
+
+      scheduleItems.sort((a, b) => {
+        const dateA = a.nextDueDate !== '-' ? new Date(a.nextDueDate).getTime() : Infinity;
+        const dateB = b.nextDueDate !== '-' ? new Date(b.nextDueDate).getTime() : Infinity;
+        if (dateA !== dateB) return dateA - dateB;
+        return (a.componentCode || '').localeCompare(b.componentCode || '');
+      });
+
+      scheduleItems.forEach((item, i) => { item.sno = i + 1; });
+
+      const onScheduleCount = scheduleItems.filter(i => i.status === 'On Schedule').length;
+      const dueSoonCount = scheduleItems.filter(i => i.status === 'Due Soon').length;
+      const overdueCount = scheduleItems.filter(i => i.status === 'Overdue').length;
+      const numericDays = scheduleItems.filter(i => typeof i.daysUntilDue === 'number').map(i => i.daysUntilDue as number);
+      const avgDaysUntilDue = numericDays.length > 0 ? Math.round(numericDays.reduce((a: number, b: number) => a + b, 0) / numericDays.length) : 0;
+
+      if (format === 'excel') {
+        const columns: ColumnDef[] = [
+          { key: 'sno', header: 'S.No', width: 6, type: 'number', align: 'center' },
+          { key: 'componentCode', header: 'Comp Code', width: 16, type: 'text' },
+          { key: 'componentName', header: 'Component Name', width: 30, type: 'text' },
+          { key: 'location', header: 'Location', width: 18, type: 'text' },
+          { key: 'jobCode', header: 'Job Code', width: 16, type: 'text' },
+          { key: 'jobTitle', header: 'Job Title', width: 35, type: 'text' },
+          { key: 'taskType', header: 'Task Type', width: 16, type: 'text' },
+          { key: 'maintenanceBasis', header: 'Maint. Basis', width: 14, type: 'text' },
+          { key: 'frequency', header: 'Frequency', width: 14, type: 'text' },
+          { key: 'nextDueDate', header: 'Next Due Date', width: 16, type: 'text' },
+          { key: 'daysUntilDue', header: 'Days Until Due', width: 14, type: 'number', align: 'center' },
+          { key: 'status', header: 'Status', width: 14, type: 'text', align: 'center' },
+          { key: 'lastDoneDate', header: 'Last Done', width: 16, type: 'text' },
+          { key: 'lastWONumber', header: 'Last WO No', width: 18, type: 'text' },
+          { key: 'lastWOStatus', header: 'Last WO Status', width: 14, type: 'text' },
+          { key: 'assignedTo', header: 'Assigned To', width: 16, type: 'text' },
+          { key: 'estimatedManHours', header: 'Man-Hours', width: 12, type: 'number', align: 'center' },
+          { key: 'runningHours', header: 'Running Hours', width: 14, type: 'text' }
+        ];
+
+        const conditionalStyles: ConditionalStyle[] = [
+          {
+            condition: (row: any) => row.status === 'Overdue',
+            style: 'danger'
+          },
+          {
+            condition: (row: any) => row.status === 'Due Soon',
+            style: 'warning'
+          }
+        ];
+
+        const vesselName = vesselId !== 'all' ? (allVessels.find(v => v.id === vesselId)?.name || vesselId) : 'All Vessels';
+        const lastCol = getLastColumnLetter(columns.length);
+
+        const wb = new ExcelJS.Workbook();
+        const ws = wb.addWorksheet('Critical Equipment Schedule');
+
+        applyStandardHeader(ws, 'Critical Equipment Maintenance Schedule', `${scheduleItems.length} schedule items`, vesselName, scheduleItems.length, lastCol);
+        applyStandardTableHeader(ws, columns);
+        applyStandardDataRows(ws, scheduleItems, columns, 8, conditionalStyles);
+
+        const summaryItems: SummaryItem[] = [
+          { label: 'Total Schedule Items', value: scheduleItems.length },
+          { label: 'On Schedule', value: onScheduleCount },
+          { label: 'Due Soon', value: dueSoonCount, highlight: true },
+          { label: 'Overdue', value: overdueCount, highlight: true },
+          { label: 'Avg Days Until Due', value: avgDaysUntilDue }
+        ];
+
+        const summaryStartRow = 8 + scheduleItems.length + 1;
+        const lastRow = applyStandardSummary(ws, summaryItems, summaryStartRow, columns.length);
+        applyStandardPageSetup(ws, 7, columns.length, lastRow, vesselName);
+
+        const buffer = await wb.xlsx.writeBuffer();
+        const filename = generateFilename('Critical_Equipment_Schedule', vesselName);
+        res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+        res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+        res.send(Buffer.from(buffer as ArrayBuffer));
+        return;
+      }
+
+      res.json({
+        scheduleItems,
+        summary: {
+          total: scheduleItems.length,
+          onSchedule: onScheduleCount,
+          dueSoon: dueSoonCount,
+          overdue: overdueCount,
+          avgDaysUntilDue
+        }
+      });
+    } catch (error: any) {
+      console.error("Error generating critical equipment schedule report:", error);
+      res.status(500).json({ error: "Failed to generate report", details: error.message });
+    }
+  });
+
   // Recurring Defects API routes
   
   // Get all recurring defects with filters
