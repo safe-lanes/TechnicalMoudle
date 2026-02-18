@@ -27,7 +27,7 @@ export interface SparesTemplateField {
  */
 export const SPARES_TEMPLATE_FIELDS: SparesTemplateField[] = [
   { header: 'Part Code', key: 'partCode', width: 18, required: false, description: 'Auto-generated PT-XXXXXX if not provided' },
-  { header: '', key: 'reserved', width: 5, required: false, description: 'Reserved column' },
+  { header: 'Reserved', key: 'reserved', width: 5, required: false, description: 'Reserved column' },
   { header: 'Fleet Equipment Code', key: 'fleetEquipmentCode', width: 20, required: false, description: 'Links to fleet master equipment' },
   { header: 'Fleet Equipment Name', key: 'fleetEquipmentName', width: 28, required: false, description: 'Fleet equipment reference name' },
   { header: 'Component Code', key: 'componentCode', width: 18, required: true, description: 'Must exist in system' },
