@@ -537,7 +537,9 @@ export const insertSpareHistorySchema = createInsertSchema(sparesHistory).omit({
 });
 
 export type InsertSpareHistory = z.infer<typeof insertSpareHistorySchema>;
-export type SpareHistory = typeof sparesHistory.$inferSelect;
+export type SpareHistory = typeof sparesHistory.$inferSelect & {
+  partNumber?: string | null;
+};
 
 // Stores Ledger Table (for Stores module history)
 export const storesLedger = pgTable("stores_ledger", {

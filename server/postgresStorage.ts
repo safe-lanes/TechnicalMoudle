@@ -2978,16 +2978,32 @@ export class PostgresStorage {
 
   async getSpareHistory(vesselId: string): Promise<SpareHistory[]> {
     const db = await getDb();
-    return await db.select().from(sparesHistory)
+    const rows = await db.select({
+      history: sparesHistory,
+      partNumber: spares.partNumber,
+    }).from(sparesHistory)
+      .leftJoin(spares, eq(sparesHistory.spareId, spares.id))
       .where(eq(sparesHistory.vesselId, vesselId))
       .orderBy(desc(sparesHistory.timestampUTC));
+    return rows.map(r => ({
+      ...r.history,
+      partNumber: r.partNumber ?? null,
+    })) as SpareHistory[];
   }
 
   async getSpareHistoryBySpareId(spareId: number): Promise<SpareHistory[]> {
     const db = await getDb();
-    return await db.select().from(sparesHistory)
+    const rows = await db.select({
+      history: sparesHistory,
+      partNumber: spares.partNumber,
+    }).from(sparesHistory)
+      .leftJoin(spares, eq(sparesHistory.spareId, spares.id))
       .where(eq(sparesHistory.spareId, spareId))
       .orderBy(desc(sparesHistory.timestampUTC));
+    return rows.map(r => ({
+      ...r.history,
+      partNumber: r.partNumber ?? null,
+    })) as SpareHistory[];
   }
 
   async createSpareHistory(history: InsertSpareHistory): Promise<SpareHistory> {
