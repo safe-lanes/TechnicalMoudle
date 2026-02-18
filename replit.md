@@ -83,7 +83,7 @@ All future Fleet-related tables MUST include these mandatory columns with exact 
     -   `maker_list` - Updated Feb 2026 with all mandatory columns (maker_list_uuid, sortOrder, createdByUuid, updatedByUuid, isDeleted, isSync). All future FK references to this table MUST use `maker_list_uuid` column only (not the numeric `id`)
 
 ## System Architecture
-The application employs a modern full-stack architecture with a mobile-first, responsive design. The frontend is developed using React (TypeScript, Vite, Tailwind CSS, shadcn/ui, TanStack Query, Wouter), while the backend is powered by Express.js (TypeScript). PostgreSQL serves as the primary data store.
+The application employs a modern full-stack architecture with a mobile-first, responsive design. The frontend is developed using React (TypeScript, Vite, Tailwind CSS, shadcn/ui, TanStack Query, Wouter), while the backend is powered by Express.js (TypeScript). PostgreSQL serves as the primary data store. All API endpoints use the `/technical/api` prefix.
 
 **UI/UX Decisions**:
 - Emphasizes a mobile-first and responsive design philosophy.
@@ -106,7 +106,6 @@ The application employs a modern full-stack architecture with a mobile-first, re
 - **Role-Based Access Control (RBAC)**: Implements authorization and data isolation for Ship, Office, and PMS Admin roles.
 - **Global Business Rules**: Enforces critical rules like Parent vs Sub-Component RH Authority, Stores Module Isolation, and Work Order naming conventions.
 - **Component Document Storage**: Handles file uploads exclusively via Replit Object Storage.
-- **API Route Prefix**: All API endpoints use the `/technical/api` prefix.
 - **Change Request Workflow**: Implements an "Apply Approved Changes" step with atomic database transactions.
 - **Ship Certificates & Surveys Admin Modules**: Manage requirements with 3-tab interfaces (Master, Company, Vessel), configurable categories/groups, and prefixed ID formats.
 - **Standard Sequencing Component**: Admin tables use a number input for sequence reordering.
@@ -114,24 +113,17 @@ The application employs a modern full-stack architecture with a mobile-first, re
 - **Database Migration Strategy**: Exclusively uses Drizzle file-based SQL migrations.
 - **Vessel Data Source Strategy**: Employs a unified `useVessels()` hook prioritizing local PMS data with fallback to an external master-data API.
 - **ROB Location Stock Synchronization**: Dual-write synchronization between legacy ROB fields and `spare_location_stock` for inventory consistency.
+- **Location Management Refactor**: Locations are now independent entities that must be pre-imported via bulk upload or manual entry before being referenced by spares operations.
 - **Excel Report Standardization**: All Maintenance & Work Order Excel exports use a standardized 18-column template with status-based full-row highlighting.
 - **Job Postponement Log Report**: Uses `work_order_postponements` history table for tracking, with a custom 19-column Excel export.
 - **Running Hours Anomaly Detection Report**: Analyzes `running_hours_audit` to identify 5 anomaly types, with severity-based row coloring in Excel export.
 - **Consumption Pattern Analysis Report**: Aggregates `spares_history` CONSUME events, providing a 10-column PDF/Excel report.
 - **IHM Inventory Status Report**: Interactive report combining `spares` and `stores_items` data, with summary cards, filters, and PDF/Excel export.
-
-- **AI Chatbot Assistant**: Floating chat panel (bottom-right) powered by OpenAI GPT-4o with function calling via Replit AI Integration (no external API key needed - uses AI_INTEGRATIONS_OPENAI_API_KEY and AI_INTEGRATIONS_OPENAI_BASE_URL). Features 15 tools for querying work orders, spares, components, jobs, stores/lubricants/chemicals inventory, defects (active/resolved/recurring), consumption pattern analysis, and maintenance calendar/scheduling. Uses lazy-initialized OpenAI client. Frontend uses react-markdown for safe rendering. Files: `server/services/chatbotService.ts`, `server/routes/chatbot.ts`, `client/src/hooks/useChat.ts`, `client/src/components/chat/`.
-- **Chatbot Analytical Upgrade (Feb 2026)**: Enhanced from data-dump to intelligent analyst. System prompt enforces structured responses (Summary → Critical Insights → Priority Items → Recommendations). 5 core analytical tools: `get_maintenance_insights` (KPIs, compliance rate, overdue aging), `get_spare_coverage_analysis` (shortage risk, reorder urgency, stockout estimates), `get_workload_analysis` (backlog aging buckets, department distribution), `get_component_health_score` (risk scoring combining defects + overdue + criticality), `get_performance_trends` (completion rates, resolution times, trend direction). 9 specialized analytical tools: `get_running_hours_analytics` (RH accumulation, anomaly detection), `get_maintenance_planner` (weekly breakdown, critical path), `get_rob_analysis` (stockout estimates, procurement), `get_change_request_analysis` (status/aging/approval metrics), `get_recurring_defect_analysis` (MTBF, COC, multi-vessel), `get_compliance_alerts` (certificate/survey expiry tracking), `get_equipment_comparison` (side-by-side health scoring), `get_cost_impact_estimate` (risk-scored deferred maintenance), `get_workload_forecast` (historical projection, bottleneck risk). Existing tools enhanced with analytical summaries. Natural language date handling in system prompt. Config: max_tokens=4000, maxIterations=8, temperature=0.4. Total: 29 function-calling tools.
-- **Chatbot Intelligence Phase 1 (Feb 2026)**: Added 3 few-shot example responses in system prompt (multi-tool prioritization, clarifying question for ambiguous queries, direct fleet answer). Added query classification decision tree mapping 8 question categories to specific multi-tool chain patterns (priorities, status, equipment, inventory, scheduling, compliance, ambiguous, simple). Added clarifying question behavior rules with examples of when to ask vs answer directly. Added conversation history trimming (MAX_HISTORY=20 messages) with context summary injection when older messages are trimmed.
-- **V2 Modular Architecture Refactor Plans (Feb 2026)**: Comprehensive planning documents for 6 modules covering 113+ route handlers, following Repository/Service/Controller pattern with independent toggle-based migration per module. All V2 plans stored in `docs/` folder (Fleet plan in `attached_assets/`):
-  - `attached_assets/V2-Fleet-Module-Refactor-Plan.md` (1,756 lines) — 85 routes across `routes.ts` and `fleetAdmin.ts`, toggle: `fleet_api_version`
-  - `docs/V2-Reports-Module-Refactor-Plan.md` (1,569 lines) — 38 routes, 7 sub-domains, cross-module storage consumption pattern, toggle: `reports_api_version`
-  - `docs/V2-CertSurvey-Module-Refactor-Plan.md` (1,302 lines) — 24 routes, 10 schema tables, 3-tab admin pattern, toggle: `cert_survey_api_version`
-  - `docs/V2-Defects-Module-Refactor-Plan.md` (1,225 lines) — 37 routes, 8 schema tables, 47+ storage methods, toggle: `defects_api_version`
-  - `docs/V2-ModifyPMS-ChangeRequests-Module-Refactor-Plan.md` (1,129 lines) — 14 routes, status state machine, cross-entity mutation, toggle: `change_requests_api_version`
-  - `docs/V2-Dashboard-Module-Refactor-Plan.md` (1,100 lines) — 0 legacy + 2 new V2 aggregation routes, toggle: `dashboard_api_version`
+- **AI Chatbot Assistant**: Floating chat panel powered by OpenAI GPT-4o with function calling via Replit AI Integration. Features 29 analytical and operational tools for querying various system data (work orders, spares, components, jobs, inventory, defects, compliance, etc.). The chatbot provides structured responses (Summary → Critical Insights → Priority Items → Recommendations), employs query classification, and manages conversation history.
+- **V2 Modular Architecture Refactor Plans**: Comprehensive planning for 6 modules (Fleet, Reports, CertSurvey, Defects, ModifyPMS-ChangeRequests, Dashboard) following Repository/Service/Controller pattern, with independent toggle-based migration per module. Plans are detailed in `docs/` and `attached_assets/`.
 
 ## External Dependencies
 *   **Frontend**: `@radix-ui/*`, `@tanstack/react-query`, `wouter`, `tailwindcss`, `lucide-react`
 *   **Backend**: `express`, `drizzle-orm`, `@neondatabase/serverless`, `connect-pg-simple`
 *   **Development**: `vite`, `typescript`, `drizzle-kit`
+*   **AI**: OpenAI GPT-4o (via Replit AI Integration)
