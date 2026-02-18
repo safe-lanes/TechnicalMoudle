@@ -19659,6 +19659,101 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   })();
   
+  // STARTUP BACKFILL: Create missing maintenance history records for completed work orders
+  // This handles work orders that were completed before the auto-population feature was added
+  (async () => {
+    try {
+      // Get all completed work orders
+      const allVessels = await storage.getVessels();
+      let backfilledCount = 0;
+      let skippedCount = 0;
+      
+      for (const vessel of allVessels) {
+        const workOrders = await storage.getWorkOrders(vessel.id);
+        const completedWOs = workOrders.filter((wo: any) => wo.status === 'Completed');
+        
+        for (const wo of completedWOs) {
+          const woAny = wo as any;
+          // Check if maintenance history already exists for this work order
+          const existingHistory = await storage.getMaintenanceHistoryByWorkOrderId(woAny.id);
+          if (existingHistory) {
+            skippedCount++;
+            continue;
+          }
+          
+          // Find the component for this work order
+          if (!woAny.dateCompleted) continue;
+          if (!woAny.componentCode) continue;
+          const component = await storage.getComponentByCode(woAny.componentCode, woAny.vesselId);
+          if (!component) continue;
+          
+          // Find the parent job
+          let parentJob = null;
+          let parentJobNo: string | null = null;
+          
+          if (woAny.jobId) {
+            parentJob = await storage.getJob(woAny.jobId);
+            if (parentJob) parentJobNo = parentJob.jobNo;
+          }
+          
+          if (!parentJobNo && woAny.workOrderNo) {
+            const woNumber = woAny.workOrderNo;
+            const newFormatMatch = woNumber.match(/^(.+?)-\d+\.\d+.*-\d{4}-\d+$/);
+            if (newFormatMatch) parentJobNo = newFormatMatch[1];
+            if (!parentJobNo) {
+              const oldFormatMatch = woNumber.match(/^(.+)-\d{4}-\d+$/);
+              if (oldFormatMatch) parentJobNo = oldFormatMatch[1];
+            }
+            if (parentJobNo && !parentJob) {
+              const allJobs = await storage.getJobsByVessel(woAny.vesselId);
+              parentJob = allJobs.find((j: any) => j.jobNo === parentJobNo) || null;
+            }
+          }
+          
+          // Normalize date
+          const normalizeToISO = (isoDate: string | undefined): string => {
+            if (!isoDate) return new Date().toISOString().split('T')[0];
+            const date = new Date(isoDate);
+            return date.toISOString().split('T')[0];
+          };
+          
+          const historyPayload = {
+            componentId: component.id,
+            componentCode: woAny.componentCode || component.componentCode,
+            vesselCode: woAny.vesselId,
+            jobId: parentJob?.id || woAny.jobId || null,
+            jobCode: parentJobNo || null,
+            workOrderId: woAny.id,
+            workOrderNo: woAny.templateCode || woAny.workOrderNo || `WO-${woAny.id}`,
+            jobTitle: woAny.jobTitle,
+            maintenanceType: woAny.taskType || 'Servicing',
+            dateCompleted: normalizeToISO(woAny.dateCompleted),
+            runningHoursAtCompletion: woAny.runningHoursAtCompletion?.toString() || null,
+            performedBy: woAny.performedBy || 'Unknown',
+            approvedBy: woAny.approvedBy || null,
+            approvalDate: woAny.approvalDate ? normalizeToISO(woAny.approvalDate) : null,
+            status: 'Approved' as const,
+            workDescription: woAny.briefWorkDescription || null,
+            sparesUsed: null,
+            remarks: woAny.remarks || null,
+            isComponentReplaced: false
+          };
+          
+          await storage.createComponentMaintenanceHistory(historyPayload);
+          backfilledCount++;
+        }
+      }
+      
+      if (backfilledCount > 0) {
+        console.log(`✅ Maintenance history backfill complete: ${backfilledCount} records created, ${skippedCount} already existed`);
+      } else {
+        console.log(`✅ Maintenance history backfill check complete - all ${skippedCount} completed work orders already have history records`);
+      }
+    } catch (err) {
+      console.error('⚠️ Error during maintenance history backfill:', err);
+    }
+  })();
+  
   // Check and revert expired postponed work orders on startup
   (async () => {
     try {
