@@ -8,7 +8,11 @@ import { Marker } from "@/components/Marker";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+<<<<<<< HEAD
 import { Search, ChevronRight, ChevronDown, Edit, Edit2, Trash2, Plus, PlusCircle, Square, FileSpreadsheet, X, Minus, AlertCircle, CheckCircle, HelpCircle, MapPin, Info, Download, Settings2, Check, ChevronsUpDown, Expand, Minimize2 } from "lucide-react";
+=======
+import { Search, ChevronRight, ChevronLeft, ChevronDown, Edit, Edit2, Trash2, Plus, PlusCircle, Square, FileSpreadsheet, X, Minus, AlertCircle, CheckCircle, HelpCircle, MapPin, Info, Download, Settings2, Check, ChevronsUpDown, ChevronsLeft, ChevronsRight } from "lucide-react";
+>>>>>>> 0bf1d8b6 (Add pagination and consistent action features to spares inventory and history)
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import * as XLSX from "xlsx";
@@ -106,9 +110,12 @@ const Spares: React.FC = () => {
   });
   const { vesselId, setVesselId } = useVessel();
   
-  // Pagination state
+  // Pagination state - Inventory
   const [currentPage, setCurrentPage] = useState(1);
-  const itemsPerPage = 10;
+  const [itemsPerPage, setItemsPerPage] = useState(10);
+  // Pagination state - History
+  const [historyPage, setHistoryPage] = useState(1);
+  const [historyItemsPerPage, setHistoryItemsPerPage] = useState(10);
   const { data: vessels = [] } = useVessels();
   
   // Modify mode state - use proper hook for reactivity
@@ -1294,6 +1301,7 @@ const Spares: React.FC = () => {
     }
   }, [totalPages, currentPage, filteredSpares.length]);
 
+<<<<<<< HEAD
   const collectAllNodeIds = (nodes: ComponentNode[]): string[] => {
     const ids: string[] = [];
     const traverse = (nodeList: ComponentNode[]) => {
@@ -1315,6 +1323,35 @@ const Spares: React.FC = () => {
 
   const collapseAllNodes = () => {
     setExpandedNodes(new Set());
+=======
+  // History pagination calculations
+  const historyTotalPages = Math.ceil(historyData.length / historyItemsPerPage);
+  const paginatedHistory = useMemo(() => {
+    const startIndex = (historyPage - 1) * historyItemsPerPage;
+    return historyData.slice(startIndex, startIndex + historyItemsPerPage);
+  }, [historyData, historyPage, historyItemsPerPage]);
+
+  useEffect(() => {
+    setHistoryPage(1);
+  }, [vesselId, historyItemsPerPage]);
+
+  useEffect(() => {
+    if (historyTotalPages > 0 && historyPage > historyTotalPages) {
+      setHistoryPage(historyTotalPages);
+    } else if (historyTotalPages === 0 && historyData.length === 0) {
+      setHistoryPage(1);
+    }
+  }, [historyTotalPages, historyPage, historyData.length]);
+
+  const goToInventoryPage = (page: number) => {
+    const p = Math.max(1, Math.min(page, totalPages || 1));
+    setCurrentPage(p);
+  };
+
+  const goToHistoryPage = (page: number) => {
+    const p = Math.max(1, Math.min(page, historyTotalPages || 1));
+    setHistoryPage(p);
+>>>>>>> 0bf1d8b6 (Add pagination and consistent action features to spares inventory and history)
   };
 
   // Toggle node expansion
@@ -2398,51 +2435,55 @@ const Spares: React.FC = () => {
                 )}
               </div>
               
-              {/* Pagination Controls */}
+              {/* Pagination Footer */}
               {filteredSpares.length > 0 && (
-                <div className="px-4 py-3 border-t border-gray-200 bg-gray-50 flex items-center justify-between">
-                  <div className="text-sm text-gray-600">
-                    Showing {((currentPage - 1) * itemsPerPage) + 1} to {Math.min(currentPage * itemsPerPage, filteredSpares.length)} of {filteredSpares.length} entries
+                <div className="p-4 bg-gray-50 border-t border-gray-200 flex items-center justify-between" data-testid="inventory-pagination-footer">
+                  <div className="flex items-center gap-2 text-sm text-gray-600">
+                    <span>Show</span>
+                    <Select value={String(itemsPerPage)} onValueChange={(val) => { setItemsPerPage(Number(val)); setCurrentPage(1); }}>
+                      <SelectTrigger className="w-20 h-8" data-testid="select-inventory-items-per-page">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="5">5</SelectItem>
+                        <SelectItem value="10">10</SelectItem>
+                        <SelectItem value="20">20</SelectItem>
+                        <SelectItem value="50">50</SelectItem>
+                        <SelectItem value="100">100</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <span>items per page</span>
                   </div>
-                  <div className="flex items-center gap-2">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => setCurrentPage(1)}
-                      disabled={currentPage === 1}
-                      data-testid="pagination-first"
-                    >
-                      First
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
-                      disabled={currentPage === 1}
-                      data-testid="pagination-prev"
-                    >
-                      Previous
-                    </Button>
-                    <span className="px-3 py-1 text-sm text-gray-700">
-                      Page {currentPage} of {totalPages}
+                  <div className="flex items-center gap-2 text-sm text-gray-600" data-testid="inventory-pagination-info">
+                    <span>
+                      Showing {((currentPage - 1) * itemsPerPage) + 1} - {Math.min(currentPage * itemsPerPage, filteredSpares.length)} of {filteredSpares.length} spares
                     </span>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
-                      disabled={currentPage === totalPages}
-                      data-testid="pagination-next"
-                    >
-                      Next
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <Button variant="outline" size="sm" onClick={() => goToInventoryPage(1)} disabled={currentPage === 1} className="h-8 w-8 p-0" data-testid="pagination-first">
+                      <ChevronsLeft className="h-4 w-4" />
                     </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => setCurrentPage(totalPages)}
-                      disabled={currentPage === totalPages}
-                      data-testid="pagination-last"
-                    >
-                      Last
+                    <Button variant="outline" size="sm" onClick={() => goToInventoryPage(currentPage - 1)} disabled={currentPage === 1} className="h-8 w-8 p-0" data-testid="pagination-prev">
+                      <ChevronLeft className="h-4 w-4" />
+                    </Button>
+                    <div className="flex items-center gap-1 px-2">
+                      <span className="text-sm text-gray-600">Page</span>
+                      <Input
+                        type="number"
+                        min={1}
+                        max={totalPages || 1}
+                        value={currentPage}
+                        onChange={(e) => { const v = parseInt(e.target.value); if (!isNaN(v)) goToInventoryPage(v); }}
+                        className="w-14 h-8 text-center"
+                        data-testid="input-inventory-page-number"
+                      />
+                      <span className="text-sm text-gray-600">of {totalPages || 1}</span>
+                    </div>
+                    <Button variant="outline" size="sm" onClick={() => goToInventoryPage(currentPage + 1)} disabled={currentPage >= totalPages} className="h-8 w-8 p-0" data-testid="pagination-next">
+                      <ChevronRight className="h-4 w-4" />
+                    </Button>
+                    <Button variant="outline" size="sm" onClick={() => goToInventoryPage(totalPages)} disabled={currentPage >= totalPages} className="h-8 w-8 p-0" data-testid="pagination-last">
+                      <ChevronsRight className="h-4 w-4" />
                     </Button>
                   </div>
                 </div>
@@ -2467,13 +2508,13 @@ const Spares: React.FC = () => {
               </div>
 
               {/* History Table Body */}
-              <div className="overflow-y-auto h-[calc(100%-48px)]">
+              <div className="overflow-y-auto flex-1">
                 {historyData.length === 0 ? (
                   <div className="p-8 text-center text-gray-500">
                     No history records found.
                   </div>
                 ) : (
-                  historyData.map((history: SpareHistory) => (
+                  paginatedHistory.map((history: SpareHistory) => (
                     <div key={history.id} className="px-4 py-3 border-b border-gray-100 hover:bg-gray-50">
                       <div className="grid grid-cols-9 gap-4 text-sm items-center">
                         <div className="text-gray-900">
@@ -2528,6 +2569,60 @@ const Spares: React.FC = () => {
                   ))
                 )}
               </div>
+
+              {/* History Pagination Footer */}
+              {historyData.length > 0 && (
+                <div className="p-4 bg-gray-50 border-t border-gray-200 flex items-center justify-between" data-testid="history-pagination-footer">
+                  <div className="flex items-center gap-2 text-sm text-gray-600">
+                    <span>Show</span>
+                    <Select value={String(historyItemsPerPage)} onValueChange={(val) => { setHistoryItemsPerPage(Number(val)); setHistoryPage(1); }}>
+                      <SelectTrigger className="w-20 h-8" data-testid="select-history-items-per-page">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="5">5</SelectItem>
+                        <SelectItem value="10">10</SelectItem>
+                        <SelectItem value="20">20</SelectItem>
+                        <SelectItem value="50">50</SelectItem>
+                        <SelectItem value="100">100</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <span>items per page</span>
+                  </div>
+                  <div className="flex items-center gap-2 text-sm text-gray-600" data-testid="history-pagination-info">
+                    <span>
+                      Showing {((historyPage - 1) * historyItemsPerPage) + 1} - {Math.min(historyPage * historyItemsPerPage, historyData.length)} of {historyData.length} transactions
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <Button variant="outline" size="sm" onClick={() => goToHistoryPage(1)} disabled={historyPage === 1} className="h-8 w-8 p-0" data-testid="history-pagination-first">
+                      <ChevronsLeft className="h-4 w-4" />
+                    </Button>
+                    <Button variant="outline" size="sm" onClick={() => goToHistoryPage(historyPage - 1)} disabled={historyPage === 1} className="h-8 w-8 p-0" data-testid="history-pagination-prev">
+                      <ChevronLeft className="h-4 w-4" />
+                    </Button>
+                    <div className="flex items-center gap-1 px-2">
+                      <span className="text-sm text-gray-600">Page</span>
+                      <Input
+                        type="number"
+                        min={1}
+                        max={historyTotalPages || 1}
+                        value={historyPage}
+                        onChange={(e) => { const v = parseInt(e.target.value); if (!isNaN(v)) goToHistoryPage(v); }}
+                        className="w-14 h-8 text-center"
+                        data-testid="input-history-page-number"
+                      />
+                      <span className="text-sm text-gray-600">of {historyTotalPages || 1}</span>
+                    </div>
+                    <Button variant="outline" size="sm" onClick={() => goToHistoryPage(historyPage + 1)} disabled={historyPage >= historyTotalPages} className="h-8 w-8 p-0" data-testid="history-pagination-next">
+                      <ChevronRight className="h-4 w-4" />
+                    </Button>
+                    <Button variant="outline" size="sm" onClick={() => goToHistoryPage(historyTotalPages)} disabled={historyPage >= historyTotalPages} className="h-8 w-8 p-0" data-testid="history-pagination-last">
+                      <ChevronsRight className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </div>
+              )}
             </>
           )}
         </div>
