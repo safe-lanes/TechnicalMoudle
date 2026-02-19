@@ -267,6 +267,40 @@ const Stores: React.FC = () => {
     }
   };
 
+  const [isSavingLocRob, setIsSavingLocRob] = useState(false);
+  const handleSaveAllLocRob = async () => {
+    const entries = Object.entries(editingLocRobValues);
+    if (entries.length === 0) {
+      toast({ title: "No Changes", description: "No pending location ROB changes to save." });
+      return;
+    }
+    setIsSavingLocRob(true);
+    try {
+      for (const [key, val] of entries) {
+        const [itemIdStr, side] = key.split('-');
+        const itemId = Number(itemIdStr);
+        const newVal = Number(val);
+        const item = items.find(i => i.id === itemId);
+        if (!item || isNaN(newVal) || newVal < 0) continue;
+        const currentVal = side === 'A' ? (item.robLocationA ?? 0) : (item.robLocationB ?? 0);
+        if (newVal === currentVal) continue;
+        const fieldKey = side === 'A' ? 'robLocationA' : 'robLocationB';
+        await fetch(`/technical/api/stores/${vesselId}/${itemId}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ [fieldKey]: newVal }),
+        });
+      }
+      queryClient.invalidateQueries({ queryKey: [`/technical/api/stores/${vesselId}?itemType=${activeTab}`] });
+      setEditingLocRobValues({});
+      toast({ title: "Saved", description: `Location ROB values saved successfully.` });
+    } catch (error) {
+      toast({ title: "Error", description: "Failed to save some location ROB changes.", variant: "destructive" });
+    } finally {
+      setIsSavingLocRob(false);
+    }
+  };
+
   // Map API data to StoreItem format and update items state
   useEffect(() => {
     if (storesData && storesData.length > 0) {
@@ -1626,6 +1660,15 @@ const Stores: React.FC = () => {
           data-testid="stores-loc-clear"
         >
           Clear
+        </Button>
+        <Button 
+          size="sm" 
+          className="bg-[#52baf3] hover:bg-[#3da8e0] text-white"
+          onClick={handleSaveAllLocRob}
+          disabled={isSavingLocRob}
+          data-testid="stores-loc-save"
+        >
+          {isSavingLocRob ? 'Saving...' : 'Save'}
         </Button>
       </div>
       ) : viewMode === "inventory" ? (
