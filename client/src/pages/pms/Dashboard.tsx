@@ -1,6 +1,6 @@
 import { useState, useMemo } from "react";
 import { useLocation } from "wouter";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueries, useMutation, useQueryClient } from "@tanstack/react-query";
 import { format } from "date-fns";
 import { useVessel } from "@/contexts/VesselContext";
 import { useUIRole } from "@/contexts/UIRoleContext";
@@ -25,7 +25,12 @@ import {
   XCircle,
   Eye,
   TrendingUp,
-  TrendingDown
+  TrendingDown,
+  LayoutGrid,
+  ArrowUpDown,
+  ArrowUp,
+  ArrowDown,
+  Loader2
 } from "lucide-react";
 import { AgCharts } from "ag-charts-react";
 import { AgChartOptions } from "ag-charts-community";
@@ -65,10 +70,273 @@ interface Component {
   isActive?: boolean;
 }
 
+type SortField = 'vessel' | 'overduePercent' | 'outstandingPercent' | 'compliancePercent' | 'lowStockItems' | 'overdueCount';
+type SortDir = 'asc' | 'desc';
+
+interface VesselKPI {
+  vesselId: string;
+  vesselName: string;
+  overduePercent: number;
+  outstandingPercent: number;
+  compliancePercent: number;
+  lowStockItems: number;
+  overdueCount: number;
+  totalWOs: number;
+  totalPlanned: number;
+  completedPlanned: number;
+}
+
+function getFleetStatus(overduePercent: number): { label: string; color: string; bgColor: string } {
+  if (overduePercent > 40) return { label: 'Critical', color: 'text-red-700', bgColor: 'bg-red-100 border-red-300' };
+  if (overduePercent >= 20) return { label: 'At Risk', color: 'text-amber-700', bgColor: 'bg-amber-100 border-amber-300' };
+  return { label: 'Good', color: 'text-green-700', bgColor: 'bg-green-100 border-green-300' };
+}
+
+function getBarColor(value: number, invert: boolean = false): string {
+  if (invert) {
+    if (value >= 80) return 'bg-green-500';
+    if (value >= 50) return 'bg-amber-500';
+    return 'bg-red-500';
+  }
+  if (value > 40) return 'bg-red-500';
+  if (value >= 20) return 'bg-amber-500';
+  return 'bg-green-500';
+}
+
+const FleetView = ({ vessels, onSelectVessel }: { vessels: { id: string; name: string }[]; onSelectVessel: (id: string) => void }) => {
+  const [sortField, setSortField] = useState<SortField>('overduePercent');
+  const [sortDir, setSortDir] = useState<SortDir>('desc');
+
+  const woQueries = useQueries({
+    queries: vessels.map(vessel => ({
+      queryKey: ['/technical/api/work-orders', vessel.id],
+      queryFn: async () => {
+        const response = await fetch(`/technical/api/work-orders?vesselId=${vessel.id}`);
+        if (!response.ok) return [];
+        return response.json();
+      },
+    })),
+  });
+
+  const sparesQueries = useQueries({
+    queries: vessels.map(vessel => ({
+      queryKey: ['/technical/api/spares', vessel.id],
+      queryFn: async () => {
+        const response = await fetch(`/technical/api/spares/${vessel.id}`);
+        if (!response.ok) return [];
+        return response.json();
+      },
+    })),
+  });
+
+  const isLoading = woQueries.some(q => q.isLoading) || sparesQueries.some(q => q.isLoading);
+
+  const vesselKPIs: VesselKPI[] = useMemo(() => {
+    return vessels.map((vessel, idx) => {
+      const workOrders = (woQueries[idx]?.data || []).filter((wo: any) => wo !== null && wo !== undefined);
+      const sparesArr = sparesQueries[idx]?.data || [];
+
+      const nonExecWOs = workOrders.filter((wo: any) => !wo.isExecution);
+      const totalWOs = nonExecWOs.length;
+      const overdueWOs = nonExecWOs.filter((wo: any) => (wo as any).computedStatus === 'Overdue');
+      const overdueCount = overdueWOs.length;
+      const overduePercent = totalWOs > 0 ? Math.round((overdueCount / totalWOs) * 100) : 0;
+
+      const now = new Date();
+      const currentMonth = now.getMonth();
+      const currentYear = now.getFullYear();
+      const monthlyPlanned = nonExecWOs.filter((wo: any) => {
+        const dueDate = wo.dueDate ? new Date(wo.dueDate) : null;
+        if (!dueDate || isNaN(dueDate.getTime())) return false;
+        return dueDate.getMonth() === currentMonth && dueDate.getFullYear() === currentYear;
+      });
+      const totalPlanned = monthlyPlanned.length;
+      const completedPlanned = monthlyPlanned.filter((wo: any) => (wo as any).computedStatus === 'Completed').length;
+      const outstandingPlanned = totalPlanned - completedPlanned;
+      const outstandingPercent = totalPlanned > 0 ? Math.round((outstandingPlanned / totalPlanned) * 100) : 0;
+      const compliancePercent = totalPlanned > 0 ? Math.round((completedPlanned / totalPlanned) * 100) : 0;
+
+      const lowStockItems = sparesArr.filter((s: any) => {
+        const rob = typeof s.rob === 'number' ? s.rob : parseInt(s.rob) || 0;
+        const min = typeof s.min === 'number' ? s.min : parseInt(s.min) || 0;
+        return rob <= min && min > 0;
+      }).length;
+
+      return {
+        vesselId: vessel.id,
+        vesselName: vessel.name,
+        overduePercent,
+        outstandingPercent,
+        compliancePercent,
+        lowStockItems,
+        overdueCount,
+        totalWOs,
+        totalPlanned,
+        completedPlanned,
+      };
+    });
+  }, [vessels, woQueries.map(q => q.data), sparesQueries.map(q => q.data)]);
+
+  const sorted = useMemo(() => {
+    const list = [...vesselKPIs];
+    list.sort((a, b) => {
+      let cmp = 0;
+      if (sortField === 'vessel') cmp = a.vesselName.localeCompare(b.vesselName);
+      else cmp = (a[sortField] as number) - (b[sortField] as number);
+      return sortDir === 'desc' ? -cmp : cmp;
+    });
+    return list;
+  }, [vesselKPIs, sortField, sortDir]);
+
+  const handleSort = (field: SortField) => {
+    if (sortField === field) {
+      setSortDir(d => d === 'asc' ? 'desc' : 'asc');
+    } else {
+      setSortField(field);
+      setSortDir(field === 'vessel' ? 'asc' : 'desc');
+    }
+  };
+
+  const SortIcon = ({ field }: { field: SortField }) => {
+    if (sortField !== field) return <ArrowUpDown className="w-3 h-3 ml-1 opacity-40" />;
+    return sortDir === 'asc' ? <ArrowUp className="w-3 h-3 ml-1" /> : <ArrowDown className="w-3 h-3 ml-1" />;
+  };
+
+  const InlineBar = ({ value, maxValue = 100, colorClass }: { value: number; maxValue?: number; colorClass: string }) => {
+    const width = Math.min((value / maxValue) * 100, 100);
+    return (
+      <div className="relative flex items-center gap-2">
+        <div className="flex-1 h-5 bg-gray-100 dark:bg-gray-800 rounded-sm overflow-hidden">
+          <div className={`h-full rounded-sm transition-all ${colorClass}`} style={{ width: `${width}%` }} />
+        </div>
+      </div>
+    );
+  };
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center py-20">
+        <Loader2 className="w-8 h-8 animate-spin text-gray-400" />
+        <span className="ml-3 text-gray-500">Loading fleet data...</span>
+      </div>
+    );
+  }
+
+  const columns: { field: SortField; label: string }[] = [
+    { field: 'vessel', label: 'Vessel' },
+    { field: 'overduePercent', label: 'Overdue %' },
+    { field: 'outstandingPercent', label: 'Outstanding %' },
+    { field: 'compliancePercent', label: 'Compliance %' },
+    { field: 'lowStockItems', label: 'Low Stock Items' },
+    { field: 'overdueCount', label: 'Overdue Count' },
+  ];
+
+  return (
+    <Card data-testid="card-fleet-view" className="bg-white">
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2">
+          <LayoutGrid className="w-5 h-5" />
+          Fleet Comparison — Vessel Benchmarking
+        </CardTitle>
+        <CardDescription>
+          All vessels ranked by maintenance KPIs. Click a vessel name to view its dashboard.
+        </CardDescription>
+      </CardHeader>
+      <CardContent>
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm" data-testid="table-fleet-comparison">
+            <thead>
+              <tr className="border-b border-gray-200 dark:border-gray-700">
+                {columns.map(col => (
+                  <th
+                    key={col.field}
+                    className="text-left py-3 px-3 font-medium text-gray-600 dark:text-gray-400 cursor-pointer select-none whitespace-nowrap"
+                    onClick={() => handleSort(col.field)}
+                    data-testid={`th-sort-${col.field}`}
+                  >
+                    <span className="flex items-center">
+                      {col.label}
+                      <SortIcon field={col.field} />
+                    </span>
+                  </th>
+                ))}
+                <th className="text-left py-3 px-3 font-medium text-gray-600 dark:text-gray-400 whitespace-nowrap">Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              {sorted.map((v, idx) => {
+                const status = getFleetStatus(v.overduePercent);
+                return (
+                  <tr
+                    key={v.vesselId}
+                    className={`border-b border-gray-100 dark:border-gray-800 ${idx % 2 === 0 ? 'bg-gray-50/50 dark:bg-gray-900/30' : ''}`}
+                    data-testid={`row-fleet-vessel-${v.vesselId}`}
+                  >
+                    <td className="py-3 px-3">
+                      <button
+                        className="font-medium text-blue-600 dark:text-blue-400 hover:underline text-left"
+                        onClick={() => onSelectVessel(v.vesselId)}
+                        data-testid={`button-select-vessel-${v.vesselId}`}
+                      >
+                        {v.vesselName}
+                      </button>
+                    </td>
+                    <td className="py-3 px-3" data-testid={`cell-overdue-percent-${v.vesselId}`}>
+                      <div className="flex items-center gap-2 min-w-[120px]">
+                        <span className="w-10 text-right font-mono font-medium">{v.overduePercent}%</span>
+                        <div className="flex-1">
+                          <InlineBar value={v.overduePercent} colorClass={getBarColor(v.overduePercent)} />
+                        </div>
+                      </div>
+                    </td>
+                    <td className="py-3 px-3" data-testid={`cell-outstanding-percent-${v.vesselId}`}>
+                      <div className="flex items-center gap-2 min-w-[120px]">
+                        <span className="w-10 text-right font-mono font-medium">{v.outstandingPercent}%</span>
+                        <div className="flex-1">
+                          <InlineBar value={v.outstandingPercent} colorClass={getBarColor(v.outstandingPercent)} />
+                        </div>
+                      </div>
+                    </td>
+                    <td className="py-3 px-3" data-testid={`cell-compliance-percent-${v.vesselId}`}>
+                      <div className="flex items-center gap-2 min-w-[120px]">
+                        <span className="w-10 text-right font-mono font-medium">{v.compliancePercent}%</span>
+                        <div className="flex-1">
+                          <InlineBar value={v.compliancePercent} colorClass={getBarColor(v.compliancePercent, true)} />
+                        </div>
+                      </div>
+                    </td>
+                    <td className="py-3 px-3 text-center font-mono font-medium" data-testid={`cell-low-stock-${v.vesselId}`}>
+                      <span className={v.lowStockItems > 0 ? 'text-amber-600' : 'text-gray-500'}>{v.lowStockItems}</span>
+                    </td>
+                    <td className="py-3 px-3 text-center font-mono font-medium" data-testid={`cell-overdue-count-${v.vesselId}`}>
+                      <span className={v.overdueCount > 0 ? 'text-red-600' : 'text-gray-500'}>{v.overdueCount}</span>
+                    </td>
+                    <td className="py-3 px-3" data-testid={`cell-status-${v.vesselId}`}>
+                      <Badge className={`${status.bgColor} ${status.color} border text-xs`}>
+                        {status.label}
+                      </Badge>
+                    </td>
+                  </tr>
+                );
+              })}
+              {sorted.length === 0 && (
+                <tr>
+                  <td colSpan={7} className="py-12 text-center text-gray-500">No vessel data available</td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      </CardContent>
+    </Card>
+  );
+};
+
 const Dashboard = () => {
   const [, setLocation] = useLocation();
   const [lastUpdated, setLastUpdated] = useState(new Date());
   const [bulkApproveModalOpen, setBulkApproveModalOpen] = useState(false);
+  const [isFleetView, setIsFleetView] = useState(false);
   const { vesselId, setVesselId } = useVessel();
   const { data: vessels = [] } = useVessels();
   const { isSailAdmin, isClientAdmin, isHeadOfDept } = useUIRole();
@@ -496,6 +764,14 @@ const Dashboard = () => {
 
   const handleVesselChange = (newVesselId: string) => {
     setVesselId(newVesselId);
+    if (newVesselId !== 'all') {
+      setIsFleetView(false);
+    }
+  };
+
+  const handleFleetVesselSelect = (selectedVesselId: string) => {
+    setVesselId(selectedVesselId);
+    setIsFleetView(false);
   };
 
   const handleRefresh = () => {
@@ -513,7 +789,7 @@ const Dashboard = () => {
           <h1 className="text-2xl font-bold text-gray-900" data-testid="text-dashboard-title">PMS Dashboard</h1>
         </div>
 
-        {/* Vessel Selector - Visible for Sail Admin and Client Admin */}
+        {/* Vessel Selector + Fleet View Toggle - Visible for Sail Admin and Client Admin */}
         {(isSailAdmin || isClientAdmin) && (
           <div className="flex items-center gap-4 mt-4">
             <div className="flex items-center gap-2">
@@ -534,12 +810,31 @@ const Dashboard = () => {
                 </SelectContent>
               </Select>
             </div>
+            {vessels.length > 1 && (
+              <Button
+                variant={isFleetView ? 'default' : 'outline'}
+                size="sm"
+                onClick={() => setIsFleetView(!isFleetView)}
+                data-testid="button-toggle-fleet-view"
+              >
+                <LayoutGrid className="w-4 h-4 mr-2" />
+                {isFleetView ? 'Vessel View' : 'Fleet View'}
+              </Button>
+            )}
           </div>
         )}
       </div>
 
       {/* Main Content - Scrollable */}
       <div className="flex-1 overflow-y-auto space-y-6">
+
+        {/* Fleet View Mode */}
+        {isFleetView && vessels.length > 0 && (
+          <FleetView vessels={vessels} onSelectVessel={handleFleetVesselSelect} />
+        )}
+
+        {/* Single Vessel Dashboard */}
+        {!isFleetView && (<>
         
         {/* Work Order Status KPI Cards - Clickable */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
@@ -1210,7 +1505,7 @@ const Dashboard = () => {
           </CardContent>
         </Card>
 
-
+        </>)}
       </div>
 
       {/* Bulk Approve Modal for Head of Dept */}
