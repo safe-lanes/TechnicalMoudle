@@ -16,6 +16,7 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { getComponentCategory } from "@/utils/componentUtils";
 import { useVessels } from "@/hooks/useVessels";
+import { useDepartmentOptions } from "@/hooks/useDepartments";
 import type { ComponentDocument } from "@shared/schema";
 
 interface ComponentNode {
@@ -43,6 +44,7 @@ export default function ComponentRegisterAddEdit({
   const { toast } = useToast();
   const { vesselId, setVesselId } = useVessel();
   const { data: vessels = [] } = useVessels();
+  const { options: departmentOptions } = useDepartmentOptions();
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedTreeNode, setSelectedTreeNode] = useState<string | null>(null);
   const [expandedNodes, setExpandedNodes] = useState<Set<string>>(new Set());
@@ -1247,10 +1249,9 @@ export default function ComponentRegisterAddEdit({
                       data-testid="select-eqpt-system-dept"
                     >
                       <option value="">Select</option>
-                      <option value="Engine">Engine</option>
-                      <option value="Deck">Deck</option>
-                      <option value="Electrical">Electrical</option>
-                      <option value="Hotel">Hotel</option>
+                      {departmentOptions.map((opt) => (
+                        <option key={opt.value} value={opt.value}>{opt.label}</option>
+                      ))}
                     </select>
                   </div>
                   <div>
