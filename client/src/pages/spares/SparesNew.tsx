@@ -2887,30 +2887,33 @@ const Spares: React.FC = () => {
                                 <PopoverContent className="w-56 p-0" align="start">
                                   <Command>
                                     <CommandInput placeholder="Search locations..." data-testid={`input-search-location-${spare.id}`} />
-                                    <CommandList>
+                                    <CommandList className="max-h-none">
                                       <CommandEmpty>No locations found.</CommandEmpty>
-                                      <CommandGroup heading="Locations">
-                                        {vesselLocations.map((loc: any) => (
-                                          <CommandItem
-                                            key={loc.id}
-                                            value={loc.locationName}
-                                            onSelect={() => {
-                                              if (loc.id !== selectedLocationId) {
-                                                handleChangeSpareLocation(spare, loc.id, loc.locationName);
-                                              }
-                                            }}
-                                            data-testid={`option-location-${loc.id}-${spare.id}`}
-                                          >
-                                            <MapPin className="h-3 w-3 mr-2 flex-shrink-0" />
-                                            <span className="truncate">{loc.locationName}</span>
-                                            {loc.id === selectedLocationId && <Check className="h-3 w-3 ml-auto text-blue-600" />}
-                                          </CommandItem>
-                                        ))}
-                                      </CommandGroup>
-                                      <CommandGroup>
+                                      <div className="max-h-[144px] overflow-y-auto">
+                                        <CommandGroup heading="Locations">
+                                          {vesselLocations.map((loc: any) => (
+                                            <CommandItem
+                                              key={loc.id}
+                                              value={loc.locationName}
+                                              onSelect={() => {
+                                                if (loc.id !== selectedLocationId) {
+                                                  handleChangeSpareLocation(spare, loc.id, loc.locationName);
+                                                }
+                                              }}
+                                              data-testid={`option-location-${loc.id}-${spare.id}`}
+                                            >
+                                              <MapPin className="h-3 w-3 mr-2 flex-shrink-0" />
+                                              <span className="truncate">{loc.locationName}</span>
+                                              {loc.id === selectedLocationId && <Check className="h-3 w-3 ml-auto text-blue-600" />}
+                                            </CommandItem>
+                                          ))}
+                                        </CommandGroup>
+                                      </div>
+                                      <CommandGroup className="border-t" forceMount>
                                         <CommandItem
                                           onSelect={() => setCreatingLocationForSpare(spare)}
                                           data-testid={`button-create-location-${spare.id}`}
+                                          forceMount
                                         >
                                           <Plus className="h-3 w-3 mr-2 text-green-600" />
                                           <span className="text-green-600 font-medium">Create New Location</span>
