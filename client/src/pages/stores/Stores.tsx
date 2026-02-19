@@ -174,7 +174,7 @@ const Stores: React.FC = () => {
   const [editingLocations, setEditingLocations] = useState<{[key: number]: {locationA: string, locationB: string, nameA?: string, nameB?: string}}>({});
 
   // Location tab state
-  const [selectedLocationSide, setSelectedLocationSide] = useState<"A" | "B" | null>(null);
+  const [selectedLocationName, setSelectedLocationName] = useState<string | null>(null);
   const [locationTabSearch, setLocationTabSearch] = useState("");
   const [editingLocRobValues, setEditingLocRobValues] = useState<Record<string, string>>({});
   const [creatingLocationForStoreItem, setCreatingLocationForStoreItem] = useState<StoreItem | null>(null);
@@ -182,8 +182,14 @@ const Stores: React.FC = () => {
   const [isCreatingLocation, setIsCreatingLocation] = useState(false);
   const [isChangingStoreLocation, setIsChangingStoreLocation] = useState(false);
 
+  const getItemLocationSide = (item: StoreItem, locName: string): "A" | "B" | null => {
+    if ((item.locationAName || '') === locName && (item.robLocationA ?? 0) > 0) return 'A';
+    if ((item.locationBName || '') === locName && (item.robLocationB ?? 0) > 0) return 'B';
+    return null;
+  };
+
   useEffect(() => {
-    setSelectedLocationSide(null);
+    setSelectedLocationName(null);
     setLocationTabSearch("");
   }, [vesselId, activeTab]);
 
@@ -219,18 +225,20 @@ const Stores: React.FC = () => {
     return (allVesselLocationsResponse as any)?.data || [];
   }, [allVesselLocationsResponse]);
 
-  const handleChangeStoreLocation = async (item: StoreItem, newLocationName: string) => {
-    if (!vesselId || !selectedLocationSide || isChangingStoreLocation) return;
+  const handleChangeStoreLocation = async (item: StoreItem, newLocName: string) => {
+    if (!vesselId || !selectedLocationName || isChangingStoreLocation) return;
+    const side = getItemLocationSide(item, selectedLocationName);
+    if (!side) return;
     setIsChangingStoreLocation(true);
     try {
-      const fieldKey = selectedLocationSide === 'A' ? 'locationA' : 'locationB';
+      const fieldKey = side === 'A' ? 'locationA' : 'locationB';
       await fetch(`/technical/api/stores/${vesselId}/${item.id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ [fieldKey]: newLocationName }),
+        body: JSON.stringify({ [fieldKey]: newLocName }),
       });
       queryClient.invalidateQueries({ queryKey: [`/technical/api/stores/${vesselId}?itemType=${activeTab}`] });
-      toast({ title: "Location Updated", description: `Location changed to "${newLocationName}"` });
+      toast({ title: "Location Updated", description: `Location changed to "${newLocName}"` });
     } catch (e: any) {
       toast({ title: "Error", description: e.message || 'Failed to update location', variant: "destructive" });
     } finally {
@@ -2015,28 +2023,35 @@ const Stores: React.FC = () => {
           </div>
           <div className="overflow-y-auto flex-1">
             {(() => {
-              const locAName = locationNames.locationA || 'Location A';
-              const locBName = locationNames.locationB || 'Location B';
-              const locACount = filteredItems.filter(i => (i.robLocationA ?? 0) > 0).length;
-              const locBCount = filteredItems.filter(i => (i.robLocationB ?? 0) > 0).length;
-              const locations = [
-                { side: 'A' as const, name: locAName, count: locACount },
-                { side: 'B' as const, name: locBName, count: locBCount },
-              ].filter(l => {
-                if (!locationTabSearch) return true;
-                return l.name.toLowerCase().includes(locationTabSearch.toLowerCase());
+              const locationMap = new Map<string, number>();
+              filteredItems.forEach(item => {
+                const locA = item.locationAName || '';
+                const locB = item.locationBName || '';
+                if (locA && (item.robLocationA ?? 0) > 0) {
+                  locationMap.set(locA, (locationMap.get(locA) || 0) + 1);
+                }
+                if (locB && (item.robLocationB ?? 0) > 0) {
+                  locationMap.set(locB, (locationMap.get(locB) || 0) + 1);
+                }
               });
+              const locations = Array.from(locationMap.entries())
+                .map(([name, count]) => ({ name, count }))
+                .filter(l => {
+                  if (!locationTabSearch) return true;
+                  return l.name.toLowerCase().includes(locationTabSearch.toLowerCase());
+                })
+                .sort((a, b) => a.name.localeCompare(b.name));
               if (locations.length === 0) {
                 return <div className="p-4 text-center text-gray-500 text-sm">No locations found</div>;
               }
               return locations.map((loc) => (
                 <button
-                  key={loc.side}
-                  onClick={() => setSelectedLocationSide(loc.side)}
+                  key={loc.name}
+                  onClick={() => setSelectedLocationName(loc.name)}
                   className={`w-full text-left px-4 py-2.5 text-sm border-b border-gray-100 transition-colors ${
-                    selectedLocationSide === loc.side ? 'bg-blue-50 text-blue-700 font-medium' : 'text-gray-700 hover:bg-gray-50'
+                    selectedLocationName === loc.name ? 'bg-blue-50 text-blue-700 font-medium' : 'text-gray-700 hover:bg-gray-50'
                   }`}
-                  data-testid={`stores-location-item-${loc.side}`}
+                  data-testid={`stores-location-item-${loc.name}`}
                 >
                   <div className="flex items-center gap-2">
                     <MapPin className="h-3.5 w-3.5 flex-shrink-0" />
@@ -2073,23 +2088,23 @@ const Stores: React.FC = () => {
               </div>
             </div>
             <div className="flex flex-col overflow-y-auto flex-1">
-              {!selectedLocationSide ? (
+              {!selectedLocationName ? (
                 <div className="p-8 text-center text-gray-500">Select a location from the left panel to view stores items.</div>
               ) : storesLoading ? (
                 <div className="p-8 text-center text-gray-500">Loading...</div>
               ) : (() => {
                 const locationItems = filteredItems.filter(item => {
-                  if (selectedLocationSide === 'A') return (item.robLocationA ?? 0) > 0;
-                  return (item.robLocationB ?? 0) > 0;
+                  return getItemLocationSide(item, selectedLocationName) !== null;
                 });
                 if (locationItems.length === 0) {
                   return <div className="p-8 text-center text-gray-500">No items found at this location.</div>;
                 }
                 return locationItems.map((item) => {
+                  const side = getItemLocationSide(item, selectedLocationName)!;
                   const stockStatus = getStockColor(item.stock);
-                  const locRob = selectedLocationSide === 'A' ? (item.robLocationA ?? 0) : (item.robLocationB ?? 0);
-                  const locName = selectedLocationSide === 'A' ? (item.locationAName || '') : (item.locationBName || '');
-                  const editKey = `${item.id}-${selectedLocationSide}`;
+                  const locRob = side === 'A' ? (item.robLocationA ?? 0) : (item.robLocationB ?? 0);
+                  const locName = side === 'A' ? (item.locationAName || '') : (item.locationBName || '');
+                  const editKey = `${item.id}-${side}`;
                   const editingLocRobVal = editingLocRobValues[editKey];
                   return (
                     <div key={item.id} className="px-4 py-3 border-b border-gray-100 hover:bg-gray-50">
@@ -2168,7 +2183,7 @@ const Stores: React.FC = () => {
                             onBlur={() => {
                               const newVal = editingLocRobVal !== undefined ? Number(editingLocRobVal) : locRob;
                               if (editingLocRobVal !== undefined && newVal !== locRob && !isNaN(newVal) && newVal >= 0) {
-                                const fieldKey = selectedLocationSide === 'A' ? 'robLocationA' : 'robLocationB';
+                                const fieldKey = side === 'A' ? 'robLocationA' : 'robLocationB';
                                 fetch(`/technical/api/stores/${vesselId}/${item.id}`, {
                                   method: 'PATCH',
                                   headers: { 'Content-Type': 'application/json' },
