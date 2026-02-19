@@ -12,7 +12,9 @@ import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
-import { Search, Edit2, Clock, Trash2, FileSpreadsheet, X, MessageSquare, Calendar, PlusCircle, MinusCircle, Download, AlertCircle, CheckCircle, HelpCircle, MapPin, ChevronDown } from "lucide-react";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
+import { Search, Edit2, Clock, Trash2, FileSpreadsheet, X, MessageSquare, Calendar, PlusCircle, MinusCircle, Download, AlertCircle, CheckCircle, HelpCircle, MapPin, ChevronDown, ChevronsUpDown, Plus, Check } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
@@ -175,7 +177,10 @@ const Stores: React.FC = () => {
   const [selectedLocationSide, setSelectedLocationSide] = useState<"A" | "B" | null>(null);
   const [locationTabSearch, setLocationTabSearch] = useState("");
   const [editingLocRobValues, setEditingLocRobValues] = useState<Record<string, string>>({});
-  const [editingLocNameValues, setEditingLocNameValues] = useState<Record<string, string>>({});
+  const [creatingLocationForStoreItem, setCreatingLocationForStoreItem] = useState<StoreItem | null>(null);
+  const [newLocationName, setNewLocationName] = useState("");
+  const [isCreatingLocation, setIsCreatingLocation] = useState(false);
+  const [isChangingStoreLocation, setIsChangingStoreLocation] = useState(false);
 
   useEffect(() => {
     setSelectedLocationSide(null);
@@ -203,6 +208,63 @@ const Stores: React.FC = () => {
   const locationNames = {
     locationA: locationNamesData?.locationAName || 'Location A',
     locationB: locationNamesData?.locationBName || 'Location B'
+  };
+
+  const { data: allVesselLocationsResponse } = useQuery({
+    queryKey: [`/technical/api/inventory/locations/${vesselId}`],
+    enabled: vesselId !== 'all' && vesselId !== '' && viewMode === 'location',
+  });
+
+  const allVesselLocations = useMemo(() => {
+    return (allVesselLocationsResponse as any)?.data || [];
+  }, [allVesselLocationsResponse]);
+
+  const handleChangeStoreLocation = async (item: StoreItem, newLocationName: string) => {
+    if (!vesselId || !selectedLocationSide || isChangingStoreLocation) return;
+    setIsChangingStoreLocation(true);
+    try {
+      const fieldKey = selectedLocationSide === 'A' ? 'locationA' : 'locationB';
+      await fetch(`/technical/api/stores/${vesselId}/${item.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ [fieldKey]: newLocationName }),
+      });
+      queryClient.invalidateQueries({ queryKey: [`/technical/api/stores/${vesselId}?itemType=${activeTab}`] });
+      toast({ title: "Location Updated", description: `Location changed to "${newLocationName}"` });
+    } catch (e: any) {
+      toast({ title: "Error", description: e.message || 'Failed to update location', variant: "destructive" });
+    } finally {
+      setIsChangingStoreLocation(false);
+    }
+  };
+
+  const handleCreateNewStoreLocation = async () => {
+    if (!newLocationName.trim() || !vesselId || !creatingLocationForStoreItem) return;
+    setIsCreatingLocation(true);
+    try {
+      const res = await fetch(`/technical/api/inventory/locations/${vesselId}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ locationName: newLocationName.trim(), createdBy: 'System' }),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error || 'Failed to create location');
+      }
+      const result = await res.json();
+      const newLoc = result.data;
+      toast({ title: "Location Created", description: `Location "${newLocationName.trim()}" created successfully.` });
+      queryClient.invalidateQueries({ queryKey: [`/technical/api/inventory/locations/${vesselId}`] });
+      if (creatingLocationForStoreItem && newLoc?.locationName) {
+        await handleChangeStoreLocation(creatingLocationForStoreItem, newLoc.locationName);
+      }
+      setCreatingLocationForStoreItem(null);
+      setNewLocationName('');
+    } catch (e: any) {
+      toast({ title: "Error", description: e.message || 'Failed to create location', variant: "destructive" });
+    } finally {
+      setIsCreatingLocation(false);
+    }
   };
 
   // Map API data to StoreItem format and update items state
@@ -2006,7 +2068,6 @@ const Stores: React.FC = () => {
                   const locName = selectedLocationSide === 'A' ? (item.locationAName || '') : (item.locationBName || '');
                   const editKey = `${item.id}-${selectedLocationSide}`;
                   const editingLocRobVal = editingLocRobValues[editKey];
-                  const editingLocNameVal = editingLocNameValues[editKey];
                   return (
                     <div key={item.id} className="px-4 py-3 border-b border-gray-100 hover:bg-gray-50">
                       <div className="grid text-sm items-center min-w-max" style={{ gridTemplateColumns: FEATURES.IHM ? '120px 200px 160px 80px 80px 80px 80px 160px 100px 40px' : '120px 200px 160px 80px 80px 80px 80px 160px 100px', minWidth: 'max-content', gap: '12px' }}>
@@ -2022,30 +2083,57 @@ const Stores: React.FC = () => {
                           </span>
                         </div>
                         <div className="px-2">
-                          <div className="flex items-center gap-1 border border-gray-200 rounded-md px-2 py-1">
-                            <MapPin className="h-3 w-3 flex-shrink-0 text-gray-500" />
-                            <input
-                              type="text"
-                              className="text-xs flex-1 min-w-0 bg-transparent outline-none"
-                              value={editingLocNameVal !== undefined ? editingLocNameVal : locName}
-                              onChange={(e) => setEditingLocNameValues(prev => ({ ...prev, [editKey]: e.target.value }))}
-                              onBlur={() => {
-                                const newName = editingLocNameVal?.trim();
-                                if (newName !== undefined && newName !== locName) {
-                                  const fieldKey = selectedLocationSide === 'A' ? 'locationA' : 'locationB';
-                                  fetch(`/technical/api/stores/${vesselId}/${item.id}`, {
-                                    method: 'PATCH',
-                                    headers: { 'Content-Type': 'application/json' },
-                                    body: JSON.stringify({ [fieldKey]: newName }),
-                                  }).then(() => {
-                                    queryClient.invalidateQueries({ queryKey: [`/technical/api/stores/${vesselId}?itemType=${activeTab}`] });
-                                  });
-                                }
-                                setEditingLocNameValues(prev => { const n = { ...prev }; delete n[editKey]; return n; });
-                              }}
-                              data-testid={`input-loc-name-${item.id}`}
-                            />
-                          </div>
+                          <Popover>
+                            <PopoverTrigger asChild>
+                              <button
+                                className={`flex items-center gap-1 text-gray-700 hover:text-blue-600 cursor-pointer w-full text-left border border-gray-200 rounded-md px-2 py-1 ${isChangingStoreLocation ? 'opacity-50 pointer-events-none' : ''}`}
+                                disabled={isChangingStoreLocation}
+                                data-testid={`button-change-store-location-${item.id}`}
+                              >
+                                <MapPin className="h-3 w-3 flex-shrink-0 text-gray-500" />
+                                <span className="truncate text-xs flex-1">{locName || '-'}</span>
+                                <ChevronsUpDown className="h-3 w-3 flex-shrink-0 text-gray-400" />
+                              </button>
+                            </PopoverTrigger>
+                            <PopoverContent className="w-56 p-0" align="start">
+                              <Command>
+                                <CommandInput placeholder="Search locations..." data-testid={`input-search-store-location-${item.id}`} />
+                                <CommandList className="max-h-none">
+                                  <CommandEmpty>No locations found.</CommandEmpty>
+                                  <div className="max-h-[144px] overflow-y-auto">
+                                    <CommandGroup heading="Locations">
+                                      {allVesselLocations.map((loc: any) => (
+                                        <CommandItem
+                                          key={loc.id}
+                                          value={loc.locationName}
+                                          onSelect={() => {
+                                            if (loc.locationName !== locName) {
+                                              handleChangeStoreLocation(item, loc.locationName);
+                                            }
+                                          }}
+                                          data-testid={`option-store-location-${loc.id}-${item.id}`}
+                                        >
+                                          <MapPin className="h-3 w-3 mr-2 flex-shrink-0" />
+                                          <span className="truncate">{loc.locationName}</span>
+                                          {loc.locationName === locName && <Check className="h-3 w-3 ml-auto text-blue-600" />}
+                                        </CommandItem>
+                                      ))}
+                                    </CommandGroup>
+                                  </div>
+                                  <CommandGroup className="border-t" forceMount>
+                                    <CommandItem
+                                      onSelect={() => setCreatingLocationForStoreItem(item)}
+                                      data-testid={`button-create-store-location-${item.id}`}
+                                      forceMount
+                                    >
+                                      <Plus className="h-3 w-3 mr-2 text-green-600" />
+                                      <span className="text-green-600 font-medium">Create New Location</span>
+                                    </CommandItem>
+                                  </CommandGroup>
+                                </CommandList>
+                              </Command>
+                            </PopoverContent>
+                          </Popover>
                         </div>
                         <div className="px-2">
                           <input
@@ -3219,6 +3307,59 @@ const Stores: React.FC = () => {
               </DialogFooter>
             </div>
           )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Create New Location Dialog (for Stores By Location) */}
+      <Dialog 
+        open={creatingLocationForStoreItem !== null} 
+        onOpenChange={(open) => { 
+          if (!open) { 
+            setCreatingLocationForStoreItem(null); 
+            setNewLocationName(''); 
+          } 
+        }}
+      >
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <div className="flex items-center gap-2">
+              <div className="bg-green-500 rounded-md p-1.5">
+                <Plus className="h-4 w-4 text-white" />
+              </div>
+              <DialogTitle className="text-base">Create New Location</DialogTitle>
+            </div>
+          </DialogHeader>
+          <div className="space-y-4">
+            {creatingLocationForStoreItem && (
+              <div className="text-xs text-gray-500">
+                Creating a new location for item: <span className="font-medium text-gray-700">{creatingLocationForStoreItem.itemCode}</span>
+              </div>
+            )}
+            <div>
+              <Label htmlFor="new-store-location-name" className="text-sm">Location Name</Label>
+              <Input
+                id="new-store-location-name"
+                value={newLocationName}
+                onChange={(e) => setNewLocationName(e.target.value)}
+                placeholder="Enter location name..."
+                className="mt-1"
+                data-testid="input-new-store-location-name"
+                onKeyDown={(e) => { if (e.key === 'Enter' && newLocationName.trim()) handleCreateNewStoreLocation(); }}
+              />
+            </div>
+            <DialogFooter className="flex gap-2">
+              <Button variant="outline" onClick={() => { setCreatingLocationForStoreItem(null); setNewLocationName(''); }} data-testid="button-cancel-create-store-location">
+                Cancel
+              </Button>
+              <Button 
+                onClick={handleCreateNewStoreLocation}
+                disabled={!newLocationName.trim() || isCreatingLocation}
+                data-testid="button-confirm-create-store-location"
+              >
+                {isCreatingLocation ? 'Creating...' : 'Create Location'}
+              </Button>
+            </DialogFooter>
+          </div>
         </DialogContent>
       </Dialog>
 
