@@ -1938,12 +1938,11 @@ const Stores: React.FC = () => {
                 {FEATURES.IHM && (
                   <div className="flex justify-center" data-testid={index === 0 ? getMarkerId(activeTab, "28") : undefined}>
                     {index === 0 && <Marker id={getMarkerId(activeTab, "28")} />}
-                    {/* Mock IHM status - in real implementation, would come from API */}
-                    {item.itemCode === 'ST-TOOL-001' ? (
+                    {item.ihmPresence === 'Present' ? (
                       <div title="IHM Present">
                         <AlertCircle className="h-4 w-4 text-red-500" />
                       </div>
-                    ) : item.itemCode === 'ST-CONS-001' ? (
+                    ) : item.ihmPresence === 'Not Present' ? (
                       <div title="IHM Not Present">
                         <CheckCircle className="h-4 w-4 text-green-500" />
                       </div>
