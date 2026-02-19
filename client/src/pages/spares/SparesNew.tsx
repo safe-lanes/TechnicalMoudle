@@ -506,6 +506,7 @@ const Spares: React.FC = () => {
 
     queryClient.invalidateQueries({ queryKey: [`/technical/api/inventory/stock/full-by-location/${vesselId}/${selectedLocationId}`] });
     queryClient.invalidateQueries({ queryKey: ['/technical/api/inventory/spares-with-inventory', vesselId] });
+    queryClient.invalidateQueries({ queryKey: ['/technical/api/spares/history', vesselId] });
   };
 
   // Quick adjust mutation (for +/- buttons) with optimistic updates
