@@ -4558,7 +4558,7 @@ const Spares: React.FC = () => {
         </DialogContent>
       </Dialog>
 
-      {/* Advanced Inventory Transaction Dialog */}
+      {/* Inventory Transaction Dialog */}
       <Dialog 
         open={locationDialogSpare !== null} 
         onOpenChange={(open) => { 
@@ -4574,23 +4574,19 @@ const Spares: React.FC = () => {
               <div className="bg-[#52baf3] rounded-md p-1.5">
                 <MapPin className="h-4 w-4 text-white" />
               </div>
-              <DialogTitle className="text-base">Advanced Inventory Transaction</DialogTitle>
+              <DialogTitle className="text-base">Inventory Transaction</DialogTitle>
             </div>
           </DialogHeader>
           {locationDialogSpare && (
             <div className="space-y-4">
               <div className="bg-gray-50 rounded-md p-3 space-y-1">
                 <div className="flex gap-2 flex-wrap">
-                  <span className="text-xs text-gray-500">Part Code:</span>
-                  <span className="text-xs font-medium" data-testid="text-dialog-partcode">{locationDialogSpare.partCode}</span>
-                </div>
-                <div className="flex gap-2 flex-wrap">
                   <span className="text-xs text-gray-500">Part Name:</span>
                   <span className="text-xs font-medium" data-testid="text-dialog-partname">{locationDialogSpare.partName}</span>
                 </div>
                 <div className="flex gap-2 flex-wrap">
-                  <span className="text-xs text-gray-500">Component:</span>
-                  <span className="text-xs font-medium" data-testid="text-dialog-component">{locationDialogSpare.componentName}</span>
+                  <span className="text-xs text-gray-500">Part Number:</span>
+                  <span className="text-xs font-medium" data-testid="text-dialog-partcode">{locationDialogSpare.partCode}</span>
                 </div>
               </div>
 
