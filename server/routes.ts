@@ -10831,7 +10831,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         'ihm-inventory-status',
         'change-requests-status-tracking',
         'critical-components-list',
-        'critical-equipment-schedule'
+        'critical-equipment-schedule',
+        'lsa-ffa-master-list'
       ];
       
       if (dedicatedReportRoutes.includes(reportType)) {
@@ -11391,6 +11392,117 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
     } catch (error: any) {
       console.error("Error generating critical components report:", error);
+      res.status(500).json({ error: "Failed to generate report", details: error.message });
+    }
+  });
+
+  app.get("/technical/api/reports/lsa-ffa-master-list", async (req, res) => {
+    try {
+      const vesselId = req.query.vesselId as string;
+      const equipmentType = req.query.equipmentType as string | undefined;
+      const format = (req.query.format as string) || 'json';
+
+      if (!vesselId) {
+        return res.status(400).json({ error: "vesselId is required" });
+      }
+
+      const allVessels = await storage.getVessels();
+      let allComponents: any[] = [];
+      if (vesselId === 'all') {
+        for (const v of allVessels) {
+          allComponents = allComponents.concat(await storage.getComponents(v.id));
+        }
+      } else {
+        allComponents = await storage.getComponents(vesselId);
+      }
+
+      let filteredComponents = allComponents.filter((c: any) =>
+        c.eqptSystemDept === 'LSA' || c.eqptSystemDept === 'FFA'
+      );
+
+      if (equipmentType && equipmentType !== 'all') {
+        filteredComponents = filteredComponents.filter((c: any) => c.eqptSystemDept === equipmentType);
+      }
+
+      const data = filteredComponents.map((c: any, i: number) => ({
+        sno: i + 1,
+        componentCode: c.componentCode || '-',
+        componentName: c.name || '-',
+        equipmentType: c.eqptSystemDept || '-',
+        location: c.location || '-',
+        maker: c.maker || '-',
+        model: c.model || '-',
+        serialNo: c.serialNo || '-',
+        installationDate: c.installationDate || '-',
+        critical: c.critical ? 'Yes' : 'No',
+        classItem: c.classItem ? 'Yes' : 'No',
+        isActive: c.isActive !== false ? 'Yes' : 'No',
+        vesselId: c.vesselId || '-'
+      }));
+
+      const lsaCount = filteredComponents.filter(c => c.eqptSystemDept === 'LSA').length;
+      const ffaCount = filteredComponents.filter(c => c.eqptSystemDept === 'FFA').length;
+      const activeCount = filteredComponents.filter(c => c.isActive !== false).length;
+      const inactiveCount = filteredComponents.filter(c => c.isActive === false).length;
+
+      if (format === 'excel') {
+        const columns: ColumnDef[] = [
+          { key: 'sno', header: 'S.No', width: 6, type: 'number', align: 'center' },
+          { key: 'componentCode', header: 'Component Code', width: 20, type: 'text' },
+          { key: 'componentName', header: 'Component Name', width: 40, type: 'text' },
+          { key: 'equipmentType', header: 'Equipment Type', width: 16, type: 'text', align: 'center' },
+          { key: 'location', header: 'Location', width: 20, type: 'text' },
+          { key: 'maker', header: 'Maker', width: 20, type: 'text' },
+          { key: 'model', header: 'Model', width: 20, type: 'text' },
+          { key: 'serialNo', header: 'Serial No', width: 18, type: 'text' },
+          { key: 'installationDate', header: 'Installation Date', width: 16, type: 'text' },
+          { key: 'critical', header: 'Criticality', width: 12, type: 'text', align: 'center' },
+          { key: 'classItem', header: 'Class Item', width: 12, type: 'text', align: 'center' },
+          { key: 'isActive', header: 'Active', width: 10, type: 'text', align: 'center' }
+        ];
+
+        const vesselName = vesselId !== 'all' ? (allVessels.find(v => v.id === vesselId)?.name || vesselId) : 'All Vessels';
+        const lastCol = getLastColumnLetter(columns.length);
+
+        const wb = new ExcelJS.Workbook();
+        const ws = wb.addWorksheet('LSA-FFA Equipment');
+
+        applyStandardHeader(ws, 'LSA/FFA Equipment Master List', `${data.length} components (LSA: ${lsaCount}, FFA: ${ffaCount})`, vesselName, data.length, lastCol);
+        applyStandardTableHeader(ws, columns);
+        applyStandardDataRows(ws, data, columns);
+
+        const summaryItems: SummaryItem[] = [
+          { label: 'Total LSA Components', value: lsaCount },
+          { label: 'Total FFA Components', value: ffaCount },
+          { label: 'Total Combined', value: data.length },
+          { label: 'Active', value: activeCount },
+          { label: 'Inactive', value: inactiveCount }
+        ];
+
+        const summaryStartRow = 8 + data.length + 1;
+        const lastRow = applyStandardSummary(ws, summaryItems, summaryStartRow, columns.length);
+        applyStandardPageSetup(ws, 7, columns.length, lastRow, vesselName);
+
+        const buffer = await wb.xlsx.writeBuffer();
+        const filename = generateFilename('LSA_FFA_Equipment_Master_List', vesselName);
+        res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+        res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+        res.send(Buffer.from(buffer as ArrayBuffer));
+        return;
+      }
+
+      res.json({
+        components: data,
+        summary: {
+          total: filteredComponents.length,
+          lsaCount,
+          ffaCount,
+          activeCount,
+          inactiveCount
+        }
+      });
+    } catch (error: any) {
+      console.error("Error generating LSA/FFA master list report:", error);
       res.status(500).json({ error: "Failed to generate report", details: error.message });
     }
   });
