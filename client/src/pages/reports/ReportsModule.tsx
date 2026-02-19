@@ -150,7 +150,7 @@ const ReportsModule = () => {
       title: "LSA/FFA Equipment",
       description: "Life-saving and fire-fighting equipment tracking, statutory compliance reports, and maintenance schedules",
       icon: LifeBuoy,
-      reportCount: 1,
+      reportCount: 2,
       color: "border-orange-500",
       iconBg: "bg-orange-500",
       iconBgLight: "bg-orange-100 text-orange-600"

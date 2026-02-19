@@ -10832,7 +10832,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         'change-requests-status-tracking',
         'critical-components-list',
         'critical-equipment-schedule',
-        'lsa-ffa-master-list'
+        'lsa-ffa-master-list',
+        'lsa-ffa-maintenance-schedule'
       ];
       
       if (dedicatedReportRoutes.includes(reportType)) {
@@ -11503,6 +11504,254 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
     } catch (error: any) {
       console.error("Error generating LSA/FFA master list report:", error);
+      res.status(500).json({ error: "Failed to generate report", details: error.message });
+    }
+  });
+
+  // LSA/FFA Maintenance Schedule & Status Report
+  app.get("/technical/api/reports/lsa-ffa-maintenance-schedule", async (req, res) => {
+    try {
+      const vesselId = req.query.vesselId as string;
+      const statusFilter = req.query.status as string | undefined;
+      const equipmentType = req.query.equipmentType as string | undefined;
+      const format = (req.query.format as string) || 'json';
+
+      if (!vesselId) {
+        return res.status(400).json({ error: "vesselId is required" });
+      }
+
+      const allVessels = await storage.getVessels();
+      let allComponents: any[] = [];
+      if (vesselId === 'all') {
+        for (const v of allVessels) {
+          allComponents = allComponents.concat(await storage.getComponents(v.id));
+        }
+      } else {
+        allComponents = await storage.getComponents(vesselId);
+      }
+
+      let lsaFfaComponents = allComponents.filter((c: any) =>
+        c.eqptSystemDept === 'LSA' || c.eqptSystemDept === 'FFA'
+      );
+
+      if (equipmentType && equipmentType !== 'all') {
+        lsaFfaComponents = lsaFfaComponents.filter((c: any) => c.eqptSystemDept === equipmentType);
+      }
+
+      const lsaFfaComponentIds = new Set(lsaFfaComponents.map((c: any) => c.id));
+      const lsaFfaComponentMap = new Map(lsaFfaComponents.map((c: any) => [c.id, c]));
+
+      let allJobs: any[] = [];
+      if (vesselId === 'all') {
+        for (const v of allVessels) {
+          const vJobs = await storage.getJobs(v.id);
+          allJobs = allJobs.concat(vJobs);
+        }
+      } else {
+        allJobs = await storage.getJobs(vesselId);
+      }
+      const jobMap = new Map(allJobs.map((j: any) => [j.id, j]));
+
+      let allLinks: any[] = [];
+      if (vesselId === 'all') {
+        for (const v of allVessels) {
+          const links = await storage.getJobComponentLinks(v.id);
+          allLinks.push(...links);
+        }
+      } else {
+        allLinks = await storage.getJobComponentLinks(vesselId);
+      }
+
+      let allWorkOrders: any[] = [];
+      if (vesselId === 'all') {
+        for (const v of allVessels) {
+          const wos = await storage.getWorkOrders(v.id);
+          allWorkOrders = allWorkOrders.concat(wos);
+        }
+      } else {
+        allWorkOrders = await storage.getWorkOrders(vesselId);
+      }
+      const woByJobId = new Map<string, any[]>();
+      for (const wo of allWorkOrders) {
+        const jobId = wo.jobId;
+        if (jobId) {
+          const existing = woByJobId.get(jobId) || [];
+          existing.push(wo);
+          woByJobId.set(jobId, existing);
+        }
+      }
+
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+
+      const formatDateStr = (d: string | null | undefined) => {
+        if (!d) return '-';
+        try {
+          const date = new Date(d);
+          if (isNaN(date.getTime())) return d;
+          const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+          return `${date.getDate().toString().padStart(2,'0')}-${months[date.getMonth()]}-${date.getFullYear()}`;
+        } catch { return d; }
+      };
+
+      const scheduleItems: any[] = [];
+
+      for (const link of allLinks) {
+        if (!lsaFfaComponentIds.has(link.componentId)) continue;
+
+        const comp = lsaFfaComponentMap.get(link.componentId);
+        const job = jobMap.get(link.jobId);
+        if (!comp || !job) continue;
+
+        const nextDueDateStr = link.nextDueDate || job.nextDueDate;
+        let daysUntilDue: number | null = null;
+        let status = 'On Schedule';
+
+        if (nextDueDateStr) {
+          const nextDueDate = new Date(nextDueDateStr);
+          if (!isNaN(nextDueDate.getTime())) {
+            nextDueDate.setHours(0, 0, 0, 0);
+            daysUntilDue = Math.ceil((nextDueDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+            if (daysUntilDue < 0) {
+              status = 'Overdue';
+            } else if (daysUntilDue <= 30) {
+              status = 'Due Soon';
+            } else {
+              status = 'On Schedule';
+            }
+          }
+        }
+
+        const jobWorkOrders = woByJobId.get(job.id) || [];
+        const sortedWOs = jobWorkOrders.sort((a: any, b: any) => {
+          const dateA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+          const dateB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+          return dateB - dateA;
+        });
+        const lastWO = sortedWOs[0];
+
+        const lastDoneDateStr = link.lastDoneDate || job.lastDoneDate;
+        const freq = job.frequencyValue ? `${job.frequencyValue} ${job.frequencyUnit || ''}`.trim() : '-';
+
+        scheduleItems.push({
+          componentId: comp.id,
+          jobId: job.id,
+          componentCode: comp.componentCode || '-',
+          componentName: comp.name || '-',
+          equipmentType: comp.eqptSystemDept || '-',
+          location: comp.location || '-',
+          jobCode: job.jobNo || '-',
+          jobTitle: job.jobTitle || '-',
+          taskType: job.maintenanceType || '-',
+          maintenanceBasis: job.maintenanceBasis || '-',
+          frequency: freq,
+          nextDueDate: formatDateStr(nextDueDateStr),
+          daysUntilDue: daysUntilDue !== null ? daysUntilDue : '-',
+          status,
+          lastDoneDate: formatDateStr(lastDoneDateStr),
+          lastWONumber: lastWO?.workOrderNo || '-',
+          assignedTo: job.assignedTo || '-'
+        });
+      }
+
+      if (statusFilter && statusFilter !== 'all') {
+        const statusMap: Record<string, string> = {
+          'on-schedule': 'On Schedule',
+          'due-soon': 'Due Soon',
+          'overdue': 'Overdue'
+        };
+        const filterValue = statusMap[statusFilter];
+        if (filterValue) {
+          const filtered = scheduleItems.filter(item => item.status === filterValue);
+          scheduleItems.length = 0;
+          scheduleItems.push(...filtered);
+        }
+      }
+
+      scheduleItems.sort((a, b) => {
+        const dateA = a.nextDueDate !== '-' ? new Date(a.nextDueDate).getTime() : Infinity;
+        const dateB = b.nextDueDate !== '-' ? new Date(b.nextDueDate).getTime() : Infinity;
+        if (dateA !== dateB) return dateA - dateB;
+        return (a.componentCode || '').localeCompare(b.componentCode || '');
+      });
+
+      scheduleItems.forEach((item, i) => { item.sno = i + 1; });
+
+      const onScheduleCount = scheduleItems.filter(i => i.status === 'On Schedule').length;
+      const dueSoonCount = scheduleItems.filter(i => i.status === 'Due Soon').length;
+      const overdueCount = scheduleItems.filter(i => i.status === 'Overdue').length;
+
+      if (format === 'excel') {
+        const columns: ColumnDef[] = [
+          { key: 'sno', header: 'S.No', width: 6, type: 'number', align: 'center' },
+          { key: 'componentCode', header: 'Comp Code', width: 16, type: 'text' },
+          { key: 'componentName', header: 'Component Name', width: 30, type: 'text' },
+          { key: 'equipmentType', header: 'Equipment Type', width: 14, type: 'text', align: 'center' },
+          { key: 'location', header: 'Location', width: 18, type: 'text' },
+          { key: 'jobCode', header: 'Job Code', width: 16, type: 'text' },
+          { key: 'jobTitle', header: 'Job Title', width: 35, type: 'text' },
+          { key: 'taskType', header: 'Task Type', width: 16, type: 'text' },
+          { key: 'maintenanceBasis', header: 'Basis', width: 14, type: 'text' },
+          { key: 'frequency', header: 'Frequency', width: 14, type: 'text' },
+          { key: 'nextDueDate', header: 'Next Due Date', width: 16, type: 'text' },
+          { key: 'daysUntilDue', header: 'Days', width: 10, type: 'number', align: 'center' },
+          { key: 'status', header: 'Status', width: 14, type: 'text', align: 'center' },
+          { key: 'lastDoneDate', header: 'Last Done', width: 16, type: 'text' },
+          { key: 'lastWONumber', header: 'Last WO', width: 18, type: 'text' },
+          { key: 'assignedTo', header: 'Assigned To', width: 16, type: 'text' }
+        ];
+
+        const conditionalStyles: ConditionalStyle[] = [
+          {
+            condition: (row: any) => row.status === 'Overdue',
+            style: 'danger'
+          },
+          {
+            condition: (row: any) => row.status === 'Due Soon',
+            style: 'warning'
+          }
+        ];
+
+        const vesselName = vesselId !== 'all' ? (allVessels.find(v => v.id === vesselId)?.name || vesselId) : 'All Vessels';
+        const lastCol = getLastColumnLetter(columns.length);
+
+        const wb = new ExcelJS.Workbook();
+        const ws = wb.addWorksheet('LSA-FFA Maintenance Schedule');
+
+        applyStandardHeader(ws, 'LSA/FFA Maintenance Schedule & Status', `${scheduleItems.length} schedule items`, vesselName, scheduleItems.length, lastCol);
+        applyStandardTableHeader(ws, columns);
+        applyStandardDataRows(ws, scheduleItems, columns, 8, conditionalStyles);
+
+        const summaryItems: SummaryItem[] = [
+          { label: 'Total Items', value: scheduleItems.length },
+          { label: 'On Schedule', value: onScheduleCount },
+          { label: 'Due Soon', value: dueSoonCount, highlight: true },
+          { label: 'Overdue', value: overdueCount, highlight: true }
+        ];
+
+        const summaryStartRow = 8 + scheduleItems.length + 1;
+        const lastRow = applyStandardSummary(ws, summaryItems, summaryStartRow, columns.length);
+        applyStandardPageSetup(ws, 7, columns.length, lastRow, vesselName);
+
+        const buffer = await wb.xlsx.writeBuffer();
+        const filename = generateFilename('LSA_FFA_Maintenance_Schedule', vesselName);
+        res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+        res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+        res.send(Buffer.from(buffer as ArrayBuffer));
+        return;
+      }
+
+      res.json({
+        scheduleItems,
+        summary: {
+          total: scheduleItems.length,
+          onSchedule: onScheduleCount,
+          dueSoon: dueSoonCount,
+          overdue: overdueCount
+        }
+      });
+    } catch (error: any) {
+      console.error("Error generating LSA/FFA maintenance schedule report:", error);
       res.status(500).json({ error: "Failed to generate report", details: error.message });
     }
   });

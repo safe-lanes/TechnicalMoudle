@@ -18,7 +18,10 @@ import {
   Eye,
   FileText,
   Download,
-  Calendar as CalendarIcon
+  Calendar as CalendarIcon,
+  AlertTriangle,
+  Clock,
+  ListChecks
 } from "lucide-react";
 import { format } from "date-fns";
 import { pdfReportGenerator, formatReportDateRange } from "@/lib/pdfReportGenerator";
@@ -57,6 +60,7 @@ const LsaFfaReports: React.FC<LsaFfaReportsProps> = ({ onBack, globalFilters }) 
     dateRange: globalFilters?.dateRange || { from: null, to: null }
   });
   const [equipmentTypeFilter, setEquipmentTypeFilter] = useState<string>("all");
+  const [statusFilter, setStatusFilter] = useState<string>("all");
   const [generatingReports, setGeneratingReports] = useState<Set<string>>(new Set());
   const [previewData, setPreviewData] = useState<ReportPreviewData | null>(null);
   const { toast } = useToast();
@@ -91,6 +95,19 @@ const LsaFfaReports: React.FC<LsaFfaReportsProps> = ({ onBack, globalFilters }) 
     },
   });
 
+  const { data: scheduleData, isLoading: isScheduleLoading } = useQuery<any>({
+    queryKey: ['/technical/api/reports/lsa-ffa-maintenance-schedule', effectiveVesselId, equipmentTypeFilter, statusFilter],
+    queryFn: async () => {
+      const params = new URLSearchParams();
+      params.set('vesselId', effectiveVesselId || 'all');
+      if (equipmentTypeFilter !== 'all') params.set('equipmentType', equipmentTypeFilter);
+      if (statusFilter !== 'all') params.set('status', statusFilter);
+      const res = await fetch(`/technical/api/reports/lsa-ffa-maintenance-schedule?${params}`, { credentials: 'include' });
+      if (!res.ok) throw new Error('Failed to fetch');
+      return res.json();
+    },
+  });
+
   const reports: LsaFfaReport[] = [
     {
       id: "lsa-ffa-master-list",
@@ -100,6 +117,16 @@ const LsaFfaReports: React.FC<LsaFfaReportsProps> = ({ onBack, globalFilters }) 
       icon: LifeBuoy,
       priority: "high",
       estimatedTime: "1-2 min",
+      outputs: ["PDF", "Excel"]
+    },
+    {
+      id: "lsa-ffa-maintenance-schedule",
+      name: "LSA/FFA Maintenance Schedule & Status",
+      description: "Maintenance tracking for LSA and FFA equipment with due dates, overdue status, last done date, and work order history",
+      frequency: "Weekly",
+      icon: ListChecks,
+      priority: "high",
+      estimatedTime: "2-3 min",
       outputs: ["PDF", "Excel"]
     }
   ];
@@ -193,6 +220,86 @@ const LsaFfaReports: React.FC<LsaFfaReportsProps> = ({ onBack, globalFilters }) 
         finalData,
         summaryItems
       );
+    } else if (reportId === 'lsa-ffa-maintenance-schedule') {
+      if (!scheduleData) {
+        toast({ title: "No Data", description: "No maintenance schedule data available.", variant: "destructive" });
+        return;
+      }
+
+      const columns = [
+        { header: 'S.No', field: 'sno', width: 6 },
+        { header: 'Comp Code', field: 'componentCode', width: 16 },
+        { header: 'Component Name', field: 'componentName', width: 28 },
+        { header: 'Type', field: 'equipmentType', width: 8 },
+        { header: 'Location', field: 'location', width: 16 },
+        { header: 'Job Code', field: 'jobCode', width: 14 },
+        { header: 'Job Title', field: 'jobTitle', width: 30 },
+        { header: 'Task Type', field: 'taskType', width: 14 },
+        { header: 'Basis', field: 'maintenanceBasis', width: 12 },
+        { header: 'Frequency', field: 'frequency', width: 12 },
+        { header: 'Next Due', field: 'nextDueDate', width: 14 },
+        { header: 'Days', field: 'daysUntilDue', width: 8 },
+        { header: 'Status', field: 'status', width: 12 },
+        { header: 'Last Done', field: 'lastDoneDate', width: 14 },
+        { header: 'Last WO', field: 'lastWONumber', width: 16 },
+        { header: 'Assigned To', field: 'assignedTo', width: 14 }
+      ];
+
+      const items = scheduleData.scheduleItems || [];
+      const tableData = items.map((item: any) => ({
+        sno: String(item.sno || ''),
+        componentCode: item.componentCode || '-',
+        componentName: item.componentName || '-',
+        equipmentType: item.equipmentType || '-',
+        location: item.location || '-',
+        jobCode: item.jobCode || '-',
+        jobTitle: item.jobTitle || '-',
+        taskType: item.taskType || '-',
+        maintenanceBasis: item.maintenanceBasis || '-',
+        frequency: item.frequency || '-',
+        nextDueDate: item.nextDueDate || '-',
+        daysUntilDue: item.daysUntilDue !== undefined ? String(item.daysUntilDue) : '-',
+        status: item.status || '-',
+        lastDoneDate: item.lastDoneDate || '-',
+        lastWONumber: item.lastWONumber || '-',
+        assignedTo: item.assignedTo || '-'
+      }));
+
+      const summary = scheduleData.summary || {};
+      const summaryItems = [
+        { label: 'Total Items', value: summary.total ?? 0 },
+        { label: 'On Schedule', value: summary.onSchedule ?? 0 },
+        { label: 'Due Soon', value: summary.dueSoon ?? 0 },
+        { label: 'Overdue', value: summary.overdue ?? 0 }
+      ];
+
+      const finalData = tableData.length > 0 ? tableData : [{ sno: '-', componentCode: '-', componentName: 'No maintenance items found', equipmentType: '-', location: '-', jobCode: '-', jobTitle: '-', taskType: '-', maintenanceBasis: '-', frequency: '-', nextDueDate: '-', daysUntilDue: '-', status: '-', lastDoneDate: '-', lastWONumber: '-', assignedTo: '-' }];
+
+      if (mode === 'preview') {
+        setPreviewData({
+          title: 'LSA/FFA Maintenance Schedule & Status',
+          subtitle: `${items.length} schedule items (Overdue: ${summary.overdue ?? 0}, Due Soon: ${summary.dueSoon ?? 0}, On Schedule: ${summary.onSchedule ?? 0})`,
+          vessel: vesselName,
+          dateRange: formatReportDateRange(categoryFilters.dateRange?.from, categoryFilters.dateRange?.to),
+          columns,
+          data: finalData,
+          summary: summaryItems
+        });
+        return;
+      }
+
+      pdfReportGenerator.generateReport(
+        {
+          title: 'LSA/FFA Maintenance Schedule & Status',
+          subtitle: `${items.length} schedule items (Overdue: ${summary.overdue ?? 0}, Due Soon: ${summary.dueSoon ?? 0}, On Schedule: ${summary.onSchedule ?? 0})`,
+          vessel: vesselName,
+          orientation: 'landscape',
+          dateRange: formatReportDateRange(categoryFilters.dateRange?.from, categoryFilters.dateRange?.to)
+        },
+        columns,
+        finalData,
+        summaryItems
+      );
     } else {
       toast({ title: "Report Not Available", description: "This report is not yet implemented", variant: "destructive" });
     }
@@ -214,7 +321,15 @@ const LsaFfaReports: React.FC<LsaFfaReportsProps> = ({ onBack, globalFilters }) 
     params.set('format', 'excel');
     if (equipmentTypeFilter !== 'all') params.set('equipmentType', equipmentTypeFilter);
 
-    const response = await fetch(`/technical/api/reports/lsa-ffa-master-list?${params.toString()}`);
+    let endpoint = '';
+    if (reportId === 'lsa-ffa-master-list') {
+      endpoint = '/technical/api/reports/lsa-ffa-master-list';
+    } else if (reportId === 'lsa-ffa-maintenance-schedule') {
+      endpoint = '/technical/api/reports/lsa-ffa-maintenance-schedule';
+      if (statusFilter !== 'all') params.set('status', statusFilter);
+    }
+
+    const response = await fetch(`${endpoint}?${params.toString()}`);
     if (!response.ok) throw new Error('Export failed');
     const blob = await response.blob();
     const url = window.URL.createObjectURL(blob);
@@ -222,7 +337,7 @@ const LsaFfaReports: React.FC<LsaFfaReportsProps> = ({ onBack, globalFilters }) 
     a.href = url;
     const disposition = response.headers.get('Content-Disposition');
     const filenameMatch = disposition?.match(/filename="(.+)"/);
-    a.download = filenameMatch ? filenameMatch[1] : `lsa-ffa-master-list.xlsx`;
+    a.download = filenameMatch ? filenameMatch[1] : `${reportId}.xlsx`;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
@@ -256,6 +371,10 @@ const LsaFfaReports: React.FC<LsaFfaReportsProps> = ({ onBack, globalFilters }) 
     }
   };
 
+  const scheduleSummary = scheduleData?.summary || {};
+  const masterSummary = masterListData?.summary || {};
+  const anyLoading = isLoading || isScheduleLoading;
+
   return (
     <div className="p-6 bg-white dark:bg-background min-h-screen">
       <div className="mb-6">
@@ -271,7 +390,7 @@ const LsaFfaReports: React.FC<LsaFfaReportsProps> = ({ onBack, globalFilters }) 
           </Button>
           <div>
             <h1 className="text-2xl font-bold text-gray-900 dark:text-foreground" data-testid="text-lsa-ffa-title">LSA/FFA Equipment</h1>
-            <p className="text-sm text-gray-500 dark:text-muted-foreground">1 report for life-saving and fire-fighting equipment</p>
+            <p className="text-sm text-gray-500 dark:text-muted-foreground">2 reports for life-saving and fire-fighting equipment</p>
           </div>
         </div>
 
@@ -307,6 +426,20 @@ const LsaFfaReports: React.FC<LsaFfaReportsProps> = ({ onBack, globalFilters }) 
               </SelectContent>
             </Select>
           </div>
+          <div className="flex items-center gap-2">
+            <span className="text-sm text-gray-500 dark:text-muted-foreground">Status:</span>
+            <Select value={statusFilter} onValueChange={setStatusFilter}>
+              <SelectTrigger className="w-[170px]" data-testid="select-status-filter">
+                <SelectValue placeholder="All Statuses" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Statuses</SelectItem>
+                <SelectItem value="overdue">Overdue</SelectItem>
+                <SelectItem value="due-soon">Due Soon</SelectItem>
+                <SelectItem value="on-schedule">On Schedule</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
         </div>
       </div>
 
@@ -314,33 +447,33 @@ const LsaFfaReports: React.FC<LsaFfaReportsProps> = ({ onBack, globalFilters }) 
         <Card>
           <CardHeader className="pb-2">
             <CardDescription className="flex items-center gap-1">
-              <LifeBuoy className="w-4 h-4 text-blue-500" />
-              Total LSA Components
+              <Layers className="w-4 h-4 text-blue-500" />
+              Total Items
             </CardDescription>
-            <CardTitle className="text-3xl text-blue-600" data-testid="text-lsa-count">
-              {isLoading ? '...' : (masterListData?.summary?.lsaCount ?? 0)}
+            <CardTitle className="text-3xl text-blue-600" data-testid="text-total-items">
+              {anyLoading ? '...' : (scheduleSummary.total ?? masterSummary.total ?? 0)}
             </CardTitle>
           </CardHeader>
         </Card>
         <Card>
           <CardHeader className="pb-2">
             <CardDescription className="flex items-center gap-1">
-              <Flame className="w-4 h-4 text-orange-500" />
-              Total FFA Components
+              <AlertTriangle className="w-4 h-4 text-red-500" />
+              Overdue
             </CardDescription>
-            <CardTitle className="text-3xl text-orange-600" data-testid="text-ffa-count">
-              {isLoading ? '...' : (masterListData?.summary?.ffaCount ?? 0)}
+            <CardTitle className="text-3xl text-red-600" data-testid="text-overdue-count">
+              {anyLoading ? '...' : (scheduleSummary.overdue ?? 0)}
             </CardTitle>
           </CardHeader>
         </Card>
         <Card>
           <CardHeader className="pb-2">
             <CardDescription className="flex items-center gap-1">
-              <Layers className="w-4 h-4 text-purple-500" />
-              Total Combined
+              <Clock className="w-4 h-4 text-amber-500" />
+              Due Soon
             </CardDescription>
-            <CardTitle className="text-3xl text-purple-600" data-testid="text-total-combined">
-              {isLoading ? '...' : (masterListData?.summary?.total ?? 0)}
+            <CardTitle className="text-3xl text-amber-600" data-testid="text-due-soon-count">
+              {anyLoading ? '...' : (scheduleSummary.dueSoon ?? 0)}
             </CardTitle>
           </CardHeader>
         </Card>
@@ -348,16 +481,16 @@ const LsaFfaReports: React.FC<LsaFfaReportsProps> = ({ onBack, globalFilters }) 
           <CardHeader className="pb-2">
             <CardDescription className="flex items-center gap-1">
               <CheckCircle className="w-4 h-4 text-green-500" />
-              Active
+              On Schedule
             </CardDescription>
-            <CardTitle className="text-3xl text-green-600" data-testid="text-active-count">
-              {isLoading ? '...' : (masterListData?.summary?.activeCount ?? 0)}
+            <CardTitle className="text-3xl text-green-600" data-testid="text-on-schedule-count">
+              {anyLoading ? '...' : (scheduleSummary.onSchedule ?? 0)}
             </CardTitle>
           </CardHeader>
         </Card>
       </div>
 
-      {!masterListData && !isLoading && (
+      {!masterListData && !scheduleData && !anyLoading && (
         <div className="mb-6 p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg" data-testid="text-error-message">
           <p className="text-red-700 dark:text-red-300 text-sm">Failed to load report data. Please try again.</p>
         </div>
@@ -405,7 +538,7 @@ const LsaFfaReports: React.FC<LsaFfaReportsProps> = ({ onBack, globalFilters }) 
                       variant="ghost"
                       title="Preview"
                       onClick={() => handlePreviewReport(report.id)}
-                      disabled={isLoading}
+                      disabled={anyLoading}
                       data-testid={`button-preview-${report.id}`}
                     >
                       <Eye className="h-4 w-4" />
@@ -415,7 +548,7 @@ const LsaFfaReports: React.FC<LsaFfaReportsProps> = ({ onBack, globalFilters }) 
                       variant="ghost"
                       title="Download PDF"
                       onClick={() => handleGenerateReport(report.id, 'PDF')}
-                      disabled={generatingReports.has(`${report.id}-PDF`) || isLoading}
+                      disabled={generatingReports.has(`${report.id}-PDF`) || anyLoading}
                       data-testid={`button-pdf-${report.id}`}
                     >
                       <FileText className="h-4 w-4" />
@@ -426,7 +559,7 @@ const LsaFfaReports: React.FC<LsaFfaReportsProps> = ({ onBack, globalFilters }) 
                         variant="ghost"
                         title="Download Excel"
                         onClick={() => handleGenerateReport(report.id, 'Excel')}
-                        disabled={generatingReports.has(`${report.id}-Excel`) || isLoading}
+                        disabled={generatingReports.has(`${report.id}-Excel`) || anyLoading}
                         data-testid={`button-excel-${report.id}`}
                       >
                         <Download className="h-4 w-4" />
