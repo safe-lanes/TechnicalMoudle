@@ -1549,11 +1549,11 @@ const Stores: React.FC = () => {
 
       {/* Filters - Show different filters based on view mode */}
       {viewMode === "location" ? (
-      <div className="flex gap-4 mb-6">
+      <div className="flex gap-3 items-center mb-4">
         {(isSailAdmin || isClientAdmin || isChangeMode) && (
-          <div className="flex-1">
+          <div>
             <Select value={vesselId === 'all' ? '' : vesselId} onValueChange={setVesselId}>
-              <SelectTrigger className="text-sm" data-testid="stores-loc-vessel-selector">
+              <SelectTrigger className="w-48" data-testid="stores-loc-vessel-selector">
                 <SelectValue placeholder="Choose vessel" />
               </SelectTrigger>
               <SelectContent>
@@ -1566,19 +1566,19 @@ const Stores: React.FC = () => {
             </Select>
           </div>
         )}
-        <div className="flex-1 relative">
+        <div className="relative w-80">
           <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
           <Input
             placeholder="Search"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="pl-10 text-sm"
+            className="pl-10"
             data-testid="stores-loc-search"
           />
         </div>
         <div>
           <Select value={categoryFilter} onValueChange={setCategoryFilter}>
-            <SelectTrigger className="w-40 text-sm" data-testid="stores-loc-category-filter">
+            <SelectTrigger className="w-40" data-testid="stores-loc-category-filter">
               <SelectValue placeholder="All Categories" />
             </SelectTrigger>
             <SelectContent>
@@ -1592,7 +1592,7 @@ const Stores: React.FC = () => {
         </div>
         <div>
           <Select value={stockFilter} onValueChange={setStockFilter}>
-            <SelectTrigger className="w-32 text-sm" data-testid="stores-loc-stock-filter">
+            <SelectTrigger className="w-32" data-testid="stores-loc-stock-filter">
               <SelectValue placeholder="Stock" />
             </SelectTrigger>
             <SelectContent>
@@ -1627,12 +1627,12 @@ const Stores: React.FC = () => {
         </Button>
       </div>
       ) : viewMode === "inventory" ? (
-      <div className="flex gap-4 mb-6">
+      <div className="flex gap-3 items-center mb-4">
         {/* Vessel selector - visible for Sail Admin, Client Admin, or in change mode */}
         {(isSailAdmin || isClientAdmin || isChangeMode) && (
-          <div className="flex-1">
+          <div>
             <Select value={vesselId === 'all' ? '' : vesselId} onValueChange={setVesselId}>
-              <SelectTrigger className="text-sm" data-testid={getMarkerId(activeTab, "4")}>
+              <SelectTrigger className="w-48" data-testid={getMarkerId(activeTab, "4")}>
                 <Marker id={getMarkerId(activeTab, "4")} />
                 <SelectValue placeholder="Choose vessel" />
               </SelectTrigger>
@@ -1646,20 +1646,20 @@ const Stores: React.FC = () => {
             </Select>
           </div>
         )}
-        <div className="flex-1 relative">
+        <div className="relative w-80">
           <Marker id={getMarkerId(activeTab, "5")} />
           <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
           <Input
             placeholder="Search"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="pl-10 text-sm"
+            className="pl-10"
             data-testid={getMarkerId(activeTab, "5")}
           />
         </div>
         <div>
           <Select value={categoryFilter} onValueChange={setCategoryFilter}>
-            <SelectTrigger className="w-40 text-sm" data-testid={getMarkerId(activeTab, "6")}>
+            <SelectTrigger className="w-40" data-testid={getMarkerId(activeTab, "6")}>
               <Marker id={getMarkerId(activeTab, "6")} />
               <SelectValue placeholder="All Categories" />
             </SelectTrigger>
@@ -1674,7 +1674,7 @@ const Stores: React.FC = () => {
         </div>
         <div>
           <Select value={stockFilter} onValueChange={setStockFilter}>
-            <SelectTrigger className="w-32 text-sm" data-testid={getMarkerId(activeTab, "7")}>
+            <SelectTrigger className="w-32" data-testid={getMarkerId(activeTab, "7")}>
               <Marker id={getMarkerId(activeTab, "7")} />
               <SelectValue placeholder="Stock" />
             </SelectTrigger>
