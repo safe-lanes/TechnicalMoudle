@@ -3606,12 +3606,12 @@ const Spares: React.FC = () => {
                         <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                       </Button>
                     </PopoverTrigger>
-                    <PopoverContent className="w-[250px] p-0" align="start">
+                    <PopoverContent className="w-[280px] p-0" align="start">
                       <Command>
                         <CommandInput placeholder="Search locations..." value={addLocSearchA} onValueChange={setAddLocSearchA} />
                         <CommandList>
                           <CommandEmpty>No locations found.</CommandEmpty>
-                          <CommandGroup>
+                          <CommandGroup heading="Locations">
                             <CommandItem
                               value="none"
                               onSelect={() => {
@@ -3620,8 +3620,10 @@ const Spares: React.FC = () => {
                                 setAddLocSearchA('');
                               }}
                             >
-                              <Check className={`mr-2 h-4 w-4 ${!addSpareForm.location ? 'opacity-100' : 'opacity-0'}`} />
                               <span className="text-muted-foreground">None</span>
+                              {!addSpareForm.location && (
+                                <Check className="ml-auto h-4 w-4 flex-shrink-0 text-green-600" />
+                              )}
                             </CommandItem>
                             {allVesselLocations.map((loc: any) => (
                               <CommandItem
@@ -3633,12 +3635,20 @@ const Spares: React.FC = () => {
                                   setAddLocSearchA('');
                                 }}
                               >
-                                <Check className={`mr-2 h-4 w-4 ${addSpareForm.location === loc.locationName ? 'opacity-100' : 'opacity-0'}`} />
-                                {loc.locationName}
+                                <MapPin className="mr-2 h-4 w-4 flex-shrink-0 text-muted-foreground" />
+                                <span className="truncate flex-1">{loc.locationName}</span>
+                                {addSpareForm.location === loc.locationName && (
+                                  <Check className="ml-2 h-4 w-4 flex-shrink-0 text-green-600" />
+                                )}
                               </CommandItem>
                             ))}
-                            {addLocSearchA.trim() && !allVesselLocations.some((loc: any) => loc.locationName.toLowerCase() === addLocSearchA.trim().toLowerCase()) && (
+                          </CommandGroup>
+                          {addLocSearchA.trim() && !allVesselLocations.some((loc: any) => loc.locationName.toLowerCase() === addLocSearchA.trim().toLowerCase()) && (
+                            <CommandGroup heading="">
                               <CommandItem
+                                value={`create-${addLocSearchA.trim()}`}
+                                className="text-green-600"
+                                data-testid="button-add-create-location-a"
                                 onSelect={async () => {
                                   const name = addLocSearchA.trim();
                                   try {
@@ -3661,11 +3671,11 @@ const Spares: React.FC = () => {
                                   setAddLocSearchA('');
                                 }}
                               >
-                                <Plus className="mr-2 h-4 w-4" />
-                                Create "{addLocSearchA.trim()}"
+                                <Plus className="mr-2 h-4 w-4 text-green-600" />
+                                <span className="font-medium">Create New Location</span>
                               </CommandItem>
-                            )}
-                          </CommandGroup>
+                            </CommandGroup>
+                          )}
                         </CommandList>
                       </Command>
                     </PopoverContent>
@@ -3686,12 +3696,12 @@ const Spares: React.FC = () => {
                         <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                       </Button>
                     </PopoverTrigger>
-                    <PopoverContent className="w-[250px] p-0" align="start">
+                    <PopoverContent className="w-[280px] p-0" align="start">
                       <Command>
                         <CommandInput placeholder="Search locations..." value={addLocSearchB} onValueChange={setAddLocSearchB} />
                         <CommandList>
                           <CommandEmpty>No locations found.</CommandEmpty>
-                          <CommandGroup>
+                          <CommandGroup heading="Locations">
                             <CommandItem
                               value="none"
                               onSelect={() => {
@@ -3700,8 +3710,10 @@ const Spares: React.FC = () => {
                                 setAddLocSearchB('');
                               }}
                             >
-                              <Check className={`mr-2 h-4 w-4 ${!addSpareForm.location2 ? 'opacity-100' : 'opacity-0'}`} />
                               <span className="text-muted-foreground">None</span>
+                              {!addSpareForm.location2 && (
+                                <Check className="ml-auto h-4 w-4 flex-shrink-0 text-green-600" />
+                              )}
                             </CommandItem>
                             {allVesselLocations.map((loc: any) => (
                               <CommandItem
@@ -3713,12 +3725,20 @@ const Spares: React.FC = () => {
                                   setAddLocSearchB('');
                                 }}
                               >
-                                <Check className={`mr-2 h-4 w-4 ${addSpareForm.location2 === loc.locationName ? 'opacity-100' : 'opacity-0'}`} />
-                                {loc.locationName}
+                                <MapPin className="mr-2 h-4 w-4 flex-shrink-0 text-muted-foreground" />
+                                <span className="truncate flex-1">{loc.locationName}</span>
+                                {addSpareForm.location2 === loc.locationName && (
+                                  <Check className="ml-2 h-4 w-4 flex-shrink-0 text-green-600" />
+                                )}
                               </CommandItem>
                             ))}
-                            {addLocSearchB.trim() && !allVesselLocations.some((loc: any) => loc.locationName.toLowerCase() === addLocSearchB.trim().toLowerCase()) && (
+                          </CommandGroup>
+                          {addLocSearchB.trim() && !allVesselLocations.some((loc: any) => loc.locationName.toLowerCase() === addLocSearchB.trim().toLowerCase()) && (
+                            <CommandGroup>
                               <CommandItem
+                                value={`create-${addLocSearchB.trim()}`}
+                                className="text-green-600"
+                                data-testid="button-add-create-location-b"
                                 onSelect={async () => {
                                   const name = addLocSearchB.trim();
                                   try {
@@ -3741,11 +3761,11 @@ const Spares: React.FC = () => {
                                   setAddLocSearchB('');
                                 }}
                               >
-                                <Plus className="mr-2 h-4 w-4" />
-                                Create "{addLocSearchB.trim()}"
+                                <Plus className="mr-2 h-4 w-4 text-green-600" />
+                                <span className="font-medium">Create New Location</span>
                               </CommandItem>
-                            )}
-                          </CommandGroup>
+                            </CommandGroup>
+                          )}
                         </CommandList>
                       </Command>
                     </PopoverContent>
@@ -4049,12 +4069,12 @@ const Spares: React.FC = () => {
                         <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                       </Button>
                     </PopoverTrigger>
-                    <PopoverContent className="w-[250px] p-0" align="start">
+                    <PopoverContent className="w-[280px] p-0" align="start">
                       <Command>
                         <CommandInput placeholder="Search locations..." value={editLocSearchA} onValueChange={setEditLocSearchA} />
                         <CommandList>
                           <CommandEmpty>No locations found.</CommandEmpty>
-                          <CommandGroup>
+                          <CommandGroup heading="Locations">
                             <CommandItem
                               value="none"
                               onSelect={() => {
@@ -4063,8 +4083,10 @@ const Spares: React.FC = () => {
                                 setEditLocSearchA('');
                               }}
                             >
-                              <Check className={`mr-2 h-4 w-4 ${!editSpareForm.location ? 'opacity-100' : 'opacity-0'}`} />
                               <span className="text-muted-foreground">None</span>
+                              {!editSpareForm.location && (
+                                <Check className="ml-auto h-4 w-4 flex-shrink-0 text-green-600" />
+                              )}
                             </CommandItem>
                             {allVesselLocations.map((loc: any) => (
                               <CommandItem
@@ -4076,12 +4098,20 @@ const Spares: React.FC = () => {
                                   setEditLocSearchA('');
                                 }}
                               >
-                                <Check className={`mr-2 h-4 w-4 ${editSpareForm.location === loc.locationName ? 'opacity-100' : 'opacity-0'}`} />
-                                {loc.locationName}
+                                <MapPin className="mr-2 h-4 w-4 flex-shrink-0 text-muted-foreground" />
+                                <span className="truncate flex-1">{loc.locationName}</span>
+                                {editSpareForm.location === loc.locationName && (
+                                  <Check className="ml-2 h-4 w-4 flex-shrink-0 text-green-600" />
+                                )}
                               </CommandItem>
                             ))}
-                            {editLocSearchA.trim() && !allVesselLocations.some((loc: any) => loc.locationName.toLowerCase() === editLocSearchA.trim().toLowerCase()) && (
+                          </CommandGroup>
+                          {editLocSearchA.trim() && !allVesselLocations.some((loc: any) => loc.locationName.toLowerCase() === editLocSearchA.trim().toLowerCase()) && (
+                            <CommandGroup>
                               <CommandItem
+                                value={`create-${editLocSearchA.trim()}`}
+                                className="text-green-600"
+                                data-testid="button-edit-create-location-a"
                                 onSelect={async () => {
                                   const name = editLocSearchA.trim();
                                   try {
@@ -4104,11 +4134,11 @@ const Spares: React.FC = () => {
                                   setEditLocSearchA('');
                                 }}
                               >
-                                <Plus className="mr-2 h-4 w-4" />
-                                Create "{editLocSearchA.trim()}"
+                                <Plus className="mr-2 h-4 w-4 text-green-600" />
+                                <span className="font-medium">Create New Location</span>
                               </CommandItem>
-                            )}
-                          </CommandGroup>
+                            </CommandGroup>
+                          )}
                         </CommandList>
                       </Command>
                     </PopoverContent>
@@ -4129,12 +4159,12 @@ const Spares: React.FC = () => {
                         <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                       </Button>
                     </PopoverTrigger>
-                    <PopoverContent className="w-[250px] p-0" align="start">
+                    <PopoverContent className="w-[280px] p-0" align="start">
                       <Command>
                         <CommandInput placeholder="Search locations..." value={editLocSearchB} onValueChange={setEditLocSearchB} />
                         <CommandList>
                           <CommandEmpty>No locations found.</CommandEmpty>
-                          <CommandGroup>
+                          <CommandGroup heading="Locations">
                             <CommandItem
                               value="none"
                               onSelect={() => {
@@ -4143,8 +4173,10 @@ const Spares: React.FC = () => {
                                 setEditLocSearchB('');
                               }}
                             >
-                              <Check className={`mr-2 h-4 w-4 ${!editSpareForm.location2 ? 'opacity-100' : 'opacity-0'}`} />
                               <span className="text-muted-foreground">None</span>
+                              {!editSpareForm.location2 && (
+                                <Check className="ml-auto h-4 w-4 flex-shrink-0 text-green-600" />
+                              )}
                             </CommandItem>
                             {allVesselLocations.map((loc: any) => (
                               <CommandItem
@@ -4156,12 +4188,20 @@ const Spares: React.FC = () => {
                                   setEditLocSearchB('');
                                 }}
                               >
-                                <Check className={`mr-2 h-4 w-4 ${editSpareForm.location2 === loc.locationName ? 'opacity-100' : 'opacity-0'}`} />
-                                {loc.locationName}
+                                <MapPin className="mr-2 h-4 w-4 flex-shrink-0 text-muted-foreground" />
+                                <span className="truncate flex-1">{loc.locationName}</span>
+                                {editSpareForm.location2 === loc.locationName && (
+                                  <Check className="ml-2 h-4 w-4 flex-shrink-0 text-green-600" />
+                                )}
                               </CommandItem>
                             ))}
-                            {editLocSearchB.trim() && !allVesselLocations.some((loc: any) => loc.locationName.toLowerCase() === editLocSearchB.trim().toLowerCase()) && (
+                          </CommandGroup>
+                          {editLocSearchB.trim() && !allVesselLocations.some((loc: any) => loc.locationName.toLowerCase() === editLocSearchB.trim().toLowerCase()) && (
+                            <CommandGroup>
                               <CommandItem
+                                value={`create-${editLocSearchB.trim()}`}
+                                className="text-green-600"
+                                data-testid="button-edit-create-location-b"
                                 onSelect={async () => {
                                   const name = editLocSearchB.trim();
                                   try {
@@ -4184,11 +4224,11 @@ const Spares: React.FC = () => {
                                   setEditLocSearchB('');
                                 }}
                               >
-                                <Plus className="mr-2 h-4 w-4" />
-                                Create "{editLocSearchB.trim()}"
+                                <Plus className="mr-2 h-4 w-4 text-green-600" />
+                                <span className="font-medium">Create New Location</span>
                               </CommandItem>
-                            )}
-                          </CommandGroup>
+                            </CommandGroup>
+                          )}
                         </CommandList>
                       </Command>
                     </PopoverContent>
