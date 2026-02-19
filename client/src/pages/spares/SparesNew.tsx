@@ -486,6 +486,29 @@ const Spares: React.FC = () => {
 
     const selectedLoc = vesselLocations.find((l: any) => l.id === selectedLocationId);
     const fromName = selectedLoc?.locationName || 'Current Location';
+
+    const spareLocA = (spare.location || '').toLowerCase().trim();
+    const spareLocB = (spare.location2 || '').toLowerCase().trim();
+    const fromNameLower = fromName.toLowerCase().trim();
+
+    let slotToUpdate: 'A' | 'B' | null = null;
+    if (spareLocA && fromNameLower === spareLocA) {
+      slotToUpdate = 'A';
+    } else if (spareLocB && fromNameLower === spareLocB) {
+      slotToUpdate = 'B';
+    } else if (spareLocA && !spareLocB) {
+      slotToUpdate = 'A';
+    } else if (!spareLocA && spareLocB) {
+      slotToUpdate = 'B';
+    } else if (!spareLocA && !spareLocB) {
+      slotToUpdate = 'A';
+    }
+
+    if (!slotToUpdate) {
+      toast({ title: "Cannot Change Location", description: `Could not determine which location slot to update. The spare has both locations configured ("${spare.location}", "${spare.location2}") but the current location "${fromName}" doesn't match either.`, variant: "destructive" });
+      return;
+    }
+
     const confirmed = window.confirm(`Move ${currentQty} units of ${spare.partCode} from "${fromName}" to "${newLocationName}"?`);
     if (!confirmed) return;
 
@@ -510,6 +533,35 @@ const Spares: React.FC = () => {
         throw new Error(err.error?.message || err.error || 'Failed to remove stock from current location');
       }
 
+      const patchBody: any = {};
+      if (slotToUpdate === 'A') {
+        patchBody.location = newLocationName;
+      } else {
+        patchBody.location2 = newLocationName;
+      }
+      const patchRes = await fetch(`/technical/api/spares/${vesselId}/${spare.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(patchBody),
+      });
+      if (!patchRes.ok) {
+        const err = await patchRes.json().catch(() => ({}));
+        try {
+          await fetch('/technical/api/inventory/transactions', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              vesselId, spareId: spare.id, locationId: selectedLocationId,
+              eventType: 'ADJUST_CORRECTION', qtyChange: currentQty,
+              referenceType: 'MANUAL',
+              referenceNote: `Rollback: restored ${currentQty} units after failed location name update`,
+              userId: 'System'
+            }),
+          });
+        } catch (rollbackErr) { console.error('Rollback failed:', rollbackErr); }
+        throw new Error(err.error || 'Failed to update spare location name');
+      }
+
       const addRes = await fetch('/technical/api/inventory/transactions', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -526,24 +578,26 @@ const Spares: React.FC = () => {
       });
       if (!addRes.ok) {
         const err = await addRes.json().catch(() => ({}));
+        const revertBody: any = {};
+        if (slotToUpdate === 'A') { revertBody.location = spare.location || ''; }
+        else { revertBody.location2 = spare.location2 || ''; }
+        await fetch(`/technical/api/spares/${vesselId}/${spare.id}`, {
+          method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(revertBody),
+        }).catch(() => {});
         try {
           await fetch('/technical/api/inventory/transactions', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-              vesselId,
-              spareId: spare.id,
-              locationId: selectedLocationId,
-              eventType: 'ADJUST_CORRECTION',
-              qtyChange: currentQty,
+              vesselId, spareId: spare.id, locationId: selectedLocationId,
+              eventType: 'ADJUST_CORRECTION', qtyChange: currentQty,
               referenceType: 'MANUAL',
               referenceNote: `Rollback: restored ${currentQty} units after failed transfer to ${newLocationName}`,
               userId: 'System'
             }),
           });
-        } catch (rollbackErr) {
-          console.error('Rollback failed:', rollbackErr);
-        }
+        } catch (rollbackErr) { console.error('Rollback failed:', rollbackErr); }
         throw new Error(err.error?.message || err.error || 'Failed to add stock to new location. Stock has been restored.');
       }
 
@@ -553,10 +607,12 @@ const Spares: React.FC = () => {
       queryClient.invalidateQueries({ queryKey: [`/technical/api/inventory/stock/locations-with-stock/${vesselId}`] });
       queryClient.invalidateQueries({ queryKey: ['/technical/api/inventory/spares-with-inventory', vesselId] });
       queryClient.invalidateQueries({ queryKey: ['/technical/api/spares/history', vesselId] });
+      queryClient.invalidateQueries({ queryKey: [`/technical/api/spares/${vesselId}`] });
     } catch (e: any) {
       toast({ title: "Error", description: e.message || 'Failed to change location', variant: "destructive" });
       queryClient.invalidateQueries({ queryKey: [`/technical/api/inventory/stock/full-by-location/${vesselId}/${selectedLocationId}`] });
       queryClient.invalidateQueries({ queryKey: [`/technical/api/inventory/stock/locations-with-stock/${vesselId}`] });
+      queryClient.invalidateQueries({ queryKey: [`/technical/api/spares/${vesselId}`] });
     } finally {
       setIsChangingLocation(false);
     }
