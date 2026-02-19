@@ -2105,7 +2105,7 @@ const Spares: React.FC = () => {
         <div className="flex items-center gap-4">
           <h1 className="text-2xl font-bold text-gray-800" data-testid={activeTab === 'inventory' ? "E1" : activeTab === 'by-location' ? "E-LOC-1" : "E3.1"}>
             {activeTab === 'inventory' ? <Marker id="E1" /> : activeTab === 'by-location' ? <Marker id="E-LOC-1" /> : <Marker id="E3.1" />}
-            {activeTab === 'inventory' ? 'Spares Inventory' : activeTab === 'by-location' ? 'Spares by Location' : 'Spares - History of Transactions'}
+            {activeTab === 'inventory' ? 'Spares Inventory' : activeTab === 'by-location' ? 'Location' : 'Spares - History of Transactions'}
           </h1>
           {isModifyMode && (
             <span className="px-3 py-1 bg-blue-100 text-blue-800 text-sm font-medium rounded-full border border-blue-300">
@@ -2129,7 +2129,7 @@ const Spares: React.FC = () => {
             onClick={() => setActiveTab('by-location')}
             data-testid="tab-by-location"
           >
-            Spares by Location
+            Location
           </button>
           <button 
             className={`px-4 py-1.5 rounded-md text-sm font-medium transition-colors ${activeTab === 'history' ? 'bg-[#52baf3] text-white' : 'text-gray-700 hover:bg-gray-200'}`}
