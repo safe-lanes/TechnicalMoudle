@@ -243,6 +243,7 @@ const Spares: React.FC = () => {
   const { toast } = useToast();
   const [adjustingSpares, setAdjustingSpares] = useState<Set<number>>(new Set());
   const [pendingAdjustments, setPendingAdjustments] = useState<Map<number, number>>(new Map());
+  const [editingLocRob, setEditingLocRob] = useState<{[key: number]: string}>({});
   
   // Location dropdown state
   const [openLocationDropdown, setOpenLocationDropdown] = useState<number | null>(null);
@@ -420,6 +421,63 @@ const Spares: React.FC = () => {
     } else {
       // All attempts failed
       toast({ title: "Error", description: errors.join('; '), variant: "destructive" });
+    }
+  };
+
+  const handleSaveLocRob = async (spare: any) => {
+    if (!selectedLocationId) {
+      toast({ title: "Error", description: "No location selected.", variant: "destructive" });
+      return;
+    }
+    const newValueStr = editingLocRob[spare.id];
+    const currentQty = spare.locationQty ?? 0;
+    const newValue = newValueStr !== undefined ? parseInt(newValueStr) : currentQty;
+
+    if (newValueStr === '' || isNaN(newValue)) {
+      toast({ title: "Validation Error", description: "Please enter a valid numeric value.", variant: "destructive" });
+      return;
+    }
+    if (newValue < 0) {
+      toast({ title: "Validation Error", description: "Value cannot be negative.", variant: "destructive" });
+      return;
+    }
+    if (newValue === currentQty) {
+      toast({ title: "No Changes", description: "No changes to save." });
+      return;
+    }
+
+    const qtyChange = newValue - currentQty;
+
+    try {
+      const res = await fetch('/technical/api/inventory/transactions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          vesselId,
+          spareId: spare.id,
+          locationId: selectedLocationId,
+          eventType: 'ADJUST_CORRECTION',
+          qtyChange,
+          referenceType: 'MANUAL',
+          referenceNote: 'Location ROB adjustment via Location tab',
+          userId: 'System'
+        }),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        toast({ title: "Error", description: err.error?.message || err.error || 'Failed to update Location ROB', variant: "destructive" });
+      } else {
+        toast({ title: "Success", description: "Location ROB updated successfully." });
+        setEditingLocRob(prev => {
+          const next = { ...prev };
+          delete next[spare.id];
+          return next;
+        });
+        queryClient.invalidateQueries({ queryKey: [`/technical/api/inventory/stock/full-by-location/${vesselId}/${selectedLocationId}`] });
+        queryClient.invalidateQueries({ queryKey: ['/technical/api/inventory/spares-with-inventory', vesselId] });
+      }
+    } catch (e: any) {
+      toast({ title: "Error", description: e.message || 'Network error', variant: "destructive" });
     }
   };
 
@@ -2621,7 +2679,7 @@ const Spares: React.FC = () => {
             <>
               <div className="overflow-x-auto flex-1 flex flex-col">
                 <div className="px-4 py-3 border-b border-gray-200 bg-[#52baf3]">
-                  <div className="grid text-sm font-semibold text-[#ffffff] min-w-max" style={{ gridTemplateColumns: FEATURES.IHM ? '110px 180px 220px 120px 80px 60px 60px 80px 100px 80px 40px 160px' : '110px 180px 220px 120px 80px 60px 60px 80px 100px 80px 160px', minWidth: 'max-content', gap: '12px' }}>
+                  <div className="grid text-sm font-semibold text-[#ffffff] min-w-max" style={{ gridTemplateColumns: FEATURES.IHM ? '110px 180px 220px 120px 80px 60px 60px 80px 160px 100px 80px 40px' : '110px 180px 220px 120px 80px 60px 60px 80px 160px 100px 80px', minWidth: 'max-content', gap: '12px' }}>
                     <div className="px-2 text-[#ffffff]" data-testid="loc-col-part-code">Part Code</div>
                     <div className="px-2" data-testid="loc-col-part-name">Part Name</div>
                     <div className="px-2" data-testid="loc-col-component">Component</div>
@@ -2631,9 +2689,9 @@ const Spares: React.FC = () => {
                     <div className="px-2 text-center" data-testid="loc-col-min">Min</div>
                     <div className="px-2 text-center" data-testid="loc-col-stock">Stock</div>
                     <div className="px-2" data-testid="loc-col-location">Location</div>
-                    <div className="px-2 text-center" data-testid="loc-col-loc-qty">Loc Qty</div>
+                    <div className="px-2 text-center" data-testid="loc-col-loc-rob">Loc ROB</div>
+                    <div className="px-2 text-center" data-testid="loc-col-save">Save</div>
                     {FEATURES.IHM && <div className="px-2 text-center" data-testid="loc-col-ihm">IHM</div>}
-                    <div className="px-2 text-center" data-testid="loc-col-actions">Actions</div>
                   </div>
                 </div>
                 <div className="flex flex-col">
@@ -2646,13 +2704,12 @@ const Spares: React.FC = () => {
                   ) : (
                     paginatedLocationSpares.map((spare: any, rowIndex: number) => {
                       const stockStatus = getStockStatus(spare.rob, spare.min);
-                      const locRobA = spare.robLocationA ?? 0;
-                      const locRobB = spare.robLocationB ?? 0;
-                      const locLocationDisplay = `${locRobA} / ${locRobB}`;
-                      const isLocDropdownOpen = openLocationDropdown === spare.id;
+                      const selectedLoc = allLocations.find((l: any) => l.id === selectedLocationId);
+                      const selectedLocName = selectedLoc?.locationName || 'Unknown';
+                      const locRobValue = editingLocRob[spare.id] ?? String(spare.locationQty ?? 0);
                       return (
                         <div key={spare.id} className="px-4 py-3 border-b border-gray-100 hover:bg-gray-50">
-                          <div className="grid text-sm items-center min-w-max" style={{ gridTemplateColumns: FEATURES.IHM ? '110px 180px 220px 120px 80px 60px 60px 80px 100px 80px 40px 160px' : '110px 180px 220px 120px 80px 60px 60px 80px 100px 80px 160px', minWidth: 'max-content', gap: '12px' }}>
+                          <div className="grid text-sm items-center min-w-max" style={{ gridTemplateColumns: FEATURES.IHM ? '110px 180px 220px 120px 80px 60px 60px 80px 160px 100px 80px 40px' : '110px 180px 220px 120px 80px 60px 60px 80px 160px 100px 80px', minWidth: 'max-content', gap: '12px' }}>
                             <div className="px-2 text-gray-900">{spare.partCode}</div>
                             <div className="px-2 text-gray-700">{spare.partName}</div>
                             <div className="px-2 text-gray-700">{spare.componentName || '-'}</div>
@@ -2673,97 +2730,36 @@ const Spares: React.FC = () => {
                                 {stockStatus.label}
                               </span>
                             </div>
-                            <div className="px-2 relative">
-                              <button
-                                onClick={(e) => handleOpenLocationDropdown(spare, e)}
-                                className="flex items-center gap-1 text-gray-700 hover:text-blue-600 cursor-pointer w-full text-left"
-                                data-testid={`button-loc-location-${spare.id}`}
-                              >
-                                <MapPin className="h-3 w-3 flex-shrink-0" />
-                                <span className="truncate text-sm">{locLocationDisplay}</span>
-                                <ChevronDown className={`h-3 w-3 flex-shrink-0 transition-transform ${isLocDropdownOpen ? 'rotate-180' : ''}`} />
-                              </button>
-                              {isLocDropdownOpen && (
-                                <div 
-                                  ref={locationDropdownRef}
-                                  className={`absolute z-50 left-0 bg-white border border-gray-200 rounded-lg shadow-lg p-3 w-48 ${
-                                    dropdownPosition === 'above' ? 'bottom-full mb-1' : 'top-full mt-1'
-                                  }`}
-                                  onClick={(e) => e.stopPropagation()}
-                                >
-                                  <div className="space-y-3">
-                                    <div className="text-xs font-medium text-gray-500 mb-2">ROB by Location</div>
-                                    <div>
-                                      <div className="text-[10px] font-semibold text-blue-600 mb-1">Location A</div>
-                                      <Input
-                                        type="text"
-                                        value={editingLocations[spare.id]?.nameA ?? spare.location ?? 'Location A'}
-                                        onChange={(e) => setEditingLocations(prev => ({
-                                          ...prev,
-                                          [spare.id]: { ...prev[spare.id], nameA: e.target.value }
-                                        }))}
-                                        className="h-6 text-xs font-medium text-gray-600 mb-1 border-dashed"
-                                        placeholder="Location A name"
-                                        data-testid={`input-loc-nameA-${spare.id}`}
-                                      />
-                                      <Input
-                                        type="number"
-                                        min="0"
-                                        value={editingLocations[spare.id]?.locationA || '0'}
-                                        onChange={(e) => setEditingLocations(prev => ({
-                                          ...prev,
-                                          [spare.id]: { ...prev[spare.id], locationA: e.target.value }
-                                        }))}
-                                        className="h-8 text-sm"
-                                        placeholder="0"
-                                        data-testid={`input-loc-locationA-${spare.id}`}
-                                      />
-                                    </div>
-                                    <div>
-                                      <div className="text-[10px] font-semibold text-blue-600 mb-1">Location B</div>
-                                      <Input
-                                        type="text"
-                                        value={editingLocations[spare.id]?.nameB ?? spare.location2 ?? 'Location B'}
-                                        onChange={(e) => setEditingLocations(prev => ({
-                                          ...prev,
-                                          [spare.id]: { ...prev[spare.id], nameB: e.target.value }
-                                        }))}
-                                        className="h-6 text-xs font-medium text-gray-600 mb-1 border-dashed"
-                                        placeholder="Location B name"
-                                        data-testid={`input-loc-nameB-${spare.id}`}
-                                      />
-                                      <Input
-                                        type="number"
-                                        min="0"
-                                        value={editingLocations[spare.id]?.locationB || '0'}
-                                        onChange={(e) => setEditingLocations(prev => ({
-                                          ...prev,
-                                          [spare.id]: { ...prev[spare.id], locationB: e.target.value }
-                                        }))}
-                                        className="h-8 text-sm"
-                                        placeholder="0"
-                                        data-testid={`input-loc-locationB-${spare.id}`}
-                                      />
-                                    </div>
-                                    <div className="text-xs text-gray-500 text-center border-t pt-2">
-                                      Total ROB: {(parseInt(editingLocations[spare.id]?.locationA) || 0) + (parseInt(editingLocations[spare.id]?.locationB) || 0)}
-                                    </div>
-                                    <Button
-                                      size="sm"
-                                      className="w-full h-7 text-xs"
-                                      onClick={() => {
-                                        handleSaveLocation(spare.id);
-                                        setOpenLocationDropdown(null);
-                                      }}
-                                      data-testid={`button-loc-save-location-${spare.id}`}
-                                    >
-                                      Save
-                                    </Button>
-                                  </div>
-                                </div>
-                              )}
+                            <div className="px-2 flex items-center gap-1">
+                              <MapPin className="h-3 w-3 flex-shrink-0 text-gray-500" />
+                              <span className="truncate text-sm text-gray-700">{selectedLocName}</span>
                             </div>
-                            <div className="px-2 text-center font-medium">{spare.locationQty}</div>
+                            <div className="px-2">
+                              <Input
+                                type="number"
+                                min="0"
+                                value={locRobValue}
+                                onChange={(e) => {
+                                  const val = e.target.value;
+                                  if (val === '' || (/^\d+$/.test(val) && parseInt(val) >= 0)) {
+                                    setEditingLocRob(prev => ({ ...prev, [spare.id]: val }));
+                                  }
+                                }}
+                                className="h-7 text-sm text-center w-full"
+                                placeholder="0"
+                                data-testid={`input-loc-rob-${spare.id}`}
+                              />
+                            </div>
+                            <div className="px-2 flex justify-center">
+                              <Button
+                                size="sm"
+                                className="h-7 text-xs px-3"
+                                onClick={() => handleSaveLocRob(spare)}
+                                data-testid={`button-loc-save-rob-${spare.id}`}
+                              >
+                                Save
+                              </Button>
+                            </div>
                             {FEATURES.IHM && (
                               <div className="px-2 flex justify-center">
                                 {spare.ihm?.toLowerCase() === 'yes' ? (
@@ -2775,57 +2771,6 @@ const Spares: React.FC = () => {
                                 )}
                               </div>
                             )}
-                            <div className="px-2 flex gap-0.5 justify-center">
-                              <Button 
-                                size="sm" 
-                                variant="ghost"
-                                onClick={() => openInfoModal(spare)}
-                                title="View Details"
-                                data-testid={`button-loc-info-${spare.id}`}
-                              >
-                                <Info className="h-4 w-4 text-blue-600" />
-                              </Button>
-                              {(isSailAdmin || isClientAdmin || isHeadOfDept || isChangeMode) && (
-                                <Button 
-                                  size="sm" 
-                                  variant="ghost"
-                                  onClick={() => openEditModal(spare)}
-                                  title="Edit"
-                                  data-testid={`button-loc-edit-${spare.id}`}
-                                >
-                                  <Edit2 className="h-4 w-4" />
-                                </Button>
-                              )}
-                              <Button 
-                                size="sm" 
-                                variant="ghost"
-                                onClick={() => openConsumeReceiveModal(spare)}
-                                title="Consume/Receive"
-                                data-testid={`button-loc-plus-${spare.id}`}
-                              >
-                                <PlusCircle className="h-4 w-4" />
-                              </Button>
-                              <Button 
-                                size="sm" 
-                                variant="ghost"
-                                onClick={() => openAdjustModal(spare)}
-                                title="Adjust ROB"
-                                data-testid={`button-loc-adjust-${spare.id}`}
-                              >
-                                <Settings2 className="h-4 w-4 text-orange-500" />
-                              </Button>
-                              {(isSailAdmin || isClientAdmin || isChangeMode) && (
-                                <Button 
-                                  size="sm" 
-                                  variant="ghost"
-                                  onClick={() => handleDeleteSpare(spare.id)}
-                                  title="Delete"
-                                  data-testid={`button-loc-delete-${spare.id}`}
-                                >
-                                  <Trash2 className="h-4 w-4 text-red-500" />
-                                </Button>
-                              )}
-                            </div>
                           </div>
                         </div>
                       );
