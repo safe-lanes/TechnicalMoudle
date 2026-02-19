@@ -1484,6 +1484,18 @@ const Stores: React.FC = () => {
         
         <div className="flex items-center gap-2">
           <Button 
+            variant="ghost" 
+            size="sm" 
+            className="text-blue-600"
+            onClick={viewMode === "history" ? exportHistoryToExcel : exportInventoryToExcel}
+            data-testid={viewMode === "inventory" ? getMarkerId(activeTab, "8") : viewMode === "history" ? getMarkerId(activeTab, "2.13") : "stores-loc-export"}
+          >
+            {viewMode === "inventory" && <Marker id={getMarkerId(activeTab, "8")} />}
+            {viewMode === "history" && <Marker id={getMarkerId(activeTab, "2.13")} />}
+            <FileSpreadsheet className="h-4 w-4 mr-1" />
+            Export
+          </Button>
+          <Button 
             className="bg-[#5dc86f] hover:bg-[#4db85f] text-white" 
             onClick={openAddStoreModal}
             data-testid={viewMode === "inventory" ? getMarkerId(activeTab, "3a") : getMarkerId(activeTab, "2.6a")}
@@ -1605,16 +1617,6 @@ const Stores: React.FC = () => {
         <Button 
           variant="ghost" 
           size="sm" 
-          className="text-blue-600"
-          onClick={exportInventoryToExcel}
-          data-testid="stores-loc-export"
-        >
-          <FileSpreadsheet className="h-4 w-4 mr-1" />
-          Export
-        </Button>
-        <Button 
-          variant="ghost" 
-          size="sm" 
           className="text-gray-600"
           onClick={() => {
             setSearchTerm("");
@@ -1688,17 +1690,6 @@ const Stores: React.FC = () => {
         <Button 
           variant="ghost" 
           size="sm" 
-          className="text-blue-600"
-          onClick={exportInventoryToExcel}
-          data-testid={getMarkerId(activeTab, "8")}
-        >
-          <Marker id={getMarkerId(activeTab, "8")} />
-          <FileSpreadsheet className="h-4 w-4 mr-1" />
-          Export
-        </Button>
-        <Button 
-          variant="ghost" 
-          size="sm" 
           className="text-gray-600"
           onClick={() => {
             setSearchTerm("");
@@ -1764,17 +1755,6 @@ const Stores: React.FC = () => {
             />
           </div>
         </div>
-        <Button 
-          variant="ghost" 
-          size="sm" 
-          className="text-blue-600"
-          onClick={exportHistoryToExcel}
-          data-testid={getMarkerId(activeTab, "2.13")}
-        >
-          <Marker id={getMarkerId(activeTab, "2.13")} />
-          <FileSpreadsheet className="h-4 w-4 mr-1" />
-          Export
-        </Button>
       </div>
       )}
       </div>
