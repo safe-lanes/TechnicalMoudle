@@ -491,7 +491,8 @@ const Spares: React.FC = () => {
     const spareLocB = (spare.location2 || '').toLowerCase().trim();
     const fromNameLower = fromName.toLowerCase().trim();
 
-    let slotToUpdate: 'A' | 'B' | null = null;
+    let slotToUpdate: 'A' | 'B' = 'A';
+    let needsPrePatch = false;
     if (spareLocA && fromNameLower === spareLocA) {
       slotToUpdate = 'A';
     } else if (spareLocB && fromNameLower === spareLocB) {
@@ -502,18 +503,34 @@ const Spares: React.FC = () => {
       slotToUpdate = 'B';
     } else if (!spareLocA && !spareLocB) {
       slotToUpdate = 'A';
-    }
-
-    if (!slotToUpdate) {
-      toast({ title: "Cannot Change Location", description: `Could not determine which location slot to update. The spare has both locations configured ("${spare.location}", "${spare.location2}") but the current location "${fromName}" doesn't match either.`, variant: "destructive" });
-      return;
+    } else {
+      const robA = spare.robLocationA ?? 0;
+      const robB = spare.robLocationB ?? 0;
+      slotToUpdate = robA === 0 ? 'A' : robB === 0 ? 'B' : 'A';
+      needsPrePatch = true;
     }
 
     const confirmed = window.confirm(`Move ${currentQty} units of ${spare.partCode} from "${fromName}" to "${newLocationName}"?`);
     if (!confirmed) return;
 
     setIsChangingLocation(true);
+    const originalSlotValue = slotToUpdate === 'A' ? (spare.location || '') : (spare.location2 || '');
     try {
+      if (needsPrePatch) {
+        const prePatchBody: any = {};
+        if (slotToUpdate === 'A') { prePatchBody.location = fromName; }
+        else { prePatchBody.location2 = fromName; }
+        const prePatchRes = await fetch(`/technical/api/spares/${vesselId}/${spare.id}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(prePatchBody),
+        });
+        if (!prePatchRes.ok) {
+          const err = await prePatchRes.json().catch(() => ({}));
+          throw new Error(err.error || 'Failed to align spare location name before transfer');
+        }
+      }
+
       const removeRes = await fetch('/technical/api/inventory/transactions', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -530,6 +547,15 @@ const Spares: React.FC = () => {
       });
       if (!removeRes.ok) {
         const err = await removeRes.json().catch(() => ({}));
+        if (needsPrePatch) {
+          const revertPrePatch: any = {};
+          if (slotToUpdate === 'A') { revertPrePatch.location = originalSlotValue; }
+          else { revertPrePatch.location2 = originalSlotValue; }
+          await fetch(`/technical/api/spares/${vesselId}/${spare.id}`, {
+            method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(revertPrePatch),
+          }).catch(() => {});
+        }
         throw new Error(err.error?.message || err.error || 'Failed to remove stock from current location');
       }
 
@@ -558,7 +584,16 @@ const Spares: React.FC = () => {
               userId: 'System'
             }),
           });
-        } catch (rollbackErr) { console.error('Rollback failed:', rollbackErr); }
+        } catch (rollbackErr) { console.error('Rollback stock restore failed:', rollbackErr); }
+        if (needsPrePatch) {
+          const revertPrePatch: any = {};
+          if (slotToUpdate === 'A') { revertPrePatch.location = originalSlotValue; }
+          else { revertPrePatch.location2 = originalSlotValue; }
+          await fetch(`/technical/api/spares/${vesselId}/${spare.id}`, {
+            method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(revertPrePatch),
+          }).catch(() => {});
+        }
         throw new Error(err.error || 'Failed to update spare location name');
       }
 
@@ -578,12 +613,12 @@ const Spares: React.FC = () => {
       });
       if (!addRes.ok) {
         const err = await addRes.json().catch(() => ({}));
-        const revertBody: any = {};
-        if (slotToUpdate === 'A') { revertBody.location = spare.location || ''; }
-        else { revertBody.location2 = spare.location2 || ''; }
+        const revertToFrom: any = {};
+        if (slotToUpdate === 'A') { revertToFrom.location = fromName; }
+        else { revertToFrom.location2 = fromName; }
         await fetch(`/technical/api/spares/${vesselId}/${spare.id}`, {
           method: 'PATCH', headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(revertBody),
+          body: JSON.stringify(revertToFrom),
         }).catch(() => {});
         try {
           await fetch('/technical/api/inventory/transactions', {
@@ -597,7 +632,16 @@ const Spares: React.FC = () => {
               userId: 'System'
             }),
           });
-        } catch (rollbackErr) { console.error('Rollback failed:', rollbackErr); }
+        } catch (rollbackErr) { console.error('Rollback stock restore failed:', rollbackErr); }
+        if (needsPrePatch) {
+          const revertFinal: any = {};
+          if (slotToUpdate === 'A') { revertFinal.location = originalSlotValue; }
+          else { revertFinal.location2 = originalSlotValue; }
+          await fetch(`/technical/api/spares/${vesselId}/${spare.id}`, {
+            method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(revertFinal),
+          }).catch(() => {});
+        }
         throw new Error(err.error?.message || err.error || 'Failed to add stock to new location. Stock has been restored.');
       }
 
