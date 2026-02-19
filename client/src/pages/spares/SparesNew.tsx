@@ -255,6 +255,15 @@ const Spares: React.FC = () => {
   const [newLocationName, setNewLocationName] = useState('');
   const [isCreatingLocation, setIsCreatingLocation] = useState(false);
   const [isChangingLocation, setIsChangingLocation] = useState(false);
+  const [pendingLocationChange, setPendingLocationChange] = useState<{
+    spare: any;
+    newLocationId: number;
+    newLocationName: string;
+    fromName: string;
+    currentQty: number;
+    slotToUpdate: 'A' | 'B';
+    needsPrePatch: boolean;
+  } | null>(null);
   
   const handleOpenLocationDialog = (spare: Spare) => {
     setOpenLocationDropdown(spare.id);
@@ -510,9 +519,13 @@ const Spares: React.FC = () => {
       needsPrePatch = true;
     }
 
-    const confirmed = window.confirm(`Move ${currentQty} units of ${spare.partCode} from "${fromName}" to "${newLocationName}"?`);
-    if (!confirmed) return;
+    setPendingLocationChange({ spare, newLocationId, newLocationName, fromName, currentQty, slotToUpdate, needsPrePatch });
+  };
 
+  const executeLocationChange = async () => {
+    if (!pendingLocationChange || !selectedLocationId || !vesselId || isChangingLocation) return;
+    const { spare, newLocationId, newLocationName, fromName, currentQty, slotToUpdate, needsPrePatch } = pendingLocationChange;
+    setPendingLocationChange(null);
     setIsChangingLocation(true);
     const originalSlotValue = slotToUpdate === 'A' ? (spare.location || '') : (spare.location2 || '');
     try {
@@ -4481,6 +4494,67 @@ const Spares: React.FC = () => {
               </Button>
             </DialogFooter>
           </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Location Change Confirmation Dialog */}
+      <Dialog
+        open={pendingLocationChange !== null}
+        onOpenChange={(open) => {
+          if (!open) setPendingLocationChange(null);
+        }}
+      >
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <div className="flex items-center gap-2">
+              <div className="bg-blue-500 rounded-md p-1.5">
+                <MapPin className="h-4 w-4 text-white" />
+              </div>
+              <DialogTitle className="text-base">Confirm Location Change</DialogTitle>
+            </div>
+          </DialogHeader>
+          {pendingLocationChange && (
+            <div className="space-y-3">
+              <p className="text-sm text-muted-foreground">
+                Are you sure you want to move stock to a different location?
+              </p>
+              <div className="bg-muted/50 rounded-md p-3 space-y-2 text-sm">
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Part Code:</span>
+                  <span className="font-medium">{pendingLocationChange.spare.partCode}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Quantity:</span>
+                  <span className="font-medium">{pendingLocationChange.currentQty} units</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">From:</span>
+                  <span className="font-medium">{pendingLocationChange.fromName}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">To:</span>
+                  <span className="font-medium text-blue-600">{pendingLocationChange.newLocationName}</span>
+                </div>
+              </div>
+            </div>
+          )}
+          <DialogFooter className="flex gap-2">
+            <Button
+              variant="outline"
+              onClick={() => setPendingLocationChange(null)}
+              data-testid="button-cancel-location-change"
+            >
+              Cancel
+            </Button>
+            <Button
+              className="bg-blue-600 text-white"
+              onClick={executeLocationChange}
+              disabled={isChangingLocation}
+              data-testid="button-confirm-location-change"
+            >
+              {isChangingLocation ? 'Moving...' : 'Confirm Move'}
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
 
