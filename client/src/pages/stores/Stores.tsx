@@ -174,6 +174,8 @@ const Stores: React.FC = () => {
   // Location tab state
   const [selectedLocationSide, setSelectedLocationSide] = useState<"A" | "B" | null>(null);
   const [locationTabSearch, setLocationTabSearch] = useState("");
+  const [editingLocRobValues, setEditingLocRobValues] = useState<Record<string, string>>({});
+  const [editingLocNameValues, setEditingLocNameValues] = useState<Record<string, string>>({});
 
   useEffect(() => {
     setSelectedLocationSide(null);
@@ -1972,7 +1974,7 @@ const Stores: React.FC = () => {
         <div className="flex-1 bg-white border border-gray-200 rounded-lg overflow-hidden flex flex-col">
           <div className="overflow-x-auto flex-1 flex flex-col">
             <div className="px-4 py-3 border-b border-gray-200 bg-[#52baf3]">
-              <div className="grid text-sm font-semibold text-white min-w-max" style={{ gridTemplateColumns: '120px 200px 160px 80px 80px 80px 80px 120px', minWidth: 'max-content', gap: '12px' }}>
+              <div className="grid text-sm font-semibold text-white min-w-max" style={{ gridTemplateColumns: FEATURES.IHM ? '120px 200px 160px 80px 80px 80px 80px 160px 100px 40px' : '120px 200px 160px 80px 80px 80px 80px 160px 100px', minWidth: 'max-content', gap: '12px' }}>
                 <div className="px-2" data-testid="stores-loc-col-item-code">Item Code</div>
                 <div className="px-2" data-testid="stores-loc-col-item-name">Item Name</div>
                 <div className="px-2" data-testid="stores-loc-col-category">Stores Category</div>
@@ -1980,7 +1982,9 @@ const Stores: React.FC = () => {
                 <div className="px-2 text-center" data-testid="stores-loc-col-rob">ROB</div>
                 <div className="px-2 text-center" data-testid="stores-loc-col-min">Min</div>
                 <div className="px-2 text-center" data-testid="stores-loc-col-stock">Stock</div>
+                <div className="px-2" data-testid="stores-loc-col-location">Location</div>
                 <div className="px-2 text-center" data-testid="stores-loc-col-loc-rob">Loc ROB</div>
+                {FEATURES.IHM && <div className="px-2 text-center" data-testid="stores-loc-col-ihm">IHM</div>}
               </div>
             </div>
             <div className="flex flex-col overflow-y-auto flex-1">
@@ -1999,9 +2003,13 @@ const Stores: React.FC = () => {
                 return locationItems.map((item) => {
                   const stockStatus = getStockColor(item.stock);
                   const locRob = selectedLocationSide === 'A' ? (item.robLocationA ?? 0) : (item.robLocationB ?? 0);
+                  const locName = selectedLocationSide === 'A' ? (item.locationAName || '') : (item.locationBName || '');
+                  const editKey = `${item.id}-${selectedLocationSide}`;
+                  const editingLocRobVal = editingLocRobValues[editKey];
+                  const editingLocNameVal = editingLocNameValues[editKey];
                   return (
                     <div key={item.id} className="px-4 py-3 border-b border-gray-100 hover:bg-gray-50">
-                      <div className="grid text-sm items-center min-w-max" style={{ gridTemplateColumns: '120px 200px 160px 80px 80px 80px 80px 120px', minWidth: 'max-content', gap: '12px' }}>
+                      <div className="grid text-sm items-center min-w-max" style={{ gridTemplateColumns: FEATURES.IHM ? '120px 200px 160px 80px 80px 80px 80px 160px 100px 40px' : '120px 200px 160px 80px 80px 80px 80px 160px 100px', minWidth: 'max-content', gap: '12px' }}>
                         <div className="px-2 text-gray-900">{item.itemCode}</div>
                         <div className="px-2 text-gray-700">{item.itemName}</div>
                         <div className="px-2 text-gray-700">{item.storesCategory}</div>
@@ -2013,7 +2021,73 @@ const Stores: React.FC = () => {
                             {item.stock}
                           </span>
                         </div>
-                        <div className="px-2 text-center font-medium">{locRob}</div>
+                        <div className="px-2">
+                          <div className="flex items-center gap-1 border border-gray-200 rounded-md px-2 py-1">
+                            <MapPin className="h-3 w-3 flex-shrink-0 text-gray-500" />
+                            <input
+                              type="text"
+                              className="text-xs flex-1 min-w-0 bg-transparent outline-none"
+                              value={editingLocNameVal !== undefined ? editingLocNameVal : locName}
+                              onChange={(e) => setEditingLocNameValues(prev => ({ ...prev, [editKey]: e.target.value }))}
+                              onBlur={() => {
+                                const newName = editingLocNameVal?.trim();
+                                if (newName !== undefined && newName !== locName) {
+                                  const fieldKey = selectedLocationSide === 'A' ? 'locationA' : 'locationB';
+                                  fetch(`/technical/api/stores/${vesselId}/${item.id}`, {
+                                    method: 'PATCH',
+                                    headers: { 'Content-Type': 'application/json' },
+                                    body: JSON.stringify({ [fieldKey]: newName }),
+                                  }).then(() => {
+                                    queryClient.invalidateQueries({ queryKey: [`/technical/api/stores/${vesselId}?itemType=${activeTab}`] });
+                                  });
+                                }
+                                setEditingLocNameValues(prev => { const n = { ...prev }; delete n[editKey]; return n; });
+                              }}
+                              data-testid={`input-loc-name-${item.id}`}
+                            />
+                          </div>
+                        </div>
+                        <div className="px-2">
+                          <input
+                            type="number"
+                            min="0"
+                            className="w-full text-center border border-gray-200 rounded-md px-2 py-1 text-sm outline-none focus:border-blue-400"
+                            value={editingLocRobVal !== undefined ? editingLocRobVal : locRob}
+                            onChange={(e) => setEditingLocRobValues(prev => ({ ...prev, [editKey]: e.target.value }))}
+                            onBlur={() => {
+                              const newVal = editingLocRobVal !== undefined ? Number(editingLocRobVal) : locRob;
+                              if (editingLocRobVal !== undefined && newVal !== locRob && !isNaN(newVal) && newVal >= 0) {
+                                const fieldKey = selectedLocationSide === 'A' ? 'robLocationA' : 'robLocationB';
+                                fetch(`/technical/api/stores/${vesselId}/${item.id}`, {
+                                  method: 'PATCH',
+                                  headers: { 'Content-Type': 'application/json' },
+                                  body: JSON.stringify({ [fieldKey]: newVal }),
+                                }).then(() => {
+                                  queryClient.invalidateQueries({ queryKey: [`/technical/api/stores/${vesselId}?itemType=${activeTab}`] });
+                                });
+                              }
+                              setEditingLocRobValues(prev => { const n = { ...prev }; delete n[editKey]; return n; });
+                            }}
+                            data-testid={`input-loc-rob-${item.id}`}
+                          />
+                        </div>
+                        {FEATURES.IHM && (
+                          <div className="flex justify-center">
+                            {item.ihmPresence === 'Present' ? (
+                              <div title="IHM Present">
+                                <AlertCircle className="h-4 w-4 text-red-500" />
+                              </div>
+                            ) : item.ihmPresence === 'Not Present' ? (
+                              <div title="IHM Not Present">
+                                <CheckCircle className="h-4 w-4 text-green-500" />
+                              </div>
+                            ) : (
+                              <div title="IHM Unknown">
+                                <HelpCircle className="h-4 w-4 text-gray-400" />
+                              </div>
+                            )}
+                          </div>
+                        )}
                       </div>
                     </div>
                   );
