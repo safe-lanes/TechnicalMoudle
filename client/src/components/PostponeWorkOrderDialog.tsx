@@ -61,7 +61,7 @@ const PostponeWorkOrderDialog: React.FC<PostponeWorkOrderDialogProps> = ({
         jobTitle: workOrder.jobTitle,
         originalDueDate: workOrder.dueDate || "",
         reasonForPostponement: "",
-        authorizedBy: "Chief Engineer",
+        authorizedBy: "superintendent",
         approvalRemarks: "",
         nextDueDate: "",
         durationOfPostponement: "5 Days",
@@ -219,10 +219,9 @@ const PostponeWorkOrderDialog: React.FC<PostponeWorkOrderDialogProps> = ({
                     <SelectValue placeholder="Select authorizer" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="chief-engineer">Chief Engineer</SelectItem>
-                    <SelectItem value="2nd-engineer">2nd Engineer</SelectItem>
-                    <SelectItem value="3rd-engineer">3rd Engineer</SelectItem>
-                    <SelectItem value="captain">Captain</SelectItem>
+                    <SelectItem value="superintendent">Superintendent</SelectItem>
+                    <SelectItem value="technical-manager">Technical Manager</SelectItem>
+                    <SelectItem value="dpa">DPA</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
