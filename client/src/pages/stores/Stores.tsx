@@ -1487,7 +1487,7 @@ const Stores: React.FC = () => {
       {viewMode === "location" ? (
       <div className="flex gap-4 mb-6">
         {(isSailAdmin || isClientAdmin || isChangeMode) && (
-          <div className="w-48">
+          <div className="flex-1">
             <Select value={vesselId === 'all' ? '' : vesselId} onValueChange={setVesselId}>
               <SelectTrigger className="text-sm" data-testid="stores-loc-vessel-selector">
                 <SelectValue placeholder="Choose vessel" />
@@ -1502,6 +1502,65 @@ const Stores: React.FC = () => {
             </Select>
           </div>
         )}
+        <div className="flex-1 relative">
+          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+          <Input
+            placeholder="Search"
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="pl-10 text-sm"
+            data-testid="stores-loc-search"
+          />
+        </div>
+        <div>
+          <Select value={categoryFilter} onValueChange={setCategoryFilter}>
+            <SelectTrigger className="w-40 text-sm" data-testid="stores-loc-category-filter">
+              <SelectValue placeholder="All Categories" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Categories</SelectItem>
+              <SelectItem value="Engine">Engine Stores</SelectItem>
+              <SelectItem value="General">General Tools</SelectItem>
+              <SelectItem value="PPE">PPE / All Sections</SelectItem>
+              <SelectItem value="Machinery">General Machinery</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+        <div>
+          <Select value={stockFilter} onValueChange={setStockFilter}>
+            <SelectTrigger className="w-32 text-sm" data-testid="stores-loc-stock-filter">
+              <SelectValue placeholder="Stock" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All</SelectItem>
+              <SelectItem value="OK">OK</SelectItem>
+              <SelectItem value="Low">Low</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+        <Button 
+          variant="ghost" 
+          size="sm" 
+          className="text-blue-600"
+          onClick={exportInventoryToExcel}
+          data-testid="stores-loc-export"
+        >
+          <FileSpreadsheet className="h-4 w-4 mr-1" />
+          Export
+        </Button>
+        <Button 
+          variant="ghost" 
+          size="sm" 
+          className="text-gray-600"
+          onClick={() => {
+            setSearchTerm("");
+            setCategoryFilter("all");
+            setStockFilter("all");
+          }}
+          data-testid="stores-loc-clear"
+        >
+          Clear
+        </Button>
       </div>
       ) : viewMode === "inventory" ? (
       <div className="flex gap-4 mb-6">
@@ -1871,8 +1930,8 @@ const Stores: React.FC = () => {
             {(() => {
               const locAName = locationNames.locationA || 'Location A';
               const locBName = locationNames.locationB || 'Location B';
-              const locACount = items.filter(i => (i.robLocationA ?? 0) > 0).length;
-              const locBCount = items.filter(i => (i.robLocationB ?? 0) > 0).length;
+              const locACount = filteredItems.filter(i => (i.robLocationA ?? 0) > 0).length;
+              const locBCount = filteredItems.filter(i => (i.robLocationB ?? 0) > 0).length;
               const locations = [
                 { side: 'A' as const, name: locAName, count: locACount },
                 { side: 'B' as const, name: locBName, count: locBCount },
@@ -1930,7 +1989,7 @@ const Stores: React.FC = () => {
               ) : storesLoading ? (
                 <div className="p-8 text-center text-gray-500">Loading...</div>
               ) : (() => {
-                const locationItems = items.filter(item => {
+                const locationItems = filteredItems.filter(item => {
                   if (selectedLocationSide === 'A') return (item.robLocationA ?? 0) > 0;
                   return (item.robLocationB ?? 0) > 0;
                 });
