@@ -4585,7 +4585,7 @@ const Spares: React.FC = () => {
                   <span className="text-xs font-medium" data-testid="text-dialog-partname">{locationDialogSpare.partName}</span>
                 </div>
                 <div className="flex gap-2 flex-wrap">
-                  <span className="text-xs text-gray-500">Part Number:</span>
+                  <span className="text-xs text-gray-500">Part Code:</span>
                   <span className="text-xs font-medium" data-testid="text-dialog-partcode">{locationDialogSpare.partCode}</span>
                 </div>
               </div>
