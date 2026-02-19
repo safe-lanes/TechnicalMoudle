@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect, useRef } from "react";
+import React, { useState, useMemo, useEffect } from "react";
 import { useModifyMode } from "@/hooks/useModifyMode";
 import { useVessel } from "@/contexts/VesselContext";
 import { useUIRole } from "@/contexts/UIRoleContext";
@@ -167,11 +167,9 @@ const Stores: React.FC = () => {
     }
   }, [isModifyMode]);
   
-  // Location dropdown state
-  const [openLocationDropdown, setOpenLocationDropdown] = useState<number | null>(null);
+  // Location dialog state
+  const [locationDialogItem, setLocationDialogItem] = useState<StoreItem | null>(null);
   const [editingLocations, setEditingLocations] = useState<{[key: number]: {locationA: string, locationB: string, nameA?: string, nameB?: string}}>({});
-  const locationDropdownRef = useRef<HTMLDivElement>(null);
-  const [dropdownPosition, setDropdownPosition] = useState<'below' | 'above'>('below');
 
   // Fetch stores items from API - uses default TanStack Query fetcher
   // The query key includes the full URL with query parameters
@@ -306,41 +304,8 @@ const Stores: React.FC = () => {
   const [historySearch, setHistorySearch] = useState("");
   const [historyEventFilter, setHistoryEventFilter] = useState("all");
   
-  // Click outside handler for location dropdown
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (locationDropdownRef.current && !locationDropdownRef.current.contains(event.target as Node)) {
-        if (openLocationDropdown !== null && editingLocations[openLocationDropdown]) {
-          handleSaveLocation(openLocationDropdown);
-        }
-        setOpenLocationDropdown(null);
-      }
-    };
-    
-    if (openLocationDropdown !== null) {
-      document.addEventListener('mousedown', handleClickOutside);
-    }
-    
-    return () => {
-      document.removeEventListener('mousedown', handleClickOutside);
-    };
-  }, [openLocationDropdown, editingLocations]);
-  
-  const handleOpenLocationDropdown = (item: StoreItem, event: React.MouseEvent) => {
-    // Calculate if dropdown should open above or below based on viewport position
-    const buttonRect = (event.currentTarget as HTMLElement).getBoundingClientRect();
-    const dropdownHeight = 320; // Approximate height of the dropdown
-    const viewportHeight = window.innerHeight;
-    const spaceBelow = viewportHeight - buttonRect.bottom;
-    
-    // If not enough space below, open above
-    if (spaceBelow < dropdownHeight && buttonRect.top > dropdownHeight) {
-      setDropdownPosition('above');
-    } else {
-      setDropdownPosition('below');
-    }
-    
-    setOpenLocationDropdown(item.id);
+  const handleOpenLocationDialog = (item: StoreItem) => {
+    setLocationDialogItem(item);
     setEditingLocations(prev => ({
       ...prev,
       [item.id]: {
@@ -1724,109 +1689,18 @@ const Stores: React.FC = () => {
                     {item.stock}
                   </span>
                 </div>
-                {/* Location Dropdown - matches Spares format "@ X / Y" */}
-                <div className="relative" data-testid={index === 0 ? getMarkerId(activeTab, "27") : undefined}>
+                {/* Location - opens Inventory Transaction dialog */}
+                <div data-testid={index === 0 ? getMarkerId(activeTab, "27") : undefined}>
                   {index === 0 && <Marker id={getMarkerId(activeTab, "27")} />}
-                  {(() => {
-                    const robA = item.robLocationA ?? 0;
-                    const robB = item.robLocationB ?? 0;
-                    const locationDisplay = `@ ${robA} / ${robB}`;
-                    const isDropdownOpen = openLocationDropdown === item.id;
-                    
-                    return (
-                      <>
-                        <button
-                          onClick={(e) => handleOpenLocationDropdown(item, e)}
-                          className="flex items-center gap-1 text-gray-700 hover:text-blue-600 cursor-pointer w-full text-left"
-                          data-testid={`button-location-${item.id}`}
-                        >
-                          <MapPin className="h-3 w-3 flex-shrink-0" />
-                          <span className="truncate text-sm">{locationDisplay}</span>
-                          <ChevronDown className={`h-3 w-3 flex-shrink-0 transition-transform ${isDropdownOpen ? 'rotate-180' : ''}`} />
-                        </button>
-                        
-                        {isDropdownOpen && (
-                          <div 
-                            ref={locationDropdownRef}
-                            className={`absolute z-50 left-0 bg-white border border-gray-200 rounded-lg shadow-lg p-3 w-48 ${
-                              dropdownPosition === 'above' ? 'bottom-full mb-1' : 'top-full mt-1'
-                            }`}
-                            onClick={(e) => e.stopPropagation()}
-                          >
-                            <div className="space-y-3">
-                              <div className="text-xs font-medium text-gray-500 mb-2">ROB by Location</div>
-                              <div>
-                                <div className="text-[10px] font-semibold text-blue-600 mb-1" data-testid="label-dropdown-location-a">Location A</div>
-                                <Input
-                                  type="text"
-                                  value={editingLocations[item.id]?.nameA || locationNames.locationA || 'Location A'}
-                                  onChange={(e) => setEditingLocations(prev => ({
-                                    ...prev,
-                                    [item.id]: { ...prev[item.id], nameA: e.target.value }
-                                  }))}
-                                  className="h-6 text-xs font-medium text-gray-600 mb-1 border-dashed"
-                                  placeholder="Location A name"
-                                  data-testid={`input-nameA-${item.id}`}
-                                />
-                                <Input
-                                  type="number"
-                                  min="0"
-                                  value={editingLocations[item.id]?.locationA || '0'}
-                                  onChange={(e) => setEditingLocations(prev => ({
-                                    ...prev,
-                                    [item.id]: { ...prev[item.id], locationA: e.target.value }
-                                  }))}
-                                  className="h-8 text-sm"
-                                  placeholder="0"
-                                  data-testid={`input-locationA-${item.id}`}
-                                />
-                              </div>
-                              <div>
-                                <div className="text-[10px] font-semibold text-blue-600 mb-1" data-testid="label-dropdown-location-b">Location B</div>
-                                <Input
-                                  type="text"
-                                  value={editingLocations[item.id]?.nameB || locationNames.locationB || 'Location B'}
-                                  onChange={(e) => setEditingLocations(prev => ({
-                                    ...prev,
-                                    [item.id]: { ...prev[item.id], nameB: e.target.value }
-                                  }))}
-                                  className="h-6 text-xs font-medium text-gray-600 mb-1 border-dashed"
-                                  placeholder="Location B name"
-                                  data-testid={`input-nameB-${item.id}`}
-                                />
-                                <Input
-                                  type="number"
-                                  min="0"
-                                  value={editingLocations[item.id]?.locationB || '0'}
-                                  onChange={(e) => setEditingLocations(prev => ({
-                                    ...prev,
-                                    [item.id]: { ...prev[item.id], locationB: e.target.value }
-                                  }))}
-                                  className="h-8 text-sm"
-                                  placeholder="0"
-                                  data-testid={`input-locationB-${item.id}`}
-                                />
-                              </div>
-                              <div className="text-xs text-gray-500 text-center border-t pt-2">
-                                Total ROB: {(parseInt(editingLocations[item.id]?.locationA) || 0) + (parseInt(editingLocations[item.id]?.locationB) || 0)}
-                              </div>
-                              <Button
-                                size="sm"
-                                className="w-full h-7 text-xs"
-                                onClick={() => {
-                                  handleSaveLocation(item.id);
-                                  setOpenLocationDropdown(null);
-                                }}
-                                data-testid={`button-save-location-${item.id}`}
-                              >
-                                Save
-                              </Button>
-                            </div>
-                          </div>
-                        )}
-                      </>
-                    );
-                  })()}
+                  <button
+                    onClick={() => handleOpenLocationDialog(item)}
+                    className="flex items-center gap-1 text-gray-700 hover:text-blue-600 cursor-pointer w-full text-left"
+                    data-testid={`button-location-${item.id}`}
+                  >
+                    <MapPin className="h-3 w-3 flex-shrink-0" />
+                    <span className="truncate text-sm">@ {item.robLocationA ?? 0} / {item.robLocationB ?? 0}</span>
+                    <ChevronDown className="h-3 w-3 flex-shrink-0" />
+                  </button>
                 </div>
                 {activeTab === "chemicals" && (
                   <div className="text-center text-xs">
@@ -2946,6 +2820,114 @@ const Stores: React.FC = () => {
               Consume
             </Button>
           </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Inventory Transaction Dialog */}
+      <Dialog 
+        open={locationDialogItem !== null} 
+        onOpenChange={(open) => { 
+          if (!open) { 
+            setLocationDialogItem(null); 
+          } 
+        }}
+      >
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <div className="flex items-center gap-2">
+              <div className="bg-[#52baf3] rounded-md p-1.5">
+                <MapPin className="h-4 w-4 text-white" />
+              </div>
+              <DialogTitle className="text-base">Inventory Transaction</DialogTitle>
+            </div>
+          </DialogHeader>
+          {locationDialogItem && (
+            <div className="space-y-4">
+              <div className="bg-gray-50 rounded-md p-3 space-y-1">
+                <div className="flex gap-2 flex-wrap">
+                  <span className="text-xs text-gray-500">Item Name:</span>
+                  <span className="text-xs font-medium" data-testid="text-dialog-itemname">{locationDialogItem.itemName}</span>
+                </div>
+                <div className="flex gap-2 flex-wrap">
+                  <span className="text-xs text-gray-500">Item Code:</span>
+                  <span className="text-xs font-medium" data-testid="text-dialog-itemcode">{locationDialogItem.itemCode}</span>
+                </div>
+              </div>
+
+              <div className="space-y-3">
+                <div className="border border-gray-200 rounded-md p-3">
+                  <Label className="text-xs font-semibold text-blue-600 mb-1 block" data-testid="label-dialog-location-a">Location A</Label>
+                  <div className="text-sm text-gray-700 mb-2 break-words" data-testid="text-dialog-location-a-name">
+                    {editingLocations[locationDialogItem.id]?.nameA ?? locationNames.locationA ?? 'Location A'}
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Label className="text-xs text-gray-500 whitespace-nowrap">ROB:</Label>
+                    <Input
+                      type="number"
+                      min="0"
+                      value={editingLocations[locationDialogItem.id]?.locationA || '0'}
+                      onChange={(e) => setEditingLocations(prev => ({
+                        ...prev,
+                        [locationDialogItem.id]: { ...prev[locationDialogItem.id], locationA: e.target.value }
+                      }))}
+                      className="h-8 text-sm w-24"
+                      placeholder="0"
+                      data-testid={`input-dialog-locationA-${locationDialogItem.id}`}
+                    />
+                  </div>
+                </div>
+
+                <div className="border border-gray-200 rounded-md p-3">
+                  <Label className="text-xs font-semibold text-blue-600 mb-1 block" data-testid="label-dialog-location-b">Location B</Label>
+                  <div className="text-sm text-gray-700 mb-2 break-words" data-testid="text-dialog-location-b-name">
+                    {editingLocations[locationDialogItem.id]?.nameB ?? locationNames.locationB ?? 'Location B'}
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Label className="text-xs text-gray-500 whitespace-nowrap">ROB:</Label>
+                    <Input
+                      type="number"
+                      min="0"
+                      value={editingLocations[locationDialogItem.id]?.locationB || '0'}
+                      onChange={(e) => setEditingLocations(prev => ({
+                        ...prev,
+                        [locationDialogItem.id]: { ...prev[locationDialogItem.id], locationB: e.target.value }
+                      }))}
+                      className="h-8 text-sm w-24"
+                      placeholder="0"
+                      data-testid={`input-dialog-locationB-${locationDialogItem.id}`}
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <div className="bg-gray-50 rounded-md p-3 flex items-center justify-between">
+                <span className="text-sm font-medium text-gray-600">Total ROB</span>
+                <span className="text-lg font-bold text-gray-800" data-testid="text-dialog-total-rob">
+                  {(parseInt(editingLocations[locationDialogItem.id]?.locationA) || 0) + (parseInt(editingLocations[locationDialogItem.id]?.locationB) || 0)}
+                </span>
+              </div>
+
+              <DialogFooter className="flex gap-2">
+                <Button
+                  variant="outline"
+                  onClick={() => setLocationDialogItem(null)}
+                  data-testid="button-dialog-cancel"
+                >
+                  Cancel
+                </Button>
+                <Button
+                  className="bg-[#52baf3] text-white"
+                  onClick={() => {
+                    handleSaveLocation(locationDialogItem.id);
+                    setLocationDialogItem(null);
+                  }}
+                  data-testid="button-dialog-save"
+                >
+                  Save
+                </Button>
+              </DialogFooter>
+            </div>
+          )}
         </DialogContent>
       </Dialog>
 
