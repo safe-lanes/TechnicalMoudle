@@ -91,6 +91,7 @@ interface ChangeRequest {
 
 export function ModifyPMS() {
   const [categoryFilter, setCategoryFilter] = useState<string>('all');
+  const [statusFilter, setStatusFilter] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [isNewRequestModalOpen, setIsNewRequestModalOpen] = useState(false);
   const [viewingRequest, setViewingRequest] = useState<ChangeRequest | null>(null);
@@ -118,11 +119,14 @@ export function ModifyPMS() {
     enabled: !!vesselId  // Only fetch when vesselId is defined
   });
 
-  // Filter requests based on search query
-  const filteredRequests = requests.filter((request: ChangeRequest) =>
-    request.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    request.status.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  // Filter requests based on search query and status filter
+  const filteredRequests = requests.filter((request: ChangeRequest) => {
+    const matchesSearch = searchQuery === '' ||
+      request.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      request.status.toLowerCase().includes(searchQuery.toLowerCase());
+    const matchesStatus = statusFilter === 'all' || request.status === statusFilter;
+    return matchesSearch && matchesStatus;
+  });
 
   // Approve mutation
   const approveMutation = useMutation({
@@ -214,7 +218,7 @@ export function ModifyPMS() {
       </div>
 
       {/* Search Row */}
-      <div className="flex items-center">
+      <div className="flex items-center gap-3">
         <div className="relative">
           <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
           <input
@@ -222,8 +226,27 @@ export function ModifyPMS() {
             placeholder="Search Status"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="pl-10 w-80 border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+            className="pl-10 w-48 border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+            data-testid="input-search-status"
           />
+        </div>
+        <div className="flex items-center gap-1" data-testid="status-filter-tabs">
+          {[
+            { label: 'All', value: 'all' },
+            { label: 'Pending Approval', value: 'submitted' },
+            { label: 'Approved', value: 'approved' },
+            { label: 'Rejected', value: 'rejected' },
+          ].map((tab) => (
+            <Button
+              key={tab.value}
+              variant={statusFilter === tab.value ? 'default' : 'outline'}
+              size="sm"
+              onClick={() => setStatusFilter(tab.value)}
+              data-testid={`btn-filter-${tab.value}`}
+            >
+              {tab.label}
+            </Button>
+          ))}
         </div>
       </div>
 

@@ -415,15 +415,34 @@ export default function ModifyPMS() {
       </div>
 
       {/* Search Row */}
-      <div className="flex items-center">
+      <div className="flex items-center gap-3">
         <div className="relative">
           <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
           <Input
             placeholder="Search Status"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="pl-10 w-80 border-gray-300 bg-white"
+            className="pl-10 w-48 border-gray-300 bg-white"
+            data-testid="input-search-status"
           />
+        </div>
+        <div className="flex items-center gap-1" data-testid="status-filter-tabs">
+          {([
+            { label: 'All', value: 'all' },
+            { label: 'Pending Approval', value: 'submitted' },
+            { label: 'Approved', value: 'approved' },
+            { label: 'Rejected', value: 'rejected' },
+          ] as const).map((tab) => (
+            <Button
+              key={tab.value}
+              variant={statusFilter === tab.value ? 'default' : 'outline'}
+              size="sm"
+              onClick={() => setStatusFilter(tab.value)}
+              data-testid={`btn-filter-${tab.value}`}
+            >
+              {tab.label}
+            </Button>
+          ))}
         </div>
       </div>
 
