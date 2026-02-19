@@ -143,7 +143,7 @@ const Stores: React.FC = () => {
     }
     return "stores";
   });
-  const [viewMode, setViewMode] = useState<"inventory" | "history">("inventory");
+  const [viewMode, setViewMode] = useState<"inventory" | "location" | "history">("inventory");
   const [searchTerm, setSearchTerm] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("");
   const [stockFilter, setStockFilter] = useState("");
@@ -170,6 +170,15 @@ const Stores: React.FC = () => {
   // Location dialog state
   const [locationDialogItem, setLocationDialogItem] = useState<StoreItem | null>(null);
   const [editingLocations, setEditingLocations] = useState<{[key: number]: {locationA: string, locationB: string, nameA?: string, nameB?: string}}>({});
+
+  // Location tab state
+  const [selectedLocationSide, setSelectedLocationSide] = useState<"A" | "B" | null>(null);
+  const [locationTabSearch, setLocationTabSearch] = useState("");
+
+  useEffect(() => {
+    setSelectedLocationSide(null);
+    setLocationTabSearch("");
+  }, [vesselId, activeTab]);
 
   // Fetch stores items from API - uses default TanStack Query fetcher
   // The query key includes the full URL with query parameters
@@ -1337,10 +1346,12 @@ const Stores: React.FC = () => {
         {/* Header with centered module tabs */}
         <div className="flex items-center justify-between relative">
         <div className="flex items-center gap-4">
-          <h1 className="text-2xl font-bold text-gray-800" data-testid={viewMode === "inventory" ? getMarkerId(activeTab, "33") : getMarkerId(activeTab, "2.1")}>
+          <h1 className="text-2xl font-bold text-gray-800" data-testid={viewMode === "inventory" ? getMarkerId(activeTab, "33") : viewMode === "location" ? getMarkerId(activeTab, "loc.1") : getMarkerId(activeTab, "2.1")}>
             {viewMode === "inventory" && <Marker id={getMarkerId(activeTab, "33")} />}
+            {viewMode === "location" && <Marker id={getMarkerId(activeTab, "loc.1")} />}
             {viewMode === "history" && <Marker id={getMarkerId(activeTab, "2.1")} />}
-            {activeTab === "stores" ? "Stores Inventory" : 
+            {viewMode === "location" ? "Stores By Location" :
+             activeTab === "stores" ? "Stores Inventory" : 
              activeTab === "lubes" ? "Lubes Inventory" :
              activeTab === "chemicals" ? "Chemicals Inventory" : "Others Inventory"}
           </h1>
@@ -1446,6 +1457,17 @@ const Stores: React.FC = () => {
             Inventory
           </button>
           <button
+            onClick={() => setViewMode("location")}
+            className={`px-4 py-1.5 rounded-md text-sm font-medium transition-colors ${
+              viewMode === "location"
+                ? "bg-[#52baf3] text-white"
+                : "text-gray-700 hover:bg-gray-200"
+            }`}
+            data-testid="tab-stores-by-location"
+          >
+            Location
+          </button>
+          <button
             onClick={() => setViewMode("history")}
             className={`px-4 py-1.5 rounded-md text-sm font-medium transition-colors ${
               viewMode === "history"
@@ -1462,7 +1484,26 @@ const Stores: React.FC = () => {
       </div>
 
       {/* Filters - Show different filters based on view mode */}
-      {viewMode === "inventory" ? (
+      {viewMode === "location" ? (
+      <div className="flex gap-4 mb-6">
+        {(isSailAdmin || isClientAdmin || isChangeMode) && (
+          <div className="w-48">
+            <Select value={vesselId === 'all' ? '' : vesselId} onValueChange={setVesselId}>
+              <SelectTrigger className="text-sm" data-testid="stores-loc-vessel-selector">
+                <SelectValue placeholder="Choose vessel" />
+              </SelectTrigger>
+              <SelectContent>
+                {vessels.map(vessel => (
+                  <SelectItem key={vessel.id} value={vessel.id}>
+                    {vessel.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        )}
+      </div>
+      ) : viewMode === "inventory" ? (
       <div className="flex gap-4 mb-6">
         {/* Vessel selector - visible for Sail Admin, Client Admin, or in change mode */}
         {(isSailAdmin || isClientAdmin || isChangeMode) && (
@@ -1804,6 +1845,123 @@ const Stores: React.FC = () => {
               </div>
             </div>
           ))}
+        </div>
+      </div>
+      ) : viewMode === "location" ? (
+      /* Location View - Left Panel + Right Table */
+      <div className="flex gap-4 flex-1 min-h-0">
+        {/* Left Panel - Location Search */}
+        <div className="w-60 bg-white border border-gray-200 rounded-lg overflow-hidden flex flex-col" data-testid="stores-location-search-panel">
+          <div className="text-white px-4 py-2 font-semibold bg-[#52baf3]">
+            LOCATION SEARCH
+          </div>
+          <div className="p-2 border-b border-gray-200">
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+              <Input
+                placeholder="Search locations..."
+                value={locationTabSearch}
+                onChange={(e) => setLocationTabSearch(e.target.value)}
+                className="pl-10 h-8 text-sm"
+                data-testid="input-stores-location-search"
+              />
+            </div>
+          </div>
+          <div className="overflow-y-auto flex-1">
+            {(() => {
+              const locAName = locationNames.locationA || 'Location A';
+              const locBName = locationNames.locationB || 'Location B';
+              const locACount = items.filter(i => (i.robLocationA ?? 0) > 0).length;
+              const locBCount = items.filter(i => (i.robLocationB ?? 0) > 0).length;
+              const locations = [
+                { side: 'A' as const, name: locAName, count: locACount },
+                { side: 'B' as const, name: locBName, count: locBCount },
+              ].filter(l => {
+                if (!locationTabSearch) return true;
+                return l.name.toLowerCase().includes(locationTabSearch.toLowerCase());
+              });
+              if (locations.length === 0) {
+                return <div className="p-4 text-center text-gray-500 text-sm">No locations found</div>;
+              }
+              return locations.map((loc) => (
+                <button
+                  key={loc.side}
+                  onClick={() => setSelectedLocationSide(loc.side)}
+                  className={`w-full text-left px-4 py-2.5 text-sm border-b border-gray-100 transition-colors ${
+                    selectedLocationSide === loc.side ? 'bg-blue-50 text-blue-700 font-medium' : 'text-gray-700 hover:bg-gray-50'
+                  }`}
+                  data-testid={`stores-location-item-${loc.side}`}
+                >
+                  <div className="flex items-center gap-2">
+                    <MapPin className="h-3.5 w-3.5 flex-shrink-0" />
+                    <div className="flex-1 min-w-0">
+                      <div className="truncate">{loc.name}</div>
+                    </div>
+                    {loc.count > 0 && (
+                      <span className="text-xs bg-gray-100 text-gray-600 px-1.5 py-0.5 rounded-full flex-shrink-0">
+                        {loc.count}
+                      </span>
+                    )}
+                  </div>
+                </button>
+              ));
+            })()}
+          </div>
+        </div>
+
+        {/* Right Panel - Items Table */}
+        <div className="flex-1 bg-white border border-gray-200 rounded-lg overflow-hidden flex flex-col">
+          <div className="overflow-x-auto flex-1 flex flex-col">
+            <div className="px-4 py-3 border-b border-gray-200 bg-[#52baf3]">
+              <div className="grid text-sm font-semibold text-white min-w-max" style={{ gridTemplateColumns: '120px 200px 160px 80px 80px 80px 80px 120px', minWidth: 'max-content', gap: '12px' }}>
+                <div className="px-2" data-testid="stores-loc-col-item-code">Item Code</div>
+                <div className="px-2" data-testid="stores-loc-col-item-name">Item Name</div>
+                <div className="px-2" data-testid="stores-loc-col-category">Stores Category</div>
+                <div className="px-2" data-testid="stores-loc-col-uom">UOM</div>
+                <div className="px-2 text-center" data-testid="stores-loc-col-rob">ROB</div>
+                <div className="px-2 text-center" data-testid="stores-loc-col-min">Min</div>
+                <div className="px-2 text-center" data-testid="stores-loc-col-stock">Stock</div>
+                <div className="px-2 text-center" data-testid="stores-loc-col-loc-rob">Loc ROB</div>
+              </div>
+            </div>
+            <div className="flex flex-col overflow-y-auto flex-1">
+              {!selectedLocationSide ? (
+                <div className="p-8 text-center text-gray-500">Select a location from the left panel to view stores items.</div>
+              ) : storesLoading ? (
+                <div className="p-8 text-center text-gray-500">Loading...</div>
+              ) : (() => {
+                const locationItems = items.filter(item => {
+                  if (selectedLocationSide === 'A') return (item.robLocationA ?? 0) > 0;
+                  return (item.robLocationB ?? 0) > 0;
+                });
+                if (locationItems.length === 0) {
+                  return <div className="p-8 text-center text-gray-500">No items found at this location.</div>;
+                }
+                return locationItems.map((item) => {
+                  const stockStatus = getStockColor(item.stock);
+                  const locRob = selectedLocationSide === 'A' ? (item.robLocationA ?? 0) : (item.robLocationB ?? 0);
+                  return (
+                    <div key={item.id} className="px-4 py-3 border-b border-gray-100 hover:bg-gray-50">
+                      <div className="grid text-sm items-center min-w-max" style={{ gridTemplateColumns: '120px 200px 160px 80px 80px 80px 80px 120px', minWidth: 'max-content', gap: '12px' }}>
+                        <div className="px-2 text-gray-900">{item.itemCode}</div>
+                        <div className="px-2 text-gray-700">{item.itemName}</div>
+                        <div className="px-2 text-gray-700">{item.storesCategory}</div>
+                        <div className="px-2 text-gray-500">{item.uom || '-'}</div>
+                        <div className="px-2 text-center">{item.rob}</div>
+                        <div className="px-2 text-center">{item.min}</div>
+                        <div className="px-2 text-center">
+                          <span className={`px-2 py-0.5 rounded text-xs font-medium inline-block ${stockStatus}`}>
+                            {item.stock}
+                          </span>
+                        </div>
+                        <div className="px-2 text-center font-medium">{locRob}</div>
+                      </div>
+                    </div>
+                  );
+                });
+              })()}
+            </div>
+          </div>
         </div>
       </div>
       ) : (
