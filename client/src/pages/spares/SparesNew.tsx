@@ -424,61 +424,88 @@ const Spares: React.FC = () => {
     }
   };
 
-  const handleSaveLocRob = async (spare: any) => {
+  const [isSavingLocRob, setIsSavingLocRob] = useState(false);
+
+  const handleSaveAllLocRob = async () => {
     if (!selectedLocationId) {
       toast({ title: "Error", description: "No location selected.", variant: "destructive" });
       return;
     }
-    const newValueStr = editingLocRob[spare.id];
-    const currentQty = spare.locationQty ?? 0;
-    const newValue = newValueStr !== undefined ? parseInt(newValueStr) : currentQty;
 
-    if (newValueStr === '' || isNaN(newValue)) {
-      toast({ title: "Validation Error", description: "Please enter a valid numeric value.", variant: "destructive" });
-      return;
-    }
-    if (newValue < 0) {
-      toast({ title: "Validation Error", description: "Value cannot be negative.", variant: "destructive" });
-      return;
-    }
-    if (newValue === currentQty) {
+    const sparesToSave = (locationSpares as any[]).filter((spare: any) => {
+      const editedVal = editingLocRob[spare.id];
+      if (editedVal === undefined) return false;
+      const currentQty = spare.locationQty ?? 0;
+      const newValue = parseInt(editedVal);
+      return !isNaN(newValue) && newValue >= 0 && newValue !== currentQty;
+    });
+
+    if (sparesToSave.length === 0) {
       toast({ title: "No Changes", description: "No changes to save." });
       return;
     }
 
-    const qtyChange = newValue - currentQty;
-
-    try {
-      const res = await fetch('/technical/api/inventory/transactions', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          vesselId,
-          spareId: spare.id,
-          locationId: selectedLocationId,
-          eventType: 'ADJUST_CORRECTION',
-          qtyChange,
-          referenceType: 'MANUAL',
-          referenceNote: 'Location ROB adjustment via Location tab',
-          userId: 'System'
-        }),
-      });
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({}));
-        toast({ title: "Error", description: err.error?.message || err.error || 'Failed to update Location ROB', variant: "destructive" });
-      } else {
-        toast({ title: "Success", description: "Location ROB updated successfully." });
-        setEditingLocRob(prev => {
-          const next = { ...prev };
-          delete next[spare.id];
-          return next;
-        });
-        queryClient.invalidateQueries({ queryKey: [`/technical/api/inventory/stock/full-by-location/${vesselId}/${selectedLocationId}`] });
-        queryClient.invalidateQueries({ queryKey: ['/technical/api/inventory/spares-with-inventory', vesselId] });
+    for (const spare of locationSpares as any[]) {
+      const editedVal = editingLocRob[spare.id];
+      if (editedVal === undefined) continue;
+      if (editedVal === '' || isNaN(parseInt(editedVal))) {
+        toast({ title: "Validation Error", description: `Invalid value for ${spare.partCode}. Please enter a valid number.`, variant: "destructive" });
+        return;
       }
-    } catch (e: any) {
-      toast({ title: "Error", description: e.message || 'Network error', variant: "destructive" });
+      if (parseInt(editedVal) < 0) {
+        toast({ title: "Validation Error", description: `Negative value not allowed for ${spare.partCode}.`, variant: "destructive" });
+        return;
+      }
     }
+
+    setIsSavingLocRob(true);
+    let successCount = 0;
+    const errors: string[] = [];
+
+    for (const spare of sparesToSave) {
+      const newValue = parseInt(editingLocRob[spare.id]);
+      const currentQty = spare.locationQty ?? 0;
+      const qtyChange = newValue - currentQty;
+
+      try {
+        const res = await fetch('/technical/api/inventory/transactions', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            vesselId,
+            spareId: spare.id,
+            locationId: selectedLocationId,
+            eventType: 'ADJUST_CORRECTION',
+            qtyChange,
+            referenceType: 'MANUAL',
+            referenceNote: 'Location ROB adjustment via Location tab',
+            userId: 'System'
+          }),
+        });
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({}));
+          errors.push(`${spare.partCode}: ${err.error?.message || err.error || 'Failed'}`);
+        } else {
+          successCount++;
+        }
+      } catch (e: any) {
+        errors.push(`${spare.partCode}: ${e.message || 'Network error'}`);
+      }
+    }
+
+    setIsSavingLocRob(false);
+
+    if (errors.length === 0) {
+      toast({ title: "Success", description: "Location ROB updated successfully." });
+      setEditingLocRob({});
+    } else if (successCount > 0) {
+      toast({ title: "Partial Update", description: `${successCount} saved, ${errors.length} failed: ${errors.join('; ')}` });
+    } else {
+      toast({ title: "Error", description: errors.join('; '), variant: "destructive" });
+    }
+
+    queryClient.invalidateQueries({ queryKey: [`/technical/api/inventory/stock/full-by-location/${vesselId}/${selectedLocationId}`] });
+    queryClient.invalidateQueries({ queryKey: ['/technical/api/inventory/spares-with-inventory', vesselId] });
   };
 
   // Quick adjust mutation (for +/- buttons) with optimistic updates
@@ -2295,6 +2322,16 @@ const Spares: React.FC = () => {
           <Marker id="E8" />
           Clear
         </Button>
+        {activeTab === 'by-location' && (
+          <Button
+            onClick={handleSaveAllLocRob}
+            disabled={isSavingLocRob || Object.keys(editingLocRob).length === 0}
+            className="bg-[#52baf3] hover:bg-[#3da8e0] text-white"
+            data-testid="button-save-all-loc-rob"
+          >
+            {isSavingLocRob ? 'Saving...' : 'Save'}
+          </Button>
+        )}
       </div>
       </div>
 
@@ -2679,7 +2716,7 @@ const Spares: React.FC = () => {
             <>
               <div className="overflow-x-auto flex-1 flex flex-col">
                 <div className="px-4 py-3 border-b border-gray-200 bg-[#52baf3]">
-                  <div className="grid text-sm font-semibold text-[#ffffff] min-w-max" style={{ gridTemplateColumns: FEATURES.IHM ? '110px 180px 220px 120px 80px 60px 60px 80px 160px 100px 80px 40px' : '110px 180px 220px 120px 80px 60px 60px 80px 160px 100px 80px', minWidth: 'max-content', gap: '12px' }}>
+                  <div className="grid text-sm font-semibold text-[#ffffff] min-w-max" style={{ gridTemplateColumns: FEATURES.IHM ? '110px 180px 220px 120px 80px 60px 60px 80px 160px 100px 40px' : '110px 180px 220px 120px 80px 60px 60px 80px 160px 100px', minWidth: 'max-content', gap: '12px' }}>
                     <div className="px-2 text-[#ffffff]" data-testid="loc-col-part-code">Part Code</div>
                     <div className="px-2" data-testid="loc-col-part-name">Part Name</div>
                     <div className="px-2" data-testid="loc-col-component">Component</div>
@@ -2690,7 +2727,6 @@ const Spares: React.FC = () => {
                     <div className="px-2 text-center" data-testid="loc-col-stock">Stock</div>
                     <div className="px-2" data-testid="loc-col-location">Location</div>
                     <div className="px-2 text-center" data-testid="loc-col-loc-rob">Loc ROB</div>
-                    <div className="px-2 text-center" data-testid="loc-col-save">Save</div>
                     {FEATURES.IHM && <div className="px-2 text-center" data-testid="loc-col-ihm">IHM</div>}
                   </div>
                 </div>
@@ -2709,7 +2745,7 @@ const Spares: React.FC = () => {
                       const locRobValue = editingLocRob[spare.id] ?? String(spare.locationQty ?? 0);
                       return (
                         <div key={spare.id} className="px-4 py-3 border-b border-gray-100 hover:bg-gray-50">
-                          <div className="grid text-sm items-center min-w-max" style={{ gridTemplateColumns: FEATURES.IHM ? '110px 180px 220px 120px 80px 60px 60px 80px 160px 100px 80px 40px' : '110px 180px 220px 120px 80px 60px 60px 80px 160px 100px 80px', minWidth: 'max-content', gap: '12px' }}>
+                          <div className="grid text-sm items-center min-w-max" style={{ gridTemplateColumns: FEATURES.IHM ? '110px 180px 220px 120px 80px 60px 60px 80px 160px 100px 40px' : '110px 180px 220px 120px 80px 60px 60px 80px 160px 100px', minWidth: 'max-content', gap: '12px' }}>
                             <div className="px-2 text-gray-900">{spare.partCode}</div>
                             <div className="px-2 text-gray-700">{spare.partName}</div>
                             <div className="px-2 text-gray-700">{spare.componentName || '-'}</div>
@@ -2749,16 +2785,6 @@ const Spares: React.FC = () => {
                                 placeholder="0"
                                 data-testid={`input-loc-rob-${spare.id}`}
                               />
-                            </div>
-                            <div className="px-2 flex justify-center">
-                              <Button
-                                size="sm"
-                                className="h-7 text-xs px-3"
-                                onClick={() => handleSaveLocRob(spare)}
-                                data-testid={`button-loc-save-rob-${spare.id}`}
-                              >
-                                Save
-                              </Button>
                             </div>
                             {FEATURES.IHM && (
                               <div className="px-2 flex justify-center">
