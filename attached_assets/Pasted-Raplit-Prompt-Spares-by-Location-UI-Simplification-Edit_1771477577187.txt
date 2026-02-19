@@ -1,0 +1,165 @@
+Raplit Prompt — Spares by Location UI Simplification & Editable Loc ROB
+Module
+
+PMS → Spares → Inventory → Spares by Location (Location Tab)
+
+🎯 Objective
+
+Refine the Spares by Location tab by:
+
+Removing unnecessary columns
+
+Simplifying the layout
+
+Making Location ROB directly editable
+
+Allowing users to save updated Location ROB values
+
+📌 Change Type
+
+UI Change + Controlled Field Edit Enablement
+
+No change to:
+
+Inventory transaction logic
+
+Ledger logic
+
+Consumption logic
+
+Audit logic
+
+Spare master structure
+
+🧹 1️⃣ Column Removal
+
+In the Spares by Location grid:
+
+Remove the following columns:
+
+❌ Loc Qty
+
+❌ Actions
+
+These columns must not be displayed in this tab.
+
+No backend deletion required.
+UI-level removal only.
+
+📍 2️⃣ Location Section Layout Adjustment
+
+In the Location section, modify layout as follows:
+
+Display Order:
+[ Selected Location Name ]    [ Loc ROB ]
+
+Layout Rules:
+
+Location Name displayed first
+
+Loc ROB displayed next to it (inline alignment)
+
+Clean horizontal alignment
+
+Follow Alpha UI pattern spacing
+
+🔢 3️⃣ Loc ROB Behavior
+Field Type
+
+Editable numeric input field
+
+Default Value
+
+Display current ROB for the selected location
+
+Behavior
+
+Field must show live current ROB value
+
+User can directly edit the number
+
+Allow only valid numeric input
+
+No negative values allowed (unless system already permits negative stock)
+
+💾 4️⃣ Save Functionality
+
+Add:
+
+[ Save ]
+
+
+button near the editable Loc ROB field.
+
+On Save:
+
+Update the Location ROB value
+
+Use existing inventory update logic (no new API)
+
+Maintain validation rules
+
+Trigger existing audit trail mechanism
+
+Validation Rules
+
+Cannot save blank value
+
+Cannot save non-numeric value
+
+Apply existing stock validation rules
+
+Show success message on save:
+
+Location ROB updated successfully.
+
+⚙️ Backend Reuse Rule
+
+This feature must:
+
+Reuse existing stock update logic
+
+Not create new transaction types
+
+Not bypass inventory ledger
+
+Not introduce new database fields
+
+If existing system requires stock adjustment entry → call that logic internally.
+
+🚫 Strict Non-Impact Constraints
+
+This change must NOT:
+
+Modify spare master table structure
+
+Affect bulk update
+
+Affect consumption pattern reports
+
+Affect export logic
+
+Modify global ROB calculation logic
+
+Remove inventory history
+
+📌 Scope
+
+Only applicable to:
+
+PMS → Spares → Inventory → Spares by Location Tab
+
+
+No changes elsewhere.
+
+✅ Expected Outcome
+
+Cleaner Location tab UI
+
+Reduced clutter
+
+Direct and intuitive ROB update
+
+Controlled stock adjustment
+
+Maintained inventory integrity
