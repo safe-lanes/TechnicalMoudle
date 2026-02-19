@@ -644,8 +644,8 @@ const Dashboard = () => {
           </Card>
         </div>
 
-        {/* Charts Row - Work Order Status, Outstanding Tasks, and Spares Stock */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        {/* Charts Row - Work Order Status, Outstanding Tasks, Maintenance Trend, and Spares Stock */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
           {/* Work Order Status Donut - Clickable */}
           <Card data-testid="card-wo-status-chart" className="bg-white">
             <CardHeader>
@@ -687,109 +687,136 @@ const Dashboard = () => {
             </CardContent>
           </Card>
 
-          {/* Outstanding Tasks as Percentage of Monthly Planned Maintenance - Enhanced with Trend */}
+          {/* Card 1: Outstanding Tasks — Donut + Percentage + Trend Delta */}
           <Card data-testid="card-outstanding-tasks-chart" className="bg-white">
-            <CardHeader className="pb-2">
-              <CardTitle className="text-base">Outstanding Tasks as % of Monthly Planned Maintenance</CardTitle>
+            <CardHeader>
+              <CardTitle>Outstanding Tasks</CardTitle>
               <CardDescription>
                 {outstandingTasksChartData.totalMonthly > 0 
                   ? `${outstandingTasksChartData.outstandingCount} of ${outstandingTasksChartData.totalMonthly} tasks outstanding`
                   : 'No planned maintenance tasks this month'}
               </CardDescription>
             </CardHeader>
-            <CardContent className="pt-0">
+            <CardContent>
               {outstandingTasksChartData.data.length > 0 ? (
-                <div className="flex flex-col gap-3">
-                  <div className="flex items-start gap-4">
-                    <div className="h-44 flex-1">
-                      <AgCharts options={{
-                        data: outstandingTasksChartData.data,
-                        series: [{
-                          type: 'donut',
-                          angleKey: 'count',
-                          calloutLabelKey: 'status',
-                          sectorLabelKey: 'percent',
-                          sectorLabel: {
-                            formatter: (params: any) => `${params.datum.percent}%`
-                          },
-                          innerRadiusRatio: 0.6,
-                          fills: outstandingTasksChartData.data.map(d => d.color),
-                          strokes: outstandingTasksChartData.data.map(d => d.color),
-                          listeners: {
-                            nodeClick: (event: any) => {
-                              const status = event.datum.status;
-                              if (status === 'Outstanding') {
-                                navigateToWorkOrders('Planned');
-                              } else {
-                                navigateToWorkOrders('Completed');
-                              }
+                <div className="flex flex-col items-center gap-2">
+                  <div className="h-52 w-full">
+                    <AgCharts options={{
+                      data: outstandingTasksChartData.data,
+                      series: [{
+                        type: 'donut',
+                        angleKey: 'count',
+                        calloutLabelKey: 'status',
+                        sectorLabelKey: 'percent',
+                        sectorLabel: {
+                          formatter: (params: any) => `${params.datum.percent}%`
+                        },
+                        innerRadiusRatio: 0.6,
+                        fills: outstandingTasksChartData.data.map(d => d.color),
+                        strokes: outstandingTasksChartData.data.map(d => d.color),
+                        listeners: {
+                          nodeClick: (event: any) => {
+                            const status = event.datum.status;
+                            if (status === 'Outstanding') {
+                              navigateToWorkOrders('Planned');
+                            } else {
+                              navigateToWorkOrders('Completed');
                             }
                           }
-                        } as any],
-                        legend: { enabled: true, position: 'bottom' },
-                        padding: { top: 0, bottom: 0, left: 0, right: 0 }
-                      } as AgChartOptions} />
-                    </div>
-                    <div className="flex flex-col items-center justify-center pt-4">
-                      <span className="text-3xl font-bold" data-testid="text-outstanding-percent">{outstandingTasksChartData.outstandingPercent}%</span>
-                      {maintenanceTrendData.delta !== 0 && (
-                        <div 
-                          className={`flex items-center gap-1 mt-1 text-sm font-medium ${maintenanceTrendData.delta > 0 ? 'text-red-600' : 'text-green-600'}`}
-                          data-testid="text-trend-delta"
-                        >
-                          {maintenanceTrendData.delta > 0 ? (
-                            <TrendingUp className="w-4 h-4" />
-                          ) : (
-                            <TrendingDown className="w-4 h-4" />
-                          )}
-                          <span>{Math.abs(maintenanceTrendData.delta)}% vs last month</span>
-                        </div>
-                      )}
-                      {maintenanceTrendData.delta === 0 && (
-                        <div className="text-sm text-gray-500 dark:text-gray-400 mt-1" data-testid="text-trend-delta">No change vs last month</div>
-                      )}
-                    </div>
+                        }
+                      } as any],
+                      legend: { enabled: true, position: 'bottom' },
+                      padding: { top: 0, bottom: 0, left: 0, right: 0 }
+                    } as AgChartOptions} />
                   </div>
-                  <div>
-                    <div className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">6-Month Trend</div>
-                    <div className="h-28" data-testid="chart-maintenance-trend">
-                      <ResponsiveContainer width="100%" height="100%">
-                        <BarChart data={maintenanceTrendData.months} margin={{ top: 4, right: 4, bottom: 0, left: -20 }}>
-                          <XAxis dataKey="monthShort" tick={{ fontSize: 11 }} tickLine={false} axisLine={false} />
-                          <YAxis domain={[0, 100]} tick={{ fontSize: 10 }} tickLine={false} axisLine={false} tickFormatter={(v) => `${v}%`} />
-                          <Tooltip
-                            content={({ active, payload }) => {
-                              if (active && payload && payload.length) {
-                                const d = payload[0].payload;
-                                return (
-                                  <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-md shadow-md p-2 text-xs text-gray-900 dark:text-gray-100" data-testid="tooltip-trend-bar">
-                                    <div className="font-semibold mb-1">{d.month}</div>
-                                    <div>Total planned: {d.totalPlanned}</div>
-                                    <div>Completed: {d.completed}</div>
-                                    <div>Outstanding: {d.outstandingPercent}%</div>
-                                    <div>Overdue: {d.overdue}</div>
-                                  </div>
-                                );
-                              }
-                              return null;
-                            }}
-                          />
-                          <Bar dataKey="outstandingPercent" radius={[3, 3, 0, 0]} maxBarSize={32}>
-                            {maintenanceTrendData.months.map((entry, index) => (
-                              <Cell
-                                key={`cell-${index}`}
-                                fill={entry.outstandingPercent > 60 ? '#ef4444' : entry.outstandingPercent >= 30 ? '#f59e0b' : '#10b981'}
-                              />
-                            ))}
-                          </Bar>
-                        </BarChart>
-                      </ResponsiveContainer>
+                  <div className="flex flex-col items-center">
+                    <span className="text-3xl font-bold" data-testid="text-outstanding-percent">{outstandingTasksChartData.outstandingPercent}%</span>
+                    {maintenanceTrendData.delta !== 0 && (
+                      <div 
+                        className={`flex items-center gap-1 mt-1 text-sm font-medium ${maintenanceTrendData.delta > 0 ? 'text-red-600' : 'text-green-600'}`}
+                        data-testid="text-trend-delta"
+                      >
+                        {maintenanceTrendData.delta > 0 ? (
+                          <TrendingUp className="w-4 h-4" />
+                        ) : (
+                          <TrendingDown className="w-4 h-4" />
+                        )}
+                        <span>{Math.abs(maintenanceTrendData.delta)}% vs last month</span>
+                      </div>
+                    )}
+                    {maintenanceTrendData.delta === 0 && (
+                      <div className="text-sm text-gray-500 dark:text-gray-400 mt-1" data-testid="text-trend-delta">No change vs last month</div>
+                    )}
+                  </div>
+                </div>
+              ) : (
+                <div className="h-72 flex items-center justify-center text-gray-500 dark:text-gray-400">
+                  No planned maintenance tasks this month
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Card 2: 6-Month Maintenance Trend — Sparkline Bar Chart */}
+          <Card data-testid="card-maintenance-trend" className="bg-white">
+            <CardHeader>
+              <CardTitle>6-Month Maintenance Trend</CardTitle>
+              <CardDescription>Outstanding tasks % over time</CardDescription>
+            </CardHeader>
+            <CardContent>
+              {maintenanceTrendData.months.length > 0 ? (
+                <div className="flex flex-col gap-3">
+                  <div className="h-52" data-testid="chart-maintenance-trend">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <BarChart data={maintenanceTrendData.months} margin={{ top: 4, right: 4, bottom: 0, left: -20 }}>
+                        <XAxis dataKey="monthShort" tick={{ fontSize: 11 }} tickLine={false} axisLine={false} />
+                        <YAxis domain={[0, 100]} tick={{ fontSize: 10 }} tickLine={false} axisLine={false} tickFormatter={(v) => `${v}%`} />
+                        <Tooltip
+                          content={({ active, payload }) => {
+                            if (active && payload && payload.length) {
+                              const d = payload[0].payload;
+                              return (
+                                <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-md shadow-md p-2 text-xs text-gray-900 dark:text-gray-100" data-testid="tooltip-trend-bar">
+                                  <div className="font-semibold mb-1">{d.month}</div>
+                                  <div>Total planned: {d.totalPlanned}</div>
+                                  <div>Completed: {d.completed}</div>
+                                  <div>Outstanding: {d.outstandingPercent}%</div>
+                                  <div>Overdue: {d.overdue}</div>
+                                </div>
+                              );
+                            }
+                            return null;
+                          }}
+                        />
+                        <Bar dataKey="outstandingPercent" radius={[3, 3, 0, 0]} maxBarSize={32}>
+                          {maintenanceTrendData.months.map((entry, index) => (
+                            <Cell
+                              key={`cell-${index}`}
+                              fill={entry.outstandingPercent > 60 ? '#ef4444' : entry.outstandingPercent >= 30 ? '#f59e0b' : '#10b981'}
+                            />
+                          ))}
+                        </Bar>
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </div>
+                  <div className="flex items-center justify-center gap-4 text-xs text-gray-600 dark:text-gray-400" data-testid="legend-maintenance-trend">
+                    <div className="flex items-center gap-1" data-testid="legend-item-healthy">
+                      <span className="inline-block w-3 h-3 rounded-sm" style={{ backgroundColor: '#10b981' }} />
+                      <span>Healthy (&lt;30%)</span>
+                    </div>
+                    <div className="flex items-center gap-1" data-testid="legend-item-watch">
+                      <span className="inline-block w-3 h-3 rounded-sm" style={{ backgroundColor: '#f59e0b' }} />
+                      <span>Watch (30–60%)</span>
+                    </div>
+                    <div className="flex items-center gap-1" data-testid="legend-item-backlog">
+                      <span className="inline-block w-3 h-3 rounded-sm" style={{ backgroundColor: '#ef4444' }} />
+                      <span>Backlog (&gt;60%)</span>
                     </div>
                   </div>
                 </div>
               ) : (
-                <div className="h-80 flex items-center justify-center text-gray-500 dark:text-gray-400">
-                  No planned maintenance tasks this month
+                <div className="h-72 flex items-center justify-center text-gray-500 dark:text-gray-400">
+                  No trend data available
                 </div>
               )}
             </CardContent>
