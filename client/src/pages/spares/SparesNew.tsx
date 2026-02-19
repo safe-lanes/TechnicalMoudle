@@ -484,7 +484,7 @@ const Spares: React.FC = () => {
       return;
     }
 
-    const selectedLoc = vesselLocations.find((l: any) => l.id === selectedLocationId);
+    const selectedLoc = vesselLocations.find((l: any) => l.id === selectedLocationId) || allVesselLocations.find((l: any) => l.id === selectedLocationId);
     const fromName = selectedLoc?.locationName || 'Current Location';
 
     const spareLocA = (spare.location || '').toLowerCase().trim();
@@ -649,6 +649,7 @@ const Spares: React.FC = () => {
       queryClient.invalidateQueries({ queryKey: [`/technical/api/inventory/stock/full-by-location/${vesselId}/${selectedLocationId}`] });
       queryClient.invalidateQueries({ queryKey: [`/technical/api/inventory/stock/full-by-location/${vesselId}/${newLocationId}`] });
       queryClient.invalidateQueries({ queryKey: [`/technical/api/inventory/stock/locations-with-stock/${vesselId}`] });
+      queryClient.invalidateQueries({ queryKey: [`/technical/api/inventory/locations/${vesselId}`] });
       queryClient.invalidateQueries({ queryKey: ['/technical/api/inventory/spares-with-inventory', vesselId] });
       queryClient.invalidateQueries({ queryKey: ['/technical/api/spares/history', vesselId] });
       queryClient.invalidateQueries({ queryKey: [`/technical/api/spares/${vesselId}`] });
@@ -656,6 +657,7 @@ const Spares: React.FC = () => {
       toast({ title: "Error", description: e.message || 'Failed to change location', variant: "destructive" });
       queryClient.invalidateQueries({ queryKey: [`/technical/api/inventory/stock/full-by-location/${vesselId}/${selectedLocationId}`] });
       queryClient.invalidateQueries({ queryKey: [`/technical/api/inventory/stock/locations-with-stock/${vesselId}`] });
+      queryClient.invalidateQueries({ queryKey: [`/technical/api/inventory/locations/${vesselId}`] });
       queryClient.invalidateQueries({ queryKey: [`/technical/api/spares/${vesselId}`] });
     } finally {
       setIsChangingLocation(false);
@@ -679,6 +681,7 @@ const Spares: React.FC = () => {
       const newLoc = result.data;
       toast({ title: "Location Created", description: `Location "${newLocationName.trim()}" created successfully.` });
       queryClient.invalidateQueries({ queryKey: [`/technical/api/inventory/stock/locations-with-stock/${vesselId}`] });
+      queryClient.invalidateQueries({ queryKey: [`/technical/api/inventory/locations/${vesselId}`] });
 
       if (creatingLocationForSpare && newLoc?.id) {
         await handleChangeSpareLocation(creatingLocationForSpare, newLoc.id, newLocationName.trim());
@@ -1181,6 +1184,15 @@ const Spares: React.FC = () => {
   const vesselLocations = useMemo(() => {
     return (vesselLocationsResponse as any)?.data || [];
   }, [vesselLocationsResponse]);
+
+  const { data: allVesselLocationsResponse } = useQuery({
+    queryKey: [`/technical/api/inventory/locations/${vesselId}`],
+    enabled: vesselId !== 'all' && vesselId !== '' && activeTab === 'by-location',
+  });
+
+  const allVesselLocations = useMemo(() => {
+    return (allVesselLocationsResponse as any)?.data || [];
+  }, [allVesselLocationsResponse]);
 
   const { data: locationSparesResponse, isLoading: isLocationSparesLoading } = useQuery({
     queryKey: [`/technical/api/inventory/stock/full-by-location/${vesselId}/${selectedLocationId}`],
@@ -2891,7 +2903,7 @@ const Spares: React.FC = () => {
                                       <CommandEmpty>No locations found.</CommandEmpty>
                                       <div className="max-h-[144px] overflow-y-auto">
                                         <CommandGroup heading="Locations">
-                                          {vesselLocations.map((loc: any) => (
+                                          {allVesselLocations.map((loc: any) => (
                                             <CommandItem
                                               key={loc.id}
                                               value={loc.locationName}
