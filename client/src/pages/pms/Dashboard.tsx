@@ -1079,8 +1079,8 @@ const Dashboard = () => {
           </Card>
         </div>
 
-        {/* Charts Row - Work Order Status, Outstanding Tasks, and Spares Stock */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        {/* Charts Row - Work Order Status, Outstanding Tasks, Maintenance Trend, and Spares Stock */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
           {/* Work Order Status Donut - Clickable */}
           <Card data-testid="card-wo-status-chart" className="bg-white">
             <CardHeader>
@@ -1187,6 +1187,71 @@ const Dashboard = () => {
               ) : (
                 <div className="h-72 flex items-center justify-center text-gray-500 dark:text-gray-400">
                   No planned maintenance tasks this month
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Card 2: 6-Month Maintenance Trend — Sparkline Bar Chart */}
+          <Card data-testid="card-maintenance-trend" className="bg-white">
+            <CardHeader>
+              <CardTitle>6-Month Maintenance Trend</CardTitle>
+              <CardDescription>Outstanding tasks % over time</CardDescription>
+            </CardHeader>
+            <CardContent>
+              {maintenanceTrendData.months.length > 0 ? (
+                <div className="flex flex-col gap-3">
+                  <div className="h-52" data-testid="chart-maintenance-trend">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <BarChart data={maintenanceTrendData.months} margin={{ top: 4, right: 4, bottom: 0, left: -20 }}>
+                        <XAxis dataKey="monthShort" tick={{ fontSize: 11 }} tickLine={false} axisLine={false} />
+                        <YAxis domain={[0, 100]} tick={{ fontSize: 10 }} tickLine={false} axisLine={false} tickFormatter={(v) => `${v}%`} />
+                        <Tooltip
+                          content={({ active, payload }) => {
+                            if (active && payload && payload.length) {
+                              const d = payload[0].payload;
+                              return (
+                                <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-md shadow-md p-2 text-xs text-gray-900 dark:text-gray-100" data-testid="tooltip-trend-bar">
+                                  <div className="font-semibold mb-1">{d.month}</div>
+                                  <div>Total planned: {d.totalPlanned}</div>
+                                  <div>Completed: {d.completed}</div>
+                                  <div>Outstanding: {d.outstandingPercent}%</div>
+                                  <div>Overdue: {d.overdue}</div>
+                                </div>
+                              );
+                            }
+                            return null;
+                          }}
+                        />
+                        <Bar dataKey="outstandingPercent" radius={[3, 3, 0, 0]} maxBarSize={32}>
+                          {maintenanceTrendData.months.map((entry, index) => (
+                            <Cell
+                              key={`cell-${index}`}
+                              fill={entry.outstandingPercent > 60 ? '#ef4444' : entry.outstandingPercent >= 30 ? '#f59e0b' : '#10b981'}
+                            />
+                          ))}
+                        </Bar>
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </div>
+                  <div className="flex items-center justify-center gap-4 text-xs text-gray-600 dark:text-gray-400" data-testid="legend-maintenance-trend">
+                    <div className="flex items-center gap-1" data-testid="legend-item-healthy">
+                      <span className="inline-block w-3 h-3 rounded-sm" style={{ backgroundColor: '#10b981' }} />
+                      <span>Healthy (&lt;30%)</span>
+                    </div>
+                    <div className="flex items-center gap-1" data-testid="legend-item-watch">
+                      <span className="inline-block w-3 h-3 rounded-sm" style={{ backgroundColor: '#f59e0b' }} />
+                      <span>Watch (30–60%)</span>
+                    </div>
+                    <div className="flex items-center gap-1" data-testid="legend-item-backlog">
+                      <span className="inline-block w-3 h-3 rounded-sm" style={{ backgroundColor: '#ef4444' }} />
+                      <span>Backlog (&gt;60%)</span>
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <div className="h-72 flex items-center justify-center text-gray-500 dark:text-gray-400">
+                  No trend data available
                 </div>
               )}
             </CardContent>
