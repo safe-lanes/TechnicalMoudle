@@ -802,35 +802,6 @@ const Dashboard = () => {
     return { totalTracked, totalInherited, totalComponents, recentlyUpdated };
   }, [rhParentsData]);
 
-  const complianceTrendData = useMemo(() => {
-    const safeWOs = workOrdersData.filter(wo => wo !== null && wo !== undefined);
-    const now = new Date();
-    const months: { month: string; monthShort: string; totalPlanned: number; completed: number; compliancePercent: number }[] = [];
-
-    for (let i = 5; i >= 0; i--) {
-      const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
-      const monthName = format(d, 'MMM yyyy');
-      const monthShort = format(d, 'MMM');
-      const targetMonth = d.getMonth();
-      const targetYear = d.getFullYear();
-
-      const monthlyPlanned = safeWOs.filter(wo => {
-        if (wo.isExecution) return false;
-        const dueDate = parseFlexibleDate(wo.dueDate);
-        if (!dueDate) return false;
-        return dueDate.getMonth() === targetMonth && dueDate.getFullYear() === targetYear;
-      });
-
-      const totalPlanned = monthlyPlanned.length;
-      const completedCount = monthlyPlanned.filter(wo => (wo as any).computedStatus === 'Completed').length;
-      const compliancePercent = totalPlanned > 0 ? Math.round((completedCount / totalPlanned) * 100) : 0;
-
-      months.push({ month: monthName, monthShort, totalPlanned, completed: completedCount, compliancePercent });
-    }
-
-    return months;
-  }, [workOrdersData]);
-
   const sparesConsumptionTrendData = useMemo(() => {
     const now = new Date();
     const months: { month: string; monthShort: string; consumeEvents: number; totalQty: number; receiveEvents: number; receiveQty: number }[] = [];
@@ -1649,76 +1620,8 @@ const Dashboard = () => {
           </CardContent>
         </Card>
 
-        {/* Trend Analytics Row - Compliance Rate & Spares Consumption */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {/* Compliance Rate Trend */}
-          <Card data-testid="card-compliance-trend" className="bg-white">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <CheckCircle className="w-5 h-5 text-green-500" />
-                6-Month Compliance Rate Trend
-              </CardTitle>
-              <CardDescription>Percentage of planned tasks completed each month</CardDescription>
-            </CardHeader>
-            <CardContent>
-              {complianceTrendData.length > 0 ? (
-                <div className="flex flex-col gap-3">
-                  <div className="h-52" data-testid="chart-compliance-trend">
-                    <ResponsiveContainer width="100%" height="100%">
-                      <BarChart data={complianceTrendData} margin={{ top: 4, right: 4, bottom: 0, left: -20 }}>
-                        <XAxis dataKey="monthShort" tick={{ fontSize: 11 }} tickLine={false} axisLine={false} />
-                        <YAxis domain={[0, 100]} tick={{ fontSize: 10 }} tickLine={false} axisLine={false} tickFormatter={(v) => `${v}%`} />
-                        <Tooltip
-                          content={({ active, payload }) => {
-                            if (active && payload && payload.length) {
-                              const d = payload[0].payload;
-                              return (
-                                <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-md shadow-md p-2 text-xs text-gray-900 dark:text-gray-100" data-testid="tooltip-compliance-bar">
-                                  <div className="font-semibold mb-1">{d.month}</div>
-                                  <div>Total planned: {d.totalPlanned}</div>
-                                  <div>Completed: {d.completed}</div>
-                                  <div>Compliance: {d.compliancePercent}%</div>
-                                </div>
-                              );
-                            }
-                            return null;
-                          }}
-                        />
-                        <Bar dataKey="compliancePercent" radius={[3, 3, 0, 0]} maxBarSize={32}>
-                          {complianceTrendData.map((entry, index) => (
-                            <Cell
-                              key={`cell-compliance-${index}`}
-                              fill={entry.compliancePercent >= 80 ? '#10b981' : entry.compliancePercent >= 50 ? '#f59e0b' : '#ef4444'}
-                            />
-                          ))}
-                        </Bar>
-                      </BarChart>
-                    </ResponsiveContainer>
-                  </div>
-                  <div className="flex items-center justify-center gap-4 text-xs text-gray-600 dark:text-gray-400" data-testid="legend-compliance-trend">
-                    <div className="flex items-center gap-1">
-                      <span className="inline-block w-3 h-3 rounded-sm" style={{ backgroundColor: '#10b981' }} />
-                      <span>Good ({'\u2265'}80%)</span>
-                    </div>
-                    <div className="flex items-center gap-1">
-                      <span className="inline-block w-3 h-3 rounded-sm" style={{ backgroundColor: '#f59e0b' }} />
-                      <span>Fair (50–79%)</span>
-                    </div>
-                    <div className="flex items-center gap-1">
-                      <span className="inline-block w-3 h-3 rounded-sm" style={{ backgroundColor: '#ef4444' }} />
-                      <span>Poor ({'<'}50%)</span>
-                    </div>
-                  </div>
-                </div>
-              ) : (
-                <div className="h-52 flex items-center justify-center text-gray-500 dark:text-gray-400">
-                  No compliance data available
-                </div>
-              )}
-            </CardContent>
-          </Card>
-
-          {/* Spares Consumption Trend */}
+        {/* Spares Movement Trend */}
+        <div className="grid grid-cols-1 gap-6">
           <Card data-testid="card-spares-consumption-trend" className="bg-white">
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
