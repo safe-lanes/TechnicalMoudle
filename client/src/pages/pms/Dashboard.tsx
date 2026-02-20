@@ -7,20 +7,8 @@ import { useUIRole } from "@/contexts/UIRoleContext";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import {
-  RefreshCw,
-  AlertTriangle,
   CheckCircle,
-  Package,
-  Clock,
-  Ship,
-  Wrench,
-  ClipboardList,
-  Box,
-  Gauge,
-  FileText,
   ChevronRight,
-  AlertCircle,
-  RotateCcw,
   CheckSquare,
   XCircle,
   Eye,
@@ -34,15 +22,14 @@ import {
 } from "lucide-react";
 import { AgCharts } from "ag-charts-react";
 import { AgChartOptions } from "ag-charts-community";
-import { BarChart, Bar, LineChart, Line, XAxis, YAxis, Tooltip, Cell, Legend, ResponsiveContainer } from "recharts";
+import { BarChart, Bar, XAxis, YAxis, Tooltip, Cell, ResponsiveContainer } from "recharts";
 import { Button } from "@/components/ui/button";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { WorkOrder } from "@shared/schema";
 import { useVessels } from "@/hooks/useVessels";
 import { BulkApproveModal } from "@/components/BulkApproveModal";
 import { FleetVesselContextBar } from "@/components/FleetVesselContextBar";
+import { SemiCircleGauge } from "@/components/SemiCircleGauge";
 
 interface Spare {
   id: number;
@@ -358,6 +345,8 @@ const Dashboard = () => {
   const [lastUpdated, setLastUpdated] = useState(new Date());
   const [bulkApproveModalOpen, setBulkApproveModalOpen] = useState(false);
   const [isFleetView, setIsFleetView] = useState(false);
+  const [activeTab, setActiveTab] = useState('overview');
+  const [dotMatrixMode, setDotMatrixMode] = useState<'vessels'>('vessels');
   const { vesselId, setVesselId } = useVessel();
   const { data: vessels = [] } = useVessels();
   const { isSailAdmin, isClientAdmin, isHeadOfDept } = useUIRole();
@@ -907,35 +896,33 @@ const Dashboard = () => {
     return parts.join(' \u00b7 ');
   }, [isFleetView, currentVessel, workOrderKPIs.total, sparesKPIs.total, componentsKPIs.total, vessels.length, lastUpdated]);
 
-  const criticalIssues = workOrderKPIs.overdue + sparesKPIs.criticalLowStock;
-
   const overduePercent = workOrderKPIs.total > 0 ? Math.round((workOrderKPIs.overdue / workOrderKPIs.total) * 100) : 0;
   const completionRate = workOrderKPIs.total > 0 ? Math.round((workOrderKPIs.completed / workOrderKPIs.total) * 100) : 0;
+  const duePercent = workOrderKPIs.total > 0 ? Math.round((workOrderKPIs.due / workOrderKPIs.total) * 100) : 0;
+  const pendingPercent = workOrderKPIs.total > 0 ? Math.round((workOrderKPIs.pendingApproval / workOrderKPIs.total) * 100) : 0;
 
-  const cardStyle = {
-    background: '#FFFFFF',
-    borderRadius: '8px',
-    boxShadow: '0 1px 4px rgba(0,0,0,0.08)',
-    border: 'none',
-  };
+  const HEADER_BLUE = '#1a3a5c';
 
-  const sectionTitleStyle: React.CSSProperties = {
-    color: '#1565C0',
-    fontSize: '12px',
+  const sectionHeaderBar: React.CSSProperties = {
+    background: HEADER_BLUE,
+    color: '#FFFFFF',
     fontWeight: 700,
+    fontSize: '11px',
     textTransform: 'uppercase' as const,
-    letterSpacing: '0.05em',
+    letterSpacing: '0.5px',
+    padding: '8px 16px',
   };
 
-  const sectionBarStyle: React.CSSProperties = {
-    background: '#EEF2FF',
-    padding: '10px 16px',
-    borderRadius: '6px',
-    marginBottom: '12px',
+  const subTitle: React.CSSProperties = {
+    color: '#1565C0',
+    fontSize: '11px',
+    fontWeight: 600,
+    textTransform: 'uppercase' as const,
+    letterSpacing: '0.5px',
   };
 
   const tableHeaderStyle: React.CSSProperties = {
-    background: '#1565C0',
+    background: HEADER_BLUE,
     color: '#FFFFFF',
     fontWeight: 700,
     fontSize: '11px',
@@ -943,150 +930,148 @@ const Dashboard = () => {
     letterSpacing: '0.03em',
   };
 
+  const contentCard: React.CSSProperties = {
+    background: '#FFFFFF',
+    borderRadius: '6px',
+    boxShadow: '0 1px 3px rgba(0,0,0,0.08)',
+    padding: '16px',
+  };
+
+  const dividerH: React.CSSProperties = {
+    borderBottom: '1px solid #e8e8e8',
+    margin: '0',
+  };
+
+  const statRow: React.CSSProperties = {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    padding: '10px 16px',
+  };
+
+  const vesselDotMatrixData = useMemo(() => {
+    if (vessels.length === 0) return [];
+    return vessels.slice(0, 8);
+  }, [vessels]);
+
+  const getVesselDotColor = (vesselId: string, metric: string): string => {
+    return '#2E7D32';
+  };
+
+  const watchListItems = useMemo(() => {
+    const items: { label: string; vessel: string; badge: string; badgeColor: string }[] = [];
+    workOrderKPIs.overdueList.slice(0, 3).forEach((wo: any) => {
+      items.push({
+        label: wo.taskDescription || wo.jobTitle || `WO-${wo.id}`,
+        vessel: currentVessel?.name || '',
+        badge: 'Overdue',
+        badgeColor: '#E53935',
+      });
+    });
+    sparesKPIs.criticalLowStockList?.slice(0, 2).forEach((spare: Spare) => {
+      items.push({
+        label: spare.partName,
+        vessel: currentVessel?.name || '',
+        badge: 'Critical',
+        badgeColor: '#E53935',
+      });
+    });
+    return items.slice(0, 5);
+  }, [workOrderKPIs.overdueList, sparesKPIs.criticalLowStockList, currentVessel]);
+
   return (
     <div className="flex flex-col" style={{ height: 'calc(100vh - 120px)' }}>
-      {/* SECTION 1: PAGE HEADER BAR */}
+      {/* SUB-HEADER BAR */}
       <div className="flex-shrink-0 -mx-4 sm:-mx-6 -mt-4 sm:-mt-6">
-        {(isSailAdmin || isClientAdmin) ? (
-          <FleetVesselContextBar
-            isFleetView={isFleetView}
-            onViewModeChange={(isFleet) => setIsFleetView(isFleet)}
-            vesselId={vesselId}
-            onVesselChange={handleVesselChange}
-            vessels={vessels}
-            summaryLine={summaryLine}
-          />
-        ) : (
-          <div style={{ background: '#FFFFFF', borderBottom: '1px solid #E0E0E0' }} className="px-5 py-3">
-            <h1 className="text-base font-bold" style={{ color: '#212121' }} data-testid="text-dashboard-title">PMS Dashboard</h1>
-            <p className="text-xs mt-0.5" style={{ color: '#9E9E9E' }} data-testid="text-hero-summary">{summaryLine}</p>
-          </div>
-        )}
+        <FleetVesselContextBar
+          isFleetView={isFleetView}
+          onViewModeChange={(isFleet) => setIsFleetView(isFleet)}
+          vesselId={vesselId}
+          onVesselChange={handleVesselChange}
+          vessels={vessels}
+          summaryLine={summaryLine}
+          activeTab={activeTab}
+          onTabChange={setActiveTab}
+        />
       </div>
 
-      {/* Main Content - Scrollable */}
-      <div className="flex-1 overflow-y-auto" style={{ background: '#F4F6F9', padding: '16px' }}>
-        <div className="space-y-4 max-w-[1400px] mx-auto">
+      {/* MAIN CONTENT */}
+      <div className="flex-1 overflow-y-auto" style={{ background: '#F4F6F9' }}>
 
         {/* Fleet View Mode */}
         {isFleetView && vessels.length > 0 && (
-          <FleetView vessels={vessels} onSelectVessel={handleFleetVesselSelect} />
+          <div style={{ padding: '16px' }}>
+            <FleetView vessels={vessels} onSelectVessel={handleFleetVesselSelect} />
+          </div>
         )}
 
-        {!isFleetView && (<>
+        {!isFleetView && (
+          <div
+            className="grid grid-cols-1 lg:grid-cols-[25%_1px_40%_1px_1fr]"
+            style={{ minHeight: '100%' }}
+          >
+            {/* ═══ COLUMN 1: WORK ORDER KPIs ═══ */}
+            <div className="lg:overflow-y-auto" data-testid="column-wo-kpis">
+              <div style={sectionHeaderBar}>WORK ORDER KPIs</div>
 
-        {/* ═══ SECTION 2: EXECUTIVE SUMMARY ═══ */}
-        <section data-testid="band-executive-summary">
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4" style={{ alignItems: 'stretch' }}>
-            {/* Card 1: Total Work Orders */}
-            <div
-              className="cursor-pointer transition-shadow hover:shadow-md"
-              style={cardStyle}
-              onClick={() => navigateToWorkOrders('Planned')}
-              data-testid="card-total-wo"
-            >
-              <div style={{ height: '4px', background: '#1565C0', borderRadius: '8px 8px 0 0' }} />
-              <div className="p-4">
-                <div className="flex items-center gap-2 mb-2">
-                  <Wrench className="w-4 h-4" style={{ color: '#1565C0' }} />
-                  <span style={{ ...sectionTitleStyle, color: '#1565C0' }}>TOTAL WORK ORDERS</span>
-                </div>
-                <div className="text-3xl font-bold" style={{ color: '#212121' }} data-testid="text-total-wo-count">{workOrderKPIs.total}</div>
-                <div className="text-xs mt-1" style={{ color: '#757575' }}>{workOrderKPIs.active} planned / active</div>
-                <div className="text-xs mt-2" style={{ color: '#9E9E9E' }}>{isFleetView ? 'Fleet scope' : (currentVessel?.name || 'All vessels')}</div>
-              </div>
+              {/* Gauge 1: Overdue WOs */}
+              <SemiCircleGauge
+                value={workOrderKPIs.overdue}
+                max={workOrderKPIs.total || 10}
+                color="#E53935"
+                label="Overdue WOs"
+                displayValue={workOrderKPIs.overdue.toString()}
+                subtitle={`${overduePercent}% of total`}
+                statLeft={`Due: ${workOrderKPIs.due}`}
+                statRight={`Pending: ${workOrderKPIs.pendingApproval}`}
+                onClick={() => navigateToWorkOrders('Overdue')}
+                testId="gauge-overdue-wo"
+              />
+
+              <div style={dividerH} />
+
+              {/* Gauge 2: Completion Rate */}
+              <SemiCircleGauge
+                value={workOrderKPIs.completed}
+                max={workOrderKPIs.total || 10}
+                color="#2E7D32"
+                label="Completion Rate"
+                displayValue={workOrderKPIs.completed.toString()}
+                subtitle={`${completionRate}% completion rate`}
+                statLeft={`Total WOs: ${workOrderKPIs.total}`}
+                statRight={`Active: ${workOrderKPIs.active}`}
+                onClick={() => navigateToWorkOrders('Completed')}
+                testId="gauge-completion-rate"
+              />
+
+              <div style={dividerH} />
+
+              {/* Gauge 3: Outstanding Tasks */}
+              <SemiCircleGauge
+                value={outstandingTasksChartData.outstandingCount}
+                max={outstandingTasksChartData.totalMonthly || 10}
+                color="#F57C00"
+                label="Outstanding Tasks"
+                displayValue={`${outstandingTasksChartData.outstandingPercent}%`}
+                subtitle={`${outstandingTasksChartData.outstandingCount} of ${outstandingTasksChartData.totalMonthly} tasks`}
+                statLeft={`vs last month: ${maintenanceTrendData.delta > 0 ? '+' : ''}${maintenanceTrendData.delta}%`}
+                onClick={() => navigateToWorkOrders('Planned')}
+                testId="gauge-outstanding-tasks"
+              />
             </div>
 
-            {/* Card 2: Overdue */}
-            <div
-              className="cursor-pointer transition-shadow hover:shadow-md"
-              style={cardStyle}
-              onClick={() => navigateToWorkOrders('Overdue')}
-              data-testid="card-overdue-wo"
-            >
-              <div style={{ height: '4px', background: '#E53935', borderRadius: '8px 8px 0 0' }} />
-              <div className="p-4">
-                <div className="flex items-center gap-2 mb-2">
-                  <AlertTriangle className="w-4 h-4" style={{ color: '#E53935' }} />
-                  <span style={{ ...sectionTitleStyle, color: '#E53935' }}>OVERDUE</span>
-                </div>
-                <div className="text-3xl font-bold" style={{ color: '#E53935' }} data-testid="text-overdue-count">{workOrderKPIs.overdue}</div>
-                <div className="text-xs mt-1" style={{ color: '#757575' }}>{overduePercent}% of all work orders</div>
-                {workOrderKPIs.overdue > 0 && (
-                  <div className="mt-2">
-                    <span className="inline-block text-xs font-medium px-2 py-0.5 rounded-full" style={{ background: '#FFEBEE', color: '#E53935' }} data-testid="badge-action-required">Action required</span>
-                  </div>
-                )}
-              </div>
-            </div>
+            {/* Vertical Divider 1 - hidden on mobile */}
+            <div className="hidden lg:block" style={{ background: '#e8e8e8', width: '1px' }} />
 
-            {/* Card 3: Completed */}
-            <div
-              className="cursor-pointer transition-shadow hover:shadow-md"
-              style={cardStyle}
-              onClick={() => navigateToWorkOrders('Completed')}
-              data-testid="card-completed-wo"
-            >
-              <div style={{ height: '4px', background: '#2E7D32', borderRadius: '8px 8px 0 0' }} />
-              <div className="p-4">
-                <div className="flex items-center gap-2 mb-2">
-                  <CheckCircle className="w-4 h-4" style={{ color: '#2E7D32' }} />
-                  <span style={{ ...sectionTitleStyle, color: '#2E7D32' }}>COMPLETED</span>
-                </div>
-                <div className="text-3xl font-bold" style={{ color: '#2E7D32' }} data-testid="text-completed-count">{workOrderKPIs.completed}</div>
-                <div className="text-xs mt-1" style={{ color: '#757575' }}>{completionRate}% completion rate</div>
-                <div className="text-xs mt-2" style={{ color: '#9E9E9E' }}>
-                  {maintenanceTrendData.delta !== 0 ? `vs last month: ${maintenanceTrendData.delta > 0 ? '+' : ''}${maintenanceTrendData.delta}%` : 'No change vs last month'}
-                </div>
-              </div>
-            </div>
+            {/* ═══ COLUMN 2: WORK ORDER STATUS & TRENDS ═══ */}
+            <div className="lg:overflow-y-auto" data-testid="column-wo-status-trends">
+              <div style={sectionHeaderBar}>WORK ORDER STATUS & TRENDS</div>
 
-            {/* Card 4: Outstanding / Backlog */}
-            <div
-              className="cursor-pointer transition-shadow hover:shadow-md"
-              style={cardStyle}
-              onClick={() => navigateToWorkOrders('Planned')}
-              data-testid="card-outstanding-summary"
-            >
-              <div style={{ height: '4px', background: '#F57C00', borderRadius: '8px 8px 0 0' }} />
-              <div className="p-4">
-                <div className="flex items-center gap-2 mb-2">
-                  <ClipboardList className="w-4 h-4" style={{ color: '#F57C00' }} />
-                  <span style={{ ...sectionTitleStyle, color: '#F57C00' }}>OUTSTANDING TASKS</span>
-                </div>
-                <div className="text-3xl font-bold" style={{ color: '#212121' }} data-testid="text-outstanding-count">
-                  {outstandingTasksChartData.outstandingCount} / {outstandingTasksChartData.totalMonthly}
-                </div>
-                <div className="text-xs mt-1" style={{ color: '#757575' }}>{outstandingTasksChartData.outstandingPercent}% incomplete this month</div>
-                {maintenanceTrendData.delta !== 0 && (
-                  <div className="mt-2">
-                    <span
-                      className="inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full"
-                      style={{
-                        background: maintenanceTrendData.delta > 0 ? '#FFF3E0' : '#E8F5E9',
-                        color: maintenanceTrendData.delta > 0 ? '#E65100' : '#2E7D32',
-                      }}
-                      data-testid="badge-trend-delta"
-                    >
-                      {maintenanceTrendData.delta > 0 ? <TrendingUp className="w-3 h-3" /> : <TrendingDown className="w-3 h-3" />}
-                      {maintenanceTrendData.delta > 0 ? '+' : ''}{maintenanceTrendData.delta}% vs last month
-                    </span>
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>
-        </section>
-
-        {/* ═══ SECTION 3: TWO-COLUMN MIDDLE — Charts + Quick Stats ═══ */}
-        <section data-testid="band-charts-quickstats">
-          <div className="grid grid-cols-1 lg:grid-cols-5 gap-4">
-            {/* LEFT: WO Status Distribution (3/5 = 60%) */}
-            <div className="lg:col-span-3" style={cardStyle} data-testid="card-wo-status-chart">
-              <div className="p-4">
-                <div style={sectionTitleStyle} className="mb-1">WORK ORDER STATUS DISTRIBUTION</div>
-                <div className="text-xs mb-3" style={{ color: '#9E9E9E' }}>Click segments to filter work orders</div>
-                <div className="h-64">
+              {/* Status Distribution Donut Chart */}
+              <div style={{ padding: '16px' }}>
+                <div style={subTitle} className="mb-1">Status Distribution</div>
+                <div style={{ fontSize: '11px', color: '#9E9E9E', marginBottom: '8px' }}>Click segments to filter</div>
+                <div style={{ height: '220px' }} data-testid="card-wo-status-chart">
                   {workOrderStatusChartData.length > 0 ? (
                     <AgCharts options={{
                       data: workOrderStatusChartData,
@@ -1115,315 +1100,190 @@ const Dashboard = () => {
                     <div className="h-full flex items-center justify-center" style={{ color: '#9E9E9E' }}>No work orders to display</div>
                   )}
                 </div>
-              </div>
-            </div>
 
-            {/* RIGHT: Quick Stats (2/5 = 40%) */}
-            <div className="lg:col-span-2" style={cardStyle} data-testid="card-quick-stats">
-              <div className="p-4">
-                <div style={sectionTitleStyle} className="mb-3">QUICK STATS</div>
-                <div className="divide-y" style={{ borderColor: '#E0E0E0' }}>
-                  <div className="flex items-center justify-between py-3 cursor-pointer hover:bg-gray-50 px-2 rounded transition-colors" onClick={() => navigateToWorkOrders('Due')} data-testid="row-quick-due">
-                    <span className="text-sm" style={{ color: '#424242' }}>Due this week</span>
-                    <span className="inline-flex items-center justify-center min-w-[32px] px-2 py-0.5 rounded-full text-xs font-bold text-white" style={{ background: '#F57C00' }} data-testid="badge-due-count">{workOrderKPIs.due}</span>
-                  </div>
-                  <div className="flex items-center justify-between py-3 cursor-pointer hover:bg-gray-50 px-2 rounded transition-colors" onClick={() => navigateToWorkOrders('Pending Approval')} data-testid="row-quick-pending">
-                    <span className="text-sm" style={{ color: '#424242' }}>Pending Approval</span>
-                    <span className="inline-flex items-center justify-center min-w-[32px] px-2 py-0.5 rounded-full text-xs font-bold text-white" style={{ background: '#1565C0' }} data-testid="badge-pending-count">{workOrderKPIs.pendingApproval}</span>
-                  </div>
-                  <div className="flex items-center justify-between py-3 cursor-pointer hover:bg-gray-50 px-2 rounded transition-colors" onClick={() => navigateToSpares('Low')} data-testid="row-quick-critical-spares">
-                    <span className="text-sm" style={{ color: '#424242' }}>Critical Low Stock Spares</span>
-                    <span className="inline-flex items-center justify-center min-w-[32px] px-2 py-0.5 rounded-full text-xs font-bold text-white" style={{ background: '#E53935' }} data-testid="badge-critical-spares">{sparesKPIs.criticalLowStock}</span>
-                  </div>
-                  <div className="flex items-center justify-between py-3 cursor-pointer hover:bg-gray-50 px-2 rounded transition-colors" onClick={navigateToComponents} data-testid="row-quick-components">
-                    <span className="text-sm" style={{ color: '#424242' }}>Total Components</span>
-                    <span className="inline-flex items-center justify-center min-w-[32px] px-2 py-0.5 rounded-full text-xs font-bold text-white" style={{ background: '#546E7A' }} data-testid="badge-components">{componentsKPIs.total}</span>
-                  </div>
-                  <div className="flex items-center justify-between py-3 cursor-pointer hover:bg-gray-50 px-2 rounded transition-colors" onClick={navigateToRunningHours} data-testid="row-quick-rh">
-                    <span className="text-sm" style={{ color: '#424242' }}>Running Hours Tracked</span>
-                    <span className="inline-flex items-center justify-center min-w-[32px] px-2 py-0.5 rounded-full text-xs font-bold text-white" style={{ background: '#F57C00' }} data-testid="badge-rh">{runningHoursKPIs.totalComponents}</span>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </section>
-
-        {/* ═══ SECTION 4A: WORK ORDER HEALTH ═══ */}
-        <section data-testid="band-work-order-health">
-          <div style={sectionBarStyle}>
-            <span style={sectionTitleStyle} data-testid="text-band-wo-health">WORK ORDER HEALTH</span>
-          </div>
-
-          {/* 5 compact KPI cards */}
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 mb-4">
-            {[
-              { label: 'OVERDUE', value: workOrderKPIs.overdue, color: '#E53935', icon: AlertTriangle, onClick: () => navigateToWorkOrders('Overdue'), testId: 'card-wo-overdue' },
-              { label: 'DUE', value: workOrderKPIs.due, color: '#F57C00', icon: Clock, onClick: () => navigateToWorkOrders('Due'), testId: 'card-wo-due' },
-              { label: 'PENDING APPROVAL', value: workOrderKPIs.pendingApproval, color: '#1565C0', icon: ClipboardList, onClick: () => navigateToWorkOrders('Pending Approval'), testId: 'card-wo-pending' },
-              { label: 'COMPLETED', value: workOrderKPIs.completed, color: '#2E7D32', icon: CheckCircle, onClick: () => navigateToWorkOrders('Completed'), testId: 'card-wo-completed' },
-              { label: 'TOTAL WOs', value: workOrderKPIs.total, color: '#1565C0', icon: Wrench, onClick: () => navigateToWorkOrders('Planned'), testId: 'card-wo-total' },
-            ].map(item => (
-              <div
-                key={item.testId}
-                className="cursor-pointer transition-shadow hover:shadow-md"
-                style={cardStyle}
-                onClick={item.onClick}
-                data-testid={item.testId}
-              >
-                <div style={{ height: '3px', background: item.color, borderRadius: '8px 8px 0 0' }} />
-                <div className="p-3 text-center">
-                  <item.icon className="w-4 h-4 mx-auto mb-1" style={{ color: item.color }} />
-                  <div className="text-xs font-bold uppercase mb-1" style={{ color: item.color, letterSpacing: '0.03em' }}>{item.label}</div>
-                  <div className="text-2xl font-bold" style={{ color: item.value > 0 && (item.label === 'OVERDUE') ? '#E53935' : '#212121' }}>{item.value}</div>
-                </div>
-              </div>
-            ))}
-          </div>
-
-          {/* Overdue Work Orders Table */}
-          <div style={cardStyle} className="overflow-hidden" data-testid="card-overdue-table">
-            <div className="px-4 py-3 flex items-center justify-between" style={{ borderBottom: '1px solid #E0E0E0' }}>
-              <div>
-                <span style={sectionTitleStyle}>OVERDUE WORK ORDERS</span>
-                <div className="text-xs mt-0.5" style={{ color: '#9E9E9E' }}>
-                  {workOrderKPIs.overdueList.length > 0
-                    ? `Showing top ${workOrderKPIs.overdueList.length} of ${workOrderKPIs.overdue} total`
-                    : 'No overdue items'}
-                </div>
-              </div>
-              {workOrderKPIs.overdue > 0 && (
-                <Button variant="outline" size="sm" onClick={() => navigateToWorkOrders('Overdue')} data-testid="button-view-all-overdue" style={{ borderColor: '#1565C0', color: '#1565C0' }}>
-                  View All ({workOrderKPIs.overdue})
-                </Button>
-              )}
-            </div>
-            {workOrderKPIs.overdueList.length > 0 ? (
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm" data-testid="table-overdue-wo">
-                  <thead>
-                    <tr>
-                      <th className="text-left py-2.5 px-4" style={tableHeaderStyle}>Work Order</th>
-                      <th className="text-left py-2.5 px-4" style={tableHeaderStyle}>Equipment</th>
-                      <th className="text-left py-2.5 px-4" style={tableHeaderStyle}>Status</th>
-                      <th className="text-right py-2.5 px-4" style={tableHeaderStyle}></th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {workOrderKPIs.overdueList.map((wo: any, idx: number) => (
-                      <tr
-                        key={wo.id}
-                        className="cursor-pointer transition-colors"
-                        style={{ background: idx % 2 === 0 ? '#FFFFFF' : '#F9FAFB' }}
-                        onMouseEnter={e => (e.currentTarget.style.background = '#E3F2FD')}
-                        onMouseLeave={e => (e.currentTarget.style.background = idx % 2 === 0 ? '#FFFFFF' : '#F9FAFB')}
-                        onClick={() => navigateToWorkOrder(wo.id)}
-                        data-testid={`row-overdue-wo-${wo.id}`}
-                      >
-                        <td className="py-2.5 px-4">
-                          <div className="font-medium text-xs" style={{ color: '#212121' }}>{wo.workOrderNumber || `WO-${wo.id}`}</div>
-                        </td>
-                        <td className="py-2.5 px-4">
-                          <div className="text-xs" style={{ color: '#616161' }}>{wo.taskDescription || wo.jobTitle || 'No description'}</div>
-                        </td>
-                        <td className="py-2.5 px-4">
-                          <span className="inline-flex items-center justify-center px-2.5 py-0.5 rounded-full text-xs font-bold text-white" style={{ background: '#E53935' }}>Overdue</span>
-                        </td>
-                        <td className="py-2.5 px-4 text-right">
-                          <ChevronRight className="w-4 h-4 inline-block" style={{ color: '#BDBDBD' }} />
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            ) : (
-              <div className="text-center py-8" style={{ color: '#9E9E9E' }}>
-                <CheckCircle className="w-10 h-10 mx-auto mb-2" style={{ color: '#2E7D32' }} />
-                <p className="text-sm">No overdue work orders</p>
-              </div>
-            )}
-          </div>
-        </section>
-
-        {/* ═══ SECTION 4B: MAINTENANCE EFFECTIVENESS ═══ */}
-        <section data-testid="band-maintenance-effectiveness">
-          <div style={sectionBarStyle}>
-            <span style={sectionTitleStyle} data-testid="text-band-maintenance">MAINTENANCE EFFECTIVENESS</span>
-          </div>
-
-          {/* 3 KPI cards */}
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-4">
-            <div style={cardStyle} data-testid="card-outstanding-tasks-kpi">
-              <div style={{ height: '3px', background: '#F57C00', borderRadius: '8px 8px 0 0' }} />
-              <div className="p-4">
-                <div className="flex items-center gap-2 mb-2">
-                  <ClipboardList className="w-4 h-4" style={{ color: '#F57C00' }} />
-                  <span className="text-xs font-bold uppercase" style={{ color: '#F57C00' }}>Outstanding Tasks</span>
-                </div>
-                <div className="text-2xl font-bold" style={{ color: '#212121' }} data-testid="text-outstanding-fraction">
-                  {outstandingTasksChartData.outstandingCount} of {outstandingTasksChartData.totalMonthly}
-                </div>
-                <div className="text-xs mt-1" style={{ color: '#757575' }}>{outstandingTasksChartData.outstandingPercent}% incomplete</div>
-              </div>
-            </div>
-
-            <div style={cardStyle} data-testid="card-backlog-trend-kpi">
-              <div style={{ height: '3px', background: maintenanceTrendData.delta > 0 ? '#E53935' : '#2E7D32', borderRadius: '8px 8px 0 0' }} />
-              <div className="p-4">
-                <div className="flex items-center gap-2 mb-2">
-                  {maintenanceTrendData.delta > 0 ? <TrendingUp className="w-4 h-4" style={{ color: '#E53935' }} /> : <TrendingDown className="w-4 h-4" style={{ color: '#2E7D32' }} />}
-                  <span className="text-xs font-bold uppercase" style={{ color: maintenanceTrendData.delta > 0 ? '#E53935' : '#2E7D32' }}>Backlog Trend</span>
-                </div>
-                <div className="text-2xl font-bold" style={{ color: '#212121' }} data-testid="text-backlog-trend">
-                  {maintenanceTrendData.delta > 0 ? '+' : ''}{maintenanceTrendData.delta}% vs last month
-                </div>
-                <div className="text-xs mt-1" style={{ color: '#757575' }}>Trend: {maintenanceTrendData.delta > 0 ? 'Worsening \u2191' : maintenanceTrendData.delta < 0 ? 'Improving \u2193' : 'Stable'}</div>
-              </div>
-            </div>
-
-            <div style={cardStyle} className="cursor-pointer hover:shadow-md transition-shadow" onClick={navigateToRunningHours} data-testid="card-running-hours-summary">
-              <div style={{ height: '3px', background: '#1565C0', borderRadius: '8px 8px 0 0' }} />
-              <div className="p-4">
-                <div className="flex items-center gap-2 mb-2">
-                  <Gauge className="w-4 h-4" style={{ color: '#1565C0' }} />
-                  <span className="text-xs font-bold uppercase" style={{ color: '#1565C0' }}>Running Hours</span>
-                </div>
-                <div className="text-2xl font-bold" style={{ color: '#212121' }}>{runningHoursKPIs.totalComponents}</div>
-                <div className="text-xs mt-1" style={{ color: '#757575' }}>{runningHoursKPIs.totalTracked} master, {runningHoursKPIs.totalInherited} inherited</div>
-                <div className="text-xs mt-1" style={{ color: runningHoursKPIs.recentlyUpdated > 0 ? '#2E7D32' : '#9E9E9E' }}>
-                  {runningHoursKPIs.recentlyUpdated} updated this week
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* 6-Month Maintenance Trend Chart */}
-          <div style={cardStyle} data-testid="card-maintenance-trend">
-            <div className="p-4">
-              <div style={sectionTitleStyle} className="mb-1">6-MONTH MAINTENANCE TREND</div>
-              <div className="text-xs mb-3" style={{ color: '#9E9E9E' }}>Outstanding tasks % over time</div>
-              {maintenanceTrendData.months.length > 0 ? (
-                <div className="flex flex-col gap-2">
-                  <div className="h-48" data-testid="chart-maintenance-trend">
-                    <ResponsiveContainer width="100%" height="100%">
-                      <BarChart data={maintenanceTrendData.months} margin={{ top: 4, right: 8, bottom: 0, left: -16 }}>
-                        <XAxis dataKey="monthShort" tick={{ fontSize: 11, fill: '#757575' }} tickLine={false} axisLine={false} />
-                        <YAxis domain={[0, 100]} tick={{ fontSize: 10, fill: '#757575' }} tickLine={false} axisLine={false} tickFormatter={(v) => `${v}%`} />
-                        <Tooltip
-                          content={({ active, payload }) => {
-                            if (active && payload && payload.length) {
-                              const d = payload[0].payload;
-                              return (
-                                <div style={{ background: '#FFFFFF', border: '1px solid #E0E0E0', borderRadius: '6px', boxShadow: '0 2px 8px rgba(0,0,0,0.12)', padding: '8px 12px' }} data-testid="tooltip-trend-bar">
-                                  <div className="font-semibold text-xs mb-1" style={{ color: '#212121' }}>{d.month}</div>
-                                  <div className="text-xs" style={{ color: '#616161' }}>Total planned: {d.totalPlanned}</div>
-                                  <div className="text-xs" style={{ color: '#616161' }}>Completed: {d.completed}</div>
-                                  <div className="text-xs" style={{ color: '#616161' }}>Outstanding: {d.outstandingPercent}%</div>
-                                  <div className="text-xs" style={{ color: '#616161' }}>Overdue: {d.overdue}</div>
-                                </div>
-                              );
-                            }
-                            return null;
-                          }}
-                        />
-                        <Bar dataKey="outstandingPercent" radius={[4, 4, 0, 0]} maxBarSize={32}>
-                          {maintenanceTrendData.months.map((entry, index) => (
-                            <Cell
-                              key={`cell-${index}`}
-                              fill={entry.outstandingPercent > 60 ? '#E53935' : entry.outstandingPercent >= 30 ? '#F57C00' : '#2E7D32'}
-                            />
-                          ))}
-                        </Bar>
-                      </BarChart>
-                    </ResponsiveContainer>
-                  </div>
-                  <div className="flex items-center justify-center gap-4 text-xs" style={{ color: '#757575' }} data-testid="legend-maintenance-trend">
-                    <div className="flex items-center gap-1" data-testid="legend-item-healthy">
-                      <span className="inline-block w-3 h-3 rounded-sm" style={{ backgroundColor: '#2E7D32' }} />
-                      <span>Healthy (&lt;30%)</span>
+                {/* Status % Bars */}
+                <div style={{ marginTop: '12px' }}>
+                  {[
+                    { label: 'Overdue', pct: overduePercent, color: '#E53935' },
+                    { label: 'Completed', pct: completionRate, color: '#2E7D32' },
+                    { label: 'Due', pct: duePercent, color: '#F57C00' },
+                    { label: 'Pending', pct: pendingPercent, color: '#1565C0' },
+                  ].map(bar => (
+                    <div key={bar.label} style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px' }}>
+                      <span style={{ fontSize: '11px', color: '#616161', width: '70px', flexShrink: 0 }}>{bar.label}</span>
+                      <div style={{ flex: 1, height: '8px', background: '#EEEEEE', borderRadius: '4px', overflow: 'hidden' }}>
+                        <div style={{ height: '100%', width: `${bar.pct}%`, background: bar.color, borderRadius: '4px', transition: 'width 0.3s' }} />
+                      </div>
+                      <span style={{ fontSize: '11px', color: '#616161', width: '32px', textAlign: 'right', flexShrink: 0 }}>{bar.pct}%</span>
                     </div>
-                    <div className="flex items-center gap-1" data-testid="legend-item-watch">
-                      <span className="inline-block w-3 h-3 rounded-sm" style={{ backgroundColor: '#F57C00' }} />
-                      <span>Watch (30\u201360%)</span>
+                  ))}
+                </div>
+              </div>
+
+              <div style={dividerH} />
+
+              {/* 6-Month Maintenance Trend */}
+              <div style={{ padding: '16px' }}>
+                <div style={subTitle} className="mb-1">6-MONTH MAINTENANCE TREND</div>
+                {maintenanceTrendData.months.length > 0 ? (
+                  <div className="flex flex-col gap-2">
+                    <div style={{ height: '180px' }} data-testid="chart-maintenance-trend">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <BarChart data={maintenanceTrendData.months} margin={{ top: 4, right: 8, bottom: 0, left: -16 }}>
+                          <XAxis dataKey="monthShort" tick={{ fontSize: 11, fill: '#757575' }} tickLine={false} axisLine={false} />
+                          <YAxis domain={[0, 100]} tick={{ fontSize: 10, fill: '#757575' }} tickLine={false} axisLine={false} tickFormatter={(v) => `${v}%`} />
+                          <Tooltip
+                            content={({ active, payload }) => {
+                              if (active && payload && payload.length) {
+                                const d = payload[0].payload;
+                                return (
+                                  <div style={{ background: '#FFFFFF', border: '1px solid #E0E0E0', borderRadius: '6px', boxShadow: '0 2px 8px rgba(0,0,0,0.12)', padding: '8px 12px' }} data-testid="tooltip-trend-bar">
+                                    <div className="font-semibold text-xs mb-1" style={{ color: '#212121' }}>{d.month}</div>
+                                    <div className="text-xs" style={{ color: '#616161' }}>Total planned: {d.totalPlanned}</div>
+                                    <div className="text-xs" style={{ color: '#616161' }}>Completed: {d.completed}</div>
+                                    <div className="text-xs" style={{ color: '#616161' }}>Outstanding: {d.outstandingPercent}%</div>
+                                    <div className="text-xs" style={{ color: '#616161' }}>Overdue: {d.overdue}</div>
+                                  </div>
+                                );
+                              }
+                              return null;
+                            }}
+                          />
+                          <Bar dataKey="outstandingPercent" radius={[4, 4, 0, 0]} maxBarSize={32}>
+                            {maintenanceTrendData.months.map((entry, index) => (
+                              <Cell
+                                key={`cell-${index}`}
+                                fill={entry.outstandingPercent > 60 ? '#E53935' : entry.outstandingPercent >= 30 ? '#F57C00' : '#2E7D32'}
+                              />
+                            ))}
+                          </Bar>
+                        </BarChart>
+                      </ResponsiveContainer>
                     </div>
-                    <div className="flex items-center gap-1" data-testid="legend-item-backlog">
-                      <span className="inline-block w-3 h-3 rounded-sm" style={{ backgroundColor: '#E53935' }} />
-                      <span>Backlog (&gt;60%)</span>
+                    <div className="flex items-center justify-center gap-4 text-xs" style={{ color: '#757575' }} data-testid="legend-maintenance-trend">
+                      <div className="flex items-center gap-1"><span className="inline-block w-3 h-3 rounded-sm" style={{ backgroundColor: '#2E7D32' }} /><span>Healthy</span></div>
+                      <div className="flex items-center gap-1"><span className="inline-block w-3 h-3 rounded-sm" style={{ backgroundColor: '#F57C00' }} /><span>Watch</span></div>
+                      <div className="flex items-center gap-1"><span className="inline-block w-3 h-3 rounded-sm" style={{ backgroundColor: '#E53935' }} /><span>Backlog</span></div>
                     </div>
                   </div>
-                </div>
-              ) : (
-                <div className="h-48 flex items-center justify-center" style={{ color: '#9E9E9E' }}>No trend data available</div>
-              )}
-            </div>
-          </div>
-        </section>
+                ) : (
+                  <div style={{ height: '180px' }} className="flex items-center justify-center" ><span style={{ color: '#9E9E9E', fontSize: '12px' }}>No trend data available</span></div>
+                )}
+              </div>
 
-        {/* ═══ SECTION 4C: INVENTORY HEALTH ═══ */}
-        <section data-testid="band-inventory-health">
-          <div style={sectionBarStyle}>
-            <span style={sectionTitleStyle} data-testid="text-band-inventory">INVENTORY HEALTH</span>
-          </div>
+              <div style={dividerH} />
 
-          {/* 4 KPI cards */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 mb-4">
-            <div style={cardStyle} className="cursor-pointer hover:shadow-md transition-shadow" onClick={() => navigateToSpares()} data-testid="card-spares-summary">
-              <div style={{ height: '3px', background: '#1565C0', borderRadius: '8px 8px 0 0' }} />
-              <div className="p-4">
-                <div className="flex items-center gap-2 mb-2">
-                  <Package className="w-4 h-4" style={{ color: '#1565C0' }} />
-                  <span className="text-xs font-bold uppercase" style={{ color: '#1565C0' }}>Total Spares</span>
+              {/* Overdue Work Orders Table */}
+              <div style={{ padding: '16px' }} data-testid="card-overdue-table">
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
+                  <div style={subTitle}>OVERDUE WORK ORDERS</div>
+                  {workOrderKPIs.overdue > 0 && (
+                    <button
+                      onClick={() => navigateToWorkOrders('Overdue')}
+                      style={{ fontSize: '11px', color: '#1565C0', fontWeight: 600, background: 'none', border: 'none', cursor: 'pointer' }}
+                      data-testid="button-view-all-overdue"
+                    >
+                      View All ({workOrderKPIs.overdue})
+                    </button>
+                  )}
                 </div>
-                <div className="text-2xl font-bold" style={{ color: '#212121' }}>{sparesKPIs.total}</div>
-                <div className="text-xs mt-1" style={{ color: '#757575' }}>{sparesKPIs.critical} critical items</div>
+                {workOrderKPIs.overdue > 0 && (
+                  <div style={{ fontSize: '11px', color: '#9E9E9E', marginBottom: '6px' }}>
+                    Showing top {workOrderKPIs.overdueList.length} of {workOrderKPIs.overdue} total
+                  </div>
+                )}
+                <div style={{ ...contentCard, padding: 0, overflow: 'hidden' }}>
+                  {workOrderKPIs.overdueList.length > 0 ? (
+                    <table className="w-full text-sm" data-testid="table-overdue-wo">
+                      <thead>
+                        <tr>
+                          <th className="text-left py-2 px-3" style={tableHeaderStyle}>Work Order</th>
+                          <th className="text-left py-2 px-3" style={tableHeaderStyle}>Equipment</th>
+                          <th className="text-left py-2 px-3" style={tableHeaderStyle}>Status</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {workOrderKPIs.overdueList.map((wo: any, idx: number) => (
+                          <tr
+                            key={wo.id}
+                            className="cursor-pointer"
+                            style={{ background: idx % 2 === 0 ? '#FFFFFF' : '#F9FAFB' }}
+                            onMouseEnter={e => (e.currentTarget.style.background = '#E3F2FD')}
+                            onMouseLeave={e => (e.currentTarget.style.background = idx % 2 === 0 ? '#FFFFFF' : '#F9FAFB')}
+                            onClick={() => navigateToWorkOrder(wo.id)}
+                            data-testid={`row-overdue-wo-${wo.id}`}
+                          >
+                            <td className="py-2 px-3" style={{ fontSize: '11px', color: '#212121', fontWeight: 500, maxWidth: '140px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                              {wo.workOrderNumber || `WO-${wo.id}`}
+                            </td>
+                            <td className="py-2 px-3" style={{ fontSize: '11px', color: '#616161', maxWidth: '180px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                              {wo.taskDescription || wo.jobTitle || 'No description'}
+                            </td>
+                            <td className="py-2 px-3">
+                              <span style={{ display: 'inline-block', padding: '2px 10px', borderRadius: '12px', fontSize: '10px', fontWeight: 700, color: '#FFFFFF', background: '#E53935' }}>Overdue</span>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  ) : (
+                    <div className="text-center py-6" style={{ color: '#9E9E9E' }}>
+                      <CheckCircle className="w-8 h-8 mx-auto mb-2" style={{ color: '#2E7D32' }} />
+                      <p style={{ fontSize: '12px' }}>No overdue work orders</p>
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
 
-            <div style={cardStyle} className="cursor-pointer hover:shadow-md transition-shadow" onClick={() => navigateToSpares('Low')} data-testid="card-low-stock-kpi">
-              <div style={{ height: '3px', background: '#E53935', borderRadius: '8px 8px 0 0' }} />
-              <div className="p-4">
-                <div className="flex items-center gap-2 mb-2">
-                  <AlertCircle className="w-4 h-4" style={{ color: '#E53935' }} />
-                  <span className="text-xs font-bold uppercase" style={{ color: '#E53935' }}>Low Stock</span>
-                </div>
-                <div className="text-2xl font-bold" style={{ color: '#E53935' }}>{sparesKPIs.lowStock}</div>
-                <div className="text-xs mt-1" style={{ color: '#757575' }}>{sparesKPIs.criticalLowStock} critical low stock</div>
-              </div>
-            </div>
+            {/* Vertical Divider 2 - hidden on mobile */}
+            <div className="hidden lg:block" style={{ background: '#e8e8e8', width: '1px' }} />
 
-            <div style={cardStyle} className="cursor-pointer hover:shadow-md transition-shadow" onClick={() => navigateToStores()} data-testid="card-stores-summary">
-              <div style={{ height: '3px', background: '#1565C0', borderRadius: '8px 8px 0 0' }} />
-              <div className="p-4">
-                <div className="flex items-center gap-2 mb-2">
-                  <Box className="w-4 h-4" style={{ color: '#1565C0' }} />
-                  <span className="text-xs font-bold uppercase" style={{ color: '#1565C0' }}>Stores Inventory</span>
-                </div>
-                <div className="text-2xl font-bold" style={{ color: '#212121' }}>{storesKPIs.total}</div>
-                <div className="text-xs mt-1" style={{ color: '#757575' }}>{storesKPIs.stores}S / {storesKPIs.lubes}L / {storesKPIs.chemicals}C / {storesKPIs.others}O</div>
-              </div>
-            </div>
+            {/* ═══ COLUMN 3: INVENTORY & FLEET ANALYSIS ═══ */}
+            <div className="lg:overflow-y-auto" data-testid="column-inventory-fleet">
+              <div style={sectionHeaderBar}>INVENTORY & FLEET ANALYSIS</div>
 
-            <div style={cardStyle} className="cursor-pointer hover:shadow-md transition-shadow" onClick={navigateToComponents} data-testid="card-components-summary">
-              <div style={{ height: '3px', background: '#546E7A', borderRadius: '8px 8px 0 0' }} />
-              <div className="p-4">
-                <div className="flex items-center gap-2 mb-2">
-                  <Box className="w-4 h-4" style={{ color: '#546E7A' }} />
-                  <span className="text-xs font-bold uppercase" style={{ color: '#546E7A' }}>Components</span>
-                </div>
-                <div className="text-2xl font-bold" style={{ color: '#212121' }}>{componentsKPIs.total}</div>
-                <div className="text-xs mt-1" style={{ color: '#757575' }}>{componentsKPIs.active} active ({componentsKPIs.total > 0 ? Math.round((componentsKPIs.active / componentsKPIs.total) * 100) : 0}%)</div>
+              {/* Inventory Quick Stats */}
+              <div data-testid="card-quick-stats">
+                {[
+                  { label: 'Total Spares', value: sparesKPIs.total, color: '#37474F', onClick: () => navigateToSpares() },
+                  { label: 'Low Stock', value: sparesKPIs.lowStock, color: '#E53935', onClick: () => navigateToSpares('Low') },
+                  { label: 'Critical Low Stock', value: sparesKPIs.criticalLowStock, color: '#E53935', onClick: () => navigateToSpares('Low') },
+                  { label: 'Total Components', value: componentsKPIs.total, color: '#37474F', onClick: navigateToComponents },
+                  { label: 'Stores Inventory', value: storesKPIs.total, color: '#37474F', onClick: () => navigateToStores() },
+                ].map((item, idx) => (
+                  <div key={item.label}>
+                    <div
+                      style={statRow}
+                      className="cursor-pointer hover:bg-gray-50 transition-colors"
+                      onClick={item.onClick}
+                      data-testid={`row-stat-${item.label.toLowerCase().replace(/\s/g, '-')}`}
+                    >
+                      <span style={{ fontSize: '12px', color: '#757575' }}>{item.label}</span>
+                      <span style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        minWidth: '36px',
+                        padding: '2px 10px',
+                        borderRadius: '12px',
+                        fontSize: '11px',
+                        fontWeight: 700,
+                        color: '#FFFFFF',
+                        background: item.color,
+                      }}>{item.value}</span>
+                    </div>
+                    {idx < 4 && <div style={{ borderBottom: '1px solid #EEEEEE' }} />}
+                  </div>
+                ))}
               </div>
-            </div>
-          </div>
 
-          {/* Spares charts side by side */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-4">
-            <div style={cardStyle} data-testid="card-spares-status-chart">
-              <div className="p-4">
-                <div style={sectionTitleStyle} className="mb-1">SPARES STOCK STATUS</div>
-                <div className="text-xs mb-3" style={{ color: '#9E9E9E' }}>Click segments to view filtered spares</div>
-                <div className="h-56">
+              <div style={dividerH} />
+
+              {/* Spares Stock Status donut */}
+              <div style={{ padding: '16px' }} data-testid="card-spares-status-chart">
+                <div style={subTitle} className="mb-1">SPARES STOCK STATUS</div>
+                <div style={{ height: '200px' }}>
                   {sparesStockChartData.length > 0 ? (
                     <AgCharts options={{
                       data: sparesStockChartData,
@@ -1437,144 +1297,130 @@ const Dashboard = () => {
                         strokes: sparesStockChartData.map(d => d.color),
                         listeners: {
                           nodeClick: (event: any) => {
-                            const status = event.datum.status;
-                            navigateToSpares(status);
+                            navigateToSpares(event.datum.status);
                           }
                         }
                       } as any],
                       legend: { enabled: true, position: 'bottom' }
                     } as AgChartOptions} />
                   ) : (
-                    <div className="h-full flex items-center justify-center" style={{ color: '#9E9E9E' }}>No spares to display</div>
+                    <div className="h-full flex items-center justify-center" style={{ color: '#9E9E9E', fontSize: '12px' }}>No spares data</div>
                   )}
                 </div>
               </div>
-            </div>
 
-            <div style={cardStyle} data-testid="card-spares-consumption-trend">
-              <div className="p-4">
-                <div style={sectionTitleStyle} className="mb-1">6-MONTH SPARES MOVEMENT TREND</div>
-                <div className="text-xs mb-3" style={{ color: '#9E9E9E' }}>Consumption vs receiving activity</div>
-                {sparesConsumptionTrendData.length > 0 ? (
-                  <div className="h-56" data-testid="chart-spares-consumption-trend">
-                    <ResponsiveContainer width="100%" height="100%">
-                      <BarChart data={sparesConsumptionTrendData} margin={{ top: 4, right: 8, bottom: 0, left: -10 }}>
-                        <XAxis dataKey="monthShort" tick={{ fontSize: 11, fill: '#757575' }} tickLine={false} axisLine={false} />
-                        <YAxis tick={{ fontSize: 10, fill: '#757575' }} tickLine={false} axisLine={false} />
-                        <Tooltip
-                          content={({ active, payload }) => {
-                            if (active && payload && payload.length) {
-                              const d = payload[0].payload;
+              <div style={dividerH} />
+
+              {/* Vessel / Fleet Analysis Dot Matrix */}
+              <div style={{ padding: '16px' }} data-testid="card-dot-matrix">
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
+                  <div style={subTitle}>VESSEL / GROUP ANALYSIS</div>
+                </div>
+                <div style={{ display: 'flex', gap: '12px', marginBottom: '10px', fontSize: '11px' }}>
+                  {(['vessels'] as const).map(mode => (
+                    <label key={mode} style={{ display: 'flex', alignItems: 'center', gap: '4px', cursor: 'pointer', color: '#546E7A' }}>
+                      <input
+                        type="radio"
+                        name="dotMatrixMode"
+                        checked={dotMatrixMode === mode}
+                        onChange={() => setDotMatrixMode(mode)}
+                        style={{ accentColor: '#1565C0' }}
+                      />
+                      <span style={{ textTransform: 'capitalize' }}>{mode === 'vessels' ? 'Vessels' : mode}</span>
+                    </label>
+                  ))}
+                </div>
+                {vesselDotMatrixData.length > 0 ? (
+                  <div className="overflow-x-auto">
+                    <table style={{ width: '100%', fontSize: '11px', borderCollapse: 'collapse' }}>
+                      <thead>
+                        <tr>
+                          <th style={{ textAlign: 'left', padding: '4px 6px', color: '#9E9E9E', fontWeight: 500 }}></th>
+                          {vesselDotMatrixData.map(v => (
+                            <th key={v.id} style={{ textAlign: 'center', padding: '4px 4px', color: '#9E9E9E', fontWeight: 500, fontSize: '9px', maxWidth: '50px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                              {v.name.length > 8 ? v.name.substring(0, 7) + '..' : v.name}
+                            </th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {['Work Orders', 'Overdue WOs', 'Low Stock', 'Spares', 'Running Hrs'].map(metric => (
+                          <tr key={metric}>
+                            <td style={{ padding: '6px 6px', color: '#424242', fontWeight: 500, whiteSpace: 'nowrap' }}>{metric}</td>
+                            {vesselDotMatrixData.map(v => {
+                              const dotColor = getVesselDotColor(v.id, metric);
                               return (
-                                <div style={{ background: '#FFFFFF', border: '1px solid #E0E0E0', borderRadius: '6px', boxShadow: '0 2px 8px rgba(0,0,0,0.12)', padding: '8px 12px' }} data-testid="tooltip-spares-consumption">
-                                  <div className="font-semibold text-xs mb-1" style={{ color: '#212121' }}>{d.month}</div>
-                                  <div className="text-xs" style={{ color: '#E53935' }}>Consumed: {d.consumeEvents} events ({d.totalQty} units)</div>
-                                  <div className="text-xs" style={{ color: '#2E7D32' }}>Received: {d.receiveEvents} events ({d.receiveQty} units)</div>
-                                </div>
+                                <td key={v.id} style={{ textAlign: 'center', padding: '6px 4px' }}>
+                                  <span style={{
+                                    display: 'inline-block',
+                                    width: '12px',
+                                    height: '12px',
+                                    borderRadius: '50%',
+                                    background: dotColor,
+                                  }} />
+                                </td>
                               );
-                            }
-                            return null;
-                          }}
-                        />
-                        <Legend wrapperStyle={{ fontSize: '11px' }} formatter={(value) => value === 'consumeEvents' ? 'Consumed' : 'Received'} />
-                        <Bar dataKey="consumeEvents" name="consumeEvents" fill="#E53935" radius={[3, 3, 0, 0]} maxBarSize={24} />
-                        <Bar dataKey="receiveEvents" name="receiveEvents" fill="#2E7D32" radius={[3, 3, 0, 0]} maxBarSize={24} />
-                      </BarChart>
-                    </ResponsiveContainer>
+                            })}
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
                   </div>
                 ) : (
-                  <div className="h-56 flex items-center justify-center" style={{ color: '#9E9E9E' }}>No spares history data available</div>
+                  <div className="text-center py-4" style={{ color: '#9E9E9E', fontSize: '12px' }}>
+                    No vessel data available for analysis
+                  </div>
+                )}
+              </div>
+
+              <div style={dividerH} />
+
+              {/* Watch List */}
+              <div style={{ padding: '16px' }} data-testid="card-watch-list">
+                <div style={subTitle} className="mb-2">WATCH LIST</div>
+                {watchListItems.length > 0 ? (
+                  <div>
+                    {watchListItems.map((item, idx) => (
+                      <div key={idx} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 0', borderBottom: idx < watchListItems.length - 1 ? '1px solid #EEEEEE' : 'none' }}>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ fontSize: '11px', color: '#212121', fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.label}</div>
+                          {item.vessel && <div style={{ fontSize: '10px', color: '#9E9E9E' }}>{item.vessel}</div>}
+                        </div>
+                        <span style={{ display: 'inline-block', padding: '2px 8px', borderRadius: '12px', fontSize: '10px', fontWeight: 700, color: '#FFFFFF', background: item.badgeColor, flexShrink: 0 }}>{item.badge}</span>
+                      </div>
+                    ))}
+                    <button
+                      onClick={() => navigateToWorkOrders('Overdue')}
+                      style={{ display: 'block', width: '100%', textAlign: 'center', fontSize: '11px', color: '#1565C0', fontWeight: 600, background: 'none', border: 'none', cursor: 'pointer', marginTop: '8px', padding: '4px' }}
+                      data-testid="button-view-all-watchlist"
+                    >
+                      View All
+                    </button>
+                  </div>
+                ) : (
+                  <div className="text-center py-4" style={{ color: '#9E9E9E', fontSize: '12px' }}>
+                    <CheckCircle className="w-6 h-6 mx-auto mb-1" style={{ color: '#2E7D32' }} />
+                    No items requiring attention
+                  </div>
                 )}
               </div>
             </div>
           </div>
+        )}
 
-          {/* Low Stock Spares Table */}
-          <div style={cardStyle} className="overflow-hidden" data-testid="card-low-stock-table">
-            <div className="px-4 py-3 flex items-center justify-between" style={{ borderBottom: '1px solid #E0E0E0' }}>
-              <div>
-                <span style={sectionTitleStyle}>LOW STOCK SPARES</span>
-                <div className="text-xs mt-0.5" style={{ color: '#9E9E9E' }}>
-                  {sparesKPIs.lowStockList.length > 0
-                    ? `Sample from ${sparesKPIs.lowStock} low stock items${sparesKPIs.criticalLowStock > 0 ? ` (${sparesKPIs.criticalLowStock} critical)` : ''}`
-                    : 'All spares adequately stocked'}
-                </div>
-              </div>
-              {sparesKPIs.lowStock > 0 && (
-                <Button variant="outline" size="sm" onClick={() => navigateToSpares('Low')} data-testid="button-view-all-low-stock" style={{ borderColor: '#1565C0', color: '#1565C0' }}>
-                  View All ({sparesKPIs.lowStock})
-                </Button>
-              )}
-            </div>
-            {sparesKPIs.lowStockList.length > 0 ? (
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm" data-testid="table-low-stock">
-                  <thead>
-                    <tr>
-                      <th className="text-left py-2.5 px-4" style={tableHeaderStyle}>Part Name</th>
-                      <th className="text-left py-2.5 px-4" style={tableHeaderStyle}>Part No.</th>
-                      <th className="text-right py-2.5 px-4" style={tableHeaderStyle}>Current Stock</th>
-                      <th className="text-right py-2.5 px-4" style={tableHeaderStyle}>Min. Required</th>
-                      <th className="text-center py-2.5 px-4" style={tableHeaderStyle}>Status</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {sparesKPIs.lowStockList.map((spare: Spare, idx: number) => {
-                      const isCritical = spare.critical === 'Critical' || spare.critical === 'Yes';
-                      return (
-                        <tr
-                          key={spare.id}
-                          className="cursor-pointer transition-colors"
-                          style={{ background: idx % 2 === 0 ? '#FFFFFF' : '#F9FAFB' }}
-                          onMouseEnter={e => (e.currentTarget.style.background = '#E3F2FD')}
-                          onMouseLeave={e => (e.currentTarget.style.background = idx % 2 === 0 ? '#FFFFFF' : '#F9FAFB')}
-                          onClick={() => navigateToSpares('Low')}
-                          data-testid={`row-low-stock-spare-${spare.id}`}
-                        >
-                          <td className="py-2.5 px-4 font-medium text-xs" style={{ color: '#212121' }}>{spare.partName}</td>
-                          <td className="py-2.5 px-4 text-xs" style={{ color: '#616161' }}>{spare.partNumber}</td>
-                          <td className="py-2.5 px-4 text-right text-xs font-mono font-medium" style={{ color: '#212121' }}>{spare.rob}</td>
-                          <td className="py-2.5 px-4 text-right text-xs font-mono" style={{ color: '#616161' }}>{spare.min}</td>
-                          <td className="py-2.5 px-4 text-center">
-                            <span
-                              className="inline-flex items-center justify-center px-2 py-0.5 rounded-full text-xs font-bold text-white"
-                              style={{ background: isCritical ? '#E53935' : '#F57C00' }}
-                            >
-                              {isCritical ? 'Critical' : 'Low'}
-                            </span>
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
-            ) : (
-              <div className="text-center py-8" style={{ color: '#9E9E9E' }}>
-                <CheckCircle className="w-10 h-10 mx-auto mb-2" style={{ color: '#2E7D32' }} />
-                <p className="text-sm">All spares adequately stocked</p>
-              </div>
-            )}
-          </div>
-        </section>
-
-        {/* ═══ Pending Approval Section (Head of Dept) ═══ */}
-        {isHeadOfDept && workOrderKPIs.pendingApproval > 0 && (
-          <section>
-            <div style={sectionBarStyle}>
-              <span style={sectionTitleStyle}>PENDING YOUR APPROVAL</span>
-            </div>
-            <div style={cardStyle} className="overflow-hidden" data-testid="card-pending-approval-section">
-              <div className="px-4 py-3 flex items-center justify-between" style={{ borderBottom: '1px solid #E0E0E0' }}>
-                <div>
-                  <span className="text-sm font-medium" style={{ color: '#212121' }}>
-                    {workOrderKPIs.pendingApproval} work orders from {currentVessel?.name || 'vessel'} require your review
-                  </span>
-                </div>
+        {/* Pending Approval Section (Head of Dept) - shown below the 3-column layout */}
+        {!isFleetView && isHeadOfDept && workOrderKPIs.pendingApproval > 0 && (
+          <div style={{ padding: '16px', borderTop: '1px solid #e8e8e8' }}>
+            <div style={{ ...contentCard, padding: 0, overflow: 'hidden' }} data-testid="card-pending-approval-section">
+              <div style={{ padding: '10px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid #E0E0E0' }}>
+                <span style={{ fontSize: '13px', fontWeight: 500, color: '#212121' }}>
+                  {workOrderKPIs.pendingApproval} work orders from {currentVessel?.name || 'vessel'} require your review
+                </span>
                 <Button
                   onClick={() => setBulkApproveModalOpen(true)}
                   style={{ background: '#1565C0' }}
                   className="text-white hover:opacity-90"
+                  size="sm"
                   data-testid="button-bulk-approve-open"
                 >
                   <CheckSquare className="w-4 h-4 mr-2" />
@@ -1637,20 +1483,10 @@ const Dashboard = () => {
                     </div>
                   </div>
                 ))}
-                {workOrderKPIs.pendingApproval > 5 && (
-                  <div className="text-center pt-2">
-                    <Button variant="link" onClick={() => setBulkApproveModalOpen(true)} style={{ color: '#1565C0' }}>
-                      View all {workOrderKPIs.pendingApproval} pending work orders
-                    </Button>
-                  </div>
-                )}
               </div>
             </div>
-          </section>
+          </div>
         )}
-
-        </>)}
-        </div>
       </div>
 
       <BulkApproveModal

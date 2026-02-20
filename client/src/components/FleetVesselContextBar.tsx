@@ -1,5 +1,4 @@
-import { Ship, LayoutDashboard } from "lucide-react";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Ship, SlidersHorizontal } from "lucide-react";
 
 interface Vessel {
   id: string;
@@ -14,6 +13,8 @@ interface FleetVesselContextBarProps {
   onVesselChange: (vesselId: string) => void;
   vessels: Vessel[];
   summaryLine?: string;
+  activeTab?: string;
+  onTabChange?: (tab: string) => void;
 }
 
 export function FleetVesselContextBar({
@@ -23,79 +24,128 @@ export function FleetVesselContextBar({
   onVesselChange,
   vessels,
   summaryLine,
+  activeTab = "overview",
+  onTabChange,
 }: FleetVesselContextBarProps) {
-  const currentVessel = vessels.find(v => v.id === vesselId);
-  const viewMode = isFleetView ? "fleet" : "vessel";
+  const currentYear = new Date().getFullYear();
 
-  const handleViewModeChange = (value: string) => {
-    onViewModeChange(value === "fleet");
+  const pillBase: React.CSSProperties = {
+    padding: '5px 16px',
+    fontSize: '12px',
+    fontWeight: 600,
+    border: 'none',
+    cursor: 'pointer',
+    transition: 'all 0.15s',
+    letterSpacing: '0.02em',
   };
 
-  const scopeText = isFleetView
-    ? "Entire fleet"
-    : currentVessel
-      ? currentVessel.name
-      : "No vessel selected";
+  const pillActive: React.CSSProperties = {
+    ...pillBase,
+    background: '#1a3a5c',
+    color: '#FFFFFF',
+  };
+
+  const pillInactive: React.CSSProperties = {
+    ...pillBase,
+    background: '#E8EDF2',
+    color: '#546E7A',
+  };
 
   return (
     <div
-      style={{ background: '#FFFFFF', borderBottom: '1px solid #E0E0E0' }}
+      style={{ background: '#FFFFFF', borderBottom: '1px solid #e0e0e0', padding: '10px 20px' }}
       data-testid="bar-fleet-vessel-context"
     >
-      <div className="flex flex-col gap-1 px-5 py-3 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
-        <div className="flex flex-col gap-0.5 min-w-0">
-          <div className="flex items-center gap-2">
-            <LayoutDashboard className="w-5 h-5 flex-shrink-0" style={{ color: '#1565C0' }} />
-            <h1 className="text-base font-bold truncate" style={{ color: '#212121' }} data-testid="text-dashboard-title">
-              PMS Dashboard
-            </h1>
+      <div className="flex items-center justify-between flex-wrap gap-y-2">
+        <div className="flex items-center gap-4">
+          <h1 style={{ fontSize: '16px', fontWeight: 700, color: '#212121', margin: 0 }} data-testid="text-dashboard-title">
+            Dashboard
+          </h1>
+          <div style={{ display: 'flex', borderRadius: '6px', overflow: 'hidden', border: '1px solid #D0D5DD' }}>
+            <button
+              style={activeTab === 'overview' ? pillActive : pillInactive}
+              onClick={() => onTabChange?.('overview')}
+              data-testid="tab-overview"
+            >
+              Overview
+            </button>
+            <button
+              style={activeTab === 'management' ? pillActive : pillInactive}
+              onClick={() => onTabChange?.('management')}
+              data-testid="tab-management"
+            >
+              Management
+            </button>
           </div>
-          {summaryLine && (
-            <p className="text-xs pl-7 truncate" style={{ color: '#9E9E9E' }} data-testid="text-hero-summary">
-              {summaryLine}
-            </p>
-          )}
         </div>
 
-        <div className="flex flex-wrap items-center gap-x-4 gap-y-2 flex-shrink-0">
-          <div className="flex items-center gap-2">
-            <label className="text-xs font-medium whitespace-nowrap" style={{ color: '#757575' }}>View:</label>
-            <Select value={viewMode} onValueChange={handleViewModeChange}>
-              <SelectTrigger className="w-40 text-xs h-8 border-gray-300" data-testid="select-view-mode">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="fleet" data-testid="option-fleet-view">Fleet view</SelectItem>
-                <SelectItem value="vessel" data-testid="option-vessel-view">Single vessel view</SelectItem>
-              </SelectContent>
-            </Select>
+        <div style={{ fontSize: '22px', fontWeight: 700, color: '#212121' }} data-testid="text-current-year">
+          {currentYear}
+        </div>
+
+        <div className="flex items-center gap-3">
+          <div style={{ display: 'flex', borderRadius: '6px', overflow: 'hidden', border: '1px solid #D0D5DD' }}>
+            <button
+              style={isFleetView ? pillActive : pillInactive}
+              onClick={() => onViewModeChange(true)}
+              data-testid="toggle-all-vessels"
+            >
+              All Vessel
+            </button>
+            <button
+              style={!isFleetView ? pillActive : pillInactive}
+              onClick={() => onViewModeChange(false)}
+              data-testid="toggle-my-vessel"
+            >
+              My Vessel
+            </button>
           </div>
 
           {!isFleetView && (
-            <div className="flex items-center gap-2">
-              <label className="text-xs font-medium whitespace-nowrap" style={{ color: '#757575' }}>Vessel:</label>
-              <Ship className="w-3.5 h-3.5" style={{ color: '#757575' }} />
-              <Select value={vesselId} onValueChange={onVesselChange}>
-                <SelectTrigger className="w-48 text-xs h-8 border-gray-300" data-testid="select-context-vessel">
-                  <SelectValue placeholder="Select vessel" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all" data-testid="option-all-vessels">All Vessels</SelectItem>
-                  {vessels.map(v => (
-                    <SelectItem key={v.id} value={v.id} data-testid={`option-vessel-${v.id}`}>
-                      {v.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+            <select
+              value={vesselId}
+              onChange={(e) => onVesselChange(e.target.value)}
+              style={{
+                padding: '5px 10px',
+                fontSize: '12px',
+                border: '1px solid #D0D5DD',
+                borderRadius: '6px',
+                background: '#FFFFFF',
+                color: '#212121',
+                cursor: 'pointer',
+                outline: 'none',
+                height: '32px',
+              }}
+              data-testid="select-context-vessel"
+            >
+              <option value="all" data-testid="option-vessel-all">All Vessels</option>
+              {vessels.map(v => (
+                <option key={v.id} value={v.id} data-testid={`option-vessel-${v.id}`}>
+                  {v.name}
+                </option>
+              ))}
+            </select>
           )}
 
-          <div className="flex items-center gap-1.5">
-            <span className="text-xs font-medium whitespace-nowrap" style={{ color: '#757575' }} data-testid="text-scope">
-              Scope: <span style={{ color: '#1565C0', fontWeight: 600 }}>{scopeText}</span>
-            </span>
-          </div>
+          <button
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '4px',
+              padding: '5px 14px',
+              fontSize: '12px',
+              fontWeight: 600,
+              border: '1px solid #D0D5DD',
+              borderRadius: '6px',
+              background: '#FFFFFF',
+              color: '#546E7A',
+              cursor: 'pointer',
+            }}
+            data-testid="button-filters"
+          >
+            <SlidersHorizontal style={{ width: '14px', height: '14px' }} />
+            Filters
+          </button>
         </div>
       </div>
     </div>
