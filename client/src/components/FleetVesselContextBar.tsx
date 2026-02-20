@@ -1,4 +1,4 @@
-import { Ship, Anchor, LayoutDashboard } from "lucide-react";
+import { Ship, LayoutDashboard } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 interface Vessel {
@@ -39,19 +39,19 @@ export function FleetVesselContextBar({
 
   return (
     <div
-      className="bg-gradient-to-r from-slate-50 to-blue-50/60 dark:from-slate-900 dark:to-blue-950/40 border-b border-border"
+      style={{ background: '#FFFFFF', borderBottom: '1px solid #E0E0E0' }}
       data-testid="bar-fleet-vessel-context"
     >
-      <div className="flex flex-col gap-1 px-4 py-3 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
+      <div className="flex flex-col gap-1 px-5 py-3 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
         <div className="flex flex-col gap-0.5 min-w-0">
           <div className="flex items-center gap-2">
-            <LayoutDashboard className="w-4 h-4 text-blue-600 dark:text-blue-400 flex-shrink-0" />
-            <h1 className="text-lg font-bold text-gray-900 dark:text-gray-100 truncate" data-testid="text-dashboard-title">
+            <LayoutDashboard className="w-5 h-5 flex-shrink-0" style={{ color: '#1565C0' }} />
+            <h1 className="text-base font-bold truncate" style={{ color: '#212121' }} data-testid="text-dashboard-title">
               PMS Dashboard
             </h1>
           </div>
           {summaryLine && (
-            <p className="text-xs text-muted-foreground pl-6 truncate" data-testid="text-hero-summary">
+            <p className="text-xs pl-7 truncate" style={{ color: '#9E9E9E' }} data-testid="text-hero-summary">
               {summaryLine}
             </p>
           )}
@@ -59,9 +59,9 @@ export function FleetVesselContextBar({
 
         <div className="flex flex-wrap items-center gap-x-4 gap-y-2 flex-shrink-0">
           <div className="flex items-center gap-2">
-            <label className="text-xs text-muted-foreground whitespace-nowrap">View:</label>
+            <label className="text-xs font-medium whitespace-nowrap" style={{ color: '#757575' }}>View:</label>
             <Select value={viewMode} onValueChange={handleViewModeChange}>
-              <SelectTrigger className="w-40 text-xs" data-testid="select-view-mode">
+              <SelectTrigger className="w-40 text-xs h-8 border-gray-300" data-testid="select-view-mode">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -73,10 +73,10 @@ export function FleetVesselContextBar({
 
           {!isFleetView && (
             <div className="flex items-center gap-2">
-              <label className="text-xs text-muted-foreground whitespace-nowrap">Vessel:</label>
-              <Ship className="w-3.5 h-3.5 text-muted-foreground" />
+              <label className="text-xs font-medium whitespace-nowrap" style={{ color: '#757575' }}>Vessel:</label>
+              <Ship className="w-3.5 h-3.5" style={{ color: '#757575' }} />
               <Select value={vesselId} onValueChange={onVesselChange}>
-                <SelectTrigger className="w-48 text-xs" data-testid="select-context-vessel">
+                <SelectTrigger className="w-48 text-xs h-8 border-gray-300" data-testid="select-context-vessel">
                   <SelectValue placeholder="Select vessel" />
                 </SelectTrigger>
                 <SelectContent>
@@ -88,21 +88,12 @@ export function FleetVesselContextBar({
                   ))}
                 </SelectContent>
               </Select>
-              {currentVessel?.vesselType && (
-                <span
-                  className="text-xs text-muted-foreground whitespace-nowrap"
-                  data-testid="text-vessel-type"
-                >
-                  Type: {currentVessel.vesselType}
-                </span>
-              )}
             </div>
           )}
 
           <div className="flex items-center gap-1.5">
-            <Anchor className="w-3.5 h-3.5 text-muted-foreground" />
-            <span className="text-xs text-muted-foreground whitespace-nowrap" data-testid="text-scope">
-              Scope: {scopeText}
+            <span className="text-xs font-medium whitespace-nowrap" style={{ color: '#757575' }} data-testid="text-scope">
+              Scope: <span style={{ color: '#1565C0', fontWeight: 600 }}>{scopeText}</span>
             </span>
           </div>
         </div>
