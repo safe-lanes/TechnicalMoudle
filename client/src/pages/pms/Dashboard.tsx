@@ -893,35 +893,45 @@ const Dashboard = () => {
 
   const isLoading = isWorkOrdersLoading || isSparesLoading || isStoresLoading || isComponentsLoading || isRHLoading || isSparesHistoryLoading;
 
+  const heroSummaryLine = useMemo(() => {
+    const scope = isFleetView ? "Fleet" : (currentVessel?.name || "No vessel");
+    const parts: string[] = [`Scope: ${scope}`];
+    if (!isFleetView) {
+      parts.push(`${workOrderKPIs.total} work orders`);
+      parts.push(`${sparesKPIs.total} spares`);
+      parts.push(`${componentsKPIs.total} components`);
+    } else {
+      parts.push(`${vessels.length} vessels`);
+    }
+    parts.push(`Data as of ${format(lastUpdated, 'dd MMM yyyy, HH:mm')}`);
+    return parts.join(" \u00b7 ");
+  }, [isFleetView, currentVessel, workOrderKPIs.total, sparesKPIs.total, componentsKPIs.total, vessels.length, lastUpdated]);
+
   return (
     <div className="flex flex-col" style={{ height: 'calc(100vh - 120px)' }}>
-      {/* Header - Fixed */}
-      <div className="flex-shrink-0 mb-6">
-        <div className="flex items-center justify-between">
-          <h1 className="text-2xl font-bold text-gray-900" data-testid="text-dashboard-title">PMS Dashboard</h1>
-        </div>
-
-        {/* Fleet / Vessel Context Bar */}
-        {(isSailAdmin || isClientAdmin) && (
-          <div className="mt-3 -mx-4 sm:-mx-6">
-            <FleetVesselContextBar
-              isFleetView={isFleetView}
-              onViewModeChange={(isFleet) => {
-                setIsFleetView(isFleet);
-                if (isFleet && vesselId !== 'all') {
-                  // keep vesselId as-is; fleet view uses all vessels already
-                }
-              }}
-              vesselId={vesselId}
-              onVesselChange={handleVesselChange}
-              vessels={vessels}
-            />
+      {/* Hero Strip - Title + Context Bar */}
+      <div className="flex-shrink-0 -mx-4 sm:-mx-6 -mt-4 sm:-mt-6 mb-4">
+        {(isSailAdmin || isClientAdmin) ? (
+          <FleetVesselContextBar
+            isFleetView={isFleetView}
+            onViewModeChange={(isFleet) => {
+              setIsFleetView(isFleet);
+            }}
+            vesselId={vesselId}
+            onVesselChange={handleVesselChange}
+            vessels={vessels}
+            summaryLine={heroSummaryLine}
+          />
+        ) : (
+          <div className="bg-gradient-to-r from-slate-50 to-blue-50/60 dark:from-slate-900 dark:to-blue-950/40 border-b border-border px-4 py-3">
+            <h1 className="text-lg font-bold text-gray-900 dark:text-gray-100" data-testid="text-dashboard-title">PMS Dashboard</h1>
+            <p className="text-xs text-muted-foreground mt-0.5" data-testid="text-hero-summary">{heroSummaryLine}</p>
           </div>
         )}
       </div>
 
       {/* Main Content - Scrollable */}
-      <div className="flex-1 overflow-y-auto space-y-6">
+      <div className="flex-1 overflow-y-auto space-y-4">
 
         {/* Fleet View Mode */}
         {isFleetView && vessels.length > 0 && (
@@ -931,120 +941,122 @@ const Dashboard = () => {
         {/* Single Vessel Dashboard */}
         {!isFleetView && (<>
 
-        {/* ═══ Band 1: Work Order Health ═══ */}
-        <section data-testid="band-work-order-health">
-          <h2 className="text-base font-semibold text-gray-700 dark:text-gray-300 mb-3" data-testid="text-band-wo-health">Work Order Health</h2>
+        {/* ═══ Two-Column Top Layout: WO Health (left) + Maintenance Effectiveness (right) ═══ */}
+        <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
 
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
-            <Card
-              className="cursor-pointer hover:shadow-lg transition-shadow border-l-4 border-l-red-500 bg-white"
-              onClick={() => navigateToWorkOrders('Overdue')}
-              data-testid="card-overdue-wo"
-            >
-              <CardHeader className="pb-2">
-                <CardDescription className="flex items-center gap-1">
-                  <AlertTriangle className="w-4 h-4 text-red-500" />
-                  Overdue Work Orders
-                </CardDescription>
-                <CardTitle className="text-3xl text-red-600">{workOrderKPIs.overdue}</CardTitle>
+          {/* ── Left Column: Work Order Health ── */}
+          <section
+            className="rounded-md border border-gray-100 dark:border-gray-800 bg-gray-50/50 dark:bg-gray-900/30 p-4 space-y-3"
+            data-testid="band-work-order-health"
+          >
+            <h2 className="text-sm font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wide" data-testid="text-band-wo-health">Work Order Health</h2>
+
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-3 gap-2">
+              <Card
+                className="cursor-pointer hover:shadow-md transition-shadow border-l-4 border-l-red-500"
+                onClick={() => navigateToWorkOrders('Overdue')}
+                data-testid="card-overdue-wo"
+              >
+                <CardHeader className="pb-1 pt-3 px-3">
+                  <CardDescription className="flex items-center gap-1 text-xs">
+                    <AlertTriangle className="w-3.5 h-3.5 text-red-500" />
+                    Overdue
+                  </CardDescription>
+                  <CardTitle className="text-2xl text-red-600">{workOrderKPIs.overdue}</CardTitle>
+                </CardHeader>
+                <CardContent className="px-3 pb-2">
+                  <p className="text-xs text-muted-foreground" data-testid="text-overdue-pct">
+                    {workOrderKPIs.total > 0 ? `${Math.round((workOrderKPIs.overdue / workOrderKPIs.total) * 100)}% of total` : 'No WOs'}
+                  </p>
+                </CardContent>
+              </Card>
+
+              <Card
+                className="cursor-pointer hover:shadow-md transition-shadow border-l-4 border-l-amber-500"
+                onClick={() => navigateToWorkOrders('Due')}
+                data-testid="card-due-wo"
+              >
+                <CardHeader className="pb-1 pt-3 px-3">
+                  <CardDescription className="flex items-center gap-1 text-xs">
+                    <Clock className="w-3.5 h-3.5 text-amber-500" />
+                    Due
+                  </CardDescription>
+                  <CardTitle className="text-2xl text-amber-600">{workOrderKPIs.due}</CardTitle>
+                </CardHeader>
+                <CardContent className="px-3 pb-2">
+                  <p className="text-xs text-muted-foreground" data-testid="text-due-pct">
+                    {workOrderKPIs.total > 0 ? `${Math.round((workOrderKPIs.due / workOrderKPIs.total) * 100)}% of total` : 'No WOs'}
+                  </p>
+                </CardContent>
+              </Card>
+
+              <Card
+                className="cursor-pointer hover:shadow-md transition-shadow border-l-4 border-l-blue-500"
+                onClick={() => navigateToWorkOrders('Pending Approval')}
+                data-testid="card-pending-approval-wo"
+              >
+                <CardHeader className="pb-1 pt-3 px-3">
+                  <CardDescription className="flex items-center gap-1 text-xs">
+                    <ClipboardList className="w-3.5 h-3.5 text-blue-500" />
+                    Pending Approval
+                  </CardDescription>
+                  <CardTitle className="text-2xl text-blue-600">{workOrderKPIs.pendingApproval}</CardTitle>
+                </CardHeader>
+                <CardContent className="px-3 pb-2">
+                  <p className="text-xs text-muted-foreground" data-testid="text-pending-detail">
+                    {workOrderKPIs.pendingApprovalList.filter((wo: any) => wo.wasRejected).length > 0
+                      ? `${workOrderKPIs.pendingApprovalList.filter((wo: any) => wo.wasRejected).length} resubmitted`
+                      : 'Awaiting review'}
+                  </p>
+                </CardContent>
+              </Card>
+
+              <Card
+                className="cursor-pointer hover:shadow-md transition-shadow border-l-4 border-l-green-500"
+                onClick={() => navigateToWorkOrders('Completed')}
+                data-testid="card-completed-wo"
+              >
+                <CardHeader className="pb-1 pt-3 px-3">
+                  <CardDescription className="flex items-center gap-1 text-xs">
+                    <CheckCircle className="w-3.5 h-3.5 text-green-500" />
+                    Completed
+                  </CardDescription>
+                  <CardTitle className="text-2xl text-green-600">{workOrderKPIs.completed}</CardTitle>
+                </CardHeader>
+                <CardContent className="px-3 pb-2">
+                  <p className="text-xs text-muted-foreground" data-testid="text-completed-rate">
+                    {workOrderKPIs.total > 0 ? `${Math.round((workOrderKPIs.completed / workOrderKPIs.total) * 100)}% completion rate` : 'No WOs'}
+                  </p>
+                </CardContent>
+              </Card>
+
+              <Card
+                className="cursor-pointer hover:shadow-md transition-shadow border-l-4 border-l-gray-400"
+                onClick={() => navigateToWorkOrders('Planned')}
+                data-testid="card-total-wo"
+              >
+                <CardHeader className="pb-1 pt-3 px-3">
+                  <CardDescription className="flex items-center gap-1 text-xs">
+                    <Wrench className="w-3.5 h-3.5 text-gray-500" />
+                    Total WOs
+                  </CardDescription>
+                  <CardTitle className="text-2xl">{workOrderKPIs.total}</CardTitle>
+                </CardHeader>
+                <CardContent className="px-3 pb-2">
+                  <p className="text-xs text-muted-foreground" data-testid="text-active-count">
+                    {workOrderKPIs.active} planned / active
+                  </p>
+                </CardContent>
+              </Card>
+            </div>
+
+            <Card data-testid="card-wo-status-chart">
+              <CardHeader className="pb-2 pt-3">
+                <CardTitle className="text-sm">Status Distribution</CardTitle>
+                <CardDescription className="text-xs">Click segments to filter</CardDescription>
               </CardHeader>
               <CardContent>
-                <div className="flex items-center text-sm text-red-600">
-                  <ChevronRight className="w-4 h-4" />
-                  <span>View all overdue</span>
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card
-              className="cursor-pointer hover:shadow-lg transition-shadow border-l-4 border-l-amber-500 bg-white"
-              onClick={() => navigateToWorkOrders('Due')}
-              data-testid="card-due-wo"
-            >
-              <CardHeader className="pb-2">
-                <CardDescription className="flex items-center gap-1">
-                  <Clock className="w-4 h-4 text-amber-500" />
-                  Due Work Orders
-                </CardDescription>
-                <CardTitle className="text-3xl text-amber-600">{workOrderKPIs.due}</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="flex items-center text-sm text-amber-600">
-                  <ChevronRight className="w-4 h-4" />
-                  <span>View all due</span>
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card
-              className="cursor-pointer hover:shadow-lg transition-shadow border-l-4 border-l-blue-500 bg-white"
-              onClick={() => navigateToWorkOrders('Pending Approval')}
-              data-testid="card-pending-approval-wo"
-            >
-              <CardHeader className="pb-2">
-                <CardDescription className="flex items-center gap-1">
-                  <ClipboardList className="w-4 h-4 text-blue-500" />
-                  Pending Approval
-                </CardDescription>
-                <CardTitle className="text-3xl text-blue-600">{workOrderKPIs.pendingApproval}</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="flex items-center text-sm text-blue-600">
-                  <ChevronRight className="w-4 h-4" />
-                  <span>Review pending</span>
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card
-              className="cursor-pointer hover:shadow-lg transition-shadow border-l-4 border-l-green-500 bg-white"
-              onClick={() => navigateToWorkOrders('Completed')}
-              data-testid="card-completed-wo"
-            >
-              <CardHeader className="pb-2">
-                <CardDescription className="flex items-center gap-1">
-                  <CheckCircle className="w-4 h-4 text-green-500" />
-                  Completed
-                </CardDescription>
-                <CardTitle className="text-3xl text-green-600">{workOrderKPIs.completed}</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="flex items-center text-sm text-green-600">
-                  <ChevronRight className="w-4 h-4" />
-                  <span>View completed</span>
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card
-              className="cursor-pointer hover:shadow-lg transition-shadow border-l-4 border-l-gray-400 bg-white"
-              onClick={() => navigateToWorkOrders('Planned')}
-              data-testid="card-total-wo"
-            >
-              <CardHeader className="pb-2">
-                <CardDescription className="flex items-center gap-1">
-                  <Wrench className="w-4 h-4 text-gray-500" />
-                  Total Work Orders
-                </CardDescription>
-                <CardTitle className="text-3xl">{workOrderKPIs.total}</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="flex items-center text-sm text-gray-600">
-                  <ChevronRight className="w-4 h-4" />
-                  <span>View all work orders</span>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-
-          <div className="mt-4">
-            <Card data-testid="card-wo-status-chart" className="bg-white">
-              <CardHeader>
-                <CardTitle>Work Order Status Distribution</CardTitle>
-                <CardDescription>Click segments to view filtered work orders</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="h-72">
+                <div className="h-56">
                   {workOrderStatusChartData.length > 0 ? (
                     <AgCharts options={{
                       data: workOrderStatusChartData,
@@ -1077,98 +1089,185 @@ const Dashboard = () => {
                 </div>
               </CardContent>
             </Card>
-          </div>
-        </section>
 
-        {/* ═══ Band 2: Maintenance Effectiveness ═══ */}
-        <section data-testid="band-maintenance-effectiveness">
-          <h2 className="text-base font-semibold text-gray-700 dark:text-gray-300 mb-3" data-testid="text-band-maintenance">Maintenance Effectiveness</h2>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {/* Outstanding Tasks — Donut + Percentage + Trend Delta */}
-            <Card data-testid="card-outstanding-tasks-chart" className="bg-white">
-              <CardHeader>
-                <CardTitle>Outstanding Tasks</CardTitle>
-                <CardDescription>
-                  {outstandingTasksChartData.totalMonthly > 0
-                    ? `${outstandingTasksChartData.outstandingCount} of ${outstandingTasksChartData.totalMonthly} tasks outstanding`
-                    : 'No planned maintenance tasks this month'}
-                </CardDescription>
+            {/* Overdue WO list attached to band */}
+            <Card data-testid="card-overdue-table">
+              <CardHeader className="flex flex-row items-center justify-between gap-2 pb-2 pt-3">
+                <div>
+                  <CardTitle className="flex items-center gap-1.5 text-sm">
+                    <AlertTriangle className="w-4 h-4 text-red-500" />
+                    Overdue Work Orders
+                  </CardTitle>
+                  <CardDescription className="text-xs">
+                    {workOrderKPIs.overdueList.length > 0
+                      ? `Top ${workOrderKPIs.overdueList.length} of ${workOrderKPIs.overdue} overdue`
+                      : 'No overdue items'}
+                  </CardDescription>
+                </div>
+                {workOrderKPIs.overdue > 0 && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => navigateToWorkOrders('Overdue')}
+                    data-testid="button-view-all-overdue"
+                  >
+                    View All
+                  </Button>
+                )}
               </CardHeader>
               <CardContent>
-                {outstandingTasksChartData.data.length > 0 ? (
-                  <div className="flex flex-col items-center gap-2">
-                    <div className="h-52 w-full">
-                      <AgCharts options={{
-                        data: outstandingTasksChartData.data,
-                        series: [{
-                          type: 'donut',
-                          angleKey: 'count',
-                          calloutLabelKey: 'status',
-                          sectorLabelKey: 'percent',
-                          sectorLabel: {
-                            formatter: (params: any) => `${params.datum.percent}%`
-                          },
-                          innerRadiusRatio: 0.6,
-                          fills: outstandingTasksChartData.data.map(d => d.color),
-                          strokes: outstandingTasksChartData.data.map(d => d.color),
-                          listeners: {
-                            nodeClick: (event: any) => {
-                              const status = event.datum.status;
-                              if (status === 'Outstanding') {
-                                navigateToWorkOrders('Planned');
-                              } else {
-                                navigateToWorkOrders('Completed');
-                              }
-                            }
-                          }
-                        } as any],
-                        legend: { enabled: true, position: 'bottom' },
-                        padding: { top: 0, bottom: 0, left: 0, right: 0 }
-                      } as AgChartOptions} />
-                    </div>
-                    <div className="flex flex-col items-center">
-                      <span className="text-3xl font-bold" data-testid="text-outstanding-percent">{outstandingTasksChartData.outstandingPercent}%</span>
-                      {maintenanceTrendData.delta !== 0 && (
-                        <div
-                          className={`flex items-center gap-1 mt-1 text-sm font-medium ${maintenanceTrendData.delta > 0 ? 'text-red-600' : 'text-green-600'}`}
-                          data-testid="text-trend-delta"
-                        >
-                          {maintenanceTrendData.delta > 0 ? (
-                            <TrendingUp className="w-4 h-4" />
-                          ) : (
-                            <TrendingDown className="w-4 h-4" />
-                          )}
-                          <span>{Math.abs(maintenanceTrendData.delta)}% vs last month</span>
+                {workOrderKPIs.overdueList.length > 0 ? (
+                  <div className="space-y-1.5">
+                    {workOrderKPIs.overdueList.map((wo: any) => (
+                      <div
+                        key={wo.id}
+                        className="flex items-center justify-between p-2.5 bg-red-50 dark:bg-red-950/20 rounded-md cursor-pointer hover:bg-red-100 dark:hover:bg-red-950/30 transition-colors"
+                        onClick={() => navigateToWorkOrder(wo.id)}
+                        data-testid={`row-overdue-wo-${wo.id}`}
+                      >
+                        <div className="flex-1 min-w-0">
+                          <div className="font-medium text-xs truncate">{wo.workOrderNumber || `WO-${wo.id}`}</div>
+                          <div className="text-xs text-gray-500 truncate">{wo.taskDescription || wo.jobTitle || 'No description'}</div>
                         </div>
-                      )}
-                      {maintenanceTrendData.delta === 0 && (
-                        <div className="text-sm text-gray-500 dark:text-gray-400 mt-1" data-testid="text-trend-delta">No change vs last month</div>
-                      )}
-                    </div>
+                        <div className="flex items-center gap-1.5 flex-shrink-0">
+                          <Badge className="bg-red-500 text-white text-xs">Overdue</Badge>
+                          <ChevronRight className="w-3.5 h-3.5 text-gray-400" />
+                        </div>
+                      </div>
+                    ))}
                   </div>
                 ) : (
-                  <div className="h-72 flex items-center justify-center text-gray-500 dark:text-gray-400">
-                    No planned maintenance tasks this month
+                  <div className="text-center py-4 text-gray-500">
+                    <CheckCircle className="w-8 h-8 mx-auto mb-1 text-green-500" />
+                    <p className="text-xs">No overdue work orders</p>
                   </div>
                 )}
               </CardContent>
             </Card>
+          </section>
 
-            {/* 6-Month Maintenance Trend — Bar Chart */}
-            <Card data-testid="card-maintenance-trend" className="bg-white">
-              <CardHeader>
-                <CardTitle>6-Month Maintenance Trend</CardTitle>
-                <CardDescription>Outstanding tasks % over time</CardDescription>
+          {/* ── Right Column: Maintenance Effectiveness ── */}
+          <section
+            className="rounded-md border border-gray-100 dark:border-gray-800 bg-gray-50/50 dark:bg-gray-900/30 p-4 space-y-3"
+            data-testid="band-maintenance-effectiveness"
+          >
+            <h2 className="text-sm font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wide" data-testid="text-band-maintenance">Maintenance Effectiveness</h2>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              {/* Outstanding Tasks Donut */}
+              <Card data-testid="card-outstanding-tasks-chart">
+                <CardHeader className="pb-1 pt-3">
+                  <CardTitle className="text-sm">Outstanding Tasks</CardTitle>
+                  <CardDescription className="text-xs">
+                    {outstandingTasksChartData.totalMonthly > 0
+                      ? `${outstandingTasksChartData.outstandingCount} of ${outstandingTasksChartData.totalMonthly} this month`
+                      : 'No planned tasks this month'}
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  {outstandingTasksChartData.data.length > 0 ? (
+                    <div className="flex flex-col items-center gap-1">
+                      <div className="h-44 w-full">
+                        <AgCharts options={{
+                          data: outstandingTasksChartData.data,
+                          series: [{
+                            type: 'donut',
+                            angleKey: 'count',
+                            calloutLabelKey: 'status',
+                            sectorLabelKey: 'percent',
+                            sectorLabel: {
+                              formatter: (params: any) => `${params.datum.percent}%`
+                            },
+                            innerRadiusRatio: 0.6,
+                            fills: outstandingTasksChartData.data.map(d => d.color),
+                            strokes: outstandingTasksChartData.data.map(d => d.color),
+                            listeners: {
+                              nodeClick: (event: any) => {
+                                const status = event.datum.status;
+                                if (status === 'Outstanding') {
+                                  navigateToWorkOrders('Planned');
+                                } else {
+                                  navigateToWorkOrders('Completed');
+                                }
+                              }
+                            }
+                          } as any],
+                          legend: { enabled: true, position: 'bottom' },
+                          padding: { top: 0, bottom: 0, left: 0, right: 0 }
+                        } as AgChartOptions} />
+                      </div>
+                      <div className="flex flex-col items-center">
+                        <span className="text-2xl font-bold" data-testid="text-outstanding-percent">{outstandingTasksChartData.outstandingPercent}%</span>
+                        {maintenanceTrendData.delta !== 0 && (
+                          <div
+                            className={`flex items-center gap-1 text-xs font-medium ${maintenanceTrendData.delta > 0 ? 'text-red-600' : 'text-green-600'}`}
+                            data-testid="text-trend-delta"
+                          >
+                            {maintenanceTrendData.delta > 0 ? (
+                              <TrendingUp className="w-3.5 h-3.5" />
+                            ) : (
+                              <TrendingDown className="w-3.5 h-3.5" />
+                            )}
+                            <span>{Math.abs(maintenanceTrendData.delta)}% vs last month</span>
+                          </div>
+                        )}
+                        {maintenanceTrendData.delta === 0 && (
+                          <div className="text-xs text-gray-500 dark:text-gray-400" data-testid="text-trend-delta">No change vs last month</div>
+                        )}
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="h-52 flex items-center justify-center text-gray-500 dark:text-gray-400 text-xs">
+                      No planned maintenance tasks this month
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+
+              {/* Running Hours Card */}
+              <Card
+                className="cursor-pointer hover:shadow-md transition-shadow"
+                onClick={navigateToRunningHours}
+                data-testid="card-running-hours-summary"
+              >
+                <CardHeader className="pb-1 pt-3">
+                  <CardDescription className="flex items-center gap-1 text-xs">
+                    <Gauge className="w-3.5 h-3.5 text-orange-500" />
+                    Running Hours Tracked
+                  </CardDescription>
+                  <CardTitle className="text-2xl">{runningHoursKPIs.totalComponents}</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between text-xs text-muted-foreground">
+                      <span>{runningHoursKPIs.totalTracked} master</span>
+                      <span>{runningHoursKPIs.totalInherited} inherited</span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className={`text-xs ${runningHoursKPIs.recentlyUpdated > 0 ? 'text-green-600 font-medium' : 'text-muted-foreground'}`}>
+                        {runningHoursKPIs.recentlyUpdated} updated this week
+                      </span>
+                      <ChevronRight className="w-3.5 h-3.5 text-gray-400" />
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+
+            {/* 6-Month Maintenance Trend */}
+            <Card data-testid="card-maintenance-trend">
+              <CardHeader className="pb-2 pt-3">
+                <CardTitle className="text-sm">6-Month Maintenance Trend</CardTitle>
+                <CardDescription className="text-xs">Outstanding tasks % over time</CardDescription>
               </CardHeader>
               <CardContent>
                 {maintenanceTrendData.months.length > 0 ? (
-                  <div className="flex flex-col gap-3">
-                    <div className="h-52" data-testid="chart-maintenance-trend">
+                  <div className="flex flex-col gap-2">
+                    <div className="h-44" data-testid="chart-maintenance-trend">
                       <ResponsiveContainer width="100%" height="100%">
                         <BarChart data={maintenanceTrendData.months} margin={{ top: 4, right: 4, bottom: 0, left: -20 }}>
-                          <XAxis dataKey="monthShort" tick={{ fontSize: 11 }} tickLine={false} axisLine={false} />
-                          <YAxis domain={[0, 100]} tick={{ fontSize: 10 }} tickLine={false} axisLine={false} tickFormatter={(v) => `${v}%`} />
+                          <XAxis dataKey="monthShort" tick={{ fontSize: 10 }} tickLine={false} axisLine={false} />
+                          <YAxis domain={[0, 100]} tick={{ fontSize: 9 }} tickLine={false} axisLine={false} tickFormatter={(v) => `${v}%`} />
                           <Tooltip
                             content={({ active, payload }) => {
                               if (active && payload && payload.length) {
@@ -1186,7 +1285,7 @@ const Dashboard = () => {
                               return null;
                             }}
                           />
-                          <Bar dataKey="outstandingPercent" radius={[3, 3, 0, 0]} maxBarSize={32}>
+                          <Bar dataKey="outstandingPercent" radius={[3, 3, 0, 0]} maxBarSize={28}>
                             {maintenanceTrendData.months.map((entry, index) => (
                               <Cell
                                 key={`cell-${index}`}
@@ -1197,145 +1296,115 @@ const Dashboard = () => {
                         </BarChart>
                       </ResponsiveContainer>
                     </div>
-                    <div className="flex items-center justify-center gap-4 text-xs text-gray-600 dark:text-gray-400" data-testid="legend-maintenance-trend">
+                    <div className="flex items-center justify-center gap-3 text-xs text-gray-500 dark:text-gray-400" data-testid="legend-maintenance-trend">
                       <div className="flex items-center gap-1" data-testid="legend-item-healthy">
-                        <span className="inline-block w-3 h-3 rounded-sm" style={{ backgroundColor: '#10b981' }} />
-                        <span>Healthy (&lt;30%)</span>
+                        <span className="inline-block w-2.5 h-2.5 rounded-sm" style={{ backgroundColor: '#10b981' }} />
+                        <span>&lt;30%</span>
                       </div>
                       <div className="flex items-center gap-1" data-testid="legend-item-watch">
-                        <span className="inline-block w-3 h-3 rounded-sm" style={{ backgroundColor: '#f59e0b' }} />
-                        <span>Watch (30–60%)</span>
+                        <span className="inline-block w-2.5 h-2.5 rounded-sm" style={{ backgroundColor: '#f59e0b' }} />
+                        <span>30-60%</span>
                       </div>
                       <div className="flex items-center gap-1" data-testid="legend-item-backlog">
-                        <span className="inline-block w-3 h-3 rounded-sm" style={{ backgroundColor: '#ef4444' }} />
-                        <span>Backlog (&gt;60%)</span>
+                        <span className="inline-block w-2.5 h-2.5 rounded-sm" style={{ backgroundColor: '#ef4444' }} />
+                        <span>&gt;60%</span>
                       </div>
                     </div>
                   </div>
                 ) : (
-                  <div className="h-72 flex items-center justify-center text-gray-500 dark:text-gray-400">
+                  <div className="h-44 flex items-center justify-center text-gray-500 dark:text-gray-400 text-xs">
                     No trend data available
                   </div>
                 )}
               </CardContent>
             </Card>
+          </section>
+        </div>
 
-            {/* Running Hours Card */}
+        {/* ═══ Band 3: Inventory Health (full width) ═══ */}
+        <section
+          className="rounded-md border border-gray-100 dark:border-gray-800 bg-gray-50/50 dark:bg-gray-900/30 p-4 space-y-3"
+          data-testid="band-inventory-health"
+        >
+          <h2 className="text-sm font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wide" data-testid="text-band-inventory">Inventory Health</h2>
+
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             <Card
-              className="cursor-pointer hover:shadow-lg transition-shadow bg-white"
-              onClick={navigateToRunningHours}
-              data-testid="card-running-hours-summary"
-            >
-              <CardHeader className="pb-2">
-                <CardDescription className="flex items-center gap-1">
-                  <Gauge className="w-4 h-4 text-orange-500" />
-                  Running Hours
-                </CardDescription>
-                <CardTitle className="text-2xl">{runningHoursKPIs.totalComponents}</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-1">
-                  <div className="flex items-center justify-between text-sm">
-                    <span className="text-gray-500">{runningHoursKPIs.totalTracked} master, {runningHoursKPIs.totalInherited} inherited</span>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <span className={`text-sm ${runningHoursKPIs.recentlyUpdated > 0 ? 'text-green-600 font-medium' : 'text-gray-500'}`}>
-                      {runningHoursKPIs.recentlyUpdated} updated this week
-                    </span>
-                    <ChevronRight className="w-4 h-4 text-gray-400" />
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-        </section>
-
-        {/* ═══ Band 3: Inventory Health ═══ */}
-        <section data-testid="band-inventory-health">
-          <h2 className="text-base font-semibold text-gray-700 dark:text-gray-300 mb-3" data-testid="text-band-inventory">Inventory Health</h2>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {/* Components Card */}
-            <Card
-              className="cursor-pointer hover:shadow-lg transition-shadow bg-white"
+              className="cursor-pointer hover:shadow-md transition-shadow"
               onClick={navigateToComponents}
               data-testid="card-components-summary"
             >
-              <CardHeader className="pb-2">
-                <CardDescription className="flex items-center gap-1">
-                  <Box className="w-4 h-4 text-blue-500" />
+              <CardHeader className="pb-1 pt-3 px-3">
+                <CardDescription className="flex items-center gap-1 text-xs">
+                  <Box className="w-3.5 h-3.5 text-blue-500" />
                   Components
                 </CardDescription>
                 <CardTitle className="text-2xl">{componentsKPIs.total}</CardTitle>
               </CardHeader>
-              <CardContent>
-                <div className="flex items-center justify-between">
-                  <span className="text-sm text-gray-500">{componentsKPIs.active} active</span>
-                  <ChevronRight className="w-4 h-4 text-gray-400" />
-                </div>
+              <CardContent className="px-3 pb-2">
+                <p className="text-xs text-muted-foreground" data-testid="text-components-active">
+                  {componentsKPIs.active} active ({componentsKPIs.total > 0 ? Math.round((componentsKPIs.active / componentsKPIs.total) * 100) : 0}%)
+                </p>
               </CardContent>
             </Card>
 
-            {/* Spares Card */}
             <Card
-              className="cursor-pointer hover:shadow-lg transition-shadow bg-white"
+              className="cursor-pointer hover:shadow-md transition-shadow"
               onClick={() => navigateToSpares()}
               data-testid="card-spares-summary"
             >
-              <CardHeader className="pb-2">
-                <CardDescription className="flex items-center gap-1">
-                  <Package className="w-4 h-4 text-purple-500" />
+              <CardHeader className="pb-1 pt-3 px-3">
+                <CardDescription className="flex items-center gap-1 text-xs">
+                  <Package className="w-3.5 h-3.5 text-purple-500" />
                   Spares Inventory
                 </CardDescription>
                 <CardTitle className="text-2xl">{sparesKPIs.total}</CardTitle>
               </CardHeader>
-              <CardContent>
-                <div className="flex items-center justify-between">
-                  <span className="text-sm">
-                    <span className={sparesKPIs.lowStock > 0 ? 'text-red-500 font-medium' : 'text-gray-500'}>
-                      {sparesKPIs.lowStock} low stock
-                    </span>
+              <CardContent className="px-3 pb-2">
+                <div className="flex items-center justify-between text-xs">
+                  <span className={sparesKPIs.lowStock > 0 ? 'text-red-500 font-medium' : 'text-muted-foreground'}>
+                    {sparesKPIs.lowStock} low stock
                   </span>
-                  <ChevronRight className="w-4 h-4 text-gray-400" />
+                  <span className="text-muted-foreground" data-testid="text-spares-critical">
+                    {sparesKPIs.critical} critical
+                  </span>
                 </div>
               </CardContent>
             </Card>
 
-            {/* Stores Card */}
             <Card
-              className="cursor-pointer hover:shadow-lg transition-shadow bg-white"
+              className="cursor-pointer hover:shadow-md transition-shadow"
               onClick={() => navigateToStores()}
               data-testid="card-stores-summary"
             >
-              <CardHeader className="pb-2">
-                <CardDescription className="flex items-center gap-1">
-                  <Box className="w-4 h-4 text-teal-500" />
+              <CardHeader className="pb-1 pt-3 px-3">
+                <CardDescription className="flex items-center gap-1 text-xs">
+                  <Box className="w-3.5 h-3.5 text-teal-500" />
                   Stores Inventory
                 </CardDescription>
                 <CardTitle className="text-2xl">{storesKPIs.total}</CardTitle>
               </CardHeader>
-              <CardContent>
-                <div className="flex items-center justify-between">
-                  <span className="text-sm">
-                    <span className={storesKPIs.lowStock > 0 ? 'text-amber-500 font-medium' : 'text-gray-500'}>
-                      {storesKPIs.lowStock} low stock
-                    </span>
+              <CardContent className="px-3 pb-2">
+                <div className="flex items-center justify-between text-xs">
+                  <span className={storesKPIs.lowStock > 0 ? 'text-amber-500 font-medium' : 'text-muted-foreground'}>
+                    {storesKPIs.lowStock} low stock
                   </span>
-                  <ChevronRight className="w-4 h-4 text-gray-400" />
+                  <span className="text-muted-foreground" data-testid="text-stores-breakdown-summary">
+                    {storesKPIs.stores}S / {storesKPIs.lubes}L / {storesKPIs.chemicals}C / {storesKPIs.others}O
+                  </span>
                 </div>
               </CardContent>
             </Card>
           </div>
 
-          {/* Spares Stock Status Donut */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-4">
-            <Card data-testid="card-spares-status-chart" className="bg-white">
-              <CardHeader>
-                <CardTitle>Spares Stock Status</CardTitle>
-                <CardDescription>Click segments to view filtered spares</CardDescription>
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+            <Card data-testid="card-spares-status-chart">
+              <CardHeader className="pb-2 pt-3">
+                <CardTitle className="text-sm">Spares Stock Status</CardTitle>
+                <CardDescription className="text-xs">Click segments to view filtered spares</CardDescription>
               </CardHeader>
               <CardContent>
-                <div className="h-72">
+                <div className="h-56">
                   {sparesStockChartData.length > 0 ? (
                     <AgCharts options={{
                       data: sparesStockChartData,
@@ -1357,7 +1426,7 @@ const Dashboard = () => {
                       legend: { enabled: true, position: 'bottom' }
                     } as AgChartOptions} />
                   ) : (
-                    <div className="h-full flex items-center justify-center text-gray-500">
+                    <div className="h-full flex items-center justify-center text-gray-500 text-xs">
                       No spares to display
                     </div>
                   )}
@@ -1365,48 +1434,47 @@ const Dashboard = () => {
               </CardContent>
             </Card>
 
-            {/* Stores Breakdown */}
-            <Card data-testid="card-stores-breakdown" className="bg-white">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Box className="w-5 h-5 text-teal-500" />
-                  Stores Inventory Breakdown
+            <Card data-testid="card-stores-breakdown">
+              <CardHeader className="pb-2 pt-3">
+                <CardTitle className="flex items-center gap-1.5 text-sm">
+                  <Box className="w-4 h-4 text-teal-500" />
+                  Stores Breakdown
                 </CardTitle>
-                <CardDescription>Click on category to view</CardDescription>
+                <CardDescription className="text-xs">Click category to view</CardDescription>
               </CardHeader>
               <CardContent>
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-2 gap-2">
                   <div
-                    className="p-4 bg-blue-50 rounded-md cursor-pointer hover:bg-blue-100 transition-colors text-center"
+                    className="p-3 bg-blue-50 dark:bg-blue-950/20 rounded-md cursor-pointer hover:bg-blue-100 dark:hover:bg-blue-950/30 transition-colors text-center"
                     onClick={() => navigateToStores('stores')}
                     data-testid="card-stores-tab"
                   >
-                    <div className="text-2xl font-bold text-blue-600">{storesKPIs.stores}</div>
-                    <div className="text-sm text-gray-600">Stores</div>
+                    <div className="text-xl font-bold text-blue-600">{storesKPIs.stores}</div>
+                    <div className="text-xs text-gray-600 dark:text-gray-400">Stores</div>
                   </div>
                   <div
-                    className="p-4 bg-amber-50 rounded-md cursor-pointer hover:bg-amber-100 transition-colors text-center"
+                    className="p-3 bg-amber-50 dark:bg-amber-950/20 rounded-md cursor-pointer hover:bg-amber-100 dark:hover:bg-amber-950/30 transition-colors text-center"
                     onClick={() => navigateToStores('lubes')}
                     data-testid="card-lubes-tab"
                   >
-                    <div className="text-2xl font-bold text-amber-600">{storesKPIs.lubes}</div>
-                    <div className="text-sm text-gray-600">Lubes</div>
+                    <div className="text-xl font-bold text-amber-600">{storesKPIs.lubes}</div>
+                    <div className="text-xs text-gray-600 dark:text-gray-400">Lubes</div>
                   </div>
                   <div
-                    className="p-4 bg-green-50 rounded-md cursor-pointer hover:bg-green-100 transition-colors text-center"
+                    className="p-3 bg-green-50 dark:bg-green-950/20 rounded-md cursor-pointer hover:bg-green-100 dark:hover:bg-green-950/30 transition-colors text-center"
                     onClick={() => navigateToStores('chemicals')}
                     data-testid="card-chemicals-tab"
                   >
-                    <div className="text-2xl font-bold text-green-600">{storesKPIs.chemicals}</div>
-                    <div className="text-sm text-gray-600">Chemicals</div>
+                    <div className="text-xl font-bold text-green-600">{storesKPIs.chemicals}</div>
+                    <div className="text-xs text-gray-600 dark:text-gray-400">Chemicals</div>
                   </div>
                   <div
-                    className="p-4 bg-purple-50 rounded-md cursor-pointer hover:bg-purple-100 transition-colors text-center"
+                    className="p-3 bg-purple-50 dark:bg-purple-950/20 rounded-md cursor-pointer hover:bg-purple-100 dark:hover:bg-purple-950/30 transition-colors text-center"
                     onClick={() => navigateToStores('others')}
                     data-testid="card-others-tab"
                   >
-                    <div className="text-2xl font-bold text-purple-600">{storesKPIs.others}</div>
-                    <div className="text-sm text-gray-600">Others</div>
+                    <div className="text-xl font-bold text-purple-600">{storesKPIs.others}</div>
+                    <div className="text-xs text-gray-600 dark:text-gray-400">Others</div>
                   </div>
                 </div>
               </CardContent>
@@ -1414,64 +1482,120 @@ const Dashboard = () => {
           </div>
 
           {/* Spares Movement Trend */}
-          <div className="mt-4">
-            <Card data-testid="card-spares-consumption-trend" className="bg-white">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Package className="w-5 h-5 text-purple-500" />
-                  6-Month Spares Movement Trend
+          <Card data-testid="card-spares-consumption-trend">
+            <CardHeader className="pb-2 pt-3">
+              <CardTitle className="flex items-center gap-1.5 text-sm">
+                <Package className="w-4 h-4 text-purple-500" />
+                6-Month Spares Movement Trend
+              </CardTitle>
+              <CardDescription className="text-xs">Consumption vs receiving activity over time</CardDescription>
+            </CardHeader>
+            <CardContent>
+              {sparesConsumptionTrendData.length > 0 ? (
+                <div className="flex flex-col gap-2">
+                  <div className="h-44" data-testid="chart-spares-consumption-trend">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <BarChart data={sparesConsumptionTrendData} margin={{ top: 4, right: 4, bottom: 0, left: -10 }}>
+                        <XAxis dataKey="monthShort" tick={{ fontSize: 10 }} tickLine={false} axisLine={false} />
+                        <YAxis tick={{ fontSize: 9 }} tickLine={false} axisLine={false} />
+                        <Tooltip
+                          content={({ active, payload }) => {
+                            if (active && payload && payload.length) {
+                              const d = payload[0].payload;
+                              return (
+                                <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-md shadow-md p-2 text-xs text-gray-900 dark:text-gray-100" data-testid="tooltip-spares-consumption">
+                                  <div className="font-semibold mb-1">{d.month}</div>
+                                  <div className="text-red-600">Consumed: {d.consumeEvents} events ({d.totalQty} units)</div>
+                                  <div className="text-green-600">Received: {d.receiveEvents} events ({d.receiveQty} units)</div>
+                                </div>
+                              );
+                            }
+                            return null;
+                          }}
+                        />
+                        <Legend
+                          wrapperStyle={{ fontSize: '10px' }}
+                          formatter={(value) => value === 'consumeEvents' ? 'Consumed' : 'Received'}
+                        />
+                        <Bar dataKey="consumeEvents" name="consumeEvents" fill="#ef4444" radius={[3, 3, 0, 0]} maxBarSize={20} />
+                        <Bar dataKey="receiveEvents" name="receiveEvents" fill="#10b981" radius={[3, 3, 0, 0]} maxBarSize={20} />
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </div>
+                </div>
+              ) : (
+                <div className="h-44 flex items-center justify-center text-gray-500 dark:text-gray-400 text-xs">
+                  No spares history data available
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Low Stock list attached to Inventory band */}
+          <Card data-testid="card-low-stock-table">
+            <CardHeader className="flex flex-row items-center justify-between gap-2 pb-2 pt-3">
+              <div>
+                <CardTitle className="flex items-center gap-1.5 text-sm">
+                  <AlertCircle className="w-4 h-4 text-amber-500" />
+                  Low Stock Spares
                 </CardTitle>
-                <CardDescription>Consumption vs receiving activity over time</CardDescription>
-              </CardHeader>
-              <CardContent>
-                {sparesConsumptionTrendData.length > 0 ? (
-                  <div className="flex flex-col gap-3">
-                    <div className="h-52" data-testid="chart-spares-consumption-trend">
-                      <ResponsiveContainer width="100%" height="100%">
-                        <BarChart data={sparesConsumptionTrendData} margin={{ top: 4, right: 4, bottom: 0, left: -10 }}>
-                          <XAxis dataKey="monthShort" tick={{ fontSize: 11 }} tickLine={false} axisLine={false} />
-                          <YAxis tick={{ fontSize: 10 }} tickLine={false} axisLine={false} />
-                          <Tooltip
-                            content={({ active, payload }) => {
-                              if (active && payload && payload.length) {
-                                const d = payload[0].payload;
-                                return (
-                                  <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-md shadow-md p-2 text-xs text-gray-900 dark:text-gray-100" data-testid="tooltip-spares-consumption">
-                                    <div className="font-semibold mb-1">{d.month}</div>
-                                    <div className="text-red-600">Consumed: {d.consumeEvents} events ({d.totalQty} units)</div>
-                                    <div className="text-green-600">Received: {d.receiveEvents} events ({d.receiveQty} units)</div>
-                                  </div>
-                                );
-                              }
-                              return null;
-                            }}
-                          />
-                          <Legend
-                            wrapperStyle={{ fontSize: '11px' }}
-                            formatter={(value) => value === 'consumeEvents' ? 'Consumed' : 'Received'}
-                          />
-                          <Bar dataKey="consumeEvents" name="consumeEvents" fill="#ef4444" radius={[3, 3, 0, 0]} maxBarSize={24} />
-                          <Bar dataKey="receiveEvents" name="receiveEvents" fill="#10b981" radius={[3, 3, 0, 0]} maxBarSize={24} />
-                        </BarChart>
-                      </ResponsiveContainer>
+                <CardDescription className="text-xs">
+                  {sparesKPIs.lowStockList.length > 0
+                    ? `Sample ${sparesKPIs.lowStockList.length} of ${sparesKPIs.lowStock} low stock items${sparesKPIs.criticalLowStock > 0 ? ` (${sparesKPIs.criticalLowStock} critical)` : ''}`
+                    : 'All spares adequately stocked'}
+                </CardDescription>
+              </div>
+              {sparesKPIs.lowStock > 0 && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => navigateToSpares('Low')}
+                  data-testid="button-view-all-low-stock"
+                >
+                  View All
+                </Button>
+              )}
+            </CardHeader>
+            <CardContent>
+              {sparesKPIs.lowStockList.length > 0 ? (
+                <div className="space-y-1.5">
+                  {sparesKPIs.lowStockList.map((spare: Spare) => (
+                    <div
+                      key={spare.id}
+                      className="flex items-center justify-between p-2.5 bg-amber-50 dark:bg-amber-950/20 rounded-md cursor-pointer hover:bg-amber-100 dark:hover:bg-amber-950/30 transition-colors"
+                      onClick={() => navigateToSpares('Low')}
+                      data-testid={`row-low-stock-spare-${spare.id}`}
+                    >
+                      <div className="flex-1 min-w-0">
+                        <div className="font-medium text-xs truncate">{spare.partName}</div>
+                        <div className="text-xs text-gray-500 truncate">{spare.partNumber}</div>
+                      </div>
+                      <div className="flex items-center gap-1.5 flex-shrink-0">
+                        <span className="text-xs font-medium">ROB: {spare.rob} / Min: {spare.min}</span>
+                        {(spare.critical === 'Critical' || spare.critical === 'Yes') && (
+                          <Badge className="bg-red-500 text-white text-xs">Critical</Badge>
+                        )}
+                        <ChevronRight className="w-3.5 h-3.5 text-gray-400" />
+                      </div>
                     </div>
-                  </div>
-                ) : (
-                  <div className="h-52 flex items-center justify-center text-gray-500 dark:text-gray-400">
-                    No spares history data available
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-center py-4 text-gray-500">
+                  <CheckCircle className="w-8 h-8 mx-auto mb-1 text-green-500" />
+                  <p className="text-xs">All spares adequately stocked</p>
+                </div>
+              )}
+            </CardContent>
+          </Card>
         </section>
 
-        {/* ═══ Actionable Sections (below the 3 bands) ═══ */}
+        {/* ═══ Actionable Sections ═══ */}
 
-        {/* Head of Dept Approval Section - Only visible to Head of Dept */}
+        {/* Head of Dept Approval Section */}
         {isHeadOfDept && workOrderKPIs.pendingApproval > 0 && (
-          <Card data-testid="card-pending-approval-section" className="bg-white border-l-4 border-l-blue-500">
-            <CardHeader className="flex flex-row items-center justify-between">
+          <Card data-testid="card-pending-approval-section" className="border-l-4 border-l-blue-500">
+            <CardHeader className="flex flex-row items-center justify-between gap-2">
               <div>
                 <CardTitle className="flex items-center gap-2">
                   <ClipboardList className="w-5 h-5 text-blue-500" />
@@ -1568,110 +1692,6 @@ const Dashboard = () => {
             </CardContent>
           </Card>
         )}
-
-        {/* Actionable Tables Row */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {/* Overdue Work Orders Table */}
-          <Card data-testid="card-overdue-table" className="bg-white">
-            <CardHeader className="flex flex-row items-center justify-between">
-              <div>
-                <CardTitle className="flex items-center gap-2">
-                  <AlertTriangle className="w-5 h-5 text-red-500" />
-                  Overdue Work Orders
-                </CardTitle>
-                <CardDescription>Immediate attention required</CardDescription>
-              </div>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => navigateToWorkOrders('Overdue')}
-                data-testid="button-view-all-overdue"
-              >
-                View All ({workOrderKPIs.overdue})
-              </Button>
-            </CardHeader>
-            <CardContent>
-              {workOrderKPIs.overdueList.length > 0 ? (
-                <div className="space-y-2">
-                  {workOrderKPIs.overdueList.map((wo: any) => (
-                    <div
-                      key={wo.id}
-                      className="flex items-center justify-between p-3 bg-red-50 rounded-lg cursor-pointer hover:bg-red-100 transition-colors"
-                      onClick={() => navigateToWorkOrder(wo.id)}
-                      data-testid={`row-overdue-wo-${wo.id}`}
-                    >
-                      <div className="flex-1">
-                        <div className="font-medium text-sm">{wo.workOrderNumber || `WO-${wo.id}`}</div>
-                        <div className="text-xs text-gray-600">{wo.taskDescription || wo.jobTitle || 'No description'}</div>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <Badge className="bg-red-500 text-white">Overdue</Badge>
-                        <ChevronRight className="w-4 h-4 text-gray-400" />
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <div className="text-center py-8 text-gray-500">
-                  <CheckCircle className="w-12 h-12 mx-auto mb-2 text-green-500" />
-                  <p>No overdue work orders</p>
-                </div>
-              )}
-            </CardContent>
-          </Card>
-
-          {/* Low Stock Spares Table */}
-          <Card data-testid="card-low-stock-table" className="bg-white">
-            <CardHeader className="flex flex-row items-center justify-between">
-              <div>
-                <CardTitle className="flex items-center gap-2">
-                  <AlertCircle className="w-5 h-5 text-amber-500" />
-                  Low Stock Spares
-                </CardTitle>
-                <CardDescription>Reorder recommended</CardDescription>
-              </div>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => navigateToSpares('Low')}
-                data-testid="button-view-all-low-stock"
-              >
-                View All ({sparesKPIs.lowStock})
-              </Button>
-            </CardHeader>
-            <CardContent>
-              {sparesKPIs.lowStockList.length > 0 ? (
-                <div className="space-y-2">
-                  {sparesKPIs.lowStockList.map((spare: Spare) => (
-                    <div
-                      key={spare.id}
-                      className="flex items-center justify-between p-3 bg-amber-50 rounded-lg cursor-pointer hover:bg-amber-100 transition-colors"
-                      onClick={() => navigateToSpares('Low')}
-                      data-testid={`row-low-stock-spare-${spare.id}`}
-                    >
-                      <div className="flex-1">
-                        <div className="font-medium text-sm">{spare.partName}</div>
-                        <div className="text-xs text-gray-600">{spare.partNumber}</div>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <span className="text-sm font-medium">ROB: {spare.rob} / Min: {spare.min}</span>
-                        {(spare.critical === 'Critical' || spare.critical === 'Yes') && (
-                          <Badge className="bg-red-500 text-white text-xs">Critical</Badge>
-                        )}
-                        <ChevronRight className="w-4 h-4 text-gray-400" />
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <div className="text-center py-8 text-gray-500">
-                  <CheckCircle className="w-12 h-12 mx-auto mb-2 text-green-500" />
-                  <p>All spares adequately stocked</p>
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        </div>
 
         </>)}
       </div>
