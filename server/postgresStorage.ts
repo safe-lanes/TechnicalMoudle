@@ -193,7 +193,40 @@ import {
  * Additional modules will be added incrementally.
  */
 export class PostgresStorage {
-  
+
+  private async insertWithSequenceRepair<T>(
+    tableName: string,
+    insertFn: () => Promise<T>
+  ): Promise<T> {
+    try {
+      return await insertFn();
+    } catch (error: any) {
+      const isPkeyViolation =
+        error?.code === '23505' &&
+        error?.constraint?.endsWith('_pkey');
+      if (!isPkeyViolation) throw error;
+
+      console.warn(
+        `[SequenceRepair] Primary key collision on "${tableName}" — resetting sequence`
+      );
+      const db = await getDb();
+      await db.execute(
+        sql.raw(
+          `SELECT setval('${tableName}_id_seq', (SELECT COALESCE(MAX(id), 0) FROM "${tableName}"))`
+        )
+      );
+      return await insertFn();
+    }
+  }
+
+  private async insertStoresLedgerEntry(values: InsertStoresLedger): Promise<void> {
+    await this.insertWithSequenceRepair('stores_ledger', async () => {
+      const db = await getDb();
+      await db.insert(storesLedger).values(values);
+      return undefined;
+    });
+  }
+
   // ============= USERS (Module 1) =============
   
   async getUser(id: number): Promise<User | undefined> {
@@ -3007,9 +3040,11 @@ export class PostgresStorage {
   }
 
   async createSpareHistory(history: InsertSpareHistory): Promise<SpareHistory> {
-    const db = await getDb();
-    const result = await db.insert(sparesHistory).values(history).returning();
-    return result[0];
+    return this.insertWithSequenceRepair('spares_history', async () => {
+      const db = await getDb();
+      const result = await db.insert(sparesHistory).values(history).returning();
+      return result[0];
+    });
   }
 
   // ============= MODULE 8: STORES ITEMS =============
@@ -3064,7 +3099,7 @@ export class PostgresStorage {
     
     // Create initial ledger entry if starting with non-zero ROB
     if (totalRob > 0) {
-      await db.insert(storesLedger).values({
+      await this.insertStoresLedgerEntry({
         vesselId: created.vesselId,
         section: created.itemType,
         itemId: created.id,
@@ -3146,7 +3181,7 @@ export class PostgresStorage {
       .where(eq(storesItems.id, id))
       .returning();
 
-    await db.insert(storesLedger).values({
+    await this.insertStoresLedgerEntry({
       vesselId: item.vesselId,
       section: item.itemType,
       itemId: id,
@@ -3199,7 +3234,7 @@ export class PostgresStorage {
       .where(eq(storesItems.id, id))
       .returning();
 
-    await db.insert(storesLedger).values({
+    await this.insertStoresLedgerEntry({
       vesselId: item.vesselId,
       section: item.itemType,
       itemId: id,
@@ -3280,7 +3315,7 @@ export class PostgresStorage {
       const toLocation = deltaA < 0 ? 'B' : 'A';
       const transferRemarks = remarks || `Transfer ${transferQty} from Location ${fromLocation} to Location ${toLocation}`;
 
-      await db.insert(storesLedger).values({
+      await this.insertStoresLedgerEntry({
         vesselId: item.vesselId,
         section: item.itemType,
         itemId: id,
@@ -3299,7 +3334,7 @@ export class PostgresStorage {
         remarks: transferRemarks,
       });
 
-      await db.insert(storesLedger).values({
+      await this.insertStoresLedgerEntry({
         vesselId: item.vesselId,
         section: item.itemType,
         itemId: id,
@@ -3328,7 +3363,7 @@ export class PostgresStorage {
       ? `Adjustment: +${netChange} (Location A: ${oldLocA}→${newLocA}, Location B: ${oldLocB}→${newLocB})`
       : `Adjustment: ${netChange} (Location A: ${oldLocA}→${newLocA}, Location B: ${oldLocB}→${newLocB})`);
     
-    await db.insert(storesLedger).values({
+    await this.insertStoresLedgerEntry({
       vesselId: item.vesselId,
       section: item.itemType,
       itemId: id,
@@ -3403,7 +3438,7 @@ export class PostgresStorage {
 
     const adjustmentRemarks = remarks || `Adjustment at Location ${location}: ${location === 'A' ? oldLocA : oldLocB}→${newRob}`;
     
-    await db.insert(storesLedger).values({
+    await this.insertStoresLedgerEntry({
       vesselId: item.vesselId,
       section: item.itemType,
       itemId: id,
@@ -6952,9 +6987,11 @@ export class PostgresStorage {
   // ============= INVENTORY MANAGEMENT: TRANSACTIONS =============
 
   async createInventoryTransaction(txn: InsertInventoryTransaction): Promise<InventoryTransaction> {
-    const db = await getDb();
-    const result = await db.insert(inventoryTransactions).values(txn).returning();
-    return result[0];
+    return this.insertWithSequenceRepair('inventory_transactions', async () => {
+      const db = await getDb();
+      const result = await db.insert(inventoryTransactions).values(txn).returning();
+      return result[0];
+    });
   }
 
   async getInventoryTransactions(vesselId: string, options?: {
