@@ -672,14 +672,9 @@ const Dashboard = () => {
   }, [workOrdersData]);
 
   const maintenanceTrendData = useMemo(() => {
+    const safeWOs = workOrdersData.filter(wo => wo !== null && wo !== undefined);
     const now = new Date();
     const months: { month: string; monthShort: string; totalPlanned: number; completed: number; outstanding: number; outstandingPercent: number; overdue: number }[] = [];
-    
-    const seedFromVessel = (vesselId || 'all').split('').reduce((acc, ch) => acc + ch.charCodeAt(0), 0);
-    const seededRandom = (seed: number, i: number) => {
-      const x = Math.sin(seed * 9301 + i * 49297 + 233280) * 10000;
-      return x - Math.floor(x);
-    };
 
     for (let i = 5; i >= 0; i--) {
       const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
@@ -697,18 +692,29 @@ const Dashboard = () => {
           overdue: workOrderKPIs.overdue
         });
       } else {
-        const total = Math.floor(60 + seededRandom(seedFromVessel, i) * 40);
-        const outPct = Math.floor(20 + seededRandom(seedFromVessel, i * 7 + 3) * 55);
-        const outCount = Math.round((outPct / 100) * total);
-        const compCount = total - outCount;
-        const overdueCount = Math.floor(outCount * (0.2 + seededRandom(seedFromVessel, i * 13 + 5) * 0.3));
+        const targetMonth = d.getMonth();
+        const targetYear = d.getFullYear();
+
+        const monthlyPlanned = safeWOs.filter(wo => {
+          if (wo.isExecution) return false;
+          const dueDate = parseFlexibleDate(wo.dueDate);
+          if (!dueDate) return false;
+          return dueDate.getMonth() === targetMonth && dueDate.getFullYear() === targetYear;
+        });
+
+        const totalPlanned = monthlyPlanned.length;
+        const completedCount = monthlyPlanned.filter(wo => (wo as any).computedStatus === 'Completed').length;
+        const outstandingCount = totalPlanned - completedCount;
+        const outstandingPercent = totalPlanned > 0 ? Math.round((outstandingCount / totalPlanned) * 100) : 0;
+        const overdueCount = monthlyPlanned.filter(wo => (wo as any).computedStatus === 'Overdue').length;
+
         months.push({
           month: monthName,
           monthShort,
-          totalPlanned: total,
-          completed: compCount,
-          outstanding: outCount,
-          outstandingPercent: outPct,
+          totalPlanned,
+          completed: completedCount,
+          outstanding: outstandingCount,
+          outstandingPercent,
           overdue: overdueCount
         });
       }
@@ -722,7 +728,7 @@ const Dashboard = () => {
     }
 
     return { months, delta };
-  }, [vesselId, outstandingTasksChartData, workOrderKPIs.overdue]);
+  }, [workOrdersData, outstandingTasksChartData, workOrderKPIs.overdue]);
 
   // Navigation handlers
   const navigateToWorkOrders = (tab?: string) => {
