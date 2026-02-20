@@ -34,7 +34,7 @@ import {
 } from "lucide-react";
 import { AgCharts } from "ag-charts-react";
 import { AgChartOptions } from "ag-charts-community";
-import { BarChart, Bar, XAxis, YAxis, Tooltip, Cell, ResponsiveContainer } from "recharts";
+import { BarChart, Bar, LineChart, Line, XAxis, YAxis, Tooltip, Cell, Legend, ResponsiveContainer } from "recharts";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -68,6 +68,26 @@ interface Component {
   name: string;
   parentId?: string;
   isActive?: boolean;
+}
+
+interface RHParentComponent {
+  id: string;
+  componentCode: string;
+  name: string;
+  runningHours: string | number | null;
+  currentCumulativeRH: string | number | null;
+  rhCounterType: string | null;
+  lastUpdated: string | null;
+  inheritedCount: number;
+}
+
+interface SparesHistoryItem {
+  id: number;
+  timestampUTC: string;
+  vesselId: string;
+  eventType: string;
+  qtyChange: number;
+  partName: string;
 }
 
 type SortField = 'vessel' | 'overduePercent' | 'outstandingPercent' | 'compliancePercent' | 'lowStockItems' | 'overdueCount';
@@ -439,6 +459,44 @@ const Dashboard = () => {
     enabled: !!vesselId && (isAllVessels ? vessels.length > 0 : true)
   });
 
+  const { data: rhParentsData = [], isLoading: isRHLoading } = useQuery<RHParentComponent[]>({
+    queryKey: ['/technical/api/running-hours/parents', vesselId],
+    queryFn: async () => {
+      if (isAllVessels) {
+        const results = await Promise.allSettled(
+          vessels.map(vessel =>
+            fetch(`/technical/api/running-hours/parents?vesselId=${vessel.id}`)
+              .then(r => r.ok ? r.json() : [])
+          )
+        );
+        return results.flatMap(r => r.status === 'fulfilled' ? r.value : []);
+      }
+      const response = await fetch(`/technical/api/running-hours/parents?vesselId=${vesselId}`);
+      if (!response.ok) throw new Error('Failed to fetch running hours');
+      return response.json();
+    },
+    enabled: !!vesselId && (isAllVessels ? vessels.length > 0 : true)
+  });
+
+  const { data: sparesHistoryData = [], isLoading: isSparesHistoryLoading } = useQuery<SparesHistoryItem[]>({
+    queryKey: ['/technical/api/spares/history', vesselId],
+    queryFn: async () => {
+      if (isAllVessels) {
+        const results = await Promise.allSettled(
+          vessels.map(vessel =>
+            fetch(`/technical/api/spares/history/${vessel.id}`)
+              .then(r => r.ok ? r.json() : [])
+          )
+        );
+        return results.flatMap(r => r.status === 'fulfilled' ? r.value : []);
+      }
+      const response = await fetch(`/technical/api/spares/history/${vesselId}`);
+      if (!response.ok) throw new Error('Failed to fetch spares history');
+      return response.json();
+    },
+    enabled: !!vesselId && (isAllVessels ? vessels.length > 0 : true)
+  });
+
   // Helper: Calculate stock status
   const getStockStatus = (rob: number, min: number): { label: string; isLow: boolean } => {
     if (rob < min) return { label: 'Low', isLow: true };
@@ -730,6 +788,82 @@ const Dashboard = () => {
     return { months, delta };
   }, [workOrdersData, outstandingTasksChartData, workOrderKPIs.overdue]);
 
+  const runningHoursKPIs = useMemo(() => {
+    const totalTracked = rhParentsData.length;
+    const totalInherited = rhParentsData.reduce((sum, p) => sum + (p.inheritedCount || 0), 0);
+    const totalComponents = totalTracked + totalInherited;
+    const recentlyUpdated = rhParentsData.filter(p => {
+      if (!p.lastUpdated) return false;
+      const updated = new Date(p.lastUpdated);
+      const sevenDaysAgo = new Date();
+      sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+      return updated >= sevenDaysAgo;
+    }).length;
+    return { totalTracked, totalInherited, totalComponents, recentlyUpdated };
+  }, [rhParentsData]);
+
+  const complianceTrendData = useMemo(() => {
+    const safeWOs = workOrdersData.filter(wo => wo !== null && wo !== undefined);
+    const now = new Date();
+    const months: { month: string; monthShort: string; totalPlanned: number; completed: number; compliancePercent: number }[] = [];
+
+    for (let i = 5; i >= 0; i--) {
+      const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+      const monthName = format(d, 'MMM yyyy');
+      const monthShort = format(d, 'MMM');
+      const targetMonth = d.getMonth();
+      const targetYear = d.getFullYear();
+
+      const monthlyPlanned = safeWOs.filter(wo => {
+        if (wo.isExecution) return false;
+        const dueDate = parseFlexibleDate(wo.dueDate);
+        if (!dueDate) return false;
+        return dueDate.getMonth() === targetMonth && dueDate.getFullYear() === targetYear;
+      });
+
+      const totalPlanned = monthlyPlanned.length;
+      const completedCount = monthlyPlanned.filter(wo => (wo as any).computedStatus === 'Completed').length;
+      const compliancePercent = totalPlanned > 0 ? Math.round((completedCount / totalPlanned) * 100) : 0;
+
+      months.push({ month: monthName, monthShort, totalPlanned, completed: completedCount, compliancePercent });
+    }
+
+    return months;
+  }, [workOrdersData]);
+
+  const sparesConsumptionTrendData = useMemo(() => {
+    const now = new Date();
+    const months: { month: string; monthShort: string; consumeEvents: number; totalQty: number; receiveEvents: number; receiveQty: number }[] = [];
+
+    for (let i = 5; i >= 0; i--) {
+      const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+      const monthName = format(d, 'MMM yyyy');
+      const monthShort = format(d, 'MMM');
+      const targetMonth = d.getMonth();
+      const targetYear = d.getFullYear();
+
+      const monthEvents = sparesHistoryData.filter(e => {
+        if (!e.timestampUTC) return false;
+        const ts = new Date(e.timestampUTC);
+        return ts.getMonth() === targetMonth && ts.getFullYear() === targetYear;
+      });
+
+      const consumeEvents = monthEvents.filter(e => e.eventType === 'CONSUME');
+      const receiveEvents = monthEvents.filter(e => e.eventType === 'RECEIVE');
+
+      months.push({
+        month: monthName,
+        monthShort,
+        consumeEvents: consumeEvents.length,
+        totalQty: consumeEvents.reduce((sum, e) => sum + Math.abs(e.qtyChange), 0),
+        receiveEvents: receiveEvents.length,
+        receiveQty: receiveEvents.reduce((sum, e) => sum + Math.abs(e.qtyChange), 0),
+      });
+    }
+
+    return months;
+  }, [sparesHistoryData]);
+
   // Navigation handlers
   const navigateToWorkOrders = (tab?: string) => {
     if (tab) {
@@ -785,7 +919,7 @@ const Dashboard = () => {
     window.location.reload();
   };
 
-  const isLoading = isWorkOrdersLoading || isSparesLoading || isStoresLoading || isComponentsLoading;
+  const isLoading = isWorkOrdersLoading || isSparesLoading || isStoresLoading || isComponentsLoading || isRHLoading || isSparesHistoryLoading;
 
   return (
     <div className="flex flex-col" style={{ height: 'calc(100vh - 120px)' }}>
@@ -1450,15 +1584,19 @@ const Dashboard = () => {
                 <Gauge className="w-4 h-4 text-orange-500" />
                 Running Hours
               </CardDescription>
-              <CardTitle className="text-2xl flex items-center gap-2">
-                <RotateCcw className="w-5 h-5" />
-                Track
-              </CardTitle>
+              <CardTitle className="text-2xl">{runningHoursKPIs.totalComponents}</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="flex items-center justify-between">
-                <span className="text-sm text-gray-500">Update component hours</span>
-                <ChevronRight className="w-4 h-4 text-gray-400" />
+              <div className="space-y-1">
+                <div className="flex items-center justify-between text-sm">
+                  <span className="text-gray-500">{runningHoursKPIs.totalTracked} master, {runningHoursKPIs.totalInherited} inherited</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className={`text-sm ${runningHoursKPIs.recentlyUpdated > 0 ? 'text-green-600 font-medium' : 'text-gray-500'}`}>
+                    {runningHoursKPIs.recentlyUpdated} updated this week
+                  </span>
+                  <ChevronRight className="w-4 h-4 text-gray-400" />
+                </div>
               </div>
             </CardContent>
           </Card>
@@ -1510,6 +1648,126 @@ const Dashboard = () => {
             </div>
           </CardContent>
         </Card>
+
+        {/* Trend Analytics Row - Compliance Rate & Spares Consumption */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          {/* Compliance Rate Trend */}
+          <Card data-testid="card-compliance-trend" className="bg-white">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <CheckCircle className="w-5 h-5 text-green-500" />
+                6-Month Compliance Rate Trend
+              </CardTitle>
+              <CardDescription>Percentage of planned tasks completed each month</CardDescription>
+            </CardHeader>
+            <CardContent>
+              {complianceTrendData.length > 0 ? (
+                <div className="flex flex-col gap-3">
+                  <div className="h-52" data-testid="chart-compliance-trend">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <BarChart data={complianceTrendData} margin={{ top: 4, right: 4, bottom: 0, left: -20 }}>
+                        <XAxis dataKey="monthShort" tick={{ fontSize: 11 }} tickLine={false} axisLine={false} />
+                        <YAxis domain={[0, 100]} tick={{ fontSize: 10 }} tickLine={false} axisLine={false} tickFormatter={(v) => `${v}%`} />
+                        <Tooltip
+                          content={({ active, payload }) => {
+                            if (active && payload && payload.length) {
+                              const d = payload[0].payload;
+                              return (
+                                <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-md shadow-md p-2 text-xs text-gray-900 dark:text-gray-100" data-testid="tooltip-compliance-bar">
+                                  <div className="font-semibold mb-1">{d.month}</div>
+                                  <div>Total planned: {d.totalPlanned}</div>
+                                  <div>Completed: {d.completed}</div>
+                                  <div>Compliance: {d.compliancePercent}%</div>
+                                </div>
+                              );
+                            }
+                            return null;
+                          }}
+                        />
+                        <Bar dataKey="compliancePercent" radius={[3, 3, 0, 0]} maxBarSize={32}>
+                          {complianceTrendData.map((entry, index) => (
+                            <Cell
+                              key={`cell-compliance-${index}`}
+                              fill={entry.compliancePercent >= 80 ? '#10b981' : entry.compliancePercent >= 50 ? '#f59e0b' : '#ef4444'}
+                            />
+                          ))}
+                        </Bar>
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </div>
+                  <div className="flex items-center justify-center gap-4 text-xs text-gray-600 dark:text-gray-400" data-testid="legend-compliance-trend">
+                    <div className="flex items-center gap-1">
+                      <span className="inline-block w-3 h-3 rounded-sm" style={{ backgroundColor: '#10b981' }} />
+                      <span>Good ({'\u2265'}80%)</span>
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <span className="inline-block w-3 h-3 rounded-sm" style={{ backgroundColor: '#f59e0b' }} />
+                      <span>Fair (50–79%)</span>
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <span className="inline-block w-3 h-3 rounded-sm" style={{ backgroundColor: '#ef4444' }} />
+                      <span>Poor ({'<'}50%)</span>
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <div className="h-52 flex items-center justify-center text-gray-500 dark:text-gray-400">
+                  No compliance data available
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Spares Consumption Trend */}
+          <Card data-testid="card-spares-consumption-trend" className="bg-white">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Package className="w-5 h-5 text-purple-500" />
+                6-Month Spares Movement Trend
+              </CardTitle>
+              <CardDescription>Consumption vs receiving activity over time</CardDescription>
+            </CardHeader>
+            <CardContent>
+              {sparesConsumptionTrendData.length > 0 ? (
+                <div className="flex flex-col gap-3">
+                  <div className="h-52" data-testid="chart-spares-consumption-trend">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <BarChart data={sparesConsumptionTrendData} margin={{ top: 4, right: 4, bottom: 0, left: -10 }}>
+                        <XAxis dataKey="monthShort" tick={{ fontSize: 11 }} tickLine={false} axisLine={false} />
+                        <YAxis tick={{ fontSize: 10 }} tickLine={false} axisLine={false} />
+                        <Tooltip
+                          content={({ active, payload }) => {
+                            if (active && payload && payload.length) {
+                              const d = payload[0].payload;
+                              return (
+                                <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-md shadow-md p-2 text-xs text-gray-900 dark:text-gray-100" data-testid="tooltip-spares-consumption">
+                                  <div className="font-semibold mb-1">{d.month}</div>
+                                  <div className="text-red-600">Consumed: {d.consumeEvents} events ({d.totalQty} units)</div>
+                                  <div className="text-green-600">Received: {d.receiveEvents} events ({d.receiveQty} units)</div>
+                                </div>
+                              );
+                            }
+                            return null;
+                          }}
+                        />
+                        <Legend
+                          wrapperStyle={{ fontSize: '11px' }}
+                          formatter={(value) => value === 'consumeEvents' ? 'Consumed' : 'Received'}
+                        />
+                        <Bar dataKey="consumeEvents" name="consumeEvents" fill="#ef4444" radius={[3, 3, 0, 0]} maxBarSize={24} />
+                        <Bar dataKey="receiveEvents" name="receiveEvents" fill="#10b981" radius={[3, 3, 0, 0]} maxBarSize={24} />
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </div>
+                </div>
+              ) : (
+                <div className="h-52 flex items-center justify-center text-gray-500 dark:text-gray-400">
+                  No spares history data available
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </div>
 
         </>)}
       </div>
