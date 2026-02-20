@@ -2178,38 +2178,81 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const vesselId = req.query.vesselId as string;
       const workOrders = await storage.getWorkOrders(vesselId);
       
-      // Fetch jobs to hydrate lead time data
-      const jobs = await storage.getJobs(vesselId);
-      const jobsMap = new Map(jobs.map(job => [job.id, job]));
+      // For "All Vessels" (no vesselId), we need per-vessel components, jobs, and settings
+      // to correctly compute statuses. Collect unique vessel IDs from work orders.
+      const isAllVessels = !vesselId;
+      const uniqueVesselIds = isAllVessels 
+        ? [...new Set(workOrders.map(wo => wo.vesselId).filter(Boolean))] as string[]
+        : [vesselId];
       
-      // Fetch all components to hydrate currentRH for RH-based status computation
-      const components = await storage.getComponents(vesselId);
-      // Create map by component_code for matching with work order's componentCode field
-      const componentsByCodeMap = new Map(components.map(comp => [comp.componentCode, comp]));
-      // Also keep map by id for fallback
-      const componentsMap = new Map(components.map(comp => [comp.id, comp]));
+      // Fetch jobs - for all vessels, fetch per-vessel to ensure complete coverage
+      let allJobs: any[] = [];
+      if (isAllVessels) {
+        for (const vid of uniqueVesselIds) {
+          const vesselJobs = await storage.getJobs(vid);
+          allJobs.push(...vesselJobs);
+        }
+      } else {
+        allJobs = await storage.getJobs(vesselId);
+      }
+      const jobsMap = new Map(allJobs.map(job => [job.id, job]));
+      
+      // Fetch components per-vessel to ensure correct RH data
+      // Key components by vesselId+componentCode and by id for proper matching
+      const componentsByCodeMap = new Map<string, any>();
+      const componentsMap = new Map<string, any>();
+      if (isAllVessels) {
+        for (const vid of uniqueVesselIds) {
+          const vesselComponents = await storage.getComponents(vid);
+          for (const comp of vesselComponents) {
+            componentsByCodeMap.set(`${vid}:${comp.componentCode}`, comp);
+            componentsMap.set(comp.id, comp);
+          }
+        }
+      } else {
+        const components = await storage.getComponents(vesselId);
+        for (const comp of components) {
+          componentsByCodeMap.set(`${vesselId}:${comp.componentCode}`, comp);
+          componentsMap.set(comp.id, comp);
+        }
+      }
       
       // Fetch vessel-specific grace settings for status calculation
-      const vesselSettings = vesselId ? await storage.getPmsVesselSettings(vesselId) : null;
-      const vesselGraceSettings = vesselSettings ? {
-        calendarGraceMode: (vesselSettings.calendarGraceMode || 'COMPANY_STANDARD') as 'COMPANY_STANDARD' | 'CUSTOM_DAYS',
-        calendarGraceDays: vesselSettings.calendarGraceDays ?? WORK_ORDER_THRESHOLDS.CALENDAR_GRACE_PERIOD_DAYS,
-        rhGraceHours: vesselSettings.rhGraceHours ?? WORK_ORDER_THRESHOLDS.RH_GRACE_PERIOD_HOURS,
-        rhLeadTimeHours: vesselSettings.rhLeadHoursNonCritical ?? WORK_ORDER_THRESHOLDS.RH_LEAD_TIME_HOURS
-      } : undefined;
+      // For all vessels, fetch per-vessel settings and store in a map
+      const vesselSettingsMap = new Map<string, any>();
+      if (isAllVessels) {
+        const allSettings = await storage.getAllPmsVesselSettings();
+        for (const s of allSettings) {
+          vesselSettingsMap.set(s.vesselId, s);
+        }
+      } else {
+        const vesselSettings = await storage.getPmsVesselSettings(vesselId);
+        if (vesselSettings) {
+          vesselSettingsMap.set(vesselId, vesselSettings);
+        }
+      }
       
       // Augment each work order with computed status and lead time data
       const enrichedWorkOrders = workOrders.map(wo => {
+        const woVesselId = wo.vesselId || vesselId;
+        const vesselSettings = woVesselId ? vesselSettingsMap.get(woVesselId) : null;
+        const vesselGraceSettings = vesselSettings ? {
+          calendarGraceMode: (vesselSettings.calendarGraceMode || 'COMPANY_STANDARD') as 'COMPANY_STANDARD' | 'CUSTOM_DAYS',
+          calendarGraceDays: vesselSettings.calendarGraceDays ?? WORK_ORDER_THRESHOLDS.CALENDAR_GRACE_PERIOD_DAYS,
+          rhGraceHours: vesselSettings.rhGraceHours ?? WORK_ORDER_THRESHOLDS.RH_GRACE_PERIOD_HOURS,
+          rhLeadTimeHours: vesselSettings.rhLeadHoursNonCritical ?? WORK_ORDER_THRESHOLDS.RH_LEAD_TIME_HOURS
+        } : undefined;
+
         // Try to match by jobId first (more reliable), then fall back to templateCode === jobNo
         const job = wo.jobId 
           ? jobsMap.get(wo.jobId)
           : wo.templateCode 
-            ? jobs.find(j => j.jobNo === wo.templateCode)
+            ? allJobs.find(j => j.jobNo === wo.templateCode)
             : null;
         
-        // Get component to fetch currentCumulativeRH - match by componentCode first, then by id
+        // Get component to fetch currentCumulativeRH - match by vesselId+componentCode first, then by id
         const component = wo.componentCode 
-          ? componentsByCodeMap.get(wo.componentCode) 
+          ? componentsByCodeMap.get(`${woVesselId}:${wo.componentCode}`) 
           : (wo.component ? componentsMap.get(wo.component) : null);
         
         // For RH-based jobs, use job's nextDueRH as dueRH and component's currentCumulativeRH as currentRH
