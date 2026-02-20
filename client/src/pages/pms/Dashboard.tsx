@@ -22,7 +22,7 @@ import {
 } from "lucide-react";
 import { AgCharts } from "ag-charts-react";
 import { AgChartOptions } from "ag-charts-community";
-import { BarChart, Bar, XAxis, YAxis, Tooltip, Cell, ResponsiveContainer } from "recharts";
+import { AreaChart, Area, LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, ReferenceArea } from "recharts";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { WorkOrder } from "@shared/schema";
@@ -344,9 +344,7 @@ const Dashboard = () => {
   const [, setLocation] = useLocation();
   const [lastUpdated, setLastUpdated] = useState(new Date());
   const [bulkApproveModalOpen, setBulkApproveModalOpen] = useState(false);
-  const [isFleetView, setIsFleetView] = useState(false);
   const [activeTab, setActiveTab] = useState('overview');
-  const [dotMatrixMode, setDotMatrixMode] = useState<'vessels'>('vessels');
   const { vesselId, setVesselId } = useVessel();
   const { data: vessels = [] } = useVessels();
   const { isSailAdmin, isClientAdmin, isHeadOfDept } = useUIRole();
@@ -865,14 +863,20 @@ const Dashboard = () => {
 
   const handleVesselChange = (newVesselId: string) => {
     setVesselId(newVesselId);
-    if (newVesselId !== 'all') {
-      setIsFleetView(false);
+  };
+
+  const handleAllVesselsChange = (isAll: boolean) => {
+    if (isAll) {
+      setVesselId('all');
+    } else {
+      if (vesselId === 'all' && vessels.length > 0) {
+        setVesselId(vessels[0].id);
+      }
     }
   };
 
   const handleFleetVesselSelect = (selectedVesselId: string) => {
     setVesselId(selectedVesselId);
-    setIsFleetView(false);
   };
 
   const handleRefresh = () => {
@@ -883,9 +887,9 @@ const Dashboard = () => {
   const isLoading = isWorkOrdersLoading || isSparesLoading || isStoresLoading || isComponentsLoading || isRHLoading || isSparesHistoryLoading;
 
   const summaryLine = useMemo(() => {
-    const scope = isFleetView ? "Fleet" : (currentVessel?.name || "No vessel");
+    const scope = isAllVessels ? "Fleet" : (currentVessel?.name || "No vessel");
     const parts: string[] = [`Scope: ${scope}`];
-    if (!isFleetView) {
+    if (!isAllVessels) {
       parts.push(`${workOrderKPIs.total} work orders`);
       parts.push(`${sparesKPIs.total} spares`);
       parts.push(`${componentsKPIs.total} components`);
@@ -894,12 +898,10 @@ const Dashboard = () => {
     }
     parts.push(`Data as of ${format(lastUpdated, 'dd MMM yyyy, HH:mm')}`);
     return parts.join(' \u00b7 ');
-  }, [isFleetView, currentVessel, workOrderKPIs.total, sparesKPIs.total, componentsKPIs.total, vessels.length, lastUpdated]);
+  }, [isAllVessels, currentVessel, workOrderKPIs.total, sparesKPIs.total, componentsKPIs.total, vessels.length, lastUpdated]);
 
   const overduePercent = workOrderKPIs.total > 0 ? Math.round((workOrderKPIs.overdue / workOrderKPIs.total) * 100) : 0;
   const completionRate = workOrderKPIs.total > 0 ? Math.round((workOrderKPIs.completed / workOrderKPIs.total) * 100) : 0;
-  const duePercent = workOrderKPIs.total > 0 ? Math.round((workOrderKPIs.due / workOrderKPIs.total) * 100) : 0;
-  const pendingPercent = workOrderKPIs.total > 0 ? Math.round((workOrderKPIs.pendingApproval / workOrderKPIs.total) * 100) : 0;
 
   const HEADER_BLUE = '#1a3a5c';
 
@@ -949,13 +951,103 @@ const Dashboard = () => {
     padding: '10px 16px',
   };
 
-  const vesselDotMatrixData = useMemo(() => {
+  const dotMatrixVesselData = useMemo(() => {
     if (vessels.length === 0) return [];
     return vessels.slice(0, 8);
   }, [vessels]);
 
-  const getVesselDotColor = (vesselId: string, metric: string): string => {
-    return '#2E7D32';
+  const dotMatrixWoQueries = useQueries({
+    queries: dotMatrixVesselData.map(vessel => ({
+      queryKey: ['/technical/api/work-orders/dot-matrix', vessel.id],
+      queryFn: async () => {
+        const response = await fetch(`/technical/api/work-orders?vesselId=${vessel.id}`);
+        if (!response.ok) return [];
+        return response.json();
+      },
+    })),
+  });
+
+  const dotMatrixSparesQueries = useQueries({
+    queries: dotMatrixVesselData.map(vessel => ({
+      queryKey: ['/technical/api/spares/dot-matrix', vessel.id],
+      queryFn: async () => {
+        const response = await fetch(`/technical/api/spares/${vessel.id}`);
+        if (!response.ok) return [];
+        return response.json();
+      },
+    })),
+  });
+
+  const dotMatrixRhQueries = useQueries({
+    queries: dotMatrixVesselData.map(vessel => ({
+      queryKey: ['/technical/api/running-hours/parents/dot-matrix', vessel.id],
+      queryFn: async () => {
+        const response = await fetch(`/technical/api/running-hours/parents?vesselId=${vessel.id}`);
+        if (!response.ok) return [];
+        return response.json();
+      },
+    })),
+  });
+
+  const getDotColor = (vesselIdx: number, metric: string): string => {
+    const GREY = '#BDBDBD';
+    const GREEN = '#2E7D32';
+    const AMBER = '#F57C00';
+    const RED = '#E53935';
+
+    const wos = dotMatrixWoQueries[vesselIdx]?.data || [];
+    const spares = dotMatrixSparesQueries[vesselIdx]?.data || [];
+    const rhParents = dotMatrixRhQueries[vesselIdx]?.data || [];
+
+    if (metric === 'Work Orders') {
+      if (!wos || wos.length === 0) return GREY;
+      return GREEN;
+    }
+    if (metric === 'Overdue WOs') {
+      if (!wos || wos.length === 0) return GREY;
+      const nonExec = wos.filter((wo: any) => !wo.isExecution);
+      const total = nonExec.length;
+      if (total === 0) return GREY;
+      const overdueCount = nonExec.filter((wo: any) => (wo as any).computedStatus === 'Overdue').length;
+      const pct = (overdueCount / total) * 100;
+      if (pct > 30) return RED;
+      if (pct >= 10) return AMBER;
+      return GREEN;
+    }
+    if (metric === 'Low Stock') {
+      if (!spares || spares.length === 0) return GREY;
+      const lowCount = spares.filter((s: any) => {
+        const rob = typeof s.rob === 'number' ? s.rob : parseInt(s.rob) || 0;
+        const min = typeof s.min === 'number' ? s.min : parseInt(s.min) || 0;
+        return rob <= min && min > 0;
+      }).length;
+      if (lowCount > 100) return RED;
+      if (lowCount >= 50) return AMBER;
+      return GREEN;
+    }
+    if (metric === 'Spares') {
+      if (!spares || spares.length === 0) return GREY;
+      return GREEN;
+    }
+    if (metric === 'Running Hrs') {
+      if (!rhParents || rhParents.length === 0) return GREY;
+      const now = new Date();
+      const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+      const ninetyDaysAgo = new Date(now.getTime() - 90 * 24 * 60 * 60 * 1000);
+      const hasRecent = rhParents.some((p: any) => {
+        if (!p.lastUpdated) return false;
+        return new Date(p.lastUpdated) >= thirtyDaysAgo;
+      });
+      if (hasRecent) return GREEN;
+      const hasModerate = rhParents.some((p: any) => {
+        if (!p.lastUpdated) return false;
+        const d = new Date(p.lastUpdated);
+        return d >= ninetyDaysAgo && d < thirtyDaysAgo;
+      });
+      if (hasModerate) return AMBER;
+      return RED;
+    }
+    return GREY;
   };
 
   const watchListItems = useMemo(() => {
@@ -984,12 +1076,11 @@ const Dashboard = () => {
       {/* SUB-HEADER BAR */}
       <div className="flex-shrink-0 -mx-4 sm:-mx-6 -mt-4 sm:-mt-6">
         <FleetVesselContextBar
-          isFleetView={isFleetView}
-          onViewModeChange={(isFleet) => setIsFleetView(isFleet)}
+          isAllVessels={isAllVessels}
+          onAllVesselsChange={handleAllVesselsChange}
           vesselId={vesselId}
           onVesselChange={handleVesselChange}
           vessels={vessels}
-          summaryLine={summaryLine}
           activeTab={activeTab}
           onTabChange={setActiveTab}
         />
@@ -998,14 +1089,15 @@ const Dashboard = () => {
       {/* MAIN CONTENT */}
       <div className="flex-1 overflow-y-auto" style={{ background: '#F4F6F9' }}>
 
-        {/* Fleet View Mode */}
-        {isFleetView && vessels.length > 0 && (
+        {/* MANAGEMENT TAB: Fleet Benchmarking Table */}
+        {activeTab === 'management' && vessels.length > 0 && (
           <div style={{ padding: '16px' }}>
             <FleetView vessels={vessels} onSelectVessel={handleFleetVesselSelect} />
           </div>
         )}
 
-        {!isFleetView && (
+        {/* OVERVIEW TAB: 3-Column Layout */}
+        {activeTab === 'overview' && (
           <div
             className="grid grid-cols-1 lg:grid-cols-[25%_1px_40%_1px_1fr]"
             style={{ minHeight: '100%' }}
@@ -1014,7 +1106,6 @@ const Dashboard = () => {
             <div className="lg:overflow-y-auto" data-testid="column-wo-kpis">
               <div style={sectionHeaderBar}>WORK ORDER KPIs</div>
 
-              {/* Gauge 1: Overdue WOs */}
               <SemiCircleGauge
                 value={workOrderKPIs.overdue}
                 max={workOrderKPIs.total || 10}
@@ -1022,15 +1113,13 @@ const Dashboard = () => {
                 label="Overdue WOs"
                 displayValue={workOrderKPIs.overdue.toString()}
                 subtitle={`${overduePercent}% of total`}
-                statLeft={`Due: ${workOrderKPIs.due}`}
-                statRight={`Pending: ${workOrderKPIs.pendingApproval}`}
+                statLine={`Due: ${workOrderKPIs.due} · Pending: ${workOrderKPIs.pendingApproval}`}
                 onClick={() => navigateToWorkOrders('Overdue')}
                 testId="gauge-overdue-wo"
               />
 
               <div style={dividerH} />
 
-              {/* Gauge 2: Completion Rate */}
               <SemiCircleGauge
                 value={workOrderKPIs.completed}
                 max={workOrderKPIs.total || 10}
@@ -1038,15 +1127,13 @@ const Dashboard = () => {
                 label="Completion Rate"
                 displayValue={workOrderKPIs.completed.toString()}
                 subtitle={`${completionRate}% completion rate`}
-                statLeft={`Total WOs: ${workOrderKPIs.total}`}
-                statRight={`Active: ${workOrderKPIs.active}`}
+                statLine={`Total: ${workOrderKPIs.total} · Active: ${workOrderKPIs.active}`}
                 onClick={() => navigateToWorkOrders('Completed')}
                 testId="gauge-completion-rate"
               />
 
               <div style={dividerH} />
 
-              {/* Gauge 3: Outstanding Tasks */}
               <SemiCircleGauge
                 value={outstandingTasksChartData.outstandingCount}
                 max={outstandingTasksChartData.totalMonthly || 10}
@@ -1054,24 +1141,24 @@ const Dashboard = () => {
                 label="Outstanding Tasks"
                 displayValue={`${outstandingTasksChartData.outstandingPercent}%`}
                 subtitle={`${outstandingTasksChartData.outstandingCount} of ${outstandingTasksChartData.totalMonthly} tasks`}
-                statLeft={`vs last month: ${maintenanceTrendData.delta > 0 ? '+' : ''}${maintenanceTrendData.delta}%`}
+                statLine={`Tasks: ${outstandingTasksChartData.outstandingCount}/${outstandingTasksChartData.totalMonthly} · vs last month: ${maintenanceTrendData.delta > 0 ? '+' : ''}${maintenanceTrendData.delta}%`}
                 onClick={() => navigateToWorkOrders('Planned')}
                 testId="gauge-outstanding-tasks"
               />
             </div>
 
-            {/* Vertical Divider 1 - hidden on mobile */}
+            {/* Vertical Divider 1 */}
             <div className="hidden lg:block" style={{ background: '#e8e8e8', width: '1px' }} />
 
             {/* ═══ COLUMN 2: WORK ORDER STATUS & TRENDS ═══ */}
             <div className="lg:overflow-y-auto" data-testid="column-wo-status-trends">
               <div style={sectionHeaderBar}>WORK ORDER STATUS & TRENDS</div>
 
-              {/* Status Distribution Donut Chart */}
+              {/* Status Distribution Donut Chart — NO progress bars */}
               <div style={{ padding: '16px' }}>
                 <div style={subTitle} className="mb-1">Status Distribution</div>
                 <div style={{ fontSize: '11px', color: '#9E9E9E', marginBottom: '8px' }}>Click segments to filter</div>
-                <div style={{ height: '220px' }} data-testid="card-wo-status-chart">
+                <div style={{ height: '250px' }} data-testid="card-wo-status-chart">
                   {workOrderStatusChartData.length > 0 ? (
                     <AgCharts options={{
                       data: workOrderStatusChartData,
@@ -1100,36 +1187,27 @@ const Dashboard = () => {
                     <div className="h-full flex items-center justify-center" style={{ color: '#9E9E9E' }}>No work orders to display</div>
                   )}
                 </div>
-
-                {/* Status % Bars */}
-                <div style={{ marginTop: '12px' }}>
-                  {[
-                    { label: 'Overdue', pct: overduePercent, color: '#E53935' },
-                    { label: 'Completed', pct: completionRate, color: '#2E7D32' },
-                    { label: 'Due', pct: duePercent, color: '#F57C00' },
-                    { label: 'Pending', pct: pendingPercent, color: '#1565C0' },
-                  ].map(bar => (
-                    <div key={bar.label} style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px' }}>
-                      <span style={{ fontSize: '11px', color: '#616161', width: '70px', flexShrink: 0 }}>{bar.label}</span>
-                      <div style={{ flex: 1, height: '8px', background: '#EEEEEE', borderRadius: '4px', overflow: 'hidden' }}>
-                        <div style={{ height: '100%', width: `${bar.pct}%`, background: bar.color, borderRadius: '4px', transition: 'width 0.3s' }} />
-                      </div>
-                      <span style={{ fontSize: '11px', color: '#616161', width: '32px', textAlign: 'right', flexShrink: 0 }}>{bar.pct}%</span>
-                    </div>
-                  ))}
-                </div>
               </div>
 
               <div style={dividerH} />
 
-              {/* 6-Month Maintenance Trend */}
+              {/* 6-Month Maintenance Trend — LINE/AREA chart with zone bands */}
               <div style={{ padding: '16px' }}>
                 <div style={subTitle} className="mb-1">6-MONTH MAINTENANCE TREND</div>
                 {maintenanceTrendData.months.length > 0 ? (
                   <div className="flex flex-col gap-2">
                     <div style={{ height: '180px' }} data-testid="chart-maintenance-trend">
                       <ResponsiveContainer width="100%" height="100%">
-                        <BarChart data={maintenanceTrendData.months} margin={{ top: 4, right: 8, bottom: 0, left: -16 }}>
+                        <AreaChart data={maintenanceTrendData.months} margin={{ top: 4, right: 8, bottom: 0, left: -16 }}>
+                          <defs>
+                            <linearGradient id="trendFill" x1="0" y1="0" x2="0" y2="1">
+                              <stop offset="5%" stopColor="#1565C0" stopOpacity={0.3}/>
+                              <stop offset="95%" stopColor="#1565C0" stopOpacity={0.05}/>
+                            </linearGradient>
+                          </defs>
+                          <ReferenceArea y1={0} y2={30} fill="#E8F5E9" fillOpacity={0.5} />
+                          <ReferenceArea y1={30} y2={60} fill="#FFF3E0" fillOpacity={0.5} />
+                          <ReferenceArea y1={60} y2={100} fill="#FFEBEE" fillOpacity={0.5} />
                           <XAxis dataKey="monthShort" tick={{ fontSize: 11, fill: '#757575' }} tickLine={false} axisLine={false} />
                           <YAxis domain={[0, 100]} tick={{ fontSize: 10, fill: '#757575' }} tickLine={false} axisLine={false} tickFormatter={(v) => `${v}%`} />
                           <Tooltip
@@ -1137,7 +1215,7 @@ const Dashboard = () => {
                               if (active && payload && payload.length) {
                                 const d = payload[0].payload;
                                 return (
-                                  <div style={{ background: '#FFFFFF', border: '1px solid #E0E0E0', borderRadius: '6px', boxShadow: '0 2px 8px rgba(0,0,0,0.12)', padding: '8px 12px' }} data-testid="tooltip-trend-bar">
+                                  <div style={{ background: '#FFFFFF', border: '1px solid #E0E0E0', borderRadius: '6px', boxShadow: '0 2px 8px rgba(0,0,0,0.12)', padding: '8px 12px' }} data-testid="tooltip-trend-line">
                                     <div className="font-semibold text-xs mb-1" style={{ color: '#212121' }}>{d.month}</div>
                                     <div className="text-xs" style={{ color: '#616161' }}>Total planned: {d.totalPlanned}</div>
                                     <div className="text-xs" style={{ color: '#616161' }}>Completed: {d.completed}</div>
@@ -1149,21 +1227,22 @@ const Dashboard = () => {
                               return null;
                             }}
                           />
-                          <Bar dataKey="outstandingPercent" radius={[4, 4, 0, 0]} maxBarSize={32}>
-                            {maintenanceTrendData.months.map((entry, index) => (
-                              <Cell
-                                key={`cell-${index}`}
-                                fill={entry.outstandingPercent > 60 ? '#E53935' : entry.outstandingPercent >= 30 ? '#F57C00' : '#2E7D32'}
-                              />
-                            ))}
-                          </Bar>
-                        </BarChart>
+                          <Area
+                            type="monotone"
+                            dataKey="outstandingPercent"
+                            stroke="#1565C0"
+                            strokeWidth={2.5}
+                            fill="url(#trendFill)"
+                            dot={{ r: 4, fill: '#1565C0', stroke: '#FFFFFF', strokeWidth: 2 }}
+                            activeDot={{ r: 6, fill: '#1565C0' }}
+                          />
+                        </AreaChart>
                       </ResponsiveContainer>
                     </div>
                     <div className="flex items-center justify-center gap-4 text-xs" style={{ color: '#757575' }} data-testid="legend-maintenance-trend">
-                      <div className="flex items-center gap-1"><span className="inline-block w-3 h-3 rounded-sm" style={{ backgroundColor: '#2E7D32' }} /><span>Healthy</span></div>
-                      <div className="flex items-center gap-1"><span className="inline-block w-3 h-3 rounded-sm" style={{ backgroundColor: '#F57C00' }} /><span>Watch</span></div>
-                      <div className="flex items-center gap-1"><span className="inline-block w-3 h-3 rounded-sm" style={{ backgroundColor: '#E53935' }} /><span>Backlog</span></div>
+                      <div className="flex items-center gap-1"><span className="inline-block w-3 h-3 rounded-sm" style={{ backgroundColor: '#2E7D32' }} /><span>Healthy (&lt;30%)</span></div>
+                      <div className="flex items-center gap-1"><span className="inline-block w-3 h-3 rounded-sm" style={{ backgroundColor: '#F57C00' }} /><span>Watch (30–60%)</span></div>
+                      <div className="flex items-center gap-1"><span className="inline-block w-3 h-3 rounded-sm" style={{ backgroundColor: '#E53935' }} /><span>Backlog (&gt;60%)</span></div>
                     </div>
                   </div>
                 ) : (
@@ -1236,7 +1315,7 @@ const Dashboard = () => {
               </div>
             </div>
 
-            {/* Vertical Divider 2 - hidden on mobile */}
+            {/* Vertical Divider 2 */}
             <div className="hidden lg:block" style={{ background: '#e8e8e8', width: '1px' }} />
 
             {/* ═══ COLUMN 3: INVENTORY & FLEET ANALYSIS ═══ */}
@@ -1311,33 +1390,28 @@ const Dashboard = () => {
 
               <div style={dividerH} />
 
-              {/* Vessel / Fleet Analysis Dot Matrix */}
+              {/* Vessel / Fleet Analysis Dot Matrix — with real data colors and column headers */}
               <div style={{ padding: '16px' }} data-testid="card-dot-matrix">
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
-                  <div style={subTitle}>VESSEL / GROUP ANALYSIS</div>
-                </div>
-                <div style={{ display: 'flex', gap: '12px', marginBottom: '10px', fontSize: '11px' }}>
-                  {(['vessels'] as const).map(mode => (
-                    <label key={mode} style={{ display: 'flex', alignItems: 'center', gap: '4px', cursor: 'pointer', color: '#546E7A' }}>
-                      <input
-                        type="radio"
-                        name="dotMatrixMode"
-                        checked={dotMatrixMode === mode}
-                        onChange={() => setDotMatrixMode(mode)}
-                        style={{ accentColor: '#1565C0' }}
-                      />
-                      <span style={{ textTransform: 'capitalize' }}>{mode === 'vessels' ? 'Vessels' : mode}</span>
-                    </label>
-                  ))}
-                </div>
-                {vesselDotMatrixData.length > 0 ? (
+                <div style={subTitle} className="mb-2">VESSEL / GROUP ANALYSIS</div>
+                {dotMatrixVesselData.length > 0 ? (
                   <div className="overflow-x-auto">
                     <table style={{ width: '100%', fontSize: '11px', borderCollapse: 'collapse' }}>
                       <thead>
                         <tr>
-                          <th style={{ textAlign: 'left', padding: '4px 6px', color: '#9E9E9E', fontWeight: 500 }}></th>
-                          {vesselDotMatrixData.map(v => (
-                            <th key={v.id} style={{ textAlign: 'center', padding: '4px 4px', color: '#9E9E9E', fontWeight: 500, fontSize: '9px', maxWidth: '50px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                          <th style={{ textAlign: 'left', padding: '4px 6px', color: '#757575', fontWeight: 600, fontSize: '10px' }}>Metric</th>
+                          {dotMatrixVesselData.map(v => (
+                            <th key={v.id} style={{
+                              textAlign: 'center',
+                              padding: '4px 3px',
+                              color: '#546E7A',
+                              fontWeight: 600,
+                              fontSize: '9px',
+                              maxWidth: '55px',
+                              overflow: 'hidden',
+                              textOverflow: 'ellipsis',
+                              whiteSpace: 'nowrap',
+                              borderBottom: '1px solid #E0E0E0',
+                            }}>
                               {v.name.length > 8 ? v.name.substring(0, 7) + '..' : v.name}
                             </th>
                           ))}
@@ -1346,18 +1420,21 @@ const Dashboard = () => {
                       <tbody>
                         {['Work Orders', 'Overdue WOs', 'Low Stock', 'Spares', 'Running Hrs'].map(metric => (
                           <tr key={metric}>
-                            <td style={{ padding: '6px 6px', color: '#424242', fontWeight: 500, whiteSpace: 'nowrap' }}>{metric}</td>
-                            {vesselDotMatrixData.map(v => {
-                              const dotColor = getVesselDotColor(v.id, metric);
+                            <td style={{ padding: '6px 6px', color: '#424242', fontWeight: 500, whiteSpace: 'nowrap', fontSize: '11px' }}>{metric}</td>
+                            {dotMatrixVesselData.map((v, vIdx) => {
+                              const dotColor = getDotColor(vIdx, metric);
                               return (
                                 <td key={v.id} style={{ textAlign: 'center', padding: '6px 4px' }}>
-                                  <span style={{
-                                    display: 'inline-block',
-                                    width: '12px',
-                                    height: '12px',
-                                    borderRadius: '50%',
-                                    background: dotColor,
-                                  }} />
+                                  <span
+                                    style={{
+                                      display: 'inline-block',
+                                      width: '12px',
+                                      height: '12px',
+                                      borderRadius: '50%',
+                                      background: dotColor,
+                                    }}
+                                    title={`${v.name} - ${metric}`}
+                                  />
                                 </td>
                               );
                             })}
@@ -1408,8 +1485,8 @@ const Dashboard = () => {
           </div>
         )}
 
-        {/* Pending Approval Section (Head of Dept) - shown below the 3-column layout */}
-        {!isFleetView && isHeadOfDept && workOrderKPIs.pendingApproval > 0 && (
+        {/* Pending Approval Section (Head of Dept) - shown below layout */}
+        {activeTab === 'overview' && isHeadOfDept && workOrderKPIs.pendingApproval > 0 && (
           <div style={{ padding: '16px', borderTop: '1px solid #e8e8e8' }}>
             <div style={{ ...contentCard, padding: 0, overflow: 'hidden' }} data-testid="card-pending-approval-section">
               <div style={{ padding: '10px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid #E0E0E0' }}>

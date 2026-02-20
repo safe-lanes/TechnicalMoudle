@@ -1,4 +1,4 @@
-import { Ship, SlidersHorizontal } from "lucide-react";
+import { SlidersHorizontal } from "lucide-react";
 
 interface Vessel {
   id: string;
@@ -7,23 +7,21 @@ interface Vessel {
 }
 
 interface FleetVesselContextBarProps {
-  isFleetView: boolean;
-  onViewModeChange: (isFleet: boolean) => void;
+  isAllVessels: boolean;
+  onAllVesselsChange: (isAll: boolean) => void;
   vesselId: string;
   onVesselChange: (vesselId: string) => void;
   vessels: Vessel[];
-  summaryLine?: string;
   activeTab?: string;
   onTabChange?: (tab: string) => void;
 }
 
 export function FleetVesselContextBar({
-  isFleetView,
-  onViewModeChange,
+  isAllVessels,
+  onAllVesselsChange,
   vesselId,
   onVesselChange,
   vessels,
-  summaryLine,
   activeTab = "overview",
   onTabChange,
 }: FleetVesselContextBarProps) {
@@ -86,22 +84,22 @@ export function FleetVesselContextBar({
         <div className="flex items-center gap-3">
           <div style={{ display: 'flex', borderRadius: '6px', overflow: 'hidden', border: '1px solid #D0D5DD' }}>
             <button
-              style={isFleetView ? pillActive : pillInactive}
-              onClick={() => onViewModeChange(true)}
+              style={isAllVessels ? pillActive : pillInactive}
+              onClick={() => onAllVesselsChange(true)}
               data-testid="toggle-all-vessels"
             >
               All Vessel
             </button>
             <button
-              style={!isFleetView ? pillActive : pillInactive}
-              onClick={() => onViewModeChange(false)}
+              style={!isAllVessels ? pillActive : pillInactive}
+              onClick={() => onAllVesselsChange(false)}
               data-testid="toggle-my-vessel"
             >
               My Vessel
             </button>
           </div>
 
-          {!isFleetView && (
+          {!isAllVessels && (
             <select
               value={vesselId}
               onChange={(e) => onVesselChange(e.target.value)}
@@ -118,7 +116,6 @@ export function FleetVesselContextBar({
               }}
               data-testid="select-context-vessel"
             >
-              <option value="all" data-testid="option-vessel-all">All Vessels</option>
               {vessels.map(v => (
                 <option key={v.id} value={v.id} data-testid={`option-vessel-${v.id}`}>
                   {v.name}

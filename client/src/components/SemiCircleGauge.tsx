@@ -5,8 +5,7 @@ interface SemiCircleGaugeProps {
   label: string;
   displayValue?: string;
   subtitle?: string;
-  statLeft?: string;
-  statRight?: string;
+  statLine?: string;
   onClick?: () => void;
   testId?: string;
 }
@@ -18,8 +17,7 @@ export function SemiCircleGauge({
   label,
   displayValue,
   subtitle,
-  statLeft,
-  statRight,
+  statLine,
   onClick,
   testId,
 }: SemiCircleGaugeProps) {
@@ -48,9 +46,9 @@ export function SemiCircleGauge({
       className={onClick ? "cursor-pointer" : ""}
       onClick={onClick}
       data-testid={testId}
-      style={{ textAlign: 'center', padding: '12px 16px' }}
+      style={{ textAlign: 'center', padding: '16px 16px 12px' }}
     >
-      <div style={{ fontSize: '13px', fontWeight: 700, color: '#212121', marginBottom: '4px' }}>{label}</div>
+      <div style={{ fontSize: '13px', fontWeight: 700, color: '#212121', marginBottom: '6px', textTransform: 'uppercase', letterSpacing: '0.3px' }}>{label}</div>
       <svg width="200" height="110" viewBox="0 0 200 110" style={{ display: 'block', margin: '0 auto' }}>
         <path
           d={trackPath}
@@ -80,13 +78,10 @@ export function SemiCircleGauge({
         <text x={cx + radius + 2} y={cy + 16} textAnchor="end" style={{ fontSize: '10px', fill: '#9E9E9E' }}>{max > 0 ? max : 10}</text>
       </svg>
       {subtitle && (
-        <div style={{ fontSize: '11px', color: '#757575', marginTop: '-4px', marginBottom: '6px' }}>{subtitle}</div>
+        <div style={{ fontSize: '11px', color: '#757575', marginTop: '-4px', marginBottom: '4px' }}>{subtitle}</div>
       )}
-      {(statLeft || statRight) && (
-        <div style={{ display: 'flex', justifyContent: 'center', gap: '16px', fontSize: '11px', color: '#616161' }}>
-          {statLeft && <span>{statLeft}</span>}
-          {statRight && <span>{statRight}</span>}
-        </div>
+      {statLine && (
+        <div style={{ fontSize: '11px', color: '#616161', textAlign: 'center' }}>{statLine}</div>
       )}
     </div>
   );
