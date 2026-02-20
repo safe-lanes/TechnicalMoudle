@@ -1,0 +1,141 @@
+I want to visually enhance the PMS Dashboard above the fold so that in the first screen it feels rich, informative, and “enterprise-grade”, without adding any new data sources.
+Do NOT change any backend logic or calculations, only adjust layout and presentation.
+
+Overall goals:
+
+The first visible screen should immediately answer:
+“Which scope am I in (fleet/vessel), how is work-order health, how is maintenance effectiveness, and how is inventory health?”
+
+Reduce empty-looking whitespace and make the top feel more dense and informative.
+
+Please do the following:
+
+Improve the top “hero” area
+
+Keep the main page title (PMS Dashboard) and the context bar (Fleet view / Single vessel, vessel dropdown etc.) but visually integrate them into a hero strip.
+
+Make this strip stand out slightly:
+
+Add a very light background color (subtle, same design language as the app).
+
+Left side: show title and one concise summary line, for example:
+
+“Scope: [Fleet OR Vessel name] - [Total WOs] work orders - [Total spares] spares - Data as of [date if available].”
+
+Use existing totals already available on the dashboard (don’t create new data).
+
+Right side: show the view controls (View: Fleet/Single, Vessel dropdown, etc.) aligned in one row.
+
+Keep it compact in height, but visually clear that this is the “context + summary” area.
+
+Create a denser two-column layout just under the hero
+
+Just below the hero strip, change the layout so the top section has two main columns on desktop/wide screens:
+
+Left column: “Work-order health” band.
+
+Right column: “Maintenance effectiveness” band.
+
+The “Inventory health” band should come directly under these, full width.
+
+Ensure that on smaller screens this gracefully stacks to a single column while keeping the order: Work-order health → Maintenance effectiveness → Inventory health.
+
+Enrich the KPI cards with micro-metrics
+
+For each main KPI card in these bands, add one secondary line of information (using data that already exists):
+
+Examples (use whichever fields are already in the app):
+
+Overdue WOs card:
+
+Main: “Overdue: [value]”
+
+Secondary line: something like “Critical: [count or %]” or “Last overdue created: [date]”.
+
+Outstanding Tasks / backlog card:
+
+Main: “[completed] / [total] ([percentage]%)”
+
+Secondary line: “Change vs last month: [+/-X%]”.
+
+Inventory/Spares card:
+
+Main: “Spares: [total items]”
+
+Secondary: “Low stock: [count]”.
+
+The idea is: each card should have a strong main number PLUS a small contextual clue that makes the card feel more informative.
+
+Visually group bands so the page feels “full”, not empty
+
+For each band (Work-order health, Maintenance effectiveness, Inventory health):
+
+Add a small section title above the cards (e.g., “Work-order health”).
+
+Give the band a subtle background panel or clear vertical padding and, if appropriate, a faint border or divider so it reads as one solid block of information, not floating cards.
+
+Reduce excessive vertical gaps between:
+
+Hero strip and the first band.
+
+Each band and the content right below it.
+
+Maintain consistent horizontal spacing between cards.
+
+Attach lists to their related bands more tightly
+
+The “Overdue Work Orders” list should visually connect to the Work-order health band:
+
+Place it immediately under that band.
+
+Add a small subtitle like: “Overdue Work Orders (Top 5 of [total overdue count])”.
+
+The “Low Stock Spares” list should visually connect to the Inventory health band:
+
+Place it immediately under that band.
+
+Add a subtitle like: “Low Stock Spares (Sample from [total low stock count])”.
+
+This makes the lists look like an extension of the KPIs rather than a disconnected section, which helps fill the page visually and conceptually.
+
+Add simple visual accents without clutter
+
+Add small, meaningful icons to key KPI cards:
+
+Clock for Overdue, checklist for Completed/Outstanding, box/crate for Spares/Stores, etc.
+
+Keep icons subtle (not huge) and consistent with the current design system.
+
+Ensure color usage for statuses (red for overdue, amber for due/warning, green for good) is consistent across these cards.
+
+Responsiveness
+
+Desktop / wide screen:
+
+Hero strip on top.
+
+Under it: two-column layout (Work-order health left, Maintenance effectiveness right).
+
+Inventory health full width below.
+
+Related lists right under their bands.
+
+Tablet / mobile:
+
+Stack bands vertically but retain the same order and the visual grouping (background panels, titles).
+
+Cards wrapping to multiple rows is fine; they should still look cohesive.
+
+Do not
+
+Do not change any calculations or remove any existing KPI.
+
+Do not introduce new dummy KPIs; only re-use and re-present existing values.
+
+Do not remove existing charts or lists; only reposition them slightly if needed to create a better “first look”.
+
+At the end, briefly explain:
+
+Which layout/container components you changed to create the hero strip and two-column top layout.
+
+Which KPI cards you enriched with secondary text, and what data fields you used for those micro-metrics.
