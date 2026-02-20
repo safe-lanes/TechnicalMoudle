@@ -42,6 +42,7 @@ import { Badge } from "@/components/ui/badge";
 import { WorkOrder } from "@shared/schema";
 import { useVessels } from "@/hooks/useVessels";
 import { BulkApproveModal } from "@/components/BulkApproveModal";
+import { FleetVesselContextBar } from "@/components/FleetVesselContextBar";
 
 interface Spare {
   id: number;
@@ -900,38 +901,21 @@ const Dashboard = () => {
           <h1 className="text-2xl font-bold text-gray-900" data-testid="text-dashboard-title">PMS Dashboard</h1>
         </div>
 
-        {/* Vessel Selector + Fleet View Toggle - Visible for Sail Admin and Client Admin */}
+        {/* Fleet / Vessel Context Bar */}
         {(isSailAdmin || isClientAdmin) && (
-          <div className="flex items-center gap-4 mt-4">
-            <div className="flex items-center gap-2">
-              <Ship className="w-4 h-4 text-gray-500" />
-              <Select value={vesselId} onValueChange={handleVesselChange}>
-                <SelectTrigger className="w-48" data-testid="select-vessel">
-                  <SelectValue placeholder="Select vessel" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all" data-testid="option-all-vessels">
-                    All Vessels
-                  </SelectItem>
-                  {vessels.map(vessel => (
-                    <SelectItem key={vessel.id} value={vessel.id}>
-                      {vessel.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            {vessels.length > 1 && (
-              <Button
-                variant={isFleetView ? 'default' : 'outline'}
-                size="sm"
-                onClick={() => setIsFleetView(!isFleetView)}
-                data-testid="button-toggle-fleet-view"
-              >
-                <LayoutGrid className="w-4 h-4 mr-2" />
-                {isFleetView ? 'Vessel View' : 'Fleet View'}
-              </Button>
-            )}
+          <div className="mt-3 -mx-4 sm:-mx-6">
+            <FleetVesselContextBar
+              isFleetView={isFleetView}
+              onViewModeChange={(isFleet) => {
+                setIsFleetView(isFleet);
+                if (isFleet && vesselId !== 'all') {
+                  // keep vesselId as-is; fleet view uses all vessels already
+                }
+              }}
+              vesselId={vesselId}
+              onVesselChange={handleVesselChange}
+              vessels={vessels}
+            />
           </div>
         )}
       </div>
