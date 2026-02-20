@@ -1,0 +1,292 @@
+I want you to completely redesign the visual layout and styling of the PMS Dashboard so that it matches the same design language used in our Audit module dashboard. Do NOT change any data, calculations, or backend logic. Only change how things look and how they are arranged.
+
+DESIGN LANGUAGE TO FOLLOW (copy from Audit dashboard)
+Look at the Audit dashboard already in this project for reference. The PMS dashboard must use the exact same:
+
+Colors:
+
+Primary blue (used for section titles, table headers, active elements): #1565C0 or the same blue used in the Audit dashboard's table header rows
+
+Dark navy sidebar: already in place, keep it
+
+White card backgrounds: #FFFFFF with very subtle box shadow (0 1px 4px rgba(0,0,0,0.08))
+
+Page background: very light grey #F4F6F9 (same as Audit)
+
+Red for overdue/critical badges: #E53935
+
+Amber/orange for due/warning: #F57C00
+
+Green for completed/OK: #2E7D32
+
+Soft blue for informational: #1565C0
+
+Section title text: uppercase, bold, #1565C0, font size small (12–13px)
+
+Table header background: #1565C0 with white text (exactly like Audit's "Vessel / Inspection Type / Last Inspection" table rows)
+
+Typography:
+
+Section titles: ALL CAPS, bold, blue, small font (like "KPI EXTERNAL INSPECTIONS" in Audit)
+
+Card titles: sentence case, medium weight, dark grey
+
+Main KPI number: large, bold, colored by status (red/amber/green/dark)
+
+Secondary text: small, light grey
+
+Card style:
+
+All cards: white background, border radius 8px, box shadow 0 1px 4px rgba(0,0,0,0.1)
+
+NO colored left borders (remove the current red/amber/green left borders from KPI cards)
+
+Instead use colored TOP borders or colored icon badges at the top left of each card
+
+All cards in the same row: EXACT same height and width. Use CSS grid with fixed columns, not flexbox that stretches unevenly
+
+Tables style (like Audit's "Inspections in Range" and "Open Reports" tables):
+
+Header row: solid blue background #1565C0, white text, bold, uppercase
+
+Alternating row shading: white and very light grey #F9FAFB
+
+Row hover: light blue #E3F2FD
+
+Overdue count badges: red pill badge (like the "861", "248" red badges in Audit's "Days to Go" column)
+
+Table container: white card, same border radius and shadow as other cards
+
+LAYOUT REDESIGN — EXACT STRUCTURE
+SECTION 1: PAGE HEADER BAR (top of content area, not the nav)
+Create a slim header bar spanning full width of the content area (not the sidebar). It should have:
+
+Left side: Page icon (grid icon already there) + text "PMS Dashboard" in dark bold
+
+Below the title: one line of summary text in small grey: "2397 work orders · 5565 spares · Data as of [today's date]"
+
+Right side (inline on same row as title): "View:" label + dropdown (Fleet view / Single vessel view) + "Vessel:" label + vessel dropdown + "Scope:" text showing current scope
+
+This header bar should have a white background with a bottom border 1px solid #E0E0E0
+
+Height: compact, around 60–70px total
+
+SECTION 2: EXECUTIVE SUMMARY BAND
+Immediately below the header bar, create a band with background #F4F6F9 and padding 16px.
+
+Inside this band, place 4 equal-width cards in a single row (CSS grid, 4 columns, equal width, equal height):
+
+Card 1 — Total Work Orders
+
+Top colored bar: dark blue #1565C0, height 4px
+
+Icon: wrench/tool icon, dark blue
+
+Title text: "TOTAL WORK ORDERS" (uppercase, small, blue)
+
+Main number: "2397" (large, bold, dark grey #212121)
+
+Secondary line: "122 planned / active"
+
+Bottom line: small grey text "Fleet scope" or vessel name
+
+Card 2 — Overdue Work Orders
+
+Top colored bar: red #E53935, height 4px
+
+Icon: alert/clock icon, red
+
+Title: "OVERDUE" (uppercase, small, red)
+
+Main number: "899" (large, bold, red #E53935)
+
+Secondary line: "38% of all work orders"
+
+Bottom: small red chip/badge saying "Action required"
+
+Card 3 — Completion Rate
+
+Top colored bar: green #2E7D32, height 4px
+
+Icon: checkmark icon, green
+
+Title: "COMPLETED" (uppercase, small, green)
+
+Main number: "1274" (large, bold, green #2E7D32)
+
+Secondary line: "53% completion rate"
+
+Bottom: small grey text "vs last month: +[X]%"
+
+Card 4 — Outstanding / Backlog
+
+Top colored bar: amber #F57C00, height 4px
+
+Icon: list/tasks icon, amber
+
+Title: "OUTSTANDING TASKS" (uppercase, small, amber)
+
+Main number: "61 / 92" (large, bold, dark)
+
+Secondary line: "66% incomplete this month"
+
+Bottom: small amber chip saying "+24% vs last month ↑"
+
+All 4 cards: same height (auto but equal via CSS grid align-items: stretch), white background, border radius 8px, subtle shadow.
+
+SECTION 3: TWO-COLUMN MIDDLE BAND
+Below the executive summary band, create a two-column layout (left 60%, right 40%) with 16px gap:
+
+LEFT COLUMN — Work Order Status Distribution
+
+Section title above: "WORK ORDER STATUS DISTRIBUTION" (uppercase, bold, blue #1565C0, small font)
+
+A white card containing the existing donut/pie chart (keep it, just restyle the container)
+
+Chart should fill the card with proper padding
+
+Below the chart, add a legend row: colored dot + label + count for each status (Overdue, Due, Pending, Completed)
+
+Card: white, border radius 8px, shadow, same height as right column card
+
+RIGHT COLUMN — Quick Stats
+
+Section title above: "QUICK STATS" (uppercase, bold, blue)
+
+A white card with 3 small horizontal stat rows inside (like Audit's summary rows):
+
+Row 1: "Due this week" — show count "101" — amber badge
+
+Row 2: "Pending Approval" — show count "1" — blue badge
+
+Row 3: "Critical Low Stock Spares" — show count from existing spares data — red badge
+
+Each row: left label, right value badge, bottom border separator between rows
+
+Card height matches left column
+
+SECTION 4: THREE-SECTION DETAIL AREA
+Below the two columns, create three stacked full-width sections. Each section has:
+
+A section title bar: full-width, background #EEF2FF (very light blue), padding 8px 16px, text in uppercase bold blue #1565C0, with a small expand icon on the right
+
+SECTION 4A — WORK ORDER HEALTH (KPI row + table)
+
+Under the section title, place a row of 5 equal-width small KPI cards (same card style as Section 2 but smaller/more compact):
+
+Card: "Overdue" → number "899" → red top bar
+
+Card: "Due" → number "101" → amber top bar
+
+Card: "Pending Approval" → number "1" → blue top bar
+
+Card: "Completed" → number "1274" → green top bar
+
+Card: "Total WOs" → number "2397" → dark blue top bar
+
+All 5 in one row, equal width (CSS grid 5 columns), equal height, white, rounded, shadowed.
+
+Below this row of 5 cards, place the Overdue Work Orders table:
+
+Table title: "OVERDUE WORK ORDERS" uppercase blue, with subtitle "(Showing top results of 899 total)" in small grey
+
+Table header row: background #1565C0, white bold text, columns: "Work Order" | "Equipment" | "Due Date" | "Days Overdue" | "Status"
+
+Rows: alternating white / #F9FAFB, row hover #E3F2FD
+
+"Days Overdue" column: show number inside a red pill badge (exactly like Audit's "Days to Go" red badges)
+
+Table container: white card, border radius 8px, shadow
+
+SECTION 4B — MAINTENANCE EFFECTIVENESS (KPI row + chart)
+
+Under the section title, place a row of 3 equal-width KPI cards:
+
+Card 1: "Outstanding Tasks" → "61 of 92" → amber top bar → secondary: "66% incomplete"
+
+Card 2: "Backlog Trend" → "+24% vs last month" → red top bar (worsening) → secondary: "Trend: Worsening ↑"
+
+Card 3: "6-Month Avg Completion" → show percentage from existing data → green or amber depending on value
+
+Below these 3 cards, place the 6-Month Maintenance Trend chart (keep existing chart, just restyle its container card):
+
+Container: white card, border radius 8px, shadow, full width of section
+
+Chart title inside card: "6-MONTH MAINTENANCE TREND" uppercase, small, blue
+
+Keep the existing line/area chart inside
+
+SECTION 4C — INVENTORY HEALTH (KPI row + table)
+
+Under the section title, place a row of 4 equal-width KPI cards:
+
+Card 1: "Total Spares" → number from existing data → dark blue top bar
+
+Card 2: "Low Stock" → number from existing data → red top bar → small badge "Critical"
+
+Card 3: "Stores Inventory" → number → blue top bar
+
+Card 4: "Components" → number → grey/dark top bar
+
+Below these 4 cards, place the Low Stock Spares table:
+
+Table title: "LOW STOCK SPARES" uppercase blue, subtitle "(Sample from [total] low stock items)"
+
+Table header row: background #1565C0, white bold text, columns: "Part Name" | "Part No." | "Current Stock" | "Min. Required" | "Status"
+
+"Status" column: show a colored badge — "Critical" in red pill, "Low" in amber pill, "OK" in green pill
+
+Alternating rows, row hover, same style as Section 4A table
+
+SECTION 5: RUNNING HOURS + PMS ASSISTANT (Two-column row at bottom)
+Place this as the last section before the page ends, in a two-column layout (50/50):
+
+LEFT — Running Hours card:
+
+Section title: "RUNNING HOURS" uppercase blue
+
+White card, border radius 8px, shadow
+
+Inside: two horizontal stat rows:
+
+"Master Hours: 856" — with a thin blue progress bar showing relative fill
+
+"Inherited Hours: 761" — with a thin grey progress bar
+
+Below: small red chip "0 updated this week — Consider refreshing data"
+
+RIGHT — PMS Assistant card:
+
+Section title: "PMS ASSISTANT" uppercase blue
+
+White card, border radius 8px, shadow
+
+Keep the existing chat/assistant component inside
+
+Just make sure the card matches the same styling
+
+WHAT NOT TO CHANGE
+Do NOT change any calculation, data source, or backend logic
+
+Do NOT remove any existing data or KPI
+
+Do NOT change the sidebar navigation
+
+Do NOT change the top navigation bar (Technical / Cert. & Surveys / Defects / PMS / Admin)
+
+Keep all existing chart click-to-filter behaviours
+
+RESPONSIVENESS
+Desktop (above 1200px): all layouts as described above
+
+Tablet (768px–1199px): Executive Summary cards wrap to 2 columns, middle band stacks to single column, section KPI cards wrap to 2–3 columns
+
+Mobile (below 768px): everything stacks to single column, tables scroll horizontally
+
+At the end, please tell me:
+
+Which component files you changed
+
+What CSS approach you used for the equal-height-and-width card grid
+
+Confirm that no data or calculation logic was touched
