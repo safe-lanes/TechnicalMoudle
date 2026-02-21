@@ -5,6 +5,7 @@ import * as woCompletionService from '../services/workOrderCompletionService';
 import * as woBulkService from '../services/workOrderBulkService';
 import * as woAutoService from '../services/workOrderAutoService';
 import * as executionService from '../services/executionService';
+import { ValidationError } from '../../shared/errors';
 
 // ── Core Work Order CRUD ──
 
@@ -41,9 +42,14 @@ export async function updateWorkOrder(req: Request, res: Response) {
     const workOrder = await woService.updateWorkOrder(req.params.id, req.body);
     res.json(workOrder);
   } catch (error: any) {
+    console.error('❌ Work order update error:', error);
     if (error.name === 'ZodError') {
       console.error('❌ Zod validation errors:', JSON.stringify(error.errors, null, 2));
       return res.status(400).json({ error: "Invalid work order data", details: error.errors });
+    }
+    // ValidationError with extra details (disallowedFields, code, etc.)
+    if (error instanceof ValidationError) {
+      return res.status(400).json({ error: error.message, ...error.details });
     }
     if (error.message?.includes('not found')) {
       return res.status(404).json({ error: error.message });
@@ -78,8 +84,13 @@ export async function completeWorkOrder(req: Request, res: Response) {
     const result = await woCompletionService.completeWorkOrder(req.params.id, req.body);
     res.json(result);
   } catch (error: any) {
+    console.error('Work order completion error:', error);
     if (error.name === 'ZodError') {
       return res.status(400).json({ error: "Invalid completion data", details: error.errors });
+    }
+    // ValidationError with extra details (code: DEPARTMENT_MISMATCH, etc.)
+    if (error instanceof ValidationError) {
+      return res.status(400).json({ error: error.message, ...error.details });
     }
     // Return 400 for inventory enforcement errors
     if (error.message?.includes('LOCATION_REQUIRED') ||

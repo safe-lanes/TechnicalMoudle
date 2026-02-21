@@ -437,7 +437,11 @@ export async function updateWorkOrder(id: string, body: any) {
     if (disallowedFields.length > 0) {
       console.warn(`⚠️ Attempted to modify completed WO ${existingWO.workOrderNo}: ${disallowedFields.join(', ')}`);
       throw new ValidationError(
-        `Cannot modify completed work order. Work Order ${existingWO.workOrderNo} is completed and cannot be modified. Only remarks can be added.`
+        'Cannot modify completed work order',
+        {
+          message: `Work Order ${existingWO.workOrderNo} is completed and cannot be modified. Only remarks can be added.`,
+          disallowedFields
+        }
       );
     }
   }
@@ -581,7 +585,8 @@ export async function updateWorkOrder(id: string, body: any) {
             if (!isNaN(enteredRH) && !isNaN(masterRH) && enteredRH > masterRH) {
               console.error(`❌ RH validation failed: Entered RH (${enteredRH}) exceeds master component ${rhMasterComponent.componentCode} RH (${masterRH})`);
               throw new ValidationError(
-                `Running hours (${enteredRH}) cannot exceed master component "${rhMasterComponent.name}" (${rhMasterComponent.componentCode}) running hours of ${masterRH}. Please update the master component's running hours first.`
+                `Running hours (${enteredRH}) cannot exceed master component "${rhMasterComponent.name}" (${rhMasterComponent.componentCode}) running hours of ${masterRH}. Please update the master component's running hours first.`,
+                { code: 'RH_EXCEEDS_MASTER' }
               );
             }
           }

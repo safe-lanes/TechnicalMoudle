@@ -72,7 +72,8 @@ export async function completeWorkOrder(
         const approver = await repo.findUser(approverUserId);
         if (approver && (approver as any).department && (approver as any).department !== job.department) {
           throw new ValidationError(
-            `Approver department mismatch: Approver belongs to "${(approver as any).department}" but job requires "${job.department}" department authorization.`
+            `Approver department mismatch: Approver belongs to "${(approver as any).department}" but job requires "${job.department}" department authorization.`,
+            { code: 'DEPARTMENT_MISMATCH' }
           );
         }
         console.log(`[RULE #19] Department validation passed: Approver (${(approver as any)?.department || 'no dept'}) can approve job in ${job.department} department`);
