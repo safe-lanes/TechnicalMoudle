@@ -1,0 +1,70 @@
+import { Router } from 'express';
+import { asyncHandler } from '../shared/middleware';
+import * as woCtrl from './controllers/workOrderController';
+
+const router = Router();
+
+// ── Core Work Order CRUD ──
+
+// GET  /work-orders — list all (optional ?vesselId= filter)
+router.get('/work-orders', asyncHandler(woCtrl.listWorkOrders));
+
+// GET  /work-orders/:id — get single work order
+router.get('/work-orders/:id', asyncHandler(woCtrl.getWorkOrder));
+
+// GET  /work-orders/:id/context — get work order context (template data, execution data, component, RH)
+router.get('/work-orders/:id/context', asyncHandler(woCtrl.getWorkOrderContext));
+
+// POST /work-orders — create work order
+router.post('/work-orders', asyncHandler(woCtrl.createWorkOrder));
+
+// PATCH /work-orders/:id — update work order (includes approval/completion flow)
+router.patch('/work-orders/:id', asyncHandler(woCtrl.updateWorkOrder));
+
+// DELETE /work-orders/:id — delete work order
+router.delete('/work-orders/:id', asyncHandler(woCtrl.deleteWorkOrder));
+
+// ── Work Order Completion ──
+
+// POST /work-orders/:id/complete — complete a work order
+router.post('/work-orders/:id/complete', asyncHandler(woCtrl.completeWorkOrder));
+
+// ── Bulk Operations ──
+
+// POST /work-orders/bulk-approve — bulk approve work orders
+router.post('/work-orders/bulk-approve', asyncHandler(woCtrl.bulkApprove));
+
+// POST /work-orders/bulk-reject — bulk reject work orders
+router.post('/work-orders/bulk-reject', asyncHandler(woCtrl.bulkReject));
+
+// ── Auto-Generate & Backfill ──
+
+// POST /work-orders/auto-generate — auto-generate work orders for due jobs
+router.post('/work-orders/auto-generate', asyncHandler(woCtrl.autoGenerate));
+
+// POST /work-orders/backfill-job-ids — backfill missing jobId fields
+router.post('/work-orders/backfill-job-ids', asyncHandler(woCtrl.backfillJobIds));
+
+// ── Status Recalculation & Postponements ──
+
+// POST /work-orders/recalculate-statuses — force status recalculation
+router.post('/work-orders/recalculate-statuses', asyncHandler(woCtrl.recalculateStatuses));
+
+// POST /work-orders/check-postponements — check and revert postponed work orders
+router.post('/work-orders/check-postponements', asyncHandler(woCtrl.checkPostponements));
+
+// ── Work Order Executions ──
+
+// GET  /work-order-executions/:componentId — get executions for component
+router.get('/work-order-executions/:componentId', asyncHandler(woCtrl.getExecutions));
+
+// GET  /work-order-executions/details/:id — get single execution
+router.get('/work-order-executions/details/:id', asyncHandler(woCtrl.getExecution));
+
+// POST /work-order-executions — create execution
+router.post('/work-order-executions', asyncHandler(woCtrl.createExecution));
+
+// PATCH /work-order-executions/:id — update execution
+router.patch('/work-order-executions/:id', asyncHandler(woCtrl.updateExecution));
+
+export default router;
