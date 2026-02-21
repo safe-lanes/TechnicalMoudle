@@ -62,6 +62,7 @@ import fleetAdminRouter from "./routes/fleetAdmin";
 import createChangeRequestsRouter from "./routes/changeRequests";
 import { ObjectStorageService, objectStorageClient, parseObjectPath, ObjectNotFoundError } from "./objectStorage";
 import { registerRunningHoursRoutes } from "./runningHoursRoutes";
+import moduleRouter from "./modules";
 import chatbotRouter from "./routes/chatbot";
 import { requireAuth, requireRole, requirePMSAdmin, requireOfficeOrAdmin, requireVesselAccess, mockAuthMiddleware, type AuthenticatedRequest } from "./middleware/auth";
 import { ensureMaintenanceHistoryImmutability } from "./initDb";
@@ -84,7 +85,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // This populates req.user with an admin user for testing purposes
   app.use('/technical/api', mockAuthMiddleware);
   console.log('🔒 Mock authentication enabled for /technical/api/* routes');
-  
+
+  // Mount modular architecture router (modules extracted from routes.ts go here)
+  app.use('/technical/api', moduleRouter);
+
   // Documentation download endpoint
   app.get("/download/docs/:filename", (req, res) => {
     const filename = req.params.filename;
