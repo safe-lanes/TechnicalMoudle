@@ -5,8 +5,7 @@ import { getPool, getDb } from "./db";
 import * as fs from "fs";
 import * as path from "path";
 import {
-  insertRunningHoursAuditSchema,
-  cascadeRunningHoursSchema,
+  // insertRunningHoursAuditSchema, cascadeRunningHoursSchema → Moved to modules/running-hours
   insertWorkOrderSchema,
   insertWorkOrderExecutionSchema,
   insertDefectSchema,
@@ -56,12 +55,12 @@ import formRouter from "./routes/forms";
 import fleetAdminRouter from "./routes/fleetAdmin";
 import createChangeRequestsRouter from "./routes/changeRequests";
 import { ObjectStorageService, objectStorageClient, parseObjectPath, ObjectNotFoundError } from "./objectStorage";
-import { registerRunningHoursRoutes } from "./runningHoursRoutes";
+// Running Hours routes → Extracted to modules/running-hours
 import moduleRouter from "./modules";
 import chatbotRouter from "./routes/chatbot";
 import { requireAuth, requireRole, requirePMSAdmin, requireOfficeOrAdmin, requireVesselAccess, mockAuthMiddleware, type AuthenticatedRequest } from "./middleware/auth";
 import { ensureMaintenanceHistoryImmutability } from "./initDb";
-import { validateRunningHoursIncrease, canAdminOverride } from "./utils/rhValidation";
+// validateRunningHoursIncrease, canAdminOverride → Moved to modules/running-hours/utils/rhValidation
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // CRITICAL: Ensure immutability trigger exists BEFORE registering routes
@@ -112,8 +111,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   workOrderStatusRecalculator.start(1 * 60 * 1000); // Run every 1 minute
   console.log('[StatusRecalculator] Scheduler started - will recalculate work order statuses based on current settings');
   
-  // Register Running Hours routes from dedicated file
-  registerRunningHoursRoutes(app);
+  // Running Hours routes → Extracted to modules/running-hours
   // Set up multer for file uploads
   const upload = multer({ 
     storage: multer.memoryStorage(),
@@ -2036,163 +2034,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Running hours routes...
-  
-  // Get running hours audits for a specific component
-  app.get("/technical/api/running-hours/:componentId", async (req, res) => {
-    try {
-      const audits = await storage.getRunningHoursAudits(req.params.componentId);
-      res.json(audits);
-    } catch (error) {
-      res.status(500).json({ error: "Failed to fetch running hours audits" });
-    }
-  });
-  
-  // Create a new running hours audit
-  app.post("/technical/api/running-hours", async (req, res) => {
-    try {
-      const validatedData = insertRunningHoursAuditSchema.parse(req.body);
-      const audit = await storage.createRunningHoursAudit(validatedData);
-      res.status(201).json(audit);
-    } catch (error: any) {
-      if (error.name === 'ZodError') {
-        return res.status(400).json({ error: "Invalid audit data", details: error.errors });
-      }
-      res.status(500).json({ error: "Failed to create audit" });
-    }
-  });
-  
-  // TEST endpoint - does ANY new code load?
-  app.get("/technical/api/test-new-endpoint", async (req, res) => {
-    res.json({ message: "This is a brand new endpoint added just now!", timestamp: new Date().toISOString() });
-  });
-  
-  // DEBUG endpoint to check jobs data
-  app.get("/technical/api/debug/jobs", async (req, res) => {
-    try {
-      const allJobs = await storage.getJobs();
-      const rhJobs = allJobs.filter(j => j.maintenanceBasis === "Running Hours" && j.vesselId === "V001");
-      res.json({
-        totalJobs: allJobs.length,
-        rhJobsCount: rhJobs.length,
-        sampleRHJobs: rhJobs.slice(0, 3).map(j => ({
-          id: j.id,
-          jobNo: j.jobNo,
-          componentId: j.componentId,
-          maintenanceBasis: j.maintenanceBasis,
-          vesselId: j.vesselId
-        }))
-      });
-    } catch (error: any) {
-      res.status(500).json({ error: error.message });
-    }
-  });
-  
-  // REMOVED: Running Hours parents endpoint now registered in runningHoursRoutes.ts
-  
-  // Cascade running hours update to parent and children
-  app.post("/technical/api/running-hours/cascade", async (req, res) => {
-    try {
-      const validatedData = cascadeRunningHoursSchema.parse(req.body);
-      
-      // Get the parent component to determine current RH
-      const parentComponent = await storage.getComponent(validatedData.parentComponentId);
-      if (!parentComponent) {
-        return res.status(404).json({ error: "Parent component not found" });
-      }
-      
-      const currentRH = parseFloat(parentComponent.currentCumulativeRH || '0');
-      let targetRH: number;
-      
-      if (validatedData.mode === 'setTotal') {
-        targetRH = validatedData.value;
-      } else {
-        // addDelta mode
-        targetRH = currentRH + validatedData.value;
-      }
-      
-      // Validate running hours increase against daily limits
-      // Use same fallback logic as the Running Hours display: lastUpdated || rhMasterUpdatedAt || updatedAt
-      const componentLastUpdated = parentComponent.lastUpdated 
-        || (parentComponent.rhMasterUpdatedAt ? new Date(parentComponent.rhMasterUpdatedAt).toISOString() : null)
-        || (parentComponent.updatedAt ? new Date(parentComponent.updatedAt).toISOString() : null);
-      
-      console.log('[RH Validation Debug] componentLastUpdated:', componentLastUpdated);
-      console.log('[RH Validation Debug] newUpdateDate:', validatedData.dateUpdated);
-      console.log('[RH Validation Debug] currentRH:', currentRH, 'targetRH:', targetRH);
-      
-      const validation = validateRunningHoursIncrease({
-        currentRH: currentRH,
-        newRH: targetRH,
-        componentLastUpdated: componentLastUpdated,
-        newUpdateDate: validatedData.dateUpdated,
-        userRole: validatedData.userRole || 'Ship',
-        adminOverride: validatedData.adminOverride || false
-      });
-      
-      console.log('[RH Validation Debug] result:', validation);
-      
-      if (!validation.allowed) {
-        return res.status(400).json({
-          error: validation.message,
-          validation: {
-            maxAllowedIncrease: validation.maxAllowedIncrease,
-            requestedIncrease: validation.requestedIncrease,
-            daysSinceLastUpdate: validation.daysSinceLastUpdate,
-            lastUpdateDate: validation.lastUpdateDate,
-            requiresAdminOverride: validation.requiresAdminOverride,
-            canOverride: canAdminOverride(validatedData.userRole || 'Ship')
-          }
-        });
-      }
-      
-      const result = await storage.cascadeRunningHoursUpdate(validatedData);
-      res.json({
-        ...result,
-        validation: {
-          maxAllowedIncrease: validation.maxAllowedIncrease,
-          actualIncrease: validation.requestedIncrease
-        }
-      });
-    } catch (error: any) {
-      if (error.name === 'ZodError') {
-        return res.status(400).json({ error: "Invalid cascade data", details: error.errors });
-      }
-      console.error('Error cascading running hours update:', error);
-      res.status(500).json({ error: error.message || "Failed to cascade running hours update" });
-    }
-  });
-  
-  // Update existing audit by ID - COMMENTED OUT: method not implemented in storage
-  // app.patch("/technical/api/running-hours/:id", async (req, res) => {
-  //   try {
-  //     const partialAuditSchema = insertRunningHoursAuditSchema.partial();
-  //     const validatedData = partialAuditSchema.parse(req.body);
-  //     const audit = await storage.updateRunningHoursAudit(parseInt(req.params.id), validatedData);
-  //     res.json(audit);
-  //   } catch (error: any) {
-  //     if (error.name === 'ZodError') {
-  //       return res.status(400).json({ error: "Invalid audit data", details: error.errors });
-  //     }
-  //     if (error.message?.includes('not found')) {
-  //       return res.status(404).json({ error: error.message });
-  //     }
-  //     res.status(500).json({ error: "Failed to update audit" });
-  //   }
-  // });
-  
-  // Delete audit by ID - COMMENTED OUT: method not implemented in storage
-  // app.delete("/technical/api/running-hours/:id", async (req, res) => {
-  //   try {
-  //     await storage.deleteRunningHoursAudit(parseInt(req.params.id));
-  //     res.json({ success: true });
-  //   } catch (error: any) {
-  //     if (error.message?.includes('not found')) {
-  //       return res.status(404).json({ error: error.message });
-  //     }
-  //     res.status(500).json({ error: "Failed to delete audit" });
-  //   }
-  // });
+  // Running Hours routes → Extracted to modules/running-hours
 
   // Spares routes...
   

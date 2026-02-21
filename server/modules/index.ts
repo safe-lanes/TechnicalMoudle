@@ -3,6 +3,7 @@ import vesselRoutes from './vessels/routes';
 import componentRoutes from './components/routes';
 import jobRoutes from './jobs/routes';
 import workOrderRoutes from './work-orders/routes';
+import runningHoursRoutes from './running-hours/routes';
 
 const moduleRouter = Router();
 
@@ -11,5 +12,6 @@ moduleRouter.use(vesselRoutes);
 moduleRouter.use(componentRoutes);
 moduleRouter.use(jobRoutes);
 moduleRouter.use(workOrderRoutes);
+moduleRouter.use(runningHoursRoutes);
 
 export default moduleRouter;
