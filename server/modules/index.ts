@@ -1,14 +1,9 @@
 import { Router } from 'express';
+import vesselRoutes from './vessels/routes';
 
 const moduleRouter = Router();
 
-// Modules will be registered here as they're extracted:
-// import vesselRoutes from './vessels/routes';
-// import componentRoutes from './components/routes';
-// ... etc
-
-// moduleRouter.use('/vessels', vesselRoutes);
-// moduleRouter.use('/components', componentRoutes);
-// ... etc
+// Extracted modules
+moduleRouter.use(vesselRoutes);
 
 export default moduleRouter;
