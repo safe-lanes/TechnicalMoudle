@@ -5,6 +5,7 @@ import jobRoutes from './jobs/routes';
 import workOrderRoutes from './work-orders/routes';
 import runningHoursRoutes from './running-hours/routes';
 import sparesRoutes from './spares/routes';
+import storesRoutes from './stores/routes';
 
 const moduleRouter = Router();
 
@@ -15,5 +16,6 @@ moduleRouter.use(jobRoutes);
 moduleRouter.use(workOrderRoutes);
 moduleRouter.use(runningHoursRoutes);
 moduleRouter.use(sparesRoutes);
+moduleRouter.use(storesRoutes);
 
 export default moduleRouter;
