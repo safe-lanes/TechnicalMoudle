@@ -1,0 +1,146 @@
+import { getPostgresClient } from '../../../postgresClient';
+import {
+  shipSurveysMaster,
+  shipSurveysLabelsConfig,
+  vesselSurveyApplicability,
+} from '@shared/schema';
+import { eq, and, inArray } from 'drizzle-orm';
+
+// ── Helpers ──
+
+function getDb() {
+  const postgres = getPostgresClient();
+  if (!postgres) return null;
+  return postgres.db;
+}
+
+// ══════════════════════════════════════════════════════════
+// Master Survey CRUD
+// ══════════════════════════════════════════════════════════
+
+export async function getMasterSurveys() {
+  const db = await getDb();
+  if (!db) return null;
+  return db.select().from(shipSurveysMaster).orderBy(shipSurveysMaster.sequence);
+}
+
+export async function getMasterSurveyByMasterId(masterId: string) {
+  const db = await getDb();
+  if (!db) return null;
+  return db.select().from(shipSurveysMaster)
+    .where(eq(shipSurveysMaster.masterId, masterId))
+    .limit(1);
+}
+
+export async function updateMasterSurvey(masterId: string, data: any) {
+  const db = await getDb();
+  if (!db) return null;
+  return db.update(shipSurveysMaster)
+    .set({ ...data, updatedAt: new Date() })
+    .where(eq(shipSurveysMaster.masterId, masterId));
+}
+
+export async function insertMasterSurvey(data: any) {
+  const db = await getDb();
+  if (!db) return null;
+  return db.insert(shipSurveysMaster).values(data);
+}
+
+export async function deleteMasterSurvey(masterId: string) {
+  const db = await getDb();
+  if (!db) return null;
+  return db.delete(shipSurveysMaster)
+    .where(eq(shipSurveysMaster.masterId, masterId));
+}
+
+// ══════════════════════════════════════════════════════════
+// Labels Configuration
+// ══════════════════════════════════════════════════════════
+
+export async function getSurveyLabels() {
+  const db = await getDb();
+  if (!db) return null;
+  return db.select().from(shipSurveysLabelsConfig);
+}
+
+export async function deleteSurveyLabelsByType(configType: string) {
+  const db = await getDb();
+  if (!db) return null;
+  return db.delete(shipSurveysLabelsConfig)
+    .where(eq(shipSurveysLabelsConfig.configType, configType));
+}
+
+export async function insertSurveyLabels(data: Array<{ configType: string; key: string; label: string }>) {
+  const db = await getDb();
+  if (!db) return null;
+  return db.insert(shipSurveysLabelsConfig).values(data);
+}
+
+// ══════════════════════════════════════════════════════════
+// Applicability
+// ══════════════════════════════════════════════════════════
+
+export async function getApplicabilityByVesselIds(vesselIdList: string[]) {
+  const db = await getDb();
+  if (!db) return null;
+  return db.select()
+    .from(vesselSurveyApplicability)
+    .where(inArray(vesselSurveyApplicability.vesselId, vesselIdList));
+}
+
+export async function getApplicabilityByVesselId(vesselId: string) {
+  const db = await getDb();
+  if (!db) return null;
+  return db.select()
+    .from(vesselSurveyApplicability)
+    .where(eq(vesselSurveyApplicability.vesselId, vesselId));
+}
+
+export async function insertApplicabilityBulk(data: Array<{
+  vesselId: string;
+  vesselName: string;
+  masterId: string;
+  isApplicable: boolean;
+}>) {
+  const db = await getDb();
+  if (!db) return null;
+  return db.insert(vesselSurveyApplicability).values(data).returning();
+}
+
+export async function bulkUpdateApplicability(vesselIds: string[], masterId: string, isApplicable: boolean) {
+  const db = await getDb();
+  if (!db) return null;
+  return db.update(vesselSurveyApplicability)
+    .set({ isApplicable, updatedAt: new Date() })
+    .where(and(
+      inArray(vesselSurveyApplicability.vesselId, vesselIds),
+      eq(vesselSurveyApplicability.masterId, masterId)
+    ))
+    .returning();
+}
+
+export async function getDistinctVessels() {
+  const db = await getDb();
+  if (!db) return null;
+  return db.selectDistinct({
+    vesselId: vesselSurveyApplicability.vesselId,
+    vesselName: vesselSurveyApplicability.vesselName,
+  }).from(vesselSurveyApplicability);
+}
+
+export async function getAllApplicability() {
+  const db = await getDb();
+  if (!db) return null;
+  return db.select({
+    vesselId: vesselSurveyApplicability.vesselId,
+    masterId: vesselSurveyApplicability.masterId,
+  }).from(vesselSurveyApplicability);
+}
+
+export async function getCompanySurveys() {
+  const db = await getDb();
+  if (!db) return null;
+  return db.select()
+    .from(shipSurveysMaster)
+    .where(eq(shipSurveysMaster.applicableToCompany, true));
+}
