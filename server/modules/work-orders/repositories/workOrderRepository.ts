@@ -97,11 +97,17 @@ export async function createRunningHoursAudit(data: any) {
 // ── Inventory ──
 
 export async function findSpareInventoryByPartCodes(vesselId: string, partCodes: string[]) {
-  return (storage as any).getSpareInventoryByPartCodes(vesselId, partCodes);
+  if (typeof (storage as any).getSpareInventoryByPartCodes === 'function') {
+    return (storage as any).getSpareInventoryByPartCodes(vesselId, partCodes);
+  }
+  return new Map(); // MemStorage doesn't implement this method
 }
 
 export async function findSpareInventoryByPartNumbers(vesselId: string, partNumbers: string[]) {
-  return (storage as any).getSpareInventoryByPartNumbers(vesselId, partNumbers);
+  if (typeof (storage as any).getSpareInventoryByPartNumbers === 'function') {
+    return (storage as any).getSpareInventoryByPartNumbers(vesselId, partNumbers);
+  }
+  return new Map(); // MemStorage doesn't implement this method
 }
 
 export async function findSpares(vesselId: string) {
@@ -133,7 +139,10 @@ export async function updateJobComponentLinkTracking(vesselId: string, jobId: st
 }
 
 export async function findLinkedComponentsForJob(jobId: string) {
-  return storage.getLinkedComponentsForJob(jobId);
+  if (typeof storage.getLinkedComponentsForJob === 'function') {
+    return storage.getLinkedComponentsForJob(jobId);
+  }
+  return []; // MemStorage doesn't implement this method
 }
 
 // ── Users ──
