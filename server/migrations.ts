@@ -702,6 +702,50 @@ const migrations: Migration[] = [
         END IF;
       END $$
     `
+  },
+
+  // ─── FK-3: JOB IDENTITY RESTRUCTURE ───
+  // Jobs use JOB-xxx format IDs. juuid is populated with gen_random_uuid()::text.
+  // All 4 child table job_id values are remapped from JOB-xxx → UUID.
+  {
+    id: '034_job_juuid_column_and_data_migration',
+    name: 'Add juuid column to jobs + migrate child data',
+    description: 'FK-3 Phase 1: Add juuid UUID column, populate existing rows, migrate 4 child tables',
+    sql: `
+      ALTER TABLE jobs ADD COLUMN IF NOT EXISTS juuid TEXT;
+      UPDATE jobs SET juuid = gen_random_uuid()::text WHERE juuid IS NULL;
+      ALTER TABLE jobs ALTER COLUMN juuid SET NOT NULL;
+      DO $$ BEGIN
+        IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'jobs_juuid_unique') THEN
+          ALTER TABLE jobs ADD CONSTRAINT jobs_juuid_unique UNIQUE(juuid);
+        END IF;
+      END $$;
+      UPDATE work_orders SET job_id = j.juuid FROM jobs j WHERE work_orders.job_id = j.id AND work_orders.job_id IS NOT NULL;
+      UPDATE job_component_links SET job_id = j.juuid FROM jobs j WHERE job_component_links.job_id = j.id;
+      UPDATE component_maintenance_history SET job_id = j.juuid FROM jobs j WHERE component_maintenance_history.job_id = j.id AND component_maintenance_history.job_id IS NOT NULL;
+      UPDATE fleet_job_vessel_mapping SET job_id = j.juuid FROM jobs j WHERE fleet_job_vessel_mapping.job_id = j.id AND fleet_job_vessel_mapping.job_id IS NOT NULL
+    `
+  },
+  {
+    id: '035_job_fk_constraints',
+    name: 'FK constraints for 4 job child tables',
+    description: 'FK-3 Phase 2: Add FK constraints from all 4 child tables to jobs(juuid)',
+    sql: `
+      DO $$ BEGIN
+        IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'work_orders_job_id_jobs_juuid_fk') THEN
+          ALTER TABLE work_orders ADD CONSTRAINT work_orders_job_id_jobs_juuid_fk FOREIGN KEY (job_id) REFERENCES jobs(juuid);
+        END IF;
+        IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'job_component_links_job_id_jobs_juuid_fk') THEN
+          ALTER TABLE job_component_links ADD CONSTRAINT job_component_links_job_id_jobs_juuid_fk FOREIGN KEY (job_id) REFERENCES jobs(juuid);
+        END IF;
+        IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'component_maintenance_history_job_id_jobs_juuid_fk') THEN
+          ALTER TABLE component_maintenance_history ADD CONSTRAINT component_maintenance_history_job_id_jobs_juuid_fk FOREIGN KEY (job_id) REFERENCES jobs(juuid);
+        END IF;
+        IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'fleet_job_vessel_mapping_job_id_jobs_juuid_fk') THEN
+          ALTER TABLE fleet_job_vessel_mapping ADD CONSTRAINT fleet_job_vessel_mapping_job_id_jobs_juuid_fk FOREIGN KEY (job_id) REFERENCES jobs(juuid);
+        END IF;
+      END $$
+    `
   }
 ];
 

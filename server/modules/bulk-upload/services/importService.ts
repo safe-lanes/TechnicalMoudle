@@ -1620,12 +1620,12 @@ export async function performImport(
           const jobKey = getJobUniqueKey(job.vesselId || vesselId || '', job.componentCode, job.jobNo);
           if (!importedCompositeKeys.has(jobKey)) {
             const previousSnapshot = createRecordSnapshot(job);
-            const archivedJob = await storage.archiveJob(job.id);
+            const archivedJob = await storage.archiveJob(job.juuid);
             result.archived++;
             
             // Track job archive with authoritative before/after snapshots
             if (importHistoryId) {
-              await trackChange(importHistoryId, 'archived', 'job', job.id, job, archivedJob);
+              await trackChange(importHistoryId, 'archived', 'job', job.juuid, job, archivedJob);
             }
             
             console.log(`📦 Archived job: ${job.jobNo} for component ${job.componentCode}`);

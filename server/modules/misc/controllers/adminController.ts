@@ -177,7 +177,7 @@ export async function syncWorkOrderStatus(req: Request, res: Response) {
   }
 
   const allJobs = await storage.getJobs();
-  const jobMap = new Map(allJobs.map(j => [j.id, j]));
+  const jobMap = new Map(allJobs.map(j => [j.juuid, j]));
 
   // Collect components from all vessels for code-based lookup
   const allComponents: any[] = [];

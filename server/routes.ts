@@ -252,7 +252,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
         // Apply updates if needed
         if (needsUpdate) {
-          await storage.updateJob(job.id, updates);
+          await storage.updateJob(job.juuid, updates);
         }
       }
 

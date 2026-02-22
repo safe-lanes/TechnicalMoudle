@@ -294,11 +294,11 @@ export async function completeWorkOrder(
 
         const updateVesselId = workOrder.vesselId || job.vesselId;
         if (woComponentId && updateVesselId) {
-          await repo.updateJobComponentLinkTracking(updateVesselId, job.id, woComponentId, linkUpdates);
+          await repo.updateJobComponentLinkTracking(updateVesselId, job.juuid, woComponentId, linkUpdates);
           console.log(`✅ Updated component-specific tracking for vessel ${updateVesselId}, job ${job.jobNo} + component ${woComponentId} with lastDoneDate: ${dateOfCompletion}`);
         }
 
-        await repo.updateJob(job.id, jobUpdates);
+        await repo.updateJob(job.juuid, jobUpdates);
         console.log(`✅ Updated calendar job ${job.jobNo} with lastDoneDate: ${dateOfCompletion}`);
       }
 
@@ -319,11 +319,11 @@ export async function completeWorkOrder(
 
           const rhUpdateVesselId = workOrder.vesselId || job.vesselId;
           if (woComponentId && rhUpdateVesselId) {
-            await repo.updateJobComponentLinkTracking(rhUpdateVesselId, job.id, woComponentId, linkUpdates);
+            await repo.updateJobComponentLinkTracking(rhUpdateVesselId, job.juuid, woComponentId, linkUpdates);
             console.log(`✅ Updated component-specific RH tracking for vessel ${rhUpdateVesselId}, job ${job.jobNo} + component ${woComponentId} with lastDoneRH: ${currentRH}`);
           }
 
-          await repo.updateJob(job.id, jobUpdates);
+          await repo.updateJob(job.juuid, jobUpdates);
           console.log(`✅ Updated RH job ${job.jobNo} with lastDoneRH: ${currentRH}`);
         }
       }

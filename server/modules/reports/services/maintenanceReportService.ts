@@ -75,7 +75,7 @@ export async function exportDueJobs7Days(vesselId: string): Promise<{ buffer: Bu
   const vessel = allVessels.find(v => v.id === vesselId);
   const vesselName = vessel?.name || vesselId;
 
-  const jobsMap = new Map(jobs.map(job => [job.id, job]));
+  const jobsMap = new Map(jobs.map(job => [job.juuid, job]));
   const componentsByCodeMap = new Map(components.map(comp => [comp.componentCode, comp]));
   const componentsMap = new Map(components.map(comp => [comp.cuuid, comp]));
 
@@ -316,7 +316,7 @@ export async function exportOverdueJobs(vesselId: string): Promise<{ buffer: Buf
   const vessel = allVessels.find(v => v.id === vesselId);
   const vesselName = vessel?.name || vesselId;
 
-  const jobsMap = new Map(jobs.map(job => [job.id, job]));
+  const jobsMap = new Map(jobs.map(job => [job.juuid, job]));
   const componentsByCodeMap = new Map(components.map(comp => [comp.componentCode, comp]));
   const componentsMap = new Map(components.map(comp => [comp.cuuid, comp]));
 
@@ -554,7 +554,7 @@ export async function exportCompletedJobs(vesselId: string, dateFrom?: string, d
   const vessel = allVessels.find(v => v.id === vesselId);
   const vesselName = vessel?.name || vesselId;
 
-  const jobsMap = new Map(jobs.map(job => [job.id, job]));
+  const jobsMap = new Map(jobs.map(job => [job.juuid, job]));
   const componentsByCodeMap = new Map(components.map(comp => [comp.componentCode, comp]));
 
   const completedWorkOrders = workOrders.filter(wo => wo.status === 'Completed');
@@ -836,7 +836,7 @@ export async function exportUnplannedJobs(vesselId: string, dateFrom?: string, d
   const vessel = allVessels.find(v => v.id === vesselId);
   const vesselName = vessel?.name || vesselId;
 
-  const jobsMap = new Map(jobs.map(job => [job.id, job]));
+  const jobsMap = new Map(jobs.map(job => [job.juuid, job]));
   const componentsByCodeMap = new Map(components.map(comp => [comp.componentCode, comp]));
 
   const unplannedWorkOrders = workOrders.filter(wo =>
@@ -1223,7 +1223,7 @@ export async function exportMonthlySummary(
   const jobs = await repo.getJobs(vesselId);
   const components = await repo.getComponents(vesselId);
 
-  const jobsMap = new Map(jobs.map(job => [job.id, job]));
+  const jobsMap = new Map(jobs.map(job => [job.juuid, job]));
   const componentsByCodeMap = new Map(components.map(comp => [comp.componentCode, comp]));
 
   const parseDateLocal = (dateStr: string | null | undefined): Date | null => {

@@ -837,6 +837,7 @@ export type AlertConfig = typeof alertConfig.$inferSelect;
 // NOTE: componentId/componentCode/componentName are DEPRECATED - use jobComponentLinks table for many-to-many relationships
 export const jobs = pgTable("jobs", {
   id: text("id").primaryKey(),
+  juuid: text("juuid").notNull().unique(), // Canonical UUID identity — FK target for all 4 child tables
   vesselId: text("vessel_id").references(() => vessels.vuuid),
   componentId: text("component_id").references(() => components.cuuid), // DEPRECATED: Use jobComponentLinks for many-to-many. Nullable for backward compatibility
   componentCode: text("component_code"), // DEPRECATED: Use jobComponentLinks for many-to-many
@@ -905,7 +906,7 @@ export const workOrders = pgTable("work_orders", {
   vesselId: text("vessel_id").references(() => vessels.vuuid), // Nullable - only required when dataScope='vessel'
   component: text("component").notNull(),
   componentCode: text("component_code"),
-  jobId: text("job_id"), // Reference to jobs.id for reliable lead time hydration
+  jobId: text("job_id").references(() => jobs.juuid), // FK → jobs.juuid for reliable lead time hydration
   workOrderNo: text("work_order_no").notNull(),
   workOrderType: text("work_order_type").notNull().default("Planned"), // 'Planned' | 'Unplanned'
   templateCode: text("template_code"),
@@ -1631,7 +1632,7 @@ export const componentMaintenanceHistory = pgTable("component_maintenance_histor
   componentId: text("component_id").notNull().references(() => components.cuuid),
   componentCode: text("component_code").notNull(),
   vesselCode: text("vessel_code").notNull(),
-  jobId: text("job_id"), // Link to parent job for Jobs Form A5 history
+  jobId: text("job_id").references(() => jobs.juuid), // FK → jobs.juuid for Jobs Form A5 history
   jobCode: text("job_code"), // Job number for querying (e.g., MKR-IN-00001)
   workOrderId: text("work_order_id").notNull(), // Link to completed work order
   workOrderNo: text("work_order_no").notNull(),
@@ -2065,7 +2066,7 @@ export const fleetJobVesselMapping = pgTable("fleet_job_vessel_mapping", {
   id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
   fleetEquipmentCode: text("fleet_equipment_code").notNull(), // Equipment the job belongs to
   jobCode: text("job_code").notNull(), // Fleet job code
-  jobId: text("job_id"), // Reference to jobs table
+  jobId: text("job_id").references(() => jobs.juuid), // FK → jobs.juuid
   vesselCode: text("vessel_code").notNull(), // Vessel identifier
   vesselName: text("vessel_name"), // Vessel display name
   mappedBy: text("mapped_by").notNull(), // User who created mapping
@@ -2464,7 +2465,7 @@ export type SpareWithInventory = {
 export const jobComponentLinks = pgTable("job_component_links", {
   id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
   vesselId: text("vessel_id").notNull().references(() => vessels.vuuid),
-  jobId: text("job_id").notNull(), // FK → jobs.id (UUID)
+  jobId: text("job_id").notNull().references(() => jobs.juuid), // FK → jobs.juuid
   componentId: text("component_id").notNull().references(() => components.cuuid), // FK → components.cuuid
   componentCode: text("component_code"), // Denormalized for faster lookups
   linkedBy: text("linked_by").notNull(),

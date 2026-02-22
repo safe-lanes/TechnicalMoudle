@@ -96,7 +96,7 @@ export async function getMaintenancePlannerData(filters: PlannerFilters) {
   const jobComponentPairs: JobComponentPair[] = [];
 
   for (const job of activeJobs) {
-    const linkedComponentIds = jobToComponentsMap.get(job.id);
+    const linkedComponentIds = jobToComponentsMap.get(job.juuid);
 
     if (linkedComponentIds && linkedComponentIds.size > 0) {
       // Job has entries in jobComponentLinks - use those (many-to-many)
@@ -291,7 +291,7 @@ export async function getMaintenancePlannerData(filters: PlannerFilters) {
 
     // Find open/active work orders for this job only
     // Completed/Rejected WOs are historical and not relevant for planning the current cycle
-    const jobWOs = allWorkOrders.filter(wo => wo.jobId === job.id);
+    const jobWOs = allWorkOrders.filter(wo => wo.jobId === job.juuid);
     const relevantWO = jobWOs.find(wo =>
       wo.status !== 'Completed' &&
       wo.status !== 'Rejected'
@@ -327,7 +327,7 @@ export async function getMaintenancePlannerData(filters: PlannerFilters) {
     // Build planner item using the component from the job-component pair
     // This ensures multi-component jobs appear as separate rows
     plannerItems.push({
-      jobId: job.id,
+      jobId: job.juuid,
       jobCode: job.jobNo,
       jobTitle: job.jobTitle,
       jobType: isCalendarJob ? 'CALENDAR' : 'RH',

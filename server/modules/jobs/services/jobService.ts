@@ -58,7 +58,7 @@ export async function listJobs(vesselId?: string, componentId?: string) {
 
   // Hydrate jobs
   const hydratedJobs = await Promise.all(jobs.map(async (job) => {
-    const linkedComponentCodes = jobLinksMap.get(job.id) || [];
+    const linkedComponentCodes = jobLinksMap.get(job.juuid) || [];
 
     if (job.componentCode && !linkedComponentCodes.includes(job.componentCode)) {
       linkedComponentCodes.push(job.componentCode);
@@ -66,7 +66,7 @@ export async function listJobs(vesselId?: string, componentId?: string) {
 
     const componentTracking: Record<string, any> = {};
     for (const [linkKey, link] of Array.from(jobLinkTrackingMap.entries())) {
-      if (linkKey.startsWith(`${job.id}:`)) {
+      if (linkKey.startsWith(`${job.juuid}:`)) {
         const compCode = (link as any).componentCode;
         if (compCode) {
           componentTracking[compCode] = {
@@ -92,7 +92,7 @@ export async function listJobs(vesselId?: string, componentId?: string) {
       hydratedJob.lastDoneRH = null;
       hydratedJob.nextDueRH = null;
     } else if (componentId) {
-      const linkKey = `${job.id}:${componentId}`;
+      const linkKey = `${job.juuid}:${componentId}`;
       const componentLink = jobLinkTrackingMap.get(linkKey);
       if (componentLink) {
         if (componentLink.lastDoneDate) hydratedJob.lastDoneDate = componentLink.lastDoneDate;

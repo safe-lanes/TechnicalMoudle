@@ -954,7 +954,7 @@ export async function getLsaFfaMaintenanceSchedule(
   } else {
     allJobs = await repo.getJobs(vesselId);
   }
-  const jobMap = new Map(allJobs.map((j: any) => [j.id, j]));
+  const jobMap = new Map(allJobs.map((j: any) => [j.juuid, j]));
 
   let allLinks: any[] = [];
   if (vesselId === 'all') {
@@ -1026,7 +1026,7 @@ export async function getLsaFfaMaintenanceSchedule(
       }
     }
 
-    const jobWorkOrders = woByJobId.get(job.id) || [];
+    const jobWorkOrders = woByJobId.get(job.juuid) || [];
     const sortedWOs = jobWorkOrders.sort((a: any, b: any) => {
       const dateA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
       const dateB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
@@ -1039,7 +1039,7 @@ export async function getLsaFfaMaintenanceSchedule(
 
     scheduleItems.push({
       componentId: comp.cuuid,
-      jobId: job.id,
+      jobId: job.juuid,
       componentCode: comp.componentCode || '-',
       componentName: comp.name || '-',
       equipmentType: comp.eqptSystemDept || '-',
@@ -1196,7 +1196,7 @@ export async function getCriticalEquipmentSchedule(
   } else {
     allJobs = await repo.getJobs(vesselId);
   }
-  const jobMap = new Map(allJobs.map((j: any) => [j.id, j]));
+  const jobMap = new Map(allJobs.map((j: any) => [j.juuid, j]));
 
   let allLinks: any[] = [];
   if (vesselId === 'all') {
@@ -1268,7 +1268,7 @@ export async function getCriticalEquipmentSchedule(
       }
     }
 
-    const jobWorkOrders = woByJobId.get(job.id) || [];
+    const jobWorkOrders = woByJobId.get(job.juuid) || [];
     const sortedWOs = jobWorkOrders.sort((a: any, b: any) => {
       const dateA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
       const dateB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
@@ -1281,7 +1281,7 @@ export async function getCriticalEquipmentSchedule(
 
     scheduleItems.push({
       componentId: comp.cuuid,
-      jobId: job.id,
+      jobId: job.juuid,
       componentCode: comp.componentCode || '-',
       componentName: comp.name || '-',
       location: comp.location || '-',

@@ -82,7 +82,7 @@ export async function getCriticalSparesPreview(
   const findCriticalComponents = (relatedJobs: any[]) => {
     const critComps: string[] = [];
     for (const job of relatedJobs) {
-      const links = jobComponentLinks.filter(l => l.jobId === job.id);
+      const links = jobComponentLinks.filter(l => l.jobId === job.juuid);
       for (const link of links) {
         const comp = componentMap.get(link.componentId);
         if (comp && comp.critical === true) {
@@ -292,7 +292,7 @@ export async function exportCriticalSparesExcel(
   const findCriticalComponents = (relatedJobs: any[]) => {
     const critComps: string[] = [];
     for (const job of relatedJobs) {
-      const links = jobComponentLinks.filter(l => l.jobId === job.id);
+      const links = jobComponentLinks.filter(l => l.jobId === job.juuid);
       for (const link of links) {
         const comp = componentMap.get(link.componentId);
         if (comp && comp.critical === true) {

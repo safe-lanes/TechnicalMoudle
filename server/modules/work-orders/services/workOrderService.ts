@@ -24,7 +24,7 @@ export async function listWorkOrders(vesselId?: string) {
   } else {
     allJobs = await repo.findJobs(vesselId);
   }
-  const jobsMap = new Map(allJobs.map((job: any) => [job.id, job]));
+  const jobsMap = new Map(allJobs.map((job: any) => [job.juuid, job]));
 
   // Fetch components per-vessel
   const componentsByCodeMap = new Map<string, any>();
@@ -175,7 +175,7 @@ export async function getWorkOrder(id: string) {
   if (workOrder.vesselId) {
     const jobs = await repo.findJobs(workOrder.vesselId);
     job = workOrder.jobId
-      ? jobs.find((j: any) => j.id === workOrder.jobId)
+      ? jobs.find((j: any) => j.juuid === workOrder.jobId)
       : workOrder.templateCode
         ? jobs.find((j: any) => j.jobNo === workOrder.templateCode)
         : null;
@@ -746,11 +746,11 @@ export async function updateWorkOrder(id: string, body: any) {
 
               const updateVesselId = freshWorkOrder.vesselId || job.vesselId;
               if (component.cuuid && updateVesselId) {
-                await repo.updateJobComponentLinkTracking(updateVesselId, job.id, component.cuuid, linkUpdates);
+                await repo.updateJobComponentLinkTracking(updateVesselId, job.juuid, component.cuuid, linkUpdates);
                 console.log(`✅ Updated component-specific tracking for vessel ${updateVesselId}, job ${job.jobNo} + component ${component.cuuid} with lastDoneDate: ${dateOfCompletionNorm}`);
               }
 
-              await repo.updateJob(job.id, calendarUpdates);
+              await repo.updateJob(job.juuid, calendarUpdates);
             }
 
             // Handle Running Hours-based jobs
@@ -768,11 +768,11 @@ export async function updateWorkOrder(id: string, body: any) {
 
                 const rhUpdateVesselId = freshWorkOrder.vesselId || job.vesselId;
                 if (component.cuuid && rhUpdateVesselId) {
-                  await repo.updateJobComponentLinkTracking(rhUpdateVesselId, job.id, component.cuuid, rhLinkUpdates);
+                  await repo.updateJobComponentLinkTracking(rhUpdateVesselId, job.juuid, component.cuuid, rhLinkUpdates);
                   console.log(`✅ Updated component-specific RH tracking for vessel ${rhUpdateVesselId}, job ${job.jobNo} + component ${component.cuuid} with lastDoneRH: ${currentRH}`);
                 }
 
-                await repo.updateJob(job.id, rhUpdates);
+                await repo.updateJob(job.juuid, rhUpdates);
 
                 // UPDATE COMPONENT RUNNING HOURS on work order approval
                 try {
