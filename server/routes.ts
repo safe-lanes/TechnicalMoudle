@@ -13,7 +13,7 @@ import { computeWorkOrderStatus } from "@shared/workOrders/status";
 import { WORK_ORDER_THRESHOLDS } from "@shared/workOrders/constants";
 import multer from "multer";
 // bulkRouter → Moved to modules/bulk-upload
-import alertRouter from "./routes/alerts";
+// alertRouter → Moved to modules/alerts
 import formRouter from "./routes/forms";
 // fleetAdminRouter → Moved to modules/fleet
 // createChangeRequestsRouter → Moved to modules/change-requests
@@ -89,8 +89,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Sub-routers (originally interspersed with report blocks)
   app.use(chatbotRouter);
   // bulkRouter → Moved to modules/bulk-upload
-  app.use("/technical/api/alerts", alertRouter);
-  app.use("/technical/api/forms", formRouter);
+  // alertRouter → Moved to modules/alerts
+  app.use("/technical/api", formRouter);
   // changeRequestsRouter → Moved to modules/change-requests
 
   // Recurring defects endpoints: extracted to server/modules/defects
