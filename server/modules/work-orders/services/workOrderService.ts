@@ -867,6 +867,7 @@ export async function updateWorkOrder(id: string, body: any) {
                   await repo.performInventoryTransaction({
                     vesselId: woVesselId,
                     spareId: spare.id,
+                    spareUuid: spare.suuid,
                     locationId: resolvedLocationId,
                     eventType: 'CONSUME',
                     qtyChange: -Math.abs(qtyConsumed),

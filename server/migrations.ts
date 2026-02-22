@@ -792,6 +792,66 @@ const migrations: Migration[] = [
         END IF;
       END $$
     `
+  },
+
+  // ─── FK-5: Spares Identity Restructure ────────────────────────────
+  // Key difference: spares.id is INTEGER, child tables have INTEGER spare_id.
+  // We add parallel spare_uuid TEXT columns to child tables.
+  {
+    id: '038_spare_suuid_column',
+    name: 'Add suuid column to spares',
+    description: 'Add suuid TEXT column, populate with gen_random_uuid(), SET NOT NULL + UNIQUE',
+    sql: `
+      ALTER TABLE spares ADD COLUMN IF NOT EXISTS suuid TEXT;
+      UPDATE spares SET suuid = gen_random_uuid()::text WHERE suuid IS NULL;
+      ALTER TABLE spares ALTER COLUMN suuid SET NOT NULL;
+      DO $$ BEGIN
+        IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'spares_suuid_unique') THEN
+          ALTER TABLE spares ADD CONSTRAINT spares_suuid_unique UNIQUE(suuid);
+        END IF;
+      END $$
+    `
+  },
+  {
+    id: '039_spare_child_uuid_columns_and_fk_constraints',
+    name: 'Add spare_uuid columns to 4 child tables + FK constraints',
+    description: 'Add spare_uuid TEXT to spares_history, spare_component_links, spare_location_stock, inventory_transactions. Populate from JOIN, add FK constraints.',
+    sql: `
+      -- spares_history: add spare_uuid, populate, FK
+      ALTER TABLE spares_history ADD COLUMN IF NOT EXISTS spare_uuid TEXT;
+      UPDATE spares_history sh SET spare_uuid = s.suuid FROM spares s WHERE sh.spare_id = s.id AND sh.spare_uuid IS NULL;
+
+      -- spare_component_links: add spare_uuid, populate, SET NOT NULL, FK
+      ALTER TABLE spare_component_links ADD COLUMN IF NOT EXISTS spare_uuid TEXT;
+      UPDATE spare_component_links scl SET spare_uuid = s.suuid FROM spares s WHERE scl.spare_id = s.id AND scl.spare_uuid IS NULL;
+      ALTER TABLE spare_component_links ALTER COLUMN spare_uuid SET NOT NULL;
+
+      -- spare_location_stock: add spare_uuid, populate, SET NOT NULL, FK
+      ALTER TABLE spare_location_stock ADD COLUMN IF NOT EXISTS spare_uuid TEXT;
+      UPDATE spare_location_stock sls SET spare_uuid = s.suuid FROM spares s WHERE sls.spare_id = s.id AND sls.spare_uuid IS NULL;
+      ALTER TABLE spare_location_stock ALTER COLUMN spare_uuid SET NOT NULL;
+
+      -- inventory_transactions: add spare_uuid, populate, SET NOT NULL, FK
+      ALTER TABLE inventory_transactions ADD COLUMN IF NOT EXISTS spare_uuid TEXT;
+      UPDATE inventory_transactions it SET spare_uuid = s.suuid FROM spares s WHERE it.spare_id = s.id AND it.spare_uuid IS NULL;
+      ALTER TABLE inventory_transactions ALTER COLUMN spare_uuid SET NOT NULL;
+
+      -- FK constraints (idempotent)
+      DO $$ BEGIN
+        IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'spares_history_spare_uuid_spares_suuid_fk') THEN
+          ALTER TABLE spares_history ADD CONSTRAINT spares_history_spare_uuid_spares_suuid_fk FOREIGN KEY (spare_uuid) REFERENCES spares(suuid);
+        END IF;
+        IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'spare_component_links_spare_uuid_spares_suuid_fk') THEN
+          ALTER TABLE spare_component_links ADD CONSTRAINT spare_component_links_spare_uuid_spares_suuid_fk FOREIGN KEY (spare_uuid) REFERENCES spares(suuid);
+        END IF;
+        IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'spare_location_stock_spare_uuid_spares_suuid_fk') THEN
+          ALTER TABLE spare_location_stock ADD CONSTRAINT spare_location_stock_spare_uuid_spares_suuid_fk FOREIGN KEY (spare_uuid) REFERENCES spares(suuid);
+        END IF;
+        IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'inventory_transactions_spare_uuid_spares_suuid_fk') THEN
+          ALTER TABLE inventory_transactions ADD CONSTRAINT inventory_transactions_spare_uuid_spares_suuid_fk FOREIGN KEY (spare_uuid) REFERENCES spares(suuid);
+        END IF;
+      END $$
+    `
   }
 ];
 

@@ -93,9 +93,9 @@ export async function migrateInventory(req: Request, res: Response) {
 
         if (!dryRun) {
           const locA = await storage.findOrCreateLocation(vesselId, locationA, 'System Migration');
-          await storage.upsertSpareLocationStock({ vesselId, spareId: spare.id, locationId: locA.id, qty: robA });
+          await storage.upsertSpareLocationStock({ vesselId, spareId: spare.id, spareUuid: spare.suuid, locationId: locA.id, qty: robA });
           await storage.createInventoryTransaction({
-            vesselId, spareId: spare.id, locationId: locA.id, eventType: 'RECEIVE',
+            vesselId, spareId: spare.id, spareUuid: spare.suuid, locationId: locA.id, eventType: 'RECEIVE',
             qtyChange: robA, robTotalBefore: runningRob, robTotalAfter: runningRob + robA,
             robLocationBefore: 0, robLocationAfter: robA, referenceType: 'MANUAL',
             referenceId: `MIGRATE-${vesselId}-${Date.now()}`,
@@ -112,9 +112,9 @@ export async function migrateInventory(req: Request, res: Response) {
 
         if (!dryRun) {
           const locB = await storage.findOrCreateLocation(vesselId, locationB, 'System Migration');
-          await storage.upsertSpareLocationStock({ vesselId, spareId: spare.id, locationId: locB.id, qty: robB });
+          await storage.upsertSpareLocationStock({ vesselId, spareId: spare.id, spareUuid: spare.suuid, locationId: locB.id, qty: robB });
           await storage.createInventoryTransaction({
-            vesselId, spareId: spare.id, locationId: locB.id, eventType: 'RECEIVE',
+            vesselId, spareId: spare.id, spareUuid: spare.suuid, locationId: locB.id, eventType: 'RECEIVE',
             qtyChange: robB, robTotalBefore: runningRob, robTotalAfter: runningRob + robB,
             robLocationBefore: 0, robLocationAfter: robB, referenceType: 'MANUAL',
             referenceId: `MIGRATE-${vesselId}-${Date.now()}`,
@@ -128,7 +128,7 @@ export async function migrateInventory(req: Request, res: Response) {
         if (!dryRun) {
           try {
             await storage.createSpareComponentLink({
-              vesselId, spareId: spare.id, componentId: spare.componentId, linkedBy: 'System Migration'
+              vesselId, spareId: spare.id, spareUuid: spare.suuid, componentId: spare.componentId, linkedBy: 'System Migration'
             });
           } catch (linkError: any) {
             if (!linkError.message?.includes('duplicate')) {

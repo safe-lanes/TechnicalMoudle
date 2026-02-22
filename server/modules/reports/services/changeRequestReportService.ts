@@ -92,7 +92,7 @@ export async function getChangeRequestsStatusTracking(
             break;
           }
           case 'spare': {
-            const spare = await repo.getSpare(parseInt(r.targetId));
+            const spare = await repo.getSpare(r.targetId);
             targetName = spare?.partName || spare?.partCode || r.targetId;
             break;
           }

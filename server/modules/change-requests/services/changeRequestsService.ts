@@ -34,7 +34,7 @@ export async function getTargetEntity(targetType: string, targetId: string) {
       entity = await crRepo.getWorkOrder(targetId);
       break;
     case 'spare':
-      entity = await crRepo.getSpare(parseInt(targetId));
+      entity = await crRepo.getSpare(targetId);
       break;
     case 'store':
       entity = await crRepo.getStoresItem(parseInt(targetId));

@@ -71,7 +71,7 @@ export async function getSparesByVessel(req: Request, res: Response) {
 
 export async function getSpareById(req: Request, res: Response) {
   try {
-    const spare = await sparesService.getSpare(parseInt(req.params.id));
+    const spare = await sparesService.getSpare(req.params.id);
     if (!spare) {
       return res.status(404).json({ error: "Spare not found" });
     }
@@ -97,7 +97,7 @@ export async function createSpare(req: Request, res: Response) {
 export async function updateSpare(req: Request, res: Response) {
   try {
     console.log('[PATCH Spare] Updating spare', req.params.id, 'with data:', JSON.stringify(req.body));
-    const spareId = parseInt(req.params.id);
+    const spareId = req.params.id;
     const userId = (req as any).user?.id?.toString() || 'System';
     const spare = await sparesService.updateSpare(spareId, req.body, userId);
     console.log('[PATCH Spare] Result - location:', spare.location, 'location2:', spare.location2);
@@ -118,7 +118,7 @@ export async function updateSpare(req: Request, res: Response) {
 
 export async function deleteSpare(req: Request, res: Response) {
   try {
-    await sparesService.deleteSpare(parseInt(req.params.id));
+    await sparesService.deleteSpare(req.params.id);
     res.json({ success: true });
   } catch (error: any) {
     if (error.message?.includes('not found')) {
@@ -132,7 +132,7 @@ export async function deleteSpare(req: Request, res: Response) {
 
 export async function adjustSpareAtLocation(req: Request, res: Response) {
   try {
-    const spareId = parseInt(req.params.id);
+    const spareId = req.params.id;
     const vesselId = req.params.vesselId;
     const userId = (req as any).user?.id?.toString() || 'System';
     const spare = await sparesService.adjustSpareAtLocationEndpoint(spareId, vesselId, req.body, userId);
@@ -158,7 +158,7 @@ export async function adjustSpareAtLocation(req: Request, res: Response) {
 
 export async function adjustSpareQuantity(req: Request, res: Response) {
   try {
-    const spare = await sparesService.adjustSpareQuantityEndpoint(parseInt(req.params.id), req.body);
+    const spare = await sparesService.adjustSpareQuantityEndpoint(req.params.id, req.body);
     res.json(spare);
   } catch (error: any) {
     if (error.name === 'ZodError') {
@@ -237,8 +237,8 @@ export async function batchReceive(req: Request, res: Response) {
 
 export async function consumeSimple(req: Request, res: Response) {
   try {
-    const spareId = parseInt(req.params.id);
-    if (isNaN(spareId)) {
+    const spareId = req.params.id;
+    if (!spareId) {
       return res.status(400).json({ error: "Invalid spare ID" });
     }
     const result = await sparesService.consumeSimple(spareId, req.body);
@@ -256,8 +256,8 @@ export async function consumeSimple(req: Request, res: Response) {
 
 export async function receiveSimple(req: Request, res: Response) {
   try {
-    const spareId = parseInt(req.params.id);
-    if (isNaN(spareId)) {
+    const spareId = req.params.id;
+    if (!spareId) {
       return res.status(400).json({ error: "Invalid spare ID" });
     }
     const result = await sparesService.receiveSimple(spareId, req.body);

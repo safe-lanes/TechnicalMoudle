@@ -437,6 +437,7 @@ export type IhmMaintenanceLog = typeof ihmMaintenanceLog.$inferSelect;
 // Spares Table
 export const spares = pgTable("spares", {
   id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
+  suuid: text("suuid").notNull().unique(), // Canonical UUID identity — FK target for all 4 child tables
   partCode: text("part_code").notNull(),
   partName: text("part_name").notNull(),
   componentId: text("component_id").references(() => components.cuuid), // Nullable for fleet spares
@@ -499,6 +500,7 @@ export const spares = pgTable("spares", {
 
 export const insertSpareSchema = createInsertSchema(spares).omit({
   id: true,
+  suuid: true,
   deleted: true,
   createdAt: true,
   updatedAt: true,
@@ -512,7 +514,8 @@ export const sparesHistory = pgTable("spares_history", {
   id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
   timestampUTC: timestamp("timestamp_utc").notNull(),
   vesselId: text("vessel_id").notNull().references(() => vessels.vuuid),
-  spareId: integer("spare_id").notNull(),
+  spareId: integer("spare_id").notNull(), // Legacy integer FK — kept during transition
+  spareUuid: text("spare_uuid").references(() => spares.suuid), // FK → spares.suuid (nullable for spares_history since table was empty)
   partCode: text("part_code").notNull(),
   partName: text("part_name").notNull(),
   componentId: text("component_id").notNull().references(() => components.cuuid),
@@ -2343,7 +2346,8 @@ export type Location = typeof locations.$inferSelect;
 export const spareComponentLinks = pgTable("spare_component_links", {
   id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
   vesselId: text("vessel_id").notNull().references(() => vessels.vuuid),
-  spareId: integer("spare_id").notNull(), // FK → spares.id
+  spareId: integer("spare_id").notNull(), // Legacy integer FK — kept during transition
+  spareUuid: text("spare_uuid").notNull().references(() => spares.suuid), // FK → spares.suuid
   componentId: text("component_id").notNull().references(() => components.cuuid), // FK → components.cuuid
   linkedBy: text("linked_by").notNull(),
   linkedAt: timestamp("linked_at").notNull().defaultNow(),
@@ -2366,7 +2370,8 @@ export type SpareComponentLink = typeof spareComponentLinks.$inferSelect;
 export const spareLocationStock = pgTable("spare_location_stock", {
   id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
   vesselId: text("vessel_id").notNull().references(() => vessels.vuuid),
-  spareId: integer("spare_id").notNull(), // FK → spares.id
+  spareId: integer("spare_id").notNull(), // Legacy integer FK — kept during transition
+  spareUuid: text("spare_uuid").notNull().references(() => spares.suuid), // FK → spares.suuid
   locationId: integer("location_id").notNull(), // FK → locations.id
   qty: integer("qty").notNull().default(0), // Must never go negative
 }, (table) => ({
@@ -2388,7 +2393,8 @@ export const inventoryTransactions = pgTable("inventory_transactions", {
   id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
   vesselId: text("vessel_id").notNull().references(() => vessels.vuuid),
   txnDatetime: timestamp("txn_datetime").notNull().defaultNow(),
-  spareId: integer("spare_id").notNull(), // FK → spares.id
+  spareId: integer("spare_id").notNull(), // Legacy integer FK — kept during transition
+  spareUuid: text("spare_uuid").notNull().references(() => spares.suuid), // FK → spares.suuid
   locationId: integer("location_id"), // Nullable only if non-location specific; for consume/receive MUST set
   eventType: text("event_type").notNull(), // RECEIVE | CONSUME | ADJUST_OPENING_BALANCE | ADJUST_CORRECTION
   qtyChange: integer("qty_change").notNull(), // Positive for receive, negative for consume

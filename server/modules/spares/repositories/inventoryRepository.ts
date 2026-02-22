@@ -110,7 +110,7 @@ export async function getSparesWithInventoryByVessel(vesselId: string): Promise<
   return storage.getSparesWithInventoryByVessel(vesselId);
 }
 
-export async function getSpareWithInventory(spareId: number): Promise<SpareWithInventory | null> {
+export async function getSpareWithInventory(spareId: string): Promise<SpareWithInventory | null> {
   return storage.getSpareWithInventory(spareId);
 }
 
@@ -124,6 +124,6 @@ export async function getSparesWithInventoryByComponentCode(vesselId: string, co
 
 // ── Helper: getSpare (needed for transaction hydration) ──
 
-export async function getSpare(id: number): Promise<Spare | undefined> {
+export async function getSpare(id: string): Promise<Spare | undefined> {
   return storage.getSpare(id);
 }

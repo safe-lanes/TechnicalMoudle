@@ -2076,9 +2076,9 @@ export class PostgresStorage {
       ));
   }
 
-  async getSpare(id: number): Promise<Spare | undefined> {
+  async getSpare(id: string): Promise<Spare | undefined> {
     const db = await getDb();
-    const result = await db.select().from(spares).where(eq(spares.id, id));
+    const result = await db.select().from(spares).where(eq(spares.suuid, id));
     return result[0];
   }
 
@@ -2088,28 +2088,29 @@ export class PostgresStorage {
     const robB = spare.robLocationB ?? 0;
     const result = await db.insert(spares).values({
       ...spare,
+      suuid: randomUUID(),
       dataScope: spare.dataScope || 'vessel',
       rob: spare.rob ?? 0,
       robLocationA: robA,
       robLocationB: robB,
       min: spare.min ?? 0,
     }).returning();
-    
+
     const createdSpare = result[0];
-    
+
     // SYNC: Always create spare_location_stock entries to ensure consistent location presence
     if (createdSpare.vesselId) {
       const vesselId = createdSpare.vesselId;
       const locationAName = createdSpare.location || 'Location A';
       const locationBName = createdSpare.location2 || 'Location B';
       const userId = spare.createdBy || 'System';
-      
+
       try {
         const locationAObj = await this.findLocationStrict(vesselId, locationAName);
         const locationBObj = await this.findLocationStrict(vesselId, locationBName);
         // Always create both location stock entries (even with zero qty) for consistent display
-        await this.upsertSpareLocationStock({ vesselId, spareId: createdSpare.id, locationId: locationAObj.id, qty: robA });
-        await this.upsertSpareLocationStock({ vesselId, spareId: createdSpare.id, locationId: locationBObj.id, qty: robB });
+        await this.upsertSpareLocationStock({ vesselId, spareId: createdSpare.id, spareUuid: createdSpare.suuid, locationId: locationAObj.id, qty: robA });
+        await this.upsertSpareLocationStock({ vesselId, spareId: createdSpare.id, spareUuid: createdSpare.suuid, locationId: locationBObj.id, qty: robB });
       } catch (syncError: any) {
         console.warn(`[createSpare] Failed to sync spare_location_stock for new spare ${createdSpare.id}: ${syncError.message}`);
       }
@@ -2118,7 +2119,7 @@ export class PostgresStorage {
     return createdSpare;
   }
 
-  async updateSpare(id: number, data: Partial<Spare>): Promise<Spare> {
+  async updateSpare(id: string, data: Partial<Spare>): Promise<Spare> {
     const db = await getDb();
     // Filter out undefined/null partCode to prevent NOT NULL constraint violation
     const { partCode, ...restData } = data;
@@ -2126,7 +2127,7 @@ export class PostgresStorage {
     
     const result = await db.update(spares)
       .set(updateData)
-      .where(eq(spares.id, id))
+      .where(eq(spares.suuid, id))
       .returning();
     if (!result[0]) {
       throw new Error(`Spare ${id} not found`);
@@ -2148,8 +2149,8 @@ export class PostgresStorage {
       try {
         const locationAObj = await this.findLocationStrict(vesselId, locationAName);
         const locationBObj = await this.findLocationStrict(vesselId, locationBName);
-        await this.upsertSpareLocationStock({ vesselId, spareId: id, locationId: locationAObj.id, qty: robA });
-        await this.upsertSpareLocationStock({ vesselId, spareId: id, locationId: locationBObj.id, qty: robB });
+        await this.upsertSpareLocationStock({ vesselId, spareId: updatedSpare.id, spareUuid: updatedSpare.suuid, locationId: locationAObj.id, qty: robA });
+        await this.upsertSpareLocationStock({ vesselId, spareId: updatedSpare.id, spareUuid: updatedSpare.suuid, locationId: locationBObj.id, qty: robB });
       } catch (syncError: any) {
         console.warn(`[updateSpare] Failed to sync spare_location_stock for spare ${id}: ${syncError.message}`);
       }
@@ -2158,20 +2159,20 @@ export class PostgresStorage {
     return updatedSpare;
   }
 
-  async deleteSpare(id: number): Promise<void> {
+  async deleteSpare(id: string): Promise<void> {
     const db = await getDb();
     await db.update(spares)
       .set({ deleted: true, updatedAt: new Date() })
-      .where(eq(spares.id, id));
+      .where(eq(spares.suuid, id));
   }
 
   async consumeSpare(
-    id: number, 
-    quantity: number, 
-    userId: string, 
-    remarks?: string, 
-    place?: string, 
-    dateLocal?: string, 
+    id: string,
+    quantity: number,
+    userId: string,
+    remarks?: string,
+    place?: string,
+    dateLocal?: string,
     tz?: string
   ): Promise<Spare> {
     const db = await getDb();
@@ -2189,13 +2190,14 @@ export class PostgresStorage {
         robLocationA: newRobA < 0 ? 0 : newRobA,
         updatedAt: new Date()
       })
-      .where(eq(spares.id, id))
+      .where(eq(spares.suuid, id))
       .returning();
     
     await this.createSpareHistory({
       timestampUTC: new Date(),
       vesselId: spare.vesselId || 'V001',
       spareId: spare.id,
+      spareUuid: spare.suuid,
       partCode: spare.partCode ?? spare.componentSpareCode ?? `SP-${spare.id}`,
       partName: spare.partName,
       componentId: spare.componentId || '',
@@ -2220,7 +2222,8 @@ export class PostgresStorage {
       const locationA = await this.findLocationStrict(vesselId, locationAName);
       await this.upsertSpareLocationStock({
         vesselId,
-        spareId: id,
+        spareId: spare.id,
+        spareUuid: spare.suuid,
         locationId: locationA.id,
         qty: newRobA < 0 ? 0 : newRobA,
       });
@@ -2232,7 +2235,7 @@ export class PostgresStorage {
   }
 
   async consumeSpareFromLocation(
-    id: number,
+    id: string,
     quantity: number,
     location: 'A' | 'B',
     userId: string,
@@ -2273,13 +2276,14 @@ export class PostgresStorage {
         robLocationB: newRobB,
         updatedAt: new Date()
       })
-      .where(eq(spares.id, id))
+      .where(eq(spares.suuid, id))
       .returning();
     
     await this.createSpareHistory({
       timestampUTC: new Date(),
       vesselId: spare.vesselId || 'V001',
       spareId: spare.id,
+      spareUuid: spare.suuid,
       partCode: spare.partCode ?? spare.componentSpareCode ?? `SP-${spare.id}`,
       partName: spare.partName,
       componentId: spare.componentId || '',
@@ -2304,8 +2308,8 @@ export class PostgresStorage {
     try {
       const locationAObj = await this.findLocationStrict(vesselId, locationAName);
       const locationBObj = await this.findLocationStrict(vesselId, locationBName);
-      await this.upsertSpareLocationStock({ vesselId, spareId: id, locationId: locationAObj.id, qty: newRobA });
-      await this.upsertSpareLocationStock({ vesselId, spareId: id, locationId: locationBObj.id, qty: newRobB });
+      await this.upsertSpareLocationStock({ vesselId, spareId: spare.id, spareUuid: spare.suuid, locationId: locationAObj.id, qty: newRobA });
+      await this.upsertSpareLocationStock({ vesselId, spareId: spare.id, spareUuid: spare.suuid, locationId: locationBObj.id, qty: newRobB });
     } catch (syncError: any) {
       console.warn(`[consumeSpareFromLocation] Failed to sync spare_location_stock for spare ${id}: ${syncError.message}`);
     }
@@ -2319,7 +2323,7 @@ export class PostgresStorage {
   }
 
   async receiveSpareToLocation(
-    id: number,
+    id: string,
     quantity: number,
     location: 'A' | 'B',
     userId: string,
@@ -2356,13 +2360,14 @@ export class PostgresStorage {
         lastOrderDate: dateLocal ?? null,
         updatedAt: new Date()
       })
-      .where(eq(spares.id, id))
+      .where(eq(spares.suuid, id))
       .returning();
     
     await this.createSpareHistory({
       timestampUTC: new Date(),
       vesselId: spare.vesselId || 'V001',
       spareId: spare.id,
+      spareUuid: spare.suuid,
       partCode: spare.partCode ?? spare.componentSpareCode ?? `SP-${spare.id}`,
       partName: spare.partName,
       componentId: spare.componentId || '',
@@ -2387,8 +2392,8 @@ export class PostgresStorage {
     try {
       const locationAObj = await this.findLocationStrict(vesselId, locationAName);
       const locationBObj = await this.findLocationStrict(vesselId, locationBName);
-      await this.upsertSpareLocationStock({ vesselId, spareId: id, locationId: locationAObj.id, qty: newRobA });
-      await this.upsertSpareLocationStock({ vesselId, spareId: id, locationId: locationBObj.id, qty: newRobB });
+      await this.upsertSpareLocationStock({ vesselId, spareId: spare.id, spareUuid: spare.suuid, locationId: locationAObj.id, qty: newRobA });
+      await this.upsertSpareLocationStock({ vesselId, spareId: spare.id, spareUuid: spare.suuid, locationId: locationBObj.id, qty: newRobB });
     } catch (syncError: any) {
       console.warn(`[receiveSpareToLocation] Failed to sync spare_location_stock for spare ${id}: ${syncError.message}`);
     }
@@ -2400,7 +2405,7 @@ export class PostgresStorage {
   }
 
   async adjustSpareAtLocation(
-    id: number,
+    id: string,
     newRob: number,
     location: 'A' | 'B',
     userId: string,
@@ -2446,7 +2451,7 @@ export class PostgresStorage {
         robLocationB: newLocB,
         updatedAt: new Date()
       })
-      .where(eq(spares.id, id))
+      .where(eq(spares.suuid, id))
       .returning();
 
     const adjustmentRemarks = remarks || `Adjustment at Location ${location}: ${location === 'A' ? oldLocA : oldLocB}→${newRob}`;
@@ -2455,6 +2460,7 @@ export class PostgresStorage {
       timestampUTC: new Date(),
       vesselId: spare.vesselId || 'V001',
       spareId: spare.id,
+      spareUuid: spare.suuid,
       partCode: spare.partCode ?? spare.componentSpareCode ?? `SP-${spare.id}`,
       partName: spare.partName,
       componentId: spare.componentId || '',
@@ -2479,8 +2485,8 @@ export class PostgresStorage {
     try {
       const locationAObj = await this.findLocationStrict(vesselId, locationAName);
       const locationBObj = await this.findLocationStrict(vesselId, locationBName);
-      await this.upsertSpareLocationStock({ vesselId, spareId: id, locationId: locationAObj.id, qty: newLocA });
-      await this.upsertSpareLocationStock({ vesselId, spareId: id, locationId: locationBObj.id, qty: newLocB });
+      await this.upsertSpareLocationStock({ vesselId, spareId: spare.id, spareUuid: spare.suuid, locationId: locationAObj.id, qty: newLocA });
+      await this.upsertSpareLocationStock({ vesselId, spareId: spare.id, spareUuid: spare.suuid, locationId: locationBObj.id, qty: newLocB });
     } catch (syncError: any) {
       console.warn(`[adjustSpareAtLocation] Failed to sync spare_location_stock for spare ${id}: ${syncError.message}`);
     }
@@ -2489,7 +2495,7 @@ export class PostgresStorage {
   }
 
   async transferSpareLocation(
-    id: number,
+    id: string,
     newRobLocationA: number,
     newRobLocationB: number,
     userId: string,
@@ -2533,7 +2539,7 @@ export class PostgresStorage {
         robLocationB: newLocB,
         updatedAt: new Date()
       })
-      .where(eq(spares.id, id))
+      .where(eq(spares.suuid, id))
       .returning();
     
     // SYNC: Update normalized spare_location_stock table for consistency with Component → Spares view
@@ -2550,15 +2556,17 @@ export class PostgresStorage {
       // Upsert spare_location_stock for Location A
       await this.upsertSpareLocationStock({
         vesselId,
-        spareId: id,
+        spareId: spare.id,
+        spareUuid: spare.suuid,
         locationId: locationA.id,
         qty: newLocA,
       });
-      
+
       // Upsert spare_location_stock for Location B
       await this.upsertSpareLocationStock({
         vesselId,
-        spareId: id,
+        spareId: spare.id,
+        spareUuid: spare.suuid,
         locationId: locationB.id,
         qty: newLocB,
       });
@@ -2585,6 +2593,7 @@ export class PostgresStorage {
         timestampUTC: new Date(),
         vesselId: spare.vesselId || 'V001',
         spareId: spare.id,
+        spareUuid: spare.suuid,
         partCode: spare.partCode ?? spare.componentSpareCode ?? `SP-${spare.id}`,
         partName: spare.partName,
         componentId: spare.componentId || '',
@@ -2616,6 +2625,7 @@ export class PostgresStorage {
       timestampUTC: new Date(),
       vesselId: spare.vesselId || 'V001',
       spareId: spare.id,
+      spareUuid: spare.suuid,
       partCode: spare.partCode ?? spare.componentSpareCode ?? `SP-${spare.id}`,
       partName: spare.partName,
       componentId: spare.componentId || '',
@@ -2637,13 +2647,13 @@ export class PostgresStorage {
   }
 
   async receiveSpare(
-    id: number, 
-    quantity: number, 
-    userId: string, 
-    remarks?: string, 
-    supplierPO?: string, 
-    place?: string, 
-    dateLocal?: string, 
+    id: string,
+    quantity: number,
+    userId: string,
+    remarks?: string,
+    supplierPO?: string,
+    place?: string,
+    dateLocal?: string,
     tz?: string
   ): Promise<Spare> {
     const db = await getDb();
@@ -2662,13 +2672,14 @@ export class PostgresStorage {
         lastOrderDate: dateLocal ?? null,
         updatedAt: new Date()
       })
-      .where(eq(spares.id, id))
+      .where(eq(spares.suuid, id))
       .returning();
     
     await this.createSpareHistory({
       timestampUTC: new Date(),
       vesselId: spare.vesselId || 'V001',
       spareId: spare.id,
+      spareUuid: spare.suuid,
       partCode: spare.partCode ?? spare.componentSpareCode ?? `SP-${spare.id}`,
       partName: spare.partName,
       componentId: spare.componentId || '',
@@ -2690,7 +2701,7 @@ export class PostgresStorage {
   }
 
   async adjustSpareQuantity(
-    spareId: number,
+    spareId: string,
     qtyChange: number,
     eventType: 'CONSUME' | 'RECEIVE' | 'ADJUST',
     reference?: string,
@@ -2715,13 +2726,14 @@ export class PostgresStorage {
         robLocationA: newRobA,
         updatedAt: new Date()
       })
-      .where(eq(spares.id, spareId))
+      .where(eq(spares.suuid, spareId))
       .returning();
     
     await this.createSpareHistory({
       timestampUTC: new Date(),
       vesselId: spare.vesselId || 'V001',
       spareId: spare.id,
+      spareUuid: spare.suuid,
       partCode: spare.partCode ?? spare.componentSpareCode ?? `SP-${spare.id}`,
       partName: spare.partName,
       componentId: spare.componentId || '',
@@ -2743,7 +2755,7 @@ export class PostgresStorage {
   }
 
   async bulkUpdateSpares(
-    updates: Array<{id: number, consumed?: number, received?: number, receivedDate?: string, receivedPlace?: string}>,
+    updates: Array<{id: string, consumed?: number, received?: number, receivedDate?: string, receivedPlace?: string}>,
     userId: string,
     remarks?: string
   ): Promise<Spare[]> {
@@ -2843,7 +2855,7 @@ export class PostgresStorage {
     const db = await getDb();
     const result = await db.select().from(spares)
       .where(and(
-        eq(spares.id, id),
+        eq(spares.suuid, id),
         eq(spares.dataScope, 'fleet')
       ));
     return result[0];
@@ -2853,6 +2865,7 @@ export class PostgresStorage {
     const db = await getDb();
     const result = await db.insert(spares).values({
       ...spare,
+      suuid: randomUUID(),
       dataScope: 'fleet',
       rob: spare.rob ?? 0,
       robLocationA: spare.robLocationA ?? 0,
@@ -2880,6 +2893,7 @@ export class PostgresStorage {
       const robB = spare.robLocationB ?? 0;
       const result = await db.insert(spares).values({
         ...spare,
+        suuid: randomUUID(),
         dataScope: spare.dataScope || 'vessel',
         rob: spare.rob ?? 0,
         robLocationA: robA,
@@ -2925,7 +2939,7 @@ export class PostgresStorage {
       
       const result = await db.update(spares)
         .set(updateData)
-        .where(eq(spares.id, id))
+        .where(eq(spares.suuid, id))
         .returning();
       if (result[0]) {
         results.push(result[0]);
@@ -2958,9 +2972,9 @@ export class PostgresStorage {
         
         await db.update(spares)
           .set(updateData)
-          .where(eq(spares.id, existing.id));
+          .where(eq(spares.suuid, existing.suuid));
         updated++;
-        
+
         // SYNC: Update spare_location_stock if ROB values changed
         const newRobA = spare.robLocationA ?? existing.robLocationA ?? 0;
         const newRobB = spare.robLocationB ?? existing.robLocationB ?? 0;
@@ -2971,8 +2985,8 @@ export class PostgresStorage {
           try {
             const locationAObj = await this.findLocationStrict(spare.vesselId, locationAName);
             const locationBObj = await this.findLocationStrict(spare.vesselId, locationBName);
-            await this.upsertSpareLocationStock({ vesselId: spare.vesselId, spareId: existing.id, locationId: locationAObj.id, qty: newRobA });
-            await this.upsertSpareLocationStock({ vesselId: spare.vesselId, spareId: existing.id, locationId: locationBObj.id, qty: newRobB });
+            await this.upsertSpareLocationStock({ vesselId: spare.vesselId, spareId: existing.id, spareUuid: existing.suuid, locationId: locationAObj.id, qty: newRobA });
+            await this.upsertSpareLocationStock({ vesselId: spare.vesselId, spareId: existing.id, spareUuid: existing.suuid, locationId: locationBObj.id, qty: newRobB });
           } catch (syncError: any) {
             console.warn(`[bulkUpsertSpares] Failed to sync spare_location_stock for spare ${existing.id}: ${syncError.message}`);
           }
@@ -2986,6 +3000,7 @@ export class PostgresStorage {
         const robB = spare.robLocationB ?? 0;
         const result = await db.insert(spares).values({
           ...spare,
+          suuid: randomUUID(),
           dataScope: spare.dataScope || 'vessel',
           rob: spare.rob ?? 0,
           robLocationA: robA,
@@ -3025,7 +3040,7 @@ export class PostgresStorage {
       history: sparesHistory,
       partNumber: spares.partNumber,
     }).from(sparesHistory)
-      .leftJoin(spares, eq(sparesHistory.spareId, spares.id))
+      .leftJoin(spares, eq(sparesHistory.spareUuid, spares.suuid))
       .where(eq(sparesHistory.vesselId, vesselId))
       .orderBy(desc(sparesHistory.timestampUTC));
     return rows.map(r => ({
@@ -3040,7 +3055,7 @@ export class PostgresStorage {
       history: sparesHistory,
       partNumber: spares.partNumber,
     }).from(sparesHistory)
-      .leftJoin(spares, eq(sparesHistory.spareId, spares.id))
+      .leftJoin(spares, eq(sparesHistory.spareUuid, spares.suuid))
       .where(eq(sparesHistory.spareId, spareId))
       .orderBy(desc(sparesHistory.timestampUTC));
     return rows.map(r => ({
@@ -4648,7 +4663,7 @@ export class PostgresStorage {
    */
   private async applySpareChangesInTx(tx: any, spareId: number, updateData: Record<string, any>): Promise<void> {
     // Verify spare exists and capture before state
-    const existing = await tx.select().from(spares).where(eq(spares.id, spareId));
+    const existing = await tx.select().from(spares).where(eq(spares.suuid, spareId));
     if (!existing[0]) {
       throw new Error(`Spare ${spareId} not found`);
     }
@@ -4682,7 +4697,7 @@ export class PostgresStorage {
     
     const result = await tx.update(spares)
       .set({ ...safeUpdateData, updatedAt: new Date() })
-      .where(eq(spares.id, spareId))
+      .where(eq(spares.suuid, spareId))
       .returning();
     
     if (!result[0]) {
@@ -6925,7 +6940,7 @@ export class PostgresStorage {
       qty: spareLocationStock.qty,
     })
     .from(spareLocationStock)
-    .innerJoin(spares, eq(spareLocationStock.spareId, spares.id))
+    .innerJoin(spares, eq(spareLocationStock.spareUuid, spares.suuid))
     .where(eq(spareLocationStock.locationId, locationId));
     
     return result;
@@ -6964,7 +6979,7 @@ export class PostgresStorage {
       locationQty: spareLocationStock.qty,
     })
     .from(spareLocationStock)
-    .innerJoin(spares, eq(spareLocationStock.spareId, spares.id))
+    .innerJoin(spares, eq(spareLocationStock.spareUuid, spares.suuid))
     .where(and(
       eq(spareLocationStock.locationId, locationId),
       eq(spares.vesselId, vesselId),
@@ -6983,7 +6998,7 @@ export class PostgresStorage {
     })
     .from(spareLocationStock)
     .innerJoin(locations, eq(spareLocationStock.locationId, locations.id))
-    .innerJoin(spares, eq(spareLocationStock.spareId, spares.id))
+    .innerJoin(spares, eq(spareLocationStock.spareUuid, spares.suuid))
     .where(and(
       eq(spares.vesselId, vesselId),
       gt(spareLocationStock.qty, 0)
@@ -7092,7 +7107,8 @@ export class PostgresStorage {
     }
     
     // Get spare info for updating legacy ROB fields
-    const spare = await this.getSpare(input.spareId);
+    const spareResult = await db.select().from(spares).where(eq(spares.id, input.spareId));
+    const spare = spareResult[0];
     if (!spare) {
       throw new Error(`Spare ${input.spareId} not found`);
     }
@@ -7101,6 +7117,7 @@ export class PostgresStorage {
     await this.upsertSpareLocationStock({
       vesselId: input.vesselId,
       spareId: input.spareId,
+      spareUuid: spare.suuid,
       locationId: input.locationId,
       qty: newLocationQty,
     });
@@ -7109,6 +7126,7 @@ export class PostgresStorage {
     const transaction = await this.createInventoryTransaction({
       vesselId: input.vesselId,
       spareId: input.spareId,
+      spareUuid: spare.suuid,
       locationId: input.locationId,
       eventType: input.eventType,
       qtyChange: input.qtyChange,
@@ -7241,6 +7259,7 @@ export class PostgresStorage {
         timestampUTC: new Date(),
         vesselId: input.vesselId,
         spareId: input.spareId,
+        spareUuid: spare.suuid,
         partCode: spare.partCode ?? spare.componentSpareCode ?? `SP-${spare.id}`,
         partName: spare.partName,
         componentId: spare.componentId || '',
@@ -7271,13 +7290,13 @@ export class PostgresStorage {
     };
   }
 
-  async getSpareWithInventory(spareId: number): Promise<SpareWithInventory | null> {
+  async getSpareWithInventory(spareId: string): Promise<SpareWithInventory | null> {
     const spare = await this.getSpare(spareId);
     if (!spare) return null;
     
-    const robTotal = await this.getSpareRobTotal(spareId);
-    const locationsWithQty = await this.getSpareLocationsWithQty(spareId);
-    const linkedComponents = await this.getLinkedComponentsForSpare(spareId);
+    const robTotal = await this.getSpareRobTotal(spare.id);
+    const locationsWithQty = await this.getSpareLocationsWithQty(spare.id);
+    const linkedComponents = await this.getLinkedComponentsForSpare(spare.id);
     
     const stockStatus: "OK" | "At Min" = robTotal <= (spare.min ?? 0) ? "At Min" : "OK";
     
@@ -7295,7 +7314,7 @@ export class PostgresStorage {
     const results: SpareWithInventory[] = [];
     
     for (const spare of sparesInVessel) {
-      const withInventory = await this.getSpareWithInventory(spare.id);
+      const withInventory = await this.getSpareWithInventory(spare.suuid);
       if (withInventory) {
         results.push(withInventory);
       }
@@ -7323,7 +7342,7 @@ export class PostgresStorage {
     for (const spare of directSpares) {
       if (!spareIdSet.has(spare.id)) {
         spareIdSet.add(spare.id);
-        const withInventory = await this.getSpareWithInventory(spare.id);
+        const withInventory = await this.getSpareWithInventory(spare.suuid);
         if (withInventory) {
           results.push(withInventory);
         }
@@ -7334,13 +7353,18 @@ export class PostgresStorage {
     for (const link of links) {
       if (!spareIdSet.has(link.spareId)) {
         spareIdSet.add(link.spareId);
-        const withInventory = await this.getSpareWithInventory(link.spareId);
-        if (withInventory) {
-          results.push(withInventory);
+        // Look up spare by integer ID to get suuid for getSpareWithInventory
+        const linkedSpareResult = await db.select().from(spares).where(eq(spares.id, link.spareId));
+        const linkedSpare = linkedSpareResult[0];
+        if (linkedSpare) {
+          const withInventory = await this.getSpareWithInventory(linkedSpare.suuid);
+          if (withInventory) {
+            results.push(withInventory);
+          }
         }
       }
     }
-    
+
     return results;
   }
 
@@ -7380,7 +7404,7 @@ export class PostgresStorage {
     for (const spare of matchingSpares) {
       if (!spareIdSet.has(spare.id)) {
         spareIdSet.add(spare.id);
-        const withInventory = await this.getSpareWithInventory(spare.id);
+        const withInventory = await this.getSpareWithInventory(spare.suuid);
         if (withInventory) {
           results.push(withInventory);
         }
@@ -7391,13 +7415,18 @@ export class PostgresStorage {
     for (const spareId of linkedSpareIds) {
       if (!spareIdSet.has(spareId)) {
         spareIdSet.add(spareId);
-        const withInventory = await this.getSpareWithInventory(spareId);
-        if (withInventory) {
-          results.push(withInventory);
+        // Look up spare by integer ID to get suuid for getSpareWithInventory
+        const linkedSpareResult = await db.select().from(spares).where(eq(spares.id, spareId));
+        const linkedSpare = linkedSpareResult[0];
+        if (linkedSpare) {
+          const withInventory = await this.getSpareWithInventory(linkedSpare.suuid);
+          if (withInventory) {
+            results.push(withInventory);
+          }
         }
       }
     }
-    
+
     return results;
   }
 
@@ -7494,8 +7523,8 @@ export class PostgresStorage {
         const locationBObj = await this.findLocationStrict(vesselId, locationBName);
 
         // Insert fresh entries with correct quantities
-        await db.insert(spareLocationStock).values({ vesselId, spareId: spare.id, locationId: locationAObj.id, qty: robA });
-        await db.insert(spareLocationStock).values({ vesselId, spareId: spare.id, locationId: locationBObj.id, qty: robB });
+        await db.insert(spareLocationStock).values({ vesselId, spareId: spare.id, spareUuid: spare.suuid, locationId: locationAObj.id, qty: robA });
+        await db.insert(spareLocationStock).values({ vesselId, spareId: spare.id, spareUuid: spare.suuid, locationId: locationBObj.id, qty: robB });
         synced++;
       } catch (err: any) {
         console.warn(`[reconcileSpareLocationStock] Failed to sync spare ${spare.id}: ${err.message}`);

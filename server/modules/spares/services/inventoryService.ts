@@ -156,7 +156,7 @@ export async function getTransactions(vesselId: string, query: any) {
 
   // Hydrate transactions with spare data including linkedComponents
   const hydratedTransactions = await Promise.all(transactions.map(async (txn) => {
-    const spare = await repo.getSpare(txn.spareId);
+    const spare = await repo.getSpare(txn.spareUuid);
     const linkedComponents = spare ? await repo.getLinkedComponentsForSpare(spare.id) : [];
     const location = txn.locationId ? await repo.getLocationById(txn.locationId) : null;
     return {
@@ -178,7 +178,7 @@ export async function getSparesWithInventoryByVessel(vesselId: string): Promise<
   return repo.getSparesWithInventoryByVessel(vesselId);
 }
 
-export async function getSpareWithInventory(spareId: number): Promise<SpareWithInventory | null> {
+export async function getSpareWithInventory(spareId: string): Promise<SpareWithInventory | null> {
   return repo.getSpareWithInventory(spareId);
 }
 

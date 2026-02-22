@@ -32,7 +32,7 @@ export async function getSpares(vesselId: string) {
   return storage.getSpares(vesselId);
 }
 
-export async function updateSpare(id: number, data: any) {
+export async function updateSpare(id: string, data: any) {
   return storage.updateSpare(id, data);
 }
 
@@ -142,7 +142,7 @@ export async function getWorkOrder(workOrderId: string) {
   return storage.getWorkOrder(workOrderId);
 }
 
-export async function getSpare(spareId: number) {
+export async function getSpare(spareId: string) {
   return storage.getSpare(spareId);
 }
 

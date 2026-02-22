@@ -28,7 +28,7 @@ export async function getSparesByVessel(vesselId: string): Promise<Spare[]> {
   return repo.getSpares(vesselId);
 }
 
-export async function getSpare(id: number): Promise<Spare | undefined> {
+export async function getSpare(id: string): Promise<Spare | undefined> {
   return repo.getSpare(id);
 }
 
@@ -40,7 +40,7 @@ export async function createSpare(vesselId: string, body: any): Promise<Spare> {
 }
 
 export async function updateSpare(
-  spareId: number,
+  spareId: string,
   body: any,
   userId: string
 ): Promise<Spare> {
@@ -82,14 +82,14 @@ export async function updateSpare(
   return repo.updateSpare(spareId, otherUpdates);
 }
 
-export async function deleteSpare(id: number): Promise<void> {
+export async function deleteSpare(id: string): Promise<void> {
   return repo.deleteSpare(id);
 }
 
 // ── Location-specific Adjustment ──
 
 export async function adjustSpareAtLocationEndpoint(
-  spareId: number, vesselId: string, body: any, userId: string
+  spareId: string, vesselId: string, body: any, userId: string
 ): Promise<Spare> {
   const payload = adjustmentPayloadSchema.parse(body);
 
@@ -110,7 +110,7 @@ export async function adjustSpareAtLocationEndpoint(
 
 // ── Qty Adjust (+/- buttons) ──
 
-export async function adjustSpareQuantityEndpoint(spareId: number, body: any): Promise<Spare> {
+export async function adjustSpareQuantityEndpoint(spareId: string, body: any): Promise<Spare> {
   const payload = adjustPayloadSchema.parse(body);
   return repo.adjustSpareQuantity(
     spareId, payload.qtyChange, payload.eventType, payload.reference, payload.notes
@@ -120,7 +120,7 @@ export async function adjustSpareQuantityEndpoint(spareId: number, body: any): P
 // ── Bulk Update (Location-specific) ──
 
 export interface BulkUpdateRow {
-  componentSpareId: number;
+  componentSpareId: string;
   consumedA?: number;
   consumedB?: number;
   receivedA?: number;
@@ -133,7 +133,7 @@ export interface BulkUpdateRow {
 }
 
 export interface BulkUpdateResult {
-  componentSpareId: number;
+  componentSpareId: string;
   success: boolean;
   message?: string;
   robAfter?: number;
@@ -282,7 +282,7 @@ export async function batchReceive(items: any[], purchaseOrderRef: string, recei
 
 // ── Simple Consume (legacy - Location A default) ──
 
-export async function consumeSimple(spareId: number, body: any): Promise<any> {
+export async function consumeSimple(spareId: string, body: any): Promise<any> {
   const { qty, dateLocal, place, remarks, userId, workOrder } = body;
 
   if (!qty || qty <= 0) {
@@ -304,7 +304,7 @@ export async function consumeSimple(spareId: number, body: any): Promise<any> {
 
 // ── Simple Receive (legacy - Location A default) ──
 
-export async function receiveSimple(spareId: number, body: any): Promise<any> {
+export async function receiveSimple(spareId: string, body: any): Promise<any> {
   const { qty, dateLocal, supplierPO, remarks, userId } = body;
 
   if (!qty || qty <= 0) {

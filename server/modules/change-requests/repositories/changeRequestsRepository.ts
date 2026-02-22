@@ -79,7 +79,7 @@ export async function getWorkOrder(id: string) {
   return storage.getWorkOrder(id);
 }
 
-export async function getSpare(id: number) {
+export async function getSpare(id: string) {
   return storage.getSpare(id);
 }
 

@@ -1031,9 +1031,9 @@ export async function undoImport(req: Request, res: Response) {
       } else if (log.entityType === 'storesItem') {
         currentEntity = await storage.getStoresItem(parseInt(log.entityId));
       } else if (log.entityType === 'spare') {
-        currentEntity = await storage.getSpare(parseInt(log.entityId));
+        currentEntity = await storage.getSpare(log.entityId);
       }
-      
+
       // If entity was deleted or doesn't exist (and it wasn't a created operation)
       if (!currentEntity && log.operation !== 'created') {
         conflicts.push({
@@ -1107,9 +1107,9 @@ export async function undoImport(req: Request, res: Response) {
         } else if (log.entityType === 'storesItem') {
           currentState = await storage.getStoresItem(parseInt(log.entityId));
         } else if (log.entityType === 'spare') {
-          currentState = await storage.getSpare(parseInt(log.entityId));
+          currentState = await storage.getSpare(log.entityId);
         }
-        
+
         // Apply undo operation
         if (log.entityType === 'component') {
           if (log.operation === 'created') {
@@ -1176,7 +1176,7 @@ export async function undoImport(req: Request, res: Response) {
             console.log(`  ✓ Unarchived stores item ${log.entityId}`);
           }
         } else if (log.entityType === 'spare') {
-          const spareId = parseInt(log.entityId);
+          const spareId = log.entityId;
           if (log.operation === 'created') {
             await storage.deleteSpare(spareId);
             result.deleted++;
@@ -1237,7 +1237,7 @@ export async function undoImport(req: Request, res: Response) {
               await storage.updateStoresItem(parseInt(change.log.entityId), change.previousState);
               console.log(`  ↩️ Rolled back stores item ${change.log.entityId}`);
             } else if (change.log.entityType === 'spare') {
-              await storage.updateSpare(parseInt(change.log.entityId), change.previousState);
+              await storage.updateSpare(change.log.entityId, change.previousState);
               console.log(`  ↩️ Rolled back spare ${change.log.entityId}`);
             }
           }

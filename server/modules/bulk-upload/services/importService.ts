@@ -679,7 +679,7 @@ export async function performImport(
           const robLocationAUpdate = row['Location A - ROB'] !== undefined ? (parseInt(row['Location A - ROB']) || 0) : existingSpare.robLocationA;
           const robLocationBUpdate = row['Location B - ROB'] !== undefined ? (parseInt(row['Location B - ROB']) || 0) : existingSpare.robLocationB;
           
-          const updatedSpare = await storage.updateSpare(existingSpare.id, {
+          const updatedSpare = await storage.updateSpare(existingSpare.suuid, {
             partName: String(row['Part Name']).trim(),
             componentId: component.cuuid,
             componentCode: componentCode,
@@ -769,7 +769,7 @@ export async function performImport(
               
               // Always update the spare with latest data (upsert behavior)
               // Same component - update existing spare
-              const updatedSpare = await storage.updateSpare(existingSpare.id, {
+              const updatedSpare = await storage.updateSpare(existingSpare.suuid, {
                 partName: String(row['Part Name']).trim(),
                 componentId: component.cuuid,
                 componentCode: componentCode,
