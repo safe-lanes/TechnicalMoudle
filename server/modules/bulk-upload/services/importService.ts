@@ -1170,7 +1170,7 @@ export async function performImport(
       for (const workOrder of allWorkOrders) {
         if (workOrder.templateCode && !importedTemplateCodes.has(workOrder.templateCode)) {
           const previousSnapshot = createRecordSnapshot(workOrder);
-          const archivedWorkOrder = await storage.archiveWorkOrder(workOrder.id);
+          const archivedWorkOrder = await storage.archiveWorkOrder(workOrder.wouuid);
           result.archived++;
           
           // Track work order archive with authoritative before/after snapshots

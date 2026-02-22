@@ -986,7 +986,7 @@ export async function exportPostponementLog(
   const vessel = allVessels.find(v => v.id === vesselId);
   const vesselName = vessel?.name || vesselId;
 
-  const workOrdersMap = new Map(workOrders.map(wo => [wo.id, wo]));
+  const workOrdersMap = new Map(workOrders.map(wo => [wo.wouuid, wo]));
   const componentsByCodeMap = new Map(components.map(comp => [comp.componentCode, comp]));
 
   let postponements = await repo.getWorkOrderPostponements(vesselId, {
@@ -1003,7 +1003,7 @@ export async function exportPostponementLog(
 
     postponements = postponedWOs.map(wo => ({
       id: `temp-${wo.id}`,
-      workOrderId: wo.id,
+      workOrderId: wo.wouuid,
       vesselId: vesselId,
       postponementNumber: 1,
       originalDueDate: wo.dueDate,

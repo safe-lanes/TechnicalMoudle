@@ -252,7 +252,7 @@ export async function syncWorkOrderStatus(req: Request, res: Response) {
         });
 
         if (!dryRun) {
-          await storage.updateWorkOrder(wo.id, { status: computedStatus });
+          await storage.updateWorkOrder(wo.wouuid, { status: computedStatus });
         }
         stats.statusUpdated++;
       } else {
@@ -457,7 +457,7 @@ export async function populatePostponementHistory(req: Request, res: Response) {
       try {
         const existingPostponements = await storage.getWorkOrderPostponements(
           vessel.id,
-          { workOrderId: wo.id }
+          { workOrderId: wo.wouuid }
         );
 
         if (existingPostponements.length > 0) {
@@ -468,7 +468,7 @@ export async function populatePostponementHistory(req: Request, res: Response) {
         const postponementId = `pp-${wo.id}-${Date.now()}`;
         const postponementData: any = {
           id: postponementId,
-          workOrderId: wo.id,
+          workOrderId: wo.wouuid,
           vesselId: vessel.id,
           postponementNumber: 1,
           originalDueDate: wo.dueDate || null,

@@ -630,7 +630,7 @@ export async function updateWorkOrder(id: string, body: any) {
       if (component) {
         // Create maintenance history record
         try {
-          const existingHistory = await repo.findMaintenanceHistoryByWorkOrderId(freshWorkOrder.id);
+          const existingHistory = await repo.findMaintenanceHistoryByWorkOrderId(freshWorkOrder.wouuid);
           if (existingHistory) {
             console.log(`⚠️ Maintenance history already exists for work order ${freshWorkOrder.id}, skipping duplicate creation`);
           } else {
@@ -661,7 +661,7 @@ export async function updateWorkOrder(id: string, body: any) {
                   componentId: component.cuuid,
                   componentCode: freshWorkOrder.componentCode || component.componentCode,
                   vesselCode: freshWorkOrder.vesselId,
-                  workOrderId: freshWorkOrder.id,
+                  workOrderId: freshWorkOrder.wouuid,
                   workOrderNo: freshWorkOrder.workOrderNo || `WO-${freshWorkOrder.id}`,
                   jobTitle: freshWorkOrder.jobTitle,
                   maintenanceType: freshWorkOrder.maintenanceType || freshWorkOrder.taskType || 'Servicing',
@@ -871,7 +871,7 @@ export async function updateWorkOrder(id: string, body: any) {
                     eventType: 'CONSUME',
                     qtyChange: -Math.abs(qtyConsumed),
                     referenceType: 'WORK_ORDER',
-                    referenceId: workOrder.id,
+                    referenceId: workOrder.wouuid,
                     referenceNote: `WO Approval: ${workOrder.workOrderNo} - ${consumedSpare.comments || 'Consumed during work approval'}`,
                     userId: workOrder.approver || 'system'
                   });

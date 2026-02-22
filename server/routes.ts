@@ -366,7 +366,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         for (const wo of completedWOs) {
           const woAny = wo as any;
           // Check if maintenance history already exists for this work order
-          const existingHistory = await storage.getMaintenanceHistoryByWorkOrderId(woAny.id);
+          const existingHistory = await storage.getMaintenanceHistoryByWorkOrderId(woAny.wouuid);
           if (existingHistory) {
             skippedCount++;
             continue;
@@ -414,7 +414,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             vesselCode: woAny.vesselId,
             jobId: parentJob?.id || woAny.jobId || null,
             jobCode: parentJobNo || null,
-            workOrderId: woAny.id,
+            workOrderId: woAny.wouuid,
             workOrderNo: woAny.templateCode || woAny.workOrderNo || `WO-${woAny.id}`,
             jobTitle: woAny.jobTitle,
             maintenanceType: woAny.taskType || 'Servicing',

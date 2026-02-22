@@ -204,7 +204,7 @@ export class WorkOrderStatusRecalculatorService {
 
         // Only update if status has changed
         if (computedStatus !== wo.status) {
-          await storage.updateWorkOrder(wo.id, { status: computedStatus });
+          await storage.updateWorkOrder(wo.wouuid, { status: computedStatus });
           results.statusesUpdated++;
           console.log(`📝 [StatusRecalculator] Updated WO ${wo.workOrderNo}: ${wo.status} → ${computedStatus}`);
         }

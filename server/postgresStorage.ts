@@ -1873,7 +1873,7 @@ export class PostgresStorage {
 
   async getWorkOrder(id: string): Promise<WorkOrder | undefined> {
     const db = await getDb();
-    const result = await db.select().from(workOrders).where(eq(workOrders.id, id));
+    const result = await db.select().from(workOrders).where(eq(workOrders.wouuid, id));
     return result[0];
   }
 
@@ -1896,6 +1896,7 @@ export class PostgresStorage {
     const result = await db.insert(workOrders).values({
       ...wo,
       id,
+      wouuid: randomUUID(),
       dataScope: wo.dataScope || 'vessel',
     }).returning();
     return result[0];
@@ -1917,7 +1918,7 @@ export class PostgresStorage {
     
     const result = await db.update(workOrders)
       .set({ ...sanitizedData, updatedAt: new Date() })
-      .where(eq(workOrders.id, id))
+      .where(eq(workOrders.wouuid, id))
       .returning();
     if (!result[0]) {
       throw new Error(`Work order ${id} not found`);
@@ -1927,7 +1928,7 @@ export class PostgresStorage {
 
   async deleteWorkOrder(id: string): Promise<void> {
     const db = await getDb();
-    await db.delete(workOrders).where(eq(workOrders.id, id));
+    await db.delete(workOrders).where(eq(workOrders.wouuid, id));
   }
 
   async bulkCreateWorkOrders(woList: InsertWorkOrder[]): Promise<WorkOrder[]> {
@@ -1940,6 +1941,7 @@ export class PostgresStorage {
       const result = await db.insert(workOrders).values({
         ...wo,
         id,
+        wouuid: randomUUID(),
         dataScope: wo.dataScope || 'vessel',
       }).returning();
       results.push(result[0]);
@@ -1976,13 +1978,14 @@ export class PostgresStorage {
       if (existing) {
         await db.update(workOrders)
           .set({ ...wo, updatedAt: new Date() })
-          .where(eq(workOrders.id, existing.id));
+          .where(eq(workOrders.wouuid, existing.wouuid));
         updated++;
       } else {
         const id = wo.id || `WO-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
         await db.insert(workOrders).values({
           ...wo,
           id,
+          wouuid: randomUUID(),
           dataScope: wo.dataScope || 'vessel',
         });
         created++;
@@ -2029,7 +2032,7 @@ export class PostgresStorage {
     const db = await getDb();
     const result = await db.select().from(workOrders)
       .where(and(
-        eq(workOrders.id, id),
+        eq(workOrders.wouuid, id),
         eq(workOrders.dataScope, 'fleet')
       ));
     return result[0];
@@ -2041,6 +2044,7 @@ export class PostgresStorage {
     const result = await db.insert(workOrders).values({
       ...wo,
       id,
+      wouuid: randomUUID(),
       dataScope: 'fleet',
     }).returning();
     return result[0];
@@ -4595,7 +4599,7 @@ export class PostgresStorage {
    */
   private async applyWorkOrderChangesInTx(tx: any, workOrderId: string, updateData: Record<string, any>): Promise<void> {
     // Verify work order exists and capture before state
-    const existing = await tx.select().from(workOrders).where(eq(workOrders.id, workOrderId));
+    const existing = await tx.select().from(workOrders).where(eq(workOrders.wouuid, workOrderId));
     if (!existing[0]) {
       throw new Error(`Work Order ${workOrderId} not found`);
     }
@@ -4621,7 +4625,7 @@ export class PostgresStorage {
     
     const result = await tx.update(workOrders)
       .set({ ...safeUpdateData, updatedAt: new Date() })
-      .where(eq(workOrders.id, workOrderId))
+      .where(eq(workOrders.wouuid, workOrderId))
       .returning();
     
     if (!result[0]) {
@@ -6008,7 +6012,7 @@ export class PostgresStorage {
     const db = await getDb();
     const result = await db.update(workOrders)
       .set({ isActive: false })
-      .where(eq(workOrders.id, id))
+      .where(eq(workOrders.wouuid, id))
       .returning();
     if (result.length === 0) {
       throw new Error(`WorkOrder not found: ${id}`);
@@ -6460,7 +6464,7 @@ export class PostgresStorage {
             postponedDate: null,
             updatedAt: new Date()
           })
-          .where(eq(workOrders.id, wo.id))
+          .where(eq(workOrders.wouuid, wo.wouuid))
           .returning();
         
         if (result.length > 0) {

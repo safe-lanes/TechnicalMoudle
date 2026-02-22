@@ -227,7 +227,7 @@ export async function backfillJobIds(vesselId?: string) {
     );
 
     if (matchingJob) {
-      await repo.update(wo.id, { jobId: (matchingJob as any).id });
+      await repo.update(wo.wouuid, { jobId: (matchingJob as any).id });
       updated++;
       updateResults.push({
         workOrderId: wo.id,

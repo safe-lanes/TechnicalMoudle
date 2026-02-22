@@ -167,7 +167,7 @@ export async function completeWorkOrder(
 
   // Auto-populate component_maintenance_history
   try {
-    const existingHistory = await repo.findMaintenanceHistoryByWorkOrderId(workOrder.id);
+    const existingHistory = await repo.findMaintenanceHistoryByWorkOrderId(workOrder.wouuid);
     if (existingHistory) {
       console.log(`⚠️ Maintenance history already exists for work order ${workOrder.id}, skipping duplicate creation`);
     } else {
@@ -211,7 +211,7 @@ export async function completeWorkOrder(
         vesselCode: workOrder.vesselId,
         jobId: parentJob?.id || workOrder.jobId || null,
         jobCode: parentJobNo || null,
-        workOrderId: workOrder.id,
+        workOrderId: workOrder.wouuid,
         workOrderNo: workOrder.templateCode || `WO-${workOrder.id}`,
         jobTitle: workOrder.jobTitle,
         maintenanceType: workOrder.taskType || 'Servicing',
@@ -391,7 +391,7 @@ export async function completeWorkOrder(
                   eventType: 'CONSUME',
                   qtyChange: -Math.abs(qtyConsumed),
                   referenceType: 'WORK_ORDER',
-                  referenceId: workOrder.id,
+                  referenceId: workOrder.wouuid,
                   referenceNote: `WO: ${workOrder.workOrderNo} - ${consumedSpare.comments || 'Consumed during work completion'}`
                 });
                 console.log(`✅ [Inventory Transaction] Consumed ${qtyConsumed} units of ${consumedSpare.partNo} from location ${resolvedLocationId} (WO: ${workOrder.workOrderNo})`);
