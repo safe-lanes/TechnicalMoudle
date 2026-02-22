@@ -1,0 +1,196 @@
+import * as crRepo from '../repositories/changeRequestsRepository';
+import { insertChangeRequestSchema, insertChangeRequestCommentSchema, insertChangeRequestAttachmentSchema } from '@shared/schema';
+import { getFieldDefinitions, getEditableFields, type TargetType } from '@shared/changeRequestFields';
+import { ValidationError, NotFoundError } from '../../shared/errors';
+
+const VALID_TARGET_TYPES: TargetType[] = ['component', 'job', 'work_order', 'spare', 'store'];
+const VALID_STATUSES = ['draft', 'submitted', 'returned', 'approved', 'rejected'];
+
+// ── Field Definitions ──
+
+export function getFieldDefs(targetType: string, editableOnly: boolean) {
+  if (!VALID_TARGET_TYPES.includes(targetType as TargetType)) {
+    throw new ValidationError(`Invalid target type: ${targetType}`);
+  }
+
+  return editableOnly
+    ? getEditableFields(targetType as TargetType)
+    : getFieldDefinitions(targetType as TargetType);
+}
+
+// ── Target Entity Resolution ──
+
+export async function getTargetEntity(targetType: string, targetId: string) {
+  let entity: any = null;
+
+  switch (targetType) {
+    case 'component':
+      entity = await crRepo.getComponent(targetId);
+      break;
+    case 'job':
+      entity = await crRepo.getJob(targetId);
+      break;
+    case 'work_order':
+      entity = await crRepo.getWorkOrder(targetId);
+      break;
+    case 'spare':
+      entity = await crRepo.getSpare(parseInt(targetId));
+      break;
+    case 'store':
+      entity = await crRepo.getStoresItem(parseInt(targetId));
+      break;
+    default:
+      throw new ValidationError(`Invalid target type: ${targetType}`);
+  }
+
+  if (!entity) {
+    throw new NotFoundError(`${targetType} with ID ${targetId} not found`);
+  }
+
+  // Build field values map
+  const fields = getFieldDefinitions(targetType as TargetType);
+  const fieldValues: Record<string, { displayName: string; currentValue: any; editable: boolean; type: string }> = {};
+
+  for (const field of fields) {
+    fieldValues[field.columnName] = {
+      displayName: field.displayName,
+      currentValue: entity[field.columnName] ?? null,
+      editable: field.editable,
+      type: field.type
+    };
+  }
+
+  return { entity, fieldValues, targetType, targetId };
+}
+
+// ── Change Request CRUD ──
+
+export async function getChangeRequests(query: { vesselId?: string; status?: string; category?: string; requestedBy?: string }) {
+  const { vesselId, status, category, requestedBy } = query;
+
+  if (!vesselId) {
+    throw new ValidationError('vesselId is required for change requests');
+  }
+
+  let requests = await crRepo.getChangeRequests({ vesselId });
+
+  // Apply filters
+  if (status) {
+    requests = requests.filter(r => r.status === status);
+  }
+  if (category) {
+    requests = requests.filter(r => r.category === category);
+  }
+  if (requestedBy) {
+    requests = requests.filter(r => r.requestedByUserId === requestedBy);
+  }
+
+  // Sort by most recent first
+  requests.sort((a, b) => {
+    const aTime = a.createdAt instanceof Date ? a.createdAt.getTime() : new Date(a.createdAt).getTime();
+    const bTime = b.createdAt instanceof Date ? b.createdAt.getTime() : new Date(b.createdAt).getTime();
+    return bTime - aTime;
+  });
+
+  return requests;
+}
+
+export async function getChangeRequest(id: number) {
+  const request = await crRepo.getChangeRequest(id);
+  if (!request) {
+    throw new NotFoundError('Change request not found');
+  }
+  return request;
+}
+
+export async function createChangeRequest(body: any) {
+  const validatedData = insertChangeRequestSchema.parse(body);
+
+  if (!validatedData.vesselId) {
+    throw new ValidationError('vesselId is required for change requests');
+  }
+
+  const requestData = {
+    ...validatedData,
+    vesselId: validatedData.vesselId,
+    status: validatedData.status || 'draft' as const,
+    requestedByUserId: validatedData.requestedByUserId || 'system'
+  };
+
+  return crRepo.createChangeRequest(requestData);
+}
+
+// ── Status Updates ──
+
+export async function updateStatus(id: number, body: { status: string; reviewedByUserId?: string; reviewComments?: string }) {
+  const { status, reviewedByUserId } = body;
+
+  if (!VALID_STATUSES.includes(status)) {
+    throw new ValidationError('Invalid status');
+  }
+
+  return crRepo.updateChangeRequest(id, {
+    status: status as any,
+    reviewedByUserId,
+    reviewedAt: new Date()
+  });
+}
+
+// ── Approve / Reject ──
+
+export async function approveChangeRequest(id: number, body: { comment: string; reviewerId?: string }) {
+  const { comment, reviewerId } = body;
+
+  if (!comment) {
+    throw new ValidationError('Comment is required for approval');
+  }
+
+  const existing = await crRepo.getChangeRequest(id);
+  console.log(`[CR_SERVICE] Approving change request ${id}`, {
+    id: existing?.id,
+    targetType: existing?.targetType,
+    targetId: existing?.targetId,
+    proposedChangesCount: Array.isArray(existing?.proposedChangesJson) ? existing.proposedChangesJson.length : 0
+  });
+
+  const updated = await crRepo.approveChangeRequest(id, reviewerId || 'reviewer', comment);
+  console.log(`[CR_SERVICE] Approval complete, status: ${updated.status}`);
+  return updated;
+}
+
+export async function rejectChangeRequest(id: number, body: { comment: string; reviewerId?: string }) {
+  const { comment, reviewerId } = body;
+
+  if (!comment) {
+    throw new ValidationError('Comment is required for rejection');
+  }
+
+  console.log('Rejecting change request:', id, 'with comment:', comment);
+  const updated = await crRepo.rejectChangeRequest(id, reviewerId || 'reviewer', comment);
+  console.log('Successfully rejected request:', updated);
+  return updated;
+}
+
+// ── Comments ──
+
+export async function getComments(changeRequestId: number) {
+  return crRepo.getChangeRequestComments(changeRequestId);
+}
+
+export async function createComment(changeRequestId: number, body: any) {
+  const commentData = { ...body, changeRequestId };
+  const validatedData = insertChangeRequestCommentSchema.parse(commentData);
+  return crRepo.createChangeRequestComment(validatedData);
+}
+
+// ── Attachments ──
+
+export async function getAttachments(changeRequestId: number) {
+  return crRepo.getChangeRequestAttachments(changeRequestId);
+}
+
+export async function createAttachment(changeRequestId: number, body: any) {
+  const attachmentData = { ...body, changeRequestId };
+  const validatedData = insertChangeRequestAttachmentSchema.parse(attachmentData);
+  return crRepo.createChangeRequestAttachment(validatedData);
+}

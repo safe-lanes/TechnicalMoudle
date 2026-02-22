@@ -16,7 +16,7 @@ import bulkRouter from "./routes/bulk";
 import alertRouter from "./routes/alerts";
 import formRouter from "./routes/forms";
 // fleetAdminRouter → Moved to modules/fleet
-import createChangeRequestsRouter from "./routes/changeRequests";
+// createChangeRequestsRouter → Moved to modules/change-requests
 import { ObjectStorageService, objectStorageClient, parseObjectPath, ObjectNotFoundError } from "./objectStorage";
 // Running Hours routes → Extracted to modules/running-hours
 import moduleRouter from "./modules";
@@ -91,8 +91,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.use("/technical/api/bulk", bulkRouter);
   app.use("/technical/api/alerts", alertRouter);
   app.use("/technical/api/forms", formRouter);
-  const changeRequestsRouter = createChangeRequestsRouter(storage);
-  app.use("/technical/api/change-requests", changeRequestsRouter);
+  // changeRequestsRouter → Moved to modules/change-requests
 
   // Recurring defects endpoints: extracted to server/modules/defects
 
