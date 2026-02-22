@@ -20,7 +20,7 @@ import multer from "multer";
 import { ObjectStorageService, objectStorageClient, parseObjectPath, ObjectNotFoundError } from "./objectStorage";
 // Running Hours routes → Extracted to modules/running-hours
 import moduleRouter from "./modules";
-import chatbotRouter from "./routes/chatbot";
+// chatbotRouter → Moved to modules/chatbot
 import { requirePMSAdmin, mockAuthMiddleware } from "./middleware/auth";
 import { ensureMaintenanceHistoryImmutability } from "./initDb";
 // validateRunningHoursIncrease, canAdminOverride → Moved to modules/running-hours/utils/rhValidation
@@ -87,7 +87,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Reports (critical-spares, equipment-status, breakdown, low-stock, stores, consumption, chemicals, snapshots, change-requests, template-builder, LSA/FFA, critical-components, critical-equipment-schedule) → Extracted to modules/reports
 
   // Sub-routers (originally interspersed with report blocks)
-  app.use(chatbotRouter);
+  // chatbotRouter → Moved to modules/chatbot
   // bulkRouter → Moved to modules/bulk-upload
   // alertRouter → Moved to modules/alerts
   // formRouter → Moved to modules/forms

@@ -14,6 +14,7 @@ import changeRequestRoutes from './change-requests/routes';
 import bulkUploadRoutes from './bulk-upload/routes';
 import alertRoutes from './alerts/routes';
 import formRoutes from './forms/routes';
+import chatbotRoutes from './chatbot/routes';
 
 const moduleRouter = Router();
 
@@ -33,5 +34,6 @@ moduleRouter.use(changeRequestRoutes);
 moduleRouter.use(bulkUploadRoutes);
 moduleRouter.use(alertRoutes);
 moduleRouter.use(formRoutes);
+moduleRouter.use(chatbotRoutes);
 
 export default moduleRouter;
