@@ -46,7 +46,7 @@ export async function getCriticalSparesPreview(
     jobComponentLinks = await repo.getJobComponentLinks(vesselId);
   }
 
-  const componentMap = new Map(componentsData.map(c => [c.id, c]));
+  const componentMap = new Map(componentsData.map(c => [c.cuuid, c]));
 
   const getStockStatus = (rob: number | null | undefined, min: number | null | undefined): string => {
     const robVal = rob ?? 0;
@@ -256,7 +256,7 @@ export async function exportCriticalSparesExcel(
     jobComponentLinks = await repo.getJobComponentLinks(vesselId);
   }
 
-  const componentMap = new Map(componentsData.map(c => [c.id, c]));
+  const componentMap = new Map(componentsData.map(c => [c.cuuid, c]));
 
   const getStockStatus = (rob: number | null | undefined, min: number | null | undefined): string => {
     const robVal = rob ?? 0;

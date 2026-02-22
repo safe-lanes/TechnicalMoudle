@@ -133,7 +133,7 @@ export async function completeWorkOrder(
 
     // Update running hours using the CENTRALIZED function
     await repo.setComponentRunningHours({
-      componentId: component.id,
+      componentId: component.cuuid,
       newRHValue: newRH,
       updateSource: 'WO_COMPLETION',
       userId: executionData.performedBy || 'System',
@@ -142,7 +142,7 @@ export async function completeWorkOrder(
 
     // Record running hours audit entry
     await repo.createRunningHoursAudit({
-      componentId: component.id,
+      componentId: component.cuuid,
       vesselId: componentVesselId,
       previousRH: previousRH.toString(),
       newRH: newRH.toString(),
@@ -206,7 +206,7 @@ export async function completeWorkOrder(
       }
 
       const historyPayload = {
-        componentId: component.id,
+        componentId: component.cuuid,
         componentCode: workOrder.componentCode || component.componentCode,
         vesselCode: workOrder.vesselId,
         jobId: parentJob?.id || workOrder.jobId || null,
@@ -228,7 +228,7 @@ export async function completeWorkOrder(
       };
 
       await repo.createMaintenanceHistory(historyPayload);
-      console.log(`✅ Auto-populated maintenance history for work order ${workOrder.id} (componentId: ${component.id}, jobId: ${historyPayload.jobId}, jobCode: ${historyPayload.jobCode})`);
+      console.log(`✅ Auto-populated maintenance history for work order ${workOrder.id} (componentId: ${component.cuuid}, jobId: ${historyPayload.jobId}, jobCode: ${historyPayload.jobCode})`);
     }
   } catch (historyError) {
     console.error('Failed to create maintenance history record:', historyError);
@@ -275,7 +275,7 @@ export async function completeWorkOrder(
       const jobUpdates: any = {};
       const linkUpdates: any = { updatedAt: new Date() };
 
-      const woComponentId = (workOrder as any).componentId || component.id;
+      const woComponentId = (workOrder as any).componentId || component.cuuid;
 
       // Calendar-based job cycle update
       if (workOrder.maintenanceBasis === 'Calendar' && dateOfCompletion) {

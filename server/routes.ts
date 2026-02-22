@@ -409,7 +409,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           };
 
           const historyPayload = {
-            componentId: component.id,
+            componentId: component.cuuid,
             componentCode: woAny.componentCode || component.componentCode,
             vesselCode: woAny.vesselId,
             jobId: parentJob?.id || woAny.jobId || null,

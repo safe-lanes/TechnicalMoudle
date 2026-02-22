@@ -73,7 +73,7 @@ export async function createDocument(body: any, file: Express.Multer.File, user:
 
   // Coerce types explicitly
   const coercedBody = {
-    componentId: component.id,
+    componentId: component.cuuid,
     componentCode: component.componentCode,
     vesselCode: component.vesselCode,
     fleetEquipmentCode: body.fleetEquipmentCode || null,

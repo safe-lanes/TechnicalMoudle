@@ -66,7 +66,7 @@ export async function getCrewWorkloadDistribution(
 
   const workOrders = await repo.getWorkOrders(String(vesselId));
   const components = await repo.getComponents(String(vesselId));
-  const componentsMap = new Map(components.map(c => [c.id, c]));
+  const componentsMap = new Map(components.map(c => [c.cuuid, c]));
 
   const startDateObj = startDate ? new Date(String(startDate)) : null;
   const endDateObj = endDate ? new Date(String(endDate)) : null;
@@ -258,7 +258,7 @@ export async function exportCrewWorkloadDistributionExcel(
 
   const workOrders = await repo.getWorkOrders(vesselId);
   const components = await repo.getComponents(vesselId);
-  const componentsMap = new Map(components.map(c => [c.id, c]));
+  const componentsMap = new Map(components.map(c => [c.cuuid, c]));
 
   const startDateObj = startDate ? new Date(startDate) : null;
   const endDateObj = endDate ? new Date(endDate) : null;
@@ -613,7 +613,7 @@ export async function getEquipmentUtilizationSummary(
   const utilizationData = rhComponents.map((component, index) => {
     // Get RH logs for this component in the period
     const componentLogs = rhLogs.filter(log =>
-      (log.componentCode === component.componentCode || log.componentId === component.id) &&
+      (log.componentCode === component.componentCode || log.componentId === component.cuuid) &&
       log.updatedAt &&
       new Date(log.updatedAt) >= periodStart &&
       new Date(log.updatedAt) <= periodEnd
@@ -819,7 +819,7 @@ export async function exportEquipmentUtilizationSummaryExcel(
   // Build utilization data
   const utilizationData = rhComponents.map((component, index) => {
     const componentLogs = rhLogs.filter(log =>
-      (log.componentCode === component.componentCode || log.componentId === component.id) &&
+      (log.componentCode === component.componentCode || log.componentId === component.cuuid) &&
       log.updatedAt &&
       new Date(log.updatedAt) >= periodStart &&
       new Date(log.updatedAt) <= periodEnd

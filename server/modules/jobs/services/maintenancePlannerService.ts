@@ -56,7 +56,7 @@ export async function getMaintenancePlannerData(filters: PlannerFilters) {
 
   // Fetch all components for RH lookup
   const components = await repo.findComponents(vesselId);
-  const componentMap = new Map(components.map(c => [c.id, c]));
+  const componentMap = new Map(components.map(c => [c.cuuid, c]));
   const componentCodeMap = new Map(components.map(c => [(c as any).componentCode, c]));
 
   // Fetch job-component links (many-to-many relationships)
@@ -108,7 +108,7 @@ export async function getMaintenancePlannerData(filters: PlannerFilters) {
       // Fallback: Use deprecated componentId/componentCode fields (backward compatibility)
       const component = componentMap.get(job.componentId as string) || componentCodeMap.get(job.componentCode);
       if (component) {
-        jobComponentPairs.push({ job, componentId: component.id, component });
+        jobComponentPairs.push({ job, componentId: component.cuuid, component });
       } else if (job.componentId || job.componentCode) {
         // Job references a component that doesn't exist - still include for visibility
         jobComponentPairs.push({ job, componentId: job.componentId || '', component: undefined });

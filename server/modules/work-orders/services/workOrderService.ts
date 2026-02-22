@@ -34,14 +34,14 @@ export async function listWorkOrders(vesselId?: string) {
       const vesselComponents = await repo.findComponents(vid);
       for (const comp of vesselComponents) {
         componentsByCodeMap.set(`${vid}:${comp.componentCode}`, comp);
-        componentsMap.set(comp.id, comp);
+        componentsMap.set(comp.cuuid, comp);
       }
     }
   } else {
     const components = await repo.findComponents(vesselId);
     for (const comp of components) {
       componentsByCodeMap.set(`${vesselId}:${comp.componentCode}`, comp);
-      componentsMap.set(comp.id, comp);
+      componentsMap.set(comp.cuuid, comp);
     }
   }
 
@@ -658,7 +658,7 @@ export async function updateWorkOrder(id: string, body: any) {
                 console.log(`📅 Using completion date for maintenance history: ${dateOfCompletion} (raw: ${rawCompletionDate})`);
 
                 const historyPayload = {
-                  componentId: component.id,
+                  componentId: component.cuuid,
                   componentCode: freshWorkOrder.componentCode || component.componentCode,
                   vesselCode: freshWorkOrder.vesselId,
                   workOrderId: freshWorkOrder.id,
@@ -678,7 +678,7 @@ export async function updateWorkOrder(id: string, body: any) {
                 };
 
                 await repo.createMaintenanceHistory(historyPayload);
-                console.log(`✅ Created maintenance history for work order ${freshWorkOrder.id} (componentId: ${component.id})`);
+                console.log(`✅ Created maintenance history for work order ${freshWorkOrder.id} (componentId: ${component.cuuid})`);
               }
             }
           }
@@ -745,9 +745,9 @@ export async function updateWorkOrder(id: string, body: any) {
               }
 
               const updateVesselId = freshWorkOrder.vesselId || job.vesselId;
-              if (component.id && updateVesselId) {
-                await repo.updateJobComponentLinkTracking(updateVesselId, job.id, component.id, linkUpdates);
-                console.log(`✅ Updated component-specific tracking for vessel ${updateVesselId}, job ${job.jobNo} + component ${component.id} with lastDoneDate: ${dateOfCompletionNorm}`);
+              if (component.cuuid && updateVesselId) {
+                await repo.updateJobComponentLinkTracking(updateVesselId, job.id, component.cuuid, linkUpdates);
+                console.log(`✅ Updated component-specific tracking for vessel ${updateVesselId}, job ${job.jobNo} + component ${component.cuuid} with lastDoneDate: ${dateOfCompletionNorm}`);
               }
 
               await repo.updateJob(job.id, calendarUpdates);
@@ -767,9 +767,9 @@ export async function updateWorkOrder(id: string, body: any) {
                 }
 
                 const rhUpdateVesselId = freshWorkOrder.vesselId || job.vesselId;
-                if (component.id && rhUpdateVesselId) {
-                  await repo.updateJobComponentLinkTracking(rhUpdateVesselId, job.id, component.id, rhLinkUpdates);
-                  console.log(`✅ Updated component-specific RH tracking for vessel ${rhUpdateVesselId}, job ${job.jobNo} + component ${component.id} with lastDoneRH: ${currentRH}`);
+                if (component.cuuid && rhUpdateVesselId) {
+                  await repo.updateJobComponentLinkTracking(rhUpdateVesselId, job.id, component.cuuid, rhLinkUpdates);
+                  console.log(`✅ Updated component-specific RH tracking for vessel ${rhUpdateVesselId}, job ${job.jobNo} + component ${component.cuuid} with lastDoneRH: ${currentRH}`);
                 }
 
                 await repo.updateJob(job.id, rhUpdates);
@@ -782,7 +782,7 @@ export async function updateWorkOrder(id: string, body: any) {
 
                   if (isInherited) {
                     await repo.setComponentRunningHours({
-                      componentId: component.id,
+                      componentId: component.cuuid,
                       newRHValue: currentRH,
                       updateSource: 'WO_COMPLETION',
                       userId: freshWorkOrder.performedBy || freshWorkOrder.approver || 'System',
@@ -791,7 +791,7 @@ export async function updateWorkOrder(id: string, body: any) {
                     console.log(`✅ Updated INHERITED component ${component.componentCode} RH to ${currentRH} (Section B update only, master unchanged)`);
                   } else if (isMaster || !counterType) {
                     await repo.setComponentRunningHours({
-                      componentId: component.id,
+                      componentId: component.cuuid,
                       newRHValue: currentRH,
                       updateSource: 'WO_COMPLETION',
                       userId: freshWorkOrder.performedBy || freshWorkOrder.approver || 'System',

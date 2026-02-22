@@ -141,7 +141,7 @@ export async function createJob(body: any) {
     if (!component && jobData.componentCode && jobData.vesselId) {
       component = await repo.findComponentByCode(jobData.componentCode, jobData.vesselId);
       if (component) {
-        jobData = { ...jobData, componentId: component.id };
+        jobData = { ...jobData, componentId: component.cuuid };
       }
     }
 

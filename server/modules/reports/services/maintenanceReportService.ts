@@ -77,7 +77,7 @@ export async function exportDueJobs7Days(vesselId: string): Promise<{ buffer: Bu
 
   const jobsMap = new Map(jobs.map(job => [job.id, job]));
   const componentsByCodeMap = new Map(components.map(comp => [comp.componentCode, comp]));
-  const componentsMap = new Map(components.map(comp => [comp.id, comp]));
+  const componentsMap = new Map(components.map(comp => [comp.cuuid, comp]));
 
   const now = new Date();
   now.setHours(0, 0, 0, 0);
@@ -318,7 +318,7 @@ export async function exportOverdueJobs(vesselId: string): Promise<{ buffer: Buf
 
   const jobsMap = new Map(jobs.map(job => [job.id, job]));
   const componentsByCodeMap = new Map(components.map(comp => [comp.componentCode, comp]));
-  const componentsMap = new Map(components.map(comp => [comp.id, comp]));
+  const componentsMap = new Map(components.map(comp => [comp.cuuid, comp]));
 
   const now = new Date();
   now.setHours(0, 0, 0, 0);

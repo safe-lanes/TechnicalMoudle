@@ -362,7 +362,7 @@ export class WorkOrderService {
         const primaryComponent = await storage.getComponent(job.componentId);
         if (primaryComponent) {
           linkedComponents.push({
-            componentId: primaryComponent.id,
+            componentId: primaryComponent.cuuid,
             componentCode: primaryComponent.componentCode || '',
             componentName: primaryComponent.name || ''
           });

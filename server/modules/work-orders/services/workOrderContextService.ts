@@ -215,7 +215,7 @@ export async function getWorkOrderContext(workOrderId: string) {
     executionData,
     job,
     component: {
-      id: component.id,
+      id: component.cuuid,
       componentCode: component.componentCode,
       name: component.name,
       parentId: component.parentId,

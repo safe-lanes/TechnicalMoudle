@@ -380,7 +380,7 @@ export async function performImport(
       
       // Track parent component creation with authoritative state
       if (importHistoryId) {
-        await trackChange(importHistoryId, 'created', 'component', parentComponent.id, null, parentComponent);
+        await trackChange(importHistoryId, 'created', 'component', parentComponent.cuuid, null, parentComponent);
       }
     }
     
@@ -429,7 +429,7 @@ export async function performImport(
           
           // Track component creation with authoritative state
           if (importHistoryId) {
-            await trackChange(importHistoryId, 'created', 'component', newComponent.id, null, newComponent);
+            await trackChange(importHistoryId, 'created', 'component', newComponent.cuuid, null, newComponent);
           }
         } else {
           result.skipped++;
@@ -443,7 +443,7 @@ export async function performImport(
           
           // Track component update with authoritative before/after snapshots
           if (importHistoryId) {
-            await trackChange(importHistoryId, 'updated', 'component', updatedComponent.id, existingComponent, updatedComponent);
+            await trackChange(importHistoryId, 'updated', 'component', updatedComponent.cuuid, existingComponent, updatedComponent);
           }
         } else {
           result.skipped++;
@@ -460,7 +460,7 @@ export async function performImport(
           
           // Track component update with authoritative before/after snapshots
           if (importHistoryId) {
-            await trackChange(importHistoryId, 'updated', 'component', updatedComponent.id, existingComponent, updatedComponent);
+            await trackChange(importHistoryId, 'updated', 'component', updatedComponent.cuuid, existingComponent, updatedComponent);
           }
         } else {
           const newComponent = await createComponentFromRow(row, vesselId);
@@ -469,7 +469,7 @@ export async function performImport(
           
           // Track component creation with authoritative state
           if (importHistoryId) {
-            await trackChange(importHistoryId, 'created', 'component', newComponent.id, null, newComponent);
+            await trackChange(importHistoryId, 'created', 'component', newComponent.cuuid, null, newComponent);
           }
         }
       }
@@ -483,12 +483,12 @@ export async function performImport(
       for (const component of allVesselComponents) {
         if (component.componentCode && !importedCodes.has(component.componentCode) && component.isActive !== false) {
           const previousSnapshot = createRecordSnapshot(component);
-          const archivedComponent = await storage.archiveComponent(component.id);
+          const archivedComponent = await storage.archiveComponent(component.cuuid);
           result.archived++;
           
           // Track component archive with authoritative before/after snapshots
           if (importHistoryId) {
-            await trackChange(importHistoryId, 'archived', 'component', component.id, component, archivedComponent);
+            await trackChange(importHistoryId, 'archived', 'component', component.cuuid, component, archivedComponent);
           }
           
           console.log(`📦 Archived component: ${component.componentCode}`);
@@ -553,13 +553,13 @@ export async function performImport(
             // MANY-TO-MANY SUPPORT: Check via spareComponentLinks (source of truth) if spare is already linked to this component
             try {
               const existingLinks = await storage.getSpareComponentLinksBySpare(existingSpare.id);
-              const linkAlreadyExists = existingLinks.some(link => link.componentId === component.id);
+              const linkAlreadyExists = existingLinks.some(link => link.componentId === component.cuuid);
               
               if (!linkAlreadyExists) {
                 await storage.createSpareComponentLink({
                   vesselId: sparesVesselId,
                   spareId: existingSpare.id,
-                  componentId: component.id,
+                  componentId: component.cuuid,
                   linkedBy: 'system-bulk-import',
                 });
                 result.spareComponentLinksCreated++;
@@ -600,7 +600,7 @@ export async function performImport(
           const newSpare = await storage.createSpare({
             partCode: partCode,
             partName: String(row['Part Name']).trim(),
-            componentId: component.id,
+            componentId: component.cuuid,
             componentCode: componentCode,
             componentName: component.name || '',
             componentSpareCode: `SP-${componentCode}-${String(result.created + 1).padStart(3, '0')}`,
@@ -641,7 +641,7 @@ export async function performImport(
           await processSpareInventory({
             spareId: newSpare.id,
             vesselId: sparesVesselId,
-            componentId: component.id,
+            componentId: component.cuuid,
             locationAName: row['Location A'] ? String(row['Location A']).trim() : null,
             locationBName: row['Location B'] ? String(row['Location B']).trim() : null,
             robLocationA: robLocationAVal,
@@ -681,7 +681,7 @@ export async function performImport(
           
           const updatedSpare = await storage.updateSpare(existingSpare.id, {
             partName: String(row['Part Name']).trim(),
-            componentId: component.id,
+            componentId: component.cuuid,
             componentCode: componentCode,
             componentName: component.name || '',
             critical: criticalValUpdate === 'Yes' || criticalValUpdate === true ? 'Yes' : 'No',
@@ -718,7 +718,7 @@ export async function performImport(
           await processSpareInventory({
             spareId: updatedSpare.id,
             vesselId: sparesVesselId,
-            componentId: component.id,
+            componentId: component.cuuid,
             locationAName: row['Location A'] ? String(row['Location A']).trim() : existingSpare.location,
             locationBName: row['Location B'] ? String(row['Location B']).trim() : existingSpare.location2,
             robLocationA: robLocationAUpdate,
@@ -753,14 +753,14 @@ export async function performImport(
             // MANY-TO-MANY SUPPORT: Check via spareComponentLinks (source of truth) if spare is already linked to this component
             try {
               const existingLinks = await storage.getSpareComponentLinksBySpare(existingSpare.id);
-              const linkAlreadyExists = existingLinks.some(link => link.componentId === component.id);
+              const linkAlreadyExists = existingLinks.some(link => link.componentId === component.cuuid);
               
               if (!linkAlreadyExists) {
                 // Create new link for this component
                 await storage.createSpareComponentLink({
                   vesselId: sparesVesselId,
                   spareId: existingSpare.id,
-                  componentId: component.id,
+                  componentId: component.cuuid,
                   linkedBy: 'system-bulk-import',
                 });
                 result.spareComponentLinksCreated++;
@@ -771,7 +771,7 @@ export async function performImport(
               // Same component - update existing spare
               const updatedSpare = await storage.updateSpare(existingSpare.id, {
                 partName: String(row['Part Name']).trim(),
-                componentId: component.id,
+                componentId: component.cuuid,
                 componentCode: componentCode,
                 componentName: component.name || '',
                 critical: criticalValUpsert === 'Yes' || criticalValUpsert === true ? 'Yes' : 'No',
@@ -808,7 +808,7 @@ export async function performImport(
               await processSpareInventory({
                 spareId: updatedSpare.id,
                 vesselId: sparesVesselId,
-                componentId: component.id,
+                componentId: component.cuuid,
                 locationAName: row['Location A'] ? String(row['Location A']).trim() : existingSpare.location,
                 locationBName: row['Location B'] ? String(row['Location B']).trim() : existingSpare.location2,
                 robLocationA: row['Location A - ROB'] !== undefined ? robLocationAUpsert : existingSpare.robLocationA,
@@ -827,7 +827,7 @@ export async function performImport(
             const newSpare = await storage.createSpare({
               partCode: partCode,
               partName: String(row['Part Name']).trim(),
-              componentId: component.id,
+              componentId: component.cuuid,
               componentCode: componentCode,
               componentName: component.name || '',
               componentSpareCode: `SP-${componentCode}-${String(result.created + 1).padStart(3, '0')}`,
@@ -867,7 +867,7 @@ export async function performImport(
             await processSpareInventory({
               spareId: newSpare.id,
               vesselId: sparesVesselId,
-              componentId: component.id,
+              componentId: component.cuuid,
               locationAName: row['Location A'] ? String(row['Location A']).trim() : null,
               locationBName: row['Location B'] ? String(row['Location B']).trim() : null,
               robLocationA: robLocationAUpsert,
@@ -1394,7 +1394,7 @@ export async function performImport(
       // MANY-TO-MANY: Separate component fields from job master data
       // Component association is now handled via jobComponentLinks table, NOT the job record
       const componentFields = {
-        componentId: component.id,          // DEPRECATED: FK reference to component (UUID)
+        componentId: component.cuuid,          // DEPRECATED: FK reference to component (UUID)
         componentCode: componentCode,       // DEPRECATED: Display/tracking field (SFI code)
         componentName: row['Component Name'] || component.name || null, // DEPRECATED
       };
@@ -1472,7 +1472,7 @@ export async function performImport(
             await storage.createJobComponentLink({
               vesselId: canonicalVesselId,
               jobId: createdJob.id,
-              componentId: component.id,
+              componentId: component.cuuid,
               componentCode: componentCode,
               linkedBy: 'system-bulk-import',
             });
@@ -1497,13 +1497,13 @@ export async function performImport(
           // MANY-TO-MANY: Create link if it doesn't exist
           try {
             const existingLinks = await storage.getJobComponentLinksByJob(existingJob.id);
-            const linkAlreadyExists = existingLinks.some(link => link.componentId === component.id);
+            const linkAlreadyExists = existingLinks.some(link => link.componentId === component.cuuid);
             
             if (!linkAlreadyExists) {
               await storage.createJobComponentLink({
                 vesselId: canonicalVesselId,
                 jobId: existingJob.id,
-                componentId: component.id,
+                componentId: component.cuuid,
                 componentCode: componentCode,
                 linkedBy: 'system-bulk-import',
               });
@@ -1535,13 +1535,13 @@ export async function performImport(
           try {
             // Check if link already exists before creating
             const existingLinks = await storage.getJobComponentLinksByJob(existingJob.id);
-            const linkAlreadyExists = existingLinks.some(link => link.componentId === component.id);
+            const linkAlreadyExists = existingLinks.some(link => link.componentId === component.cuuid);
             
             if (!linkAlreadyExists) {
               await storage.createJobComponentLink({
                 vesselId: canonicalVesselId,
                 jobId: existingJob.id,
-                componentId: component.id,
+                componentId: component.cuuid,
                 componentCode: componentCode,
                 linkedBy: 'system-bulk-import',
               });
@@ -1580,7 +1580,7 @@ export async function performImport(
             await storage.createJobComponentLink({
               vesselId: canonicalVesselId,
               jobId: createdJob.id,
-              componentId: component.id,
+              componentId: component.cuuid,
               componentCode: componentCode,
               linkedBy: 'system-bulk-import',
             });
@@ -2416,7 +2416,7 @@ export async function updateComponentFromRow(componentCode: string, row: any, ve
     throw new Error(`Component code '${componentCode}' not found for vessel '${lookupVesselId}'. Verify that the component exists in this vessel and that the component_code matches exactly.`);
   }
   
-  return await storage.updateComponent(component.id, updateData);
+  return await storage.updateComponent(component.cuuid, updateData);
 }
 
 // Helper function to create work order from Excel row
@@ -2434,7 +2434,7 @@ export async function createWorkOrderFromRow(row: any, templateCode: string, ves
     try {
       const jobs = await storage.getJobs(effectiveVesselId);
       matchingJob = jobs.find(j => 
-        j.componentId === component.id && 
+        j.componentId === component.cuuid && 
         j.jobTitle === jobTitle
       );
       if (matchingJob) {

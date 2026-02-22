@@ -99,7 +99,7 @@ export async function getRunningHoursAnomalyDetection(
 
   // Get components for reference
   const allComponents = await repo.getComponents(vesselId);
-  const componentMap = new Map(allComponents.map(c => [c.id, c]));
+  const componentMap = new Map(allComponents.map(c => [c.cuuid, c]));
   const componentCodeMap = new Map(allComponents.map(c => [c.componentCode, c]));
 
   // Detect anomalies
@@ -318,7 +318,7 @@ export async function exportRunningHoursAnomalyDetectionExcel(
 
   // Get components for reference
   const allComponents = await repo.getComponents(vesselId);
-  const componentMap = new Map(allComponents.map(c => [c.id, c]));
+  const componentMap = new Map(allComponents.map(c => [c.cuuid, c]));
   const componentCodeMap = new Map(allComponents.map(c => [c.componentCode, c]));
 
   // Detect anomalies (same logic as GET endpoint)

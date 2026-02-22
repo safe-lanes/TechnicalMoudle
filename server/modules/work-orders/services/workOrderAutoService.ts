@@ -54,7 +54,7 @@ export async function autoGenerate(vesselId: string) {
 
   // Fetch all components to get currentRH for RH-based jobs
   const allComponents = await repo.findComponents(vesselId);
-  const componentsMap = new Map(allComponents.map((c: any) => [c.id, c]));
+  const componentsMap = new Map(allComponents.map((c: any) => [c.cuuid, c]));
   const storage = repo.getStorage();
 
   // Process Calendar-based jobs

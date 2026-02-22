@@ -118,7 +118,7 @@ export async function getJobContext(jobId: string) {
     job,
     templateData,
     component: component ? {
-      id: component.id,
+      id: component.cuuid,
       componentCode: component.componentCode,
       name: component.name,
       parentId: component.parentId,

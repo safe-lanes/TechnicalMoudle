@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { randomUUID } from 'crypto';
 import { eq, and } from 'drizzle-orm';
 import {
   insertMasterDataSchema,
@@ -716,21 +717,23 @@ export async function copyVessel(body: any) {
       .where(eq(components.vesselId, data.targetVesselCode));
     const existingCodeToId = new Map<string, string>();
     for (const c of targetComps) {
-      if (c.componentCode) existingCodeToId.set(c.componentCode, c.id);
+      if (c.componentCode) existingCodeToId.set(c.componentCode, c.cuuid);
     }
 
     for (const comp of sourceComps) {
       const existingTargetId = comp.componentCode ? existingCodeToId.get(comp.componentCode) : undefined;
       if (existingTargetId) {
-        componentIdMap.set(comp.id, existingTargetId);
+        componentIdMap.set(comp.cuuid, existingTargetId);
         continue;
       }
       const newId = generateId('COMP');
-      componentIdMap.set(comp.id, newId);
+      const newCuuid = randomUUID();
+      componentIdMap.set(comp.cuuid, newCuuid);
 
       try {
         await db.insert(components).values({
           id: newId,
+          cuuid: newCuuid,
           vesselId: data.targetVesselCode,
           componentCode: comp.componentCode,
           name: comp.name,

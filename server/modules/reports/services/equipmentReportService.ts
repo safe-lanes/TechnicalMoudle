@@ -942,8 +942,8 @@ export async function getLsaFfaMaintenanceSchedule(
     lsaFfaComponents = lsaFfaComponents.filter((c: any) => c.eqptSystemDept === equipmentType);
   }
 
-  const lsaFfaComponentIds = new Set(lsaFfaComponents.map((c: any) => c.id));
-  const lsaFfaComponentMap = new Map(lsaFfaComponents.map((c: any) => [c.id, c]));
+  const lsaFfaComponentIds = new Set(lsaFfaComponents.map((c: any) => c.cuuid));
+  const lsaFfaComponentMap = new Map(lsaFfaComponents.map((c: any) => [c.cuuid, c]));
 
   let allJobs: any[] = [];
   if (vesselId === 'all') {
@@ -1038,7 +1038,7 @@ export async function getLsaFfaMaintenanceSchedule(
     const freq = job.frequencyValue ? `${job.frequencyValue} ${job.frequencyUnit || ''}`.trim() : '-';
 
     scheduleItems.push({
-      componentId: comp.id,
+      componentId: comp.cuuid,
       jobId: job.id,
       componentCode: comp.componentCode || '-',
       componentName: comp.name || '-',
@@ -1184,8 +1184,8 @@ export async function getCriticalEquipmentSchedule(
     criticalComponents = criticalComponents.filter((c: any) => c.category === category);
   }
 
-  const criticalComponentIds = new Set(criticalComponents.map((c: any) => c.id));
-  const criticalComponentMap = new Map(criticalComponents.map((c: any) => [c.id, c]));
+  const criticalComponentIds = new Set(criticalComponents.map((c: any) => c.cuuid));
+  const criticalComponentMap = new Map(criticalComponents.map((c: any) => [c.cuuid, c]));
 
   let allJobs: any[] = [];
   if (vesselId === 'all') {
@@ -1280,7 +1280,7 @@ export async function getCriticalEquipmentSchedule(
     const freq = job.frequencyValue ? `${job.frequencyValue} ${job.frequencyUnit || ''}`.trim() : '-';
 
     scheduleItems.push({
-      componentId: comp.id,
+      componentId: comp.cuuid,
       jobId: job.id,
       componentCode: comp.componentCode || '-',
       componentName: comp.name || '-',

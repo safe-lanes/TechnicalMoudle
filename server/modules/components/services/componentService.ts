@@ -49,7 +49,7 @@ export async function create(data: any): Promise<Component> {
 
   const component = await repo.create(data);
   console.log('[API_CREATE] New component:', {
-    id: component.id,
+    id: component.cuuid,
     code: component.componentCode,
     parentId: component.parentId,
     vesselId: component.vesselId

@@ -132,7 +132,7 @@ export async function listParents(vesselId: string) {
   const parentsWithCounts = await Promise.all(
     masterComponents.map(async (component) => {
       // Use storage layer method which handles all ID formats (composite, code, uuid)
-      const inheritedComponents = await repo.getInheritedComponents(component.id, vesselId);
+      const inheritedComponents = await repo.getInheritedComponents(component.cuuid, vesselId);
 
       // Calculate total cumulative RH (includes meter replacement history)
       // Total = meterReplacedLastRh + current meter reading
@@ -173,7 +173,7 @@ export async function listChildren(parentCode: string, vesselId: string) {
   }
 
   // Use storage layer method which handles all ID formats
-  const children = await repo.getInheritedComponents(parent.id, vesselId);
+  const children = await repo.getInheritedComponents(parent.cuuid, vesselId);
 
   // Format response with RH data for each child
   const childrenWithRH = children.map(child => {
@@ -407,7 +407,7 @@ export async function getRHConfig(componentId: string) {
   }
 
   return {
-    componentId: component.id,
+    componentId: component.cuuid,
     componentName: component.name,
     rhCounterType: component.rhCounterType,
     rhMasterComponentId: component.rhMasterComponentId,
@@ -608,7 +608,7 @@ export async function propagateAll(vesselId: string, userId: string) {
     if (currentRH > 0) {
       try {
         const result = await repo.updateMasterRunningHours({
-          componentId: master.id,
+          componentId: master.cuuid,
           newRHValue: currentRH,
           updateSource: 'AUTOMATION',
           userId: userId,
