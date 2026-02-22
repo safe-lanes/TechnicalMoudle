@@ -13,6 +13,7 @@ import reportRoutes from './reports/routes';
 import changeRequestRoutes from './change-requests/routes';
 import bulkUploadRoutes from './bulk-upload/routes';
 import alertRoutes from './alerts/routes';
+import formRoutes from './forms/routes';
 
 const moduleRouter = Router();
 
@@ -31,5 +32,6 @@ moduleRouter.use(reportRoutes);
 moduleRouter.use(changeRequestRoutes);
 moduleRouter.use(bulkUploadRoutes);
 moduleRouter.use(alertRoutes);
+moduleRouter.use(formRoutes);
 
 export default moduleRouter;

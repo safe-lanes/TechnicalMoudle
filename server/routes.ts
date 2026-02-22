@@ -14,7 +14,7 @@ import { WORK_ORDER_THRESHOLDS } from "@shared/workOrders/constants";
 import multer from "multer";
 // bulkRouter → Moved to modules/bulk-upload
 // alertRouter → Moved to modules/alerts
-import formRouter from "./routes/forms";
+// formRouter → Moved to modules/forms
 // fleetAdminRouter → Moved to modules/fleet
 // createChangeRequestsRouter → Moved to modules/change-requests
 import { ObjectStorageService, objectStorageClient, parseObjectPath, ObjectNotFoundError } from "./objectStorage";
@@ -90,7 +90,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.use(chatbotRouter);
   // bulkRouter → Moved to modules/bulk-upload
   // alertRouter → Moved to modules/alerts
-  app.use("/technical/api", formRouter);
+  // formRouter → Moved to modules/forms
   // changeRequestsRouter → Moved to modules/change-requests
 
   // Recurring defects endpoints: extracted to server/modules/defects
