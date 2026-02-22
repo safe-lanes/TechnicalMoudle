@@ -5,9 +5,9 @@ import * as surveyCtrl from './controllers/surveyController';
 import * as certAdminCtrl from './controllers/certAdminController';
 import * as surveyAdminCtrl from './controllers/surveyAdminController';
 
-// Initialize surveys with sample data on startup
+// Initialize surveys lazily (deferred to avoid accessing storage before it's initialized)
 import { initializeSurveys } from './services/surveyService';
-initializeSurveys();
+setTimeout(() => initializeSurveys().catch(() => {}), 0);
 
 const router = Router();
 

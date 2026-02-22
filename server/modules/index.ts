@@ -8,6 +8,7 @@ import sparesRoutes from './spares/routes';
 import storesRoutes from './stores/routes';
 import defectsRoutes from './defects/routes';
 import certSurveysRoutes from './cert-surveys/routes';
+import fleetRoutes from './fleet/routes';
 
 const moduleRouter = Router();
 
@@ -21,5 +22,6 @@ moduleRouter.use(sparesRoutes);
 moduleRouter.use(storesRoutes);
 moduleRouter.use(defectsRoutes);
 moduleRouter.use(certSurveysRoutes);
+moduleRouter.use(fleetRoutes);
 
 export default moduleRouter;
