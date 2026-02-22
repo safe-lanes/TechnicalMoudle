@@ -660,7 +660,7 @@ export interface IStorage {
     mappedBy: string;
   }): Promise<any[]>;
   deleteFleetVesselMapping(id: string): Promise<void>;
-  getVessels(): Promise<Array<{id: string, name: string, code: string}>>;
+  getVessels(): Promise<Array<{id: string, vuuid: string, name: string, code: string}>>;
   
   // On-Demand Work Order Generation (Rule #4)
   // activeComponentCode: optional override for multi-linked jobs to bind WO to specific component context

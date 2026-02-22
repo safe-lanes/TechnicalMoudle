@@ -554,7 +554,8 @@ class MemStorage {
   }
   async createVessel(vessel: any): Promise<any> {
     if (!this.data.vessels) this.data.vessels = {};
-    const newVessel = { ...vessel, id: vessel.id || `V${String(this.getNextId('vessels')).padStart(3, '0')}` };
+    const id = vessel.id || `V${String(this.getNextId('vessels')).padStart(3, '0')}`;
+    const newVessel = { ...vessel, id, vuuid: vessel.vuuid || id };
     this.data.vessels[newVessel.id] = newVessel;
     this.saveData();
     return newVessel;

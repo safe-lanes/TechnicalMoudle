@@ -76,7 +76,7 @@ export async function getVesselsByFleet(fleetId: string): Promise<Vessel[]> {
 
 // ── Vessel operations ──
 
-export async function getVessels(): Promise<Array<{ id: string; name: string; code: string }>> {
+export async function getVessels(): Promise<Array<{ id: string; vuuid: string; name: string; code: string }>> {
   return repo.getVessels();
 }
 
@@ -97,6 +97,7 @@ export async function createVessel(data: {
   try {
     return await repo.createVessel({
       id: data.id,
+      vuuid: data.id, // vuuid = id (canonical UUID identity)
       name: data.name,
       code: data.code || data.id,
       fleetId: data.fleetId ?? null,

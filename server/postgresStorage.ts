@@ -313,11 +313,12 @@ export class PostgresStorage {
 
   // ============= VESSELS (Module 1) =============
 
-  async getVessels(): Promise<Array<{id: string, name: string, code: string}>> {
+  async getVessels(): Promise<Array<{id: string, vuuid: string, name: string, code: string}>> {
     const db = await getDb();
     const result = await db.select().from(vessels);
     return result.map(v => ({
       id: v.id,
+      vuuid: v.vuuid,
       name: v.name,
       code: v.code
     }));
@@ -325,7 +326,7 @@ export class PostgresStorage {
 
   async getVessel(id: string): Promise<Vessel | undefined> {
     const db = await getDb();
-    const result = await db.select().from(vessels).where(eq(vessels.id, id));
+    const result = await db.select().from(vessels).where(eq(vessels.vuuid, id));
     return result[0];
   }
 
@@ -338,7 +339,7 @@ export class PostgresStorage {
   async getVesselIdByName(vesselName: string): Promise<string | undefined> {
     const db = await getDb();
     const result = await db.select().from(vessels).where(eq(vessels.name, vesselName));
-    return result[0]?.id;
+    return result[0]?.vuuid;
   }
 
   async createVessel(vessel: InsertVessel): Promise<Vessel> {
@@ -351,7 +352,7 @@ export class PostgresStorage {
     const db = await getDb();
     const result = await db.update(vessels)
       .set({ ...data, updatedAt: new Date() })
-      .where(eq(vessels.id, id))
+      .where(eq(vessels.vuuid, id))
       .returning();
     if (!result[0]) {
       throw new Error(`Vessel ${id} not found`);
@@ -361,7 +362,7 @@ export class PostgresStorage {
 
   async deleteVessel(id: string): Promise<void> {
     const db = await getDb();
-    await db.delete(vessels).where(eq(vessels.id, id));
+    await db.delete(vessels).where(eq(vessels.vuuid, id));
   }
 
   // ============= PMS VESSEL SETTINGS (Module 1) =============
@@ -3621,7 +3622,7 @@ export class PostgresStorage {
     // First try from vessels table
     const vesselResult = await db.select({ vesselSequence: vessels.vesselSequence })
       .from(vessels)
-      .where(eq(vessels.id, vesselId));
+      .where(eq(vessels.vuuid, vesselId));
     
     let vesselSeq = vesselResult[0]?.vesselSequence;
     
@@ -3632,7 +3633,7 @@ export class PostgresStorage {
       vesselSeq = (maxSeqResult[0]?.max || 0) + 1;
       await db.update(vessels)
         .set({ vesselSequence: vesselSeq })
-        .where(eq(vessels.id, vesselId));
+        .where(eq(vessels.vuuid, vesselId));
     }
     
     // If vessel doesn't exist in vessels table, derive sequence from defect_sequences or defects
@@ -6542,7 +6543,7 @@ export class PostgresStorage {
     const db = await getDb();
     const result = await db.update(vessels)
       .set({ fleetId: fleetId, updatedAt: new Date() })
-      .where(eq(vessels.id, vesselId))
+      .where(eq(vessels.vuuid, vesselId))
       .returning();
     
     if (result.length === 0) {
