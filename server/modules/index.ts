@@ -9,6 +9,7 @@ import storesRoutes from './stores/routes';
 import defectsRoutes from './defects/routes';
 import certSurveysRoutes from './cert-surveys/routes';
 import fleetRoutes from './fleet/routes';
+import reportRoutes from './reports/routes';
 
 const moduleRouter = Router();
 
@@ -23,5 +24,6 @@ moduleRouter.use(storesRoutes);
 moduleRouter.use(defectsRoutes);
 moduleRouter.use(certSurveysRoutes);
 moduleRouter.use(fleetRoutes);
+moduleRouter.use(reportRoutes);
 
 export default moduleRouter;
