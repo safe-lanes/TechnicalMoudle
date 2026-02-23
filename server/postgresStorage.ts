@@ -3631,7 +3631,7 @@ export class PostgresStorage {
 
   async getDefect(id: string): Promise<Defect | undefined> {
     const db = await getDb();
-    const result = await db.select().from(defects).where(eq(defects.id, id));
+    const result = await db.select().from(defects).where(eq(defects.duuid, id));
     return result[0];
   }
 
@@ -3723,6 +3723,7 @@ export class PostgresStorage {
     const result = await db.insert(defects).values({
       ...defect,
       id,
+      duuid: randomUUID(),
     }).returning();
     return result[0];
   }
@@ -3731,7 +3732,7 @@ export class PostgresStorage {
     const db = await getDb();
     const result = await db.update(defects)
       .set({ ...data, updatedAt: new Date() })
-      .where(eq(defects.id, id))
+      .where(eq(defects.duuid, id))
       .returning();
     if (!result[0]) {
       throw new Error(`Defect ${id} not found`);
@@ -3741,7 +3742,7 @@ export class PostgresStorage {
 
   async deleteDefect(id: string): Promise<void> {
     const db = await getDb();
-    await db.delete(defects).where(eq(defects.id, id));
+    await db.delete(defects).where(eq(defects.duuid, id));
   }
 
   async addDefectNote(defectId: string, note: { noteText: string; attachments: string[]; createdBy: string }): Promise<Defect> {
@@ -3764,7 +3765,7 @@ export class PostgresStorage {
     
     const result = await db.update(defects)
       .set({ notes: updatedNotes, updatedAt: new Date() })
-      .where(eq(defects.id, defectId))
+      .where(eq(defects.duuid, defectId))
       .returning();
     
     return result[0];
@@ -3782,7 +3783,7 @@ export class PostgresStorage {
     
     const result = await db.update(defects)
       .set({ linkedDefects: mergedLinks, updatedAt: new Date() })
-      .where(eq(defects.id, defectId))
+      .where(eq(defects.duuid, defectId))
       .returning();
     
     return result[0];
@@ -3804,7 +3805,7 @@ export class PostgresStorage {
         dateCompleted: new Date().toISOString().split('T')[0],
         updatedAt: new Date(),
       })
-      .where(eq(defects.id, defectId))
+      .where(eq(defects.duuid, defectId))
       .returning();
     
     if (!result[0]) {
@@ -3946,7 +3947,7 @@ export class PostgresStorage {
     }
     const defectIds = links.map(l => l.defectId);
     return await db.select().from(defects)
-      .where(inArray(defects.id, defectIds))
+      .where(inArray(defects.duuid, defectIds))
       .orderBy(desc(defects.issueDate));
   }
 
@@ -6066,7 +6067,7 @@ export class PostgresStorage {
         for (const defect of group) {
           await db.update(defects)
             .set({ isRecurring: true })
-            .where(eq(defects.id, defect.id));
+            .where(eq(defects.duuid, defect.duuid));
         }
       }
     }

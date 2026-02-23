@@ -1095,6 +1095,7 @@ export type WorkOrderExecution = typeof workOrderExecutions.$inferSelect;
 // Defects Table for maritime defect tracking
 export const defects = pgTable("defects", {
   id: text("id").primaryKey(),
+  duuid: text("duuid").notNull().unique(), // Canonical UUID identity — FK target for child tables
   vesselId: text("vessel_id").notNull().references(() => vessels.vuuid),
   vesselName: text("vessel_name").notNull(),
   issueDate: text("issue_date").notNull(), // ISO format YYYY-MM-DD
@@ -1293,6 +1294,7 @@ export const defects = pgTable("defects", {
 
 export const insertDefectSchema = createInsertSchema(defects).omit({
   id: true,
+  duuid: true,
   createdAt: true,
   updatedAt: true,
 });
@@ -1303,7 +1305,7 @@ export type Defect = typeof defects.$inferSelect;
 // Defect Actions Table for corrective/preventive actions
 export const defectActions = pgTable("defect_actions", {
   id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
-  defectId: text("defect_id").notNull(),
+  defectId: text("defect_id").notNull().references(() => defects.duuid),
   actionType: text("action_type").notNull(), // 'Corrective' | 'Preventive' | 'Containment' | 'Long-term fix'
   actionDescription: text("action_description").notNull(),
   proposedBy: text("proposed_by").notNull(),
@@ -1334,7 +1336,7 @@ export type DefectAction = typeof defectActions.$inferSelect;
 // Defect Attachments Table for photos and documents
 export const defectAttachments = pgTable("defect_attachments", {
   id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
-  defectId: text("defect_id").notNull(),
+  defectId: text("defect_id").notNull().references(() => defects.duuid),
   filename: text("filename").notNull(),
   url: text("url").notNull(),
   attachmentType: text("attachment_type").notNull(), // 'photo' | 'document' | 'evidence'
@@ -1381,7 +1383,7 @@ export type RecurringDefect = typeof recurringDefects.$inferSelect;
 // Recurring Defect Links - links recurring groups to individual defects
 export const recurringDefectLinks = pgTable("recurring_defect_links", {
   recurringId: integer("recurring_id").notNull().references(() => recurringDefects.id, { onDelete: "cascade" }),
-  defectId: text("defect_id").notNull().references(() => defects.id, { onDelete: "cascade" }),
+  defectId: text("defect_id").notNull().references(() => defects.duuid, { onDelete: "cascade" }),
 }, (table) => ({
   pk: primaryKey({ columns: [table.recurringId, table.defectId] }),
   recurringIdx: index("idx_link_recurring").on(table.recurringId),

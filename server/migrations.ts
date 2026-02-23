@@ -889,6 +889,70 @@ const migrations: Migration[] = [
         END IF;
       END $$
     `
+  },
+  {
+    id: '042_defects_duuid_column',
+    name: 'Add duuid column to defects',
+    description: 'Add duuid TEXT column, populate with gen_random_uuid(), SET NOT NULL + UNIQUE',
+    sql: `
+      ALTER TABLE defects ADD COLUMN IF NOT EXISTS duuid TEXT;
+      UPDATE defects SET duuid = gen_random_uuid()::text WHERE duuid IS NULL;
+      DO $$ BEGIN
+        BEGIN ALTER TABLE defects ALTER COLUMN duuid SET NOT NULL; EXCEPTION WHEN others THEN NULL; END;
+      END $$;
+      DO $$ BEGIN
+        IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'defects_duuid_unique') THEN
+          ALTER TABLE defects ADD CONSTRAINT defects_duuid_unique UNIQUE(duuid);
+        END IF;
+      END $$
+    `
+  },
+  {
+    id: '043_defect_child_tables_fk_constraints',
+    name: 'Backfill child tables with duuid + FK constraints',
+    description: 'Backfill defect_actions, defect_attachments, recurring_defect_links defect_id columns with duuid values, drop old FK, add 3 FK constraints to defects(duuid).',
+    sql: `
+      -- Backfill defect_actions: replace DEF-xxx text IDs with duuid values
+      UPDATE defect_actions da
+      SET defect_id = d.duuid
+      FROM defects d
+      WHERE da.defect_id = d.id AND da.defect_id NOT IN (SELECT duuid FROM defects);
+
+      -- Backfill defect_attachments: replace DEF-xxx text IDs with duuid values
+      UPDATE defect_attachments datt
+      SET defect_id = d.duuid
+      FROM defects d
+      WHERE datt.defect_id = d.id AND datt.defect_id NOT IN (SELECT duuid FROM defects);
+
+      -- Drop existing FK on recurring_defect_links that references defects.id
+      DO $$ BEGIN
+        IF EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'recurring_defect_links_defect_id_defects_id_fk') THEN
+          ALTER TABLE recurring_defect_links DROP CONSTRAINT recurring_defect_links_defect_id_defects_id_fk;
+        END IF;
+      END $$;
+
+      -- Backfill recurring_defect_links: replace DEF-xxx text IDs with duuid values
+      UPDATE recurring_defect_links rdl
+      SET defect_id = d.duuid
+      FROM defects d
+      WHERE rdl.defect_id = d.id AND rdl.defect_id NOT IN (SELECT duuid FROM defects);
+
+      -- Add FK constraints from all 3 child tables to defects(duuid)
+      DO $$ BEGIN
+        IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'defect_actions_defect_id_defects_duuid_fk') THEN
+          ALTER TABLE defect_actions ADD CONSTRAINT defect_actions_defect_id_defects_duuid_fk
+            FOREIGN KEY (defect_id) REFERENCES defects(duuid);
+        END IF;
+        IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'defect_attachments_defect_id_defects_duuid_fk') THEN
+          ALTER TABLE defect_attachments ADD CONSTRAINT defect_attachments_defect_id_defects_duuid_fk
+            FOREIGN KEY (defect_id) REFERENCES defects(duuid);
+        END IF;
+        IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'recurring_defect_links_defect_id_defects_duuid_fk') THEN
+          ALTER TABLE recurring_defect_links ADD CONSTRAINT recurring_defect_links_defect_id_defects_duuid_fk
+            FOREIGN KEY (defect_id) REFERENCES defects(duuid) ON DELETE CASCADE;
+        END IF;
+      END $$
+    `
   }
 ];
 
