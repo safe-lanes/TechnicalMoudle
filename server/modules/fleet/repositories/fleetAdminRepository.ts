@@ -173,11 +173,11 @@ export async function getBulkImportHistory(vesselCode?: string, moduleType?: str
   return storage.getBulkImportHistory(vesselCode, moduleType);
 }
 
-export async function getBulkImportHistoryItem(id: number) {
+export async function getBulkImportHistoryItem(id: string) {
   return storage.getBulkImportHistoryItem(id);
 }
 
-export async function getBulkImportErrors(importId: number) {
+export async function getBulkImportErrors(importId: string) {
   return storage.getBulkImportErrors(importId);
 }
 
@@ -185,7 +185,7 @@ export async function createBulkImportHistory(data: any) {
   return storage.createBulkImportHistory(data);
 }
 
-export async function updateBulkImportHistory(id: number, data: any) {
+export async function updateBulkImportHistory(id: string, data: any) {
   return storage.updateBulkImportHistory(id, data);
 }
 

@@ -1085,6 +1085,43 @@ const migrations: Migration[] = [
         END IF;
       END $$
     `
+  },
+
+  // ── FK-10: Bulk Import History Identity Restructure ──
+
+  {
+    id: '050_bulk_import_history_biuuid_column',
+    name: 'Add biuuid column to bulk_import_history',
+    description: 'Add canonical UUID identity column to bulk_import_history with backfill, NOT NULL, UNIQUE',
+    sql: `
+      ALTER TABLE bulk_import_history ADD COLUMN IF NOT EXISTS biuuid TEXT;
+      UPDATE bulk_import_history SET biuuid = gen_random_uuid()::text WHERE biuuid IS NULL;
+      DO $$ BEGIN
+        BEGIN ALTER TABLE bulk_import_history ALTER COLUMN biuuid SET NOT NULL; EXCEPTION WHEN others THEN NULL; END;
+      END $$;
+      DO $$ BEGIN
+        IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'bulk_import_history_biuuid_unique') THEN
+          ALTER TABLE bulk_import_history ADD CONSTRAINT bulk_import_history_biuuid_unique UNIQUE(biuuid);
+        END IF;
+      END $$
+    `
+  },
+  {
+    id: '051_bulk_import_errors_import_uuid_and_fk',
+    name: 'Add import_uuid to bulk_import_errors + FK constraint',
+    description: 'Add UUID FK column to bulk_import_errors referencing bulk_import_history.biuuid',
+    sql: `
+      ALTER TABLE bulk_import_errors ADD COLUMN IF NOT EXISTS import_uuid TEXT;
+      UPDATE bulk_import_errors bie SET import_uuid = bih.biuuid FROM bulk_import_history bih WHERE bie.import_id = bih.id AND bie.import_uuid IS NULL;
+      DO $$ BEGIN
+        BEGIN ALTER TABLE bulk_import_errors ALTER COLUMN import_uuid SET NOT NULL; EXCEPTION WHEN others THEN NULL; END;
+      END $$;
+      DO $$ BEGIN
+        IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'bulk_import_errors_import_uuid_bulk_import_history_biuuid_fk') THEN
+          ALTER TABLE bulk_import_errors ADD CONSTRAINT bulk_import_errors_import_uuid_bulk_import_history_biuuid_fk FOREIGN KEY (import_uuid) REFERENCES bulk_import_history(biuuid);
+        END IF;
+      END $$
+    `
   }
 ];
 

@@ -755,12 +755,12 @@ export interface IStorage {
   
   // Bulk Import History - Tracking all bulk imports
   getBulkImportHistory(vesselCode?: string, moduleType?: string): Promise<BulkImportHistory[]>;
-  getBulkImportHistoryItem(id: number): Promise<BulkImportHistory | undefined>;
+  getBulkImportHistoryItem(id: string): Promise<BulkImportHistory | undefined>;
   createBulkImportHistory(history: InsertBulkImportHistory): Promise<BulkImportHistory>;
-  updateBulkImportHistory(id: number, data: Partial<BulkImportHistory>): Promise<BulkImportHistory>;
-  
+  updateBulkImportHistory(id: string, data: Partial<BulkImportHistory>): Promise<BulkImportHistory>;
+
   // Bulk Import Errors - Detailed error tracking
-  getBulkImportErrors(importId: number): Promise<BulkImportError[]>;
+  getBulkImportErrors(importId: string): Promise<BulkImportError[]>;
   createBulkImportError(error: InsertBulkImportError): Promise<BulkImportError>;
   createBulkImportErrors(errors: InsertBulkImportError[]): Promise<BulkImportError[]>;
   

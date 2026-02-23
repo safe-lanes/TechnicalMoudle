@@ -504,7 +504,7 @@ export async function getImportHistory(query: any) {
   return { items: history, total, limit: limitNum, offset: offsetNum };
 }
 
-export async function getImportHistoryItem(id: number) {
+export async function getImportHistoryItem(id: string) {
   const entry = await repo.getBulkImportHistoryItem(id);
   if (!entry) {
     const err: any = new Error('Import history entry not found');
@@ -514,7 +514,7 @@ export async function getImportHistoryItem(id: number) {
   return entry;
 }
 
-export async function getImportErrors(importId: number) {
+export async function getImportErrors(importId: string) {
   return repo.getBulkImportErrors(importId);
 }
 
@@ -523,7 +523,7 @@ export async function createImportHistory(body: any) {
   return repo.createBulkImportHistory(validatedData);
 }
 
-export async function updateImportHistory(id: number, body: any) {
+export async function updateImportHistory(id: string, body: any) {
   return repo.updateBulkImportHistory(id, body);
 }
 

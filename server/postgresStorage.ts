@@ -5222,16 +5222,17 @@ export class PostgresStorage {
       .orderBy(desc(bulkImportHistory.uploadedAt));
   }
 
-  async getBulkImportHistoryItem(id: number): Promise<BulkImportHistory | undefined> {
+  async getBulkImportHistoryItem(id: string): Promise<BulkImportHistory | undefined> {
     const db = await getDb();
     const result = await db.select().from(bulkImportHistory)
-      .where(eq(bulkImportHistory.id, id));
+      .where(eq(bulkImportHistory.biuuid, id));
     return result[0];
   }
 
   async createBulkImportHistory(history: InsertBulkImportHistory): Promise<BulkImportHistory> {
     const db = await getDb();
     const result = await db.insert(bulkImportHistory).values({
+      biuuid: randomUUID(),
       vesselCode: history.vesselCode ?? null,
       vesselName: history.vesselName ?? null,
       moduleType: history.moduleType,
@@ -5253,11 +5254,11 @@ export class PostgresStorage {
     return result[0];
   }
 
-  async updateBulkImportHistory(id: number, data: Partial<BulkImportHistory>): Promise<BulkImportHistory> {
+  async updateBulkImportHistory(id: string, data: Partial<BulkImportHistory>): Promise<BulkImportHistory> {
     const db = await getDb();
     const result = await db.update(bulkImportHistory)
       .set(data)
-      .where(eq(bulkImportHistory.id, id))
+      .where(eq(bulkImportHistory.biuuid, id))
       .returning();
     if (!result[0]) {
       throw new Error(`Bulk Import History with id ${id} not found`);
@@ -5265,10 +5266,10 @@ export class PostgresStorage {
     return result[0];
   }
 
-  async getBulkImportErrors(importId: number): Promise<BulkImportError[]> {
+  async getBulkImportErrors(importId: string): Promise<BulkImportError[]> {
     const db = await getDb();
     return await db.select().from(bulkImportErrors)
-      .where(eq(bulkImportErrors.importId, importId))
+      .where(eq(bulkImportErrors.importUuid, importId))
       .orderBy(asc(bulkImportErrors.rowNumber));
   }
 
@@ -5276,6 +5277,7 @@ export class PostgresStorage {
     const db = await getDb();
     const result = await db.insert(bulkImportErrors).values({
       importId: error.importId,
+      importUuid: error.importUuid,
       rowNumber: error.rowNumber,
       fieldName: error.fieldName ?? null,
       fieldValue: error.fieldValue ?? null,

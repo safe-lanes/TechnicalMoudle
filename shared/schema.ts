@@ -2145,6 +2145,7 @@ export type FleetSpareVesselMapping = typeof fleetSpareVesselMapping.$inferSelec
 // =====================================================
 export const bulkImportHistory = pgTable("bulk_import_history", {
   id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
+  biuuid: text("biuuid").notNull().unique(), // Canonical UUID identity — FK target for bulk_import_errors
   vesselCode: text("vessel_code"), // Null for fleet-level imports
   vesselName: text("vessel_name"),
   moduleType: text("module_type").notNull(), // 'Machinery' | 'Jobs' | 'Spares' | 'Stores' | 'Fleet_Component' | 'Fleet_Job' | 'Fleet_Spare'
@@ -2172,6 +2173,7 @@ export const bulkImportHistory = pgTable("bulk_import_history", {
 
 export const insertBulkImportHistorySchema = createInsertSchema(bulkImportHistory).omit({
   id: true,
+  biuuid: true,
   uploadedAt: true,
 });
 
@@ -2184,7 +2186,9 @@ export type BulkImportHistory = typeof bulkImportHistory.$inferSelect;
 // =====================================================
 export const bulkImportErrors = pgTable("bulk_import_errors", {
   id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
-  importId: integer("import_id").notNull(), // Reference to bulkImportHistory
+  importId: integer("import_id").notNull(), // Legacy integer reference — kept during transition
+  importUuid: text("import_uuid").notNull()
+    .references(() => bulkImportHistory.biuuid), // FK → bulk_import_history.biuuid
   rowNumber: integer("row_number").notNull(), // Row number in Excel (1-indexed)
   fieldName: text("field_name"), // Which field had the error
   fieldValue: text("field_value"), // Value that caused error

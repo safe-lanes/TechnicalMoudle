@@ -482,7 +482,7 @@ export async function getImportHistory(req: Request, res: Response) {
 
 export async function getImportHistoryItem(req: Request, res: Response) {
   try {
-    const id = parseInt(req.params.id);
+    const id = req.params.id;
     const entry = await adminService.getImportHistoryItem(id);
     res.json(entry);
   } catch (error: any) {
@@ -496,7 +496,7 @@ export async function getImportHistoryItem(req: Request, res: Response) {
 
 export async function getImportErrors(req: Request, res: Response) {
   try {
-    const id = parseInt(req.params.id);
+    const id = req.params.id;
     const errors = await adminService.getImportErrors(id);
     res.json(errors);
   } catch (error) {
@@ -520,7 +520,7 @@ export async function createImportHistory(req: Request, res: Response) {
 
 export async function updateImportHistory(req: Request, res: Response) {
   try {
-    const id = parseInt(req.params.id);
+    const id = req.params.id;
     const updated = await adminService.updateImportHistory(id, req.body);
     res.json(updated);
   } catch (error) {
