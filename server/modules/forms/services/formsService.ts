@@ -19,7 +19,7 @@ export async function getFormDefinitions() {
   // Get latest version for each form
   const formsWithVersions = await Promise.all(
     forms.map(async (form) => {
-      const latestVersion = await formsRepo.getLatestPublishedVersion(form.id);
+      const latestVersion = await formsRepo.getLatestPublishedVersion(form.fduuid);
       return {
         ...form,
         versionNo: latestVersion?.versionNo || 0,
@@ -34,11 +34,11 @@ export async function getFormDefinitions() {
 
 // ── Versions ──
 
-export async function getFormVersions(formId: number) {
+export async function getFormVersions(formId: string) {
   return formsRepo.getFormVersions(formId);
 }
 
-export async function getFormVersion(versionId: number) {
+export async function getFormVersion(versionId: string) {
   const version = await formsRepo.getFormVersion(versionId);
   if (!version) {
     throw new NotFoundError('Version not found');
@@ -46,7 +46,7 @@ export async function getFormVersion(versionId: number) {
   return version;
 }
 
-export async function createDraftVersion(formId: number, userId: string) {
+export async function createDraftVersion(formId: string, userId: string) {
   const latestPublished = await formsRepo.getLatestPublishedVersion(formId);
   if (!latestPublished) {
     throw new NotFoundError('No published version found to clone');
@@ -59,7 +59,8 @@ export async function createDraftVersion(formId: number, userId: string) {
   }
 
   return formsRepo.createFormVersion({
-    formId,
+    formId: latestPublished.formId,             // Legacy integer reference
+    formDefinitionUuid: formId,                  // UUID FK → form_definitions.fduuid
     versionNo: latestPublished.versionNo + 1,
     versionDate: new Date(),
     status: 'DRAFT',
@@ -69,7 +70,7 @@ export async function createDraftVersion(formId: number, userId: string) {
   });
 }
 
-export async function updateDraftSchema(versionId: number, schemaJson: any) {
+export async function updateDraftSchema(versionId: string, schemaJson: any) {
   if (!schemaJson) {
     throw new ValidationError('Schema JSON is required');
   }
@@ -79,7 +80,7 @@ export async function updateDraftSchema(versionId: number, schemaJson: any) {
   });
 }
 
-export async function publishVersion(versionId: number, userId: string, changelog: string) {
+export async function publishVersion(versionId: string, userId: string, changelog: string) {
   if (!changelog) {
     throw new ValidationError('Changelog is required');
   }
@@ -87,11 +88,11 @@ export async function publishVersion(versionId: number, userId: string, changelo
   return formsRepo.publishFormVersion(versionId, userId || 'user', changelog);
 }
 
-export async function discardVersion(versionId: number) {
+export async function discardVersion(versionId: string) {
   return formsRepo.discardFormVersion(versionId);
 }
 
-export async function rollbackToVersion(formId: number, versionId: number, userId: string) {
+export async function rollbackToVersion(formId: string, versionId: string, userId: string) {
   const sourceVersion = await formsRepo.getFormVersion(versionId);
   if (!sourceVersion) {
     throw new NotFoundError('Version not found');
@@ -107,7 +108,8 @@ export async function rollbackToVersion(formId: number, versionId: number, userI
   const newVersionNo = latestVersion ? latestVersion.versionNo + 1 : 1;
 
   return formsRepo.createFormVersion({
-    formId,
+    formId: sourceVersion.formId,               // Legacy integer reference
+    formDefinitionUuid: formId,                  // UUID FK → form_definitions.fduuid
     versionNo: newVersionNo,
     versionDate: new Date(),
     status: 'DRAFT',
@@ -126,13 +128,14 @@ export async function getRuntimeSchema(name: string, module: string) {
   }
 
   await formsRepo.createFormVersionUsage({
-    formVersionId: version.id,
+    formVersionId: version.id,            // Legacy integer reference
+    formVersionUuid: version.fvuuid,      // UUID FK → form_versions.fvuuid
     usedInModule: module || 'unknown',
     usedAt: new Date()
   });
 
   return {
-    versionId: version.id,
+    versionId: version.fvuuid,
     versionNo: version.versionNo,
     schema: JSON.parse(version.schemaJson)
   };

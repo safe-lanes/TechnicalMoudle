@@ -4145,10 +4145,10 @@ export class PostgresStorage {
     return await db.select().from(formDefinitions);
   }
 
-  async getFormDefinition(id: number): Promise<FormDefinition | undefined> {
+  async getFormDefinition(id: string): Promise<FormDefinition | undefined> {
     const db = await getDb();
     const result = await db.select().from(formDefinitions)
-      .where(eq(formDefinitions.id, id));
+      .where(eq(formDefinitions.fduuid, id));
     return result[0];
   }
 
@@ -4161,31 +4161,34 @@ export class PostgresStorage {
 
   async createFormDefinition(form: InsertFormDefinition): Promise<FormDefinition> {
     const db = await getDb();
-    const result = await db.insert(formDefinitions).values(form).returning();
+    const result = await db.insert(formDefinitions).values({
+      ...form,
+      fduuid: randomUUID(),
+    }).returning();
     return result[0];
   }
 
   // ============= MODULE 11: FORM VERSIONS =============
 
-  async getFormVersions(formId: number): Promise<FormVersion[]> {
+  async getFormVersions(formId: string): Promise<FormVersion[]> {
     const db = await getDb();
     return await db.select().from(formVersions)
-      .where(eq(formVersions.formId, formId))
+      .where(eq(formVersions.formDefinitionUuid, formId))
       .orderBy(desc(formVersions.versionNo));
   }
 
-  async getFormVersion(id: number): Promise<FormVersion | undefined> {
+  async getFormVersion(id: string): Promise<FormVersion | undefined> {
     const db = await getDb();
     const result = await db.select().from(formVersions)
-      .where(eq(formVersions.id, id));
+      .where(eq(formVersions.fvuuid, id));
     return result[0];
   }
 
-  async getLatestPublishedVersion(formId: number): Promise<FormVersion | undefined> {
+  async getLatestPublishedVersion(formId: string): Promise<FormVersion | undefined> {
     const db = await getDb();
     const result = await db.select().from(formVersions)
       .where(and(
-        eq(formVersions.formId, formId),
+        eq(formVersions.formDefinitionUuid, formId),
         eq(formVersions.status, 'PUBLISHED')
       ))
       .orderBy(desc(formVersions.versionNo))
@@ -4196,20 +4199,23 @@ export class PostgresStorage {
   async getLatestPublishedVersionByName(name: string): Promise<FormVersion | undefined> {
     const form = await this.getFormDefinitionByName(name);
     if (!form) return undefined;
-    return this.getLatestPublishedVersion(form.id);
+    return this.getLatestPublishedVersion(form.fduuid);
   }
 
   async createFormVersion(version: InsertFormVersion): Promise<FormVersion> {
     const db = await getDb();
-    const result = await db.insert(formVersions).values(version).returning();
+    const result = await db.insert(formVersions).values({
+      ...version,
+      fvuuid: randomUUID(),
+    }).returning();
     return result[0];
   }
 
-  async updateFormVersion(id: number, data: Partial<FormVersion>): Promise<FormVersion> {
+  async updateFormVersion(id: string, data: Partial<FormVersion>): Promise<FormVersion> {
     const db = await getDb();
     const result = await db.update(formVersions)
       .set(data)
-      .where(eq(formVersions.id, id))
+      .where(eq(formVersions.fvuuid, id))
       .returning();
     if (!result[0]) {
       throw new Error(`Form version ${id} not found`);
@@ -4217,16 +4223,16 @@ export class PostgresStorage {
     return result[0];
   }
 
-  async publishFormVersion(id: number, userId: string, changelog: string): Promise<FormVersion> {
+  async publishFormVersion(id: string, userId: string, changelog: string): Promise<FormVersion> {
     const db = await getDb();
     const result = await db.update(formVersions)
-      .set({ 
+      .set({
         status: 'PUBLISHED',
         authorUserId: userId,
         changelog,
         versionDate: new Date()
       })
-      .where(eq(formVersions.id, id))
+      .where(eq(formVersions.fvuuid, id))
       .returning();
     if (!result[0]) {
       throw new Error(`Form version ${id} not found`);
@@ -4234,9 +4240,9 @@ export class PostgresStorage {
     return result[0];
   }
 
-  async discardFormVersion(id: number): Promise<void> {
+  async discardFormVersion(id: string): Promise<void> {
     const db = await getDb();
-    await db.delete(formVersions).where(eq(formVersions.id, id));
+    await db.delete(formVersions).where(eq(formVersions.fvuuid, id));
   }
 
   // ============= MODULE 11: FORM VERSION USAGE =============
@@ -4247,10 +4253,10 @@ export class PostgresStorage {
     return result[0];
   }
 
-  async getFormVersionUsage(formVersionId: number): Promise<FormVersionUsage[]> {
+  async getFormVersionUsage(formVersionId: string): Promise<FormVersionUsage[]> {
     const db = await getDb();
     return await db.select().from(formVersionUsage)
-      .where(eq(formVersionUsage.formVersionId, formVersionId));
+      .where(eq(formVersionUsage.formVersionUuid, formVersionId));
   }
 
   async seedForms(): Promise<void> {

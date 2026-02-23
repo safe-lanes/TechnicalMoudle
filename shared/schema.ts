@@ -330,12 +330,14 @@ export type Component = typeof components.$inferSelect;
 // Form Definitions Table
 export const formDefinitions = pgTable("form_definitions", {
   id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
+  fduuid: text("fduuid").notNull().unique(), // Canonical UUID identity — FK target for form_versions
   name: text("name").notNull().unique(), // ADD_COMPONENT, WO_PLANNED, WO_UNPLANNED
   subgroup: text("subgroup"),
 });
 
 export const insertFormDefinitionSchema = createInsertSchema(formDefinitions).omit({
   id: true,
+  fduuid: true,
 });
 
 export type InsertFormDefinition = z.infer<typeof insertFormDefinitionSchema>;
@@ -344,7 +346,10 @@ export type FormDefinition = typeof formDefinitions.$inferSelect;
 // Form Versions Table
 export const formVersions = pgTable("form_versions", {
   id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
-  formId: integer("form_id").notNull(),
+  fvuuid: text("fvuuid").notNull().unique(), // Canonical UUID identity — FK target for form_version_usage
+  formId: integer("form_id").notNull(), // Legacy integer reference — kept during transition
+  formDefinitionUuid: text("form_definition_uuid").notNull()
+    .references(() => formDefinitions.fduuid), // FK → form_definitions.fduuid
   versionNo: integer("version_no").notNull(),
   versionDate: timestamp("version_date").notNull(),
   status: text("status").notNull(), // DRAFT, PUBLISHED, ARCHIVED
@@ -358,6 +363,7 @@ export const formVersions = pgTable("form_versions", {
 
 export const insertFormVersionSchema = createInsertSchema(formVersions).omit({
   id: true,
+  fvuuid: true,
 });
 
 export type InsertFormVersion = z.infer<typeof insertFormVersionSchema>;
@@ -366,7 +372,9 @@ export type FormVersion = typeof formVersions.$inferSelect;
 // Form Version Usage Table (Audit)
 export const formVersionUsage = pgTable("form_version_usage", {
   id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
-  formVersionId: integer("form_version_id").notNull(),
+  formVersionId: integer("form_version_id").notNull(), // Legacy integer reference — kept during transition
+  formVersionUuid: text("form_version_uuid").notNull()
+    .references(() => formVersions.fvuuid), // FK → form_versions.fvuuid
   usedInModule: text("used_in_module").notNull(),
   usedAt: timestamp("used_at").notNull(),
 });

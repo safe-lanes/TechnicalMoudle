@@ -450,23 +450,23 @@ export interface IStorage {
   
   // Form Definition methods
   getFormDefinitions(): Promise<FormDefinition[]>;
-  getFormDefinition(id: number): Promise<FormDefinition | undefined>;
+  getFormDefinition(id: string): Promise<FormDefinition | undefined>;
   getFormDefinitionByName(name: string): Promise<FormDefinition | undefined>;
   createFormDefinition(form: InsertFormDefinition): Promise<FormDefinition>;
-  
+
   // Form Version methods
-  getFormVersions(formId: number): Promise<FormVersion[]>;
-  getFormVersion(id: number): Promise<FormVersion | undefined>;
-  getLatestPublishedVersion(formId: number): Promise<FormVersion | undefined>;
+  getFormVersions(formId: string): Promise<FormVersion[]>;
+  getFormVersion(id: string): Promise<FormVersion | undefined>;
+  getLatestPublishedVersion(formId: string): Promise<FormVersion | undefined>;
   getLatestPublishedVersionByName(name: string): Promise<FormVersion | undefined>;
   createFormVersion(version: InsertFormVersion): Promise<FormVersion>;
-  updateFormVersion(id: number, data: Partial<FormVersion>): Promise<FormVersion>;
-  publishFormVersion(id: number, userId: string, changelog: string): Promise<FormVersion>;
-  discardFormVersion(id: number): Promise<void>;
-  
+  updateFormVersion(id: string, data: Partial<FormVersion>): Promise<FormVersion>;
+  publishFormVersion(id: string, userId: string, changelog: string): Promise<FormVersion>;
+  discardFormVersion(id: string): Promise<void>;
+
   // Form Version Usage methods
   createFormVersionUsage(usage: InsertFormVersionUsage): Promise<FormVersionUsage>;
-  getFormVersionUsage(formVersionId: number): Promise<FormVersionUsage[]>;
+  getFormVersionUsage(formVersionId: string): Promise<FormVersionUsage[]>;
   
   // Seed forms method
   seedForms(): Promise<void>;

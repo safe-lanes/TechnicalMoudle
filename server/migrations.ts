@@ -1019,6 +1019,72 @@ const migrations: Migration[] = [
         END IF;
       END $$
     `
+  },
+
+  // ── FK-9: Form Definitions + Form Versions Identity Restructure ──
+
+  {
+    id: '047_form_definitions_fduuid_column',
+    name: 'Add fduuid column to form_definitions',
+    description: 'Add canonical UUID identity column to form_definitions with backfill, NOT NULL, UNIQUE',
+    sql: `
+      ALTER TABLE form_definitions ADD COLUMN IF NOT EXISTS fduuid TEXT;
+      UPDATE form_definitions SET fduuid = gen_random_uuid()::text WHERE fduuid IS NULL;
+      DO $$ BEGIN
+        BEGIN ALTER TABLE form_definitions ALTER COLUMN fduuid SET NOT NULL; EXCEPTION WHEN others THEN NULL; END;
+      END $$;
+      DO $$ BEGIN
+        IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'form_definitions_fduuid_unique') THEN
+          ALTER TABLE form_definitions ADD CONSTRAINT form_definitions_fduuid_unique UNIQUE(fduuid);
+        END IF;
+      END $$
+    `
+  },
+  {
+    id: '048_form_versions_fvuuid_and_form_definition_uuid',
+    name: 'Add fvuuid + form_definition_uuid to form_versions + FK constraint',
+    description: 'Add canonical UUID identity column and FK to form_definitions on form_versions',
+    sql: `
+      -- fvuuid column
+      ALTER TABLE form_versions ADD COLUMN IF NOT EXISTS fvuuid TEXT;
+      UPDATE form_versions SET fvuuid = gen_random_uuid()::text WHERE fvuuid IS NULL;
+      DO $$ BEGIN
+        BEGIN ALTER TABLE form_versions ALTER COLUMN fvuuid SET NOT NULL; EXCEPTION WHEN others THEN NULL; END;
+      END $$;
+      DO $$ BEGIN
+        IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'form_versions_fvuuid_unique') THEN
+          ALTER TABLE form_versions ADD CONSTRAINT form_versions_fvuuid_unique UNIQUE(fvuuid);
+        END IF;
+      END $$;
+      -- form_definition_uuid column + FK
+      ALTER TABLE form_versions ADD COLUMN IF NOT EXISTS form_definition_uuid TEXT;
+      UPDATE form_versions fv SET form_definition_uuid = fd.fduuid FROM form_definitions fd WHERE fv.form_id = fd.id AND fv.form_definition_uuid IS NULL;
+      DO $$ BEGIN
+        BEGIN ALTER TABLE form_versions ALTER COLUMN form_definition_uuid SET NOT NULL; EXCEPTION WHEN others THEN NULL; END;
+      END $$;
+      DO $$ BEGIN
+        IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'form_versions_form_definition_uuid_form_definitions_fduuid_fk') THEN
+          ALTER TABLE form_versions ADD CONSTRAINT form_versions_form_definition_uuid_form_definitions_fduuid_fk FOREIGN KEY (form_definition_uuid) REFERENCES form_definitions(fduuid);
+        END IF;
+      END $$
+    `
+  },
+  {
+    id: '049_form_version_usage_form_version_uuid_and_fk',
+    name: 'Add form_version_uuid to form_version_usage + FK constraint',
+    description: 'Add UUID FK column to form_version_usage referencing form_versions.fvuuid',
+    sql: `
+      ALTER TABLE form_version_usage ADD COLUMN IF NOT EXISTS form_version_uuid TEXT;
+      UPDATE form_version_usage fvu SET form_version_uuid = fv.fvuuid FROM form_versions fv WHERE fvu.form_version_id = fv.id AND fvu.form_version_uuid IS NULL;
+      DO $$ BEGIN
+        BEGIN ALTER TABLE form_version_usage ALTER COLUMN form_version_uuid SET NOT NULL; EXCEPTION WHEN others THEN NULL; END;
+      END $$;
+      DO $$ BEGIN
+        IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'form_version_usage_form_version_uuid_form_versions_fvuuid_fk') THEN
+          ALTER TABLE form_version_usage ADD CONSTRAINT form_version_usage_form_version_uuid_form_versions_fvuuid_fk FOREIGN KEY (form_version_uuid) REFERENCES form_versions(fvuuid);
+        END IF;
+      END $$
+    `
   }
 ];
 
