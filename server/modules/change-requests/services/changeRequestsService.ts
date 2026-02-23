@@ -37,7 +37,7 @@ export async function getTargetEntity(targetType: string, targetId: string) {
       entity = await crRepo.getSpare(targetId);
       break;
     case 'store':
-      entity = await crRepo.getStoresItem(parseInt(targetId));
+      entity = await crRepo.getStoresItem(targetId);
       break;
     default:
       throw new ValidationError(`Invalid target type: ${targetType}`);

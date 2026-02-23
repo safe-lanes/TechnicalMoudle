@@ -3091,9 +3091,9 @@ export class PostgresStorage {
       ));
   }
 
-  async getStoresItem(id: number): Promise<StoresItem | undefined> {
+  async getStoresItem(id: string): Promise<StoresItem | undefined> {
     const db = await getDb();
-    const result = await db.select().from(storesItems).where(eq(storesItems.id, id));
+    const result = await db.select().from(storesItems).where(eq(storesItems.stuuid, id));
     return result[0];
   }
 
@@ -3114,6 +3114,7 @@ export class PostgresStorage {
     
     const result = await db.insert(storesItems).values({
       ...item,
+      stuuid: randomUUID(),
       rob: String(totalRob),
       robLocationA: String(robLocationA),
       robLocationB: String(robLocationB),
@@ -3128,6 +3129,7 @@ export class PostgresStorage {
         vesselId: created.vesselId,
         section: created.itemType,
         itemId: created.id,
+        storeUuid: created.stuuid,
         partCode: created.itemCode,
         itemName: created.itemName,
         uom: created.uom,
@@ -3147,7 +3149,7 @@ export class PostgresStorage {
     return created;
   }
 
-  async updateStoresItem(id: number, data: Partial<StoresItem>): Promise<StoresItem> {
+  async updateStoresItem(id: string, data: Partial<StoresItem>): Promise<StoresItem> {
     const db = await getDb();
     
     // Block direct ROB updates - these must go through dedicated methods
@@ -3160,7 +3162,7 @@ export class PostgresStorage {
     
     const result = await db.update(storesItems)
       .set({ ...data, updatedAt: new Date() })
-      .where(eq(storesItems.id, id))
+      .where(eq(storesItems.stuuid, id))
       .returning();
     if (!result[0]) {
       throw new Error(`Stores item with id ${id} not found`);
@@ -3168,15 +3170,15 @@ export class PostgresStorage {
     return result[0];
   }
 
-  async deleteStoresItem(id: number): Promise<void> {
+  async deleteStoresItem(id: string): Promise<void> {
     const db = await getDb();
     await db.update(storesItems)
       .set({ deleted: true, updatedAt: new Date() })
-      .where(eq(storesItems.id, id));
+      .where(eq(storesItems.stuuid, id));
   }
 
   async consumeStoresItem(
-    id: number,
+    id: string,
     quantity: number,
     location: 'A' | 'B',
     userId: string,
@@ -3203,13 +3205,14 @@ export class PostgresStorage {
         ...(location === 'A' ? { robLocationA: String(newLocationRob) } : { robLocationB: String(newLocationRob) }),
         updatedAt: new Date()
       })
-      .where(eq(storesItems.id, id))
+      .where(eq(storesItems.stuuid, id))
       .returning();
 
     await this.insertStoresLedgerEntry({
       vesselId: item.vesselId,
       section: item.itemType,
-      itemId: id,
+      itemId: item.id,
+      storeUuid: item.stuuid,
       partCode: item.itemCode,
       itemName: item.itemName,
       uom: item.uom,
@@ -3229,7 +3232,7 @@ export class PostgresStorage {
   }
 
   async receiveStoresItem(
-    id: number,
+    id: string,
     quantity: number,
     location: 'A' | 'B',
     userId: string,
@@ -3256,13 +3259,14 @@ export class PostgresStorage {
         ...(location === 'A' ? { robLocationA: String(newLocationRob) } : { robLocationB: String(newLocationRob) }),
         updatedAt: new Date()
       })
-      .where(eq(storesItems.id, id))
+      .where(eq(storesItems.stuuid, id))
       .returning();
 
     await this.insertStoresLedgerEntry({
       vesselId: item.vesselId,
       section: item.itemType,
-      itemId: id,
+      itemId: item.id,
+      storeUuid: item.stuuid,
       partCode: item.itemCode,
       itemName: item.itemName,
       uom: item.uom,
@@ -3283,7 +3287,7 @@ export class PostgresStorage {
   }
 
   async transferStoresItemLocation(
-    id: number,
+    id: string,
     newRobLocationA: string,
     newRobLocationB: string,
     userId: string,
@@ -3327,7 +3331,7 @@ export class PostgresStorage {
         robLocationB: String(newLocB),
         updatedAt: new Date()
       })
-      .where(eq(storesItems.id, id))
+      .where(eq(storesItems.stuuid, id))
       .returning();
 
     // Only create transfer ledger entries if this is a true transfer
@@ -3343,7 +3347,8 @@ export class PostgresStorage {
       await this.insertStoresLedgerEntry({
         vesselId: item.vesselId,
         section: item.itemType,
-        itemId: id,
+        itemId: item.id,
+        storeUuid: item.stuuid,
         partCode: item.itemCode,
         itemName: item.itemName,
         uom: item.uom,
@@ -3362,7 +3367,8 @@ export class PostgresStorage {
       await this.insertStoresLedgerEntry({
         vesselId: item.vesselId,
         section: item.itemType,
-        itemId: id,
+        itemId: item.id,
+        storeUuid: item.stuuid,
         partCode: item.itemCode,
         itemName: item.itemName,
         uom: item.uom,
@@ -3391,7 +3397,8 @@ export class PostgresStorage {
     await this.insertStoresLedgerEntry({
       vesselId: item.vesselId,
       section: item.itemType,
-      itemId: id,
+      itemId: item.id,
+      storeUuid: item.stuuid,
       partCode: item.itemCode,
       itemName: item.itemName,
       uom: item.uom,
@@ -3406,12 +3413,12 @@ export class PostgresStorage {
       userId: userId,
       remarks: adjustmentRemarks,
     });
-    
+
     return { item: updated[0], isTransfer: false };
   }
 
   async adjustStoresItem(
-    id: number,
+    id: string,
     newRob: number,
     location: 'A' | 'B',
     userId: string,
@@ -3458,7 +3465,7 @@ export class PostgresStorage {
         robLocationB: String(newLocB),
         updatedAt: new Date()
       })
-      .where(eq(storesItems.id, id))
+      .where(eq(storesItems.stuuid, id))
       .returning();
 
     const adjustmentRemarks = remarks || `Adjustment at Location ${location}: ${location === 'A' ? oldLocA : oldLocB}→${newRob}`;
@@ -3466,7 +3473,8 @@ export class PostgresStorage {
     await this.insertStoresLedgerEntry({
       vesselId: item.vesselId,
       section: item.itemType,
-      itemId: id,
+      itemId: item.id,
+      storeUuid: item.stuuid,
       partCode: item.itemCode,
       itemName: item.itemName,
       uom: item.uom,
@@ -3502,10 +3510,10 @@ export class PostgresStorage {
       .orderBy(desc(storesLedger.timestampUTC));
   }
 
-  async getStoresItemHistory(itemId: number): Promise<StoresLedger[]> {
+  async getStoresItemHistory(itemId: string): Promise<StoresLedger[]> {
     const db = await getDb();
     return await db.select().from(storesLedger)
-      .where(eq(storesLedger.itemId, itemId))
+      .where(eq(storesLedger.storeUuid, itemId))
       .orderBy(desc(storesLedger.timestampUTC));
   }
 
@@ -4718,9 +4726,9 @@ export class PostgresStorage {
   /**
    * Apply changes to a Store Item record within a transaction
    */
-  private async applyStoreChangesInTx(tx: any, storeId: number, updateData: Record<string, any>): Promise<void> {
+  private async applyStoreChangesInTx(tx: any, storeId: string, updateData: Record<string, any>): Promise<void> {
     // Verify store item exists and capture before state
-    const existing = await tx.select().from(storesItems).where(eq(storesItems.id, storeId));
+    const existing = await tx.select().from(storesItems).where(eq(storesItems.stuuid, storeId));
     if (!existing[0]) {
       throw new Error(`Store item ${storeId} not found`);
     }
@@ -4754,7 +4762,7 @@ export class PostgresStorage {
     
     const result = await tx.update(storesItems)
       .set({ ...safeUpdateData, updatedAt: new Date() })
-      .where(eq(storesItems.id, storeId))
+      .where(eq(storesItems.stuuid, storeId))
       .returning();
     
     if (!result[0]) {

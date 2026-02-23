@@ -961,9 +961,9 @@ export async function performImport(
           result.created++;
           
           if (importHistoryId) {
-            await trackChange(importHistoryId, 'created', 'storesItem', String(newStoresItem.id), null, newStoresItem);
+            await trackChange(importHistoryId, 'created', 'storesItem', newStoresItem.stuuid, null, newStoresItem);
           }
-          
+
           console.log(`✅ Created stores item: ${itemCode} - ${itemName}`);
         } else if (mode === 'update') {
           if (!existingItem) {
@@ -973,7 +973,7 @@ export async function performImport(
           
           const previousSnapshot = createRecordSnapshot(existingItem);
           
-          const updated = await storage.updateStoresItem(existingItem.id, {
+          const updated = await storage.updateStoresItem(existingItem.stuuid, {
             impaCode: row['IMPA Code'] ? String(row['IMPA Code']).trim() : existingItem.impaCode,
             itemName: itemName || existingItem.itemName,
             itemType,
@@ -991,16 +991,16 @@ export async function performImport(
           result.updated++;
           
           if (importHistoryId) {
-            await trackChange(importHistoryId, 'updated', 'storesItem', String(existingItem.id), previousSnapshot, updated);
+            await trackChange(importHistoryId, 'updated', 'storesItem', existingItem.stuuid, previousSnapshot, updated);
           }
-          
+
           console.log(`✅ Updated stores item: ${itemCode}`);
         } else {
           // Upsert mode
           if (existingItem) {
             const previousSnapshot = createRecordSnapshot(existingItem);
             
-            const updated = await storage.updateStoresItem(existingItem.id, {
+            const updated = await storage.updateStoresItem(existingItem.stuuid, {
               impaCode: row['IMPA Code'] ? String(row['IMPA Code']).trim() : existingItem.impaCode,
               itemName: itemName || existingItem.itemName,
               itemType,
@@ -1018,9 +1018,9 @@ export async function performImport(
             result.updated++;
             
             if (importHistoryId) {
-              await trackChange(importHistoryId, 'updated', 'storesItem', String(existingItem.id), previousSnapshot, updated);
+              await trackChange(importHistoryId, 'updated', 'storesItem', existingItem.stuuid, previousSnapshot, updated);
             }
-            
+
             console.log(`✅ Updated stores item (upsert): ${itemCode}`);
           } else {
             const newStoresItem = await storage.createStoresItem({
@@ -1053,9 +1053,9 @@ export async function performImport(
             result.created++;
             
             if (importHistoryId) {
-              await trackChange(importHistoryId, 'created', 'storesItem', String(newStoresItem.id), null, newStoresItem);
+              await trackChange(importHistoryId, 'created', 'storesItem', newStoresItem.stuuid, null, newStoresItem);
             }
-            
+
             console.log(`✅ Created stores item (upsert): ${itemCode} - ${itemName}`);
           }
         }

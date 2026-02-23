@@ -852,6 +852,43 @@ const migrations: Migration[] = [
         END IF;
       END $$
     `
+  },
+  {
+    id: '040_stores_stuuid_column',
+    name: 'Add stuuid column to stores_items',
+    description: 'Add stuuid TEXT column, populate with gen_random_uuid(), SET NOT NULL + UNIQUE',
+    sql: `
+      ALTER TABLE stores_items ADD COLUMN IF NOT EXISTS stuuid TEXT;
+      UPDATE stores_items SET stuuid = gen_random_uuid()::text WHERE stuuid IS NULL;
+      DO $$ BEGIN
+        BEGIN ALTER TABLE stores_items ALTER COLUMN stuuid SET NOT NULL; EXCEPTION WHEN others THEN NULL; END;
+      END $$;
+      DO $$ BEGIN
+        IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'stores_items_stuuid_unique') THEN
+          ALTER TABLE stores_items ADD CONSTRAINT stores_items_stuuid_unique UNIQUE(stuuid);
+        END IF;
+      END $$
+    `
+  },
+  {
+    id: '041_stores_ledger_store_uuid_and_fk_constraints',
+    name: 'Add store_uuid column to stores_ledger + FK constraints',
+    description: 'Add store_uuid TEXT to stores_ledger, populate from JOIN, add FK constraints for both store_uuid and item_id.',
+    sql: `
+      ALTER TABLE stores_ledger ADD COLUMN IF NOT EXISTS store_uuid TEXT;
+      UPDATE stores_ledger sl SET store_uuid = si.stuuid FROM stores_items si WHERE sl.item_id = si.id AND sl.store_uuid IS NULL;
+      DO $$ BEGIN
+        BEGIN ALTER TABLE stores_ledger ALTER COLUMN store_uuid SET NOT NULL; EXCEPTION WHEN others THEN NULL; END;
+      END $$;
+      DO $$ BEGIN
+        IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'stores_ledger_store_uuid_stores_items_stuuid_fk') THEN
+          ALTER TABLE stores_ledger ADD CONSTRAINT stores_ledger_store_uuid_stores_items_stuuid_fk FOREIGN KEY (store_uuid) REFERENCES stores_items(stuuid);
+        END IF;
+        IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'stores_ledger_item_id_stores_items_id_fk') THEN
+          ALTER TABLE stores_ledger ADD CONSTRAINT stores_ledger_item_id_stores_items_id_fk FOREIGN KEY (item_id) REFERENCES stores_items(id);
+        END IF;
+      END $$
+    `
   }
 ];
 

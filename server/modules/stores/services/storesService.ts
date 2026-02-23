@@ -37,7 +37,7 @@ export async function getTransactionHistory(vesselId: string, itemType?: string)
   return repo.getStoresTransactionHistory(vesselId, itemType);
 }
 
-export async function getItemHistory(itemId: number): Promise<StoresLedger[]> {
+export async function getItemHistory(itemId: string): Promise<StoresLedger[]> {
   return repo.getStoresItemHistory(itemId);
 }
 
@@ -59,7 +59,7 @@ export async function createStoresItem(vesselId: string, body: any, userId: stri
 
 // ── Update Store Item (PUT - strips ROB fields) ──
 
-export async function updateStoresItem(itemId: number, body: any): Promise<StoresItem> {
+export async function updateStoresItem(itemId: string, body: any): Promise<StoresItem> {
   // Strip ROB fields - these must go through dedicated methods
   const { rob, robLocationA, robLocationB, ...safeData } = body;
 
@@ -77,7 +77,7 @@ export async function updateStoresItem(itemId: number, body: any): Promise<Store
 // ── Adjust Stock ──
 
 export async function adjustStoresItem(
-  itemId: number, newRob: number, location: 'A' | 'B', userId: string,
+  itemId: string, newRob: number, location: 'A' | 'B', userId: string,
   remarks?: string, place?: string, dateLocal?: string, tz?: string
 ): Promise<StoresItem> {
   if (newRob === undefined || newRob < 0) {
@@ -93,7 +93,7 @@ export async function adjustStoresItem(
 // ── Patch Store Item (location ROB transfer or regular update) ──
 
 export async function patchStoresItem(
-  itemId: number, body: any, userId: string
+  itemId: string, body: any, userId: string
 ): Promise<StoresItem> {
   const { robLocationA, robLocationB, rob, remarks, place, dateLocal, tz } = body;
 
@@ -151,7 +151,7 @@ export async function patchStoresItem(
 
 // ── Delete Store Item (soft delete) ──
 
-export async function deleteStoresItem(itemId: number): Promise<void> {
+export async function deleteStoresItem(itemId: string): Promise<void> {
   return repo.deleteStoresItem(itemId);
 }
 

@@ -83,6 +83,6 @@ export async function getSpare(id: string) {
   return storage.getSpare(id);
 }
 
-export async function getStoresItem(id: number) {
+export async function getStoresItem(id: string) {
   return storage.getStoresItem(id);
 }

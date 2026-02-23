@@ -97,7 +97,7 @@ export async function getChangeRequestsStatusTracking(
             break;
           }
           case 'store': {
-            const store = await repo.getStoresItem(parseInt(r.targetId));
+            const store = await repo.getStoresItem(r.targetId);
             targetName = store?.itemName || store?.itemCode || r.targetId;
             break;
           }

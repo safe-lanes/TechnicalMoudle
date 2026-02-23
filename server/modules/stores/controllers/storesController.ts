@@ -48,7 +48,7 @@ export async function getTransactionHistory(req: Request, res: Response) {
 
 export async function getItemHistory(req: Request, res: Response) {
   try {
-    const itemId = parseInt(req.params.id);
+    const itemId = req.params.id;
     const history = await storesService.getItemHistory(itemId);
     res.json(history);
   } catch (error) {
@@ -76,7 +76,7 @@ export async function createStoresItem(req: AuthenticatedRequest, res: Response)
 
 export async function updateStoresItem(req: AuthenticatedRequest, res: Response) {
   try {
-    const itemId = parseInt(req.params.id);
+    const itemId = req.params.id;
     const item = await storesService.updateStoresItem(itemId, req.body);
     res.json(item);
   } catch (error: any) {
@@ -91,7 +91,7 @@ export async function updateStoresItem(req: AuthenticatedRequest, res: Response)
 
 export async function adjustStoresItem(req: AuthenticatedRequest, res: Response) {
   try {
-    const itemId = parseInt(req.params.id);
+    const itemId = req.params.id;
     const { newRob, location, remarks, place, dateLocal, tz } = req.body;
     const userId = req.user?.id?.toString() || 'System';
     const item = await storesService.adjustStoresItem(
@@ -110,7 +110,7 @@ export async function adjustStoresItem(req: AuthenticatedRequest, res: Response)
 
 export async function patchStoresItem(req: AuthenticatedRequest, res: Response) {
   try {
-    const itemId = parseInt(req.params.id);
+    const itemId = req.params.id;
     const userId = req.user?.id?.toString() || 'System';
     const item = await storesService.patchStoresItem(itemId, req.body, userId);
     res.json(item);
@@ -130,7 +130,7 @@ export async function patchStoresItem(req: AuthenticatedRequest, res: Response) 
 
 export async function deleteStoresItem(req: AuthenticatedRequest, res: Response) {
   try {
-    const itemId = parseInt(req.params.id);
+    const itemId = req.params.id;
     await storesService.deleteStoresItem(itemId);
     res.json({ success: true });
   } catch (error: any) {

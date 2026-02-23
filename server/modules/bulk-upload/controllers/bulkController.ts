@@ -1029,7 +1029,7 @@ export async function undoImport(req: Request, res: Response) {
       } else if (log.entityType === 'workOrder') {
         currentEntity = await storage.getWorkOrder(log.entityId);
       } else if (log.entityType === 'storesItem') {
-        currentEntity = await storage.getStoresItem(parseInt(log.entityId));
+        currentEntity = await storage.getStoresItem(log.entityId);
       } else if (log.entityType === 'spare') {
         currentEntity = await storage.getSpare(log.entityId);
       }
@@ -1105,7 +1105,7 @@ export async function undoImport(req: Request, res: Response) {
         } else if (log.entityType === 'workOrder') {
           currentState = await storage.getWorkOrder(log.entityId);
         } else if (log.entityType === 'storesItem') {
-          currentState = await storage.getStoresItem(parseInt(log.entityId));
+          currentState = await storage.getStoresItem(log.entityId);
         } else if (log.entityType === 'spare') {
           currentState = await storage.getSpare(log.entityId);
         }
@@ -1160,7 +1160,7 @@ export async function undoImport(req: Request, res: Response) {
             console.log(`  ✓ Unarchived work order ${log.entityId}`);
           }
         } else if (log.entityType === 'storesItem') {
-          const storesItemId = parseInt(log.entityId);
+          const storesItemId = log.entityId;
           if (log.operation === 'created') {
             await storage.deleteStoresItem(storesItemId);
             result.deleted++;
@@ -1234,7 +1234,7 @@ export async function undoImport(req: Request, res: Response) {
               await storage.updateWorkOrder(change.log.entityId, change.previousState);
               console.log(`  ↩️ Rolled back work order ${change.log.entityId}`);
             } else if (change.log.entityType === 'storesItem') {
-              await storage.updateStoresItem(parseInt(change.log.entityId), change.previousState);
+              await storage.updateStoresItem(change.log.entityId, change.previousState);
               console.log(`  ↩️ Rolled back stores item ${change.log.entityId}`);
             } else if (change.log.entityType === 'spare') {
               await storage.updateSpare(change.log.entityId, change.previousState);

@@ -638,16 +638,16 @@ export interface IStorage {
   
   // Stores methods - ZERO PMS linkages (no componentId, workOrderId, jobId)
   getStoresItems(vesselId: string, itemType?: string): Promise<StoresItem[]>;
-  getStoresItem(id: number): Promise<StoresItem | undefined>;
+  getStoresItem(id: string): Promise<StoresItem | undefined>;
   createStoresItem(item: InsertStoresItem, userId?: string): Promise<StoresItem>;
-  updateStoresItem(id: number, data: Partial<StoresItem>): Promise<StoresItem>;
-  deleteStoresItem(id: number): Promise<void>;
-  consumeStoresItem(id: number, quantity: number, location: 'A' | 'B', userId: string, remarks?: string, place?: string, dateLocal?: string, tz?: string): Promise<StoresItem>;
-  receiveStoresItem(id: number, quantity: number, location: 'A' | 'B', userId: string, remarks?: string, ref?: string, place?: string, dateLocal?: string, tz?: string): Promise<StoresItem>;
-  transferStoresItemLocation(id: number, newRobLocationA: string, newRobLocationB: string, userId: string, remarks?: string, place?: string, dateLocal?: string, tz?: string): Promise<{ item: StoresItem; isTransfer: boolean }>;
-  adjustStoresItem(id: number, newRob: number, location: 'A' | 'B', userId: string, remarks?: string, place?: string, dateLocal?: string, tz?: string): Promise<StoresItem>;
+  updateStoresItem(id: string, data: Partial<StoresItem>): Promise<StoresItem>;
+  deleteStoresItem(id: string): Promise<void>;
+  consumeStoresItem(id: string, quantity: number, location: 'A' | 'B', userId: string, remarks?: string, place?: string, dateLocal?: string, tz?: string): Promise<StoresItem>;
+  receiveStoresItem(id: string, quantity: number, location: 'A' | 'B', userId: string, remarks?: string, ref?: string, place?: string, dateLocal?: string, tz?: string): Promise<StoresItem>;
+  transferStoresItemLocation(id: string, newRobLocationA: string, newRobLocationB: string, userId: string, remarks?: string, place?: string, dateLocal?: string, tz?: string): Promise<{ item: StoresItem; isTransfer: boolean }>;
+  adjustStoresItem(id: string, newRob: number, location: 'A' | 'B', userId: string, remarks?: string, place?: string, dateLocal?: string, tz?: string): Promise<StoresItem>;
   getStoresTransactionHistory(vesselId: string, itemType?: string): Promise<StoresLedger[]>;
-  getStoresItemHistory(itemId: number): Promise<StoresLedger[]>;
+  getStoresItemHistory(itemId: string): Promise<StoresLedger[]>;
   
   // Fleet Vessel Mapping methods (Rule #16)
   getFleetVesselMappings(): Promise<any[]>;

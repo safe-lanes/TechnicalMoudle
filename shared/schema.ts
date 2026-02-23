@@ -551,7 +551,8 @@ export const storesLedger = pgTable("stores_ledger", {
   id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
   vesselId: text("vessel_id").notNull().references(() => vessels.vuuid),
   section: text("section").notNull(), // 'stores' | 'lubes' | 'chemicals' | 'others'
-  itemId: integer("item_id").notNull(),
+  itemId: integer("item_id").notNull(), // Legacy integer FK — kept during transition
+  storeUuid: text("store_uuid").notNull().references(() => storesItems.stuuid), // FK → stores_items.stuuid
   partCode: text("part_code").notNull(),
   itemName: text("item_name").notNull(),
   uom: text("uom"), // Base unit of measure
@@ -583,6 +584,7 @@ export type StoresLedger = typeof storesLedger.$inferSelect;
 // Stores module is completely isolated from Components/Jobs/Work Orders per Global Business Rule Section 7.2
 export const storesItems = pgTable("stores_items", {
   id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
+  stuuid: text("stuuid").notNull().unique(), // Canonical UUID identity — FK target for stores_ledger
   vesselId: text("vessel_id").notNull().references(() => vessels.vuuid),
   itemType: text("item_type").notNull(), // 'stores' | 'lubricants' | 'chemicals' | 'others'
   itemCode: text("item_code").notNull(), // Unique item identifier (Part Code)
@@ -640,6 +642,7 @@ export const storesItems = pgTable("stores_items", {
 
 export const insertStoresItemSchema = createInsertSchema(storesItems).omit({
   id: true,
+  stuuid: true,
   deleted: true,
   createdAt: true,
   updatedAt: true,

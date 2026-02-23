@@ -146,7 +146,7 @@ export async function getSpare(spareId: string) {
   return storage.getSpare(spareId);
 }
 
-export async function getStoresItem(storesItemId: number) {
+export async function getStoresItem(storesItemId: string) {
   return storage.getStoresItem(storesItemId);
 }
 
