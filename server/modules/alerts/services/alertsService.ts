@@ -7,7 +7,7 @@ export async function getPolicies() {
   return alertsRepo.getAlertPolicies();
 }
 
-export async function getPolicy(id: number) {
+export async function getPolicy(id: string) {
   const policy = await alertsRepo.getAlertPolicy(id);
   if (!policy) {
     throw new NotFoundError('Alert policy not found');
@@ -15,11 +15,11 @@ export async function getPolicy(id: number) {
   return policy;
 }
 
-export async function updatePolicy(id: number, data: any) {
+export async function updatePolicy(id: string, data: any) {
   return alertsRepo.updateAlertPolicy(id, data);
 }
 
-export async function batchUpdatePolicies(policies: Array<{ id: number; [key: string]: any }>) {
+export async function batchUpdatePolicies(policies: Array<{ id: string; [key: string]: any }>) {
   const results = [];
   for (const update of policies) {
     const policy = await alertsRepo.updateAlertPolicy(update.id, update);
@@ -48,7 +48,7 @@ export async function getEvents(filters: {
   });
 }
 
-export async function getEvent(id: number) {
+export async function getEvent(id: string) {
   const event = await alertsRepo.getAlertEvent(id);
   if (!event) {
     throw new NotFoundError('Alert event not found');
@@ -57,20 +57,21 @@ export async function getEvent(id: number) {
   return { ...event, deliveries };
 }
 
-export async function acknowledgeEvent(id: number, userId: string) {
+export async function acknowledgeEvent(id: string, userId: string) {
   return alertsRepo.acknowledgeAlertEvent(id, userId);
 }
 
 // ── Test Alert ──
 
-export async function sendTestAlert(policyId: number, userId: string) {
+export async function sendTestAlert(policyId: string, userId: string) {
   const policy = await alertsRepo.getAlertPolicy(policyId);
   if (!policy) {
     throw new NotFoundError('Alert policy not found');
   }
 
   const event = await alertsRepo.createAlertEvent({
-    policyId,
+    policyId: policy.id,
+    policyUuid: policy.apuuid,
     alertType: policy.alertType,
     priority: policy.priority,
     objectType: 'test',
@@ -88,6 +89,7 @@ export async function sendTestAlert(policyId: number, userId: string) {
   if (policy.inAppEnabled) {
     await alertsRepo.createAlertDelivery({
       eventId: event.id,
+      eventUuid: event.aeuuid,
       channel: 'in_app',
       recipient: userId || 'user1',
       status: 'sent'
@@ -97,6 +99,7 @@ export async function sendTestAlert(policyId: number, userId: string) {
   if (policy.emailEnabled) {
     await alertsRepo.createAlertDelivery({
       eventId: event.id,
+      eventUuid: event.aeuuid,
       channel: 'email',
       recipient: userId || 'user1@example.com',
       status: 'sent'

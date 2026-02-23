@@ -740,6 +740,7 @@ export type ChangeRequestComment = typeof changeRequestComment.$inferSelect;
 // Alert Policy Table
 export const alertPolicies = pgTable("alert_policies", {
   id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
+  apuuid: text("apuuid").notNull().unique(), // Canonical UUID identity — FK target for alert_events
   alertType: text("alert_type").notNull(), // 'maintenance_due' | 'running_hours' | 'critical_inventory' | 'certificate_expiration' | 'system_backup'
   enabled: boolean("enabled").notNull().default(true),
   priority: text("priority").notNull().default("medium"), // 'low' | 'medium' | 'high'
@@ -756,6 +757,7 @@ export const alertPolicies = pgTable("alert_policies", {
 
 export const insertAlertPolicySchema = createInsertSchema(alertPolicies).omit({
   id: true,
+  apuuid: true,
   createdAt: true,
   updatedAt: true,
 });
@@ -766,7 +768,9 @@ export type AlertPolicy = typeof alertPolicies.$inferSelect;
 // Alert Events Table
 export const alertEvents = pgTable("alert_events", {
   id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
-  policyId: integer("policy_id").notNull(),
+  aeuuid: text("aeuuid").notNull().unique(), // Canonical UUID identity — FK target for alert_deliveries
+  policyId: integer("policy_id").notNull(), // Legacy integer reference — kept during transition
+  policyUuid: text("policy_uuid").notNull().references(() => alertPolicies.apuuid), // FK → alert_policies.apuuid
   alertType: text("alert_type").notNull(),
   priority: text("priority").notNull(),
   objectType: text("object_type"), // 'work_order' | 'component' | 'spare' | 'certificate' | 'system'
@@ -785,6 +789,7 @@ export const alertEvents = pgTable("alert_events", {
 
 export const insertAlertEventSchema = createInsertSchema(alertEvents).omit({
   id: true,
+  aeuuid: true,
   createdAt: true,
 });
 
@@ -794,7 +799,8 @@ export type AlertEvent = typeof alertEvents.$inferSelect;
 // Alert Deliveries Table
 export const alertDeliveries = pgTable("alert_deliveries", {
   id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
-  eventId: integer("event_id").notNull(),
+  eventId: integer("event_id").notNull(), // Legacy integer reference — kept during transition
+  eventUuid: text("event_uuid").notNull().references(() => alertEvents.aeuuid), // FK → alert_events.aeuuid
   channel: text("channel").notNull(), // 'email' | 'in_app' | 'sms' | 'slack'
   recipient: text("recipient").notNull(), // email address, user ID, phone number, etc
   status: text("status").notNull().default("pending"), // 'pending' | 'sent' | 'failed' | 'acknowledged'

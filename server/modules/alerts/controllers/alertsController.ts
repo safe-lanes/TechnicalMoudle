@@ -11,7 +11,7 @@ export async function getPolicies(req: Request, res: Response) {
 // ── GET /alerts/policies/:id ──
 
 export async function getPolicy(req: Request, res: Response) {
-  const id = parseInt(req.params.id);
+  const id = req.params.id;
   const policy = await alertsService.getPolicy(id);
   res.json(policy);
 }
@@ -19,7 +19,7 @@ export async function getPolicy(req: Request, res: Response) {
 // ── PATCH /alerts/policies/:id ──
 
 export async function updatePolicy(req: Request, res: Response) {
-  const id = parseInt(req.params.id);
+  const id = req.params.id;
   const policy = await alertsService.updatePolicy(id, req.body);
   res.json(policy);
 }
@@ -48,7 +48,7 @@ export async function getEvents(req: Request, res: Response) {
 // ── GET /alerts/events/:id ──
 
 export async function getEvent(req: Request, res: Response) {
-  const id = parseInt(req.params.id);
+  const id = req.params.id;
   const event = await alertsService.getEvent(id);
   res.json(event);
 }
@@ -56,7 +56,7 @@ export async function getEvent(req: Request, res: Response) {
 // ── POST /alerts/events/:id/acknowledge ──
 
 export async function acknowledgeEvent(req: Request, res: Response) {
-  const id = parseInt(req.params.id);
+  const id = req.params.id;
   const userId = req.body.userId || 'user1';
   const event = await alertsService.acknowledgeEvent(id, userId);
   res.json(event);

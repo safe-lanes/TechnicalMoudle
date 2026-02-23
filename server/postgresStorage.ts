@@ -3973,23 +3973,26 @@ export class PostgresStorage {
     return await db.select().from(alertPolicies).orderBy(desc(alertPolicies.createdAt));
   }
 
-  async getAlertPolicy(id: number): Promise<AlertPolicy | undefined> {
+  async getAlertPolicy(id: string): Promise<AlertPolicy | undefined> {
     const db = await getDb();
-    const result = await db.select().from(alertPolicies).where(eq(alertPolicies.id, id));
+    const result = await db.select().from(alertPolicies).where(eq(alertPolicies.apuuid, id));
     return result[0];
   }
 
   async createAlertPolicy(policy: InsertAlertPolicy): Promise<AlertPolicy> {
     const db = await getDb();
-    const result = await db.insert(alertPolicies).values(policy).returning();
+    const result = await db.insert(alertPolicies).values({
+      ...policy,
+      apuuid: randomUUID(),
+    }).returning();
     return result[0];
   }
 
-  async updateAlertPolicy(id: number, data: Partial<AlertPolicy>): Promise<AlertPolicy> {
+  async updateAlertPolicy(id: string, data: Partial<AlertPolicy>): Promise<AlertPolicy> {
     const db = await getDb();
     const result = await db.update(alertPolicies)
       .set({ ...data, updatedAt: new Date() })
-      .where(eq(alertPolicies.id, id))
+      .where(eq(alertPolicies.apuuid, id))
       .returning();
     if (!result[0]) {
       throw new Error(`Alert policy ${id} not found`);
@@ -3997,9 +4000,9 @@ export class PostgresStorage {
     return result[0];
   }
 
-  async deleteAlertPolicy(id: number): Promise<void> {
+  async deleteAlertPolicy(id: string): Promise<void> {
     const db = await getDb();
-    await db.delete(alertPolicies).where(eq(alertPolicies.id, id));
+    await db.delete(alertPolicies).where(eq(alertPolicies.apuuid, id));
   }
 
   // ============= MODULE 10: ALERT EVENTS =============
@@ -4042,23 +4045,26 @@ export class PostgresStorage {
     return await db.select().from(alertEvents).orderBy(desc(alertEvents.createdAt));
   }
 
-  async getAlertEvent(id: number): Promise<AlertEvent | undefined> {
+  async getAlertEvent(id: string): Promise<AlertEvent | undefined> {
     const db = await getDb();
-    const result = await db.select().from(alertEvents).where(eq(alertEvents.id, id));
+    const result = await db.select().from(alertEvents).where(eq(alertEvents.aeuuid, id));
     return result[0];
   }
 
   async createAlertEvent(event: InsertAlertEvent): Promise<AlertEvent> {
     const db = await getDb();
-    const result = await db.insert(alertEvents).values(event).returning();
+    const result = await db.insert(alertEvents).values({
+      ...event,
+      aeuuid: randomUUID(),
+    }).returning();
     return result[0];
   }
 
-  async acknowledgeAlertEvent(id: number, userId: string): Promise<AlertEvent> {
+  async acknowledgeAlertEvent(id: string, userId: string): Promise<AlertEvent> {
     const db = await getDb();
     const result = await db.update(alertEvents)
       .set({ ackBy: userId, ackAt: new Date() })
-      .where(eq(alertEvents.id, id))
+      .where(eq(alertEvents.aeuuid, id))
       .returning();
     if (!result[0]) {
       throw new Error(`Alert event ${id} not found`);
@@ -4068,10 +4074,10 @@ export class PostgresStorage {
 
   // ============= MODULE 10: ALERT DELIVERIES =============
 
-  async getAlertDeliveries(eventId: number): Promise<AlertDelivery[]> {
+  async getAlertDeliveries(eventId: string): Promise<AlertDelivery[]> {
     const db = await getDb();
     return await db.select().from(alertDeliveries)
-      .where(eq(alertDeliveries.eventId, eventId))
+      .where(eq(alertDeliveries.eventUuid, eventId))
       .orderBy(desc(alertDeliveries.createdAt));
   }
 

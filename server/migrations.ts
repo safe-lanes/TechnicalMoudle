@@ -953,6 +953,72 @@ const migrations: Migration[] = [
         END IF;
       END $$
     `
+  },
+  {
+    id: '044_alert_policies_apuuid_column',
+    name: 'Add apuuid column to alert_policies',
+    description: 'Add apuuid TEXT column, populate with gen_random_uuid(), SET NOT NULL + UNIQUE',
+    sql: `
+      ALTER TABLE alert_policies ADD COLUMN IF NOT EXISTS apuuid TEXT;
+      UPDATE alert_policies SET apuuid = gen_random_uuid()::text WHERE apuuid IS NULL;
+      DO $$ BEGIN
+        BEGIN ALTER TABLE alert_policies ALTER COLUMN apuuid SET NOT NULL; EXCEPTION WHEN others THEN NULL; END;
+      END $$;
+      DO $$ BEGIN
+        IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'alert_policies_apuuid_unique') THEN
+          ALTER TABLE alert_policies ADD CONSTRAINT alert_policies_apuuid_unique UNIQUE(apuuid);
+        END IF;
+      END $$
+    `
+  },
+  {
+    id: '045_alert_events_aeuuid_and_policy_uuid',
+    name: 'Add aeuuid + policy_uuid to alert_events + FK constraint',
+    description: 'Add aeuuid TEXT (UUID identity) and policy_uuid TEXT (FK → alert_policies.apuuid) to alert_events.',
+    sql: `
+      -- aeuuid column
+      ALTER TABLE alert_events ADD COLUMN IF NOT EXISTS aeuuid TEXT;
+      UPDATE alert_events SET aeuuid = gen_random_uuid()::text WHERE aeuuid IS NULL;
+      DO $$ BEGIN
+        BEGIN ALTER TABLE alert_events ALTER COLUMN aeuuid SET NOT NULL; EXCEPTION WHEN others THEN NULL; END;
+      END $$;
+      DO $$ BEGIN
+        IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'alert_events_aeuuid_unique') THEN
+          ALTER TABLE alert_events ADD CONSTRAINT alert_events_aeuuid_unique UNIQUE(aeuuid);
+        END IF;
+      END $$;
+
+      -- policy_uuid column
+      ALTER TABLE alert_events ADD COLUMN IF NOT EXISTS policy_uuid TEXT;
+      UPDATE alert_events ae SET policy_uuid = ap.apuuid FROM alert_policies ap WHERE ae.policy_id = ap.id AND ae.policy_uuid IS NULL;
+      DO $$ BEGIN
+        BEGIN ALTER TABLE alert_events ALTER COLUMN policy_uuid SET NOT NULL; EXCEPTION WHEN others THEN NULL; END;
+      END $$;
+      DO $$ BEGIN
+        IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'alert_events_policy_uuid_alert_policies_apuuid_fk') THEN
+          ALTER TABLE alert_events ADD CONSTRAINT alert_events_policy_uuid_alert_policies_apuuid_fk
+            FOREIGN KEY (policy_uuid) REFERENCES alert_policies(apuuid);
+        END IF;
+      END $$
+    `
+  },
+  {
+    id: '046_alert_deliveries_event_uuid_and_fk',
+    name: 'Add event_uuid to alert_deliveries + FK constraint',
+    description: 'Add event_uuid TEXT (FK → alert_events.aeuuid) to alert_deliveries.',
+    sql: `
+      ALTER TABLE alert_deliveries ADD COLUMN IF NOT EXISTS event_uuid TEXT;
+      UPDATE alert_deliveries ad SET event_uuid = ae.aeuuid FROM alert_events ae WHERE ad.event_id = ae.id AND ad.event_uuid IS NULL;
+      DO $$ BEGIN
+        BEGIN ALTER TABLE alert_deliveries ALTER COLUMN event_uuid SET NOT NULL; EXCEPTION WHEN others THEN NULL; END;
+      END $$;
+      DO $$ BEGIN
+        IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'alert_deliveries_event_uuid_alert_events_aeuuid_fk') THEN
+          ALTER TABLE alert_deliveries ADD CONSTRAINT alert_deliveries_event_uuid_alert_events_aeuuid_fk
+            FOREIGN KEY (event_uuid) REFERENCES alert_events(aeuuid);
+        END IF;
+      END $$
+    `
   }
 ];
 

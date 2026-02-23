@@ -431,17 +431,17 @@ export interface IStorage {
   
   // Alert methods
   getAlertPolicies(): Promise<AlertPolicy[]>;
-  getAlertPolicy(id: number): Promise<AlertPolicy | undefined>;
+  getAlertPolicy(id: string): Promise<AlertPolicy | undefined>;
   createAlertPolicy(policy: InsertAlertPolicy): Promise<AlertPolicy>;
-  updateAlertPolicy(id: number, data: Partial<AlertPolicy>): Promise<AlertPolicy>;
-  deleteAlertPolicy(id: number): Promise<void>;
-  
+  updateAlertPolicy(id: string, data: Partial<AlertPolicy>): Promise<AlertPolicy>;
+  deleteAlertPolicy(id: string): Promise<void>;
+
   getAlertEvents(filters?: { startDate?: Date; endDate?: Date; alertType?: string; priority?: string; status?: string; vesselId?: string }): Promise<AlertEvent[]>;
-  getAlertEvent(id: number): Promise<AlertEvent | undefined>;
+  getAlertEvent(id: string): Promise<AlertEvent | undefined>;
   createAlertEvent(event: InsertAlertEvent): Promise<AlertEvent>;
-  acknowledgeAlertEvent(id: number, userId: string): Promise<AlertEvent>;
-  
-  getAlertDeliveries(eventId: number): Promise<AlertDelivery[]>;
+  acknowledgeAlertEvent(id: string, userId: string): Promise<AlertEvent>;
+
+  getAlertDeliveries(eventId: string): Promise<AlertDelivery[]>;
   createAlertDelivery(delivery: InsertAlertDelivery): Promise<AlertDelivery>;
   updateAlertDeliveryStatus(id: number, status: string, errorMessage?: string): Promise<AlertDelivery>;
   

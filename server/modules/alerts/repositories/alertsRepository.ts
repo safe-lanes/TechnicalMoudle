@@ -6,11 +6,11 @@ export async function getAlertPolicies() {
   return storage.getAlertPolicies();
 }
 
-export async function getAlertPolicy(id: number) {
+export async function getAlertPolicy(id: string) {
   return storage.getAlertPolicy(id);
 }
 
-export async function updateAlertPolicy(id: number, data: any) {
+export async function updateAlertPolicy(id: string, data: any) {
   return storage.updateAlertPolicy(id, data);
 }
 
@@ -27,15 +27,15 @@ export async function getAlertEvents(filters: {
   return storage.getAlertEvents(filters);
 }
 
-export async function getAlertEvent(id: number) {
+export async function getAlertEvent(id: string) {
   return storage.getAlertEvent(id);
 }
 
-export async function getAlertDeliveries(eventId: number) {
+export async function getAlertDeliveries(eventId: string) {
   return storage.getAlertDeliveries(eventId);
 }
 
-export async function acknowledgeAlertEvent(id: number, userId: string) {
+export async function acknowledgeAlertEvent(id: string, userId: string) {
   return storage.acknowledgeAlertEvent(id, userId);
 }
 
