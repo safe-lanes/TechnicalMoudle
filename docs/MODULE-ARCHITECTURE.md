@@ -1,8 +1,13 @@
 # Backend Module Architecture
 
+**Last updated:** 2026-02-23
+
 ## Overview
 
-The backend was refactored from a monolithic `server/routes.ts` (21,144 lines) into 17 domain modules under `server/modules/`. Each module follows a layered architecture pattern.
+The backend has undergone two major restructuring phases:
+
+1. **Modularization** — Monolithic `server/routes.ts` (21,144 lines) decomposed into 18 domain modules under `server/modules/`
+2. **FK Identity Restructure** — All major tables migrated from integer PKs to UUID identifiers with 72 enforced FK constraints
 
 ## Refactoring Impact
 
@@ -12,8 +17,15 @@ The backend was refactored from a monolithic `server/routes.ts` (21,144 lines) i
 | Module files | 0 | 121 |
 | Total module lines | 0 | 35,116 |
 | Total endpoints | 339 | 339 |
+| UUID-based FK constraints | 0 | 72 |
+| Custom SQL migrations | 26 | 51 |
+| Parent tables with UUID identity | 0 | 12 |
 
-## Module Registry
+---
+
+## Part 1: Module Architecture
+
+### Module Registry
 
 All modules are registered in `server/modules/index.ts` and mounted at `/technical/api` via `moduleRouter`.
 
@@ -36,9 +48,10 @@ All modules are registered in `server/modules/index.ts` and mounted at `/technic
 | 15 | forms | 4 | 299 | 10 | Form definitions, versioning, runtime |
 | 16 | chatbot | 2 | 59 | 1 | AI chatbot integration |
 | 17 | misc | 3 | 637 | 10 | Document storage, admin utilities |
+| 18 | dashboard | - | - | - | Dashboard metrics |
 | | **shared** | 2 | 77 | - | `asyncHandler` middleware, `AppError` class |
 
-## Layer Structure
+### Layer Structure
 
 Each module follows a 4-layer architecture:
 
@@ -50,7 +63,7 @@ server/modules/<module>/
   repositories/        # Data access — wraps storage.* calls
 ```
 
-### Layer Rules
+#### Layer Rules
 
 1. **Routes** (`routes.ts`)
    - Defines Express routes using `router.get/post/put/patch/delete`
@@ -64,6 +77,7 @@ server/modules/<module>/
    - Call service methods
    - Return JSON responses with appropriate status codes
    - No direct `storage.*` calls
+   - **ID params are UUID strings** — no `parseInt()` on entity IDs
 
 3. **Services** (`services/*.ts`)
    - Pure business logic functions
@@ -77,11 +91,11 @@ server/modules/<module>/
    - Import `storage` from `../../storage` (relative to module root)
    - No business logic, just data access delegation
 
-### Exception: Simpler Modules
+#### Exception: Simpler Modules
 
 Some smaller modules (chatbot, misc) skip the repository layer when the service layer directly delegates to existing services or the operations are simple enough.
 
-## Shared Infrastructure
+### Shared Infrastructure
 
 | File | Purpose |
 |------|---------|
@@ -89,7 +103,7 @@ Some smaller modules (chatbot, misc) skip the repository layer when the service 
 | `server/modules/shared/errors.ts` | `AppError` class with statusCode for HTTP error responses |
 | `server/modules/index.ts` | Module router registry — all modules registered here |
 
-## What Remains in routes.ts
+### What Remains in routes.ts
 
 `server/routes.ts` now contains only:
 
@@ -102,7 +116,7 @@ Some smaller modules (chatbot, misc) skip the repository layer when the service 
 7. **Startup backfill tasks** — job nextDueDate/RH, maintenance history, postponement checks
 8. **Server lifecycle** — HTTP server creation, shutdown handlers
 
-## Dependency Flow
+### Dependency Flow
 
 ```
 routes.ts
@@ -121,7 +135,130 @@ Cross-module dependencies:
 - Shared utilities (`@shared/*`) are used for date/status calculations
 - Auth middleware (`server/middleware/auth.ts`) is shared across modules
 
-## How to Add a New Endpoint
+---
+
+## Part 2: FK Identity Restructure
+
+### Why UUIDs
+
+All major entity tables previously used auto-incrementing integer primary keys. These were replaced with UUID-based identity columns to:
+
+- Enable globally unique identifiers across environments
+- Support future multi-tenant and cross-service architectures
+- Enforce referential integrity at the database level (previously only application-level)
+- Decouple identity from insertion order
+
+### UUID Column Naming Convention
+
+Each parent table has a dedicated UUID column following the pattern `<abbreviation>uuid`:
+
+| Table | UUID Column | Type | Constraints |
+|-------|-------------|------|-------------|
+| `vessels` | `vuuid` | `TEXT` | `NOT NULL UNIQUE` |
+| `components` | `cuuid` | `TEXT` | `NOT NULL UNIQUE` |
+| `jobs` | `juuid` | `TEXT` | `NOT NULL UNIQUE` |
+| `work_orders` | `wouuid` | `TEXT` | `NOT NULL UNIQUE` |
+| `spares` | `suuid` | `TEXT` | `NOT NULL UNIQUE` |
+| `stores_items` | `stuuid` | `TEXT` | `NOT NULL UNIQUE` |
+| `defects` | `duuid` | `TEXT` | `NOT NULL UNIQUE` |
+| `alert_policies` | `apuuid` | `TEXT` | `NOT NULL UNIQUE` |
+| `alert_events` | `aeuuid` | `TEXT` | `NOT NULL UNIQUE` |
+| `form_definitions` | `fduuid` | `TEXT` | `NOT NULL UNIQUE` |
+| `form_versions` | `fvuuid` | `TEXT` | `NOT NULL UNIQUE` |
+| `bulk_import_history` | `biuuid` | `TEXT` | `NOT NULL UNIQUE` |
+
+### FK Constraint Summary (72 total)
+
+```
+vessels.vuuid          ← 33 child FKs (components, jobs, work_orders, spares, stores_items,
+                         defects, inventory_transactions, spare_location_stock, running_hours,
+                         running_hours_log, report_snapshots, ship_certificates, drydock_projects,
+                         drydock_tasks, spare_component_links, alert_config, alert_events,
+                         certificates, change_request, defect_sequences, ihm_items,
+                         ihm_maintenance_log, import_history, job_component_links, locations,
+                         pms_vessel_settings, running_hours_audit, spares_history, stores_ledger,
+                         surveys, users, vessel_certificate_*, vessel_survey_*, work_order_*)
+
+components.cuuid       ← 15 child FKs (jobs, spares, spare_component_links, defects,
+                         component_documents, component_class_regulatory,
+                         component_maintenance_history, component_requisitions,
+                         component_running_hours_log, fleet_component_mapping,
+                         ihm_items, job_component_links, running_hours_audit,
+                         spares_history, work_order_executions)
+
+work_orders.wouuid     ←  5 child FKs
+jobs.juuid             ←  4 child FKs
+spares.suuid           ←  4 child FKs
+defects.duuid          ←  3 child FKs
+alert_policies.apuuid  ←  1 child FK
+alert_events.aeuuid    ←  1 child FK
+form_definitions.fduuid ← 1 child FK
+form_versions.fvuuid   ←  1 child FK
+stores_items.stuuid    ←  1 child FK
+bulk_import_history.biuuid ← 1 child FK
+```
+
+### Two Migration Patterns Used
+
+**Pattern A: Column Repurpose (FK-1 through FK-7)**
+
+For core tables (vessels, components, jobs, work_orders, spares, stores_items, defects), the existing child ID columns (e.g., `vessel_id`, `component_id`) were repurposed to store UUID strings instead of integers. The FK constraint points from the same column to the parent UUID column.
+
+```
+-- Example: components.vessel_id now contains vuuid values
+-- FK: components.vessel_id → vessels.vuuid
+```
+
+**Pattern B: New UUID Column + Dual Write (FK-8 through FK-10)**
+
+For newer tables (alerts, forms, bulk_import), a new `*_uuid` column was added alongside the existing integer FK column. Both are written during inserts (dual-write pattern).
+
+```
+-- Example: alert_events has both:
+--   policy_id  (integer, legacy — kept during transition)
+--   policy_uuid (text, FK → alert_policies.apuuid)
+```
+
+### Storage Layer Changes
+
+All `IStorage` interface methods and `PostgresStorage` implementations were updated:
+
+- **Lookup methods** use UUID: `getVessel(id: string)` queries by `vuuid` instead of integer `id`
+- **Create methods** generate UUID: `createVessel()` sets `vuuid: randomUUID()` automatically
+- **Insert schemas** omit parent UUIDs: `insertVesselSchema.omit({ vuuid: true })` — storage layer generates them
+- **Child FK columns** provided by callers: e.g., `formDefinitionUuid` is passed explicitly, not auto-generated
+
+### Migration System
+
+**Dual migration system** — both run on every server startup:
+
+1. **Custom SQL** (`server/migrations.ts`): 51 migrations (001-051)
+   - Tracked in `schema_migrations` table
+   - Idempotent SQL with `IF NOT EXISTS`, `DO $ BEGIN...END $` guards
+   - Runs first
+
+2. **Drizzle auto-generated** (`migrations/*.sql`): 25 migrations
+   - Generated from `shared/schema.ts` diffs
+   - Tracked in Drizzle's own `__drizzle_migrations` journal
+   - Runs after custom migrations
+
+**Startup sequence:**
+```
+initStorage() → runBackupAndMigrations() → initializeDatabase() → registerRoutes()
+```
+
+### Verification Scripts
+
+| Script | Purpose |
+|--------|---------|
+| `scripts/verify-data-integrity.ts` | Confirms row counts match baseline (10,107 rows across 75 tables) |
+| `scripts/fk-final-verification.ts` | Verifies all 72 FK constraints, UNIQUE/NOT NULL, zero NULL UUIDs |
+
+---
+
+## Part 3: Developer Guide
+
+### How to Add a New Endpoint
 
 1. **Identify the module** — which domain does this endpoint belong to?
 2. **Add repository method** (if new storage call needed) in `<module>/repositories/`
@@ -130,7 +267,7 @@ Cross-module dependencies:
 5. **Add route** in `<module>/routes.ts` using `asyncHandler(controller.method)`
 6. No changes needed to `routes.ts` or `modules/index.ts`
 
-### Example: Adding `GET /technical/api/spares/:id/history`
+#### Example: Adding `GET /technical/api/spares/:id/history`
 
 ```typescript
 // 1. repositories/sparesRepository.ts
@@ -154,3 +291,46 @@ export async function getSpareHistory(req: Request, res: Response) {
 // 4. routes.ts
 router.get('/spares/:id/history', asyncHandler(sparesCtrl.getSpareHistory));
 ```
+
+### How to Add a New Database Migration
+
+1. Add the migration to the `migrations` array in `server/migrations.ts`
+2. Use the next sequential ID (e.g., `052_...`)
+3. Write idempotent SQL:
+   - `ALTER TABLE ... ADD COLUMN IF NOT EXISTS`
+   - `DO $ BEGIN ... EXCEPTION WHEN others THEN NULL; END $` for constraints
+   - `WHERE ... IS NULL` for backfill updates
+4. Update `shared/schema.ts` with matching Drizzle schema changes
+5. Run `npm run dev` — both custom and Drizzle migrations auto-apply
+
+#### Example: Adding a UUID column to a new table
+
+```typescript
+// In server/migrations.ts — append to migrations array:
+{
+  id: '052_my_table_uuid_column',
+  name: 'Add myuuid column to my_table',
+  description: 'Add canonical UUID identity column',
+  sql: `
+    ALTER TABLE my_table ADD COLUMN IF NOT EXISTS myuuid TEXT;
+    UPDATE my_table SET myuuid = gen_random_uuid()::text WHERE myuuid IS NULL;
+    DO $ BEGIN
+      BEGIN ALTER TABLE my_table ALTER COLUMN myuuid SET NOT NULL;
+      EXCEPTION WHEN others THEN NULL; END;
+    END $;
+    DO $ BEGIN
+      IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'my_table_myuuid_unique') THEN
+        ALTER TABLE my_table ADD CONSTRAINT my_table_myuuid_unique UNIQUE(myuuid);
+      END IF;
+    END $
+  `
+}
+```
+
+### Key Rules
+
+- **Never use `parseInt()` on entity IDs** — all IDs are UUID strings at the API layer
+- **Parent UUID columns are auto-generated** — omitted from insert schemas, storage layer calls `randomUUID()`
+- **Child FK UUID columns are caller-provided** — NOT omitted from insert schemas
+- **Modules do NOT import from each other** — all cross-domain access goes through `storage`
+- **Never modify `shared/schema.ts` without a corresponding migration** in `server/migrations.ts`
