@@ -890,7 +890,9 @@ export class PostgresStorage {
 
   async getComponent(id: string): Promise<Component | undefined> {
     const db = await getDb();
-    const result = await db.select().from(components).where(eq(components.cuuid, id));
+    const result = await db.select().from(components).where(
+      or(eq(components.cuuid, id), eq(components.id, id))
+    );
     return result[0];
   }
 
@@ -920,7 +922,7 @@ export class PostgresStorage {
     const db = await getDb();
     const result = await db.update(components)
       .set({ ...data, updatedAt: new Date() })
-      .where(eq(components.cuuid, id))
+      .where(or(eq(components.cuuid, id), eq(components.id, id)))
       .returning();
     if (!result[0]) {
       throw new Error(`Component ${id} not found`);
@@ -930,7 +932,7 @@ export class PostgresStorage {
 
   async deleteComponent(id: string): Promise<void> {
     const db = await getDb();
-    await db.delete(components).where(eq(components.cuuid, id));
+    await db.delete(components).where(or(eq(components.cuuid, id), eq(components.id, id)));
   }
 
   async inactivateComponent(id: string, userId?: string, options?: { cascadeInactivate?: boolean }): Promise<{
@@ -944,7 +946,7 @@ export class PostgresStorage {
     
     // Get the component
     const componentResult = await db.select().from(components)
-      .where(eq(components.cuuid, id))
+      .where(or(eq(components.cuuid, id), eq(components.id, id)))
       .limit(1);
     
     if (componentResult.length === 0) {
@@ -958,10 +960,10 @@ export class PostgresStorage {
     
     const component = componentResult[0];
     
-    // Check for active children
+    // Check for active children (use resolved cuuid for parentId lookup)
     const activeChildren = await db.select().from(components)
       .where(and(
-        eq(components.parentId, id),
+        or(eq(components.parentId, component.cuuid), eq(components.parentId, component.id)),
         eq(components.isActive, true)
       ));
     
@@ -1014,23 +1016,23 @@ export class PostgresStorage {
       jobsInactivated += childJobIdsToInactivate.size;
     }
     
-    // Inactivate the main component
+    // Inactivate the main component (use resolved cuuid)
     await db.update(components)
       .set({ isActive: false })
-      .where(eq(components.cuuid, id));
+      .where(eq(components.cuuid, component.cuuid));
     componentsInactivated++;
-    
+
     // Inactivate jobs linked to main component (via direct componentId and jobComponentLinks)
     // Collect all unique job IDs to avoid duplicate updates/counts
     const mainJobIdsToInactivate = new Set<string>();
-    
+
     const directJobs = await db.select().from(jobs)
-      .where(eq(jobs.componentId, id));
+      .where(or(eq(jobs.componentId, component.cuuid), eq(jobs.componentId, component.id)));
     for (const job of directJobs) {
       mainJobIdsToInactivate.add(job.juuid);
     }
     // Jobs linked via jobComponentLinks table (many-to-many)
-    const linkedJobIds = await this.getJobComponentLinksByComponent(id);
+    const linkedJobIds = await this.getJobComponentLinksByComponent(component.cuuid);
     for (const link of linkedJobIds) {
       mainJobIdsToInactivate.add(link.jobId);
     }
@@ -1062,7 +1064,7 @@ export class PostgresStorage {
     const db = await getDb();
     const result = await db.select().from(components)
       .where(and(
-        eq(components.cuuid, id),
+        or(eq(components.cuuid, id), eq(components.id, id)),
         eq(components.dataScope, 'fleet')
       ));
     return result[0];
@@ -1252,7 +1254,7 @@ export class PostgresStorage {
         lastUpdated: now.toISOString(),
         updatedAt: now,
       })
-      .where(eq(components.cuuid, params.componentId))
+      .where(eq(components.cuuid, component.cuuid))
       .returning();
 
     if (!masterResult[0]) {
@@ -1273,12 +1275,12 @@ export class PostgresStorage {
     }
     
     // Get all inherited components linked to this master
-    const inheritedComponents = await this.getInheritedComponents(params.componentId, masterVesselId);
-    
+    const inheritedComponents = await this.getInheritedComponents(component.cuuid, masterVesselId);
+
     // Create audit entry for the master component update
     await db.insert(runningHoursAudit).values({
       vesselId: masterVesselId,
-      componentId: params.componentId,
+      componentId: component.cuuid,
       previousRH: previousMasterRH.toFixed(2),
       newRH: params.newRHValue.toFixed(2),
       cumulativeRH: params.newRHValue.toFixed(2),
@@ -1361,7 +1363,7 @@ export class PostgresStorage {
           lastUpdated: lastUpdatedValue,
           updatedAt: now,
         })
-        .where(eq(components.cuuid, params.componentId))
+        .where(eq(components.cuuid, component.cuuid))
         .returning();
 
       if (!result[0]) {
@@ -1370,15 +1372,15 @@ export class PostgresStorage {
 
       // CRITICAL: Filter by vesselId to prevent cross-vessel RH aggregation
       const masterVesselId = component.vesselId;
-      
+
       // CRITICAL SAFEGUARD: Skip cascade if vesselId cannot be determined
       if (!masterVesselId) {
         console.warn(`⚠️ [setComponentRunningHours] Cannot determine vesselId for master "${params.componentId}" - skipping cascade to prevent cross-vessel leak`);
         return { component: result[0], inheritedUpdated: 0 };
       }
-      
+
       // Get all inherited components linked to this master
-      const inheritedComponents = await this.getInheritedComponents(params.componentId, masterVesselId);
+      const inheritedComponents = await this.getInheritedComponents(component.cuuid, masterVesselId);
       
       // Apply DELTA to each inherited component's currentCumulativeRH (actual running hours)
       // rhCurrentInheritedCached stores the master's absolute value (for display/config)
@@ -1413,7 +1415,7 @@ export class PostgresStorage {
           lastUpdated: lastUpdatedValue,
           updatedAt: now,
         })
-        .where(eq(components.cuuid, params.componentId))
+        .where(eq(components.cuuid, component.cuuid))
         .returning();
 
       if (!result[0]) {
@@ -1429,7 +1431,7 @@ export class PostgresStorage {
           lastUpdated: lastUpdatedValue,
           updatedAt: now,
         })
-        .where(eq(components.cuuid, params.componentId))
+        .where(eq(components.cuuid, component.cuuid))
         .returning();
 
       if (!result[0]) {
@@ -1640,10 +1642,13 @@ export class PostgresStorage {
 
   async getRunningHoursAudits(componentId: string, limit?: number): Promise<RunningHoursAudit[]> {
     const db = await getDb();
+    // Resolve componentId to cuuid (dual-lookup support)
+    const comp = await this.getComponent(componentId);
+    const resolvedId = comp ? comp.cuuid : componentId;
     let query = db.select().from(runningHoursAudit)
-      .where(eq(runningHoursAudit.componentId, componentId))
+      .where(or(eq(runningHoursAudit.componentId, resolvedId), eq(runningHoursAudit.componentId, componentId)))
       .orderBy(desc(runningHoursAudit.enteredAtUTC));
-    
+
     if (limit) {
       return await query.limit(limit);
     }
@@ -1651,14 +1656,17 @@ export class PostgresStorage {
   }
 
   async getRunningHoursAuditsInDateRange(
-    componentId: string, 
-    startDate: Date, 
+    componentId: string,
+    startDate: Date,
     endDate: Date
   ): Promise<RunningHoursAudit[]> {
     const db = await getDb();
+    // Resolve componentId to cuuid (dual-lookup support)
+    const comp = await this.getComponent(componentId);
+    const resolvedId = comp ? comp.cuuid : componentId;
     return await db.select().from(runningHoursAudit)
       .where(and(
-        eq(runningHoursAudit.componentId, componentId),
+        or(eq(runningHoursAudit.componentId, resolvedId), eq(runningHoursAudit.componentId, componentId)),
         gte(runningHoursAudit.enteredAtUTC, startDate),
         lte(runningHoursAudit.enteredAtUTC, endDate)
       ))
@@ -1725,7 +1733,9 @@ export class PostgresStorage {
 
   async getJob(id: string): Promise<Job | undefined> {
     const db = await getDb();
-    const result = await db.select().from(jobs).where(eq(jobs.juuid, id));
+    const result = await db.select().from(jobs).where(
+      or(eq(jobs.juuid, id), eq(jobs.id, id))
+    );
     return result[0];
   }
 
@@ -1751,7 +1761,7 @@ export class PostgresStorage {
     const db = await getDb();
     const result = await db.update(jobs)
       .set({ ...data, updatedAt: new Date() })
-      .where(eq(jobs.juuid, id))
+      .where(or(eq(jobs.juuid, id), eq(jobs.id, id)))
       .returning();
     if (!result[0]) {
       throw new Error(`Job ${id} not found`);
@@ -1761,7 +1771,7 @@ export class PostgresStorage {
 
   async deleteJob(id: string): Promise<void> {
     const db = await getDb();
-    await db.delete(jobs).where(eq(jobs.juuid, id));
+    await db.delete(jobs).where(or(eq(jobs.juuid, id), eq(jobs.id, id)));
   }
 
   async bulkCreateJobs(jobList: InsertJob[]): Promise<Job[]> {
@@ -1873,7 +1883,9 @@ export class PostgresStorage {
 
   async getWorkOrder(id: string): Promise<WorkOrder | undefined> {
     const db = await getDb();
-    const result = await db.select().from(workOrders).where(eq(workOrders.wouuid, id));
+    const result = await db.select().from(workOrders).where(
+      or(eq(workOrders.wouuid, id), eq(workOrders.id, id))
+    );
     return result[0];
   }
 
@@ -1918,7 +1930,7 @@ export class PostgresStorage {
     
     const result = await db.update(workOrders)
       .set({ ...sanitizedData, updatedAt: new Date() })
-      .where(eq(workOrders.wouuid, id))
+      .where(or(eq(workOrders.wouuid, id), eq(workOrders.id, id)))
       .returning();
     if (!result[0]) {
       throw new Error(`Work order ${id} not found`);
@@ -1928,7 +1940,7 @@ export class PostgresStorage {
 
   async deleteWorkOrder(id: string): Promise<void> {
     const db = await getDb();
-    await db.delete(workOrders).where(eq(workOrders.wouuid, id));
+    await db.delete(workOrders).where(or(eq(workOrders.wouuid, id), eq(workOrders.id, id)));
   }
 
   async bulkCreateWorkOrders(woList: InsertWorkOrder[]): Promise<WorkOrder[]> {
@@ -2032,7 +2044,7 @@ export class PostgresStorage {
     const db = await getDb();
     const result = await db.select().from(workOrders)
       .where(and(
-        eq(workOrders.wouuid, id),
+        or(eq(workOrders.wouuid, id), eq(workOrders.id, id)),
         eq(workOrders.dataScope, 'fleet')
       ));
     return result[0];
@@ -2078,7 +2090,10 @@ export class PostgresStorage {
 
   async getSpare(id: string): Promise<Spare | undefined> {
     const db = await getDb();
-    const result = await db.select().from(spares).where(eq(spares.suuid, id));
+    const numId = Number(id);
+    const result = await db.select().from(spares).where(
+      or(eq(spares.suuid, id), ...(Number.isInteger(numId) && numId > 0 ? [eq(spares.id, numId)] : []))
+    );
     return result[0];
   }
 
@@ -2125,9 +2140,10 @@ export class PostgresStorage {
     const { partCode, ...restData } = data;
     const updateData = partCode != null ? { ...restData, partCode, updatedAt: new Date() } : { ...restData, updatedAt: new Date() };
     
+    const numId = Number(id);
     const result = await db.update(spares)
       .set(updateData)
-      .where(eq(spares.suuid, id))
+      .where(or(eq(spares.suuid, id), ...(Number.isInteger(numId) && numId > 0 ? [eq(spares.id, numId)] : [])))
       .returning();
     if (!result[0]) {
       throw new Error(`Spare ${id} not found`);
@@ -2161,9 +2177,10 @@ export class PostgresStorage {
 
   async deleteSpare(id: string): Promise<void> {
     const db = await getDb();
+    const numId = Number(id);
     await db.update(spares)
       .set({ deleted: true, updatedAt: new Date() })
-      .where(eq(spares.suuid, id));
+      .where(or(eq(spares.suuid, id), ...(Number.isInteger(numId) && numId > 0 ? [eq(spares.id, numId)] : [])));
   }
 
   async consumeSpare(
@@ -2190,9 +2207,9 @@ export class PostgresStorage {
         robLocationA: newRobA < 0 ? 0 : newRobA,
         updatedAt: new Date()
       })
-      .where(eq(spares.suuid, id))
+      .where(eq(spares.suuid, spare.suuid))
       .returning();
-    
+
     await this.createSpareHistory({
       timestampUTC: new Date(),
       vesselId: spare.vesselId || 'V001',
@@ -2214,7 +2231,7 @@ export class PostgresStorage {
       tz: tz ?? null,
       place: place ?? null,
     });
-    
+
     // SYNC: Update normalized spare_location_stock table
     const vesselId = spare.vesselId || 'V001';
     const locationAName = spare.location || 'Location A';
@@ -2230,7 +2247,7 @@ export class PostgresStorage {
     } catch (syncError: any) {
       console.warn(`[consumeSpare] Failed to sync spare_location_stock for spare ${id}: ${syncError.message}`);
     }
-    
+
     return updated[0];
   }
 
@@ -2276,9 +2293,9 @@ export class PostgresStorage {
         robLocationB: newRobB,
         updatedAt: new Date()
       })
-      .where(eq(spares.suuid, id))
+      .where(eq(spares.suuid, spare.suuid))
       .returning();
-    
+
     await this.createSpareHistory({
       timestampUTC: new Date(),
       vesselId: spare.vesselId || 'V001',
@@ -2360,9 +2377,9 @@ export class PostgresStorage {
         lastOrderDate: dateLocal ?? null,
         updatedAt: new Date()
       })
-      .where(eq(spares.suuid, id))
+      .where(eq(spares.suuid, spare.suuid))
       .returning();
-    
+
     await this.createSpareHistory({
       timestampUTC: new Date(),
       vesselId: spare.vesselId || 'V001',
@@ -2451,11 +2468,11 @@ export class PostgresStorage {
         robLocationB: newLocB,
         updatedAt: new Date()
       })
-      .where(eq(spares.suuid, id))
+      .where(eq(spares.suuid, spare.suuid))
       .returning();
 
     const adjustmentRemarks = remarks || `Adjustment at Location ${location}: ${location === 'A' ? oldLocA : oldLocB}→${newRob}`;
-    
+
     await this.createSpareHistory({
       timestampUTC: new Date(),
       vesselId: spare.vesselId || 'V001',
@@ -2539,9 +2556,9 @@ export class PostgresStorage {
         robLocationB: newLocB,
         updatedAt: new Date()
       })
-      .where(eq(spares.suuid, id))
+      .where(eq(spares.suuid, spare.suuid))
       .returning();
-    
+
     // SYNC: Update normalized spare_location_stock table for consistency with Component → Spares view
     // Get spare-specific location names (from spare.location and spare.location2 fields)
     const vesselId = spare.vesselId || 'V001';
@@ -2672,9 +2689,9 @@ export class PostgresStorage {
         lastOrderDate: dateLocal ?? null,
         updatedAt: new Date()
       })
-      .where(eq(spares.suuid, id))
+      .where(eq(spares.suuid, spare.suuid))
       .returning();
-    
+
     await this.createSpareHistory({
       timestampUTC: new Date(),
       vesselId: spare.vesselId || 'V001',
@@ -2696,7 +2713,7 @@ export class PostgresStorage {
       tz: tz ?? null,
       place: place ?? null,
     });
-    
+
     return updated[0];
   }
 
@@ -2726,7 +2743,7 @@ export class PostgresStorage {
         robLocationA: newRobA,
         updatedAt: new Date()
       })
-      .where(eq(spares.suuid, spareId))
+      .where(eq(spares.suuid, spare.suuid))
       .returning();
     
     await this.createSpareHistory({
@@ -2855,7 +2872,7 @@ export class PostgresStorage {
     const db = await getDb();
     const result = await db.select().from(spares)
       .where(and(
-        eq(spares.suuid, id),
+        or(eq(spares.id, id), eq(spares.suuid, String(id))),
         eq(spares.dataScope, 'fleet')
       ));
     return result[0];
@@ -2928,24 +2945,24 @@ export class PostgresStorage {
   async bulkUpdateSparesByROB(updates: Array<{ robId: string; data: Partial<Spare> }>): Promise<Spare[]> {
     const db = await getDb();
     const results: Spare[] = [];
-    
+
     for (const { robId, data } of updates) {
-      const id = parseInt(robId, 10);
-      if (isNaN(id)) continue;
-      
+      const numId = parseInt(robId, 10);
+      if (isNaN(numId)) continue;
+
       // Filter out undefined/null partCode to prevent NOT NULL constraint violation
       const { partCode, ...restData } = data;
       const updateData = partCode != null ? { ...restData, partCode, updatedAt: new Date() } : { ...restData, updatedAt: new Date() };
-      
+
       const result = await db.update(spares)
         .set(updateData)
-        .where(eq(spares.suuid, id))
+        .where(or(eq(spares.id, numId), eq(spares.suuid, robId)))
         .returning();
       if (result[0]) {
         results.push(result[0]);
       }
     }
-    
+
     return results;
   }
 
@@ -3093,7 +3110,10 @@ export class PostgresStorage {
 
   async getStoresItem(id: string): Promise<StoresItem | undefined> {
     const db = await getDb();
-    const result = await db.select().from(storesItems).where(eq(storesItems.stuuid, id));
+    const numId = Number(id);
+    const result = await db.select().from(storesItems).where(
+      or(eq(storesItems.stuuid, id), ...(Number.isInteger(numId) && numId > 0 ? [eq(storesItems.id, numId)] : []))
+    );
     return result[0];
   }
 
@@ -3160,9 +3180,11 @@ export class PostgresStorage {
       throw new Error('Direct ROB updates are not allowed. Use consume, receive, transfer, or adjust methods to modify stock quantities.');
     }
     
+    const numId = Number(id);
+    const idCondition = or(eq(storesItems.stuuid, id), ...(Number.isInteger(numId) && numId > 0 ? [eq(storesItems.id, numId)] : []));
     const result = await db.update(storesItems)
       .set({ ...data, updatedAt: new Date() })
-      .where(eq(storesItems.stuuid, id))
+      .where(idCondition)
       .returning();
     if (!result[0]) {
       throw new Error(`Stores item with id ${id} not found`);
@@ -3172,9 +3194,10 @@ export class PostgresStorage {
 
   async deleteStoresItem(id: string): Promise<void> {
     const db = await getDb();
+    const numId = Number(id);
     await db.update(storesItems)
       .set({ deleted: true, updatedAt: new Date() })
-      .where(eq(storesItems.stuuid, id));
+      .where(or(eq(storesItems.stuuid, id), ...(Number.isInteger(numId) && numId > 0 ? [eq(storesItems.id, numId)] : [])));
   }
 
   async consumeStoresItem(
@@ -3205,7 +3228,7 @@ export class PostgresStorage {
         ...(location === 'A' ? { robLocationA: String(newLocationRob) } : { robLocationB: String(newLocationRob) }),
         updatedAt: new Date()
       })
-      .where(eq(storesItems.stuuid, id))
+      .where(eq(storesItems.stuuid, item.stuuid))
       .returning();
 
     await this.insertStoresLedgerEntry({
@@ -3259,7 +3282,7 @@ export class PostgresStorage {
         ...(location === 'A' ? { robLocationA: String(newLocationRob) } : { robLocationB: String(newLocationRob) }),
         updatedAt: new Date()
       })
-      .where(eq(storesItems.stuuid, id))
+      .where(eq(storesItems.stuuid, item.stuuid))
       .returning();
 
     await this.insertStoresLedgerEntry({
@@ -3331,7 +3354,7 @@ export class PostgresStorage {
         robLocationB: String(newLocB),
         updatedAt: new Date()
       })
-      .where(eq(storesItems.stuuid, id))
+      .where(eq(storesItems.stuuid, item.stuuid))
       .returning();
 
     // Only create transfer ledger entries if this is a true transfer
@@ -3465,7 +3488,7 @@ export class PostgresStorage {
         robLocationB: String(newLocB),
         updatedAt: new Date()
       })
-      .where(eq(storesItems.stuuid, id))
+      .where(eq(storesItems.stuuid, item.stuuid))
       .returning();
 
     const adjustmentRemarks = remarks || `Adjustment at Location ${location}: ${location === 'A' ? oldLocA : oldLocB}→${newRob}`;
@@ -3631,7 +3654,9 @@ export class PostgresStorage {
 
   async getDefect(id: string): Promise<Defect | undefined> {
     const db = await getDb();
-    const result = await db.select().from(defects).where(eq(defects.duuid, id));
+    const result = await db.select().from(defects).where(
+      or(eq(defects.duuid, id), eq(defects.id, id))
+    );
     return result[0];
   }
 
@@ -3732,7 +3757,7 @@ export class PostgresStorage {
     const db = await getDb();
     const result = await db.update(defects)
       .set({ ...data, updatedAt: new Date() })
-      .where(eq(defects.duuid, id))
+      .where(or(eq(defects.duuid, id), eq(defects.id, id)))
       .returning();
     if (!result[0]) {
       throw new Error(`Defect ${id} not found`);
@@ -3742,7 +3767,7 @@ export class PostgresStorage {
 
   async deleteDefect(id: string): Promise<void> {
     const db = await getDb();
-    await db.delete(defects).where(eq(defects.duuid, id));
+    await db.delete(defects).where(or(eq(defects.duuid, id), eq(defects.id, id)));
   }
 
   async addDefectNote(defectId: string, note: { noteText: string; attachments: string[]; createdBy: string }): Promise<Defect> {
@@ -3765,9 +3790,9 @@ export class PostgresStorage {
     
     const result = await db.update(defects)
       .set({ notes: updatedNotes, updatedAt: new Date() })
-      .where(eq(defects.duuid, defectId))
+      .where(eq(defects.duuid, defect.duuid))
       .returning();
-    
+
     return result[0];
   }
 
@@ -3777,21 +3802,21 @@ export class PostgresStorage {
     if (!defect) {
       throw new Error(`Defect ${defectId} not found`);
     }
-    
+
     const existingLinks = Array.isArray(defect.linkedDefects) ? defect.linkedDefects : [];
     const mergedLinks = [...new Set([...existingLinks, ...linkedDefectIds])];
-    
+
     const result = await db.update(defects)
       .set({ linkedDefects: mergedLinks, updatedAt: new Date() })
-      .where(eq(defects.duuid, defectId))
+      .where(eq(defects.duuid, defect.duuid))
       .returning();
-    
+
     return result[0];
   }
 
-  async closeDefect(defectId: string, closure: { 
-    closedBy: string; 
-    closureComment?: string; 
+  async closeDefect(defectId: string, closure: {
+    closedBy: string;
+    closureComment?: string;
     closureFiles?: string[];
   }): Promise<Defect> {
     const db = await getDb();
@@ -3805,7 +3830,7 @@ export class PostgresStorage {
         dateCompleted: new Date().toISOString().split('T')[0],
         updatedAt: new Date(),
       })
-      .where(eq(defects.duuid, defectId))
+      .where(or(eq(defects.duuid, defectId), eq(defects.id, defectId)))
       .returning();
     
     if (!result[0]) {
@@ -5681,14 +5706,17 @@ export class PostgresStorage {
     const { parentComponentId, mode, value, dateUpdated, comments, meterReplaced, oldMeterFinal, newMeterStart, isRenewalReset, renewalActionType, renewalReason, renewalReference, renewalEvidenceUrls } = params;
     const now = new Date();
     
+    // First resolve the parent component (dual-lookup: cuuid or legacy id)
+    const parentResult = await db.select().from(components)
+      .where(or(eq(components.cuuid, parentComponentId), eq(components.id, parentComponentId)))
+      .limit(1);
+
+    // Use resolved cuuid for all subsequent queries
+    const resolvedParentId = parentResult.length > 0 ? parentResult[0].cuuid : parentComponentId;
+
     // Get all child components (by parentId - structural hierarchy)
     const children = await db.select().from(components)
-      .where(eq(components.parentId, parentComponentId));
-    
-    // Update parent component
-    const parentResult = await db.select().from(components)
-      .where(eq(components.cuuid, parentComponentId))
-      .limit(1);
+      .where(or(eq(components.parentId, resolvedParentId), eq(components.parentId, parentComponentId)));
     
     let updatedComponents = 0;
     let auditsCreated = 0;
@@ -5701,7 +5729,7 @@ export class PostgresStorage {
       // VALIDATION 1: Date Rule - Check if entry date is not earlier than latest saved RH entry date
       const latestAudit = await db.select()
         .from(runningHoursAudit)
-        .where(eq(runningHoursAudit.componentId, parentComponentId))
+        .where(or(eq(runningHoursAudit.componentId, resolvedParentId), eq(runningHoursAudit.componentId, parentComponentId)))
         .orderBy(desc(runningHoursAudit.enteredAtUTC))
         .limit(1);
       
@@ -5772,7 +5800,7 @@ export class PostgresStorage {
       
       await db.update(components)
         .set(updateData)
-        .where(eq(components.cuuid, parentComponentId));
+        .where(eq(components.cuuid, resolvedParentId));
       
       // Log audit for parent
       // Calculate the total cumulative RH (includes meter replacement history)
@@ -5782,7 +5810,7 @@ export class PostgresStorage {
       
       await db.insert(runningHoursAudit).values({
         vesselId: parent.vesselId || 'unknown',
-        componentId: parentComponentId,
+        componentId: resolvedParentId,
         previousRH: currentRH.toString(),
         newRH: newRH.toString(),
         cumulativeRH: totalCumulativeRH.toString(),
@@ -5824,6 +5852,7 @@ export class PostgresStorage {
               eq(components.rhCounterType, 'INHERITED'),
               eq(components.vesselId, masterVesselId),
               or(
+                eq(components.rhMasterComponentId, resolvedParentId),
                 eq(components.rhMasterComponentId, parentComponentId),
                 eq(components.rhMasterComponentId, masterComponentCode),
                 eq(components.rhCounterSource, masterComponentCode)
@@ -6026,7 +6055,7 @@ export class PostgresStorage {
     const db = await getDb();
     const result = await db.update(components)
       .set({ isActive: false })
-      .where(eq(components.cuuid, id))
+      .where(or(eq(components.cuuid, id), eq(components.id, id)))
       .returning();
     if (result.length === 0) {
       throw new Error(`Component not found: ${id}`);
@@ -6038,7 +6067,7 @@ export class PostgresStorage {
     const db = await getDb();
     const result = await db.update(jobs)
       .set({ isActive: false })
-      .where(eq(jobs.juuid, id))
+      .where(or(eq(jobs.juuid, id), eq(jobs.id, id)))
       .returning();
     if (result.length === 0) {
       throw new Error(`Job not found: ${id}`);
@@ -6050,7 +6079,7 @@ export class PostgresStorage {
     const db = await getDb();
     const result = await db.update(workOrders)
       .set({ isActive: false })
-      .where(eq(workOrders.wouuid, id))
+      .where(or(eq(workOrders.wouuid, id), eq(workOrders.id, id)))
       .returning();
     if (result.length === 0) {
       throw new Error(`WorkOrder not found: ${id}`);
