@@ -65,14 +65,14 @@ app.use((req, res, next) => {
   // setting up all the other routes so the catch-all route
   // doesn't interfere with the other routes
   //
-  // Detection: Use serveStatic (production) if:
-  //   1. NODE_ENV is explicitly "production", OR
-  //   2. dist/public/index.html exists (built assets present — handles Windows
-  //      where NODE_ENV=production in package.json scripts doesn't work)
-  const distPublicIndex = path.resolve(import.meta.dirname, "public", "index.html");
-  const isProduction = app.get("env") === "production" || fs.existsSync(distPublicIndex);
+  // Detection: setupVite (dev) ONLY if client/index.html exists on disk.
+  // In production builds (dist/index.js), ../client/ doesn't exist, so
+  // we always fall through to serveStatic. This works on Windows where
+  // NODE_ENV=production in package.json scripts doesn't take effect.
+  const clientIndexHtml = path.resolve(import.meta.dirname, "..", "client", "index.html");
+  const isDevelopment = app.get("env") === "development" && fs.existsSync(clientIndexHtml);
 
-  if (!isProduction) {
+  if (isDevelopment) {
     await setupVite(app, server);
   } else {
     serveStatic(app);
