@@ -1,4 +1,6 @@
 import express, { type Request, Response, NextFunction } from "express";
+import fs from "fs";
+import path from "path";
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
 import { initStorage } from "./storage";
@@ -62,7 +64,15 @@ app.use((req, res, next) => {
   // importantly only setup vite in development and after
   // setting up all the other routes so the catch-all route
   // doesn't interfere with the other routes
-  if (app.get("env") === "development") {
+  //
+  // Detection: Use serveStatic (production) if:
+  //   1. NODE_ENV is explicitly "production", OR
+  //   2. dist/public/index.html exists (built assets present — handles Windows
+  //      where NODE_ENV=production in package.json scripts doesn't work)
+  const distPublicIndex = path.resolve(import.meta.dirname, "public", "index.html");
+  const isProduction = app.get("env") === "production" || fs.existsSync(distPublicIndex);
+
+  if (!isProduction) {
     await setupVite(app, server);
   } else {
     serveStatic(app);
