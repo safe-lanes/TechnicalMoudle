@@ -1122,6 +1122,566 @@ const migrations: Migration[] = [
         END IF;
       END $$
     `
+  },
+  {
+    id: '052_standard_audit_columns',
+    name: 'Add standard audit columns to all tables',
+    description: 'Adds 7 standard columns (sort_order, created_at, updated_at, created_by_uuid, updated_by_uuid, is_deleted, is_sync) to all tables missing them. 410 alterations across 71 tables. Safe: uses ADD COLUMN IF NOT EXISTS only.',
+    sql: `
+      ALTER TABLE "alert_config"
+        ADD COLUMN IF NOT EXISTS sort_order INTEGER DEFAULT 0,
+        ADD COLUMN IF NOT EXISTS created_by_uuid TEXT,
+        ADD COLUMN IF NOT EXISTS updated_by_uuid TEXT,
+        ADD COLUMN IF NOT EXISTS is_deleted BOOLEAN DEFAULT FALSE,
+        ADD COLUMN IF NOT EXISTS is_sync BOOLEAN DEFAULT FALSE;
+
+      ALTER TABLE "alert_deliveries"
+        ADD COLUMN IF NOT EXISTS sort_order INTEGER DEFAULT 0,
+        ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP DEFAULT NOW(),
+        ADD COLUMN IF NOT EXISTS created_by_uuid TEXT,
+        ADD COLUMN IF NOT EXISTS updated_by_uuid TEXT,
+        ADD COLUMN IF NOT EXISTS is_deleted BOOLEAN DEFAULT FALSE,
+        ADD COLUMN IF NOT EXISTS is_sync BOOLEAN DEFAULT FALSE;
+
+      ALTER TABLE "alert_events"
+        ADD COLUMN IF NOT EXISTS sort_order INTEGER DEFAULT 0,
+        ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP DEFAULT NOW(),
+        ADD COLUMN IF NOT EXISTS created_by_uuid TEXT,
+        ADD COLUMN IF NOT EXISTS updated_by_uuid TEXT,
+        ADD COLUMN IF NOT EXISTS is_deleted BOOLEAN DEFAULT FALSE,
+        ADD COLUMN IF NOT EXISTS is_sync BOOLEAN DEFAULT FALSE;
+
+      ALTER TABLE "alert_policies"
+        ADD COLUMN IF NOT EXISTS sort_order INTEGER DEFAULT 0,
+        ADD COLUMN IF NOT EXISTS created_by_uuid TEXT,
+        ADD COLUMN IF NOT EXISTS updated_by_uuid TEXT,
+        ADD COLUMN IF NOT EXISTS is_deleted BOOLEAN DEFAULT FALSE,
+        ADD COLUMN IF NOT EXISTS is_sync BOOLEAN DEFAULT FALSE;
+
+      ALTER TABLE "audit_log"
+        ADD COLUMN IF NOT EXISTS sort_order INTEGER DEFAULT 0,
+        ADD COLUMN IF NOT EXISTS created_at TIMESTAMP DEFAULT NOW(),
+        ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP DEFAULT NOW(),
+        ADD COLUMN IF NOT EXISTS created_by_uuid TEXT,
+        ADD COLUMN IF NOT EXISTS updated_by_uuid TEXT,
+        ADD COLUMN IF NOT EXISTS is_deleted BOOLEAN DEFAULT FALSE,
+        ADD COLUMN IF NOT EXISTS is_sync BOOLEAN DEFAULT FALSE;
+
+      ALTER TABLE "bulk_import_errors"
+        ADD COLUMN IF NOT EXISTS sort_order INTEGER DEFAULT 0,
+        ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP DEFAULT NOW(),
+        ADD COLUMN IF NOT EXISTS created_by_uuid TEXT,
+        ADD COLUMN IF NOT EXISTS updated_by_uuid TEXT,
+        ADD COLUMN IF NOT EXISTS is_deleted BOOLEAN DEFAULT FALSE,
+        ADD COLUMN IF NOT EXISTS is_sync BOOLEAN DEFAULT FALSE;
+
+      ALTER TABLE "bulk_import_history"
+        ADD COLUMN IF NOT EXISTS sort_order INTEGER DEFAULT 0,
+        ADD COLUMN IF NOT EXISTS created_at TIMESTAMP DEFAULT NOW(),
+        ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP DEFAULT NOW(),
+        ADD COLUMN IF NOT EXISTS created_by_uuid TEXT,
+        ADD COLUMN IF NOT EXISTS updated_by_uuid TEXT,
+        ADD COLUMN IF NOT EXISTS is_deleted BOOLEAN DEFAULT FALSE,
+        ADD COLUMN IF NOT EXISTS is_sync BOOLEAN DEFAULT FALSE;
+
+      ALTER TABLE "certificates"
+        ADD COLUMN IF NOT EXISTS sort_order INTEGER DEFAULT 0,
+        ADD COLUMN IF NOT EXISTS created_by_uuid TEXT,
+        ADD COLUMN IF NOT EXISTS updated_by_uuid TEXT,
+        ADD COLUMN IF NOT EXISTS is_deleted BOOLEAN DEFAULT FALSE,
+        ADD COLUMN IF NOT EXISTS is_sync BOOLEAN DEFAULT FALSE;
+
+      ALTER TABLE "change_request"
+        ADD COLUMN IF NOT EXISTS sort_order INTEGER DEFAULT 0,
+        ADD COLUMN IF NOT EXISTS created_by_uuid TEXT,
+        ADD COLUMN IF NOT EXISTS updated_by_uuid TEXT,
+        ADD COLUMN IF NOT EXISTS is_deleted BOOLEAN DEFAULT FALSE,
+        ADD COLUMN IF NOT EXISTS is_sync BOOLEAN DEFAULT FALSE;
+
+      ALTER TABLE "change_request_attachment"
+        ADD COLUMN IF NOT EXISTS sort_order INTEGER DEFAULT 0,
+        ADD COLUMN IF NOT EXISTS created_at TIMESTAMP DEFAULT NOW(),
+        ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP DEFAULT NOW(),
+        ADD COLUMN IF NOT EXISTS created_by_uuid TEXT,
+        ADD COLUMN IF NOT EXISTS updated_by_uuid TEXT,
+        ADD COLUMN IF NOT EXISTS is_deleted BOOLEAN DEFAULT FALSE,
+        ADD COLUMN IF NOT EXISTS is_sync BOOLEAN DEFAULT FALSE;
+
+      ALTER TABLE "change_request_comment"
+        ADD COLUMN IF NOT EXISTS sort_order INTEGER DEFAULT 0,
+        ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP DEFAULT NOW(),
+        ADD COLUMN IF NOT EXISTS created_by_uuid TEXT,
+        ADD COLUMN IF NOT EXISTS updated_by_uuid TEXT,
+        ADD COLUMN IF NOT EXISTS is_deleted BOOLEAN DEFAULT FALSE,
+        ADD COLUMN IF NOT EXISTS is_sync BOOLEAN DEFAULT FALSE;
+
+      ALTER TABLE "component_class_regulatory"
+        ADD COLUMN IF NOT EXISTS sort_order INTEGER DEFAULT 0,
+        ADD COLUMN IF NOT EXISTS created_by_uuid TEXT,
+        ADD COLUMN IF NOT EXISTS updated_by_uuid TEXT,
+        ADD COLUMN IF NOT EXISTS is_deleted BOOLEAN DEFAULT FALSE,
+        ADD COLUMN IF NOT EXISTS is_sync BOOLEAN DEFAULT FALSE;
+
+      ALTER TABLE "component_documents"
+        ADD COLUMN IF NOT EXISTS sort_order INTEGER DEFAULT 0,
+        ADD COLUMN IF NOT EXISTS created_at TIMESTAMP DEFAULT NOW(),
+        ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP DEFAULT NOW(),
+        ADD COLUMN IF NOT EXISTS created_by_uuid TEXT,
+        ADD COLUMN IF NOT EXISTS updated_by_uuid TEXT,
+        ADD COLUMN IF NOT EXISTS is_deleted BOOLEAN DEFAULT FALSE,
+        ADD COLUMN IF NOT EXISTS is_sync BOOLEAN DEFAULT FALSE;
+
+      ALTER TABLE "component_maintenance_history"
+        ADD COLUMN IF NOT EXISTS sort_order INTEGER DEFAULT 0,
+        ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP DEFAULT NOW(),
+        ADD COLUMN IF NOT EXISTS created_by_uuid TEXT,
+        ADD COLUMN IF NOT EXISTS updated_by_uuid TEXT,
+        ADD COLUMN IF NOT EXISTS is_deleted BOOLEAN DEFAULT FALSE,
+        ADD COLUMN IF NOT EXISTS is_sync BOOLEAN DEFAULT FALSE;
+
+      ALTER TABLE "component_requisitions"
+        ADD COLUMN IF NOT EXISTS sort_order INTEGER DEFAULT 0,
+        ADD COLUMN IF NOT EXISTS created_by_uuid TEXT,
+        ADD COLUMN IF NOT EXISTS updated_by_uuid TEXT,
+        ADD COLUMN IF NOT EXISTS is_deleted BOOLEAN DEFAULT FALSE,
+        ADD COLUMN IF NOT EXISTS is_sync BOOLEAN DEFAULT FALSE;
+
+      ALTER TABLE "component_running_hours_log"
+        ADD COLUMN IF NOT EXISTS sort_order INTEGER DEFAULT 0,
+        ADD COLUMN IF NOT EXISTS created_by_uuid TEXT,
+        ADD COLUMN IF NOT EXISTS updated_by_uuid TEXT,
+        ADD COLUMN IF NOT EXISTS is_deleted BOOLEAN DEFAULT FALSE,
+        ADD COLUMN IF NOT EXISTS is_sync BOOLEAN DEFAULT FALSE;
+
+      ALTER TABLE "components"
+        ADD COLUMN IF NOT EXISTS sort_order INTEGER DEFAULT 0,
+        ADD COLUMN IF NOT EXISTS created_by_uuid TEXT,
+        ADD COLUMN IF NOT EXISTS updated_by_uuid TEXT,
+        ADD COLUMN IF NOT EXISTS is_deleted BOOLEAN DEFAULT FALSE,
+        ADD COLUMN IF NOT EXISTS is_sync BOOLEAN DEFAULT FALSE;
+
+      ALTER TABLE "defect_actions"
+        ADD COLUMN IF NOT EXISTS sort_order INTEGER DEFAULT 0,
+        ADD COLUMN IF NOT EXISTS created_by_uuid TEXT,
+        ADD COLUMN IF NOT EXISTS updated_by_uuid TEXT,
+        ADD COLUMN IF NOT EXISTS is_deleted BOOLEAN DEFAULT FALSE,
+        ADD COLUMN IF NOT EXISTS is_sync BOOLEAN DEFAULT FALSE;
+
+      ALTER TABLE "defect_attachments"
+        ADD COLUMN IF NOT EXISTS sort_order INTEGER DEFAULT 0,
+        ADD COLUMN IF NOT EXISTS created_at TIMESTAMP DEFAULT NOW(),
+        ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP DEFAULT NOW(),
+        ADD COLUMN IF NOT EXISTS created_by_uuid TEXT,
+        ADD COLUMN IF NOT EXISTS updated_by_uuid TEXT,
+        ADD COLUMN IF NOT EXISTS is_deleted BOOLEAN DEFAULT FALSE,
+        ADD COLUMN IF NOT EXISTS is_sync BOOLEAN DEFAULT FALSE;
+
+      ALTER TABLE "defect_categories"
+        ADD COLUMN IF NOT EXISTS created_by_uuid TEXT,
+        ADD COLUMN IF NOT EXISTS updated_by_uuid TEXT,
+        ADD COLUMN IF NOT EXISTS is_deleted BOOLEAN DEFAULT FALSE,
+        ADD COLUMN IF NOT EXISTS is_sync BOOLEAN DEFAULT FALSE;
+
+      ALTER TABLE "defect_sequences"
+        ADD COLUMN IF NOT EXISTS sort_order INTEGER DEFAULT 0,
+        ADD COLUMN IF NOT EXISTS created_at TIMESTAMP DEFAULT NOW(),
+        ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP DEFAULT NOW(),
+        ADD COLUMN IF NOT EXISTS created_by_uuid TEXT,
+        ADD COLUMN IF NOT EXISTS updated_by_uuid TEXT,
+        ADD COLUMN IF NOT EXISTS is_deleted BOOLEAN DEFAULT FALSE,
+        ADD COLUMN IF NOT EXISTS is_sync BOOLEAN DEFAULT FALSE;
+
+      ALTER TABLE "defect_types"
+        ADD COLUMN IF NOT EXISTS created_by_uuid TEXT,
+        ADD COLUMN IF NOT EXISTS updated_by_uuid TEXT,
+        ADD COLUMN IF NOT EXISTS is_deleted BOOLEAN DEFAULT FALSE,
+        ADD COLUMN IF NOT EXISTS is_sync BOOLEAN DEFAULT FALSE;
+
+      ALTER TABLE "defects"
+        ADD COLUMN IF NOT EXISTS sort_order INTEGER DEFAULT 0,
+        ADD COLUMN IF NOT EXISTS created_by_uuid TEXT,
+        ADD COLUMN IF NOT EXISTS updated_by_uuid TEXT,
+        ADD COLUMN IF NOT EXISTS is_deleted BOOLEAN DEFAULT FALSE,
+        ADD COLUMN IF NOT EXISTS is_sync BOOLEAN DEFAULT FALSE;
+
+      ALTER TABLE "equipment_categories"
+        ADD COLUMN IF NOT EXISTS created_by_uuid TEXT,
+        ADD COLUMN IF NOT EXISTS updated_by_uuid TEXT,
+        ADD COLUMN IF NOT EXISTS is_deleted BOOLEAN DEFAULT FALSE,
+        ADD COLUMN IF NOT EXISTS is_sync BOOLEAN DEFAULT FALSE;
+
+      ALTER TABLE "fleet_component_mapping"
+        ADD COLUMN IF NOT EXISTS sort_order INTEGER DEFAULT 0,
+        ADD COLUMN IF NOT EXISTS created_at TIMESTAMP DEFAULT NOW(),
+        ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP DEFAULT NOW(),
+        ADD COLUMN IF NOT EXISTS created_by_uuid TEXT,
+        ADD COLUMN IF NOT EXISTS updated_by_uuid TEXT,
+        ADD COLUMN IF NOT EXISTS is_deleted BOOLEAN DEFAULT FALSE,
+        ADD COLUMN IF NOT EXISTS is_sync BOOLEAN DEFAULT FALSE;
+
+      ALTER TABLE "fleet_job_vessel_mapping"
+        ADD COLUMN IF NOT EXISTS sort_order INTEGER DEFAULT 0,
+        ADD COLUMN IF NOT EXISTS created_at TIMESTAMP DEFAULT NOW(),
+        ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP DEFAULT NOW(),
+        ADD COLUMN IF NOT EXISTS created_by_uuid TEXT,
+        ADD COLUMN IF NOT EXISTS updated_by_uuid TEXT,
+        ADD COLUMN IF NOT EXISTS is_deleted BOOLEAN DEFAULT FALSE,
+        ADD COLUMN IF NOT EXISTS is_sync BOOLEAN DEFAULT FALSE;
+
+      ALTER TABLE "fleet_spare_vessel_mapping"
+        ADD COLUMN IF NOT EXISTS sort_order INTEGER DEFAULT 0,
+        ADD COLUMN IF NOT EXISTS created_at TIMESTAMP DEFAULT NOW(),
+        ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP DEFAULT NOW(),
+        ADD COLUMN IF NOT EXISTS created_by_uuid TEXT,
+        ADD COLUMN IF NOT EXISTS updated_by_uuid TEXT,
+        ADD COLUMN IF NOT EXISTS is_deleted BOOLEAN DEFAULT FALSE,
+        ADD COLUMN IF NOT EXISTS is_sync BOOLEAN DEFAULT FALSE;
+
+      ALTER TABLE "fleet_vessel_mapping"
+        ADD COLUMN IF NOT EXISTS sort_order INTEGER DEFAULT 0,
+        ADD COLUMN IF NOT EXISTS created_at TIMESTAMP DEFAULT NOW(),
+        ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP DEFAULT NOW(),
+        ADD COLUMN IF NOT EXISTS created_by_uuid TEXT,
+        ADD COLUMN IF NOT EXISTS updated_by_uuid TEXT,
+        ADD COLUMN IF NOT EXISTS is_deleted BOOLEAN DEFAULT FALSE,
+        ADD COLUMN IF NOT EXISTS is_sync BOOLEAN DEFAULT FALSE;
+
+      ALTER TABLE "fleets"
+        ADD COLUMN IF NOT EXISTS sort_order INTEGER DEFAULT 0,
+        ADD COLUMN IF NOT EXISTS created_by_uuid TEXT,
+        ADD COLUMN IF NOT EXISTS updated_by_uuid TEXT,
+        ADD COLUMN IF NOT EXISTS is_deleted BOOLEAN DEFAULT FALSE,
+        ADD COLUMN IF NOT EXISTS is_sync BOOLEAN DEFAULT FALSE;
+
+      ALTER TABLE "form_definitions"
+        ADD COLUMN IF NOT EXISTS sort_order INTEGER DEFAULT 0,
+        ADD COLUMN IF NOT EXISTS created_at TIMESTAMP DEFAULT NOW(),
+        ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP DEFAULT NOW(),
+        ADD COLUMN IF NOT EXISTS created_by_uuid TEXT,
+        ADD COLUMN IF NOT EXISTS updated_by_uuid TEXT,
+        ADD COLUMN IF NOT EXISTS is_deleted BOOLEAN DEFAULT FALSE,
+        ADD COLUMN IF NOT EXISTS is_sync BOOLEAN DEFAULT FALSE;
+
+      ALTER TABLE "form_version_usage"
+        ADD COLUMN IF NOT EXISTS sort_order INTEGER DEFAULT 0,
+        ADD COLUMN IF NOT EXISTS created_at TIMESTAMP DEFAULT NOW(),
+        ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP DEFAULT NOW(),
+        ADD COLUMN IF NOT EXISTS created_by_uuid TEXT,
+        ADD COLUMN IF NOT EXISTS updated_by_uuid TEXT,
+        ADD COLUMN IF NOT EXISTS is_deleted BOOLEAN DEFAULT FALSE,
+        ADD COLUMN IF NOT EXISTS is_sync BOOLEAN DEFAULT FALSE;
+
+      ALTER TABLE "form_versions"
+        ADD COLUMN IF NOT EXISTS sort_order INTEGER DEFAULT 0,
+        ADD COLUMN IF NOT EXISTS created_at TIMESTAMP DEFAULT NOW(),
+        ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP DEFAULT NOW(),
+        ADD COLUMN IF NOT EXISTS created_by_uuid TEXT,
+        ADD COLUMN IF NOT EXISTS updated_by_uuid TEXT,
+        ADD COLUMN IF NOT EXISTS is_deleted BOOLEAN DEFAULT FALSE,
+        ADD COLUMN IF NOT EXISTS is_sync BOOLEAN DEFAULT FALSE;
+
+      ALTER TABLE "ihm_items"
+        ADD COLUMN IF NOT EXISTS sort_order INTEGER DEFAULT 0,
+        ADD COLUMN IF NOT EXISTS created_by_uuid TEXT,
+        ADD COLUMN IF NOT EXISTS updated_by_uuid TEXT,
+        ADD COLUMN IF NOT EXISTS is_deleted BOOLEAN DEFAULT FALSE,
+        ADD COLUMN IF NOT EXISTS is_sync BOOLEAN DEFAULT FALSE;
+
+      ALTER TABLE "ihm_maintenance_log"
+        ADD COLUMN IF NOT EXISTS sort_order INTEGER DEFAULT 0,
+        ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP DEFAULT NOW(),
+        ADD COLUMN IF NOT EXISTS created_by_uuid TEXT,
+        ADD COLUMN IF NOT EXISTS updated_by_uuid TEXT,
+        ADD COLUMN IF NOT EXISTS is_deleted BOOLEAN DEFAULT FALSE,
+        ADD COLUMN IF NOT EXISTS is_sync BOOLEAN DEFAULT FALSE;
+
+      ALTER TABLE "import_change_log"
+        ADD COLUMN IF NOT EXISTS sort_order INTEGER DEFAULT 0,
+        ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP DEFAULT NOW(),
+        ADD COLUMN IF NOT EXISTS created_by_uuid TEXT,
+        ADD COLUMN IF NOT EXISTS updated_by_uuid TEXT,
+        ADD COLUMN IF NOT EXISTS is_deleted BOOLEAN DEFAULT FALSE,
+        ADD COLUMN IF NOT EXISTS is_sync BOOLEAN DEFAULT FALSE;
+
+      ALTER TABLE "import_history"
+        ADD COLUMN IF NOT EXISTS sort_order INTEGER DEFAULT 0,
+        ADD COLUMN IF NOT EXISTS created_at TIMESTAMP DEFAULT NOW(),
+        ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP DEFAULT NOW(),
+        ADD COLUMN IF NOT EXISTS created_by_uuid TEXT,
+        ADD COLUMN IF NOT EXISTS updated_by_uuid TEXT,
+        ADD COLUMN IF NOT EXISTS is_deleted BOOLEAN DEFAULT FALSE,
+        ADD COLUMN IF NOT EXISTS is_sync BOOLEAN DEFAULT FALSE;
+
+      ALTER TABLE "inventory_transactions"
+        ADD COLUMN IF NOT EXISTS sort_order INTEGER DEFAULT 0,
+        ADD COLUMN IF NOT EXISTS created_at TIMESTAMP DEFAULT NOW(),
+        ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP DEFAULT NOW(),
+        ADD COLUMN IF NOT EXISTS created_by_uuid TEXT,
+        ADD COLUMN IF NOT EXISTS updated_by_uuid TEXT,
+        ADD COLUMN IF NOT EXISTS is_deleted BOOLEAN DEFAULT FALSE,
+        ADD COLUMN IF NOT EXISTS is_sync BOOLEAN DEFAULT FALSE;
+
+      ALTER TABLE "job_component_links"
+        ADD COLUMN IF NOT EXISTS sort_order INTEGER DEFAULT 0,
+        ADD COLUMN IF NOT EXISTS created_at TIMESTAMP DEFAULT NOW(),
+        ADD COLUMN IF NOT EXISTS created_by_uuid TEXT,
+        ADD COLUMN IF NOT EXISTS updated_by_uuid TEXT,
+        ADD COLUMN IF NOT EXISTS is_deleted BOOLEAN DEFAULT FALSE,
+        ADD COLUMN IF NOT EXISTS is_sync BOOLEAN DEFAULT FALSE;
+
+      ALTER TABLE "jobs"
+        ADD COLUMN IF NOT EXISTS sort_order INTEGER DEFAULT 0,
+        ADD COLUMN IF NOT EXISTS created_by_uuid TEXT,
+        ADD COLUMN IF NOT EXISTS updated_by_uuid TEXT,
+        ADD COLUMN IF NOT EXISTS is_deleted BOOLEAN DEFAULT FALSE,
+        ADD COLUMN IF NOT EXISTS is_sync BOOLEAN DEFAULT FALSE;
+
+      ALTER TABLE "locations"
+        ADD COLUMN IF NOT EXISTS sort_order INTEGER DEFAULT 0,
+        ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP DEFAULT NOW(),
+        ADD COLUMN IF NOT EXISTS created_by_uuid TEXT,
+        ADD COLUMN IF NOT EXISTS updated_by_uuid TEXT,
+        ADD COLUMN IF NOT EXISTS is_deleted BOOLEAN DEFAULT FALSE,
+        ADD COLUMN IF NOT EXISTS is_sync BOOLEAN DEFAULT FALSE;
+
+      ALTER TABLE "makers"
+        ADD COLUMN IF NOT EXISTS sort_order INTEGER DEFAULT 0,
+        ADD COLUMN IF NOT EXISTS created_by_uuid TEXT,
+        ADD COLUMN IF NOT EXISTS updated_by_uuid TEXT,
+        ADD COLUMN IF NOT EXISTS is_deleted BOOLEAN DEFAULT FALSE,
+        ADD COLUMN IF NOT EXISTS is_sync BOOLEAN DEFAULT FALSE;
+
+      ALTER TABLE "master_data"
+        ADD COLUMN IF NOT EXISTS sort_order INTEGER DEFAULT 0,
+        ADD COLUMN IF NOT EXISTS created_by_uuid TEXT,
+        ADD COLUMN IF NOT EXISTS updated_by_uuid TEXT,
+        ADD COLUMN IF NOT EXISTS is_deleted BOOLEAN DEFAULT FALSE,
+        ADD COLUMN IF NOT EXISTS is_sync BOOLEAN DEFAULT FALSE;
+
+      ALTER TABLE "master_lists"
+        ADD COLUMN IF NOT EXISTS sort_order INTEGER DEFAULT 0,
+        ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP DEFAULT NOW(),
+        ADD COLUMN IF NOT EXISTS created_by_uuid TEXT,
+        ADD COLUMN IF NOT EXISTS updated_by_uuid TEXT,
+        ADD COLUMN IF NOT EXISTS is_deleted BOOLEAN DEFAULT FALSE,
+        ADD COLUMN IF NOT EXISTS is_sync BOOLEAN DEFAULT FALSE;
+
+      ALTER TABLE "pms_vessel_settings"
+        ADD COLUMN IF NOT EXISTS sort_order INTEGER DEFAULT 0,
+        ADD COLUMN IF NOT EXISTS created_by_uuid TEXT,
+        ADD COLUMN IF NOT EXISTS updated_by_uuid TEXT,
+        ADD COLUMN IF NOT EXISTS is_deleted BOOLEAN DEFAULT FALSE,
+        ADD COLUMN IF NOT EXISTS is_sync BOOLEAN DEFAULT FALSE;
+
+      ALTER TABLE "recurring_defect_links"
+        ADD COLUMN IF NOT EXISTS sort_order INTEGER DEFAULT 0,
+        ADD COLUMN IF NOT EXISTS created_at TIMESTAMP DEFAULT NOW(),
+        ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP DEFAULT NOW(),
+        ADD COLUMN IF NOT EXISTS created_by_uuid TEXT,
+        ADD COLUMN IF NOT EXISTS updated_by_uuid TEXT,
+        ADD COLUMN IF NOT EXISTS is_deleted BOOLEAN DEFAULT FALSE,
+        ADD COLUMN IF NOT EXISTS is_sync BOOLEAN DEFAULT FALSE;
+
+      ALTER TABLE "recurring_defects"
+        ADD COLUMN IF NOT EXISTS sort_order INTEGER DEFAULT 0,
+        ADD COLUMN IF NOT EXISTS created_at TIMESTAMP DEFAULT NOW(),
+        ADD COLUMN IF NOT EXISTS created_by_uuid TEXT,
+        ADD COLUMN IF NOT EXISTS updated_by_uuid TEXT,
+        ADD COLUMN IF NOT EXISTS is_deleted BOOLEAN DEFAULT FALSE,
+        ADD COLUMN IF NOT EXISTS is_sync BOOLEAN DEFAULT FALSE;
+
+      ALTER TABLE "report_snapshots"
+        ADD COLUMN IF NOT EXISTS sort_order INTEGER DEFAULT 0,
+        ADD COLUMN IF NOT EXISTS created_at TIMESTAMP DEFAULT NOW(),
+        ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP DEFAULT NOW(),
+        ADD COLUMN IF NOT EXISTS created_by_uuid TEXT,
+        ADD COLUMN IF NOT EXISTS updated_by_uuid TEXT,
+        ADD COLUMN IF NOT EXISTS is_deleted BOOLEAN DEFAULT FALSE,
+        ADD COLUMN IF NOT EXISTS is_sync BOOLEAN DEFAULT FALSE;
+
+      ALTER TABLE "running_hours_audit"
+        ADD COLUMN IF NOT EXISTS sort_order INTEGER DEFAULT 0,
+        ADD COLUMN IF NOT EXISTS created_at TIMESTAMP DEFAULT NOW(),
+        ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP DEFAULT NOW(),
+        ADD COLUMN IF NOT EXISTS created_by_uuid TEXT,
+        ADD COLUMN IF NOT EXISTS updated_by_uuid TEXT,
+        ADD COLUMN IF NOT EXISTS is_deleted BOOLEAN DEFAULT FALSE,
+        ADD COLUMN IF NOT EXISTS is_sync BOOLEAN DEFAULT FALSE;
+
+      ALTER TABLE "schema_migrations"
+        ADD COLUMN IF NOT EXISTS sort_order INTEGER DEFAULT 0,
+        ADD COLUMN IF NOT EXISTS created_at TIMESTAMP DEFAULT NOW(),
+        ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP DEFAULT NOW(),
+        ADD COLUMN IF NOT EXISTS created_by_uuid TEXT,
+        ADD COLUMN IF NOT EXISTS updated_by_uuid TEXT,
+        ADD COLUMN IF NOT EXISTS is_deleted BOOLEAN DEFAULT FALSE,
+        ADD COLUMN IF NOT EXISTS is_sync BOOLEAN DEFAULT FALSE;
+
+      ALTER TABLE "sfi_details"
+        ADD COLUMN IF NOT EXISTS sort_order INTEGER DEFAULT 0,
+        ADD COLUMN IF NOT EXISTS created_by_uuid TEXT,
+        ADD COLUMN IF NOT EXISTS updated_by_uuid TEXT,
+        ADD COLUMN IF NOT EXISTS is_deleted BOOLEAN DEFAULT FALSE,
+        ADD COLUMN IF NOT EXISTS is_sync BOOLEAN DEFAULT FALSE;
+
+      ALTER TABLE "ship_certificates_labels_config"
+        ADD COLUMN IF NOT EXISTS sort_order INTEGER DEFAULT 0,
+        ADD COLUMN IF NOT EXISTS created_by_uuid TEXT,
+        ADD COLUMN IF NOT EXISTS updated_by_uuid TEXT,
+        ADD COLUMN IF NOT EXISTS is_deleted BOOLEAN DEFAULT FALSE,
+        ADD COLUMN IF NOT EXISTS is_sync BOOLEAN DEFAULT FALSE;
+
+      ALTER TABLE "ship_certificates_master"
+        ADD COLUMN IF NOT EXISTS sort_order INTEGER DEFAULT 0,
+        ADD COLUMN IF NOT EXISTS created_by_uuid TEXT,
+        ADD COLUMN IF NOT EXISTS updated_by_uuid TEXT,
+        ADD COLUMN IF NOT EXISTS is_deleted BOOLEAN DEFAULT FALSE,
+        ADD COLUMN IF NOT EXISTS is_sync BOOLEAN DEFAULT FALSE;
+
+      ALTER TABLE "ship_surveys_labels_config"
+        ADD COLUMN IF NOT EXISTS sort_order INTEGER DEFAULT 0,
+        ADD COLUMN IF NOT EXISTS created_by_uuid TEXT,
+        ADD COLUMN IF NOT EXISTS updated_by_uuid TEXT,
+        ADD COLUMN IF NOT EXISTS is_deleted BOOLEAN DEFAULT FALSE,
+        ADD COLUMN IF NOT EXISTS is_sync BOOLEAN DEFAULT FALSE;
+
+      ALTER TABLE "ship_surveys_master"
+        ADD COLUMN IF NOT EXISTS sort_order INTEGER DEFAULT 0,
+        ADD COLUMN IF NOT EXISTS created_by_uuid TEXT,
+        ADD COLUMN IF NOT EXISTS updated_by_uuid TEXT,
+        ADD COLUMN IF NOT EXISTS is_deleted BOOLEAN DEFAULT FALSE,
+        ADD COLUMN IF NOT EXISTS is_sync BOOLEAN DEFAULT FALSE;
+
+      ALTER TABLE "spare_component_links"
+        ADD COLUMN IF NOT EXISTS sort_order INTEGER DEFAULT 0,
+        ADD COLUMN IF NOT EXISTS created_at TIMESTAMP DEFAULT NOW(),
+        ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP DEFAULT NOW(),
+        ADD COLUMN IF NOT EXISTS created_by_uuid TEXT,
+        ADD COLUMN IF NOT EXISTS updated_by_uuid TEXT,
+        ADD COLUMN IF NOT EXISTS is_deleted BOOLEAN DEFAULT FALSE,
+        ADD COLUMN IF NOT EXISTS is_sync BOOLEAN DEFAULT FALSE;
+
+      ALTER TABLE "spare_location_stock"
+        ADD COLUMN IF NOT EXISTS sort_order INTEGER DEFAULT 0,
+        ADD COLUMN IF NOT EXISTS created_at TIMESTAMP DEFAULT NOW(),
+        ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP DEFAULT NOW(),
+        ADD COLUMN IF NOT EXISTS created_by_uuid TEXT,
+        ADD COLUMN IF NOT EXISTS updated_by_uuid TEXT,
+        ADD COLUMN IF NOT EXISTS is_deleted BOOLEAN DEFAULT FALSE,
+        ADD COLUMN IF NOT EXISTS is_sync BOOLEAN DEFAULT FALSE;
+
+      ALTER TABLE "spares"
+        ADD COLUMN IF NOT EXISTS sort_order INTEGER DEFAULT 0,
+        ADD COLUMN IF NOT EXISTS created_by_uuid TEXT,
+        ADD COLUMN IF NOT EXISTS updated_by_uuid TEXT,
+        ADD COLUMN IF NOT EXISTS is_deleted BOOLEAN DEFAULT FALSE,
+        ADD COLUMN IF NOT EXISTS is_sync BOOLEAN DEFAULT FALSE;
+
+      ALTER TABLE "spares_history"
+        ADD COLUMN IF NOT EXISTS sort_order INTEGER DEFAULT 0,
+        ADD COLUMN IF NOT EXISTS created_at TIMESTAMP DEFAULT NOW(),
+        ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP DEFAULT NOW(),
+        ADD COLUMN IF NOT EXISTS created_by_uuid TEXT,
+        ADD COLUMN IF NOT EXISTS updated_by_uuid TEXT,
+        ADD COLUMN IF NOT EXISTS is_deleted BOOLEAN DEFAULT FALSE,
+        ADD COLUMN IF NOT EXISTS is_sync BOOLEAN DEFAULT FALSE;
+
+      ALTER TABLE "stores_items"
+        ADD COLUMN IF NOT EXISTS sort_order INTEGER DEFAULT 0,
+        ADD COLUMN IF NOT EXISTS created_by_uuid TEXT,
+        ADD COLUMN IF NOT EXISTS updated_by_uuid TEXT,
+        ADD COLUMN IF NOT EXISTS is_deleted BOOLEAN DEFAULT FALSE,
+        ADD COLUMN IF NOT EXISTS is_sync BOOLEAN DEFAULT FALSE;
+
+      ALTER TABLE "stores_ledger"
+        ADD COLUMN IF NOT EXISTS sort_order INTEGER DEFAULT 0,
+        ADD COLUMN IF NOT EXISTS created_at TIMESTAMP DEFAULT NOW(),
+        ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP DEFAULT NOW(),
+        ADD COLUMN IF NOT EXISTS created_by_uuid TEXT,
+        ADD COLUMN IF NOT EXISTS updated_by_uuid TEXT,
+        ADD COLUMN IF NOT EXISTS is_deleted BOOLEAN DEFAULT FALSE,
+        ADD COLUMN IF NOT EXISTS is_sync BOOLEAN DEFAULT FALSE;
+
+      ALTER TABLE "surveys"
+        ADD COLUMN IF NOT EXISTS sort_order INTEGER DEFAULT 0,
+        ADD COLUMN IF NOT EXISTS created_by_uuid TEXT,
+        ADD COLUMN IF NOT EXISTS updated_by_uuid TEXT,
+        ADD COLUMN IF NOT EXISTS is_deleted BOOLEAN DEFAULT FALSE,
+        ADD COLUMN IF NOT EXISTS is_sync BOOLEAN DEFAULT FALSE;
+
+      ALTER TABLE "users"
+        ADD COLUMN IF NOT EXISTS sort_order INTEGER DEFAULT 0,
+        ADD COLUMN IF NOT EXISTS created_by_uuid TEXT,
+        ADD COLUMN IF NOT EXISTS updated_by_uuid TEXT,
+        ADD COLUMN IF NOT EXISTS is_deleted BOOLEAN DEFAULT FALSE,
+        ADD COLUMN IF NOT EXISTS is_sync BOOLEAN DEFAULT FALSE;
+
+      ALTER TABLE "vessel_certificate_applicability"
+        ADD COLUMN IF NOT EXISTS sort_order INTEGER DEFAULT 0,
+        ADD COLUMN IF NOT EXISTS created_by_uuid TEXT,
+        ADD COLUMN IF NOT EXISTS updated_by_uuid TEXT,
+        ADD COLUMN IF NOT EXISTS is_deleted BOOLEAN DEFAULT FALSE,
+        ADD COLUMN IF NOT EXISTS is_sync BOOLEAN DEFAULT FALSE;
+
+      ALTER TABLE "vessel_certificate_data"
+        ADD COLUMN IF NOT EXISTS sort_order INTEGER DEFAULT 0,
+        ADD COLUMN IF NOT EXISTS created_by_uuid TEXT,
+        ADD COLUMN IF NOT EXISTS updated_by_uuid TEXT,
+        ADD COLUMN IF NOT EXISTS is_deleted BOOLEAN DEFAULT FALSE,
+        ADD COLUMN IF NOT EXISTS is_sync BOOLEAN DEFAULT FALSE;
+
+      ALTER TABLE "vessel_survey_applicability"
+        ADD COLUMN IF NOT EXISTS sort_order INTEGER DEFAULT 0,
+        ADD COLUMN IF NOT EXISTS created_by_uuid TEXT,
+        ADD COLUMN IF NOT EXISTS updated_by_uuid TEXT,
+        ADD COLUMN IF NOT EXISTS is_deleted BOOLEAN DEFAULT FALSE,
+        ADD COLUMN IF NOT EXISTS is_sync BOOLEAN DEFAULT FALSE;
+
+      ALTER TABLE "vessel_survey_data"
+        ADD COLUMN IF NOT EXISTS sort_order INTEGER DEFAULT 0,
+        ADD COLUMN IF NOT EXISTS created_by_uuid TEXT,
+        ADD COLUMN IF NOT EXISTS updated_by_uuid TEXT,
+        ADD COLUMN IF NOT EXISTS is_deleted BOOLEAN DEFAULT FALSE,
+        ADD COLUMN IF NOT EXISTS is_sync BOOLEAN DEFAULT FALSE;
+
+      ALTER TABLE "vessels"
+        ADD COLUMN IF NOT EXISTS sort_order INTEGER DEFAULT 0,
+        ADD COLUMN IF NOT EXISTS created_by_uuid TEXT,
+        ADD COLUMN IF NOT EXISTS updated_by_uuid TEXT,
+        ADD COLUMN IF NOT EXISTS is_deleted BOOLEAN DEFAULT FALSE,
+        ADD COLUMN IF NOT EXISTS is_sync BOOLEAN DEFAULT FALSE;
+
+      ALTER TABLE "work_order_execution_details"
+        ADD COLUMN IF NOT EXISTS sort_order INTEGER DEFAULT 0,
+        ADD COLUMN IF NOT EXISTS created_by_uuid TEXT,
+        ADD COLUMN IF NOT EXISTS updated_by_uuid TEXT,
+        ADD COLUMN IF NOT EXISTS is_deleted BOOLEAN DEFAULT FALSE,
+        ADD COLUMN IF NOT EXISTS is_sync BOOLEAN DEFAULT FALSE;
+
+      ALTER TABLE "work_order_executions"
+        ADD COLUMN IF NOT EXISTS sort_order INTEGER DEFAULT 0,
+        ADD COLUMN IF NOT EXISTS created_by_uuid TEXT,
+        ADD COLUMN IF NOT EXISTS updated_by_uuid TEXT,
+        ADD COLUMN IF NOT EXISTS is_deleted BOOLEAN DEFAULT FALSE,
+        ADD COLUMN IF NOT EXISTS is_sync BOOLEAN DEFAULT FALSE;
+
+      ALTER TABLE "work_order_postponements"
+        ADD COLUMN IF NOT EXISTS sort_order INTEGER DEFAULT 0,
+        ADD COLUMN IF NOT EXISTS created_by_uuid TEXT,
+        ADD COLUMN IF NOT EXISTS updated_by_uuid TEXT,
+        ADD COLUMN IF NOT EXISTS is_deleted BOOLEAN DEFAULT FALSE,
+        ADD COLUMN IF NOT EXISTS is_sync BOOLEAN DEFAULT FALSE;
+
+      ALTER TABLE "work_orders"
+        ADD COLUMN IF NOT EXISTS sort_order INTEGER DEFAULT 0,
+        ADD COLUMN IF NOT EXISTS created_by_uuid TEXT,
+        ADD COLUMN IF NOT EXISTS updated_by_uuid TEXT,
+        ADD COLUMN IF NOT EXISTS is_deleted BOOLEAN DEFAULT FALSE,
+        ADD COLUMN IF NOT EXISTS is_sync BOOLEAN DEFAULT FALSE;
+
+      ALTER TABLE "job_component_links"
+        ALTER COLUMN updated_at SET DEFAULT NOW()
+    `
   }
 ];
 
