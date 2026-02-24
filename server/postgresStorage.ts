@@ -4518,10 +4518,10 @@ export class PostgresStorage {
         await this.applyWorkOrderChangesInTx(tx, targetId, updateData);
         break;
       case 'spare':
-        await this.applySpareChangesInTx(tx, parseInt(targetId), updateData);
+        await this.applySpareChangesInTx(tx, targetId, updateData);
         break;
       case 'store':
-        await this.applyStoreChangesInTx(tx, parseInt(targetId), updateData);
+        await this.applyStoreChangesInTx(tx, targetId, updateData);
         break;
       default:
         console.warn(`[CR_APPLY] Unknown target type: ${targetType}`);
@@ -4536,33 +4536,36 @@ export class PostgresStorage {
    * Apply changes to a Component record within a transaction
    */
   private async applyComponentChangesInTx(tx: any, componentId: string, updateData: Record<string, any>): Promise<void> {
-    // Verify component exists and capture before state
-    const existing = await tx.select().from(components).where(eq(components.cuuid, componentId));
+    // Verify component exists using dual-lookup (UUID or legacy ID)
+    const existing = await tx.select().from(components).where(
+      or(eq(components.cuuid, componentId), eq(components.id, componentId))
+    );
     if (!existing[0]) {
       throw new Error(`Component ${componentId} not found`);
     }
     const beforeState = existing[0];
-    
+    const resolvedCuuid = beforeState.cuuid;
+
     // Filter out fields that shouldn't be updated directly
     const safeUpdateData = { ...updateData };
     delete safeUpdateData.id;
     delete safeUpdateData.createdAt;
     delete safeUpdateData.vesselId;
-    
+
     if (Object.keys(safeUpdateData).length === 0) {
       console.log(`[CR_APPLY] Component ${componentId}: No valid fields to update`);
       return;
     }
-    
+
     // Log before values for each field being updated
-    console.log(`[CR_APPLY] Component ${componentId} BEFORE update:`);
+    console.log(`[CR_APPLY] Component ${componentId} (resolved cuuid: ${resolvedCuuid}) BEFORE update:`);
     for (const field of Object.keys(safeUpdateData)) {
       console.log(`  - ${field}: "${beforeState[field]}" -> "${safeUpdateData[field]}"`);
     }
-    
+
     const result = await tx.update(components)
       .set({ ...safeUpdateData, updatedAt: new Date() })
-      .where(eq(components.cuuid, componentId))
+      .where(eq(components.cuuid, resolvedCuuid))
       .returning();
     
     if (!result[0]) {
@@ -4587,19 +4590,22 @@ export class PostgresStorage {
    * Apply changes to a Job record within a transaction
    */
   private async applyJobChangesInTx(tx: any, jobId: string, updateData: Record<string, any>): Promise<void> {
-    // Verify job exists and capture before state
-    const existing = await tx.select().from(jobs).where(eq(jobs.juuid, jobId));
+    // Verify job exists using dual-lookup (UUID or legacy ID)
+    const existing = await tx.select().from(jobs).where(
+      or(eq(jobs.juuid, jobId), eq(jobs.id, jobId))
+    );
     if (!existing[0]) {
       throw new Error(`Job ${jobId} not found`);
     }
     const beforeState = existing[0];
-    
+    const resolvedJuuid = beforeState.juuid;
+
     // Filter out fields that shouldn't be updated directly
     const safeUpdateData = { ...updateData };
     delete safeUpdateData.id;
     delete safeUpdateData.createdAt;
     delete safeUpdateData.vesselId;
-    
+
     // Legacy field translations for jobs - UI uses different field names than schema
     // woTitle -> jobTitle (UI uses woTitle for display, schema uses jobTitle)
     if ('woTitle' in safeUpdateData) {
@@ -4607,14 +4613,14 @@ export class PostgresStorage {
       safeUpdateData.jobTitle = safeUpdateData.woTitle;
       delete safeUpdateData.woTitle;
     }
-    
+
     // taskType -> maintenanceType (UI uses taskType, schema uses maintenanceType)
     if ('taskType' in safeUpdateData) {
       console.log(`[CR_APPLY] Job field translation: taskType -> maintenanceType`);
       safeUpdateData.maintenanceType = safeUpdateData.taskType;
       delete safeUpdateData.taskType;
     }
-    
+
     // Remove any fields that don't exist in the jobs table schema
     const invalidFields = ['woTemplateCode', 'componentName', 'componentCode', 'nextDueReading'];
     for (const field of invalidFields) {
@@ -4623,21 +4629,21 @@ export class PostgresStorage {
         delete safeUpdateData[field];
       }
     }
-    
+
     if (Object.keys(safeUpdateData).length === 0) {
       console.log(`[CR_APPLY] Job ${jobId}: No valid fields to update`);
       return;
     }
-    
+
     // Log before values for each field being updated
-    console.log(`[CR_APPLY] Job ${jobId} BEFORE update:`);
+    console.log(`[CR_APPLY] Job ${jobId} (resolved juuid: ${resolvedJuuid}) BEFORE update:`);
     for (const field of Object.keys(safeUpdateData)) {
       console.log(`  - ${field}: "${beforeState[field]}" -> "${safeUpdateData[field]}"`);
     }
-    
+
     const result = await tx.update(jobs)
       .set({ ...safeUpdateData, updatedAt: new Date() })
-      .where(eq(jobs.juuid, jobId))
+      .where(eq(jobs.juuid, resolvedJuuid))
       .returning();
     
     if (!result[0]) {
@@ -4659,34 +4665,37 @@ export class PostgresStorage {
    * Apply changes to a Work Order record within a transaction
    */
   private async applyWorkOrderChangesInTx(tx: any, workOrderId: string, updateData: Record<string, any>): Promise<void> {
-    // Verify work order exists and capture before state
-    const existing = await tx.select().from(workOrders).where(eq(workOrders.wouuid, workOrderId));
+    // Verify work order exists using dual-lookup (UUID or legacy ID)
+    const existing = await tx.select().from(workOrders).where(
+      or(eq(workOrders.wouuid, workOrderId), eq(workOrders.id, workOrderId))
+    );
     if (!existing[0]) {
       throw new Error(`Work Order ${workOrderId} not found`);
     }
     const beforeState = existing[0];
-    
+    const resolvedWouuid = beforeState.wouuid;
+
     // Filter out fields that shouldn't be updated directly
     const safeUpdateData = { ...updateData };
     delete safeUpdateData.id;
     delete safeUpdateData.createdAt;
     delete safeUpdateData.vesselId;
     delete safeUpdateData.status; // Status changes should go through dedicated workflow
-    
+
     if (Object.keys(safeUpdateData).length === 0) {
       console.log(`[CR_APPLY] Work Order ${workOrderId}: No valid fields to update`);
       return;
     }
-    
+
     // Log before values for each field being updated
-    console.log(`[CR_APPLY] Work Order ${workOrderId} BEFORE update:`);
+    console.log(`[CR_APPLY] Work Order ${workOrderId} (resolved wouuid: ${resolvedWouuid}) BEFORE update:`);
     for (const field of Object.keys(safeUpdateData)) {
       console.log(`  - ${field}: "${beforeState[field]}" -> "${safeUpdateData[field]}"`);
     }
-    
+
     const result = await tx.update(workOrders)
       .set({ ...safeUpdateData, updatedAt: new Date() })
-      .where(eq(workOrders.wouuid, workOrderId))
+      .where(eq(workOrders.wouuid, resolvedWouuid))
       .returning();
     
     if (!result[0]) {
@@ -4707,43 +4716,47 @@ export class PostgresStorage {
   /**
    * Apply changes to a Spare record within a transaction
    */
-  private async applySpareChangesInTx(tx: any, spareId: number, updateData: Record<string, any>): Promise<void> {
-    // Verify spare exists and capture before state
-    const existing = await tx.select().from(spares).where(eq(spares.suuid, spareId));
+  private async applySpareChangesInTx(tx: any, spareId: string, updateData: Record<string, any>): Promise<void> {
+    // Verify spare exists using dual-lookup (UUID or legacy integer ID)
+    const numId = Number(spareId);
+    const existing = await tx.select().from(spares).where(
+      or(eq(spares.suuid, spareId), ...(Number.isInteger(numId) && numId > 0 ? [eq(spares.id, numId)] : []))
+    );
     if (!existing[0]) {
       throw new Error(`Spare ${spareId} not found`);
     }
     const beforeState = existing[0];
-    
+    const resolvedSuuid = beforeState.suuid;
+
     // Filter out fields that shouldn't be updated directly
     const safeUpdateData = { ...updateData };
     delete safeUpdateData.id;
     delete safeUpdateData.createdAt;
     delete safeUpdateData.vesselId;
-    
+
     // Handle ROB-related fields through proper methods if present
     const robFields = ['rob', 'robLocationA', 'robLocationB'];
     const hasRobChanges = robFields.some(f => f in safeUpdateData);
-    
+
     if (hasRobChanges) {
       console.log(`[CR_APPLY] Spare ${spareId} has ROB changes - these require dedicated adjustment methods`);
       robFields.forEach(f => delete safeUpdateData[f]);
     }
-    
+
     if (Object.keys(safeUpdateData).length === 0) {
       console.log(`[CR_APPLY] Spare ${spareId}: No valid fields to update`);
       return;
     }
-    
+
     // Log before values for each field being updated
-    console.log(`[CR_APPLY] Spare ${spareId} BEFORE update:`);
+    console.log(`[CR_APPLY] Spare ${spareId} (resolved suuid: ${resolvedSuuid}) BEFORE update:`);
     for (const field of Object.keys(safeUpdateData)) {
       console.log(`  - ${field}: "${beforeState[field]}" -> "${safeUpdateData[field]}"`);
     }
-    
+
     const result = await tx.update(spares)
       .set({ ...safeUpdateData, updatedAt: new Date() })
-      .where(eq(spares.suuid, spareId))
+      .where(eq(spares.suuid, resolvedSuuid))
       .returning();
     
     if (!result[0]) {
@@ -4765,42 +4778,46 @@ export class PostgresStorage {
    * Apply changes to a Store Item record within a transaction
    */
   private async applyStoreChangesInTx(tx: any, storeId: string, updateData: Record<string, any>): Promise<void> {
-    // Verify store item exists and capture before state
-    const existing = await tx.select().from(storesItems).where(eq(storesItems.stuuid, storeId));
+    // Verify store item exists using dual-lookup (UUID or legacy integer ID)
+    const numId = Number(storeId);
+    const existing = await tx.select().from(storesItems).where(
+      or(eq(storesItems.stuuid, storeId), ...(Number.isInteger(numId) && numId > 0 ? [eq(storesItems.id, numId)] : []))
+    );
     if (!existing[0]) {
       throw new Error(`Store item ${storeId} not found`);
     }
     const beforeState = existing[0];
-    
+    const resolvedStuuid = beforeState.stuuid;
+
     // Filter out fields that shouldn't be updated directly
     const safeUpdateData = { ...updateData };
     delete safeUpdateData.id;
     delete safeUpdateData.createdAt;
     delete safeUpdateData.vesselId;
-    
+
     // Handle ROB-related fields through proper methods if present
     const robFields = ['rob', 'robLocationA', 'robLocationB'];
     const hasRobChanges = robFields.some(f => f in safeUpdateData);
-    
+
     if (hasRobChanges) {
       console.log(`[CR_APPLY] Store ${storeId} has ROB changes - these require dedicated adjustment methods`);
       robFields.forEach(f => delete safeUpdateData[f]);
     }
-    
+
     if (Object.keys(safeUpdateData).length === 0) {
       console.log(`[CR_APPLY] Store ${storeId}: No valid fields to update`);
       return;
     }
-    
+
     // Log before values for each field being updated
-    console.log(`[CR_APPLY] Store ${storeId} BEFORE update:`);
+    console.log(`[CR_APPLY] Store ${storeId} (resolved stuuid: ${resolvedStuuid}) BEFORE update:`);
     for (const field of Object.keys(safeUpdateData)) {
       console.log(`  - ${field}: "${beforeState[field]}" -> "${safeUpdateData[field]}"`);
     }
-    
+
     const result = await tx.update(storesItems)
       .set({ ...safeUpdateData, updatedAt: new Date() })
-      .where(eq(storesItems.stuuid, storeId))
+      .where(eq(storesItems.stuuid, resolvedStuuid))
       .returning();
     
     if (!result[0]) {
