@@ -6,6 +6,37 @@ import { ValidationError, NotFoundError } from '../../shared/errors';
 const VALID_TARGET_TYPES: TargetType[] = ['component', 'job', 'work_order', 'spare', 'store'];
 const VALID_STATUSES = ['draft', 'submitted', 'returned', 'approved', 'rejected'];
 
+// ── Target ID Resolution ──
+// Resolves any target_id (legacy or UUID) to the canonical UUID column value.
+// This ensures change_request.target_id always stores UUID values.
+
+async function resolveTargetIdToUuid(targetType: string, targetId: string): Promise<string> {
+  switch (targetType) {
+    case 'component': {
+      const entity = await crRepo.getComponent(targetId);
+      return entity?.cuuid || targetId;
+    }
+    case 'job': {
+      const entity = await crRepo.getJob(targetId);
+      return entity?.juuid || targetId;
+    }
+    case 'work_order': {
+      const entity = await crRepo.getWorkOrder(targetId);
+      return entity?.wouuid || targetId;
+    }
+    case 'spare': {
+      const entity = await crRepo.getSpare(targetId);
+      return entity?.suuid || targetId;
+    }
+    case 'store': {
+      const entity = await crRepo.getStoresItem(targetId);
+      return entity?.stuuid || targetId;
+    }
+    default:
+      return targetId;
+  }
+}
+
 // ── Field Definitions ──
 
 export function getFieldDefs(targetType: string, editableOnly: boolean) {
@@ -47,6 +78,9 @@ export async function getTargetEntity(targetType: string, targetId: string) {
     throw new NotFoundError(`${targetType} with ID ${targetId} not found`);
   }
 
+  // Resolve to canonical UUID so frontend always gets the UUID back
+  const resolvedTargetId = await resolveTargetIdToUuid(targetType, targetId);
+
   // Build field values map
   const fields = getFieldDefinitions(targetType as TargetType);
   const fieldValues: Record<string, { displayName: string; currentValue: any; editable: boolean; type: string }> = {};
@@ -60,7 +94,7 @@ export async function getTargetEntity(targetType: string, targetId: string) {
     };
   }
 
-  return { entity, fieldValues, targetType, targetId };
+  return { entity, fieldValues, targetType, targetId: resolvedTargetId };
 }
 
 // ── Change Request CRUD ──
@@ -110,9 +144,19 @@ export async function createChangeRequest(body: any) {
     throw new ValidationError('vesselId is required for change requests');
   }
 
+  // Resolve target_id to canonical UUID before storing
+  let resolvedTargetId = validatedData.targetId || null;
+  if (validatedData.targetType && validatedData.targetId) {
+    resolvedTargetId = await resolveTargetIdToUuid(validatedData.targetType, validatedData.targetId);
+    if (resolvedTargetId !== validatedData.targetId) {
+      console.log(`[CR_CREATE] Resolved target_id from "${validatedData.targetId}" to UUID "${resolvedTargetId}"`);
+    }
+  }
+
   const requestData = {
     ...validatedData,
     vesselId: validatedData.vesselId,
+    targetId: resolvedTargetId,
     status: validatedData.status || 'draft' as const,
     requestedByUserId: validatedData.requestedByUserId || 'system'
   };

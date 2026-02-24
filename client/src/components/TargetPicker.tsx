@@ -84,10 +84,11 @@ export function TargetPicker({
   };
 
   const getItemId = (item: any, cat: string) => {
-    if (cat === 'work_orders') return item.id || item.woNo;
-    if (cat === 'spares') return String(item.id || item.partCode);
-    if (cat === 'stores') return String(item.id || item.itemCode);
-    return item.id || item.componentId;
+    // Always return UUID columns as canonical identifiers for change_request.target_id
+    if (cat === 'work_orders') return item.wouuid || item.id || item.woNo;
+    if (cat === 'spares') return item.suuid || String(item.id || item.partCode);
+    if (cat === 'stores') return item.stuuid || String(item.id || item.itemCode);
+    return item.cuuid || item.id || item.componentId;
   };
 
   const getItemName = (item: any, cat: string) => {
