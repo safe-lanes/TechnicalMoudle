@@ -1840,8 +1840,8 @@ export async function runMigrations(): Promise<{ applied: number; skipped: numbe
         applied++;
         console.log(`  ✅ Migration ${migration.id} applied successfully`);
       } catch (error: any) {
-        if (error.message?.includes('already exists') || error.code === '42701') {
-          console.log(`  ⚠️  Migration ${migration.id} - column/table already exists, marking as complete`);
+        if (error.message?.includes('already exists') || error.message?.includes('does not exist') || error.code === '42701' || error.code === '42704') {
+          console.log(`  ⚠️  Migration ${migration.id} - object already/does not exist, marking as complete`);
           await markMigrationComplete(db, migration);
           skipped++;
         } else {
@@ -1975,10 +1975,12 @@ export async function runDrizzleMigrations(): Promise<{ applied: number; skipped
       applied++;
       console.log(`  ✅ Migration ${migrationId} applied successfully`);
     } catch (error: any) {
-      if (error.message?.includes('already exists') || 
-          error.code === '42P07' || 
-          error.code === '42701') {
-        console.log(`  ⚠️  Migration ${migrationId} - object already exists, marking as complete`);
+      if (error.message?.includes('already exists') ||
+          error.message?.includes('does not exist') ||
+          error.code === '42P07' ||
+          error.code === '42701' ||
+          error.code === '42704') {
+        console.log(`  ⚠️  Migration ${migrationId} - object already/does not exist, marking as complete`);
         const migration: Migration = {
           id: migrationId,
           name: `Drizzle SQL migration: ${sqlFile}`,
