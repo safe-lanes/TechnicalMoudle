@@ -471,8 +471,19 @@ const migrations: Migration[] = [
   {
     id: '028_vessel_fk_batch1_data_tables',
     name: 'FK constraints batch 1 — 11 tables with data',
-    description: 'Adds vessel_id FK constraints referencing vessels(vuuid) for: components, spares, stores_items, stores_ledger, jobs, work_orders, inventory_transactions, job_component_links, locations, spare_component_links, spare_location_stock',
+    description: 'Cleans up orphaned vessel_id references then adds FK constraints referencing vessels(vuuid) for: components, spares, stores_items, stores_ledger, jobs, work_orders, inventory_transactions, job_component_links, locations, spare_component_links, spare_location_stock',
     sql: `
+      UPDATE components SET vessel_id = NULL WHERE vessel_id IS NOT NULL AND vessel_id != '' AND NOT EXISTS (SELECT 1 FROM vessels WHERE vuuid = components.vessel_id);
+      UPDATE spares SET vessel_id = NULL WHERE vessel_id IS NOT NULL AND vessel_id != '' AND NOT EXISTS (SELECT 1 FROM vessels WHERE vuuid = spares.vessel_id);
+      UPDATE stores_items SET vessel_id = NULL WHERE vessel_id IS NOT NULL AND vessel_id != '' AND NOT EXISTS (SELECT 1 FROM vessels WHERE vuuid = stores_items.vessel_id);
+      UPDATE stores_ledger SET vessel_id = NULL WHERE vessel_id IS NOT NULL AND vessel_id != '' AND NOT EXISTS (SELECT 1 FROM vessels WHERE vuuid = stores_ledger.vessel_id);
+      UPDATE jobs SET vessel_id = NULL WHERE vessel_id IS NOT NULL AND vessel_id != '' AND NOT EXISTS (SELECT 1 FROM vessels WHERE vuuid = jobs.vessel_id);
+      UPDATE work_orders SET vessel_id = NULL WHERE vessel_id IS NOT NULL AND vessel_id != '' AND NOT EXISTS (SELECT 1 FROM vessels WHERE vuuid = work_orders.vessel_id);
+      UPDATE inventory_transactions SET vessel_id = NULL WHERE vessel_id IS NOT NULL AND vessel_id != '' AND NOT EXISTS (SELECT 1 FROM vessels WHERE vuuid = inventory_transactions.vessel_id);
+      UPDATE job_component_links SET vessel_id = NULL WHERE vessel_id IS NOT NULL AND vessel_id != '' AND NOT EXISTS (SELECT 1 FROM vessels WHERE vuuid = job_component_links.vessel_id);
+      UPDATE locations SET vessel_id = NULL WHERE vessel_id IS NOT NULL AND vessel_id != '' AND NOT EXISTS (SELECT 1 FROM vessels WHERE vuuid = locations.vessel_id);
+      UPDATE spare_component_links SET vessel_id = NULL WHERE vessel_id IS NOT NULL AND vessel_id != '' AND NOT EXISTS (SELECT 1 FROM vessels WHERE vuuid = spare_component_links.vessel_id);
+      UPDATE spare_location_stock SET vessel_id = NULL WHERE vessel_id IS NOT NULL AND vessel_id != '' AND NOT EXISTS (SELECT 1 FROM vessels WHERE vuuid = spare_location_stock.vessel_id);
       DO $$ BEGIN
         IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'components_vessel_id_vessels_vuuid_fk') THEN
           ALTER TABLE components ADD CONSTRAINT components_vessel_id_vessels_vuuid_fk FOREIGN KEY (vessel_id) REFERENCES vessels(vuuid);
@@ -513,8 +524,29 @@ const migrations: Migration[] = [
   {
     id: '029_vessel_fk_batch2_empty_tables',
     name: 'FK constraints batch 2 — 21 remaining tables',
-    description: 'Adds vessel_id FK constraints referencing vessels(vuuid) for all remaining child tables: defect_sequences, users, running_hours_audit, change_request, ihm_items, ihm_maintenance_log, spares_history, alert_config, alert_events, certificates, defects, import_history, pms_vessel_settings, surveys, work_order_execution_details, work_order_executions, vessel_certificate_applicability, vessel_certificate_data, vessel_survey_applicability, vessel_survey_data, work_order_postponements',
+    description: 'Cleans up orphaned vessel_id references then adds FK constraints referencing vessels(vuuid) for all remaining child tables',
     sql: `
+      UPDATE defect_sequences SET vessel_id = NULL WHERE vessel_id IS NOT NULL AND vessel_id != '' AND NOT EXISTS (SELECT 1 FROM vessels WHERE vuuid = defect_sequences.vessel_id);
+      UPDATE users SET vessel_id = NULL WHERE vessel_id IS NOT NULL AND vessel_id != '' AND NOT EXISTS (SELECT 1 FROM vessels WHERE vuuid = users.vessel_id);
+      UPDATE running_hours_audit SET vessel_id = NULL WHERE vessel_id IS NOT NULL AND vessel_id != '' AND NOT EXISTS (SELECT 1 FROM vessels WHERE vuuid = running_hours_audit.vessel_id);
+      UPDATE change_request SET vessel_id = NULL WHERE vessel_id IS NOT NULL AND vessel_id != '' AND NOT EXISTS (SELECT 1 FROM vessels WHERE vuuid = change_request.vessel_id);
+      UPDATE ihm_items SET vessel_id = NULL WHERE vessel_id IS NOT NULL AND vessel_id != '' AND NOT EXISTS (SELECT 1 FROM vessels WHERE vuuid = ihm_items.vessel_id);
+      UPDATE ihm_maintenance_log SET vessel_id = NULL WHERE vessel_id IS NOT NULL AND vessel_id != '' AND NOT EXISTS (SELECT 1 FROM vessels WHERE vuuid = ihm_maintenance_log.vessel_id);
+      UPDATE spares_history SET vessel_id = NULL WHERE vessel_id IS NOT NULL AND vessel_id != '' AND NOT EXISTS (SELECT 1 FROM vessels WHERE vuuid = spares_history.vessel_id);
+      UPDATE alert_config SET vessel_id = NULL WHERE vessel_id IS NOT NULL AND vessel_id != '' AND NOT EXISTS (SELECT 1 FROM vessels WHERE vuuid = alert_config.vessel_id);
+      UPDATE alert_events SET vessel_id = NULL WHERE vessel_id IS NOT NULL AND vessel_id != '' AND NOT EXISTS (SELECT 1 FROM vessels WHERE vuuid = alert_events.vessel_id);
+      UPDATE certificates SET vessel_id = NULL WHERE vessel_id IS NOT NULL AND vessel_id != '' AND NOT EXISTS (SELECT 1 FROM vessels WHERE vuuid = certificates.vessel_id);
+      UPDATE defects SET vessel_id = NULL WHERE vessel_id IS NOT NULL AND vessel_id != '' AND NOT EXISTS (SELECT 1 FROM vessels WHERE vuuid = defects.vessel_id);
+      UPDATE import_history SET vessel_id = NULL WHERE vessel_id IS NOT NULL AND vessel_id != '' AND NOT EXISTS (SELECT 1 FROM vessels WHERE vuuid = import_history.vessel_id);
+      UPDATE pms_vessel_settings SET vessel_id = NULL WHERE vessel_id IS NOT NULL AND vessel_id != '' AND NOT EXISTS (SELECT 1 FROM vessels WHERE vuuid = pms_vessel_settings.vessel_id);
+      UPDATE surveys SET vessel_id = NULL WHERE vessel_id IS NOT NULL AND vessel_id != '' AND NOT EXISTS (SELECT 1 FROM vessels WHERE vuuid = surveys.vessel_id);
+      UPDATE work_order_execution_details SET vessel_id = NULL WHERE vessel_id IS NOT NULL AND vessel_id != '' AND NOT EXISTS (SELECT 1 FROM vessels WHERE vuuid = work_order_execution_details.vessel_id);
+      UPDATE work_order_executions SET vessel_id = NULL WHERE vessel_id IS NOT NULL AND vessel_id != '' AND NOT EXISTS (SELECT 1 FROM vessels WHERE vuuid = work_order_executions.vessel_id);
+      UPDATE vessel_certificate_applicability SET vessel_id = NULL WHERE vessel_id IS NOT NULL AND vessel_id != '' AND NOT EXISTS (SELECT 1 FROM vessels WHERE vuuid = vessel_certificate_applicability.vessel_id);
+      UPDATE vessel_certificate_data SET vessel_id = NULL WHERE vessel_id IS NOT NULL AND vessel_id != '' AND NOT EXISTS (SELECT 1 FROM vessels WHERE vuuid = vessel_certificate_data.vessel_id);
+      UPDATE vessel_survey_applicability SET vessel_id = NULL WHERE vessel_id IS NOT NULL AND vessel_id != '' AND NOT EXISTS (SELECT 1 FROM vessels WHERE vuuid = vessel_survey_applicability.vessel_id);
+      UPDATE vessel_survey_data SET vessel_id = NULL WHERE vessel_id IS NOT NULL AND vessel_id != '' AND NOT EXISTS (SELECT 1 FROM vessels WHERE vuuid = vessel_survey_data.vessel_id);
+      UPDATE work_order_postponements SET vessel_id = NULL WHERE vessel_id IS NOT NULL AND vessel_id != '' AND NOT EXISTS (SELECT 1 FROM vessels WHERE vuuid = work_order_postponements.vessel_id);
       DO $$ BEGIN
         IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'defect_sequences_vessel_id_vessels_vuuid_fk') THEN
           ALTER TABLE defect_sequences ADD CONSTRAINT defect_sequences_vessel_id_vessels_vuuid_fk FOREIGN KEY (vessel_id) REFERENCES vessels(vuuid);
@@ -585,8 +617,9 @@ const migrations: Migration[] = [
   {
     id: '030_vessel_fk_report_snapshots',
     name: 'FK constraint for report_snapshots',
-    description: 'Adds vessel_id FK constraint for report_snapshots table. Documents 13 future tables that will need FK constraints when created: audit_log, bulk_import_history, component_class_regulatory, component_documents, component_maintenance_history, component_requisitions, component_running_hours_log, fleet_component_mapping, fleet_job_vessel_mapping, fleet_spare_vessel_mapping, fleet_vessel_mapping, master_data, postponement_history',
+    description: 'Cleans up orphaned vessel_id then adds FK constraint for report_snapshots table',
     sql: `
+      UPDATE report_snapshots SET vessel_id = NULL WHERE vessel_id IS NOT NULL AND vessel_id != '' AND NOT EXISTS (SELECT 1 FROM vessels WHERE vuuid = report_snapshots.vessel_id);
       DO $$ BEGIN
         IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'report_snapshots_vessel_id_vessels_vuuid_fk') THEN
           ALTER TABLE report_snapshots ADD CONSTRAINT report_snapshots_vessel_id_vessels_vuuid_fk FOREIGN KEY (vessel_id) REFERENCES vessels(vuuid);
