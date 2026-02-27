@@ -398,7 +398,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             componentId: component.cuuid,
             componentCode: woAny.componentCode || component.componentCode,
             vesselCode: woAny.vesselId,
-            jobId: parentJob?.id || woAny.jobId || null,
+            jobId: parentJob?.juuid || parentJob?.id || null,
             jobCode: parentJobNo || null,
             workOrderId: woAny.wouuid,
             workOrderNo: woAny.templateCode || woAny.workOrderNo || `WO-${woAny.id}`,
