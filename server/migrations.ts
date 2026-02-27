@@ -664,7 +664,9 @@ const migrations: Migration[] = [
       UPDATE component_running_hours_log SET component_id = c.cuuid FROM components c WHERE component_running_hours_log.component_id = c.id;
       UPDATE component_documents SET component_id = c.cuuid FROM components c WHERE component_documents.component_id = c.id;
       UPDATE component_class_regulatory SET component_id = c.cuuid FROM components c WHERE component_class_regulatory.component_id = c.id;
+      ALTER TABLE component_maintenance_history DISABLE TRIGGER ALL;
       UPDATE component_maintenance_history SET component_id = c.cuuid FROM components c WHERE component_maintenance_history.component_id = c.id;
+      ALTER TABLE component_maintenance_history ENABLE TRIGGER ALL;
       UPDATE component_requisitions SET component_id = c.cuuid FROM components c WHERE component_requisitions.component_id = c.id;
       UPDATE fleet_component_mapping SET component_id = c.cuuid FROM components c WHERE fleet_component_mapping.component_id = c.id AND fleet_component_mapping.component_id IS NOT NULL;
 
@@ -676,8 +678,13 @@ const migrations: Migration[] = [
   {
     id: '032_component_fk_batch1_data_tables',
     name: 'FK constraints batch 1 — 4 tables with data',
-    description: 'Adds component_id FK constraints referencing components(cuuid) for: spares, jobs, spare_component_links, job_component_links',
+    description: 'Cleans up orphaned component_id references then adds FK constraints referencing components(cuuid) for: spares, jobs, spare_component_links, job_component_links',
     sql: `
+      UPDATE spares SET component_id = NULL WHERE component_id IS NOT NULL AND component_id NOT IN (SELECT cuuid FROM components);
+      UPDATE jobs SET component_id = NULL WHERE component_id IS NOT NULL AND component_id NOT IN (SELECT cuuid FROM components);
+      DELETE FROM spare_component_links WHERE component_id NOT IN (SELECT cuuid FROM components);
+      DELETE FROM job_component_links WHERE component_id NOT IN (SELECT cuuid FROM components);
+
       DO $$ BEGIN
         IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'spares_component_id_components_cuuid_fk') THEN
           ALTER TABLE spares ADD CONSTRAINT spares_component_id_components_cuuid_fk FOREIGN KEY (component_id) REFERENCES components(cuuid);
@@ -697,8 +704,22 @@ const migrations: Migration[] = [
   {
     id: '033_component_fk_batch2_empty_tables',
     name: 'FK constraints batch 2 — 11 empty tables',
-    description: 'Adds component_id FK constraints referencing components(cuuid) for: running_hours_audit, ihm_items, spares_history, work_order_executions, defects, component_running_hours_log, component_documents, component_class_regulatory, component_maintenance_history, component_requisitions, fleet_component_mapping',
+    description: 'Cleans up orphaned component_id references then adds FK constraints referencing components(cuuid) for remaining tables',
     sql: `
+      DELETE FROM running_hours_audit WHERE component_id IS NOT NULL AND component_id NOT IN (SELECT cuuid FROM components);
+      DELETE FROM ihm_items WHERE component_id IS NOT NULL AND component_id NOT IN (SELECT cuuid FROM components);
+      DELETE FROM spares_history WHERE component_id IS NOT NULL AND component_id NOT IN (SELECT cuuid FROM components);
+      DELETE FROM work_order_executions WHERE component_id IS NOT NULL AND component_id NOT IN (SELECT cuuid FROM components);
+      DELETE FROM defects WHERE component_id IS NOT NULL AND component_id NOT IN (SELECT cuuid FROM components);
+      DELETE FROM component_running_hours_log WHERE component_id IS NOT NULL AND component_id NOT IN (SELECT cuuid FROM components);
+      DELETE FROM component_documents WHERE component_id IS NOT NULL AND component_id NOT IN (SELECT cuuid FROM components);
+      DELETE FROM component_class_regulatory WHERE component_id IS NOT NULL AND component_id NOT IN (SELECT cuuid FROM components);
+      ALTER TABLE component_maintenance_history DISABLE TRIGGER ALL;
+      DELETE FROM component_maintenance_history WHERE component_id IS NOT NULL AND component_id NOT IN (SELECT cuuid FROM components);
+      ALTER TABLE component_maintenance_history ENABLE TRIGGER ALL;
+      DELETE FROM component_requisitions WHERE component_id IS NOT NULL AND component_id NOT IN (SELECT cuuid FROM components);
+      DELETE FROM fleet_component_mapping WHERE component_id IS NOT NULL AND component_id NOT IN (SELECT cuuid FROM components);
+
       DO $$ BEGIN
         IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'running_hours_audit_component_id_components_cuuid_fk') THEN
           ALTER TABLE running_hours_audit ADD CONSTRAINT running_hours_audit_component_id_components_cuuid_fk FOREIGN KEY (component_id) REFERENCES components(cuuid);
@@ -755,15 +776,24 @@ const migrations: Migration[] = [
       END $$;
       UPDATE work_orders SET job_id = j.juuid FROM jobs j WHERE work_orders.job_id = j.id AND work_orders.job_id IS NOT NULL;
       UPDATE job_component_links SET job_id = j.juuid FROM jobs j WHERE job_component_links.job_id = j.id;
+      ALTER TABLE component_maintenance_history DISABLE TRIGGER ALL;
       UPDATE component_maintenance_history SET job_id = j.juuid FROM jobs j WHERE component_maintenance_history.job_id = j.id AND component_maintenance_history.job_id IS NOT NULL;
+      ALTER TABLE component_maintenance_history ENABLE TRIGGER ALL;
       UPDATE fleet_job_vessel_mapping SET job_id = j.juuid FROM jobs j WHERE fleet_job_vessel_mapping.job_id = j.id AND fleet_job_vessel_mapping.job_id IS NOT NULL
     `
   },
   {
     id: '035_job_fk_constraints',
     name: 'FK constraints for 4 job child tables',
-    description: 'FK-3 Phase 2: Add FK constraints from all 4 child tables to jobs(juuid)',
+    description: 'FK-3 Phase 2: Cleans orphaned references then adds FK constraints from all 4 child tables to jobs(juuid)',
     sql: `
+      UPDATE work_orders SET job_id = NULL WHERE job_id IS NOT NULL AND job_id NOT IN (SELECT juuid FROM jobs);
+      DELETE FROM job_component_links WHERE job_id NOT IN (SELECT juuid FROM jobs);
+      ALTER TABLE component_maintenance_history DISABLE TRIGGER ALL;
+      UPDATE component_maintenance_history SET job_id = NULL WHERE job_id IS NOT NULL AND job_id NOT IN (SELECT juuid FROM jobs);
+      ALTER TABLE component_maintenance_history ENABLE TRIGGER ALL;
+      UPDATE fleet_job_vessel_mapping SET job_id = NULL WHERE job_id IS NOT NULL AND job_id NOT IN (SELECT juuid FROM jobs);
+
       DO $$ BEGIN
         IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'work_orders_job_id_jobs_juuid_fk') THEN
           ALTER TABLE work_orders ADD CONSTRAINT work_orders_job_id_jobs_juuid_fk FOREIGN KEY (job_id) REFERENCES jobs(juuid);
@@ -798,15 +828,25 @@ const migrations: Migration[] = [
       UPDATE work_order_executions SET template_id = wo.wouuid FROM work_orders wo WHERE work_order_executions.template_id = wo.id AND work_order_executions.template_id IS NOT NULL;
       UPDATE work_order_execution_details SET work_order_id = wo.wouuid FROM work_orders wo WHERE work_order_execution_details.work_order_id = wo.id AND work_order_execution_details.work_order_id IS NOT NULL;
       UPDATE work_order_postponements SET work_order_id = wo.wouuid FROM work_orders wo WHERE work_order_postponements.work_order_id = wo.id AND work_order_postponements.work_order_id IS NOT NULL;
+      ALTER TABLE component_maintenance_history DISABLE TRIGGER ALL;
       UPDATE component_maintenance_history SET work_order_id = wo.wouuid FROM work_orders wo WHERE component_maintenance_history.work_order_id = wo.id AND component_maintenance_history.work_order_id IS NOT NULL;
+      ALTER TABLE component_maintenance_history ENABLE TRIGGER ALL;
       UPDATE ihm_maintenance_log SET work_order_id = wo.wouuid FROM work_orders wo WHERE ihm_maintenance_log.work_order_id = wo.id AND ihm_maintenance_log.work_order_id IS NOT NULL
     `
   },
   {
     id: '037_work_order_fk_constraints',
     name: 'FK constraints for 5 work order child tables',
-    description: 'Add FK constraints from work_order_executions, work_order_execution_details, work_order_postponements, component_maintenance_history, ihm_maintenance_log to work_orders(wouuid)',
+    description: 'Cleans orphaned references then adds FK constraints for 5 work order child tables to work_orders(wouuid)',
     sql: `
+      UPDATE work_order_executions SET template_id = NULL WHERE template_id IS NOT NULL AND template_id NOT IN (SELECT wouuid FROM work_orders);
+      UPDATE work_order_execution_details SET work_order_id = NULL WHERE work_order_id IS NOT NULL AND work_order_id NOT IN (SELECT wouuid FROM work_orders);
+      UPDATE work_order_postponements SET work_order_id = NULL WHERE work_order_id IS NOT NULL AND work_order_id NOT IN (SELECT wouuid FROM work_orders);
+      ALTER TABLE component_maintenance_history DISABLE TRIGGER ALL;
+      UPDATE component_maintenance_history SET work_order_id = NULL WHERE work_order_id IS NOT NULL AND work_order_id NOT IN (SELECT wouuid FROM work_orders);
+      ALTER TABLE component_maintenance_history ENABLE TRIGGER ALL;
+      UPDATE ihm_maintenance_log SET work_order_id = NULL WHERE work_order_id IS NOT NULL AND work_order_id NOT IN (SELECT wouuid FROM work_orders);
+
       DO $$ BEGIN
         IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'work_order_executions_template_id_work_orders_wouuid_fk') THEN
           ALTER TABLE work_order_executions ADD CONSTRAINT work_order_executions_template_id_work_orders_wouuid_fk FOREIGN KEY (template_id) REFERENCES work_orders(wouuid);
