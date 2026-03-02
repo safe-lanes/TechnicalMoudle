@@ -126,7 +126,7 @@ export async function getWorkOrderContext(workOrderId: string) {
     frequencyValue: job.frequencyValue?.toString() || '',
     frequencyUnit: job.frequencyUnit || 'Months',
     intervalRunningHour: job.intervalRunningHour?.toString() || '',
-    assignedTo: job.assignedTo,
+    assignedTo: job.assignedTo || workOrder.assignedTo,
     approver: job.approver,
     department: job.department,
     jobPriority: job.jobPriority,

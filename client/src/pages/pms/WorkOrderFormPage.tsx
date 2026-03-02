@@ -427,7 +427,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
     }
   });
 
-  const ranks = [
+  const baseRanks = [
     "Master",
     "Chief Officer",
     "2nd Officer",
@@ -449,6 +449,9 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
     "Cook",
     "Steward"
   ];
+  const ranks = templateData.assignedTo && !baseRanks.includes(templateData.assignedTo)
+    ? [...baseRanks, templateData.assignedTo]
+    : baseRanks;
 
   const generateWOExecutionId = () => {
     const uniqueId = Math.floor(Math.random() * 9000000) + 1000000;
