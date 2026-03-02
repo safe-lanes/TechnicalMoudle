@@ -2113,6 +2113,25 @@ export class PostgresStorage {
 
     const createdSpare = result[0];
 
+    // SYNC: Create spare_component_links entry when componentId is present
+    if (createdSpare.componentId && createdSpare.vesselId) {
+      try {
+        const existingLinks = await this.getSpareComponentLinksBySpare(createdSpare.id);
+        const alreadyLinked = existingLinks.some((link: any) => link.componentId === createdSpare.componentId);
+        if (!alreadyLinked) {
+          await this.createSpareComponentLink({
+            spareId: createdSpare.id,
+            spareUuid: createdSpare.suuid,
+            componentId: createdSpare.componentId,
+            vesselId: createdSpare.vesselId,
+            linkedBy: spare.createdBy || 'System',
+          });
+        }
+      } catch (linkError: any) {
+        console.warn(`[createSpare] Failed to create spare_component_link for spare ${createdSpare.id} → component ${createdSpare.componentId}: ${linkError.message}`);
+      }
+    }
+
     // SYNC: Always create spare_location_stock entries to ensure consistent location presence
     if (createdSpare.vesselId) {
       const vesselId = createdSpare.vesselId;
@@ -2150,7 +2169,26 @@ export class PostgresStorage {
     }
     
     const updatedSpare = result[0];
-    
+
+    // SYNC: Create spare_component_links entry when componentId is updated
+    if (data.componentId && updatedSpare.vesselId) {
+      try {
+        const existingLinks = await this.getSpareComponentLinksBySpare(updatedSpare.id);
+        const alreadyLinked = existingLinks.some((link: any) => link.componentId === data.componentId);
+        if (!alreadyLinked) {
+          await this.createSpareComponentLink({
+            spareId: updatedSpare.id,
+            spareUuid: updatedSpare.suuid,
+            componentId: data.componentId,
+            vesselId: updatedSpare.vesselId,
+            linkedBy: data.updatedBy || 'System',
+          });
+        }
+      } catch (linkError: any) {
+        console.warn(`[updateSpare] Failed to create spare_component_link for spare ${id} → component ${data.componentId}: ${linkError.message}`);
+      }
+    }
+
     // SYNC: Update spare_location_stock if ROB values or location fields changed
     const robChanged = data.robLocationA !== undefined || data.robLocationB !== undefined;
     const locationChanged = data.location !== undefined || data.location2 !== undefined;
