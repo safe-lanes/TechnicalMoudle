@@ -29,7 +29,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { FileText, ArrowLeft, Plus, Eye, Upload, Download, Menu, Check, X, Edit2, Trash2, Link2, Paperclip, Copy, Loader2 } from "lucide-react";
+import { FileText, ArrowLeft, Plus, Eye, Upload, Download, Menu, Check, X, Edit2, Trash2, Copy, Loader2 } from "lucide-react";
 import sailLogo from "@assets/SAIL logo Transparent_1753957135582.png";
 import {
   Sheet,
@@ -314,6 +314,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
   const riskAssessmentFileRef = useRef<HTMLInputElement>(null);
   const safetyChecklistFileRef = useRef<HTMLInputElement>(null);
   const operationalFormFileRef = useRef<HTMLInputElement>(null);
+  const workCarriedOutFileRef = useRef<HTMLInputElement>(null);
   const [deleteDocumentDialogOpen, setDeleteDocumentDialogOpen] = useState(false);
   const [documentToDelete, setDocumentToDelete] = useState<{type: string, fileKey: string, documentId?: string} | null>(null);
   const [uploadingDocType, setUploadingDocType] = useState<string | null>(null);
@@ -3248,27 +3249,50 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                   />
                   {/* Upload button column */}
                   <div className="flex flex-col items-center gap-1 pt-1">
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      onClick={() => {
-                        toast({
-                          title: "Upload",
-                          description: "Document upload feature coming soon"
-                        });
-                      }}
-                      className="h-8 px-3 text-xs font-medium border-gray-300 text-gray-600 hover:bg-gray-50"
-                      data-testid="button-upload-work-carried-out"
-                    >
-                      Upload
-                    </Button>
-                    <div className="flex items-center gap-1.5 text-gray-400">
-                      <Link2 className="w-4 h-4 cursor-pointer hover:text-gray-600" onClick={() => toast({ title: "Coming Soon", description: "This feature is coming soon." })} />
-                      <Paperclip className="w-4 h-4 cursor-pointer hover:text-gray-600" onClick={() => toast({ title: "Coming Soon", description: "This feature is coming soon." })} />
-                    </div>
+                    {!isReadOnly && getDocsByType('other').length < 5 && (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handleUploadDocument('other', workCarriedOutFileRef)}
+                        disabled={uploadingDocType !== null}
+                        className="h-8 px-3 text-xs font-medium border-gray-300 text-gray-600 hover:bg-gray-50"
+                        data-testid="button-upload-work-carried-out"
+                      >
+                        {uploadingDocType === 'other' ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <Upload className="h-4 w-4 mr-1" />}
+                        Upload
+                      </Button>
+                    )}
+                    <input
+                      ref={workCarriedOutFileRef}
+                      type="file"
+                      className="hidden"
+                      onChange={(e) => handleFileSelected(e, 'other')}
+                      accept=".pdf,.doc,.docx,.jpg,.jpeg,.png,.xlsx"
+                    />
+                    <span className="text-xs text-gray-400">{getDocsByType('other').length}/5</span>
                   </div>
                 </div>
+                {getDocsByType('other').length > 0 && (
+                  <div className="mt-2 space-y-1">
+                    {getDocsByType('other').map((doc) => (
+                      <div key={doc.id} className="flex items-center justify-between bg-gray-50 rounded px-2 py-1 text-xs" data-testid={`doc-row-other-${doc.id}`}>
+                        <span className="truncate max-w-[200px]" title={doc.fileName}>{doc.fileName}</span>
+                        <span className="text-gray-400 mx-2">{formatFileSize(doc.fileSize)}</span>
+                        <div className="flex items-center gap-1">
+                          <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => handleViewDocument('other', doc.id)} data-testid={`button-view-other-${doc.id}`}>
+                            <Eye className="h-3 w-3" />
+                          </Button>
+                          {!isReadOnly && (
+                            <Button variant="ghost" size="icon" className="h-6 w-6 text-red-500 hover:text-red-700" onClick={() => handleDeleteDocumentClick('other', doc.id)} data-testid={`button-delete-other-${doc.id}`}>
+                              <Trash2 className="h-3 w-3" />
+                            </Button>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
 
               {/* Job Experience / Notes */}
