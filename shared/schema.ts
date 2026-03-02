@@ -2857,3 +2857,31 @@ export const insertReportSnapshotSchema = createInsertSchema(reportSnapshots).om
 
 export type InsertReportSnapshot = z.infer<typeof insertReportSnapshotSchema>;
 export type ReportSnapshot = typeof reportSnapshots.$inferSelect;
+
+export const workOrderDocuments = pgTable("work_order_documents", {
+  id: text("id").primaryKey(),
+  workOrderId: text("work_order_id").notNull().references(() => workOrders.wouuid),
+  executionId: text("execution_id"),
+  vesselId: text("vessel_id").notNull().references(() => vessels.vuuid),
+  documentType: text("document_type").notNull(),
+  fileName: text("file_name").notNull(),
+  fileKey: text("file_key").notNull(),
+  fileType: text("file_type").notNull(),
+  fileSize: integer("file_size").notNull(),
+  storageBackend: text("storage_backend").notNull().default("object"),
+  uploadedBy: text("uploaded_by").notNull(),
+  uploadedAt: timestamp("uploaded_at").notNull().defaultNow(),
+}, (table) => ({
+  workOrderIdx: index("idx_wo_docs_work_order").on(table.workOrderId),
+  vesselIdx: index("idx_wo_docs_vessel").on(table.vesselId),
+  executionIdx: index("idx_wo_docs_execution").on(table.executionId),
+  docTypeIdx: index("idx_wo_docs_type").on(table.documentType),
+}));
+
+export const insertWorkOrderDocumentSchema = createInsertSchema(workOrderDocuments).omit({
+  id: true,
+  uploadedAt: true,
+});
+
+export type InsertWorkOrderDocument = z.infer<typeof insertWorkOrderDocumentSchema>;
+export type WorkOrderDocument = typeof workOrderDocuments.$inferSelect;

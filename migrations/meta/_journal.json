@@ -183,6 +183,13 @@
       "when": 1771819504710,
       "tag": "0025_auto_2026-02-23T04-04-54",
       "breakpoints": true
+    },
+    {
+      "idx": 26,
+      "version": "7",
+      "when": 1772448122285,
+      "tag": "0026_medical_turbo",
+      "breakpoints": true
     }
   ]
 }

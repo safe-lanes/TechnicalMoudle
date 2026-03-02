@@ -29,7 +29,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { FileText, ArrowLeft, Plus, Eye, Upload, Download, Menu, Check, X, Edit2, Trash2, Link2, Paperclip, Copy } from "lucide-react";
+import { FileText, ArrowLeft, Plus, Eye, Upload, Download, Menu, Check, X, Edit2, Trash2, Link2, Paperclip, Copy, Loader2 } from "lucide-react";
 import sailLogo from "@assets/SAIL logo Transparent_1753957135582.png";
 import {
   Sheet,
@@ -315,7 +315,9 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
   const safetyChecklistFileRef = useRef<HTMLInputElement>(null);
   const operationalFormFileRef = useRef<HTMLInputElement>(null);
   const [deleteDocumentDialogOpen, setDeleteDocumentDialogOpen] = useState(false);
-  const [documentToDelete, setDocumentToDelete] = useState<{type: string, fileKey: string} | null>(null);
+  const [documentToDelete, setDocumentToDelete] = useState<{type: string, fileKey: string, documentId?: string} | null>(null);
+  const [uploadingDocType, setUploadingDocType] = useState<string | null>(null);
+  const [woDocuments, setWoDocuments] = useState<Array<{id: string, workOrderId: string, documentType: string, fileName: string, fileKey: string, fileType: string, fileSize: number, uploadedBy: string, uploadedAt: string}>>([]);
   
   const [editingConsumedSparePart, setEditingConsumedSparePart] = useState<number | null>(null);
   
@@ -463,6 +465,15 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
       setExecutionData(prev => ({ ...prev, woExecutionId: generateWOExecutionId() }));
     }
   }, []);
+
+  useEffect(() => {
+    if (workOrderId && resolvedMode !== 'template') {
+      fetch(`/technical/api/work-orders/${workOrderId}/documents`)
+        .then(res => res.ok ? res.json() : [])
+        .then(docs => setWoDocuments(docs))
+        .catch(() => setWoDocuments([]));
+    }
+  }, [workOrderId, resolvedMode]);
 
   // Normalize frequency value to ensure it's a valid positive integer
   const normalizeFrequencyValue = (value: string): string => {
@@ -1062,71 +1073,106 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
     fileInputRef.current?.click();
   };
 
+  const getDocsByType = (documentType: string) => {
+    return woDocuments.filter(d => d.documentType === documentType);
+  };
+
   const handleFileSelected = async (event: React.ChangeEvent<HTMLInputElement>, documentType: string) => {
-    if (isReadOnly) return;
+    if (isReadOnly || !workOrderId) return;
     const file = event.target.files?.[0];
     if (!file) return;
 
+    const currentVesselId = vesselId || contextVesselId;
+    if (!currentVesselId) {
+      toast({ title: "Upload failed", description: "No vessel context available.", variant: "destructive" });
+      return;
+    }
+
+    const docsOfType = getDocsByType(documentType);
+    if (docsOfType.length >= 5) {
+      toast({ title: "Limit reached", description: "Maximum 5 documents per type. Delete an existing document first.", variant: "destructive" });
+      event.target.value = '';
+      return;
+    }
+
+    setUploadingDocType(documentType);
     try {
       const formData = new FormData();
       formData.append('file', file);
       formData.append('documentType', documentType);
+      formData.append('vesselId', currentVesselId);
 
-      const response = await fetch('/technical/api/upload-document', {
+      const response = await fetch(`/technical/api/work-orders/${workOrderId}/documents`, {
         method: 'POST',
         body: formData
       });
 
       if (!response.ok) {
-        throw new Error('Failed to upload document');
+        const errBody = await response.json().catch(() => ({}));
+        throw new Error(errBody.message || errBody.error || 'Failed to upload document');
       }
 
       const result = await response.json();
+      setWoDocuments(prev => [...prev, result]);
 
       setExecutionData(prev => ({
         ...prev,
         uploadedDocuments: [
-          ...prev.uploadedDocuments.filter(doc => doc.type !== documentType),
+          ...prev.uploadedDocuments,
           {
             type: documentType,
             fileName: result.fileName,
             fileKey: result.fileKey,
             uploadedAt: result.uploadedAt,
-            uploadedBy: 'current_user'
+            uploadedBy: result.uploadedBy
           }
         ]
       }));
 
       toast({
-        title: "Document uploaded successfully",
-        description: `${file.name} has been uploaded.`,
+        title: "Document uploaded",
+        description: `${file.name} has been uploaded successfully.`,
       });
 
       event.target.value = '';
-    } catch (error) {
+    } catch (error: any) {
       console.error('Upload error:', error);
       toast({
         title: "Upload failed",
-        description: "Failed to upload document. Please try again.",
+        description: error.message || "Failed to upload document. Please try again.",
         variant: "destructive"
       });
+    } finally {
+      setUploadingDocType(null);
     }
   };
 
-  const handleViewDocument = async (documentType: string) => {
-    const document = executionData.uploadedDocuments.find(doc => doc.type === documentType);
-    if (!document) return;
+  const handleViewDocument = async (documentType: string, docId?: string) => {
+    let targetDoc: any;
+    if (docId) {
+      targetDoc = woDocuments.find(d => d.id === docId);
+    } else {
+      targetDoc = woDocuments.find(d => d.documentType === documentType);
+      if (!targetDoc) {
+        targetDoc = executionData.uploadedDocuments.find(doc => doc.type === documentType);
+      }
+    }
+    if (!targetDoc) return;
 
     try {
-      const fileKeyEncoded = encodeURIComponent(document.fileKey.substring(1));
-      const response = await fetch(`/technical/api/documents/${fileKeyEncoded}`);
-      
-      if (!response.ok) {
-        throw new Error('Failed to retrieve document');
+      const fetchId = targetDoc.id || null;
+      if (fetchId) {
+        const response = await fetch(`/technical/api/work-order-documents/${fetchId}/download`);
+        if (!response.ok) throw new Error('Failed to retrieve document');
+        const result = await response.json();
+        window.open(result.dataUrl, '_blank');
+      } else if (targetDoc.fileKey) {
+        const fileKeyEncoded = encodeURIComponent(targetDoc.fileKey.substring(1));
+        const response = await fetch(`/technical/api/documents/${fileKeyEncoded}`);
+        if (!response.ok) throw new Error('Failed to retrieve document');
+        const result = await response.json();
+        window.open(result.dataUrl, '_blank');
       }
-
-      const result = await response.json();
-      window.open(result.dataUrl, '_blank');
     } catch (error) {
       console.error('View error:', error);
       toast({
@@ -1137,12 +1183,17 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
     }
   };
 
-  const handleDeleteDocumentClick = (documentType: string) => {
+  const handleDeleteDocumentClick = (documentType: string, docId?: string) => {
     if (isReadOnly) return;
-    const document = executionData.uploadedDocuments.find(doc => doc.type === documentType);
-    if (!document) return;
-
-    setDocumentToDelete({ type: documentType, fileKey: document.fileKey });
+    if (docId) {
+      const doc = woDocuments.find(d => d.id === docId);
+      if (!doc) return;
+      setDocumentToDelete({ type: documentType, fileKey: doc.fileKey, documentId: docId });
+    } else {
+      const document = executionData.uploadedDocuments.find(doc => doc.type === documentType);
+      if (!document) return;
+      setDocumentToDelete({ type: documentType, fileKey: document.fileKey });
+    }
     setDeleteDocumentDialogOpen(true);
   };
 
@@ -1151,22 +1202,29 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
     if (!documentToDelete) return;
 
     try {
-      const fileKeyEncoded = encodeURIComponent(documentToDelete.fileKey.substring(1));
-      const response = await fetch(`/technical/api/documents/${fileKeyEncoded}`, {
-        method: 'DELETE'
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to delete document');
+      if (documentToDelete.documentId) {
+        const response = await fetch(`/technical/api/work-order-documents/${documentToDelete.documentId}`, {
+          method: 'DELETE'
+        });
+        if (!response.ok) throw new Error('Failed to delete document');
+        setWoDocuments(prev => prev.filter(d => d.id !== documentToDelete.documentId));
+      } else {
+        const fileKeyEncoded = encodeURIComponent(documentToDelete.fileKey.substring(1));
+        const response = await fetch(`/technical/api/documents/${fileKeyEncoded}`, {
+          method: 'DELETE'
+        });
+        if (!response.ok) throw new Error('Failed to delete document');
       }
 
       setExecutionData(prev => ({
         ...prev,
-        uploadedDocuments: prev.uploadedDocuments.filter(doc => doc.type !== documentToDelete.type)
+        uploadedDocuments: documentToDelete.documentId
+          ? prev.uploadedDocuments.filter(doc => doc.fileKey !== documentToDelete.fileKey)
+          : prev.uploadedDocuments.filter(doc => doc.type !== documentToDelete.type)
       }));
 
       toast({
-        title: "Document deleted successfully",
+        title: "Document deleted",
         description: "The document has been removed.",
       });
 
@@ -1184,6 +1242,12 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
 
   const getUploadedDocument = (documentType: string) => {
     return executionData.uploadedDocuments.find(doc => doc.type === documentType);
+  };
+
+  const formatFileSize = (bytes: number): string => {
+    if (bytes < 1024) return `${bytes} B`;
+    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
   };
 
   const handleAddConsumedSparePart = () => {
@@ -2725,24 +2789,15 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                     </label>
                   </div>
                   <div className="flex items-center gap-2">
-                    {getUploadedDocument('riskAssessment') ? (
-                      <>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => handleViewDocument('riskAssessment')}
-                          data-testid="WOF.B1.8"
-                        >
-                          View
-                        </Button>
-                      </>
-                    ) : (
+                    {!isReadOnly && getDocsByType('riskAssessment').length < 5 && (
                       <Button
                         variant="outline"
                         size="sm"
-                        onClick={() => toast({ title: "Coming Soon", description: "This feature is coming soon." })}
-                        data-testid="WOF.B1.9"
+                        onClick={() => handleUploadDocument('riskAssessment', riskAssessmentFileRef)}
+                        disabled={uploadingDocType !== null}
+                        data-testid="button-upload-risk-assessment"
                       >
+                        {uploadingDocType === 'riskAssessment' ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <Upload className="h-4 w-4 mr-1" />}
                         Upload
                       </Button>
                     )}
@@ -2751,15 +2806,30 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                       type="file"
                       className="hidden"
                       onChange={(e) => handleFileSelected(e, 'riskAssessment')}
-                      accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
+                      accept=".pdf,.doc,.docx,.jpg,.jpeg,.png,.xlsx"
                     />
-                    <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => toast({ title: "Coming Soon", description: "This feature is coming soon." })}>
-                      <Link2 className="h-4 w-4 text-gray-500" />
-                    </Button>
-                    <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => toast({ title: "Coming Soon", description: "This feature is coming soon." })}>
-                      <Paperclip className="h-4 w-4 text-gray-500" />
-                    </Button>
+                    <span className="text-xs text-gray-400">{getDocsByType('riskAssessment').length}/5</span>
                   </div>
+                  {getDocsByType('riskAssessment').length > 0 && (
+                    <div className="mt-2 space-y-1">
+                      {getDocsByType('riskAssessment').map((doc) => (
+                        <div key={doc.id} className="flex items-center justify-between bg-gray-50 rounded px-2 py-1 text-xs" data-testid={`doc-row-risk-${doc.id}`}>
+                          <span className="truncate max-w-[200px]" title={doc.fileName}>{doc.fileName}</span>
+                          <span className="text-gray-400 mx-2">{formatFileSize(doc.fileSize)}</span>
+                          <div className="flex items-center gap-1">
+                            <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => handleViewDocument('riskAssessment', doc.id)} data-testid={`button-view-risk-${doc.id}`}>
+                              <Eye className="h-3 w-3" />
+                            </Button>
+                            {!isReadOnly && (
+                              <Button variant="ghost" size="icon" className="h-6 w-6 text-red-500 hover:text-red-700" onClick={() => handleDeleteDocumentClick('riskAssessment', doc.id)} data-testid={`button-delete-risk-${doc.id}`}>
+                                <Trash2 className="h-3 w-3" />
+                              </Button>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
               </div>
 
@@ -2806,24 +2876,15 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                     </label>
                   </div>
                   <div className="flex items-center gap-2">
-                    {getUploadedDocument('safetyChecklists') ? (
-                      <>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => handleViewDocument('safetyChecklists')}
-                          data-testid="WOF.B1.15"
-                        >
-                          View
-                        </Button>
-                      </>
-                    ) : (
+                    {!isReadOnly && getDocsByType('safetyChecklist').length < 5 && (
                       <Button
                         variant="outline"
                         size="sm"
-                        onClick={() => toast({ title: "Coming Soon", description: "This feature is coming soon." })}
-                        data-testid="WOF.B1.16"
+                        onClick={() => handleUploadDocument('safetyChecklist', safetyChecklistFileRef)}
+                        disabled={uploadingDocType !== null}
+                        data-testid="button-upload-safety-checklist"
                       >
+                        {uploadingDocType === 'safetyChecklist' ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <Upload className="h-4 w-4 mr-1" />}
                         Upload
                       </Button>
                     )}
@@ -2831,16 +2892,31 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                       ref={safetyChecklistFileRef}
                       type="file"
                       className="hidden"
-                      onChange={(e) => handleFileSelected(e, 'safetyChecklists')}
-                      accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
+                      onChange={(e) => handleFileSelected(e, 'safetyChecklist')}
+                      accept=".pdf,.doc,.docx,.jpg,.jpeg,.png,.xlsx"
                     />
-                    <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => toast({ title: "Coming Soon", description: "This feature is coming soon." })}>
-                      <Link2 className="h-4 w-4 text-gray-500" />
-                    </Button>
-                    <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => toast({ title: "Coming Soon", description: "This feature is coming soon." })}>
-                      <Paperclip className="h-4 w-4 text-gray-500" />
-                    </Button>
+                    <span className="text-xs text-gray-400">{getDocsByType('safetyChecklist').length}/5</span>
                   </div>
+                  {getDocsByType('safetyChecklist').length > 0 && (
+                    <div className="mt-2 space-y-1">
+                      {getDocsByType('safetyChecklist').map((doc) => (
+                        <div key={doc.id} className="flex items-center justify-between bg-gray-50 rounded px-2 py-1 text-xs" data-testid={`doc-row-safety-${doc.id}`}>
+                          <span className="truncate max-w-[200px]" title={doc.fileName}>{doc.fileName}</span>
+                          <span className="text-gray-400 mx-2">{formatFileSize(doc.fileSize)}</span>
+                          <div className="flex items-center gap-1">
+                            <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => handleViewDocument('safetyChecklist', doc.id)} data-testid={`button-view-safety-${doc.id}`}>
+                              <Eye className="h-3 w-3" />
+                            </Button>
+                            {!isReadOnly && (
+                              <Button variant="ghost" size="icon" className="h-6 w-6 text-red-500 hover:text-red-700" onClick={() => handleDeleteDocumentClick('safetyChecklist', doc.id)} data-testid={`button-delete-safety-${doc.id}`}>
+                                <Trash2 className="h-3 w-3" />
+                              </Button>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
               </div>
 
@@ -2887,24 +2963,15 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                     </label>
                   </div>
                   <div className="flex items-center gap-2">
-                    {getUploadedDocument('operationalForms') ? (
-                      <>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => handleViewDocument('operationalForms')}
-                          data-testid="button-view-operational-forms"
-                        >
-                          View
-                        </Button>
-                      </>
-                    ) : (
+                    {!isReadOnly && getDocsByType('operationalForm').length < 5 && (
                       <Button
                         variant="outline"
                         size="sm"
-                        onClick={() => toast({ title: "Coming Soon", description: "This feature is coming soon." })}
-                        data-testid="button-upload-operational-forms"
+                        onClick={() => handleUploadDocument('operationalForm', operationalFormFileRef)}
+                        disabled={uploadingDocType !== null}
+                        data-testid="button-upload-operational-form"
                       >
+                        {uploadingDocType === 'operationalForm' ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <Upload className="h-4 w-4 mr-1" />}
                         Upload
                       </Button>
                     )}
@@ -2912,16 +2979,31 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                       ref={operationalFormFileRef}
                       type="file"
                       className="hidden"
-                      onChange={(e) => handleFileSelected(e, 'operationalForms')}
-                      accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
+                      onChange={(e) => handleFileSelected(e, 'operationalForm')}
+                      accept=".pdf,.doc,.docx,.jpg,.jpeg,.png,.xlsx"
                     />
-                    <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => toast({ title: "Coming Soon", description: "This feature is coming soon." })}>
-                      <Link2 className="h-4 w-4 text-gray-500" />
-                    </Button>
-                    <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => toast({ title: "Coming Soon", description: "This feature is coming soon." })}>
-                      <Paperclip className="h-4 w-4 text-gray-500" />
-                    </Button>
+                    <span className="text-xs text-gray-400">{getDocsByType('operationalForm').length}/5</span>
                   </div>
+                  {getDocsByType('operationalForm').length > 0 && (
+                    <div className="mt-2 space-y-1">
+                      {getDocsByType('operationalForm').map((doc) => (
+                        <div key={doc.id} className="flex items-center justify-between bg-gray-50 rounded px-2 py-1 text-xs" data-testid={`doc-row-operational-${doc.id}`}>
+                          <span className="truncate max-w-[200px]" title={doc.fileName}>{doc.fileName}</span>
+                          <span className="text-gray-400 mx-2">{formatFileSize(doc.fileSize)}</span>
+                          <div className="flex items-center gap-1">
+                            <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => handleViewDocument('operationalForm', doc.id)} data-testid={`button-view-operational-${doc.id}`}>
+                              <Eye className="h-3 w-3" />
+                            </Button>
+                            {!isReadOnly && (
+                              <Button variant="ghost" size="icon" className="h-6 w-6 text-red-500 hover:text-red-700" onClick={() => handleDeleteDocumentClick('operationalForm', doc.id)} data-testid={`button-delete-operational-${doc.id}`}>
+                                <Trash2 className="h-3 w-3" />
+                              </Button>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
               </div>
             </div>

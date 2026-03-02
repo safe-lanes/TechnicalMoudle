@@ -1,8 +1,30 @@
 import { Router } from 'express';
+import multer from 'multer';
 import { asyncHandler } from '../shared/middleware';
 import * as woCtrl from './controllers/workOrderController';
+import * as woDocCtrl from './controllers/woDocumentController';
 
 const router = Router();
+
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 25 * 1024 * 1024 },
+  fileFilter: (_req, file, cb) => {
+    const allowed = [
+      'application/pdf',
+      'application/msword',
+      'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      'image/jpeg',
+      'image/png',
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    ];
+    if (allowed.includes(file.mimetype)) {
+      cb(null, true);
+    } else {
+      cb(new Error(`File type not allowed: ${file.mimetype}`));
+    }
+  },
+});
 
 // ── Core Work Order CRUD ──
 
@@ -66,5 +88,19 @@ router.post('/work-order-executions', asyncHandler(woCtrl.createExecution));
 
 // PATCH /work-order-executions/:id — update execution
 router.patch('/work-order-executions/:id', asyncHandler(woCtrl.updateExecution));
+
+// ── Work Order Documents ──
+
+// GET  /work-orders/:workOrderId/documents — list documents for a work order
+router.get('/work-orders/:workOrderId/documents', asyncHandler(woDocCtrl.listDocuments));
+
+// POST /work-orders/:workOrderId/documents — upload a document
+router.post('/work-orders/:workOrderId/documents', upload.single('file'), asyncHandler(woDocCtrl.uploadDocument));
+
+// GET  /work-order-documents/:documentId/download — download/view a document
+router.get('/work-order-documents/:documentId/download', asyncHandler(woDocCtrl.downloadDocument));
+
+// DELETE /work-order-documents/:documentId — delete a document
+router.delete('/work-order-documents/:documentId', asyncHandler(woDocCtrl.deleteDocument));
 
 export default router;
