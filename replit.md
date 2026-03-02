@@ -198,6 +198,12 @@ Both migration runners catch and skip these non-fatal errors:
 - Key tables with data: `spare_component_links`, `spare_location_stock`, `inventory_transactions`, `spares`, `jobs`, `components`, `work_orders`
 - `component_maintenance_history` — immutable audit trail
 
+### Spare-Component Sibling Link Distribution
+- `spare_component_links` uses a sibling distribution system: when a spare is linked to a component, it is automatically also linked to all sibling components (components sharing the same `parentId`)
+- `createSpareComponentLink()` in `postgresStorage.ts` auto-creates sibling links (with `skipSiblingSync` flag to prevent recursion)
+- `getComponentSiblings(componentId)` finds siblings via the component tree's `parentId` field
+- Backfill endpoint: `POST /technical/api/inventory/backfill-sibling-links/:vesselId` — batch SQL using CTEs for performance, idempotent (safe to re-run)
+
 ---
 
 ## Fleet Table Schema Contract

@@ -6776,10 +6776,107 @@ export class PostgresStorage {
       .where(eq(spareComponentLinks.componentId, componentId));
   }
 
-  async createSpareComponentLink(link: InsertSpareComponentLink): Promise<SpareComponentLink> {
+  async createSpareComponentLink(link: InsertSpareComponentLink, skipSiblingSync: boolean = false): Promise<SpareComponentLink> {
     const db = await getDb();
     const result = await db.insert(spareComponentLinks).values(link).returning();
-    return result[0];
+    const created = result[0];
+
+    if (!skipSiblingSync && link.componentId && link.vesselId) {
+      try {
+        await this.createSiblingLinks(link.spareId, link.spareUuid, link.componentId, link.vesselId, link.linkedBy);
+      } catch (siblingError: any) {
+        console.warn(`[createSpareComponentLink] Sibling sync failed for spare ${link.spareId}: ${siblingError.message}`);
+      }
+    }
+
+    return created;
+  }
+
+  async getComponentSiblings(componentId: string): Promise<Array<{ cuuid: string; name: string }>> {
+    const db = await getDb();
+    const comp = await db.select().from(components).where(
+      or(eq(components.cuuid, componentId), eq(components.id, componentId))
+    );
+    if (!comp[0] || !comp[0].parentId) return [];
+
+    const siblings = await db.select({ cuuid: components.cuuid, name: components.name })
+      .from(components)
+      .where(and(
+        eq(components.parentId, comp[0].parentId),
+        sql`${components.cuuid} != ${componentId}`
+      ));
+    return siblings;
+  }
+
+  private async createSiblingLinks(
+    spareId: number, spareUuid: string, componentId: string,
+    vesselId: string, linkedBy: string
+  ): Promise<number> {
+    const siblings = await this.getComponentSiblings(componentId);
+    if (siblings.length === 0) return 0;
+
+    const existingLinks = await this.getSpareComponentLinksBySpare(spareId);
+    const existingCompIds = new Set(existingLinks.map(l => l.componentId));
+    let created = 0;
+
+    for (const sibling of siblings) {
+      if (existingCompIds.has(sibling.cuuid)) continue;
+      try {
+        await this.createSpareComponentLink({
+          spareId,
+          spareUuid,
+          componentId: sibling.cuuid,
+          vesselId,
+          linkedBy,
+        }, true);
+        created++;
+      } catch (e: any) {
+        if (!e.message?.includes('duplicate')) {
+          console.warn(`[createSiblingLinks] Failed to link spare ${spareId} → sibling ${sibling.cuuid}: ${e.message}`);
+        }
+      }
+    }
+    return created;
+  }
+
+  async backfillSiblingLinks(vesselId: string): Promise<{ linksCreated: number; sparesProcessed: number; errors: number }> {
+    const db = await getDb();
+
+    const result = await db.execute(sql`
+      WITH existing_links AS (
+        SELECT scl.spare_id, scl.spare_uuid, scl.component_id, scl.vessel_id, c.parent_id
+        FROM spare_component_links scl
+        JOIN components c ON c.cuuid = scl.component_id
+        WHERE scl.vessel_id = ${vesselId} AND c.parent_id IS NOT NULL
+      ),
+      sibling_pairs AS (
+        SELECT DISTINCT
+          el.spare_id, el.spare_uuid, sib.cuuid AS sibling_cuuid, el.vessel_id
+        FROM existing_links el
+        JOIN components sib ON sib.parent_id = el.parent_id AND sib.cuuid != el.component_id
+        WHERE NOT EXISTS (
+          SELECT 1 FROM spare_component_links x
+          WHERE x.spare_id = el.spare_id AND x.component_id = sib.cuuid
+        )
+      ),
+      inserted AS (
+        INSERT INTO spare_component_links (spare_id, spare_uuid, component_id, vessel_id, linked_by)
+        SELECT spare_id, spare_uuid, sibling_cuuid, vessel_id, 'system-sibling-backfill'
+        FROM sibling_pairs
+        ON CONFLICT (spare_id, component_id) DO NOTHING
+        RETURNING spare_id
+      )
+      SELECT
+        (SELECT COUNT(*) FROM inserted) AS links_created,
+        (SELECT COUNT(DISTINCT spare_id) FROM existing_links) AS spares_processed
+    `);
+
+    const row = (result as any).rows?.[0] || (result as any)[0] || {};
+    return {
+      linksCreated: Number(row.links_created || 0),
+      sparesProcessed: Number(row.spares_processed || 0),
+      errors: 0,
+    };
   }
 
   async deleteSpareComponentLink(spareId: number, componentId: string): Promise<void> {

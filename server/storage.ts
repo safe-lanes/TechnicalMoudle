@@ -833,9 +833,11 @@ export interface IStorage {
   getSpareComponentLinks(vesselId: string): Promise<SpareComponentLink[]>;
   getSpareComponentLinksBySpare(spareId: number): Promise<SpareComponentLink[]>;
   getSpareComponentLinksByComponent(componentId: string): Promise<SpareComponentLink[]>;
-  createSpareComponentLink(link: InsertSpareComponentLink): Promise<SpareComponentLink>;
+  createSpareComponentLink(link: InsertSpareComponentLink, skipSiblingSync?: boolean): Promise<SpareComponentLink>;
   deleteSpareComponentLink(spareId: number, componentId: string): Promise<void>;
   getLinkedComponentsForSpare(spareId: number): Promise<Array<{ componentId: string; componentCode: string; componentName: string }>>;
+  getComponentSiblings(componentId: string): Promise<Array<{ cuuid: string; name: string }>>;
+  backfillSiblingLinks(vesselId: string): Promise<{ linksCreated: number; sparesProcessed: number; errors: number }>;
   
   // Job-Component Link Methods (many-to-many for shared jobs)
   getJobComponentLinks(vesselId: string): Promise<JobComponentLink[]>;

@@ -189,3 +189,9 @@ export async function getSparesWithInventoryByComponent(componentId: string): Pr
 export async function getSparesWithInventoryByComponentCode(vesselId: string, componentCode: string): Promise<SpareWithInventory[]> {
   return repo.getSparesWithInventoryByComponentCode(vesselId, componentCode);
 }
+
+// ── Sibling Backfill ──
+
+export async function backfillSiblingLinks(vesselId: string): Promise<{ linksCreated: number; sparesProcessed: number; errors: number }> {
+  return repo.backfillSiblingLinks(vesselId);
+}

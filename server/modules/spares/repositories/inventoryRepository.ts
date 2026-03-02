@@ -122,6 +122,12 @@ export async function getSparesWithInventoryByComponentCode(vesselId: string, co
   return storage.getSparesWithInventoryByComponentCode(vesselId, componentCode);
 }
 
+// ── Sibling Backfill ──
+
+export async function backfillSiblingLinks(vesselId: string): Promise<{ linksCreated: number; sparesProcessed: number; errors: number }> {
+  return storage.backfillSiblingLinks(vesselId);
+}
+
 // ── Helper: getSpare (needed for transaction hydration) ──
 
 export async function getSpare(id: string): Promise<Spare | undefined> {

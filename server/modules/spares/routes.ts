@@ -111,6 +111,10 @@ router.post('/inventory/stock/:spareId/:locationId', asyncHandler(invCtrl.upsert
 router.post('/inventory/transactions', asyncHandler(invCtrl.createTransaction));
 router.get('/inventory/transactions/:vesselId', asyncHandler(invCtrl.getTransactions));
 
+// ── Inventory: Sibling Backfill ──
+
+router.post('/inventory/backfill-sibling-links/:vesselId', asyncHandler(invCtrl.backfillSiblingLinks));
+
 // ── Inventory: Enhanced Spare Data (specific paths before catch-all) ──
 
 router.get('/inventory/spares-with-inventory/:vesselId', asyncHandler(invCtrl.getSparesWithInventory));

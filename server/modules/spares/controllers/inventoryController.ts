@@ -302,6 +302,18 @@ export async function getSparesByComponent(req: Request, res: Response) {
   }
 }
 
+// ── POST /inventory/backfill-sibling-links/:vesselId ──
+
+export async function backfillSiblingLinks(req: Request, res: Response) {
+  try {
+    const result = await inventoryService.backfillSiblingLinks(req.params.vesselId);
+    res.json({ success: true, data: result });
+  } catch (error: any) {
+    console.error("Error backfilling sibling links:", error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+}
+
 // ── GET /inventory/spares-by-component-code/:vesselId/:componentCode ──
 
 export async function getSparesByComponentCode(req: Request, res: Response) {
