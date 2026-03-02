@@ -1,0 +1,19 @@
+{
+  "id": "d8ada060-ade8-4325-a8f6-2a95188a435e",
+  "type": "components",
+  "mode": "upsert",
+  "vesselId": "74481b72-841a-11ed-aa7c-7003bca91a86",
+  "userId": 1,
+  "startedAt": "2026-03-02T05:03:33.082Z",
+  "completedAt": "2026-03-02T05:03:35.374Z",
+  "status": "complete",
+  "created": 297,
+  "updated": 3,
+  "skipped": 0,
+  "archived": 0,
+  "originalName": "Vessel component _ Test Vessel_With LSA and FFA 2.xlsx",
+  "storedFilePath": "local:/home/runner/workspace/uploads/bulk-imports/components/1772427815373_Vessel_component___Test_Vessel_With_LSA_and_FFA_2.xlsx",
+  "errorReport": null,
+  "jobComponentLinksCreated": 0,
+  "spareComponentLinksCreated": 0
+}
