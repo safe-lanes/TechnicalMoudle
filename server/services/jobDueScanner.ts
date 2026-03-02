@@ -151,6 +151,17 @@ export class JobDueScannerService {
    * - AND no DUE/OVERDUE/PENDING APPROVAL/POSTPONED WO exists for same job + same RH_due cycle
    */
   private async processRunningHoursJobs(): Promise<{ checked: number; generated: number }> {
+    const skipReasons = {
+      noComponentId: 0,
+      componentNotFound: 0,
+      wrongCounterType: 0,
+      belowThreshold: 0,
+      legacyBlocking: 0,
+      noLinkedComponents: 0,
+      existingWO: 0,
+      cycleExists: 0,
+    };
+
     // Get only active RH-based jobs
     const allJobs = await storage.getJobs();
     const rhJobs = allJobs.filter(job => 
@@ -192,7 +203,10 @@ export class JobDueScannerService {
       // Ensure we've fetched components for this vessel
       if (vesselId && !vesselComponentsFetched.has(vesselId)) {
         const vesselComponents = await storage.getComponents(vesselId);
-        vesselComponents.forEach(c => componentCache.set(c.id, c));
+        vesselComponents.forEach(c => {
+          componentCache.set(c.id, c);
+          if (c.cuuid) componentCache.set(c.cuuid, c);
+        });
         vesselComponentsFetched.add(vesselId);
       }
       return componentCache.get(componentId);
@@ -202,14 +216,21 @@ export class JobDueScannerService {
 
     for (const job of rhJobs) {
       // Get the component from cache to check RH counter type and current RH
-      if (!job.componentId) continue; // Skip jobs without component
+      if (!job.componentId) {
+        skipReasons.noComponentId++;
+        continue;
+      }
       const component = await getComponentFromCache(job.componentId, job.vesselId);
-      if (!component) continue;
+      if (!component) {
+        skipReasons.componentNotFound++;
+        continue;
+      }
 
       // Check RH counter type - must be MASTER or INHERITED
       const rhCounterType = component.rhCounterType;
       if (rhCounterType !== 'MASTER' && rhCounterType !== 'INHERITED') {
-        continue; // Skip jobs on components without proper RH tracking
+        skipReasons.wrongCounterType++;
+        continue;
       }
 
       // Determine effective current RH based on counter type
@@ -240,7 +261,8 @@ export class JobDueScannerService {
 
       // Check auto-generation condition: RH_effective_current >= RH_generate
       if (rhEffectiveCurrent < rhGenerate) {
-        continue; // Not yet time to generate
+        skipReasons.belowThreshold++;
+        continue;
       }
 
       // LEGACY FALLBACK: Check if job has any active WO with NULL/empty componentCode
@@ -261,7 +283,7 @@ export class JobDueScannerService {
       });
 
       if (legacyBlockingWO) {
-        // Legacy WO exists without component code - block entire job
+        skipReasons.legacyBlocking++;
         continue;
       }
       
@@ -279,7 +301,7 @@ export class JobDueScannerService {
       }
       
       if (linkedComponents.length === 0) {
-        console.warn(`⚠️ No linked components for RH job ${job.jobNo} - skipping WO generation`);
+        skipReasons.noLinkedComponents++;
         continue;
       }
       
@@ -301,13 +323,15 @@ export class JobDueScannerService {
         );
         
         if (existingWOForComponent) {
-          continue; // Already has an active WO for this component - skip
+          skipReasons.existingWO++;
+          continue;
         }
         
         // Component-specific cycle key for RH: `${vesselId}|${jobNo}|${componentCode}|${rhDue}`
         const componentCycleKey = `${job.vesselId || 'unknown'}|${job.jobNo}|${componentCode}|${rhDue}`;
         if (existingCycleWOs.has(componentCycleKey)) {
-          continue; // WO already exists for this component's cycle - skip
+          skipReasons.cycleExists++;
+          continue;
         }
         
         const workOrderNo = await generatePlannedWorkOrderNumber(storage, job.jobNo, componentCode, job.vesselId || undefined);
@@ -377,6 +401,11 @@ export class JobDueScannerService {
           console.log(`⚠️ [RH WO Gen] Vessel ${vId} has no PMS settings configured, using 0 hour lead time`);
         }
       });
+    }
+
+    const totalSkipped = Object.values(skipReasons).reduce((a, b) => a + b, 0);
+    if (rhJobs.length > 0 && generated === 0) {
+      console.log(`[RH Scan Diagnostic] ${rhJobs.length} RH jobs checked, ${generated} WOs generated. Skip breakdown: belowThreshold=${skipReasons.belowThreshold}, wrongCounterType=${skipReasons.wrongCounterType}, existingWO=${skipReasons.existingWO}, cycleExists=${skipReasons.cycleExists}, legacyBlocking=${skipReasons.legacyBlocking}, noComponentId=${skipReasons.noComponentId}, componentNotFound=${skipReasons.componentNotFound}, noLinkedComponents=${skipReasons.noLinkedComponents}`);
     }
 
     return { checked: rhJobs.length, generated };

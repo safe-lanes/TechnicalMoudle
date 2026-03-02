@@ -57,8 +57,9 @@ export function validateRunningHoursIncrease(
 
     daysSinceLastUpdate = getDaysBetweenCalendarDates(lastCalendarDate, newCalendarDate);
 
-    if (daysSinceLastUpdate === 0) {
+    if (daysSinceLastUpdate <= 0) {
       sameDayUpdate = true;
+      daysSinceLastUpdate = 0;
     }
   } else {
     daysSinceLastUpdate = 1;

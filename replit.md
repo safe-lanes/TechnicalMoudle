@@ -245,6 +245,18 @@ isSync: boolean("is_sync").default(false),
 
 ---
 
+## Known Fixes Applied
+
+### Running Hours Job Component Cache Fix (2026-03-02)
+**Root Cause**: In `server/services/jobDueScanner.ts`, the `processRunningHoursJobs()` method cached components keyed by `c.id` (the text primary key), but `job.componentId` references `components.cuuid` (the canonical UUID). This mismatch caused all 664 RH jobs to fail component lookup, resulting in 0 work orders being generated.
+**Fix**: Cache components by both `c.id` and `c.cuuid` so lookups work with either identifier.
+**Files**: `server/services/jobDueScanner.ts`
+
+### RH Validation Negative Days Fix (2026-03-02)
+**Root Cause**: In `server/modules/running-hours/utils/rhValidation.ts`, when `componentLastUpdated` was ahead of `newUpdateDate` (timezone/clock edge case), `daysSinceLastUpdate` became negative, producing a negative `maxAllowedIncrease` which blocked all manual RH updates.
+**Fix**: Clamp `daysSinceLastUpdate` to minimum 0, treating negative values as same-day updates (handled by existing same-day logic).
+**Files**: `server/modules/running-hours/utils/rhValidation.ts`
+
 ## External Dependencies
 - **Frontend**: `@radix-ui/*`, `@tanstack/react-query`, `wouter`, `tailwindcss`, `lucide-react`, `ag-grid-enterprise`, `ag-charts-react`
 - **Backend**: `express`, `drizzle-orm`, `@neondatabase/serverless`, `connect-pg-simple`
