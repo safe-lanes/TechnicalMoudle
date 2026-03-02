@@ -1,5 +1,6 @@
 import { createContext, useContext, useState, useEffect, ReactNode } from "react";
 import type { PublicUser, UserRole } from "@shared/schema";
+import { analyzeLocalStorage } from "@/utils/localStorageAnalyzer";
 
 interface AuthContextType {
   currentUser: PublicUser | null;
@@ -35,8 +36,6 @@ export function AuthProvider({ children }: AuthProviderProps) {
         localStorage.removeItem("currentUser");
       }
     } else {
-      // Default to Office user for testing C2 Verification auto-fill
-      // Simulating: Munawer A. Modak (UUID: d70fb663-a6b0-4f66-8e42-ca25ff8de235)
       const defaultUser: PublicUser = {
         id: 1,
         username: "munawer.modak",
@@ -52,6 +51,12 @@ export function AuthProvider({ children }: AuthProviderProps) {
       };
       setCurrentUser(defaultUser);
       localStorage.setItem("currentUser", JSON.stringify(defaultUser));
+    }
+
+    try {
+      analyzeLocalStorage();
+    } catch (error) {
+      console.error("LocalStorage analysis failed (non-blocking):", error);
     }
   }, []);
 

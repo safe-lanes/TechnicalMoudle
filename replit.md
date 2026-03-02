@@ -257,6 +257,12 @@ isSync: boolean("is_sync").default(false),
 **Fix**: Clamp `daysSinceLastUpdate` to minimum 0, treating negative values as same-day updates (handled by existing same-day logic).
 **Files**: `server/modules/running-hours/utils/rhValidation.ts`
 
+### LocalStorage Analysis Utility (2026-03-02)
+**Purpose**: Diagnostic utility that reads and analyzes role-based access data from localStorage keys (`userProfile`, `userRole`, `userType`, `credentials`, `Role_Access_Data`) on app load.
+**Behavior**: Safely checks each key's existence, detects encryption (AES/base64/hex), attempts decryption, masks sensitive credential fields, and logs results to console. Only runs in development mode (`import.meta.env.PROD` check). App never crashes if keys are missing.
+**Files**: `client/src/utils/localStorageAnalyzer.ts`, `client/src/contexts/AuthContext.tsx`
+**Documentation**: `docs/RBAC_ANALYSIS.md` — full RBAC analysis and implementation plan
+
 ## External Dependencies
 - **Frontend**: `@radix-ui/*`, `@tanstack/react-query`, `wouter`, `tailwindcss`, `lucide-react`, `ag-grid-enterprise`, `ag-charts-react`
 - **Backend**: `express`, `drizzle-orm`, `@neondatabase/serverless`, `connect-pg-simple`
