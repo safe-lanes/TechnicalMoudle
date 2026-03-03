@@ -720,7 +720,7 @@ const Dashboard = () => {
   const maintenanceTrendData = useMemo(() => {
     const safeWOs = workOrdersData.filter(wo => wo !== null && wo !== undefined);
     const now = new Date();
-    const months: { month: string; monthShort: string; totalPlanned: number; completed: number; outstanding: number; outstandingPercent: number; overdue: number }[] = [];
+    const months: { month: string; monthShort: string; totalPlanned: number; completed: number; outstanding: number; outstandingPercent: number; overdue: number; completedPercent: number; overduePercent: number }[] = [];
 
     for (let i = 5; i >= 0; i--) {
       const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
@@ -728,14 +728,17 @@ const Dashboard = () => {
       const monthShort = format(d, 'MMM');
 
       if (i === 0) {
+        const tp = outstandingTasksChartData.totalMonthly;
         months.push({
           month: monthName,
           monthShort,
-          totalPlanned: outstandingTasksChartData.totalMonthly,
+          totalPlanned: tp,
           completed: outstandingTasksChartData.completedCount,
           outstanding: outstandingTasksChartData.outstandingCount,
           outstandingPercent: outstandingTasksChartData.outstandingPercent,
-          overdue: workOrderKPIs.overdue
+          overdue: workOrderKPIs.overdue,
+          completedPercent: tp > 0 ? Math.round((outstandingTasksChartData.completedCount / tp) * 100) : 0,
+          overduePercent: tp > 0 ? Math.round((workOrderKPIs.overdue / tp) * 100) : 0,
         });
       } else {
         const targetMonth = d.getMonth();
@@ -761,7 +764,9 @@ const Dashboard = () => {
           completed: completedCount,
           outstanding: outstandingCount,
           outstandingPercent,
-          overdue: overdueCount
+          overdue: overdueCount,
+          completedPercent: totalPlanned > 0 ? Math.round((completedCount / totalPlanned) * 100) : 0,
+          overduePercent: totalPlanned > 0 ? Math.round((overdueCount / totalPlanned) * 100) : 0,
         });
       }
     }
@@ -1156,7 +1161,7 @@ const Dashboard = () => {
               {/* Status Distribution Donut Chart — NO progress bars */}
               <div style={{ padding: '16px' }}>
                 <div style={subTitle} className="mb-1">Status Distribution</div>
-                <div style={{ fontSize: '11px', color: '#6b7280', marginBottom: '8px' }}>Click segments to filter</div>
+                <div style={{ fontSize: '11px', color: '#9ca3af', marginBottom: '8px' }}>Click segments to filter</div>
                 <div style={{ height: '250px', backgroundColor: '#ffffff' }} data-testid="card-wo-status-chart">
                   {workOrderStatusChartData.length > 0 ? (
                     <AgCharts options={{
@@ -1166,7 +1171,7 @@ const Dashboard = () => {
                         angleKey: 'count',
                         calloutLabelKey: 'status',
                         sectorLabelKey: 'count',
-                        innerRadiusRatio: 0.75,
+                        innerRadiusRatio: 0.78,
                         fills: workOrderStatusChartData.map(d => d.color),
                         strokes: workOrderStatusChartData.map(d => d.color),
                         listeners: {
@@ -1200,7 +1205,7 @@ const Dashboard = () => {
                         <LineChart data={maintenanceTrendData.months} margin={{ top: 4, right: 8, bottom: 0, left: -16 }}>
                           <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
                           <XAxis dataKey="monthShort" tick={{ fontSize: 11, fill: '#757575' }} tickLine={false} axisLine={false} />
-                          <YAxis tick={{ fontSize: 10, fill: '#757575' }} tickLine={false} axisLine={false} />
+                          <YAxis domain={[0, 100]} tickFormatter={(v: number) => `${v}%`} tick={{ fontSize: 10, fill: '#757575' }} tickLine={false} axisLine={false} />
                           <Tooltip
                             content={({ active, payload }) => {
                               if (active && payload && payload.length) {
@@ -1209,9 +1214,9 @@ const Dashboard = () => {
                                   <div style={{ background: '#FFFFFF', border: '1px solid #E0E0E0', borderRadius: '6px', boxShadow: '0 2px 8px rgba(0,0,0,0.12)', padding: '8px 12px' }} data-testid="tooltip-trend-line">
                                     <div className="font-semibold text-xs mb-1" style={{ color: '#212121' }}>{d.month}</div>
                                     <div className="text-xs" style={{ color: '#616161' }}>Total planned: {d.totalPlanned}</div>
-                                    <div className="text-xs" style={{ color: '#2ecc71' }}>Completed: {d.completed}</div>
-                                    <div className="text-xs" style={{ color: '#f39c12' }}>Outstanding: {d.outstandingPercent}%</div>
-                                    <div className="text-xs" style={{ color: '#e74c3c' }}>Overdue: {d.overdue}</div>
+                                    <div className="text-xs" style={{ color: '#2ecc71' }}>Completed: {d.completedPercent}% ({d.completed})</div>
+                                    <div className="text-xs" style={{ color: '#f39c12' }}>Outstanding: {d.outstandingPercent}% ({d.outstanding})</div>
+                                    <div className="text-xs" style={{ color: '#e74c3c' }}>Overdue: {d.overduePercent}% ({d.overdue})</div>
                                   </div>
                                 );
                               }
@@ -1220,8 +1225,8 @@ const Dashboard = () => {
                           />
                           <Line
                             type="monotone"
-                            dataKey="completed"
-                            name="Completed"
+                            dataKey="completedPercent"
+                            name="Completed %"
                             stroke="#2ecc71"
                             strokeWidth={2}
                             dot={{ r: 4, fill: '#2ecc71', stroke: '#ffffff', strokeWidth: 2 }}
@@ -1238,8 +1243,8 @@ const Dashboard = () => {
                           />
                           <Line
                             type="monotone"
-                            dataKey="overdue"
-                            name="Overdue"
+                            dataKey="overduePercent"
+                            name="Overdue %"
                             stroke="#e74c3c"
                             strokeWidth={2}
                             dot={{ r: 4, fill: '#e74c3c', stroke: '#ffffff', strokeWidth: 2 }}
@@ -1249,9 +1254,9 @@ const Dashboard = () => {
                       </ResponsiveContainer>
                     </div>
                     <div className="flex items-center justify-center gap-4 text-xs" style={{ color: '#6b7280' }} data-testid="legend-maintenance-trend">
-                      <div className="flex items-center gap-1"><span className="inline-block w-3 h-3 rounded-full" style={{ backgroundColor: '#2ecc71' }} /><span>Completed</span></div>
+                      <div className="flex items-center gap-1"><span className="inline-block w-3 h-3 rounded-full" style={{ backgroundColor: '#2ecc71' }} /><span>Completed %</span></div>
                       <div className="flex items-center gap-1"><span className="inline-block w-3 h-3 rounded-full" style={{ backgroundColor: '#f39c12' }} /><span>Outstanding %</span></div>
-                      <div className="flex items-center gap-1"><span className="inline-block w-3 h-3 rounded-full" style={{ backgroundColor: '#e74c3c' }} /><span>Overdue</span></div>
+                      <div className="flex items-center gap-1"><span className="inline-block w-3 h-3 rounded-full" style={{ backgroundColor: '#e74c3c' }} /><span>Overdue %</span></div>
                     </div>
                   </div>
                 ) : (
@@ -1287,7 +1292,7 @@ const Dashboard = () => {
                         <tr>
                           <th className="text-left py-2 px-3" style={tableHeaderStyle}>Work Order</th>
                           <th className="text-left py-2 px-3" style={tableHeaderStyle}>Equipment</th>
-                          <th className="text-left py-2 px-3" style={tableHeaderStyle}>Status</th>
+                          <th className="text-left py-2 px-3" style={{ ...tableHeaderStyle, minWidth: '90px' }}>Status</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -1308,7 +1313,7 @@ const Dashboard = () => {
                               {wo.taskDescription || wo.jobTitle || 'No description'}
                             </td>
                             <td className="py-2 px-3">
-                              <span style={{ display: 'inline-block', padding: '2px 10px', borderRadius: '12px', fontSize: '10px', fontWeight: 700, color: '#FFFFFF', background: '#E53935' }}>Overdue</span>
+                              <span style={{ display: 'inline-block', padding: '2px 8px', borderRadius: '4px', fontSize: '11px', fontWeight: 600, color: '#dc2626', backgroundColor: '#fee2e2' }}>Overdue</span>
                             </td>
                           </tr>
                         ))}
@@ -1373,7 +1378,7 @@ const Dashboard = () => {
                         angleKey: 'count',
                         calloutLabelKey: 'status',
                         sectorLabelKey: 'count',
-                        innerRadiusRatio: 0.75,
+                        innerRadiusRatio: 0.78,
                         fills: sparesStockChartData.map(d => d.color),
                         strokes: sparesStockChartData.map(d => d.color),
                         listeners: {
@@ -1396,11 +1401,11 @@ const Dashboard = () => {
               <div style={{ padding: '16px' }} data-testid="card-dot-matrix">
                 <div style={subTitle} className="mb-2">VESSEL / GROUP ANALYSIS</div>
                 {dotMatrixVesselData.length > 0 ? (
-                  <div className="overflow-x-auto">
+                  <div className="overflow-x-auto" style={{ scrollbarWidth: 'thin' as any }}>
                     <table style={{ width: '100%', fontSize: '11px', borderCollapse: 'collapse' }}>
                       <thead>
                         <tr>
-                          <th style={{ textAlign: 'left', padding: '4px 6px', color: '#757575', fontWeight: 600, fontSize: '10px' }}>Metric</th>
+                          <th style={{ textAlign: 'left', padding: '4px 6px', color: '#757575', fontWeight: 600, fontSize: '10px', minWidth: '100px' }}>Metric</th>
                           {dotMatrixVesselData.map(v => (
                             <th key={v.id} style={{
                               textAlign: 'center',
@@ -1408,6 +1413,7 @@ const Dashboard = () => {
                               color: '#546E7A',
                               fontWeight: 600,
                               fontSize: '9px',
+                              minWidth: '50px',
                               maxWidth: '55px',
                               overflow: 'hidden',
                               textOverflow: 'ellipsis',

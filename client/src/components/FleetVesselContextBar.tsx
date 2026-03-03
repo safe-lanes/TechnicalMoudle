@@ -37,18 +37,32 @@ export function FleetVesselContextBar({
     borderRadius: '20px',
   };
 
-  const pillActive: React.CSSProperties = {
+  const tabPillActive: React.CSSProperties = {
     ...pillBase,
-    background: '#1a3a5c',
-    color: '#FFFFFF',
-    border: '1px solid #1a3a5c',
+    backgroundColor: '#1a2b4a',
+    color: '#ffffff',
+    border: 'none',
   };
 
-  const pillInactive: React.CSSProperties = {
+  const tabPillInactive: React.CSSProperties = {
     ...pillBase,
-    background: '#FFFFFF',
-    color: '#1a3a5c',
-    border: '1px solid #1a3a5c',
+    backgroundColor: '#f3f4f6',
+    color: '#374151',
+    border: 'none',
+  };
+
+  const vesselPillActive: React.CSSProperties = {
+    ...pillBase,
+    backgroundColor: '#1a2b4a',
+    color: '#ffffff',
+    border: 'none',
+  };
+
+  const vesselPillInactive: React.CSSProperties = {
+    ...pillBase,
+    backgroundColor: '#ffffff',
+    color: '#374151',
+    border: '1px solid #d1d5db',
   };
 
   return (
@@ -63,14 +77,14 @@ export function FleetVesselContextBar({
           </h1>
           <div style={{ display: 'flex', gap: '4px' }}>
             <button
-              style={activeTab === 'overview' ? pillActive : pillInactive}
+              style={activeTab === 'overview' ? tabPillActive : tabPillInactive}
               onClick={() => onTabChange?.('overview')}
               data-testid="tab-overview"
             >
               Overview
             </button>
             <button
-              style={activeTab === 'management' ? pillActive : pillInactive}
+              style={activeTab === 'management' ? tabPillActive : tabPillInactive}
               onClick={() => onTabChange?.('management')}
               data-testid="tab-management"
             >
@@ -86,14 +100,14 @@ export function FleetVesselContextBar({
         <div className="flex items-center gap-3">
           <div style={{ display: 'flex', gap: '4px' }}>
             <button
-              style={isAllVessels ? pillActive : pillInactive}
+              style={isAllVessels ? vesselPillActive : vesselPillInactive}
               onClick={() => onAllVesselsChange(true)}
               data-testid="toggle-all-vessels"
             >
               All Vessel
             </button>
             <button
-              style={!isAllVessels ? pillActive : pillInactive}
+              style={!isAllVessels ? vesselPillActive : vesselPillInactive}
               onClick={() => onAllVesselsChange(false)}
               data-testid="toggle-my-vessel"
             >

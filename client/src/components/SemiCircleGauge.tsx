@@ -23,7 +23,7 @@ export function SemiCircleGauge({
 }: SemiCircleGaugeProps) {
   const percentage = max > 0 ? Math.min((value / max) * 100, 100) : 0;
   const radius = 70;
-  const strokeWidth = 14;
+  const strokeWidth = 10;
   const cx = 100;
   const cy = 85;
   const startAngle = Math.PI;

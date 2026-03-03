@@ -128,9 +128,10 @@ export const SideMenuBar: React.FC<SideMenuBarProps> = ({
             onClick={() => handleItemClick(item.id)}
             className={cn(
               "w-full flex flex-col items-center justify-center transition-all duration-200 px-2 py-3 h-16",
-              isSelected ? "bg-[#52baf3]" : "hover:bg-[#1d4ed8]",
+              !isSelected && "hover:bg-white/10",
               "group relative"
             )}
+            style={isSelected ? { backgroundColor: 'rgba(255,255,255,0.15)', borderLeft: '3px solid #ffffff' } : undefined}
             role="link"
             aria-label={item.sublabel ? `${item.label}, ${item.sublabel}` : item.label}
             aria-current={isSelected ? "page" : undefined}

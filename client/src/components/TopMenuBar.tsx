@@ -58,9 +58,9 @@ export const TopMenuBar: React.FC<TopMenuBarProps> = ({
   ];
 
   return (
-    <div className="bg-white border-b border-gray-200 shadow-sm relative sticky top-0 z-50">
-      <div className="flex items-stretch h-16 bg-white">
-        <div className="flex items-center px-4 bg-white">
+    <div className="relative sticky top-0 z-50" style={{ backgroundColor: '#ffffff', borderBottom: '1px solid #e5e7eb' }}>
+      <div className="flex items-stretch h-16" style={{ backgroundColor: '#ffffff' }}>
+        <div className="flex items-center px-4" style={{ backgroundColor: '#ffffff' }}>
           <img 
             src={sailLogoPath} 
             alt="SAIL Logo" 
@@ -85,15 +85,12 @@ export const TopMenuBar: React.FC<TopMenuBarProps> = ({
               <DropdownMenu key={item.id}>
                 <DropdownMenuTrigger asChild>
                   <div
-                    className={cn(
-                      "flex flex-col items-center justify-center w-[110px] transition-all duration-200 relative cursor-pointer select-none",
-                      "hover:bg-gray-50",
-                      "bg-white border-r border-gray-200"
-                    )}
+                    className="flex flex-col items-center justify-center w-[110px] transition-all duration-200 relative cursor-pointer select-none"
+                    style={{ backgroundColor: '#ffffff', borderRight: '1px solid #e5e7eb' }}
                     data-testid="dropdown-technical-module"
                   >
-                    <Icon className="h-5 w-5 mb-1" style={{ color: '#333' }} />
-                    <span className="text-xs font-medium" style={{ color: '#333' }}>
+                    <Icon className="h-5 w-5 mb-1" style={{ color: '#374151' }} />
+                    <span className="text-xs font-medium" style={{ color: '#374151' }}>
                       {item.label}
                     </span>
                   </div>
@@ -118,18 +115,15 @@ export const TopMenuBar: React.FC<TopMenuBarProps> = ({
             <button
               key={item.id}
               onClick={() => onSubModuleChange(item.id)}
-              className={cn(
-                "flex flex-col items-center justify-center w-[110px] transition-all duration-200 relative",
-                "hover:bg-gray-50",
-                "bg-white"
-              )}
+              className="flex flex-col items-center justify-center w-[110px] transition-all duration-200 relative"
+              style={{ backgroundColor: '#ffffff' }}
             >
-              <Icon className="h-5 w-5 mb-1" style={{ color: isSelected ? '#1a6eb5' : '#333' }} />
-              <span className="text-xs font-medium" style={{ color: isSelected ? '#1a6eb5' : '#333' }}>
+              <Icon className="h-5 w-5 mb-1" style={{ color: isSelected ? '#1a6eb5' : '#374151' }} />
+              <span className="text-xs font-medium" style={{ color: isSelected ? '#1a6eb5' : '#374151' }}>
                 {item.label}
               </span>
               {isSelected && (
-                <div className="absolute bottom-0 left-0 right-0 z-10" style={{ height: '3px', background: '#1a6eb5' }} />
+                <div className="absolute bottom-0 left-0 right-0 z-10" style={{ height: '3px', backgroundColor: '#1a6eb5' }} />
               )}
             </button>
           );
@@ -145,7 +139,6 @@ export const TopMenuBar: React.FC<TopMenuBarProps> = ({
           <SyncStatusIndicator />
         </div>
       </div>
-      <div className="absolute bottom-0 left-0 right-0 h-[1px] bg-[#e2e8f0]" />
     </div>
   );
 };

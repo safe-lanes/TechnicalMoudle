@@ -33,18 +33,21 @@ Preferred communication style: Simple, everyday language.
 -   All dashboard charts display real database data.
 
 ### Dashboard Visual Design Language (Audit-Reference Style)
--   **Top Navbar**: White background (`#ffffff`), active tab has blue bottom-border underline (`#1a6eb5`), inactive tabs in dark gray (`#333`).
--   **Left Sidebar**: Medium blue background (`#1565c0`) with white icons/text.
+-   **Top Navbar**: Pure white background (`#ffffff`), no shadow, active tab has 3px blue bottom-border underline (`#1a6eb5`), active tab text/icon `#1a6eb5`, inactive tabs in dark gray (`#374151`), separator `1px solid #e5e7eb`.
+-   **Left Sidebar**: Medium blue background (`#1565c0`) with white icons/text; active item uses subtle `rgba(255,255,255,0.15)` overlay + `3px solid #ffffff` left border (not bright cyan).
 -   **Section Headers**: Plain blue uppercase text labels (`#1a6eb5`, 11px, bold, 0.8px letter-spacing) on white background — no dark banner bars.
--   **Gauge Charts**: Dark navy arc color (`#1d3557`), dark navy value text (`#1a2b4a`), light gray background track.
--   **Donut Charts**: Thin ring style (`innerRadiusRatio: 0.75`), white background containers.
--   **Trend Charts**: Multi-line LineChart (green/orange/red) with CartesianGrid, no area fills or colored reference bands.
+-   **Gauge Charts**: Dark navy arc color (`#1d3557`), thin stroke (`strokeWidth: 10`), dark navy value text (`#1a2b4a`, 28px, bold), light gray background track (`#E8E8E8`).
+-   **Donut Charts**: Thin ring style (`innerRadiusRatio: 0.78`), white background containers.
+-   **Trend Charts**: Multi-line LineChart (green/orange/red) with CartesianGrid, percentage-based Y-axis (0–100%), all three lines use percent data keys (`completedPercent`, `outstandingPercent`, `overduePercent`).
 -   **KPI Badges**: Plain bold text (dark navy `#1a2b4a` or red `#e74c3c`) — no colored background badges.
--   **Vessel Toggle**: Pill-shaped buttons (border-radius: 20px), active=filled dark navy, inactive=white with dark navy border.
+-   **Overview/Management Toggle**: Pill-shaped (20px radius); active = `#1a2b4a` bg white text, no border; inactive = `#f3f4f6` bg `#374151` text, no border.
+-   **All Vessel/My Vessel Toggle**: Pill-shaped (20px radius); active = `#1a2b4a` bg white text, no border; inactive = white bg `#374151` text, `1px solid #d1d5db` border.
+-   **Overdue Table Status Badge**: Light red bg (`#fee2e2`), red text (`#dc2626`), 4px radius, 11px font. Status column `minWidth: 90px`.
 -   **Cards**: White background, `box-shadow: 0 1px 4px rgba(0,0,0,0.08)`, border-radius 8px.
--   **Typography**: Section labels in blue `#1a6eb5`, supporting text in gray `#6b7280`.
--   **Dot Matrix**: Default neutral gray (`#9ca3af`), colored only for significant signals (red/amber).
+-   **Typography**: Section labels in blue `#1a6eb5`, supporting text in gray `#6b7280`, helper text (e.g. "Click segments to filter") in `#9ca3af`.
+-   **Dot Matrix**: Default neutral gray (`#9ca3af`), colored only for significant signals (red/amber). Table has thin scrollbar styling, metric column `minWidth: 100px`, vessel columns `minWidth: 50px`.
 -   **Chat FAB**: Subtle white circle with blue border/icon, not filled primary button.
+-   **Custom Scrollbar CSS**: `.overflow-x-auto` elements use thin 4px WebKit scrollbar with `#cbd5e1` thumb on `#f1f5f9` track (in `index.css`).
 
 ### Feature Specifications
 -   **Spare-Component Sibling Link Distribution**: When a spare is linked to a component, it is automatically linked to all sibling components (components sharing the same `parentId`). An idempotent backfill endpoint is available for batch processing.
