@@ -600,6 +600,9 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
         setExecutionData(prev => ({
           ...prev,
           ...context.executionData,
+          riskAssessment: context.executionData.riskAssessmentStatus || context.executionData.riskAssessment || prev.riskAssessment,
+          safetyChecklists: context.executionData.safetyChecklistsStatus || context.executionData.safetyChecklists || prev.safetyChecklists,
+          operationalForms: context.executionData.operationalFormsStatus || context.executionData.operationalForms || prev.operationalForms,
           consumedSpareParts: hydratedConsumedSpareParts,
           woExecutionId: prev.woExecutionId || context.executionData.woExecutionId || generateWOExecutionId(),
           // Preserve saved previousReading; only use fallback for new WOs
@@ -1150,7 +1153,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
     }
   };
 
-  const handleViewDocument = (documentType: string, docId?: string) => {
+  const handleViewDocument = async (documentType: string, docId?: string) => {
     let targetDoc: any;
     if (docId) {
       targetDoc = woDocuments.find(d => d.id === docId);
@@ -1173,13 +1176,15 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
     }
 
     if (fetchUrl) {
-      setPreviewDoc({
-        id: fetchId || targetDoc.fileKey,
-        fileName: targetDoc.fileName || targetDoc.name || 'Document',
-        fileType: targetDoc.fileType || targetDoc.type || 'application/octet-stream',
-        fileSize: targetDoc.fileSize,
-        fetchUrl,
-      });
+      try {
+        const response = await fetch(fetchUrl);
+        if (!response.ok) throw new Error('Failed to retrieve document');
+        const result = await response.json();
+        window.open(result.dataUrl || result.url || fetchUrl, '_blank');
+      } catch (error) {
+        console.error('View error:', error);
+        window.open(fetchUrl, '_blank');
+      }
     }
   };
 
@@ -1588,7 +1593,10 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
       const saveExecutionData = {
         ...executionData,
         // Sync runningHours with currentReading for backend storage
-        runningHours: runningHoursValue || executionData.runningHours
+        runningHours: runningHoursValue || executionData.runningHours,
+        riskAssessmentStatus: executionData.riskAssessment,
+        safetyChecklistsStatus: executionData.safetyChecklists,
+        operationalFormsStatus: executionData.operationalForms,
       };
       
       response = await fetch(`/technical/api/work-orders/${workOrderId}`, {
@@ -2794,7 +2802,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                         variant="outline"
                         size="sm"
                         onClick={() => handleUploadDocument('riskAssessment', riskAssessmentFileRef)}
-                        disabled={uploadingDocType !== null}
+                        disabled={uploadingDocType !== null || executionData.riskAssessment !== "Yes"}
                         data-testid="button-upload-risk-assessment"
                       >
                         {uploadingDocType === 'riskAssessment' ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <Upload className="h-4 w-4 mr-1" />}
@@ -2881,7 +2889,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                         variant="outline"
                         size="sm"
                         onClick={() => handleUploadDocument('safetyChecklist', safetyChecklistFileRef)}
-                        disabled={uploadingDocType !== null}
+                        disabled={uploadingDocType !== null || executionData.safetyChecklists !== "Yes"}
                         data-testid="button-upload-safety-checklist"
                       >
                         {uploadingDocType === 'safetyChecklist' ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <Upload className="h-4 w-4 mr-1" />}
@@ -2968,7 +2976,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                         variant="outline"
                         size="sm"
                         onClick={() => handleUploadDocument('operationalForm', operationalFormFileRef)}
-                        disabled={uploadingDocType !== null}
+                        disabled={uploadingDocType !== null || executionData.operationalForms !== "Yes"}
                         data-testid="button-upload-operational-form"
                       >
                         {uploadingDocType === 'operationalForm' ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <Upload className="h-4 w-4 mr-1" />}

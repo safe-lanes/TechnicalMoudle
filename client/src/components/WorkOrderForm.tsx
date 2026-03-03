@@ -2106,15 +2106,15 @@ const WorkOrderForm: React.FC<WorkOrderFormProps> = ({
                         </div>
                         <div className="col-span-3 flex items-center gap-4">
                           <label className="flex items-center gap-2">
-                            <input type="radio" name="riskAssessment" value="yes" defaultChecked className="text-blue-600" />
+                            <input type="radio" name="riskAssessment" value="Yes" checked={executionData.riskAssessment === "Yes"} onChange={() => handleExecutionChange('riskAssessment', 'Yes')} className="text-blue-600" />
                             <span className="text-sm">Yes</span>
                           </label>
                           <label className="flex items-center gap-2">
-                            <input type="radio" name="riskAssessment" value="no" className="text-blue-600" />
+                            <input type="radio" name="riskAssessment" value="No" checked={executionData.riskAssessment === "No"} onChange={() => handleExecutionChange('riskAssessment', 'No')} className="text-blue-600" />
                             <span className="text-sm">No</span>
                           </label>
                           <label className="flex items-center gap-2">
-                            <input type="radio" name="riskAssessment" value="na" className="text-blue-600" />
+                            <input type="radio" name="riskAssessment" value="NA" checked={executionData.riskAssessment === "NA"} onChange={() => handleExecutionChange('riskAssessment', 'NA')} className="text-blue-600" />
                             <span className="text-sm">NA</span>
                           </label>
                         </div>
@@ -2131,6 +2131,7 @@ const WorkOrderForm: React.FC<WorkOrderFormProps> = ({
                             size="sm" 
                             className="text-xs"
                             onClick={() => handleUploadDocument('riskAssessment', riskAssessmentFileRef)}
+                            disabled={executionData.riskAssessment !== "Yes"}
                             data-testid="button-upload-risk-assessment"
                           >
                             <Upload className="h-3 w-3 mr-1" />
@@ -2166,15 +2167,15 @@ const WorkOrderForm: React.FC<WorkOrderFormProps> = ({
                         </div>
                         <div className="col-span-3 flex items-center gap-4">
                           <label className="flex items-center gap-2">
-                            <input type="radio" name="safetyChecklists" value="yes" defaultChecked className="text-blue-600" />
+                            <input type="radio" name="safetyChecklists" value="Yes" checked={executionData.safetyChecklists === "Yes"} onChange={() => handleExecutionChange('safetyChecklists', 'Yes')} className="text-blue-600" />
                             <span className="text-sm">Yes</span>
                           </label>
                           <label className="flex items-center gap-2">
-                            <input type="radio" name="safetyChecklists" value="no" className="text-blue-600" />
+                            <input type="radio" name="safetyChecklists" value="No" checked={executionData.safetyChecklists === "No"} onChange={() => handleExecutionChange('safetyChecklists', 'No')} className="text-blue-600" />
                             <span className="text-sm">No</span>
                           </label>
                           <label className="flex items-center gap-2">
-                            <input type="radio" name="safetyChecklists" value="na" className="text-blue-600" />
+                            <input type="radio" name="safetyChecklists" value="NA" checked={executionData.safetyChecklists === "NA"} onChange={() => handleExecutionChange('safetyChecklists', 'NA')} className="text-blue-600" />
                             <span className="text-sm">NA</span>
                           </label>
                         </div>
@@ -2191,6 +2192,7 @@ const WorkOrderForm: React.FC<WorkOrderFormProps> = ({
                             size="sm" 
                             className="text-xs"
                             onClick={() => handleUploadDocument('safetyChecklist', safetyChecklistFileRef)}
+                            disabled={executionData.safetyChecklists !== "Yes"}
                             data-testid="button-upload-safety-checklist"
                           >
                             <Upload className="h-3 w-3 mr-1" />
@@ -2226,15 +2228,15 @@ const WorkOrderForm: React.FC<WorkOrderFormProps> = ({
                         </div>
                         <div className="col-span-3 flex items-center gap-4">
                           <label className="flex items-center gap-2">
-                            <input type="radio" name="operationalForms" value="yes" checked={executionData.operationalForms === "Yes"} onChange={() => handleExecutionChange('operationalForms', 'Yes')} className="text-blue-600" />
+                            <input type="radio" name="operationalForms" value="Yes" checked={executionData.operationalForms === "Yes"} onChange={() => handleExecutionChange('operationalForms', 'Yes')} className="text-blue-600" />
                             <span className="text-sm">Yes</span>
                           </label>
                           <label className="flex items-center gap-2">
-                            <input type="radio" name="operationalForms" value="no" className="text-blue-600" />
+                            <input type="radio" name="operationalForms" value="No" checked={executionData.operationalForms === "No"} onChange={() => handleExecutionChange('operationalForms', 'No')} className="text-blue-600" />
                             <span className="text-sm">No</span>
                           </label>
                           <label className="flex items-center gap-2">
-                            <input type="radio" name="operationalForms" value="na" className="text-blue-600" />
+                            <input type="radio" name="operationalForms" value="NA" checked={executionData.operationalForms === "NA"} onChange={() => handleExecutionChange('operationalForms', 'NA')} className="text-blue-600" />
                             <span className="text-sm">NA</span>
                           </label>
                         </div>
@@ -2251,6 +2253,7 @@ const WorkOrderForm: React.FC<WorkOrderFormProps> = ({
                             size="sm" 
                             className="text-xs"
                             onClick={() => handleUploadDocument('operationalForm', operationalFormFileRef)}
+                            disabled={executionData.operationalForms !== "Yes"}
                             data-testid="button-upload-operational-form"
                           >
                             <Upload className="h-3 w-3 mr-1" />
