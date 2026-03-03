@@ -1,0 +1,91 @@
+Prompt for Replit – Fix Conditional Upload Visibility & Save Selection in Work Order (B1 Section)
+
+Module
+
+Work Order Form → B1. Risk Assessment, Checklists & Records
+
+Issue 1: Conditional Upload Option Visibility
+Current Problem
+
+The Upload option is visible irrespective of the selected value (Yes / No / NA).
+
+Required Behavior
+
+The Upload option must appear only if the field is marked as “Yes.”
+
+If the selection is:
+
+No → Upload option must be hidden.
+
+NA → Upload option must be hidden.
+
+Upload field must dynamically show/hide based on selection (without page reload).
+
+Implementation Requirements
+
+Add conditional rendering logic:
+
+If value === 'Yes' → Show Upload control.
+
+Else → Hide Upload control.
+
+Ensure state resets:
+
+If user changes from “Yes” to “No” or “NA,” any uploaded file reference must be cleared (if business logic requires).
+
+Issue 2: Selection Not Saving (Tick Mark Persistence Issue)
+Current Problem
+
+The selected option (Yes / No / NA) and the tick mark added in this section are not being saved.
+
+Required Behavior
+
+The selected option must:
+
+Be saved in the database.
+
+Persist after form save.
+
+Reload correctly when reopening the Work Order.
+
+The tick mark indicator must reflect the saved value.
+
+Backend Requirements
+
+Ensure:
+
+Proper binding of radio/checkbox value to backend field.
+
+API payload includes selected value.
+
+Database column is updated correctly.
+
+Confirm:
+
+No state reset is happening after save.
+
+No mismatch between frontend field name and backend column name.
+
+Expected Final Behavior
+
+User selects “Yes” → Upload option appears.
+
+User selects “No” or “NA” → Upload option disappears.
+
+User adds tick mark → Saves Work Order.
+
+On reopening → Selected value and tick mark remain correctly saved and displayed.
+
+Upload option visibility matches saved value.
+
+Validation & Testing
+
+Test cases to verify:
+
+Select Yes → Upload visible → Save → Reopen → Upload visible.
+
+Select No → Upload hidden → Save → Reopen → Upload hidden.
+
+Change Yes → No → Save → Reopen → Upload hidden.
+
+Confirm database reflects correct saved values.
