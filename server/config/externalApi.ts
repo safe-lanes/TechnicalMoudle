@@ -1,19 +1,74 @@
-const DEFAULT_DEV_URL = 'https://dev.sl-sail.com/b/api/v1/crewmasterdata/getallmasterdata';
+type AppEnv = 'local' | 'dev' | 'production';
+
+const VALID_APP_ENVS: AppEnv[] = ['local', 'dev', 'production'];
+
+function resolveAppEnv(): AppEnv {
+  const appEnv = process.env.APP_ENV;
+
+  if (appEnv) {
+    if (!VALID_APP_ENVS.includes(appEnv as AppEnv)) {
+      throw new Error(
+        `[Environment] FATAL: Invalid APP_ENV="${appEnv}". Must be one of: ${VALID_APP_ENVS.join(', ')}`
+      );
+    }
+    return appEnv as AppEnv;
+  }
+
+  const nodeEnv = process.env.NODE_ENV;
+  let inferred: AppEnv;
+
+  if (nodeEnv === 'production') {
+    inferred = 'production';
+  } else {
+    inferred = 'local';
+  }
+
+  console.warn(
+    `[Environment] WARNING: APP_ENV is not set. Inferred "${inferred}" from NODE_ENV="${nodeEnv || 'undefined'}". Set APP_ENV explicitly for reliable environment detection.`
+  );
+
+  return inferred;
+}
+
+function maskUrl(url: string): string {
+  try {
+    const parsed = new URL(url);
+    return parsed.hostname;
+  } catch {
+    return url.substring(0, 30) + '...';
+  }
+}
+
+export const APP_ENV = resolveAppEnv();
 
 function getExternalMasterDataBaseUrl(): string {
-  const envUrl = process.env.EXTERNAL_MASTER_DATA_URL;
+  const devUrl = process.env.EXTERNAL_MASTER_DATA_URL_DEV;
+  const prodUrl = process.env.EXTERNAL_MASTER_DATA_URL_PROD;
 
-  if (envUrl) {
-    return envUrl.replace(/\/+$/, '');
+  let selectedUrl: string | undefined;
+
+  if (APP_ENV === 'local' || APP_ENV === 'dev') {
+    if (!devUrl) {
+      throw new Error(
+        `[ExternalAPI] FATAL: EXTERNAL_MASTER_DATA_URL_DEV is not set. Required when APP_ENV="${APP_ENV}". Set this environment variable before starting the server.`
+      );
+    }
+    selectedUrl = devUrl;
+  } else {
+    if (!prodUrl) {
+      throw new Error(
+        `[ExternalAPI] FATAL: EXTERNAL_MASTER_DATA_URL_PROD is not set. Required when APP_ENV="production". Set this environment variable before starting the server.`
+      );
+    }
+    selectedUrl = prodUrl;
   }
 
-  if (process.env.NODE_ENV === 'production') {
-    console.warn(
-      '[ExternalAPI] WARNING: EXTERNAL_MASTER_DATA_URL is not set in production. Falling back to dev URL.'
-    );
-  }
+  const cleanUrl = selectedUrl.replace(/\/+$/, '');
 
-  return DEFAULT_DEV_URL;
+  console.log(`[Environment] APP_ENV=${APP_ENV}`);
+  console.log(`[ExternalAPI] Using ${APP_ENV === 'production' ? 'PRODUCTION' : 'DEV'} master data URL (${maskUrl(cleanUrl)})`);
+
+  return cleanUrl;
 }
 
 export const EXTERNAL_MASTER_DATA_BASE_URL = getExternalMasterDataBaseUrl();

@@ -44,4 +44,6 @@ expertMode = true
 [userenv]
 
 [userenv.shared]
-EXTERNAL_MASTER_DATA_URL = "https://dev.sl-sail.com/b/api/v1/crewmasterdata/getallmasterdata"
+APP_ENV = "dev"
+EXTERNAL_MASTER_DATA_URL_DEV = "https://dev.sl-sail.com/b/api/v1/crewmasterdata/getallmasterdata"
+EXTERNAL_MASTER_DATA_URL_PROD = "https://prod.sl-sail.com/b/api/v1/crewmasterdata/getallmasterdata"
