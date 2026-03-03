@@ -302,7 +302,10 @@ export async function syncWorkOrderStatus(req: Request, res: Response) {
 export async function syncMasters(req: Request, res: Response) {
   console.log('🔄 Starting master data sync...');
 
-  const domain = req.body.domain || 'rsms';
+  const domain = req.body.domain;
+  if (!domain || typeof domain !== 'string' || domain.trim().length === 0) {
+    return res.status(400).json({ error: 'Missing required "domain" parameter in request body.' });
+  }
 
   const stats = {
     vessels: { inserted: 0, updated: 0, skipped: 0, errors: [] as string[] },

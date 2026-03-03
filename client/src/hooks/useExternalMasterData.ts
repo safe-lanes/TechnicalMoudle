@@ -8,8 +8,18 @@ function buildProxyUrl(endpoint: string, domain: string): string {
   return `/technical/api/external/master-data/${endpoint}?domain=${encodeURIComponent(domain)}`;
 }
 
-function getDomain(): string {
-  return localStorage.getItem('domain') || 'rsms';
+export function getDomain(): string {
+  try {
+    const domain = localStorage.getItem('domain');
+    if (domain && domain.trim().length > 0) {
+      return domain.trim();
+    }
+    console.warn('[getDomain] "domain" key not found or empty in localStorage. External API calls may fail.');
+    return '';
+  } catch (e) {
+    console.warn('[getDomain] Failed to read "domain" from localStorage:', e);
+    return '';
+  }
 }
 
 export const useLocalVessels = (options?: UseExternalDataOptions) => {

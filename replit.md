@@ -16,6 +16,7 @@ Preferred communication style: Simple, everyday language.
 -   **Database Safety Patterns**: Migrations include safety guards (`IF NOT EXISTS`, `IF EXISTS`) and orphan cleanup procedures before adding foreign key constraints.
 -   **API Route Prefix**: All API endpoints must use the `/technical/api` prefix.
 -   **Vessel Data Source Strategy**: The system supports fetching vessel data from both local and external sources, with a robust fallback mechanism for identifying vessels by various ID formats.
+-   **Domain Parameter Requirement**: All external master data API calls require an explicit `domain` parameter. The frontend reads domain from `localStorage.getItem('domain')` (set by the parent Sail-ERP app) and passes it as a query parameter to the backend. No hardcoded domain fallbacks are used — backend returns 400 if domain is missing.
 
 ### Tech Stack
 -   **Frontend**: React 18, TypeScript, Vite, Tailwind CSS, shadcn/ui, TanStack Query, Wouter.

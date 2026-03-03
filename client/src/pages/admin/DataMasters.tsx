@@ -22,6 +22,7 @@ import {
   useExternalCrewPools,
   useExternalAppraisalTypes,
   useExternalUsers,
+  getDomain,
 } from "@/hooks/useExternalMasterData";
 
 interface ColumnDef {
@@ -362,7 +363,11 @@ export default function DataMasters() {
   // apiRequest throws on non-OK responses, so errors are caught by onError handler
   const syncMastersMutation = useMutation({
     mutationFn: async () => {
-      const response = await apiRequest("POST", "/technical/api/admin/sync-masters", {});
+      const domain = getDomain();
+      if (!domain) {
+        throw new Error('Domain not found in localStorage. Cannot sync master data.');
+      }
+      const response = await apiRequest("POST", "/technical/api/admin/sync-masters", { domain });
       return response.json();
     },
     onSuccess: (data) => {

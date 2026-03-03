@@ -41,7 +41,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       return res.status(400).json({ error: `Unknown endpoint: ${endpoint}` });
     }
 
-    const domain = (req.query.domain as string) || 'rsms';
+    const domain = req.query.domain as string;
+    if (!domain || domain.trim().length === 0) {
+      return res.status(400).json({ error: 'Missing required "domain" query parameter.' });
+    }
 
     try {
       const { buildExternalMasterDataUrl } = await import('./config/externalApi');
@@ -99,7 +102,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     app.post("/dev/seed/recurring-defects", async (req, res) => {
       try {
         const { buildExternalMasterDataUrl } = await import('./config/externalApi');
-        const domain = (req.query.domain as string) || 'rsms';
+        const domain = (req.query.domain as string) || '';
         let externalVessels: Array<{ vuid: string; vessel: string; imo_number?: string; vessel_type_name?: string }> = [];
 
         try {
