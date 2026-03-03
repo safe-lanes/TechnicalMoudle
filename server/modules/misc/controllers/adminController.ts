@@ -1,9 +1,18 @@
 import { Request, Response } from 'express';
 import { storage } from '../../../storage';
-import { getPool } from '../../../db';
+import { getDb } from '../../../db';
 import { computeWorkOrderStatus } from '@shared/workOrders/status';
 import { WORK_ORDER_THRESHOLDS } from '@shared/workOrders/constants';
 import { buildExternalMasterDataUrl } from '../../../config/externalApi';
+import { sql } from 'drizzle-orm';
+import {
+  vessels as vesselsTable,
+  vesselTypes as vesselTypesTable,
+  additionalGroups as additionalGroupsTable,
+  ports as portsTable,
+  fleetGroups as fleetGroupsTable,
+  masterUsers as masterUsersTable,
+} from '@shared/schema';
 
 // ── GET/POST /admin/job-due-scan ──
 
@@ -326,27 +335,49 @@ export async function syncMasters(req: Request, res: Response) {
     return null;
   };
 
-  const pool = await getPool();
+  const db = await getDb();
+  const now = new Date();
 
   // 1. Sync Vessels
   console.log('📦 Syncing Vessel Master...');
-  const vessels = await fetchExternal('vessels', 'vessels');
-  for (const v of vessels) {
+  const fetchedVessels = await fetchExternal('vessels', 'vessels');
+  for (const v of fetchedVessels) {
     try {
       const entryId = getEntryId(v, ['vuid', 'vesselId']);
       if (!entryId) { stats.vessels.skipped++; continue; }
       const name = getFieldValue(v, ['vessel', 'vesselName', 'name']) || 'Unknown';
       const imoNumber = getFieldValue(v, ['imo_number', 'imoNumber', 'imo_no', 'imo']);
       const vesselType = getFieldValue(v, ['vessel_type_name', 'vesselTypeName', 'vessel_type', 'vesselType', 'type']);
-      await pool.query(`INSERT INTO vessels (id, vuuid, name, code, imo_number, vessel_type, is_active, created_at, updated_at) VALUES ($1, $1, $2, $3, $4, $5, true, NOW(), NOW()) ON CONFLICT (id) DO UPDATE SET name = EXCLUDED.name, code = EXCLUDED.code, imo_number = EXCLUDED.imo_number, vessel_type = EXCLUDED.vessel_type, is_active = true, updated_at = NOW(), vuuid = COALESCE(vessels.vuuid, EXCLUDED.vuuid)`, [entryId, name, entryId, imoNumber, vesselType]);
+      await db.insert(vesselsTable).values({
+        id: entryId,
+        vuuid: entryId,
+        name,
+        code: entryId,
+        imoNumber,
+        vesselType,
+        isActive: true,
+        createdAt: now,
+        updatedAt: now,
+      }).onConflictDoUpdate({
+        target: vesselsTable.id,
+        set: {
+          name,
+          code: entryId,
+          imoNumber,
+          vesselType,
+          isActive: true,
+          updatedAt: now,
+          vuuid: sql`COALESCE(${vesselsTable.vuuid}, EXCLUDED.vuuid)`,
+        },
+      });
       stats.vessels.updated++;
     } catch (e: any) { stats.vessels.errors.push(`Vessel ${v.vuid || v.vesselId}: ${e.message}`); }
   }
 
   // 2. Sync Vessel Types
   console.log('📦 Syncing Vessel Types...');
-  const vesselTypes = await fetchExternal('vesseltypes', 'vesseltypes');
-  for (const vt of vesselTypes) {
+  const fetchedVesselTypes = await fetchExternal('vesseltypes', 'vesseltypes');
+  for (const vt of fetchedVesselTypes) {
     try {
       const entryId = getEntryId(vt, ['vtuid', 'id', 'vesselTypeId']);
       if (!entryId) { stats.vesselTypes.skipped++; continue; }
@@ -359,43 +390,70 @@ export async function syncMasters(req: Request, res: Response) {
       if (vt.dry === 1) classifications.push('Dry');
       if (vt.container === 1) classifications.push('Container');
       const classification = classifications.length > 0 ? classifications.join(', ') : null;
-      await pool.query(`INSERT INTO vessel_types (id, name, classification, synced_at, updated_at) VALUES ($1, $2, $3, NOW(), NOW()) ON CONFLICT (id) DO UPDATE SET name = EXCLUDED.name, classification = EXCLUDED.classification, synced_at = NOW(), updated_at = NOW()`, [entryId, name, classification]);
+      await db.insert(vesselTypesTable).values({
+        id: entryId,
+        name,
+        classification,
+        syncedAt: now,
+        updatedAt: now,
+      }).onConflictDoUpdate({
+        target: vesselTypesTable.id,
+        set: { name, classification, syncedAt: now, updatedAt: now },
+      });
       stats.vesselTypes.updated++;
     } catch (e: any) { stats.vesselTypes.errors.push(`VesselType ${vt.vtuid}: ${e.message}`); }
   }
 
   // 3. Sync Additional Groups
   console.log('📦 Syncing Additional Groups...');
-  const additionalGroups = await fetchExternal('additionalgroups', 'additionalGroups');
-  for (const ag of additionalGroups) {
+  const fetchedAdditionalGroups = await fetchExternal('additionalgroups', 'additionalGroups');
+  for (const ag of fetchedAdditionalGroups) {
     try {
       const entryId = getEntryId(ag, ['id', 'groupId', 'additional_group_id']);
       if (!entryId) { stats.additionalGroups.skipped++; continue; }
       const name = getFieldValue(ag, ['group_name', 'groupName', 'name', 'additional_group_name']) || 'Unknown';
       const description = getFieldValue(ag, ['vessels', 'group_description', 'desc']);
-      await pool.query(`INSERT INTO additional_groups (id, name, description, synced_at, updated_at) VALUES ($1, $2, $3, NOW(), NOW()) ON CONFLICT (id) DO UPDATE SET name = EXCLUDED.name, description = EXCLUDED.description, synced_at = NOW(), updated_at = NOW()`, [entryId, name, description]);
+      await db.insert(additionalGroupsTable).values({
+        id: entryId,
+        name,
+        description,
+        syncedAt: now,
+        updatedAt: now,
+      }).onConflictDoUpdate({
+        target: additionalGroupsTable.id,
+        set: { name, description, syncedAt: now, updatedAt: now },
+      });
       stats.additionalGroups.updated++;
     } catch (e: any) { stats.additionalGroups.errors.push(`AdditionalGroup ${ag.id}: ${e.message}`); }
   }
 
   // 4. Sync Ports
   console.log('📦 Syncing Ports...');
-  const ports = await fetchExternal('ports', 'ports');
-  for (const p of ports) {
+  const fetchedPorts = await fetchExternal('ports', 'ports');
+  for (const p of fetchedPorts) {
     try {
       const entryId = getEntryId(p, ['puid', 'id', 'portId']);
       if (!entryId) { stats.ports.skipped++; continue; }
       const name = getFieldValue(p, ['port_name', 'portName', 'name']) || 'Unknown';
       const country = getFieldValue(p, ['country_name', 'countryName', 'country']);
-      await pool.query(`INSERT INTO ports (id, name, country, synced_at, updated_at) VALUES ($1, $2, $3, NOW(), NOW()) ON CONFLICT (id) DO UPDATE SET name = EXCLUDED.name, country = EXCLUDED.country, synced_at = NOW(), updated_at = NOW()`, [entryId, name, country]);
+      await db.insert(portsTable).values({
+        id: entryId,
+        name,
+        country,
+        syncedAt: now,
+        updatedAt: now,
+      }).onConflictDoUpdate({
+        target: portsTable.id,
+        set: { name, country, syncedAt: now, updatedAt: now },
+      });
       stats.ports.updated++;
     } catch (e: any) { stats.ports.errors.push(`Port ${p.puid}: ${e.message}`); }
   }
 
   // 5. Sync Users
   console.log('📦 Syncing Users...');
-  const users = await fetchExternal('users', 'users');
-  for (const u of users) {
+  const fetchedUsers = await fetchExternal('users', 'users');
+  for (const u of fetchedUsers) {
     try {
       const entryId = getEntryId(u, ['uuid', 'id', 'userId']);
       if (!entryId) { stats.users.skipped++; continue; }
@@ -405,21 +463,43 @@ export async function syncMasters(req: Request, res: Response) {
       const userType = getFieldValue(u, ['user_type', 'userType', 'type']);
       const department = getFieldValue(u, ['department', 'department_name', 'dept']);
       const email = getFieldValue(u, ['email', 'email_address', 'user_email']);
-      await pool.query(`INSERT INTO master_users (id, full_name, role, designation, user_type, department, email, synced_at, updated_at) VALUES ($1, $2, $3, $4, $5, $6, $7, NOW(), NOW()) ON CONFLICT (id) DO UPDATE SET full_name = EXCLUDED.full_name, role = EXCLUDED.role, designation = EXCLUDED.designation, user_type = EXCLUDED.user_type, department = EXCLUDED.department, email = EXCLUDED.email, synced_at = NOW(), updated_at = NOW()`, [entryId, fullName, role, designation, userType, department, email]);
+      await db.insert(masterUsersTable).values({
+        id: entryId,
+        fullName,
+        role,
+        designation,
+        userType,
+        department,
+        email,
+        syncedAt: now,
+        updatedAt: now,
+      }).onConflictDoUpdate({
+        target: masterUsersTable.id,
+        set: { fullName, role, designation, userType, department, email, syncedAt: now, updatedAt: now },
+      });
       stats.users.updated++;
     } catch (e: any) { stats.users.errors.push(`User ${u.uuid}: ${e.message}`); }
   }
 
   // 6. Sync Fleet Groups
   console.log('📦 Syncing Fleet Groups...');
-  const fleetGroups = await fetchExternal('fleetgroups', 'fleetGroups');
-  for (const fg of fleetGroups) {
+  const fetchedFleetGroups = await fetchExternal('fleetgroups', 'fleetGroups');
+  for (const fg of fetchedFleetGroups) {
     try {
       const entryId = getEntryId(fg, ['fleet_group_id', 'id', 'fleetGroupId']);
       if (!entryId) { stats.fleetGroups.skipped++; continue; }
       const name = getFieldValue(fg, ['fleet_group_name', 'fleetGroupName', 'name', 'group_name']) || 'Unknown';
       const description = getFieldValue(fg, ['vessels', 'fleet_group_description', 'desc']);
-      await pool.query(`INSERT INTO fleet_groups (id, name, description, synced_at, updated_at) VALUES ($1, $2, $3, NOW(), NOW()) ON CONFLICT (id) DO UPDATE SET name = EXCLUDED.name, description = EXCLUDED.description, synced_at = NOW(), updated_at = NOW()`, [entryId, name, description]);
+      await db.insert(fleetGroupsTable).values({
+        id: entryId,
+        name,
+        description,
+        syncedAt: now,
+        updatedAt: now,
+      }).onConflictDoUpdate({
+        target: fleetGroupsTable.id,
+        set: { name, description, syncedAt: now, updatedAt: now },
+      });
       stats.fleetGroups.updated++;
     } catch (e: any) { stats.fleetGroups.errors.push(`FleetGroup ${fg.fleet_group_id}: ${e.message}`); }
   }

@@ -43,6 +43,18 @@ The system is built with a modular, domain-driven approach, organizing backend c
     -   Dev server: `APP_ENV=dev`, set `EXTERNAL_MASTER_DATA_URL_DEV` only.
     -   Production: `APP_ENV=production`, set `EXTERNAL_MASTER_DATA_URL_PROD` only.
 
+## Master Data Tables (Drizzle ORM)
+All 5 master tables have proper Drizzle schema definitions in `shared/schema.ts`:
+-   `vesselTypes` — vessel type classifications (19 rows)
+-   `additionalGroups` — grouping metadata (15 rows)
+-   `ports` — worldwide port reference data (9,500+ rows)
+-   `fleetGroups` — fleet grouping metadata (13 rows)
+-   `masterUsers` — user directory from external system (348 rows)
+
+Each table follows the pattern: text PK (`id`), domain columns, `syncedAt`/`createdAt`/`updatedAt` timestamps with `defaultNow()`, insert schema (omitting auto timestamps), and select/insert types. Named indexes exist on `name` columns.
+
+The sync controller (`server/modules/misc/controllers/adminController.ts` → `syncMasters`) uses Drizzle ORM `db.insert().onConflictDoUpdate()` for all master tables (no raw SQL). Triggered via `POST /technical/api/admin/sync-masters`.
+
 ## External Dependencies
 -   **Frontend Libraries:** `@radix-ui/*`, `@tanstack/react-query`, `wouter`, `tailwindcss`, `lucide-react`, `ag-grid-enterprise`, `ag-charts-react`.
 -   **Backend Libraries:** `express`, `drizzle-orm`, `@neondatabase/serverless`, `connect-pg-simple`, `sharp`.

@@ -2885,3 +2885,114 @@ export const insertWorkOrderDocumentSchema = createInsertSchema(workOrderDocumen
 
 export type InsertWorkOrderDocument = z.infer<typeof insertWorkOrderDocumentSchema>;
 export type WorkOrderDocument = typeof workOrderDocuments.$inferSelect;
+
+// =====================================================
+// MASTER DATA TABLES — Synced from External API
+// These tables store master reference data fetched from
+// the external crew master data service via /admin/sync-masters.
+// =====================================================
+
+export const vesselTypes = pgTable("vessel_types", {
+  id: text("id").primaryKey(),
+  name: text("name").notNull(),
+  classification: text("classification"),
+  syncedAt: timestamp("synced_at").notNull().defaultNow(),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+}, (table) => ({
+  nameIdx: index("idx_vessel_types_name").on(table.name),
+}));
+
+export const insertVesselTypeSchema = createInsertSchema(vesselTypes).omit({
+  syncedAt: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type InsertVesselType = z.infer<typeof insertVesselTypeSchema>;
+export type VesselType = typeof vesselTypes.$inferSelect;
+
+export const additionalGroups = pgTable("additional_groups", {
+  id: text("id").primaryKey(),
+  name: text("name").notNull(),
+  description: text("description"),
+  syncedAt: timestamp("synced_at").notNull().defaultNow(),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+}, (table) => ({
+  nameIdx: index("idx_additional_groups_name").on(table.name),
+}));
+
+export const insertAdditionalGroupSchema = createInsertSchema(additionalGroups).omit({
+  syncedAt: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type InsertAdditionalGroup = z.infer<typeof insertAdditionalGroupSchema>;
+export type AdditionalGroup = typeof additionalGroups.$inferSelect;
+
+export const ports = pgTable("ports", {
+  id: text("id").primaryKey(),
+  name: text("name").notNull(),
+  country: text("country"),
+  syncedAt: timestamp("synced_at").notNull().defaultNow(),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+}, (table) => ({
+  nameIdx: index("idx_ports_name").on(table.name),
+}));
+
+export const insertPortSchema = createInsertSchema(ports).omit({
+  syncedAt: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type InsertPort = z.infer<typeof insertPortSchema>;
+export type Port = typeof ports.$inferSelect;
+
+export const fleetGroups = pgTable("fleet_groups", {
+  id: text("id").primaryKey(),
+  name: text("name").notNull(),
+  description: text("description"),
+  syncedAt: timestamp("synced_at").notNull().defaultNow(),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+}, (table) => ({
+  nameIdx: index("idx_fleet_groups_name").on(table.name),
+}));
+
+export const insertFleetGroupSchema = createInsertSchema(fleetGroups).omit({
+  syncedAt: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type InsertFleetGroup = z.infer<typeof insertFleetGroupSchema>;
+export type FleetGroup = typeof fleetGroups.$inferSelect;
+
+export const masterUsers = pgTable("master_users", {
+  id: text("id").primaryKey(),
+  fullName: text("full_name").notNull(),
+  role: text("role"),
+  designation: text("designation"),
+  userType: text("user_type"),
+  department: text("department"),
+  email: text("email"),
+  syncedAt: timestamp("synced_at").notNull().defaultNow(),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+}, (table) => ({
+  fullNameIdx: index("idx_master_users_full_name").on(table.fullName),
+  emailIdx: index("idx_master_users_email").on(table.email),
+}));
+
+export const insertMasterUserSchema = createInsertSchema(masterUsers).omit({
+  syncedAt: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type InsertMasterUser = z.infer<typeof insertMasterUserSchema>;
+export type MasterUser = typeof masterUsers.$inferSelect;
