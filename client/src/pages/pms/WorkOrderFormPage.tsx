@@ -56,6 +56,7 @@ import { PartHeader } from '@/components/PartHeader';
 import { WorkOrderDataTable } from '@/components/WorkOrderDataTable';
 import { StatusPill } from '@/components/StatusPill';
 import { Marker } from "@/components/Marker";
+import { DocumentPreviewModal } from "@/components/DocumentPreviewModal";
 
 export interface HistoryWorkOrderPayload {
   template: WorkOrder;
@@ -319,6 +320,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
   const [documentToDelete, setDocumentToDelete] = useState<{type: string, fileKey: string, documentId?: string} | null>(null);
   const [uploadingDocType, setUploadingDocType] = useState<string | null>(null);
   const [woDocuments, setWoDocuments] = useState<Array<{id: string, workOrderId: string, documentType: string, fileName: string, fileKey: string, fileType: string, fileSize: number, uploadedBy: string, uploadedAt: string}>>([]);
+  const [previewDoc, setPreviewDoc] = useState<{id: string, fileName: string, fileType: string, fileSize?: number, fetchUrl?: string} | null>(null);
   
   const [editingConsumedSparePart, setEditingConsumedSparePart] = useState<number | null>(null);
   
@@ -1148,19 +1150,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
     }
   };
 
-  const dataUrlToBlob = (dataUrl: string): Blob => {
-    const [header, base64Data] = dataUrl.split(',');
-    const mimeMatch = header.match(/data:([^;]+)/);
-    const mime = mimeMatch ? mimeMatch[1] : 'application/octet-stream';
-    const binaryStr = atob(base64Data);
-    const bytes = new Uint8Array(binaryStr.length);
-    for (let i = 0; i < binaryStr.length; i++) {
-      bytes[i] = binaryStr.charCodeAt(i);
-    }
-    return new Blob([bytes], { type: mime });
-  };
-
-  const handleViewDocument = async (documentType: string, docId?: string) => {
+  const handleViewDocument = (documentType: string, docId?: string) => {
     let targetDoc: any;
     if (docId) {
       targetDoc = woDocuments.find(d => d.id === docId);
@@ -1172,33 +1162,23 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
     }
     if (!targetDoc) return;
 
-    try {
-      const fetchId = targetDoc.id || null;
-      let dataUrl: string | null = null;
-      if (fetchId) {
-        const response = await fetch(`/technical/api/work-order-documents/${fetchId}/download`);
-        if (!response.ok) throw new Error('Failed to retrieve document');
-        const result = await response.json();
-        dataUrl = result.dataUrl;
-      } else if (targetDoc.fileKey) {
-        const fileKeyEncoded = encodeURIComponent(targetDoc.fileKey.substring(1));
-        const response = await fetch(`/technical/api/documents/${fileKeyEncoded}`);
-        if (!response.ok) throw new Error('Failed to retrieve document');
-        const result = await response.json();
-        dataUrl = result.dataUrl;
-      }
+    const fetchId = targetDoc.id || null;
+    let fetchUrl: string | undefined;
 
-      if (dataUrl) {
-        const blob = dataUrlToBlob(dataUrl);
-        const blobUrl = URL.createObjectURL(blob);
-        window.open(blobUrl, '_blank');
-      }
-    } catch (error) {
-      console.error('View error:', error);
-      toast({
-        title: "View failed",
-        description: "Failed to open document. Please try again.",
-        variant: "destructive"
+    if (fetchId) {
+      fetchUrl = `/technical/api/work-order-documents/${fetchId}/download`;
+    } else if (targetDoc.fileKey) {
+      const fileKeyEncoded = encodeURIComponent(targetDoc.fileKey.substring(1));
+      fetchUrl = `/technical/api/documents/${fileKeyEncoded}`;
+    }
+
+    if (fetchUrl) {
+      setPreviewDoc({
+        id: fetchId || targetDoc.fileKey,
+        fileName: targetDoc.fileName || targetDoc.name || 'Document',
+        fileType: targetDoc.fileType || targetDoc.type || 'application/octet-stream',
+        fileSize: targetDoc.fileSize,
+        fetchUrl,
       });
     }
   };
@@ -3865,6 +3845,17 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Document Preview Modal */}
+      <DocumentPreviewModal
+        open={!!previewDoc}
+        onOpenChange={(open) => { if (!open) setPreviewDoc(null); }}
+        documentId={previewDoc?.id || null}
+        fileName={previewDoc?.fileName || ''}
+        fileType={previewDoc?.fileType || ''}
+        fileSize={previewDoc?.fileSize}
+        fetchUrl={previewDoc?.fetchUrl}
+      />
 
       {/* Delete Document Confirmation Dialog */}
       <AlertDialog open={deleteDocumentDialogOpen} onOpenChange={setDeleteDocumentDialogOpen}>
