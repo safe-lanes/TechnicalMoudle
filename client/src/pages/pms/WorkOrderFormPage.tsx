@@ -29,7 +29,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { FileText, ArrowLeft, Plus, Eye, Upload, Download, Menu, Check, X, Edit2, Trash2, Copy, Loader2 } from "lucide-react";
+import { FileText, ArrowLeft, Plus, Eye, Upload, Download, Menu, Check, X, Edit2, Trash2, Copy, Loader2, Paperclip } from "lucide-react";
 import sailLogo from "@assets/SAIL logo Transparent_1753957135582.png";
 import {
   Sheet,
@@ -85,18 +85,18 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
   const workOrderIdFromUrl = params?.id;
   const workOrderId = workOrderIdOverride || workOrderIdFromUrl;
   const componentIdFromUrl = newParams?.componentId;
-  
+
   // Determine if this is a "new job" creation flow (Add Job button)
   const isNewJobCreation = !!componentIdFromUrl;
-  
+
   // Check for mode query parameter (e.g., ?mode=template)
   const urlParams = new URLSearchParams(window.location.search);
   const modeFromUrl = urlParams.get('mode') as 'template' | 'execution' | null;
   const resolvedMode = modeFromUrl || mode;
-  
+
   const [isWorkInstructionsOpen, setIsWorkInstructionsOpen] = useState(false);
   const [isMobileNavOpen, setIsMobileNavOpen] = useState(false);
-  
+
   // Minimal A/B navigation matching reference design (hide Part B in template mode)
   const navSteps = resolvedMode === 'template'
     ? [{ id: 'part-a', label: 'A', title: 'Job Details' }]
@@ -104,32 +104,32 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
         { id: 'part-a', label: 'A', title: 'Job Details' },
         { id: 'part-b', label: 'B', title: 'Work Completion Record' }
       ];
-  
+
   const [activeStep, setActiveStep] = useState('part-a');
-  
+
   // Scroll tracking for navigation with IntersectionObserver (only if Part B exists)
   useEffect(() => {
     // Skip scroll tracking in template mode (no Part B)
     if (resolvedMode === 'template') return;
-    
+
     const partAElement = document.getElementById('part-a');
     const partBElement = document.getElementById('part-b');
-    
+
     if (!partAElement || !partBElement) return;
-    
+
     // Check initial position on mount
     const checkInitialPosition = () => {
       const scrollPosition = window.scrollY + 200;
       const partATop = partAElement.offsetTop;
       const partBTop = partBElement.offsetTop;
-      
+
       if (scrollPosition >= partBTop) {
         setActiveStep('part-b');
       } else {
         setActiveStep('part-a');
       }
     };
-    
+
     // IntersectionObserver for continuous tracking
     const observer = new IntersectionObserver(
       (entries) => {
@@ -147,18 +147,18 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
         threshold: 0
       }
     );
-    
+
     observer.observe(partAElement);
     observer.observe(partBElement);
-    
+
     // Check initial position after a short delay to ensure layout is ready
     setTimeout(checkInitialPosition, 100);
-    
+
     return () => {
       observer.disconnect();
     };
   }, [resolvedMode]);
-  
+
   // Use job context endpoint for template mode (viewing job template), 
   // work order context endpoint otherwise
   const { data: jobContext, isLoading: isJobContextLoading } = useQuery({
@@ -170,14 +170,14 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
     queryKey: [`/technical/api/work-orders/${workOrderId}/context`],
     enabled: !!workOrderId && resolvedMode !== 'template'
   });
-  
+
   // Combine contexts: use job context for template mode, work order context otherwise
   const workOrderContext = resolvedMode === 'template' ? jobContext : woContext;
   const isContextLoading = resolvedMode === 'template' ? isJobContextLoading : isWoContextLoading;
 
   // Extract vesselId from context for spares query
   const vesselId = workOrderContext ? (workOrderContext as any).templateData?.vesselId || (workOrderContext as any).workOrder?.vesselId : null;
-  
+
   // Fetch spares inventory for location auto-selection in Part B4
   // IMPORTANT: Uses location/location2 and robLocationA/robLocationB from Spares table per spec
   // Query uses vesselId in path to get vessel-specific spares with live ROB data
@@ -229,11 +229,11 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
   const getAvailableLocationsForSpare = (partCode: string): Array<{ name: string; robValue: number; field: 'location' | 'location2' }> => {
     const spare = sparesInventory.find(s => s.partCode === partCode);
     if (!spare) return []; // No spare found
-    
+
     const locations: Array<{ name: string; robValue: number; field: 'location' | 'location2' }> = [];
     const robA = spare.robLocationA ?? 0;
     const robB = spare.robLocationB ?? 0;
-    
+
     // location -> rob_location_a mapping
     if (spare.location) {
       locations.push({ name: spare.location, robValue: robA, field: 'location' });
@@ -242,24 +242,24 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
     if (spare.location2) {
       locations.push({ name: spare.location2, robValue: robB, field: 'location2' });
     }
-    
+
     return locations;
   };
-  
+
   // Get ROB for a specific location field
   const getRobForLocation = (partCode: string, locationField: 'location' | 'location2'): number => {
     const spare = sparesInventory.find(s => s.partCode === partCode);
     if (!spare) return 0;
     return locationField === 'location' ? (spare.robLocationA ?? 0) : (spare.robLocationB ?? 0);
   };
-  
+
   // Get location name for a specific location field
   const getLocationName = (partCode: string, locationField: 'location' | 'location2'): string | null => {
     const spare = sparesInventory.find(s => s.partCode === partCode);
     if (!spare) return null;
     return locationField === 'location' ? spare.location : spare.location2;
   };
-  
+
   // Get ROB by location name for a specific spare part
   // Used for validation to ensure consumption doesn't exceed available stock
   const getRobByLocationName = (partCode: string, locationName: string): number => {
@@ -282,13 +282,13 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
     if (locations.length === 1) return locations[0].field;
     return null;
   };
-  
+
   const workCarriedOutRef = useRef<HTMLTextAreaElement>(null);
   const [showQuickInputs, setShowQuickInputs] = useState(false);
-  
+
   const [showSmartSuggestions, setShowSmartSuggestions] = useState(false);
   const [smartSuggestions, setSmartSuggestions] = useState<string[]>([]);
-  
+
   const quickAnswers = [
     "Work carried out, found satisfactory.",
     "Checked and tested, no defects observed.",
@@ -301,9 +301,9 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
     "Defect rectified, equipment put back in service.",
     "Cleaning carried out, area left tidy."
   ];
-  
+
   const { isModifyMode, targetId, fieldChanges, trackFieldChange, setOriginalSnapshot } = useModifyMode();
-  
+
   const [editingSparePart, setEditingSparePart] = useState<number | null>(null);
   const [editingTool, setEditingTool] = useState<number | null>(null);
   const [originalSparePart, setOriginalSparePart] = useState<{partNo: string, description: string, quantityRequired: string, remarks: string} | null>(null);
@@ -311,7 +311,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
   const [isSafetyModalOpen, setIsSafetyModalOpen] = useState(false);
   const [newSafetyRequirement, setNewSafetyRequirement] = useState("");
   const [safetyRequirementCategory, setSafetyRequirementCategory] = useState<'ppeRequirements' | 'permitRequirements' | 'otherRequirements'>('ppeRequirements');
-  
+
   const riskAssessmentFileRef = useRef<HTMLInputElement>(null);
   const safetyChecklistFileRef = useRef<HTMLInputElement>(null);
   const operationalFormFileRef = useRef<HTMLInputElement>(null);
@@ -321,9 +321,9 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
   const [uploadingDocType, setUploadingDocType] = useState<string | null>(null);
   const [woDocuments, setWoDocuments] = useState<Array<{id: string, workOrderId: string, documentType: string, fileName: string, fileKey: string, fileType: string, fileSize: number, uploadedBy: string, uploadedAt: string}>>([]);
   const [previewDoc, setPreviewDoc] = useState<{id: string, fileName: string, fileType: string, fileSize?: number, fetchUrl?: string} | null>(null);
-  
+
   const [editingConsumedSparePart, setEditingConsumedSparePart] = useState<number | null>(null);
-  
+
   // Spare parts selection modal state
   const [isSparePartsModalOpen, setIsSparePartsModalOpen] = useState(false);
   const [linkedSpares, setLinkedSpares] = useState<Array<{
@@ -339,22 +339,22 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
     comments: string;
   }>>([]);
   const [isLoadingSpares, setIsLoadingSpares] = useState(false);
-  
+
   // Cache the last Calendar unit selection to preserve user choice when toggling maintenance basis
   const [lastCalendarUnit, setLastCalendarUnit] = useState('Months');
-  
+
   // Form hydration guard - prevent late async data from overwriting user edits
   const hasUserTouchedForm = useRef(false);
   const contextLoadedOnce = useRef(false);
-  
+
   // Approver workflow state
   const [currentWorkOrderStatus, setCurrentWorkOrderStatus] = useState<string>('');
   const [rejectionComments, setRejectionComments] = useState('');
   const [isProcessingApproval, setIsProcessingApproval] = useState(false);
-  
+
   // Track work order type to conditionally skip frequency validation for unplanned WOs
   const [workOrderType, setWorkOrderType] = useState<'Planned' | 'Unplanned'>('Planned');
-  
+
   // Determine if Part A should be read-only (immutable)
   // Per PMS business rules: Part A is a "frozen snapshot" of the job template
   // Part A is read-only when:
@@ -365,7 +365,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
   // 2. Creating a new work order from scratch (no workOrderId)
   const context = workOrderContext as any;
   const isPartAReadOnly = isNewJobCreation ? false : (resolvedMode === 'template' || !!workOrderId);
-  
+
   const isReadOnly = embedded; // Read-only in embedded mode for maintenance history viewing
 
   const [templateData, setTemplateData] = useState({
@@ -498,13 +498,13 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
         console.log('[WorkOrderForm] Skipping context hydration - user has touched form');
         return;
       }
-      
+
       const context = workOrderContext as any;
       if (context.templateData) {
         // Determine the correct frequency unit based on maintenance basis
         let normalizedFrequencyUnit = context.templateData.frequencyUnit;
         const isRunningHours = context.templateData.maintenanceBasis === 'Running Hours';
-        
+
         if (isRunningHours) {
           // Running Hours must always use Hours
           normalizedFrequencyUnit = 'Hours';
@@ -512,12 +512,12 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
           // Calendar basis with missing or Hours unit → default to Months
           normalizedFrequencyUnit = 'Months';
         }
-        
+
         // For Running Hours jobs, use intervalRunningHour as the frequency value
         const frequencyValue = isRunningHours
           ? (context.templateData.intervalRunningHour || context.templateData.frequencyValue || '')
           : (context.templateData.frequencyValue || '');
-        
+
         const normalizedTemplateData = {
           ...context.templateData,
           // Map backend field names to frontend field names
@@ -546,12 +546,12 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
           requiredTools: context.templateData.requiredTools || [],
           safetyRequirements: context.templateData.safetyRequirements || { ppeRequirements: [], permitRequirements: [], otherRequirements: [] }
         };
-        
+
         setTemplateData(prev => ({
           ...prev,
           ...normalizedTemplateData
         }));
-        
+
         // Cache the original calendar unit from backend data (preserve even if currently Running Hours)
         // This ensures we restore the correct unit when toggling from Running Hours back to Calendar
         const originalCalendarUnit = context.templateData.frequencyUnit;
@@ -562,7 +562,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
           // Only default to Months if we're in Calendar mode and have no valid unit to preserve
           setLastCalendarUnit(normalizedFrequencyUnit);
         }
-        
+
         // Set Modify Mode snapshot if enabled
         if (isModifyMode && setOriginalSnapshot) {
           setOriginalSnapshot(normalizedTemplateData);
@@ -586,7 +586,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
           }
           return spare;
         });
-        
+
         // Determine previousReading value:
         // - For existing WOs: use saved previousReading from executionData
         // - For new WOs (no saved previousReading): use component's currentCumulativeRH as initial value
@@ -595,7 +595,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
         const fallbackPreviousReading = (hasNoSavedPreviousReading && context.component?.currentCumulativeRH != null)
           ? String(context.component.currentCumulativeRH)
           : undefined;
-        
+
         // Single consolidated setExecutionData call to prevent React batching race conditions
         setExecutionData(prev => ({
           ...prev,
@@ -616,17 +616,17 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
           previousReading: String(context.component.currentCumulativeRH)
         }));
       }
-      
+
       // Load work order number from context (for Part B display)
       if (context.workOrder?.workOrderNo || context.workOrder?.templateCode) {
         setWorkOrderNo(context.workOrder.workOrderNo || context.workOrder.templateCode);
       }
-      
+
       // Load work order status for approval workflow
       if (context.workOrder?.status) {
         setCurrentWorkOrderStatus(context.workOrder.status);
       }
-      
+
       // Load work order type to conditionally skip frequency validation for unplanned WOs
       // Check multiple sources: explicit workOrderType field, or infer from WO number prefix (UWO- = Unplanned)
       if (context.workOrder?.workOrderType) {
@@ -635,7 +635,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
         // Fallback: detect unplanned WO from number format (UWO-{component_code}-{year}-{increment})
         setWorkOrderType('Unplanned');
       }
-      
+
       // Mark context as loaded once to prevent re-hydration
       contextLoadedOnce.current = true;
     }
@@ -662,10 +662,10 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
   const handleTemplateChange = (field: string, value: string) => {
     // Mark form as touched by user to prevent late async data from overwriting
     hasUserTouchedForm.current = true;
-    
+
     setTemplateData(prev => {
       let finalValue = value;
-      
+
       // Validate frequency value - only accept positive integers (no decimals, no scientific notation)
       if (field === 'frequencyValue') {
         if (value !== '') {
@@ -680,9 +680,9 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
           }
         }
       }
-      
+
       const newData = { ...prev, [field]: finalValue };
-      
+
       // Auto-update frequency unit when maintenance basis changes
       if (field === 'maintenanceBasis') {
         if (value === 'Running Hours') {
@@ -692,16 +692,16 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
           newData.frequencyUnit = lastCalendarUnit || 'Months';
         }
       }
-      
+
       // Cache the calendar unit when it changes (but not when it's Hours)
       if (field === 'frequencyUnit' && value !== 'Hours' && newData.maintenanceBasis === 'Calendar') {
         setLastCalendarUnit(value);
       }
-      
+
       if (isModifyMode && trackFieldChange) {
         trackFieldChange(field, finalValue, (prev as any)[field]);
       }
-      
+
       return newData;
     });
   };
@@ -712,19 +712,19 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
         ...prev,
         [field]: value
       };
-      
+
       // Auto-calculate manhours when noOfPersons or totalTimeHours changes
       if (field === 'noOfPersons' || field === 'totalTimeHours') {
         const persons = field === 'noOfPersons' ? parseFloat(value) : parseFloat(prev.noOfPersons);
         const hours = field === 'totalTimeHours' ? parseFloat(value) : parseFloat(prev.totalTimeHours);
-        
+
         if (!isNaN(persons) && !isNaN(hours) && persons > 0 && hours > 0) {
           newData.manhours = (persons * hours).toString();
         } else {
           newData.manhours = '';
         }
       }
-      
+
       return newData;
     });
   };
@@ -732,19 +732,19 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
   const insertQuickText = (text: string) => {
     const textarea = workCarriedOutRef.current;
     if (!textarea) return;
-    
+
     const start = textarea.selectionStart;
     const end = textarea.selectionEnd;
     const currentValue = executionData.workCarriedOut;
-    
+
     const beforeCursor = currentValue.substring(0, start);
     const afterCursor = currentValue.substring(end);
-    
+
     const prefix = beforeCursor && start > 0 ? '\n' : '';
     const newValue = beforeCursor + prefix + text + afterCursor;
-    
+
     handleExecutionChange('workCarriedOut', newValue);
-    
+
     setTimeout(() => {
       textarea.focus();
       const newCursorPosition = start + prefix.length + text.length;
@@ -771,7 +771,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
   const toggleSmartSuggestions = () => {
     const newShowState = !showSmartSuggestions;
     setShowSmartSuggestions(newShowState);
-    
+
     if (newShowState && smartSuggestions.length === 0) {
       generateSmartSuggestions();
     }
@@ -791,7 +791,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
   // Fetch and open spare parts selection modal for Section B4
   const handleOpenSparePartsModal = async () => {
     if (isReadOnly) return;
-    
+
     const componentCode = templateData.componentCode;
     if (!componentCode) {
       toast({
@@ -801,7 +801,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
       });
       return;
     }
-    
+
     if (!vesselId) {
       toast({
         title: "Vessel Required",
@@ -810,14 +810,14 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
       });
       return;
     }
-    
+
     setIsLoadingSpares(true);
     setIsSparePartsModalOpen(true);
-    
+
     try {
       const response = await fetch(`/technical/api/inventory/spares-by-component-code/${vesselId}/${encodeURIComponent(componentCode)}`);
       const data = await response.json();
-      
+
       if (data.success && data.data) {
         // Initialize spares with selection state
         const sparesWithState = data.data.map((item: any) => ({
@@ -853,7 +853,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
   // Add selected spares to consumed spare parts
   const handleAddSelectedSpares = () => {
     const selectedSpares = linkedSpares.filter(s => s.selected && s.consumeQty && parseInt(s.consumeQty) > 0);
-    
+
     if (selectedSpares.length === 0) {
       toast({
         title: "No Spares Selected",
@@ -862,11 +862,11 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
       });
       return;
     }
-    
+
     // Validate location selection and quantities using Spares table locations (NO inventory location IDs)
     for (const spare of selectedSpares) {
       const qty = parseInt(spare.consumeQty);
-      
+
       // Require location selection (using Spares table location name, not inventory locationId)
       if (!spare.selectedLocation) {
         toast({
@@ -876,18 +876,18 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
         });
         return;
       }
-      
+
       // Validate quantity against per-location ROB from Spares table (NO summation or cross-mapping)
       // location -> rob_location_a, location_2 -> rob_location_b
       const locationA = spare.spare.location || '';
       const locationB = spare.spare.location2 || '';
       const robLocationA = spare.spare.robLocationA ?? 0;
       const robLocationB = spare.spare.robLocationB ?? 0;
-      
+
       // Get available qty based on selected Spares table location name
       const availableQty = spare.selectedLocation === locationA ? robLocationA : 
                            spare.selectedLocation === locationB ? robLocationB : 0;
-      
+
       if (qty > availableQty) {
         toast({
           title: "Quantity Exceeds Stock",
@@ -897,7 +897,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
         return;
       }
     }
-    
+
     // Add selected spares to consumedSpareParts using Spares table location name
     const newConsumedParts = selectedSpares.map(s => {
       return {
@@ -910,15 +910,15 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
         comments: s.comments
       };
     });
-    
+
     setExecutionData(prev => ({
       ...prev,
       consumedSpareParts: [...prev.consumedSpareParts, ...newConsumedParts]
     }));
-    
+
     setIsSparePartsModalOpen(false);
     setLinkedSpares([]);
-    
+
     toast({
       title: "Spare Parts Added",
       description: `Added ${selectedSpares.length} spare part(s) to consumed list.`,
@@ -1051,7 +1051,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
   const handleAddSafetyRequirement = (category: 'ppeRequirements' | 'permitRequirements' | 'otherRequirements') => {
     if (isReadOnly) return;
     if (!newSafetyRequirement.trim()) return;
-    
+
     setTemplateData(prev => ({
       ...prev,
       safetyRequirements: {
@@ -1153,7 +1153,19 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
     }
   };
 
-  const handleViewDocument = async (documentType: string, docId?: string) => {
+  const dataUrlToBlob = (dataUrl: string): Blob => {
+    const [header, base64Data] = dataUrl.split(',');
+    const mimeMatch = header.match(/data:([^;]+)/);
+    const mime = mimeMatch ? mimeMatch[1] : 'application/octet-stream';
+    const binaryStr = atob(base64Data);
+    const bytes = new Uint8Array(binaryStr.length);
+    for (let i = 0; i < binaryStr.length; i++) {
+      bytes[i] = binaryStr.charCodeAt(i);
+    }
+    return new Blob([bytes], { type: mime });
+  };
+
+  const resolveDocumentFetchUrl = (documentType: string, docId?: string): { fetchUrl: string | undefined; targetDoc: any } => {
     let targetDoc: any;
     if (docId) {
       targetDoc = woDocuments.find(d => d.id === docId);
@@ -1163,7 +1175,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
         targetDoc = executionData.uploadedDocuments.find(doc => doc.type === documentType);
       }
     }
-    if (!targetDoc) return;
+    if (!targetDoc) return { fetchUrl: undefined, targetDoc: undefined };
 
     const fetchId = targetDoc.id || null;
     let fetchUrl: string | undefined;
@@ -1174,6 +1186,12 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
       const fileKeyEncoded = encodeURIComponent(targetDoc.fileKey.substring(1));
       fetchUrl = `/technical/api/documents/${fileKeyEncoded}`;
     }
+
+    return { fetchUrl, targetDoc };
+  };
+
+  const handleViewDocument = async (documentType: string, docId?: string) => {
+    const { fetchUrl } = resolveDocumentFetchUrl(documentType, docId);
 
     if (fetchUrl) {
       try {
@@ -1203,6 +1221,34 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
         toast({
           title: "View failed",
           description: "Failed to open document. Please try again.",
+          variant: "destructive"
+        });
+      }
+    }
+  };
+
+  const handleDownloadDocument = async (documentType: string, docId?: string) => {
+    const { fetchUrl, targetDoc } = resolveDocumentFetchUrl(documentType, docId);
+
+    if (fetchUrl) {
+      try {
+        const response = await fetch(fetchUrl);
+        if (!response.ok) throw new Error('Failed to retrieve document');
+        const result = await response.json();
+        const blob = dataUrlToBlob(result.dataUrl);
+        const objectUrl = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = objectUrl;
+        a.download = result.fileName || targetDoc?.fileName || 'download';
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(objectUrl);
+      } catch (error) {
+        console.error('Download error:', error);
+        toast({
+          title: "Download failed",
+          description: "Failed to download document. Please try again.",
           variant: "destructive"
         });
       }
@@ -1294,7 +1340,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
     // Rule #9: Show warning toast when quantity consumed is 0 or blank
     const part = executionData.consumedSpareParts[index];
     const quantityValue = parseFloat(part.quantityConsumed || '0');
-    
+
     if (!part.quantityConsumed || part.quantityConsumed.trim() === '' || quantityValue === 0) {
       toast({
         title: "Spare Consumption Notice",
@@ -1303,7 +1349,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
         duration: 5000
       });
     }
-    
+
     setEditingConsumedSparePart(null);
   };
 
@@ -1341,7 +1387,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
       // Skip frequency validation for unplanned work orders
       // Unplanned WOs are single-execution tasks without frequency requirements
       const isUnplannedWO = workOrderType === 'Unplanned';
-      
+
       if (!isUnplannedWO) {
         // Validate frequency value before saving using the normalization helper
         const normalizedFrequency = normalizeFrequencyValue(templateData.frequencyValue);
@@ -1353,7 +1399,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
           });
           return;
         }
-        
+
         // Validate frequency unit
         if (!templateData.frequencyUnit || templateData.frequencyUnit.trim() === '') {
           toast({
@@ -1376,7 +1422,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
         });
         return;
       }
-      
+
       // Completion Date is required
       const completionDate = executionData.completionDateTime ? executionData.completionDateTime.split('T')[0] : (executionData.dateOfCompletion || '');
       if (!completionDate) {
@@ -1387,7 +1433,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
         });
         return;
       }
-      
+
       // Performed by is required
       if (!executionData.performedBy || executionData.performedBy.trim() === '') {
         toast({
@@ -1397,11 +1443,11 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
         });
         return;
       }
-      
+
       // Validate dates are not in the future (cannot be more than today's date)
       const today = new Date();
       today.setHours(23, 59, 59, 999); // End of today
-      
+
       const startDateObj = new Date(startDate);
       if (startDateObj > today) {
         toast({
@@ -1411,7 +1457,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
         });
         return;
       }
-      
+
       const completionDateObj = new Date(completionDate);
       if (completionDateObj > today) {
         toast({
@@ -1421,7 +1467,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
         });
         return;
       }
-      
+
       // If Maintenance basis is Running Hours, Current RH (currentReading) is also required
       const currentRHValue = executionData.currentReading || executionData.runningHours;
       if ((workOrderContext as any)?.maintenanceBasis === 'Running Hours' && !currentRHValue) {
@@ -1461,12 +1507,12 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
       const sparesWithMissingLocation = executionData.consumedSpareParts.filter(spare => {
         const hasQuantity = spare.quantityConsumed && parseFloat(spare.quantityConsumed) > 0;
         if (!hasQuantity) return false;
-        
+
         // Check if this spare exists in inventory using partCode (primary) or partNo (fallback)
         const lookupKey = spare.partCode || spare.partNo;
         const isInInventory = lookupKey && sparesWithInventory.some(s => s.spare.partCode === lookupKey);
         if (!isInInventory) return false; // Skip validation for manual entries not in inventory
-        
+
         // Check for either locationId (numeric) OR location name (string) - both are valid
         const hasLocationId = spare.locationId != null && spare.locationId > 0;
         const hasLocationName = spare.location && typeof spare.location === 'string' && spare.location.trim().length > 0;
@@ -1488,15 +1534,15 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
       const sparesWithInsufficientStock = executionData.consumedSpareParts.filter(spare => {
         const qty = parseFloat(spare.quantityConsumed);
         if (!qty || qty <= 0 || !spare.location) return false;
-        
+
         // Use partCode for inventory lookup (primary) or partNo (fallback for legacy data)
         const lookupKey = spare.partCode || spare.partNo;
         if (!lookupKey) return false;
-        
+
         // Check if spare exists in inventory
         const spareInInventory = sparesInventory.find(s => s.partCode === lookupKey);
         if (!spareInInventory) return false;
-        
+
         // Get ROB at the selected location using location name mapping
         const stockAtLocation = getRobByLocationName(lookupKey, spare.location);
         return qty > stockAtLocation;
@@ -1515,20 +1561,20 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
         });
         return;
       }
-      
+
       // Check if Part B has completion data (indicates work is done and needs approval)
       const hasCompletionData = !!(executionData.completionDateTime || executionData.dateOfCompletion);
-      
+
       // Validate running hours if completion data is present
       // Note: The form uses "currentReading" field for running hours input (B3 section)
       // We check both executionData.runningHours and executionData.currentReading for backwards compatibility
       const runningHoursValue = executionData.currentReading || executionData.runningHours;
-      
+
       // Validate that currentReading is not less than previousReading (running hours can only increase)
       if (runningHoursValue && executionData.previousReading) {
         const currentRH = parseFloat(runningHoursValue);
         const previousRH = parseFloat(executionData.previousReading);
-        
+
         if (!isNaN(currentRH) && !isNaN(previousRH) && currentRH < previousRH) {
           toast({
             title: "Validation Error",
@@ -1538,7 +1584,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
           return;
         }
       }
-      
+
       if (hasCompletionData) {
         if ((workOrderContext as any)?.maintenanceBasis === 'Running Hours' && !runningHoursValue) {
           toast({
@@ -1548,11 +1594,11 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
           });
           return;
         }
-        
+
         if (runningHoursValue && workOrderContext && (workOrderContext as any).component) {
           const { component, rhMasterComponent } = workOrderContext as any;
           const newRunningHours = parseInt(runningHoursValue);
-          
+
           if (isNaN(newRunningHours)) {
             toast({
               title: "Validation Error",
@@ -1561,7 +1607,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
             });
             return;
           }
-          
+
           // For INHERITED components, validate RH against master component
           // Inherited components can NEVER have RH greater than their master component
           const counterType = (component.rhCounterType || '').toUpperCase();
@@ -1576,7 +1622,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
               return;
             }
           }
-          
+
           if (newRunningHours < component.currentCumulativeRH) {
             toast({
               title: "Validation Error",
@@ -1585,14 +1631,14 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
             });
             return;
           }
-          
+
           if (executionData.dateOfCompletion && component.lastUpdated) {
             const completionDate = new Date(executionData.dateOfCompletion);
             const lastUpdate = new Date(component.lastUpdated);
             const daysDiff = Math.max(1, (completionDate.getTime() - lastUpdate.getTime()) / (1000 * 60 * 60 * 24));
             const hoursDelta = newRunningHours - component.currentCumulativeRH;
             const maxAllowed = daysDiff * 25;
-            
+
             if (hoursDelta > maxAllowed) {
               toast({
                 title: "Validation Error",
@@ -1604,12 +1650,12 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
           }
         }
       }
-      
+
       // FIXED: When saving Part B with completion data, set status to "Pending Approval"
       // The work order should NOT go directly to "Completed" - it requires approval first
       // Only the approver can change status to "Completed" via the Approve action
       let response;
-      
+
       // Ensure runningHours is set from currentReading for backend compatibility
       const saveExecutionData = {
         ...executionData,
@@ -1619,7 +1665,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
         safetyChecklistsStatus: executionData.safetyChecklists,
         operationalFormsStatus: executionData.operationalForms,
       };
-      
+
       response = await fetch(`/technical/api/work-orders/${workOrderId}`, {
         method: 'PATCH',
         headers: {
@@ -1633,18 +1679,18 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
           status: hasCompletionData ? 'Pending Approval' : undefined
         })
       });
-      
+
       const result = await response.json();
-      
+
       if (!response.ok) {
         throw new Error(result.error || 'Failed to save work order');
       }
-      
+
       // Invalidate all work orders-related caches so the updated status is reflected
       // This includes the list (with any vesselId variants) and the specific work order context
       await queryClient.invalidateQueries({ queryKey: ['/technical/api/work-orders'] });
       await queryClient.invalidateQueries({ queryKey: [`/technical/api/work-orders/${workOrderId}/context`] });
-      
+
       toast({
         title: "Success",
         description: hasCompletionData 
@@ -1674,7 +1720,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
         });
         return;
       }
-      
+
       if (!templateData.componentCode?.trim()) {
         toast({
           title: "Validation Error",
@@ -1683,7 +1729,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
         });
         return;
       }
-      
+
       // Validate frequency value
       const normalizedFrequency = normalizeFrequencyValue(templateData.frequencyValue);
       if (!normalizedFrequency) {
@@ -1694,17 +1740,17 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
         });
         return;
       }
-      
+
       // Use componentCode as componentId (they are often the same in this system)
       // componentName defaults to componentCode if not provided
       const componentId = templateData.componentCode;
       const componentName = templateData.componentName || templateData.componentCode;
-      
+
       // Generate a unique job number (format: JOB-XXXXXXX)
       const timestamp = Date.now().toString(36).toUpperCase();
       const random = Math.random().toString(36).substring(2, 5).toUpperCase();
       const jobNo = `JOB-${timestamp}${random}`;
-      
+
       // Build job payload matching the jobs schema
       // Note: All fields are strings as per the schema (frequencyValue is text type)
       const jobPayload = {
@@ -1733,18 +1779,18 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
         isActive: templateData.isActive === 'Yes',
         dataScope: 'vessel', // Jobs created from UI are vessel-specific
       };
-      
+
       const response = await apiRequest('POST', '/technical/api/jobs', jobPayload);
       const result = await response.json();
-      
+
       // Invalidate jobs cache so the new job appears in the list
       queryClient.invalidateQueries({ queryKey: ['/technical/api/jobs'] });
-      
+
       toast({
         title: "Success",
         description: "New job created successfully",
       });
-      
+
       // Navigate back to components page
       navigate("/pms/components");
     } catch (error: any) {
@@ -1760,24 +1806,24 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
   const handleApprove = async () => {
     if (embedded) return;
     if (!workOrderId) return;
-    
+
     // Use the actual completion date entered by the user (from execution data)
     // Priority: completionDateTime > dateOfCompletion > undefined (let backend handle)
     // Keep full ISO timestamp - do not trim to preserve time information
     const actualCompletionDate = executionData.completionDateTime || executionData.dateOfCompletion || undefined;
-    
+
     setIsProcessingApproval(true);
     try {
       const payload: Record<string, any> = {
         status: 'Completed',
         approvalAction: 'approved'
       };
-      
+
       // Only set dateCompleted if we have an actual completion date from the form
       if (actualCompletionDate) {
         payload.dateCompleted = actualCompletionDate;
       }
-      
+
       const response = await fetch(`/technical/api/work-orders/${workOrderId}`, {
         method: 'PATCH',
         headers: {
@@ -1785,13 +1831,13 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
         },
         body: JSON.stringify(payload)
       });
-      
+
       const result = await response.json();
-      
+
       if (!response.ok) {
         throw new Error(result.error || 'Failed to approve work order');
       }
-      
+
       setCurrentWorkOrderStatus('Completed');
       toast({
         title: "Approved",
@@ -1812,7 +1858,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
   const handleReject = async () => {
     if (embedded) return;
     if (!workOrderId) return;
-    
+
     if (!rejectionComments.trim()) {
       toast({
         title: "Rejection Comments Required",
@@ -1821,7 +1867,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
       });
       return;
     }
-    
+
     setIsProcessingApproval(true);
     try {
       const response = await fetch(`/technical/api/work-orders/${workOrderId}`, {
@@ -1835,13 +1881,13 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
           rejectionComments: rejectionComments
         })
       });
-      
+
       const result = await response.json();
-      
+
       if (!response.ok) {
         throw new Error(result.error || 'Failed to reject work order');
       }
-      
+
       setCurrentWorkOrderStatus('Rejected');
       // Invalidate work orders cache so the list shows updated data
       queryClient.invalidateQueries({ queryKey: ['/technical/api/work-orders'] });
@@ -2014,7 +2060,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
         {/* Main Content Area */}
         <div className="flex-1 px-6 py-6">
           <div className="max-w-5xl mx-auto space-y-6">
-            
+
             {/* Part A - Job Details */}
             <div data-testid="WOF3"><Marker id="WOF3" /></div>
             <PartHeader
@@ -2025,7 +2071,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
             />
             <div data-testid="WOF.AA"><Marker id="WOF.AA" /></div>
             <div data-testid="WOF.A"><Marker id="WOF.A" /></div>
-            
+
             {/* A1. Job Information */}
             <div data-testid="WOF.A1.1"><Marker id="WOF.A1.1" /></div>
             <div data-testid="WOF.A1.2"><Marker id="WOF.A1.2" /></div>
@@ -2341,7 +2387,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                   Add spares
                 </Button>
               </div>
-              
+
               {/* Editable Spare Parts Table - Updated to show location-wise ROB per spec */}
               <div className="overflow-x-auto">
                 <table className="w-full text-sm border border-gray-200">
@@ -2369,11 +2415,11 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                         const lookupKey = part.partCode || '';
                         const spareData = lookupKey ? sparesInventory.find(s => s.partCode === lookupKey) : null;
                         const locations = lookupKey ? getAvailableLocationsForSpare(lookupKey) : [];
-                        
+
                         // Location-specific ROB values (NO summation per spec)
                         const robLocationA = spareData?.robLocationA ?? 0;
                         const robLocationB = spareData?.robLocationB ?? 0;
-                        
+
                         // Stock status based on per-location availability (no summation)
                         // Available = at least one location can fulfill the required qty
                         // Insufficient = some stock exists at any location but no single location has enough
@@ -2385,7 +2431,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                         const isAvailable = locationACanFulfill || locationBCanFulfill;
                         const isInsufficientStock = hasAnyStock && !isAvailable;
                         const stockStatus = !spareData ? 'unknown' : isAvailable ? 'available' : isInsufficientStock ? 'insufficient' : 'unavailable';
-                        
+
                         return (
                           <tr key={index} className="border-b border-gray-200 hover:bg-gray-50">
                             {editingSparePart === index ? (
@@ -2536,7 +2582,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                   Add tools
                 </Button>
               </div>
-              
+
               {/* Editable Tools Table */}
               <div className="overflow-x-auto">
                 <table className="w-full text-sm border border-gray-200">
@@ -2677,7 +2723,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                   <p className="text-sm text-gray-500 italic ml-4">No PPE requirements specified</p>
                 )}
               </div>
-              
+
               {/* Permit Requirements */}
               <div>
                 <h3 className="text-sm font-semibold text-gray-700 mb-1.5">Permits Required:</h3>
@@ -2694,7 +2740,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                   <p className="text-sm text-gray-500 italic ml-4">No permits required</p>
                 )}
               </div>
-              
+
               {/* Other Requirements */}
               {(templateData.safetyRequirements?.otherRequirements || []).length > 0 && (
                 <div>
@@ -2765,7 +2811,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                 title="Work Completion Record"
                 description="Enter work completion details here including Risk assessment, checklists, comments etc."
               />
-          
+
           {/* B1. Risk Assessment, Checklists & Records */}
           <div data-testid="WOF.B1.1"><Marker id="WOF.B1.1" /></div>
           <div data-testid="WOF.B1.2"><Marker id="WOF.B1.2" /></div>
@@ -2846,12 +2892,13 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                           <span className="truncate max-w-[200px]" title={doc.fileName}>{doc.fileName}</span>
                           <span className="text-gray-400 mx-2">{formatFileSize(doc.fileSize)}</span>
                           <div className="flex items-center gap-1">
+                            <Paperclip className="h-4 w-4 text-blue-500 cursor-pointer" title={doc.fileName} onClick={() => handleDownloadDocument('riskAssessment', doc.id)} data-testid={`button-download-risk-${doc.id}`} />
                             <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => handleViewDocument('riskAssessment', doc.id)} data-testid={`button-view-risk-${doc.id}`}>
-                              <Eye className="h-3 w-3" />
+                              <Eye className="h-4 w-4 text-blue-600" />
                             </Button>
                             {!isReadOnly && (
                               <Button variant="ghost" size="icon" className="h-6 w-6 text-red-500 hover:text-red-700" onClick={() => handleDeleteDocumentClick('riskAssessment', doc.id)} data-testid={`button-delete-risk-${doc.id}`}>
-                                <Trash2 className="h-3 w-3" />
+                                <Trash2 className="h-4 w-4 text-red-500" />
                               </Button>
                             )}
                           </div>
@@ -2933,12 +2980,13 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                           <span className="truncate max-w-[200px]" title={doc.fileName}>{doc.fileName}</span>
                           <span className="text-gray-400 mx-2">{formatFileSize(doc.fileSize)}</span>
                           <div className="flex items-center gap-1">
+                            <Paperclip className="h-4 w-4 text-blue-500 cursor-pointer" title={doc.fileName} onClick={() => handleDownloadDocument('safetyChecklist', doc.id)} data-testid={`button-download-safety-${doc.id}`} />
                             <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => handleViewDocument('safetyChecklist', doc.id)} data-testid={`button-view-safety-${doc.id}`}>
-                              <Eye className="h-3 w-3" />
+                              <Eye className="h-4 w-4 text-blue-600" />
                             </Button>
                             {!isReadOnly && (
                               <Button variant="ghost" size="icon" className="h-6 w-6 text-red-500 hover:text-red-700" onClick={() => handleDeleteDocumentClick('safetyChecklist', doc.id)} data-testid={`button-delete-safety-${doc.id}`}>
-                                <Trash2 className="h-3 w-3" />
+                                <Trash2 className="h-4 w-4 text-red-500" />
                               </Button>
                             )}
                           </div>
@@ -3020,12 +3068,13 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                           <span className="truncate max-w-[200px]" title={doc.fileName}>{doc.fileName}</span>
                           <span className="text-gray-400 mx-2">{formatFileSize(doc.fileSize)}</span>
                           <div className="flex items-center gap-1">
+                            <Paperclip className="h-4 w-4 text-blue-500 cursor-pointer" title={doc.fileName} onClick={() => handleDownloadDocument('operationalForm', doc.id)} data-testid={`button-download-operational-${doc.id}`} />
                             <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => handleViewDocument('operationalForm', doc.id)} data-testid={`button-view-operational-${doc.id}`}>
-                              <Eye className="h-3 w-3" />
+                              <Eye className="h-4 w-4 text-blue-600" />
                             </Button>
                             {!isReadOnly && (
                               <Button variant="ghost" size="icon" className="h-6 w-6 text-red-500 hover:text-red-700" onClick={() => handleDeleteDocumentClick('operationalForm', doc.id)} data-testid={`button-delete-operational-${doc.id}`}>
-                                <Trash2 className="h-3 w-3" />
+                                <Trash2 className="h-4 w-4 text-red-500" />
                               </Button>
                             )}
                           </div>
@@ -3216,7 +3265,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                     </Button>
                   </div>
                 </div>
-                
+
                 {/* Quick Input Expandable Panel */}
                 {showQuickInputs && (
                   <div className="p-3 border border-[#17a2b8]/30 rounded-lg bg-[#f0fbfc]">
@@ -3238,7 +3287,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                     </div>
                   </div>
                 )}
-                
+
                 {/* Smart Suggestions Expandable Panel */}
                 {showSmartSuggestions && (
                   <div className="p-3 border border-[#17a2b8]/30 rounded-lg bg-[#f0fbfc]">
@@ -3264,7 +3313,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                     )}
                   </div>
                 )}
-                
+
                 {/* Textarea with Upload button */}
                 <div className="flex gap-2">
                   <Textarea
@@ -3308,12 +3357,13 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                         <span className="truncate max-w-[200px]" title={doc.fileName}>{doc.fileName}</span>
                         <span className="text-gray-400 mx-2">{formatFileSize(doc.fileSize)}</span>
                         <div className="flex items-center gap-1">
+                          <Paperclip className="h-4 w-4 text-blue-500 cursor-pointer" title={doc.fileName} onClick={() => handleDownloadDocument('other', doc.id)} data-testid={`button-download-other-${doc.id}`} />
                           <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => handleViewDocument('other', doc.id)} data-testid={`button-view-other-${doc.id}`}>
-                            <Eye className="h-3 w-3" />
+                            <Eye className="h-4 w-4 text-blue-600" />
                           </Button>
                           {!isReadOnly && (
                             <Button variant="ghost" size="icon" className="h-6 w-6 text-red-500 hover:text-red-700" onClick={() => handleDeleteDocumentClick('other', doc.id)} data-testid={`button-delete-other-${doc.id}`}>
-                              <Trash2 className="h-3 w-3" />
+                              <Trash2 className="h-4 w-4 text-red-500" />
                             </Button>
                           )}
                         </div>
@@ -3414,11 +3464,11 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                         (!sparePartCode && spare.partNo && c.partNo === spare.partNo)
                       );
                       const consumedData = consumedIndex >= 0 ? executionData.consumedSpareParts[consumedIndex] : null;
-                      
+
                       // Get locations from Spares table per spec: location -> rob_location_a, location_2 -> rob_location_b
                       const spareLocations = getAvailableLocationsForSpare(sparePartCode || spare.partNo);
                       const autoSelectedLocationField = getAutoSelectedLocationField(sparePartCode || spare.partNo);
-                      
+
                       // Calculate if current quantity exceeds ROB at selected location
                       const currentQty = parseFloat(consumedData?.quantityConsumed || '0') || 0;
                       const selectedLocation = consumedData?.location || '';
@@ -3426,7 +3476,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                         ? getRobByLocationName(sparePartCode, selectedLocation) 
                         : 0;
                       const exceedsRob = currentQty > 0 && selectedLocation && currentQty > availableRob;
-                      
+
                       return (
                         <tr key={`preloaded-${index}`} className="border-b border-gray-100">
                           <td className="py-3 text-gray-900">{spare.partNo || '-'}</td>
@@ -3564,7 +3614,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                       .map((consumed, index) => {
                         const actualIndex = executionData.consumedSpareParts.findIndex(c => c === consumed);
                         const isEditing = editingConsumedSparePart === actualIndex;
-                        
+
                         // Calculate if current quantity exceeds ROB at selected location
                         const manualCurrentQty = parseFloat(consumed.quantityConsumed || '0') || 0;
                         const manualSelectedLocation = consumed.location || '';
@@ -3573,7 +3623,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                           ? getRobByLocationName(manualPartCode, manualSelectedLocation) 
                           : 0;
                         const manualExceedsRob = manualCurrentQty > 0 && manualSelectedLocation && manualCurrentQty > manualAvailableRob;
-                        
+
                         return (
                           <tr key={`manual-${actualIndex}`} className="border-b border-gray-100">
                             {isEditing ? (
@@ -3781,7 +3831,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                     data-testid="WOF.B5.2.1"
                   />
                 </div>
-                
+
                 {/* Approve / Reject Buttons */}
                 <div className="flex justify-center gap-4 pt-2" data-testid="WOF.B5.3"><Marker id="WOF.B5.3" />
                   <Button
@@ -3913,7 +3963,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
               Select spare parts to consume and enter the quantity used from each location.
             </DialogDescription>
           </DialogHeader>
-          
+
           <div className="flex-1 overflow-auto">
             {isLoadingSpares ? (
               <div className="flex items-center justify-center py-8">
@@ -3944,12 +3994,12 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                     const robLocationB = item.spare.robLocationB ?? 0;
                     const locationA = item.spare.location || '';
                     const locationB = item.spare.location2 || '';
-                    
+
                     // Get the max qty based on selected location (no summation)
                     const selectedLocRob = item.selectedLocation === locationA ? robLocationA : 
                                           item.selectedLocation === locationB ? robLocationB : 
                                           Math.max(robLocationA, robLocationB); // Default to max single location
-                    
+
                     return (
                       <tr key={item.spare.id || index} className="border-b hover:bg-gray-50 dark:hover:bg-gray-800">
                         <td className="py-2 px-2">
@@ -4034,7 +4084,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
               </table>
             )}
           </div>
-          
+
           <DialogFooter className="pt-4 border-t">
             <Button variant="outline" onClick={() => setIsSparePartsModalOpen(false)} data-testid="spare-modal-cancel">
               Cancel

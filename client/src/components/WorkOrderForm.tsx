@@ -649,12 +649,23 @@ const WorkOrderForm: React.FC<WorkOrderFormProps> = ({
     }
   };
 
+  const dataUrlToBlob = (dataUrl: string): Blob => {
+    const [header, base64Data] = dataUrl.split(',');
+    const mimeMatch = header.match(/data:([^;]+)/);
+    const mime = mimeMatch ? mimeMatch[1] : 'application/octet-stream';
+    const binaryStr = atob(base64Data);
+    const bytes = new Uint8Array(binaryStr.length);
+    for (let i = 0; i < binaryStr.length; i++) {
+      bytes[i] = binaryStr.charCodeAt(i);
+    }
+    return new Blob([bytes], { type: mime });
+  };
+
   const handleViewDocument = async (documentType: string) => {
     const document = executionData.uploadedDocuments.find(doc => doc.type === documentType);
     if (!document) return;
 
     try {
-      // Get signed URL from backend
       const fileKeyEncoded = encodeURIComponent(document.fileKey.substring(1));
       const response = await fetch(`/technical/api/documents/${fileKeyEncoded}`);
       
@@ -663,14 +674,47 @@ const WorkOrderForm: React.FC<WorkOrderFormProps> = ({
       }
 
       const result = await response.json();
-      
-      // Open in new tab
-      window.open(result.dataUrl, '_blank');
+      const blob = dataUrlToBlob(result.dataUrl);
+      const objectUrl = URL.createObjectURL(blob);
+      window.open(objectUrl, '_blank');
+      setTimeout(() => URL.revokeObjectURL(objectUrl), 60000);
     } catch (error) {
       console.error('View error:', error);
       toast({
         title: "View failed",
         description: "Failed to open document. Please try again.",
+        variant: "destructive"
+      });
+    }
+  };
+
+  const handleDownloadDocument = async (documentType: string) => {
+    const docData = executionData.uploadedDocuments.find(doc => doc.type === documentType);
+    if (!docData) return;
+
+    try {
+      const fileKeyEncoded = encodeURIComponent(docData.fileKey.substring(1));
+      const response = await fetch(`/technical/api/documents/${fileKeyEncoded}`);
+      
+      if (!response.ok) {
+        throw new Error('Failed to retrieve document');
+      }
+
+      const result = await response.json();
+      const blob = dataUrlToBlob(result.dataUrl);
+      const objectUrl = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = objectUrl;
+      a.download = result.fileName || docData.fileName || 'download';
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(objectUrl);
+    } catch (error) {
+      console.error('Download error:', error);
+      toast({
+        title: "Download failed",
+        description: "Failed to download document. Please try again.",
         variant: "destructive"
       });
     }
@@ -2142,7 +2186,7 @@ const WorkOrderForm: React.FC<WorkOrderFormProps> = ({
                             Upload
                           </Button>
                           {getUploadedDocument('riskAssessment') && (
-                            <Paperclip className="h-4 w-4 text-blue-500" />
+                            <Paperclip className="h-4 w-4 text-blue-500 cursor-pointer" onClick={() => handleDownloadDocument('riskAssessment')} data-testid="button-download-risk-assessment" />
                           )}
                           <Button
                             variant="ghost"
@@ -2208,7 +2252,7 @@ const WorkOrderForm: React.FC<WorkOrderFormProps> = ({
                             Upload
                           </Button>
                           {getUploadedDocument('safetyChecklist') && (
-                            <Paperclip className="h-4 w-4 text-blue-500" />
+                            <Paperclip className="h-4 w-4 text-blue-500 cursor-pointer" onClick={() => handleDownloadDocument('safetyChecklist')} data-testid="button-download-safety-checklist" />
                           )}
                           <Button
                             variant="ghost"
@@ -2274,7 +2318,7 @@ const WorkOrderForm: React.FC<WorkOrderFormProps> = ({
                             Upload
                           </Button>
                           {getUploadedDocument('operationalForm') && (
-                            <Paperclip className="h-4 w-4 text-blue-500" />
+                            <Paperclip className="h-4 w-4 text-blue-500 cursor-pointer" onClick={() => handleDownloadDocument('operationalForm')} data-testid="button-download-operational-form" />
                           )}
                           <Button
                             variant="ghost"
