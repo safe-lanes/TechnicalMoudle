@@ -193,8 +193,15 @@ export async function updateSortOrder(body: any) {
       id: z.string(),
       sortOrder: z.number(),
     })),
+    reparents: z.array(z.object({
+      id: z.string(),
+      newParentCode: z.string(),
+    })).optional().default([]),
   });
-  const { updates } = sortOrderSchema.parse(body);
+  const { updates, reparents } = sortOrderSchema.parse(body);
+  if (reparents.length > 0) {
+    return repo.updateHierarchyAndSortOrder(updates, reparents);
+  }
   return repo.updateSortOrder(updates);
 }
 

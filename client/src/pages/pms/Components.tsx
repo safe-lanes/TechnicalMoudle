@@ -2778,6 +2778,63 @@ const Components: React.FC = () => {
     return undefined;
   };
 
+  const isDescendantOf = (nodes: ComponentNode[], ancestorCode: string, targetCode: string): boolean => {
+    const findNode = (list: ComponentNode[], code: string): ComponentNode | null => {
+      for (const n of list) {
+        if (n.id === code) return n;
+        if (n.children) {
+          const found = findNode(n.children, code);
+          if (found) return found;
+        }
+      }
+      return null;
+    };
+    const ancestor = findNode(nodes, ancestorCode);
+    if (!ancestor) return false;
+    const checkDescendants = (node: ComponentNode): boolean => {
+      if (!node.children) return false;
+      for (const child of node.children) {
+        if (child.id === targetCode) return true;
+        if (checkDescendants(child)) return true;
+      }
+      return false;
+    };
+    return checkDescendants(ancestor);
+  };
+
+  const removeNodeFromTree = (nodes: ComponentNode[], code: string): { tree: ComponentNode[]; removed: ComponentNode | null } => {
+    let removed: ComponentNode | null = null;
+    const filter = (list: ComponentNode[]): ComponentNode[] => {
+      return list.reduce<ComponentNode[]>((acc, node) => {
+        if (node.id === code) {
+          removed = node;
+          return acc;
+        }
+        acc.push({
+          ...node,
+          children: node.children ? filter(node.children) : [],
+        });
+        return acc;
+      }, []);
+    };
+    return { tree: filter(nodes), removed };
+  };
+
+  const insertNodeAfterTarget = (nodes: ComponentNode[], targetCode: string, nodeToInsert: ComponentNode): ComponentNode[] => {
+    return nodes.map(node => {
+      if (node.id === targetCode) {
+        return {
+          ...node,
+          children: [...(node.children || []), nodeToInsert],
+        };
+      }
+      return {
+        ...node,
+        children: node.children ? insertNodeAfterTarget(node.children, targetCode, nodeToInsert) : [],
+      };
+    });
+  };
+
   const handleDragStart = (e: React.DragEvent, code: string) => {
     const parentCode = getParentCode(editTreeData, code) ?? null;
     setDragSourceCode(code);
@@ -2789,51 +2846,78 @@ const Components: React.FC = () => {
   const handleDragOver = (e: React.DragEvent, code: string) => {
     e.preventDefault();
     if (dragSourceCode === code) return;
-    const targetParent = getParentCode(editTreeData, code) ?? null;
-    if (dragSourceParent !== targetParent) return;
+    if (dragSourceCode && isDescendantOf(editTreeData, dragSourceCode, code)) return;
     setDragOverCode(code);
     e.dataTransfer.dropEffect = "move";
-  };
-
-  const reorderSiblings = (nodes: ComponentNode[], sourceCode: string, targetCode: string, parentCode: string | null): ComponentNode[] => {
-    if (!parentCode) {
-      const sourceIndex = nodes.findIndex(n => n.id === sourceCode);
-      const targetIndex = nodes.findIndex(n => n.id === targetCode);
-      if (sourceIndex !== -1 && targetIndex !== -1) {
-        const newNodes = [...nodes];
-        const [moved] = newNodes.splice(sourceIndex, 1);
-        newNodes.splice(targetIndex, 0, moved);
-        return newNodes;
-      }
-      return nodes;
-    }
-    return nodes.map(node => {
-      if (node.id === parentCode) {
-        const children = node.children || [];
-        const sourceIndex = children.findIndex(n => n.id === sourceCode);
-        const targetIndex = children.findIndex(n => n.id === targetCode);
-        if (sourceIndex !== -1 && targetIndex !== -1) {
-          const newChildren = [...children];
-          const [moved] = newChildren.splice(sourceIndex, 1);
-          newChildren.splice(targetIndex, 0, moved);
-          return { ...node, children: newChildren };
-        }
-        return node;
-      }
-      return {
-        ...node,
-        children: node.children ? reorderSiblings(node.children, sourceCode, targetCode, parentCode) : [],
-      };
-    });
   };
 
   const handleDrop = (e: React.DragEvent, targetCode: string) => {
     e.preventDefault();
     setDragOverCode(null);
     if (!dragSourceCode || dragSourceCode === targetCode) return;
+
+    if (isDescendantOf(editTreeData, dragSourceCode, targetCode)) {
+      toast({
+        title: "Invalid Move",
+        description: "Cannot move a component under its own descendant — this would create a circular hierarchy.",
+        variant: "destructive",
+      });
+      setDragSourceCode(null);
+      setDragSourceParent(null);
+      return;
+    }
+
+    const sourceParent = getParentCode(editTreeData, dragSourceCode) ?? null;
     const targetParent = getParentCode(editTreeData, targetCode) ?? null;
-    if (dragSourceParent !== targetParent) return;
-    setEditTreeData(prev => reorderSiblings(prev, dragSourceCode!, targetCode, dragSourceParent ?? null));
+
+    if (sourceParent === targetParent) {
+      setEditTreeData(prev => {
+        const reorderSiblings = (nodes: ComponentNode[], sCode: string, tCode: string, pCode: string | null): ComponentNode[] => {
+          if (!pCode) {
+            const sourceIndex = nodes.findIndex(n => n.id === sCode);
+            const targetIndex = nodes.findIndex(n => n.id === tCode);
+            if (sourceIndex !== -1 && targetIndex !== -1) {
+              const newNodes = [...nodes];
+              const [moved] = newNodes.splice(sourceIndex, 1);
+              newNodes.splice(targetIndex, 0, moved);
+              return newNodes;
+            }
+            return nodes;
+          }
+          return nodes.map(node => {
+            if (node.id === pCode) {
+              const children = node.children || [];
+              const sourceIndex = children.findIndex(n => n.id === sCode);
+              const targetIndex = children.findIndex(n => n.id === tCode);
+              if (sourceIndex !== -1 && targetIndex !== -1) {
+                const newChildren = [...children];
+                const [moved] = newChildren.splice(sourceIndex, 1);
+                newChildren.splice(targetIndex, 0, moved);
+                return { ...node, children: newChildren };
+              }
+              return node;
+            }
+            return {
+              ...node,
+              children: node.children ? reorderSiblings(node.children, sCode, tCode, pCode) : node.children || [],
+            };
+          });
+        };
+        return reorderSiblings(prev, dragSourceCode!, targetCode, sourceParent);
+      });
+    } else {
+      setEditTreeData(prev => {
+        const { tree, removed } = removeNodeFromTree(prev, dragSourceCode!);
+        if (!removed) return prev;
+        return insertNodeAfterTarget(tree, targetCode, removed);
+      });
+      setExpandedNodes(prev => {
+        const newSet = new Set(prev);
+        newSet.add(targetCode);
+        return newSet;
+      });
+    }
+
     setDragSourceCode(null);
     setDragSourceParent(null);
   };
@@ -2857,22 +2941,54 @@ const Components: React.FC = () => {
     return updates;
   };
 
+  const collectReparents = (editNodes: ComponentNode[], origNodes: ComponentNode[], parentCode: string | null = null): { id: string; newParentCode: string }[] => {
+    const reparents: { id: string; newParentCode: string }[] = [];
+    const origParentMap = new Map<string, string | null>();
+    const buildOrigMap = (nodes: ComponentNode[], pCode: string | null) => {
+      for (const node of nodes) {
+        if (node.actualId) {
+          origParentMap.set(node.id, pCode);
+        }
+        if (node.children) buildOrigMap(node.children, node.id);
+      }
+    };
+    buildOrigMap(origNodes, null);
+
+    const checkEdited = (nodes: ComponentNode[], pCode: string | null) => {
+      for (const node of nodes) {
+        if (node.actualId) {
+          const origParent = origParentMap.get(node.id);
+          if (origParent !== pCode && pCode !== null) {
+            reparents.push({ id: node.actualId, newParentCode: pCode });
+          }
+        }
+        if (node.children) checkEdited(node.children, node.id);
+      }
+    };
+    checkEdited(editNodes, parentCode);
+    return reparents;
+  };
+
   const handleSaveEditMode = async () => {
     setIsSavingSortOrder(true);
     try {
       const updates = collectSortUpdates(editTreeData);
-      await apiRequest("POST", "/technical/api/components/sort-order", { updates });
+      const reparents = collectReparents(editTreeData, filteredComponentTree);
+      await apiRequest("POST", "/technical/api/components/sort-order", { updates, reparents });
       queryClient.invalidateQueries({ queryKey: [`/technical/api/components/${vesselId}`] });
       setIsEditMode(false);
       setEditTreeData([]);
       toast({
         title: "Success",
-        description: "Sort order saved successfully",
+        description: reparents.length > 0
+          ? `Sort order saved — ${reparents.length} component(s) moved to new parent`
+          : "Sort order saved successfully",
       });
-    } catch (error) {
+    } catch (error: any) {
+      const errorMsg = error?.message || "Failed to save sort order";
       toast({
         title: "Error",
-        description: "Failed to save sort order",
+        description: errorMsg.includes('Circular') ? errorMsg : "Failed to save sort order",
         variant: "destructive",
       });
     } finally {
@@ -2905,6 +3021,7 @@ const Components: React.FC = () => {
       const isExpanded = expandedNodes.has(node.id);
       const isSelected = selectedComponent?.id === node.id;
       const isDragOver = dragOverCode === node.id;
+      const isCrossLevelDrop = isDragOver && dragSourceCode && (getParentCode(editTreeData, dragSourceCode) ?? null) !== (getParentCode(editTreeData, node.id) ?? null);
       const markerLevel = getTreeNodeMarker(level);
 
       return (
@@ -2912,7 +3029,7 @@ const Components: React.FC = () => {
           <div
             className={`flex items-center px-3 py-2 cursor-pointer hover:bg-gray-50 border-b border-gray-100 ${
               isSelected ? "bg-blue-50" : ""
-            }${isDragOver ? " bg-blue-100 border-t-2 border-t-blue-400" : ""}`}
+            }${isDragOver ? (isCrossLevelDrop ? " bg-green-50 border-l-4 border-l-green-500 border-b-2 border-b-green-400" : " bg-blue-100 border-t-2 border-t-blue-400") : ""}`}
             style={{ paddingLeft: `${level * 20 + (isEditMode ? 4 : 12)}px` }}
             onClick={() => {
               if (isEditMode) return;

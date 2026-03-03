@@ -10,6 +10,9 @@ export async function updateSortOrder(req: Request, res: Response) {
     if (error.name === 'ZodError') {
       return res.status(400).json({ error: "Invalid request data", details: error.errors });
     }
+    if (error.message?.includes('Circular hierarchy')) {
+      return res.status(400).json({ error: error.message });
+    }
     console.error("Error updating component sort order:", error);
     res.status(500).json({ error: "Failed to update sort order" });
   }

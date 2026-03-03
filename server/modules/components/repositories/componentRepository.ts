@@ -164,7 +164,7 @@ export async function findMaintenanceHistoryItem(id: number) {
   return storage.getComponentMaintenanceHistoryItem(id);
 }
 
-// ── Component Sort Order ──
+// ── Component Sort Order & Hierarchy ──
 
 export async function updateSortOrder(updates: { id: string; sortOrder: number }[]) {
   const { pool } = getPostgresClient();
@@ -175,6 +175,63 @@ export async function updateSortOrder(updates: { id: string; sortOrder: number }
     );
   }
   return { success: true, updated: updates.length };
+}
+
+export async function updateHierarchyAndSortOrder(
+  sortUpdates: { id: string; sortOrder: number }[],
+  reparents: { id: string; newParentCode: string }[]
+) {
+  const { pool } = getPostgresClient();
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+
+    for (const rp of reparents) {
+      const componentResult = await client.query(
+        `SELECT component_code FROM components WHERE id = $1`,
+        [rp.id]
+      );
+      if (componentResult.rows.length === 0) {
+        throw new Error(`Component not found: ${rp.id}`);
+      }
+      const movingCode = componentResult.rows[0].component_code;
+
+      let checkParent = rp.newParentCode;
+      const visited = new Set<string>();
+      while (checkParent) {
+        if (checkParent === movingCode) {
+          throw new Error(`Circular hierarchy detected: cannot move "${movingCode}" under "${rp.newParentCode}" because it would create a cycle`);
+        }
+        if (visited.has(checkParent)) break;
+        visited.add(checkParent);
+        const parentResult = await client.query(
+          `SELECT parent_id FROM components WHERE component_code = $1 AND vessel_id = (SELECT vessel_id FROM components WHERE id = $2)`,
+          [checkParent, rp.id]
+        );
+        checkParent = parentResult.rows[0]?.parent_id || null;
+      }
+
+      await client.query(
+        `UPDATE components SET parent_id = $1, parent_component = $1 WHERE id = $2`,
+        [rp.newParentCode, rp.id]
+      );
+    }
+
+    for (const update of sortUpdates) {
+      await client.query(
+        `UPDATE components SET sort_order = $1 WHERE id = $2`,
+        [update.sortOrder, update.id]
+      );
+    }
+
+    await client.query('COMMIT');
+    return { success: true, updated: sortUpdates.length, reparented: reparents.length };
+  } catch (error) {
+    await client.query('ROLLBACK');
+    throw error;
+  } finally {
+    client.release();
+  }
 }
 
 // ── Equipment Category Methods (direct DB — no storage.* methods exist) ──
