@@ -18,6 +18,27 @@ export async function getById(id: string): Promise<Component | undefined> {
 }
 
 export async function create(data: any): Promise<Component> {
+  const mandatoryFields: { key: string; label: string; isBoolean?: boolean }[] = [
+    { key: 'name', label: 'Component Name' },
+    { key: 'componentCode', label: 'Component Code' },
+    { key: 'parentId', label: 'Parent Component Code' },
+    { key: 'componentCategory', label: 'Component Category' },
+    { key: 'model', label: 'Model' },
+    { key: 'modelCode', label: 'Model Code' },
+    { key: 'critical', label: 'Criticality', isBoolean: true },
+    { key: 'conditionBased', label: 'Condition Based', isBoolean: true },
+    { key: 'eqptSystemDept', label: 'Equipment / System Department' },
+    { key: 'isActive', label: 'Is Active', isBoolean: true },
+  ];
+  const missing = mandatoryFields.filter(f => {
+    const val = data[f.key];
+    if (f.isBoolean) return val === undefined || val === null || val === '';
+    return !val || (typeof val === 'string' && val.trim() === '');
+  }).map(f => f.label);
+  if (missing.length > 0) {
+    throw new ValidationError(`Missing mandatory fields: ${missing.join(', ')}`);
+  }
+
   // RH field validation (B7.B rules)
   const effectiveRhType = data.rhCounterType || 'NOT_RH_DRIVEN';
 
@@ -63,6 +84,28 @@ export async function update(id: string, data: any, userId: string): Promise<Com
   const existingComponent = await repo.findById(id);
   if (!existingComponent) {
     throw new NotFoundError('Component not found');
+  }
+
+  const mandatoryPatchFields: { key: string; label: string; isBoolean?: boolean }[] = [
+    { key: 'name', label: 'Component Name' },
+    { key: 'componentCode', label: 'Component Code' },
+    { key: 'parentId', label: 'Parent Component Code' },
+    { key: 'componentCategory', label: 'Component Category' },
+    { key: 'model', label: 'Model' },
+    { key: 'modelCode', label: 'Model Code' },
+    { key: 'critical', label: 'Criticality', isBoolean: true },
+    { key: 'conditionBased', label: 'Condition Based', isBoolean: true },
+    { key: 'eqptSystemDept', label: 'Equipment / System Department' },
+    { key: 'isActive', label: 'Is Active', isBoolean: true },
+  ];
+  const invalidPatch = mandatoryPatchFields.filter(f => {
+    if (!(f.key in data)) return false;
+    const val = data[f.key];
+    if (f.isBoolean) return val === undefined || val === null || val === '';
+    return val === null || val === '' || (typeof val === 'string' && val.trim() === '');
+  }).map(f => f.label);
+  if (invalidPatch.length > 0) {
+    throw new ValidationError(`Cannot set mandatory fields to empty: ${invalidPatch.join(', ')}`);
   }
 
   // RH field validation (B7.B rules)

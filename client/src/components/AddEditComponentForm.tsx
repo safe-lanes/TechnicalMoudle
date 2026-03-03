@@ -322,14 +322,58 @@ const AddEditComponentForm: React.FC<AddEditComponentFormProps> = ({
     }
   }, [componentData.componentCode]);
 
+  const MANDATORY_FIELDS = [
+    { key: 'parentComponent', label: 'Parent Component Code' },
+    { key: 'componentCode', label: 'Component Code' },
+    { key: 'componentName', label: 'Component Name' },
+    { key: 'componentCategory', label: 'Component Category' },
+    { key: 'model', label: 'Model' },
+    { key: 'modelCode', label: 'Model Code' },
+    { key: 'critical', label: 'Criticality' },
+    { key: 'conditionBased', label: 'Condition Based' },
+    { key: 'eqptSystemDept', label: 'Equipment / System Department' },
+    { key: 'isActive', label: 'Is Active' },
+  ] as const;
+
+  const [validationErrors, setValidationErrors] = useState<Record<string, boolean>>({});
+
+  const validateMandatoryFields = (): boolean => {
+    const errors: Record<string, boolean> = {};
+    let hasErrors = false;
+    for (const field of MANDATORY_FIELDS) {
+      const value = componentData[field.key as keyof typeof componentData];
+      if (!value || value.trim() === '') {
+        errors[field.key] = true;
+        hasErrors = true;
+      }
+    }
+    setValidationErrors(errors);
+    return !hasErrors;
+  };
+
   const handleFieldChange = (fieldName: string, value: string) => {
     setComponentData(prev => ({ ...prev, [fieldName]: value }));
+    if (validationErrors[fieldName]) {
+      setValidationErrors(prev => {
+        const next = { ...prev };
+        delete next[fieldName];
+        return next;
+      });
+    }
   };
 
   // Convert Yes/No strings to boolean
   const toBool = (val: string) => val === "Yes";
 
   const handleSave = async () => {
+    if (!validateMandatoryFields()) {
+      toast({
+        title: "Validation Error",
+        description: "Please fill all mandatory fields before saving.",
+        variant: "destructive",
+      });
+      return;
+    }
     setIsSaving(true);
     try {
       // Prepare component payload with proper field name mapping and boolean conversion
@@ -517,18 +561,19 @@ const AddEditComponentForm: React.FC<AddEditComponentFormProps> = ({
                               />
                             </div>
                             <div>
-                              <label className="text-xs font-medium text-gray-600 block mb-1">Parent Component Code</label>
+                              <label className="text-xs font-medium text-gray-600 block mb-1">Parent Component Code<span className="text-red-500 ml-0.5">*</span></label>
                               <input
                                 type="text"
                                 value={componentData.parentComponent}
                                 onChange={(e) => handleFieldChange('parentComponent', e.target.value)}
-                                className="text-sm w-full px-2 py-1 border rounded text-[#52BAF3] border-[#52BAF3]"
+                                className={`text-sm w-full px-2 py-1 border rounded ${validationErrors.parentComponent ? 'border-red-500 text-red-700' : 'text-[#52BAF3] border-[#52BAF3]'}`}
                                 data-testid="input-parent-component-code"
                                 disabled={!!parentComponent}
                               />
+                              {validationErrors.parentComponent && <span className="text-xs text-red-500" data-testid="validation-error-parentComponent">This field is required</span>}
                             </div>
                             <div>
-                              <label className="text-xs font-medium text-gray-600 block mb-1">Component Code</label>
+                              <label className="text-xs font-medium text-gray-600 block mb-1">Component Code<span className="text-red-500 ml-0.5">*</span></label>
                               {isEditMode ? (
                                 <div className="text-sm text-gray-900" data-testid="text-component-code">
                                   {componentData.componentCode}
@@ -538,35 +583,38 @@ const AddEditComponentForm: React.FC<AddEditComponentFormProps> = ({
                                   type="text"
                                   value={componentData.componentCode}
                                   onChange={(e) => handleFieldChange('componentCode', e.target.value)}
-                                  className="text-sm w-full px-2 py-1 border rounded text-[#52BAF3] border-[#52BAF3]"
+                                  className={`text-sm w-full px-2 py-1 border rounded ${validationErrors.componentCode ? 'border-red-500 text-red-700' : 'text-[#52BAF3] border-[#52BAF3]'}`}
                                   data-testid="input-component-code"
                                 />
                               )}
+                              {validationErrors.componentCode && <span className="text-xs text-red-500" data-testid="validation-error-componentCode">This field is required</span>}
                             </div>
                           </div>
 
                           {/* Row 2: Component Name, Component Category, Maker, Maker Code */}
                           <div className="grid grid-cols-4 gap-4">
                             <div>
-                              <label className="text-xs font-medium text-gray-600 block mb-1">Component Name</label>
+                              <label className="text-xs font-medium text-gray-600 block mb-1">Component Name<span className="text-red-500 ml-0.5">*</span></label>
                               <input
                                 type="text"
                                 value={componentData.componentName}
                                 onChange={(e) => handleFieldChange('componentName', e.target.value)}
-                                className="text-sm w-full px-2 py-1 border rounded text-[#52BAF3] border-[#52BAF3]"
+                                className={`text-sm w-full px-2 py-1 border rounded ${validationErrors.componentName ? 'border-red-500 text-red-700' : 'text-[#52BAF3] border-[#52BAF3]'}`}
                                 data-testid="input-component-name"
                               />
+                              {validationErrors.componentName && <span className="text-xs text-red-500" data-testid="validation-error-componentName">This field is required</span>}
                             </div>
                             <div>
-                              <label className="text-xs font-medium text-gray-600 block mb-1">Component Category</label>
+                              <label className="text-xs font-medium text-gray-600 block mb-1">Component Category<span className="text-red-500 ml-0.5">*</span></label>
                               <input
                                 type="text"
                                 value={componentData.componentCategory}
                                 readOnly
-                                className="text-sm w-full px-2 py-1 border rounded bg-gray-50 text-gray-700 border-gray-300 cursor-not-allowed"
+                                className={`text-sm w-full px-2 py-1 border rounded bg-gray-50 cursor-not-allowed ${validationErrors.componentCategory ? 'border-red-500 text-red-700' : 'text-gray-700 border-gray-300'}`}
                                 data-testid="input-component-category"
                                 title="Auto-populated based on component group (1-8)"
                               />
+                              {validationErrors.componentCategory && <span className="text-xs text-red-500" data-testid="validation-error-componentCategory">This field is required</span>}
                             </div>
                             <div>
                               <label className="text-xs font-medium text-gray-600 block mb-1">Maker</label>
@@ -593,24 +641,26 @@ const AddEditComponentForm: React.FC<AddEditComponentFormProps> = ({
                           {/* Row 3: Model, Model Code, Serial No, Drawing No */}
                           <div className="grid grid-cols-4 gap-4">
                             <div>
-                              <label className="text-xs font-medium text-gray-600 block mb-1">Model</label>
+                              <label className="text-xs font-medium text-gray-600 block mb-1">Model<span className="text-red-500 ml-0.5">*</span></label>
                               <input
                                 type="text"
                                 value={componentData.model}
                                 onChange={(e) => handleFieldChange('model', e.target.value)}
-                                className="text-sm w-full px-2 py-1 border rounded text-[#52BAF3] border-[#52BAF3]"
+                                className={`text-sm w-full px-2 py-1 border rounded ${validationErrors.model ? 'border-red-500 text-red-700' : 'text-[#52BAF3] border-[#52BAF3]'}`}
                                 data-testid="input-model"
                               />
+                              {validationErrors.model && <span className="text-xs text-red-500" data-testid="validation-error-model">This field is required</span>}
                             </div>
                             <div>
-                              <label className="text-xs font-medium text-gray-600 block mb-1">Model Code</label>
+                              <label className="text-xs font-medium text-gray-600 block mb-1">Model Code<span className="text-red-500 ml-0.5">*</span></label>
                               <input
                                 type="text"
                                 value={componentData.modelCode}
                                 onChange={(e) => handleFieldChange('modelCode', e.target.value)}
-                                className="text-sm w-full px-2 py-1 border rounded text-[#52BAF3] border-[#52BAF3]"
+                                className={`text-sm w-full px-2 py-1 border rounded ${validationErrors.modelCode ? 'border-red-500 text-red-700' : 'text-[#52BAF3] border-[#52BAF3]'}`}
                                 data-testid="input-model-code"
                               />
+                              {validationErrors.modelCode && <span className="text-xs text-red-500" data-testid="validation-error-modelCode">This field is required</span>}
                             </div>
                             <div>
                               <label className="text-xs font-medium text-gray-600 block mb-1">Serial No</label>
@@ -647,30 +697,32 @@ const AddEditComponentForm: React.FC<AddEditComponentFormProps> = ({
                               />
                             </div>
                             <div>
-                              <label className="text-xs font-medium text-gray-600 block mb-1">Criticality</label>
+                              <label className="text-xs font-medium text-gray-600 block mb-1">Criticality<span className="text-red-500 ml-0.5">*</span></label>
                               <select
                                 value={componentData.critical}
                                 onChange={(e) => handleFieldChange('critical', e.target.value)}
-                                className="text-sm w-full px-2 py-1 border rounded text-[#52BAF3] border-[#52BAF3]"
+                                className={`text-sm w-full px-2 py-1 border rounded ${validationErrors.critical ? 'border-red-500 text-red-700' : 'text-[#52BAF3] border-[#52BAF3]'}`}
                                 data-testid="select-criticality"
                               >
                                 <option value="">Select</option>
                                 <option value="Yes">Yes</option>
                                 <option value="No">No</option>
                               </select>
+                              {validationErrors.critical && <span className="text-xs text-red-500" data-testid="validation-error-critical">This field is required</span>}
                             </div>
                             <div>
-                              <label className="text-xs font-medium text-gray-600 block mb-1">Condition Based</label>
+                              <label className="text-xs font-medium text-gray-600 block mb-1">Condition Based<span className="text-red-500 ml-0.5">*</span></label>
                               <select
                                 value={componentData.conditionBased}
                                 onChange={(e) => handleFieldChange('conditionBased', e.target.value)}
-                                className="text-sm w-full px-2 py-1 border rounded text-[#52BAF3] border-[#52BAF3]"
+                                className={`text-sm w-full px-2 py-1 border rounded ${validationErrors.conditionBased ? 'border-red-500 text-red-700' : 'text-[#52BAF3] border-[#52BAF3]'}`}
                                 data-testid="select-condition-based"
                               >
                                 <option value="">Select</option>
                                 <option value="Yes">Yes</option>
                                 <option value="No">No</option>
                               </select>
+                              {validationErrors.conditionBased && <span className="text-xs text-red-500" data-testid="validation-error-conditionBased">This field is required</span>}
                             </div>
                             <div>
                               <label className="text-xs font-medium text-gray-600 block mb-1">Installation Date</label>
@@ -707,11 +759,11 @@ const AddEditComponentForm: React.FC<AddEditComponentFormProps> = ({
                               />
                             </div>
                             <div>
-                              <label className="text-xs font-medium text-gray-600 block mb-1">Equipment / System Department</label>
+                              <label className="text-xs font-medium text-gray-600 block mb-1">Equipment / System Department<span className="text-red-500 ml-0.5">*</span></label>
                               <select
                                 value={componentData.eqptSystemDept}
                                 onChange={(e) => handleFieldChange('eqptSystemDept', e.target.value)}
-                                className="text-sm w-full px-2 py-1 border rounded text-[#52BAF3] border-[#52BAF3]"
+                                className={`text-sm w-full px-2 py-1 border rounded ${validationErrors.eqptSystemDept ? 'border-red-500 text-red-700' : 'text-[#52BAF3] border-[#52BAF3]'}`}
                                 data-testid="select-eqpt-system-dept"
                               >
                                 <option value="">Select Department</option>
@@ -719,6 +771,7 @@ const AddEditComponentForm: React.FC<AddEditComponentFormProps> = ({
                                 <option value="Engine">Engine</option>
                                 <option value="Electrical">Electrical</option>
                               </select>
+                              {validationErrors.eqptSystemDept && <span className="text-xs text-red-500" data-testid="validation-error-eqptSystemDept">This field is required</span>}
                             </div>
                             <div>
                               {/* Empty spacer field */}
@@ -741,17 +794,18 @@ const AddEditComponentForm: React.FC<AddEditComponentFormProps> = ({
                               </select>
                             </div>
                             <div>
-                              <label className="text-xs font-medium text-gray-600 block mb-1">IS Active</label>
+                              <label className="text-xs font-medium text-gray-600 block mb-1">IS Active<span className="text-red-500 ml-0.5">*</span></label>
                               <select
                                 value={componentData.isActive}
                                 onChange={(e) => handleFieldChange('isActive', e.target.value)}
-                                className="text-sm w-full px-2 py-1 border rounded text-[#52BAF3] border-[#52BAF3]"
+                                className={`text-sm w-full px-2 py-1 border rounded ${validationErrors.isActive ? 'border-red-500 text-red-700' : 'text-[#52BAF3] border-[#52BAF3]'}`}
                                 data-testid="select-is-active"
                               >
                                 <option value="">Select</option>
                                 <option value="Yes">Yes</option>
                                 <option value="No">No</option>
                               </select>
+                              {validationErrors.isActive && <span className="text-xs text-red-500" data-testid="validation-error-isActive">This field is required</span>}
                             </div>
                             <div>
                               <label className="text-xs font-medium text-gray-600 block mb-1">Vessel Code</label>

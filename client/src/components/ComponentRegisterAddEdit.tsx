@@ -689,11 +689,55 @@ export default function ComponentRegisterAddEdit({
     });
   };
 
+  const MANDATORY_FIELDS = [
+    { key: 'parentComponent', label: 'Parent Component Code' },
+    { key: 'componentCode', label: 'Component Code' },
+    { key: 'componentName', label: 'Component Name' },
+    { key: 'eqptSystemCategory', label: 'Component Category' },
+    { key: 'model', label: 'Model' },
+    { key: 'modelCode', label: 'Model Code' },
+    { key: 'critical', label: 'Criticality' },
+    { key: 'conditionBased', label: 'Condition Based' },
+    { key: 'eqptSystemDept', label: 'Equipment / System Department' },
+    { key: 'isActive', label: 'Is Active' },
+  ] as const;
+
+  const [validationErrors, setValidationErrors] = useState<Record<string, boolean>>({});
+
+  const validateMandatoryFields = (): boolean => {
+    const errors: Record<string, boolean> = {};
+    let hasErrors = false;
+    for (const field of MANDATORY_FIELDS) {
+      const value = componentData[field.key as keyof typeof componentData];
+      if (!value || value.trim() === '') {
+        errors[field.key] = true;
+        hasErrors = true;
+      }
+    }
+    setValidationErrors(errors);
+    return !hasErrors;
+  };
+
   const handleFieldChange = (field: string, value: string) => {
     setComponentData(prev => ({ ...prev, [field]: value }));
+    if (validationErrors[field]) {
+      setValidationErrors(prev => {
+        const next = { ...prev };
+        delete next[field];
+        return next;
+      });
+    }
   };
 
   const handleSave = async () => {
+    if (!validateMandatoryFields()) {
+      toast({
+        title: "Validation Error",
+        description: "Please fill all mandatory fields before saving.",
+        variant: "destructive",
+      });
+      return;
+    }
     setIsSaving(true);
     try {
       const payload = {
@@ -1070,45 +1114,49 @@ export default function ComponentRegisterAddEdit({
                     />
                   </div>
                   <div>
-                    <label className="text-xs text-gray-500 mb-1 block">Parent Component Code</label>
+                    <label className="text-xs text-gray-500 mb-1 block">Parent Component Code<span className="text-red-500 ml-0.5">*</span></label>
                     <Input
                       value={componentData.parentComponent}
                       onChange={(e) => handleFieldChange('parentComponent', e.target.value)}
-                      className="h-8 text-sm"
+                      className={`h-8 text-sm ${validationErrors.parentComponent ? 'border-red-500' : ''}`}
                       data-testid="input-parent-component"
                     />
+                    {validationErrors.parentComponent && <span className="text-xs text-red-500" data-testid="validation-error-parentComponent">This field is required</span>}
                   </div>
                   <div>
-                    <label className="text-xs text-gray-500 mb-1 block">Component Code</label>
+                    <label className="text-xs text-gray-500 mb-1 block">Component Code<span className="text-red-500 ml-0.5">*</span></label>
                     <Input
                       value={componentData.componentCode}
                       onChange={(e) => handleFieldChange('componentCode', e.target.value)}
-                      className="h-8 text-sm"
+                      className={`h-8 text-sm ${validationErrors.componentCode ? 'border-red-500' : ''}`}
                       data-testid="input-component-code"
                     />
+                    {validationErrors.componentCode && <span className="text-xs text-red-500" data-testid="validation-error-componentCode">This field is required</span>}
                   </div>
                 </div>
 
                 {/* Row 2: Component Name, Component Category, Maker, Maker Code */}
                 <div className="grid grid-cols-4 gap-4 mb-4">
                   <div>
-                    <label className="text-xs text-gray-500 mb-1 block">Component Name</label>
+                    <label className="text-xs text-gray-500 mb-1 block">Component Name<span className="text-red-500 ml-0.5">*</span></label>
                     <Input
                       value={componentData.componentName}
                       onChange={(e) => handleFieldChange('componentName', e.target.value)}
-                      className="h-8 text-sm"
+                      className={`h-8 text-sm ${validationErrors.componentName ? 'border-red-500' : ''}`}
                       data-testid="input-component-name"
                     />
+                    {validationErrors.componentName && <span className="text-xs text-red-500" data-testid="validation-error-componentName">This field is required</span>}
                   </div>
                   <div>
-                    <label className="text-xs text-gray-500 mb-1 block">Component Category</label>
+                    <label className="text-xs text-gray-500 mb-1 block">Component Category<span className="text-red-500 ml-0.5">*</span></label>
                     <Input
                       value={componentData.eqptSystemCategory}
                       readOnly
-                      className="h-8 text-sm bg-gray-50 text-gray-700 cursor-not-allowed"
+                      className={`h-8 text-sm bg-gray-50 text-gray-700 cursor-not-allowed ${validationErrors.eqptSystemCategory ? 'border-red-500' : ''}`}
                       data-testid="input-component-category"
                       title="Auto-populated based on component group (1-8)"
                     />
+                    {validationErrors.eqptSystemCategory && <span className="text-xs text-red-500" data-testid="validation-error-eqptSystemCategory">This field is required</span>}
                   </div>
                   <div>
                     <label className="text-xs text-gray-500 mb-1 block">Maker</label>
@@ -1133,22 +1181,24 @@ export default function ComponentRegisterAddEdit({
                 {/* Row 3: Model, Model Code, Serial No, Drawing No */}
                 <div className="grid grid-cols-4 gap-4 mb-4">
                   <div>
-                    <label className="text-xs text-gray-500 mb-1 block">Model</label>
+                    <label className="text-xs text-gray-500 mb-1 block">Model<span className="text-red-500 ml-0.5">*</span></label>
                     <Input
                       value={componentData.model}
                       onChange={(e) => handleFieldChange('model', e.target.value)}
-                      className="h-8 text-sm"
+                      className={`h-8 text-sm ${validationErrors.model ? 'border-red-500' : ''}`}
                       data-testid="input-model"
                     />
+                    {validationErrors.model && <span className="text-xs text-red-500" data-testid="validation-error-model">This field is required</span>}
                   </div>
                   <div>
-                    <label className="text-xs text-gray-500 mb-1 block">Model Code</label>
+                    <label className="text-xs text-gray-500 mb-1 block">Model Code<span className="text-red-500 ml-0.5">*</span></label>
                     <Input
                       value={componentData.modelCode}
                       onChange={(e) => handleFieldChange('modelCode', e.target.value)}
-                      className="h-8 text-sm"
+                      className={`h-8 text-sm ${validationErrors.modelCode ? 'border-red-500' : ''}`}
                       data-testid="input-model-code"
                     />
+                    {validationErrors.modelCode && <span className="text-xs text-red-500" data-testid="validation-error-modelCode">This field is required</span>}
                   </div>
                   <div>
                     <label className="text-xs text-gray-500 mb-1 block">Serial No</label>
@@ -1182,30 +1232,32 @@ export default function ComponentRegisterAddEdit({
                     />
                   </div>
                   <div>
-                    <label className="text-xs text-gray-500 mb-1 block">Criticality</label>
+                    <label className="text-xs text-gray-500 mb-1 block">Criticality<span className="text-red-500 ml-0.5">*</span></label>
                     <select
                       value={componentData.critical}
                       onChange={(e) => handleFieldChange('critical', e.target.value)}
-                      className="h-8 w-full text-sm px-2 border rounded border-gray-200"
+                      className={`h-8 w-full text-sm px-2 border rounded ${validationErrors.critical ? 'border-red-500' : 'border-gray-200'}`}
                       data-testid="select-criticality-field"
                     >
                       <option value="">Select</option>
                       <option value="Yes">Yes</option>
                       <option value="No">No</option>
                     </select>
+                    {validationErrors.critical && <span className="text-xs text-red-500" data-testid="validation-error-critical">This field is required</span>}
                   </div>
                   <div>
-                    <label className="text-xs text-gray-500 mb-1 block">Condition Based</label>
+                    <label className="text-xs text-gray-500 mb-1 block">Condition Based<span className="text-red-500 ml-0.5">*</span></label>
                     <select
                       value={componentData.conditionBased}
                       onChange={(e) => handleFieldChange('conditionBased', e.target.value)}
-                      className="h-8 w-full text-sm px-2 border rounded border-gray-200"
+                      className={`h-8 w-full text-sm px-2 border rounded ${validationErrors.conditionBased ? 'border-red-500' : 'border-gray-200'}`}
                       data-testid="select-condition-based"
                     >
                       <option value="">Select</option>
                       <option value="Yes">Yes</option>
                       <option value="No">No</option>
                     </select>
+                    {validationErrors.conditionBased && <span className="text-xs text-red-500" data-testid="validation-error-conditionBased">This field is required</span>}
                   </div>
                   <div>
                     <label className="text-xs text-gray-500 mb-1 block">Installation Date</label>
@@ -1241,11 +1293,11 @@ export default function ComponentRegisterAddEdit({
                     />
                   </div>
                   <div>
-                    <label className="text-xs text-gray-500 mb-1 block">Equipment / System Department</label>
+                    <label className="text-xs text-gray-500 mb-1 block">Equipment / System Department<span className="text-red-500 ml-0.5">*</span></label>
                     <select
                       value={componentData.eqptSystemDept}
                       onChange={(e) => handleFieldChange('eqptSystemDept', e.target.value)}
-                      className="h-8 w-full text-sm px-2 border rounded border-gray-200"
+                      className={`h-8 w-full text-sm px-2 border rounded ${validationErrors.eqptSystemDept ? 'border-red-500' : 'border-gray-200'}`}
                       data-testid="select-eqpt-system-dept"
                     >
                       <option value="">Select</option>
@@ -1253,6 +1305,7 @@ export default function ComponentRegisterAddEdit({
                         <option key={opt.value} value={opt.value}>{opt.label}</option>
                       ))}
                     </select>
+                    {validationErrors.eqptSystemDept && <span className="text-xs text-red-500" data-testid="validation-error-eqptSystemDept">This field is required</span>}
                   </div>
                   <div>
                     <label className="text-xs text-gray-500 mb-1 block">Class Item</label>
@@ -1281,16 +1334,17 @@ export default function ComponentRegisterAddEdit({
                     />
                   </div>
                   <div>
-                    <label className="text-xs text-gray-500 mb-1 block">Is Active</label>
+                    <label className="text-xs text-gray-500 mb-1 block">Is Active<span className="text-red-500 ml-0.5">*</span></label>
                     <select
                       value={componentData.isActive}
                       onChange={(e) => handleFieldChange('isActive', e.target.value)}
-                      className="h-8 w-full text-sm px-2 border rounded border-gray-200"
+                      className={`h-8 w-full text-sm px-2 border rounded ${validationErrors.isActive ? 'border-red-500' : 'border-gray-200'}`}
                       data-testid="select-is-active"
                     >
                       <option value="Yes">Yes (Active)</option>
                       <option value="No">No (Inactive)</option>
                     </select>
+                    {validationErrors.isActive && <span className="text-xs text-red-500" data-testid="validation-error-isActive">This field is required</span>}
                   </div>
                   <div>
                     <label className="text-xs text-gray-500 mb-1 block">Vessel Code</label>

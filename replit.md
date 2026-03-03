@@ -37,6 +37,7 @@ Preferred communication style: Simple, everyday language.
 -   **Fleet Table Schema Contract**: All `fleet_*` tables must include mandatory columns such as `uuid`, `sortOrder`, `createdAt`, `updatedAt`, `createdByUuid`, `updatedByUuid`, `isDeleted`, and `isSync`.
 -   **Bulk Import Maker Validation**: Component bulk import now validates that makers specified in the import sheet already exist in `maker_list`, preventing automatic creation of new makers.
 -   **Inventory Transaction Location Picker**: The Inventory Transaction dialog features interactive, searchable combobox dropdowns for selecting and creating locations directly from the `locations` table.
+-   **Component Mandatory Field Validation**: The Add/Edit Component forms (`ComponentRegisterAddEdit.tsx`, `AddEditComponentForm.tsx`) enforce 10 mandatory fields (Parent Component Code, Component Code, Component Name, Component Category, Model, Model Code, Criticality, Condition Based, Equipment/System Department, Is Active) with red asterisks, red border highlights, inline error messages, and a validation toast on Save. Backend validation in `componentService.ts` also rejects missing mandatory fields on both create and update.
 
 ## External Dependencies
 
