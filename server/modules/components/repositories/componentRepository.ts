@@ -6,23 +6,44 @@ import type { Component, InsertComponent } from '@shared/schema';
 
 // ── Core Component Methods ──
 
+async function augmentWithSortOrder(components: Component[]): Promise<Component[]> {
+  if (components.length === 0) return components;
+  const { pool } = getPostgresClient();
+  const ids = components.map(c => c.id);
+  const result = await pool.query(
+    `SELECT id, sort_order FROM components WHERE id = ANY($1)`,
+    [ids]
+  );
+  const sortOrderMap = new Map<string, number>();
+  for (const row of result.rows) {
+    sortOrderMap.set(row.id, row.sort_order ?? 0);
+  }
+  return components.map(c => ({
+    ...c,
+    sortOrder: sortOrderMap.get(c.id) ?? 0,
+  })) as Component[];
+}
+
 export async function findByVesselId(vesselId: string): Promise<Component[]> {
-  return storage.getComponents(vesselId);
+  const components = await storage.getComponents(vesselId);
+  return augmentWithSortOrder(components);
 }
 
 export async function findById(id: string): Promise<Component | undefined> {
-  return storage.getComponent(id);
+  const component = await storage.getComponent(id);
+  if (!component) return undefined;
+  const [augmented] = await augmentWithSortOrder([component]);
+  return augmented;
 }
 
 export async function findAll(): Promise<Component[]> {
-  // List all components across all vessels
   const allVessels = await storage.getVessels();
   const allComponents: Component[] = [];
   for (const vessel of allVessels) {
     const vesselComponents = await storage.getComponents(vessel.id);
     allComponents.push(...vesselComponents);
   }
-  return allComponents;
+  return augmentWithSortOrder(allComponents);
 }
 
 export async function create(data: InsertComponent): Promise<Component> {
