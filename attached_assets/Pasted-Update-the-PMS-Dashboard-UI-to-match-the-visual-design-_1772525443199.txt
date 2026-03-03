@@ -1,0 +1,67 @@
+Update the PMS Dashboard UI to match the visual design language of the reference Audit Dashboard 
+(dev.sl-sail.com/audit/dashboard/summary). Apply the following changes:
+
+1. **Section Header Bars**: Remove the dark navy/teal full-width banner rows for section titles 
+   ("WORK ORDER KPIS", "WORK ORDER STATUS & TRENDS", "INVENTORY & FLEET ANALYSIS"). Replace them 
+   with small, bold, uppercase blue text labels (similar to a section heading in plain white card 
+   background) — no colored background banner. Use color: #1a6eb5 (blue), font-size: 11px, 
+   font-weight: 700, letter-spacing: 0.8px.
+
+2. **Gauge / Speedometer Charts (KPI Cards)**:
+   - Change all gauge arcs to a uniform LIGHT GRAY color for the background track.
+   - Remove the strong vibrant color fills (red, green, orange). Instead, use a single consistent 
+     dark navy or blue arc color (#1d3557 or similar) for the filled/active portion.
+   - The numeric value displayed inside the gauge should be bold dark navy (#1a2b4a), not colored.
+   - Keep the gauge style as a half-circle (semicircle gauge, not full circle).
+
+3. **KPI Number Badges (Inventory section)**:
+   - Replace the colored rounded-rectangle badges (gray, red) with plain bold text numbers in dark 
+     navy color.
+   - For "Low Stock" and "Critical Low Stock", instead of red filled badge, use a red text color 
+     (#e74c3c) without a background badge.
+
+4. **Trend Line Chart ("6-Month Maintenance Trend")**:
+   - Remove the area-fill (the blue shaded area under the line and pink background).
+   - Change to a clean multi-line chart on a plain white background with only a light gray grid.
+   - Use distinct colors per metric line: Healthy = #2ecc71 (green), Watch = #f39c12 (orange), 
+     Backlog = #e74c3c (red).
+   - Add data point dots on each line node.
+
+5. **Donut Charts**:
+   - For "Status Distribution" donut: keep the donut style but reduce the outer ring thickness 
+     (thinner ring, more white center space). Match the clean minimal look.
+   - For "Spares Stock Status" donut: same — thinner ring, clean white center.
+   - Ensure chart backgrounds are plain white (no card background tint).
+
+6. **"All Vessel / My Vessel" Toggle**:
+   - The INACTIVE option should be the one with dark navy filled background.
+   - The ACTIVE option should have a white background with dark navy border and dark navy text 
+     (outlined pill style). This matches the reference where "My Vessel" is the filled one and 
+     "All Vessel" is the outline.
+   - Use border-radius: 20px pill shape.
+
+7. **Top Navigation Bar**:
+   - Change the top module navigation bar background from dark navy to plain white (#ffffff).
+   - Active module tab (PMS) should be highlighted with a solid colored bottom border underline 
+     (border-bottom: 3px solid #1a6eb5) rather than a filled colored background tab.
+   - Tab text and icons should be dark gray (#333) for inactive, and blue (#1a6eb5) for active.
+   - Remove the colored active-tab background pill/block style.
+
+8. **Left Sidebar**:
+   - Change the sidebar background from dark navy to a slightly lighter navy or medium blue 
+     (#1565c0 or #1a3a6b) to match the reference sidebar blue tone more closely.
+   - Ensure icon + label pairs are vertically stacked and centered, with white color.
+
+9. **Card Styling**:
+   - All dashboard cards/panels should have a white background (#ffffff), very light box-shadow 
+     (box-shadow: 0 1px 4px rgba(0,0,0,0.08)), and a border-radius of 8px.
+   - Remove any dark/colored card header backgrounds inside the cards.
+
+10. **Typography**:
+    - Section sub-labels and supporting text (e.g., "43% of total", "Due: 93 · Pending: 1") 
+      should be in #6b7280 (medium gray), font-size: 12px.
+    - All section title labels should follow the pattern: uppercase, 11px, bold, blue (#1a6eb5), 
+      no background.
+
+Keep all existing data, chart types, layout structure, and functionality unchanged. Only update 
+colors, typography, chart styling, and component visual treatment as described above.
