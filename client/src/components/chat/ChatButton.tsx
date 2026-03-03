@@ -32,7 +32,14 @@ export function ChatButton() {
           <Button
             onClick={toggleChat}
             size="icon"
-            className="rounded-full shadow-lg"
+            variant="outline"
+            className="rounded-full"
+            style={{
+              background: '#ffffff',
+              borderColor: '#1a6eb5',
+              color: '#1a6eb5',
+              boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
+            }}
             data-testid="button-open-chat"
             aria-label="Open PMS Assistant"
           >

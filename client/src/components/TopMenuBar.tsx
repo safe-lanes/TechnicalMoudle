@@ -35,12 +35,6 @@ export const TopMenuBar: React.FC<TopMenuBarProps> = ({
       icon: Grid3X3,
       isModule: true,
     },
-    // Dashboard menu item hidden - will restore when functionality is added
-    // {
-    //   id: "dashboard",
-    //   label: "Dashboard",
-    //   icon: BarChart3,
-    // },
     {
       id: "cert-surveys",
       label: "Cert. & Surveys",
@@ -65,9 +59,8 @@ export const TopMenuBar: React.FC<TopMenuBarProps> = ({
 
   return (
     <div className="bg-white border-b border-gray-200 shadow-sm relative sticky top-0 z-50">
-      <div className="flex items-stretch h-16 bg-[#f5f5f5]">
-        {/* SAIL Logo */}
-        <div className="flex items-center px-4 bg-[#f5f5f5]">
+      <div className="flex items-stretch h-16 bg-white">
+        <div className="flex items-center px-4 bg-white">
           <img 
             src={sailLogoPath} 
             alt="SAIL Logo" 
@@ -75,7 +68,6 @@ export const TopMenuBar: React.FC<TopMenuBarProps> = ({
           />
         </div>
         
-        {/* Spacer to push module selector to the right */}
         <div className="w-8"></div>
         
         {menuItems.map((item) => {
@@ -96,12 +88,12 @@ export const TopMenuBar: React.FC<TopMenuBarProps> = ({
                     className={cn(
                       "flex flex-col items-center justify-center w-[110px] transition-all duration-200 relative cursor-pointer select-none",
                       "hover:bg-gray-50",
-                      "bg-[#f5f5f5] border-r border-gray-200"
+                      "bg-white border-r border-gray-200"
                     )}
                     data-testid="dropdown-technical-module"
                   >
-                    <Icon className="h-5 w-5 mb-1 text-gray-600" />
-                    <span className="text-xs font-medium text-gray-600">
+                    <Icon className="h-5 w-5 mb-1" style={{ color: '#333' }} />
+                    <span className="text-xs font-medium" style={{ color: '#333' }}>
                       {item.label}
                     </span>
                   </div>
@@ -129,44 +121,31 @@ export const TopMenuBar: React.FC<TopMenuBarProps> = ({
               className={cn(
                 "flex flex-col items-center justify-center w-[110px] transition-all duration-200 relative",
                 "hover:bg-gray-50",
-                isSelected && "bg-[#52baf3] text-white hover:bg-[#52baf3]",
-                !isSelected && "text-gray-600 hover:text-gray-900"
+                "bg-white"
               )}
             >
-              <Icon className={cn(
-                "h-5 w-5 mb-1",
-                isSelected && "text-white",
-                !isSelected && "text-gray-600"
-              )} />
-              <span className={cn(
-                "text-xs font-medium",
-                isSelected && "text-white",
-                !isSelected && "text-gray-600"
-              )}>
+              <Icon className="h-5 w-5 mb-1" style={{ color: isSelected ? '#1a6eb5' : '#333' }} />
+              <span className="text-xs font-medium" style={{ color: isSelected ? '#1a6eb5' : '#333' }}>
                 {item.label}
               </span>
               {isSelected && (
-                <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-white" />
+                <div className="absolute bottom-0 left-0 right-0 z-10" style={{ height: '3px', background: '#1a6eb5' }} />
               )}
             </button>
           );
         })}
         
-        {/* Right side spacer */}
         <div className="flex-1" />
         
-        {/* Role Switcher */}
         <div className="flex items-center px-4">
           <RoleSwitcher />
         </div>
         
-        {/* Sync Status Indicator */}
         <div className="flex items-center px-4">
           <SyncStatusIndicator />
         </div>
       </div>
-      {/* Blue line at bottom border matching SAIL Phase 2 design - full width */}
-      <div className="absolute bottom-0 left-0 right-0 h-1 bg-[#52baf3]" />
+      <div className="absolute bottom-0 left-0 right-0 h-[1px] bg-[#e2e8f0]" />
     </div>
   );
 };

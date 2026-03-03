@@ -121,7 +121,7 @@ export const TechnicalModule = () => {
       
       <div className="flex h-[calc(100vh-68px)] overflow-hidden">
         {/* Sidebar column with continuous dark blue background - wrapper provides full-height color */}
-        <div className="w-20 min-w-[80px] flex-shrink-0 bg-[#16569e]">
+        <div className="w-20 min-w-[80px] flex-shrink-0 bg-[#1565c0]">
           <SideMenuBar 
             subModule={selectedSubModule}
             selectedItem={selectedMenuItem}

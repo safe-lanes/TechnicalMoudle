@@ -32,6 +32,20 @@ Preferred communication style: Simple, everyday language.
 -   Work Order forms are designed as single-page scrollable interfaces with numbered subsections.
 -   All dashboard charts display real database data.
 
+### Dashboard Visual Design Language (Audit-Reference Style)
+-   **Top Navbar**: White background (`#ffffff`), active tab has blue bottom-border underline (`#1a6eb5`), inactive tabs in dark gray (`#333`).
+-   **Left Sidebar**: Medium blue background (`#1565c0`) with white icons/text.
+-   **Section Headers**: Plain blue uppercase text labels (`#1a6eb5`, 11px, bold, 0.8px letter-spacing) on white background — no dark banner bars.
+-   **Gauge Charts**: Dark navy arc color (`#1d3557`), dark navy value text (`#1a2b4a`), light gray background track.
+-   **Donut Charts**: Thin ring style (`innerRadiusRatio: 0.75`), white background containers.
+-   **Trend Charts**: Multi-line LineChart (green/orange/red) with CartesianGrid, no area fills or colored reference bands.
+-   **KPI Badges**: Plain bold text (dark navy `#1a2b4a` or red `#e74c3c`) — no colored background badges.
+-   **Vessel Toggle**: Pill-shaped buttons (border-radius: 20px), active=filled dark navy, inactive=white with dark navy border.
+-   **Cards**: White background, `box-shadow: 0 1px 4px rgba(0,0,0,0.08)`, border-radius 8px.
+-   **Typography**: Section labels in blue `#1a6eb5`, supporting text in gray `#6b7280`.
+-   **Dot Matrix**: Default neutral gray (`#9ca3af`), colored only for significant signals (red/amber).
+-   **Chat FAB**: Subtle white circle with blue border/icon, not filled primary button.
+
 ### Feature Specifications
 -   **Spare-Component Sibling Link Distribution**: When a spare is linked to a component, it is automatically linked to all sibling components (components sharing the same `parentId`). An idempotent backfill endpoint is available for batch processing.
 -   **Fleet Table Schema Contract**: All `fleet_*` tables must include mandatory columns such as `uuid`, `sortOrder`, `createdAt`, `updatedAt`, `createdByUuid`, `updatedByUuid`, `isDeleted`, and `isSync`.

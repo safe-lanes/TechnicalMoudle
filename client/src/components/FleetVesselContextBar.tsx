@@ -31,22 +31,24 @@ export function FleetVesselContextBar({
     padding: '5px 16px',
     fontSize: '12px',
     fontWeight: 600,
-    border: 'none',
     cursor: 'pointer',
     transition: 'all 0.15s',
     letterSpacing: '0.02em',
+    borderRadius: '20px',
   };
 
   const pillActive: React.CSSProperties = {
     ...pillBase,
     background: '#1a3a5c',
     color: '#FFFFFF',
+    border: '1px solid #1a3a5c',
   };
 
   const pillInactive: React.CSSProperties = {
     ...pillBase,
-    background: '#E8EDF2',
-    color: '#546E7A',
+    background: '#FFFFFF',
+    color: '#1a3a5c',
+    border: '1px solid #1a3a5c',
   };
 
   return (
@@ -59,7 +61,7 @@ export function FleetVesselContextBar({
           <h1 style={{ fontSize: '16px', fontWeight: 700, color: '#212121', margin: 0 }} data-testid="text-dashboard-title">
             Dashboard
           </h1>
-          <div style={{ display: 'flex', borderRadius: '6px', overflow: 'hidden', border: '1px solid #D0D5DD' }}>
+          <div style={{ display: 'flex', gap: '4px' }}>
             <button
               style={activeTab === 'overview' ? pillActive : pillInactive}
               onClick={() => onTabChange?.('overview')}
@@ -82,7 +84,7 @@ export function FleetVesselContextBar({
         </div>
 
         <div className="flex items-center gap-3">
-          <div style={{ display: 'flex', borderRadius: '6px', overflow: 'hidden', border: '1px solid #D0D5DD' }}>
+          <div style={{ display: 'flex', gap: '4px' }}>
             <button
               style={isAllVessels ? pillActive : pillInactive}
               onClick={() => onAllVesselsChange(true)}

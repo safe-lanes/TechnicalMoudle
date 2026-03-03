@@ -22,7 +22,7 @@ import {
 } from "lucide-react";
 import { AgCharts } from "ag-charts-react";
 import { AgChartOptions } from "ag-charts-community";
-import { AreaChart, Area, LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, ReferenceArea } from "recharts";
+import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from "recharts";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { WorkOrder } from "@shared/schema";
@@ -906,21 +906,21 @@ const Dashboard = () => {
   const HEADER_BLUE = '#1a3a5c';
 
   const sectionHeaderBar: React.CSSProperties = {
-    background: HEADER_BLUE,
-    color: '#FFFFFF',
+    background: 'transparent',
+    color: '#1a6eb5',
     fontWeight: 700,
     fontSize: '11px',
     textTransform: 'uppercase' as const,
-    letterSpacing: '0.5px',
-    padding: '8px 16px',
+    letterSpacing: '0.8px',
+    padding: '12px 16px 4px',
   };
 
   const subTitle: React.CSSProperties = {
-    color: '#1565C0',
+    color: '#1a6eb5',
     fontSize: '11px',
-    fontWeight: 600,
+    fontWeight: 700,
     textTransform: 'uppercase' as const,
-    letterSpacing: '0.5px',
+    letterSpacing: '0.8px',
   };
 
   const tableHeaderStyle: React.CSSProperties = {
@@ -934,8 +934,8 @@ const Dashboard = () => {
 
   const contentCard: React.CSSProperties = {
     background: '#FFFFFF',
-    borderRadius: '6px',
-    boxShadow: '0 1px 3px rgba(0,0,0,0.08)',
+    borderRadius: '8px',
+    boxShadow: '0 1px 4px rgba(0,0,0,0.08)',
     padding: '16px',
   };
 
@@ -990,8 +990,7 @@ const Dashboard = () => {
   });
 
   const getDotColor = (vesselIdx: number, metric: string): string => {
-    const GREY = '#BDBDBD';
-    const GREEN = '#2E7D32';
+    const GREY = '#9ca3af';
     const AMBER = '#F57C00';
     const RED = '#E53935';
 
@@ -1001,7 +1000,7 @@ const Dashboard = () => {
 
     if (metric === 'Work Orders') {
       if (!wos || wos.length === 0) return GREY;
-      return GREEN;
+      return GREY;
     }
     if (metric === 'Overdue WOs') {
       if (!wos || wos.length === 0) return GREY;
@@ -1012,7 +1011,7 @@ const Dashboard = () => {
       const pct = (overdueCount / total) * 100;
       if (pct > 30) return RED;
       if (pct >= 10) return AMBER;
-      return GREEN;
+      return GREY;
     }
     if (metric === 'Low Stock') {
       if (!spares || spares.length === 0) return GREY;
@@ -1023,29 +1022,29 @@ const Dashboard = () => {
       }).length;
       if (lowCount > 100) return RED;
       if (lowCount >= 50) return AMBER;
-      return GREEN;
+      return GREY;
     }
     if (metric === 'Spares') {
       if (!spares || spares.length === 0) return GREY;
-      return GREEN;
+      return GREY;
     }
     if (metric === 'Running Hrs') {
       if (!rhParents || rhParents.length === 0) return GREY;
       const now = new Date();
-      const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
       const ninetyDaysAgo = new Date(now.getTime() - 90 * 24 * 60 * 60 * 1000);
-      const hasRecent = rhParents.some((p: any) => {
-        if (!p.lastUpdated) return false;
-        return new Date(p.lastUpdated) >= thirtyDaysAgo;
+      const hasStale = rhParents.every((p: any) => {
+        if (!p.lastUpdated) return true;
+        return new Date(p.lastUpdated) < ninetyDaysAgo;
       });
-      if (hasRecent) return GREEN;
-      const hasModerate = rhParents.some((p: any) => {
-        if (!p.lastUpdated) return false;
+      if (hasStale) return RED;
+      const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+      const allModerate = rhParents.every((p: any) => {
+        if (!p.lastUpdated) return true;
         const d = new Date(p.lastUpdated);
-        return d >= ninetyDaysAgo && d < thirtyDaysAgo;
+        return d < thirtyDaysAgo;
       });
-      if (hasModerate) return AMBER;
-      return RED;
+      if (allModerate) return AMBER;
+      return GREY;
     }
     return GREY;
   };
@@ -1109,7 +1108,7 @@ const Dashboard = () => {
               <SemiCircleGauge
                 value={workOrderKPIs.overdue}
                 max={workOrderKPIs.total || 10}
-                color="#E53935"
+                color="#1d3557"
                 label="Overdue WOs"
                 displayValue={workOrderKPIs.overdue.toString()}
                 subtitle={`${overduePercent}% of total`}
@@ -1123,7 +1122,7 @@ const Dashboard = () => {
               <SemiCircleGauge
                 value={workOrderKPIs.completed}
                 max={workOrderKPIs.total || 10}
-                color="#2E7D32"
+                color="#1d3557"
                 label="Completion Rate"
                 displayValue={workOrderKPIs.completed.toString()}
                 subtitle={`${completionRate}% completion rate`}
@@ -1137,7 +1136,7 @@ const Dashboard = () => {
               <SemiCircleGauge
                 value={outstandingTasksChartData.outstandingCount}
                 max={outstandingTasksChartData.totalMonthly || 10}
-                color="#F57C00"
+                color="#1d3557"
                 label="Outstanding Tasks"
                 displayValue={`${outstandingTasksChartData.outstandingPercent}%`}
                 subtitle={`${outstandingTasksChartData.outstandingCount} of ${outstandingTasksChartData.totalMonthly} tasks`}
@@ -1157,8 +1156,8 @@ const Dashboard = () => {
               {/* Status Distribution Donut Chart — NO progress bars */}
               <div style={{ padding: '16px' }}>
                 <div style={subTitle} className="mb-1">Status Distribution</div>
-                <div style={{ fontSize: '11px', color: '#9E9E9E', marginBottom: '8px' }}>Click segments to filter</div>
-                <div style={{ height: '250px' }} data-testid="card-wo-status-chart">
+                <div style={{ fontSize: '11px', color: '#6b7280', marginBottom: '8px' }}>Click segments to filter</div>
+                <div style={{ height: '250px', backgroundColor: '#ffffff' }} data-testid="card-wo-status-chart">
                   {workOrderStatusChartData.length > 0 ? (
                     <AgCharts options={{
                       data: workOrderStatusChartData,
@@ -1167,7 +1166,7 @@ const Dashboard = () => {
                         angleKey: 'count',
                         calloutLabelKey: 'status',
                         sectorLabelKey: 'count',
-                        innerRadiusRatio: 0.6,
+                        innerRadiusRatio: 0.75,
                         fills: workOrderStatusChartData.map(d => d.color),
                         strokes: workOrderStatusChartData.map(d => d.color),
                         listeners: {
@@ -1196,20 +1195,12 @@ const Dashboard = () => {
                 <div style={subTitle} className="mb-1">6-MONTH MAINTENANCE TREND</div>
                 {maintenanceTrendData.months.length > 0 ? (
                   <div className="flex flex-col gap-2">
-                    <div style={{ height: '180px' }} data-testid="chart-maintenance-trend">
+                    <div style={{ height: '180px', backgroundColor: '#ffffff' }} data-testid="chart-maintenance-trend">
                       <ResponsiveContainer width="100%" height="100%">
-                        <AreaChart data={maintenanceTrendData.months} margin={{ top: 4, right: 8, bottom: 0, left: -16 }}>
-                          <defs>
-                            <linearGradient id="trendFill" x1="0" y1="0" x2="0" y2="1">
-                              <stop offset="5%" stopColor="#1565C0" stopOpacity={0.3}/>
-                              <stop offset="95%" stopColor="#1565C0" stopOpacity={0.05}/>
-                            </linearGradient>
-                          </defs>
-                          <ReferenceArea y1={0} y2={30} fill="#E8F5E9" fillOpacity={0.5} />
-                          <ReferenceArea y1={30} y2={60} fill="#FFF3E0" fillOpacity={0.5} />
-                          <ReferenceArea y1={60} y2={100} fill="#FFEBEE" fillOpacity={0.5} />
+                        <LineChart data={maintenanceTrendData.months} margin={{ top: 4, right: 8, bottom: 0, left: -16 }}>
+                          <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
                           <XAxis dataKey="monthShort" tick={{ fontSize: 11, fill: '#757575' }} tickLine={false} axisLine={false} />
-                          <YAxis domain={[0, 100]} tick={{ fontSize: 10, fill: '#757575' }} tickLine={false} axisLine={false} tickFormatter={(v) => `${v}%`} />
+                          <YAxis tick={{ fontSize: 10, fill: '#757575' }} tickLine={false} axisLine={false} />
                           <Tooltip
                             content={({ active, payload }) => {
                               if (active && payload && payload.length) {
@@ -1218,31 +1209,49 @@ const Dashboard = () => {
                                   <div style={{ background: '#FFFFFF', border: '1px solid #E0E0E0', borderRadius: '6px', boxShadow: '0 2px 8px rgba(0,0,0,0.12)', padding: '8px 12px' }} data-testid="tooltip-trend-line">
                                     <div className="font-semibold text-xs mb-1" style={{ color: '#212121' }}>{d.month}</div>
                                     <div className="text-xs" style={{ color: '#616161' }}>Total planned: {d.totalPlanned}</div>
-                                    <div className="text-xs" style={{ color: '#616161' }}>Completed: {d.completed}</div>
-                                    <div className="text-xs" style={{ color: '#616161' }}>Outstanding: {d.outstandingPercent}%</div>
-                                    <div className="text-xs" style={{ color: '#616161' }}>Overdue: {d.overdue}</div>
+                                    <div className="text-xs" style={{ color: '#2ecc71' }}>Completed: {d.completed}</div>
+                                    <div className="text-xs" style={{ color: '#f39c12' }}>Outstanding: {d.outstandingPercent}%</div>
+                                    <div className="text-xs" style={{ color: '#e74c3c' }}>Overdue: {d.overdue}</div>
                                   </div>
                                 );
                               }
                               return null;
                             }}
                           />
-                          <Area
+                          <Line
+                            type="monotone"
+                            dataKey="completed"
+                            name="Completed"
+                            stroke="#2ecc71"
+                            strokeWidth={2}
+                            dot={{ r: 4, fill: '#2ecc71', stroke: '#ffffff', strokeWidth: 2 }}
+                            activeDot={{ r: 6, fill: '#2ecc71' }}
+                          />
+                          <Line
                             type="monotone"
                             dataKey="outstandingPercent"
-                            stroke="#1565C0"
-                            strokeWidth={2.5}
-                            fill="url(#trendFill)"
-                            dot={{ r: 4, fill: '#1565C0', stroke: '#FFFFFF', strokeWidth: 2 }}
-                            activeDot={{ r: 6, fill: '#1565C0' }}
+                            name="Outstanding %"
+                            stroke="#f39c12"
+                            strokeWidth={2}
+                            dot={{ r: 4, fill: '#f39c12', stroke: '#ffffff', strokeWidth: 2 }}
+                            activeDot={{ r: 6, fill: '#f39c12' }}
                           />
-                        </AreaChart>
+                          <Line
+                            type="monotone"
+                            dataKey="overdue"
+                            name="Overdue"
+                            stroke="#e74c3c"
+                            strokeWidth={2}
+                            dot={{ r: 4, fill: '#e74c3c', stroke: '#ffffff', strokeWidth: 2 }}
+                            activeDot={{ r: 6, fill: '#e74c3c' }}
+                          />
+                        </LineChart>
                       </ResponsiveContainer>
                     </div>
-                    <div className="flex items-center justify-center gap-4 text-xs" style={{ color: '#757575' }} data-testid="legend-maintenance-trend">
-                      <div className="flex items-center gap-1"><span className="inline-block w-3 h-3 rounded-sm" style={{ backgroundColor: '#2E7D32' }} /><span>Healthy (&lt;30%)</span></div>
-                      <div className="flex items-center gap-1"><span className="inline-block w-3 h-3 rounded-sm" style={{ backgroundColor: '#F57C00' }} /><span>Watch (30–60%)</span></div>
-                      <div className="flex items-center gap-1"><span className="inline-block w-3 h-3 rounded-sm" style={{ backgroundColor: '#E53935' }} /><span>Backlog (&gt;60%)</span></div>
+                    <div className="flex items-center justify-center gap-4 text-xs" style={{ color: '#6b7280' }} data-testid="legend-maintenance-trend">
+                      <div className="flex items-center gap-1"><span className="inline-block w-3 h-3 rounded-full" style={{ backgroundColor: '#2ecc71' }} /><span>Completed</span></div>
+                      <div className="flex items-center gap-1"><span className="inline-block w-3 h-3 rounded-full" style={{ backgroundColor: '#f39c12' }} /><span>Outstanding %</span></div>
+                      <div className="flex items-center gap-1"><span className="inline-block w-3 h-3 rounded-full" style={{ backgroundColor: '#e74c3c' }} /><span>Overdue</span></div>
                     </div>
                   </div>
                 ) : (
@@ -1325,11 +1334,11 @@ const Dashboard = () => {
               {/* Inventory Quick Stats */}
               <div data-testid="card-quick-stats">
                 {[
-                  { label: 'Total Spares', value: sparesKPIs.total, color: '#37474F', onClick: () => navigateToSpares() },
-                  { label: 'Low Stock', value: sparesKPIs.lowStock, color: '#E53935', onClick: () => navigateToSpares('Low') },
-                  { label: 'Critical Low Stock', value: sparesKPIs.criticalLowStock, color: '#E53935', onClick: () => navigateToSpares('Low') },
-                  { label: 'Total Components', value: componentsKPIs.total, color: '#37474F', onClick: navigateToComponents },
-                  { label: 'Stores Inventory', value: storesKPIs.total, color: '#37474F', onClick: () => navigateToStores() },
+                  { label: 'Total Spares', value: sparesKPIs.total, color: '#1a2b4a', onClick: () => navigateToSpares() },
+                  { label: 'Low Stock', value: sparesKPIs.lowStock, color: '#e74c3c', onClick: () => navigateToSpares('Low') },
+                  { label: 'Critical Low Stock', value: sparesKPIs.criticalLowStock, color: '#e74c3c', onClick: () => navigateToSpares('Low') },
+                  { label: 'Total Components', value: componentsKPIs.total, color: '#1a2b4a', onClick: navigateToComponents },
+                  { label: 'Stores Inventory', value: storesKPIs.total, color: '#1a2b4a', onClick: () => navigateToStores() },
                 ].map((item, idx) => (
                   <div key={item.label}>
                     <div
@@ -1338,18 +1347,11 @@ const Dashboard = () => {
                       onClick={item.onClick}
                       data-testid={`row-stat-${item.label.toLowerCase().replace(/\s/g, '-')}`}
                     >
-                      <span style={{ fontSize: '12px', color: '#757575' }}>{item.label}</span>
+                      <span style={{ fontSize: '12px', color: '#6b7280' }}>{item.label}</span>
                       <span style={{
-                        display: 'inline-flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        minWidth: '36px',
-                        padding: '2px 10px',
-                        borderRadius: '12px',
-                        fontSize: '11px',
+                        fontSize: '13px',
                         fontWeight: 700,
-                        color: '#FFFFFF',
-                        background: item.color,
+                        color: item.color,
                       }}>{item.value}</span>
                     </div>
                     {idx < 4 && <div style={{ borderBottom: '1px solid #EEEEEE' }} />}
@@ -1362,7 +1364,7 @@ const Dashboard = () => {
               {/* Spares Stock Status donut */}
               <div style={{ padding: '16px' }} data-testid="card-spares-status-chart">
                 <div style={subTitle} className="mb-1">SPARES STOCK STATUS</div>
-                <div style={{ height: '200px' }}>
+                <div style={{ height: '200px', backgroundColor: '#ffffff' }}>
                   {sparesStockChartData.length > 0 ? (
                     <AgCharts options={{
                       data: sparesStockChartData,
@@ -1371,7 +1373,7 @@ const Dashboard = () => {
                         angleKey: 'count',
                         calloutLabelKey: 'status',
                         sectorLabelKey: 'count',
-                        innerRadiusRatio: 0.6,
+                        innerRadiusRatio: 0.75,
                         fills: sparesStockChartData.map(d => d.color),
                         strokes: sparesStockChartData.map(d => d.color),
                         listeners: {

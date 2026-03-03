@@ -41,6 +41,9 @@ export function SemiCircleGauge({
 
   const trackPath = describeArc(startAngle, endAngle);
 
+  const arcColor = '#1d3557';
+  const valueColor = '#1a2b4a';
+
   return (
     <div
       className={onClick ? "cursor-pointer" : ""}
@@ -48,7 +51,7 @@ export function SemiCircleGauge({
       data-testid={testId}
       style={{ textAlign: 'center', padding: '16px 16px 12px' }}
     >
-      <div style={{ fontSize: '13px', fontWeight: 700, color: '#212121', marginBottom: '6px', textTransform: 'uppercase', letterSpacing: '0.3px' }}>{label}</div>
+      <div style={{ fontSize: '11px', fontWeight: 700, color: '#1a6eb5', marginBottom: '6px', textTransform: 'uppercase', letterSpacing: '0.8px' }}>{label}</div>
       <svg width="200" height="110" viewBox="0 0 200 110" style={{ display: 'block', margin: '0 auto' }}>
         <path
           d={trackPath}
@@ -60,7 +63,7 @@ export function SemiCircleGauge({
         <path
           d={trackPath}
           fill="none"
-          stroke={color}
+          stroke={arcColor}
           strokeWidth={strokeWidth}
           strokeLinecap="round"
           strokeDasharray={`${fillLength} ${circumference}`}
@@ -70,7 +73,7 @@ export function SemiCircleGauge({
           y={cy - 10}
           textAnchor="middle"
           dominantBaseline="middle"
-          style={{ fontSize: '28px', fontWeight: 700, fill: color }}
+          style={{ fontSize: '28px', fontWeight: 700, fill: valueColor }}
         >
           {displayValue ?? value.toString()}
         </text>
@@ -78,10 +81,10 @@ export function SemiCircleGauge({
         <text x={cx + radius + 2} y={cy + 16} textAnchor="end" style={{ fontSize: '10px', fill: '#9E9E9E' }}>{max > 0 ? max : 10}</text>
       </svg>
       {subtitle && (
-        <div style={{ fontSize: '11px', color: '#757575', marginTop: '-4px', marginBottom: '4px' }}>{subtitle}</div>
+        <div style={{ fontSize: '12px', color: '#6b7280', marginTop: '-4px', marginBottom: '4px' }}>{subtitle}</div>
       )}
       {statLine && (
-        <div style={{ fontSize: '11px', color: '#616161', textAlign: 'center' }}>{statLine}</div>
+        <div style={{ fontSize: '12px', color: '#6b7280', textAlign: 'center' }}>{statLine}</div>
       )}
     </div>
   );
