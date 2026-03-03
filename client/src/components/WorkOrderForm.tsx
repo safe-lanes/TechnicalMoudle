@@ -29,7 +29,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { ChevronDown, ChevronRight, FileText, ArrowLeft, AlertCircle, Pencil, Trash2, Check, X, Plus, Eye, Upload } from "lucide-react";
+import { ChevronDown, ChevronRight, FileText, ArrowLeft, AlertCircle, Pencil, Trash2, Check, X, Plus, Eye, Upload, Paperclip } from "lucide-react";
 import { useLocation } from "wouter";
 import WorkInstructionsDialog from "./WorkInstructionsDialog";
 import { useToast } from "@/hooks/use-toast";
@@ -2141,6 +2141,9 @@ const WorkOrderForm: React.FC<WorkOrderFormProps> = ({
                             <Upload className="h-3 w-3 mr-1" />
                             Upload
                           </Button>
+                          {getUploadedDocument('riskAssessment') && (
+                            <Paperclip className="h-4 w-4 text-blue-500" />
+                          )}
                           <Button
                             variant="ghost"
                             size="sm"
@@ -2204,6 +2207,9 @@ const WorkOrderForm: React.FC<WorkOrderFormProps> = ({
                             <Upload className="h-3 w-3 mr-1" />
                             Upload
                           </Button>
+                          {getUploadedDocument('safetyChecklist') && (
+                            <Paperclip className="h-4 w-4 text-blue-500" />
+                          )}
                           <Button
                             variant="ghost"
                             size="sm"
@@ -2267,6 +2273,9 @@ const WorkOrderForm: React.FC<WorkOrderFormProps> = ({
                             <Upload className="h-3 w-3 mr-1" />
                             Upload
                           </Button>
+                          {getUploadedDocument('operationalForm') && (
+                            <Paperclip className="h-4 w-4 text-blue-500" />
+                          )}
                           <Button
                             variant="ghost"
                             size="sm"
@@ -3091,7 +3100,7 @@ const WorkOrderForm: React.FC<WorkOrderFormProps> = ({
           <AlertDialogHeader>
             <AlertDialogTitle>Delete Document</AlertDialogTitle>
             <AlertDialogDescription>
-              Are you sure you want to delete this document? This action cannot be undone.
+              Are you sure you want to delete this attachment?
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
