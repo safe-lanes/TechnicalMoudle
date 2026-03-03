@@ -16,6 +16,9 @@ const upload = multer({
 
 // ── Core Components ──
 
+// IMPORTANT: sort-order MUST come before :id/:vesselId to avoid catch-all
+router.post('/components/sort-order', asyncHandler(componentCtrl.updateSortOrder));
+
 // GET /components/:vesselId — list by vessel (Target Picker)
 // NOTE: this must be registered BEFORE the generic /components/:id route
 // but the generic routes below use a separate base path, so no conflict

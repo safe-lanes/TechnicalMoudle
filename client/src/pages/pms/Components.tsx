@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { Search, ChevronRight, ChevronDown, ChevronUp, ChevronLeft, Edit2, FileText, ArrowLeft, Plus, Check, Package, X, AlertCircle, CheckCircle, HelpCircle, File, FileImage, FileCheck, Upload, Download, Lock, Wrench, User, ClipboardList, MessageSquare, MapPin, Pencil, Expand, Minimize2 } from "lucide-react";
+import { Search, ChevronRight, ChevronDown, ChevronUp, ChevronLeft, Edit2, FileText, ArrowLeft, Plus, Check, Package, X, AlertCircle, CheckCircle, HelpCircle, File, FileImage, FileCheck, Upload, Download, Lock, Wrench, User, ClipboardList, MessageSquare, MapPin, Pencil, Expand, Minimize2, GripVertical } from "lucide-react";
 import { Marker } from "@/components/Marker";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
@@ -24,7 +24,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useModifyMode } from "@/hooks/useModifyMode";
 import { FEATURES } from '@/config/features';
 import { useQuery, useMutation } from '@tanstack/react-query';
-import { queryClient } from '@/lib/queryClient';
+import { queryClient, apiRequest } from '@/lib/queryClient';
 import { ModifyFieldWrapper } from "@/components/modify/ModifyFieldWrapper";
 import { ModifyStickyFooter } from "@/components/modify/ModifyStickyFooter";
 import { useVessels } from "@/hooks/useVessels";
@@ -2222,6 +2222,12 @@ const Components: React.FC = () => {
   const [editingComponentCode, setEditingComponentCode] = useState<string | null>(null);
   const [showReviewDrawer, setShowReviewDrawer] = useState(false);
   const [showModifySubmitFooter, setShowModifySubmitFooter] = useState(false);
+  const [isEditMode, setIsEditMode] = useState(false);
+  const [editTreeData, setEditTreeData] = useState<ComponentNode[]>([]);
+  const [dragSourceCode, setDragSourceCode] = useState<string | null>(null);
+  const [dragSourceParent, setDragSourceParent] = useState<string | null | undefined>(null);
+  const [dragOverCode, setDragOverCode] = useState<string | null>(null);
+  const [isSavingSortOrder, setIsSavingSortOrder] = useState(false);
   const [modifiedComponentData, setModifiedComponentData] = useState<any>(null);
   const [originalComponentData, setOriginalComponentData] = useState<any>(null);
   const [showAddEditFullPage, setShowAddEditFullPage] = useState(false);
@@ -2371,24 +2377,22 @@ const Components: React.FC = () => {
       }
     });
     
-    // Sort children in ascending order by component code
     const sortChildrenAscending = (nodes: ComponentNode[]) => {
       nodes.forEach(node => {
         if (node.children && node.children.length > 0) {
-          // Sort children by code in ascending order (handles numeric and alphanumeric codes)
           node.children.sort((a, b) => {
+            const aSortOrder = (a as any).sortOrder ?? 0;
+            const bSortOrder = (b as any).sortOrder ?? 0;
+            if (aSortOrder !== bSortOrder) return aSortOrder - bSortOrder;
             const aCode = a.code || '';
             const bCode = b.code || '';
-            // Try numeric comparison first
             const aNum = parseFloat(aCode);
             const bNum = parseFloat(bCode);
             if (!isNaN(aNum) && !isNaN(bNum)) {
               return aNum - bNum;
             }
-            // Fall back to string comparison
             return aCode.localeCompare(bCode);
           });
-          // Recursively sort descendants
           sortChildrenAscending(node.children);
         }
       });
@@ -2680,13 +2684,55 @@ const Components: React.FC = () => {
     return ids;
   };
 
-  const expandAllNodes = () => {
-    const allIds = collectAllNodeIds(filteredComponentTree);
-    setExpandedNodes(new Set(allIds));
+  const findNodeById = (nodes: ComponentNode[], id: string): ComponentNode | null => {
+    for (const node of nodes) {
+      if (node.id === id) return node;
+      if (node.children) {
+        const found = findNodeById(node.children, id);
+        if (found) return found;
+      }
+    }
+    return null;
   };
 
-  const collapseAllNodes = () => {
-    setExpandedNodes(new Set());
+  const handleExpandSelected = () => {
+    if (!selectedComponent) {
+      toast({
+        title: "No Selection",
+        description: "Please select a component to expand.",
+      });
+      return;
+    }
+    const activeTree = isEditMode ? editTreeData : filteredComponentTree;
+    const targetNode = findNodeById(activeTree, selectedComponent.id);
+    if (!targetNode) return;
+    const codesToExpand = collectAllNodeIds([targetNode]);
+    codesToExpand.push(targetNode.id);
+    setExpandedNodes(prev => {
+      const newSet = new Set(prev);
+      codesToExpand.forEach(c => newSet.add(c));
+      return newSet;
+    });
+  };
+
+  const handleCollapseSelected = () => {
+    if (!selectedComponent) {
+      setExpandedNodes(new Set());
+      return;
+    }
+    const activeTree = isEditMode ? editTreeData : filteredComponentTree;
+    const targetNode = findNodeById(activeTree, selectedComponent.id);
+    if (!targetNode) {
+      setExpandedNodes(new Set());
+      return;
+    }
+    const codesToCollapse = collectAllNodeIds([targetNode]);
+    codesToCollapse.push(targetNode.id);
+    setExpandedNodes(prev => {
+      const newSet = new Set(prev);
+      codesToCollapse.forEach(c => newSet.delete(c));
+      return newSet;
+    });
   };
 
   const toggleNode = (nodeId: string) => {
@@ -2699,6 +2745,139 @@ const Components: React.FC = () => {
       }
       return newSet;
     });
+  };
+
+  const deepCloneTree = (nodes: ComponentNode[]): ComponentNode[] => {
+    return nodes.map(node => ({
+      ...node,
+      children: node.children ? deepCloneTree(node.children) : [],
+    }));
+  };
+
+  const handleEnterEditMode = () => {
+    setEditTreeData(deepCloneTree(filteredComponentTree));
+    setIsEditMode(true);
+  };
+
+  const handleCancelEditMode = () => {
+    setEditTreeData([]);
+    setIsEditMode(false);
+    setDragSourceCode(null);
+    setDragSourceParent(null);
+    setDragOverCode(null);
+  };
+
+  const getParentCode = (nodes: ComponentNode[], targetCode: string, parentCode: string | null = null): string | null | undefined => {
+    for (const node of nodes) {
+      if (node.id === targetCode) return parentCode;
+      if (node.children) {
+        const found = getParentCode(node.children, targetCode, node.id);
+        if (found !== undefined) return found;
+      }
+    }
+    return undefined;
+  };
+
+  const handleDragStart = (e: React.DragEvent, code: string) => {
+    const parentCode = getParentCode(editTreeData, code) ?? null;
+    setDragSourceCode(code);
+    setDragSourceParent(parentCode);
+    e.dataTransfer.effectAllowed = "move";
+    e.dataTransfer.setData("text/plain", code);
+  };
+
+  const handleDragOver = (e: React.DragEvent, code: string) => {
+    e.preventDefault();
+    if (dragSourceCode === code) return;
+    const targetParent = getParentCode(editTreeData, code) ?? null;
+    if (dragSourceParent !== targetParent) return;
+    setDragOverCode(code);
+    e.dataTransfer.dropEffect = "move";
+  };
+
+  const reorderSiblings = (nodes: ComponentNode[], sourceCode: string, targetCode: string, parentCode: string | null): ComponentNode[] => {
+    if (!parentCode) {
+      const sourceIndex = nodes.findIndex(n => n.id === sourceCode);
+      const targetIndex = nodes.findIndex(n => n.id === targetCode);
+      if (sourceIndex !== -1 && targetIndex !== -1) {
+        const newNodes = [...nodes];
+        const [moved] = newNodes.splice(sourceIndex, 1);
+        newNodes.splice(targetIndex, 0, moved);
+        return newNodes;
+      }
+      return nodes;
+    }
+    return nodes.map(node => {
+      if (node.id === parentCode) {
+        const children = node.children || [];
+        const sourceIndex = children.findIndex(n => n.id === sourceCode);
+        const targetIndex = children.findIndex(n => n.id === targetCode);
+        if (sourceIndex !== -1 && targetIndex !== -1) {
+          const newChildren = [...children];
+          const [moved] = newChildren.splice(sourceIndex, 1);
+          newChildren.splice(targetIndex, 0, moved);
+          return { ...node, children: newChildren };
+        }
+        return node;
+      }
+      return {
+        ...node,
+        children: node.children ? reorderSiblings(node.children, sourceCode, targetCode, parentCode) : [],
+      };
+    });
+  };
+
+  const handleDrop = (e: React.DragEvent, targetCode: string) => {
+    e.preventDefault();
+    setDragOverCode(null);
+    if (!dragSourceCode || dragSourceCode === targetCode) return;
+    const targetParent = getParentCode(editTreeData, targetCode) ?? null;
+    if (dragSourceParent !== targetParent) return;
+    setEditTreeData(prev => reorderSiblings(prev, dragSourceCode!, targetCode, dragSourceParent ?? null));
+    setDragSourceCode(null);
+    setDragSourceParent(null);
+  };
+
+  const handleDragEnd = () => {
+    setDragSourceCode(null);
+    setDragSourceParent(null);
+    setDragOverCode(null);
+  };
+
+  const collectSortUpdates = (nodes: ComponentNode[]): { id: string; sortOrder: number }[] => {
+    const updates: { id: string; sortOrder: number }[] = [];
+    nodes.forEach((node, index) => {
+      if (node.actualId) {
+        updates.push({ id: node.actualId, sortOrder: index + 1 });
+      }
+      if (node.children && node.children.length > 0) {
+        updates.push(...collectSortUpdates(node.children));
+      }
+    });
+    return updates;
+  };
+
+  const handleSaveEditMode = async () => {
+    setIsSavingSortOrder(true);
+    try {
+      const updates = collectSortUpdates(editTreeData);
+      await apiRequest("POST", "/technical/api/components/sort-order", { updates });
+      queryClient.invalidateQueries({ queryKey: [`/technical/api/components/${vesselId}`] });
+      setIsEditMode(false);
+      setEditTreeData([]);
+      toast({
+        title: "Success",
+        description: "Sort order saved successfully",
+      });
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to save sort order",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSavingSortOrder(false);
+    }
   };
 
   const toggleSection = (sectionId: string) => {
@@ -2725,6 +2904,7 @@ const Components: React.FC = () => {
       const hasChildren = node.children && node.children.length > 0;
       const isExpanded = expandedNodes.has(node.id);
       const isSelected = selectedComponent?.id === node.id;
+      const isDragOver = dragOverCode === node.id;
       const markerLevel = getTreeNodeMarker(level);
 
       return (
@@ -2732,9 +2912,10 @@ const Components: React.FC = () => {
           <div
             className={`flex items-center px-3 py-2 cursor-pointer hover:bg-gray-50 border-b border-gray-100 ${
               isSelected ? "bg-blue-50" : ""
-            }`}
-            style={{ paddingLeft: `${level * 20 + 12}px` }}
+            }${isDragOver ? " bg-blue-100 border-t-2 border-t-blue-400" : ""}`}
+            style={{ paddingLeft: `${level * 20 + (isEditMode ? 4 : 12)}px` }}
             onClick={() => {
+              if (isEditMode) return;
               setSelectedComponent(node);
               if (hasChildren) {
                 toggleNode(node.id);
@@ -2743,7 +2924,15 @@ const Components: React.FC = () => {
                 setIsComponentFormOpen(true);
               }
             }}
+            draggable={isEditMode && !!node.actualId}
+            onDragStart={isEditMode && node.actualId ? (e) => handleDragStart(e, node.id) : undefined}
+            onDragOver={isEditMode ? (e) => handleDragOver(e, node.id) : undefined}
+            onDrop={isEditMode ? (e) => handleDrop(e, node.id) : undefined}
+            onDragEnd={isEditMode ? handleDragEnd : undefined}
           >
+            {isEditMode && node.actualId && (
+              <GripVertical className="h-4 w-4 text-gray-400 mr-1 flex-shrink-0 cursor-grab" data-testid={`drag-handle-${node.code}`} />
+            )}
             <Marker id={markerLevel} />
             <button
               className="mr-2 flex-shrink-0"
@@ -3072,27 +3261,60 @@ const Components: React.FC = () => {
                 <Marker id="B6" /> COMPONENTS
               </div>
               <div className="flex items-center gap-1">
-                <button
-                  onClick={expandAllNodes}
-                  className="flex items-center gap-1 px-2 py-0.5 text-xs rounded hover:bg-white/20 transition-colors"
-                  data-testid="button-expand-all-components"
-                >
-                  <Expand className="h-3 w-3" />
-                  Expand
-                </button>
-                <button
-                  onClick={collapseAllNodes}
-                  className="flex items-center gap-1 px-2 py-0.5 text-xs rounded hover:bg-white/20 transition-colors"
-                  data-testid="button-collapse-all-components"
-                >
-                  <Minimize2 className="h-3 w-3" />
-                  Collapse
-                </button>
+                {isEditMode ? (
+                  <>
+                    <button
+                      onClick={handleSaveEditMode}
+                      disabled={isSavingSortOrder}
+                      className="flex items-center gap-1 px-2 py-0.5 text-xs rounded hover:bg-white/20 transition-colors"
+                      data-testid="button-save-sort-order"
+                    >
+                      <Check className="h-3 w-3" />
+                      {isSavingSortOrder ? "Saving..." : "Save"}
+                    </button>
+                    <button
+                      onClick={handleCancelEditMode}
+                      disabled={isSavingSortOrder}
+                      className="flex items-center gap-1 px-2 py-0.5 text-xs rounded hover:bg-white/20 transition-colors"
+                      data-testid="button-cancel-sort-order"
+                    >
+                      <X className="h-3 w-3" />
+                      Cancel
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    <button
+                      onClick={handleEnterEditMode}
+                      className="flex items-center gap-1 px-2 py-0.5 text-xs rounded hover:bg-white/20 transition-colors"
+                      data-testid="button-edit-components"
+                    >
+                      <Pencil className="h-3 w-3" />
+                      Edit
+                    </button>
+                    <button
+                      onClick={handleExpandSelected}
+                      className="flex items-center gap-1 px-2 py-0.5 text-xs rounded hover:bg-white/20 transition-colors"
+                      data-testid="button-expand-all-components"
+                    >
+                      <Expand className="h-3 w-3" />
+                      Expand
+                    </button>
+                    <button
+                      onClick={handleCollapseSelected}
+                      className="flex items-center gap-1 px-2 py-0.5 text-xs rounded hover:bg-white/20 transition-colors"
+                      data-testid="button-collapse-all-components"
+                    >
+                      <Minimize2 className="h-3 w-3" />
+                      Collapse
+                    </button>
+                  </>
+                )}
               </div>
             </div>
             <div className="flex-1 overflow-auto">
               <div>
-                {renderComponentTree(filteredComponentTree)}
+                {renderComponentTree(isEditMode ? editTreeData : filteredComponentTree)}
               </div>
             </div>
           </div>

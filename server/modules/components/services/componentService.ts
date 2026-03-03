@@ -186,6 +186,18 @@ export async function update(id: string, data: any, userId: string): Promise<Com
   return component;
 }
 
+export async function updateSortOrder(body: any) {
+  const { z } = await import('zod');
+  const sortOrderSchema = z.object({
+    updates: z.array(z.object({
+      id: z.string(),
+      sortOrder: z.number(),
+    })),
+  });
+  const { updates } = sortOrderSchema.parse(body);
+  return repo.updateSortOrder(updates);
+}
+
 export async function remove(id: string): Promise<void> {
   return repo.remove(id);
 }

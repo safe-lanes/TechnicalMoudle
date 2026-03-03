@@ -2,6 +2,19 @@ import { Request, Response } from 'express';
 import * as componentService from '../services/componentService';
 import { NotFoundError, ValidationError } from '../../shared/errors';
 
+export async function updateSortOrder(req: Request, res: Response) {
+  try {
+    const result = await componentService.updateSortOrder(req.body);
+    res.json(result);
+  } catch (error: any) {
+    if (error.name === 'ZodError') {
+      return res.status(400).json({ error: "Invalid request data", details: error.errors });
+    }
+    console.error("Error updating component sort order:", error);
+    res.status(500).json({ error: "Failed to update sort order" });
+  }
+}
+
 // GET /components/:vesselId — list components for a vessel (Target Picker)
 export async function listByVessel(req: Request, res: Response) {
   const components = await componentService.listByVessel(req.params.vesselId);

@@ -143,6 +143,19 @@ export async function findMaintenanceHistoryItem(id: number) {
   return storage.getComponentMaintenanceHistoryItem(id);
 }
 
+// ── Component Sort Order ──
+
+export async function updateSortOrder(updates: { id: string; sortOrder: number }[]) {
+  const { pool } = getPostgresClient();
+  for (const update of updates) {
+    await pool.query(
+      `UPDATE components SET sort_order = $1 WHERE id = $2`,
+      [update.sortOrder, update.id]
+    );
+  }
+  return { success: true, updated: updates.length };
+}
+
 // ── Equipment Category Methods (direct DB — no storage.* methods exist) ──
 
 export async function findEquipmentCategories() {

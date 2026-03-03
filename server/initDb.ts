@@ -115,6 +115,9 @@ async function runIndexMigrations(db: any): Promise<void> {
     // Migration: Add vessel_sequence column to vessels table for defect ID generation
     await db.execute(sql`ALTER TABLE vessels ADD COLUMN IF NOT EXISTS vessel_sequence INTEGER`);
     
+    // Migration: Add sort_order column to components table for tree view reordering
+    await db.execute(sql`ALTER TABLE components ADD COLUMN IF NOT EXISTS sort_order INTEGER DEFAULT 0`);
+    
     // Migration: Create defect_sequences table for tracking per-vessel-per-year defect counters
     await db.execute(sql`
       CREATE TABLE IF NOT EXISTS defect_sequences (
