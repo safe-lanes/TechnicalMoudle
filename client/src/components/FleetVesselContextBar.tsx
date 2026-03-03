@@ -45,7 +45,7 @@ export function FleetVesselContextBar({
 
   const tabPillInactive: React.CSSProperties = {
     ...pillBase,
-    backgroundColor: '#f1f5f9',
+    backgroundColor: '#e2e8f0',
     color: '#64748b',
     border: 'none',
   };

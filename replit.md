@@ -36,14 +36,14 @@ Preferred communication style: Simple, everyday language.
 -   **Top Navbar**: Pure white background (`#ffffff`), no shadow, active tab has 3px blue bottom-border underline (`#1a6eb5`), active tab text/icon `#1a6eb5`, inactive tabs `#4b5563`, separator `1px solid #e5e7eb`.
 -   **Left Sidebar**: Medium blue background (`#1565c0`); active item uses `rgba(255,255,255,0.12)` overlay + `3px solid rgba(255,255,255,0.9)` left border; active text/icon full white; inactive text/icon `rgba(255,255,255,0.75)`.
 -   **Section Headers**: Plain blue uppercase text labels (`#1a6eb5`, 11px, bold, 0.8px letter-spacing), padding `16px 4px 12px 4px`, transparent background.
--   **Gauge Charts**: Semantic arc colors (overdue=`#e74c3c`, completion=`#16a34a`, outstanding=`#f59e0b`), thin stroke (`strokeWidth: 10`), value text `#1a2b4a` 28px bold, track `#e5e7eb`.
--   **Donut Charts**: Thin ring style (`innerRadiusRatio: 0.78`), white background containers.
--   **Trend Charts**: Multi-line LineChart with CartesianGrid (horizontal only, stroke `#f0f4f8`), percentage Y-axis domain `[0,100]` ticks `[0,25,50,75,100]`, data keys `completedPercent`/`outstandingPercent`/`overduePercent` with Math.min(100,...) clamp, chart height 220px.
+-   **Gauge Charts**: Gray arc (`#d1d5db`), thin stroke (`strokeWidth: 10`), **number text** carries semantic color via `color` prop (overdue=`#e74c3c` red, completion=`#16a34a` green, outstanding=`#f59e0b` amber), track `#e5e7eb`.
+-   **Donut Charts**: Thin ring style (`innerRadiusRatio: 0.82`), white background containers.
+-   **Trend Charts**: Hardcoded static data (values 30–49%), multi-line LineChart with CartesianGrid (horizontal only, stroke `#f0f4f8`), percentage Y-axis domain `[0,100]` ticks `[0,25,50,75,100]`, chart height 220px.
 -   **KPI List**: Label text 13px `#374151`, value text 14px bold, separators `1px solid #f1f5f9`.
--   **Overview/Management Toggle**: Pill 13px (20px radius); active = `#1a2b4a` bg white text, no border; inactive = `#f1f5f9` bg `#64748b` text, no border.
+-   **Overview/Management Toggle**: Pill 13px (20px radius); active = `#1a2b4a` bg white text, no border; inactive = `#e2e8f0` bg `#64748b` text, no border.
 -   **All Vessel/My Vessel Toggle**: Pill 13px (20px radius); active = `#1a2b4a` bg white text, no border; inactive = white bg `#374151` text, `1px solid #e2e8f0` border.
 -   **Dashboard Title**: 20px, fontWeight 600, `#1a2b4a`. Year: 18px, bold, `#1a2b4a`.
--   **Overdue Table**: Dark navy header (`#1a2b4a`), column min-widths (WO 160px, Equipment 200px, Status 100px), status badge `#fee2e2`/`#dc2626` 4px radius, row text 12px `#374151`, zebra `#ffffff`/`#fafafa`, separator `1px solid #f1f5f9`.
+-   **Overdue Table**: Dark navy header (`#1a2b4a`), table minWidth 500px, column min-widths (WO 160px, Equipment 200px, Status 90px), status badge `#fee2e2`/`#dc2626` 4px radius whiteSpace nowrap, row text 12px `#374151`, zebra `#ffffff`/`#fafafa`, separator `1px solid #f1f5f9`.
 -   **Watch List Badges**: Overdue = `#fee2e2`/`#dc2626`, Critical = `#fff7ed`/`#ea580c`, both 4px radius, 11px font. View All link `#1a6eb5` 12px with top border.
 -   **Cards**: White bg, `box-shadow: 0 1px 3px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.04)`, `border: 1px solid #f1f5f9`, border-radius 8px.
 -   **Page Background**: `#f8fafc` (subtle blue-gray tint).
