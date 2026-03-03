@@ -1180,10 +1180,31 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
         const response = await fetch(fetchUrl);
         if (!response.ok) throw new Error('Failed to retrieve document');
         const result = await response.json();
-        window.open(result.dataUrl || result.url || fetchUrl, '_blank');
+        const dataUrl = result.dataUrl || result.url;
+        if (dataUrl && dataUrl.startsWith('data:')) {
+          const [header, base64Data] = dataUrl.split(',');
+          const mimeMatch = header.match(/data:([^;]+)/);
+          const mime = mimeMatch ? mimeMatch[1] : 'application/octet-stream';
+          const byteChars = atob(base64Data);
+          const byteArray = new Uint8Array(byteChars.length);
+          for (let i = 0; i < byteChars.length; i++) {
+            byteArray[i] = byteChars.charCodeAt(i);
+          }
+          const blob = new Blob([byteArray], { type: mime });
+          const blobUrl = URL.createObjectURL(blob);
+          window.open(blobUrl, '_blank');
+        } else if (dataUrl) {
+          window.open(dataUrl, '_blank');
+        } else {
+          window.open(fetchUrl, '_blank');
+        }
       } catch (error) {
         console.error('View error:', error);
-        window.open(fetchUrl, '_blank');
+        toast({
+          title: "View failed",
+          description: "Failed to open document. Please try again.",
+          variant: "destructive"
+        });
       }
     }
   };
