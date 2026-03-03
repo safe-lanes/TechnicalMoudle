@@ -3,6 +3,7 @@ import { storage } from '../../../storage';
 import { getPool } from '../../../db';
 import { computeWorkOrderStatus } from '@shared/workOrders/status';
 import { WORK_ORDER_THRESHOLDS } from '@shared/workOrders/constants';
+import { buildExternalMasterDataUrl } from '../../../config/externalApi';
 
 // ── GET/POST /admin/job-due-scan ──
 
@@ -293,7 +294,6 @@ export async function syncMasters(req: Request, res: Response) {
   console.log('🔄 Starting master data sync...');
 
   const domain = req.body.domain || 'rsms';
-  const BASE_URL = 'https://dev.sl-sail.com/b/api/v1/crewmasterdata/getallmasterdata';
 
   const stats = {
     vessels: { inserted: 0, updated: 0, skipped: 0, errors: [] as string[] },
@@ -305,7 +305,8 @@ export async function syncMasters(req: Request, res: Response) {
   };
 
   const fetchExternal = async (endpoint: string, key: string) => {
-    const response = await fetch(`${BASE_URL}/${endpoint}?domain=${domain}`);
+    const url = buildExternalMasterDataUrl(endpoint, domain);
+    const response = await fetch(url);
     if (!response.ok) throw new Error(`Failed to fetch ${endpoint}: ${response.status}`);
     const data = await response.json();
     return data[key] || [];

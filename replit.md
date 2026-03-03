@@ -29,6 +29,12 @@ The system is built with a modular, domain-driven approach, organizing backend c
 -   **Data Integrity:** All dashboard charts display real-time data from the database, avoiding hardcoded or mock data.
 -   **Work Order Document Upload:** Multi-file upload functionality with server-side image compression, dual storage backend (local filesystem when `PRIVATE_OBJECT_DIR` is not set, Replit Object Storage when available), and metadata management in `work_order_documents` table. Backend code in `server/modules/work-orders/` (repositories/documentRepository.ts, services/woDocumentService.ts, controllers/woDocumentController.ts).
 
+## External API Configuration
+-   **External Master Data API:** The crew master data service URL is configured via the `EXTERNAL_MASTER_DATA_URL` environment variable. This controls where the application fetches vessels, users, ports, nationalities, and other master data from.
+-   **Configuration file:** `server/config/externalApi.ts` — centralized config that reads the env var, validates it, and exports a URL builder function.
+-   **Proxy pattern:** Frontend hooks (`client/src/hooks/useExternalMasterData.ts`) call the backend proxy at `/technical/api/external/master-data/:endpoint` instead of calling the external API directly. This avoids CORS issues and keeps the external URL server-side only.
+-   **Environment setup:** Set `EXTERNAL_MASTER_DATA_URL` in the environment. In development, it falls back to the dev URL if not set. In production, a warning is logged if missing.
+
 ## External Dependencies
 -   **Frontend Libraries:** `@radix-ui/*`, `@tanstack/react-query`, `wouter`, `tailwindcss`, `lucide-react`, `ag-grid-enterprise`, `ag-charts-react`.
 -   **Backend Libraries:** `express`, `drizzle-orm`, `@neondatabase/serverless`, `connect-pg-simple`, `sharp`.

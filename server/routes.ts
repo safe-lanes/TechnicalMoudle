@@ -29,6 +29,42 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Mount modular architecture router (modules extracted from routes.ts go here)
   app.use('/technical/api', moduleRouter);
 
+  const ALLOWED_EXTERNAL_ENDPOINTS = [
+    'nationalities', 'vessels', 'vesseltypes', 'licenses',
+    'additionalgroups', 'ports', 'languages', 'fleetgroups',
+    'countries', 'manningagents', 'crewpools', 'appraisaltypes', 'users'
+  ];
+
+  app.get('/technical/api/external/master-data/:endpoint', async (req, res) => {
+    const { endpoint } = req.params;
+    if (!ALLOWED_EXTERNAL_ENDPOINTS.includes(endpoint.toLowerCase())) {
+      return res.status(400).json({ error: `Unknown endpoint: ${endpoint}` });
+    }
+
+    const domain = (req.query.domain as string) || 'rsms';
+
+    try {
+      const { buildExternalMasterDataUrl } = await import('./config/externalApi');
+      const url = buildExternalMasterDataUrl(endpoint, domain);
+      const apiResponse = await fetch(url, {
+        method: 'GET',
+        headers: { 'accept': '*/*' },
+      });
+
+      if (!apiResponse.ok) {
+        return res.status(apiResponse.status).json({
+          error: `External API returned ${apiResponse.status}`,
+        });
+      }
+
+      const data = await apiResponse.json();
+      return res.json(data);
+    } catch (error: any) {
+      console.error(`[ExternalProxy] Failed to fetch ${endpoint}:`, error.message);
+      return res.status(502).json({ error: 'Failed to fetch from external API' });
+    }
+  });
+
   // Documentation download endpoint (outside /technical/api prefix)
   app.get("/download/docs/:filename", (req, res) => {
     const filename = req.params.filename;
@@ -62,13 +98,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
     // Seed recurring defects test data
     app.post("/dev/seed/recurring-defects", async (req, res) => {
       try {
-        // Fetch real vessels from external API
-        const EXTERNAL_API_URL = "https://dev.sl-sail.com/b/api/v1/crewmasterdata/getallmasterdata";
-        const domain = req.query.domain || 'rsms';
+        const { buildExternalMasterDataUrl } = await import('./config/externalApi');
+        const domain = (req.query.domain as string) || 'rsms';
         let externalVessels: Array<{ vuid: string; vessel: string; imo_number?: string; vessel_type_name?: string }> = [];
 
         try {
-          const apiResponse = await fetch(`${EXTERNAL_API_URL}/vessels?domain=${domain}`, {
+          const apiResponse = await fetch(buildExternalMasterDataUrl('vessels', domain), {
             method: 'GET',
             headers: { 'accept': '*/*' }
           });
