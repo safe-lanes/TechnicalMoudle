@@ -1148,6 +1148,18 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
     }
   };
 
+  const dataUrlToBlob = (dataUrl: string): Blob => {
+    const [header, base64Data] = dataUrl.split(',');
+    const mimeMatch = header.match(/data:([^;]+)/);
+    const mime = mimeMatch ? mimeMatch[1] : 'application/octet-stream';
+    const binaryStr = atob(base64Data);
+    const bytes = new Uint8Array(binaryStr.length);
+    for (let i = 0; i < binaryStr.length; i++) {
+      bytes[i] = binaryStr.charCodeAt(i);
+    }
+    return new Blob([bytes], { type: mime });
+  };
+
   const handleViewDocument = async (documentType: string, docId?: string) => {
     let targetDoc: any;
     if (docId) {
@@ -1162,17 +1174,24 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
 
     try {
       const fetchId = targetDoc.id || null;
+      let dataUrl: string | null = null;
       if (fetchId) {
         const response = await fetch(`/technical/api/work-order-documents/${fetchId}/download`);
         if (!response.ok) throw new Error('Failed to retrieve document');
         const result = await response.json();
-        window.open(result.dataUrl, '_blank');
+        dataUrl = result.dataUrl;
       } else if (targetDoc.fileKey) {
         const fileKeyEncoded = encodeURIComponent(targetDoc.fileKey.substring(1));
         const response = await fetch(`/technical/api/documents/${fileKeyEncoded}`);
         if (!response.ok) throw new Error('Failed to retrieve document');
         const result = await response.json();
-        window.open(result.dataUrl, '_blank');
+        dataUrl = result.dataUrl;
+      }
+
+      if (dataUrl) {
+        const blob = dataUrlToBlob(dataUrl);
+        const blobUrl = URL.createObjectURL(blob);
+        window.open(blobUrl, '_blank');
       }
     } catch (error) {
       console.error('View error:', error);
