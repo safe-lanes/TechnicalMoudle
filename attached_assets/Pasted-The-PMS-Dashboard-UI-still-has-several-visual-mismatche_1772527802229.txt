@@ -1,0 +1,160 @@
+The PMS Dashboard UI still has several visual mismatches compared to the reference Audit Dashboard 
+(dev.sl-sail.com/audit/dashboard/summary). Apply ALL of the following corrections precisely:
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+FIX 1: GAUGE CHART — Arc Style & Number
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Current: The gauge arc is dark navy but extremely THICK and bold, making it look heavy.
+Reference: The gauge arc is a thin, elegant semicircle with a thinner stroke width.
+Also: The numeric value inside the gauge (1127, 1275, 100%) is currently in default 
+dark color but has NO visible font styling distinction.
+Reference: Number is bold, large (~28–32px), dark navy #1a2b4a.
+
+Fix in SemiCircleGauge.tsx:
+- Reduce the arc stroke width from current value to strokeWidth={12} (or equivalent thin value)
+- The background track arc should also be strokeWidth={12}, color #E8E8E8
+- The number inside must be: fontSize: 28, fontWeight: 700, color: #1a2b4a
+- The gauge label text (e.g., "OVERDUE WOS", "COMPLETION RATE") above the gauge 
+  must be: fontSize: 11px, fontWeight: 700, color: #1a6eb5, textTransform: uppercase, 
+  letterSpacing: 0.8px — NOT bold large dark text as it currently appears
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+FIX 2: TREND LINE CHART — Y-Axis Scale is Wrong
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Current: The Y-axis goes from 0 to 1200 (raw counts), making the green 
+"Completed" and orange "Outstanding" lines appear completely flat at the 
+bottom while only the red "Overdue" line spikes dramatically. This makes 
+the chart unreadable.
+Reference: The trend chart shows PERCENTAGE-based lines (0–100%) so all 
+lines are visible and meaningful.
+
+Fix in Dashboard.tsx (trend chart section):
+- Convert all three data series to PERCENTAGES of total work orders:
+  • Completed % = (completedCount / totalWOs) * 100
+  • Overdue % = (overdueCount / totalWOs) * 100  
+  • Outstanding % = (outstandingCount / totalWOs) * 100
+- Set Y-axis domain to [0, 100] with tickFormatter: (v) => `${v}%`
+- This ensures all three lines are visible and proportional
+- Keep line colors: Completed = #2ecc71, Outstanding = #f39c12, Overdue = #e74c3c
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+FIX 3: TOP NAVBAR — Active Tab Style
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Current: The active "PMS" tab shows a blue underline (#1a6eb5) which is 
+correct, BUT the navbar background still appears as a very light gray 
+(not pure white). Also the active tab icon/text color appears to still 
+have some residual blue background tint.
+Reference: Pure white (#ffffff) navbar background. Active tab has ONLY 
+a bottom border underline, icon and text are #1a6eb5 blue, no background 
+on the tab at all.
+
+Fix in TopMenuBar.tsx:
+- Set navbar container background to strictly: backgroundColor: '#ffffff' 
+  (or bg-white in Tailwind — remove any bg-gray or bg-[#f5f5f5])
+- Active tab: remove any background-color, keep only borderBottom: '3px solid #1a6eb5'
+- Active tab icon color: #1a6eb5
+- Active tab text color: #1a6eb5
+- Inactive tab text + icon: #374151 (dark gray)
+- The bottom separator line of the navbar should be: borderBottom: '1px solid #e5e7eb'
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+FIX 4: OVERVIEW / MANAGEMENT TAB TOGGLE
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Current: "Overview" tab is filled dark navy (correct for active), 
+"Management" is plain text with rounded border outline. Style looks 
+slightly off compared to reference.
+Reference: Active tab = dark navy filled pill (#1a2b4a background, white 
+text). Inactive tab = very light gray background (#f3f4f6) with dark gray 
+text (#374151), rounded pill, NO border outline.
+
+Fix in Dashboard.tsx (tab toggle area):
+- Active tab style: backgroundColor: '#1a2b4a', color: '#ffffff', 
+  borderRadius: '20px', padding: '5px 16px', border: 'none'
+- Inactive tab style: backgroundColor: '#f3f4f6', color: '#374151', 
+  borderRadius: '20px', padding: '5px 16px', border: 'none'
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+FIX 5: ALL VESSEL / MY VESSEL TOGGLE
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Current: "All Vessel" = dark navy filled (active). "My Vessel" = 
+outlined with dark border. The outline style on "My Vessel" looks heavy.
+Reference: "All Vessel" = dark navy filled pill. "My Vessel" = white 
+background, very light gray border (#d1d5db), dark gray text (#374151). 
+Thin border, not a bold dark navy border.
+
+Fix in FleetVesselContextBar.tsx:
+- Active (All Vessel): backgroundColor: '#1a2b4a', color: '#ffffff', 
+  border: 'none', borderRadius: '20px'
+- Inactive (My Vessel): backgroundColor: '#ffffff', color: '#374151', 
+  border: '1px solid #d1d5db', borderRadius: '20px'
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+FIX 6: DONUT CHART — Status Distribution
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Current: The donut ring appears thick and the chart area has a faint 
+gray/off-white background tint.
+Reference: Thin donut ring, pure white card background, clean appearance.
+
+Fix in Dashboard.tsx:
+- Status Distribution donut: set innerRadius to 75% of outerRadius 
+  (e.g., innerRadius={70} outerRadius={95} for a standard size)
+- Spares Stock Status donut: same ratio — innerRadius={65} outerRadius={90}
+- Set the chart wrapper div background to explicitly: backgroundColor: '#ffffff'
+- Remove any padding/fill color on the chart container
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+FIX 7: SECTION LABEL — "STATUS DISTRIBUTION" Subtitle
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Current: "Click segments to filter" appears in a dark/blue color.
+Fix: Change to color: '#9ca3af', fontSize: '11px', fontStyle: 'italic' 
+(or non-italic gray is fine too — match subdued helper text style).
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+FIX 8: OVERDUE WORK ORDERS TABLE — Row Truncation
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Current: The STATUS column in the Overdue Work Orders table is cut off — 
+only "ST" is visible instead of showing the full "Overdue" status badge.
+Reference: All columns have sufficient width, status is fully visible.
+
+Fix in Dashboard.tsx (overdue table):
+- Ensure the table container has overflow: visible or the STATUS column 
+  has enough minWidth (minWidth: 90px)
+- STATUS badge should show "Overdue" text fully with red background 
+  badge: backgroundColor: '#fee2e2', color: '#dc2626', borderRadius: '4px', 
+  padding: '2px 8px', fontSize: '11px'
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+FIX 9: LEFT SIDEBAR — Active Item Highlight
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Current: The sidebar active item "Dashboard" shows a bright cyan/teal 
+highlight (#52baf3) which is very vibrant and doesn't match the reference.
+Reference: The active sidebar item uses a slightly lighter blue shade 
+that is more subtle — NOT a bright cyan. The reference sidebar uses a 
+softer highlight or a left-border indicator.
+
+Fix in SideMenuBar.tsx:
+- Active item background: change from bg-[#52baf3] to 
+  backgroundColor: 'rgba(255,255,255,0.15)' (subtle white overlay)
+- Add a left border indicator: borderLeft: '3px solid #ffffff' on active item
+- Keep white text and icon color for all items
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+FIX 10: VESSEL/GROUP ANALYSIS TABLE — Layout
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Current: The Vessel/Group Analysis matrix is cut off on the right — 
+only some columns visible, horizontal scroll bar appears.
+Reference: The matrix fits cleanly within the card with no overflow, 
+or has a clean horizontal scroll without a visible scrollbar unless 
+hovering.
+
+Fix in Dashboard.tsx (vessel group analysis section):
+- Set table container: overflowX: 'auto', scrollbarWidth: 'thin'
+- Hide scrollbar by default using CSS: 
+  '::-webkit-scrollbar { height: 4px }' 
+  '::-webkit-scrollbar-track { background: #f1f5f9 }'
+  '::-webkit-scrollbar-thumb { background: #cbd5e1; borderRadius: 2px }'
+- Ensure the metric label column has minWidth: 100px
+- Each vessel column: minWidth: 60px, textAlign: center
+
+Do NOT change any existing data, routing, functionality, or layout 
+structure. Only apply the visual/style corrections listed above.
