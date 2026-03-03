@@ -128,25 +128,23 @@ export const SideMenuBar: React.FC<SideMenuBarProps> = ({
             onClick={() => handleItemClick(item.id)}
             className={cn(
               "w-full flex flex-col items-center justify-center transition-all duration-200 px-2 py-3 h-16",
-              !isSelected && "hover:bg-white/10",
+              !isSelected && "hover:bg-white/[0.08]",
               "group relative"
             )}
-            style={isSelected ? { backgroundColor: 'rgba(255,255,255,0.15)', borderLeft: '3px solid #ffffff' } : undefined}
+            style={isSelected ? { backgroundColor: 'rgba(255,255,255,0.12)', borderLeft: '3px solid rgba(255,255,255,0.9)' } : undefined}
             role="link"
             aria-label={item.sublabel ? `${item.label}, ${item.sublabel}` : item.label}
             aria-current={isSelected ? "page" : undefined}
           >
             <Icon
-              className={cn(
-                "h-6 w-6 mb-1",
-                isSelected ? "text-white" : "text-blue-100"
-              )}
+              className="h-6 w-6 mb-1"
+              style={{ color: isSelected ? '#ffffff' : 'rgba(255,255,255,0.75)' }}
             />
-            <span className="text-white text-center leading-tight break-words text-[10px]">
+            <span className="text-center leading-tight break-words text-[10px]" style={{ color: isSelected ? '#ffffff' : 'rgba(255,255,255,0.75)' }}>
               {item.label}
             </span>
             {item.sublabel && (
-              <span className="text-[8px] text-blue-200 text-center leading-tight opacity-90">
+              <span className="text-[8px] text-center leading-tight" style={{ color: 'rgba(255,255,255,0.6)' }}>
                 {item.sublabel}
               </span>
             )}

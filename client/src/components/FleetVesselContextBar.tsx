@@ -28,12 +28,11 @@ export function FleetVesselContextBar({
   const currentYear = new Date().getFullYear();
 
   const pillBase: React.CSSProperties = {
-    padding: '5px 16px',
-    fontSize: '12px',
+    padding: '5px 18px',
+    fontSize: '13px',
     fontWeight: 600,
     cursor: 'pointer',
     transition: 'all 0.15s',
-    letterSpacing: '0.02em',
     borderRadius: '20px',
   };
 
@@ -46,13 +45,14 @@ export function FleetVesselContextBar({
 
   const tabPillInactive: React.CSSProperties = {
     ...pillBase,
-    backgroundColor: '#f3f4f6',
-    color: '#374151',
+    backgroundColor: '#f1f5f9',
+    color: '#64748b',
     border: 'none',
   };
 
   const vesselPillActive: React.CSSProperties = {
     ...pillBase,
+    padding: '5px 16px',
     backgroundColor: '#1a2b4a',
     color: '#ffffff',
     border: 'none',
@@ -60,19 +60,20 @@ export function FleetVesselContextBar({
 
   const vesselPillInactive: React.CSSProperties = {
     ...pillBase,
+    padding: '5px 16px',
     backgroundColor: '#ffffff',
     color: '#374151',
-    border: '1px solid #d1d5db',
+    border: '1px solid #e2e8f0',
   };
 
   return (
     <div
-      style={{ background: '#FFFFFF', borderBottom: '1px solid #e0e0e0', padding: '10px 20px' }}
+      style={{ background: '#FFFFFF', borderBottom: '1px solid #e5e7eb', padding: '10px 20px' }}
       data-testid="bar-fleet-vessel-context"
     >
       <div className="flex items-center justify-between flex-wrap gap-y-2">
         <div className="flex items-center gap-4">
-          <h1 style={{ fontSize: '16px', fontWeight: 700, color: '#212121', margin: 0 }} data-testid="text-dashboard-title">
+          <h1 style={{ fontSize: '20px', fontWeight: 600, color: '#1a2b4a', margin: 0 }} data-testid="text-dashboard-title">
             Dashboard
           </h1>
           <div style={{ display: 'flex', gap: '4px' }}>
@@ -93,7 +94,7 @@ export function FleetVesselContextBar({
           </div>
         </div>
 
-        <div style={{ fontSize: '22px', fontWeight: 700, color: '#212121' }} data-testid="text-current-year">
+        <div style={{ fontSize: '18px', fontWeight: 700, color: '#1a2b4a' }} data-testid="text-current-year">
           {currentYear}
         </div>
 
@@ -122,10 +123,10 @@ export function FleetVesselContextBar({
               style={{
                 padding: '5px 10px',
                 fontSize: '12px',
-                border: '1px solid #D0D5DD',
+                border: '1px solid #e2e8f0',
                 borderRadius: '6px',
                 background: '#FFFFFF',
-                color: '#212121',
+                color: '#374151',
                 cursor: 'pointer',
                 outline: 'none',
                 height: '32px',
@@ -145,13 +146,13 @@ export function FleetVesselContextBar({
               display: 'flex',
               alignItems: 'center',
               gap: '4px',
-              padding: '5px 14px',
+              padding: '6px 12px',
               fontSize: '12px',
               fontWeight: 600,
-              border: '1px solid #D0D5DD',
-              borderRadius: '6px',
+              border: '1px solid #e2e8f0',
+              borderRadius: '8px',
               background: '#FFFFFF',
-              color: '#546E7A',
+              color: '#374151',
               cursor: 'pointer',
             }}
             data-testid="button-filters"

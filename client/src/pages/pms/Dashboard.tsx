@@ -729,16 +729,17 @@ const Dashboard = () => {
 
       if (i === 0) {
         const tp = outstandingTasksChartData.totalMonthly;
+        const totalWOs = workOrderKPIs.total || 1;
         months.push({
           month: monthName,
           monthShort,
           totalPlanned: tp,
           completed: outstandingTasksChartData.completedCount,
           outstanding: outstandingTasksChartData.outstandingCount,
-          outstandingPercent: outstandingTasksChartData.outstandingPercent,
+          outstandingPercent: Math.min(100, outstandingTasksChartData.outstandingPercent),
           overdue: workOrderKPIs.overdue,
-          completedPercent: tp > 0 ? Math.round((outstandingTasksChartData.completedCount / tp) * 100) : 0,
-          overduePercent: tp > 0 ? Math.round((workOrderKPIs.overdue / tp) * 100) : 0,
+          completedPercent: Math.min(100, Math.round((outstandingTasksChartData.completedCount / totalWOs) * 100)),
+          overduePercent: Math.min(100, Math.round((workOrderKPIs.overdue / totalWOs) * 100)),
         });
       } else {
         const targetMonth = d.getMonth();
@@ -763,10 +764,10 @@ const Dashboard = () => {
           totalPlanned,
           completed: completedCount,
           outstanding: outstandingCount,
-          outstandingPercent,
+          outstandingPercent: Math.min(100, outstandingPercent),
           overdue: overdueCount,
-          completedPercent: totalPlanned > 0 ? Math.round((completedCount / totalPlanned) * 100) : 0,
-          overduePercent: totalPlanned > 0 ? Math.round((overdueCount / totalPlanned) * 100) : 0,
+          completedPercent: Math.min(100, totalPlanned > 0 ? Math.round((completedCount / totalPlanned) * 100) : 0),
+          overduePercent: Math.min(100, totalPlanned > 0 ? Math.round((overdueCount / totalPlanned) * 100) : 0),
         });
       }
     }
@@ -917,7 +918,7 @@ const Dashboard = () => {
     fontSize: '11px',
     textTransform: 'uppercase' as const,
     letterSpacing: '0.8px',
-    padding: '12px 16px 4px',
+    padding: '16px 4px 12px 4px',
   };
 
   const subTitle: React.CSSProperties = {
@@ -929,23 +930,25 @@ const Dashboard = () => {
   };
 
   const tableHeaderStyle: React.CSSProperties = {
-    background: HEADER_BLUE,
+    background: '#1a2b4a',
     color: '#FFFFFF',
-    fontWeight: 700,
+    fontWeight: 600,
     fontSize: '11px',
     textTransform: 'uppercase' as const,
-    letterSpacing: '0.03em',
+    letterSpacing: '0.5px',
+    padding: '10px 12px',
   };
 
   const contentCard: React.CSSProperties = {
     background: '#FFFFFF',
     borderRadius: '8px',
-    boxShadow: '0 1px 4px rgba(0,0,0,0.08)',
+    boxShadow: '0 1px 3px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.04)',
+    border: '1px solid #f1f5f9',
     padding: '16px',
   };
 
   const dividerH: React.CSSProperties = {
-    borderBottom: '1px solid #e8e8e8',
+    borderBottom: '1px solid #f1f5f9',
     margin: '0',
   };
 
@@ -1091,7 +1094,7 @@ const Dashboard = () => {
       </div>
 
       {/* MAIN CONTENT */}
-      <div className="flex-1 overflow-y-auto" style={{ background: '#F4F6F9' }}>
+      <div className="flex-1 overflow-y-auto" style={{ background: '#f8fafc' }}>
 
         {/* MANAGEMENT TAB: Fleet Benchmarking Table */}
         {activeTab === 'management' && vessels.length > 0 && (
@@ -1113,7 +1116,7 @@ const Dashboard = () => {
               <SemiCircleGauge
                 value={workOrderKPIs.overdue}
                 max={workOrderKPIs.total || 10}
-                color="#1d3557"
+                color="#e74c3c"
                 label="Overdue WOs"
                 displayValue={workOrderKPIs.overdue.toString()}
                 subtitle={`${overduePercent}% of total`}
@@ -1127,7 +1130,7 @@ const Dashboard = () => {
               <SemiCircleGauge
                 value={workOrderKPIs.completed}
                 max={workOrderKPIs.total || 10}
-                color="#1d3557"
+                color="#16a34a"
                 label="Completion Rate"
                 displayValue={workOrderKPIs.completed.toString()}
                 subtitle={`${completionRate}% completion rate`}
@@ -1141,7 +1144,7 @@ const Dashboard = () => {
               <SemiCircleGauge
                 value={outstandingTasksChartData.outstandingCount}
                 max={outstandingTasksChartData.totalMonthly || 10}
-                color="#1d3557"
+                color="#f59e0b"
                 label="Outstanding Tasks"
                 displayValue={`${outstandingTasksChartData.outstandingPercent}%`}
                 subtitle={`${outstandingTasksChartData.outstandingCount} of ${outstandingTasksChartData.totalMonthly} tasks`}
@@ -1200,12 +1203,12 @@ const Dashboard = () => {
                 <div style={subTitle} className="mb-1">6-MONTH MAINTENANCE TREND</div>
                 {maintenanceTrendData.months.length > 0 ? (
                   <div className="flex flex-col gap-2">
-                    <div style={{ height: '180px', backgroundColor: '#ffffff' }} data-testid="chart-maintenance-trend">
+                    <div style={{ height: '220px', backgroundColor: '#ffffff', borderRadius: '8px', padding: '8px 4px' }} data-testid="chart-maintenance-trend">
                       <ResponsiveContainer width="100%" height="100%">
                         <LineChart data={maintenanceTrendData.months} margin={{ top: 4, right: 8, bottom: 0, left: -16 }}>
-                          <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
-                          <XAxis dataKey="monthShort" tick={{ fontSize: 11, fill: '#757575' }} tickLine={false} axisLine={false} />
-                          <YAxis domain={[0, 100]} tickFormatter={(v: number) => `${v}%`} tick={{ fontSize: 10, fill: '#757575' }} tickLine={false} axisLine={false} />
+                          <CartesianGrid strokeDasharray="3 3" stroke="#f0f4f8" vertical={false} />
+                          <XAxis dataKey="monthShort" tick={{ fontSize: 11, fill: '#6b7280' }} axisLine={{ stroke: '#e5e7eb' }} tickLine={false} />
+                          <YAxis domain={[0, 100]} ticks={[0, 25, 50, 75, 100]} tickFormatter={(v: number) => `${v}%`} tick={{ fontSize: 11, fill: '#6b7280' }} axisLine={false} tickLine={false} width={38} />
                           <Tooltip
                             content={({ active, payload }) => {
                               if (active && payload && payload.length) {
@@ -1281,18 +1284,19 @@ const Dashboard = () => {
                   )}
                 </div>
                 {workOrderKPIs.overdue > 0 && (
-                  <div style={{ fontSize: '11px', color: '#9E9E9E', marginBottom: '6px' }}>
+                  <div style={{ fontSize: '11px', color: '#9ca3af', marginBottom: '6px' }}>
                     Showing top {workOrderKPIs.overdueList.length} of {workOrderKPIs.overdue} total
                   </div>
                 )}
-                <div style={{ ...contentCard, padding: 0, overflow: 'hidden' }}>
+                <div style={{ ...contentCard, padding: 0, overflow: 'hidden', border: '1px solid #f1f5f9', borderRadius: '8px' }}>
                   {workOrderKPIs.overdueList.length > 0 ? (
+                    <div style={{ overflowX: 'auto', width: '100%' }}>
                     <table className="w-full text-sm" data-testid="table-overdue-wo">
                       <thead>
                         <tr>
-                          <th className="text-left py-2 px-3" style={tableHeaderStyle}>Work Order</th>
-                          <th className="text-left py-2 px-3" style={tableHeaderStyle}>Equipment</th>
-                          <th className="text-left py-2 px-3" style={{ ...tableHeaderStyle, minWidth: '90px' }}>Status</th>
+                          <th className="text-left" style={{ ...tableHeaderStyle, minWidth: '160px' }}>Work Order</th>
+                          <th className="text-left" style={{ ...tableHeaderStyle, minWidth: '200px' }}>Equipment</th>
+                          <th className="text-left" style={{ ...tableHeaderStyle, minWidth: '100px', width: '100px' }}>Status</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -1300,25 +1304,26 @@ const Dashboard = () => {
                           <tr
                             key={wo.id}
                             className="cursor-pointer"
-                            style={{ background: idx % 2 === 0 ? '#FFFFFF' : '#F9FAFB' }}
+                            style={{ background: idx % 2 === 0 ? '#FFFFFF' : '#fafafa', borderBottom: '1px solid #f1f5f9' }}
                             onMouseEnter={e => (e.currentTarget.style.background = '#E3F2FD')}
-                            onMouseLeave={e => (e.currentTarget.style.background = idx % 2 === 0 ? '#FFFFFF' : '#F9FAFB')}
+                            onMouseLeave={e => (e.currentTarget.style.background = idx % 2 === 0 ? '#FFFFFF' : '#fafafa')}
                             onClick={() => navigateToWorkOrder(wo.id)}
                             data-testid={`row-overdue-wo-${wo.id}`}
                           >
-                            <td className="py-2 px-3" style={{ fontSize: '11px', color: '#212121', fontWeight: 500, maxWidth: '140px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            <td style={{ fontSize: '12px', color: '#374151', fontWeight: 500, padding: '9px 12px', maxWidth: '160px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                               {wo.workOrderNumber || `WO-${wo.id}`}
                             </td>
-                            <td className="py-2 px-3" style={{ fontSize: '11px', color: '#616161', maxWidth: '180px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            <td style={{ fontSize: '12px', color: '#374151', padding: '9px 12px', maxWidth: '200px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                               {wo.taskDescription || wo.jobTitle || 'No description'}
                             </td>
-                            <td className="py-2 px-3">
-                              <span style={{ display: 'inline-block', padding: '2px 8px', borderRadius: '4px', fontSize: '11px', fontWeight: 600, color: '#dc2626', backgroundColor: '#fee2e2' }}>Overdue</span>
+                            <td style={{ padding: '9px 12px' }}>
+                              <span style={{ display: 'inline-block', padding: '3px 8px', borderRadius: '4px', fontSize: '11px', fontWeight: 500, color: '#dc2626', backgroundColor: '#fee2e2', whiteSpace: 'nowrap' }}>Overdue</span>
                             </td>
                           </tr>
                         ))}
                       </tbody>
                     </table>
+                    </div>
                   ) : (
                     <div className="text-center py-6" style={{ color: '#9E9E9E' }}>
                       <CheckCircle className="w-8 h-8 mx-auto mb-2" style={{ color: '#2E7D32' }} />
@@ -1352,14 +1357,14 @@ const Dashboard = () => {
                       onClick={item.onClick}
                       data-testid={`row-stat-${item.label.toLowerCase().replace(/\s/g, '-')}`}
                     >
-                      <span style={{ fontSize: '12px', color: '#6b7280' }}>{item.label}</span>
+                      <span style={{ fontSize: '13px', color: '#374151', fontWeight: 400 }}>{item.label}</span>
                       <span style={{
-                        fontSize: '13px',
+                        fontSize: '14px',
                         fontWeight: 700,
                         color: item.color,
                       }}>{item.value}</span>
                     </div>
-                    {idx < 4 && <div style={{ borderBottom: '1px solid #EEEEEE' }} />}
+                    {idx < 4 && <div style={{ borderBottom: '1px solid #f1f5f9' }} />}
                   </div>
                 ))}
               </div>
@@ -1402,23 +1407,22 @@ const Dashboard = () => {
                 <div style={subTitle} className="mb-2">VESSEL / GROUP ANALYSIS</div>
                 {dotMatrixVesselData.length > 0 ? (
                   <div className="overflow-x-auto" style={{ scrollbarWidth: 'thin' as any }}>
-                    <table style={{ width: '100%', fontSize: '11px', borderCollapse: 'collapse' }}>
+                    <table style={{ width: '100%', fontSize: '12px', borderCollapse: 'collapse', minWidth: '500px' }}>
                       <thead>
                         <tr>
-                          <th style={{ textAlign: 'left', padding: '4px 6px', color: '#757575', fontWeight: 600, fontSize: '10px', minWidth: '100px' }}>Metric</th>
+                          <th style={{ textAlign: 'left', padding: '6px 8px', color: '#6b7280', fontWeight: 500, fontSize: '11px', minWidth: '110px' }}>Metric</th>
                           {dotMatrixVesselData.map(v => (
                             <th key={v.id} style={{
                               textAlign: 'center',
-                              padding: '4px 3px',
-                              color: '#546E7A',
-                              fontWeight: 600,
-                              fontSize: '9px',
-                              minWidth: '50px',
-                              maxWidth: '55px',
+                              padding: '6px 4px',
+                              color: '#6b7280',
+                              fontWeight: 500,
+                              fontSize: '11px',
+                              minWidth: '55px',
+                              maxWidth: '70px',
                               overflow: 'hidden',
                               textOverflow: 'ellipsis',
                               whiteSpace: 'nowrap',
-                              borderBottom: '1px solid #E0E0E0',
                             }}>
                               {v.name.length > 8 ? v.name.substring(0, 7) + '..' : v.name}
                             </th>
@@ -1428,11 +1432,11 @@ const Dashboard = () => {
                       <tbody>
                         {['Work Orders', 'Overdue WOs', 'Low Stock', 'Spares', 'Running Hrs'].map(metric => (
                           <tr key={metric}>
-                            <td style={{ padding: '6px 6px', color: '#424242', fontWeight: 500, whiteSpace: 'nowrap', fontSize: '11px' }}>{metric}</td>
+                            <td style={{ padding: '8px 10px', color: '#374151', fontWeight: 500, whiteSpace: 'nowrap', fontSize: '12px', backgroundColor: '#ffffff', borderBottom: '1px solid #f1f5f9' }}>{metric}</td>
                             {dotMatrixVesselData.map((v, vIdx) => {
                               const dotColor = getDotColor(vIdx, metric);
                               return (
-                                <td key={v.id} style={{ textAlign: 'center', padding: '6px 4px' }}>
+                                <td key={v.id} style={{ textAlign: 'center', padding: '8px 4px', borderBottom: '1px solid #f1f5f9' }}>
                                   <span
                                     style={{
                                       display: 'inline-block',
@@ -1466,17 +1470,27 @@ const Dashboard = () => {
                 {watchListItems.length > 0 ? (
                   <div>
                     {watchListItems.map((item, idx) => (
-                      <div key={idx} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 0', borderBottom: idx < watchListItems.length - 1 ? '1px solid #EEEEEE' : 'none' }}>
-                        <div style={{ flex: 1, minWidth: 0 }}>
-                          <div style={{ fontSize: '11px', color: '#212121', fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.label}</div>
-                          {item.vessel && <div style={{ fontSize: '10px', color: '#9E9E9E' }}>{item.vessel}</div>}
+                      <div key={idx} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '9px 4px', borderBottom: '1px solid #f1f5f9', backgroundColor: '#ffffff' }}>
+                        <div style={{ flex: 1, minWidth: 0, paddingRight: '8px' }}>
+                          <div style={{ fontSize: '12px', color: '#374151', fontWeight: 400, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.label}</div>
+                          {item.vessel && <div style={{ fontSize: '10px', color: '#9ca3af' }}>{item.vessel}</div>}
                         </div>
-                        <span style={{ display: 'inline-block', padding: '2px 8px', borderRadius: '12px', fontSize: '10px', fontWeight: 700, color: '#FFFFFF', background: item.badgeColor, flexShrink: 0 }}>{item.badge}</span>
+                        <span style={{
+                          display: 'inline-block',
+                          padding: '2px 8px',
+                          borderRadius: '4px',
+                          fontSize: '11px',
+                          fontWeight: 600,
+                          whiteSpace: 'nowrap',
+                          flexShrink: 0,
+                          color: item.badge === 'Overdue' ? '#dc2626' : '#ea580c',
+                          backgroundColor: item.badge === 'Overdue' ? '#fee2e2' : '#fff7ed',
+                        }}>{item.badge}</span>
                       </div>
                     ))}
                     <button
                       onClick={() => navigateToWorkOrders('Overdue')}
-                      style={{ display: 'block', width: '100%', textAlign: 'center', fontSize: '11px', color: '#1565C0', fontWeight: 600, background: 'none', border: 'none', cursor: 'pointer', marginTop: '8px', padding: '4px' }}
+                      style={{ display: 'block', width: '100%', textAlign: 'center', fontSize: '12px', color: '#1a6eb5', fontWeight: 500, background: 'none', border: 'none', cursor: 'pointer', padding: '10px 0', borderTop: '1px solid #f1f5f9', marginTop: '4px' }}
                       data-testid="button-view-all-watchlist"
                     >
                       View All

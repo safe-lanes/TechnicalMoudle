@@ -41,7 +41,7 @@ export function SemiCircleGauge({
 
   const trackPath = describeArc(startAngle, endAngle);
 
-  const arcColor = '#1d3557';
+  const arcColor = color;
   const valueColor = '#1a2b4a';
 
   return (
@@ -56,7 +56,7 @@ export function SemiCircleGauge({
         <path
           d={trackPath}
           fill="none"
-          stroke="#E8E8E8"
+          stroke="#e5e7eb"
           strokeWidth={strokeWidth}
           strokeLinecap="round"
         />

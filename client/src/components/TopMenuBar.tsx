@@ -89,8 +89,8 @@ export const TopMenuBar: React.FC<TopMenuBarProps> = ({
                     style={{ backgroundColor: '#ffffff', borderRight: '1px solid #e5e7eb' }}
                     data-testid="dropdown-technical-module"
                   >
-                    <Icon className="h-5 w-5 mb-1" style={{ color: '#374151' }} />
-                    <span className="text-xs font-medium" style={{ color: '#374151' }}>
+                    <Icon className="h-5 w-5 mb-1" style={{ color: '#4b5563' }} />
+                    <span className="text-xs font-medium" style={{ color: '#4b5563' }}>
                       {item.label}
                     </span>
                   </div>
@@ -118,8 +118,8 @@ export const TopMenuBar: React.FC<TopMenuBarProps> = ({
               className="flex flex-col items-center justify-center w-[110px] transition-all duration-200 relative"
               style={{ backgroundColor: '#ffffff' }}
             >
-              <Icon className="h-5 w-5 mb-1" style={{ color: isSelected ? '#1a6eb5' : '#374151' }} />
-              <span className="text-xs font-medium" style={{ color: isSelected ? '#1a6eb5' : '#374151' }}>
+              <Icon className="h-5 w-5 mb-1" style={{ color: isSelected ? '#1a6eb5' : '#4b5563' }} />
+              <span className="text-xs font-medium" style={{ color: isSelected ? '#1a6eb5' : '#4b5563' }}>
                 {item.label}
               </span>
               {isSelected && (
