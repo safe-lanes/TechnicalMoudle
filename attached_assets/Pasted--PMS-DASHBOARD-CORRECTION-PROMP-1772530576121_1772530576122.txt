@@ -1,0 +1,340 @@
+```
+=============================================================
+PMS DASHBOARD — CORRECTION PROMPT (ISSUES 11 TO END)
+Continuing from previously provided Issues 1–10.
+Do NOT change data, APIs, routing, or business logic.
+ONLY change visual styles, chart config, and CSS.
+=============================================================
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+ISSUE 11 — VESSEL / GROUP ANALYSIS MATRIX TABLE
+File: client/src/pages/pms/Dashboard.tsx
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+WHAT IS WRONG:
+- Table overflows and is cut off on the right — "ST" visible 
+  instead of full STATUS column in the overdue table
+- The horizontal scrollbar appears heavy and ugly
+- Matrix dot colors — some are showing wrong shades
+- The table feels cramped with no breathing room
+
+EXACT FIXES:
+
+1. Outer table wrapper div:
+   overflowX: 'auto'
+   width: '100%'
+   borderRadius: '8px'
+   Add these CSS rules via a <style> tag or styled approach:
+     .matrix-scroll::-webkit-scrollbar { height: 3px; }
+     .matrix-scroll::-webkit-scrollbar-thumb { 
+       background: #cbd5e1; border-radius: 2px; }
+     .matrix-scroll::-webkit-scrollbar-track { 
+       background: transparent; }
+
+2. Table itself:
+   borderCollapse: 'collapse'
+   width: '100%'
+   minWidth: '500px'
+
+3. First column (metric labels: Overdue WOs, Low Stock, Spares, Running Hrs):
+   minWidth: '110px'
+   fontSize: '12px'
+   color: '#374151'
+   fontWeight: 500
+   padding: '8px 10px'
+   backgroundColor: '#ffffff'
+   borderBottom: '1px solid #f1f5f9'
+
+4. Vessel name header cells (top row):
+   minWidth: '55px'
+   maxWidth: '70px'
+   textAlign: 'center'
+   fontSize: '11px'
+   color: '#6b7280'
+   fontWeight: 500
+   padding: '6px 4px'
+   overflow: 'hidden'
+   textOverflow: 'ellipsis'
+   whiteSpace: 'nowrap'
+
+5. Dot indicator cells (status dots per vessel per metric):
+   textAlign: 'center'
+   padding: '8px 4px'
+   borderBottom: '1px solid #f1f5f9'
+
+6. Dot color logic — apply these EXACT rules:
+   Each dot is a small circle: 
+   width: 12px, height: 12px, borderRadius: '50%', 
+   display: 'inline-block'
+
+   Color rules per metric:
+   - If value is 0 or null/no data:
+     backgroundColor: '#d1d5db'  (neutral gray — most dots should be gray)
+   - If metric is "Overdue WOs" and value > 0:
+     backgroundColor: '#e74c3c'  (red)
+   - If metric is "Low Stock" and status is critical:
+     backgroundColor: '#e74c3c'  (red)
+   - If metric is "Running Hrs" and approaching limit:
+     backgroundColor: '#f59e0b'  (amber)
+   - If status is healthy/OK:
+     backgroundColor: '#16a34a'  (green)
+
+   NOTE: Reference dashboard shows mostly GRAY dots (#d1d5db) 
+   with only a few red/amber where there is actual data. 
+   Do not show green everywhere — default must be gray.
+
+7. The section label "VESSEL / GROUP ANALYSIS":
+   fontSize: '11px', fontWeight: 700, color: '#1a6eb5',
+   textTransform: 'uppercase', letterSpacing: '0.8px',
+   padding: '14px 4px 8px 4px'
+
+8. The filter tabs row (FLEET GROUP | ADDITIONAL GROUP | OWNERS | VESSELS):
+   These are radio-style tab selectors above the matrix.
+   Active tab: color '#1a6eb5', fontWeight 600, fontSize '12px'
+   Inactive tabs: color '#9ca3af', fontSize '12px'
+   The filled radio circle for active: fill '#1a6eb5'
+   The empty radio circle for inactive: border '1px solid #d1d5db'
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+ISSUE 12 — WATCH LIST SECTION
+File: client/src/pages/pms/Dashboard.tsx
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+WHAT IS WRONG:
+- "Overdue" badges are a bright saturated red filled pill — 
+  slightly too heavy. Should be a softer badge.
+- "Critical" badges are also bright red — should be a 
+  different style to distinguish from Overdue.
+- Row items are not well separated.
+
+EXACT FIXES:
+
+1. Section label "WATCH LIST":
+   fontSize: '11px', fontWeight: 700, color: '#1a6eb5',
+   textTransform: 'uppercase', letterSpacing: '0.8px',
+   padding: '14px 4px 8px 4px'
+
+2. Each watch list row:
+   display: 'flex'
+   justifyContent: 'space-between'
+   alignItems: 'center'
+   padding: '9px 4px'
+   borderBottom: '1px solid #f1f5f9'
+   backgroundColor: '#ffffff'
+
+3. Item name text:
+   fontSize: '12px'
+   color: '#374151'
+   fontWeight: 400
+   flex: 1
+   overflow: 'hidden'
+   textOverflow: 'ellipsis'
+   whiteSpace: 'nowrap'
+   paddingRight: '8px'
+
+4. "Overdue" badge:
+   backgroundColor: '#fee2e2'
+   color: '#dc2626'
+   fontSize: '11px'
+   fontWeight: 600
+   borderRadius: '4px'
+   padding: '2px 8px'
+   whiteSpace: 'nowrap'
+
+5. "Critical" badge:
+   backgroundColor: '#fff7ed'
+   color: '#ea580c'
+   fontSize: '11px'
+   fontWeight: 600
+   borderRadius: '4px'
+   padding: '2px 8px'
+   whiteSpace: 'nowrap'
+
+6. "View All" link at the bottom:
+   display: 'block'
+   textAlign: 'center'
+   fontSize: '12px'
+   color: '#1a6eb5'
+   fontWeight: 500
+   padding: '10px 0'
+   textDecoration: 'none'
+   borderTop: '1px solid #f1f5f9'
+   marginTop: '4px'
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+ISSUE 13 — OVERALL CARD / PANEL STYLING
+File: client/src/pages/pms/Dashboard.tsx
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+WHAT IS WRONG:
+- Some cards have slightly off-white or gray backgrounds
+- Card shadows are either too strong or missing
+- Card border radius is inconsistent
+
+EXACT FIXES — apply to ALL card/panel containers 
+(contentCard style or equivalent):
+
+{
+  backgroundColor: '#ffffff',
+  borderRadius: '8px',
+  boxShadow: '0 1px 3px rgba(0, 0, 0, 0.06), 0 1px 2px rgba(0, 0, 0, 0.04)',
+  border: '1px solid #f1f5f9',
+  overflow: 'hidden',
+  marginBottom: '12px'
+}
+
+The three-column layout wrapper (the parent div holding 
+WORK ORDER KPIS | WORK ORDER STATUS & TRENDS | INVENTORY):
+{
+  display: 'grid',
+  gridTemplateColumns: '1fr 2fr 1.2fr',
+  gap: '12px',
+  padding: '12px',
+  backgroundColor: '#f8fafc'   ← very light blue-gray page background
+}
+
+The page background (the area behind all cards):
+backgroundColor: '#f8fafc'
+(reference has a very subtle blue-gray tint on the page bg, 
+NOT pure white and NOT gray — it is #f8fafc)
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+ISSUE 14 — GLOBAL TYPOGRAPHY AUDIT
+File: client/src/pages/pms/Dashboard.tsx
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Apply these typography rules universally across all text 
+elements in the dashboard. Do a find-and-replace style 
+review of all style objects in Dashboard.tsx:
+
+SECTION LABELS (column headers, sub-section titles):
+  fontSize: '11px'
+  fontWeight: 700
+  color: '#1a6eb5'
+  textTransform: 'uppercase'
+  letterSpacing: '0.8px'
+
+CARD TITLES (e.g. "STATUS DISTRIBUTION", "OVERDUE WORK ORDERS"):
+  fontSize: '13px'
+  fontWeight: 600
+  color: '#1a2b4a'
+
+BODY / DATA TEXT (table cells, list items):
+  fontSize: '12px'
+  color: '#374151'
+  fontWeight: 400
+
+SUPPORTING / SUB TEXT (e.g. "43% of total", "Showing top 5 of..."):
+  fontSize: '11px'
+  color: '#6b7280'
+  fontWeight: 400
+
+KPI NUMBER (large number in gauge center, big stat numbers):
+  fontSize: '28px'
+  fontWeight: 700
+  color: '#1a2b4a'
+
+LINK TEXT (View All, View All 1127):
+  fontSize: '12px'
+  color: '#1a6eb5'
+  fontWeight: 500
+  textDecoration: 'none'
+
+PAGE TITLE ("Dashboard"):
+  fontSize: '20px'
+  fontWeight: 600
+  color: '#1a2b4a'
+
+YEAR TEXT ("2026"):
+  fontSize: '18px'
+  fontWeight: 700
+  color: '#1a2b4a'
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+ISSUE 15 — FLOATING CHAT BUTTON (PMS Assistant)
+File: wherever the floating chat FAB button is rendered
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+WHAT IS WRONG:
+- The bright teal/blue floating circle button (bottom right)
+  is too visually dominant and does not exist in the reference
+
+EXACT FIXES:
+  Change the FAB button style to:
+  {
+    backgroundColor: '#ffffff',
+    border: '1.5px solid #1a6eb5',
+    borderRadius: '50%',
+    width: '40px',
+    height: '40px',
+    boxShadow: '0 2px 8px rgba(0,0,0,0.12)',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    cursor: 'pointer',
+    position: 'fixed',
+    bottom: '20px',
+    right: '20px',
+    zIndex: 999
+  }
+  Icon inside the button: color '#1a6eb5', size 18px
+  On hover: backgroundColor: '#eff6ff'
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+ISSUE 16 — SPARES STOCK STATUS — THICK GREEN ARC
+File: client/src/pages/pms/Dashboard.tsx (bottom-right area)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+WHAT IS WRONG:
+- The spares stock status area currently shows a large thick 
+  GREEN semicircle arc at the top-right (visible in scrolled view)
+  This appears to be a gauge left over from a previous design 
+  or incorrectly placed — it is not a donut chart, it is a 
+  giant semicircle taking up visual space.
+
+EXACT FIX:
+- Identify this component — it is likely a SemiCircleGauge 
+  rendering the "OK" spares count as a gauge. 
+- REMOVE this gauge entirely from the inventory column — 
+  it should NOT be there.
+- The inventory column should only contain:
+  1. The KPI list (Total Spares, Low Stock, Critical Low Stock, 
+     Total Components, Stores Inventory) with plain text values
+  2. The "SPARES STOCK STATUS" donut PieChart below the list
+  3. The "VESSEL / GROUP ANALYSIS" matrix below that
+  4. The "WATCH LIST" below that
+- There should be NO standalone green semicircle gauge in the 
+  inventory column.
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+FINAL CHECKLIST — VERIFY ALL OF THESE AFTER CHANGES
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+After applying all fixes, verify visually:
+
+[ ] Top navbar is pure white, active PMS tab has blue underline 
+    only, no colored background on any tab
+[ ] Sidebar is #1565c0 medium blue, active item has subtle 
+    white-overlay background + white left border, NO cyan highlight
+[ ] Section headers ("WORK ORDER KPIS" etc.) are small blue 
+    uppercase text on transparent background, no banner
+[ ] All 3 gauge arcs are THIN (strokeWidth ~10), colors are 
+    semantic (red/green/amber), numbers are dark navy bold
+[ ] Trend line chart Y-axis shows 0%–100%, all 3 lines are 
+    visible and make sense, no area fill, white background
+[ ] Status Distribution donut has thin ring, white center, 
+    white background
+[ ] Spares Stock Status donut has thin ring, white center, 
+    white background
+[ ] The large standalone green semicircle arc in inventory 
+    column is REMOVED
+[ ] Overdue Work Orders table STATUS column is fully visible 
+    with soft red badge
+[ ] Watch List Overdue badges are
