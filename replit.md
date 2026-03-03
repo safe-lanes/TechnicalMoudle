@@ -1,74 +1,46 @@
 # Seafarer Technical Management System
 
 ## Overview
-This project is a full-stack Technical Module for a maritime Planned Maintenance System (PMS). Its primary purpose is to manage technical equipment maintenance, scheduling, and performance tracking within the maritime industry. Key capabilities include Certificate & Surveys management, Defect Reporting, and core PMS operations. The project aims to provide a robust, scalable solution for maritime technical management, improving operational efficiency and compliance.
+This project is a full-stack Technical Module for a maritime Planned Maintenance System (PMS). Its primary purpose is to manage technical equipment maintenance, scheduling, and performance tracking within the maritime industry. Key capabilities include Certificate & Surveys management, Defect Reporting, and core PMS operations. The system aims to provide a robust, scalable solution for technical management in the maritime sector, improving operational efficiency and compliance.
 
 ## User Preferences
 Preferred communication style: Simple, everyday language.
 
 ## System Architecture
-The system is built with a modular, domain-driven approach, organizing backend code into specific feature modules. It utilizes a UUID-based identity system for primary keys and foreign key relationships across the database, moving away from legacy ID formats. A dual migration system (code-based and Drizzle SQL) ensures controlled and safe database schema evolution, with strict rules against manual modification of migration files or existing schema definitions. Immutability rules are enforced for critical audit tables like `component_maintenance_history`.
 
-**Key Architectural Principles:**
--   **Module-Based Backend:** All backend features are organized into domain-specific modules (`server/modules/`), each with its own routes, schemas, and services.
--   **UUID-Based Identity:** Canonical UUID columns are used as primary identifiers for all core entities (vessels, components, jobs, work orders) and for foreign key references.
--   **Dual Migration System:** A robust system that runs both code-based and Drizzle SQL migrations automatically on startup, ensuring schema consistency and preventing manual errors.
--   **Immutable Tables:** Certain tables, like `component_maintenance_history`, are designed as insert-only audit trails, preventing runtime updates or deletions.
--   **API Route Prefixing:** All API endpoints are uniformly prefixed with `/technical/api`.
--   **Vessel Data Sourcing:** A flexible data handling strategy for vessel information accommodates data from both internal and external sources.
--   **Database Safety:** Migrations incorporate `IF NOT EXISTS` / `IF EXISTS` guards and orphan cleanup procedures to ensure idempotent and safe schema changes.
--   **Production/Development Detection:** Automatic detection logic differentiates between development (Vite hot reload) and production (static file serving) environments.
--   **Fleet Table Contract:** All `fleet_*` tables must adhere to a strict schema contract including standard audit and state columns (e.g., `_uuid`, `createdAt`, `updatedAt`, `isDeleted`, `isSync`).
+### Core Design Principles
+-   **Module-Based Architecture**: All backend code is organized into domain-specific modules under `server/modules/` (e.g., `alerts`, `fleet`, `spares`, `vessels`, `work-orders`). New features must adhere to this structure, with each module typically containing `routes.ts` and optional `schemas.ts`.
+-   **UUID-Based Identity System**: The system primarily uses canonical UUID columns (e.g., `vuuid`, `cuuid`, `juuid`, `wouuid`) as the primary identity for foreign key relationships, deprecating older `id` formats for new references.
+-   **Immutable Tables**: Certain tables like `component_maintenance_history` are designed as INSERT-only audit trails, enforced by database triggers.
+-   **Dual Migration System**: A robust migration system combines 52 frozen code-based migrations (`server/migrations.ts`) with auto-generated Drizzle SQL migrations (`migrations/*.sql`). Schema changes are made in `shared/schema.ts`, and new SQL migration files are automatically generated.
+-   **Database Safety Patterns**: Migrations include safety guards (`IF NOT EXISTS`, `IF EXISTS`) and orphan cleanup procedures before adding foreign key constraints.
+-   **API Route Prefix**: All API endpoints must use the `/technical/api` prefix.
+-   **Vessel Data Source Strategy**: The system supports fetching vessel data from both local and external sources, with a robust fallback mechanism for identifying vessels by various ID formats.
 
-**UI/UX Decisions:**
--   **Responsive Design:** Mobile-first approach for all user interfaces.
--   **Data Visualization & Grids:** AG Charts React for interactive visualizations and AG Grid Enterprise for robust data table management.
--   **Layout & Spacing:** Consistent `p-6` padding for main content areas and `space-y-6` for vertical element spacing.
--   **Interaction Patterns:** "Delta UI Pattern" for mapping and selection dialogs.
--   **Forms:** Work Order forms are single-page, scrollable interfaces with clearly numbered subsections.
--   **Data Integrity:** All dashboard charts display real-time data from the database, avoiding hardcoded or mock data.
--   **Work Order Document Upload:** Multi-file upload functionality with server-side image compression, dual storage backend (local filesystem when `PRIVATE_OBJECT_DIR` is not set, Replit Object Storage when available), and metadata management in `work_order_documents` table. Backend code in `server/modules/work-orders/` (repositories/documentRepository.ts, services/woDocumentService.ts, controllers/woDocumentController.ts).
+### Tech Stack
+-   **Frontend**: React 18, TypeScript, Vite, Tailwind CSS, shadcn/ui, TanStack Query, Wouter.
+-   **Backend**: Express.js, TypeScript, Drizzle ORM.
+-   **Database**: PostgreSQL 16.
+-   **AI**: OpenAI GPT-4o (via Replit AI Integration).
+-   **Storage**: Replit Object Storage (for document uploads).
 
-## External API Configuration
--   **Environment Detection:** The system uses `APP_ENV` (values: `local`, `dev`, `production`) to determine which external API URL to use. If `APP_ENV` is not set, it is inferred from `NODE_ENV` with a warning.
--   **Environment Variables:**
-    -   `APP_ENV` — Explicit environment identifier (`local` | `dev` | `production`).
-    -   `EXTERNAL_MASTER_DATA_URL_DEV` — Used when `APP_ENV` is `local` or `dev`.
-    -   `EXTERNAL_MASTER_DATA_URL_PROD` — Used when `APP_ENV` is `production`.
-    -   The server will **not start** if the required URL variable is missing (fail-fast, no fallback defaults).
--   **Configuration file:** `server/config/externalApi.ts` — centralized config that validates `APP_ENV`, selects the correct URL, and exports a `buildExternalMasterDataUrl()` helper. Imported at the top of `server/index.ts` so environment info logs before anything else.
--   **Proxy pattern:** Frontend hooks (`client/src/hooks/useExternalMasterData.ts`) call the backend proxy at `/technical/api/external/master-data/:endpoint` instead of calling the external API directly. This avoids CORS issues and keeps the external URL server-side only.
--   **Deployment per environment:**
-    -   Local: `APP_ENV=local`, set `EXTERNAL_MASTER_DATA_URL_DEV` only.
-    -   Dev server: `APP_ENV=dev`, set `EXTERNAL_MASTER_DATA_URL_DEV` only.
-    -   Production: `APP_ENV=production`, set `EXTERNAL_MASTER_DATA_URL_PROD` only.
+### UI/UX Standards
+-   Mobile-first responsive design.
+-   AG Charts React for visualizations and AG Grid Enterprise for data tables.
+-   Consistent `p-6` padding for main content and `space-y-6` for vertical spacing.
+-   Delta UI Pattern for mapping/selection dialogs.
+-   Work Order forms are designed as single-page scrollable interfaces with numbered subsections.
+-   All dashboard charts display real database data.
 
-## Master Data Tables (Drizzle ORM)
-All 5 master tables have proper Drizzle schema definitions in `shared/schema.ts`:
--   `vesselTypes` — vessel type classifications (19 rows)
--   `additionalGroups` — grouping metadata (15 rows)
--   `ports` — worldwide port reference data (9,500+ rows)
--   `fleetGroups` — fleet grouping metadata (13 rows)
--   `masterUsers` — user directory from external system (348 rows)
-
-Each table follows the pattern: text PK (`id`), domain columns, `syncedAt`/`createdAt`/`updatedAt` timestamps with `defaultNow()`, insert schema (omitting auto timestamps), and select/insert types. Named indexes exist on `name` columns.
-
-The sync controller (`server/modules/misc/controllers/adminController.ts` → `syncMasters`) uses Drizzle ORM `db.insert().onConflictDoUpdate()` for all master tables (no raw SQL). Triggered via `POST /technical/api/admin/sync-masters`.
-
-### Bulk Import Maker Validation (2026-03-03)
-**Change**: Component bulk import no longer auto-creates makers in `maker_list`. Instead, during dry-run validation, the system checks that every Maker (by name or code) specified in the component import sheet already exists in `maker_list`. If not found, a validation error is shown: "Please import makers first."
-**Scope**: Only affects component import (`validationService.ts` validation + `importService.ts` Step 0 removal). Spares, fleet-components, jobs, stores, work-orders imports are unaffected. `createComponentFromRow`/`updateComponentFromRow` still resolve maker names from codes via read-only lookup.
-**Files**: `server/modules/bulk-upload/services/validationService.ts`, `server/modules/bulk-upload/services/importService.ts`
-
-### Inventory Transaction Location Picker (2026-03-03)
-**Change**: The Inventory Transaction dialog (opened by clicking the Location column in the Spares table) now has interactive location pickers for Location A and Location B. Instead of static text, each location name area is a searchable combobox dropdown that fetches locations from the `locations` table via `GET /technical/api/inventory/locations/:vesselId`. Users can select an existing location or type a new name to create one inline via `POST /technical/api/inventory/locations/:vesselId`. The existing ROB input fields and save logic are unchanged.
-**Files**: `client/src/pages/spares/SparesNew.tsx` (Inventory Transaction dialog section)
-**Pattern**: Matches the existing location picker pattern used in the Edit Spare and Add Spare modals (Popover + Command components).
+### Feature Specifications
+-   **Spare-Component Sibling Link Distribution**: When a spare is linked to a component, it is automatically linked to all sibling components (components sharing the same `parentId`). An idempotent backfill endpoint is available for batch processing.
+-   **Fleet Table Schema Contract**: All `fleet_*` tables must include mandatory columns such as `uuid`, `sortOrder`, `createdAt`, `updatedAt`, `createdByUuid`, `updatedByUuid`, `isDeleted`, and `isSync`.
+-   **Bulk Import Maker Validation**: Component bulk import now validates that makers specified in the import sheet already exist in `maker_list`, preventing automatic creation of new makers.
+-   **Inventory Transaction Location Picker**: The Inventory Transaction dialog features interactive, searchable combobox dropdowns for selecting and creating locations directly from the `locations` table.
 
 ## External Dependencies
--   **Frontend Libraries:** `@radix-ui/*`, `@tanstack/react-query`, `wouter`, `tailwindcss`, `lucide-react`, `ag-grid-enterprise`, `ag-charts-react`.
--   **Backend Libraries:** `express`, `drizzle-orm`, `@neondatabase/serverless`, `connect-pg-simple`, `sharp`.
--   **Development Tools:** `vite`, `typescript`, `drizzle-kit`, `tsx`.
--   **Database:** PostgreSQL 16.
--   **AI Integration:** OpenAI GPT-4o (via Replit AI Integration).
--   **Object Storage:** Replit Object Storage (for document uploads).
+
+-   **Frontend Libraries**: `@radix-ui/*`, `@tanstack/react-query`, `wouter`, `tailwindcss`, `lucide-react`, `ag-grid-enterprise`, `ag-charts-react`.
+-   **Backend Libraries**: `express`, `drizzle-orm`, `@neondatabase/serverless`, `connect-pg-simple`.
+-   **Development Tools**: `vite`, `typescript`, `drizzle-kit`, `tsx`.
+-   **AI Services**: OpenAI GPT-4o (integrated via Replit AI).
