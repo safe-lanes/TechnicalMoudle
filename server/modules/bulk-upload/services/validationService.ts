@@ -200,6 +200,10 @@ export async function validateData(type: string, data: any[], mode: string, vess
     });
   }
   
+  let existingMakersByCode = new Map<string, any>();
+  let existingMakersByName = new Map<string, any>();
+  let makerListLoaded = false;
+
   if (type === 'components') {
     // Fetch existing component codes for the vessel from the database
     if (vesselId) {
@@ -214,6 +218,16 @@ export async function validateData(type: string, data: any[], mode: string, vess
       } catch (err) {
         console.error(`Failed to fetch existing components for vessel ${vesselId}:`, err);
       }
+    }
+
+    try {
+      const existingMakers = await storage.getMakerList();
+      existingMakersByCode = new Map(existingMakers.map((m: any) => [m.makerCode, m]));
+      existingMakersByName = new Map(existingMakers.map((m: any) => [m.makerName.toLowerCase(), m]));
+      makerListLoaded = true;
+      console.log(`📋 Loaded ${existingMakers.length} existing makers for validation`);
+    } catch (err) {
+      console.error('Failed to fetch maker list for validation:', err);
     }
     
     // Track occurrences within the uploaded file (case-insensitive)
@@ -399,6 +413,35 @@ export async function validateData(type: string, data: any[], mode: string, vess
           normalized[field] = String(row[field]).trim();
         }
       });
+
+      // Validate Maker exists in Maker List (only if maker list was loaded successfully)
+      if (makerListLoaded) {
+        const rowMakerCode = normalized['Maker Code'] || null;
+        const rowMakerName = normalized['Maker'] || normalized['Maker Name'] || null;
+        if (rowMakerCode) {
+          const trimmedCode = String(rowMakerCode).trim();
+          if (!existingMakersByCode.has(trimmedCode)) {
+            if (rowMakerName) {
+              const nameMatch = existingMakersByName.get(String(rowMakerName).trim().toLowerCase());
+              if (nameMatch) {
+                normalized['Maker Code'] = nameMatch.makerCode;
+              } else {
+                errors.push(`Row ${rowNum}: Maker Code '${trimmedCode}' not found in Maker List. Please import makers first.`);
+              }
+            } else {
+              errors.push(`Row ${rowNum}: Maker Code '${trimmedCode}' not found in Maker List. Please import makers first.`);
+            }
+          }
+        } else if (rowMakerName) {
+          const trimmedName = String(rowMakerName).trim();
+          const nameMatch = existingMakersByName.get(trimmedName.toLowerCase());
+          if (nameMatch) {
+            normalized['Maker Code'] = nameMatch.makerCode;
+          } else {
+            errors.push(`Row ${rowNum}: Maker '${trimmedName}' not found in Maker List. Please import makers first.`);
+          }
+        }
+      }
 
       // Note: Parent Component Code is now handled by the centralized logic above
       // using getExplicitParentFromRow() which checks all header variants

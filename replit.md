@@ -55,6 +55,11 @@ Each table follows the pattern: text PK (`id`), domain columns, `syncedAt`/`crea
 
 The sync controller (`server/modules/misc/controllers/adminController.ts` → `syncMasters`) uses Drizzle ORM `db.insert().onConflictDoUpdate()` for all master tables (no raw SQL). Triggered via `POST /technical/api/admin/sync-masters`.
 
+### Bulk Import Maker Validation (2026-03-03)
+**Change**: Component bulk import no longer auto-creates makers in `maker_list`. Instead, during dry-run validation, the system checks that every Maker (by name or code) specified in the component import sheet already exists in `maker_list`. If not found, a validation error is shown: "Please import makers first."
+**Scope**: Only affects component import (`validationService.ts` validation + `importService.ts` Step 0 removal). Spares, fleet-components, jobs, stores, work-orders imports are unaffected. `createComponentFromRow`/`updateComponentFromRow` still resolve maker names from codes via read-only lookup.
+**Files**: `server/modules/bulk-upload/services/validationService.ts`, `server/modules/bulk-upload/services/importService.ts`
+
 ## External Dependencies
 -   **Frontend Libraries:** `@radix-ui/*`, `@tanstack/react-query`, `wouter`, `tailwindcss`, `lucide-react`, `ag-grid-enterprise`, `ag-charts-react`.
 -   **Backend Libraries:** `express`, `drizzle-orm`, `@neondatabase/serverless`, `connect-pg-simple`, `sharp`.
