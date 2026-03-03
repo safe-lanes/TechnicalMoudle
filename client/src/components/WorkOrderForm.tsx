@@ -447,9 +447,9 @@ const WorkOrderForm: React.FC<WorkOrderFormProps> = ({
       // Hydrate Section B (Execution Data) from execution
       setExecutionData({
         woExecutionId: execution.executionId || '',
-        riskAssessment: 'No', // Not stored in execution
-        safetyChecklists: 'No',
-        operationalForms: 'No',
+        riskAssessment: execution.riskAssessmentStatus || 'No',
+        safetyChecklists: execution.safetyChecklistsStatus || 'No',
+        operationalForms: execution.operationalFormsStatus || 'No',
         startDateTime: '',
         completionDateTime: execution.dateCompleted || '',
         assignedTo: '',
@@ -1090,6 +1090,9 @@ const WorkOrderForm: React.FC<WorkOrderFormProps> = ({
         const executionRecord = {
           ...templateData,
           ...executionData,
+          riskAssessmentStatus: executionData.riskAssessment,
+          safetyChecklistsStatus: executionData.safetyChecklists,
+          operationalFormsStatus: executionData.operationalForms,
           woExecutionId: executionData.woExecutionId || generateWOExecutionId(),
           templateCode: templateData.woTemplateCode || workOrder?.templateCode,
           submittedDate: new Date().toISOString().split('T')[0]
@@ -2118,6 +2121,7 @@ const WorkOrderForm: React.FC<WorkOrderFormProps> = ({
                             <span className="text-sm">NA</span>
                           </label>
                         </div>
+                        {executionData.riskAssessment === "Yes" && (
                         <div className="col-span-3 flex items-center gap-2">
                           <input
                             ref={riskAssessmentFileRef}
@@ -2158,6 +2162,7 @@ const WorkOrderForm: React.FC<WorkOrderFormProps> = ({
                             <Trash2 className={`h-4 w-4 ${getUploadedDocument('riskAssessment') ? 'text-red-600' : 'text-gray-400'}`} />
                           </Button>
                         </div>
+                        )}
                       </div>
 
                       {/* B1.2 Safety Checklists Completed */}
@@ -2179,6 +2184,7 @@ const WorkOrderForm: React.FC<WorkOrderFormProps> = ({
                             <span className="text-sm">NA</span>
                           </label>
                         </div>
+                        {executionData.safetyChecklists === "Yes" && (
                         <div className="col-span-3 flex items-center gap-2">
                           <input
                             ref={safetyChecklistFileRef}
@@ -2219,6 +2225,7 @@ const WorkOrderForm: React.FC<WorkOrderFormProps> = ({
                             <Trash2 className={`h-4 w-4 ${getUploadedDocument('safetyChecklist') ? 'text-red-600' : 'text-gray-400'}`} />
                           </Button>
                         </div>
+                        )}
                       </div>
 
                       {/* B1.3 Operational Forms Completed */}
@@ -2240,6 +2247,7 @@ const WorkOrderForm: React.FC<WorkOrderFormProps> = ({
                             <span className="text-sm">NA</span>
                           </label>
                         </div>
+                        {executionData.operationalForms === "Yes" && (
                         <div className="col-span-3 flex items-center gap-2">
                           <input
                             ref={operationalFormFileRef}
@@ -2280,6 +2288,7 @@ const WorkOrderForm: React.FC<WorkOrderFormProps> = ({
                             <Trash2 className={`h-4 w-4 ${getUploadedDocument('operationalForm') ? 'text-red-600' : 'text-gray-400'}`} />
                           </Button>
                         </div>
+                        )}
                       </div>
                     </div>
                   </div>
