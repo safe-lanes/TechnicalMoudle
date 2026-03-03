@@ -60,6 +60,11 @@ The sync controller (`server/modules/misc/controllers/adminController.ts` → `s
 **Scope**: Only affects component import (`validationService.ts` validation + `importService.ts` Step 0 removal). Spares, fleet-components, jobs, stores, work-orders imports are unaffected. `createComponentFromRow`/`updateComponentFromRow` still resolve maker names from codes via read-only lookup.
 **Files**: `server/modules/bulk-upload/services/validationService.ts`, `server/modules/bulk-upload/services/importService.ts`
 
+### Inventory Transaction Location Picker (2026-03-03)
+**Change**: The Inventory Transaction dialog (opened by clicking the Location column in the Spares table) now has interactive location pickers for Location A and Location B. Instead of static text, each location name area is a searchable combobox dropdown that fetches locations from the `locations` table via `GET /technical/api/inventory/locations/:vesselId`. Users can select an existing location or type a new name to create one inline via `POST /technical/api/inventory/locations/:vesselId`. The existing ROB input fields and save logic are unchanged.
+**Files**: `client/src/pages/spares/SparesNew.tsx` (Inventory Transaction dialog section)
+**Pattern**: Matches the existing location picker pattern used in the Edit Spare and Add Spare modals (Popover + Command components).
+
 ## External Dependencies
 -   **Frontend Libraries:** `@radix-ui/*`, `@tanstack/react-query`, `wouter`, `tailwindcss`, `lucide-react`, `ag-grid-enterprise`, `ag-charts-react`.
 -   **Backend Libraries:** `express`, `drizzle-orm`, `@neondatabase/serverless`, `connect-pg-simple`, `sharp`.
