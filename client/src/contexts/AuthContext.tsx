@@ -1,6 +1,23 @@
 import { createContext, useContext, useState, useEffect, ReactNode } from "react";
 import type { PublicUser, UserRole } from "@shared/schema";
+import type { UIRole } from "@shared/uiRoles";
+import { secureSetItem, secureGetItem, clearAllSecureItems } from "@/utils/secureStorage";
 import { analyzeLocalStorage } from "@/utils/localStorageAnalyzer";
+import {
+  generateRoleAccessData,
+  getRoleAccessData,
+  setRoleAccessData,
+  canAccessModule as checkModuleAccess,
+  canPerformAction as checkAction,
+  type RoleAccessData,
+  type ModulePermissions,
+} from "@/utils/roleAccessData";
+
+const ROLE_TO_UI_TYPE: Record<UserRole, UIRole> = {
+  Ship: "Vessel",
+  Office: "Client_Admin",
+  "PMS Admin": "Sail_Admin",
+};
 
 interface AuthContextType {
   currentUser: PublicUser | null;
@@ -13,6 +30,10 @@ interface AuthContextType {
   canDownloadDocument: (shipDownloadable: boolean) => boolean;
   canModifyData: () => boolean;
   canApproveChanges: () => boolean;
+  roleAccessData: RoleAccessData | null;
+  canAccessModule: (moduleName: keyof RoleAccessData["modules"], permission: keyof ModulePermissions) => boolean;
+  canPerformAction: (actionName: keyof RoleAccessData["actions"]) => boolean;
+  userType: UIRole | null;
   login: (user: PublicUser) => void;
   logout: () => void;
 }
@@ -25,15 +46,38 @@ interface AuthProviderProps {
 
 export function AuthProvider({ children }: AuthProviderProps) {
   const [currentUser, setCurrentUser] = useState<PublicUser | null>(null);
+  const [roleAccessData, setRoleAccessDataState] = useState<RoleAccessData | null>(null);
+  const [userType, setUserType] = useState<UIRole | null>(null);
+
+  const initializeAuth = (user: PublicUser) => {
+    const derivedUIType = ROLE_TO_UI_TYPE[user.role] || "Vessel";
+    const accessData = generateRoleAccessData(user.role);
+
+    secureSetItem("userProfile", user);
+    secureSetItem("userRole", user.role);
+    secureSetItem("userType", derivedUIType);
+    secureSetItem("credentials", { sessionId: crypto.randomUUID(), createdAt: Date.now() });
+    setRoleAccessData(accessData);
+
+    setCurrentUser(user);
+    setRoleAccessDataState(accessData);
+    setUserType(derivedUIType);
+  };
 
   useEffect(() => {
-    const storedUser = localStorage.getItem("currentUser");
-    if (storedUser) {
-      try {
-        setCurrentUser(JSON.parse(storedUser));
-      } catch (error) {
-        console.error("Failed to parse stored user:", error);
-        localStorage.removeItem("currentUser");
+    const storedProfile = secureGetItem<PublicUser>("userProfile");
+
+    if (storedProfile) {
+      setCurrentUser(storedProfile);
+
+      const storedAccessData = getRoleAccessData();
+      if (storedAccessData) {
+        setRoleAccessDataState(storedAccessData);
+      }
+
+      const storedType = secureGetItem<UIRole>("userType");
+      if (storedType) {
+        setUserType(storedType);
       }
     } else {
       const defaultUser: PublicUser = {
@@ -49,8 +93,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
         createdAt: new Date(),
         updatedAt: new Date(),
       };
-      setCurrentUser(defaultUser);
-      localStorage.setItem("currentUser", JSON.stringify(defaultUser));
+      initializeAuth(defaultUser);
     }
 
     try {
@@ -106,13 +149,14 @@ export function AuthProvider({ children }: AuthProviderProps) {
       createdAt: user.createdAt,
       updatedAt: user.updatedAt,
     };
-    setCurrentUser(sanitizedUser);
-    localStorage.setItem("currentUser", JSON.stringify(sanitizedUser));
+    initializeAuth(sanitizedUser);
   };
 
   const logout = () => {
+    clearAllSecureItems();
     setCurrentUser(null);
-    localStorage.removeItem("currentUser");
+    setRoleAccessDataState(null);
+    setUserType(null);
   };
 
   const value: AuthContextType = {
@@ -126,6 +170,10 @@ export function AuthProvider({ children }: AuthProviderProps) {
     canDownloadDocument,
     canModifyData,
     canApproveChanges,
+    roleAccessData,
+    canAccessModule: (moduleName, permission) => checkModuleAccess(moduleName, permission, roleAccessData),
+    canPerformAction: (actionName) => checkAction(actionName, roleAccessData),
+    userType,
     login,
     logout,
   };

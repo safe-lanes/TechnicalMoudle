@@ -47,3 +47,4 @@ expertMode = true
 APP_ENV = "dev"
 EXTERNAL_MASTER_DATA_URL_DEV = "https://dev.sl-sail.com/b/api/v1/crewmasterdata/getallmasterdata"
 EXTERNAL_MASTER_DATA_URL_PROD = "https://prod.sl-sail.com/b/api/v1/crewmasterdata/getallmasterdata"
+VITE_STORAGE_SECRET = "s4f3-l4n3s-t3ch-m0dul3-2026-x9k2"

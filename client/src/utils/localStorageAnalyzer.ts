@@ -1,10 +1,4 @@
-const LOCAL_STORAGE_KEYS = [
-  "userProfile",
-  "userRole",
-  "userType",
-  "credentials",
-  "Role_Access_Data",
-] as const;
+import { decryptValue, LOCAL_STORAGE_KEYS } from "./secureStorage";
 
 type LocalStorageKey = (typeof LOCAL_STORAGE_KEYS)[number];
 
@@ -57,10 +51,15 @@ function tryParse(value: string): { parsed: unknown; success: boolean } {
 
 function tryDecrypt(value: string, encryptionType: string): { decrypted: unknown; method: string } {
   if (encryptionType === "AES (OpenSSL salted)") {
-    return {
-      decrypted: `[AES encrypted - requires decryption key/library. Raw length: ${value.length} chars]`,
-      method: "AES detected but no CryptoJS/decryption library available",
-    };
+    try {
+      const decrypted = decryptValue(value);
+      return { decrypted, method: "AES decrypted via CryptoJS" };
+    } catch {
+      return {
+        decrypted: `[AES encrypted - decryption failed. Raw length: ${value.length} chars]`,
+        method: "AES decryption failed (wrong key or corrupted)",
+      };
+    }
   }
 
   if (encryptionType === "hex-encoded (possibly AES/custom)") {
