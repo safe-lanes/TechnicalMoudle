@@ -329,7 +329,9 @@ const AddEditComponentForm: React.FC<AddEditComponentFormProps> = ({
     }
   }, [componentData.componentCode]);
 
-  const MANDATORY_FIELDS = [
+  const PARENT_OPTIONAL_FIELDS = ['model', 'modelCode', 'critical', 'conditionBased', 'eqptSystemDept'];
+
+  const ALL_MANDATORY_FIELDS = [
     { key: 'parentComponent', label: 'Parent Component Code' },
     { key: 'componentCode', label: 'Component Code' },
     { key: 'componentName', label: 'Component Name' },
@@ -341,6 +343,12 @@ const AddEditComponentForm: React.FC<AddEditComponentFormProps> = ({
     { key: 'eqptSystemDept', label: 'Equipment / System Department' },
     { key: 'isActive', label: 'Is Active' },
   ] as const;
+
+  const isParentComponent = componentData.isParent === "Yes";
+
+  const MANDATORY_FIELDS = isParentComponent
+    ? ALL_MANDATORY_FIELDS.filter(f => !PARENT_OPTIONAL_FIELDS.includes(f.key))
+    : ALL_MANDATORY_FIELDS;
 
   const [validationErrors, setValidationErrors] = useState<Record<string, boolean>>({});
 
@@ -723,7 +731,7 @@ const AddEditComponentForm: React.FC<AddEditComponentFormProps> = ({
                           {/* Row 3: Model, Model Code, Serial No, Drawing No */}
                           <div className="grid grid-cols-4 gap-4">
                             <div>
-                              <label className="text-xs font-medium text-gray-600 block mb-1">Model<span className="text-red-500 ml-0.5">*</span></label>
+                              <label className="text-xs font-medium text-gray-600 block mb-1">Model{!isParentComponent && <span className="text-red-500 ml-0.5">*</span>}</label>
                               <input
                                 type="text"
                                 value={componentData.model}
@@ -734,7 +742,7 @@ const AddEditComponentForm: React.FC<AddEditComponentFormProps> = ({
                               {validationErrors.model && <span className="text-xs text-red-500" data-testid="validation-error-model">This field is required</span>}
                             </div>
                             <div>
-                              <label className="text-xs font-medium text-gray-600 block mb-1">Model Code<span className="text-red-500 ml-0.5">*</span></label>
+                              <label className="text-xs font-medium text-gray-600 block mb-1">Model Code{!isParentComponent && <span className="text-red-500 ml-0.5">*</span>}</label>
                               <input
                                 type="text"
                                 value={componentData.modelCode}
@@ -779,7 +787,7 @@ const AddEditComponentForm: React.FC<AddEditComponentFormProps> = ({
                               />
                             </div>
                             <div>
-                              <label className="text-xs font-medium text-gray-600 block mb-1">Criticality<span className="text-red-500 ml-0.5">*</span></label>
+                              <label className="text-xs font-medium text-gray-600 block mb-1">Criticality{!isParentComponent && <span className="text-red-500 ml-0.5">*</span>}</label>
                               <select
                                 value={componentData.critical}
                                 onChange={(e) => handleFieldChange('critical', e.target.value)}
@@ -793,7 +801,7 @@ const AddEditComponentForm: React.FC<AddEditComponentFormProps> = ({
                               {validationErrors.critical && <span className="text-xs text-red-500" data-testid="validation-error-critical">This field is required</span>}
                             </div>
                             <div>
-                              <label className="text-xs font-medium text-gray-600 block mb-1">Condition Based<span className="text-red-500 ml-0.5">*</span></label>
+                              <label className="text-xs font-medium text-gray-600 block mb-1">Condition Based{!isParentComponent && <span className="text-red-500 ml-0.5">*</span>}</label>
                               <select
                                 value={componentData.conditionBased}
                                 onChange={(e) => handleFieldChange('conditionBased', e.target.value)}
@@ -841,7 +849,7 @@ const AddEditComponentForm: React.FC<AddEditComponentFormProps> = ({
                               />
                             </div>
                             <div>
-                              <label className="text-xs font-medium text-gray-600 block mb-1">Equipment / System Department<span className="text-red-500 ml-0.5">*</span></label>
+                              <label className="text-xs font-medium text-gray-600 block mb-1">Equipment / System Department{!isParentComponent && <span className="text-red-500 ml-0.5">*</span>}</label>
                               <select
                                 value={componentData.eqptSystemDept}
                                 onChange={(e) => handleFieldChange('eqptSystemDept', e.target.value)}

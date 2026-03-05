@@ -52,7 +52,10 @@ export async function getById(id: string): Promise<Component | undefined> {
 }
 
 export async function create(data: any): Promise<Component> {
-  const mandatoryFields: { key: string; label: string; isBoolean?: boolean }[] = [
+  const isParent = data.isParent === true || data.isParent === 'Yes';
+  const parentOptionalKeys = ['model', 'modelCode', 'critical', 'conditionBased', 'eqptSystemDept'];
+
+  const allMandatoryFields: { key: string; label: string; isBoolean?: boolean }[] = [
     { key: 'name', label: 'Component Name' },
     { key: 'componentCode', label: 'Component Code' },
     { key: 'parentId', label: 'Parent Component Code' },
@@ -64,6 +67,10 @@ export async function create(data: any): Promise<Component> {
     { key: 'eqptSystemDept', label: 'Equipment / System Department' },
     { key: 'isActive', label: 'Is Active', isBoolean: true },
   ];
+  const mandatoryFields = isParent
+    ? allMandatoryFields.filter(f => !parentOptionalKeys.includes(f.key))
+    : allMandatoryFields;
+
   const missing = mandatoryFields.filter(f => {
     const val = data[f.key];
     if (f.isBoolean) return val === undefined || val === null || val === '';
@@ -126,7 +133,10 @@ export async function update(id: string, data: any, userId: string): Promise<Com
     throw new NotFoundError('Component not found');
   }
 
-  const mandatoryPatchFields: { key: string; label: string; isBoolean?: boolean }[] = [
+  const effectiveIsParent = data.isParent !== undefined ? (data.isParent === true || data.isParent === 'Yes') : (existingComponent as any).isParent === true;
+  const parentOptionalKeys = ['model', 'modelCode', 'critical', 'conditionBased', 'eqptSystemDept'];
+
+  const allMandatoryPatchFields: { key: string; label: string; isBoolean?: boolean }[] = [
     { key: 'name', label: 'Component Name' },
     { key: 'componentCode', label: 'Component Code' },
     { key: 'parentId', label: 'Parent Component Code' },
@@ -138,6 +148,10 @@ export async function update(id: string, data: any, userId: string): Promise<Com
     { key: 'eqptSystemDept', label: 'Equipment / System Department' },
     { key: 'isActive', label: 'Is Active', isBoolean: true },
   ];
+  const mandatoryPatchFields = effectiveIsParent
+    ? allMandatoryPatchFields.filter(f => !parentOptionalKeys.includes(f.key))
+    : allMandatoryPatchFields;
+
   const invalidPatch = mandatoryPatchFields.filter(f => {
     if (!(f.key in data)) return false;
     const val = data[f.key];

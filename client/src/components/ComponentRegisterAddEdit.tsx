@@ -696,7 +696,9 @@ export default function ComponentRegisterAddEdit({
     });
   };
 
-  const MANDATORY_FIELDS = [
+  const PARENT_OPTIONAL_FIELDS = ['model', 'modelCode', 'critical', 'conditionBased', 'eqptSystemDept'];
+
+  const ALL_MANDATORY_FIELDS = [
     { key: 'parentComponent', label: 'Parent Component Code' },
     { key: 'componentCode', label: 'Component Code' },
     { key: 'componentName', label: 'Component Name' },
@@ -708,6 +710,12 @@ export default function ComponentRegisterAddEdit({
     { key: 'eqptSystemDept', label: 'Equipment / System Department' },
     { key: 'isActive', label: 'Is Active' },
   ] as const;
+
+  const isParentComponent = componentData.isParent === "Yes";
+
+  const MANDATORY_FIELDS = isParentComponent
+    ? ALL_MANDATORY_FIELDS.filter(f => !PARENT_OPTIONAL_FIELDS.includes(f.key))
+    : ALL_MANDATORY_FIELDS;
 
   const [validationErrors, setValidationErrors] = useState<Record<string, boolean>>({});
 
@@ -1264,7 +1272,7 @@ export default function ComponentRegisterAddEdit({
                 {/* Row 3: Model, Model Code, Serial No, Drawing No */}
                 <div className="grid grid-cols-4 gap-4 mb-4">
                   <div>
-                    <label className="text-xs text-gray-500 mb-1 block">Model<span className="text-red-500 ml-0.5">*</span></label>
+                    <label className="text-xs text-gray-500 mb-1 block">Model{!isParentComponent && <span className="text-red-500 ml-0.5">*</span>}</label>
                     <Input
                       value={componentData.model}
                       onChange={(e) => handleFieldChange('model', e.target.value)}
@@ -1274,7 +1282,7 @@ export default function ComponentRegisterAddEdit({
                     {validationErrors.model && <span className="text-xs text-red-500" data-testid="validation-error-model">This field is required</span>}
                   </div>
                   <div>
-                    <label className="text-xs text-gray-500 mb-1 block">Model Code<span className="text-red-500 ml-0.5">*</span></label>
+                    <label className="text-xs text-gray-500 mb-1 block">Model Code{!isParentComponent && <span className="text-red-500 ml-0.5">*</span>}</label>
                     <Input
                       value={componentData.modelCode}
                       onChange={(e) => handleFieldChange('modelCode', e.target.value)}
@@ -1315,7 +1323,7 @@ export default function ComponentRegisterAddEdit({
                     />
                   </div>
                   <div>
-                    <label className="text-xs text-gray-500 mb-1 block">Criticality<span className="text-red-500 ml-0.5">*</span></label>
+                    <label className="text-xs text-gray-500 mb-1 block">Criticality{!isParentComponent && <span className="text-red-500 ml-0.5">*</span>}</label>
                     <select
                       value={componentData.critical}
                       onChange={(e) => handleFieldChange('critical', e.target.value)}
@@ -1329,7 +1337,7 @@ export default function ComponentRegisterAddEdit({
                     {validationErrors.critical && <span className="text-xs text-red-500" data-testid="validation-error-critical">This field is required</span>}
                   </div>
                   <div>
-                    <label className="text-xs text-gray-500 mb-1 block">Condition Based<span className="text-red-500 ml-0.5">*</span></label>
+                    <label className="text-xs text-gray-500 mb-1 block">Condition Based{!isParentComponent && <span className="text-red-500 ml-0.5">*</span>}</label>
                     <select
                       value={componentData.conditionBased}
                       onChange={(e) => handleFieldChange('conditionBased', e.target.value)}
@@ -1376,7 +1384,7 @@ export default function ComponentRegisterAddEdit({
                     />
                   </div>
                   <div>
-                    <label className="text-xs text-gray-500 mb-1 block">Equipment / System Department<span className="text-red-500 ml-0.5">*</span></label>
+                    <label className="text-xs text-gray-500 mb-1 block">Equipment / System Department{!isParentComponent && <span className="text-red-500 ml-0.5">*</span>}</label>
                     <select
                       value={componentData.eqptSystemDept}
                       onChange={(e) => handleFieldChange('eqptSystemDept', e.target.value)}
