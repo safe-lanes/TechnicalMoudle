@@ -6,3 +6,4 @@ vite.config.ts.*
 *.tar.gzdb.config.json
 backup/
 .private/
+uploads/
