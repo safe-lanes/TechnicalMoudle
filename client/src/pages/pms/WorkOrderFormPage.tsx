@@ -1699,6 +1699,44 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
         }
       }
 
+      // B4 Validation: Qty Used must be a positive integer ≥ 1 if spare part row has data
+      const sparesWithInvalidQty = executionData.consumedSpareParts.filter(spare => {
+        const hasData = spare.partNo || spare.description;
+        if (!hasData) return false;
+        const qty = spare.quantityConsumed;
+        if (!qty || qty.trim() === '') return true;
+        const qtyNum = parseFloat(qty);
+        if (isNaN(qtyNum) || qtyNum < 1 || !Number.isInteger(qtyNum)) return true;
+        return false;
+      });
+      if (sparesWithInvalidQty.length > 0) {
+        const parts = sparesWithInvalidQty.map(s => s.partNo || s.description).join(', ');
+        toast({
+          title: "Validation Error",
+          description: `Qty Used must be a positive whole number (≥ 1) for: ${parts}. Remove the row if no spares were consumed.`,
+          variant: "destructive",
+        });
+        return;
+      }
+
+      // B4 Validation: Location mandatory for ALL spares with qty > 0
+      const allSparesWithMissingLocation = executionData.consumedSpareParts.filter(spare => {
+        const qty = parseFloat(spare.quantityConsumed || '0');
+        if (qty <= 0) return false;
+        const hasLocationId = spare.locationId != null && spare.locationId > 0;
+        const hasLocationName = spare.location && typeof spare.location === 'string' && spare.location.trim().length > 0;
+        return !hasLocationId && !hasLocationName;
+      });
+      if (allSparesWithMissingLocation.length > 0) {
+        const parts = allSparesWithMissingLocation.map(s => s.partNo || s.description).join(', ');
+        toast({
+          title: "Location Required",
+          description: `Please select a location for: ${parts}. A location is required when consuming spare parts.`,
+          variant: "destructive",
+        });
+        return;
+      }
+
       // PHASE 3A: Block submission if inventory data not loaded or failed and spares are being consumed
       const hasConsumedSpares = executionData.consumedSpareParts.some(
         spare => spare.partNo && spare.quantityConsumed && parseFloat(spare.quantityConsumed) > 0
@@ -1780,6 +1818,30 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
           variant: "destructive",
         });
         return;
+      }
+
+      // B4 Validation: Comments required if qty exceeds 50% of ROB (high consumption)
+      // Placed after inventory load check so ROB data is reliable
+      if (isSparesInventoryFetched && !isSparesInventoryError) {
+        const sparesNeedingComments = executionData.consumedSpareParts.filter(spare => {
+          const qty = parseFloat(spare.quantityConsumed || '0');
+          if (qty <= 0 || !spare.location) return false;
+          if (spare.comments && spare.comments.trim().length > 0) return false;
+          const lookupKey = spare.partCode || spare.partNo;
+          if (!lookupKey) return false;
+          const rob = getRobByLocationName(lookupKey, spare.location);
+          if (rob <= 0) return qty > 0;
+          return qty > (rob * 0.5);
+        });
+        if (sparesNeedingComments.length > 0) {
+          const parts = sparesNeedingComments.map(s => s.partNo || s.description).join(', ');
+          toast({
+            title: "Comments Required",
+            description: `High consumption detected for: ${parts}. Please add a comment explaining the usage when consuming more than 50% of available stock.`,
+            variant: "destructive",
+          });
+          return;
+        }
       }
 
       // Check if Part B has completion data (indicates work is done and needs approval)
@@ -3723,7 +3785,8 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                             <div className="flex flex-col gap-1">
                               <Input
                                 type="number"
-                                min="0"
+                                min="1"
+                                step="1"
                                 max={selectedLocation ? availableRob : undefined}
                                 value={consumedData?.quantityConsumed || ''}
                                 onChange={(e) => {
@@ -3899,7 +3962,8 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                                   <div className="flex flex-col gap-1">
                                     <Input
                                       type="number"
-                                      min="0"
+                                      min="1"
+                                      step="1"
                                       max={manualSelectedLocation ? manualAvailableRob : undefined}
                                       value={consumed.quantityConsumed}
                                       onChange={(e) => {

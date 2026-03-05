@@ -1416,6 +1416,63 @@ const WorkOrderForm: React.FC<WorkOrderFormProps> = ({
         }
       }
 
+      // B4 Validation: Qty Used must be a positive integer ≥ 1 if spare part row has data
+      const sparesWithInvalidQty = executionData.consumedSpareParts.filter(spare => {
+        const hasData = spare.partNo || spare.description;
+        if (!hasData) return false;
+        const qty = spare.quantityConsumed;
+        if (!qty || qty.trim() === '') return true;
+        const qtyNum = parseFloat(qty);
+        if (isNaN(qtyNum) || qtyNum < 1 || !Number.isInteger(qtyNum)) return true;
+        return false;
+      });
+      if (sparesWithInvalidQty.length > 0) {
+        const parts = sparesWithInvalidQty.map(s => s.partNo || s.description).join(', ');
+        toast({
+          title: "Validation Error",
+          description: `Qty Used must be a positive whole number (≥ 1) for: ${parts}. Remove the row if no spares were consumed.`,
+          variant: "destructive"
+        });
+        return;
+      }
+
+      // B4 Validation: Location mandatory for ALL spares with qty > 0
+      const sparesWithMissingLoc = executionData.consumedSpareParts.filter(spare => {
+        const qty = parseFloat(spare.quantityConsumed || '0');
+        if (qty <= 0) return false;
+        const hasLocationId = spare.locationId != null && spare.locationId > 0;
+        const hasLocationName = spare.locationName && spare.locationName.trim().length > 0;
+        return !hasLocationId && !hasLocationName;
+      });
+      if (sparesWithMissingLoc.length > 0) {
+        const parts = sparesWithMissingLoc.map(s => s.partNo || s.description).join(', ');
+        toast({
+          title: "Location Required",
+          description: `Please select a location for: ${parts}. A location is required when consuming spare parts.`,
+          variant: "destructive"
+        });
+        return;
+      }
+
+      // B4 Validation: Comments required if qty exceeds 50% of available stock
+      const sparesNeedingComments = executionData.consumedSpareParts.filter(spare => {
+        const qty = parseFloat(spare.quantityConsumed || '0');
+        if (qty <= 0) return false;
+        if (spare.comments && spare.comments.trim().length > 0) return false;
+        const available = spare.availableQty || 0;
+        if (available <= 0) return qty > 0;
+        return qty > (available * 0.5);
+      });
+      if (sparesNeedingComments.length > 0) {
+        const parts = sparesNeedingComments.map(s => s.partNo || s.description).join(', ');
+        toast({
+          title: "Comments Required",
+          description: `High consumption detected for: ${parts}. Please add a comment explaining the usage when consuming more than 50% of available stock.`,
+          variant: "destructive"
+        });
+        return;
+      }
+
       if (onSubmit) {
         const workOrderId = workOrder?.id || `new-${Date.now()}`;
         const executionRecord = {
@@ -2854,6 +2911,8 @@ const WorkOrderForm: React.FC<WorkOrderFormProps> = ({
                                   />
                                   <Input
                                     type="number"
+                                    min="1"
+                                    step="1"
                                     value={part.quantityConsumed}
                                     onChange={(e) => handleUpdateConsumedSparePartField(index, 'quantityConsumed', e.target.value)}
                                     placeholder="Qty"

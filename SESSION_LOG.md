@@ -90,3 +90,23 @@
 ### Key Files Changed
 - `client/src/pages/pms/WorkOrderFormPage.tsx` — Added ≥ 0 check after mandatory check, soft warning for large jumps after the ≥ previousReading check, `min="0"` on input, warning flag state + reset logic in handleExecutionChange.
 - `client/src/components/WorkOrderForm.tsx` — Added ≥ 0 check, ≥ previousReading comparison (was missing), soft warning for large jumps, `min="0"` on input, warning flag state + reset logic in handleExecutionChange.
+
+---
+
+## 2026-03-05 — B4 Spare Parts Consumed Validations (Qty Used, Location, Comments)
+
+### What We Built
+- Comprehensive B4 (Spare Parts Consumed) field validations for Qty Used, Location, and Comments in both form components.
+
+### What's Working
+- **Qty Used positive integer ≥ 1**: If a spare part row has data (partNo or description), the quantity consumed must be a non-empty positive whole number (≥ 1). Decimals, negatives, and blanks are blocked with a validation error toast listing the offending parts. Suggests removing the row if no spares were consumed.
+- **Location mandatory when Qty > 0**: Any spare with qty > 0 must have a location set (either locationId or location name). Blocks save for ALL spares — not just inventory-tracked ones. Extends the existing PHASE 3A check which only covered inventory-tracked spares.
+- **Comments required for high consumption**: If consumption exceeds 50% of the available ROB at the selected location, or if ROB is 0 but qty > 0, a comment is required explaining the usage. This check runs AFTER the PHASE 3A inventory load check to ensure reliable ROB data. In `WorkOrderForm.tsx`, uses `availableQty` field instead.
+- **Input constraints**: Qty Used inputs updated with `min="1"` and `step="1"` for both preloaded and manually-added spares in both forms.
+
+### What's Broken
+- Nothing broken from this session's changes.
+
+### Key Files Changed
+- `client/src/pages/pms/WorkOrderFormPage.tsx` — Added B4 qty/location validations before PHASE 3A, comments validation after PHASE 3A inventory check. Updated qty inputs with min="1" step="1".
+- `client/src/components/WorkOrderForm.tsx` — Added matching B4 qty/location/comments validations before onSubmit. Updated qty input with min="1" step="1".
