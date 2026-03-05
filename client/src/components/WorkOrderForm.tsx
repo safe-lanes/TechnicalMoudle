@@ -348,11 +348,11 @@ const WorkOrderForm: React.FC<WorkOrderFormProps> = ({
               spareId: part.spareId,
               locationId: part.locationId,
               eventType: 'CONSUME',
-              qty: parseInt(part.quantityConsumed, 10),
+              qtyChange: -Math.abs(parseInt(part.quantityConsumed, 10)),
               referenceType: 'WORK_ORDER',
               referenceId: workOrderRef,
-              remarks: part.comments || `Consumed for WO: ${workOrderRef}`,
-              performedBy: executionData.performedBy || 'System'
+              referenceNote: part.comments || `Consumed for WO: ${workOrderRef}`,
+              userId: executionData.performedBy || 'System'
             })
           )
       );
@@ -1558,31 +1558,16 @@ const WorkOrderForm: React.FC<WorkOrderFormProps> = ({
           submittedDate: new Date().toISOString().split('T')[0]
         };
         
-        // Post consumption transactions for BOM-linked spare parts FIRST (atomic requirement)
-        const bomConsumedParts = executionData.consumedSpareParts.filter(
-          part => part.isFromBom && part.spareId && part.locationId
-        );
-        if (bomConsumedParts.length > 0) {
-          try {
-            await consumptionMutation.mutateAsync(bomConsumedParts);
-          } catch (error: any) {
-            console.error('Failed to post consumption transactions:', error);
-            toast({
-              title: "Inventory Update Failed",
-              description: error?.message || "Failed to record spare consumption. Work Order not submitted. Please try again or remove consumption entries.",
-              variant: "destructive"
-            });
-            // Do NOT proceed with work order submission - keep dialog open
-            return;
-          }
-        }
-        
         onSubmit(workOrderId, { type: 'execution', data: executionRecord });
+        
+        const bomConsumedCount = executionData.consumedSpareParts.filter(
+          part => part.isFromBom && part.spareId && part.locationId
+        ).length;
         
         toast({
           title: "Success",
-          description: bomConsumedParts.length > 0 
-            ? `Work Order submitted. ${bomConsumedParts.length} spare consumption(s) recorded.`
+          description: bomConsumedCount > 0 
+            ? `Work Order submitted. ${bomConsumedCount} spare consumption(s) will be deducted upon approval.`
             : "Work Order submitted for approval",
         });
       }

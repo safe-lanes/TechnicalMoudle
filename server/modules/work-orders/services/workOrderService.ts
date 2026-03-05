@@ -931,6 +931,7 @@ export async function updateWorkOrder(id: string, body: any) {
         quantityConsumed: number | string;
         locationId?: number | null;
         location?: string;
+        locationName?: string;
         comments?: string;
       }>;
 
@@ -961,11 +962,12 @@ export async function updateWorkOrder(id: string, body: any) {
             if (spare) {
               let resolvedLocationId = consumedSpare.locationId ? parseInt(String(consumedSpare.locationId)) : null;
 
-              if ((!resolvedLocationId || isNaN(resolvedLocationId as number)) && consumedSpare.location) {
-                const locationObj = await repo.findOrCreateLocation(woVesselId, consumedSpare.location, workOrder.approver || 'system');
+              const locationNameFallback = consumedSpare.location || consumedSpare.locationName;
+              if ((!resolvedLocationId || isNaN(resolvedLocationId as number)) && locationNameFallback) {
+                const locationObj = await repo.findOrCreateLocation(woVesselId, locationNameFallback, workOrder.approver || 'system');
                 if (locationObj) {
                   resolvedLocationId = locationObj.id;
-                  console.log(`📍 [PATCH Approval] Resolved location name "${consumedSpare.location}" to ID ${resolvedLocationId}`);
+                  console.log(`📍 [PATCH Approval] Resolved location name "${locationNameFallback}" to ID ${resolvedLocationId}`);
                 }
               }
 

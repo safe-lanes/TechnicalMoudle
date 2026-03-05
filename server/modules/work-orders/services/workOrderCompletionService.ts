@@ -343,6 +343,7 @@ export async function completeWorkOrder(
       quantityConsumed: number | string;
       locationId?: number | null;
       location?: string;
+      locationName?: string;
       comments?: string;
     }>;
 
@@ -374,11 +375,12 @@ export async function completeWorkOrder(
             const vesselId = workOrder.vesselId || 'V001';
             let resolvedLocationId = consumedSpare.locationId ? parseInt(String(consumedSpare.locationId)) : null;
 
-            if ((!resolvedLocationId || isNaN(resolvedLocationId as number)) && consumedSpare.location) {
-              const locationObj = await repo.findOrCreateLocation(vesselId, consumedSpare.location, 'system');
+            const locationNameFallback = consumedSpare.location || consumedSpare.locationName;
+            if ((!resolvedLocationId || isNaN(resolvedLocationId as number)) && locationNameFallback) {
+              const locationObj = await repo.findOrCreateLocation(vesselId, locationNameFallback, 'system');
               if (locationObj) {
                 resolvedLocationId = locationObj.id;
-                console.log(`📍 [POST Complete] Resolved location name "${consumedSpare.location}" to ID ${resolvedLocationId}`);
+                console.log(`📍 [POST Complete] Resolved location name "${locationNameFallback}" to ID ${resolvedLocationId}`);
               }
             }
 
