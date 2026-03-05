@@ -1,0 +1,85 @@
+Strict LocalStorage Key Enforcement
+While implementing the AES encrypted storage system, enforce the following strict rule across the entire authentication and role-access flow.
+1. Allowed LocalStorage Keys (ONLY these)
+The system must only use these five keys in localStorage:
+userProfile
+userRole
+userType
+credentials
+Role_Access_Data
+Define them as a constant:
+export const LOCAL_STORAGE_KEYS = [
+  "userProfile",
+  "userRole",
+  "userType",
+  "credentials",
+  "Role_Access_Data",
+] as const;
+No other keys should be written or read from localStorage.
+2. Absolutely NO fallback keys
+The implementation must NOT read or write any alternative keys such as:
+currentUser
+sail_ui_role
+user
+profile
+authUser
+any legacy key names
+These must be completely removed from the code.
+Do NOT implement migration logic.
+Example of what should NOT exist:
+localStorage.getItem("currentUser")
+localStorage.getItem("sail_ui_role")
+The system should only read encrypted values from the 5 approved keys.
+3. AuthContext storage requirements
+AuthContext must store the following keys using secureSetItem:
+Key	Value
+userProfile	full user profile object
+userRole	backend system role (Ship / Office / PMS Admin)
+userType	UI role (Vessel / Client_Admin / Sail_Admin)
+credentials	auth tokens if needed
+Role_Access_Data	permission matrix
+4. AuthContext loading logic
+On app initialization:
+userProfile = secureGetItem("userProfile")
+userRole = secureGetItem("userRole")
+userType = secureGetItem("userType")
+Role_Access_Data = secureGetItem("Role_Access_Data")
+If userProfile is missing:
+User is considered logged out
+Do NOT attempt to read any other key.
+5. Logout behavior
+Logout must remove all five keys only:
+secureRemoveItem("userProfile")
+secureRemoveItem("userRole")
+secureRemoveItem("userType")
+secureRemoveItem("credentials")
+secureRemoveItem("Role_Access_Data")
+6. Analyzer alignment
+localStorageAnalyzer.ts must analyze the same five keys only:
+userProfile
+userRole
+userType
+credentials
+Role_Access_Data
+This ensures the analyzer and the auth system remain perfectly aligned.
+7. Validation rule
+Add a safety check inside secureStorage.ts:
+If a key is used that is not inside LOCAL_STORAGE_KEYS
+throw an error.
+Example:
+Invalid secure storage key: <key>
+Allowed keys: userProfile, userRole, userType, credentials, Role_Access_Data
+This prevents accidental usage of incorrect keys.
+Expected Result
+After login the browser localStorage should contain exactly these encrypted keys:
+userProfile        (AES encrypted)
+userRole           (AES encrypted)
+userType           (AES encrypted)
+credentials        (AES encrypted)
+Role_Access_Data   (AES encrypted)
+No other authentication-related keys should exist.
+This guarantees:
+no key mismatches
+no legacy fallback logic
+fully deterministic auth storage
+correct integration with the analyzer
