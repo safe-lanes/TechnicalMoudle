@@ -14,11 +14,11 @@ export function getDomain(): string {
     if (domain && domain.trim().length > 0) {
       return domain.trim();
     }
-    console.warn('[getDomain] "domain" key not found or empty in localStorage. External API calls may fail.');
-    return '';
+    console.warn('[getDomain] "domain" key not found or empty in localStorage. Falling back to "rsms".');
+    return 'rsms';
   } catch (e) {
-    console.warn('[getDomain] Failed to read "domain" from localStorage:', e);
-    return '';
+    console.warn('[getDomain] Failed to read "domain" from localStorage:', e, '. Falling back to "rsms".');
+    return 'rsms';
   }
 }
 
