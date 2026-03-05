@@ -1,0 +1,114 @@
+Prompt for Replit – Link Component Maker Fields with Maker_List Master
+
+Module
+
+Components → Add / Edit Component Form
+
+Objective
+
+Ensure that the Maker and Maker Code fields in the Component module are strictly linked with the maker_list master table to maintain data consistency and validation.
+
+Functional Requirements
+1. Maker Field – Searchable Selection
+
+When adding or editing a component:
+
+The Maker field must not be a free text field.
+
+It must display a searchable dropdown selection list populated from the maker_list table.
+
+Features required:
+
+Type-to-search functionality.
+
+Display list of available makers.
+
+Load dynamically from database.
+
+Example display:
+
+Maker Name
+----------
+MAN B&W
+Wartsila
+Yanmar
+Caterpillar
+2. Automatic Maker Code Loading
+
+Once the user selects a Maker from the list:
+
+The system must automatically populate the Maker Code field.
+
+The Maker Code must be fetched directly from the maker_list table.
+
+Example:
+
+Maker Selected	Maker Code Auto Loaded
+MAN B&W	MAN
+Wartsila	WAR
+Yanmar	YAN
+
+The Maker Code field should be read-only to prevent manual modification.
+
+3. Validation (Mandatory Requirement)
+
+This validation is critical and must be strictly enforced.
+
+Rules:
+
+Maker must always be selected from maker_list.
+
+Manual entry of maker name must not be allowed.
+
+Maker Code must always match the selected maker.
+
+If maker is not selected:
+
+Show validation error:
+
+"Please select a valid Maker from the Maker List."
+4. Backend Validation
+
+Even if frontend validation is bypassed:
+
+Backend must verify:
+
+Maker exists in maker_list
+
+Maker Code matches the selected maker
+
+If mismatch occurs:
+
+Return validation error.
+
+5. Database Logic
+
+Ensure:
+
+Component table stores:
+
+maker_name
+
+maker_code
+
+Both values must match the record in maker_list.
+
+Expected Final Behavior
+
+User opens Add/Edit Component form.
+
+Maker field shows searchable dropdown.
+
+User selects maker.
+
+Maker Code auto-fills.
+
+User cannot manually edit Maker Code.
+
+Component saves only if maker exists in maker_list.
+
+Important
+
+Maker_List must be imported first before component import.
+
+Component import must validate maker against maker_list only, not create new makers.
