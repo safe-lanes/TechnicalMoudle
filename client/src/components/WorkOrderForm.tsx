@@ -584,10 +584,25 @@ const WorkOrderForm: React.FC<WorkOrderFormProps> = ({
   };
 
   const handleExecutionChange = (field: string, value: string) => {
-    setExecutionData(prev => ({
-      ...prev,
-      [field]: value
-    }));
+    setExecutionData(prev => {
+      const newData = {
+        ...prev,
+        [field]: value
+      };
+
+      if (field === 'noOfPersons' || field === 'totalTimeHours') {
+        const persons = field === 'noOfPersons' ? parseFloat(value) : parseFloat(prev.noOfPersons);
+        const hours = field === 'totalTimeHours' ? parseFloat(value) : parseFloat(prev.totalTimeHours);
+
+        if (!isNaN(persons) && !isNaN(hours) && persons > 0 && hours > 0) {
+          newData.manhours = (persons * hours).toString();
+        } else {
+          newData.manhours = '';
+        }
+      }
+
+      return newData;
+    });
   };
 
   // Part B1 - Document Upload Handlers
@@ -1086,22 +1101,108 @@ const WorkOrderForm: React.FC<WorkOrderFormProps> = ({
       }
     } else {
       // Validate execution data
-      if (!executionData.startDateTime) {
+      const timeRegex = /^([01]\d|2[0-3]):([0-5]\d)$/;
+
+      // Start Date is required and cannot be in the future
+      const startDate = executionData.startDateTime ? executionData.startDateTime.split('T')[0] : '';
+      if (!startDate) {
         toast({
           title: "Validation Error",
-          description: "Start Date/Time is required",
+          description: "Start Date is required",
           variant: "destructive"
         });
         return;
       }
-      if (!executionData.completionDateTime) {
+      const today = new Date();
+      today.setHours(23, 59, 59, 999);
+      const startDateObj = new Date(startDate);
+      if (startDateObj > today) {
         toast({
           title: "Validation Error",
-          description: "Completion Date/Time is required",
+          description: "Start Date cannot be in the future.",
           variant: "destructive"
         });
         return;
       }
+
+      // Start Time is required and must be valid HH:MM
+      const startTime = executionData.startDateTime ? executionData.startDateTime.split('T')[1]?.substring(0, 5) || '' : '';
+      if (!startTime) {
+        toast({
+          title: "Validation Error",
+          description: "Start Time is required",
+          variant: "destructive"
+        });
+        return;
+      }
+      if (!timeRegex.test(startTime)) {
+        toast({
+          title: "Validation Error",
+          description: "Start Time must be in HH:MM 24-hour format (00:00–23:59).",
+          variant: "destructive"
+        });
+        return;
+      }
+
+      // Completion Date is required, cannot be future, must be >= Start Date
+      const completionDate = executionData.completionDateTime ? executionData.completionDateTime.split('T')[0] : '';
+      if (!completionDate) {
+        toast({
+          title: "Validation Error",
+          description: "Completion Date is required",
+          variant: "destructive"
+        });
+        return;
+      }
+      const completionDateObj = new Date(completionDate);
+      if (completionDateObj > today) {
+        toast({
+          title: "Validation Error",
+          description: "Completion Date cannot be in the future.",
+          variant: "destructive"
+        });
+        return;
+      }
+      if (completionDateObj < startDateObj) {
+        toast({
+          title: "Validation Error",
+          description: "Completion Date cannot be before Start Date.",
+          variant: "destructive"
+        });
+        return;
+      }
+
+      // Completion Time is required and must be valid HH:MM
+      const completionTime = executionData.completionDateTime ? executionData.completionDateTime.split('T')[1]?.substring(0, 5) || '' : '';
+      if (!completionTime) {
+        toast({
+          title: "Validation Error",
+          description: "Completion Time is required",
+          variant: "destructive"
+        });
+        return;
+      }
+      if (!timeRegex.test(completionTime)) {
+        toast({
+          title: "Validation Error",
+          description: "Completion Time must be in HH:MM 24-hour format (00:00–23:59).",
+          variant: "destructive"
+        });
+        return;
+      }
+
+      // If same day, Completion Time must be >= Start Time
+      if (startDate === completionDate && startTime && completionTime) {
+        if (completionTime < startTime) {
+          toast({
+            title: "Validation Error",
+            description: "Completion Time cannot be before Start Time on the same day.",
+            variant: "destructive"
+          });
+          return;
+        }
+      }
+
       if (!executionData.assignedTo) {
         toast({
           title: "Validation Error",
@@ -1118,6 +1219,100 @@ const WorkOrderForm: React.FC<WorkOrderFormProps> = ({
         });
         return;
       }
+
+      // No. of Persons is required, must be integer >= 1 and <= 50
+      const noOfPersonsStr = (executionData.noOfPersons || '').trim();
+      if (!noOfPersonsStr) {
+        toast({
+          title: "Validation Error",
+          description: "No. of Persons in Team is required.",
+          variant: "destructive"
+        });
+        return;
+      }
+      if (!/^[1-9]\d*$/.test(noOfPersonsStr)) {
+        toast({
+          title: "Validation Error",
+          description: "No. of Persons must be a positive whole number (≥ 1).",
+          variant: "destructive"
+        });
+        return;
+      }
+      const noOfPersonsVal = parseInt(noOfPersonsStr, 10);
+      if (noOfPersonsVal > 50) {
+        toast({
+          title: "Validation Error",
+          description: "No. of Persons cannot exceed 50.",
+          variant: "destructive"
+        });
+        return;
+      }
+
+      // Total Time Taken is required, must be > 0 and <= 720
+      const totalTimeVal = parseFloat(executionData.totalTimeHours);
+      if (!executionData.totalTimeHours || isNaN(totalTimeVal)) {
+        toast({
+          title: "Validation Error",
+          description: "Total Time Taken (Hours) is required.",
+          variant: "destructive"
+        });
+        return;
+      }
+      if (totalTimeVal <= 0) {
+        toast({
+          title: "Validation Error",
+          description: "Total Time Taken must be greater than 0.",
+          variant: "destructive"
+        });
+        return;
+      }
+      if (totalTimeVal > 720) {
+        toast({
+          title: "Validation Error",
+          description: "Total Time Taken cannot exceed 720 hours (30 days).",
+          variant: "destructive"
+        });
+        return;
+      }
+
+      // Manhours validation (auto-calculated, but safety check)
+      const manhoursVal = parseFloat(executionData.manhours);
+      if (executionData.manhours && !isNaN(manhoursVal) && manhoursVal <= 0) {
+        toast({
+          title: "Validation Error",
+          description: "Manhours must be a positive number.",
+          variant: "destructive"
+        });
+        return;
+      }
+
+      // Work Carried Out is required, min 20 characters, no placeholder text
+      const workCarriedOutTrimmed = (executionData.workCarriedOut || '').trim();
+      if (!workCarriedOutTrimmed) {
+        toast({
+          title: "Validation Error",
+          description: "Work Carried Out is required.",
+          variant: "destructive"
+        });
+        return;
+      }
+      if (workCarriedOutTrimmed.toLowerCase() === 'describe work carried out...' || workCarriedOutTrimmed.toLowerCase() === 'describe work carried out') {
+        toast({
+          title: "Validation Error",
+          description: "Please provide a proper description of work carried out, not the placeholder text.",
+          variant: "destructive"
+        });
+        return;
+      }
+      if (workCarriedOutTrimmed.length < 20) {
+        toast({
+          title: "Validation Error",
+          description: "Work Carried Out must be at least 20 characters to provide a meaningful description.",
+          variant: "destructive"
+        });
+        return;
+      }
+
       if (templateData.maintenanceBasis === "Running Hours") {
         if (!executionData.previousReading || !executionData.currentReading) {
           toast({
@@ -2354,7 +2549,7 @@ const WorkOrderForm: React.FC<WorkOrderFormProps> = ({
                       {/* Work Carried Out */}
                       <div className="space-y-2 mb-4">
                         <div className="flex items-center justify-between">
-                          <Label className="text-sm text-[#8798ad]">Work Carried Out</Label>
+                          <Label className="text-sm text-[#8798ad]">Work Carried Out <span className="text-red-500">*</span></Label>
                           <div className="flex gap-2">
                             <Button
                               type="button"

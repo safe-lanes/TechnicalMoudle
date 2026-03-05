@@ -1412,12 +1412,33 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
       }
 
       // Validate mandatory fields for work order form (Work Completion Record)
+      const timeRegex = /^([01]\d|2[0-3]):([0-5]\d)$/;
+
       // Start Date is required
       const startDate = executionData.startDateTime ? executionData.startDateTime.split('T')[0] : '';
       if (!startDate) {
         toast({
           title: "Validation Error",
           description: "Start Date is required.",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      // Start Time is required and must be valid HH:MM
+      const startTime = executionData.startDateTime ? executionData.startDateTime.split('T')[1]?.substring(0, 5) || '' : '';
+      if (!startTime) {
+        toast({
+          title: "Validation Error",
+          description: "Start Time is required.",
+          variant: "destructive",
+        });
+        return;
+      }
+      if (!timeRegex.test(startTime)) {
+        toast({
+          title: "Validation Error",
+          description: "Start Time must be in HH:MM 24-hour format (00:00–23:59).",
           variant: "destructive",
         });
         return;
@@ -1434,11 +1455,123 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
         return;
       }
 
+      // Completion Time is required and must be valid HH:MM
+      const completionTime = executionData.completionDateTime ? executionData.completionDateTime.split('T')[1]?.substring(0, 5) || '' : '';
+      if (!completionTime) {
+        toast({
+          title: "Validation Error",
+          description: "Completion Time is required.",
+          variant: "destructive",
+        });
+        return;
+      }
+      if (!timeRegex.test(completionTime)) {
+        toast({
+          title: "Validation Error",
+          description: "Completion Time must be in HH:MM 24-hour format (00:00–23:59).",
+          variant: "destructive",
+        });
+        return;
+      }
+
       // Performed by is required
       if (!executionData.performedBy || executionData.performedBy.trim() === '') {
         toast({
           title: "Validation Error",
           description: "Performed by is required.",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      // No. of Persons is required, must be integer >= 1 and <= 50
+      const noOfPersonsStr = (executionData.noOfPersons || '').trim();
+      if (!noOfPersonsStr) {
+        toast({
+          title: "Validation Error",
+          description: "No. of Persons in Team is required.",
+          variant: "destructive",
+        });
+        return;
+      }
+      if (!/^[1-9]\d*$/.test(noOfPersonsStr)) {
+        toast({
+          title: "Validation Error",
+          description: "No. of Persons must be a positive whole number (≥ 1).",
+          variant: "destructive",
+        });
+        return;
+      }
+      const noOfPersonsVal = parseInt(noOfPersonsStr, 10);
+      if (noOfPersonsVal > 50) {
+        toast({
+          title: "Validation Error",
+          description: "No. of Persons cannot exceed 50.",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      // Total Time Taken is required, must be > 0 and <= 720
+      const totalTimeVal = parseFloat(executionData.totalTimeHours);
+      if (!executionData.totalTimeHours || isNaN(totalTimeVal)) {
+        toast({
+          title: "Validation Error",
+          description: "Total Time Taken (Hours) is required.",
+          variant: "destructive",
+        });
+        return;
+      }
+      if (totalTimeVal <= 0) {
+        toast({
+          title: "Validation Error",
+          description: "Total Time Taken must be greater than 0.",
+          variant: "destructive",
+        });
+        return;
+      }
+      if (totalTimeVal > 720) {
+        toast({
+          title: "Validation Error",
+          description: "Total Time Taken cannot exceed 720 hours (30 days).",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      // Manhours validation (auto-calculated, but safety check)
+      const manhoursVal = parseFloat(executionData.manhours);
+      if (executionData.manhours && !isNaN(manhoursVal) && manhoursVal <= 0) {
+        toast({
+          title: "Validation Error",
+          description: "Manhours must be a positive number.",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      // Work Carried Out is required, min 20 characters, no placeholder text
+      const workCarriedOutTrimmed = (executionData.workCarriedOut || '').trim();
+      if (!workCarriedOutTrimmed) {
+        toast({
+          title: "Validation Error",
+          description: "Work Carried Out is required.",
+          variant: "destructive",
+        });
+        return;
+      }
+      if (workCarriedOutTrimmed.toLowerCase() === 'describe work carried out...' || workCarriedOutTrimmed.toLowerCase() === 'describe work carried out') {
+        toast({
+          title: "Validation Error",
+          description: "Please provide a proper description of work carried out, not the placeholder text.",
+          variant: "destructive",
+        });
+        return;
+      }
+      if (workCarriedOutTrimmed.length < 20) {
+        toast({
+          title: "Validation Error",
+          description: "Work Carried Out must be at least 20 characters to provide a meaningful description.",
           variant: "destructive",
         });
         return;
@@ -1466,6 +1599,28 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
           variant: "destructive",
         });
         return;
+      }
+
+      // Completion Date must be >= Start Date
+      if (completionDateObj < startDateObj) {
+        toast({
+          title: "Validation Error",
+          description: "Completion Date cannot be before Start Date.",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      // If same day, Completion Time must be >= Start Time
+      if (startDate === completionDate && startTime && completionTime) {
+        if (completionTime < startTime) {
+          toast({
+            title: "Validation Error",
+            description: "Completion Time cannot be before Start Time on the same day.",
+            variant: "destructive",
+          });
+          return;
+        }
       }
 
       // If Maintenance basis is Running Hours, Current RH (currentReading) is also required
@@ -3116,7 +3271,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                   </div>
 
                   <div className="space-y-2">
-                    <Label className="text-sm text-[#8798ad]" data-testid="WOF.B2.7"><Marker id="WOF.B2.7" />Start Time</Label>
+                    <Label className="text-sm text-[#8798ad]" data-testid="WOF.B2.7"><Marker id="WOF.B2.7" />Start Time <span className="text-red-500">*</span></Label>
                     <Input
                       type="text"
                       value={executionData.startDateTime ? executionData.startDateTime.split('T')[1]?.substring(0, 5) || '' : ''}
@@ -3125,7 +3280,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                         handleExecutionChange('startDateTime', currentDate ? `${currentDate}T${e.target.value}` : e.target.value);
                       }}
                       className="text-sm"
-                      placeholder="1045"
+                      placeholder="HH:MM (e.g. 10:45)"
                       data-testid="WOF.B2.8"
                     />
                   </div>
@@ -3168,7 +3323,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                   </div>
 
                   <div className="space-y-2">
-                    <Label className="text-sm text-[#8798ad]" data-testid="WOF.B2.11"><Marker id="WOF.B2.11" />Completion Time</Label>
+                    <Label className="text-sm text-[#8798ad]" data-testid="WOF.B2.11"><Marker id="WOF.B2.11" />Completion Time <span className="text-red-500">*</span></Label>
                     <Input
                       type="text"
                       value={executionData.completionDateTime ? executionData.completionDateTime.split('T')[1]?.substring(0, 5) || '' : ''}
@@ -3177,7 +3332,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                         handleExecutionChange('completionDateTime', currentDate ? `${currentDate}T${e.target.value}` : e.target.value);
                       }}
                       className="text-sm"
-                      placeholder="1200"
+                      placeholder="HH:MM (e.g. 12:00)"
                       data-testid="WOF.B2.12"
                     />
                   </div>
@@ -3200,25 +3355,31 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                   </div>
 
                   <div className="space-y-2">
-                    <Label className="text-sm text-[#8798ad]" data-testid="WOF.B2.15"><Marker id="WOF.B2.15" />No of Persons in the team</Label>
+                    <Label className="text-sm text-[#8798ad]" data-testid="WOF.B2.15"><Marker id="WOF.B2.15" />No of Persons in the team <span className="text-red-500">*</span></Label>
                     <Input
                       type="number"
                       value={executionData.noOfPersons}
                       onChange={(e) => handleExecutionChange('noOfPersons', e.target.value)}
                       className="text-sm"
                       placeholder="3"
+                      min={1}
+                      max={50}
+                      step={1}
                       data-testid="WOF.B2.16"
                     />
                   </div>
 
                   <div className="space-y-2">
-                    <Label className="text-sm text-[#8798ad]" data-testid="WOF.B2.17"><Marker id="WOF.B2.17" />Total Time Taken (Hours)</Label>
+                    <Label className="text-sm text-[#8798ad]" data-testid="WOF.B2.17"><Marker id="WOF.B2.17" />Total Time Taken (Hours) <span className="text-red-500">*</span></Label>
                     <Input
                       type="number"
                       value={executionData.totalTimeHours}
                       onChange={(e) => handleExecutionChange('totalTimeHours', e.target.value)}
                       className="text-sm"
                       placeholder="3"
+                      min={0.01}
+                      max={720}
+                      step="any"
                       data-testid="WOF.B2.18"
                     />
                   </div>
@@ -3241,7 +3402,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
               <div className="space-y-2">
                 {/* Header with Quick Input and Smart Suggestions buttons */}
                 <div className="flex items-center justify-between">
-                  <Label className="text-sm text-[#8798ad]">Work Carried Out</Label>
+                  <Label className="text-sm text-[#8798ad]">Work Carried Out <span className="text-red-500">*</span></Label>
                   <div className="flex items-center gap-2">
                     <Button
                       type="button"
