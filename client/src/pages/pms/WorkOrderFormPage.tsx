@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
+import { calculateNextDueDate, normalizeDateToDDMMMYYYY } from "@shared/dateUtils";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -1536,6 +1537,17 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
         return;
       }
 
+      // Rule 3: Approver ≠ Performer for Head of Department ranks
+      const hodRanks = ["Chief Engineer", "Chief Officer", "Master"];
+      if (hodRanks.includes(executionData.performedBy) && executionData.performedBy === templateData.approver) {
+        toast({
+          title: "Validation Error",
+          description: `The same Head of Department rank (${executionData.performedBy}) cannot both perform and approve the work. Please select a different Performed By or Approver rank.`,
+          variant: "destructive",
+        });
+        return;
+      }
+
       // No. of Persons is required, must be integer >= 1 and <= 50
       const noOfPersonsStr = (executionData.noOfPersons || '').trim();
       if (!noOfPersonsStr) {
@@ -1672,6 +1684,47 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
             variant: "destructive",
           });
           return;
+        }
+      }
+
+      // Rule 2: Start Date must not be earlier than Work Order creation date
+      if (workOrderId && !isNewJobCreation) {
+        const woCreatedAt = (workOrderContext as any)?.workOrder?.createdAt;
+        if (woCreatedAt) {
+          const woCreationDate = new Date(woCreatedAt);
+          woCreationDate.setHours(0, 0, 0, 0);
+          const startDateCheck = new Date(startDate);
+          startDateCheck.setHours(0, 0, 0, 0);
+          if (startDateCheck < woCreationDate) {
+            const formattedCreationDate = woCreationDate.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+            toast({
+              title: "Validation Error",
+              description: `Start Date cannot be earlier than the Work Order creation date (${formattedCreationDate}).`,
+              variant: "destructive",
+            });
+            return;
+          }
+        }
+      }
+
+      // Rule 1: Completion Date vs Next Due Date — soft overdue warning (non-blocking)
+      if (templateData.nextDueDate && completionDate) {
+        try {
+          const normalizedNextDue = normalizeDateToDDMMMYYYY(templateData.nextDueDate);
+          if (normalizedNextDue) {
+            const nextDueParts = normalizedNextDue.split('-');
+            const nextDueDateObj = new Date(`${nextDueParts[1]} ${nextDueParts[0]}, ${nextDueParts[2]}`);
+            nextDueDateObj.setHours(0, 0, 0, 0);
+            const completionCheckObj = new Date(completionDate);
+            completionCheckObj.setHours(0, 0, 0, 0);
+            if (!isNaN(nextDueDateObj.getTime()) && completionCheckObj > nextDueDateObj) {
+              toast({
+                title: "Overdue Completion",
+                description: `Work was completed after the scheduled due date (${normalizedNextDue}). The record will be tagged as overdue.`,
+              });
+            }
+          }
+        } catch (e) {
         }
       }
 
@@ -1949,6 +2002,25 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
       // Only the approver can change status to "Completed" via the Approve action
       let response;
 
+      // Rule 4: Frequency Integrity — auto-recalculate next due date for Calendar-basis jobs
+      let recalculatedNextDueDate = templateData.nextDueDate;
+      const maintenanceBasis = templateData.maintenanceBasis || (workOrderContext as any)?.maintenanceBasis;
+      if (hasCompletionData && maintenanceBasis !== 'Running Hours' && templateData.frequencyValue && templateData.frequencyUnit) {
+        const calculatedNextDue = calculateNextDueDate(completionDate, templateData.frequencyValue, templateData.frequencyUnit);
+        if (calculatedNextDue) {
+          if (templateData.nextDueDate && templateData.nextDueDate !== calculatedNextDue) {
+            const normalizedManual = normalizeDateToDDMMMYYYY(templateData.nextDueDate);
+            if (normalizedManual && normalizedManual !== calculatedNextDue) {
+              toast({
+                title: "Next Due Date Recalculated",
+                description: `Next Due Date recalculated: ${calculatedNextDue} (based on completion date + frequency of ${templateData.frequencyValue} ${templateData.frequencyUnit}).`,
+              });
+            }
+          }
+          recalculatedNextDueDate = calculatedNextDue;
+        }
+      }
+
       // Ensure runningHours is set from currentReading for backend compatibility
       const saveExecutionData = {
         ...executionData,
@@ -1967,6 +2039,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
         body: JSON.stringify({
           ...templateData,
           ...saveExecutionData,
+          nextDueDate: recalculatedNextDueDate,
           // If completion data is filled, set status to "Pending Approval"
           // Otherwise keep current status (likely "Active" or "Due")
           status: hasCompletionData ? 'Pending Approval' : undefined

@@ -110,3 +110,27 @@
 ### Key Files Changed
 - `client/src/pages/pms/WorkOrderFormPage.tsx` — Added B4 qty/location validations before PHASE 3A, comments validation after PHASE 3A inventory check. Updated qty inputs with min="1" step="1".
 - `client/src/components/WorkOrderForm.tsx` — Added matching B4 qty/location/comments validations before onSubmit. Updated qty input with min="1" step="1".
+
+---
+
+## 2026-03-05 — Cross-Field Validation Rules (Completion/Due Date, Start/Creation Date, HOD Check, Frequency Integrity)
+
+### What We Built
+- Four new cross-field validation rules for Work Order form Part B in both form components.
+- Rules cover date integrity, role-based approval separation, and automatic next due date recalculation.
+
+### What's Working
+- **Rule 1 — Completion Date vs. Next Due Date (soft warning)**: If the completion date is after the scheduled Next Due Date from Part A, an informational toast ("Overdue Completion") is shown but save is NOT blocked. The record is flagged for overdue tagging. Only applies when nextDueDate is present. Uses `normalizeDateToDDMMMYYYY` for safe date parsing.
+- **Rule 2 — Start Date vs. WO Creation Date (hard block)**: Start Date cannot be earlier than the Work Order creation date stored in the database (`workOrder.createdAt`). Blocks save with toast showing the formatted creation date. Only applies when editing existing WOs (not new job creation). Gracefully skips if `createdAt` is unavailable.
+- **Rule 3 — Approver ≠ Performer for HOD ranks (hard block)**: Head of Department ranks (Chief Engineer, Chief Officer, Master) cannot both perform and approve the same work. If Performed By equals Approver and is one of these HOD ranks, save is blocked with descriptive toast. Non-HOD ranks are not affected by this check.
+- **Rule 4 — Frequency Integrity (auto-recalculate + warning)**: For Calendar-basis jobs with completion data, the next due date is auto-recalculated as `completionDate + frequency`. If the manually set nextDueDate differs from the calculated value, an informational toast is shown. The recalculated value overrides the submission payload. Running Hours basis jobs are skipped (RH next-due handled separately). Uses `calculateNextDueDate` from `@shared/dateUtils`.
+
+### What's Broken
+- Nothing broken from this session's changes.
+
+### Key Files Changed
+- `client/src/pages/pms/WorkOrderFormPage.tsx` — Added import of `calculateNextDueDate`/`normalizeDateToDDMMMYYYY` from `@shared/dateUtils`. Added Rule 2 after same-day time check. Added Rule 1 (overdue warning) after Rule 2. Added Rule 3 (HOD check) after performedBy required check. Added Rule 4 (frequency integrity) before submission payload, with `recalculatedNextDueDate` override in PATCH body.
+- `client/src/components/WorkOrderForm.tsx` — Added same import. Added Rule 2 after same-day time check. Added Rule 1 (overdue warning) after Rule 2. Added Rule 3 (HOD check) after performedBy required check. Added Rule 4 (frequency integrity) before building `executionRecord`, with `nextDueDate: recalculatedNextDueDate` in payload.
+
+### Validation Order in WorkOrderFormPage.tsx handleSubmit
+B1 → B2 (date/time, Rule 2 start vs creation, Rule 1 overdue warning, Rule 3 HOD check) → B2 (persons, time, manhours, work description) → B3 (running hours) → B4 (qty, location, inventory, stock, comments) → Rule 4 (frequency recalculation at payload construction)

@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
+import { calculateNextDueDate, normalizeDateToDDMMMYYYY } from "@shared/dateUtils";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useVessel } from "@/contexts/VesselContext";
@@ -1258,6 +1259,45 @@ const WorkOrderForm: React.FC<WorkOrderFormProps> = ({
         }
       }
 
+      // Rule 2: Start Date must not be earlier than Work Order creation date
+      const woCreatedAtVal = (workOrder as any)?.createdAt;
+      if (woCreatedAtVal) {
+        const woCreationDate = new Date(woCreatedAtVal);
+        woCreationDate.setHours(0, 0, 0, 0);
+        const startDateCheck = new Date(startDate);
+        startDateCheck.setHours(0, 0, 0, 0);
+        if (startDateCheck < woCreationDate) {
+          const formattedCreationDate = woCreationDate.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+          toast({
+            title: "Validation Error",
+            description: `Start Date cannot be earlier than the Work Order creation date (${formattedCreationDate}).`,
+            variant: "destructive"
+          });
+          return;
+        }
+      }
+
+      // Rule 1: Completion Date vs Next Due Date — soft overdue warning (non-blocking)
+      if (templateData.nextDueDate && completionDate) {
+        try {
+          const normalizedNextDue = normalizeDateToDDMMMYYYY(templateData.nextDueDate);
+          if (normalizedNextDue) {
+            const nextDueParts = normalizedNextDue.split('-');
+            const nextDueDateObj = new Date(`${nextDueParts[1]} ${nextDueParts[0]}, ${nextDueParts[2]}`);
+            nextDueDateObj.setHours(0, 0, 0, 0);
+            const completionCheckObj = new Date(completionDate);
+            completionCheckObj.setHours(0, 0, 0, 0);
+            if (!isNaN(nextDueDateObj.getTime()) && completionCheckObj > nextDueDateObj) {
+              toast({
+                title: "Overdue Completion",
+                description: `Work was completed after the scheduled due date (${normalizedNextDue}). The record will be tagged as overdue.`,
+              });
+            }
+          }
+        } catch (e) {
+        }
+      }
+
       if (!executionData.assignedTo) {
         toast({
           title: "Validation Error",
@@ -1270,6 +1310,17 @@ const WorkOrderForm: React.FC<WorkOrderFormProps> = ({
         toast({
           title: "Validation Error",
           description: "Performed By is required",
+          variant: "destructive"
+        });
+        return;
+      }
+
+      // Rule 3: Approver ≠ Performer for Head of Department ranks
+      const hodRanks = ["Chief Engineer", "Chief Officer", "Master"];
+      if (hodRanks.includes(executionData.performedBy) && executionData.performedBy === templateData.approver) {
+        toast({
+          title: "Validation Error",
+          description: `The same Head of Department rank (${executionData.performedBy}) cannot both perform and approve the work. Please select a different Performed By or Approver rank.`,
           variant: "destructive"
         });
         return;
@@ -1474,10 +1525,29 @@ const WorkOrderForm: React.FC<WorkOrderFormProps> = ({
       }
 
       if (onSubmit) {
+        // Rule 4: Frequency Integrity — auto-recalculate next due date for Calendar-basis jobs
+        let recalculatedNextDueDate = templateData.nextDueDate;
+        if (completionDate && templateData.maintenanceBasis !== 'Running Hours' && templateData.frequencyValue && templateData.frequencyUnit) {
+          const calculatedNextDue = calculateNextDueDate(completionDate, templateData.frequencyValue, templateData.frequencyUnit);
+          if (calculatedNextDue) {
+            if (templateData.nextDueDate && templateData.nextDueDate !== calculatedNextDue) {
+              const normalizedManual = normalizeDateToDDMMMYYYY(templateData.nextDueDate);
+              if (normalizedManual && normalizedManual !== calculatedNextDue) {
+                toast({
+                  title: "Next Due Date Recalculated",
+                  description: `Next Due Date recalculated: ${calculatedNextDue} (based on completion date + frequency of ${templateData.frequencyValue} ${templateData.frequencyUnit}).`,
+                });
+              }
+            }
+            recalculatedNextDueDate = calculatedNextDue;
+          }
+        }
+
         const workOrderId = workOrder?.id || `new-${Date.now()}`;
         const executionRecord = {
           ...templateData,
           ...executionData,
+          nextDueDate: recalculatedNextDueDate,
           riskAssessmentStatus: executionData.riskAssessment,
           safetyChecklistsStatus: executionData.safetyChecklists,
           operationalFormsStatus: executionData.operationalForms,
