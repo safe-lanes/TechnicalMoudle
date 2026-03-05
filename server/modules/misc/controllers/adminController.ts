@@ -318,9 +318,22 @@ export async function syncMasters(req: Request, res: Response) {
 
   const fetchExternal = async (endpoint: string, key: string) => {
     const url = buildExternalMasterDataUrl(endpoint, domain);
+    console.log(`[fetchExternal] Fetching ${endpoint} from ${url}`);
     const response = await fetch(url);
+    console.log(`[fetchExternal] ${endpoint} response status: ${response.status}, content-length: ${response.headers.get('content-length')}`);
     if (!response.ok) throw new Error(`Failed to fetch ${endpoint}: ${response.status}`);
-    const data = await response.json();
+    const text = await response.text();
+    if (!text || text.trim().length === 0) {
+      console.warn(`[fetchExternal] ${endpoint} returned empty response body, returning empty array`);
+      return [];
+    }
+    let data: any;
+    try {
+      data = JSON.parse(text);
+    } catch (parseError: any) {
+      console.error(`[fetchExternal] Failed to parse JSON for ${endpoint}. Body preview: ${text.substring(0, 200)}`);
+      throw new Error(`Invalid JSON response for ${endpoint}: ${parseError.message}`);
+    }
     return data[key] || [];
   };
 
@@ -343,7 +356,13 @@ export async function syncMasters(req: Request, res: Response) {
 
   // 1. Sync Vessels
   console.log('📦 Syncing Vessel Master...');
-  const fetchedVessels = await fetchExternal('vessels', 'vessels');
+  let fetchedVessels: any[] = [];
+  try {
+    fetchedVessels = await fetchExternal('vessels', 'vessels');
+  } catch (e: any) {
+    console.error(`[syncMasters] Failed to fetch vessels: ${e.message}`);
+    stats.vessels.errors.push(`Fetch failed: ${e.message}`);
+  }
   for (const v of fetchedVessels) {
     try {
       const entryId = getEntryId(v, ['vuid', 'vesselId']);
@@ -379,7 +398,13 @@ export async function syncMasters(req: Request, res: Response) {
 
   // 2. Sync Vessel Types
   console.log('📦 Syncing Vessel Types...');
-  const fetchedVesselTypes = await fetchExternal('vesseltypes', 'vesseltypes');
+  let fetchedVesselTypes: any[] = [];
+  try {
+    fetchedVesselTypes = await fetchExternal('vesseltypes', 'vesseltypes');
+  } catch (e: any) {
+    console.error(`[syncMasters] Failed to fetch vessel types: ${e.message}`);
+    stats.vesselTypes.errors.push(`Fetch failed: ${e.message}`);
+  }
   for (const vt of fetchedVesselTypes) {
     try {
       const entryId = getEntryId(vt, ['vtuid', 'id', 'vesselTypeId']);
@@ -409,7 +434,13 @@ export async function syncMasters(req: Request, res: Response) {
 
   // 3. Sync Additional Groups
   console.log('📦 Syncing Additional Groups...');
-  const fetchedAdditionalGroups = await fetchExternal('additionalgroups', 'additionalGroups');
+  let fetchedAdditionalGroups: any[] = [];
+  try {
+    fetchedAdditionalGroups = await fetchExternal('additionalgroups', 'additionalGroups');
+  } catch (e: any) {
+    console.error(`[syncMasters] Failed to fetch additional groups: ${e.message}`);
+    stats.additionalGroups.errors.push(`Fetch failed: ${e.message}`);
+  }
   for (const ag of fetchedAdditionalGroups) {
     try {
       const entryId = getEntryId(ag, ['id', 'groupId', 'additional_group_id']);
@@ -432,7 +463,13 @@ export async function syncMasters(req: Request, res: Response) {
 
   // 4. Sync Ports
   console.log('📦 Syncing Ports...');
-  const fetchedPorts = await fetchExternal('ports', 'ports');
+  let fetchedPorts: any[] = [];
+  try {
+    fetchedPorts = await fetchExternal('ports', 'ports');
+  } catch (e: any) {
+    console.error(`[syncMasters] Failed to fetch ports: ${e.message}`);
+    stats.ports.errors.push(`Fetch failed: ${e.message}`);
+  }
   for (const p of fetchedPorts) {
     try {
       const entryId = getEntryId(p, ['puid', 'id', 'portId']);
@@ -455,7 +492,13 @@ export async function syncMasters(req: Request, res: Response) {
 
   // 5. Sync Users
   console.log('📦 Syncing Users...');
-  const fetchedUsers = await fetchExternal('users', 'users');
+  let fetchedUsers: any[] = [];
+  try {
+    fetchedUsers = await fetchExternal('users', 'users');
+  } catch (e: any) {
+    console.error(`[syncMasters] Failed to fetch users: ${e.message}`);
+    stats.users.errors.push(`Fetch failed: ${e.message}`);
+  }
   for (const u of fetchedUsers) {
     try {
       const entryId = getEntryId(u, ['uuid', 'id', 'userId']);
@@ -486,7 +529,13 @@ export async function syncMasters(req: Request, res: Response) {
 
   // 6. Sync Fleet Groups
   console.log('📦 Syncing Fleet Groups...');
-  const fetchedFleetGroups = await fetchExternal('fleetgroups', 'fleetGroups');
+  let fetchedFleetGroups: any[] = [];
+  try {
+    fetchedFleetGroups = await fetchExternal('fleetgroups', 'fleetGroups');
+  } catch (e: any) {
+    console.error(`[syncMasters] Failed to fetch fleet groups: ${e.message}`);
+    stats.fleetGroups.errors.push(`Fetch failed: ${e.message}`);
+  }
   for (const fg of fetchedFleetGroups) {
     try {
       const entryId = getEntryId(fg, ['fleet_group_id', 'id', 'fleetGroupId']);
