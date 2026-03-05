@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { ArrowLeft, Plus, Edit2, ChevronRight, ChevronDown, Search, Upload, Eye, Download, Trash2, FileText, Loader2 } from "lucide-react";
+import { ArrowLeft, Plus, Edit2, ChevronRight, ChevronDown, Search, Upload, Eye, Download, Trash2, FileText, Loader2, Check, ChevronsUpDown, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -10,6 +10,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { useToast } from "@/hooks/use-toast";
 import { useVessel } from "@/contexts/VesselContext";
 import { useQuery, useMutation } from "@tanstack/react-query";
@@ -50,6 +52,11 @@ export default function ComponentRegisterAddEdit({
   const [expandedNodes, setExpandedNodes] = useState<Set<string>>(new Set());
   const [isSaving, setIsSaving] = useState(false);
   const [criticalityFilter, setCriticalityFilter] = useState("all");
+  const [makerOpen, setMakerOpen] = useState(false);
+
+  const { data: makersList = [] } = useQuery<any[]>({
+    queryKey: ['/technical/api/fleet/makers'],
+  });
 
   const isEditModeFromProp = !!componentId;
   const [selectedComponentId, setSelectedComponentId] = useState<string | null>(componentId || null);
@@ -738,6 +745,30 @@ export default function ComponentRegisterAddEdit({
       });
       return;
     }
+    if (componentData.maker && componentData.maker.trim()) {
+      if (makersList.length === 0) {
+        toast({
+          title: "Validation Error",
+          description: "Maker list is still loading. Please try again in a moment.",
+          variant: "destructive",
+        });
+        return;
+      }
+      const validMaker = makersList.find((m: any) => m.makerName === componentData.maker);
+      if (!validMaker) {
+        toast({
+          title: "Validation Error",
+          description: "Please select a valid Maker from the Maker List.",
+          variant: "destructive",
+        });
+        return;
+      }
+      if (componentData.makerCode !== validMaker.makerCode) {
+        handleFieldChange('makerCode', validMaker.makerCode);
+      }
+    } else if (componentData.makerCode) {
+      handleFieldChange('makerCode', '');
+    }
     setIsSaving(true);
     try {
       const payload = {
@@ -1160,20 +1191,72 @@ export default function ComponentRegisterAddEdit({
                   </div>
                   <div>
                     <label className="text-xs text-gray-500 mb-1 block">Maker</label>
-                    <Input
-                      value={componentData.maker}
-                      onChange={(e) => handleFieldChange('maker', e.target.value)}
-                      className="h-8 text-sm"
-                      data-testid="input-maker"
-                    />
+                    <div className="flex gap-1">
+                      <Popover open={makerOpen} onOpenChange={setMakerOpen}>
+                        <PopoverTrigger asChild>
+                          <button
+                            type="button"
+                            role="combobox"
+                            aria-expanded={makerOpen}
+                            className="flex items-center justify-between w-full h-8 px-2 text-sm border rounded-md bg-white hover:bg-gray-50 text-left"
+                            data-testid="input-maker"
+                          >
+                            <span className={`truncate ${componentData.maker ? 'text-gray-900' : 'text-gray-400'}`}>
+                              {componentData.maker || "Select maker..."}
+                            </span>
+                            <ChevronsUpDown className="h-3 w-3 flex-shrink-0 text-gray-400 ml-1" />
+                          </button>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-[280px] p-0" align="start">
+                          <Command>
+                            <CommandInput placeholder="Search makers..." data-testid="input-search-maker" />
+                            <CommandList className="max-h-[200px]">
+                              <CommandEmpty>No makers found.</CommandEmpty>
+                              <CommandGroup>
+                                {makersList.map((maker: any) => (
+                                  <CommandItem
+                                    key={maker.id || maker.makerListUuid}
+                                    value={maker.makerName}
+                                    onSelect={() => {
+                                      handleFieldChange('maker', maker.makerName);
+                                      handleFieldChange('makerCode', maker.makerCode);
+                                      setMakerOpen(false);
+                                    }}
+                                    data-testid={`option-maker-${maker.makerCode}`}
+                                  >
+                                    <span className="truncate">{maker.makerName}</span>
+                                    {componentData.maker === maker.makerName && <Check className="h-3 w-3 ml-auto text-blue-600" />}
+                                  </CommandItem>
+                                ))}
+                              </CommandGroup>
+                            </CommandList>
+                          </Command>
+                        </PopoverContent>
+                      </Popover>
+                      {componentData.maker && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            handleFieldChange('maker', '');
+                            handleFieldChange('makerCode', '');
+                          }}
+                          className="flex items-center justify-center h-8 w-8 text-gray-400 hover:text-red-500 border rounded-md"
+                          data-testid="button-clear-maker"
+                          title="Clear maker"
+                        >
+                          <X className="h-3 w-3" />
+                        </button>
+                      )}
+                    </div>
                   </div>
                   <div>
                     <label className="text-xs text-gray-500 mb-1 block">Maker Code</label>
                     <Input
                       value={componentData.makerCode}
-                      onChange={(e) => handleFieldChange('makerCode', e.target.value)}
-                      className="h-8 text-sm"
+                      readOnly
+                      className="h-8 text-sm bg-gray-50 text-gray-700 cursor-not-allowed"
                       data-testid="input-maker-code"
+                      title="Auto-populated from selected maker"
                     />
                   </div>
                 </div>

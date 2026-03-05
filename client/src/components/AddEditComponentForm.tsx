@@ -16,13 +16,15 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import {
   Card,
   CardContent,
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { ChevronRight, ChevronDown, Plus, Edit2, FileText, FileImage, FileCheck, File, Upload, Download, Lock, HelpCircle, CheckCircle, AlertCircle } from "lucide-react";
+import { ChevronRight, ChevronDown, Plus, Edit2, FileText, FileImage, FileCheck, File, Upload, Download, Lock, HelpCircle, CheckCircle, AlertCircle, Check, ChevronsUpDown, X } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useVessel } from "@/contexts/VesselContext";
 import { useQuery, useMutation } from "@tanstack/react-query";
@@ -57,6 +59,11 @@ const AddEditComponentForm: React.FC<AddEditComponentFormProps> = ({
   const PREVIEW_ROW_LIMIT = 2;
 
   const isEditMode = !!componentId;
+  const [makerOpen, setMakerOpen] = useState(false);
+
+  const { data: makersList = [] } = useQuery<any[]>({
+    queryKey: ['/technical/api/fleet/makers'],
+  });
 
   // Component data state - matches exact field structure from Components.tsx Section A
   // Boolean fields default to "No" per specification
@@ -374,6 +381,30 @@ const AddEditComponentForm: React.FC<AddEditComponentFormProps> = ({
       });
       return;
     }
+    if (componentData.maker && componentData.maker.trim()) {
+      if (makersList.length === 0) {
+        toast({
+          title: "Validation Error",
+          description: "Maker list is still loading. Please try again in a moment.",
+          variant: "destructive",
+        });
+        return;
+      }
+      const validMaker = makersList.find((m: any) => m.makerName === componentData.maker);
+      if (!validMaker) {
+        toast({
+          title: "Validation Error",
+          description: "Please select a valid Maker from the Maker List.",
+          variant: "destructive",
+        });
+        return;
+      }
+      if (componentData.makerCode !== validMaker.makerCode) {
+        handleFieldChange('makerCode', validMaker.makerCode);
+      }
+    } else if (componentData.makerCode) {
+      handleFieldChange('makerCode', '');
+    }
     setIsSaving(true);
     try {
       // Prepare component payload with proper field name mapping and boolean conversion
@@ -618,22 +649,73 @@ const AddEditComponentForm: React.FC<AddEditComponentFormProps> = ({
                             </div>
                             <div>
                               <label className="text-xs font-medium text-gray-600 block mb-1">Maker</label>
-                              <input
-                                type="text"
-                                value={componentData.maker}
-                                onChange={(e) => handleFieldChange('maker', e.target.value)}
-                                className="text-sm w-full px-2 py-1 border rounded text-[#52BAF3] border-[#52BAF3]"
-                                data-testid="input-maker"
-                              />
+                              <div className="flex gap-1">
+                                <Popover open={makerOpen} onOpenChange={setMakerOpen}>
+                                  <PopoverTrigger asChild>
+                                    <button
+                                      type="button"
+                                      role="combobox"
+                                      aria-expanded={makerOpen}
+                                      className="flex items-center justify-between w-full px-2 py-1 text-sm border rounded bg-white hover:bg-gray-50 text-left border-[#52BAF3]"
+                                      data-testid="input-maker"
+                                    >
+                                      <span className={`truncate ${componentData.maker ? 'text-[#52BAF3]' : 'text-gray-400'}`}>
+                                        {componentData.maker || "Select maker..."}
+                                      </span>
+                                      <ChevronsUpDown className="h-3 w-3 flex-shrink-0 text-gray-400 ml-1" />
+                                    </button>
+                                  </PopoverTrigger>
+                                  <PopoverContent className="w-[280px] p-0" align="start">
+                                    <Command>
+                                      <CommandInput placeholder="Search makers..." data-testid="input-search-maker" />
+                                      <CommandList className="max-h-[200px]">
+                                        <CommandEmpty>No makers found.</CommandEmpty>
+                                        <CommandGroup>
+                                          {makersList.map((maker: any) => (
+                                            <CommandItem
+                                              key={maker.id || maker.makerListUuid}
+                                              value={maker.makerName}
+                                              onSelect={() => {
+                                                handleFieldChange('maker', maker.makerName);
+                                                handleFieldChange('makerCode', maker.makerCode);
+                                                setMakerOpen(false);
+                                              }}
+                                              data-testid={`option-maker-${maker.makerCode}`}
+                                            >
+                                              <span className="truncate">{maker.makerName}</span>
+                                              {componentData.maker === maker.makerName && <Check className="h-3 w-3 ml-auto text-blue-600" />}
+                                            </CommandItem>
+                                          ))}
+                                        </CommandGroup>
+                                      </CommandList>
+                                    </Command>
+                                  </PopoverContent>
+                                </Popover>
+                                {componentData.maker && (
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      handleFieldChange('maker', '');
+                                      handleFieldChange('makerCode', '');
+                                    }}
+                                    className="flex items-center justify-center w-8 text-gray-400 hover:text-red-500 border rounded border-gray-300"
+                                    data-testid="button-clear-maker"
+                                    title="Clear maker"
+                                  >
+                                    <X className="h-3 w-3" />
+                                  </button>
+                                )}
+                              </div>
                             </div>
                             <div>
                               <label className="text-xs font-medium text-gray-600 block mb-1">Maker Code</label>
                               <input
                                 type="text"
                                 value={componentData.makerCode}
-                                onChange={(e) => handleFieldChange('makerCode', e.target.value)}
-                                className="text-sm w-full px-2 py-1 border rounded text-[#52BAF3] border-[#52BAF3]"
+                                readOnly
+                                className="text-sm w-full px-2 py-1 border rounded bg-gray-50 text-gray-700 cursor-not-allowed border-gray-300"
                                 data-testid="input-maker-code"
+                                title="Auto-populated from selected maker"
                               />
                             </div>
                           </div>

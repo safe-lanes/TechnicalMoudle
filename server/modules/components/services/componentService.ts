@@ -1,6 +1,38 @@
 import * as repo from '../repositories/componentRepository';
 import { NotFoundError, ValidationError } from '../../shared/errors';
 import type { Component, InsertComponent } from '@shared/schema';
+import { makerList } from '@shared/schema';
+import { eq, and, ilike } from 'drizzle-orm';
+import { db } from '../../../db';
+
+async function validateMaker(makerName?: string, makerCode?: string) {
+  const hasName = makerName && makerName.trim();
+  const hasCode = makerCode && makerCode.trim();
+  if (!hasName && !hasCode) return;
+
+  if (hasName && hasCode) {
+    const matches = await db.select().from(makerList)
+      .where(and(
+        ilike(makerList.makerName, makerName!.trim()),
+        eq(makerList.makerCode, makerCode!.trim())
+      ));
+    if (matches.length === 0) {
+      throw new ValidationError('Maker and Maker Code combination not found in Maker List. Please select a valid Maker.');
+    }
+  } else if (hasName) {
+    const matches = await db.select().from(makerList)
+      .where(ilike(makerList.makerName, makerName!.trim()));
+    if (matches.length === 0) {
+      throw new ValidationError('Maker not found in Maker List. Please select a valid Maker.');
+    }
+  } else if (hasCode) {
+    const matches = await db.select().from(makerList)
+      .where(eq(makerList.makerCode, makerCode!.trim()));
+    if (matches.length === 0) {
+      throw new ValidationError('Maker Code not found in Maker List.');
+    }
+  }
+}
 
 export async function listByVessel(vesselId: string): Promise<Component[]> {
   return repo.findByVesselId(vesselId);
@@ -38,6 +70,8 @@ export async function create(data: any): Promise<Component> {
   if (missing.length > 0) {
     throw new ValidationError(`Missing mandatory fields: ${missing.join(', ')}`);
   }
+
+  await validateMaker(data.maker, data.makerCode);
 
   // RH field validation (B7.B rules)
   const effectiveRhType = data.rhCounterType || 'NOT_RH_DRIVEN';
@@ -106,6 +140,10 @@ export async function update(id: string, data: any, userId: string): Promise<Com
   }).map(f => f.label);
   if (invalidPatch.length > 0) {
     throw new ValidationError(`Cannot set mandatory fields to empty: ${invalidPatch.join(', ')}`);
+  }
+
+  if (data.maker !== undefined || data.makerCode !== undefined) {
+    await validateMaker(data.maker, data.makerCode);
   }
 
   // RH field validation (B7.B rules)
