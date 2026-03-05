@@ -1,17 +1,19 @@
 import { Request, Response } from 'express';
 import * as woDocService from '../services/woDocumentService';
 import * as woRepo from '../repositories/workOrderRepository';
+import { findById as findDocById } from '../repositories/documentRepository';
 import { NotFoundError } from '../../shared/errors';
+import { isCompletedStatus } from '../../../utils/workOrderStatus';
 
-async function resolveWorkOrderUUID(idOrUuid: string): Promise<string> {
+async function resolveWorkOrder(idOrUuid: string) {
   const wo = await woRepo.findById(idOrUuid);
   if (!wo) throw new NotFoundError('Work order not found');
-  return wo.wouuid;
+  return wo;
 }
 
 export async function listDocuments(req: Request, res: Response) {
-  const wouuid = await resolveWorkOrderUUID(req.params.workOrderId);
-  const documents = await woDocService.listDocuments(wouuid);
+  const wo = await resolveWorkOrder(req.params.workOrderId);
+  const documents = await woDocService.listDocuments(wo.wouuid);
   res.json(documents);
 }
 
@@ -29,13 +31,17 @@ export async function uploadDocument(req: Request, res: Response) {
     return res.status(400).json({ error: 'vesselId is required' });
   }
 
-  const wouuid = await resolveWorkOrderUUID(req.params.workOrderId);
+  const wo = await resolveWorkOrder(req.params.workOrderId);
+
+  if (isCompletedStatus(wo.status)) {
+    return res.status(403).json({ error: 'Editing is not allowed because the Work Order is completed.' });
+  }
 
   const user = (req as any).user;
   const uploadedBy = user?.username || user?.fullName || 'Unknown';
 
   const document = await woDocService.uploadDocument(
-    wouuid,
+    wo.wouuid,
     vesselId,
     documentType,
     req.file,
@@ -59,6 +65,15 @@ export async function downloadDocument(req: Request, res: Response) {
 
 export async function deleteDocument(req: Request, res: Response) {
   const { documentId } = req.params;
+
+  const doc = await findDocById(documentId);
+  if (doc && doc.workOrderUuid) {
+    const wo = await woRepo.findById(doc.workOrderUuid);
+    if (wo && isCompletedStatus(wo.status)) {
+      return res.status(403).json({ error: 'Editing is not allowed because the Work Order is completed.' });
+    }
+  }
+
   await woDocService.deleteDocument(documentId);
   res.json({ success: true, message: 'Document deleted successfully' });
 }

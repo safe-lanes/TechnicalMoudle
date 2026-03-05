@@ -222,7 +222,7 @@ const WorkOrderForm: React.FC<WorkOrderFormProps> = ({
   const executionMode = workOrder?.executionMode === true;
   
   // Check if form should be read-only - BUT in modify mode, make it editable
-  const isReadOnly = !isModifyMode && (workOrder?.status === "Pending Approval" || workOrder?.status === "Approved" || isApprovalMode || mode === 'history');
+  const isReadOnly = !isModifyMode && (workOrder?.status === "Pending Approval" || workOrder?.status === "Approved" || workOrder?.status === "Completed" || isApprovalMode || mode === 'history');
   
   // Part A is ALWAYS read-only for ship users in execution mode (per spec)
   // Part A should display pre-populated job data and not be editable by ship crew

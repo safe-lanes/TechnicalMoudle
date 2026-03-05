@@ -368,7 +368,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
   const context = workOrderContext as any;
   const isPartAReadOnly = isNewJobCreation ? false : (resolvedMode === 'template' || !!workOrderId);
 
-  const isReadOnly = embedded; // Read-only in embedded mode for maintenance history viewing
+  const isReadOnly = embedded || currentWorkOrderStatus === 'Completed';
 
   const isPartBReadOnly = isReadOnly || currentWorkOrderStatus === 'Completed' || currentWorkOrderStatus === 'Pending Approval';
 
@@ -2082,8 +2082,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Read-only mode banner for embedded viewing - scrolls with content */}
-      {isReadOnly && (
+      {embedded && isReadOnly && (
         <div className="sticky top-0 z-50 bg-amber-50 border-b border-amber-200 px-4 py-2 flex items-center justify-between">
           <span className="text-sm text-amber-800 font-medium">
             Read-only view of completed work order
@@ -2096,6 +2095,13 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
           >
             Close Viewer
           </Button>
+        </div>
+      )}
+      {!embedded && currentWorkOrderStatus === 'Completed' && (
+        <div className="sticky top-0 z-50 bg-blue-50 border-b border-blue-200 px-4 py-2">
+          <span className="text-sm text-blue-800 font-medium" data-testid="banner-completed-readonly">
+            This Work Order is completed. Part B is read-only.
+          </span>
         </div>
       )}
       {/* Top Header Bar - Professional maritime header with logo and actions */}
@@ -3629,6 +3635,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
           >
             <div className="space-y-3">
               <div className="flex justify-end">
+                {!isReadOnly && (
                 <Button
                   variant="outline"
                   size="sm"
@@ -3639,6 +3646,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                   <Marker id="WOF.B4.10" />
                   + Add Spare Part
                 </Button>
+                )}
               </div>
 
               {/* Spare Parts Consumed Table */}
@@ -3692,7 +3700,6 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                                 value={consumedData?.quantityConsumed || ''}
                                 onChange={(e) => {
                                   const newValue = e.target.value;
-                                  // Auto-select location if only one available
                                   const autoLoc = autoSelectedLocationField ? getLocationName(sparePartCode, autoSelectedLocationField) : null;
                                   setExecutionData(prev => {
                                     const consumed = [...prev.consumedSpareParts];
@@ -3716,6 +3723,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                                     return { ...prev, consumedSpareParts: consumed };
                                   });
                                 }}
+                                disabled={isReadOnly}
                                 className={`text-sm h-8 w-20 ${exceedsRob ? 'border-red-500 focus:border-red-500 focus:ring-red-500' : ''}`}
                                 data-testid={`input-consumed-qty-${sparePartCode || spare.partNo || index}`}
                               />
@@ -3729,7 +3737,6 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                             <Select
                               value={consumedData?.location || ''}
                               onValueChange={(locationName) => {
-                                // Find which field this location corresponds to
                                 const selectedLoc = spareLocations.find(l => l.name === locationName);
                                 setExecutionData(prev => {
                                   const consumed = [...prev.consumedSpareParts];
@@ -3737,7 +3744,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                                     consumed[consumedIndex] = {
                                       ...consumed[consumedIndex],
                                       location: locationName as any,
-                                      locationId: null // No longer using inventory_locations IDs
+                                      locationId: null
                                     };
                                   } else {
                                     consumed.push({
@@ -3753,6 +3760,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                                   return { ...prev, consumedSpareParts: consumed };
                                 });
                               }}
+                              disabled={isReadOnly}
                             >
                               <SelectTrigger className="h-8 text-xs" data-testid={`select-location-${sparePartCode || spare.partNo || index}`}>
                                 <SelectValue placeholder="Select location" />
@@ -3796,6 +3804,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                                   return { ...prev, consumedSpareParts: consumed };
                                 });
                               }}
+                              disabled={isReadOnly}
                               className="text-sm h-8"
                               data-testid={`input-consumed-comments-${sparePartCode || spare.partNo || index}`}
                             />
@@ -3874,6 +3883,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                                           return { ...prev, consumedSpareParts: updated };
                                         });
                                       }}
+                                      disabled={isReadOnly}
                                       className={`text-sm h-8 w-20 ${manualExceedsRob ? 'border-red-500 focus:border-red-500 focus:ring-red-500' : ''}`}
                                       onBlur={() => setEditingConsumedSparePart(null)}
                                     />
@@ -3883,7 +3893,6 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                                   </div>
                                 </td>
                                 <td className="py-3">
-                                  {/* Manual entry editing: Get locations from Spares table by partCode */}
                                   {(() => {
                                     const manualSpareLocations = consumed.partCode ? getAvailableLocationsForSpare(consumed.partCode) : [];
                                     return (
@@ -3900,6 +3909,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                                             return { ...prev, consumedSpareParts: updated };
                                           });
                                         }}
+                                        disabled={isReadOnly}
                                       >
                                         <SelectTrigger className="h-8 text-xs">
                                           <SelectValue placeholder="Select" />
@@ -3929,6 +3939,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                                         return { ...prev, consumedSpareParts: updated };
                                       });
                                     }}
+                                    disabled={isReadOnly}
                                     className="text-sm h-8"
                                   />
                                 </td>
@@ -3951,6 +3962,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                                           return { ...prev, consumedSpareParts: updated };
                                         });
                                       }}
+                                      disabled={isReadOnly}
                                       className={`text-sm h-8 w-20 ${manualExceedsRob ? 'border-red-500 focus:border-red-500 focus:ring-red-500' : ''}`}
                                     />
                                     {manualExceedsRob && (
@@ -3959,7 +3971,6 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                                   </div>
                                 </td>
                                 <td className="py-3">
-                                  {/* Non-editing view: Get locations from Spares table by partCode */}
                                   {(() => {
                                     const viewSpareLocations = consumed.partCode ? getAvailableLocationsForSpare(consumed.partCode) : [];
                                     return (
@@ -3976,6 +3987,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                                             return { ...prev, consumedSpareParts: updated };
                                           });
                                         }}
+                                        disabled={isReadOnly}
                                       >
                                         <SelectTrigger className="h-8 text-xs">
                                           <SelectValue placeholder="Select" />
@@ -4005,6 +4017,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                                         return { ...prev, consumedSpareParts: updated };
                                       });
                                     }}
+                                    disabled={isReadOnly}
                                     className="text-sm h-8"
                                   />
                                 </td>
