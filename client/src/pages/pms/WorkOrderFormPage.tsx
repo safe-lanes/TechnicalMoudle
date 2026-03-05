@@ -1088,6 +1088,22 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
     const file = event.target.files?.[0];
     if (!file) return;
 
+    const allowedTypes = ['application/pdf', 'image/jpeg', 'image/png'];
+    const allowedExtensions = ['.pdf', '.jpg', '.jpeg', '.png'];
+    const fileExtension = '.' + file.name.split('.').pop()?.toLowerCase();
+    if (!allowedTypes.includes(file.type) && !allowedExtensions.includes(fileExtension)) {
+      toast({ title: "Invalid file type", description: "Only PDF, JPG, and PNG files are allowed.", variant: "destructive" });
+      event.target.value = '';
+      return;
+    }
+
+    const maxSizeBytes = 5 * 1024 * 1024;
+    if (file.size > maxSizeBytes) {
+      toast({ title: "File too large", description: `Maximum file size is 5MB. Selected file is ${(file.size / (1024 * 1024)).toFixed(1)}MB.`, variant: "destructive" });
+      event.target.value = '';
+      return;
+    }
+
     const currentVesselId = vesselId || contextVesselId;
     if (!currentVesselId) {
       toast({ title: "Upload failed", description: "No vessel context available.", variant: "destructive" });
@@ -1405,6 +1421,37 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
           toast({
             title: "Validation Error",
             description: "Frequency unit is required.",
+            variant: "destructive",
+          });
+          return;
+        }
+      }
+
+      // B1 Validation: Warn and block if any B1 field is set to "No"
+      const b1Warnings: string[] = [];
+      if (executionData.riskAssessment === 'No') b1Warnings.push('Risk Assessment');
+      if (executionData.safetyChecklists === 'No') b1Warnings.push('Safety Checklists');
+      if (executionData.operationalForms === 'No') b1Warnings.push('Operational Forms');
+      if (b1Warnings.length > 0) {
+        toast({
+          title: "Safety Warning",
+          description: `${b1Warnings.join(', ')} ${b1Warnings.length === 1 ? 'is' : 'are'} marked as "No". This is a safety concern — please complete the required assessments or select "NA" if not applicable.`,
+          variant: "destructive",
+        });
+        return;
+      }
+
+      // B1 Validation: If "Yes" is selected, at least 1 supporting document must be uploaded
+      const b1DocChecks = [
+        { field: executionData.riskAssessment, type: 'riskAssessment', label: 'Risk Assessment' },
+        { field: executionData.safetyChecklists, type: 'safetyChecklist', label: 'Safety Checklists' },
+        { field: executionData.operationalForms, type: 'operationalForm', label: 'Operational Forms' },
+      ];
+      for (const check of b1DocChecks) {
+        if (check.field === 'Yes' && getDocsByType(check.type).length === 0) {
+          toast({
+            title: "Validation Error",
+            description: `${check.label} is marked as "Yes" but no supporting document has been uploaded. Please upload at least one document.`,
             variant: "destructive",
           });
           return;
@@ -3036,7 +3083,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                       type="file"
                       className="hidden"
                       onChange={(e) => handleFileSelected(e, 'riskAssessment')}
-                      accept=".pdf,.doc,.docx,.jpg,.jpeg,.png,.xlsx"
+                      accept=".pdf,.jpg,.jpeg,.png"
                     />
                     <span className="text-xs text-gray-400">{getDocsByType('riskAssessment').length}/5</span>
                   </div>
@@ -3124,7 +3171,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                       type="file"
                       className="hidden"
                       onChange={(e) => handleFileSelected(e, 'safetyChecklist')}
-                      accept=".pdf,.doc,.docx,.jpg,.jpeg,.png,.xlsx"
+                      accept=".pdf,.jpg,.jpeg,.png"
                     />
                     <span className="text-xs text-gray-400">{getDocsByType('safetyChecklist').length}/5</span>
                   </div>
@@ -3212,7 +3259,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                       type="file"
                       className="hidden"
                       onChange={(e) => handleFileSelected(e, 'operationalForm')}
-                      accept=".pdf,.doc,.docx,.jpg,.jpeg,.png,.xlsx"
+                      accept=".pdf,.jpg,.jpeg,.png"
                     />
                     <span className="text-xs text-gray-400">{getDocsByType('operationalForm').length}/5</span>
                   </div>

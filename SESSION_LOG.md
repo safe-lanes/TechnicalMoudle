@@ -41,3 +41,31 @@
 - Consider adding backend validation for the same rules in `workOrderService.ts` or `workOrderController.ts`.
 - Review whether `WorkOrderForm.tsx` (secondary/modal form) needs UI fields added for start/completion date/time, no. of persons, total time, etc. to match the new validation requirements.
 - Potential next feature: auto-calculate Total Time Taken from the difference between Start Date/Time and Completion Date/Time.
+
+---
+
+## 2026-03-05 — B1 Section Validations (Safety Assessments & Document Uploads)
+
+### What We Built
+- B1 section validations for Work Order form Part B across both form components (`WorkOrderFormPage.tsx` and `WorkOrderForm.tsx`).
+- Three validation rules: block on "No", require documents on "Yes", and enforce file type/size restrictions.
+
+### What's Working
+- **B1.1–B1.3 "No" blocking**: If Risk Assessment, Safety Checklists, or Operational Forms is set to "No", save is blocked with a Safety Warning toast identifying which items are flagged. Users must select "Yes" (and upload docs) or "NA" (not applicable).
+- **Document required when "Yes"**: If any B1 field is "Yes" but no supporting document has been uploaded for that type, save is blocked with a Validation Error toast. Uses `getDocsByType()` in WorkOrderFormPage and `executionData.uploadedDocuments` filtering in WorkOrderForm.
+- **File type restriction**: Only PDF (.pdf), JPG (.jpg/.jpeg), and PNG (.png) files accepted. Both programmatic validation (MIME type + extension check) and HTML `accept` attribute enforce this. Toast shown for invalid file types.
+- **File size limit**: Maximum 5MB per file enforced in `handleFileSelected`. Toast shows actual file size when rejected.
+- **Accept attributes tightened**: WorkOrderFormPage.tsx `accept` attributes updated from `.pdf,.doc,.docx,.jpg,.jpeg,.png,.xlsx` to `.pdf,.jpg,.jpeg,.png` for all three B1 document upload inputs. WorkOrderForm.tsx was already correct.
+
+### What's Broken
+- Nothing broken from this session's changes.
+
+### What's Pending
+- Server-side file type/size validation not added (frontend-only enforcement). Consider adding backend checks for defense in depth.
+
+### Key Files Changed
+- `client/src/pages/pms/WorkOrderFormPage.tsx` — Added B1 "No" blocking + doc-required validations before B2 validations in handleSubmit. Added file type/size checks in handleFileSelected. Tightened accept attributes on 3 file inputs.
+- `client/src/components/WorkOrderForm.tsx` — Added matching B1 "No" blocking + doc-required validations in handleSubmit. Added file type/size checks in handleFileSelected.
+
+### Environment Issues
+- None. Application runs normally, HMR picks up all changes without compilation errors.

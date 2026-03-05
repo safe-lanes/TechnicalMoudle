@@ -614,6 +614,22 @@ const WorkOrderForm: React.FC<WorkOrderFormProps> = ({
     const file = event.target.files?.[0];
     if (!file) return;
 
+    const allowedTypes = ['application/pdf', 'image/jpeg', 'image/png'];
+    const allowedExtensions = ['.pdf', '.jpg', '.jpeg', '.png'];
+    const fileExtension = '.' + file.name.split('.').pop()?.toLowerCase();
+    if (!allowedTypes.includes(file.type) && !allowedExtensions.includes(fileExtension)) {
+      toast({ title: "Invalid file type", description: "Only PDF, JPG, and PNG files are allowed.", variant: "destructive" });
+      event.target.value = '';
+      return;
+    }
+
+    const maxSizeBytes = 5 * 1024 * 1024;
+    if (file.size > maxSizeBytes) {
+      toast({ title: "File too large", description: `Maximum file size is 5MB. Selected file is ${(file.size / (1024 * 1024)).toFixed(1)}MB.`, variant: "destructive" });
+      event.target.value = '';
+      return;
+    }
+
     try {
       // Create form data for upload
       const formData = new FormData();
@@ -1100,6 +1116,40 @@ const WorkOrderForm: React.FC<WorkOrderFormProps> = ({
         });
       }
     } else {
+      // B1 Validation: Warn and block if any B1 field is set to "No"
+      const b1Warnings: string[] = [];
+      if (executionData.riskAssessment === 'No') b1Warnings.push('Risk Assessment');
+      if (executionData.safetyChecklists === 'No') b1Warnings.push('Safety Checklists');
+      if (executionData.operationalForms === 'No') b1Warnings.push('Operational Forms');
+      if (b1Warnings.length > 0) {
+        toast({
+          title: "Safety Warning",
+          description: `${b1Warnings.join(', ')} ${b1Warnings.length === 1 ? 'is' : 'are'} marked as "No". This is a safety concern — please complete the required assessments or select "NA" if not applicable.`,
+          variant: "destructive"
+        });
+        return;
+      }
+
+      // B1 Validation: If "Yes" is selected, at least 1 supporting document must be uploaded
+      const b1DocTypes = [
+        { field: executionData.riskAssessment, type: 'riskAssessment', label: 'Risk Assessment' },
+        { field: executionData.safetyChecklists, type: 'safetyChecklist', label: 'Safety Checklists' },
+        { field: executionData.operationalForms, type: 'operationalForm', label: 'Operational Forms' },
+      ];
+      for (const check of b1DocTypes) {
+        if (check.field === 'Yes') {
+          const hasDoc = executionData.uploadedDocuments.some(doc => doc.type === check.type);
+          if (!hasDoc) {
+            toast({
+              title: "Validation Error",
+              description: `${check.label} is marked as "Yes" but no supporting document has been uploaded. Please upload at least one document.`,
+              variant: "destructive"
+            });
+            return;
+          }
+        }
+      }
+
       // Validate execution data
       const timeRegex = /^([01]\d|2[0-3]):([0-5]\d)$/;
 
