@@ -747,8 +747,7 @@ const WorkOrders: React.FC = () => {
                           {index === 0 && <Marker id="C31" />}
                           <Pen className="h-4 w-4 text-gray-600" />
                         </button>
-                        {/* Hide postpone button for vessel view mode */}
-                        {!isVessel && (
+                        {!isVessel && (workOrder.computedStatus || workOrder.status) !== "Pending Approval" && (
                           <button 
                             className="p-1 hover:bg-gray-200 rounded"
                             onClick={(e) => {
