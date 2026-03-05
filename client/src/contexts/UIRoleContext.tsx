@@ -1,7 +1,7 @@
 import { createContext, useContext, useState, useEffect, ReactNode } from "react";
 import type { UIRole } from "@shared/uiRoles";
 import { UI_ROLES } from "@shared/uiRoles";
-import { secureGetItem, secureSetItem } from "@/utils/secureStorage";
+import { secureGetItem } from "@/utils/secureStorage";
 
 interface UIRoleContextType {
   uiRole: UIRole;
@@ -30,7 +30,6 @@ export function UIRoleProvider({ children }: UIRoleProviderProps) {
 
   const setUIRole = (role: UIRole) => {
     setUIRoleState(role);
-    secureSetItem("userType", role);
   };
 
   const value: UIRoleContextType = {

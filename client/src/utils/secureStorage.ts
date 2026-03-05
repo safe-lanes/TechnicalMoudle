@@ -41,12 +41,6 @@ export function decryptValue<T>(ciphertext: string): T {
   return JSON.parse(decryptedString) as T;
 }
 
-export function secureSetItem(key: string, value: unknown): void {
-  validateKey(key);
-  const encrypted = encryptValue(value);
-  localStorage.setItem(key, encrypted);
-}
-
 export function secureGetItem<T>(key: string): T | null {
   validateKey(key);
   const raw = localStorage.getItem(key);
@@ -56,19 +50,7 @@ export function secureGetItem<T>(key: string): T | null {
   try {
     return decryptValue<T>(raw);
   } catch {
-    console.warn(`Failed to decrypt "${key}" from localStorage. Removing corrupted value.`);
-    localStorage.removeItem(key);
+    console.warn(`Failed to decrypt "${key}" from localStorage.`);
     return null;
-  }
-}
-
-export function secureRemoveItem(key: string): void {
-  validateKey(key);
-  localStorage.removeItem(key);
-}
-
-export function clearAllSecureItems(): void {
-  for (const key of LOCAL_STORAGE_KEYS) {
-    localStorage.removeItem(key);
   }
 }

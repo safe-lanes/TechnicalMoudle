@@ -1,12 +1,11 @@
 import { createContext, useContext, useState, useEffect, ReactNode } from "react";
 import type { PublicUser, UserRole } from "@shared/schema";
 import type { UIRole } from "@shared/uiRoles";
-import { secureSetItem, secureGetItem, clearAllSecureItems } from "@/utils/secureStorage";
+import { secureGetItem } from "@/utils/secureStorage";
 import { analyzeLocalStorage } from "@/utils/localStorageAnalyzer";
 import {
   generateRoleAccessData,
   getRoleAccessData,
-  setRoleAccessData,
   canAccessModule as checkModuleAccess,
   canPerformAction as checkAction,
   type RoleAccessData,
@@ -17,6 +16,20 @@ const ROLE_TO_UI_TYPE: Record<UserRole, UIRole> = {
   Ship: "Vessel",
   Office: "Client_Admin",
   "PMS Admin": "Sail_Admin",
+};
+
+const DEFAULT_USER: PublicUser = {
+  id: 1,
+  username: "munawer.modak",
+  fullName: "Munawer A. Modak",
+  email: "ayush.agrawal@safe-lanes.com",
+  role: "Office",
+  vesselId: null,
+  department: null,
+  isActive: true,
+  crewDesignation: "Marine Manager",
+  createdAt: new Date(),
+  updatedAt: new Date(),
 };
 
 interface AuthContextType {
@@ -49,21 +62,6 @@ export function AuthProvider({ children }: AuthProviderProps) {
   const [roleAccessData, setRoleAccessDataState] = useState<RoleAccessData | null>(null);
   const [userType, setUserType] = useState<UIRole | null>(null);
 
-  const initializeAuth = (user: PublicUser) => {
-    const derivedUIType = ROLE_TO_UI_TYPE[user.role] || "Vessel";
-    const accessData = generateRoleAccessData(user.role);
-
-    secureSetItem("userProfile", user);
-    secureSetItem("userRole", user.role);
-    secureSetItem("userType", derivedUIType);
-    secureSetItem("credentials", { sessionId: crypto.randomUUID(), createdAt: Date.now() });
-    setRoleAccessData(accessData);
-
-    setCurrentUser(user);
-    setRoleAccessDataState(accessData);
-    setUserType(derivedUIType);
-  };
-
   useEffect(() => {
     const storedProfile = secureGetItem<PublicUser>("userProfile");
 
@@ -73,27 +71,20 @@ export function AuthProvider({ children }: AuthProviderProps) {
       const storedAccessData = getRoleAccessData();
       if (storedAccessData) {
         setRoleAccessDataState(storedAccessData);
+      } else {
+        setRoleAccessDataState(generateRoleAccessData(storedProfile.role));
       }
 
       const storedType = secureGetItem<UIRole>("userType");
       if (storedType) {
         setUserType(storedType);
+      } else {
+        setUserType(ROLE_TO_UI_TYPE[storedProfile.role] || "Vessel");
       }
     } else {
-      const defaultUser: PublicUser = {
-        id: 1,
-        username: "munawer.modak",
-        fullName: "Munawer A. Modak",
-        email: "ayush.agrawal@safe-lanes.com",
-        role: "Office",
-        vesselId: null,
-        department: null,
-        isActive: true,
-        crewDesignation: "Marine Manager",
-        createdAt: new Date(),
-        updatedAt: new Date(),
-      };
-      initializeAuth(defaultUser);
+      setCurrentUser(DEFAULT_USER);
+      setRoleAccessDataState(generateRoleAccessData(DEFAULT_USER.role));
+      setUserType(ROLE_TO_UI_TYPE[DEFAULT_USER.role]);
     }
 
     try {
@@ -149,11 +140,15 @@ export function AuthProvider({ children }: AuthProviderProps) {
       createdAt: user.createdAt,
       updatedAt: user.updatedAt,
     };
-    initializeAuth(sanitizedUser);
+    const derivedUIType = ROLE_TO_UI_TYPE[user.role] || "Vessel";
+    const accessData = generateRoleAccessData(user.role);
+
+    setCurrentUser(sanitizedUser);
+    setRoleAccessDataState(accessData);
+    setUserType(derivedUIType);
   };
 
   const logout = () => {
-    clearAllSecureItems();
     setCurrentUser(null);
     setRoleAccessDataState(null);
     setUserType(null);

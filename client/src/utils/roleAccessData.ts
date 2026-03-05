@@ -1,5 +1,5 @@
 import type { UserRole } from "@shared/schema";
-import { secureGetItem, secureSetItem } from "./secureStorage";
+import { secureGetItem } from "./secureStorage";
 
 export interface ModulePermissions {
   read: boolean;
@@ -140,10 +140,6 @@ export function generateRoleAccessData(role: UserRole): RoleAccessData {
 
 export function getRoleAccessData(): RoleAccessData | null {
   return secureGetItem<RoleAccessData>("Role_Access_Data");
-}
-
-export function setRoleAccessData(data: RoleAccessData): void {
-  secureSetItem("Role_Access_Data", data);
 }
 
 export function canAccessModule(
