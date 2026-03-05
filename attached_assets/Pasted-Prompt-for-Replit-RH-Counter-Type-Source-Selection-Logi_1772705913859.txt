@@ -1,0 +1,110 @@
+Prompt for Replit – RH Counter Type & Source Selection Logic in Component Add/Edit
+
+Module
+
+Components → Add Component
+Components → Edit Component
+
+Objective
+
+Ensure proper saving and dependency behavior between RH Counter Type and RH Counter Source fields.
+
+1. RH Counter Type – Save Functionality
+
+When a user selects a RH Counter Type in Add Component or Edit Component mode:
+
+The selected RH Counter Type must be saved correctly in the database.
+
+When the component is reopened in Edit mode, the previously saved value must load correctly.
+
+Example values may include:
+
+MASTER
+
+Inherited
+
+(Other types if defined)
+
+2. Conditional Logic – When RH Counter Type = Inherited
+
+If the user selects:
+
+RH Counter Type = Inherited
+
+Then the system must enable the RH Counter Source field.
+
+3. RH Counter Source Selection
+
+When RH Counter Type = Inherited:
+
+The RH Counter Source field must show a searchable selection dropdown.
+
+The dropdown should list only components where:
+
+RH Counter Type = MASTER
+
+Each record in the list must display:
+
+Component Code
+
+Component Name
+
+Example display:
+
+Component Code    Component Name
+--------------------------------
+1234567           Main Engine
+1234568           Aux Engine
+1234569           Generator
+4. Save Behavior
+
+When a user selects a component in RH Counter Source:
+
+The selected component reference must be saved correctly.
+
+The relationship between the Inherited component and the MASTER component must persist in the database.
+
+When reopening the component:
+
+The RH Counter Type must display correctly.
+
+The selected RH Counter Source must also appear correctly.
+
+5. Validation Rules
+
+If:
+
+RH Counter Type = Inherited
+
+Then:
+
+RH Counter Source selection is mandatory.
+
+If the user tries to save without selecting a source:
+
+Show validation error:
+
+Please select a RH Counter Source from MASTER components.
+6. Backend Requirements
+
+Ensure backend validation confirms:
+
+If rh_counter_type = Inherited
+
+Then rh_counter_source must reference a component where rh_counter_type = MASTER.
+
+Reject invalid data.
+
+Expected Final Behavior
+RH Counter Type	RH Counter Source Behavior
+MASTER	Source field hidden / disabled
+Inherited	Searchable dropdown showing MASTER components
+Inherited + Source selected	Saved successfully
+Inherited + No source	Validation error
+Important
+
+Dropdown must be searchable for easier selection.
+
+Ensure fast loading even with large component lists.
+
+Maintain referential integrity between components.
