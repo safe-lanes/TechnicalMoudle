@@ -157,6 +157,12 @@ export async function checkAndRevertPostponedWorkOrders(vesselId?: string) {
   return storage.checkAndRevertPostponedWorkOrders(vesselId);
 }
 
+// ── Audit Log ──
+
+export async function createAuditLog(data: any) {
+  return storage.createAuditLog(data);
+}
+
 // ── Storage reference (for WO numbering utilities) ──
 
 export function getStorage() {

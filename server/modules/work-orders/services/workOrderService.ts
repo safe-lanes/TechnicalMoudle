@@ -455,6 +455,74 @@ export async function updateWorkOrder(id: string, body: any) {
     }
   });
 
+  // VALIDATION: Numeric field precision
+  const validateNumericField = (
+    value: any,
+    fieldName: string,
+    opts: { maxDecimals?: number; maxValue?: number; integerOnly?: boolean } = {}
+  ) => {
+    if (value == null || value === '') return;
+    const str = String(value).trim();
+    if (str === '') return;
+    const num = Number(str);
+    if (isNaN(num)) {
+      throw new ValidationError(`${fieldName} must be a valid number`, { field: fieldName, value: str });
+    }
+    if (opts.integerOnly && !Number.isInteger(num)) {
+      throw new ValidationError(`${fieldName} must be a whole number (integer)`, { field: fieldName, value: str });
+    }
+    if (opts.integerOnly && num < 1) {
+      throw new ValidationError(`${fieldName} must be a positive integer`, { field: fieldName, value: str });
+    }
+    if (opts.maxDecimals != null) {
+      const parts = str.split('.');
+      if (parts.length === 2 && parts[1].length > opts.maxDecimals) {
+        throw new ValidationError(`${fieldName} must have at most ${opts.maxDecimals} decimal places`, { field: fieldName, value: str });
+      }
+    }
+    if (opts.maxValue != null && num > opts.maxValue) {
+      throw new ValidationError(`${fieldName} must not exceed ${opts.maxValue}`, { field: fieldName, value: str });
+    }
+  };
+
+  if (updateData.totalTimeHours !== undefined) {
+    validateNumericField(updateData.totalTimeHours, 'Total Time (Hours)', { maxDecimals: 2, maxValue: 720 });
+  }
+  if (updateData.manhours !== undefined) {
+    validateNumericField(updateData.manhours, 'Manhours', { maxDecimals: 2 });
+  }
+  if (updateData.previousReading !== undefined) {
+    validateNumericField(updateData.previousReading, 'Previous Reading', { maxDecimals: 2 });
+  }
+  if (updateData.runningHours !== undefined) {
+    validateNumericField(updateData.runningHours, 'Running Hours', { maxDecimals: 2 });
+  }
+  if (updateData.runningHoursDifference !== undefined) {
+    validateNumericField(updateData.runningHoursDifference, 'Running Hours Difference', { maxDecimals: 2 });
+  }
+  if (updateData.currentReading !== undefined) {
+    validateNumericField(updateData.currentReading, 'Current Reading', { maxDecimals: 2 });
+  }
+  if (updateData.noOfPersons !== undefined) {
+    validateNumericField(updateData.noOfPersons, 'Number of Persons', { integerOnly: true });
+  }
+
+  const TEXT_LIMITS: Record<string, { field: string; max: number }> = {
+    workCarriedOut: { field: 'Work Carried Out', max: 2000 },
+    jobExperienceNotes: { field: 'Job Experience / Notes', max: 2000 },
+    remarks: { field: 'Remarks', max: 500 },
+    completionRemarks: { field: 'Completion Remarks', max: 500 },
+    rejectionComments: { field: 'Rejection Comments', max: 500 },
+  };
+  for (const [key, config] of Object.entries(TEXT_LIMITS)) {
+    if (updateData[key] && typeof updateData[key] === 'string' && updateData[key].length > config.max) {
+      throw new ValidationError(
+        `${config.field} exceeds maximum length`,
+        { message: `${config.field} must be ${config.max} characters or fewer (currently ${updateData[key].length} characters).` }
+      );
+    }
+  }
+
   // AUTO-CORRECT: Fetch correct componentCode from database
   const componentRef = updateData.component || existingWO.component;
   const componentCodeRef = updateData.componentCode || existingWO.componentCode;
@@ -596,6 +664,45 @@ export async function updateWorkOrder(id: string, body: any) {
   }
 
   const workOrder = await repo.update(id, updateData);
+
+  // ── Audit Trail: Log every WO save ──
+  try {
+    const auditActionType = isBeingRejected ? 'reject'
+      : (updateData.approvalAction === 'approved' && updateData.status === 'Completed') ? 'approve'
+      : 'update';
+
+    const changedFields: Record<string, { old: any; new: any }> = {};
+    for (const key of Object.keys(body)) {
+      const oldVal = (existingWO as any)[key];
+      const newVal = body[key];
+      if (oldVal !== newVal && newVal !== undefined) {
+        changedFields[key] = { old: oldVal ?? null, new: newVal };
+      }
+    }
+
+    await repo.createAuditLog({
+      entityType: 'work_order',
+      entityId: existingWO.wouuid || id,
+      actionType: auditActionType,
+      userId: body.userId || body.approver || body.performedBy || 'system',
+      source: 'web_ui',
+      vesselCode: existingWO.vesselId || null,
+      componentCode: existingWO.componentCode || null,
+      fieldName: null,
+      oldValue: null,
+      newValue: null,
+      payload: {
+        workOrderNo: existingWO.workOrderNo,
+        changedFields,
+        status: updateData.status || existingWO.status,
+        ...(auditActionType === 'approve' && { approvedAt: new Date().toISOString() }),
+        ...(auditActionType === 'reject' && { rejectedAt: new Date().toISOString(), rejectionComments: body.rejectionComments || null }),
+      },
+    });
+    console.log(`Audit log created for WO ${existingWO.workOrderNo} (action: ${auditActionType})`);
+  } catch (auditError) {
+    console.error('Failed to create audit log entry:', auditError);
+  }
 
   // When work order is being approved/completed, create maintenance history and update job
   if (updateData.approvalAction === 'approved' && updateData.status === 'Completed') {

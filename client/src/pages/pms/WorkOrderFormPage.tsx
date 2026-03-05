@@ -370,6 +370,8 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
 
   const isReadOnly = embedded; // Read-only in embedded mode for maintenance history viewing
 
+  const isPartBReadOnly = isReadOnly || currentWorkOrderStatus === 'Completed' || currentWorkOrderStatus === 'Pending Approval';
+
   const [templateData, setTemplateData] = useState({
     woTitle: "",
     component: "",
@@ -1406,12 +1408,9 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
   const handleSave = async () => {
     if (embedded) return;
     try {
-      // Skip frequency validation for unplanned work orders
-      // Unplanned WOs are single-execution tasks without frequency requirements
       const isUnplannedWO = workOrderType === 'Unplanned';
 
       if (!isUnplannedWO) {
-        // Validate frequency value before saving using the normalization helper
         const normalizedFrequency = normalizeFrequencyValue(templateData.frequencyValue);
         if (!normalizedFrequency) {
           toast({
@@ -1421,8 +1420,6 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
           });
           return;
         }
-
-        // Validate frequency unit
         if (!templateData.frequencyUnit || templateData.frequencyUnit.trim() === '') {
           toast({
             title: "Validation Error",
@@ -1433,21 +1430,106 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
         }
       }
 
-      // B1 Validation: Warn and block if any B1 field is set to "No"
+      const timeRegex = /^([01]\d|2[0-3]):([0-5]\d)$/;
+      const startDate = executionData.startDateTime ? executionData.startDateTime.split('T')[0] : '';
+      const startTime = executionData.startDateTime ? executionData.startDateTime.split('T')[1]?.substring(0, 5) || '' : '';
+      const completionDate = executionData.completionDateTime ? executionData.completionDateTime.split('T')[0] : (executionData.dateOfCompletion || '');
+      const completionTime = executionData.completionDateTime ? executionData.completionDateTime.split('T')[1]?.substring(0, 5) || '' : '';
+      const workCarriedOutTrimmed = (executionData.workCarriedOut || '').trim();
+      const noOfPersonsStr = (executionData.noOfPersons || '').trim();
+      const totalTimeVal = parseFloat(executionData.totalTimeHours);
+      const currentRHValue = executionData.currentReading || executionData.runningHours;
+      const hasCompletionData = !!(executionData.completionDateTime || executionData.dateOfCompletion);
+      const hasAnyPartBData = !!(startDate || completionDate || executionData.performedBy || noOfPersonsStr || executionData.totalTimeHours || workCarriedOutTrimmed || currentRHValue || executionData.riskAssessment || executionData.safetyChecklists || executionData.operationalForms);
+
+      const hardErrors: string[] = [];
+      const missingFields: string[] = [];
+
+      if (startTime && !timeRegex.test(startTime)) {
+        hardErrors.push("Start Time must be in HH:MM 24-hour format (00:00–23:59).");
+      }
+      if (completionTime && !timeRegex.test(completionTime)) {
+        hardErrors.push("Completion Time must be in HH:MM 24-hour format (00:00–23:59).");
+      }
+
+      const today = new Date();
+      today.setHours(23, 59, 59, 999);
+      if (startDate) {
+        const startDateObj = new Date(startDate);
+        if (startDateObj > today) {
+          hardErrors.push("Start Date cannot be in the future.");
+        }
+        if (workOrderId && !isNewJobCreation) {
+          const woCreatedAt = (workOrderContext as any)?.workOrder?.createdAt;
+          if (woCreatedAt) {
+            const woCreationDate = new Date(woCreatedAt);
+            woCreationDate.setHours(0, 0, 0, 0);
+            const startDateCheck = new Date(startDate);
+            startDateCheck.setHours(0, 0, 0, 0);
+            if (startDateCheck < woCreationDate) {
+              const formattedCreationDate = woCreationDate.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+              hardErrors.push(`Start Date cannot be earlier than the Work Order creation date (${formattedCreationDate}).`);
+            }
+          }
+        }
+      }
+      if (completionDate) {
+        const completionDateObj = new Date(completionDate);
+        if (completionDateObj > today) {
+          hardErrors.push("Completion Date cannot be in the future.");
+        }
+        if (startDate && completionDateObj < new Date(startDate)) {
+          hardErrors.push("Completion Date cannot be before Start Date.");
+        }
+        if (startDate === completionDate && startTime && completionTime && completionTime < startTime) {
+          hardErrors.push("Completion Time cannot be before Start Time on the same day.");
+        }
+      }
+
+      const hodRanks = ["Chief Engineer", "Chief Officer", "Master"];
+      if (executionData.performedBy && hodRanks.includes(executionData.performedBy) && executionData.performedBy === templateData.approver) {
+        hardErrors.push(`The same Head of Department rank (${executionData.performedBy}) cannot both perform and approve the work.`);
+      }
+
+      if (noOfPersonsStr && !/^[1-9]\d*$/.test(noOfPersonsStr)) {
+        hardErrors.push("No. of Persons must be a positive whole number (≥ 1).");
+      }
+      if (noOfPersonsStr && parseInt(noOfPersonsStr, 10) > 50) {
+        hardErrors.push("No. of Persons cannot exceed 50.");
+      }
+
+      if (executionData.totalTimeHours && !isNaN(totalTimeVal)) {
+        if (totalTimeVal <= 0) hardErrors.push("Total Time Taken must be greater than 0.");
+        if (totalTimeVal > 720) hardErrors.push("Total Time Taken cannot exceed 720 hours (30 days).");
+      }
+
+      const manhoursVal = parseFloat(executionData.manhours);
+      if (executionData.manhours && !isNaN(manhoursVal) && manhoursVal <= 0) {
+        hardErrors.push("Manhours must be a positive number.");
+      }
+
+      if (workCarriedOutTrimmed && (workCarriedOutTrimmed.toLowerCase() === 'describe work carried out...' || workCarriedOutTrimmed.toLowerCase() === 'describe work carried out')) {
+        hardErrors.push("Please provide a proper description of work carried out, not the placeholder text.");
+      }
+      if (workCarriedOutTrimmed && workCarriedOutTrimmed.length < 20) {
+        hardErrors.push("Work Carried Out must be at least 20 characters to provide a meaningful description.");
+      }
+
+      if (currentRHValue) {
+        const currentRHNum = parseFloat(currentRHValue);
+        if (isNaN(currentRHNum) || currentRHNum < 0) {
+          hardErrors.push("Current Reading must be a positive number (≥ 0).");
+        }
+      }
+
       const b1Warnings: string[] = [];
       if (executionData.riskAssessment === 'No') b1Warnings.push('Risk Assessment');
       if (executionData.safetyChecklists === 'No') b1Warnings.push('Safety Checklists');
       if (executionData.operationalForms === 'No') b1Warnings.push('Operational Forms');
       if (b1Warnings.length > 0) {
-        toast({
-          title: "Safety Warning",
-          description: `${b1Warnings.join(', ')} ${b1Warnings.length === 1 ? 'is' : 'are'} marked as "No". This is a safety concern — please complete the required assessments or select "NA" if not applicable.`,
-          variant: "destructive",
-        });
-        return;
+        hardErrors.push(`${b1Warnings.join(', ')} ${b1Warnings.length === 1 ? 'is' : 'are'} marked as "No". Please complete the required assessments or select "NA" if not applicable.`);
       }
 
-      // B1 Validation: If "Yes" is selected, at least 1 supporting document must be uploaded
       const b1DocChecks = [
         { field: executionData.riskAssessment, type: 'riskAssessment', label: 'Risk Assessment' },
         { field: executionData.safetyChecklists, type: 'safetyChecklist', label: 'Safety Checklists' },
@@ -1455,259 +1537,189 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
       ];
       for (const check of b1DocChecks) {
         if (check.field === 'Yes' && getDocsByType(check.type).length === 0) {
+          hardErrors.push(`${check.label} is marked as "Yes" but no supporting document has been uploaded.`);
+        }
+      }
+
+      const sparesWithInvalidQty = executionData.consumedSpareParts.filter(spare => {
+        const hasData = spare.partNo || spare.description;
+        if (!hasData) return false;
+        const qty = spare.quantityConsumed;
+        if (!qty || qty.trim() === '') return true;
+        const qtyNum = parseFloat(qty);
+        if (isNaN(qtyNum) || qtyNum < 1 || !Number.isInteger(qtyNum)) return true;
+        return false;
+      });
+      if (sparesWithInvalidQty.length > 0) {
+        const parts = sparesWithInvalidQty.map(s => s.partNo || s.description).join(', ');
+        hardErrors.push(`Qty Used must be a positive whole number (≥ 1) for: ${parts}. Remove the row if no spares were consumed.`);
+      }
+
+      const allSparesWithMissingLocation = executionData.consumedSpareParts.filter(spare => {
+        const qty = parseFloat(spare.quantityConsumed || '0');
+        if (qty <= 0) return false;
+        const hasLocationId = spare.locationId != null && spare.locationId > 0;
+        const hasLocationName = spare.location && typeof spare.location === 'string' && spare.location.trim().length > 0;
+        return !hasLocationId && !hasLocationName;
+      });
+      if (allSparesWithMissingLocation.length > 0) {
+        const parts = allSparesWithMissingLocation.map(s => s.partNo || s.description).join(', ');
+        hardErrors.push(`Please select a location for: ${parts}. A location is required when consuming spare parts.`);
+      }
+
+      const hasConsumedSpares = executionData.consumedSpareParts.some(
+        spare => spare.partNo && spare.quantityConsumed && parseFloat(spare.quantityConsumed) > 0
+      );
+      if (hasConsumedSpares && vesselId) {
+        if (!isSparesInventoryFetched) {
+          hardErrors.push("Please wait for inventory data to load before submitting.");
+        }
+        if (isSparesInventoryError) {
+          hardErrors.push("Failed to load inventory data. Stock validation cannot be performed.");
+        }
+      }
+
+      if (hasConsumedSpares && isSparesInventoryFetched && !isSparesInventoryError) {
+        const sparesWithMissingLocation = executionData.consumedSpareParts.filter(spare => {
+          const hasQuantity = spare.quantityConsumed && parseFloat(spare.quantityConsumed) > 0;
+          if (!hasQuantity) return false;
+          const lookupKey = spare.partCode || spare.partNo;
+          const isInInventory = lookupKey && sparesWithInventory.some(s => s.spare.partCode === lookupKey);
+          if (!isInInventory) return false;
+          const hasLocationId = spare.locationId != null && spare.locationId > 0;
+          const hasLocationName = spare.location && typeof spare.location === 'string' && spare.location.trim().length > 0;
+          return !hasLocationId && !hasLocationName;
+        });
+        if (sparesWithMissingLocation.length > 0) {
+          const missingParts = sparesWithMissingLocation.map(s => s.partNo || s.description).join(', ');
+          hardErrors.push(`Please select a location for: ${missingParts}. Location selection is required for inventory tracking.`);
+        }
+
+        const sparesWithInsufficientStock = executionData.consumedSpareParts.filter(spare => {
+          const qty = parseFloat(spare.quantityConsumed);
+          if (!qty || qty <= 0 || !spare.location) return false;
+          const lookupKey = spare.partCode || spare.partNo;
+          if (!lookupKey) return false;
+          const spareInInventory = sparesInventory.find(s => s.partCode === lookupKey);
+          if (!spareInInventory) return false;
+          const stockAtLocation = getRobByLocationName(lookupKey, spare.location);
+          return qty > stockAtLocation;
+        });
+        if (sparesWithInsufficientStock.length > 0) {
+          const insufficientParts = sparesWithInsufficientStock.map(s => {
+            const lookupKey = s.partCode || s.partNo;
+            const stockAtLoc = getRobByLocationName(lookupKey, s.location);
+            return `${s.partNo || s.partCode} (need ${s.quantityConsumed}, have ${stockAtLoc} at ${s.location})`;
+          }).join(', ');
+          hardErrors.push(`Consumption cannot exceed available ROB: ${insufficientParts}`);
+        }
+
+        const sparesNeedingComments = executionData.consumedSpareParts.filter(spare => {
+          const qty = parseFloat(spare.quantityConsumed || '0');
+          if (qty <= 0 || !spare.location) return false;
+          if (spare.comments && spare.comments.trim().length > 0) return false;
+          const lookupKey = spare.partCode || spare.partNo;
+          if (!lookupKey) return false;
+          const rob = getRobByLocationName(lookupKey, spare.location);
+          if (rob <= 0) return qty > 0;
+          return qty > (rob * 0.5);
+        });
+        if (sparesNeedingComments.length > 0) {
+          const parts = sparesNeedingComments.map(s => s.partNo || s.description).join(', ');
+          hardErrors.push(`High consumption detected for: ${parts}. Please add a comment explaining the usage when consuming more than 50% of available stock.`);
+        }
+      }
+
+      if (hardErrors.length > 0) {
+        toast({
+          title: "Validation Error",
+          description: hardErrors[0],
+          variant: "destructive",
+        });
+        return;
+      }
+
+      if (!startDate) missingFields.push("Start Date");
+      if (!startTime) missingFields.push("Start Time");
+      if (!completionDate) missingFields.push("Completion Date");
+      if (!completionTime) missingFields.push("Completion Time");
+      if (!executionData.performedBy || executionData.performedBy.trim() === '') missingFields.push("Performed By");
+      if (!noOfPersonsStr) missingFields.push("No. of Persons");
+      if (!executionData.totalTimeHours || isNaN(totalTimeVal)) missingFields.push("Total Time Taken");
+      if (!workCarriedOutTrimmed) missingFields.push("Work Carried Out");
+      if ((workOrderContext as any)?.maintenanceBasis === 'Running Hours' && !currentRHValue) {
+        missingFields.push("Current Reading");
+      }
+
+      const isReadyForSubmission = missingFields.length === 0;
+      const isDraftSave = hasAnyPartBData && !isReadyForSubmission;
+
+      if (isDraftSave && !hasCompletionData) {
+        const saveExecutionData = {
+          ...executionData,
+          runningHours: currentRHValue || executionData.runningHours,
+          riskAssessmentStatus: executionData.riskAssessment,
+          safetyChecklistsStatus: executionData.safetyChecklists,
+          operationalFormsStatus: executionData.operationalForms,
+        };
+
+        const response = await fetch(`/technical/api/work-orders/${workOrderId}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            ...templateData,
+            ...saveExecutionData,
+          })
+        });
+
+        const result = await response.json();
+        if (!response.ok) {
+          throw new Error(result.error || 'Failed to save work order');
+        }
+
+        await queryClient.invalidateQueries({ queryKey: ['/technical/api/work-orders'] });
+        await queryClient.invalidateQueries({ queryKey: [`/technical/api/work-orders/${workOrderId}/context`] });
+
+        toast({
+          title: "Draft Saved",
+          description: `Work order saved as draft. Complete these fields before submitting for approval: ${missingFields.join(', ')}.`,
+        });
+        return;
+      }
+
+      if (!isReadyForSubmission) {
+        toast({
+          title: "Validation Error",
+          description: `The following fields are required: ${missingFields.join(', ')}.`,
+          variant: "destructive",
+        });
+        return;
+      }
+
+      if (currentRHValue && executionData.previousReading) {
+        const currentRH = parseFloat(currentRHValue);
+        const previousRH = parseFloat(executionData.previousReading);
+
+        if (!isNaN(currentRH) && !isNaN(previousRH) && currentRH < previousRH) {
           toast({
             title: "Validation Error",
-            description: `${check.label} is marked as "Yes" but no supporting document has been uploaded. Please upload at least one document.`,
+            description: `Current Reading (${currentRH}) cannot be less than Previous Reading (${previousRH}). Running hours can only increase.`,
             variant: "destructive",
           });
           return;
         }
-      }
 
-      // Validate mandatory fields for work order form (Work Completion Record)
-      const timeRegex = /^([01]\d|2[0-3]):([0-5]\d)$/;
-
-      // Start Date is required
-      const startDate = executionData.startDateTime ? executionData.startDateTime.split('T')[0] : '';
-      if (!startDate) {
-        toast({
-          title: "Validation Error",
-          description: "Start Date is required.",
-          variant: "destructive",
-        });
-        return;
-      }
-
-      // Start Time is required and must be valid HH:MM
-      const startTime = executionData.startDateTime ? executionData.startDateTime.split('T')[1]?.substring(0, 5) || '' : '';
-      if (!startTime) {
-        toast({
-          title: "Validation Error",
-          description: "Start Time is required.",
-          variant: "destructive",
-        });
-        return;
-      }
-      if (!timeRegex.test(startTime)) {
-        toast({
-          title: "Validation Error",
-          description: "Start Time must be in HH:MM 24-hour format (00:00–23:59).",
-          variant: "destructive",
-        });
-        return;
-      }
-
-      // Completion Date is required
-      const completionDate = executionData.completionDateTime ? executionData.completionDateTime.split('T')[0] : (executionData.dateOfCompletion || '');
-      if (!completionDate) {
-        toast({
-          title: "Validation Error",
-          description: "Completion Date is required.",
-          variant: "destructive",
-        });
-        return;
-      }
-
-      // Completion Time is required and must be valid HH:MM
-      const completionTime = executionData.completionDateTime ? executionData.completionDateTime.split('T')[1]?.substring(0, 5) || '' : '';
-      if (!completionTime) {
-        toast({
-          title: "Validation Error",
-          description: "Completion Time is required.",
-          variant: "destructive",
-        });
-        return;
-      }
-      if (!timeRegex.test(completionTime)) {
-        toast({
-          title: "Validation Error",
-          description: "Completion Time must be in HH:MM 24-hour format (00:00–23:59).",
-          variant: "destructive",
-        });
-        return;
-      }
-
-      // Performed by is required
-      if (!executionData.performedBy || executionData.performedBy.trim() === '') {
-        toast({
-          title: "Validation Error",
-          description: "Performed by is required.",
-          variant: "destructive",
-        });
-        return;
-      }
-
-      // Rule 3: Approver ≠ Performer for Head of Department ranks
-      const hodRanks = ["Chief Engineer", "Chief Officer", "Master"];
-      if (hodRanks.includes(executionData.performedBy) && executionData.performedBy === templateData.approver) {
-        toast({
-          title: "Validation Error",
-          description: `The same Head of Department rank (${executionData.performedBy}) cannot both perform and approve the work. Please select a different Performed By or Approver rank.`,
-          variant: "destructive",
-        });
-        return;
-      }
-
-      // No. of Persons is required, must be integer >= 1 and <= 50
-      const noOfPersonsStr = (executionData.noOfPersons || '').trim();
-      if (!noOfPersonsStr) {
-        toast({
-          title: "Validation Error",
-          description: "No. of Persons in Team is required.",
-          variant: "destructive",
-        });
-        return;
-      }
-      if (!/^[1-9]\d*$/.test(noOfPersonsStr)) {
-        toast({
-          title: "Validation Error",
-          description: "No. of Persons must be a positive whole number (≥ 1).",
-          variant: "destructive",
-        });
-        return;
-      }
-      const noOfPersonsVal = parseInt(noOfPersonsStr, 10);
-      if (noOfPersonsVal > 50) {
-        toast({
-          title: "Validation Error",
-          description: "No. of Persons cannot exceed 50.",
-          variant: "destructive",
-        });
-        return;
-      }
-
-      // Total Time Taken is required, must be > 0 and <= 720
-      const totalTimeVal = parseFloat(executionData.totalTimeHours);
-      if (!executionData.totalTimeHours || isNaN(totalTimeVal)) {
-        toast({
-          title: "Validation Error",
-          description: "Total Time Taken (Hours) is required.",
-          variant: "destructive",
-        });
-        return;
-      }
-      if (totalTimeVal <= 0) {
-        toast({
-          title: "Validation Error",
-          description: "Total Time Taken must be greater than 0.",
-          variant: "destructive",
-        });
-        return;
-      }
-      if (totalTimeVal > 720) {
-        toast({
-          title: "Validation Error",
-          description: "Total Time Taken cannot exceed 720 hours (30 days).",
-          variant: "destructive",
-        });
-        return;
-      }
-
-      // Manhours validation (auto-calculated, but safety check)
-      const manhoursVal = parseFloat(executionData.manhours);
-      if (executionData.manhours && !isNaN(manhoursVal) && manhoursVal <= 0) {
-        toast({
-          title: "Validation Error",
-          description: "Manhours must be a positive number.",
-          variant: "destructive",
-        });
-        return;
-      }
-
-      // Work Carried Out is required, min 20 characters, no placeholder text
-      const workCarriedOutTrimmed = (executionData.workCarriedOut || '').trim();
-      if (!workCarriedOutTrimmed) {
-        toast({
-          title: "Validation Error",
-          description: "Work Carried Out is required.",
-          variant: "destructive",
-        });
-        return;
-      }
-      if (workCarriedOutTrimmed.toLowerCase() === 'describe work carried out...' || workCarriedOutTrimmed.toLowerCase() === 'describe work carried out') {
-        toast({
-          title: "Validation Error",
-          description: "Please provide a proper description of work carried out, not the placeholder text.",
-          variant: "destructive",
-        });
-        return;
-      }
-      if (workCarriedOutTrimmed.length < 20) {
-        toast({
-          title: "Validation Error",
-          description: "Work Carried Out must be at least 20 characters to provide a meaningful description.",
-          variant: "destructive",
-        });
-        return;
-      }
-
-      // Validate dates are not in the future (cannot be more than today's date)
-      const today = new Date();
-      today.setHours(23, 59, 59, 999); // End of today
-
-      const startDateObj = new Date(startDate);
-      if (startDateObj > today) {
-        toast({
-          title: "Validation Error",
-          description: "Start Date cannot be in the future.",
-          variant: "destructive",
-        });
-        return;
-      }
-
-      const completionDateObj = new Date(completionDate);
-      if (completionDateObj > today) {
-        toast({
-          title: "Validation Error",
-          description: "Completion Date cannot be in the future.",
-          variant: "destructive",
-        });
-        return;
-      }
-
-      // Completion Date must be >= Start Date
-      if (completionDateObj < startDateObj) {
-        toast({
-          title: "Validation Error",
-          description: "Completion Date cannot be before Start Date.",
-          variant: "destructive",
-        });
-        return;
-      }
-
-      // If same day, Completion Time must be >= Start Time
-      if (startDate === completionDate && startTime && completionTime) {
-        if (completionTime < startTime) {
+        if (!isNaN(currentRH) && !isNaN(previousRH) && (currentRH - previousRH) > 2000 && !currentReadingWarningAcknowledged) {
           toast({
-            title: "Validation Error",
-            description: "Completion Time cannot be before Start Time on the same day.",
+            title: "Warning — Large Reading Jump",
+            description: `Current Reading (${currentRH}) exceeds Previous Reading (${previousRH}) by ${(currentRH - previousRH).toFixed(2)} hrs. Please verify this value is correct and save again to confirm.`,
             variant: "destructive",
           });
+          setCurrentReadingWarningAcknowledged(true);
           return;
         }
       }
 
-      // Rule 2: Start Date must not be earlier than Work Order creation date
-      if (workOrderId && !isNewJobCreation) {
-        const woCreatedAt = (workOrderContext as any)?.workOrder?.createdAt;
-        if (woCreatedAt) {
-          const woCreationDate = new Date(woCreatedAt);
-          woCreationDate.setHours(0, 0, 0, 0);
-          const startDateCheck = new Date(startDate);
-          startDateCheck.setHours(0, 0, 0, 0);
-          if (startDateCheck < woCreationDate) {
-            const formattedCreationDate = woCreationDate.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
-            toast({
-              title: "Validation Error",
-              description: `Start Date cannot be earlier than the Work Order creation date (${formattedCreationDate}).`,
-              variant: "destructive",
-            });
-            return;
-          }
-        }
-      }
-
-      // Rule 1: Completion Date vs Next Due Date — soft overdue warning (non-blocking)
       if (templateData.nextDueDate && completionDate) {
         try {
           const normalizedNextDue = normalizeDateToDDMMMYYYY(templateData.nextDueDate);
@@ -1728,211 +1740,8 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
         }
       }
 
-      // If Maintenance basis is Running Hours, Current RH (currentReading) is also required
-      const currentRHValue = executionData.currentReading || executionData.runningHours;
-      if ((workOrderContext as any)?.maintenanceBasis === 'Running Hours' && !currentRHValue) {
-        toast({
-          title: "Validation Error",
-          description: "Current Reading is required for Running Hours based maintenance.",
-          variant: "destructive",
-        });
-        return;
-      }
-
-      // Current Reading must be a positive number ≥ 0
-      if (currentRHValue) {
-        const currentRHNum = parseFloat(currentRHValue);
-        if (isNaN(currentRHNum) || currentRHNum < 0) {
-          toast({
-            title: "Validation Error",
-            description: "Current Reading must be a positive number (≥ 0).",
-            variant: "destructive",
-          });
-          return;
-        }
-      }
-
-      // B4 Validation: Qty Used must be a positive integer ≥ 1 if spare part row has data
-      const sparesWithInvalidQty = executionData.consumedSpareParts.filter(spare => {
-        const hasData = spare.partNo || spare.description;
-        if (!hasData) return false;
-        const qty = spare.quantityConsumed;
-        if (!qty || qty.trim() === '') return true;
-        const qtyNum = parseFloat(qty);
-        if (isNaN(qtyNum) || qtyNum < 1 || !Number.isInteger(qtyNum)) return true;
-        return false;
-      });
-      if (sparesWithInvalidQty.length > 0) {
-        const parts = sparesWithInvalidQty.map(s => s.partNo || s.description).join(', ');
-        toast({
-          title: "Validation Error",
-          description: `Qty Used must be a positive whole number (≥ 1) for: ${parts}. Remove the row if no spares were consumed.`,
-          variant: "destructive",
-        });
-        return;
-      }
-
-      // B4 Validation: Location mandatory for ALL spares with qty > 0
-      const allSparesWithMissingLocation = executionData.consumedSpareParts.filter(spare => {
-        const qty = parseFloat(spare.quantityConsumed || '0');
-        if (qty <= 0) return false;
-        const hasLocationId = spare.locationId != null && spare.locationId > 0;
-        const hasLocationName = spare.location && typeof spare.location === 'string' && spare.location.trim().length > 0;
-        return !hasLocationId && !hasLocationName;
-      });
-      if (allSparesWithMissingLocation.length > 0) {
-        const parts = allSparesWithMissingLocation.map(s => s.partNo || s.description).join(', ');
-        toast({
-          title: "Location Required",
-          description: `Please select a location for: ${parts}. A location is required when consuming spare parts.`,
-          variant: "destructive",
-        });
-        return;
-      }
-
-      // PHASE 3A: Block submission if inventory data not loaded or failed and spares are being consumed
-      const hasConsumedSpares = executionData.consumedSpareParts.some(
-        spare => spare.partNo && spare.quantityConsumed && parseFloat(spare.quantityConsumed) > 0
-      );
-      if (hasConsumedSpares && vesselId) {
-        if (!isSparesInventoryFetched) {
-          toast({
-            title: "Loading Inventory Data",
-            description: "Please wait for inventory data to load before submitting.",
-            variant: "destructive",
-          });
-          return;
-        }
-        if (isSparesInventoryError) {
-          toast({
-            title: "Inventory Data Error",
-            description: "Failed to load inventory data. Stock validation cannot be performed. Please try again.",
-            variant: "destructive",
-          });
-          return;
-        }
-      }
-
-      // PHASE 3A: Validate spare parts consumed - location must be selected for inventory-tracked items
-      // Use partCode for inventory matching (not partNo - they are separate fields)
-      const sparesWithMissingLocation = executionData.consumedSpareParts.filter(spare => {
-        const hasQuantity = spare.quantityConsumed && parseFloat(spare.quantityConsumed) > 0;
-        if (!hasQuantity) return false;
-
-        // Check if this spare exists in inventory using partCode (primary) or partNo (fallback)
-        const lookupKey = spare.partCode || spare.partNo;
-        const isInInventory = lookupKey && sparesWithInventory.some(s => s.spare.partCode === lookupKey);
-        if (!isInInventory) return false; // Skip validation for manual entries not in inventory
-
-        // Check for either locationId (numeric) OR location name (string) - both are valid
-        const hasLocationId = spare.locationId != null && spare.locationId > 0;
-        const hasLocationName = spare.location && typeof spare.location === 'string' && spare.location.trim().length > 0;
-        return !hasLocationId && !hasLocationName;
-      });
-
-      if (sparesWithMissingLocation.length > 0) {
-        const missingParts = sparesWithMissingLocation.map(s => s.partNo || s.description).join(', ');
-        toast({
-          title: "Location Required",
-          description: `Please select a location for: ${missingParts}. Location selection is required for inventory tracking.`,
-          variant: "destructive",
-        });
-        return;
-      }
-
-      // PHASE 3A: Validate stock availability at selected locations
-      // Use location names from Spares table (location -> robLocationA, location2 -> robLocationB)
-      const sparesWithInsufficientStock = executionData.consumedSpareParts.filter(spare => {
-        const qty = parseFloat(spare.quantityConsumed);
-        if (!qty || qty <= 0 || !spare.location) return false;
-
-        // Use partCode for inventory lookup (primary) or partNo (fallback for legacy data)
-        const lookupKey = spare.partCode || spare.partNo;
-        if (!lookupKey) return false;
-
-        // Check if spare exists in inventory
-        const spareInInventory = sparesInventory.find(s => s.partCode === lookupKey);
-        if (!spareInInventory) return false;
-
-        // Get ROB at the selected location using location name mapping
-        const stockAtLocation = getRobByLocationName(lookupKey, spare.location);
-        return qty > stockAtLocation;
-      });
-
-      if (sparesWithInsufficientStock.length > 0) {
-        const insufficientParts = sparesWithInsufficientStock.map(s => {
-          const lookupKey = s.partCode || s.partNo;
-          const stockAtLoc = getRobByLocationName(lookupKey, s.location);
-          return `${s.partNo || s.partCode} (need ${s.quantityConsumed}, have ${stockAtLoc} at ${s.location})`;
-        }).join(', ');
-        toast({
-          title: "Insufficient Stock",
-          description: `Consumption cannot exceed available ROB: ${insufficientParts}`,
-          variant: "destructive",
-        });
-        return;
-      }
-
-      // B4 Validation: Comments required if qty exceeds 50% of ROB (high consumption)
-      // Placed after inventory load check so ROB data is reliable
-      if (isSparesInventoryFetched && !isSparesInventoryError) {
-        const sparesNeedingComments = executionData.consumedSpareParts.filter(spare => {
-          const qty = parseFloat(spare.quantityConsumed || '0');
-          if (qty <= 0 || !spare.location) return false;
-          if (spare.comments && spare.comments.trim().length > 0) return false;
-          const lookupKey = spare.partCode || spare.partNo;
-          if (!lookupKey) return false;
-          const rob = getRobByLocationName(lookupKey, spare.location);
-          if (rob <= 0) return qty > 0;
-          return qty > (rob * 0.5);
-        });
-        if (sparesNeedingComments.length > 0) {
-          const parts = sparesNeedingComments.map(s => s.partNo || s.description).join(', ');
-          toast({
-            title: "Comments Required",
-            description: `High consumption detected for: ${parts}. Please add a comment explaining the usage when consuming more than 50% of available stock.`,
-            variant: "destructive",
-          });
-          return;
-        }
-      }
-
-      // Check if Part B has completion data (indicates work is done and needs approval)
-      const hasCompletionData = !!(executionData.completionDateTime || executionData.dateOfCompletion);
-
-      // Validate running hours if completion data is present
-      // Note: The form uses "currentReading" field for running hours input (B3 section)
-      // We check both executionData.runningHours and executionData.currentReading for backwards compatibility
-      const runningHoursValue = executionData.currentReading || executionData.runningHours;
-
-      // Validate that currentReading is not less than previousReading (running hours can only increase)
-      if (runningHoursValue && executionData.previousReading) {
-        const currentRH = parseFloat(runningHoursValue);
-        const previousRH = parseFloat(executionData.previousReading);
-
-        if (!isNaN(currentRH) && !isNaN(previousRH) && currentRH < previousRH) {
-          toast({
-            title: "Validation Error",
-            description: `Current Reading (${currentRH}) cannot be less than Previous Reading (${previousRH}). Running hours can only increase.`,
-            variant: "destructive",
-          });
-          return;
-        }
-
-        // Soft warning: large jump (> 2000 hrs above previous) may indicate a typo
-        if (!isNaN(currentRH) && !isNaN(previousRH) && (currentRH - previousRH) > 2000 && !currentReadingWarningAcknowledged) {
-          toast({
-            title: "Warning — Large Reading Jump",
-            description: `Current Reading (${currentRH}) exceeds Previous Reading (${previousRH}) by ${(currentRH - previousRH).toFixed(2)} hrs. Please verify this value is correct and save again to confirm.`,
-            variant: "destructive",
-          });
-          setCurrentReadingWarningAcknowledged(true);
-          return;
-        }
-      }
-
       if (hasCompletionData) {
-        if ((workOrderContext as any)?.maintenanceBasis === 'Running Hours' && !runningHoursValue) {
+        if ((workOrderContext as any)?.maintenanceBasis === 'Running Hours' && !currentRHValue) {
           toast({
             title: "Validation Error",
             description: "Running hours is required for RH-based maintenance when submitting for approval",
@@ -1941,9 +1750,9 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
           return;
         }
 
-        if (runningHoursValue && workOrderContext && (workOrderContext as any).component) {
+        if (currentRHValue && workOrderContext && (workOrderContext as any).component) {
           const { component, rhMasterComponent } = workOrderContext as any;
-          const newRunningHours = parseInt(runningHoursValue);
+          const newRunningHours = parseInt(currentRHValue);
 
           if (isNaN(newRunningHours)) {
             toast({
@@ -1954,8 +1763,6 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
             return;
           }
 
-          // For INHERITED components, validate RH against master component
-          // Inherited components can NEVER have RH greater than their master component
           const counterType = (component.rhCounterType || '').toUpperCase();
           if (counterType === 'INHERITED' && rhMasterComponent) {
             const masterRH = parseFloat(rhMasterComponent.currentCumulativeRH);
@@ -1979,9 +1786,9 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
           }
 
           if (executionData.dateOfCompletion && component.lastUpdated) {
-            const completionDate = new Date(executionData.dateOfCompletion);
+            const completionDateCheck = new Date(executionData.dateOfCompletion);
             const lastUpdate = new Date(component.lastUpdated);
-            const daysDiff = Math.max(1, (completionDate.getTime() - lastUpdate.getTime()) / (1000 * 60 * 60 * 24));
+            const daysDiff = Math.max(1, (completionDateCheck.getTime() - lastUpdate.getTime()) / (1000 * 60 * 60 * 24));
             const hoursDelta = newRunningHours - component.currentCumulativeRH;
             const maxAllowed = daysDiff * 25;
 
@@ -1997,12 +1804,6 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
         }
       }
 
-      // FIXED: When saving Part B with completion data, set status to "Pending Approval"
-      // The work order should NOT go directly to "Completed" - it requires approval first
-      // Only the approver can change status to "Completed" via the Approve action
-      let response;
-
-      // Rule 4: Frequency Integrity — auto-recalculate next due date for Calendar-basis jobs
       let recalculatedNextDueDate = templateData.nextDueDate;
       const maintenanceBasis = templateData.maintenanceBasis || (workOrderContext as any)?.maintenanceBasis;
       if (hasCompletionData && maintenanceBasis !== 'Running Hours' && templateData.frequencyValue && templateData.frequencyUnit) {
@@ -2021,17 +1822,15 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
         }
       }
 
-      // Ensure runningHours is set from currentReading for backend compatibility
       const saveExecutionData = {
         ...executionData,
-        // Sync runningHours with currentReading for backend storage
-        runningHours: runningHoursValue || executionData.runningHours,
+        runningHours: currentRHValue || executionData.runningHours,
         riskAssessmentStatus: executionData.riskAssessment,
         safetyChecklistsStatus: executionData.safetyChecklists,
         operationalFormsStatus: executionData.operationalForms,
       };
 
-      response = await fetch(`/technical/api/work-orders/${workOrderId}`, {
+      const response = await fetch(`/technical/api/work-orders/${workOrderId}`, {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json'
@@ -3199,6 +2998,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                         value="Yes" 
                         checked={executionData.riskAssessment === "Yes"}
                         onChange={(e) => handleExecutionChange('riskAssessment', e.target.value)}
+                        disabled={isPartBReadOnly}
                         className="text-blue-600" 
                         data-testid="WOF.B1.5"
                       />
@@ -3211,6 +3011,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                         value="No" 
                         checked={executionData.riskAssessment === "No"}
                         onChange={(e) => handleExecutionChange('riskAssessment', e.target.value)}
+                        disabled={isPartBReadOnly}
                         className="text-blue-600" 
                         data-testid="WOF.B1.6"
                       />
@@ -3223,6 +3024,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                         value="NA" 
                         checked={executionData.riskAssessment === "NA"}
                         onChange={(e) => handleExecutionChange('riskAssessment', e.target.value)}
+                        disabled={isPartBReadOnly}
                         className="text-blue-600" 
                         data-testid="WOF.B1.7"
                       />
@@ -3230,7 +3032,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                     </label>
                   </div>
                   <div className="flex items-center gap-2">
-                    {!isReadOnly && getDocsByType('riskAssessment').length < 5 && (
+                    {!isReadOnly && !isPartBReadOnly && getDocsByType('riskAssessment').length < 5 && (
                       <Button
                         variant="outline"
                         size="sm"
@@ -3262,7 +3064,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                             <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => handleViewDocument('riskAssessment', doc.id)} data-testid={`button-view-risk-${doc.id}`}>
                               <Eye className="h-4 w-4 text-blue-600" />
                             </Button>
-                            {!isReadOnly && (
+                            {!isReadOnly && !isPartBReadOnly && (
                               <Button variant="ghost" size="icon" className="h-6 w-6 text-red-500 hover:text-red-700" onClick={() => handleDeleteDocumentClick('riskAssessment', doc.id)} data-testid={`button-delete-risk-${doc.id}`}>
                                 <Trash2 className="h-4 w-4 text-red-500" />
                               </Button>
@@ -3287,6 +3089,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                         value="Yes" 
                         checked={executionData.safetyChecklists === "Yes"}
                         onChange={(e) => handleExecutionChange('safetyChecklists', e.target.value)}
+                        disabled={isPartBReadOnly}
                         className="text-blue-600" 
                         data-testid="WOF.B1.12"
                       />
@@ -3299,6 +3102,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                         value="No" 
                         checked={executionData.safetyChecklists === "No"}
                         onChange={(e) => handleExecutionChange('safetyChecklists', e.target.value)}
+                        disabled={isPartBReadOnly}
                         className="text-blue-600" 
                         data-testid="WOF.B1.13"
                       />
@@ -3311,6 +3115,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                         value="NA" 
                         checked={executionData.safetyChecklists === "NA"}
                         onChange={(e) => handleExecutionChange('safetyChecklists', e.target.value)}
+                        disabled={isPartBReadOnly}
                         className="text-blue-600" 
                         data-testid="WOF.B1.14"
                       />
@@ -3318,7 +3123,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                     </label>
                   </div>
                   <div className="flex items-center gap-2">
-                    {!isReadOnly && getDocsByType('safetyChecklist').length < 5 && (
+                    {!isReadOnly && !isPartBReadOnly && getDocsByType('safetyChecklist').length < 5 && (
                       <Button
                         variant="outline"
                         size="sm"
@@ -3350,7 +3155,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                             <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => handleViewDocument('safetyChecklist', doc.id)} data-testid={`button-view-safety-${doc.id}`}>
                               <Eye className="h-4 w-4 text-blue-600" />
                             </Button>
-                            {!isReadOnly && (
+                            {!isReadOnly && !isPartBReadOnly && (
                               <Button variant="ghost" size="icon" className="h-6 w-6 text-red-500 hover:text-red-700" onClick={() => handleDeleteDocumentClick('safetyChecklist', doc.id)} data-testid={`button-delete-safety-${doc.id}`}>
                                 <Trash2 className="h-4 w-4 text-red-500" />
                               </Button>
@@ -3375,6 +3180,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                         value="Yes" 
                         checked={executionData.operationalForms === "Yes"}
                         onChange={(e) => handleExecutionChange('operationalForms', e.target.value)}
+                        disabled={isPartBReadOnly}
                         className="text-blue-600" 
                         data-testid="WOF.B1.19"
                       />
@@ -3387,6 +3193,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                         value="No" 
                         checked={executionData.operationalForms === "No"}
                         onChange={(e) => handleExecutionChange('operationalForms', e.target.value)}
+                        disabled={isPartBReadOnly}
                         className="text-blue-600" 
                         data-testid="WOF.B1.20"
                       />
@@ -3399,6 +3206,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                         value="NA" 
                         checked={executionData.operationalForms === "NA"}
                         onChange={(e) => handleExecutionChange('operationalForms', e.target.value)}
+                        disabled={isPartBReadOnly}
                         className="text-blue-600" 
                         data-testid="WOF.B1.21"
                       />
@@ -3406,7 +3214,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                     </label>
                   </div>
                   <div className="flex items-center gap-2">
-                    {!isReadOnly && getDocsByType('operationalForm').length < 5 && (
+                    {!isReadOnly && !isPartBReadOnly && getDocsByType('operationalForm').length < 5 && (
                       <Button
                         variant="outline"
                         size="sm"
@@ -3438,7 +3246,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                             <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => handleViewDocument('operationalForm', doc.id)} data-testid={`button-view-operational-${doc.id}`}>
                               <Eye className="h-4 w-4 text-blue-600" />
                             </Button>
-                            {!isReadOnly && (
+                            {!isReadOnly && !isPartBReadOnly && (
                               <Button variant="ghost" size="icon" className="h-6 w-6 text-red-500 hover:text-red-700" onClick={() => handleDeleteDocumentClick('operationalForm', doc.id)} data-testid={`button-delete-operational-${doc.id}`}>
                                 <Trash2 className="h-4 w-4 text-red-500" />
                               </Button>
@@ -3475,6 +3283,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                         const currentTime = executionData.startDateTime ? executionData.startDateTime.split('T')[1] || '' : '';
                         handleExecutionChange('startDateTime', currentTime ? `${e.target.value}T${currentTime}` : e.target.value);
                       }}
+                      disabled={isPartBReadOnly}
                       className="text-sm"
                       placeholder="dd-mm-yyyy"
                       data-testid="WOF.B2.6"
@@ -3490,6 +3299,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                         const currentDate = executionData.startDateTime ? executionData.startDateTime.split('T')[0] : '';
                         handleExecutionChange('startDateTime', currentDate ? `${currentDate}T${e.target.value}` : e.target.value);
                       }}
+                      disabled={isPartBReadOnly}
                       className="text-sm"
                       placeholder="HH:MM (e.g. 10:45)"
                       data-testid="WOF.B2.8"
@@ -3507,6 +3317,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                           handleExecutionChange('completionDateTime', currentTime ? `${e.target.value}T${currentTime}` : e.target.value);
                           handleExecutionChange('dateOfCompletion', e.target.value);
                         }}
+                        disabled={isPartBReadOnly}
                         className="text-sm flex-1"
                         placeholder="dd-mm-yyyy"
                         data-testid="WOF.B2.10"
@@ -3523,6 +3334,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                             handleExecutionChange('dateOfCompletion', startDate);
                           }
                         }}
+                        disabled={isPartBReadOnly}
                         className="text-xs whitespace-nowrap"
                         title="Same as Start Date"
                         data-testid="button-copy-start-date"
@@ -3542,6 +3354,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                         const currentDate = executionData.completionDateTime ? executionData.completionDateTime.split('T')[0] : '';
                         handleExecutionChange('completionDateTime', currentDate ? `${currentDate}T${e.target.value}` : e.target.value);
                       }}
+                      disabled={isPartBReadOnly}
                       className="text-sm"
                       placeholder="HH:MM (e.g. 12:00)"
                       data-testid="WOF.B2.12"
@@ -3553,6 +3366,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                     <Select
                       value={executionData.performedBy}
                       onValueChange={(value) => handleExecutionChange('performedBy', value)}
+                      disabled={isPartBReadOnly}
                     >
                       <SelectTrigger className="text-sm" data-testid="WOF.B2.14">
                         <SelectValue placeholder="Select rank" />
@@ -3571,6 +3385,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                       type="number"
                       value={executionData.noOfPersons}
                       onChange={(e) => handleExecutionChange('noOfPersons', e.target.value)}
+                      disabled={isPartBReadOnly}
                       className="text-sm"
                       placeholder="3"
                       min={1}
@@ -3586,6 +3401,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                       type="number"
                       value={executionData.totalTimeHours}
                       onChange={(e) => handleExecutionChange('totalTimeHours', e.target.value)}
+                      disabled={isPartBReadOnly}
                       className="text-sm"
                       placeholder="3"
                       min={0.01}
@@ -3620,6 +3436,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                       variant="outline"
                       size="sm"
                       onClick={() => setShowQuickInputs(!showQuickInputs)}
+                      disabled={isPartBReadOnly}
                       className="h-8 px-3 text-xs font-medium border-[#17a2b8] text-[#17a2b8] hover:bg-[#17a2b8]/10 hover:text-[#17a2b8] transition-colors"
                       data-testid="button-quick-input"
                     >
@@ -3630,6 +3447,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                       variant="outline"
                       size="sm"
                       onClick={toggleSmartSuggestions}
+                      disabled={isPartBReadOnly}
                       className="h-8 px-3 text-xs font-medium border-[#17a2b8] text-[#17a2b8] hover:bg-[#17a2b8]/10 hover:text-[#17a2b8] transition-colors"
                       data-testid="button-smart-suggestions"
                     >
@@ -3688,17 +3506,22 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
 
                 {/* Textarea with Upload button */}
                 <div className="flex gap-2">
-                  <Textarea
-                    ref={workCarriedOutRef}
-                    value={executionData.workCarriedOut}
-                    onChange={(e) => handleExecutionChange('workCarriedOut', e.target.value)}
-                    className="text-sm min-h-[100px] flex-1"
-                    placeholder="Describe work carried out..."
-                    data-testid="textarea-work-carried-out"
-                  />
+                  <div className="flex-1 flex flex-col">
+                    <Textarea
+                      ref={workCarriedOutRef}
+                      value={executionData.workCarriedOut}
+                      onChange={(e) => handleExecutionChange('workCarriedOut', e.target.value)}
+                      disabled={isPartBReadOnly}
+                      maxLength={2000}
+                      className="text-sm min-h-[100px]"
+                      placeholder="Describe work carried out..."
+                      data-testid="textarea-work-carried-out"
+                    />
+                    <span className="text-xs text-gray-400 text-right mt-1" data-testid="text-work-carried-out-count">{(executionData.workCarriedOut || '').length} / 2000</span>
+                  </div>
                   {/* Upload button column */}
                   <div className="flex flex-col items-center gap-1 pt-1">
-                    {!isReadOnly && getDocsByType('other').length < 5 && (
+                    {!isReadOnly && !isPartBReadOnly && getDocsByType('other').length < 5 && (
                       <Button
                         type="button"
                         variant="outline"
@@ -3733,7 +3556,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                           <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => handleViewDocument('other', doc.id)} data-testid={`button-view-other-${doc.id}`}>
                             <Eye className="h-4 w-4 text-blue-600" />
                           </Button>
-                          {!isReadOnly && (
+                          {!isReadOnly && !isPartBReadOnly && (
                             <Button variant="ghost" size="icon" className="h-6 w-6 text-red-500 hover:text-red-700" onClick={() => handleDeleteDocumentClick('other', doc.id)} data-testid={`button-delete-other-${doc.id}`}>
                               <Trash2 className="h-4 w-4 text-red-500" />
                             </Button>
@@ -3751,10 +3574,13 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                 <Textarea
                   value={executionData.jobExperienceNotes}
                   onChange={(e) => handleExecutionChange('jobExperienceNotes', e.target.value)}
+                  disabled={isPartBReadOnly}
+                  maxLength={2000}
                   className="text-sm min-h-[80px]"
                   placeholder="Job Experience / Notes"
                   data-testid="WOF.B2.23"
                 />
+                <span className="text-xs text-gray-400" data-testid="text-job-experience-count">{(executionData.jobExperienceNotes || '').length} / 2000</span>
               </div>
             </div>
           </SectionBlock>
@@ -3785,6 +3611,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                   min="0"
                   value={executionData.currentReading}
                   onChange={(e) => handleExecutionChange('currentReading', e.target.value)}
+                  disabled={isPartBReadOnly}
                   className="text-sm"
                   data-testid="WOF.B3.6"
                 />
@@ -3806,6 +3633,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                   variant="outline"
                   size="sm"
                   onClick={handleOpenSparePartsModal}
+                  disabled={isPartBReadOnly}
                   data-testid="WOF.B4.10"
                 >
                   <Marker id="WOF.B4.10" />
@@ -4201,10 +4029,12 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                   <Textarea
                     value={rejectionComments}
                     onChange={(e) => setRejectionComments(e.target.value)}
+                    maxLength={500}
                     placeholder="Enter rejection comments..."
                     className="text-sm min-h-[100px] border-gray-200"
                     data-testid="WOF.B5.2.1"
                   />
+                  <span className="text-xs text-gray-400 text-right" data-testid="text-rejection-comments-count">{(rejectionComments || '').length} / 500</span>
                 </div>
 
                 {/* Approve / Reject Buttons */}

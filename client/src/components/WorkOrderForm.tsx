@@ -228,6 +228,8 @@ const WorkOrderForm: React.FC<WorkOrderFormProps> = ({
   // Part A should display pre-populated job data and not be editable by ship crew
   const isPartAReadOnly = mode === 'execution' || executionMode || isReadOnly;
 
+  const isPartBReadOnly = isReadOnly || workOrder?.status === 'Completed' || workOrder?.status === 'Pending Approval';
+
   // Template data (Part A)
   const [templateData, setTemplateData] = useState({
     woTitle: "",
@@ -2567,15 +2569,15 @@ const WorkOrderForm: React.FC<WorkOrderFormProps> = ({
                         </div>
                         <div className="col-span-3 flex items-center gap-4">
                           <label className="flex items-center gap-2">
-                            <input type="radio" name="riskAssessment" value="Yes" checked={executionData.riskAssessment === "Yes"} onChange={() => handleExecutionChange('riskAssessment', 'Yes')} className="text-blue-600" />
+                            <input type="radio" name="riskAssessment" value="Yes" checked={executionData.riskAssessment === "Yes"} onChange={() => handleExecutionChange('riskAssessment', 'Yes')} disabled={isPartBReadOnly} className="text-blue-600" />
                             <span className="text-sm">Yes</span>
                           </label>
                           <label className="flex items-center gap-2">
-                            <input type="radio" name="riskAssessment" value="No" checked={executionData.riskAssessment === "No"} onChange={() => handleExecutionChange('riskAssessment', 'No')} className="text-blue-600" />
+                            <input type="radio" name="riskAssessment" value="No" checked={executionData.riskAssessment === "No"} onChange={() => handleExecutionChange('riskAssessment', 'No')} disabled={isPartBReadOnly} className="text-blue-600" />
                             <span className="text-sm">No</span>
                           </label>
                           <label className="flex items-center gap-2">
-                            <input type="radio" name="riskAssessment" value="NA" checked={executionData.riskAssessment === "NA"} onChange={() => handleExecutionChange('riskAssessment', 'NA')} className="text-blue-600" />
+                            <input type="radio" name="riskAssessment" value="NA" checked={executionData.riskAssessment === "NA"} onChange={() => handleExecutionChange('riskAssessment', 'NA')} disabled={isPartBReadOnly} className="text-blue-600" />
                             <span className="text-sm">NA</span>
                           </label>
                         </div>
@@ -2633,15 +2635,15 @@ const WorkOrderForm: React.FC<WorkOrderFormProps> = ({
                         </div>
                         <div className="col-span-3 flex items-center gap-4">
                           <label className="flex items-center gap-2">
-                            <input type="radio" name="safetyChecklists" value="Yes" checked={executionData.safetyChecklists === "Yes"} onChange={() => handleExecutionChange('safetyChecklists', 'Yes')} className="text-blue-600" />
+                            <input type="radio" name="safetyChecklists" value="Yes" checked={executionData.safetyChecklists === "Yes"} onChange={() => handleExecutionChange('safetyChecklists', 'Yes')} disabled={isPartBReadOnly} className="text-blue-600" />
                             <span className="text-sm">Yes</span>
                           </label>
                           <label className="flex items-center gap-2">
-                            <input type="radio" name="safetyChecklists" value="No" checked={executionData.safetyChecklists === "No"} onChange={() => handleExecutionChange('safetyChecklists', 'No')} className="text-blue-600" />
+                            <input type="radio" name="safetyChecklists" value="No" checked={executionData.safetyChecklists === "No"} onChange={() => handleExecutionChange('safetyChecklists', 'No')} disabled={isPartBReadOnly} className="text-blue-600" />
                             <span className="text-sm">No</span>
                           </label>
                           <label className="flex items-center gap-2">
-                            <input type="radio" name="safetyChecklists" value="NA" checked={executionData.safetyChecklists === "NA"} onChange={() => handleExecutionChange('safetyChecklists', 'NA')} className="text-blue-600" />
+                            <input type="radio" name="safetyChecklists" value="NA" checked={executionData.safetyChecklists === "NA"} onChange={() => handleExecutionChange('safetyChecklists', 'NA')} disabled={isPartBReadOnly} className="text-blue-600" />
                             <span className="text-sm">NA</span>
                           </label>
                         </div>
@@ -2699,15 +2701,15 @@ const WorkOrderForm: React.FC<WorkOrderFormProps> = ({
                         </div>
                         <div className="col-span-3 flex items-center gap-4">
                           <label className="flex items-center gap-2">
-                            <input type="radio" name="operationalForms" value="Yes" checked={executionData.operationalForms === "Yes"} onChange={() => handleExecutionChange('operationalForms', 'Yes')} className="text-blue-600" />
+                            <input type="radio" name="operationalForms" value="Yes" checked={executionData.operationalForms === "Yes"} onChange={() => handleExecutionChange('operationalForms', 'Yes')} disabled={isPartBReadOnly} className="text-blue-600" />
                             <span className="text-sm">Yes</span>
                           </label>
                           <label className="flex items-center gap-2">
-                            <input type="radio" name="operationalForms" value="No" checked={executionData.operationalForms === "No"} onChange={() => handleExecutionChange('operationalForms', 'No')} className="text-blue-600" />
+                            <input type="radio" name="operationalForms" value="No" checked={executionData.operationalForms === "No"} onChange={() => handleExecutionChange('operationalForms', 'No')} disabled={isPartBReadOnly} className="text-blue-600" />
                             <span className="text-sm">No</span>
                           </label>
                           <label className="flex items-center gap-2">
-                            <input type="radio" name="operationalForms" value="NA" checked={executionData.operationalForms === "NA"} onChange={() => handleExecutionChange('operationalForms', 'NA')} className="text-blue-600" />
+                            <input type="radio" name="operationalForms" value="NA" checked={executionData.operationalForms === "NA"} onChange={() => handleExecutionChange('operationalForms', 'NA')} disabled={isPartBReadOnly} className="text-blue-600" />
                             <span className="text-sm">NA</span>
                           </label>
                         </div>
@@ -2775,6 +2777,7 @@ const WorkOrderForm: React.FC<WorkOrderFormProps> = ({
                               variant="outline"
                               size="sm"
                               onClick={() => setShowQuickInputs(!showQuickInputs)}
+                              disabled={isPartBReadOnly}
                               className="text-xs text-[#52BAF3] border-[#52BAF3] hover:bg-blue-50 h-6 px-2"
                             >
                               Quick Input {showQuickInputs ? '▲' : '▼'}
@@ -2784,6 +2787,7 @@ const WorkOrderForm: React.FC<WorkOrderFormProps> = ({
                               variant="outline"
                               size="sm"
                               onClick={toggleSmartSuggestions}
+                              disabled={isPartBReadOnly}
                               className="text-xs text-[#52BAF3] border-[#52BAF3] hover:bg-blue-50 h-6 px-2"
                             >
                               Smart Suggestions {showSmartSuggestions ? '▲' : '▼'}
@@ -2844,9 +2848,12 @@ const WorkOrderForm: React.FC<WorkOrderFormProps> = ({
                           ref={workCarriedOutRef}
                           value={executionData.workCarriedOut}
                           onChange={(e) => handleExecutionChange('workCarriedOut', e.target.value)}
+                          disabled={isPartBReadOnly}
+                          maxLength={2000}
                           className="w-full min-h-[80px]" 
                           placeholder="Describe work carried out..."
                         />
+                        <span className="text-xs text-gray-400 text-right block" data-testid="text-work-carried-out-count">{(executionData.workCarriedOut || '').length} / 2000</span>
                       </div>
                       
                       {/* Job Experience / Notes */}
@@ -2855,9 +2862,12 @@ const WorkOrderForm: React.FC<WorkOrderFormProps> = ({
                         <Textarea 
                           value={executionData.jobExperienceNotes}
                           onChange={(e) => handleExecutionChange('jobExperienceNotes', e.target.value)}
+                          disabled={isPartBReadOnly}
+                          maxLength={2000}
                           className="w-full min-h-[80px]" 
                           placeholder="Enter job experience notes..."
                         />
+                        <span className="text-xs text-gray-400 text-right block" data-testid="text-job-experience-count">{(executionData.jobExperienceNotes || '').length} / 2000</span>
                       </div>
                     </div>
                   </div>
@@ -2874,6 +2884,7 @@ const WorkOrderForm: React.FC<WorkOrderFormProps> = ({
                             type="number" 
                             value={executionData.previousReading}
                             onChange={(e) => handleExecutionChange('previousReading', e.target.value)}
+                            disabled={isPartBReadOnly}
                             placeholder="Enter previous hours reading"
                             className="w-full" 
                           />
@@ -2885,6 +2896,7 @@ const WorkOrderForm: React.FC<WorkOrderFormProps> = ({
                             min="0"
                             value={executionData.currentReading}
                             onChange={(e) => handleExecutionChange('currentReading', e.target.value)}
+                            disabled={isPartBReadOnly}
                             placeholder="Enter current hours reading"
                             className="w-full" 
                           />
@@ -2908,6 +2920,7 @@ const WorkOrderForm: React.FC<WorkOrderFormProps> = ({
                           size="sm"
                           className="text-blue-600 hover:text-blue-800"
                           onClick={handleAddConsumedSparePart}
+                          disabled={isPartBReadOnly}
                           data-testid="button-add-spare-part-b4"
                         >
                           <Plus className="h-4 w-4 mr-1" />

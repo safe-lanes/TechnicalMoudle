@@ -134,3 +134,55 @@
 
 ### Validation Order in WorkOrderFormPage.tsx handleSubmit
 B1 → B2 (date/time, Rule 2 start vs creation, Rule 1 overdue warning, Rule 3 HOD check) → B2 (persons, time, manhours, work description) → B3 (running hours) → B4 (qty, location, inventory, stock, comments) → Rule 4 (frequency recalculation at payload construction)
+
+---
+
+## 2026-03-05 — Validation/Integrity Rules (T001–T005)
+
+### What We Built
+Eight validation and integrity rules for the Work Order form Part B, covering frontend enforcement, backend guards, and data quality.
+
+### T001: Immutability After Approval
+- Added computed `isPartBReadOnly` boolean to both forms
+- `WorkOrderFormPage.tsx`: `isReadOnly || currentWorkOrderStatus === 'Completed' || currentWorkOrderStatus === 'Pending Approval'`
+- `WorkOrderForm.tsx`: `isReadOnly || workOrder?.status === 'Completed' || workOrder?.status === 'Pending Approval'`
+- All Part B inputs (B1 radios, upload/delete buttons, B2 date/time/dropdown/textarea inputs, B3 current reading, B4 spare parts controls) now `disabled` when WO status is Completed or Pending Approval
+
+### T002: Character Limits
+- Frontend: `maxLength={2000}` on Work Carried Out and Job Experience textareas; `maxLength={500}` on Rejection Comments
+- Character counters displayed below each textarea (e.g., "1234 / 2000")
+- Backend: `TEXT_LIMITS` object in `workOrderService.ts` blocks oversized text at the API level
+
+### T003: Partial Save / Draft State
+- `handleSave` refactored into "hard errors" (format, safety, data integrity — always block) and "missing fields" (required-for-submission fields)
+- `hasAnyPartBData` detects when user has started filling Part B (including B1 radio selections)
+- If hard errors pass but mandatory fields are missing and no completion data is set, saves as draft without status change, shows informational "Draft Saved" toast listing missing fields
+- Full validation (all mandatory fields) still required for Pending Approval submission
+
+### T004: Audit Trail
+- Every WO save now inserts an `audit_log` entry via `repo.createAuditLog()`
+- Records: entityType='work_order', actionType='update'/'approve'/'reject', source='web_ui'
+- Payload includes diff snapshot (old vs new values for each changed field), workOrderNo, status
+- Approval/rejection actions include timestamps
+- Errors are caught and logged but don't block the save operation
+
+### T005: Numeric Field Precision (Backend)
+- `validateNumericField` helper validates: totalTimeHours (max 720), manhours, previousReading, runningHours, runningHoursDifference, currentReading (max 2 decimal places), noOfPersons (integer only)
+- Rejects non-numeric values with `ValidationError`
+
+### Post-Review Fixes
+- Fixed WorkOrderForm.tsx `isPartBReadOnly` to include `Pending Approval` (was only `Completed`)
+- Added `currentReading` to backend `validateNumericField` checks
+- Expanded `hasAnyPartBData` to include B1 field selections (riskAssessment, safetyChecklists, operationalForms)
+- Removed duplicate running hours validation block left over from T003 refactor
+
+### Key Files Changed
+- `client/src/pages/pms/WorkOrderFormPage.tsx` — T001 (isPartBReadOnly), T002 (maxLength/counters), T003 (handleSave refactored)
+- `client/src/components/WorkOrderForm.tsx` — T001 (isPartBReadOnly), T002 (maxLength/counters)
+- `server/modules/work-orders/services/workOrderService.ts` — T002 (TEXT_LIMITS), T004 (audit log), T005 (validateNumericField + currentReading)
+
+### What's Broken
+- Nothing broken from these changes.
+
+### Environment Issues
+- None. Application compiles and runs normally.

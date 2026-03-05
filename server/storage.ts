@@ -672,6 +672,9 @@ export interface IStorage {
     revertedWorkOrders: WorkOrder[];
   }>;
   
+  // Audit Log
+  createAuditLog(data: any): Promise<any>;
+
   // PMS Vessel Settings - Lead Time & Grace Period Configuration
   getPmsVesselSettings(vesselId: string): Promise<PmsVesselSettings | undefined>;
   getAllPmsVesselSettings(): Promise<PmsVesselSettings[]>;
