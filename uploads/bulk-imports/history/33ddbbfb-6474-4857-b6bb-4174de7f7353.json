@@ -1,0 +1,17 @@
+{
+  "id": "33ddbbfb-6474-4857-b6bb-4174de7f7353",
+  "type": "components",
+  "mode": "upsert",
+  "vesselId": "",
+  "userId": 1,
+  "startedAt": "2026-03-05T11:32:22.868Z",
+  "completedAt": "2026-03-05T11:32:22.924Z",
+  "status": "failed",
+  "created": 0,
+  "updated": 0,
+  "skipped": 0,
+  "archived": 0,
+  "originalName": "components.csv",
+  "storedFilePath": null,
+  "errorReport": null
+}

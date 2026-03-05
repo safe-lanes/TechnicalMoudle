@@ -1870,3 +1870,96 @@ export async function delete_locationsByid(req: Request, res: Response) {
   }
 }
 
+export async function exportSummary(req: Request, res: Response) {
+  try {
+    const { rows, columns: rawColumns, previewColumns, templateType, fileName } = req.body;
+    const columns = rawColumns || previewColumns;
+
+    if (!rows || !Array.isArray(rows)) {
+      return res.status(400).json({ error: 'rows array is required' });
+    }
+
+    const workbook = new ExcelJS.Workbook();
+    const sheet = workbook.addWorksheet('Import Summary');
+
+    const headerNames = ['Row Number', 'Primary Identifier'];
+    if (columns && Array.isArray(columns)) {
+      for (const col of columns) {
+        const label = typeof col === 'string' ? col : col.header || col.field || col.key || '';
+        if (label && label !== 'Row Number' && label !== 'Primary Identifier' && label !== 'Status' && label !== 'Error Message') {
+          headerNames.push(label);
+        }
+      }
+    }
+    headerNames.push('Status', 'Error Message');
+
+    const headerRow = sheet.addRow(headerNames);
+    headerRow.eachCell((cell) => {
+      cell.font = { bold: true, color: { argb: 'FFFFFFFF' } };
+      cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF4F4F4F' } };
+      cell.alignment = { horizontal: 'center', vertical: 'middle' };
+      cell.border = {
+        top: { style: 'thin' },
+        left: { style: 'thin' },
+        bottom: { style: 'thin' },
+        right: { style: 'thin' },
+      };
+    });
+
+    for (const row of rows) {
+      const values: any[] = [row.rowNumber ?? '', row.primaryIdentifier ?? ''];
+      if (columns && Array.isArray(columns)) {
+        for (const col of columns) {
+          const field = typeof col === 'string' ? col : col.field || col.key || '';
+          if (field && field !== 'rowNumber' && field !== 'primaryIdentifier' && field !== 'status' && field !== 'error') {
+            values.push(row[field] ?? row.data?.[field] ?? '');
+          }
+        }
+      }
+      values.push(row.status ?? '', row.error ?? '');
+
+      const dataRow = sheet.addRow(values);
+
+      const status = (row.status || '').toString().toLowerCase();
+      if (status === 'success' || status === 'created' || status === 'updated') {
+        dataRow.eachCell((cell) => {
+          cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE8F5E9' } };
+        });
+      } else if (status === 'failed' || status === 'error') {
+        dataRow.eachCell((cell) => {
+          cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFEBEE' } };
+          cell.font = { color: { argb: 'FFC62828' } };
+        });
+      }
+
+      dataRow.eachCell((cell) => {
+        cell.border = {
+          top: { style: 'thin' },
+          left: { style: 'thin' },
+          bottom: { style: 'thin' },
+          right: { style: 'thin' },
+        };
+      });
+    }
+
+    sheet.columns.forEach((column) => {
+      let maxLength = 10;
+      column.eachCell?.({ includeEmpty: true }, (cell) => {
+        const len = cell.value ? cell.value.toString().length : 0;
+        if (len > maxLength) maxLength = len;
+      });
+      column.width = Math.min(maxLength + 4, 50);
+    });
+
+    const buffer = await workbook.xlsx.writeBuffer();
+
+    const safeName = (fileName || templateType || 'import').replace(/[^a-zA-Z0-9_-]/g, '_');
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.setHeader('Content-Disposition', `attachment; filename="${safeName}_summary.xlsx"`);
+    res.send(Buffer.from(buffer as ArrayBuffer));
+  } catch (error: any) {
+    console.error('Error exporting import summary:', error);
+    res.status(500).json({ error: error.message || 'Failed to export summary' });
+  }
+}
+

@@ -159,6 +159,13 @@ export async function trackChange(
   });
 }
 
+export interface RowResult {
+  rowNumber: number;
+  primaryIdentifier: string;
+  action: 'created' | 'updated' | 'skipped' | 'failed';
+  error?: string;
+}
+
 // Perform actual import
 export async function performImport(
   type: string,
@@ -176,7 +183,8 @@ export async function performImport(
     skipped: 0,
     archived: 0,
     jobComponentLinksCreated: 0,
-    spareComponentLinksCreated: 0
+    spareComponentLinksCreated: 0,
+    rowResults: [] as RowResult[]
   };
 
   if (type === 'components') {
@@ -338,58 +346,65 @@ export async function performImport(
     for (const row of sortedData) {
       const componentCode = String(row['Component Code'] || row['Generated Code'] || row['Original SFI Code']).trim();
       const existingComponent = existingComponentsMap.get(componentCode);
+      const rowNum = row['__meta']?.rowNumber || 0;
 
-      if (mode === 'add') {
-        if (!existingComponent) {
-          const newComponent = await createComponentFromRow(row, vesselId);
-          existingComponentsMap.set(componentCode, newComponent);
-          result.created++;
-          
-          // Track component creation with authoritative state
-          if (importHistoryId) {
-            await trackChange(importHistoryId, 'created', 'component', newComponent.cuuid, null, newComponent);
+      try {
+        if (mode === 'add') {
+          if (!existingComponent) {
+            const newComponent = await createComponentFromRow(row, vesselId);
+            existingComponentsMap.set(componentCode, newComponent);
+            result.created++;
+            result.rowResults.push({ rowNumber: rowNum, primaryIdentifier: componentCode, action: 'created' });
+            
+            if (importHistoryId) {
+              await trackChange(importHistoryId, 'created', 'component', newComponent.cuuid, null, newComponent);
+            }
+          } else {
+            result.skipped++;
+            result.rowResults.push({ rowNumber: rowNum, primaryIdentifier: componentCode, action: 'skipped', error: 'Component already exists' });
           }
-        } else {
-          result.skipped++;
+        } else if (mode === 'update') {
+          if (existingComponent) {
+            const previousSnapshot = createRecordSnapshot(existingComponent);
+            const updatedComponent = await updateComponentFromRow(componentCode, row, vesselId, existingComponent);
+            existingComponentsMap.set(componentCode, updatedComponent);
+            result.updated++;
+            result.rowResults.push({ rowNumber: rowNum, primaryIdentifier: componentCode, action: 'updated' });
+            
+            if (importHistoryId) {
+              await trackChange(importHistoryId, 'updated', 'component', updatedComponent.cuuid, existingComponent, updatedComponent);
+            }
+          } else {
+            result.skipped++;
+            result.rowResults.push({ rowNumber: rowNum, primaryIdentifier: componentCode, action: 'skipped', error: 'Component not found for update' });
+          }
+        } else if (mode === 'upsert') {
+          if (existingComponent && existingComponent.id) {
+            console.log(`🔄 Updating existing component: ${componentCode}`);
+            const previousSnapshot = createRecordSnapshot(existingComponent);
+            const updatedComponent = await updateComponentFromRow(componentCode, row, vesselId, existingComponent);
+            existingComponentsMap.set(componentCode, updatedComponent);
+            result.updated++;
+            result.rowResults.push({ rowNumber: rowNum, primaryIdentifier: componentCode, action: 'updated' });
+            
+            if (importHistoryId) {
+              await trackChange(importHistoryId, 'updated', 'component', updatedComponent.cuuid, existingComponent, updatedComponent);
+            }
+          } else {
+            const newComponent = await createComponentFromRow(row, vesselId);
+            existingComponentsMap.set(componentCode, newComponent);
+            result.created++;
+            result.rowResults.push({ rowNumber: rowNum, primaryIdentifier: componentCode, action: 'created' });
+            
+            if (importHistoryId) {
+              await trackChange(importHistoryId, 'created', 'component', newComponent.cuuid, null, newComponent);
+            }
+          }
         }
-      } else if (mode === 'update') {
-        if (existingComponent) {
-          const previousSnapshot = createRecordSnapshot(existingComponent);
-          const updatedComponent = await updateComponentFromRow(componentCode, row, vesselId, existingComponent);
-          existingComponentsMap.set(componentCode, updatedComponent);
-          result.updated++;
-          
-          // Track component update with authoritative before/after snapshots
-          if (importHistoryId) {
-            await trackChange(importHistoryId, 'updated', 'component', updatedComponent.cuuid, existingComponent, updatedComponent);
-          }
-        } else {
-          result.skipped++;
-        }
-      } else if (mode === 'upsert') {
-        // For upsert, verify component has a valid ID (exists in database)
-        // existingComponent from map may be from spreadsheet parsing without ID
-        if (existingComponent && existingComponent.id) {
-          console.log(`🔄 Updating existing component: ${componentCode}`);
-          const previousSnapshot = createRecordSnapshot(existingComponent);
-          const updatedComponent = await updateComponentFromRow(componentCode, row, vesselId, existingComponent);
-          existingComponentsMap.set(componentCode, updatedComponent);
-          result.updated++;
-          
-          // Track component update with authoritative before/after snapshots
-          if (importHistoryId) {
-            await trackChange(importHistoryId, 'updated', 'component', updatedComponent.cuuid, existingComponent, updatedComponent);
-          }
-        } else {
-          const newComponent = await createComponentFromRow(row, vesselId);
-          existingComponentsMap.set(componentCode, newComponent);
-          result.created++;
-          
-          // Track component creation with authoritative state
-          if (importHistoryId) {
-            await trackChange(importHistoryId, 'created', 'component', newComponent.cuuid, null, newComponent);
-          }
-        }
+      } catch (rowError: any) {
+        console.error(`Error processing component row ${componentCode}:`, rowError.message);
+        result.skipped++;
+        result.rowResults.push({ rowNumber: rowNum, primaryIdentifier: componentCode, action: 'failed', error: rowError.message });
       }
     }
     
@@ -443,7 +458,9 @@ export async function performImport(
     console.log(`🔢 Next auto-generated Part Code will be: PT-${String(nextPartCodeNum).padStart(6, '0')}`);
     
     // Step 4: Process each row with validation
-    for (const row of data) {
+    for (let _spareIdx = 0; _spareIdx < data.length; _spareIdx++) {
+      const row = data[_spareIdx];
+      const _spareRowNum = row['__meta']?.rowNumber || (_spareIdx + 1);
       try {
         // Validate Component Code exists
         const componentCode = String(row['Component Code']).trim();
@@ -452,6 +469,8 @@ export async function performImport(
         if (!component) {
           console.warn(`⚠️ Component ${componentCode} not found in system, skipping spare`);
           result.skipped++;
+          const _sparePartCode = row['Part Code'] ? String(row['Part Code']).trim() : `row-${_spareRowNum}`;
+          result.rowResults.push({ rowNumber: _spareRowNum, primaryIdentifier: _sparePartCode, action: 'skipped', error: `Component ${componentCode} not found` });
           continue;
         }
         
@@ -483,15 +502,17 @@ export async function performImport(
                 result.spareComponentLinksCreated++;
                 console.log(`🔗 Linked spare ${partCode} to additional component ${componentCode}`);
                 
-                // Count as an update since we modified the spare's relationships
                 result.updated++;
+                result.rowResults.push({ rowNumber: _spareRowNum, primaryIdentifier: partCode, action: 'updated' });
               } else {
                 console.log(`⏭️ Spare ${partCode} already linked to component ${componentCode}, skipping`);
                 result.skipped++;
+                result.rowResults.push({ rowNumber: _spareRowNum, primaryIdentifier: partCode, action: 'skipped', error: 'Already linked to component' });
               }
             } catch (linkError: any) {
               console.warn(`⚠️ Failed to create spare-component link for ${partCode} -> ${componentCode}: ${linkError.message}`);
               result.skipped++;
+              result.rowResults.push({ rowNumber: _spareRowNum, primaryIdentifier: partCode, action: 'failed', error: linkError.message });
             }
             continue;
           }
@@ -568,6 +589,7 @@ export async function performImport(
             userId: 'system-import',
           });
           result.spareComponentLinksCreated++; // Link created by processSpareInventory
+          result.rowResults.push({ rowNumber: _spareRowNum, primaryIdentifier: partCode, action: 'created' });
           
           console.log(`✅ Created spare: ${partCode} - ${newSpare.partName}`);
           
@@ -575,6 +597,7 @@ export async function performImport(
           if (!existingSpare) {
             console.log(`⏭️ Part Code ${partCode} not found for update, skipping`);
             result.skipped++;
+            result.rowResults.push({ rowNumber: _spareRowNum, primaryIdentifier: partCode, action: 'skipped', error: 'Part Code not found for update' });
             continue;
           }
           
@@ -645,6 +668,7 @@ export async function performImport(
             userId: 'system-import',
           });
           
+          result.rowResults.push({ rowNumber: _spareRowNum, primaryIdentifier: partCode, action: 'updated' });
           console.log(`🔄 Updated spare: ${partCode} - ${updatedSpare.partName}`);
           
         } else if (mode === 'upsert') {
@@ -735,10 +759,12 @@ export async function performImport(
                 userId: 'system-import',
               });
               
+              result.rowResults.push({ rowNumber: _spareRowNum, primaryIdentifier: partCode, action: 'updated' });
               console.log(`🔄 Updated spare (upsert): ${partCode} - ${updatedSpare.partName}`);
             } catch (linkError: any) {
               console.warn(`⚠️ Failed to process spare-component link for ${partCode} -> ${componentCode}: ${linkError.message}`);
               result.skipped++;
+              result.rowResults.push({ rowNumber: _spareRowNum, primaryIdentifier: partCode, action: 'failed', error: linkError.message });
             }
           } else {
             // Create new - use criticalValUpsert from parent scope
@@ -794,6 +820,7 @@ export async function performImport(
               userId: 'system-import',
             });
             result.spareComponentLinksCreated++; // Link created by processSpareInventory
+            result.rowResults.push({ rowNumber: _spareRowNum, primaryIdentifier: partCode, action: 'created' });
             
             console.log(`✅ Created spare (upsert): ${partCode} - ${newSpare.partName}`);
           }
@@ -801,6 +828,8 @@ export async function performImport(
       } catch (error: any) {
         console.error(`❌ Error processing spare row:`, error);
         result.skipped++;
+        const _errPartCode = row['Part Code'] ? String(row['Part Code']).trim() : `row-${_spareRowNum}`;
+        result.rowResults.push({ rowNumber: _spareRowNum, primaryIdentifier: _errPartCode, action: 'failed', error: error.message });
       }
     }
     
@@ -817,12 +846,15 @@ export async function performImport(
     const itemType = storeType || 'stores';
     console.log(`📌 All imported items will be assigned to itemType: ${itemType}`);
     
-    for (const row of data) {
+    for (let _storeIdx = 0; _storeIdx < data.length; _storeIdx++) {
+      const row = data[_storeIdx];
+      const _storeRowNum = row['__meta']?.rowNumber || (_storeIdx + 1);
       try {
         const itemCode = String(row['Item Code'] || '').trim();
         if (!itemCode) {
           console.log('⏭️ Skipping row with empty Item Code');
           result.skipped++;
+          result.rowResults.push({ rowNumber: _storeRowNum, primaryIdentifier: `row-${_storeRowNum}`, action: 'skipped', error: 'Empty Item Code' });
           continue;
         }
         
@@ -830,6 +862,7 @@ export async function performImport(
         if (!itemName) {
           console.log(`⏭️ Skipping row ${itemCode} with empty Item Name`);
           result.skipped++;
+          result.rowResults.push({ rowNumber: _storeRowNum, primaryIdentifier: itemCode, action: 'skipped', error: 'Empty Item Name' });
           continue;
         }
         
@@ -846,6 +879,7 @@ export async function performImport(
         if (mode === 'add') {
           if (existingItem) {
             result.skipped++;
+            result.rowResults.push({ rowNumber: _storeRowNum, primaryIdentifier: itemCode, action: 'skipped', error: 'Item already exists' });
             continue;
           }
           
@@ -882,10 +916,12 @@ export async function performImport(
             await trackChange(importHistoryId, 'created', 'storesItem', newStoresItem.stuuid, null, newStoresItem);
           }
 
+          result.rowResults.push({ rowNumber: _storeRowNum, primaryIdentifier: itemCode, action: 'created' });
           console.log(`✅ Created stores item: ${itemCode} - ${itemName}`);
         } else if (mode === 'update') {
           if (!existingItem) {
             result.skipped++;
+            result.rowResults.push({ rowNumber: _storeRowNum, primaryIdentifier: itemCode, action: 'skipped', error: 'Item not found for update' });
             continue;
           }
           
@@ -912,6 +948,7 @@ export async function performImport(
             await trackChange(importHistoryId, 'updated', 'storesItem', existingItem.stuuid, previousSnapshot, updated);
           }
 
+          result.rowResults.push({ rowNumber: _storeRowNum, primaryIdentifier: itemCode, action: 'updated' });
           console.log(`✅ Updated stores item: ${itemCode}`);
         } else {
           // Upsert mode
@@ -939,6 +976,7 @@ export async function performImport(
               await trackChange(importHistoryId, 'updated', 'storesItem', existingItem.stuuid, previousSnapshot, updated);
             }
 
+            result.rowResults.push({ rowNumber: _storeRowNum, primaryIdentifier: itemCode, action: 'updated' });
             console.log(`✅ Updated stores item (upsert): ${itemCode}`);
           } else {
             const newStoresItem = await storage.createStoresItem({
@@ -974,12 +1012,15 @@ export async function performImport(
               await trackChange(importHistoryId, 'created', 'storesItem', newStoresItem.stuuid, null, newStoresItem);
             }
 
+            result.rowResults.push({ rowNumber: _storeRowNum, primaryIdentifier: itemCode, action: 'created' });
             console.log(`✅ Created stores item (upsert): ${itemCode} - ${itemName}`);
           }
         }
       } catch (error: any) {
         console.error(`❌ Error processing stores item row:`, error);
         result.skipped++;
+        const _errItemCode = String(row['Item Code'] || '').trim() || `row-${_storeRowNum}`;
+        result.rowResults.push({ rowNumber: _storeRowNum, primaryIdentifier: _errItemCode, action: 'failed', error: error.message });
       }
     }
     
@@ -1019,7 +1060,9 @@ export async function performImport(
     const workOrdersByTemplateCode = await storage.getWorkOrdersByTemplateIds(allTemplateCodes, vesselId);
     
     // Step 2: Process each row individually with authoritative state capture
-    for (const row of data) {
+    for (let _woIdx = 0; _woIdx < data.length; _woIdx++) {
+      const row = data[_woIdx];
+      const _woRowNum = row['__meta']?.rowNumber || (_woIdx + 1);
       const componentCode = String(row['Generated_Component_Code']).trim();
       const componentYearKey = `${componentCode}-${currentYear}`;
       
@@ -1028,56 +1071,64 @@ export async function performImport(
       
       const existingWorkOrder = workOrdersByTemplateCode.get(templateCode);
 
-      if (mode === 'add') {
-        if (!existingWorkOrder) {
-          const newWorkOrder = await createWorkOrderFromRow(row, templateCode, vesselId);
-          workOrdersByTemplateCode.set(templateCode, newWorkOrder);
-          result.created++;
-          woSequenceMap.set(componentYearKey, sequence + 1);
-          
-          // Track work order creation with authoritative state
-          if (importHistoryId) {
-            await trackChange(importHistoryId, 'created', 'workOrder', newWorkOrder.id, null, newWorkOrder);
+      try {
+        if (mode === 'add') {
+          if (!existingWorkOrder) {
+            const newWorkOrder = await createWorkOrderFromRow(row, templateCode, vesselId);
+            workOrdersByTemplateCode.set(templateCode, newWorkOrder);
+            result.created++;
+            result.rowResults.push({ rowNumber: _woRowNum, primaryIdentifier: templateCode, action: 'created' });
+            woSequenceMap.set(componentYearKey, sequence + 1);
+            
+            if (importHistoryId) {
+              await trackChange(importHistoryId, 'created', 'workOrder', newWorkOrder.id, null, newWorkOrder);
+            }
+          } else {
+            result.skipped++;
+            result.rowResults.push({ rowNumber: _woRowNum, primaryIdentifier: templateCode, action: 'skipped', error: 'Work order already exists' });
           }
-        } else {
-          result.skipped++;
+        } else if (mode === 'update') {
+          if (existingWorkOrder) {
+            const previousSnapshot = createRecordSnapshot(existingWorkOrder);
+            const updatedWorkOrder = await updateWorkOrderFromRow(existingWorkOrder.id, row);
+            workOrdersByTemplateCode.set(templateCode, updatedWorkOrder);
+            result.updated++;
+            result.rowResults.push({ rowNumber: _woRowNum, primaryIdentifier: templateCode, action: 'updated' });
+            
+            if (importHistoryId) {
+              await trackChange(importHistoryId, 'updated', 'workOrder', updatedWorkOrder.id, existingWorkOrder, updatedWorkOrder);
+            }
+          } else {
+            result.skipped++;
+            result.rowResults.push({ rowNumber: _woRowNum, primaryIdentifier: templateCode, action: 'skipped', error: 'Work order not found for update' });
+          }
+        } else if (mode === 'upsert') {
+          if (existingWorkOrder) {
+            const previousSnapshot = createRecordSnapshot(existingWorkOrder);
+            const updatedWorkOrder = await updateWorkOrderFromRow(existingWorkOrder.id, row);
+            workOrdersByTemplateCode.set(templateCode, updatedWorkOrder);
+            result.updated++;
+            result.rowResults.push({ rowNumber: _woRowNum, primaryIdentifier: templateCode, action: 'updated' });
+            
+            if (importHistoryId) {
+              await trackChange(importHistoryId, 'updated', 'workOrder', updatedWorkOrder.id, existingWorkOrder, updatedWorkOrder);
+            }
+          } else {
+            const newWorkOrder = await createWorkOrderFromRow(row, templateCode, vesselId);
+            workOrdersByTemplateCode.set(templateCode, newWorkOrder);
+            result.created++;
+            result.rowResults.push({ rowNumber: _woRowNum, primaryIdentifier: templateCode, action: 'created' });
+            woSequenceMap.set(componentYearKey, sequence + 1);
+            
+            if (importHistoryId) {
+              await trackChange(importHistoryId, 'created', 'workOrder', newWorkOrder.id, null, newWorkOrder);
+            }
+          }
         }
-      } else if (mode === 'update') {
-        if (existingWorkOrder) {
-          const previousSnapshot = createRecordSnapshot(existingWorkOrder);
-          const updatedWorkOrder = await updateWorkOrderFromRow(existingWorkOrder.id, row);
-          workOrdersByTemplateCode.set(templateCode, updatedWorkOrder);
-          result.updated++;
-          
-          // Track work order update with authoritative before/after snapshots
-          if (importHistoryId) {
-            await trackChange(importHistoryId, 'updated', 'workOrder', updatedWorkOrder.id, existingWorkOrder, updatedWorkOrder);
-          }
-        } else {
-          result.skipped++;
-        }
-      } else if (mode === 'upsert') {
-        if (existingWorkOrder) {
-          const previousSnapshot = createRecordSnapshot(existingWorkOrder);
-          const updatedWorkOrder = await updateWorkOrderFromRow(existingWorkOrder.id, row);
-          workOrdersByTemplateCode.set(templateCode, updatedWorkOrder);
-          result.updated++;
-          
-          // Track work order update with authoritative before/after snapshots
-          if (importHistoryId) {
-            await trackChange(importHistoryId, 'updated', 'workOrder', updatedWorkOrder.id, existingWorkOrder, updatedWorkOrder);
-          }
-        } else {
-          const newWorkOrder = await createWorkOrderFromRow(row, templateCode, vesselId);
-          workOrdersByTemplateCode.set(templateCode, newWorkOrder);
-          result.created++;
-          woSequenceMap.set(componentYearKey, sequence + 1);
-          
-          // Track work order creation with authoritative state
-          if (importHistoryId) {
-            await trackChange(importHistoryId, 'created', 'workOrder', newWorkOrder.id, null, newWorkOrder);
-          }
-        }
+      } catch (woError: any) {
+        console.error(`Error processing work order row ${templateCode}:`, woError.message);
+        result.skipped++;
+        result.rowResults.push({ rowNumber: _woRowNum, primaryIdentifier: templateCode, action: 'failed', error: woError.message });
       }
     }
     
@@ -1137,7 +1188,9 @@ export async function performImport(
     console.log(`📦 Prefetched ${allSpares.length} spares for spare part linking`);
     
     // Step 2: Process each row individually with authoritative state capture
-    for (const row of data) {
+    for (let _jobIdx = 0; _jobIdx < data.length; _jobIdx++) {
+      const row = data[_jobIdx];
+      const _jobRowNum = row['__meta']?.rowNumber || (_jobIdx + 1);
       const componentCode = String(row['Component Code']).trim();
       const vesselCodeFromExcel = String(row['Vessel Code']).trim();
       
@@ -1146,6 +1199,8 @@ export async function performImport(
       if (!component) {
         console.error(`⚠️ Component not found: ${componentCode}, skipping job`);
         result.skipped++;
+        const _jobCode = row['Job Code'] ? String(row['Job Code']).trim() : `row-${_jobRowNum}`;
+        result.rowResults.push({ rowNumber: _jobRowNum, primaryIdentifier: _jobCode, action: 'skipped', error: `Component ${componentCode} not found` });
         continue;
       }
       
@@ -1204,6 +1259,8 @@ export async function performImport(
         // Validate intervalRunningHour is present and valid for RH jobs
         if (intervalRH === null || isNaN(intervalRH) || intervalRH <= 0) {
           result.skipped++;
+          const _jobCode2 = row['Job Code'] ? String(row['Job Code']).trim() : `row-${_jobRowNum}`;
+          result.rowResults.push({ rowNumber: _jobRowNum, primaryIdentifier: _jobCode2, action: 'skipped', error: 'Invalid or missing Interval Running Hours (must be > 0)' });
           console.warn(`⚠️ Skipping RH job for component ${componentCode}: Invalid or missing Interval Running Hours (must be > 0)`);
           continue;
         }
@@ -1225,6 +1282,8 @@ export async function performImport(
         const lastRH = Number(lastDoneRH);
         if (isNaN(lastRH)) {
           result.skipped++;
+          const _jobCode3 = row['Job Code'] ? String(row['Job Code']).trim() : `row-${_jobRowNum}`;
+          result.rowResults.push({ rowNumber: _jobRowNum, primaryIdentifier: _jobCode3, action: 'skipped', error: 'lastDoneRH is not a valid number' });
           console.warn(`⚠️ Skipping RH job for component ${componentCode}: lastDoneRH is not a valid number`);
           continue;
         }
@@ -1377,15 +1436,13 @@ export async function performImport(
       
       if (mode === 'add') {
         if (!existingJob) {
-          // For NEW jobs: include deprecated component fields for backwards compatibility
           const newJobData = { ...jobData, ...componentFields };
           const createdJob = await storage.createJob(newJobData);
-          // FIX: Store in map using composite key
           const newKey = getJobUniqueKey(canonicalVesselId, componentCode, createdJob.jobNo);
           jobsByCompositeKey.set(newKey, createdJob);
           result.created++;
+          result.rowResults.push({ rowNumber: _jobRowNum, primaryIdentifier: jobData.jobNo, action: 'created' });
           
-          // MANY-TO-MANY: Always create job-component link for the new job
           try {
             await storage.createJobComponentLink({
               vesselId: canonicalVesselId,
@@ -1400,19 +1457,17 @@ export async function performImport(
             console.warn(`⚠️ Job created but failed to create job-component link: ${linkError.message}`);
           }
           
-          // Track job creation with canonical state (refetch for accuracy)
           if (importHistoryId) {
             const canonicalJob = await storage.getJob(createdJob.id);
             await trackChange(importHistoryId, 'created', 'job', createdJob.id, null, canonicalJob);
           }
         } else {
-          // Job with same vesselId + componentCode + jobNo already exists - skip duplicate
           console.log(`⏭️ Job ${jobData.jobNo} already exists for component ${componentCode}, skipping`);
           result.skipped++;
+          result.rowResults.push({ rowNumber: _jobRowNum, primaryIdentifier: jobData.jobNo, action: 'skipped', error: 'Job already exists for this component' });
         }
       } else if (mode === 'update') {
         if (existingJob) {
-          // MANY-TO-MANY: Create link if it doesn't exist
           try {
             const existingLinks = await storage.getJobComponentLinksByJob(existingJob.id);
             const linkAlreadyExists = existingLinks.some(link => link.componentId === component.cuuid);
@@ -1434,24 +1489,22 @@ export async function performImport(
           
           const previousSnapshot = createRecordSnapshot(existingJob);
           const updatedJob = await storage.updateJob(existingJob.id, jobData);
-          // FIX: Store in map using composite key
           const updateKey = getJobUniqueKey(canonicalVesselId, componentCode, updatedJob.jobNo);
           jobsByCompositeKey.set(updateKey, updatedJob);
           result.updated++;
+          result.rowResults.push({ rowNumber: _jobRowNum, primaryIdentifier: jobData.jobNo, action: 'updated' });
           
-          // Track job update with canonical state (refetch for accuracy)
           if (importHistoryId) {
             const canonicalJob = await storage.getJob(updatedJob.id);
             await trackChange(importHistoryId, 'updated', 'job', updatedJob.id, existingJob, canonicalJob);
           }
         } else {
           result.skipped++;
+          result.rowResults.push({ rowNumber: _jobRowNum, primaryIdentifier: jobData.jobNo, action: 'skipped', error: 'Job not found for update' });
         }
       } else if (mode === 'upsert') {
         if (existingJob) {
-          // MANY-TO-MANY SUPPORT: Check if we need to create/update link to this component
           try {
-            // Check if link already exists before creating
             const existingLinks = await storage.getJobComponentLinksByJob(existingJob.id);
             const linkAlreadyExists = existingLinks.some(link => link.componentId === component.cuuid);
             
@@ -1467,15 +1520,13 @@ export async function performImport(
               console.log(`🔗 Linked job ${jobData.jobNo} to component ${componentCode} (upsert mode)`);
             }
             
-            // Update the job master record with latest data
             const previousSnapshot = createRecordSnapshot(existingJob);
             const updatedJob = await storage.updateJob(existingJob.id, jobData);
-            // FIX: Store in map using composite key
             const upsertKey = getJobUniqueKey(canonicalVesselId, componentCode, updatedJob.jobNo);
             jobsByCompositeKey.set(upsertKey, updatedJob);
             result.updated++;
+            result.rowResults.push({ rowNumber: _jobRowNum, primaryIdentifier: jobData.jobNo, action: 'updated' });
             
-            // Track job update with canonical state (refetch for accuracy)
             if (importHistoryId) {
               const canonicalJob = await storage.getJob(updatedJob.id);
               await trackChange(importHistoryId, 'updated', 'job', updatedJob.id, existingJob, canonicalJob);
@@ -1483,6 +1534,7 @@ export async function performImport(
           } catch (linkError: any) {
             console.warn(`⚠️ Failed to process job-component link for ${jobData.jobNo} -> ${componentCode}: ${linkError.message}`);
             result.skipped++;
+            result.rowResults.push({ rowNumber: _jobRowNum, primaryIdentifier: jobData.jobNo, action: 'failed', error: linkError.message });
           }
         } else {
           // For NEW jobs (upsert creates): include deprecated component fields for backwards compatibility
@@ -1492,8 +1544,8 @@ export async function performImport(
           const newKey = getJobUniqueKey(canonicalVesselId, componentCode, createdJob.jobNo);
           jobsByCompositeKey.set(newKey, createdJob);
           result.created++;
+          result.rowResults.push({ rowNumber: _jobRowNum, primaryIdentifier: jobData.jobNo, action: 'created' });
           
-          // MANY-TO-MANY: Always create job-component link for the new job
           try {
             await storage.createJobComponentLink({
               vesselId: canonicalVesselId,
@@ -1508,7 +1560,6 @@ export async function performImport(
             console.warn(`⚠️ Job created but failed to create job-component link: ${linkError.message}`);
           }
           
-          // Track job creation with canonical state (refetch for accuracy)
           if (importHistoryId) {
             const canonicalJob = await storage.getJob(createdJob.id);
             await trackChange(importHistoryId, 'created', 'job', createdJob.id, null, canonicalJob);
@@ -1563,14 +1614,14 @@ export async function performImport(
     console.log(`📦 Prefetched ${existingMakers.length} existing makers`);
     
     // Step 2: Process each row - using validated/normalized data from dry-run
-    for (const row of data) {
-      // Use normalized values from dry-run validation (already trimmed and validated)
+    for (let _makerIdx = 0; _makerIdx < data.length; _makerIdx++) {
+      const row = data[_makerIdx];
+      const _makerRowNum = row['__meta']?.rowNumber || (_makerIdx + 1);
       const makerCode = row['Maker Code'];
       const makerName = row['Maker Name'];
       const address = row['Address'] || null;
       
-      // Parse isActive properly - handle boolean, string, and edge cases
-      let isActive = true; // Default to active
+      let isActive = true;
       if (row['Is Active'] !== undefined && row['Is Active'] !== null) {
         if (typeof row['Is Active'] === 'boolean') {
           isActive = row['Is Active'];
@@ -1580,67 +1631,57 @@ export async function performImport(
         }
       }
       
-      // Skip rows with missing required fields (should not happen after validation)
       if (!makerCode || !makerName) {
         console.warn(`⚠️ Skipping row with missing required fields: code=${makerCode}, name=${makerName}`);
         result.skipped++;
+        result.rowResults.push({ rowNumber: _makerRowNum, primaryIdentifier: makerCode || `row-${_makerRowNum}`, action: 'skipped', error: 'Missing required fields' });
         continue;
       }
       
       const existingMaker = makersByCode.get(makerCode);
       
-      if (mode === 'add') {
-        if (existingMaker) {
-          console.log(`⏭️ Skipping existing maker: ${makerCode}`);
-          result.skipped++;
-        } else {
-          // Create new maker
-          const newMaker = await storage.createMakerListItem({
-            makerCode,
-            makerName,
-            address,
-            isActive
-          });
-          makersByCode.set(makerCode, newMaker);
-          result.created++;
-          console.log(`✅ Created maker: ${makerCode} - ${makerName}`);
+      try {
+        if (mode === 'add') {
+          if (existingMaker) {
+            console.log(`⏭️ Skipping existing maker: ${makerCode}`);
+            result.skipped++;
+            result.rowResults.push({ rowNumber: _makerRowNum, primaryIdentifier: makerCode, action: 'skipped', error: 'Maker already exists' });
+          } else {
+            const newMaker = await storage.createMakerListItem({ makerCode, makerName, address, isActive });
+            makersByCode.set(makerCode, newMaker);
+            result.created++;
+            result.rowResults.push({ rowNumber: _makerRowNum, primaryIdentifier: makerCode, action: 'created' });
+            console.log(`✅ Created maker: ${makerCode} - ${makerName}`);
+          }
+        } else if (mode === 'update') {
+          if (existingMaker) {
+            await storage.updateMakerListItem(existingMaker.id, { makerName, address, isActive });
+            result.updated++;
+            result.rowResults.push({ rowNumber: _makerRowNum, primaryIdentifier: makerCode, action: 'updated' });
+            console.log(`🔄 Updated maker: ${makerCode} - ${makerName}`);
+          } else {
+            console.log(`⏭️ Skipping non-existent maker (update mode): ${makerCode}`);
+            result.skipped++;
+            result.rowResults.push({ rowNumber: _makerRowNum, primaryIdentifier: makerCode, action: 'skipped', error: 'Maker not found for update' });
+          }
+        } else if (mode === 'upsert') {
+          if (existingMaker) {
+            await storage.updateMakerListItem(existingMaker.id, { makerName, address, isActive });
+            result.updated++;
+            result.rowResults.push({ rowNumber: _makerRowNum, primaryIdentifier: makerCode, action: 'updated' });
+            console.log(`🔄 Updated maker: ${makerCode} - ${makerName}`);
+          } else {
+            const newMaker = await storage.createMakerListItem({ makerCode, makerName, address, isActive });
+            makersByCode.set(makerCode, newMaker);
+            result.created++;
+            result.rowResults.push({ rowNumber: _makerRowNum, primaryIdentifier: makerCode, action: 'created' });
+            console.log(`✅ Created maker: ${makerCode} - ${makerName}`);
+          }
         }
-      } else if (mode === 'update') {
-        if (existingMaker) {
-          // Update existing maker
-          await storage.updateMakerListItem(existingMaker.id, {
-            makerName,
-            address,
-            isActive
-          });
-          result.updated++;
-          console.log(`🔄 Updated maker: ${makerCode} - ${makerName}`);
-        } else {
-          console.log(`⏭️ Skipping non-existent maker (update mode): ${makerCode}`);
-          result.skipped++;
-        }
-      } else if (mode === 'upsert') {
-        if (existingMaker) {
-          // Update existing maker
-          await storage.updateMakerListItem(existingMaker.id, {
-            makerName,
-            address,
-            isActive
-          });
-          result.updated++;
-          console.log(`🔄 Updated maker: ${makerCode} - ${makerName}`);
-        } else {
-          // Create new maker
-          const newMaker = await storage.createMakerListItem({
-            makerCode,
-            makerName,
-            address,
-            isActive
-          });
-          makersByCode.set(makerCode, newMaker);
-          result.created++;
-          console.log(`✅ Created maker: ${makerCode} - ${makerName}`);
-        }
+      } catch (makerError: any) {
+        console.error(`Error processing maker row ${makerCode}:`, makerError.message);
+        result.skipped++;
+        result.rowResults.push({ rowNumber: _makerRowNum, primaryIdentifier: makerCode, action: 'failed', error: makerError.message });
       }
     }
     
@@ -1655,8 +1696,9 @@ export async function performImport(
     console.log(`📦 Prefetched ${existingFleetComponents.length} existing fleet components`);
     
     // Step 2: Process each row - using validated/normalized data from dry-run
-    for (const row of data) {
-      // Use normalized values from dry-run validation (already trimmed and validated)
+    for (let _fcIdx = 0; _fcIdx < data.length; _fcIdx++) {
+      const row = data[_fcIdx];
+      const _fcRowNum = row['__meta']?.rowNumber || (_fcIdx + 1);
       const fleetEquipmentCode = row['Fleet Equipment Code'];
       const fleetEquipmentName = row['Fleet Equipment Name'];
       const parentFleetEquipmentCode = row['Parent Fleet Equipment Code'] || null;
@@ -1670,8 +1712,7 @@ export async function performImport(
       const eqptSystemDept = row['Eqpt / System Department'] || null;
       const notes = row['Notes'] || null;
       
-      // Parse isActive properly - handle boolean, string, and edge cases
-      let isActive = true; // Default to active
+      let isActive = true;
       if (row['IS Active'] !== undefined && row['IS Active'] !== null) {
         if (typeof row['IS Active'] === 'boolean') {
           isActive = row['IS Active'];
@@ -1681,103 +1722,69 @@ export async function performImport(
         }
       }
       
-      // Skip rows with missing required fields (should not happen after validation)
       if (!fleetEquipmentCode || !fleetEquipmentName) {
         console.warn(`⚠️ Skipping row with missing required fields: code=${fleetEquipmentCode}, name=${fleetEquipmentName}`);
         result.skipped++;
+        result.rowResults.push({ rowNumber: _fcRowNum, primaryIdentifier: fleetEquipmentCode || `row-${_fcRowNum}`, action: 'skipped', error: 'Missing required fields' });
         continue;
       }
       
       const existingFleetComponent = fleetComponentsByCode.get(fleetEquipmentCode);
       
-      if (mode === 'add') {
-        if (existingFleetComponent) {
-          console.log(`⏭️ Skipping existing fleet component: ${fleetEquipmentCode}`);
-          result.skipped++;
-        } else {
-          // Create new fleet component
-          const newFleetComponent = await storage.createFleetComponent({
-            fleetEquipmentCode,
-            fleetEquipmentName,
-            parentFleetEquipmentCode,
-            componentCategory,
-            makerName,
-            makerCode,
-            model,
-            modelCode,
-            location,
-            rating,
-            eqptSystemDept,
-            notes,
-            isActive
-          });
-          fleetComponentsByCode.set(fleetEquipmentCode, newFleetComponent);
-          result.created++;
-          console.log(`✅ Created fleet component: ${fleetEquipmentCode} - ${fleetEquipmentName}`);
+      try {
+        if (mode === 'add') {
+          if (existingFleetComponent) {
+            console.log(`⏭️ Skipping existing fleet component: ${fleetEquipmentCode}`);
+            result.skipped++;
+            result.rowResults.push({ rowNumber: _fcRowNum, primaryIdentifier: fleetEquipmentCode, action: 'skipped', error: 'Fleet component already exists' });
+          } else {
+            const newFleetComponent = await storage.createFleetComponent({
+              fleetEquipmentCode, fleetEquipmentName, parentFleetEquipmentCode, componentCategory,
+              makerName, makerCode, model, modelCode, location, rating, eqptSystemDept, notes, isActive
+            });
+            fleetComponentsByCode.set(fleetEquipmentCode, newFleetComponent);
+            result.created++;
+            result.rowResults.push({ rowNumber: _fcRowNum, primaryIdentifier: fleetEquipmentCode, action: 'created' });
+            console.log(`✅ Created fleet component: ${fleetEquipmentCode} - ${fleetEquipmentName}`);
+          }
+        } else if (mode === 'update') {
+          if (existingFleetComponent) {
+            await storage.updateFleetComponent(existingFleetComponent.id, {
+              fleetEquipmentName, parentFleetEquipmentCode, componentCategory,
+              makerName, makerCode, model, modelCode, location, rating, eqptSystemDept, notes, isActive
+            });
+            result.updated++;
+            result.rowResults.push({ rowNumber: _fcRowNum, primaryIdentifier: fleetEquipmentCode, action: 'updated' });
+            console.log(`🔄 Updated fleet component: ${fleetEquipmentCode} - ${fleetEquipmentName}`);
+          } else {
+            console.log(`⏭️ Skipping non-existent fleet component (update mode): ${fleetEquipmentCode}`);
+            result.skipped++;
+            result.rowResults.push({ rowNumber: _fcRowNum, primaryIdentifier: fleetEquipmentCode, action: 'skipped', error: 'Fleet component not found for update' });
+          }
+        } else if (mode === 'upsert') {
+          if (existingFleetComponent) {
+            await storage.updateFleetComponent(existingFleetComponent.id, {
+              fleetEquipmentName, parentFleetEquipmentCode, componentCategory,
+              makerName, makerCode, model, modelCode, location, rating, eqptSystemDept, notes, isActive
+            });
+            result.updated++;
+            result.rowResults.push({ rowNumber: _fcRowNum, primaryIdentifier: fleetEquipmentCode, action: 'updated' });
+            console.log(`🔄 Updated fleet component: ${fleetEquipmentCode} - ${fleetEquipmentName}`);
+          } else {
+            const newFleetComponent = await storage.createFleetComponent({
+              fleetEquipmentCode, fleetEquipmentName, parentFleetEquipmentCode, componentCategory,
+              makerName, makerCode, model, modelCode, location, rating, eqptSystemDept, notes, isActive
+            });
+            fleetComponentsByCode.set(fleetEquipmentCode, newFleetComponent);
+            result.created++;
+            result.rowResults.push({ rowNumber: _fcRowNum, primaryIdentifier: fleetEquipmentCode, action: 'created' });
+            console.log(`✅ Created fleet component: ${fleetEquipmentCode} - ${fleetEquipmentName}`);
+          }
         }
-      } else if (mode === 'update') {
-        if (existingFleetComponent) {
-          // Update existing fleet component
-          await storage.updateFleetComponent(existingFleetComponent.id, {
-            fleetEquipmentName,
-            parentFleetEquipmentCode,
-            componentCategory,
-            makerName,
-            makerCode,
-            model,
-            modelCode,
-            location,
-            rating,
-            eqptSystemDept,
-            notes,
-            isActive
-          });
-          result.updated++;
-          console.log(`🔄 Updated fleet component: ${fleetEquipmentCode} - ${fleetEquipmentName}`);
-        } else {
-          console.log(`⏭️ Skipping non-existent fleet component (update mode): ${fleetEquipmentCode}`);
-          result.skipped++;
-        }
-      } else if (mode === 'upsert') {
-        if (existingFleetComponent) {
-          // Update existing fleet component
-          await storage.updateFleetComponent(existingFleetComponent.id, {
-            fleetEquipmentName,
-            parentFleetEquipmentCode,
-            componentCategory,
-            makerName,
-            makerCode,
-            model,
-            modelCode,
-            location,
-            rating,
-            eqptSystemDept,
-            notes,
-            isActive
-          });
-          result.updated++;
-          console.log(`🔄 Updated fleet component: ${fleetEquipmentCode} - ${fleetEquipmentName}`);
-        } else {
-          // Create new fleet component
-          const newFleetComponent = await storage.createFleetComponent({
-            fleetEquipmentCode,
-            fleetEquipmentName,
-            parentFleetEquipmentCode,
-            componentCategory,
-            makerName,
-            makerCode,
-            model,
-            modelCode,
-            location,
-            rating,
-            eqptSystemDept,
-            notes,
-            isActive
-          });
-          fleetComponentsByCode.set(fleetEquipmentCode, newFleetComponent);
-          result.created++;
-          console.log(`✅ Created fleet component: ${fleetEquipmentCode} - ${fleetEquipmentName}`);
-        }
+      } catch (fcError: any) {
+        console.error(`Error processing fleet component row ${fleetEquipmentCode}:`, fcError.message);
+        result.skipped++;
+        result.rowResults.push({ rowNumber: _fcRowNum, primaryIdentifier: fleetEquipmentCode, action: 'failed', error: fcError.message });
       }
     }
     
@@ -1796,7 +1803,9 @@ export async function performImport(
     const fleetComponentsByCode = new Map(existingFleetComponents.map((fc: any) => [fc.fleetEquipmentCode, fc]));
     console.log(`📦 Prefetched ${existingFleetComponents.length} fleet components for UUID lookup`);
     
-    for (const row of data) {
+    for (let _fjIdx = 0; _fjIdx < data.length; _fjIdx++) {
+      const row = data[_fjIdx];
+      const _fjRowNum = row['__meta']?.rowNumber || (_fjIdx + 1);
       const jobCode = row['Job Code'];
       const fleetEquipmentCode = row['Fleet Equipment Code'];
       const fleetEquipmentName = row['Fleet Equipment Name'];
@@ -1834,6 +1843,7 @@ export async function performImport(
       if (!jobCode || !fleetEquipmentCode || !fleetEquipmentName || !woTitle || !taskType) {
         console.warn(`⚠️ Skipping row with missing required fields: jobCode=${jobCode}`);
         result.skipped++;
+        result.rowResults.push({ rowNumber: _fjRowNum, primaryIdentifier: jobCode || `row-${_fjRowNum}`, action: 'skipped', error: 'Missing required fields' });
         continue;
       }
       
@@ -1841,6 +1851,7 @@ export async function performImport(
       if (!matchedComponent) {
         console.warn(`⚠️ Skipping fleet job ${jobCode}: Fleet Equipment Code '${fleetEquipmentCode}' not found in fleet_components. Fleet Components must be uploaded first.`);
         result.skipped++;
+        result.rowResults.push({ rowNumber: _fjRowNum, primaryIdentifier: jobCode, action: 'skipped', error: `Fleet Equipment Code '${fleetEquipmentCode}' not found` });
         continue;
       }
       
@@ -1874,36 +1885,48 @@ export async function performImport(
       const compositeKey = `${String(jobCode).toUpperCase()}|${String(fleetEquipmentCode).trim().toUpperCase()}`;
       const existingFleetJob = fleetJobsByCompositeKey.get(compositeKey);
       
-      if (mode === 'add') {
-        if (existingFleetJob) {
-          console.log(`⏭️ Skipping existing fleet job: ${jobCode} (equipment: ${fleetEquipmentCode})`);
-          result.skipped++;
-        } else {
-          const newFleetJob = await storage.createFleetJob(fleetJobData);
-          fleetJobsByCompositeKey.set(compositeKey, newFleetJob);
-          result.created++;
-          console.log(`✅ Created fleet job: ${jobCode} - ${woTitle} (equipment: ${fleetEquipmentCode}, component: ${fleetComponentsUuid})`);
+      try {
+        if (mode === 'add') {
+          if (existingFleetJob) {
+            console.log(`⏭️ Skipping existing fleet job: ${jobCode} (equipment: ${fleetEquipmentCode})`);
+            result.skipped++;
+            result.rowResults.push({ rowNumber: _fjRowNum, primaryIdentifier: jobCode, action: 'skipped', error: 'Fleet job already exists' });
+          } else {
+            const newFleetJob = await storage.createFleetJob(fleetJobData);
+            fleetJobsByCompositeKey.set(compositeKey, newFleetJob);
+            result.created++;
+            result.rowResults.push({ rowNumber: _fjRowNum, primaryIdentifier: jobCode, action: 'created' });
+            console.log(`✅ Created fleet job: ${jobCode} - ${woTitle} (equipment: ${fleetEquipmentCode}, component: ${fleetComponentsUuid})`);
+          }
+        } else if (mode === 'update') {
+          if (existingFleetJob) {
+            await storage.updateFleetJob(existingFleetJob.id, fleetJobData);
+            result.updated++;
+            result.rowResults.push({ rowNumber: _fjRowNum, primaryIdentifier: jobCode, action: 'updated' });
+            console.log(`🔄 Updated fleet job: ${jobCode} - ${woTitle} (equipment: ${fleetEquipmentCode}, component: ${fleetComponentsUuid})`);
+          } else {
+            console.log(`⏭️ Skipping non-existent fleet job (update mode): ${jobCode} (equipment: ${fleetEquipmentCode})`);
+            result.skipped++;
+            result.rowResults.push({ rowNumber: _fjRowNum, primaryIdentifier: jobCode, action: 'skipped', error: 'Fleet job not found for update' });
+          }
+        } else if (mode === 'upsert') {
+          if (existingFleetJob) {
+            await storage.updateFleetJob(existingFleetJob.id, fleetJobData);
+            result.updated++;
+            result.rowResults.push({ rowNumber: _fjRowNum, primaryIdentifier: jobCode, action: 'updated' });
+            console.log(`🔄 Updated fleet job: ${jobCode} - ${woTitle} (equipment: ${fleetEquipmentCode}, component: ${fleetComponentsUuid})`);
+          } else {
+            const newFleetJob = await storage.createFleetJob(fleetJobData);
+            fleetJobsByCompositeKey.set(compositeKey, newFleetJob);
+            result.created++;
+            result.rowResults.push({ rowNumber: _fjRowNum, primaryIdentifier: jobCode, action: 'created' });
+            console.log(`✅ Created fleet job: ${jobCode} - ${woTitle} (equipment: ${fleetEquipmentCode}, component: ${fleetComponentsUuid})`);
+          }
         }
-      } else if (mode === 'update') {
-        if (existingFleetJob) {
-          await storage.updateFleetJob(existingFleetJob.id, fleetJobData);
-          result.updated++;
-          console.log(`🔄 Updated fleet job: ${jobCode} - ${woTitle} (equipment: ${fleetEquipmentCode}, component: ${fleetComponentsUuid})`);
-        } else {
-          console.log(`⏭️ Skipping non-existent fleet job (update mode): ${jobCode} (equipment: ${fleetEquipmentCode})`);
-          result.skipped++;
-        }
-      } else if (mode === 'upsert') {
-        if (existingFleetJob) {
-          await storage.updateFleetJob(existingFleetJob.id, fleetJobData);
-          result.updated++;
-          console.log(`🔄 Updated fleet job: ${jobCode} - ${woTitle} (equipment: ${fleetEquipmentCode}, component: ${fleetComponentsUuid})`);
-        } else {
-          const newFleetJob = await storage.createFleetJob(fleetJobData);
-          fleetJobsByCompositeKey.set(compositeKey, newFleetJob);
-          result.created++;
-          console.log(`✅ Created fleet job: ${jobCode} - ${woTitle} (equipment: ${fleetEquipmentCode}, component: ${fleetComponentsUuid})`);
-        }
+      } catch (fjError: any) {
+        console.error(`Error processing fleet job row ${jobCode}:`, fjError.message);
+        result.skipped++;
+        result.rowResults.push({ rowNumber: _fjRowNum, primaryIdentifier: jobCode, action: 'failed', error: fjError.message });
       }
     }
     
@@ -1922,7 +1945,9 @@ export async function performImport(
     const fleetComponentsByCode = new Map(existingFleetComponents.map((fc: any) => [fc.fleetEquipmentCode, fc]));
     console.log(`📦 Prefetched ${existingFleetComponents.length} fleet components for UUID lookup`);
     
-    for (const row of data) {
+    for (let _fsIdx = 0; _fsIdx < data.length; _fsIdx++) {
+      const row = data[_fsIdx];
+      const _fsRowNum = row['__meta']?.rowNumber || (_fsIdx + 1);
       const partCode = row['Part Code'];
       const fleetEquipmentCode = row['Fleet Equipment Code'];
       const fleetEquipmentName = row['Fleet Equipment Name'];
@@ -1955,6 +1980,7 @@ export async function performImport(
       if (!partCode || !fleetEquipmentCode || !fleetEquipmentName || !partName || !unitOfMeasurement) {
         console.warn(`⚠️ Skipping row with missing required fields: partCode=${partCode}`);
         result.skipped++;
+        result.rowResults.push({ rowNumber: _fsRowNum, primaryIdentifier: partCode || `row-${_fsRowNum}`, action: 'skipped', error: 'Missing required fields' });
         continue;
       }
       
@@ -1962,6 +1988,7 @@ export async function performImport(
       if (!matchedComponent) {
         console.warn(`⚠️ Skipping fleet spare ${partCode}: Fleet Equipment Code '${fleetEquipmentCode}' not found in fleet_components. Fleet Components must be uploaded first.`);
         result.skipped++;
+        result.rowResults.push({ rowNumber: _fsRowNum, primaryIdentifier: partCode, action: 'skipped', error: `Fleet Equipment Code '${fleetEquipmentCode}' not found` });
         continue;
       }
       
@@ -1992,36 +2019,48 @@ export async function performImport(
       const compositeKey = `${String(partCode).trim().toUpperCase()}|${String(fleetEquipmentCode).trim().toUpperCase()}`;
       const existingFleetSpare = fleetSparesByCompositeKey.get(compositeKey);
       
-      if (mode === 'add') {
-        if (existingFleetSpare) {
-          console.log(`⏭️ Skipping existing fleet spare: ${partCode} (equipment: ${fleetEquipmentCode})`);
-          result.skipped++;
-        } else {
-          const newFleetSpare = await storage.createFleetSpareInTable(fleetSpareData);
-          fleetSparesByCompositeKey.set(compositeKey, newFleetSpare);
-          result.created++;
-          console.log(`✅ Created fleet spare: ${partCode} - ${partName} (equipment: ${fleetEquipmentCode}, component: ${fleetComponentsUuid})`);
+      try {
+        if (mode === 'add') {
+          if (existingFleetSpare) {
+            console.log(`⏭️ Skipping existing fleet spare: ${partCode} (equipment: ${fleetEquipmentCode})`);
+            result.skipped++;
+            result.rowResults.push({ rowNumber: _fsRowNum, primaryIdentifier: partCode, action: 'skipped', error: 'Fleet spare already exists' });
+          } else {
+            const newFleetSpare = await storage.createFleetSpareInTable(fleetSpareData);
+            fleetSparesByCompositeKey.set(compositeKey, newFleetSpare);
+            result.created++;
+            result.rowResults.push({ rowNumber: _fsRowNum, primaryIdentifier: partCode, action: 'created' });
+            console.log(`✅ Created fleet spare: ${partCode} - ${partName} (equipment: ${fleetEquipmentCode}, component: ${fleetComponentsUuid})`);
+          }
+        } else if (mode === 'update') {
+          if (existingFleetSpare) {
+            await storage.updateFleetSpareInTable(existingFleetSpare.id, fleetSpareData);
+            result.updated++;
+            result.rowResults.push({ rowNumber: _fsRowNum, primaryIdentifier: partCode, action: 'updated' });
+            console.log(`🔄 Updated fleet spare: ${partCode} - ${partName} (equipment: ${fleetEquipmentCode}, component: ${fleetComponentsUuid})`);
+          } else {
+            console.log(`⏭️ Skipping non-existent fleet spare (update mode): ${partCode} (equipment: ${fleetEquipmentCode})`);
+            result.skipped++;
+            result.rowResults.push({ rowNumber: _fsRowNum, primaryIdentifier: partCode, action: 'skipped', error: 'Fleet spare not found for update' });
+          }
+        } else if (mode === 'upsert') {
+          if (existingFleetSpare) {
+            await storage.updateFleetSpareInTable(existingFleetSpare.id, fleetSpareData);
+            result.updated++;
+            result.rowResults.push({ rowNumber: _fsRowNum, primaryIdentifier: partCode, action: 'updated' });
+            console.log(`🔄 Updated fleet spare: ${partCode} - ${partName} (equipment: ${fleetEquipmentCode}, component: ${fleetComponentsUuid})`);
+          } else {
+            const newFleetSpare = await storage.createFleetSpareInTable(fleetSpareData);
+            fleetSparesByCompositeKey.set(compositeKey, newFleetSpare);
+            result.created++;
+            result.rowResults.push({ rowNumber: _fsRowNum, primaryIdentifier: partCode, action: 'created' });
+            console.log(`✅ Created fleet spare: ${partCode} - ${partName} (equipment: ${fleetEquipmentCode}, component: ${fleetComponentsUuid})`);
+          }
         }
-      } else if (mode === 'update') {
-        if (existingFleetSpare) {
-          await storage.updateFleetSpareInTable(existingFleetSpare.id, fleetSpareData);
-          result.updated++;
-          console.log(`🔄 Updated fleet spare: ${partCode} - ${partName} (equipment: ${fleetEquipmentCode}, component: ${fleetComponentsUuid})`);
-        } else {
-          console.log(`⏭️ Skipping non-existent fleet spare (update mode): ${partCode} (equipment: ${fleetEquipmentCode})`);
-          result.skipped++;
-        }
-      } else if (mode === 'upsert') {
-        if (existingFleetSpare) {
-          await storage.updateFleetSpareInTable(existingFleetSpare.id, fleetSpareData);
-          result.updated++;
-          console.log(`🔄 Updated fleet spare: ${partCode} - ${partName} (equipment: ${fleetEquipmentCode}, component: ${fleetComponentsUuid})`);
-        } else {
-          const newFleetSpare = await storage.createFleetSpareInTable(fleetSpareData);
-          fleetSparesByCompositeKey.set(compositeKey, newFleetSpare);
-          result.created++;
-          console.log(`✅ Created fleet spare: ${partCode} - ${partName} (equipment: ${fleetEquipmentCode}, component: ${fleetComponentsUuid})`);
-        }
+      } catch (fsError: any) {
+        console.error(`Error processing fleet spare row ${partCode}:`, fsError.message);
+        result.skipped++;
+        result.rowResults.push({ rowNumber: _fsRowNum, primaryIdentifier: partCode, action: 'failed', error: fsError.message });
       }
     }
     

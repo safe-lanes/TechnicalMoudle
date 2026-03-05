@@ -1488,6 +1488,11 @@ export async function validateData(type: string, data: any[], mode: string, vess
       console.log(`✅ Row ${rowNum} is OK`);
     }
 
+    if (!normalized['__meta']) {
+      normalized['__meta'] = {};
+    }
+    normalized['__meta'].rowNumber = rowNum;
+
     results.rows.push({
       row: rowNum,
       status,

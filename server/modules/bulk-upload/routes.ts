@@ -22,6 +22,7 @@ router.post('/bulk/sheets', upload.single('file'), asyncHandler(ctrl.getSheets))
 // ── Dry-Run & Import ──
 router.post('/bulk/dry-run', upload.single('file'), asyncHandler(ctrl.dryRun));
 router.post('/bulk/import', asyncHandler(ctrl.doImport));
+router.post('/bulk/export-summary', asyncHandler(ctrl.exportSummary));
 
 // ── History (specific routes before parameterized) ──
 router.get('/bulk/history', asyncHandler(ctrl.getHistoryList));

@@ -58,6 +58,7 @@ import { useQuery } from "@tanstack/react-query";
 import { queryClient } from "@/lib/queryClient";
 import { invalidateAfterBulkImport } from "@/lib/cacheInvalidation";
 import { LucideIcon } from "lucide-react";
+import ImportSummaryModal, { ImportSummaryRow } from "./ImportSummaryModal";
 
 interface FieldMapping {
   field: string;
@@ -173,6 +174,10 @@ export default function UniformBulkUpload({
   const [pageSize, setPageSize] = useState(25);
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
   const [expandedRows, setExpandedRows] = useState<Set<number>>(new Set());
+  const [importSummaryOpen, setImportSummaryOpen] = useState(false);
+  const [importSummaryData, setImportSummaryData] = useState<ImportSummaryRow[]>([]);
+  const [importCounts, setImportCounts] = useState<{ created: number; updated: number; skipped: number; archived: number }>({ created: 0, updated: 0, skipped: 0, archived: 0 });
+  const [importFileName, setImportFileName] = useState<string>('');
   const { toast } = useToast();
 
   const { data: historyData, isLoading: historyLoading } = useQuery<{items: ImportHistory[], total: number}>({
@@ -417,19 +422,22 @@ export default function UniformBulkUpload({
         description: `Created: ${result.created}, Updated: ${result.updated}, Skipped: ${result.skipped}`
       });
 
-      setSelectedFile(null);
-      setDryRunResult(null);
-      setAvailableSheets([]);
-      setSelectedSheet('');
+      const summaryRows: ImportSummaryRow[] = buildImportSummary(result, dryRunResult, skipErrors);
+
+      setImportCounts({
+        created: result.created || 0,
+        updated: result.updated || 0,
+        skipped: result.skipped || 0,
+        archived: result.archived || 0,
+      });
+      setImportSummaryData(summaryRows);
+      setImportFileName(selectedFile?.name || 'import');
+      setImportSummaryOpen(true);
+
       setPartialImportDialogOpen(false);
-      
-      if (templateType === 'stores') {
-        setSelectedStoreType('');
-      }
       
       queryClient.invalidateQueries({ queryKey: ['/technical/api/bulk/history', templateType] });
       
-      // Invalidate domain-specific caches to ensure fresh data displays
       invalidateAfterBulkImport(templateType, vesselId);
       
       if (onRefreshData) {
@@ -443,6 +451,74 @@ export default function UniformBulkUpload({
       });
     } finally {
       setIsImporting(false);
+    }
+  };
+
+  const buildImportSummary = (
+    importResult: any,
+    dryRun: DryRunResult | null,
+    wasPartial: boolean
+  ): ImportSummaryRow[] => {
+    const rows: ImportSummaryRow[] = [];
+    const primaryCol = (previewColumns && previewColumns[0]) || (dryRun?.columns?.[0] ?? '');
+
+    if (importResult.rowResults && Array.isArray(importResult.rowResults) && importResult.rowResults.length > 0) {
+      for (const rr of importResult.rowResults) {
+        const dryRunRow = dryRun?.rows.find(r => r.row === rr.rowNumber);
+        rows.push({
+          rowNumber: rr.rowNumber,
+          primaryIdentifier: rr.primaryIdentifier || '',
+          status: rr.action === 'created' || rr.action === 'updated' ? 'success'
+            : rr.action === 'failed' ? 'failed'
+            : 'skipped',
+          error: rr.error || undefined,
+          data: dryRunRow?.normalized,
+        });
+      }
+    } else if (dryRun) {
+      for (const dr of dryRun.rows) {
+        if (dr.status === 'ok' || dr.status === 'warning') {
+          rows.push({
+            rowNumber: dr.row,
+            primaryIdentifier: dr.normalized?.[primaryCol] || '',
+            status: 'success',
+            error: dr.status === 'warning' ? dr.errors.join('; ') : undefined,
+            data: dr.normalized,
+          });
+        }
+      }
+    }
+
+    if (wasPartial && dryRun) {
+      const processedRowNums = new Set(rows.map(r => r.rowNumber));
+      for (const dr of dryRun.rows) {
+        if (dr.status === 'error' && !processedRowNums.has(dr.row)) {
+          rows.push({
+            rowNumber: dr.row,
+            primaryIdentifier: dr.normalized?.[primaryCol] || '',
+            status: 'failed',
+            error: dr.errors.join('; '),
+            data: dr.normalized,
+          });
+        }
+      }
+    }
+
+    rows.sort((a, b) => a.rowNumber - b.rowNumber);
+    return rows;
+  };
+
+  const handleSummaryClose = () => {
+    setImportSummaryOpen(false);
+    setImportSummaryData([]);
+    setImportCounts({ created: 0, updated: 0, skipped: 0, archived: 0 });
+    setImportFileName('');
+    setSelectedFile(null);
+    setDryRunResult(null);
+    setAvailableSheets([]);
+    setSelectedSheet('');
+    if (templateType === 'stores') {
+      setSelectedStoreType('');
     }
   };
 
@@ -1249,6 +1325,16 @@ export default function UniformBulkUpload({
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <ImportSummaryModal
+        open={importSummaryOpen}
+        onClose={handleSummaryClose}
+        summaryData={importSummaryData}
+        importCounts={importCounts}
+        templateType={templateType}
+        previewColumns={previewColumns}
+        fileName={importFileName}
+      />
     </div>
   );
 }
