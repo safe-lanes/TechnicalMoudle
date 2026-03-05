@@ -69,3 +69,24 @@
 
 ### Environment Issues
 - None. Application runs normally, HMR picks up all changes without compilation errors.
+
+---
+
+## 2026-03-05 — Current Reading Field Validation Enhancements
+
+### What We Built
+- Enhanced "Current Reading" (running hours) field validation in the B3 section of both form components.
+- Added positive number check, ≥ Previous Reading enforcement (was missing in WorkOrderForm), and a soft warning for large jumps to catch typos.
+
+### What's Working
+- **Positive number ≥ 0**: Current Reading must be a valid number ≥ 0. Negative values are blocked with a validation error toast.
+- **≥ Previous Reading**: Current Reading cannot be less than Previous Reading (running hours can only increase). Was already present in `WorkOrderFormPage.tsx`, now also added to `WorkOrderForm.tsx`.
+- **Soft warning for large jumps**: If Current Reading exceeds Previous Reading by more than 2000 hrs, a "Warning — Large Reading Jump" toast is shown on the first save attempt. The warning displays the exact difference and asks the user to verify. On the second save attempt the value is accepted. The warning flag (`currentReadingWarningAcknowledged`) resets whenever either `currentReading` or `previousReading` changes.
+- **Input min attribute**: `min="0"` added to both forms' Current Reading inputs.
+
+### What's Broken
+- Nothing broken from this session's changes.
+
+### Key Files Changed
+- `client/src/pages/pms/WorkOrderFormPage.tsx` — Added ≥ 0 check after mandatory check, soft warning for large jumps after the ≥ previousReading check, `min="0"` on input, warning flag state + reset logic in handleExecutionChange.
+- `client/src/components/WorkOrderForm.tsx` — Added ≥ 0 check, ≥ previousReading comparison (was missing), soft warning for large jumps, `min="0"` on input, warning flag state + reset logic in handleExecutionChange.

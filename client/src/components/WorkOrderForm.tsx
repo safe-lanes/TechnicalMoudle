@@ -269,6 +269,7 @@ const WorkOrderForm: React.FC<WorkOrderFormProps> = ({
   
   // State for Part B4 spare parts consumed inline editing
   const [editingConsumedSparePart, setEditingConsumedSparePart] = useState<number | null>(null);
+  const [currentReadingWarningAcknowledged, setCurrentReadingWarningAcknowledged] = useState(false);
   
   // State for B4 spare consumption dialog
   const [showConsumeDialog, setShowConsumeDialog] = useState(false);
@@ -589,6 +590,10 @@ const WorkOrderForm: React.FC<WorkOrderFormProps> = ({
         ...prev,
         [field]: value
       };
+
+      if (field === 'currentReading' || field === 'previousReading') {
+        setCurrentReadingWarningAcknowledged(false);
+      }
 
       if (field === 'noOfPersons' || field === 'totalTimeHours') {
         const persons = field === 'noOfPersons' ? parseFloat(value) : parseFloat(prev.noOfPersons);
@@ -1371,6 +1376,43 @@ const WorkOrderForm: React.FC<WorkOrderFormProps> = ({
             variant: "destructive"
           });
           return;
+        }
+      }
+
+      // Current Reading must be a positive number ≥ 0
+      if (executionData.currentReading) {
+        const currentRHNum = parseFloat(executionData.currentReading);
+        if (isNaN(currentRHNum) || currentRHNum < 0) {
+          toast({
+            title: "Validation Error",
+            description: "Current Reading must be a positive number (≥ 0).",
+            variant: "destructive"
+          });
+          return;
+        }
+
+        // Current Reading must be ≥ Previous Reading
+        if (executionData.previousReading) {
+          const previousRHNum = parseFloat(executionData.previousReading);
+          if (!isNaN(currentRHNum) && !isNaN(previousRHNum) && currentRHNum < previousRHNum) {
+            toast({
+              title: "Validation Error",
+              description: `Current Reading (${currentRHNum}) cannot be less than Previous Reading (${previousRHNum}). Running hours can only increase.`,
+              variant: "destructive"
+            });
+            return;
+          }
+
+          // Soft warning: large jump (> 2000 hrs above previous) may indicate a typo
+          if (!isNaN(currentRHNum) && !isNaN(previousRHNum) && (currentRHNum - previousRHNum) > 2000 && !currentReadingWarningAcknowledged) {
+            toast({
+              title: "Warning — Large Reading Jump",
+              description: `Current Reading (${currentRHNum}) exceeds Previous Reading (${previousRHNum}) by ${(currentRHNum - previousRHNum).toFixed(2)} hrs. Please verify this value is correct and save again to confirm.`,
+              variant: "destructive"
+            });
+            setCurrentReadingWarningAcknowledged(true);
+            return;
+          }
         }
       }
 
@@ -2713,6 +2755,7 @@ const WorkOrderForm: React.FC<WorkOrderFormProps> = ({
                           <Label className="text-sm text-[#8798ad]">Current Reading *</Label>
                           <Input 
                             type="number" 
+                            min="0"
                             value={executionData.currentReading}
                             onChange={(e) => handleExecutionChange('currentReading', e.target.value)}
                             placeholder="Enter current hours reading"

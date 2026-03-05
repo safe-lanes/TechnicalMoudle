@@ -321,6 +321,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
   const [uploadingDocType, setUploadingDocType] = useState<string | null>(null);
   const [woDocuments, setWoDocuments] = useState<Array<{id: string, workOrderId: string, documentType: string, fileName: string, fileKey: string, fileType: string, fileSize: number, uploadedBy: string, uploadedAt: string}>>([]);
   const [previewDoc, setPreviewDoc] = useState<{id: string, fileName: string, fileType: string, fileSize?: number, fetchUrl?: string} | null>(null);
+  const [currentReadingWarningAcknowledged, setCurrentReadingWarningAcknowledged] = useState(false);
 
   const [editingConsumedSparePart, setEditingConsumedSparePart] = useState<number | null>(null);
 
@@ -712,6 +713,10 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
         ...prev,
         [field]: value
       };
+
+      if (field === 'currentReading' || field === 'previousReading') {
+        setCurrentReadingWarningAcknowledged(false);
+      }
 
       // Auto-calculate manhours when noOfPersons or totalTimeHours changes
       if (field === 'noOfPersons' || field === 'totalTimeHours') {
@@ -1681,6 +1686,19 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
         return;
       }
 
+      // Current Reading must be a positive number ≥ 0
+      if (currentRHValue) {
+        const currentRHNum = parseFloat(currentRHValue);
+        if (isNaN(currentRHNum) || currentRHNum < 0) {
+          toast({
+            title: "Validation Error",
+            description: "Current Reading must be a positive number (≥ 0).",
+            variant: "destructive",
+          });
+          return;
+        }
+      }
+
       // PHASE 3A: Block submission if inventory data not loaded or failed and spares are being consumed
       const hasConsumedSpares = executionData.consumedSpareParts.some(
         spare => spare.partNo && spare.quantityConsumed && parseFloat(spare.quantityConsumed) > 0
@@ -1783,6 +1801,17 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
             description: `Current Reading (${currentRH}) cannot be less than Previous Reading (${previousRH}). Running hours can only increase.`,
             variant: "destructive",
           });
+          return;
+        }
+
+        // Soft warning: large jump (> 2000 hrs above previous) may indicate a typo
+        if (!isNaN(currentRH) && !isNaN(previousRH) && (currentRH - previousRH) > 2000 && !currentReadingWarningAcknowledged) {
+          toast({
+            title: "Warning — Large Reading Jump",
+            description: `Current Reading (${currentRH}) exceeds Previous Reading (${previousRH}) by ${(currentRH - previousRH).toFixed(2)} hrs. Please verify this value is correct and save again to confirm.`,
+            variant: "destructive",
+          });
+          setCurrentReadingWarningAcknowledged(true);
           return;
         }
       }
@@ -3618,6 +3647,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                 <Label className="text-sm text-[#8798ad]" data-testid="WOF.B3.5"><Marker id="WOF.B3.5" />Current Reading{(workOrderContext as any)?.maintenanceBasis === 'Running Hours' && <span className="text-red-500"> *</span>}</Label>
                 <Input
                   type="number"
+                  min="0"
                   value={executionData.currentReading}
                   onChange={(e) => handleExecutionChange('currentReading', e.target.value)}
                   className="text-sm"
