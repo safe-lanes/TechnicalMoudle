@@ -111,11 +111,24 @@ export default function ComponentRegisterAddEdit({
     // Row 7: Notes (full width)
     notes: "",
     // Section B: Running Hours & Condition Monitoring
-    rhCounterType: "NONE",
+    rhCounterType: "NOT_RH_DRIVEN",
     rhCounterSource: "",
+    rhMasterComponentId: "",
     lastUpdated: "",
   });
 
+  const [rhSourceOpen, setRhSourceOpen] = useState(false);
+
+  const { data: masterComponents = [] } = useQuery<any[]>({
+    queryKey: ['/technical/api/rh-config/master-components', vesselId],
+    queryFn: async () => {
+      const res = await fetch(`/technical/api/rh-config/master-components/${vesselId}`);
+      if (!res.ok) throw new Error("Failed to fetch master components");
+      return res.json();
+    },
+    enabled: !!vesselId && componentData.rhCounterType === "INHERITED",
+    staleTime: 0,
+  });
 
   const [workOrders, setWorkOrders] = useState<any[]>([]);
   const [maintenanceHistory, setMaintenanceHistory] = useState<any[]>([]);
@@ -422,8 +435,9 @@ export default function ComponentRegisterAddEdit({
         // Row 7
         notes: comp.notes || "",
         // Section B: Running Hours & Condition Monitoring
-        rhCounterType: comp.rhCounterType || "NONE",
+        rhCounterType: comp.rhCounterType || "NOT_RH_DRIVEN",
         rhCounterSource: comp.rhCounterSource || "",
+        rhMasterComponentId: comp.rhMasterComponentId || "",
         lastUpdated: comp.lastUpdated || comp.rhLastUpdated || "",
       });
       // Use propComponentCode if provided (passed from parent), otherwise use fetched comp.componentCode
@@ -777,6 +791,14 @@ export default function ComponentRegisterAddEdit({
     } else if (componentData.makerCode) {
       handleFieldChange('makerCode', '');
     }
+    if (componentData.rhCounterType === "INHERITED" && !componentData.rhMasterComponentId) {
+      toast({
+        title: "Validation Error",
+        description: "Please select a RH Counter Source from MASTER components.",
+        variant: "destructive",
+      });
+      return;
+    }
     setIsSaving(true);
     try {
       const payload = {
@@ -802,6 +824,8 @@ export default function ComponentRegisterAddEdit({
         vesselCode: componentData.vesselCode || null,
         isParent: componentData.isParent === "Yes",
         classItem: componentData.classItem === "Yes",
+        rhCounterType: componentData.rhCounterType === "NOT_RH_DRIVEN" ? "NOT_RH_DRIVEN" : componentData.rhCounterType,
+        rhMasterComponentId: componentData.rhCounterType === "INHERITED" ? (componentData.rhMasterComponentId || null) : null,
       };
 
       if (isEditMode && componentId) {
@@ -891,8 +915,9 @@ export default function ComponentRegisterAddEdit({
       // Row 7
       notes: comp.notes || "",
       // Section B: Running Hours & Condition Monitoring
-      rhCounterType: comp.rhCounterType || "NONE",
+      rhCounterType: comp.rhCounterType || "NOT_RH_DRIVEN",
       rhCounterSource: comp.rhCounterSource || "",
+      rhMasterComponentId: comp.rhMasterComponentId || "",
       lastUpdated: comp.lastUpdated || comp.rhLastUpdated || "",
     });
     
@@ -1039,8 +1064,9 @@ export default function ComponentRegisterAddEdit({
                 // Row 7
                 notes: "",
                 // Section B: Running Hours & Condition Monitoring
-                rhCounterType: "NONE",
+                rhCounterType: "NOT_RH_DRIVEN",
                 rhCounterSource: "",
+                rhMasterComponentId: "",
                 lastUpdated: "",
               });
               setWorkOrders([]);
@@ -1492,22 +1518,97 @@ export default function ComponentRegisterAddEdit({
                         <td className="px-3 py-2">
                           <select
                             value={componentData.rhCounterType}
-                            onChange={(e) => handleFieldChange('rhCounterType', e.target.value)}
+                            onChange={(e) => {
+                              const newType = e.target.value;
+                              handleFieldChange('rhCounterType', newType);
+                              if (newType !== "INHERITED") {
+                                handleFieldChange('rhMasterComponentId', '');
+                              }
+                            }}
                             className="h-8 w-full text-sm px-2 border rounded border-gray-200"
                             data-testid="select-rh-counter-type"
                           >
-                            <option value="NONE">None</option>
+                            <option value="NOT_RH_DRIVEN">None</option>
                             <option value="MASTER">Master</option>
                             <option value="INHERITED">Inherited</option>
                           </select>
                         </td>
                         <td className="px-3 py-2">
-                          <Input
-                            value={componentData.rhCounterSource || '—'}
-                            readOnly
-                            className="h-8 text-sm bg-gray-50"
-                            data-testid="input-rh-counter-source"
-                          />
+                          {componentData.rhCounterType === "INHERITED" ? (
+                            <div className="flex gap-1">
+                              <Popover open={rhSourceOpen} onOpenChange={setRhSourceOpen}>
+                                <PopoverTrigger asChild>
+                                  <button
+                                    type="button"
+                                    role="combobox"
+                                    aria-expanded={rhSourceOpen}
+                                    className="flex items-center justify-between w-full h-8 px-2 text-sm border rounded-md bg-white hover:bg-gray-50 text-left"
+                                    data-testid="input-rh-counter-source"
+                                  >
+                                    <span className={`truncate ${componentData.rhMasterComponentId ? 'text-gray-900' : 'text-gray-400'}`}>
+                                      {componentData.rhMasterComponentId
+                                        ? (() => {
+                                            const mc = masterComponents.find((m: any) => m.id === componentData.rhMasterComponentId);
+                                            return mc ? `${mc.componentCode} — ${mc.name}` : componentData.rhCounterSource || "Select source...";
+                                          })()
+                                        : "Select source..."}
+                                    </span>
+                                    <ChevronsUpDown className="h-3 w-3 flex-shrink-0 text-gray-400 ml-1" />
+                                  </button>
+                                </PopoverTrigger>
+                                <PopoverContent className="w-[350px] p-0" align="start">
+                                  <Command>
+                                    <CommandInput placeholder="Search by code or name..." data-testid="input-search-rh-source" />
+                                    <CommandList className="max-h-[200px]">
+                                      <CommandEmpty>No MASTER components found.</CommandEmpty>
+                                      <CommandGroup>
+                                        {masterComponents
+                                          .filter((m: any) => m.id !== (componentId || selectedComponentId))
+                                          .map((mc: any) => (
+                                            <CommandItem
+                                              key={mc.id}
+                                              value={`${mc.componentCode} ${mc.name}`}
+                                              onSelect={() => {
+                                                handleFieldChange('rhMasterComponentId', mc.id);
+                                                handleFieldChange('rhCounterSource', mc.name);
+                                                setRhSourceOpen(false);
+                                              }}
+                                              data-testid={`option-rh-source-${mc.componentCode}`}
+                                            >
+                                              <div className="flex flex-col">
+                                                <span className="text-sm font-medium">{mc.componentCode}</span>
+                                                <span className="text-xs text-gray-500">{mc.name}</span>
+                                              </div>
+                                              {componentData.rhMasterComponentId === mc.id && <Check className="h-3 w-3 ml-auto text-blue-600" />}
+                                            </CommandItem>
+                                          ))}
+                                      </CommandGroup>
+                                    </CommandList>
+                                  </Command>
+                                </PopoverContent>
+                              </Popover>
+                              {componentData.rhMasterComponentId && (
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    handleFieldChange('rhMasterComponentId', '');
+                                    handleFieldChange('rhCounterSource', '');
+                                  }}
+                                  className="h-8 w-8 flex items-center justify-center border rounded-md hover:bg-red-50"
+                                  data-testid="button-clear-rh-source"
+                                >
+                                  <X className="h-3 w-3 text-gray-500" />
+                                </button>
+                              )}
+                            </div>
+                          ) : (
+                            <Input
+                              value={componentData.rhCounterType === "MASTER" ? "SELF" : "—"}
+                              readOnly
+                              className="h-8 text-sm bg-gray-50"
+                              data-testid="input-rh-counter-source"
+                            />
+                          )}
                         </td>
                         <td className="px-3 py-2">
                           <Input

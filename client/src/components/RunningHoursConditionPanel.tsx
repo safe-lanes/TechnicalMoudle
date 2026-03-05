@@ -12,9 +12,11 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { ChevronDown, ChevronRight, Save, RefreshCw } from "lucide-react";
+import { ChevronDown, ChevronRight, Save, RefreshCw, Check, ChevronsUpDown } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { formatProfessionalDate } from "@/lib/dateUtils";
@@ -66,6 +68,7 @@ export default function RunningHoursConditionPanel({
   const [localRHValue, setLocalRHValue] = useState<string>("");
   const [selectedMasterId, setSelectedMasterId] = useState<string>("");
   const [pendingCounterType, setPendingCounterType] = useState<string>("");
+  const [masterSourceOpen, setMasterSourceOpen] = useState(false);
 
   const { data: rhConfig, isLoading: isLoadingConfig } = useQuery<RHConfig>({
     queryKey: ["/technical/api/rh-config", componentId],
@@ -256,27 +259,57 @@ export default function RunningHoursConditionPanel({
 
               {pendingCounterType === "INHERITED" && (
                 <div className="mt-2">
-                  <Select
-                    value={selectedMasterId}
-                    onValueChange={handleMasterSelect}
-                    disabled={readOnly || isLoadingMasters || updateConfigMutation.isPending}
-                  >
-                    <SelectTrigger 
-                      className="w-full text-sm" 
-                      data-testid="select-master-component"
-                    >
-                      <SelectValue placeholder="Select Master Component" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {masterComponents
-                        .filter((m) => m.id !== componentId)
-                        .map((master) => (
-                          <SelectItem key={master.id} value={master.id}>
-                            {master.name} ({master.rhCurrentMaster || "0"} hrs)
-                          </SelectItem>
-                        ))}
-                    </SelectContent>
-                  </Select>
+                  <Popover open={masterSourceOpen} onOpenChange={setMasterSourceOpen}>
+                    <PopoverTrigger asChild>
+                      <button
+                        type="button"
+                        role="combobox"
+                        aria-expanded={masterSourceOpen}
+                        disabled={readOnly || isLoadingMasters || updateConfigMutation.isPending}
+                        className="flex items-center justify-between w-full h-9 px-3 text-sm border rounded-md bg-white hover:bg-gray-50 text-left disabled:opacity-50"
+                        data-testid="select-master-component"
+                      >
+                        <span className={`truncate ${selectedMasterId ? 'text-gray-900' : 'text-gray-400'}`}>
+                          {selectedMasterId
+                            ? (() => {
+                                const mc = masterComponents.find((m) => m.id === selectedMasterId);
+                                return mc ? `${mc.componentCode} — ${mc.name}` : "Select Master Component";
+                              })()
+                            : "Select Master Component"}
+                        </span>
+                        <ChevronsUpDown className="h-3 w-3 flex-shrink-0 text-gray-400 ml-1" />
+                      </button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-[350px] p-0" align="start">
+                      <Command>
+                        <CommandInput placeholder="Search by code or name..." data-testid="input-search-master-component" />
+                        <CommandList className="max-h-[200px]">
+                          <CommandEmpty>No MASTER components found.</CommandEmpty>
+                          <CommandGroup>
+                            {masterComponents
+                              .filter((m) => m.id !== componentId)
+                              .map((master) => (
+                                <CommandItem
+                                  key={master.id}
+                                  value={`${master.componentCode} ${master.name}`}
+                                  onSelect={() => {
+                                    handleMasterSelect(master.id);
+                                    setMasterSourceOpen(false);
+                                  }}
+                                  data-testid={`option-master-${master.componentCode}`}
+                                >
+                                  <div className="flex flex-col">
+                                    <span className="text-sm font-medium">{master.componentCode}</span>
+                                    <span className="text-xs text-gray-500">{master.name}</span>
+                                  </div>
+                                  {selectedMasterId === master.id && <Check className="h-3 w-3 ml-auto text-blue-600" />}
+                                </CommandItem>
+                              ))}
+                          </CommandGroup>
+                        </CommandList>
+                      </Command>
+                    </PopoverContent>
+                  </Popover>
                 </div>
               )}
             </td>
