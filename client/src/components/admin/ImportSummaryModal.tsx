@@ -8,7 +8,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
-import { ScrollArea } from "@/components/ui/scroll-area";
+
 import {
   Table,
   TableBody,
@@ -291,7 +291,7 @@ export default function ImportSummaryModal({
           </Button>
         </div>
 
-        <ScrollArea className="flex-1 min-h-0">
+        <div className="flex-1 min-h-0 overflow-y-auto border rounded-md">
           <Table data-testid="summary-table">
             <TableHeader>
               <TableRow>
@@ -384,7 +384,7 @@ export default function ImportSummaryModal({
               )}
             </TableBody>
           </Table>
-        </ScrollArea>
+        </div>
 
         {totalPages > 0 && (
           <div
