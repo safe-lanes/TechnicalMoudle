@@ -414,6 +414,11 @@ export async function validateData(type: string, data: any[], mode: string, vess
         }
       });
 
+      const deptValue = normalized['Equipment / System Department'] || normalized['Eqpt / System Department'];
+      if (deptValue && !DEPARTMENTS.includes(deptValue)) {
+        errors.push(`Row ${rowNum}: Invalid Equipment / System Department '${deptValue}'. Allowed values are: ${DEPARTMENTS.join(', ')}.`);
+      }
+
       // Validate Maker exists in Maker List (only if maker list was loaded successfully)
       if (makerListLoaded) {
         const rowMakerCode = normalized['Maker Code'] || null;

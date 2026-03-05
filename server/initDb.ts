@@ -260,6 +260,26 @@ export async function initializeDatabase() {
       // Run index migrations to update unique constraints to include vessel_id
       await runIndexMigrations(db);
       
+      // Seed department master list values (idempotent)
+      if (tableNames.includes('master_lists')) {
+        const departmentSeeds = [
+          { key: 'Engine', value: 'Engine', order: 1 },
+          { key: 'Deck', value: 'Deck', order: 2 },
+          { key: 'Electrical', value: 'Electrical', order: 3 },
+          { key: 'Galley', value: 'Galley', order: 4 },
+          { key: 'LSA', value: 'LSA', order: 5 },
+          { key: 'FFA', value: 'FFA', order: 6 },
+        ];
+        for (const dept of departmentSeeds) {
+          await db.execute(sql`
+            INSERT INTO master_lists (list_type, list_key, list_value, display_order, is_active)
+            VALUES ('department', ${dept.key}, ${dept.value}, ${dept.order}, true)
+            ON CONFLICT (list_type, list_key) DO UPDATE SET display_order = ${dept.order}
+          `);
+        }
+        console.log('✓ Ensured department master list (6 values)');
+      }
+      
       return true;
     }
     
@@ -696,7 +716,24 @@ export async function initializeDatabase() {
     `);
     await db.execute(sql`CREATE INDEX IF NOT EXISTS idx_list_type ON master_lists(list_type)`);
     console.log('✓ Created master_lists table');
-    
+
+    const departmentSeeds = [
+      { key: 'Engine', value: 'Engine', order: 1 },
+      { key: 'Deck', value: 'Deck', order: 2 },
+      { key: 'Electrical', value: 'Electrical', order: 3 },
+      { key: 'Galley', value: 'Galley', order: 4 },
+      { key: 'LSA', value: 'LSA', order: 5 },
+      { key: 'FFA', value: 'FFA', order: 6 },
+    ];
+    for (const dept of departmentSeeds) {
+      await db.execute(sql`
+        INSERT INTO master_lists (list_type, list_key, list_value, display_order, is_active)
+        VALUES ('department', ${dept.key}, ${dept.value}, ${dept.order}, true)
+        ON CONFLICT (list_type, list_key) DO UPDATE SET display_order = ${dept.order}
+      `);
+    }
+    console.log('✓ Seeded department master list (6 values)');
+
     // Alert Policies
     await db.execute(sql`
       CREATE TABLE IF NOT EXISTS alert_policies (

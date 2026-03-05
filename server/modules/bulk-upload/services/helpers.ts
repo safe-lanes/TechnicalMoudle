@@ -658,7 +658,7 @@ export const STORES_CATEGORIES = [
 ];
 
 // Departments list for jobs/work orders
-export const DEPARTMENTS = ['Engine', 'Deck', 'Electrical'];
+export const DEPARTMENTS = ['Engine', 'Deck', 'Electrical', 'Galley', 'LSA', 'FFA'];
 
 // Responsible ranks for work orders
 export const RESPONSIBLE_RANKS = [

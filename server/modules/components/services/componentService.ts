@@ -5,6 +5,8 @@ import { makerList } from '@shared/schema';
 import { eq, and, ilike } from 'drizzle-orm';
 import { db } from '../../../db';
 
+const ALLOWED_DEPARTMENTS = ['Engine', 'Deck', 'Electrical', 'Galley', 'LSA', 'FFA'];
+
 async function validateMaker(makerName?: string, makerCode?: string) {
   const hasName = makerName && makerName.trim();
   const hasCode = makerCode && makerCode.trim();
@@ -69,6 +71,10 @@ export async function create(data: any): Promise<Component> {
   }).map(f => f.label);
   if (missing.length > 0) {
     throw new ValidationError(`Missing mandatory fields: ${missing.join(', ')}`);
+  }
+
+  if (data.eqptSystemDept && !ALLOWED_DEPARTMENTS.includes(data.eqptSystemDept)) {
+    throw new ValidationError(`Invalid Equipment / System Department. Allowed values are: ${ALLOWED_DEPARTMENTS.join(', ')}.`);
   }
 
   await validateMaker(data.maker, data.makerCode);
@@ -140,6 +146,10 @@ export async function update(id: string, data: any, userId: string): Promise<Com
   }).map(f => f.label);
   if (invalidPatch.length > 0) {
     throw new ValidationError(`Cannot set mandatory fields to empty: ${invalidPatch.join(', ')}`);
+  }
+
+  if (data.eqptSystemDept !== undefined && data.eqptSystemDept !== null && data.eqptSystemDept !== '' && !ALLOWED_DEPARTMENTS.includes(data.eqptSystemDept)) {
+    throw new ValidationError(`Invalid Equipment / System Department. Allowed values are: ${ALLOWED_DEPARTMENTS.join(', ')}.`);
   }
 
   if (data.maker !== undefined || data.makerCode !== undefined) {
