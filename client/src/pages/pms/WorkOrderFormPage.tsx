@@ -1440,7 +1440,8 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
       const totalTimeVal = parseFloat(executionData.totalTimeHours);
       const currentRHValue = executionData.currentReading || executionData.runningHours;
       const hasCompletionData = !!(executionData.completionDateTime || executionData.dateOfCompletion);
-      const hasAnyPartBData = !!(startDate || completionDate || executionData.performedBy || noOfPersonsStr || executionData.totalTimeHours || workCarriedOutTrimmed || currentRHValue || executionData.riskAssessment || executionData.safetyChecklists || executionData.operationalForms);
+      const hasConsumedSparesData = executionData.consumedSpareParts.some(s => s.partNo && s.quantityConsumed && parseFloat(s.quantityConsumed) > 0);
+      const hasAnyPartBData = !!(startDate || completionDate || executionData.performedBy || noOfPersonsStr || executionData.totalTimeHours || workCarriedOutTrimmed || currentRHValue || executionData.riskAssessment || executionData.safetyChecklists || executionData.operationalForms || hasConsumedSparesData);
 
       const hardErrors: string[] = [];
       const missingFields: string[] = [];
@@ -1679,6 +1680,10 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
 
         await queryClient.invalidateQueries({ queryKey: ['/technical/api/work-orders'] });
         await queryClient.invalidateQueries({ queryKey: [`/technical/api/work-orders/${workOrderId}/context`] });
+        if (hasConsumedSparesData && vesselId) {
+          await queryClient.invalidateQueries({ queryKey: [`/technical/api/spares/${vesselId}`] });
+          await queryClient.invalidateQueries({ queryKey: [`/technical/api/inventory/spares-with-inventory/${vesselId}`] });
+        }
 
         toast({
           title: "Draft Saved",
@@ -1855,6 +1860,10 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
       // This includes the list (with any vesselId variants) and the specific work order context
       await queryClient.invalidateQueries({ queryKey: ['/technical/api/work-orders'] });
       await queryClient.invalidateQueries({ queryKey: [`/technical/api/work-orders/${workOrderId}/context`] });
+      if (hasConsumedSparesData && vesselId) {
+        await queryClient.invalidateQueries({ queryKey: [`/technical/api/spares/${vesselId}`] });
+        await queryClient.invalidateQueries({ queryKey: [`/technical/api/inventory/spares-with-inventory/${vesselId}`] });
+      }
 
       toast({
         title: "Success",
@@ -3700,14 +3709,19 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                                 value={consumedData?.quantityConsumed || ''}
                                 onChange={(e) => {
                                   const newValue = e.target.value;
-                                  const autoLoc = autoSelectedLocationField ? getLocationName(sparePartCode, autoSelectedLocationField) : null;
+                                  const lookupKey = sparePartCode || spare.partNo;
+                                  const autoLoc = autoSelectedLocationField ? getLocationName(lookupKey, autoSelectedLocationField) : null;
                                   setExecutionData(prev => {
                                     const consumed = [...prev.consumedSpareParts];
-                                    if (consumedIndex >= 0) {
-                                      consumed[consumedIndex] = {
-                                        ...consumed[consumedIndex],
+                                    const freshIndex = consumed.findIndex(c =>
+                                      (sparePartCode && c.partCode === sparePartCode) ||
+                                      (!sparePartCode && spare.partNo && c.partNo === spare.partNo)
+                                    );
+                                    if (freshIndex >= 0) {
+                                      consumed[freshIndex] = {
+                                        ...consumed[freshIndex],
                                         quantityConsumed: newValue,
-                                        location: consumed[consumedIndex].location || autoLoc || ''
+                                        location: consumed[freshIndex].location || autoLoc || ''
                                       };
                                     } else {
                                       consumed.push({
@@ -3737,12 +3751,15 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                             <Select
                               value={consumedData?.location || ''}
                               onValueChange={(locationName) => {
-                                const selectedLoc = spareLocations.find(l => l.name === locationName);
                                 setExecutionData(prev => {
                                   const consumed = [...prev.consumedSpareParts];
-                                  if (consumedIndex >= 0) {
-                                    consumed[consumedIndex] = {
-                                      ...consumed[consumedIndex],
+                                  const freshIndex = consumed.findIndex(c =>
+                                    (sparePartCode && c.partCode === sparePartCode) ||
+                                    (!sparePartCode && spare.partNo && c.partNo === spare.partNo)
+                                  );
+                                  if (freshIndex >= 0) {
+                                    consumed[freshIndex] = {
+                                      ...consumed[freshIndex],
                                       location: locationName as any,
                                       locationId: null
                                     };
@@ -3785,9 +3802,13 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                                 const newValue = e.target.value;
                                 setExecutionData(prev => {
                                   const consumed = [...prev.consumedSpareParts];
-                                  if (consumedIndex >= 0) {
-                                    consumed[consumedIndex] = {
-                                      ...consumed[consumedIndex],
+                                  const freshIndex = consumed.findIndex(c =>
+                                    (sparePartCode && c.partCode === sparePartCode) ||
+                                    (!sparePartCode && spare.partNo && c.partNo === spare.partNo)
+                                  );
+                                  if (freshIndex >= 0) {
+                                    consumed[freshIndex] = {
+                                      ...consumed[freshIndex],
                                       comments: newValue
                                     };
                                   } else {

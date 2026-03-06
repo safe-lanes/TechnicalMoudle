@@ -665,6 +665,163 @@ export async function updateWorkOrder(id: string, body: any) {
 
   const workOrder = await repo.update(id, updateData);
 
+  // ========== SPARE CONSUMPTION ON SAVE (Real-time ROB update) ==========
+  const isApprovalAction = updateData.approvalAction === 'approved' && updateData.status === 'Completed';
+  if (!isApprovalAction && !isBeingRejected && !woIsCompleted) {
+    const currentConsumed = (updateData.consumedSpareParts || []) as Array<{
+      partNo: string;
+      partCode?: string;
+      description?: string;
+      quantityConsumed: number | string;
+      locationId?: number | null;
+      location?: string;
+      locationName?: string;
+      comments?: string;
+      _deductedQty?: number;
+    }>;
+    const previousConsumed = (existingWO.consumedSpareParts || []) as Array<{
+      partNo: string;
+      partCode?: string;
+      quantityConsumed: number | string;
+      location?: string;
+      locationName?: string;
+      locationId?: number | null;
+      _deductedQty?: number;
+    }>;
+
+    const makeCompositeKey = (partKey: string, locName: string) => `${partKey}::${(locName || '').toLowerCase().trim()}`;
+
+    const previousDeductionMap = new Map<string, number>();
+    for (const prev of previousConsumed) {
+      const prevPartKey = prev.partCode || prev.partNo;
+      if (!prevPartKey) continue;
+      const prevLoc = (prev.location || prev.locationName || '').trim();
+      if (!prevLoc) continue;
+      const prevDeducted = prev._deductedQty || 0;
+      if (prevDeducted > 0) {
+        const compositeKey = makeCompositeKey(prevPartKey, prevLoc);
+        previousDeductionMap.set(compositeKey, (previousDeductionMap.get(compositeKey) || 0) + prevDeducted);
+      }
+    }
+
+    const sparesToProcess: Array<{ spare: any; qty: number; reverseQty: number; locationName: string; partKey: string; lineIndex: number }> = [];
+    const woVesselId = existingWO.vesselId || 'V001';
+    const currentCompositeKeys = new Set<string>();
+
+    for (let i = 0; i < currentConsumed.length; i++) {
+      const consumed = currentConsumed[i];
+      const qtyConsumed = typeof consumed.quantityConsumed === 'string'
+        ? parseFloat(consumed.quantityConsumed) : consumed.quantityConsumed;
+
+      const partKey = consumed.partCode || consumed.partNo;
+      if (!partKey) continue;
+
+      const locationName = (consumed.location || consumed.locationName || '').trim();
+      if (!locationName) continue;
+
+      const compositeKey = makeCompositeKey(partKey, locationName);
+      currentCompositeKeys.add(compositeKey);
+
+      const storedDeducted = previousDeductionMap.get(compositeKey) || 0;
+      const effectiveQty = (qtyConsumed && qtyConsumed > 0) ? qtyConsumed : 0;
+      const delta = effectiveQty - storedDeducted;
+
+      if (delta > 0) {
+        sparesToProcess.push({ spare: consumed, qty: delta, reverseQty: 0, locationName, partKey, lineIndex: i });
+      } else if (delta < 0) {
+        sparesToProcess.push({ spare: consumed, qty: 0, reverseQty: Math.abs(delta), locationName, partKey, lineIndex: i });
+      }
+    }
+
+    for (const [compositeKey, prevDeducted] of previousDeductionMap.entries()) {
+      if (!currentCompositeKeys.has(compositeKey) && prevDeducted > 0) {
+        const [partKey, locName] = compositeKey.split('::');
+        const prevEntry = previousConsumed.find(p => {
+          const pk = p.partCode || p.partNo;
+          const pl = (p.location || p.locationName || '').toLowerCase().trim();
+          return pk === partKey && pl === locName;
+        });
+        if (prevEntry) {
+          sparesToProcess.push({ spare: prevEntry, qty: 0, reverseQty: prevDeducted, locationName: prevEntry.location || prevEntry.locationName || '', partKey, lineIndex: -1 });
+        }
+      }
+    }
+
+    if (sparesToProcess.length > 0) {
+      const allSpares = await repo.findSpares(woVesselId);
+      const updatedConsumedSpareParts = [...currentConsumed];
+
+      for (const item of sparesToProcess) {
+        try {
+          let spare = allSpares.find((s: any) => s.partCode === item.partKey);
+          if (!spare) spare = allSpares.find((s: any) => s.partNumber === item.partKey);
+          if (!spare) {
+            console.warn(`⚠️ [Save Consumption] Spare ${item.partKey} not found in inventory, skipping ROB deduction`);
+            continue;
+          }
+
+          let resolvedLocationId: number | null = null;
+          const locationObj = await repo.findOrCreateLocation(woVesselId, item.locationName, updateData.userId || updateData.performedBy || 'system');
+          if (locationObj) resolvedLocationId = locationObj.id;
+
+          if (!resolvedLocationId) {
+            console.warn(`⚠️ [Save Consumption] Could not resolve location "${item.locationName}" for spare ${item.partKey}`);
+            continue;
+          }
+
+          if (item.reverseQty > 0) {
+            await repo.performInventoryTransaction({
+              vesselId: woVesselId,
+              spareId: spare.id,
+              locationId: resolvedLocationId,
+              eventType: 'ADJUST',
+              qtyChange: item.reverseQty,
+              referenceType: 'WORK_ORDER',
+              referenceId: existingWO.wouuid,
+              referenceNote: `WO Save Reversal: ${existingWO.workOrderNo} - Qty adjusted due to work order re-save`,
+              userId: updateData.userId || updateData.performedBy || 'system'
+            });
+            console.log(`🔄 [Save Consumption] Reversed ${item.reverseQty} units of ${item.partKey} at ${item.locationName} (WO: ${existingWO.workOrderNo})`);
+          }
+
+          if (item.qty > 0) {
+            await repo.performInventoryTransaction({
+              vesselId: woVesselId,
+              spareId: spare.id,
+              locationId: resolvedLocationId,
+              eventType: 'CONSUME',
+              qtyChange: -Math.abs(item.qty),
+              referenceType: 'WORK_ORDER',
+              referenceId: existingWO.wouuid,
+              referenceNote: `WO Save: ${existingWO.workOrderNo} - ${item.spare.comments || 'Consumed on work order save'}`,
+              userId: updateData.userId || updateData.performedBy || 'system'
+            });
+            console.log(`✅ [Save Consumption] Deducted ${item.qty} units of ${item.partKey} from ${item.locationName} (WO: ${existingWO.workOrderNo})`);
+          }
+
+          if (item.lineIndex >= 0 && item.lineIndex < updatedConsumedSpareParts.length) {
+            const currentQty = typeof updatedConsumedSpareParts[item.lineIndex].quantityConsumed === 'string'
+              ? parseFloat(updatedConsumedSpareParts[item.lineIndex].quantityConsumed as string) : updatedConsumedSpareParts[item.lineIndex].quantityConsumed as number;
+            (updatedConsumedSpareParts[item.lineIndex] as any)._deductedQty = currentQty || 0;
+          }
+        } catch (consumeError: any) {
+          if (consumeError.message?.includes('NEGATIVE_STOCK_PREVENTED') || consumeError.message?.includes('INSUFFICIENT_STOCK')) {
+            console.warn(`⚠️ [Save Consumption] Insufficient stock for ${item.partKey}: ${consumeError.message}. ROB not updated.`);
+          } else {
+            console.error(`❌ [Save Consumption] Failed to process spare ${item.partKey}:`, consumeError);
+          }
+        }
+      }
+
+      try {
+        await repo.update(id, { consumedSpareParts: updatedConsumedSpareParts });
+        console.log(`✅ [Save Consumption] Updated _deductedQty flags for WO ${existingWO.workOrderNo}`);
+      } catch (updateError) {
+        console.error(`❌ [Save Consumption] Failed to update _deductedQty flags:`, updateError);
+      }
+    }
+  }
+
   // ── Audit Trail: Log every WO save ──
   try {
     const auditActionType = isBeingRejected ? 'reject'
@@ -933,6 +1090,7 @@ export async function updateWorkOrder(id: string, body: any) {
         location?: string;
         locationName?: string;
         comments?: string;
+        _deductedQty?: number;
       }>;
 
       console.log(`🔧 [PATCH Approval] Processing ${consumedSpares.length} consumed spares for WO ${workOrder.workOrderNo}`);
@@ -942,7 +1100,14 @@ export async function updateWorkOrder(id: string, body: any) {
           ? parseFloat(consumedSpare.quantityConsumed)
           : consumedSpare.quantityConsumed;
 
-        if (qtyConsumed && qtyConsumed > 0) {
+        const alreadyDeducted = consumedSpare._deductedQty || 0;
+        const remainingToDeduct = (qtyConsumed || 0) - alreadyDeducted;
+
+        if (remainingToDeduct <= 0 && alreadyDeducted > 0) {
+          console.log(`⏭️ [PATCH Approval] Skipping ${consumedSpare.partCode || consumedSpare.partNo} - already deducted ${alreadyDeducted} units at save time`);
+        }
+
+        if (remainingToDeduct > 0) {
           try {
             const woVesselId = workOrder.vesselId || 'V001';
             const allSpares = await repo.findSpares(woVesselId);
@@ -979,16 +1144,16 @@ export async function updateWorkOrder(id: string, body: any) {
                     spareUuid: spare.suuid,
                     locationId: resolvedLocationId,
                     eventType: 'CONSUME',
-                    qtyChange: -Math.abs(qtyConsumed),
+                    qtyChange: -Math.abs(remainingToDeduct),
                     referenceType: 'WORK_ORDER',
                     referenceId: workOrder.wouuid,
                     referenceNote: `WO Approval: ${workOrder.workOrderNo} - ${consumedSpare.comments || 'Consumed during work approval'}`,
                     userId: workOrder.approver || 'system'
                   });
-                  console.log(`✅ [PATCH Approval] Consumed ${qtyConsumed} units of ${consumedSpare.partCode || consumedSpare.partNo} from location ${resolvedLocationId} (WO: ${workOrder.workOrderNo})`);
+                  console.log(`✅ [PATCH Approval] Consumed ${remainingToDeduct} units of ${consumedSpare.partCode || consumedSpare.partNo} from location ${resolvedLocationId} (WO: ${workOrder.workOrderNo})${alreadyDeducted > 0 ? ` (${alreadyDeducted} already deducted at save time)` : ''}`);
                 } catch (txnError: any) {
                   if (txnError.message?.includes('INSUFFICIENT_STOCK') || txnError.message?.includes('NEGATIVE_STOCK_PREVENTED')) {
-                    throw new Error(`INSUFFICIENT_STOCK: Cannot consume ${qtyConsumed} units of ${consumedSpare.partCode || consumedSpare.partNo}. ${txnError.message}`);
+                    throw new Error(`INSUFFICIENT_STOCK: Cannot consume ${remainingToDeduct} units of ${consumedSpare.partCode || consumedSpare.partNo}. ${txnError.message}`);
                   } else {
                     console.error(`❌ [PATCH Approval] Transaction error for ${consumedSpare.partCode || consumedSpare.partNo}:`, txnError);
                     throw txnError;

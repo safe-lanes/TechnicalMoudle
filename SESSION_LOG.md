@@ -186,3 +186,46 @@ Eight validation and integrity rules for the Work Order form Part B, covering fr
 
 ### Environment Issues
 - None. Application compiles and runs normally.
+
+---
+
+## 2026-03-06 — B4 Save Fix (Single-Location Spares) & Real-Time ROB Deduction
+
+### What We Built
+- Fixed critical bug preventing Work Order B4 (Spare Parts Consumed) save when a spare has only one location configured.
+- Implemented real-time ROB (Remaining on Board) deduction at save time instead of deferring to approval.
+- Fixed stale closure issues in B4 onChange handlers.
+- Added `consumedSpareParts` to draft save detection.
+- Added spares query cache invalidation after WO save.
+
+### What's Working
+- **Auto-location selection fix (T001)**: `getLocationName()` now uses `sparePartCode || spare.partNo` as lookup key, fixing silent failures when `partCode` is absent. All three onChange handlers (qty, location, comments) now recompute `consumedIndex` inside the state updater callback to avoid stale closure bugs.
+- **Draft save with spare consumption only (T002)**: `hasConsumedSparesData` check added so entering spare consumption alone (without other Part B fields) correctly triggers the draft save path.
+- **Real-time ROB deduction at save time (T003)**: New "SPARE CONSUMPTION ON SAVE" block in `workOrderService.ts` processes inventory transactions at save time. Uses composite key (`partKey::locationName`) for matching to correctly handle same-part/different-location scenarios. Delta tracking via `_deductedQty` stored per consumed spare entry. Supports: new consumption (CONSUME), quantity reduction (ADJUST reversal), removed lines (full reversal). Approval section updated to skip already-deducted amounts, preventing double-deduction.
+- **Spares cache invalidation (T004)**: After both draft and full save paths, invalidates `/technical/api/spares/${vesselId}` and `/technical/api/inventory/spares-with-inventory/${vesselId}` so the Spares module reflects ROB changes immediately.
+
+### Code Review Fixes
+- Replaced simple `partKey` matching with composite key (`partKey::locationName`) to handle same spare at different locations.
+- Changed delta calculation to use stored `_deductedQty` from `previousConsumed` (database state) instead of incoming payload, preventing re-deduction if client doesn't preserve `_deductedQty`.
+- Used `lineIndex` for direct array access when updating `_deductedQty` flags instead of `findIndex` by partKey.
+- Removed `spareUuid` from `performInventoryTransaction` calls (parameter not accepted by that method).
+
+### What's Broken
+- Nothing broken from these changes.
+
+### Key Files Changed
+- `client/src/pages/pms/WorkOrderFormPage.tsx` — T001 (auto-location fix, stale closure fix), T002 (hasConsumedSparesData), T004 (cache invalidation)
+- `server/modules/work-orders/services/workOrderService.ts` — T003 (real-time ROB deduction with composite key delta tracking, approval skip logic)
+
+### Architecture Notes
+- `_deductedQty` is a hidden field stored in each entry of the `consumedSpareParts` JSON array in the work_orders table.
+- Composite key format: `{partCode||partNo}::{locationName.toLowerCase().trim()}`
+- Delta = currentQty - storedDeductedQty; positive = new CONSUME; negative = ADJUST (reversal)
+- Deleted lines (present in previous but missing in current) trigger full reversal of previously deducted amount.
+
+### Environment Issues
+- None. Application compiles and runs normally.
+
+### Where to Resume
+- Consider adding unit tests for the delta calculation logic in `workOrderService.ts`.
+- Monitor for edge cases: same spare consumed from two different locations on the same WO.
