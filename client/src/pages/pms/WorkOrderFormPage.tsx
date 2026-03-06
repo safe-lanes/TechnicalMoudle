@@ -2934,149 +2934,12 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
             </div>
           </SectionBlock>
 
-          {/* A3. Required Tools & Equipment */}
-          <div data-testid="WOF.A3.1"><Marker id="WOF.A3.1" /></div>
-          <div data-testid="WOF.A3.2"><Marker id="WOF.A3.2" /></div>
-          <SectionBlock
-            id="tools"
-            number="A3"
-            title="Required Tools & Equipment"
-            description="Tools and equipment needed for this work order"
-          >
-            <div className="space-y-3">
-              {!isPartAReadOnly && (<div className="flex justify-end">
-                <Button
-                  size="sm"
-                  className="bg-[#22c55e] hover:bg-[#16a34a] text-white"
-                  onClick={handleAddTool}
-                  data-testid="WOF.A3.14"
-                >
-                  <Marker id="WOF.A3.14" />
-                  <Plus className="h-4 w-4 mr-1" />
-                  Add tools
-                </Button>
-              </div>)}
-
-              {/* Editable Tools Table */}
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm border border-gray-200">
-                  <thead>
-                    <tr className="bg-gray-50 border-b border-gray-200">
-                      <th className="text-left p-2 font-medium text-gray-700 w-[50%]" data-testid="WOF.A3.3"><Marker id="WOF.A3.3" />DESCRIPTION</th>
-                      <th className="text-left p-2 font-medium text-gray-700 w-[20%]" data-testid="WOF.A3.4"><Marker id="WOF.A3.4" />QTY REQUIRED</th>
-                      <th className="text-left p-2 font-medium text-gray-700 w-[15%]" data-testid="WOF.A3.5"><Marker id="WOF.A3.5" />ROB</th>
-                      <th className="text-left p-2 font-medium text-gray-700 w-[15%]" data-testid="WOF.A3.6"><Marker id="WOF.A3.6" />STATUS</th>
-                      {!isPartAReadOnly && <th className="text-center p-2 font-medium text-gray-700 w-[100px]" data-testid="WOF.A3.7"><Marker id="WOF.A3.7" />ACTIONS</th>}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {(templateData.requiredTools || []).length === 0 ? (
-                      <tr>
-                        <td colSpan={isPartAReadOnly ? 4 : 5} className="text-center p-4 text-gray-500 italic">
-                          No tools added yet
-                        </td>
-                      </tr>
-                    ) : (
-                      (templateData.requiredTools || []).map((tool, index) => (
-                        <tr key={index} className="border-b border-gray-200 hover:bg-gray-50">
-                          {editingTool === index ? (
-                            <>
-                              <td className="p-2">
-                                <Input
-                                  value={tool.toolName}
-                                  onChange={(e) => handleUpdateToolField(index, 'toolName', e.target.value)}
-                                  placeholder="Tool description"
-                                  className="text-sm"
-                                  data-testid={`input-tool-name-${index}`}
-                                />
-                              </td>
-                              <td className="p-2">
-                                <Input
-                                  value={tool.quantity}
-                                  onChange={(e) => handleUpdateToolField(index, 'quantity', e.target.value)}
-                                  placeholder="Quantity"
-                                  className="text-sm"
-                                  data-testid={`input-tool-quantity-${index}`}
-                                />
-                              </td>
-                              <td className="p-2 text-center text-gray-500">{tool.quantity || '-'}</td>
-                              <td className="p-2">
-                                <StatusPill status="available" />
-                              </td>
-                              <td className="p-2">
-                                <div className="flex items-center justify-center gap-1">
-                                  <Button
-                                    size="sm"
-                                    variant="ghost"
-                                    onClick={() => handleSaveTool(index)}
-                                    className="h-7 px-2"
-                                    data-testid={`button-save-tool-${index}`}
-                                  >
-                                    <Check className="h-4 w-4 text-green-600" />
-                                  </Button>
-                                  <Button
-                                    size="sm"
-                                    variant="ghost"
-                                    onClick={handleCancelEditTool}
-                                    className="h-7 px-2"
-                                    data-testid={`button-cancel-tool-${index}`}
-                                  >
-                                    <X className="h-4 w-4 text-red-600" />
-                                  </Button>
-                                </div>
-                              </td>
-                            </>
-                          ) : (
-                            <>
-                              <td className="p-2" data-testid={`text-tool-name-${index}`}>{tool.toolName || '-'}</td>
-                              <td className="p-2" data-testid={`text-tool-quantity-${index}`}>{tool.quantity || '-'}</td>
-                              <td className="p-2 text-center" data-testid={`text-tool-rob-${index}`}>{tool.quantity || '-'}</td>
-                              <td className="p-2">
-                                <span data-testid={`status-tool-${index}`}>
-                                  <StatusPill status="available" />
-                                </span>
-                              </td>
-                              {!isPartAReadOnly && (
-                                <td className="p-2">
-                                  <div className="flex items-center justify-center gap-1">
-                                    <Button
-                                      size="sm"
-                                      variant="ghost"
-                                      onClick={() => handleEditTool(index)}
-                                      className="h-7 px-2"
-                                      data-testid={`button-edit-tool-${index}`}
-                                    >
-                                      <Edit2 className="h-4 w-4 text-blue-600" />
-                                    </Button>
-                                    <Button
-                                      size="sm"
-                                      variant="ghost"
-                                      onClick={() => handleDeleteTool(index)}
-                                      className="h-7 px-2"
-                                      data-testid={`button-delete-tool-${index}`}
-                                    >
-                                      <Trash2 className="h-4 w-4 text-red-600" />
-                                    </Button>
-                                  </div>
-                                </td>
-                              )}
-                            </>
-                          )}
-                        </tr>
-                      ))
-                    )}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          </SectionBlock>
-
-          {/* A4. Safety Requirements */}
+          {/* A3. Safety Requirements */}
           <div data-testid="WOF.A4.1"><Marker id="WOF.A4.1" /></div>
           <div data-testid="WOF.A4.2"><Marker id="WOF.A4.2" /></div>
           <SectionBlock
             id="safety"
-            number="A4"
+            number="A3"
             title="Safety Requirements"
             description="Safety requirements and permits for this work order"
           >
@@ -3132,12 +2995,12 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
             </div>
           </SectionBlock>
 
-          {/* A5. Work History */}
+          {/* A4. Work History */}
           <div data-testid="WOF.A5.1"><Marker id="WOF.A5.1" /></div>
           <div data-testid="WOF.A5.2"><Marker id="WOF.A5.2" /></div>
           <SectionBlock
             id="history"
-            number="A5"
+            number="A4"
             title="Work History"
             description="Previous executions and completion history for this work order"
           >

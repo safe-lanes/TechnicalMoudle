@@ -821,54 +821,10 @@ const JobsFormPage: React.FC = () => {
               </div>
             </SectionBlock>
 
-            {/* A3. Required Tools & Equipment */}
-            <SectionBlock
-              id="tools"
-              number="A3"
-              title="Required Tools & Equipment"
-              description="Tools and equipment needed for this job"
-              headerMarker="JF.A3.1"
-              descriptionMarker="JF.A3.2"
-            >
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm border border-gray-200">
-                  <thead>
-                    <tr className="bg-gray-50 border-b border-gray-200">
-                      <th className="text-left p-2 font-medium text-gray-700 w-[50%]" data-testid="JF.A3.3"><Marker id="JF.A3.3" />DESCRIPTION</th>
-                      <th className="text-left p-2 font-medium text-gray-700 w-[15%]" data-testid="JF.A3.4"><Marker id="JF.A3.4" />QTY REQUIRED</th>
-                      <th className="text-left p-2 font-medium text-gray-700 w-[10%]" data-testid="JF.A3.5"><Marker id="JF.A3.5" />ROB</th>
-                      <th className="text-left p-2 font-medium text-gray-700 w-[15%]" data-testid="JF.A3.6"><Marker id="JF.A3.6" />STATUS</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {(templateData.requiredTools || []).length === 0 ? (
-                      <tr>
-                        <td colSpan={4} className="text-center p-4 text-gray-500 italic">
-                          No tools added yet
-                        </td>
-                      </tr>
-                    ) : (
-                      (templateData.requiredTools || []).map((tool, index) => (
-                        <tr key={index} className="border-b border-gray-200 hover:bg-gray-50">
-                          <td className="p-2" data-testid={index === 0 ? "JF.A3.7" : `text-tool-name-${index}`}>{index === 0 && <Marker id="JF.A3.7" />}{tool.toolName || '-'}</td>
-                          <td className="p-2" data-testid={index === 0 ? "JF.A3.8" : `text-tool-quantity-${index}`}>{index === 0 && <Marker id="JF.A3.8" />}{tool.quantity || '-'}</td>
-                          <td className="p-2 text-center" data-testid={index === 0 ? "JF.A3.9" : `text-tool-rob-${index}`}>{index === 0 && <Marker id="JF.A3.9" />}-</td>
-                          <td className="p-2" data-testid={index === 0 ? "JF.A3.10" : `status-tool-${index}`}>
-                            {index === 0 && <Marker id="JF.A3.10" />}
-                            <StatusPill status="available" />
-                          </td>
-                        </tr>
-                      ))
-                    )}
-                  </tbody>
-                </table>
-              </div>
-            </SectionBlock>
-
-            {/* A4. Safety Requirements */}
+            {/* A3. Safety Requirements */}
             <SectionBlock
               id="safety"
-              number="A4"
+              number="A3"
               title="Safety Requirements"
               description="Safety requirements and permits for this job"
               headerMarker="JF.A4.1"
@@ -919,10 +875,10 @@ const JobsFormPage: React.FC = () => {
               </div>
             </SectionBlock>
 
-            {/* A5. Work History */}
+            {/* A4. Work History */}
             <SectionBlock
               id="work-history"
-              number="A5"
+              number="A4"
               title="Work History"
               description="Previous executions and completion history for this job"
               headerMarker="JF.A5.1"
