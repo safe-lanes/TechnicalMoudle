@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from "react";
-import { ArrowLeft, Plus, Edit2, ChevronRight, ChevronDown, Search, Upload, Eye, Download, Trash2, FileText, Loader2, Check, ChevronsUpDown, X } from "lucide-react";
+import { ArrowLeft, Plus, Edit2, ChevronRight, ChevronDown, Search, Upload, Eye, Download, Trash2, FileText, Loader2, Check, ChevronsUpDown, X, ChevronUp } from "lucide-react";
+import { Card, CardHeader, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -53,6 +54,11 @@ export default function ComponentRegisterAddEdit({
   const [isSaving, setIsSaving] = useState(false);
   const [criticalityFilter, setCriticalityFilter] = useState("all");
   const [makerOpen, setMakerOpen] = useState(false);
+  const [collapsedSections, setCollapsedSections] = useState<Record<string, boolean>>({});
+
+  const toggleSection = (section: string) => {
+    setCollapsedSections(prev => ({ ...prev, [section]: !prev[section] }));
+  };
 
   const { data: makersList = [] } = useQuery<any[]>({
     queryKey: ['/technical/api/fleet/makers'],
@@ -1017,101 +1023,96 @@ export default function ComponentRegisterAddEdit({
 
   return (
     <div className="h-full flex flex-col bg-gray-50">
-      <div className="bg-sky-500 px-6 py-3 flex items-center justify-between">
-        <h1 className="text-white text-lg font-semibold">
-          Component Register - {isEditMode ? "Edit Component" : "Add Component"}
-        </h1>
-        <div className="flex items-center gap-2">
-          <Button
-            variant="outline"
-            size="sm"
-            className="bg-white text-sky-600 hover:bg-sky-50 border-white"
-            onClick={() => {
-              const isCategory = selectedTreeNode ? isMainCategory(selectedTreeNode) : false;
-              const parentId = selectedTreeNode || "";
-              const nextCode = selectedTreeNode ? generateNextComponentCode(selectedTreeNode, isCategory) : "";
-              const derivedCategory = nextCode ? getComponentCategory(nextCode) : (selectedTreeNode ? getComponentCategory(selectedTreeNode) : "");
-              
-              setIsAddingNew(true);
-              setSelectedComponentId(null);
-              setComponentData({
-                // Row 1
-                fleetEquipmentCode: "",
-                fleetEquipmentName: "",
-                parentComponent: parentId,
-                componentCode: nextCode,
-                // Row 2
-                componentName: "",
-                eqptSystemCategory: derivedCategory,
-                maker: "",
-                makerCode: "",
-                // Row 3
-                model: "",
-                modelCode: "",
-                serialNo: "",
-                drawingNo: "",
-                // Row 4
-                location: "",
-                critical: "",
-                conditionBased: "",
-                installationDate: "",
-                // Row 5
-                commissionedDate: "",
-                rating: "",
-                eqptSystemDept: "",
-                // Row 6
-                runningHours: "",
-                isActive: "Yes",
-                vesselCode: "",
-                isParent: "No",
-                classItem: "No",
-                // Row 7
-                notes: "",
-                // Section B: Running Hours & Condition Monitoring
-                rhCounterType: "NOT_RH_DRIVEN",
-                rhCounterSource: "",
-                rhMasterComponentId: "",
-                lastUpdated: "",
-              });
-              setWorkOrders([]);
-              setMaintenanceHistory([]);
-              setSpares([]);
-              setClassRegData({
-                classificationSociety: "",
-                certificateNo: "",
-                lastClassSurvey: "",
-                nextClassSurvey: "",
-                surveyType: "",
-                classRequirements: "",
-                classCode: "",
-                information: "",
-              });
-              toast({
-                title: "New Component",
-                description: selectedTreeNode ? `Form cleared. Component code auto-generated: ${nextCode}` : "Form cleared for adding a new component. Select a location in the tree first.",
-              });
-            }}
-            data-testid="button-add-edit-component"
-          >
-            <Plus className="h-4 w-4 mr-1" />
-            Add Component
-          </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={onBack}
-            className="bg-white text-gray-600 hover:bg-gray-50 border-white"
-            data-testid="button-back"
-          >
-            <ArrowLeft className="h-4 w-4 mr-1" />
-            Back
-          </Button>
+      <div className="px-6 py-4 bg-white border-b">
+        <div className="flex items-center justify-between">
+          <h1 className="text-xl font-semibold text-gray-900">
+            {isEditMode && !isAddingNew && componentData.componentCode
+              ? `${componentData.componentCode} ${componentData.componentName || ''}`
+              : "Components"}
+          </h1>
+          <div className="flex items-center gap-2">
+            <Button
+              size="sm"
+              className="bg-[#16569e] text-white"
+              onClick={() => {
+                const isCategory = selectedTreeNode ? isMainCategory(selectedTreeNode) : false;
+                const parentId = selectedTreeNode || "";
+                const nextCode = selectedTreeNode ? generateNextComponentCode(selectedTreeNode, isCategory) : "";
+                const derivedCategory = nextCode ? getComponentCategory(nextCode) : (selectedTreeNode ? getComponentCategory(selectedTreeNode) : "");
+                
+                setIsAddingNew(true);
+                setSelectedComponentId(null);
+                setComponentData({
+                  fleetEquipmentCode: "",
+                  fleetEquipmentName: "",
+                  parentComponent: parentId,
+                  componentCode: nextCode,
+                  componentName: "",
+                  eqptSystemCategory: derivedCategory,
+                  maker: "",
+                  makerCode: "",
+                  model: "",
+                  modelCode: "",
+                  serialNo: "",
+                  drawingNo: "",
+                  location: "",
+                  critical: "",
+                  conditionBased: "",
+                  installationDate: "",
+                  commissionedDate: "",
+                  rating: "",
+                  eqptSystemDept: "",
+                  runningHours: "",
+                  isActive: "Yes",
+                  vesselCode: "",
+                  isParent: "No",
+                  classItem: "No",
+                  notes: "",
+                  rhCounterType: "NOT_RH_DRIVEN",
+                  rhCounterSource: "",
+                  rhMasterComponentId: "",
+                  lastUpdated: "",
+                });
+                setWorkOrders([]);
+                setMaintenanceHistory([]);
+                setSpares([]);
+                setClassRegData({
+                  classificationSociety: "",
+                  certificateNo: "",
+                  lastClassSurvey: "",
+                  nextClassSurvey: "",
+                  surveyType: "",
+                  classRequirements: "",
+                  classCode: "",
+                  information: "",
+                });
+                toast({
+                  title: "New Component",
+                  description: selectedTreeNode ? `Form cleared. Component code auto-generated: ${nextCode}` : "Form cleared for adding a new component. Select a location in the tree first.",
+                });
+              }}
+              data-testid="button-add-edit-component"
+            >
+              <Plus className="h-4 w-4 mr-1" />
+              + Add / Edit Component
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={onBack}
+              className="text-gray-600 hover:bg-gray-50"
+              data-testid="button-back"
+            >
+              <ArrowLeft className="h-4 w-4 mr-1" />
+              Back
+            </Button>
+          </div>
         </div>
       </div>
 
       <div className="bg-white border-b px-6 py-2 flex items-center gap-4">
         <div className="flex items-center gap-2">
-          <span className="text-sm text-gray-600">Vessel</span>
+          <span className="text-sm font-medium text-gray-600">Vessel:</span>
           <Select value={vesselId} onValueChange={(v) => setVesselId(v as any)}>
             <SelectTrigger className="w-40 h-8" data-testid="select-vessel">
               <SelectValue />
@@ -1144,8 +1145,8 @@ export default function ComponentRegisterAddEdit({
       </div>
 
       <div className="flex-1 flex overflow-hidden">
-        <div className="w-64 bg-sky-500 flex flex-col">
-          <div className="px-3 py-2 border-b border-sky-400">
+        <div className="w-64 flex flex-col border-r">
+          <div className="px-3 py-2 bg-sky-500">
             <span className="text-white font-semibold text-sm">COMPONENTS</span>
           </div>
           <div className="flex-1 overflow-y-auto bg-white">
@@ -1158,14 +1159,26 @@ export default function ComponentRegisterAddEdit({
         </div>
 
         <div className="flex-1 overflow-y-auto p-6">
-          <div className="max-w-5xl">
-            <div className="space-y-6">
-              <div>
-                <h3 className="text-sm font-semibold text-gray-700 mb-3">A. Component Information</h3>
-                {/* Row 1: Fleet Equipment Code, Fleet Equipment Name, Parent Component Code, Component Code */}
-                <div className="grid grid-cols-4 gap-4 mb-4">
+          {isEditMode && !isAddingNew && componentData.componentCode && (
+            <h2 className="text-lg font-semibold text-gray-900 mb-4" data-testid="text-component-title">
+              {componentData.componentCode} {componentData.componentName || ''}
+            </h2>
+          )}
+          <div className="space-y-4">
+              <Card className="rounded-sm border border-gray-200 shadow-none">
+                <CardHeader
+                  className="py-3 px-4 cursor-pointer hover:bg-gray-50 flex-row items-center justify-between"
+                  onClick={() => toggleSection('A')}
+                  data-testid="section-header-a"
+                >
+                  <span className="text-sm font-medium text-[#16569e]">A. Component Information</span>
+                  {collapsedSections['A'] ? <ChevronDown className="h-4 w-4 text-gray-500" /> : <ChevronUp className="h-4 w-4 text-gray-500" />}
+                </CardHeader>
+                {!collapsedSections['A'] && (
+                <CardContent className="pt-4 pb-4 px-4 border-t border-gray-100">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 mb-4">
                   <div>
-                    <label className="text-xs text-gray-500 mb-1 block">Fleet Equipment Code</label>
+                    <label className="text-xs font-medium text-gray-600 mb-1 block">Fleet Equipment Code</label>
                     <Input
                       value={componentData.fleetEquipmentCode}
                       onChange={(e) => handleFieldChange('fleetEquipmentCode', e.target.value)}
@@ -1174,7 +1187,7 @@ export default function ComponentRegisterAddEdit({
                     />
                   </div>
                   <div>
-                    <label className="text-xs text-gray-500 mb-1 block">Fleet Equipment Name</label>
+                    <label className="text-xs font-medium text-gray-600 mb-1 block">Fleet Equipment Name</label>
                     <Input
                       value={componentData.fleetEquipmentName}
                       onChange={(e) => handleFieldChange('fleetEquipmentName', e.target.value)}
@@ -1183,7 +1196,7 @@ export default function ComponentRegisterAddEdit({
                     />
                   </div>
                   <div>
-                    <label className="text-xs text-gray-500 mb-1 block">Parent Component Code<span className="text-red-500 ml-0.5">*</span></label>
+                    <label className="text-xs font-medium text-gray-600 mb-1 block">Parent Component Code<span className="text-red-500 ml-0.5">*</span></label>
                     <Input
                       value={componentData.parentComponent}
                       onChange={(e) => handleFieldChange('parentComponent', e.target.value)}
@@ -1193,7 +1206,7 @@ export default function ComponentRegisterAddEdit({
                     {validationErrors.parentComponent && <span className="text-xs text-red-500" data-testid="validation-error-parentComponent">This field is required</span>}
                   </div>
                   <div>
-                    <label className="text-xs text-gray-500 mb-1 block">Component Code<span className="text-red-500 ml-0.5">*</span></label>
+                    <label className="text-xs font-medium text-gray-600 mb-1 block">Component Code<span className="text-red-500 ml-0.5">*</span></label>
                     <Input
                       value={componentData.componentCode}
                       onChange={(e) => handleFieldChange('componentCode', e.target.value)}
@@ -1204,10 +1217,9 @@ export default function ComponentRegisterAddEdit({
                   </div>
                 </div>
 
-                {/* Row 2: Component Name, Component Category, Maker, Maker Code */}
-                <div className="grid grid-cols-4 gap-4 mb-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 mb-4">
                   <div>
-                    <label className="text-xs text-gray-500 mb-1 block">Component Name<span className="text-red-500 ml-0.5">*</span></label>
+                    <label className="text-xs font-medium text-gray-600 mb-1 block">Component Name<span className="text-red-500 ml-0.5">*</span></label>
                     <Input
                       value={componentData.componentName}
                       onChange={(e) => handleFieldChange('componentName', e.target.value)}
@@ -1217,7 +1229,7 @@ export default function ComponentRegisterAddEdit({
                     {validationErrors.componentName && <span className="text-xs text-red-500" data-testid="validation-error-componentName">This field is required</span>}
                   </div>
                   <div>
-                    <label className="text-xs text-gray-500 mb-1 block">Component Category<span className="text-red-500 ml-0.5">*</span></label>
+                    <label className="text-xs font-medium text-gray-600 mb-1 block">Component Category<span className="text-red-500 ml-0.5">*</span></label>
                     <Input
                       value={componentData.eqptSystemCategory}
                       readOnly
@@ -1228,7 +1240,7 @@ export default function ComponentRegisterAddEdit({
                     {validationErrors.eqptSystemCategory && <span className="text-xs text-red-500" data-testid="validation-error-eqptSystemCategory">This field is required</span>}
                   </div>
                   <div>
-                    <label className="text-xs text-gray-500 mb-1 block">Maker</label>
+                    <label className="text-xs font-medium text-gray-600 mb-1 block">Maker</label>
                     <div className="flex gap-1">
                       <Popover open={makerOpen} onOpenChange={setMakerOpen}>
                         <PopoverTrigger asChild>
@@ -1288,7 +1300,7 @@ export default function ComponentRegisterAddEdit({
                     </div>
                   </div>
                   <div>
-                    <label className="text-xs text-gray-500 mb-1 block">Maker Code</label>
+                    <label className="text-xs font-medium text-gray-600 mb-1 block">Maker Code</label>
                     <Input
                       value={componentData.makerCode}
                       readOnly
@@ -1299,10 +1311,9 @@ export default function ComponentRegisterAddEdit({
                   </div>
                 </div>
 
-                {/* Row 3: Model, Model Code, Serial No, Drawing No */}
-                <div className="grid grid-cols-4 gap-4 mb-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 mb-4">
                   <div>
-                    <label className="text-xs text-gray-500 mb-1 block">Model{!isParentComponent && <span className="text-red-500 ml-0.5">*</span>}</label>
+                    <label className="text-xs font-medium text-gray-600 mb-1 block">Model{!isParentComponent && <span className="text-red-500 ml-0.5">*</span>}</label>
                     <Input
                       value={componentData.model}
                       onChange={(e) => handleFieldChange('model', e.target.value)}
@@ -1312,7 +1323,7 @@ export default function ComponentRegisterAddEdit({
                     {validationErrors.model && <span className="text-xs text-red-500" data-testid="validation-error-model">This field is required</span>}
                   </div>
                   <div>
-                    <label className="text-xs text-gray-500 mb-1 block">Model Code{!isParentComponent && <span className="text-red-500 ml-0.5">*</span>}</label>
+                    <label className="text-xs font-medium text-gray-600 mb-1 block">Model Code{!isParentComponent && <span className="text-red-500 ml-0.5">*</span>}</label>
                     <Input
                       value={componentData.modelCode}
                       onChange={(e) => handleFieldChange('modelCode', e.target.value)}
@@ -1322,7 +1333,7 @@ export default function ComponentRegisterAddEdit({
                     {validationErrors.modelCode && <span className="text-xs text-red-500" data-testid="validation-error-modelCode">This field is required</span>}
                   </div>
                   <div>
-                    <label className="text-xs text-gray-500 mb-1 block">Serial No</label>
+                    <label className="text-xs font-medium text-gray-600 mb-1 block">Serial No</label>
                     <Input
                       value={componentData.serialNo}
                       onChange={(e) => handleFieldChange('serialNo', e.target.value)}
@@ -1331,7 +1342,7 @@ export default function ComponentRegisterAddEdit({
                     />
                   </div>
                   <div>
-                    <label className="text-xs text-gray-500 mb-1 block">Drawing No</label>
+                    <label className="text-xs font-medium text-gray-600 mb-1 block">Drawing No</label>
                     <Input
                       value={componentData.drawingNo}
                       onChange={(e) => handleFieldChange('drawingNo', e.target.value)}
@@ -1341,10 +1352,9 @@ export default function ComponentRegisterAddEdit({
                   </div>
                 </div>
 
-                {/* Row 4: Location, Criticality, Condition Based, Installation Date */}
-                <div className="grid grid-cols-4 gap-4 mb-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 mb-4">
                   <div>
-                    <label className="text-xs text-gray-500 mb-1 block">Location</label>
+                    <label className="text-xs font-medium text-gray-600 mb-1 block">Location</label>
                     <Input
                       value={componentData.location}
                       onChange={(e) => handleFieldChange('location', e.target.value)}
@@ -1353,7 +1363,7 @@ export default function ComponentRegisterAddEdit({
                     />
                   </div>
                   <div>
-                    <label className="text-xs text-gray-500 mb-1 block">Criticality{!isParentComponent && <span className="text-red-500 ml-0.5">*</span>}</label>
+                    <label className="text-xs font-medium text-gray-600 mb-1 block">Criticality{!isParentComponent && <span className="text-red-500 ml-0.5">*</span>}</label>
                     <select
                       value={componentData.critical}
                       onChange={(e) => handleFieldChange('critical', e.target.value)}
@@ -1367,7 +1377,7 @@ export default function ComponentRegisterAddEdit({
                     {validationErrors.critical && <span className="text-xs text-red-500" data-testid="validation-error-critical">This field is required</span>}
                   </div>
                   <div>
-                    <label className="text-xs text-gray-500 mb-1 block">Condition Based{!isParentComponent && <span className="text-red-500 ml-0.5">*</span>}</label>
+                    <label className="text-xs font-medium text-gray-600 mb-1 block">Condition Based{!isParentComponent && <span className="text-red-500 ml-0.5">*</span>}</label>
                     <select
                       value={componentData.conditionBased}
                       onChange={(e) => handleFieldChange('conditionBased', e.target.value)}
@@ -1381,7 +1391,7 @@ export default function ComponentRegisterAddEdit({
                     {validationErrors.conditionBased && <span className="text-xs text-red-500" data-testid="validation-error-conditionBased">This field is required</span>}
                   </div>
                   <div>
-                    <label className="text-xs text-gray-500 mb-1 block">Installation Date</label>
+                    <label className="text-xs font-medium text-gray-600 mb-1 block">Installation Date</label>
                     <Input
                       type="date"
                       value={componentData.installationDate}
@@ -1392,10 +1402,9 @@ export default function ComponentRegisterAddEdit({
                   </div>
                 </div>
 
-                {/* Row 5: Commissioned Date, Rating, Equipment/System Department */}
-                <div className="grid grid-cols-4 gap-4 mb-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 mb-4">
                   <div>
-                    <label className="text-xs text-gray-500 mb-1 block">Commissioned Date</label>
+                    <label className="text-xs font-medium text-gray-600 mb-1 block">Commissioned Date</label>
                     <Input
                       type="date"
                       value={componentData.commissionedDate}
@@ -1405,7 +1414,7 @@ export default function ComponentRegisterAddEdit({
                     />
                   </div>
                   <div>
-                    <label className="text-xs text-gray-500 mb-1 block">Rating</label>
+                    <label className="text-xs font-medium text-gray-600 mb-1 block">Rating</label>
                     <Input
                       value={componentData.rating}
                       onChange={(e) => handleFieldChange('rating', e.target.value)}
@@ -1414,7 +1423,7 @@ export default function ComponentRegisterAddEdit({
                     />
                   </div>
                   <div>
-                    <label className="text-xs text-gray-500 mb-1 block">Equipment / System Department{!isParentComponent && <span className="text-red-500 ml-0.5">*</span>}</label>
+                    <label className="text-xs font-medium text-gray-600 mb-1 block">Equipment / System Department{!isParentComponent && <span className="text-red-500 ml-0.5">*</span>}</label>
                     <select
                       value={componentData.eqptSystemDept}
                       onChange={(e) => handleFieldChange('eqptSystemDept', e.target.value)}
@@ -1429,7 +1438,7 @@ export default function ComponentRegisterAddEdit({
                     {validationErrors.eqptSystemDept && <span className="text-xs text-red-500" data-testid="validation-error-eqptSystemDept">This field is required</span>}
                   </div>
                   <div>
-                    <label className="text-xs text-gray-500 mb-1 block">Class Item</label>
+                    <label className="text-xs font-medium text-gray-600 mb-1 block">Class Item</label>
                     <select
                       value={componentData.classItem}
                       onChange={(e) => handleFieldChange('classItem', e.target.value)}
@@ -1442,10 +1451,9 @@ export default function ComponentRegisterAddEdit({
                   </div>
                 </div>
 
-                {/* Row 6: Running Hours, Is Active, Vessel Code, Is Parent */}
-                <div className="grid grid-cols-4 gap-4 mb-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 mb-4">
                   <div>
-                    <label className="text-xs text-gray-500 mb-1 block">Running Hours</label>
+                    <label className="text-xs font-medium text-gray-600 mb-1 block">Running Hours</label>
                     <Input
                       value={componentData.runningHours}
                       onChange={(e) => handleFieldChange('runningHours', e.target.value)}
@@ -1455,7 +1463,7 @@ export default function ComponentRegisterAddEdit({
                     />
                   </div>
                   <div>
-                    <label className="text-xs text-gray-500 mb-1 block">Is Active<span className="text-red-500 ml-0.5">*</span></label>
+                    <label className="text-xs font-medium text-gray-600 mb-1 block">Is Active<span className="text-red-500 ml-0.5">*</span></label>
                     <select
                       value={componentData.isActive}
                       onChange={(e) => handleFieldChange('isActive', e.target.value)}
@@ -1468,7 +1476,7 @@ export default function ComponentRegisterAddEdit({
                     {validationErrors.isActive && <span className="text-xs text-red-500" data-testid="validation-error-isActive">This field is required</span>}
                   </div>
                   <div>
-                    <label className="text-xs text-gray-500 mb-1 block">Vessel Code</label>
+                    <label className="text-xs font-medium text-gray-600 mb-1 block">Vessel Code</label>
                     <Input
                       value={componentData.vesselCode}
                       onChange={(e) => handleFieldChange('vesselCode', e.target.value)}
@@ -1478,7 +1486,7 @@ export default function ComponentRegisterAddEdit({
                     />
                   </div>
                   <div>
-                    <label className="text-xs text-gray-500 mb-1 block">Is Parent</label>
+                    <label className="text-xs font-medium text-gray-600 mb-1 block">Is Parent</label>
                     <select
                       value={componentData.isParent}
                       onChange={(e) => handleFieldChange('isParent', e.target.value)}
@@ -1493,7 +1501,7 @@ export default function ComponentRegisterAddEdit({
 
                 {/* Row 7: Notes (full width) */}
                 <div className="mb-4">
-                  <label className="text-xs text-gray-500 mb-1 block">Notes</label>
+                  <label className="text-xs font-medium text-gray-600 mb-1 block">Notes</label>
                   <Textarea
                     value={componentData.notes}
                     onChange={(e) => handleFieldChange('notes', e.target.value)}
@@ -1502,19 +1510,29 @@ export default function ComponentRegisterAddEdit({
                     data-testid="textarea-notes"
                   />
                 </div>
-              </div>
+                </CardContent>
+                )}
+              </Card>
 
-              {/* Section B: Running Hours & Condition Monitoring - Teal Header with Editable Controls */}
-              <div>
-                <h3 className="text-sm font-semibold text-gray-700 mb-3">B. Running Hours & Condition Monitoring</h3>
-                <div className="border rounded overflow-hidden">
+              <Card className="rounded-sm border border-gray-200 shadow-none">
+                <CardHeader
+                  className="py-3 px-4 cursor-pointer hover:bg-gray-50 flex-row items-center justify-between"
+                  onClick={() => toggleSection('B')}
+                  data-testid="section-header-b"
+                >
+                  <span className="text-sm font-medium text-[#16569e]">B. Running Hours & Condition Monitoring</span>
+                  {collapsedSections['B'] ? <ChevronDown className="h-4 w-4 text-gray-500" /> : <ChevronUp className="h-4 w-4 text-gray-500" />}
+                </CardHeader>
+                {!collapsedSections['B'] && (
+                <CardContent className="pt-0 pb-0 px-0 border-t border-gray-100">
+                <div className="overflow-hidden">
                   <table className="w-full text-sm">
-                    <thead className="bg-[#52baf3]">
+                    <thead className="bg-gray-50">
                       <tr>
-                        <th className="text-left px-3 py-2 font-medium text-white">RH Counter Type</th>
-                        <th className="text-left px-3 py-2 font-medium text-white">RH Counter Source</th>
-                        <th className="text-left px-3 py-2 font-medium text-white">Running Hours</th>
-                        <th className="text-left px-3 py-2 font-medium text-white">Last Updated</th>
+                        <th className="text-left px-3 py-2 font-medium text-gray-600 text-xs">RH Counter Type</th>
+                        <th className="text-left px-3 py-2 font-medium text-gray-600 text-xs">RH Counter Source</th>
+                        <th className="text-left px-3 py-2 font-medium text-gray-600 text-xs">Running Hours</th>
+                        <th className="text-left px-3 py-2 font-medium text-gray-600 text-xs">Last Updated</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -1636,11 +1654,25 @@ export default function ComponentRegisterAddEdit({
                     </tbody>
                   </table>
                 </div>
-              </div>
+                </CardContent>
+                )}
+              </Card>
 
-              <div>
-                <div className="flex items-center justify-between mb-3">
-                  <h3 className="text-sm font-semibold text-gray-700">C. Jobs</h3>
+              <Card className="rounded-sm border border-gray-200 shadow-none">
+                <CardHeader
+                  className="py-3 px-4 cursor-pointer hover:bg-gray-50 flex-row items-center justify-between"
+                  onClick={() => toggleSection('C')}
+                  data-testid="section-header-c"
+                >
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm font-medium text-[#16569e]">C. Jobs</span>
+                  </div>
+                  {collapsedSections['C'] ? <ChevronDown className="h-4 w-4 text-gray-500" /> : <ChevronUp className="h-4 w-4 text-gray-500" />}
+                </CardHeader>
+                {!collapsedSections['C'] && (
+                <CardContent className="pt-4 pb-4 px-4 border-t border-gray-100">
+                <div className="flex items-center justify-end mb-3">
+                  <h3 className="text-sm font-semibold text-gray-700 sr-only">C. Jobs</h3>
                   <Button
                     variant="outline"
                     size="sm"
@@ -1690,11 +1722,23 @@ export default function ComponentRegisterAddEdit({
                     </tbody>
                   </table>
                 </div>
-              </div>
+                </CardContent>
+                )}
+              </Card>
 
-              <div>
-                <div className="flex items-center justify-between mb-3">
-                  <h3 className="text-sm font-semibold text-gray-700">D. Maintenance History</h3>
+              <Card className="rounded-sm border border-gray-200 shadow-none">
+                <CardHeader
+                  className="py-3 px-4 cursor-pointer hover:bg-gray-50 flex-row items-center justify-between"
+                  onClick={() => toggleSection('D')}
+                  data-testid="section-header-d"
+                >
+                  <span className="text-sm font-medium text-[#16569e]">D. Maintenance History</span>
+                  {collapsedSections['D'] ? <ChevronDown className="h-4 w-4 text-gray-500" /> : <ChevronUp className="h-4 w-4 text-gray-500" />}
+                </CardHeader>
+                {!collapsedSections['D'] && (
+                <CardContent className="pt-4 pb-4 px-4 border-t border-gray-100">
+                <div className="flex items-center justify-end mb-3">
+                  <h3 className="text-sm font-semibold text-gray-700 sr-only">D. Maintenance History</h3>
                   <Button
                     variant="outline"
                     size="sm"
@@ -1753,11 +1797,23 @@ export default function ComponentRegisterAddEdit({
                     </tbody>
                   </table>
                 </div>
-              </div>
+                </CardContent>
+                )}
+              </Card>
 
-              <div>
-                <div className="flex items-center justify-between mb-3">
-                  <h3 className="text-sm font-semibold text-gray-700">E. Spares</h3>
+              <Card className="rounded-sm border border-gray-200 shadow-none">
+                <CardHeader
+                  className="py-3 px-4 cursor-pointer hover:bg-gray-50 flex-row items-center justify-between"
+                  onClick={() => toggleSection('E')}
+                  data-testid="section-header-e"
+                >
+                  <span className="text-sm font-medium text-[#16569e]">E. Spares</span>
+                  {collapsedSections['E'] ? <ChevronDown className="h-4 w-4 text-gray-500" /> : <ChevronUp className="h-4 w-4 text-gray-500" />}
+                </CardHeader>
+                {!collapsedSections['E'] && (
+                <CardContent className="pt-4 pb-4 px-4 border-t border-gray-100">
+                <div className="flex items-center justify-end mb-3">
+                  <h3 className="text-sm font-semibold text-gray-700 sr-only">E. Spares</h3>
                   <Button
                     variant="outline"
                     size="sm"
@@ -1819,13 +1875,30 @@ export default function ComponentRegisterAddEdit({
                     </tbody>
                   </table>
                 </div>
-              </div>
+                </CardContent>
+                )}
+              </Card>
 
-              <div>
+              <Card className="rounded-sm border border-gray-200 shadow-none">
+                <CardHeader
+                  className="py-3 px-4 cursor-pointer hover:bg-gray-50 flex-row items-center justify-between"
+                  onClick={() => toggleSection('F')}
+                  data-testid="section-header-f"
+                >
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm font-medium text-[#16569e]">F. Drawings & Manuals</span>
+                    {isLoadingDocuments && (
+                      <Loader2 className="h-3 w-3 animate-spin text-gray-400" />
+                    )}
+                  </div>
+                  {collapsedSections['F'] ? <ChevronDown className="h-4 w-4 text-gray-500" /> : <ChevronUp className="h-4 w-4 text-gray-500" />}
+                </CardHeader>
+                {!collapsedSections['F'] && (
+                <CardContent className="pt-4 pb-4 px-4 border-t border-gray-100">
                 <div className="flex items-center justify-between mb-3">
-                  <h3 className="text-sm font-semibold text-gray-700">F. Drawings & Manuals</h3>
+                  <h3 className="text-sm font-semibold text-gray-700 sr-only">F. Drawings & Manuals</h3>
                   {isLoadingDocuments && (
-                    <span className="text-xs text-gray-500 flex items-center gap-1">
+                    <span className="text-xs text-gray-500 flex items-center gap-1 sr-only">
                       <Loader2 className="h-3 w-3 animate-spin" />
                       Loading...
                     </span>
@@ -1960,13 +2033,24 @@ export default function ComponentRegisterAddEdit({
                     </div>
                   </div>
                 )}
-              </div>
+                </CardContent>
+                )}
+              </Card>
 
-              <div>
-                <h3 className="text-sm font-semibold text-gray-700 mb-3">G. Classification & Regulatory Data</h3>
-                <div className="grid grid-cols-4 gap-4 mb-4">
+              <Card className="rounded-sm border border-gray-200 shadow-none">
+                <CardHeader
+                  className="py-3 px-4 cursor-pointer hover:bg-gray-50 flex-row items-center justify-between"
+                  onClick={() => toggleSection('G')}
+                  data-testid="section-header-g"
+                >
+                  <span className="text-sm font-medium text-[#16569e]">G. Classification & Regulatory Data</span>
+                  {collapsedSections['G'] ? <ChevronDown className="h-4 w-4 text-gray-500" /> : <ChevronUp className="h-4 w-4 text-gray-500" />}
+                </CardHeader>
+                {!collapsedSections['G'] && (
+                <CardContent className="pt-4 pb-4 px-4 border-t border-gray-100">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 mb-4">
                   <div>
-                    <label className="text-xs text-gray-500 mb-1 block">Classification Society</label>
+                    <label className="text-xs font-medium text-gray-600 mb-1 block">Classification Society</label>
                     <Input
                       value={classRegData.classificationSociety}
                       onChange={(e) => setClassRegData(prev => ({ ...prev, classificationSociety: e.target.value }))}
@@ -1975,7 +2059,7 @@ export default function ComponentRegisterAddEdit({
                     />
                   </div>
                   <div>
-                    <label className="text-xs text-gray-500 mb-1 block">Certificate No</label>
+                    <label className="text-xs font-medium text-gray-600 mb-1 block">Certificate No</label>
                     <Input
                       value={classRegData.certificateNo}
                       onChange={(e) => setClassRegData(prev => ({ ...prev, certificateNo: e.target.value }))}
@@ -1984,7 +2068,7 @@ export default function ComponentRegisterAddEdit({
                     />
                   </div>
                   <div>
-                    <label className="text-xs text-gray-500 mb-1 block">Last Class Survey</label>
+                    <label className="text-xs font-medium text-gray-600 mb-1 block">Last Class Survey</label>
                     <Input
                       type="date"
                       value={classRegData.lastClassSurvey}
@@ -1994,7 +2078,7 @@ export default function ComponentRegisterAddEdit({
                     />
                   </div>
                   <div>
-                    <label className="text-xs text-gray-500 mb-1 block">Next Class Survey</label>
+                    <label className="text-xs font-medium text-gray-600 mb-1 block">Next Class Survey</label>
                     <Input
                       type="date"
                       value={classRegData.nextClassSurvey}
@@ -2004,9 +2088,9 @@ export default function ComponentRegisterAddEdit({
                     />
                   </div>
                 </div>
-                <div className="grid grid-cols-4 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
                   <div>
-                    <label className="text-xs text-gray-500 mb-1 block">Survey Type</label>
+                    <label className="text-xs font-medium text-gray-600 mb-1 block">Survey Type</label>
                     <Input
                       value={classRegData.surveyType}
                       onChange={(e) => setClassRegData(prev => ({ ...prev, surveyType: e.target.value }))}
@@ -2015,7 +2099,7 @@ export default function ComponentRegisterAddEdit({
                     />
                   </div>
                   <div>
-                    <label className="text-xs text-gray-500 mb-1 block">Class Requirements</label>
+                    <label className="text-xs font-medium text-gray-600 mb-1 block">Class Requirements</label>
                     <Input
                       value={classRegData.classRequirements}
                       onChange={(e) => setClassRegData(prev => ({ ...prev, classRequirements: e.target.value }))}
@@ -2024,7 +2108,7 @@ export default function ComponentRegisterAddEdit({
                     />
                   </div>
                   <div>
-                    <label className="text-xs text-gray-500 mb-1 block">Class Code</label>
+                    <label className="text-xs font-medium text-gray-600 mb-1 block">Class Code</label>
                     <Input
                       value={classRegData.classCode}
                       onChange={(e) => setClassRegData(prev => ({ ...prev, classCode: e.target.value }))}
@@ -2033,7 +2117,7 @@ export default function ComponentRegisterAddEdit({
                     />
                   </div>
                   <div>
-                    <label className="text-xs text-gray-500 mb-1 block">Information</label>
+                    <label className="text-xs font-medium text-gray-600 mb-1 block">Information</label>
                     <Input
                       value={classRegData.information}
                       onChange={(e) => setClassRegData(prev => ({ ...prev, information: e.target.value }))}
@@ -2042,7 +2126,9 @@ export default function ComponentRegisterAddEdit({
                     />
                   </div>
                 </div>
-              </div>
+                </CardContent>
+                )}
+              </Card>
 
               <div className="flex justify-end pt-4">
                 <Button
@@ -2054,7 +2140,6 @@ export default function ComponentRegisterAddEdit({
                   {isSaving ? "Saving..." : "Submit"}
                 </Button>
               </div>
-            </div>
           </div>
         </div>
       </div>
