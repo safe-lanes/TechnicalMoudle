@@ -1532,15 +1532,6 @@ const WorkOrderForm: React.FC<WorkOrderFormProps> = ({
         if (completionDate && templateData.maintenanceBasis !== 'Running Hours' && templateData.frequencyValue && templateData.frequencyUnit) {
           const calculatedNextDue = calculateNextDueDate(completionDate, templateData.frequencyValue, templateData.frequencyUnit);
           if (calculatedNextDue) {
-            if (templateData.nextDueDate && templateData.nextDueDate !== calculatedNextDue) {
-              const normalizedManual = normalizeDateToDDMMMYYYY(templateData.nextDueDate);
-              if (normalizedManual && normalizedManual !== calculatedNextDue) {
-                toast({
-                  title: "Next Due Date Recalculated",
-                  description: `Next Due Date recalculated: ${calculatedNextDue} (based on completion date + frequency of ${templateData.frequencyValue} ${templateData.frequencyUnit}).`,
-                });
-              }
-            }
             recalculatedNextDueDate = calculatedNextDue;
           }
         }

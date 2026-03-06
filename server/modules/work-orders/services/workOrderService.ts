@@ -571,7 +571,11 @@ export async function updateWorkOrder(id: string, body: any) {
   };
 
   // Map dateOfCompletion to completionDateTime and dateCompleted
-  if (updateData.dateOfCompletion) {
+  // Only use dateOfCompletion as fallback if completionDateTime doesn't already have a time component
+  if (updateData.completionDateTime && updateData.completionDateTime.includes('T')) {
+    updateData.dateCompleted = updateData.completionDateTime;
+    console.log(`📅 Using completionDateTime with time: ${updateData.completionDateTime}`);
+  } else if (updateData.dateOfCompletion) {
     const normalizedDate = normalizeDateToISO(updateData.dateOfCompletion);
     if (normalizedDate) {
       const isoTimestamp = `${normalizedDate}T00:00:00.000Z`;
