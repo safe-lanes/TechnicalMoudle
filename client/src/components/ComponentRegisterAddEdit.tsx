@@ -993,7 +993,7 @@ export default function ComponentRegisterAddEdit({
             <span className="w-4 mr-1" />
           )}
           <span className="text-xs text-gray-700 truncate">
-            {node.name}
+            {node.name.startsWith(node.code + " ") ? node.name : `${node.code} ${node.name}`}
           </span>
         </div>
         {isExpanded && hasChildren && (
@@ -1026,9 +1026,9 @@ export default function ComponentRegisterAddEdit({
       <div className="px-6 py-4 bg-white border-b">
         <div className="flex items-center justify-between">
           <h1 className="text-xl font-semibold text-gray-900">
-            {isEditMode && !isAddingNew && componentData.componentCode
-              ? `${componentData.componentCode} ${componentData.componentName || ''}`
-              : "Components"}
+            {isEditMode && !isAddingNew
+              ? "Component Register \u2013 Edit Component"
+              : "Component Register \u2013 Add Component"}
           </h1>
           <div className="flex items-center gap-2">
             <Button
@@ -1145,7 +1145,7 @@ export default function ComponentRegisterAddEdit({
       </div>
 
       <div className="flex-1 flex overflow-hidden">
-        <div className="w-64 flex flex-col border-r">
+        <div className="w-[30%] flex flex-col border-r">
           <div className="px-3 py-2 bg-sky-500">
             <span className="text-white font-semibold text-sm">COMPONENTS</span>
           </div>
