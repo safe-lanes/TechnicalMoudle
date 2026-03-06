@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from "react";
+import { useLocation } from "wouter";
 import { ArrowLeft, Plus, Edit2, ChevronRight, ChevronDown, Search, Upload, Eye, Download, Trash2, FileText, Loader2, Check, ChevronsUpDown, X, ChevronUp } from "lucide-react";
 import { Card, CardHeader, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -45,6 +46,7 @@ export default function ComponentRegisterAddEdit({
   parentComponent,
 }: ComponentRegisterAddEditProps) {
   const { toast } = useToast();
+  const [, setLocation] = useLocation();
   const { vesselId, setVesselId } = useVessel();
   const { data: vessels = [] } = useVessels();
   const { options: departmentOptions } = useDepartmentOptions();
@@ -1685,6 +1687,19 @@ export default function ComponentRegisterAddEdit({
                 </CardHeader>
                 {!collapsedSections['C'] && (
                 <CardContent className="pt-4 pb-4 px-4 border-t border-gray-100">
+                {activeComponentId && componentData.componentCode && (
+                <div className="flex items-center justify-end mb-3">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="h-7 text-xs text-sky-600 border-sky-300"
+                    data-testid="button-add-job"
+                    onClick={() => setLocation(`/pms/work-order/new/${componentData.componentCode}?mode=template`)}
+                  >
+                    + Add Jobs
+                  </Button>
+                </div>
+                )}
                 <div className="border rounded overflow-hidden">
                   <table className="w-full text-xs">
                     <thead className="bg-gray-50">
