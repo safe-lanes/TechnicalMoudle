@@ -227,5 +227,34 @@ Eight validation and integrity rules for the Work Order form Part B, covering fr
 - None. Application compiles and runs normally.
 
 ### Where to Resume
-- Consider adding unit tests for the delta calculation logic in `workOrderService.ts`.
-- Monitor for edge cases: same spare consumed from two different locations on the same WO.
+- Consider adding unit tests for the delta calculation logic in `workOrderService.ts`. **DONE — see 2026-03-06 session below.**
+- Monitor for edge cases: same spare consumed from two different locations on the same WO. **DONE — unit test covers this.**
+
+---
+
+## 2026-03-06 — Spare Consumption Delta: Extract, Unit Test & Bug Fix
+
+### What We Built
+- Extracted the spare consumption delta calculation logic from inline code in `workOrderService.ts` into a standalone, testable pure function `computeSpareConsumptionDelta`.
+- Created 17 unit tests covering all edge cases for the delta logic.
+- Fixed a bug where `spareUuid` was passed to `performInventoryTransaction` in the approval section (parameter not accepted).
+
+### What's Working
+- **Extracted function (T001)**: `computeSpareConsumptionDelta(currentConsumed, previousConsumed)` returns an array of `SpareToProcess` entries with qty, reverseQty, locationName, partKey, and lineIndex. Composite key matching (`partKey::locationName`) and all delta logic preserved exactly.
+- **Unit tests (T002)**: 17 tests pass covering: first save, re-save (no delta), qty increase, qty decrease, line removal, same spare at two locations, case-insensitive location matching, string qty parsing, zero qty, partNo fallback, empty location skipping, mixed scenarios, locationName field fallback, and zero `_deductedQty` skipping.
+- **spareUuid bug fix (T003)**: Removed `spareUuid: spare.suuid` from the `performInventoryTransaction` call in the approval section (was silently ignored but incorrect).
+
+### What's Broken
+- Nothing broken from these changes.
+
+### What's Pending
+- Nothing pending from this session.
+
+### Key Files Changed
+- `server/modules/work-orders/utils/spareConsumptionDelta.ts` (new) — Extracted pure function with typed interfaces
+- `server/modules/work-orders/utils/__tests__/spareConsumptionDelta.test.ts` (new) — 17 unit tests
+- `server/modules/work-orders/services/workOrderService.ts` — Replaced inline delta logic with function call; removed `spareUuid` from approval section
+- `vitest.config.ts` (new) — Vitest configuration for server-side unit tests
+
+### Environment Issues
+- None. Application compiles and runs normally. Vitest installed as dev dependency.
