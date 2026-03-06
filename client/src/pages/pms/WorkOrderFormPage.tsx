@@ -342,6 +342,16 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
   }>>([]);
   const [isLoadingSpares, setIsLoadingSpares] = useState(false);
 
+  // A2 Required Spare Parts modal state
+  const [isA2SpareModalOpen, setIsA2SpareModalOpen] = useState(false);
+  const [a2LinkedSpares, setA2LinkedSpares] = useState<Array<{
+    spare: any;
+    selected: boolean;
+    quantityRequired: string;
+    remarks: string;
+  }>>([]);
+  const [isLoadingA2Spares, setIsLoadingA2Spares] = useState(false);
+
   // Cache the last Calendar unit selection to preserve user choice when toggling maintenance basis
   const [lastCalendarUnit, setLastCalendarUnit] = useState('Months');
 
@@ -844,15 +854,74 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
     }
   };
 
-  const handleAddSparePart = () => {
+  const handleAddSparePart = async () => {
     if (isReadOnly) return;
-    const newPart = { partNo: "", description: "", quantityRequired: "", remarks: "" };
+
+    const componentCode = templateData.componentCode;
+    if (!componentCode || !vesselId) {
+      const newPart = { partNo: "", description: "", quantityRequired: "", remarks: "" };
+      setTemplateData(prev => ({
+        ...prev,
+        requiredSpareParts: [...prev.requiredSpareParts, newPart]
+      }));
+      setOriginalSparePart(null);
+      setEditingSparePart(templateData.requiredSpareParts.length);
+      return;
+    }
+
+    setIsLoadingA2Spares(true);
+    setIsA2SpareModalOpen(true);
+
+    try {
+      const response = await fetch(`/technical/api/inventory/spares-by-component-code/${vesselId}/${encodeURIComponent(componentCode)}`);
+      const data = await response.json();
+
+      if (data.success && data.data) {
+        const existingPartCodes = new Set(templateData.requiredSpareParts.map(p => p.partNo || p.partCode));
+        const sparesWithState = data.data
+          .filter((item: any) => !existingPartCodes.has(item.spare?.partCode || item.spare?.partNumber))
+          .map((item: any) => ({
+            spare: item.spare,
+            selected: false,
+            quantityRequired: '1',
+            remarks: ''
+          }));
+        setA2LinkedSpares(sparesWithState);
+      } else {
+        setA2LinkedSpares([]);
+      }
+    } catch (error) {
+      console.error('Error fetching linked spares for A2:', error);
+      setA2LinkedSpares([]);
+      toast({
+        title: "Error",
+        description: "Failed to fetch spare parts for this component.",
+        variant: "destructive"
+      });
+    } finally {
+      setIsLoadingA2Spares(false);
+    }
+  };
+
+  const handleAddSelectedSparesA2 = () => {
+    const selectedSpares = a2LinkedSpares.filter(s => s.selected);
+    if (selectedSpares.length === 0) return;
+
+    const newParts = selectedSpares.map(s => ({
+      partNo: s.spare.partCode || s.spare.partNumber || '',
+      partCode: s.spare.partCode || s.spare.partNumber || '',
+      description: s.spare.partName || '',
+      quantityRequired: s.quantityRequired || '1',
+      remarks: s.remarks || ''
+    }));
+
     setTemplateData(prev => ({
       ...prev,
-      requiredSpareParts: [...prev.requiredSpareParts, newPart]
+      requiredSpareParts: [...prev.requiredSpareParts, ...newParts]
     }));
-    setOriginalSparePart(null); // New parts have no original state
-    setEditingSparePart(templateData.requiredSpareParts.length);
+
+    setIsA2SpareModalOpen(false);
+    setA2LinkedSpares([]);
   };
 
   // Fetch and open spare parts selection modal for Section B4
@@ -4244,6 +4313,110 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Spare Parts Selection Modal for Section A2 */}
+      <Dialog open={isA2SpareModalOpen} onOpenChange={setIsA2SpareModalOpen}>
+        <DialogContent className="max-w-[75vw] max-h-[80vh] overflow-hidden flex flex-col">
+          <DialogHeader>
+            <DialogTitle>Select Required Spare Parts for Component: {templateData.componentCode}</DialogTitle>
+            <DialogDescription>
+              Select spare parts linked to this component to add as required spare parts.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="flex-1 overflow-auto">
+            {isLoadingA2Spares ? (
+              <div className="flex items-center justify-center py-8">
+                <div className="text-gray-500">Loading spare parts...</div>
+              </div>
+            ) : a2LinkedSpares.length === 0 ? (
+              <div className="flex items-center justify-center py-8">
+                <div className="text-gray-500">No spare parts linked to this component.</div>
+              </div>
+            ) : (
+              <table className="w-full text-sm">
+                <thead className="bg-gray-50 dark:bg-gray-800 sticky top-0">
+                  <tr className="border-b">
+                    <th className="text-left py-2 px-2 font-medium w-12">Select</th>
+                    <th className="text-left py-2 px-2 font-medium">Part Code</th>
+                    <th className="text-left py-2 px-2 font-medium">Description</th>
+                    <th className="text-center py-2 px-2 font-medium">ROB</th>
+                    <th className="text-left py-2 px-2 font-medium w-24">Qty Required</th>
+                    <th className="text-left py-2 px-2 font-medium">Remarks</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {a2LinkedSpares.map((item, index) => {
+                    const robA = item.spare?.robLocationA ?? 0;
+                    const robB = item.spare?.robLocationB ?? 0;
+                    const totalRob = robA + robB;
+
+                    return (
+                      <tr key={item.spare?.id || index} className="border-b hover:bg-gray-50 dark:hover:bg-gray-800">
+                        <td className="py-2 px-2">
+                          <Checkbox
+                            checked={item.selected}
+                            onCheckedChange={(checked) => {
+                              setA2LinkedSpares(prev => prev.map((s, i) =>
+                                i === index ? { ...s, selected: !!checked } : s
+                              ));
+                            }}
+                            data-testid={`a2-spare-select-${index}`}
+                          />
+                        </td>
+                        <td className="py-2 px-2 font-mono text-xs">{item.spare?.partCode || item.spare?.partNumber || '-'}</td>
+                        <td className="py-2 px-2">{item.spare?.partName || '-'}</td>
+                        <td className="py-2 px-2 text-center font-medium">{totalRob}</td>
+                        <td className="py-2 px-2">
+                          <Input
+                            type="number"
+                            min="1"
+                            value={item.quantityRequired}
+                            onChange={(e) => {
+                              setA2LinkedSpares(prev => prev.map((s, i) =>
+                                i === index ? { ...s, quantityRequired: e.target.value, selected: e.target.value ? true : s.selected } : s
+                              ));
+                            }}
+                            className="h-8 w-20"
+                            placeholder="1"
+                            data-testid={`a2-spare-qty-${index}`}
+                          />
+                        </td>
+                        <td className="py-2 px-2">
+                          <Input
+                            value={item.remarks}
+                            onChange={(e) => {
+                              setA2LinkedSpares(prev => prev.map((s, i) =>
+                                i === index ? { ...s, remarks: e.target.value } : s
+                              ));
+                            }}
+                            className="h-8"
+                            placeholder="Remarks..."
+                            data-testid={`a2-spare-remarks-${index}`}
+                          />
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            )}
+          </div>
+
+          <DialogFooter className="pt-4 border-t">
+            <Button variant="outline" onClick={() => setIsA2SpareModalOpen(false)} data-testid="a2-spare-modal-cancel">
+              Cancel
+            </Button>
+            <Button
+              onClick={handleAddSelectedSparesA2}
+              disabled={!a2LinkedSpares.some(s => s.selected)}
+              data-testid="a2-spare-modal-add"
+            >
+              Add Selected Spares
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Spare Parts Selection Modal for Section B4 */}
       <Dialog open={isSparePartsModalOpen} onOpenChange={setIsSparePartsModalOpen}>
