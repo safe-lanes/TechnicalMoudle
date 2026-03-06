@@ -128,7 +128,8 @@ async function runIndexMigrations(db: any): Promise<void> {
         UNIQUE(vessel_id, year)
       )
     `);
-    await db.execute(sql`CREATE INDEX IF NOT EXISTS idx_defect_seq_vessel_year ON defect_sequences(vessel_id, year)`);
+    // Note: UNIQUE(vessel_id, year) in CREATE TABLE above already provides the constraint
+    // needed for ON CONFLICT. Do NOT create a separate regular index here.
     
     // Migration: Populate vessel_sequence for existing vessels based on creation order
     await db.execute(sql`
