@@ -9,72 +9,60 @@ Preferred communication style: Simple, everyday language.
 ## System Architecture
 
 ### Core Design Principles
--   **Module-Based Architecture**: All backend code is organized into domain-specific modules under `server/modules/` (e.g., `alerts`, `fleet`, `spares`, `vessels`, `work-orders`). New features must adhere to this structure, with each module typically containing `routes.ts` and optional `schemas.ts`.
--   **UUID-Based Identity System**: The system primarily uses canonical UUID columns (e.g., `vuuid`, `cuuid`, `juuid`, `wouuid`) as the primary identity for foreign key relationships, deprecating older `id` formats for new references.
--   **Immutable Tables**: Certain tables like `component_maintenance_history` are designed as INSERT-only audit trails, enforced by database triggers.
--   **Dual Migration System**: A robust migration system combines 52 frozen code-based migrations (`server/migrations.ts`) with auto-generated Drizzle SQL migrations (`migrations/*.sql`). Schema changes are made in `shared/schema.ts`, and new SQL migration files are automatically generated.
--   **Database Safety Patterns**: Migrations include safety guards (`IF NOT EXISTS`, `IF EXISTS`) and orphan cleanup procedures before adding foreign key constraints.
--   **API Route Prefix**: All API endpoints must use the `/technical/api` prefix.
--   **Vessel Data Source Strategy**: The system supports fetching vessel data from both local and external sources, with a robust fallback mechanism for identifying vessels by various ID formats.
--   **Domain Parameter Requirement**: All external master data API calls require an explicit `domain` parameter. The frontend reads domain from `localStorage.getItem('domain')` (set by the parent Sail-ERP app) and passes it as a query parameter to the backend. No hardcoded domain fallbacks are used — backend returns 400 if domain is missing.
+-   **Module-Based Architecture**: Backend code is organized into domain-specific modules (`server/modules/`) with `routes.ts` and optional `schemas.ts`.
+-   **UUID-Based Identity System**: Uses canonical UUID columns for primary identity in foreign key relationships.
+-   **Immutable Tables**: Certain tables (e.g., `component_maintenance_history`) are INSERT-only audit trails enforced by database triggers.
+-   **Dual Migration System**: Combines 52 frozen code-based migrations (`server/migrations.ts`) with auto-generated Drizzle SQL migrations (`migrations/*.sql`). Schema changes are made in `shared/schema.ts`.
+-   **Database Safety Patterns**: Migrations include safety guards (`IF NOT EXISTS`, `IF EXISTS`) and orphan cleanup.
+-   **API Route Prefix**: All API endpoints use the `/technical/api` prefix.
+-   **Vessel Data Source Strategy**: Supports fetching vessel data from local and external sources with fallback mechanisms.
+-   **Domain Parameter Requirement**: All external master data API calls require an explicit `domain` parameter from the frontend.
 
 ### Tech Stack
 -   **Frontend**: React 18, TypeScript, Vite, Tailwind CSS, shadcn/ui, TanStack Query, Wouter.
 -   **Backend**: Express.js, TypeScript, Drizzle ORM.
 -   **Database**: PostgreSQL 16.
--   **AI**: OpenAI GPT-4o (via Replit AI Integration).
--   **Storage**: Replit Object Storage (for document uploads).
+-   **AI**: OpenAI GPT-4o.
+-   **Storage**: Replit Object Storage.
 
 ### UI/UX Standards
 -   Mobile-first responsive design.
 -   AG Charts React for visualizations and AG Grid Enterprise for data tables.
--   Consistent `p-6` padding for main content and `space-y-6` for vertical spacing.
+-   Consistent `p-6` padding and `space-y-6` vertical spacing.
 -   Delta UI Pattern for mapping/selection dialogs.
--   Work Order forms are designed as single-page scrollable interfaces with numbered subsections.
--   All dashboard charts display real database data.
+-   Work Order forms are single-page scrollable interfaces with numbered subsections.
+-   Dashboard charts display real database data.
 
 ### Dashboard Visual Design Language (Audit-Reference Style)
--   **Top Navbar**: Pure white background (`#ffffff`), no shadow, active tab has 3px blue bottom-border underline (`#1a6eb5`), active tab text/icon `#1a6eb5`, inactive tabs `#4b5563`, separator `1px solid #e5e7eb`.
--   **Left Sidebar**: Medium blue background (`#1565c0`); active item uses `rgba(255,255,255,0.12)` overlay + `3px solid rgba(255,255,255,0.9)` left border; active text/icon full white; inactive text/icon `rgba(255,255,255,0.75)`.
--   **Section Headers**: Plain blue uppercase text labels (`#1a6eb5`, 11px, bold, 0.8px letter-spacing), padding `16px 4px 12px 4px`, transparent background.
--   **Gauge Charts**: Gray arc (`#d1d5db`), thin stroke (`strokeWidth: 10`), **number text** carries semantic color via `color` prop (overdue=`#e74c3c` red, completion=`#16a34a` green, outstanding=`#f59e0b` amber), track `#e5e7eb`.
--   **Donut Charts**: Thin ring style (`innerRadiusRatio: 0.82`), white background containers.
--   **Trend Charts**: Hardcoded static data (values 30–49%), multi-line LineChart with CartesianGrid (horizontal only, stroke `#f0f4f8`), percentage Y-axis domain `[0,100]` ticks `[0,25,50,75,100]`, chart height 220px.
--   **KPI List**: Label text 13px `#374151`, value text 14px bold, separators `1px solid #f1f5f9`.
--   **Overview/Management Toggle**: Pill 13px (20px radius); active = `#1a2b4a` bg white text, no border; inactive = `#e2e8f0` bg `#64748b` text, no border.
--   **All Vessel/My Vessel Toggle**: Pill 13px (20px radius); active = `#1a2b4a` bg white text, no border; inactive = white bg `#374151` text, `1px solid #e2e8f0` border.
--   **Dashboard Title**: 20px, fontWeight 600, `#1a2b4a`. Year: 18px, bold, `#1a2b4a`.
--   **Overdue Table**: Dark navy header (`#1a2b4a`), table minWidth 500px, column min-widths (WO 160px, Equipment 200px, Status 90px), status badge `#fee2e2`/`#dc2626` 4px radius whiteSpace nowrap, row text 12px `#374151`, zebra `#ffffff`/`#fafafa`, separator `1px solid #f1f5f9`.
--   **Watch List Badges**: Overdue = `#fee2e2`/`#dc2626`, Critical = `#fff7ed`/`#ea580c`, both 4px radius, 11px font. View All link `#1a6eb5` 12px with top border.
--   **Cards**: White bg, `box-shadow: 0 1px 3px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.04)`, `border: 1px solid #f1f5f9`, border-radius 8px.
--   **Page Background**: `#f8fafc` (subtle blue-gray tint).
--   **Dot Matrix**: Table minWidth 500px, metric column 110px 12px `#374151`, vessel headers 55px 11px `#6b7280`, row borders `1px solid #f1f5f9`.
--   **Chat FAB**: White circle with `#1a6eb5` border/icon.
--   **Custom Scrollbar CSS**: `.overflow-x-auto` elements use 3px WebKit scrollbar with `#cbd5e1` thumb on transparent track.
+-   **Color Scheme**: Specific colors defined for navigation (white, medium blue), text, borders, and backgrounds.
+-   **Typography**: Defined font sizes and weights for titles, headers, and labels.
+-   **Component Styling**: Gauge charts use gray arcs and semantic colors; donut charts have a thin ring style; trend charts are line charts with CartesianGrid.
+-   **Table Styling**: Overdue table has a dark navy header, specific column widths, and zebra striping. Dot matrix tables have distinct metric and vessel header styling.
+-   **Interactive Elements**: Toggles use pill shapes with distinct active/inactive styles. Cards have white backgrounds and subtle shadows.
+-   **Scrollbars**: Custom WebKit scrollbar styling for `overflow-x-auto` elements.
 
 ### Feature Specifications
--   **Spare-Component Sibling Link Distribution**: When a spare is linked to a component, it is automatically linked to all sibling components (components sharing the same `parentId`). An idempotent backfill endpoint is available for batch processing.
--   **Fleet Table Schema Contract**: All `fleet_*` tables must include mandatory columns such as `uuid`, `sortOrder`, `createdAt`, `updatedAt`, `createdByUuid`, `updatedByUuid`, `isDeleted`, and `isSync`.
--   **Bulk Import Maker Validation**: Component bulk import now validates that makers specified in the import sheet already exist in `maker_list`, preventing automatic creation of new makers.
--   **Bulk Import Summary Report**: After any bulk import completes (all 9 types: components, jobs, spares, stores, work-orders, makers, fleet-components, fleet-jobs, fleet-spares), an `ImportSummaryModal` automatically appears showing: (1) Statistics bar with Total Records, Successfully Imported, and Failed Records counts, (2) Row-by-row table with Row Number, Primary Identifier, Status badge (Success/Failed/Skipped), and Error Message, (3) Status filter badges to toggle All/Success/Failed/Skipped rows, (4) Pagination (10/25/50/100 per page), (5) "Export Summary to Excel" button that calls `POST /technical/api/bulk/export-summary` to generate a styled XLSX file. Backend `performImport()` in `importService.ts` now returns `rowResults` array alongside aggregate counts. The `validationService.ts` sets `__meta.rowNumber` for all import types to ensure row number alignment between dry-run and import. Failed validation rows from partial imports are also included in the summary.
--   **Equipment/System Department Validation**: The Equipment / System Department field is restricted to exactly 6 allowed values: Engine, Deck, Electrical, Galley, LSA, FFA. These are seeded into `master_lists` table on every startup (idempotent). The frontend `<select>` dropdown is populated from `master_lists` via `useDepartmentOptions()`. Backend `componentService.ts` validates against `ALLOWED_DEPARTMENTS` on both create and update. Bulk import `validationService.ts` validates against the `DEPARTMENTS` constant from `helpers.ts`. The `DEPARTMENTS` constant in `helpers.ts` also includes all 6 values.
--   **Maker Searchable Dropdown**: The Maker field in both `ComponentRegisterAddEdit.tsx` and `AddEditComponentForm.tsx` uses a Popover+Command (shadcn cmdk) searchable dropdown linked to the `maker_list` master table (fetched via `GET /technical/api/fleet/makers`). Selecting a maker auto-fills the Maker Code field (read-only, grey background). An X button clears both fields. Backend validation in `componentService.ts` verifies maker/makerCode combinations exist in `maker_list` on both create and update. Frontend validation blocks save if maker list hasn't loaded yet or if maker value doesn't match a valid entry.
--   **Inventory Transaction Location Picker**: The Inventory Transaction dialog features interactive, searchable combobox dropdowns for selecting and creating locations directly from the `locations` table.
--   **Component Mandatory Field Validation**: The Add/Edit Component forms (`ComponentRegisterAddEdit.tsx`, `AddEditComponentForm.tsx`) enforce 10 mandatory fields (Parent Component Code, Component Code, Component Name, Component Category, Model, Model Code, Criticality, Condition Based, Equipment/System Department, Is Active) with red asterisks, red border highlights, inline error messages, and a validation toast on Save. When Is Parent = Yes, 5 fields (Model, Model Code, Criticality, Condition Based, Equipment/System Department) become optional — asterisks hide and validation skips them. Backend validation in `componentService.ts` also applies this conditional logic on both create and update.
--   **RH Counter Type & Source Selection**: Both component forms save `rhCounterType` and `rhMasterComponentId` to the database. When RH Counter Type = "Inherited", a searchable Popover+Command dropdown appears for RH Counter Source showing MASTER components from the same vessel (fetched via `GET /technical/api/rh-config/master-components/:vesselId`), displaying Component Code + Component Name. When MASTER, Source shows "SELF" (read-only). When NOT_RH_DRIVEN, Source shows "—". Validation requires a source selection when Inherited is chosen. The `RunningHoursConditionPanel.tsx` (used in `AddEditComponentForm.tsx` edit mode) also uses the searchable dropdown. In `AddEditComponentForm.tsx` add mode, an inline Section B table replaces the previous placeholder, allowing RH Counter Type and Source to be set during component creation.
--   **Component Tree Sort Order & Cross-Level Drag-Drop**: The component tree supports drag-and-drop reordering via Edit mode, including cross-level moves (reparenting). The `sort_order` column was added to `components` via raw SQL in `initDb.ts` (not in the Drizzle schema). `componentRepository.ts` augments fetch results with a raw SQL query for `sort_order`. Backend `updateHierarchyAndSortOrder()` handles both `sort_order` and `parent_id` changes in a single DB transaction with circular hierarchy prevention. Note: `parent_id` stores the parent's `componentCode` (not UUID). Frontend `collectReparents()` detects parent changes by comparing edit tree to original, sends `reparents` array alongside sort updates.
--   **Work Order Part B Validation & Integrity Rules**: The WO form enforces 8 validation rules: (1) `isPartBReadOnly` disables all Part B fields when status is Completed or Pending Approval, (2) `maxLength` + character counters on textareas (2000 chars for Work Carried Out / Job Experience, 500 for Remarks), (3) Draft save flow — `handleSave` splits validation into "hard errors" (format, safety) vs "missing fields" (required-for-submission), allowing partial saves as draft without status change, (4) Audit trail via `audit_log` table on every WO save with diff snapshot, (5) Backend `validateNumericField` for totalTimeHours/manhours/runningHours/currentReading/noOfPersons. These rules are implemented in both `WorkOrderFormPage.tsx` and `WorkOrderForm.tsx` (frontend) and `workOrderService.ts` (backend).
--   **Work Order B1 Field Name Mapping**: The DB schema uses `riskAssessmentStatus`, `safetyChecklistsStatus`, `operationalFormsStatus` columns, but the frontend state uses shorter keys `riskAssessment`, `safetyChecklists`, `operationalForms`. Both `WorkOrderFormPage.tsx` and `WorkOrderForm.tsx` map between these on save (adding `*Status` suffix) and load (stripping `*Status` suffix). Upload controls for each B1 field only render when the corresponding radio is set to "Yes".
--   **Work Order Attachment Display**: All attachment sections in work order forms display icon-only rows (Paperclip + Eye + Trash2) without file names or file sizes. The **Paperclip icon** is clickable and triggers a file download (via temp `<a>` element with `download` attribute). The **View (Eye) icon** opens the document in a new browser tab by converting the base64 `dataUrl` to a Blob via `URL.createObjectURL()` (direct `data:` URLs are blocked by browsers). Both use a shared `dataUrlToBlob()` helper. Object URLs from View are auto-revoked after 60 seconds. The Delete icon shows a confirmation dialog. This applies to all 4 attachment areas in `WorkOrderFormPage.tsx` and all 3 in `WorkOrderForm.tsx`.
--   **Completed WO Read-Only Enforcement**: When a Work Order status is "Completed", all Part B fields (B1 radios, B2 inputs/textareas/selects, B3 running hours, B4 spare parts) are fully disabled/read-only. Upload and delete buttons are hidden. The "+ Add Spare Part" button is hidden. A blue banner ("This Work Order is completed. Part B is read-only.") displays at the top. View/download of existing attachments remains functional. Backend enforces this via `isCompletedStatus()` checks in `woDocumentController.ts` (upload/delete return 403) and `executionService.ts` (create/update throw ValidationError). Both `WorkOrderFormPage.tsx` and `WorkOrderForm.tsx` include "Completed" in their `isReadOnly` logic.
--   **Spares By Location Independent Sync**: All `spare_location_stock` SYNC blocks in `postgresStorage.ts` (8 methods: createSpare, updateSpare, consumeSpare, consumeSpareFromLocation, receiveSpareToLocation, adjustSpareAtLocation, transferSpareLocation, reconcileSpareLocationStock) sync Location A and Location B independently. Each location has its own try/catch block and only syncs if the spare actually has that location assigned (truthy `location`/`location2`). This ensures a spare with only one location still appears in the "Spares By Location" tab.
-
--   **Work Order B4 Spare Consumption Flow**: Spare parts consumption in Section B4 is recorded at save time (data persisted in work order) but inventory (ROB) is only deducted at approval time via `workOrderService.ts` PATCH approval path. The `consumptionMutation` in `WorkOrderForm.tsx` uses correct field names (`qtyChange` as negative, `referenceNote`, `userId`) matching the backend `inventoryTransactionSchema`. Both `workOrderService.ts` and `workOrderCompletionService.ts` resolve consumed spare locations using `locationId` (primary) with `location`/`locationName` as fallback. Single-location spares are supported — the backend `performInventoryTransaction` in `postgresStorage.ts` defaults to the configured location when only one exists.
--   **Read-Only AES-Encrypted LocalStorage (Secure Auth Storage)**: The auth system is **read-only** for localStorage — it never writes to localStorage. It reads 5 AES-encrypted keys (`userProfile`, `userRole`, `userType`, `credentials`, `Role_Access_Data`) via `secureGetItem` from `client/src/utils/secureStorage.ts` using `crypto-js`. If localStorage is empty (Replit/demo mode), a static default user (Office/Client_Admin) is used in React state/memory only. The role switcher updates React state only, not localStorage. The `roleAccessData.ts` utility generates granular permission matrices (module-level and action-level) based on user role, kept in memory. The `localStorageAnalyzer.ts` utility can detect and decrypt AES values for dev diagnostics. The secret key is sourced from `VITE_STORAGE_SECRET` env var. Legacy keys (`currentUser`, `sail_ui_role`) have been completely removed.
+-   **Spare-Component Sibling Link Distribution**: Spares linked to a component are automatically linked to all sibling components.
+-   **Fleet Table Schema Contract**: All `fleet_*` tables must include mandatory columns like `uuid`, `sortOrder`, `createdAt`, `updatedAt`, `createdByUuid`, `updatedByUuid`, `isDeleted`, and `isSync`.
+-   **Bulk Import Maker Validation**: Component bulk import validates makers against `maker_list`, preventing new maker creation.
+-   **Bulk Import Summary Report**: After any bulk import, an `ImportSummaryModal` displays statistics, row-by-row status, and an option to export to Excel.
+-   **Equipment/System Department Validation**: The Equipment / System Department field is restricted to 6 predefined values, validated both frontend and backend.
+-   **Maker Searchable Dropdown**: Maker fields use a searchable dropdown linked to `maker_list`, auto-filling Maker Code.
+-   **Inventory Transaction Location Picker**: Features interactive, searchable combobox dropdowns for selecting and creating locations.
+-   **Component Mandatory Field Validation**: Add/Edit Component forms enforce 10 mandatory fields with conditional logic for parent components.
+-   **RH Counter Type & Source Selection**: Components can define `rhCounterType` and `rhMasterComponentId`, with searchable dropdowns for source selection when "Inherited".
+-   **Component Tree Sort Order & Cross-Level Drag-Drop**: Supports drag-and-drop reordering and reparenting in the component tree, updating `sort_order` and `parent_id`.
+-   **Work Order Part B Validation & Integrity Rules**: Enforces 8 validation rules including read-only states, character limits, draft save logic, audit trails, and numeric field validation.
+-   **Work Order B1 Field Name Mapping**: Frontend state keys map to different DB schema column names for B1 fields.
+-   **Work Order Attachment Display**: Attachments are displayed with icon-only rows for download, view, and delete.
+-   **Completed WO Read-Only Enforcement**: When a Work Order is "Completed", all Part B fields become read-only, and upload/delete buttons are hidden.
+-   **Spares By Location Independent Sync**: `spare_location_stock` syncs Location A and Location B independently.
+-   **Work Order B4 Spare Consumption Flow**: Spare consumption is recorded at save but inventory deduction occurs at approval time.
+-   **Read-Only AES-Encrypted LocalStorage (Secure Auth Storage)**: The auth system reads AES-encrypted keys from `localStorage` but never writes to it. Static default users are used if `localStorage` is empty.
 
 ## External Dependencies
 
 -   **Frontend Libraries**: `@radix-ui/*`, `@tanstack/react-query`, `wouter`, `tailwindcss`, `lucide-react`, `ag-grid-enterprise`, `ag-charts-react`, `crypto-js`.
 -   **Backend Libraries**: `express`, `drizzle-orm`, `@neondatabase/serverless`, `connect-pg-simple`.
 -   **Development Tools**: `vite`, `typescript`, `drizzle-kit`, `tsx`.
--   **AI Services**: OpenAI GPT-4o (integrated via Replit AI).
+-   **AI Services**: OpenAI GPT-4o.

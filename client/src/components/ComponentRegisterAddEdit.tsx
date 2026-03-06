@@ -60,10 +60,11 @@ export default function ComponentRegisterAddEdit({
 
   const isEditModeFromProp = !!componentId;
   const [selectedComponentId, setSelectedComponentId] = useState<string | null>(componentId || null);
+  const [isAddingNew, setIsAddingNew] = useState(false);
   
   const isMainCategoryCheck = (id: string): boolean => /^[1-8]$/.test(id);
   
-  const isEditMode = isEditModeFromProp || (!!selectedComponentId && !isMainCategoryCheck(selectedComponentId));
+  const isEditMode = !isAddingNew && (isEditModeFromProp || (!!selectedComponentId && !isMainCategoryCheck(selectedComponentId)));
 
   // Initialize selectedTreeNode from propComponentCode (for editing) or parentComponent (for adding)
   useEffect(() => {
@@ -828,7 +829,7 @@ export default function ComponentRegisterAddEdit({
         rhMasterComponentId: componentData.rhCounterType === "INHERITED" ? (componentData.rhMasterComponentId || null) : null,
       };
 
-      if (isEditMode && componentId) {
+      if (isEditMode && !isAddingNew && componentId) {
         await apiRequest('PATCH', `/technical/api/components/${componentId}`, payload);
         toast({
           title: "Component Updated",
@@ -879,6 +880,7 @@ export default function ComponentRegisterAddEdit({
       return;
     }
     
+    setIsAddingNew(false);
     setSelectedComponentId(comp.id);
     
     setComponentData({
@@ -1024,12 +1026,12 @@ export default function ComponentRegisterAddEdit({
             className="bg-white text-sky-600 hover:bg-sky-50 border-white"
             onClick={() => {
               const isCategory = selectedTreeNode ? isMainCategory(selectedTreeNode) : false;
-              // Parent is always the selected node (whether category or component)
               const parentId = selectedTreeNode || "";
               const nextCode = selectedTreeNode ? generateNextComponentCode(selectedTreeNode, isCategory) : "";
-              // Derive category from the parent or next code
               const derivedCategory = nextCode ? getComponentCategory(nextCode) : (selectedTreeNode ? getComponentCategory(selectedTreeNode) : "");
               
+              setIsAddingNew(true);
+              setSelectedComponentId(null);
               setComponentData({
                 // Row 1
                 fleetEquipmentCode: "",
