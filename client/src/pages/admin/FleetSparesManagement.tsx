@@ -210,6 +210,13 @@ export default function FleetSparesManagement({ onBack }: { onBack?: () => void 
 
   const handleSaveEdit = () => {
     if (!detailSpare) return;
+    if (spareFormData.maker && spareFormData.maker.trim()) {
+      const validMaker = makers.find(m => m.makerName?.toLowerCase() === spareFormData.maker?.trim().toLowerCase());
+      if (!validMaker) {
+        toast({ title: "Validation Error", description: "Maker must be selected from the maker list", variant: "destructive" });
+        return;
+      }
+    }
     const EDITABLE_FIELDS: (keyof FleetSpares)[] = [
       'partCode', 'partName', 'partNumber', 'unitOfMeasurement',
       'fleetEquipmentCode', 'fleetEquipmentName', 'drawingNumber',
@@ -248,6 +255,13 @@ export default function FleetSparesManagement({ onBack }: { onBack?: () => void 
     if (!spareFormData.unitOfMeasurement?.trim()) {
       toast({ title: "Validation Error", description: "Unit of Measurement is required", variant: "destructive" });
       return;
+    }
+    if (spareFormData.maker && spareFormData.maker.trim()) {
+      const validMaker = makers.find(m => m.makerName?.toLowerCase() === spareFormData.maker?.trim().toLowerCase());
+      if (!validMaker) {
+        toast({ title: "Validation Error", description: "Maker must be selected from the maker list", variant: "destructive" });
+        return;
+      }
     }
     const payload: Record<string, any> = {};
     Object.entries(spareFormData).forEach(([key, value]) => {
@@ -464,7 +478,16 @@ export default function FleetSparesManagement({ onBack }: { onBack?: () => void 
                 value={makerSearchText}
                 onChange={(e) => handleMakerSearchChange(e.target.value)}
                 onFocus={() => { if (makerSearchText.trim()) setShowMakerSuggestions(true); }}
-                onBlur={() => setTimeout(() => setShowMakerSuggestions(false), 200)}
+                onBlur={() => setTimeout(() => {
+                  setShowMakerSuggestions(false);
+                  if (makerSearchText.trim()) {
+                    const exactMatch = makers.find(m => m.makerName?.toLowerCase() === makerSearchText.trim().toLowerCase());
+                    if (!exactMatch) {
+                      setMakerSearchText("");
+                      setSpareFormData(prev => ({ ...prev, maker: "", makerCode: "" }));
+                    }
+                  }
+                }, 200)}
                 className="pr-8"
                 data-testid="input-spare-maker"
               />

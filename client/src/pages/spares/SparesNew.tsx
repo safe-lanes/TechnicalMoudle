@@ -177,6 +177,10 @@ const Spares: React.FC = () => {
   const [editLocSearchB, setEditLocSearchB] = useState('');
   const [addLocSearchA, setAddLocSearchA] = useState('');
   const [addLocSearchB, setAddLocSearchB] = useState('');
+  const [addMakerPopoverOpen, setAddMakerPopoverOpen] = useState(false);
+  const [editMakerPopoverOpen, setEditMakerPopoverOpen] = useState(false);
+  const [addMakerSearch, setAddMakerSearch] = useState('');
+  const [editMakerSearch, setEditMakerSearch] = useState('');
   const [invLocAPopoverOpen, setInvLocAPopoverOpen] = useState(false);
   const [invLocBPopoverOpen, setInvLocBPopoverOpen] = useState(false);
   const [invLocSearchA, setInvLocSearchA] = useState('');
@@ -1002,6 +1006,32 @@ const Spares: React.FC = () => {
   };
 
   // Fetch spares data with linkedComponents for multi-component matching
+  interface MakerListItem {
+    id: number;
+    makerCode: string;
+    makerName: string;
+  }
+
+  const { data: makerListData = [] } = useQuery<MakerListItem[]>({
+    queryKey: ['/technical/api/fleet/makers'],
+  });
+
+  const filteredAddMakers = useMemo(() => {
+    if (!addMakerSearch.trim()) return makerListData;
+    const q = addMakerSearch.toLowerCase();
+    return makerListData.filter(m =>
+      m.makerName?.toLowerCase().includes(q) || m.makerCode?.toLowerCase().includes(q)
+    );
+  }, [addMakerSearch, makerListData]);
+
+  const filteredEditMakers = useMemo(() => {
+    if (!editMakerSearch.trim()) return makerListData;
+    const q = editMakerSearch.toLowerCase();
+    return makerListData.filter(m =>
+      m.makerName?.toLowerCase().includes(q) || m.makerCode?.toLowerCase().includes(q)
+    );
+  }, [editMakerSearch, makerListData]);
+
   const { data: sparesData = [], isLoading, refetch } = useQuery({
     queryKey: ['/technical/api/inventory/spares-with-inventory', vesselId],
     queryFn: async () => {
@@ -1457,6 +1487,11 @@ const Spares: React.FC = () => {
   // Handle edit spare submit
   const handleEditSpareSubmit = () => {
     if (!selectedSpare) return;
+
+    if (editSpareForm.maker && !makerListData.some(m => m.makerName.toLowerCase() === editSpareForm.maker.trim().toLowerCase())) {
+      toast({ title: "Invalid Maker", description: "Selected maker is not in the Maker List. Please select a valid maker.", variant: "destructive" });
+      return;
+    }
     
     const updateData = {
       partCode: editSpareForm.partCode,
@@ -2251,6 +2286,11 @@ const Spares: React.FC = () => {
   const handleAddSpareSubmit = () => {
     if (!addSpareForm.partCode || !addSpareForm.partName || !addSpareForm.componentId) {
       toast({ title: "Error", description: "Please fill in all required fields", variant: "destructive" });
+      return;
+    }
+
+    if (addSpareForm.maker && !makerListData.some(m => m.makerName.toLowerCase() === addSpareForm.maker.trim().toLowerCase())) {
+      toast({ title: "Invalid Maker", description: "Selected maker is not in the Maker List. Please select a valid maker.", variant: "destructive" });
       return;
     }
     
@@ -3815,21 +3855,74 @@ const Spares: React.FC = () => {
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <Label htmlFor="add-maker">Maker</Label>
-                  <Input
-                    id="add-maker"
-                    value={addSpareForm.maker}
-                    onChange={(e) => setAddSpareForm({...addSpareForm, maker: e.target.value})}
-                    placeholder="e.g., Shinko Ind Ltd"
-                    data-testid="input-add-maker"
-                  />
+                  <Popover open={addMakerPopoverOpen} onOpenChange={setAddMakerPopoverOpen}>
+                    <PopoverTrigger asChild>
+                      <Button
+                        variant="outline"
+                        role="combobox"
+                        aria-expanded={addMakerPopoverOpen}
+                        className="w-full justify-between font-normal h-10"
+                        data-testid="input-add-maker"
+                      >
+                        {addSpareForm.maker || "Select maker..."}
+                        <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-[300px] p-0" align="start">
+                      <Command>
+                        <CommandInput
+                          placeholder="Search makers..."
+                          value={addMakerSearch}
+                          onValueChange={setAddMakerSearch}
+                          data-testid="input-add-maker-search"
+                        />
+                        <CommandList>
+                          <CommandEmpty>No makers found.</CommandEmpty>
+                          <CommandGroup>
+                            {addSpareForm.maker && (
+                              <CommandItem
+                                value="__clear__"
+                                onSelect={() => {
+                                  setAddSpareForm({...addSpareForm, maker: "", makerCode: ""});
+                                  setAddMakerSearch('');
+                                  setAddMakerPopoverOpen(false);
+                                }}
+                                data-testid="add-maker-clear"
+                              >
+                                <X className="mr-2 h-4 w-4" />
+                                Clear selection
+                              </CommandItem>
+                            )}
+                            {filteredAddMakers.slice(0, 50).map((m) => (
+                              <CommandItem
+                                key={m.id}
+                                value={m.makerName}
+                                onSelect={() => {
+                                  setAddSpareForm({...addSpareForm, maker: m.makerName, makerCode: m.makerCode});
+                                  setAddMakerSearch('');
+                                  setAddMakerPopoverOpen(false);
+                                }}
+                                data-testid={`add-maker-option-${m.id}`}
+                              >
+                                <Check className={`mr-2 h-4 w-4 ${addSpareForm.maker === m.makerName ? "opacity-100" : "opacity-0"}`} />
+                                <span>{m.makerName}</span>
+                                <span className="ml-auto text-xs text-muted-foreground">{m.makerCode}</span>
+                              </CommandItem>
+                            ))}
+                          </CommandGroup>
+                        </CommandList>
+                      </Command>
+                    </PopoverContent>
+                  </Popover>
                 </div>
                 <div>
                   <Label htmlFor="add-maker-code">Maker Code</Label>
                   <Input
                     id="add-maker-code"
                     value={addSpareForm.makerCode}
-                    onChange={(e) => setAddSpareForm({...addSpareForm, makerCode: e.target.value})}
-                    placeholder="e.g., MKR-000018"
+                    readOnly
+                    className="bg-gray-100"
+                    placeholder="Auto-filled from maker selection"
                     data-testid="input-add-maker-code"
                   />
                 </div>
@@ -4278,21 +4371,74 @@ const Spares: React.FC = () => {
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <Label htmlFor="edit-maker">Maker</Label>
-                  <Input
-                    id="edit-maker"
-                    value={editSpareForm.maker}
-                    onChange={(e) => setEditSpareForm({...editSpareForm, maker: e.target.value})}
-                    placeholder="e.g., Mitsui Zosen Machinery Service"
-                    data-testid="input-edit-maker"
-                  />
+                  <Popover open={editMakerPopoverOpen} onOpenChange={setEditMakerPopoverOpen}>
+                    <PopoverTrigger asChild>
+                      <Button
+                        variant="outline"
+                        role="combobox"
+                        aria-expanded={editMakerPopoverOpen}
+                        className="w-full justify-between font-normal h-10"
+                        data-testid="input-edit-maker"
+                      >
+                        {editSpareForm.maker || "Select maker..."}
+                        <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-[300px] p-0" align="start">
+                      <Command>
+                        <CommandInput
+                          placeholder="Search makers..."
+                          value={editMakerSearch}
+                          onValueChange={setEditMakerSearch}
+                          data-testid="input-edit-maker-search"
+                        />
+                        <CommandList>
+                          <CommandEmpty>No makers found.</CommandEmpty>
+                          <CommandGroup>
+                            {editSpareForm.maker && (
+                              <CommandItem
+                                value="__clear__"
+                                onSelect={() => {
+                                  setEditSpareForm({...editSpareForm, maker: "", makerCode: ""});
+                                  setEditMakerSearch('');
+                                  setEditMakerPopoverOpen(false);
+                                }}
+                                data-testid="edit-maker-clear"
+                              >
+                                <X className="mr-2 h-4 w-4" />
+                                Clear selection
+                              </CommandItem>
+                            )}
+                            {filteredEditMakers.slice(0, 50).map((m) => (
+                              <CommandItem
+                                key={m.id}
+                                value={m.makerName}
+                                onSelect={() => {
+                                  setEditSpareForm({...editSpareForm, maker: m.makerName, makerCode: m.makerCode});
+                                  setEditMakerSearch('');
+                                  setEditMakerPopoverOpen(false);
+                                }}
+                                data-testid={`edit-maker-option-${m.id}`}
+                              >
+                                <Check className={`mr-2 h-4 w-4 ${editSpareForm.maker === m.makerName ? "opacity-100" : "opacity-0"}`} />
+                                <span>{m.makerName}</span>
+                                <span className="ml-auto text-xs text-muted-foreground">{m.makerCode}</span>
+                              </CommandItem>
+                            ))}
+                          </CommandGroup>
+                        </CommandList>
+                      </Command>
+                    </PopoverContent>
+                  </Popover>
                 </div>
                 <div>
                   <Label htmlFor="edit-maker-code">Maker Code</Label>
                   <Input
                     id="edit-maker-code"
                     value={editSpareForm.makerCode}
-                    onChange={(e) => setEditSpareForm({...editSpareForm, makerCode: e.target.value})}
-                    placeholder="e.g., MKR-000019"
+                    readOnly
+                    className="bg-gray-100"
+                    placeholder="Auto-filled from maker selection"
                     data-testid="input-edit-maker-code"
                   />
                 </div>

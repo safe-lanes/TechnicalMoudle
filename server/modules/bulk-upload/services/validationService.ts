@@ -204,19 +204,21 @@ export async function validateData(type: string, data: any[], mode: string, vess
   let existingMakersByName = new Map<string, any>();
   let makerListLoaded = false;
 
-  if (type === 'components') {
-    // Fetch existing component codes for the vessel from the database
-    if (vesselId) {
-      try {
-        const existingComponents = await storage.getComponents(vesselId);
-        existingComponents.forEach(comp => {
-          if (comp.componentCode) {
-            existingDbComponentCodes.add(comp.componentCode.toUpperCase());
-          }
-        });
-        console.log(`📋 Loaded ${existingDbComponentCodes.size} existing component codes for vessel '${vesselId}'`);
-      } catch (err) {
-        console.error(`Failed to fetch existing components for vessel ${vesselId}:`, err);
+  if (type === 'components' || type === 'spares' || type === 'fleet-spares') {
+    if (type === 'components') {
+      // Fetch existing component codes for the vessel from the database
+      if (vesselId) {
+        try {
+          const existingComponents = await storage.getComponents(vesselId);
+          existingComponents.forEach(comp => {
+            if (comp.componentCode) {
+              existingDbComponentCodes.add(comp.componentCode.toUpperCase());
+            }
+          });
+          console.log(`📋 Loaded ${existingDbComponentCodes.size} existing component codes for vessel '${vesselId}'`);
+        } catch (err) {
+          console.error(`Failed to fetch existing components for vessel ${vesselId}:`, err);
+        }
       }
     }
 
@@ -230,17 +232,19 @@ export async function validateData(type: string, data: any[], mode: string, vess
       console.error('Failed to fetch maker list for validation:', err);
     }
     
-    // Track occurrences within the uploaded file (case-insensitive)
-    filteredData.forEach((row, index) => {
-      const componentCode = row['Component Code'];
-      if (componentCode) {
-        const code = String(componentCode).trim().toUpperCase(); // Case-insensitive
-        if (!componentCodeOccurrences.has(code)) {
-          componentCodeOccurrences.set(code, []);
+    if (type === 'components') {
+      // Track occurrences within the uploaded file (case-insensitive)
+      filteredData.forEach((row, index) => {
+        const componentCode = row['Component Code'];
+        if (componentCode) {
+          const code = String(componentCode).trim().toUpperCase(); // Case-insensitive
+          if (!componentCodeOccurrences.has(code)) {
+            componentCodeOccurrences.set(code, []);
+          }
+          componentCodeOccurrences.get(code)!.push(index + 2); // Row number (Excel is 1-indexed + header)
         }
-        componentCodeOccurrences.get(code)!.push(index + 2); // Row number (Excel is 1-indexed + header)
-      }
-    });
+      });
+    }
   }
   
   // Validate each row based on type (use filtered data)
@@ -604,6 +608,34 @@ export async function validateData(type: string, data: any[], mode: string, vess
           normalized[field] = String(row[field]).trim();
         }
       });
+
+      if (makerListLoaded) {
+        const rowMakerCode = normalized['Maker Code'] || null;
+        const rowMakerName = normalized['Maker'] || null;
+        if (rowMakerCode) {
+          const trimmedCode = String(rowMakerCode).trim();
+          if (!existingMakersByCode.has(trimmedCode)) {
+            if (rowMakerName) {
+              const nameMatch = existingMakersByName.get(String(rowMakerName).trim().toLowerCase());
+              if (nameMatch) {
+                normalized['Maker Code'] = nameMatch.makerCode;
+              } else {
+                errors.push(`Row ${rowNum}: Maker Code '${trimmedCode}' not found in Maker List. Please import makers first.`);
+              }
+            } else {
+              errors.push(`Row ${rowNum}: Maker Code '${trimmedCode}' not found in Maker List. Please import makers first.`);
+            }
+          }
+        } else if (rowMakerName) {
+          const trimmedName = String(rowMakerName).trim();
+          const nameMatch = existingMakersByName.get(trimmedName.toLowerCase());
+          if (nameMatch) {
+            normalized['Maker Code'] = nameMatch.makerCode;
+          } else {
+            errors.push(`Row ${rowNum}: Maker '${trimmedName}' does not exist in Maker List. Please import makers first.`);
+          }
+        }
+      }
     } else if (type === 'stores') {
       // Validate stores (11-column format per user specification)
       // Columns: Item Code, IMPA Code, Item Name, UOM, Category, Total ROB, Location A, Location A - ROB, Location B, Location B - ROB, Min
@@ -1470,6 +1502,34 @@ export async function validateData(type: string, data: any[], mode: string, vess
       if (row['Criticality']) normalized['Criticality'] = String(row['Criticality']).trim();
       if (row['IHM (Inventory of Hazardous Materials)']) normalized['IHM (Inventory of Hazardous Materials)'] = String(row['IHM (Inventory of Hazardous Materials)']).trim();
       if (row['Evidence Type']) normalized['Evidence Type'] = String(row['Evidence Type']).trim();
+
+      if (makerListLoaded) {
+        const rowMakerCode = normalized['Maker Code'] || null;
+        const rowMakerName = normalized['Maker'] || null;
+        if (rowMakerCode) {
+          const trimmedCode = String(rowMakerCode).trim();
+          if (!existingMakersByCode.has(trimmedCode)) {
+            if (rowMakerName) {
+              const nameMatch = existingMakersByName.get(String(rowMakerName).trim().toLowerCase());
+              if (nameMatch) {
+                normalized['Maker Code'] = nameMatch.makerCode;
+              } else {
+                errors.push(`Row ${rowNum}: Maker Code '${trimmedCode}' not found in Maker List. Please import makers first.`);
+              }
+            } else {
+              errors.push(`Row ${rowNum}: Maker Code '${trimmedCode}' not found in Maker List. Please import makers first.`);
+            }
+          }
+        } else if (rowMakerName) {
+          const trimmedName = String(rowMakerName).trim();
+          const nameMatch = existingMakersByName.get(trimmedName.toLowerCase());
+          if (nameMatch) {
+            normalized['Maker Code'] = nameMatch.makerCode;
+          } else {
+            errors.push(`Row ${rowNum}: Maker '${trimmedName}' does not exist in Maker List. Please import makers first.`);
+          }
+        }
+      }
     }
 
     // Determine status

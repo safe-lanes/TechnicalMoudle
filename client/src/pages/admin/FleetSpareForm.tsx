@@ -2,7 +2,7 @@ import { useEffect, useState, useMemo } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation, useQuery } from "@tanstack/react-query";
-import { type FleetSpares, type FleetComponents } from "@shared/schema";
+import { type FleetSpares, type FleetComponents, type Maker } from "@shared/schema";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -48,10 +48,16 @@ export default function FleetSpareForm({ open, onOpenChange, spare }: FleetSpare
   const { toast } = useToast();
   const [equipSearchText, setEquipSearchText] = useState("");
   const [showEquipSuggestions, setShowEquipSuggestions] = useState(false);
+  const [makerSearchText, setMakerSearchText] = useState("");
+  const [showMakerSuggestions, setShowMakerSuggestions] = useState(false);
 
-  // Fetch fleet components for equipment selection
   const { data: components } = useQuery<FleetComponents[]>({
     queryKey: ['/technical/api/fleet-admin/fleet-components'],
+    enabled: open,
+  });
+
+  const { data: makers = [] } = useQuery<Maker[]>({
+    queryKey: ['/technical/api/fleet/makers'],
     enabled: open,
   });
 
@@ -64,6 +70,13 @@ export default function FleetSpareForm({ open, onOpenChange, spare }: FleetSpare
        c.fleetEquipmentName?.toLowerCase().includes(equipSearchText.toLowerCase()))
     );
   }, [equipSearchText, components]);
+
+  const filteredMakers = useMemo(() => {
+    if (!makerSearchText.trim()) return [];
+    return makers.filter(m =>
+      m.makerName?.toLowerCase().includes(makerSearchText.toLowerCase())
+    ).slice(0, 10);
+  }, [makerSearchText, makers]);
 
   const form = useForm<FleetSpareFormData>({
     resolver: zodResolver(fleetSpareFormSchema),
@@ -111,6 +124,7 @@ export default function FleetSpareForm({ open, onOpenChange, spare }: FleetSpare
         isActive: spare.isActive ?? true,
       });
       setEquipSearchText(spare.fleetEquipmentCode || "");
+      setMakerSearchText(spare.maker || "");
     } else {
       form.reset({
         partName: "",
@@ -132,6 +146,7 @@ export default function FleetSpareForm({ open, onOpenChange, spare }: FleetSpare
         isActive: true,
       });
       setEquipSearchText("");
+      setMakerSearchText("");
     }
   }, [spare, form]);
 
@@ -153,6 +168,29 @@ export default function FleetSpareForm({ open, onOpenChange, spare }: FleetSpare
     setEquipSearchText("");
     form.setValue("fleetEquipmentCode", "");
     setShowEquipSuggestions(false);
+  };
+
+  const handleMakerSearchChange = (value: string) => {
+    setMakerSearchText(value);
+    setShowMakerSuggestions(true);
+    if (!value.trim()) {
+      form.setValue("maker", "");
+      form.setValue("makerCode", "");
+    }
+  };
+
+  const handleMakerSelect = (maker: Maker) => {
+    setMakerSearchText(maker.makerName || "");
+    form.setValue("maker", maker.makerName || "");
+    form.setValue("makerCode", maker.makerCode || "");
+    setShowMakerSuggestions(false);
+  };
+
+  const handleClearMaker = () => {
+    setMakerSearchText("");
+    form.setValue("maker", "");
+    form.setValue("makerCode", "");
+    setShowMakerSuggestions(false);
   };
 
   // Create mutation
@@ -209,6 +247,13 @@ export default function FleetSpareForm({ open, onOpenChange, spare }: FleetSpare
   });
 
   const onSubmit = (data: FleetSpareFormData) => {
+    if (data.maker && data.maker.trim()) {
+      const validMaker = makers.find(m => m.makerName?.toLowerCase() === data.maker?.trim().toLowerCase());
+      if (!validMaker) {
+        toast({ title: "Validation Error", description: "Maker must be selected from the maker list", variant: "destructive" });
+        return;
+      }
+    }
     if (spare?.id) {
       updateMutation.mutate({ ...data, id: spare.id });
     } else {
@@ -336,21 +381,64 @@ export default function FleetSpareForm({ open, onOpenChange, spare }: FleetSpare
 
           <div className="grid grid-cols-2 gap-4">
             {/* Maker */}
-            <div className="space-y-2">
+            <div className="space-y-2 relative">
               <Label htmlFor="maker" data-testid={m("I4.QL5.5.14.9", "I4.QL5.5.28.11")}>
                 <Marker id={m("I4.QL5.5.14.9", "I4.QL5.5.28.11")} />
                 Maker
               </Label>
-              <Input
-                id="maker"
-                {...form.register("maker")}
-                placeholder="Manufacturer name"
-                data-testid={m("I4.QL5.5.14.10", "I4.QL5.5.28.12")}
-              />
-              <Marker id={m("I4.QL5.5.14.10", "I4.QL5.5.28.12")} />
+              <div className="relative">
+                <Input
+                  id="maker"
+                  placeholder="Type to search makers..."
+                  value={makerSearchText}
+                  onChange={(e) => handleMakerSearchChange(e.target.value)}
+                  onFocus={() => { if (makerSearchText.trim()) setShowMakerSuggestions(true); }}
+                  onBlur={() => setTimeout(() => {
+                    setShowMakerSuggestions(false);
+                    if (makerSearchText.trim()) {
+                      const exactMatch = makers.find(m => m.makerName?.toLowerCase() === makerSearchText.trim().toLowerCase());
+                      if (!exactMatch) {
+                        setMakerSearchText("");
+                        form.setValue("maker", "");
+                        form.setValue("makerCode", "");
+                      }
+                    }
+                  }, 200)}
+                  className="pr-8"
+                  data-testid={m("I4.QL5.5.14.10", "I4.QL5.5.28.12")}
+                />
+                <Marker id={m("I4.QL5.5.14.10", "I4.QL5.5.28.12")} />
+                {makerSearchText && (
+                  <button
+                    type="button"
+                    onClick={handleClearMaker}
+                    className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                    data-testid="button-clear-maker"
+                  >
+                    <X className="h-4 w-4" />
+                  </button>
+                )}
+              </div>
+              {showMakerSuggestions && filteredMakers.length > 0 && (
+                <div className="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-md shadow-lg max-h-48 overflow-y-auto">
+                  {filteredMakers.map((maker) => (
+                    <div
+                      key={maker.id}
+                      className="px-3 py-2 text-sm cursor-pointer hover:bg-cyan-50 hover:text-cyan-700 border-b border-gray-100 last:border-b-0"
+                      onMouseDown={() => handleMakerSelect(maker)}
+                      data-testid={`maker-suggestion-${maker.id}`}
+                    >
+                      <span className="font-medium">{maker.makerName}</span>
+                      {maker.makerCode && (
+                        <span className="text-gray-400 ml-2 text-xs">({maker.makerCode})</span>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
 
-            {/* Model */}
+            {/* Maker Code */}
             <div className="space-y-2">
               <Label htmlFor="makerCode" data-testid={m("I4.QL5.5.14.23", "I4.QL5.5.28.13")}>
                 <Marker id={m("I4.QL5.5.14.23", "I4.QL5.5.28.13")} />
@@ -358,8 +446,10 @@ export default function FleetSpareForm({ open, onOpenChange, spare }: FleetSpare
               </Label>
               <Input
                 id="makerCode"
-                {...form.register("makerCode")}
-                placeholder="Manufacturer code"
+                value={form.watch("makerCode") || ""}
+                readOnly
+                placeholder="Auto-filled from maker selection"
+                className="bg-gray-100 text-gray-600"
                 data-testid={m("I4.QL5.5.14.24", "I4.QL5.5.28.14")}
               />
               <Marker id={m("I4.QL5.5.14.24", "I4.QL5.5.28.14")} />

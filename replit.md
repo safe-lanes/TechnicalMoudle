@@ -47,7 +47,7 @@ Preferred communication style: Simple, everyday language.
 -   **Bulk Import Maker Validation**: Component bulk import validates makers against `maker_list`, preventing new maker creation.
 -   **Bulk Import Summary Report**: After any bulk import, an `ImportSummaryModal` displays statistics, row-by-row status, and an option to export to Excel.
 -   **Equipment/System Department Validation**: The Equipment / System Department field is restricted to 6 predefined values, validated both frontend and backend.
--   **Maker Searchable Dropdown**: Maker fields use a searchable dropdown linked to `maker_list`, auto-filling Maker Code.
+-   **Maker Searchable Dropdown**: Maker fields across all Spares forms (Vessel Add/Edit, Fleet Admin Add/Edit) use a searchable dropdown linked to `maker_list`, auto-filling Maker Code. Maker Code is always read-only. Save validation prevents unlinked makers. Spares bulk import also validates makers against `maker_list`.
 -   **Inventory Transaction Location Picker**: Features interactive, searchable combobox dropdowns for selecting and creating locations.
 -   **Component Mandatory Field Validation**: Add/Edit Component forms enforce 10 mandatory fields with conditional logic for parent components.
 -   **RH Counter Type & Source Selection**: Components can define `rhCounterType` and `rhMasterComponentId`, with searchable dropdowns for source selection when "Inherited".
