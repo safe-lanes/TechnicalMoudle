@@ -84,8 +84,8 @@ app.use((req, res, next) => {
   server.listen(
     {
       port,
-      host: "127.0.0.1", // Force IPv4
-      reusePort: false,  // <- must be false on Windows
+      host: "0.0.0.0",
+      reusePort: false,
     },
     () => {
     log(`serving on port ${port}`);

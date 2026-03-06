@@ -36,10 +36,12 @@ export class WorkOrderStatusRecalculatorService {
 
     console.log(`[StatusRecalculator] Starting scheduler (interval: ${this.scanIntervalMs / 1000 / 60} minutes)`);
     
-    // Run immediately on startup
-    this.runRecalculation().catch(err => {
-      console.error('[StatusRecalculator] Error during initial recalculation:', err);
-    });
+    // Defer initial recalculation to allow port detection during startup
+    setTimeout(() => {
+      this.runRecalculation().catch(err => {
+        console.error('[StatusRecalculator] Error during initial recalculation:', err);
+      });
+    }, 10000);
 
     // Schedule periodic runs
     this.intervalId = setInterval(() => {

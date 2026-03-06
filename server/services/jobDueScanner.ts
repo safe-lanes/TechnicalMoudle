@@ -64,10 +64,12 @@ export class JobDueScannerService {
 
     console.log(`[JobDueScanner] Starting scheduler (interval: ${this.scanIntervalMs / 1000 / 60} minutes)`);
     
-    // Run immediately on startup
-    this.runScan().catch(err => {
-      console.error('[JobDueScanner] Error during initial scan:', err);
-    });
+    // Defer initial scan to allow port detection during startup
+    setTimeout(() => {
+      this.runScan().catch(err => {
+        console.error('[JobDueScanner] Error during initial scan:', err);
+      });
+    }, 10000);
 
     // Schedule periodic runs
     this.intervalId = setInterval(() => {
