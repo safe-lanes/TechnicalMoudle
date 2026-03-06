@@ -2686,13 +2686,13 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                       <th className="text-left p-2 font-medium text-gray-700 w-[12%]" data-testid="WOF.A2.6"><Marker id="WOF.A2.6" />LOCATION</th>
                       <th className="text-right p-2 font-medium text-gray-700 w-[8%]" data-testid="WOF.A2.6b">ROB</th>
                       <th className="text-left p-2 font-medium text-gray-700 w-[12%]" data-testid="WOF.A2.7"><Marker id="WOF.A2.7" />STATUS</th>
-                      <th className="text-center p-2 font-medium text-gray-700 w-[100px]" data-testid="WOF.A2.8"><Marker id="WOF.A2.8" />ACTIONS</th>
+                      {!isReadOnly && <th className="text-center p-2 font-medium text-gray-700 w-[100px]" data-testid="WOF.A2.8"><Marker id="WOF.A2.8" />ACTIONS</th>}
                     </tr>
                   </thead>
                   <tbody>
                     {(templateData.requiredSpareParts || []).length === 0 ? (
                       <tr>
-                        <td colSpan={7} className="text-center p-4 text-gray-500 italic">
+                        <td colSpan={isReadOnly ? 6 : 7} className="text-center p-4 text-gray-500 italic">
                           No spare parts added yet
                         </td>
                       </tr>
@@ -2831,19 +2831,18 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                                     <StatusPill status={stockStatus} />
                                   </span>
                                 </td>
-                                <td className="p-2">
+                                {!isReadOnly && (
+                                  <td className="p-2">
                                     <div className="flex items-center justify-center gap-1">
-                                      {!isReadOnly && !isPartAReadOnly && (
-                                        <Button
-                                          size="sm"
-                                          variant="ghost"
-                                          onClick={() => handleEditSparePart(index)}
-                                          className="h-7 px-2"
-                                          data-testid={`button-edit-spare-${index}`}
-                                        >
-                                          <Edit2 className="h-4 w-4 text-blue-600" />
-                                        </Button>
-                                      )}
+                                      <Button
+                                        size="sm"
+                                        variant="ghost"
+                                        onClick={() => handleEditSparePart(index)}
+                                        className="h-7 px-2"
+                                        data-testid={`button-edit-spare-${index}`}
+                                      >
+                                        <Edit2 className="h-4 w-4 text-blue-600" />
+                                      </Button>
                                       <Button
                                         size="sm"
                                         variant="ghost"
@@ -2855,6 +2854,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                                       </Button>
                                     </div>
                                   </td>
+                                )}
                               </>
                             )}
                           </tr>
