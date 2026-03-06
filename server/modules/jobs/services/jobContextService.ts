@@ -35,7 +35,7 @@ export async function getJobContext(jobId: string) {
   }
 
   // Fetch completed work orders for this job (Work History - Section A5)
-  const allWorkOrdersForJob = await repo.findWorkOrdersByJobId(jobId);
+  const allWorkOrdersForJob = await repo.findWorkOrdersByJobId(job.juuid);
   const completedWorkOrders = allWorkOrdersForJob.filter(wo => wo.status === 'Completed');
 
   const workHistory = completedWorkOrders.map(wo => {
