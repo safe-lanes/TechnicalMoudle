@@ -51,7 +51,9 @@ export async function getSpareComponentLinks(vesselId: string): Promise<SpareCom
 
 export async function getSpareComponentLinksBySpare(spareId: number) {
   const links = await repo.getSpareComponentLinksBySpare(spareId);
-  const linkedComponents = await repo.getLinkedComponentsForSpare(spareId);
+  const spareUuid = links.length > 0 ? links[0].spareUuid : undefined;
+  const spare = spareUuid ? await repo.getSpare(spareUuid) : undefined;
+  const linkedComponents = await repo.getLinkedComponentsForSpare(spareId, spare?.vesselId || undefined);
   return { links, linkedComponents };
 }
 
@@ -157,7 +159,7 @@ export async function getTransactions(vesselId: string, query: any) {
   // Hydrate transactions with spare data including linkedComponents
   const hydratedTransactions = await Promise.all(transactions.map(async (txn) => {
     const spare = await repo.getSpare(txn.spareUuid);
-    const linkedComponents = spare ? await repo.getLinkedComponentsForSpare(spare.id) : [];
+    const linkedComponents = spare ? await repo.getLinkedComponentsForSpare(spare.id, spare.vesselId || undefined) : [];
     const location = txn.locationId ? await repo.getLocationById(txn.locationId) : null;
     return {
       ...txn,

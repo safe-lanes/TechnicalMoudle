@@ -45,8 +45,8 @@ export async function getSpareComponentLinksByComponent(componentId: string): Pr
   return storage.getSpareComponentLinksByComponent(componentId);
 }
 
-export async function getLinkedComponentsForSpare(spareId: number): Promise<Array<{ componentId: string; componentCode: string; componentName: string }>> {
-  return storage.getLinkedComponentsForSpare(spareId);
+export async function getLinkedComponentsForSpare(spareId: number, vesselId?: string): Promise<Array<{ componentId: string; componentCode: string; componentName: string }>> {
+  return storage.getLinkedComponentsForSpare(spareId, vesselId);
 }
 
 export async function createSpareComponentLink(link: InsertSpareComponentLink): Promise<SpareComponentLink> {

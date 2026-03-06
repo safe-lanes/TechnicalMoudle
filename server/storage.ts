@@ -838,7 +838,7 @@ export interface IStorage {
   getSpareComponentLinksByComponent(componentId: string): Promise<SpareComponentLink[]>;
   createSpareComponentLink(link: InsertSpareComponentLink, skipSiblingSync?: boolean): Promise<SpareComponentLink>;
   deleteSpareComponentLink(spareId: number, componentId: string): Promise<void>;
-  getLinkedComponentsForSpare(spareId: number): Promise<Array<{ componentId: string; componentCode: string; componentName: string }>>;
+  getLinkedComponentsForSpare(spareId: number, vesselId?: string): Promise<Array<{ componentId: string; componentCode: string; componentName: string }>>;
   getComponentSiblings(componentId: string): Promise<Array<{ cuuid: string; name: string }>>;
   backfillSiblingLinks(vesselId: string): Promise<{ linksCreated: number; sparesProcessed: number; errors: number }>;
   

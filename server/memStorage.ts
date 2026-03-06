@@ -1128,7 +1128,7 @@ class MemStorage {
     console.log('[MemStorage] deleteSpareComponentLink called - stub in file mode');
   }
   
-  async getLinkedComponentsForSpare(spareId: number): Promise<Array<{ componentId: string; componentCode: string; componentName: string }>> {
+  async getLinkedComponentsForSpare(spareId: number, vesselId?: string): Promise<Array<{ componentId: string; componentCode: string; componentName: string }>> {
     console.log('[MemStorage] getLinkedComponentsForSpare called - stub in file mode');
     return [];
   }

@@ -6931,8 +6931,12 @@ export class PostgresStorage {
       ));
   }
 
-  async getLinkedComponentsForSpare(spareId: number): Promise<Array<{ componentId: string; componentCode: string; componentName: string }>> {
+  async getLinkedComponentsForSpare(spareId: number, vesselId?: string): Promise<Array<{ componentId: string; componentCode: string; componentName: string }>> {
     const db = await getDb();
+    const conditions = [eq(spareComponentLinks.spareId, spareId)];
+    if (vesselId) {
+      conditions.push(eq(components.vesselId, vesselId));
+    }
     const links = await db.select({
       componentId: spareComponentLinks.componentId,
       componentCode: components.componentCode,
@@ -6940,7 +6944,7 @@ export class PostgresStorage {
     })
     .from(spareComponentLinks)
     .innerJoin(components, eq(spareComponentLinks.componentId, components.cuuid))
-    .where(eq(spareComponentLinks.spareId, spareId));
+    .where(and(...conditions));
     
     return links.map(l => ({
       componentId: l.componentId,
@@ -7543,7 +7547,7 @@ export class PostgresStorage {
     
     const robTotal = await this.getSpareRobTotal(spare.id);
     const locationsWithQty = await this.getSpareLocationsWithQty(spare.id);
-    const linkedComponents = await this.getLinkedComponentsForSpare(spare.id);
+    const linkedComponents = await this.getLinkedComponentsForSpare(spare.id, spare.vesselId || undefined);
     
     const stockStatus: "OK" | "At Min" = robTotal <= (spare.min ?? 0) ? "At Min" : "OK";
     
