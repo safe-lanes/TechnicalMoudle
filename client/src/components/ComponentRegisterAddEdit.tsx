@@ -1671,17 +1671,6 @@ export default function ComponentRegisterAddEdit({
                 </CardHeader>
                 {!collapsedSections['C'] && (
                 <CardContent className="pt-4 pb-4 px-4 border-t border-gray-100">
-                <div className="flex items-center justify-end mb-3">
-                  <h3 className="text-sm font-semibold text-gray-700 sr-only">C. Jobs</h3>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="h-7 text-xs text-sky-600 border-sky-300"
-                    data-testid="button-add-wo"
-                  >
-                    + Add W.O
-                  </Button>
-                </div>
                 <div className="border rounded overflow-hidden">
                   <table className="w-full text-xs">
                     <thead className="bg-gray-50">
@@ -1707,8 +1696,8 @@ export default function ComponentRegisterAddEdit({
                             </span>
                           </td>
                           <td className="px-3 py-2">
-                            <Button variant="ghost" size="sm" className="h-6 w-6 p-0">
-                              <Edit2 className="h-3 w-3" />
+                            <Button variant="ghost" size="sm" className="h-6 w-6 p-0 text-red-500 hover:text-red-700" data-testid={`button-delete-wo-${wo.id}`}>
+                              <Trash2 className="h-3 w-3" />
                             </Button>
                           </td>
                         </tr>
