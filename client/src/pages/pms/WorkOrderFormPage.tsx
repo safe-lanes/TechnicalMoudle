@@ -30,7 +30,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { FileText, ArrowLeft, Plus, Eye, Upload, Download, Menu, Check, X, Edit2, Trash2, Copy, Loader2, Paperclip } from "lucide-react";
+import { FileText, ArrowLeft, Plus, Eye, Upload, Download, Menu, Check, X, Edit2, Trash2, Copy, Loader2, Paperclip, Image as ImageIcon, FileSpreadsheet } from "lucide-react";
 import sailLogo from "@assets/SAIL logo Transparent_1753957135582.png";
 import {
   Sheet,
@@ -1503,6 +1503,44 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
     if (bytes < 1024) return `${bytes} B`;
     if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
     return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+  };
+
+  const getFileIcon = (fileName: string) => {
+    const ext = fileName.split('.').pop()?.toLowerCase() || '';
+    if (['jpg', 'jpeg', 'png', 'gif', 'bmp', 'webp'].includes(ext)) return <ImageIcon className="h-5 w-5" />;
+    if (['pdf'].includes(ext)) return <FileText className="h-5 w-5" />;
+    if (['xls', 'xlsx'].includes(ext)) return <FileSpreadsheet className="h-5 w-5" />;
+    return <Paperclip className="h-5 w-5" />;
+  };
+
+  const renderDocIcons = (documentType: string, typeLabel: string) => {
+    const docs = getDocsByType(documentType);
+    if (docs.length === 0) return null;
+    return (
+      <div className="mt-1 flex items-center gap-1 flex-wrap" data-testid={`doc-icons-${documentType}`}>
+        {docs.map((doc) => (
+          <div key={doc.id} className="relative group/doc" data-testid={`doc-icon-${documentType}-${doc.id}`}>
+            <div className="p-1.5 rounded border border-gray-200 bg-gray-50 text-gray-500 hover:bg-blue-50 hover:border-blue-300 hover:text-blue-600 cursor-pointer transition-colors">
+              {getFileIcon(doc.fileName)}
+            </div>
+            <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 hidden group-hover/doc:flex flex-col items-start bg-white rounded-lg shadow-lg border border-gray-200 p-2 z-50 min-w-[180px]">
+              <span className="text-xs text-gray-700 font-medium truncate max-w-[170px] mb-1" title={doc.fileName}>{doc.fileName}</span>
+              <span className="text-[10px] text-gray-400 mb-2">{formatFileSize(doc.fileSize)}</span>
+              <div className="flex items-center gap-1 w-full">
+                <Button variant="outline" size="sm" className="h-7 text-xs flex-1" onClick={() => handleViewDocument(documentType, doc.id)} data-testid={`button-view-${typeLabel}-${doc.id}`}>
+                  <Eye className="h-3.5 w-3.5 mr-1" /> Preview
+                </Button>
+                {!isReadOnly && !isPartBReadOnly && (
+                  <Button variant="outline" size="sm" className="h-7 text-xs text-red-500 hover:text-red-700 hover:border-red-300" onClick={() => handleDeleteDocumentClick(documentType, doc.id)} data-testid={`button-delete-${typeLabel}-${doc.id}`}>
+                    <Trash2 className="h-3.5 w-3.5" />
+                  </Button>
+                )}
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+    );
   };
 
   const handleAddConsumedSparePart = () => {
@@ -3302,27 +3340,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                     />
                     <span className="text-xs text-gray-400">{getDocsByType('riskAssessment').length}/5</span>
                   </div>
-                  {getDocsByType('riskAssessment').length > 0 && (
-                    <div className="mt-2 space-y-1">
-                      {getDocsByType('riskAssessment').map((doc) => (
-                        <div key={doc.id} className="flex items-center justify-between bg-gray-50 rounded px-2 py-1 text-xs" data-testid={`doc-row-risk-${doc.id}`}>
-                          <span className="truncate max-w-[200px]" title={doc.fileName}>{doc.fileName}</span>
-                          <span className="text-gray-400 mx-2">{formatFileSize(doc.fileSize)}</span>
-                          <div className="flex items-center gap-1">
-                            <Paperclip className="h-4 w-4 text-blue-500 cursor-pointer" title={doc.fileName} onClick={() => handleDownloadDocument('riskAssessment', doc.id)} data-testid={`button-download-risk-${doc.id}`} />
-                            <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => handleViewDocument('riskAssessment', doc.id)} data-testid={`button-view-risk-${doc.id}`}>
-                              <Eye className="h-4 w-4 text-blue-600" />
-                            </Button>
-                            {!isReadOnly && !isPartBReadOnly && (
-                              <Button variant="ghost" size="icon" className="h-6 w-6 text-red-500 hover:text-red-700" onClick={() => handleDeleteDocumentClick('riskAssessment', doc.id)} data-testid={`button-delete-risk-${doc.id}`}>
-                                <Trash2 className="h-4 w-4 text-red-500" />
-                              </Button>
-                            )}
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  )}
+                  {renderDocIcons('riskAssessment', 'risk')}
                 </div>
               </div>
 
@@ -3394,27 +3412,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                     />
                     <span className="text-xs text-gray-400">{getDocsByType('safetyChecklist').length}/5</span>
                   </div>
-                  {getDocsByType('safetyChecklist').length > 0 && (
-                    <div className="mt-2 space-y-1">
-                      {getDocsByType('safetyChecklist').map((doc) => (
-                        <div key={doc.id} className="flex items-center justify-between bg-gray-50 rounded px-2 py-1 text-xs" data-testid={`doc-row-safety-${doc.id}`}>
-                          <span className="truncate max-w-[200px]" title={doc.fileName}>{doc.fileName}</span>
-                          <span className="text-gray-400 mx-2">{formatFileSize(doc.fileSize)}</span>
-                          <div className="flex items-center gap-1">
-                            <Paperclip className="h-4 w-4 text-blue-500 cursor-pointer" title={doc.fileName} onClick={() => handleDownloadDocument('safetyChecklist', doc.id)} data-testid={`button-download-safety-${doc.id}`} />
-                            <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => handleViewDocument('safetyChecklist', doc.id)} data-testid={`button-view-safety-${doc.id}`}>
-                              <Eye className="h-4 w-4 text-blue-600" />
-                            </Button>
-                            {!isReadOnly && !isPartBReadOnly && (
-                              <Button variant="ghost" size="icon" className="h-6 w-6 text-red-500 hover:text-red-700" onClick={() => handleDeleteDocumentClick('safetyChecklist', doc.id)} data-testid={`button-delete-safety-${doc.id}`}>
-                                <Trash2 className="h-4 w-4 text-red-500" />
-                              </Button>
-                            )}
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  )}
+                  {renderDocIcons('safetyChecklist', 'safety')}
                 </div>
               </div>
 
@@ -3486,27 +3484,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                     />
                     <span className="text-xs text-gray-400">{getDocsByType('operationalForm').length}/5</span>
                   </div>
-                  {getDocsByType('operationalForm').length > 0 && (
-                    <div className="mt-2 space-y-1">
-                      {getDocsByType('operationalForm').map((doc) => (
-                        <div key={doc.id} className="flex items-center justify-between bg-gray-50 rounded px-2 py-1 text-xs" data-testid={`doc-row-operational-${doc.id}`}>
-                          <span className="truncate max-w-[200px]" title={doc.fileName}>{doc.fileName}</span>
-                          <span className="text-gray-400 mx-2">{formatFileSize(doc.fileSize)}</span>
-                          <div className="flex items-center gap-1">
-                            <Paperclip className="h-4 w-4 text-blue-500 cursor-pointer" title={doc.fileName} onClick={() => handleDownloadDocument('operationalForm', doc.id)} data-testid={`button-download-operational-${doc.id}`} />
-                            <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => handleViewDocument('operationalForm', doc.id)} data-testid={`button-view-operational-${doc.id}`}>
-                              <Eye className="h-4 w-4 text-blue-600" />
-                            </Button>
-                            {!isReadOnly && !isPartBReadOnly && (
-                              <Button variant="ghost" size="icon" className="h-6 w-6 text-red-500 hover:text-red-700" onClick={() => handleDeleteDocumentClick('operationalForm', doc.id)} data-testid={`button-delete-operational-${doc.id}`}>
-                                <Trash2 className="h-4 w-4 text-red-500" />
-                              </Button>
-                            )}
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  )}
+                  {renderDocIcons('operationalForm', 'operational')}
                 </div>
               </div>
             </div>
@@ -3791,27 +3769,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                     <span className="text-xs text-gray-400">{getDocsByType('other').length}/5</span>
                   </div>
                 </div>
-                {getDocsByType('other').length > 0 && (
-                  <div className="mt-2 space-y-1">
-                    {getDocsByType('other').map((doc) => (
-                      <div key={doc.id} className="flex items-center justify-between bg-gray-50 rounded px-2 py-1 text-xs" data-testid={`doc-row-other-${doc.id}`}>
-                        <span className="truncate max-w-[200px]" title={doc.fileName}>{doc.fileName}</span>
-                        <span className="text-gray-400 mx-2">{formatFileSize(doc.fileSize)}</span>
-                        <div className="flex items-center gap-1">
-                          <Paperclip className="h-4 w-4 text-blue-500 cursor-pointer" title={doc.fileName} onClick={() => handleDownloadDocument('other', doc.id)} data-testid={`button-download-other-${doc.id}`} />
-                          <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => handleViewDocument('other', doc.id)} data-testid={`button-view-other-${doc.id}`}>
-                            <Eye className="h-4 w-4 text-blue-600" />
-                          </Button>
-                          {!isReadOnly && !isPartBReadOnly && (
-                            <Button variant="ghost" size="icon" className="h-6 w-6 text-red-500 hover:text-red-700" onClick={() => handleDeleteDocumentClick('other', doc.id)} data-testid={`button-delete-other-${doc.id}`}>
-                              <Trash2 className="h-4 w-4 text-red-500" />
-                            </Button>
-                          )}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
+                {renderDocIcons('other', 'other')}
               </div>
 
               {/* Job Experience / Notes */}
