@@ -570,20 +570,26 @@ export async function updateWorkOrder(id: string, body: any) {
     return null;
   };
 
-  // Map dateOfCompletion to completionDateTime and dateCompleted
-  // Only use dateOfCompletion as fallback if completionDateTime doesn't already have a time component
-  if (updateData.completionDateTime && updateData.completionDateTime.includes('T')) {
+  // Map completion date/time fields to the database columns (completionDateTime, dateCompleted)
+  // Priority: completionDateTime (has time component) > dateOfCompletion (date-only fallback)
+  console.log(`📅 Incoming completion fields — completionDateTime: "${updateData.completionDateTime}", dateOfCompletion: "${updateData.dateOfCompletion}"`);
+  if (updateData.completionDateTime) {
+    if (!updateData.completionDateTime.includes('T')) {
+      updateData.completionDateTime = `${updateData.completionDateTime}T00:00:00.000Z`;
+    }
     updateData.dateCompleted = updateData.completionDateTime;
-    console.log(`📅 Using completionDateTime with time: ${updateData.completionDateTime}`);
+    console.log(`📅 Using completionDateTime: ${updateData.completionDateTime}`);
   } else if (updateData.dateOfCompletion) {
     const normalizedDate = normalizeDateToISO(updateData.dateOfCompletion);
     if (normalizedDate) {
       const isoTimestamp = `${normalizedDate}T00:00:00.000Z`;
       updateData.completionDateTime = isoTimestamp;
-      console.log(`📅 Mapped dateOfCompletion "${updateData.dateOfCompletion}" to completionDateTime: ${isoTimestamp}`);
       updateData.dateCompleted = isoTimestamp;
+      console.log(`📅 Fallback: mapped dateOfCompletion "${updateData.dateOfCompletion}" to completionDateTime: ${isoTimestamp}`);
     }
   }
+  // Remove dateOfCompletion — it is not a database column, just a frontend convenience field
+  delete updateData.dateOfCompletion;
 
   if (hasCompletionData && !hasExplicitStatus) {
     const currentWorkOrder = await repo.findById(id);

@@ -2610,16 +2610,17 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                     <tr className="bg-gray-50 border-b border-gray-200">
                       <th className="text-left p-2 font-medium text-gray-700 w-[15%]" data-testid="WOF.A2.3"><Marker id="WOF.A2.3" />PART NO.</th>
                       <th className="text-left p-2 font-medium text-gray-700 w-[25%]" data-testid="WOF.A2.4"><Marker id="WOF.A2.4" />DESCRIPTION</th>
-                      <th className="text-left p-2 font-medium text-gray-700 w-[10%]" data-testid="WOF.A2.5"><Marker id="WOF.A2.5" />QTY REQ</th>
-                      <th className="text-left p-2 font-medium text-gray-700 w-[20%]" data-testid="WOF.A2.6"><Marker id="WOF.A2.6" />LOCATION / ROB</th>
-                      <th className="text-left p-2 font-medium text-gray-700 w-[15%]" data-testid="WOF.A2.7"><Marker id="WOF.A2.7" />STATUS</th>
+                      <th className="text-left p-2 font-medium text-gray-700 w-[8%]" data-testid="WOF.A2.5"><Marker id="WOF.A2.5" />QTY REQ</th>
+                      <th className="text-left p-2 font-medium text-gray-700 w-[12%]" data-testid="WOF.A2.6"><Marker id="WOF.A2.6" />LOCATION</th>
+                      <th className="text-right p-2 font-medium text-gray-700 w-[8%]" data-testid="WOF.A2.6b">ROB</th>
+                      <th className="text-left p-2 font-medium text-gray-700 w-[12%]" data-testid="WOF.A2.7"><Marker id="WOF.A2.7" />STATUS</th>
                       {!isReadOnly && <th className="text-center p-2 font-medium text-gray-700 w-[100px]" data-testid="WOF.A2.8"><Marker id="WOF.A2.8" />ACTIONS</th>}
                     </tr>
                   </thead>
                   <tbody>
                     {(templateData.requiredSpareParts || []).length === 0 ? (
                       <tr>
-                        <td colSpan={isReadOnly ? 5 : 6} className="text-center p-4 text-gray-500 italic">
+                        <td colSpan={isReadOnly ? 6 : 7} className="text-center p-4 text-gray-500 italic">
                           No spare parts added yet
                         </td>
                       </tr>
@@ -2682,8 +2683,18 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                                   {locations.length > 0 ? (
                                     <div className="space-y-1">
                                       {locations.map((loc, locIdx) => (
-                                        <div key={locIdx} className="flex justify-between">
-                                          <span className="text-gray-600">{loc.name}:</span>
+                                        <div key={locIdx}>
+                                          <span className="text-gray-600">{loc.name}</span>
+                                        </div>
+                                      ))}
+                                    </div>
+                                  ) : '-'}
+                                </td>
+                                <td className="p-2 text-xs text-right">
+                                  {locations.length > 0 ? (
+                                    <div className="space-y-1">
+                                      {locations.map((loc, locIdx) => (
+                                        <div key={locIdx}>
                                           <span className="font-medium">{loc.robValue}</span>
                                         </div>
                                       ))}
@@ -2721,12 +2732,22 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                                 <td className="p-2" data-testid={`text-spare-part-no-${index}`}>{part.partNo || '-'}</td>
                                 <td className="p-2" data-testid={`text-spare-description-${index}`}>{part.description || '-'}</td>
                                 <td className="p-2" data-testid={`text-spare-quantity-${index}`}>{part.quantityRequired || '-'}</td>
-                                <td className="p-2 text-xs" data-testid={`text-spare-rob-${index}`}>
+                                <td className="p-2 text-xs" data-testid={`text-spare-location-${index}`}>
                                   {locations.length > 0 ? (
                                     <div className="space-y-1">
                                       {locations.map((loc, locIdx) => (
-                                        <div key={locIdx} className="flex justify-between">
-                                          <span className="text-gray-600">{loc.name}:</span>
+                                        <div key={locIdx}>
+                                          <span className="text-gray-600">{loc.name}</span>
+                                        </div>
+                                      ))}
+                                    </div>
+                                  ) : '-'}
+                                </td>
+                                <td className="p-2 text-xs text-right" data-testid={`text-spare-rob-${index}`}>
+                                  {locations.length > 0 ? (
+                                    <div className="space-y-1">
+                                      {locations.map((loc, locIdx) => (
+                                        <div key={locIdx}>
                                           <span className="font-medium">{loc.robValue}</span>
                                         </div>
                                       ))}
