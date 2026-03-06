@@ -1227,24 +1227,8 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
 
   const handleFileSelected = async (event: React.ChangeEvent<HTMLInputElement>, documentType: string) => {
     if (isReadOnly || !workOrderId) return;
-    const file = event.target.files?.[0];
-    if (!file) return;
-
-    const allowedTypes = ['application/pdf', 'image/jpeg', 'image/png'];
-    const allowedExtensions = ['.pdf', '.jpg', '.jpeg', '.png'];
-    const fileExtension = '.' + file.name.split('.').pop()?.toLowerCase();
-    if (!allowedTypes.includes(file.type) && !allowedExtensions.includes(fileExtension)) {
-      toast({ title: "Invalid file type", description: "Only PDF, JPG, and PNG files are allowed.", variant: "destructive" });
-      event.target.value = '';
-      return;
-    }
-
-    const maxSizeBytes = 5 * 1024 * 1024;
-    if (file.size > maxSizeBytes) {
-      toast({ title: "File too large", description: `Maximum file size is 5MB. Selected file is ${(file.size / (1024 * 1024)).toFixed(1)}MB.`, variant: "destructive" });
-      event.target.value = '';
-      return;
-    }
+    const files = event.target.files;
+    if (!files || files.length === 0) return;
 
     const currentVesselId = vesselId || contextVesselId;
     if (!currentVesselId) {
@@ -1253,49 +1237,89 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
     }
 
     const docsOfType = getDocsByType(documentType);
-    if (docsOfType.length >= 5) {
+    const slotsAvailable = 5 - docsOfType.length;
+    if (slotsAvailable <= 0) {
       toast({ title: "Limit reached", description: "Maximum 5 documents per type. Delete an existing document first.", variant: "destructive" });
       event.target.value = '';
       return;
     }
 
+    const allowedTypes = documentType === 'other'
+      ? ['application/pdf', 'image/jpeg', 'image/png', 'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet']
+      : ['application/pdf', 'image/jpeg', 'image/png'];
+    const allowedExtensions = documentType === 'other'
+      ? ['.pdf', '.jpg', '.jpeg', '.png', '.doc', '.docx', '.xlsx']
+      : ['.pdf', '.jpg', '.jpeg', '.png'];
+    const maxSizeBytes = 5 * 1024 * 1024;
+
+    const validFiles: File[] = [];
+    for (let i = 0; i < files.length; i++) {
+      const file = files[i];
+      const fileExtension = '.' + file.name.split('.').pop()?.toLowerCase();
+      if (!allowedTypes.includes(file.type) && !allowedExtensions.includes(fileExtension)) {
+        toast({ title: "Invalid file type", description: `${file.name}: Only allowed file types are accepted.`, variant: "destructive" });
+        continue;
+      }
+      if (file.size > maxSizeBytes) {
+        toast({ title: "File too large", description: `${file.name} is ${(file.size / (1024 * 1024)).toFixed(1)}MB. Maximum is 5MB.`, variant: "destructive" });
+        continue;
+      }
+      validFiles.push(file);
+    }
+
+    if (validFiles.length === 0) {
+      event.target.value = '';
+      return;
+    }
+
+    const filesToUpload = validFiles.slice(0, slotsAvailable);
+    if (validFiles.length > slotsAvailable) {
+      toast({ title: "Partial upload", description: `Only ${slotsAvailable} slot(s) remaining. Uploading first ${slotsAvailable} of ${validFiles.length} files.`, variant: "destructive" });
+    }
+
     setUploadingDocType(documentType);
+    let uploadedCount = 0;
     try {
-      const formData = new FormData();
-      formData.append('file', file);
-      formData.append('documentType', documentType);
-      formData.append('vesselId', currentVesselId);
+      for (const file of filesToUpload) {
+        const formData = new FormData();
+        formData.append('file', file);
+        formData.append('documentType', documentType);
+        formData.append('vesselId', currentVesselId);
 
-      const response = await fetch(`/technical/api/work-orders/${workOrderId}/documents`, {
-        method: 'POST',
-        body: formData
-      });
+        const response = await fetch(`/technical/api/work-orders/${workOrderId}/documents`, {
+          method: 'POST',
+          body: formData
+        });
 
-      if (!response.ok) {
-        const errBody = await response.json().catch(() => ({}));
-        throw new Error(errBody.message || errBody.error || 'Failed to upload document');
+        if (!response.ok) {
+          const errBody = await response.json().catch(() => ({}));
+          throw new Error(errBody.message || errBody.error || `Failed to upload ${file.name}`);
+        }
+
+        const result = await response.json();
+        setWoDocuments(prev => [...prev, result]);
+
+        setExecutionData(prev => ({
+          ...prev,
+          uploadedDocuments: [
+            ...prev.uploadedDocuments,
+            {
+              type: documentType,
+              fileName: result.fileName,
+              fileKey: result.fileKey,
+              uploadedAt: result.uploadedAt,
+              uploadedBy: result.uploadedBy
+            }
+          ]
+        }));
+        uploadedCount++;
       }
 
-      const result = await response.json();
-      setWoDocuments(prev => [...prev, result]);
-
-      setExecutionData(prev => ({
-        ...prev,
-        uploadedDocuments: [
-          ...prev.uploadedDocuments,
-          {
-            type: documentType,
-            fileName: result.fileName,
-            fileKey: result.fileKey,
-            uploadedAt: result.uploadedAt,
-            uploadedBy: result.uploadedBy
-          }
-        ]
-      }));
-
       toast({
-        title: "Document uploaded",
-        description: `${file.name} has been uploaded successfully.`,
+        title: "Documents uploaded",
+        description: uploadedCount === 1
+          ? `${filesToUpload[0].name} has been uploaded successfully.`
+          : `${uploadedCount} files have been uploaded successfully.`,
       });
 
       event.target.value = '';
@@ -1306,6 +1330,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
         description: error.message || "Failed to upload document. Please try again.",
         variant: "destructive"
       });
+      event.target.value = '';
     } finally {
       setUploadingDocType(null);
     }
@@ -3271,6 +3296,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                       ref={riskAssessmentFileRef}
                       type="file"
                       className="hidden"
+                      multiple
                       onChange={(e) => handleFileSelected(e, 'riskAssessment')}
                       accept=".pdf,.jpg,.jpeg,.png"
                     />
@@ -3362,6 +3388,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                       ref={safetyChecklistFileRef}
                       type="file"
                       className="hidden"
+                      multiple
                       onChange={(e) => handleFileSelected(e, 'safetyChecklist')}
                       accept=".pdf,.jpg,.jpeg,.png"
                     />
@@ -3453,6 +3480,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                       ref={operationalFormFileRef}
                       type="file"
                       className="hidden"
+                      multiple
                       onChange={(e) => handleFileSelected(e, 'operationalForm')}
                       accept=".pdf,.jpg,.jpeg,.png"
                     />
@@ -3756,6 +3784,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                       ref={workCarriedOutFileRef}
                       type="file"
                       className="hidden"
+                      multiple
                       onChange={(e) => handleFileSelected(e, 'other')}
                       accept=".pdf,.doc,.docx,.jpg,.jpeg,.png,.xlsx"
                     />
