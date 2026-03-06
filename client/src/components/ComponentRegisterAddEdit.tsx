@@ -138,7 +138,6 @@ export default function ComponentRegisterAddEdit({
   });
 
   const [workOrders, setWorkOrders] = useState<any[]>([]);
-  const [maintenanceHistory, setMaintenanceHistory] = useState<any[]>([]);
   const [spares, setSpares] = useState<any[]>([]);
   
   const documentTypes = [
@@ -245,6 +244,22 @@ export default function ComponentRegisterAddEdit({
   });
 
   const activeComponentId = componentId || selectedComponentId;
+
+  const { data: maintenanceHistory = [] } = useQuery<any[]>({
+    queryKey: ['/technical/api/component-maintenance-history', activeComponentId],
+    queryFn: async () => {
+      if (!activeComponentId) return [];
+      const response = await fetch(`/technical/api/component-maintenance-history/${activeComponentId}`, {
+        credentials: 'include',
+      });
+      if (!response.ok) {
+        if (response.status === 404) return [];
+        throw new Error('Failed to fetch maintenance history');
+      }
+      return response.json();
+    },
+    enabled: !!activeComponentId,
+  });
   
   const { data: componentDocuments = [], isLoading: isLoadingDocuments, refetch: refetchDocuments } = useQuery<ComponentDocument[]>({
     queryKey: ['/technical/api/component-documents', activeComponentId],
@@ -1074,7 +1089,6 @@ export default function ComponentRegisterAddEdit({
                   lastUpdated: "",
                 });
                 setWorkOrders([]);
-                setMaintenanceHistory([]);
                 setSpares([]);
                 setClassRegData({
                   classificationSociety: "",
@@ -1726,17 +1740,6 @@ export default function ComponentRegisterAddEdit({
                 </CardHeader>
                 {!collapsedSections['D'] && (
                 <CardContent className="pt-4 pb-4 px-4 border-t border-gray-100">
-                <div className="flex items-center justify-end mb-3">
-                  <h3 className="text-sm font-semibold text-gray-700 sr-only">D. Maintenance History</h3>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="h-7 text-xs text-sky-600 border-sky-300"
-                    data-testid="button-add-wo-history"
-                  >
-                    + Add W.O History
-                  </Button>
-                </div>
                 <div className="border rounded overflow-hidden">
                   <table className="w-full text-xs">
                     <thead className="bg-gray-50">
@@ -1746,39 +1749,30 @@ export default function ComponentRegisterAddEdit({
                         <th className="text-left px-3 py-2 font-medium text-gray-600">Total Time (Hrs)</th>
                         <th className="text-left px-3 py-2 font-medium text-gray-600">Completion Date</th>
                         <th className="text-left px-3 py-2 font-medium text-gray-600">Status</th>
+                        <th className="px-3 py-2"></th>
                       </tr>
                     </thead>
                     <tbody>
-                      {maintenanceHistory.length > 0 ? maintenanceHistory.map((item) => (
+                      {maintenanceHistory.length > 0 ? maintenanceHistory.map((item: any) => (
                         <tr key={item.id} className="border-t">
+                          <td className="px-3 py-2 text-gray-700">{item.workOrderNo || ""}</td>
+                          <td className="px-3 py-2 text-gray-700">{item.performedBy || ""}</td>
+                          <td className="px-3 py-2 text-gray-700">{item.runningHoursAtCompletion || ""}</td>
+                          <td className="px-3 py-2 text-gray-700">{item.dateCompleted || ""}</td>
                           <td className="px-3 py-2">
-                            <Input value={item.woNo || ""} className="h-7 text-xs" readOnly />
+                            <span className={`px-2 py-0.5 rounded text-xs font-medium ${getStatusBadgeClass(item.status)}`}>
+                              {item.status}
+                            </span>
                           </td>
                           <td className="px-3 py-2">
-                            <Input value={item.performedBy || ""} className="h-7 text-xs" />
-                          </td>
-                          <td className="px-3 py-2">
-                            <Input value={item.totalTime || ""} className="h-7 text-xs" />
-                          </td>
-                          <td className="px-3 py-2 flex items-center gap-1">
-                            <Input value={item.completionDate || ""} className="h-7 text-xs" placeholder="dd-mm-yyyy" />
-                            <span className="text-gray-400">📅</span>
-                          </td>
-                          <td className="px-3 py-2">
-                            <Select defaultValue={item.status || "completed"}>
-                              <SelectTrigger className="h-7 text-xs">
-                                <SelectValue />
-                              </SelectTrigger>
-                              <SelectContent>
-                                <SelectItem value="completed">Completed</SelectItem>
-                                <SelectItem value="pending">Pending</SelectItem>
-                              </SelectContent>
-                            </Select>
+                            <Button variant="ghost" size="sm" className="h-6 w-6 p-0 text-red-500 hover:text-red-700" data-testid={`button-delete-history-${item.id}`}>
+                              <Trash2 className="h-3 w-3" />
+                            </Button>
                           </td>
                         </tr>
                       )) : (
                         <tr>
-                          <td colSpan={5} className="px-3 py-4 text-center text-gray-400">
+                          <td colSpan={6} className="px-3 py-4 text-center text-gray-400">
                             No maintenance history found
                           </td>
                         </tr>
