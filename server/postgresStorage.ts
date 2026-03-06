@@ -2101,6 +2101,7 @@ export class PostgresStorage {
     const db = await getDb();
     const robA = spare.robLocationA ?? 0;
     const robB = spare.robLocationB ?? 0;
+    const ihmSynced = spare.ihm === 'Yes' ? 'YES' : spare.ihm === 'No' ? 'NO' : spare.ihmPresence;
     const result = await db.insert(spares).values({
       ...spare,
       suuid: randomUUID(),
@@ -2109,6 +2110,7 @@ export class PostgresStorage {
       robLocationA: robA,
       robLocationB: robB,
       min: spare.min ?? 0,
+      ihmPresence: ihmSynced || 'UNKNOWN',
     }).returning();
 
     const createdSpare = result[0];
@@ -2162,6 +2164,10 @@ export class PostgresStorage {
     // Filter out undefined/null partCode to prevent NOT NULL constraint violation
     const { partCode, ...restData } = data;
     const updateData = partCode != null ? { ...restData, partCode, updatedAt: new Date() } : { ...restData, updatedAt: new Date() };
+    if (updateData.ihm === 'Yes') updateData.ihmPresence = 'YES';
+    else if (updateData.ihm === 'No') updateData.ihmPresence = 'NO';
+    if (updateData.ihmPresence === 'YES' && !updateData.ihm) updateData.ihm = 'Yes';
+    else if (updateData.ihmPresence === 'NO' && !updateData.ihm) updateData.ihm = 'No';
     
     const numId = Number(id);
     const result = await db.update(spares)

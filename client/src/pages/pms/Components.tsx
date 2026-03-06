@@ -1591,9 +1591,9 @@ const SparesSection: React.FC<{ selectedComponent: ComponentNode | null }> = ({ 
               {FEATURES.IHM && (
                 <td className="py-3 px-3 text-center" data-testid={index === 0 ? "B7.E.17" : undefined}>
                   {index === 0 && <Marker id="B7.E.17" />}
-                  {spare.ihmPresence === 'YES' ? (
+                  {(spare.ihmPresence === 'YES' || spare.ihm === 'Yes') ? (
                     <span title="IHM Present"><AlertCircle className="h-4 w-4 text-red-500 mx-auto" /></span>
-                  ) : spare.ihmPresence === 'NO' ? (
+                  ) : (spare.ihmPresence === 'NO' || spare.ihm === 'No') ? (
                     <span title="No IHM"><CheckCircle className="h-4 w-4 text-green-500 mx-auto" /></span>
                   ) : (
                     <span title="IHM Unknown"><HelpCircle className="h-4 w-4 text-gray-400 mx-auto" /></span>
@@ -1837,11 +1837,11 @@ const SparesSection: React.FC<{ selectedComponent: ComponentNode | null }> = ({ 
               </div>
 
               {/* Additional Info */}
-              {FEATURES.IHM && selectedSpareDetails.spare.ihmPresence && (
+              {FEATURES.IHM && (selectedSpareDetails.spare.ihmPresence || selectedSpareDetails.spare.ihm) && (
                 <div className="space-y-3">
                   <h4 className="text-sm font-semibold text-gray-700 border-b pb-2">IHM Information</h4>
                   <div className="flex items-center gap-2 p-3 rounded-lg bg-gray-50">
-                    {selectedSpareDetails.spare.ihmPresence === 'YES' ? (
+                    {(selectedSpareDetails.spare.ihmPresence === 'YES' || selectedSpareDetails.spare.ihm === 'Yes') ? (
                       <>
                         <AlertCircle className="h-5 w-5 text-red-500" />
                         <span className="text-sm text-red-700">This spare contains hazardous materials (IHM)</span>
