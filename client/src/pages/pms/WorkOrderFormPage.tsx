@@ -710,16 +710,6 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
     });
   };
 
-  const timeOptions = (() => {
-    const options: string[] = [];
-    for (let h = 0; h < 24; h++) {
-      for (let m = 0; m < 60; m += 15) {
-        options.push(`${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}`);
-      }
-    }
-    return options;
-  })();
-
   const autoCalcTotalTime = (data: typeof executionData) => {
     const startDate = data.startDateTime ? data.startDateTime.split('T')[0] : '';
     const startTime = data.startDateTime ? data.startDateTime.split('T')[1]?.substring(0, 5) || '' : '';
@@ -3374,23 +3364,17 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
 
                   <div className="space-y-2">
                     <Label className="text-sm text-[#8798ad]" data-testid="WOF.B2.7"><Marker id="WOF.B2.7" />Start Time <span className="text-red-500">*</span></Label>
-                    <Select
+                    <Input
+                      type="time"
                       value={executionData.startDateTime ? executionData.startDateTime.split('T')[1]?.substring(0, 5) || '' : ''}
-                      onValueChange={(val) => {
+                      onChange={(e) => {
                         const currentDate = executionData.startDateTime ? executionData.startDateTime.split('T')[0] : '';
-                        handleExecutionChange('startDateTime', currentDate ? `${currentDate}T${val}` : val);
+                        handleExecutionChange('startDateTime', currentDate ? `${currentDate}T${e.target.value}` : e.target.value);
                       }}
                       disabled={isPartBReadOnly}
-                    >
-                      <SelectTrigger className="text-sm" data-testid="WOF.B2.8">
-                        <SelectValue placeholder="Select time" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {timeOptions.map((t) => (
-                          <SelectItem key={t} value={t}>{t}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                      className="text-sm"
+                      data-testid="WOF.B2.8"
+                    />
                   </div>
 
                   <div className="space-y-2">
@@ -3434,23 +3418,17 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
 
                   <div className="space-y-2">
                     <Label className="text-sm text-[#8798ad]" data-testid="WOF.B2.11"><Marker id="WOF.B2.11" />Completion Time <span className="text-red-500">*</span></Label>
-                    <Select
+                    <Input
+                      type="time"
                       value={executionData.completionDateTime ? executionData.completionDateTime.split('T')[1]?.substring(0, 5) || '' : ''}
-                      onValueChange={(val) => {
+                      onChange={(e) => {
                         const currentDate = executionData.completionDateTime ? executionData.completionDateTime.split('T')[0] : '';
-                        handleExecutionChange('completionDateTime', currentDate ? `${currentDate}T${val}` : val);
+                        handleExecutionChange('completionDateTime', currentDate ? `${currentDate}T${e.target.value}` : e.target.value);
                       }}
                       disabled={isPartBReadOnly}
-                    >
-                      <SelectTrigger className="text-sm" data-testid="WOF.B2.12">
-                        <SelectValue placeholder="Select time" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {timeOptions.map((t) => (
-                          <SelectItem key={t} value={t}>{t}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                      className="text-sm"
+                      data-testid="WOF.B2.12"
+                    />
                   </div>
 
                   <div className="space-y-2">
