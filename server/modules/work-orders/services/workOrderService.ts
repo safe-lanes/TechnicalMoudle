@@ -1018,8 +1018,11 @@ export async function updateWorkOrder(id: string, body: any) {
 
   // ========== SPARE CONSUMPTION ON APPROVAL ==========
   if (updateData.approvalAction === 'approved' && updateData.status === 'Completed') {
-    if (workOrder && workOrder.consumedSpareParts && Array.isArray(workOrder.consumedSpareParts)) {
-      const consumedSpares = workOrder.consumedSpareParts as Array<{
+    const freshWO = await repo.findById(id);
+    const woForSpares = freshWO || workOrder;
+
+    if (woForSpares && woForSpares.consumedSpareParts && Array.isArray(woForSpares.consumedSpareParts)) {
+      const consumedSpares = woForSpares.consumedSpareParts as Array<{
         partNo: string;
         partCode?: string;
         description?: string;
@@ -1031,7 +1034,7 @@ export async function updateWorkOrder(id: string, body: any) {
         _deductedQty?: number;
       }>;
 
-      console.log(`🔧 [PATCH Approval] Processing ${consumedSpares.length} consumed spares for WO ${workOrder.workOrderNo}`);
+      console.log(`🔧 [PATCH Approval] Processing ${consumedSpares.length} consumed spares for WO ${woForSpares.workOrderNo}`);
 
       for (const consumedSpare of consumedSpares) {
         const qtyConsumed = typeof consumedSpare.quantityConsumed === 'string'
@@ -1041,13 +1044,16 @@ export async function updateWorkOrder(id: string, body: any) {
         const alreadyDeducted = consumedSpare._deductedQty || 0;
         const remainingToDeduct = (qtyConsumed || 0) - alreadyDeducted;
 
-        if (remainingToDeduct <= 0 && alreadyDeducted > 0) {
+        console.log(`🔍 [PATCH Approval] Spare ${consumedSpare.partCode || consumedSpare.partNo}: qtyConsumed=${qtyConsumed}, _deductedQty=${alreadyDeducted}, remainingToDeduct=${remainingToDeduct}`);
+
+        if (remainingToDeduct <= 0) {
           console.log(`⏭️ [PATCH Approval] Skipping ${consumedSpare.partCode || consumedSpare.partNo} - already deducted ${alreadyDeducted} units at save time`);
+          continue;
         }
 
         if (remainingToDeduct > 0) {
           try {
-            const woVesselId = workOrder.vesselId || 'V001';
+            const woVesselId = woForSpares.vesselId || 'V001';
             const allSpares = await repo.findSpares(woVesselId);
 
             let spare: any = null;
@@ -1067,7 +1073,7 @@ export async function updateWorkOrder(id: string, body: any) {
 
               const locationNameFallback = consumedSpare.location || consumedSpare.locationName;
               if ((!resolvedLocationId || isNaN(resolvedLocationId as number)) && locationNameFallback) {
-                const locationObj = await repo.findOrCreateLocation(woVesselId, locationNameFallback, workOrder.approver || 'system');
+                const locationObj = await repo.findOrCreateLocation(woVesselId, locationNameFallback, woForSpares.approver || 'system');
                 if (locationObj) {
                   resolvedLocationId = locationObj.id;
                   console.log(`📍 [PATCH Approval] Resolved location name "${locationNameFallback}" to ID ${resolvedLocationId}`);
@@ -1075,22 +1081,45 @@ export async function updateWorkOrder(id: string, body: any) {
               }
 
               if (resolvedLocationId && !isNaN(resolvedLocationId as number)) {
+                const currentStock = await repo.getSpareLocationStockItem(spare.id, resolvedLocationId);
+                const currentQty = currentStock?.qty ?? 0;
+                console.log(`📊 [PATCH Approval] Current stock for spare ${spare.id} at location ${resolvedLocationId}: ${currentQty}`);
+
+                const existingTxns = await repo.getInventoryTransactions(woVesselId, {
+                  spareId: spare.id,
+                  locationId: resolvedLocationId,
+                  eventType: 'CONSUME',
+                });
+                const woRefId = woForSpares.wouuid;
+                const priorDeductions = existingTxns.filter((t: any) => t.referenceId === woRefId);
+                const priorDeductedTotal = priorDeductions.reduce((sum: number, t: any) => sum + Math.abs(t.qtyChange || 0), 0);
+
+                console.log(`📊 [PATCH Approval] Prior WO transactions for ${consumedSpare.partCode || consumedSpare.partNo}: ${priorDeductions.length} txn(s), total deducted: ${priorDeductedTotal}, needed: ${qtyConsumed}`);
+
+                const effectiveAlreadyDeducted = Math.max(alreadyDeducted, priorDeductedTotal);
+                const effectiveRemaining = (qtyConsumed || 0) - effectiveAlreadyDeducted;
+
+                if (effectiveRemaining <= 0) {
+                  console.log(`⏭️ [PATCH Approval] Skipping ${consumedSpare.partCode || consumedSpare.partNo} - already fully deducted (${effectiveAlreadyDeducted} units via ${alreadyDeducted > 0 ? '_deductedQty' : 'prior transactions'})`);
+                  continue;
+                }
+
                 try {
                   await repo.performInventoryTransaction({
                     vesselId: woVesselId,
                     spareId: spare.id,
                     locationId: resolvedLocationId,
                     eventType: 'CONSUME',
-                    qtyChange: -Math.abs(remainingToDeduct),
+                    qtyChange: -Math.abs(effectiveRemaining),
                     referenceType: 'WORK_ORDER',
-                    referenceId: workOrder.wouuid,
-                    referenceNote: `WO Approval: ${workOrder.workOrderNo} - ${consumedSpare.comments || 'Consumed during work approval'}`,
-                    userId: workOrder.approver || 'system'
+                    referenceId: woForSpares.wouuid,
+                    referenceNote: `WO Approval: ${woForSpares.workOrderNo} - ${consumedSpare.comments || 'Consumed during work approval'}`,
+                    userId: woForSpares.approver || 'system'
                   });
-                  console.log(`✅ [PATCH Approval] Consumed ${remainingToDeduct} units of ${consumedSpare.partCode || consumedSpare.partNo} from location ${resolvedLocationId} (WO: ${workOrder.workOrderNo})${alreadyDeducted > 0 ? ` (${alreadyDeducted} already deducted at save time)` : ''}`);
+                  console.log(`✅ [PATCH Approval] Consumed ${effectiveRemaining} units of ${consumedSpare.partCode || consumedSpare.partNo} from location ${resolvedLocationId} (WO: ${woForSpares.workOrderNo})${effectiveAlreadyDeducted > 0 ? ` (${effectiveAlreadyDeducted} already deducted)` : ''}`);
                 } catch (txnError: any) {
                   if (txnError.message?.includes('INSUFFICIENT_STOCK') || txnError.message?.includes('NEGATIVE_STOCK_PREVENTED')) {
-                    throw new Error(`INSUFFICIENT_STOCK: Cannot consume ${remainingToDeduct} units of ${consumedSpare.partCode || consumedSpare.partNo}. ${txnError.message}`);
+                    throw new Error(`INSUFFICIENT_STOCK: Cannot consume ${effectiveRemaining} units of ${consumedSpare.partCode || consumedSpare.partNo}. Current stock at location ${resolvedLocationId}: ${currentQty}. Already deducted (_deductedQty: ${alreadyDeducted}, prior txns: ${priorDeductedTotal}). ${txnError.message}`);
                   } else {
                     console.error(`❌ [PATCH Approval] Transaction error for ${consumedSpare.partCode || consumedSpare.partNo}:`, txnError);
                     throw txnError;

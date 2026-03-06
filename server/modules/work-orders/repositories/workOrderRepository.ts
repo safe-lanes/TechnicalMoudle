@@ -122,6 +122,20 @@ export async function performInventoryTransaction(data: any) {
   return storage.performInventoryTransaction(data);
 }
 
+export async function getSpareLocationStockItem(spareId: number, locationId: number) {
+  if (typeof (storage as any).getSpareLocationStockItem === 'function') {
+    return (storage as any).getSpareLocationStockItem(spareId, locationId);
+  }
+  return null;
+}
+
+export async function getInventoryTransactions(vesselId: string, options?: any) {
+  if (typeof (storage as any).getInventoryTransactions === 'function') {
+    return (storage as any).getInventoryTransactions(vesselId, options);
+  }
+  return [];
+}
+
 // ── Maintenance History ──
 
 export async function createMaintenanceHistory(data: any) {
