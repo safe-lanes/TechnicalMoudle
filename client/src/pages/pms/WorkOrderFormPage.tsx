@@ -2729,19 +2729,18 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
             description="Spare parts needed for this work order"
           >
             <div className="space-y-3">
-              <div className="flex justify-end">
+              {!isPartAReadOnly && (<div className="flex justify-end">
                 <Button
                   size="sm"
                   className="bg-[#22c55e] hover:bg-[#16a34a] text-white"
                   onClick={handleAddSparePart}
-                  disabled={isPartAReadOnly}
                   data-testid="WOF.A2.16"
                 >
                   <Marker id="WOF.A2.16" />
                   <Plus className="h-4 w-4 mr-1" />
                   Add spares
                 </Button>
-              </div>
+              </div>)}
 
               {/* Editable Spare Parts Table - Updated to show location-wise ROB per spec */}
               <div className="overflow-x-auto">
@@ -2754,13 +2753,13 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                       <th className="text-left p-2 font-medium text-gray-700 w-[12%]" data-testid="WOF.A2.6"><Marker id="WOF.A2.6" />LOCATION</th>
                       <th className="text-right p-2 font-medium text-gray-700 w-[8%]" data-testid="WOF.A2.6b">ROB</th>
                       <th className="text-left p-2 font-medium text-gray-700 w-[12%]" data-testid="WOF.A2.7"><Marker id="WOF.A2.7" />STATUS</th>
-                      {!isReadOnly && <th className="text-center p-2 font-medium text-gray-700 w-[100px]" data-testid="WOF.A2.8"><Marker id="WOF.A2.8" />ACTIONS</th>}
+                      {!isPartAReadOnly && <th className="text-center p-2 font-medium text-gray-700 w-[100px]" data-testid="WOF.A2.8"><Marker id="WOF.A2.8" />ACTIONS</th>}
                     </tr>
                   </thead>
                   <tbody>
                     {(templateData.requiredSpareParts || []).length === 0 ? (
                       <tr>
-                        <td colSpan={isReadOnly ? 6 : 7} className="text-center p-4 text-gray-500 italic">
+                        <td colSpan={isPartAReadOnly ? 6 : 7} className="text-center p-4 text-gray-500 italic">
                           No spare parts added yet
                         </td>
                       </tr>
@@ -2899,7 +2898,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                                     <StatusPill status={stockStatus} />
                                   </span>
                                 </td>
-                                {!isReadOnly && (
+                                {!isPartAReadOnly && (
                                   <td className="p-2">
                                     <div className="flex items-center justify-center gap-1">
                                       <Button
@@ -2945,19 +2944,18 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
             description="Tools and equipment needed for this work order"
           >
             <div className="space-y-3">
-              <div className="flex justify-end">
+              {!isPartAReadOnly && (<div className="flex justify-end">
                 <Button
                   size="sm"
                   className="bg-[#22c55e] hover:bg-[#16a34a] text-white"
                   onClick={handleAddTool}
-                  disabled={isPartAReadOnly}
                   data-testid="WOF.A3.14"
                 >
                   <Marker id="WOF.A3.14" />
                   <Plus className="h-4 w-4 mr-1" />
                   Add tools
                 </Button>
-              </div>
+              </div>)}
 
               {/* Editable Tools Table */}
               <div className="overflow-x-auto">
@@ -2968,13 +2966,13 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                       <th className="text-left p-2 font-medium text-gray-700 w-[20%]" data-testid="WOF.A3.4"><Marker id="WOF.A3.4" />QTY REQUIRED</th>
                       <th className="text-left p-2 font-medium text-gray-700 w-[15%]" data-testid="WOF.A3.5"><Marker id="WOF.A3.5" />ROB</th>
                       <th className="text-left p-2 font-medium text-gray-700 w-[15%]" data-testid="WOF.A3.6"><Marker id="WOF.A3.6" />STATUS</th>
-                      {!isReadOnly && <th className="text-center p-2 font-medium text-gray-700 w-[100px]" data-testid="WOF.A3.7"><Marker id="WOF.A3.7" />ACTIONS</th>}
+                      {!isPartAReadOnly && <th className="text-center p-2 font-medium text-gray-700 w-[100px]" data-testid="WOF.A3.7"><Marker id="WOF.A3.7" />ACTIONS</th>}
                     </tr>
                   </thead>
                   <tbody>
                     {(templateData.requiredTools || []).length === 0 ? (
                       <tr>
-                        <td colSpan={isReadOnly ? 4 : 5} className="text-center p-4 text-gray-500 italic">
+                        <td colSpan={isPartAReadOnly ? 4 : 5} className="text-center p-4 text-gray-500 italic">
                           No tools added yet
                         </td>
                       </tr>
@@ -3038,7 +3036,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                                   <StatusPill status="available" />
                                 </span>
                               </td>
-                              {!isReadOnly && (
+                              {!isPartAReadOnly && (
                                 <td className="p-2">
                                   <div className="flex items-center justify-center gap-1">
                                     <Button
