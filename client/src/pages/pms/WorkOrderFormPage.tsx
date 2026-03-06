@@ -710,6 +710,43 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
     });
   };
 
+  const timeOptions = (() => {
+    const options: string[] = [];
+    for (let h = 0; h < 24; h++) {
+      for (let m = 0; m < 60; m += 15) {
+        options.push(`${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}`);
+      }
+    }
+    return options;
+  })();
+
+  const autoCalcTotalTime = (data: typeof executionData) => {
+    const startDate = data.startDateTime ? data.startDateTime.split('T')[0] : '';
+    const startTime = data.startDateTime ? data.startDateTime.split('T')[1]?.substring(0, 5) || '' : '';
+    const compDate = data.completionDateTime ? data.completionDateTime.split('T')[0] : '';
+    const compTime = data.completionDateTime ? data.completionDateTime.split('T')[1]?.substring(0, 5) || '' : '';
+
+    if (startDate && startTime && compDate && compTime) {
+      const start = new Date(`${startDate}T${startTime}:00`);
+      const end = new Date(`${compDate}T${compTime}:00`);
+      const diffMs = end.getTime() - start.getTime();
+      if (diffMs > 0) {
+        const hours = Math.round((diffMs / (1000 * 60 * 60)) * 100) / 100;
+        data.totalTimeHours = hours.toString();
+      } else {
+        data.totalTimeHours = '';
+      }
+    }
+
+    const persons = parseFloat(data.noOfPersons);
+    const hours = parseFloat(data.totalTimeHours);
+    if (!isNaN(persons) && !isNaN(hours) && persons > 0 && hours > 0) {
+      data.manhours = (persons * hours).toString();
+    } else {
+      data.manhours = '';
+    }
+  };
+
   const handleExecutionChange = (field: string, value: string) => {
     setExecutionData(prev => {
       const newData = {
@@ -721,10 +758,13 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
         setCurrentReadingWarningAcknowledged(false);
       }
 
-      // Auto-calculate manhours when noOfPersons or totalTimeHours changes
-      if (field === 'noOfPersons' || field === 'totalTimeHours') {
-        const persons = field === 'noOfPersons' ? parseFloat(value) : parseFloat(prev.noOfPersons);
-        const hours = field === 'totalTimeHours' ? parseFloat(value) : parseFloat(prev.totalTimeHours);
+      if (field === 'startDateTime' || field === 'completionDateTime') {
+        autoCalcTotalTime(newData);
+      }
+
+      if (field === 'noOfPersons') {
+        const persons = parseFloat(value);
+        const hours = parseFloat(newData.totalTimeHours);
 
         if (!isNaN(persons) && !isNaN(hours) && persons > 0 && hours > 0) {
           newData.manhours = (persons * hours).toString();
@@ -736,6 +776,33 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
       return newData;
     });
   };
+
+  useEffect(() => {
+    const startDate = executionData.startDateTime ? executionData.startDateTime.split('T')[0] : '';
+    const startTime = executionData.startDateTime ? executionData.startDateTime.split('T')[1]?.substring(0, 5) || '' : '';
+    const compDate = executionData.completionDateTime ? executionData.completionDateTime.split('T')[0] : '';
+    const compTime = executionData.completionDateTime ? executionData.completionDateTime.split('T')[1]?.substring(0, 5) || '' : '';
+
+    if (startDate && startTime && compDate && compTime) {
+      const start = new Date(`${startDate}T${startTime}:00`);
+      const end = new Date(`${compDate}T${compTime}:00`);
+      const diffMs = end.getTime() - start.getTime();
+      if (diffMs > 0) {
+        const hours = Math.round((diffMs / (1000 * 60 * 60)) * 100) / 100;
+        const hoursStr = hours.toString();
+        if (executionData.totalTimeHours !== hoursStr) {
+          setExecutionData(prev => {
+            const newData = { ...prev, totalTimeHours: hoursStr };
+            const persons = parseFloat(prev.noOfPersons);
+            if (!isNaN(persons) && persons > 0 && hours > 0) {
+              newData.manhours = (persons * hours).toString();
+            }
+            return newData;
+          });
+        }
+      }
+    }
+  }, [executionData.startDateTime, executionData.completionDateTime]);
 
   const insertQuickText = (text: string) => {
     const textarea = workCarriedOutRef.current;
@@ -3307,18 +3374,23 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
 
                   <div className="space-y-2">
                     <Label className="text-sm text-[#8798ad]" data-testid="WOF.B2.7"><Marker id="WOF.B2.7" />Start Time <span className="text-red-500">*</span></Label>
-                    <Input
-                      type="text"
+                    <Select
                       value={executionData.startDateTime ? executionData.startDateTime.split('T')[1]?.substring(0, 5) || '' : ''}
-                      onChange={(e) => {
+                      onValueChange={(val) => {
                         const currentDate = executionData.startDateTime ? executionData.startDateTime.split('T')[0] : '';
-                        handleExecutionChange('startDateTime', currentDate ? `${currentDate}T${e.target.value}` : e.target.value);
+                        handleExecutionChange('startDateTime', currentDate ? `${currentDate}T${val}` : val);
                       }}
                       disabled={isPartBReadOnly}
-                      className="text-sm"
-                      placeholder="HH:MM (e.g. 10:45)"
-                      data-testid="WOF.B2.8"
-                    />
+                    >
+                      <SelectTrigger className="text-sm" data-testid="WOF.B2.8">
+                        <SelectValue placeholder="Select time" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {timeOptions.map((t) => (
+                          <SelectItem key={t} value={t}>{t}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                   </div>
 
                   <div className="space-y-2">
@@ -3362,18 +3434,23 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
 
                   <div className="space-y-2">
                     <Label className="text-sm text-[#8798ad]" data-testid="WOF.B2.11"><Marker id="WOF.B2.11" />Completion Time <span className="text-red-500">*</span></Label>
-                    <Input
-                      type="text"
+                    <Select
                       value={executionData.completionDateTime ? executionData.completionDateTime.split('T')[1]?.substring(0, 5) || '' : ''}
-                      onChange={(e) => {
+                      onValueChange={(val) => {
                         const currentDate = executionData.completionDateTime ? executionData.completionDateTime.split('T')[0] : '';
-                        handleExecutionChange('completionDateTime', currentDate ? `${currentDate}T${e.target.value}` : e.target.value);
+                        handleExecutionChange('completionDateTime', currentDate ? `${currentDate}T${val}` : val);
                       }}
                       disabled={isPartBReadOnly}
-                      className="text-sm"
-                      placeholder="HH:MM (e.g. 12:00)"
-                      data-testid="WOF.B2.12"
-                    />
+                    >
+                      <SelectTrigger className="text-sm" data-testid="WOF.B2.12">
+                        <SelectValue placeholder="Select time" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {timeOptions.map((t) => (
+                          <SelectItem key={t} value={t}>{t}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                   </div>
 
                   <div className="space-y-2">
@@ -3415,13 +3492,9 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                     <Input
                       type="number"
                       value={executionData.totalTimeHours}
-                      onChange={(e) => handleExecutionChange('totalTimeHours', e.target.value)}
-                      disabled={isPartBReadOnly}
-                      className="text-sm"
-                      placeholder="3"
-                      min={0.01}
-                      max={720}
-                      step="any"
+                      readOnly
+                      className="text-sm bg-gray-100"
+                      placeholder="Auto-calculated"
                       data-testid="WOF.B2.18"
                     />
                   </div>
