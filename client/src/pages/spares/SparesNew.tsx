@@ -2654,7 +2654,7 @@ const Spares: React.FC = () => {
               {/* Inventory Table with Horizontal Scroll */}
               <div className="overflow-x-auto flex-1 flex flex-col">
                 {/* Inventory Table Header */}
-                <div className="px-4 py-3 border-b border-gray-200 bg-[#52baf3]">
+                <div className="px-4 py-3 border-b border-gray-200 bg-[#52baf3] min-w-max">
                   <div className="grid text-sm font-semibold text-[#ffffff] min-w-max" style={{ gridTemplateColumns: FEATURES.IHM ? '110px 180px 220px 120px 80px 60px 60px 80px 100px 40px 160px' : '110px 180px 220px 120px 80px 60px 60px 80px 100px 160px', minWidth: 'max-content', gap: '12px' }}>
                   <div className="px-2 text-[#ffffff]" data-testid="E13"><Marker id="E13" />Part Code</div>
                   <div className="px-2" data-testid="E14"><Marker id="E14" />Part Name</div>
@@ -2857,7 +2857,7 @@ const Spares: React.FC = () => {
           {activeTab === 'by-location' && (
             <>
               <div className="overflow-x-auto flex-1 flex flex-col">
-                <div className="px-4 py-3 border-b border-gray-200 bg-[#52baf3]">
+                <div className="px-4 py-3 border-b border-gray-200 bg-[#52baf3] min-w-max">
                   <div className="grid text-sm font-semibold text-[#ffffff] min-w-max" style={{ gridTemplateColumns: FEATURES.IHM ? '110px 180px 220px 120px 80px 60px 60px 80px 160px 100px 40px' : '110px 180px 220px 120px 80px 60px 60px 80px 160px 100px', minWidth: 'max-content', gap: '12px' }}>
                     <div className="px-2 text-[#ffffff]" data-testid="loc-col-part-code">Part Code</div>
                     <div className="px-2" data-testid="loc-col-part-name">Part Name</div>
