@@ -50,6 +50,19 @@ export async function findJob(id: string) {
   return storage.getJob(id);
 }
 
+export async function findWorkOrdersByJobId(jobId: string) {
+  return storage.getWorkOrdersByJobId(jobId);
+}
+
+export async function findWorkOrdersByComponent(componentIdOrCode: string, vesselId?: string) {
+  const allWOs = await storage.getWorkOrders(vesselId);
+  return allWOs.filter((wo: any) =>
+    wo.component === componentIdOrCode ||
+    wo.componentCode === componentIdOrCode ||
+    wo.component === componentIdOrCode.split('.').pop()
+  );
+}
+
 export async function updateJob(id: string, data: any) {
   return storage.updateJob(id, data);
 }

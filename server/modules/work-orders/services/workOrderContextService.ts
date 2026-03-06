@@ -108,6 +108,40 @@ export async function getWorkOrderContext(workOrderId: string) {
     job = await repo.findJob(workOrder.jobId);
   }
 
+  let workHistoryWOs: any[] = [];
+  if (job) {
+    const allJobWOs = await repo.findWorkOrdersByJobId(job.juuid);
+    workHistoryWOs = allJobWOs.filter((wo: any) =>
+      wo.status === 'Completed' && wo.wouuid !== workOrder.wouuid && wo.id !== workOrder.id
+    );
+  } else {
+    const componentLookup = workOrder.componentCode || workOrder.component;
+    if (componentLookup && workOrder.vesselId) {
+      const componentWOs = await repo.findWorkOrdersByComponent(componentLookup, workOrder.vesselId);
+      workHistoryWOs = componentWOs.filter((wo: any) =>
+        wo.status === 'Completed' && wo.wouuid !== workOrder.wouuid && wo.id !== workOrder.id
+      );
+    }
+  }
+
+  workHistoryWOs.sort((a: any, b: any) => {
+    const dateA = a.completionDateTime || a.dateCompleted || a.startDateTime || '';
+    const dateB = b.completionDateTime || b.dateCompleted || b.startDateTime || '';
+    return dateB.localeCompare(dateA);
+  });
+
+  const workHistory = workHistoryWOs.map((wo: any) => ({
+    woNo: wo.workOrderNo || wo.woExecutionId || wo.id || '-',
+    assignedTo: wo.assignedTo || '-',
+    performedBy: wo.performedBy || wo.assignedTo || '-',
+    workDate: wo.startDateTime || wo.dueDate || '',
+    runDate: wo.runningHours?.toString() || '',
+    completionDate: wo.completionDateTime || wo.dateCompleted || '',
+    status: wo.status || 'Completed',
+    description: wo.workCarriedOut || wo.jobTitle || 'Maintenance completed',
+    remarks: wo.completionRemarks || wo.remarks || wo.jobExperienceNotes || ''
+  }));
+
   // Build templateData from job data (Part A - immutable from job definition)
   // This ensures Section A is populated from the job template
   const rawSpareParts = job?.requiredSpareParts || [];
@@ -141,6 +175,7 @@ export async function getWorkOrderContext(workOrderId: string) {
     requiredSpareParts: enrichedSpareParts,
     requiredTools: job.requiredTools || [],
     safetyRequirements: job.safetyRequirements || { ppeRequirements: [], permitRequirements: [], otherRequirements: [] },
+    workHistory,
     vesselId: workOrder.vesselId
   } : {
     // Fallback: use work order fields if job not found (for unplanned WOs)
@@ -171,6 +206,7 @@ export async function getWorkOrderContext(workOrderId: string) {
     requiredSpareParts: [],
     requiredTools: [],
     safetyRequirements: { ppeRequirements: [], permitRequirements: [], otherRequirements: [] },
+    workHistory,
     vesselId: workOrder.vesselId
   };
 

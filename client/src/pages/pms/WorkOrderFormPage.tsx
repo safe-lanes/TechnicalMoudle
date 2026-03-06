@@ -409,8 +409,13 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
       permitRequirements: [] as string[],
       otherRequirements: [] as string[]
     },
-    workHistory: [] as Array<{woNo: string, assignedTo: string, performedBy: string, workDate: string, runDate: string, completionDate: string, status: string}>
+    workHistory: [] as Array<{woNo: string, assignedTo: string, performedBy: string, workDate: string, runDate: string, completionDate: string, status: string, description: string, remarks: string}>
   });
+
+  const [workHistoryExpanded, setWorkHistoryExpanded] = useState(false);
+  const [workHistoryPage, setWorkHistoryPage] = useState(0);
+  const WORK_HISTORY_COLLAPSED_COUNT = 2;
+  const WORK_HISTORY_PAGE_SIZE = 5;
 
   // Store work order number from context (e.g., MKR-IN-00001.WO-2025-001)
   const [workOrderNo, setWorkOrderNo] = useState("");
@@ -3083,30 +3088,105 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
               <span data-testid="WOF.A5.7"><Marker id="WOF.A5.7" /></span>
               <span data-testid="WOF.A5.8"><Marker id="WOF.A5.8" /></span>
             </div>
-            <WorkOrderDataTable
-              columns={[
-                { key: 'date', label: 'Date', width: '12%' },
-                { key: 'workOrder', label: 'Work Order', width: '15%' },
-                { key: 'description', label: 'Description', width: '25%' },
-                { key: 'performedBy', label: 'Performed By', width: '15%' },
-                {
-                  key: 'status',
-                  label: 'Status',
-                  width: '13%',
-                  render: (value) => <StatusPill status={value} />
-                },
-                { key: 'remarks', label: 'Remarks', width: '20%' }
-              ]}
-              data={(templateData.workHistory || []).map(history => ({
+            {(() => {
+              const allHistory = (templateData.workHistory || []).map(history => ({
                 date: history.completionDate || history.workDate,
                 workOrder: history.woNo,
-                description: '-',
+                description: history.description || '-',
                 performedBy: history.performedBy,
                 status: history.status?.toLowerCase() === 'completed' ? ('completed' as const) : ('postponed' as const),
-                remarks: '-'
-              }))}
-              showActions={false}
-            />
+                remarks: history.remarks || '-'
+              }));
+              const totalCount = allHistory.length;
+
+              if (!workHistoryExpanded) {
+                const displayData = allHistory.slice(0, WORK_HISTORY_COLLAPSED_COUNT);
+                return (
+                  <>
+                    <WorkOrderDataTable
+                      columns={[
+                        { key: 'date', label: 'Date', width: '12%' },
+                        { key: 'workOrder', label: 'Work Order', width: '15%' },
+                        { key: 'description', label: 'Description', width: '25%' },
+                        { key: 'performedBy', label: 'Performed By', width: '15%' },
+                        { key: 'status', label: 'Status', width: '13%', render: (value) => <StatusPill status={value} /> },
+                        { key: 'remarks', label: 'Remarks', width: '20%' }
+                      ]}
+                      data={displayData}
+                      showActions={false}
+                    />
+                    {totalCount > WORK_HISTORY_COLLAPSED_COUNT && (
+                      <div className="flex justify-center mt-3">
+                        <button
+                          type="button"
+                          data-testid="button-show-all-history"
+                          className="text-sm text-blue-600 hover:text-blue-800 font-medium px-4 py-1.5 rounded border border-blue-200 hover:bg-blue-50 transition-colors"
+                          onClick={() => { setWorkHistoryExpanded(true); setWorkHistoryPage(0); }}
+                        >
+                          Show All History ({totalCount} entries)
+                        </button>
+                      </div>
+                    )}
+                  </>
+                );
+              }
+
+              const totalPages = Math.ceil(totalCount / WORK_HISTORY_PAGE_SIZE);
+              const pageStart = workHistoryPage * WORK_HISTORY_PAGE_SIZE;
+              const displayData = allHistory.slice(pageStart, pageStart + WORK_HISTORY_PAGE_SIZE);
+
+              return (
+                <>
+                  <WorkOrderDataTable
+                    columns={[
+                      { key: 'date', label: 'Date', width: '12%' },
+                      { key: 'workOrder', label: 'Work Order', width: '15%' },
+                      { key: 'description', label: 'Description', width: '25%' },
+                      { key: 'performedBy', label: 'Performed By', width: '15%' },
+                      { key: 'status', label: 'Status', width: '13%', render: (value) => <StatusPill status={value} /> },
+                      { key: 'remarks', label: 'Remarks', width: '20%' }
+                    ]}
+                    data={displayData}
+                    showActions={false}
+                  />
+                  <div className="flex items-center justify-between mt-3">
+                    <button
+                      type="button"
+                      data-testid="button-show-less-history"
+                      className="text-sm text-gray-600 hover:text-gray-800 font-medium px-4 py-1.5 rounded border border-gray-200 hover:bg-gray-50 transition-colors"
+                      onClick={() => { setWorkHistoryExpanded(false); setWorkHistoryPage(0); }}
+                    >
+                      Show Less
+                    </button>
+                    {totalPages > 1 && (
+                      <div className="flex items-center gap-2 text-sm text-gray-600">
+                        <button
+                          type="button"
+                          data-testid="button-history-prev-page"
+                          className="px-2 py-1 rounded border border-gray-200 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed"
+                          disabled={workHistoryPage === 0}
+                          onClick={() => setWorkHistoryPage(p => Math.max(0, p - 1))}
+                        >
+                          &laquo; Prev
+                        </button>
+                        <span data-testid="text-history-page-info">
+                          Page {workHistoryPage + 1} of {totalPages}
+                        </span>
+                        <button
+                          type="button"
+                          data-testid="button-history-next-page"
+                          className="px-2 py-1 rounded border border-gray-200 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed"
+                          disabled={workHistoryPage >= totalPages - 1}
+                          onClick={() => setWorkHistoryPage(p => Math.min(totalPages - 1, p + 1))}
+                        >
+                          Next &raquo;
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                </>
+              );
+            })()}
           </SectionBlock>
 
           {/* Part B - Work Completion Record (hidden for template mode) */}
