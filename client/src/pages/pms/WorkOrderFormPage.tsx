@@ -419,6 +419,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
 
   // Store work order number from context (e.g., MKR-IN-00001.WO-2025-001)
   const [workOrderNo, setWorkOrderNo] = useState("");
+  const [workOrderDueDate, setWorkOrderDueDate] = useState("");
 
   const [executionData, setExecutionData] = useState({
     woExecutionId: "",
@@ -644,6 +645,10 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
       // Load work order status for approval workflow
       if (context.workOrder?.status) {
         setCurrentWorkOrderStatus(context.workOrder.status);
+      }
+
+      if (context.workOrder?.dueDate) {
+        setWorkOrderDueDate(context.workOrder.dueDate);
       }
 
       // Load work order type to conditionally skip frequency validation for unplanned WOs
@@ -3362,7 +3367,14 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
             <div className="space-y-6">
               {/* B2.1 Work Duration */}
               <div data-testid="WOF.B2.3"><Marker id="WOF.B2.3" />
-                <h4 className="text-sm font-medium text-gray-700 mb-4" data-testid="WOF.B2.4"><Marker id="WOF.B2.4" />B2.1 Work Duration:</h4>
+                <div className="flex items-center justify-between mb-4">
+                  <h4 className="text-sm font-medium text-gray-700" data-testid="WOF.B2.4"><Marker id="WOF.B2.4" />B2.1 Work Duration:</h4>
+                  {workOrderDueDate && (
+                    <span className="text-sm text-gray-500 font-medium" data-testid="text-due-date">
+                      Due Date: <span className="text-gray-700">{workOrderDueDate}</span>
+                    </span>
+                  )}
+                </div>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   <div className="space-y-2">
                     <Label className="text-sm text-[#8798ad]" data-testid="WOF.B2.5"><Marker id="WOF.B2.5" />Start Date <span className="text-red-500">*</span></Label>
