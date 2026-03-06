@@ -858,7 +858,8 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
     if (isReadOnly) return;
 
     const componentCode = templateData.componentCode;
-    if (!componentCode || !vesselId) {
+    const effectiveVesselId = vesselId || contextVesselId;
+    if (!componentCode || !effectiveVesselId) {
       const newPart = { partNo: "", description: "", quantityRequired: "", remarks: "" };
       setTemplateData(prev => ({
         ...prev,
@@ -873,7 +874,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
     setIsA2SpareModalOpen(true);
 
     try {
-      const response = await fetch(`/technical/api/inventory/spares-by-component-code/${vesselId}/${encodeURIComponent(componentCode)}`);
+      const response = await fetch(`/technical/api/inventory/spares-by-component-code/${effectiveVesselId}/${encodeURIComponent(componentCode)}`);
       const data = await response.json();
 
       if (data.success && data.data) {
