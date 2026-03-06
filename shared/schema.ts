@@ -85,7 +85,7 @@ export const defectSequences = pgTable("defect_sequences", {
   year: integer("year").notNull(), // 2-digit year stored as 4-digit (e.g., 2026)
   lastSequence: integer("last_sequence").notNull().default(0), // Last used sequence number
 }, (table) => ({
-  uniqueVesselYear: index("idx_defect_seq_vessel_year").on(table.vesselId, table.year),
+  uniqueVesselYear: unique("unique_defect_seq_vessel_year").on(table.vesselId, table.year),
 }));
 
 export const insertDefectSequenceSchema = createInsertSchema(defectSequences).omit({
