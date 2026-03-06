@@ -25,13 +25,13 @@ import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useVessel } from "@/contexts/VesselContext";
 import { useUIRole } from "@/contexts/UIRoleContext";
 
-const ReadOnlyField: React.FC<{ label: string; value: string | undefined; labelMarker?: string; valueMarker?: string }> = ({ label, value, labelMarker, valueMarker }) => (
+const ReadOnlyField: React.FC<{ label: string; value: string | undefined; labelMarker?: string; valueMarker?: string; type?: "text" | "textarea" }> = ({ label, value, labelMarker, valueMarker, type = "text" }) => (
   <div className="space-y-1">
     <Label className="text-sm text-[#8798ad]" data-testid={labelMarker}>
       {labelMarker && <Marker id={labelMarker} />}
       {label}
     </Label>
-    <div className="text-sm font-medium text-gray-900 bg-gray-50 px-3 py-2 rounded-md border border-gray-200 min-h-[38px] flex items-center" data-testid={valueMarker}>
+    <div className={`text-sm font-medium text-gray-900 bg-gray-50 px-3 py-2 rounded-md border border-gray-200 min-h-[38px] ${type === "textarea" ? "whitespace-pre-wrap" : "flex items-center"}`} data-testid={valueMarker}>
       {valueMarker && <Marker id={valueMarker} />}
       {value || '-'}
     </div>
@@ -69,7 +69,7 @@ const EditableField: React.FC<EditableFieldProps> = ({
   const canEdit = isModifyMode || isEditMode;
   
   if (!canEdit) {
-    return <ReadOnlyField label={label} value={value} labelMarker={labelMarker} valueMarker={valueMarker} />;
+    return <ReadOnlyField label={label} value={value} labelMarker={labelMarker} valueMarker={valueMarker} type={type} />;
   }
   
   return (
