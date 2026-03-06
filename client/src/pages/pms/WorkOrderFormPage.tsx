@@ -1517,19 +1517,6 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
         if (startDateObj > today) {
           hardErrors.push("Start Date cannot be in the future.");
         }
-        if (workOrderId && !isNewJobCreation) {
-          const woCreatedAt = (workOrderContext as any)?.workOrder?.createdAt;
-          if (woCreatedAt) {
-            const woCreationDate = new Date(woCreatedAt);
-            woCreationDate.setHours(0, 0, 0, 0);
-            const startDateCheck = new Date(startDate);
-            startDateCheck.setHours(0, 0, 0, 0);
-            if (startDateCheck < woCreationDate) {
-              const formattedCreationDate = woCreationDate.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
-              hardErrors.push(`Start Date cannot be earlier than the Work Order creation date (${formattedCreationDate}).`);
-            }
-          }
-        }
       }
       if (completionDate) {
         const completionDateObj = new Date(completionDate);
