@@ -1694,7 +1694,7 @@ export default function ComponentRegisterAddEdit({
                     size="sm"
                     className="h-7 text-xs text-sky-600 border-sky-300"
                     data-testid="button-add-job"
-                    onClick={() => setLocation(`/pms/work-order/new/${componentData.componentCode}?mode=template`)}
+                    onClick={() => setLocation(`/pms/work-order/new/${componentData.componentCode}?mode=template&componentName=${encodeURIComponent(componentData.componentName)}`)}
                   >
                     + Add Jobs
                   </Button>

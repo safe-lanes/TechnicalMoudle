@@ -646,12 +646,14 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
   }, [workOrderContext, isModifyMode, setOriginalSnapshot, vesselLocations]);
 
   // Initialize form for new job creation (Add Job flow)
+  const componentNameFromUrl = urlParams.get('componentName') || '';
   useEffect(() => {
     if (isNewJobCreation && componentIdFromUrl) {
-      // Pre-populate componentCode from URL
+      // Pre-populate componentCode and componentName from URL
       setTemplateData(prev => ({
         ...prev,
         componentCode: componentIdFromUrl,
+        componentName: componentNameFromUrl || prev.componentName,
         // Set sensible defaults for new job
         maintenanceBasis: prev.maintenanceBasis || 'Calendar',
         frequencyUnit: prev.frequencyUnit || 'Months',
@@ -661,7 +663,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
         isActive: prev.isActive || 'Yes'
       }));
     }
-  }, [isNewJobCreation, componentIdFromUrl]);
+  }, [isNewJobCreation, componentIdFromUrl, componentNameFromUrl]);
 
   const handleTemplateChange = (field: string, value: string) => {
     // Mark form as touched by user to prevent late async data from overwriting
