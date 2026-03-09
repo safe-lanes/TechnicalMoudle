@@ -978,7 +978,7 @@ const WorkOrdersSection: React.FC<{ componentCode: string; componentName: string
     if (!allJobCodes.includes(componentCode)) return false;
     if ((isVessel || isHeadOfDept) && job.isActive === false) return false;
     return true;
-  });
+  }).sort((a, b) => (a.isActive === false ? 1 : 0) - (b.isActive === false ? 1 : 0));
   
   // Calculate visible jobs based on expand state and pagination
   const totalJobs = jobs.length;
