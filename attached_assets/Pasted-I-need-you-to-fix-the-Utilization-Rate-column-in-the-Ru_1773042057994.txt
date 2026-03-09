@@ -1,0 +1,78 @@
+I need you to fix the Utilization Rate column in the Running Hours module (/pms/running-hrs). This column currently exists in the main table header and is visible to the user, but it displays "—" (a dash) for every single component — it is completely empty and non-functional. This needs to be resolved properly.
+
+Background & Context:
+
+The Running Hours module tracks how many hours each piece of equipment on the vessel has been running. The Utilization Rate is a meaningful operational KPI that tells the crew what percentage of total available time a particular machine has been running. The formula is:
+
+Utilization Rate (%) = (Component Running Hours ÷ Total Operational Hours of the Vessel) × 100
+
+For example, if the Main Diesel Engine has logged 9,000 running hours and the vessel has been operational for 10,000 hours since commissioning or since a reference date, the Utilization Rate would be 90%.
+
+Step 1 — Investigate First:
+
+Before implementing anything, look at the existing codebase and understand:
+
+Where the Utilization Rate column is defined in the Running Hours table component
+
+Why it is currently rendering "—" — is the field missing from the API response? Is the calculation not implemented? Is the data field present in the database schema but never populated?
+
+Whether there is already a field called something like utilization_rate, utilizationRate, operational_hours, or total_vessel_hours anywhere in the database schema, API routes, or data models related to components or running hours
+
+Whether the vessel has any concept of a "total operational hours" or "voyage hours" stored anywhere in the system (check other modules, settings, or any vessel-level configuration table)
+
+Step 2 — Decision Logic (implement based on what you find):
+
+Case A — If "Total Operational Hours" data exists somewhere in the system:
+Calculate the Utilization Rate on the frontend (or backend, whichever is more appropriate) using the formula:
+Utilization Rate = (Component Running Hours / Total Operational Hours) × 100
+Round the result to one decimal place (e.g., 87.3%). Display it in the Utilization Rate column as "87.3%". Do not show more than one decimal place.
+
+Case B — If "Total Operational Hours" data does NOT exist anywhere in the system:
+Do not invent or hardcode a total hours value. Instead, implement the following approach:
+
+Calculate the Utilization Rate based on the time elapsed since the component's "Last Updated" date and the component's running hours, using this alternative formula:
+Utilization Rate = (Running Hours ÷ Hours elapsed since a reference date) × 100
+Use the vessel's earliest recorded running hours update date across all components as the reference start date (i.e., the oldest "Last Updated" timestamp in the running hours records). This gives a relative utilization since the system started tracking.
+
+If even this cannot be calculated reliably (e.g., running hours are 0 and last updated is old), display "0.0%" instead of "—".
+
+Case C — If after investigation you determine the Utilization Rate cannot be meaningfully calculated with available data and implementing it would require significant new infrastructure:
+Remove the Utilization Rate column from the table entirely rather than leaving it as a broken "—" placeholder. This is the fallback option only if Cases A and B are not feasible. If you remove it, also remove it from any related Export logic so it does not appear as a blank column in exported files either.
+
+Step 3 — Display Rules (if implementing Case A or B):
+
+Show the value as a percentage string with one decimal place: e.g., "45.2%", "100.0%", "0.0%"
+
+If the value exceeds 100% (which can happen if a component runs more hours than the reference total, e.g., due to data inconsistency), cap the display at "100.0%" and do not show values above 100
+
+If Running Hours for a component is 0, display "0.0%" — do not show "—"
+
+Apply a simple color coding to make the column more useful at a glance:
+
+Green text: 75% and above (well-utilized)
+
+Orange/amber text: 40% to 74.9% (moderate)
+
+Red text: Below 40% (low utilization or rarely run)
+
+This color coding should use the existing color palette of the app — do not introduce new brand colors
+
+The column header tooltip (if hoverable) can say: "Running Hours as a percentage of total vessel operational hours" — this is optional but nice to have
+
+Step 4 — Update the Export Function:
+
+If the Export button on the Running Hours page generates a CSV or any file format, ensure that the Utilization Rate column in that export also reflects the calculated value (or is removed if Case C is chosen). It should not export "—" as a value.
+
+General Instructions:
+
+Do not change any other module, page, or route outside of /pms/running-hrs
+
+Do not change the visual design, layout, column order, or any other column's behavior
+
+Do not touch the Bulk Update RH modal or the individual Update RH modal as part of this change
+
+The Inherited RH column (which shows sub-component count with a people icon) should remain completely untouched — only the Utilization Rate column is being fixed
+
+After making the changes, the column should display a real value for every component that has Running Hours > 0, and "0.0%" for components with 0 running hours — "—" should no longer appear in this column under any circumstance (unless you go with Case C and remove the column entirely)
+
+That is the complete prompt. The key instruction is: investigate the codebase first, then choose the appropriate case (A, B, or C) based on what data is actually available, and implement accordingly. Do not hardcode dummy values or placeholder percentages.
