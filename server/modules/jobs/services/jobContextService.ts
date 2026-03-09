@@ -101,6 +101,7 @@ export async function getJobContext(jobId: string) {
     jobPriority: job.jobPriority,
     classRelated: job.classRelated,
     criticality: job.criticality,
+    isActive: job.isActive === false ? 'No' : 'Yes',
     lastDoneDate: convertToIsoDate(job.lastDoneDate),
     nextDueDate: convertToIsoDate(job.nextDueDate),
     lastDoneRH: job.lastDoneRH?.toString() || '',
