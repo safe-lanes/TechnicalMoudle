@@ -24,7 +24,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { ChevronRight, ChevronDown, Plus, Edit2, FileText, FileImage, FileCheck, File, Upload, Download, Lock, HelpCircle, CheckCircle, AlertCircle, Check, ChevronsUpDown, X } from "lucide-react";
+import { ChevronRight, ChevronDown, Plus, Edit2, FileText, FileImage, FileCheck, File, Upload, Download, Lock, HelpCircle, CheckCircle, AlertCircle, Check, ChevronsUpDown, X, Trash2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useVessel } from "@/contexts/VesselContext";
 import { useQuery, useMutation } from "@tanstack/react-query";
@@ -35,6 +35,182 @@ import { AdminOnly } from "@/components/RoleGuard";
 import { FEATURES } from '@/config/features';
 import { formatProfessionalDate } from "@/lib/dateUtils";
 import RunningHoursConditionPanel from "@/components/RunningHoursConditionPanel";
+
+interface JobsSectionCProps {
+  isEditMode: boolean;
+  isLoadingJobs: boolean;
+  componentJobs: any[];
+  getPreviewData: <T>(data: T[], sectionId: string) => T[];
+  showAllRows: Set<string>;
+  toggleShowAllRows: (sectionId: string) => void;
+  PREVIEW_ROW_LIMIT: number;
+  vesselId: string;
+}
+
+const JobsSectionC: React.FC<JobsSectionCProps> = ({
+  isEditMode,
+  isLoadingJobs,
+  componentJobs,
+  getPreviewData,
+  showAllRows,
+  toggleShowAllRows,
+  PREVIEW_ROW_LIMIT,
+  vesselId,
+}) => {
+  const { toast } = useToast();
+  const [jobToDeactivate, setJobToDeactivate] = useState<any>(null);
+  const [showDeactivateDialog, setShowDeactivateDialog] = useState(false);
+
+  const inactivateMutation = useMutation({
+    mutationFn: async (jobId: string) => {
+      const res = await apiRequest("POST", `/technical/api/jobs/${jobId}/inactivate`, { vesselId });
+      return await res.json();
+    },
+    onSuccess: (data: any) => {
+      toast({ title: data.message || "Job deactivated successfully" });
+      queryClient.invalidateQueries({ queryKey: [`/technical/api/jobs?vesselId=${vesselId}`] });
+      setShowDeactivateDialog(false);
+      setJobToDeactivate(null);
+    },
+    onError: (error: any) => {
+      const message = error?.message || "Failed to deactivate job";
+      toast({ title: "Error", description: message, variant: "destructive" });
+      setShowDeactivateDialog(false);
+      setJobToDeactivate(null);
+    },
+  });
+
+  return (
+    <>
+      <div className="overflow-x-auto">
+        {isEditMode && (
+          <div className="flex justify-end mb-3">
+            <Button
+              size="sm"
+              className="bg-[#0ea5e9] hover:bg-[#0284c7] text-white"
+              disabled
+            >
+              <Plus className="h-4 w-4 mr-1" />
+              Add Job
+            </Button>
+          </div>
+        )}
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="border-b border-gray-200">
+              <th className="text-left py-2 px-3 font-medium text-gray-600">Job Code</th>
+              <th className="text-left py-2 px-3 font-medium text-gray-600">Job Title</th>
+              <th className="text-left py-2 px-3 font-medium text-gray-600">Task Type</th>
+              <th className="text-left py-2 px-3 font-medium text-gray-600">Frequency</th>
+              <th className="text-left py-2 px-3 font-medium text-gray-600">Last Done Date</th>
+              <th className="text-left py-2 px-3 font-medium text-gray-600">Next Due Date</th>
+              <th className="w-10"></th>
+            </tr>
+          </thead>
+          <tbody>
+            {isLoadingJobs ? (
+              <tr>
+                <td colSpan={7} className="py-8 text-center text-gray-500">
+                  Loading jobs...
+                </td>
+              </tr>
+            ) : !isEditMode ? (
+              <tr>
+                <td colSpan={7} className="py-8 text-center text-gray-500">
+                  Jobs will be available after component is created
+                </td>
+              </tr>
+            ) : componentJobs.length === 0 ? (
+              <tr>
+                <td colSpan={7} className="py-8 text-center text-gray-500">
+                  No jobs found for this component
+                </td>
+              </tr>
+            ) : (
+              getPreviewData(componentJobs, "C").map((job, index) => {
+                const isInactive = job.isActive === false;
+                return (
+                  <tr
+                    key={index}
+                    className={`border-b border-gray-100 ${isInactive ? "opacity-60" : "hover:bg-gray-50"}`}
+                    data-testid={`job-row-${job.jobNo}`}
+                  >
+                    <td className={`py-3 px-3 ${isInactive ? "text-gray-400" : "text-gray-900"}`}>
+                      {job.jobNo}{isInactive && <span className="ml-1 text-xs text-red-400">(Inactive)</span>}
+                    </td>
+                    <td className={`py-3 px-3 ${isInactive ? "text-gray-400" : "text-gray-900"}`}>{job.jobTitle}</td>
+                    <td className={`py-3 px-3 ${isInactive ? "text-gray-400" : "text-gray-900"}`}>{job.maintenanceType}</td>
+                    <td className={`py-3 px-3 ${isInactive ? "text-gray-400" : "text-gray-900"}`}>{job.frequencyValue} {job.frequencyUnit}</td>
+                    <td className={`py-3 px-3 ${isInactive ? "text-gray-400" : "text-gray-900"}`}>{formatProfessionalDate(job.lastDoneDate) || '-'}</td>
+                    <td className={`py-3 px-3 ${isInactive ? "text-gray-400" : "text-gray-900"}`}>{formatProfessionalDate(job.nextDueDate) || '-'}</td>
+                    <td className="py-3 px-1">
+                      {!isInactive && (
+                        <button
+                          className="p-1.5 rounded text-red-500 hover:text-red-700 hover:bg-red-50 transition-colors"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setJobToDeactivate(job);
+                            setShowDeactivateDialog(true);
+                          }}
+                          data-testid={`btn-delete-job-${job.jobNo}`}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </button>
+                      )}
+                    </td>
+                  </tr>
+                );
+              })
+            )}
+          </tbody>
+        </table>
+        {componentJobs.length > PREVIEW_ROW_LIMIT && (
+          <div className="text-center mt-2">
+            <Button
+              variant="link"
+              size="sm"
+              onClick={() => toggleShowAllRows("C")}
+              className="text-[#16569e] text-xs"
+              data-testid="button-toggle-jobs"
+            >
+              {showAllRows.has("C") ? `Show Less` : `View More (${componentJobs.length - PREVIEW_ROW_LIMIT} more)`}
+            </Button>
+          </div>
+        )}
+      </div>
+
+      <Dialog open={showDeactivateDialog} onOpenChange={setShowDeactivateDialog}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Deactivate Job</DialogTitle>
+            <DialogDescription>
+              Are you sure you want to deactivate job{" "}
+              <span className="font-semibold">{jobToDeactivate?.jobNo}</span>? It will no longer appear for vessel and department users.
+              Any active work orders for this job will continue to completion.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex justify-end gap-2 mt-4">
+            <Button
+              variant="outline"
+              onClick={() => { setShowDeactivateDialog(false); setJobToDeactivate(null); }}
+              data-testid="btn-deactivate-job-cancel"
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={() => jobToDeactivate && inactivateMutation.mutate(jobToDeactivate.id)}
+              disabled={inactivateMutation.isPending}
+              data-testid="btn-deactivate-job-confirm"
+            >
+              {inactivateMutation.isPending ? "Deactivating..." : "Deactivate"}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+    </>
+  );
+};
 
 interface AddEditComponentFormProps {
   isOpen: boolean;
@@ -1098,83 +1274,16 @@ const AddEditComponentForm: React.FC<AddEditComponentFormProps> = ({
 
                       {/* Section C: Jobs - EXACT REPLICA */}
                       {section.id === "C" && (
-                        <>
-                          <div className="overflow-x-auto">
-                            {isEditMode && (
-                              <div className="flex justify-end mb-3">
-                                <Button
-                                  size="sm"
-                                  className="bg-[#0ea5e9] hover:bg-[#0284c7] text-white"
-                                  disabled
-                                >
-                                  <Plus className="h-4 w-4 mr-1" />
-                                  Add Job
-                                </Button>
-                              </div>
-                            )}
-                            <table className="w-full text-sm">
-                              <thead>
-                                <tr className="border-b border-gray-200">
-                                  <th className="text-left py-2 px-3 font-medium text-gray-600">Job Code</th>
-                                  <th className="text-left py-2 px-3 font-medium text-gray-600">Job Title</th>
-                                  <th className="text-left py-2 px-3 font-medium text-gray-600">Task Type</th>
-                                  <th className="text-left py-2 px-3 font-medium text-gray-600">Frequency</th>
-                                  <th className="text-left py-2 px-3 font-medium text-gray-600">Last Done Date</th>
-                                  <th className="text-left py-2 px-3 font-medium text-gray-600">Next Due Date</th>
-                                </tr>
-                              </thead>
-                              <tbody>
-                                {isLoadingJobs ? (
-                                  <tr>
-                                    <td colSpan={6} className="py-8 text-center text-gray-500">
-                                      Loading jobs...
-                                    </td>
-                                  </tr>
-                                ) : !isEditMode ? (
-                                  <tr>
-                                    <td colSpan={6} className="py-8 text-center text-gray-500">
-                                      Jobs will be available after component is created
-                                    </td>
-                                  </tr>
-                                ) : componentJobs.length === 0 ? (
-                                  <tr>
-                                    <td colSpan={6} className="py-8 text-center text-gray-500">
-                                      No jobs found for this component
-                                    </td>
-                                  </tr>
-                                ) : (
-                                  getPreviewData(componentJobs, "C").map((job, index) => (
-                                    <tr
-                                      key={index}
-                                      className="border-b border-gray-100 hover:bg-gray-50"
-                                      data-testid={`job-row-${job.jobNo}`}
-                                    >
-                                      <td className="py-3 px-3 text-gray-900">{job.jobNo}</td>
-                                      <td className="py-3 px-3 text-gray-900">{job.jobTitle}</td>
-                                      <td className="py-3 px-3 text-gray-900">{job.maintenanceType}</td>
-                                      <td className="py-3 px-3 text-gray-900">{job.frequencyValue} {job.frequencyUnit}</td>
-                                      <td className="py-3 px-3 text-gray-900">{formatProfessionalDate(job.lastDoneDate) || '-'}</td>
-                                      <td className="py-3 px-3 text-gray-900">{formatProfessionalDate(job.nextDueDate) || '-'}</td>
-                                    </tr>
-                                  ))
-                                )}
-                              </tbody>
-                            </table>
-                            {componentJobs.length > PREVIEW_ROW_LIMIT && (
-                              <div className="text-center mt-2">
-                                <Button
-                                  variant="link"
-                                  size="sm"
-                                  onClick={() => toggleShowAllRows("C")}
-                                  className="text-[#16569e] text-xs"
-                                  data-testid="button-toggle-jobs"
-                                >
-                                  {showAllRows.has("C") ? `Show Less` : `View More (${componentJobs.length - PREVIEW_ROW_LIMIT} more)`}
-                                </Button>
-                              </div>
-                            )}
-                          </div>
-                        </>
+                        <JobsSectionC
+                          isEditMode={isEditMode}
+                          isLoadingJobs={isLoadingJobs}
+                          componentJobs={componentJobs}
+                          getPreviewData={getPreviewData}
+                          showAllRows={showAllRows}
+                          toggleShowAllRows={toggleShowAllRows}
+                          PREVIEW_ROW_LIMIT={PREVIEW_ROW_LIMIT}
+                          vesselId={vesselId}
+                        />
                       )}
 
                       {/* Section D: Maintenance History - EXACT REPLICA */}
