@@ -935,18 +935,23 @@ export class PostgresStorage {
     await db.delete(components).where(or(eq(components.cuuid, id), eq(components.id, id)));
   }
 
-  async inactivateComponent(id: string, userId?: string, options?: { cascadeInactivate?: boolean }): Promise<{
+  async inactivateComponent(id: string, vesselId: string, userId?: string): Promise<{
     success: boolean;
     message: string;
+    code?: string;
     componentsInactivated: number;
-    jobsInactivated: number;
     activeChildrenCount?: number;
+    activeJobsCount?: number;
+    linkedSparesCount?: number;
+    activeWorkOrdersCount?: number;
   }> {
     const db = await getDb();
     
-    // Get the component
     const componentResult = await db.select().from(components)
-      .where(or(eq(components.cuuid, id), eq(components.id, id)))
+      .where(and(
+        or(eq(components.cuuid, id), eq(components.id, id)),
+        eq(components.vesselId, vesselId)
+      ))
       .limit(1);
     
     if (componentResult.length === 0) {
@@ -954,102 +959,97 @@ export class PostgresStorage {
         success: false,
         message: `Component not found: ${id}`,
         componentsInactivated: 0,
-        jobsInactivated: 0,
       };
     }
     
     const component = componentResult[0];
     
-    // Check for active children (use resolved cuuid for parentId lookup)
     const activeChildren = await db.select().from(components)
       .where(and(
         or(eq(components.parentId, component.cuuid), eq(components.parentId, component.id)),
-        eq(components.isActive, true)
+        eq(components.isActive, true),
+        eq(components.vesselId, vesselId)
       ));
     
-    // If cascade is not requested and there are active children, return warning
-    if (!options?.cascadeInactivate && activeChildren.length > 0) {
+    if (activeChildren.length > 0) {
       return {
         success: false,
-        message: `Component has ${activeChildren.length} active children. Set cascadeInactivate to true to inactivate them all.`,
+        message: `Component has ${activeChildren.length} active child component(s). Please deactivate the child components first.`,
+        code: 'ACTIVE_CHILDREN',
         componentsInactivated: 0,
-        jobsInactivated: 0,
         activeChildrenCount: activeChildren.length,
       };
     }
     
-    let componentsInactivated = 0;
-    let jobsInactivated = 0;
-    
-    // Cascade inactivate children if requested
-    if (options?.cascadeInactivate && activeChildren.length > 0) {
-      const childIds = activeChildren.map(c => c.cuuid);
-      await db.update(components)
-        .set({ isActive: false })
-        .where(inArray(components.cuuid, childIds));
-      componentsInactivated += childIds.length;
-      
-      // Inactivate jobs linked to children (via direct componentId and jobComponentLinks)
-      // Collect all unique job IDs to avoid duplicate updates/counts
-      const childJobIdsToInactivate = new Set<string>();
-      
-      for (const childId of childIds) {
-        // Jobs linked via deprecated componentId field
-        const directJobs = await db.select().from(jobs)
-          .where(eq(jobs.componentId, childId));
-        for (const job of directJobs) {
-          childJobIdsToInactivate.add(job.juuid);
-        }
-        // Jobs linked via jobComponentLinks table (many-to-many)
-        const linkedJobIds = await this.getJobComponentLinksByComponent(childId);
-        for (const link of linkedJobIds) {
-          childJobIdsToInactivate.add(link.jobId);
-        }
+    const activeJobIds = new Set<string>();
+    const directJobs = await db.select().from(jobs)
+      .where(and(
+        or(eq(jobs.componentId, component.cuuid), eq(jobs.componentId, component.id)),
+        eq(jobs.isActive, true),
+        eq(jobs.vesselId, vesselId)
+      ));
+    for (const job of directJobs) {
+      activeJobIds.add(job.juuid);
+    }
+    const linkedJobs = await this.getJobComponentLinksByComponent(component.cuuid);
+    for (const link of linkedJobs) {
+      const jobResult = await db.select().from(jobs)
+        .where(and(eq(jobs.juuid, link.jobId), eq(jobs.isActive, true), eq(jobs.vesselId, vesselId)))
+        .limit(1);
+      if (jobResult.length > 0) {
+        activeJobIds.add(link.jobId);
       }
-      
-      // Batch update all unique jobs
-      for (const jobId of childJobIdsToInactivate) {
-        await db.update(jobs)
-          .set({ isActive: false })
-          .where(eq(jobs.juuid, jobId));
-      }
-      jobsInactivated += childJobIdsToInactivate.size;
     }
     
-    // Inactivate the main component (use resolved cuuid)
+    if (activeJobIds.size > 0) {
+      return {
+        success: false,
+        message: `Component cannot be deleted because ${activeJobIds.size} active Job(s) are linked. Please deactivate or delete the linked Jobs before deleting the component.`,
+        code: 'ACTIVE_JOBS',
+        componentsInactivated: 0,
+        activeJobsCount: activeJobIds.size,
+      };
+    }
+    
+    const linkedSpares = await db.select().from(spareComponentLinks)
+      .where(eq(spareComponentLinks.componentId, component.cuuid));
+    
+    if (linkedSpares.length > 0) {
+      return {
+        success: false,
+        message: `Component cannot be deleted because ${linkedSpares.length} Spare(s) are linked. Please remove the linked Spares before deleting the component.`,
+        code: 'LINKED_SPARES',
+        componentsInactivated: 0,
+        linkedSparesCount: linkedSpares.length,
+      };
+    }
+    
+    let activeWorkOrdersCount = 0;
+    const componentCode = component.componentCode;
+    if (componentCode) {
+      const woResults = await db.select().from(workOrders)
+        .where(and(
+          eq(workOrders.componentCode, componentCode),
+          eq(workOrders.vesselId, vesselId)
+        ));
+      const { isBlockingStatus } = await import('./utils/workOrderStatus');
+      activeWorkOrdersCount = woResults.filter(wo => isBlockingStatus(wo.status)).length;
+    }
+    
     await db.update(components)
       .set({ isActive: false })
-      .where(eq(components.cuuid, component.cuuid));
-    componentsInactivated++;
-
-    // Inactivate jobs linked to main component (via direct componentId and jobComponentLinks)
-    // Collect all unique job IDs to avoid duplicate updates/counts
-    const mainJobIdsToInactivate = new Set<string>();
-
-    const directJobs = await db.select().from(jobs)
-      .where(or(eq(jobs.componentId, component.cuuid), eq(jobs.componentId, component.id)));
-    for (const job of directJobs) {
-      mainJobIdsToInactivate.add(job.juuid);
-    }
-    // Jobs linked via jobComponentLinks table (many-to-many)
-    const linkedJobIds = await this.getJobComponentLinksByComponent(component.cuuid);
-    for (const link of linkedJobIds) {
-      mainJobIdsToInactivate.add(link.jobId);
-    }
-    
-    // Batch update all unique jobs
-    for (const jobId of mainJobIdsToInactivate) {
-      await db.update(jobs)
-        .set({ isActive: false })
-        .where(eq(jobs.juuid, jobId));
-    }
-    jobsInactivated += mainJobIdsToInactivate.size;
+      .where(and(
+        eq(components.cuuid, component.cuuid),
+        eq(components.vesselId, vesselId)
+      ));
     
     return {
       success: true,
-      message: `Component and ${componentsInactivated - 1} children inactivated, along with ${jobsInactivated} linked jobs.`,
-      componentsInactivated,
-      jobsInactivated,
+      message: activeWorkOrdersCount > 0
+        ? `Component deactivated. ${activeWorkOrdersCount} active Work Order(s) will continue to completion but no new ones will be generated.`
+        : `Component deactivated successfully.`,
+      componentsInactivated: 1,
+      activeWorkOrdersCount,
     };
   }
 

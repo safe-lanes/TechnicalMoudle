@@ -2128,9 +2128,9 @@ const Components: React.FC = () => {
   const { isSailAdmin, isClientAdmin, isVessel, isHeadOfDept } = useUIRole();
   
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
-  const [cascadeDialogOpen, setCascadeDialogOpen] = useState(false);
+  const [validationErrorDialogOpen, setValidationErrorDialogOpen] = useState(false);
+  const [validationErrorMessage, setValidationErrorMessage] = useState('');
   const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
-  const [activeChildrenCount, setActiveChildrenCount] = useState(0);
   
   const prevVesselIdRef = React.useRef(vesselId);
   React.useEffect(() => {
@@ -2150,37 +2150,34 @@ const Components: React.FC = () => {
   });
   
   const inactivateMutation = useMutation({
-    mutationFn: async ({ componentId, cascade }: { componentId: string; cascade: boolean }) => {
+    mutationFn: async ({ componentId }: { componentId: string }) => {
       const response = await fetch(`/technical/api/components/${componentId}/inactivate`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ cascadeInactivate: cascade, userId: 'User' }),
+        body: JSON.stringify({ vesselId, userId: 'User' }),
       });
       const data = await response.json();
       if (!response.ok) {
         const error: any = new Error(data.error || 'Failed to deactivate component');
         error.code = data.code;
-        error.activeChildrenCount = data.activeChildrenCount;
         throw error;
       }
       return data;
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: [`/technical/api/components/${vesselId}`] });
       setDeleteDialogOpen(false);
-      setCascadeDialogOpen(false);
       setPendingDeleteId(null);
       setSelectedComponent(null);
-      toast({ title: "Component deactivated", description: "The component has been successfully deactivated." });
+      toast({
+        title: "Component deactivated",
+        description: data.message || "The component has been successfully deactivated.",
+      });
     },
     onError: (error: any) => {
-      if (error.code === 'ACTIVE_CHILDREN') {
-        setActiveChildrenCount(error.activeChildrenCount || 0);
-        setDeleteDialogOpen(false);
-        setCascadeDialogOpen(true);
-      } else {
-        toast({ title: "Deactivation failed", description: error.message, variant: "destructive" });
-      }
+      setDeleteDialogOpen(false);
+      setValidationErrorMessage(error.message);
+      setValidationErrorDialogOpen(true);
     },
   });
 
@@ -2190,9 +2187,9 @@ const Components: React.FC = () => {
     setDeleteDialogOpen(true);
   };
 
-  const confirmDelete = (cascade: boolean) => {
+  const confirmDelete = () => {
     if (!pendingDeleteId) return;
-    inactivateMutation.mutate({ componentId: pendingDeleteId, cascade });
+    inactivateMutation.mutate({ componentId: pendingDeleteId });
   };
 
   // Build component tree from fetched data
@@ -3665,7 +3662,7 @@ const Components: React.FC = () => {
             </Button>
             <Button
               variant="destructive"
-              onClick={() => confirmDelete(false)}
+              onClick={() => confirmDelete()}
               disabled={inactivateMutation.isPending}
               data-testid="btn-delete-confirm"
             >
@@ -3675,34 +3672,24 @@ const Components: React.FC = () => {
         </DialogContent>
       </Dialog>
 
-      <Dialog open={cascadeDialogOpen} onOpenChange={setCascadeDialogOpen}>
+      <Dialog open={validationErrorDialogOpen} onOpenChange={setValidationErrorDialogOpen}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>Component Has Active Children</DialogTitle>
+            <DialogTitle className="flex items-center gap-2 text-red-600">
+              <AlertCircle className="h-5 w-5" />
+              Cannot Deactivate Component
+            </DialogTitle>
           </DialogHeader>
-          <div className="space-y-2" data-testid="text-cascade-confirm-message">
-            <p className="text-sm text-gray-600">
-              This component has {activeChildrenCount} active child component{activeChildrenCount !== 1 ? 's' : ''}.
-            </p>
-            <p className="text-sm text-gray-600">
-              Would you like to deactivate this component along with all its children?
-            </p>
-          </div>
-          <div className="flex justify-end gap-2 mt-4">
+          <p className="text-sm text-gray-600" data-testid="text-validation-error-message">
+            {validationErrorMessage}
+          </p>
+          <div className="flex justify-end mt-4">
             <Button
               variant="outline"
-              onClick={() => { setCascadeDialogOpen(false); setPendingDeleteId(null); }}
-              data-testid="btn-cascade-cancel"
+              onClick={() => { setValidationErrorDialogOpen(false); setPendingDeleteId(null); }}
+              data-testid="btn-validation-error-ok"
             >
-              Cancel
-            </Button>
-            <Button
-              variant="destructive"
-              onClick={() => confirmDelete(true)}
-              disabled={inactivateMutation.isPending}
-              data-testid="btn-cascade-confirm"
-            >
-              {inactivateMutation.isPending ? "Deactivating..." : "Deactivate All"}
+              OK
             </Button>
           </div>
         </DialogContent>

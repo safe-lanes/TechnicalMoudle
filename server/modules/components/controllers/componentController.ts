@@ -102,23 +102,25 @@ export async function remove(req: Request, res: Response) {
 // POST /components/:id/inactivate — inactivate component
 export async function inactivate(req: Request, res: Response) {
   try {
-    const { cascadeInactivate, userId } = req.body;
+    const { vesselId, userId } = req.body;
+    if (!vesselId) {
+      return res.status(400).json({ success: false, error: 'vesselId is required' });
+    }
     const result = await componentService.inactivate(
       req.params.id,
-      userId || 'system',
-      cascadeInactivate === true
+      vesselId,
+      userId || 'system'
     );
 
     if (!result.success) {
-      if (result.activeChildrenCount && result.activeChildrenCount > 0) {
-        return res.status(400).json({
-          success: false,
-          error: result.message,
-          code: 'ACTIVE_CHILDREN',
-          activeChildrenCount: result.activeChildrenCount
-        });
-      }
-      return res.status(400).json({ success: false, error: result.message });
+      return res.status(400).json({
+        success: false,
+        error: result.message,
+        code: result.code,
+        activeChildrenCount: result.activeChildrenCount,
+        activeJobsCount: result.activeJobsCount,
+        linkedSparesCount: result.linkedSparesCount,
+      });
     }
 
     res.json(result);

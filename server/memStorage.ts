@@ -165,8 +165,8 @@ class MemStorage {
     }
   }
 
-  async inactivateComponent(id: string, userId?: string, options?: any): Promise<any> {
-    return { success: true, message: 'Preview mode - operation simulated', componentsInactivated: 0, jobsInactivated: 0 };
+  async inactivateComponent(id: string, vesselId: string, userId?: string): Promise<any> {
+    return { success: true, message: 'Preview mode - operation simulated', componentsInactivated: 0 };
   }
 
   async createRunningHoursAudit(audit: any): Promise<any> { return { ...audit, id: this.getNextId('audits') }; }

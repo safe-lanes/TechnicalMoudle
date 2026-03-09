@@ -58,8 +58,8 @@ export async function remove(id: string): Promise<void> {
   return storage.deleteComponent(id);
 }
 
-export async function inactivate(id: string, userId: string, options?: { cascadeInactivate?: boolean }) {
-  return storage.inactivateComponent(id, userId, options);
+export async function inactivate(id: string, vesselId: string, userId: string) {
+  return storage.inactivateComponent(id, vesselId, userId);
 }
 
 export async function bulkUpsert(components: InsertComponent[]): Promise<{ created: number; updated: number }> {

@@ -238,12 +238,15 @@ export interface IStorage {
   createComponent(component: InsertComponent): Promise<Component>;
   updateComponent(id: string, data: Partial<Component>): Promise<Component>;
   deleteComponent(id: string): Promise<void>;
-  inactivateComponent(id: string, userId?: string, options?: { cascadeInactivate?: boolean }): Promise<{
+  inactivateComponent(id: string, vesselId: string, userId?: string): Promise<{
     success: boolean;
     message: string;
+    code?: string;
     componentsInactivated: number;
-    jobsInactivated: number;
     activeChildrenCount?: number;
+    activeJobsCount?: number;
+    linkedSparesCount?: number;
+    activeWorkOrdersCount?: number;
   }>;
   createRunningHoursAudit(audit: InsertRunningHoursAudit): Promise<RunningHoursAudit>;
   getRunningHoursAudits(componentId: string, limit?: number): Promise<RunningHoursAudit[]>;

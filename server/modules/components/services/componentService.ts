@@ -271,6 +271,6 @@ export async function remove(id: string): Promise<void> {
   return repo.remove(id);
 }
 
-export async function inactivate(id: string, userId: string, cascadeInactivate: boolean = false) {
-  return repo.inactivate(id, userId, { cascadeInactivate });
+export async function inactivate(id: string, vesselId: string, userId: string) {
+  return repo.inactivate(id, vesselId, userId);
 }
