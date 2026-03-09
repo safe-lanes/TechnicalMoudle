@@ -158,6 +158,10 @@ const RunningHours = () => {
     currentMeterRH: parent.currentMeterRH || '0'
   })) : [];
 
+  const filteredRunningHoursData = runningHoursData.filter(item =>
+    !searchTerm || item.component.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
   // Cascade update mutation
   const cascadeUpdateMutation = useMutation({
     mutationFn: async (data: any) => {
@@ -292,14 +296,6 @@ const RunningHours = () => {
 
   // Export to CSV function
   const exportToCSV = () => {
-    // Filter data based on current filters
-    const filteredData = runningHoursData.filter(item => {
-      if (searchTerm && !item.component.toLowerCase().includes(searchTerm.toLowerCase())) {
-        return false;
-      }
-      return true;
-    });
-
     // Prepare CSV headers
     const headers = [
       "Vessel",
@@ -313,7 +309,7 @@ const RunningHours = () => {
     ];
 
     // Prepare CSV rows
-    const rows = filteredData.map(item => [
+    const rows = filteredRunningHoursData.map(item => [
       vesselId,
       item.component,
       item.componentCode || "",
@@ -342,7 +338,7 @@ const RunningHours = () => {
     
     toast({
       title: "Export Complete",
-      description: `Exported ${filteredData.length} records to ${filename}`,
+      description: `Exported ${filteredRunningHoursData.length} records to ${filename}`,
     });
   };
 
@@ -808,11 +804,7 @@ const RunningHours = () => {
               Loading running hours data...
             </div>
           ) : (() => {
-            const filteredData = runningHoursData.filter(item => 
-              !searchTerm || item.component.toLowerCase().includes(searchTerm.toLowerCase())
-            );
-            
-            if (filteredData.length === 0 && searchTerm) {
+            if (filteredRunningHoursData.length === 0 && searchTerm) {
               return (
                 <div className="px-4 py-8 text-center text-gray-500">
                   No results found. <button onClick={clearFilters} className="text-blue-600 underline">Reset</button>
@@ -820,7 +812,7 @@ const RunningHours = () => {
               );
             }
             
-            if (filteredData.length === 0) {
+            if (filteredRunningHoursData.length === 0) {
               return (
                 <div className="px-4 py-8 text-center text-gray-500">
                   No running hours data available
@@ -828,7 +820,7 @@ const RunningHours = () => {
               );
             }
             
-            return filteredData.map((item, index) => (
+            return filteredRunningHoursData.map((item, index) => (
               <div key={item.id} className="px-4 py-3 hover:bg-gray-50">
               <div className="grid grid-cols-9 gap-4 text-sm items-center">
                 <div className="text-gray-900" data-testid={index === 0 ? "D13" : undefined}>{index === 0 && <Marker id="D13" />}{item.component}</div>
@@ -900,9 +892,12 @@ const RunningHours = () => {
         </div>
       </div>
 
-      {/* Pagination */}
-      <div className="flex justify-end text-sm text-gray-500" data-testid="D21">
-        <Marker id="D21" />Page 6 of 6
+      {/* Component count footer */}
+      <div className="flex justify-start px-4 py-2 text-sm text-gray-400" data-testid="D21">
+        <Marker id="D21" />
+        {searchTerm
+          ? `Showing ${filteredRunningHoursData.length} of ${runningHoursData.length} components`
+          : `Showing ${runningHoursData.length} components`}
       </div>
 
       {/* Update Running Hours Dialog */}
