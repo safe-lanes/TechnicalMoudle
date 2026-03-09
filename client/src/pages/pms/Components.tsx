@@ -711,7 +711,7 @@ const ComponentInformationSection: React.FC<{ isExpanded: boolean; selectedCompo
             data-testid="B7.A.48"
           />
         ) : (
-          <div className="text-sm text-gray-900" data-testid="B7.A.48">
+          <div className="text-sm text-gray-900 whitespace-pre-wrap" data-testid="B7.A.48">
             <Marker id="B7.A.48" /> {componentData.notes}
           </div>
         )}
