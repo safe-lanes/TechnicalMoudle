@@ -311,6 +311,35 @@ export async function deleteJob(id: string) {
   await repo.remove(id);
 }
 
+// ── Job Inactivation (Soft Delete) ──
+
+export async function inactivateJob(id: string, vesselId: string) {
+  const job = await repo.findById(id);
+  if (!job) {
+    throw new NotFoundError('Job not found');
+  }
+  if (job.vesselId !== vesselId) {
+    throw new ForbiddenError('Job does not belong to this vessel');
+  }
+  if (job.isActive === false) {
+    throw new ValidationError('Job is already inactive');
+  }
+
+  await repo.update(id, { isActive: false });
+
+  const allWOs = await repo.findWorkOrdersByJobId(id);
+  const activeWOCount = allWOs.filter((wo: any) =>
+    wo.status !== 'Completed' && wo.status !== 'Cancelled'
+  ).length;
+
+  let message = 'Job has been deactivated successfully.';
+  if (activeWOCount > 0) {
+    message += ` ${activeWOCount} active work order(s) will continue to completion. No new work orders will be generated.`;
+  }
+
+  return { message, activeWorkOrders: activeWOCount };
+}
+
 // ── Job Maintenance History ──
 
 export async function getJobMaintenanceHistory(jobId: string, user: UserInfo) {
@@ -337,6 +366,14 @@ export async function getJobMaintenanceHistory(jobId: string, user: UserInfo) {
 export async function generateWorkOrder(jobId: string, reason: string, activeComponentCode?: string) {
   if (!reason || !['Planning', 'Breakdown', 'Other'].includes(reason)) {
     throw new ValidationError("Invalid reason. Must be 'Planning', 'Breakdown', or 'Other'");
+  }
+
+  const job = await repo.findById(jobId);
+  if (!job) {
+    throw new NotFoundError('Job not found');
+  }
+  if (job.isActive === false) {
+    throw new ValidationError('Cannot generate work orders for an inactive job');
   }
 
   const { jobDueScanner } = await import('../../../services/jobDueScanner');

@@ -810,8 +810,9 @@ const JobRow: React.FC<{
   job: any;
   onRowClick: (job: any) => void;
   toast: any;
-  activeComponentCode: string; // The component context from which this job is being viewed
-}> = ({ job, onRowClick, toast, activeComponentCode }) => {
+  activeComponentCode: string;
+  isAdminRole?: boolean;
+}> = ({ job, onRowClick, toast, activeComponentCode, isAdminRole }) => {
   const [showReasonDialog, setShowReasonDialog] = useState(false);
 
   // Get component-specific tracking data for THIS component (prevents data mixing between components)
@@ -863,26 +864,28 @@ const JobRow: React.FC<{
     generateWOMutation.mutate(reason);
   };
 
+  const isInactive = job.isActive === false;
+  const inactiveClass = isInactive && isAdminRole ? 'text-gray-400 opacity-60' : 'text-gray-900';
+
   return (
     <>
       <tr 
-        className="border-b border-gray-100 hover:bg-gray-50 cursor-pointer"
+        className={`border-b border-gray-100 hover:bg-gray-50 cursor-pointer ${isInactive && isAdminRole ? 'bg-gray-50' : ''}`}
         onClick={() => onRowClick(job)}
         data-testid={`job-row-${job.jobNo}`}
       >
-        <td className="py-3 px-3 text-gray-900" data-testid={`job-no-${job.jobNo}`}>{job.jobNo}</td>
-        <td className="py-3 px-3 text-gray-900" data-testid={`job-title-${job.jobNo}`}>{job.jobTitle}</td>
-        <td className="py-3 px-3 text-gray-900">{job.maintenanceType}</td>
-        <td className="py-3 px-3 text-gray-900">
+        <td className={`py-3 px-3 ${inactiveClass}`} data-testid={`job-no-${job.jobNo}`}>{job.jobNo}</td>
+        <td className={`py-3 px-3 ${inactiveClass}`} data-testid={`job-title-${job.jobNo}`}>{job.jobTitle}{isInactive && isAdminRole ? ' (Inactive)' : ''}</td>
+        <td className={`py-3 px-3 ${inactiveClass}`}>{job.maintenanceType}</td>
+        <td className={`py-3 px-3 ${inactiveClass}`}>
           {job.maintenanceBasis === 'Running Hours' 
             ? `${job.intervalRunningHour || 0} RH` 
             : `${job.frequencyValue} ${job.frequencyUnit}`}
         </td>
-        <td className="py-3 px-3 text-gray-900">{formatProfessionalDate(effectiveLastDoneDate) || '-'}</td>
-        <td className="py-3 px-3 text-gray-900">
+        <td className={`py-3 px-3 ${inactiveClass}`}>{formatProfessionalDate(effectiveLastDoneDate) || '-'}</td>
+        <td className={`py-3 px-3 ${inactiveClass}`}>
           {job.maintenanceBasis === 'Running Hours' 
             ? (() => {
-                // Calculate remaining RH: Frequency - (Current RH - Last Done RH)
                 const frequency = parseFloat(job.intervalRunningHour || '0');
                 const currentRH = parseFloat(job.componentCurrentRH || '0');
                 const lastDoneRH = parseFloat(effectiveLastDoneRH || '0');
@@ -892,16 +895,18 @@ const JobRow: React.FC<{
             : formatProfessionalDate(effectiveNextDueDate) || '-'}
         </td>
         <td className="py-3 px-3 text-center" onClick={(e) => e.stopPropagation()}>
-          <Button
-            size="sm"
-            variant="outline"
-            onClick={() => setShowReasonDialog(true)}
-            disabled={generateWOMutation.isPending}
-            className="text-xs"
-            data-testid={`btn-generate-wo-${job.jobNo}`}
-          >
-            {generateWOMutation.isPending ? 'Generating...' : 'Generate WO'}
-          </Button>
+          {!isInactive && (
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => setShowReasonDialog(true)}
+              disabled={generateWOMutation.isPending}
+              className="text-xs"
+              data-testid={`btn-generate-wo-${job.jobNo}`}
+            >
+              {generateWOMutation.isPending ? 'Generating...' : 'Generate WO'}
+            </Button>
+          )}
         </td>
       </tr>
       
@@ -951,7 +956,7 @@ const WorkOrdersSection: React.FC<{ componentCode: string; componentName: string
   const [, setLocation] = useLocation();
   const { toast } = useToast();
   const { vesselId } = useVessel();
-  const { isSailAdmin } = useUIRole();
+  const { isSailAdmin, isClientAdmin, isVessel, isHeadOfDept } = useUIRole();
   const { isChangeRequestMode } = useChangeRequest();
   const { isChangeMode } = useChangeMode();
   
@@ -967,14 +972,12 @@ const WorkOrdersSection: React.FC<{ componentCode: string; componentName: string
     enabled: !!vesselId,
   });
   
-  // Filter jobs ONLY for this exact component (no child inheritance)
-  // MANY-TO-MANY: Use linkedComponentCodes array (from junction table) plus deprecated componentCode for backwards compatibility
   const jobs = allJobs.filter(job => {
     const linkedCodes: string[] = job.linkedComponentCodes || [];
-    // Always include the deprecated componentCode as fallback for backwards compatibility
     const allJobCodes = job.componentCode ? [...linkedCodes, job.componentCode] : linkedCodes;
-    // Check if any of the job's linked component codes match EXACTLY this component code
-    return allJobCodes.includes(componentCode);
+    if (!allJobCodes.includes(componentCode)) return false;
+    if ((isVessel || isHeadOfDept) && job.isActive === false) return false;
+    return true;
   });
   
   // Calculate visible jobs based on expand state and pagination
@@ -1088,6 +1091,7 @@ const WorkOrdersSection: React.FC<{ componentCode: string; componentName: string
                   onRowClick={handleRowClick}
                   toast={toast}
                   activeComponentCode={componentCode}
+                  isAdminRole={isSailAdmin || isClientAdmin}
                 />
               ))
             )}

@@ -41,6 +41,15 @@ export async function deleteJob(req: Request, res: Response) {
   res.status(204).send();
 }
 
+export async function inactivateJob(req: Request, res: Response) {
+  const { vesselId } = req.body;
+  if (!vesselId) {
+    return res.status(400).json({ error: 'vesselId is required' });
+  }
+  const result = await jobService.inactivateJob(req.params.id, vesselId);
+  res.json(result);
+}
+
 // ── Maintenance Planner ──
 
 export async function getMaintenancePlanner(req: Request, res: Response) {

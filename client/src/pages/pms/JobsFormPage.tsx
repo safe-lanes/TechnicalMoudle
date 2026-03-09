@@ -4,7 +4,7 @@ import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { FileText, ArrowLeft, Menu, AlertTriangle, Save, X, Pencil } from "lucide-react";
+import { FileText, ArrowLeft, Menu, AlertTriangle, Save, X, Pencil, Trash2 } from "lucide-react";
 import { Marker } from "@/components/Marker";
 import sailLogo from "@assets/SAIL logo Transparent_1753957135582.png";
 import {
@@ -22,6 +22,8 @@ import { PartHeader } from "@/components/PartHeader";
 import { StatusPill } from "@/components/StatusPill";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
+import { useMutation } from "@tanstack/react-query";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useVessel } from "@/contexts/VesselContext";
 import { useUIRole } from "@/contexts/UIRoleContext";
 
@@ -116,9 +118,10 @@ const JobsFormPage: React.FC = () => {
   const jobId = params?.id;
   const { toast } = useToast();
   const { vesselId } = useVessel();
-  const { isVessel, isHeadOfDept } = useUIRole();
+  const { isVessel, isHeadOfDept, isSailAdmin, isClientAdmin } = useUIRole();
   
   const [isWorkInstructionsOpen, setIsWorkInstructionsOpen] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [isMobileNavOpen, setIsMobileNavOpen] = useState(false);
   const [isEditMode, setIsEditMode] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
@@ -135,6 +138,27 @@ const JobsFormPage: React.FC = () => {
   const { data: jobContext, isLoading } = useQuery({
     queryKey: [`/technical/api/jobs/${jobId}/context`],
     enabled: !!jobId
+  });
+
+  const [, setLocation] = useLocation();
+
+  const inactivateMutation = useMutation({
+    mutationFn: async () => {
+      const response = await apiRequest('POST', `/technical/api/jobs/${jobId}/inactivate`, { vesselId });
+      return response.json();
+    },
+    onSuccess: (data: any) => {
+      toast({ title: "Job Deactivated", description: data.message });
+      queryClient.invalidateQueries({ predicate: (query) =>
+        typeof query.queryKey[0] === 'string' && query.queryKey[0].startsWith('/technical/api/jobs')
+      });
+      setShowDeleteConfirm(false);
+      setLocation('/pms/components');
+    },
+    onError: (error: any) => {
+      toast({ title: "Error", description: error.message || "Failed to deactivate job", variant: "destructive" });
+      setShowDeleteConfirm(false);
+    }
   });
   
   const [originalData, setOriginalData] = useState<Record<string, any>>({});
@@ -523,6 +547,17 @@ const JobsFormPage: React.FC = () => {
                 >
                   <X className="h-4 w-4 mr-1" />
                   Cancel
+                </Button>
+              )}
+              {!isModifyMode && !isEditMode && (isSailAdmin || isClientAdmin) && templateData.isActive !== 'No' && templateData.isActive !== false && (
+                <Button
+                  variant="outline"
+                  size="icon"
+                  className="h-9 w-9 border-red-300 text-red-500 hover:bg-red-50 hover:text-red-700"
+                  onClick={() => setShowDeleteConfirm(true)}
+                  data-testid="button-delete-job"
+                >
+                  <Trash2 className="h-4 w-4" />
                 </Button>
               )}
               {!isModifyMode && !isEditMode && !isVessel && !isHeadOfDept && (
@@ -966,6 +1001,25 @@ const JobsFormPage: React.FC = () => {
         isOpen={isWorkInstructionsOpen}
         onClose={() => setIsWorkInstructionsOpen(false)}
       />
+
+      <Dialog open={showDeleteConfirm} onOpenChange={setShowDeleteConfirm}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Deactivate Job</DialogTitle>
+            <DialogDescription>
+              Are you sure you want to deactivate this job? The job will be soft-deleted and no new work orders will be generated for it. Existing work orders will continue to completion.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowDeleteConfirm(false)} disabled={inactivateMutation.isPending} data-testid="button-cancel-delete-job">
+              Cancel
+            </Button>
+            <Button variant="destructive" onClick={() => inactivateMutation.mutate()} disabled={inactivateMutation.isPending} data-testid="button-confirm-delete-job">
+              {inactivateMutation.isPending ? 'Deactivating...' : 'Deactivate'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

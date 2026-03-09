@@ -25,6 +25,9 @@ router.patch('/jobs/:id', asyncHandler(jobCtrl.updateJob));
 // DELETE /jobs/:id — delete job
 router.delete('/jobs/:id', asyncHandler(jobCtrl.deleteJob));
 
+// POST /jobs/:id/inactivate — soft delete (deactivate) job
+router.post('/jobs/:id/inactivate', asyncHandler(jobCtrl.inactivateJob));
+
 // ── Generate Work Order ──
 
 // POST /jobs/:id/generate-wo — generate work order on demand
