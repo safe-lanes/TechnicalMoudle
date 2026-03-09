@@ -14,6 +14,13 @@ import {
 } from "@/components/ui/select";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
 import { useVessel } from "@/contexts/VesselContext";
 import { useQuery, useMutation } from "@tanstack/react-query";
@@ -141,6 +148,27 @@ export default function ComponentRegisterAddEdit({
 
   const [workOrders, setWorkOrders] = useState<any[]>([]);
   const [spares, setSpares] = useState<any[]>([]);
+  const [jobToDeactivate, setJobToDeactivate] = useState<any>(null);
+  const [showJobDeactivateDialog, setShowJobDeactivateDialog] = useState(false);
+
+  const jobInactivateMutation = useMutation({
+    mutationFn: async (jobId: string) => {
+      const res = await apiRequest("POST", `/technical/api/jobs/${jobId}/inactivate`, { vesselId });
+      return await res.json();
+    },
+    onSuccess: (data: any) => {
+      toast({ title: data.message || "Job deactivated successfully" });
+      queryClient.invalidateQueries({ queryKey: [`/technical/api/jobs?vesselId=${vesselId}`] });
+      setShowJobDeactivateDialog(false);
+      setJobToDeactivate(null);
+    },
+    onError: (error: any) => {
+      const message = error?.message || "Failed to deactivate job";
+      toast({ title: "Error", description: message, variant: "destructive" });
+      setShowJobDeactivateDialog(false);
+      setJobToDeactivate(null);
+    },
+  });
   
   const documentTypes = [
     { id: "1", type: "Equipment Drawing", fileType: "Drawing" },
@@ -502,6 +530,7 @@ export default function ComponentRegisterAddEdit({
         assignedTo: job.assignedTo || "Chief Engineer",
         dueDate: job.nextDueDate || "",
         status: job.status || "Due",
+        isActive: job.isActive,
       })));
 
       const componentSpares = allSpares.filter(s => s.componentId === componentId);
@@ -956,6 +985,7 @@ export default function ComponentRegisterAddEdit({
       assignedTo: job.assignedTo || "Chief Engineer",
       dueDate: job.nextDueDate || "",
       status: job.status || "Due",
+      isActive: job.isActive,
     })));
     
     const componentSpares = allSpares.filter(s => s.componentId === comp.id);
@@ -1713,24 +1743,41 @@ export default function ComponentRegisterAddEdit({
                       </tr>
                     </thead>
                     <tbody>
-                      {workOrders.length > 0 ? workOrders.map((wo) => (
-                        <tr key={wo.id} className="border-t">
-                          <td className="px-3 py-2 text-gray-700">{wo.woNo}</td>
-                          <td className="px-3 py-2 text-gray-700">{wo.jobTitle}</td>
-                          <td className="px-3 py-2 text-gray-700">{wo.assignedTo}</td>
-                          <td className="px-3 py-2 text-gray-700">{wo.dueDate}</td>
+                      {workOrders.length > 0 ? workOrders.map((wo) => {
+                        const isInactive = wo.isActive === false;
+                        const textClass = isInactive ? "text-gray-400" : "text-gray-700";
+                        return (
+                        <tr key={wo.id} className={`border-t ${isInactive ? "opacity-60 bg-gray-50" : ""}`}>
+                          <td className={`px-3 py-2 ${textClass}`}>
+                            {wo.woNo}{isInactive && <span className="ml-1 text-xs text-red-400">(Inactive)</span>}
+                          </td>
+                          <td className={`px-3 py-2 ${textClass}`}>{wo.jobTitle}</td>
+                          <td className={`px-3 py-2 ${textClass}`}>{wo.assignedTo}</td>
+                          <td className={`px-3 py-2 ${textClass}`}>{wo.dueDate}</td>
                           <td className="px-3 py-2">
                             <span className={`px-2 py-0.5 rounded text-xs font-medium ${getStatusBadgeClass(wo.status)}`}>
                               {wo.status}
                             </span>
                           </td>
                           <td className="px-3 py-2">
-                            <Button variant="ghost" size="sm" className="h-6 w-6 p-0 text-red-500 hover:text-red-700" data-testid={`button-delete-wo-${wo.id}`}>
-                              <Trash2 className="h-3 w-3" />
-                            </Button>
+                            {!isInactive && (
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="h-6 w-6 p-0 text-red-500 hover:text-red-700"
+                                data-testid={`button-delete-wo-${wo.id}`}
+                                onClick={() => {
+                                  setJobToDeactivate(wo);
+                                  setShowJobDeactivateDialog(true);
+                                }}
+                              >
+                                <Trash2 className="h-3 w-3" />
+                              </Button>
+                            )}
                           </td>
                         </tr>
-                      )) : (
+                        );
+                      }) : (
                         <tr>
                           <td colSpan={6} className="px-3 py-4 text-center text-gray-400">
                             No work orders found
@@ -2141,6 +2188,36 @@ export default function ComponentRegisterAddEdit({
           </div>
         </div>
       </div>
+
+      <Dialog open={showJobDeactivateDialog} onOpenChange={setShowJobDeactivateDialog}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Deactivate Job</DialogTitle>
+            <DialogDescription>
+              Are you sure you want to deactivate job{" "}
+              <span className="font-semibold">{jobToDeactivate?.woNo}</span>? It will no longer appear for vessel and department users.
+              Any active work orders for this job will continue to completion.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex justify-end gap-2 mt-4">
+            <Button
+              variant="outline"
+              onClick={() => { setShowJobDeactivateDialog(false); setJobToDeactivate(null); }}
+              data-testid="btn-deactivate-job-cancel"
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={() => jobToDeactivate && jobInactivateMutation.mutate(jobToDeactivate.id)}
+              disabled={jobInactivateMutation.isPending}
+              data-testid="btn-deactivate-job-confirm"
+            >
+              {jobInactivateMutation.isPending ? "Deactivating..." : "Deactivate"}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
