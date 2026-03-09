@@ -1,0 +1,105 @@
+FEATURE ALIGNMENT – DELETE JOB FUNCTIONALITY
+
+Objective
+The “Delete Job” option in **Component Register → Edit Component Page** must have the same functionality as the existing **Delete Button in the Job Form**.
+
+Reference
+Attachment 1 – Target Location (Component Register → Edit Component Page)  
+Attachment 2 – Reference Location (Job Form Delete Button)
+
+--------------------------------------------------
+
+Required Behaviour
+
+1. Functional Consistency
+The **Delete Job option in the Edit Component Page** must execute the same logic currently implemented in the **Job Form Delete Button**.
+
+No separate or different deletion logic should be created.
+
+--------------------------------------------------
+
+2. Deletion Method (Soft Delete Only)
+
+When a job is deleted:
+
+• The job must NOT be permanently removed from the database.  
+• The system must perform a **Soft Delete**.
+
+Backend update:
+
+is_active = No
+
+Example logic:
+
+UPDATE jobs
+SET is_active = 'No'
+WHERE job_id = selected_job_id
+AND vessel_id = selected_vessel_id;
+
+--------------------------------------------------
+
+3. Vessel Concept
+
+This operation must apply only to the **selected vessel**.
+
+Ensure all queries include the vessel filter to prevent cross-vessel impact.
+
+--------------------------------------------------
+
+4. Visibility Rules After Deletion
+
+Sail Admin
+• Job remains visible  
+• Display as dull / grey  
+• is_active = No  
+
+Client Admin
+• Job remains visible  
+• Display as dull / grey  
+• is_active = No  
+
+Vessel Users
+• Deactivated jobs must NOT be visible  
+
+Head of Department
+• Deactivated jobs must NOT be visible  
+
+--------------------------------------------------
+
+5. Work Order Handling
+
+If the deleted job already has Work Orders:
+
+Active / Generated Work Orders
+• Must remain unchanged  
+• Must continue until completion  
+
+Future Work Orders
+• Since the job is inactive, **new Work Orders must NOT be generated** for this job.
+
+--------------------------------------------------
+
+6. History Preservation
+
+All deleted jobs must remain stored in the backend for:
+
+• Historical tracking  
+• Work Order linkage  
+• Audit trail
+
+--------------------------------------------------
+
+7. Implementation Requirement
+
+The **Edit Component Page Delete Job option must reuse the same backend function/API used by the Job Form Delete Button** to ensure consistent behaviour across the system.
+
+--------------------------------------------------
+
+Deliverables
+
+• Delete Job option implemented in Edit Component Page  
+• Same logic reused from Job Form Delete function  
+• Soft delete implementation confirmed  
+• Vessel-specific filtering  
+• Proper UI behaviour for inactive jobs  
+• Existing Work Orders unaffected
