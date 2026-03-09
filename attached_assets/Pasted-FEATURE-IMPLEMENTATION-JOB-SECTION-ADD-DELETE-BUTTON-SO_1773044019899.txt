@@ -1,0 +1,110 @@
+FEATURE IMPLEMENTATION – JOB SECTION → ADD DELETE BUTTON (SOFT DELETE WITH VESSEL SCOPE)
+
+Objective
+Add a "Delete" button in the highlighted area in the Job section. The delete action must perform a Soft Delete by deactivating the job instead of permanently deleting it.
+
+Scope
+This functionality applies per vessel (Vessel Concept). The deletion/deactivation must affect only the job belonging to the selected vessel.
+
+--------------------------------------------------
+
+1. Delete Button Placement
+
+Add a "Delete" button in the highlighted area of the Job section.
+
+The button should work for the selected job record.
+
+--------------------------------------------------
+
+2. Delete Function (Soft Delete Only)
+
+When the user clicks Delete:
+
+The system must NOT remove the job from the database.
+
+Instead, update the job record as:
+
+is_active = No
+
+Example backend logic:
+
+UPDATE jobs
+SET is_active = 'No'
+WHERE job_id = selected_job_id
+AND vessel_id = selected_vessel_id;
+
+This ensures the job remains stored in the backend for history and audit purposes.
+
+--------------------------------------------------
+
+3. Visibility Rules
+
+After job deactivation:
+
+Sail Admin View
+• Job should remain visible
+• Job should appear dull / grey in the UI
+• is_active should show as No
+
+Client Admin View
+• Job should remain visible
+• Job should appear dull / grey
+• is_active should show as No
+
+Vessel View
+• Deactivated jobs should NOT be visible
+
+Head of Department View
+• Deactivated jobs should NOT be visible
+
+--------------------------------------------------
+
+4. Work Order Handling
+
+If the deleted (deactivated) job has existing Work Orders:
+
+Case 1 – Active Work Orders
+• Active or generated Work Orders must NOT be deleted
+• Existing WOs should continue normally until completion
+
+Case 2 – Future Work Order Generation
+Since the job is deactivated:
+
+• The system must BLOCK generation of any new Work Orders for that job.
+
+--------------------------------------------------
+
+5. Tree/List Display Behaviour
+
+In Sail Admin and Client Admin views:
+
+• Deactivated jobs should appear visually dull / grey
+• Users should clearly identify them as inactive jobs.
+
+In Vessel and HOD views:
+
+• Deactivated jobs should be completely hidden.
+
+--------------------------------------------------
+
+6. History Preservation
+
+All job data must remain stored in the backend database.
+
+The soft delete ensures:
+
+• Historical job records remain available
+• Existing Work Orders remain linked to the job
+• Audit trail is preserved.
+
+--------------------------------------------------
+
+7. Deliverables
+
+• Delete button added to Job section
+• Soft delete logic implemented (is_active = No)
+• Vessel-specific job handling
+• Role-based visibility rules
+• Prevention of new WO generation for inactive jobs
+• Existing Work Orders unaffected
+• UI dull/grey display for inactive jobs
