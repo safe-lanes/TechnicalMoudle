@@ -225,23 +225,33 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
     return loc?.qty || 0;
   };
 
-  // Helper function to get available locations for a spare part using Spares table mapping
-  // Uses: location -> rob_location_a, location_2 -> rob_location_b (per spec)
+  // Helper function to get available locations for a spare part
+  // Prefers spare_location_stock data (matches backend validation), falls back to legacy ROB fields
   const getAvailableLocationsForSpare = (partCode: string): Array<{ name: string; robValue: number; field: 'location' | 'location2' }> => {
     const spare = sparesInventory.find(s => s.partCode === partCode);
-    if (!spare) return []; // No spare found
+    if (!spare) return [];
+
+    const inventorySpare = sparesWithInventory.find(s => s.spare.partCode === partCode);
 
     const locations: Array<{ name: string; robValue: number; field: 'location' | 'location2' }> = [];
     const robA = spare.robLocationA ?? 0;
     const robB = spare.robLocationB ?? 0;
 
-    // location -> rob_location_a mapping
     if (spare.location) {
-      locations.push({ name: spare.location, robValue: robA, field: 'location' });
+      let qty = robA;
+      if (inventorySpare?.locations?.length) {
+        const match = inventorySpare.locations.find(l => l.locationName.toLowerCase().trim() === spare.location!.toLowerCase().trim());
+        if (match) qty = match.qty;
+      }
+      locations.push({ name: spare.location, robValue: qty, field: 'location' });
     }
-    // location_2 -> rob_location_b mapping
     if (spare.location2) {
-      locations.push({ name: spare.location2, robValue: robB, field: 'location2' });
+      let qty = robB;
+      if (inventorySpare?.locations?.length) {
+        const match = inventorySpare.locations.find(l => l.locationName.toLowerCase().trim() === spare.location2!.toLowerCase().trim());
+        if (match) qty = match.qty;
+      }
+      locations.push({ name: spare.location2, robValue: qty, field: 'location2' });
     }
 
     return locations;
@@ -262,11 +272,17 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
   };
 
   // Get ROB by location name for a specific spare part
-  // Used for validation to ensure consumption doesn't exceed available stock
+  // Prefers spare_location_stock data (matches backend validation), falls back to legacy ROB fields
   const getRobByLocationName = (partCode: string, locationName: string): number => {
     const spare = sparesInventory.find(s => s.partCode === partCode);
     if (!spare || !locationName) return 0;
-    // Match location name to determine which ROB field to use
+    
+    const inventorySpare = sparesWithInventory.find(s => s.spare.partCode === partCode);
+    if (inventorySpare?.locations?.length) {
+      const match = inventorySpare.locations.find(l => l.locationName.toLowerCase().trim() === locationName.toLowerCase().trim());
+      if (match) return match.qty;
+    }
+    
     if (spare.location === locationName) return spare.robLocationA ?? 0;
     if (spare.location2 === locationName) return spare.robLocationB ?? 0;
     return 0;

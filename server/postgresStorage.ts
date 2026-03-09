@@ -7373,8 +7373,44 @@ export class PostgresStorage {
       throw new Error(`Location ${input.locationId} not found`);
     }
     
-    // Get current stock levels
-    const currentLocationStock = await this.getSpareLocationStockItem(input.spareId, input.locationId);
+    // Get current stock levels — with auto-sync from legacy fields if no record exists
+    let currentLocationStock = await this.getSpareLocationStockItem(input.spareId, input.locationId);
+    
+    if (!currentLocationStock) {
+      const spareForSync = await db.select().from(spares).where(eq(spares.id, input.spareId));
+      const spareLegacy = spareForSync[0];
+      if (spareLegacy) {
+        const locName = (location.locationName || '').toLowerCase().trim();
+        const spareLegacyLocA = (spareLegacy.location || '').toLowerCase().trim();
+        const spareLegacyLocB = (spareLegacy.location2 || '').toLowerCase().trim();
+        
+        let seedQty: number | null = null;
+        if (spareLegacyLocA && locName === spareLegacyLocA) {
+          seedQty = spareLegacy.robLocationA ?? 0;
+        } else if (spareLegacyLocB && locName === spareLegacyLocB) {
+          seedQty = spareLegacy.robLocationB ?? 0;
+        } else if (spareLegacyLocA && !spareLegacyLocB) {
+          seedQty = spareLegacy.robLocationA ?? 0;
+        } else if (!spareLegacyLocA && spareLegacyLocB) {
+          seedQty = spareLegacy.robLocationB ?? 0;
+        } else if (!spareLegacyLocA && !spareLegacyLocB) {
+          seedQty = spareLegacy.rob ?? 0;
+        }
+        
+        if (seedQty !== null) {
+          console.log(`[performInventoryTransaction] AUTO-SYNC: No spare_location_stock record for spare ${input.spareId} at location ${input.locationId}. Seeding from legacy ROB: ${seedQty}`);
+          await this.upsertSpareLocationStock({
+            vesselId: input.vesselId,
+            spareId: input.spareId,
+            spareUuid: spareLegacy.suuid,
+            locationId: input.locationId,
+            qty: seedQty,
+          });
+          currentLocationStock = await this.getSpareLocationStockItem(input.spareId, input.locationId);
+        }
+      }
+    }
+    
     const currentLocationQty = currentLocationStock?.qty ?? 0;
     const currentTotalRob = await this.getSpareRobTotal(input.spareId);
     

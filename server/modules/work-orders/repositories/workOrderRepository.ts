@@ -142,6 +142,20 @@ export async function getSpareLocationStockItem(spareId: number, locationId: num
   return null;
 }
 
+export async function upsertSpareLocationStock(data: any) {
+  if (typeof (storage as any).upsertSpareLocationStock === 'function') {
+    return (storage as any).upsertSpareLocationStock(data);
+  }
+  return null;
+}
+
+export async function getLocationById(id: number) {
+  if (typeof (storage as any).getLocationById === 'function') {
+    return (storage as any).getLocationById(id);
+  }
+  return null;
+}
+
 export async function getInventoryTransactions(vesselId: string, options?: any) {
   if (typeof (storage as any).getInventoryTransactions === 'function') {
     return (storage as any).getInventoryTransactions(vesselId, options);

@@ -744,7 +744,7 @@ export async function updateWorkOrder(id: string, body: any) {
           }
         } catch (consumeError: any) {
           if (consumeError.message?.includes('NEGATIVE_STOCK_PREVENTED') || consumeError.message?.includes('INSUFFICIENT_STOCK')) {
-            console.warn(`⚠️ [Save Consumption] Insufficient stock for ${item.partKey}: ${consumeError.message}. ROB not updated.`);
+            console.error(`❌ [Save Consumption] STOCK_SYNC_ISSUE for ${item.partKey}: ${consumeError.message}. This may indicate spare_location_stock is out of sync with legacy ROB fields. The approval flow will attempt auto-sync.`);
           } else {
             console.error(`❌ [Save Consumption] Failed to process spare ${item.partKey}:`, consumeError);
           }
@@ -1081,7 +1081,43 @@ export async function updateWorkOrder(id: string, body: any) {
               }
 
               if (resolvedLocationId && !isNaN(resolvedLocationId as number)) {
-                const currentStock = await repo.getSpareLocationStockItem(spare.id, resolvedLocationId);
+                let currentStock = await repo.getSpareLocationStockItem(spare.id, resolvedLocationId);
+                
+                if (!currentStock) {
+                  console.log(`⚠️ [PATCH Approval] No spare_location_stock record for spare ${spare.id} at location ${resolvedLocationId}. Attempting auto-sync from legacy ROB fields...`);
+                  const locationObj = await repo.getLocationById(resolvedLocationId);
+                  if (locationObj && spare) {
+                    const locName = (locationObj.locationName || '').toLowerCase().trim();
+                    const spareLegacyLocA = (spare.location || '').toLowerCase().trim();
+                    const spareLegacyLocB = (spare.location2 || '').toLowerCase().trim();
+                    
+                    let seedQty: number | null = null;
+                    if (spareLegacyLocA && locName === spareLegacyLocA) {
+                      seedQty = spare.robLocationA ?? 0;
+                    } else if (spareLegacyLocB && locName === spareLegacyLocB) {
+                      seedQty = spare.robLocationB ?? 0;
+                    } else if (spareLegacyLocA && !spareLegacyLocB) {
+                      seedQty = spare.robLocationA ?? 0;
+                    } else if (!spareLegacyLocA && spareLegacyLocB) {
+                      seedQty = spare.robLocationB ?? 0;
+                    } else if (!spareLegacyLocA && !spareLegacyLocB) {
+                      seedQty = spare.rob ?? 0;
+                    }
+                    
+                    if (seedQty !== null) {
+                      console.log(`🔄 [PATCH Approval] AUTO-SYNC: Seeding spare_location_stock for spare ${spare.id} at location ${resolvedLocationId} with legacy ROB: ${seedQty}`);
+                      await repo.upsertSpareLocationStock({
+                        vesselId: woVesselId,
+                        spareId: spare.id,
+                        spareUuid: spare.suuid,
+                        locationId: resolvedLocationId,
+                        qty: seedQty,
+                      });
+                      currentStock = await repo.getSpareLocationStockItem(spare.id, resolvedLocationId);
+                    }
+                  }
+                }
+                
                 const currentQty = currentStock?.qty ?? 0;
                 console.log(`📊 [PATCH Approval] Current stock for spare ${spare.id} at location ${resolvedLocationId}: ${currentQty}`);
 
