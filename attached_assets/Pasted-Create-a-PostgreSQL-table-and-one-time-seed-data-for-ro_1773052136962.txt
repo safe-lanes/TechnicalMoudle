@@ -1,0 +1,364 @@
+Create a PostgreSQL table and one-time seed data for role definitions.
+This is a one-time initialization table used for system role configuration.
+The records will be inserted only once during setup and will not be dynamically modified by the application.
+⚠️ Important Rules
+Use PostgreSQL syntax
+Create the table first
+Insert the records only once
+Do not add update logic
+Do not generate migrations
+Do not generate backend code
+Only provide pure SQL
+Timestamps must be generated dynamically using NOW()
+Table Name
+admn_role_acess
+Columns
+Column
+	
+Type
+	
+Notes
+
+
+id
+	
+integer
+	
+Primary Key
+
+
+ruid
+	
+uuid
+	
+Unique role UUID
+
+
+assigned_role
+	
+varchar
+	
+Role name
+
+
+roletype
+	
+varchar
+	
+Office / Ship
+
+
+orderby
+	
+integer
+	
+UI ordering
+
+
+is_active
+	
+boolean
+	
+Active role
+
+
+sort_order
+	
+integer
+	
+UI sort order
+
+
+created_at
+	
+timestamptz
+	
+Creation timestamp
+
+
+updated_at
+	
+timestamptz
+	
+Last update timestamp
+
+
+created_by_uuid
+	
+uuid
+	
+Nullable
+
+
+updated_by_uuid
+	
+uuid
+	
+Nullable
+
+
+is_deleted
+	
+boolean
+	
+Soft delete flag
+
+
+is_sync
+	
+boolean
+	
+Sync flag
+Table Rules
+id must be PRIMARY KEY
+ruid must be UNIQUE
+created_by_uuid and updated_by_uuid must allow NULL
+created_at and updated_at should default to NOW()
+is_deleted default false
+is_sync default false
+is_active default true
+Insert the Following Records
+id
+	
+ruid
+	
+assigned_role
+	
+roletype
+	
+orderby
+	
+is_active
+	
+sort_order
+
+
+3
+	
+5f06d995-832d-42ba-96bd-7928ab9f099b
+	
+User
+	
+Office
+	
+2
+	
+true
+	
+2
+
+
+4
+	
+5f06d995-832d-42ba-96bd-7928ab9f099c
+	
+Sail Admin
+	
+Office
+	
+3
+	
+true
+	
+3
+
+
+5
+	
+5f06d995-832d-42ba-96bd-7928ab9f099d
+	
+Super Admin
+	
+Office
+	
+4
+	
+true
+	
+4
+
+
+6
+	
+5f06d995-832d-42ba-96bd-7928ab9f099e
+	
+Vessel Admin
+	
+Ship
+	
+5
+	
+true
+	
+5
+
+
+1
+	
+d57dd06b-7c4f-4152-8902-c8af0422b3e6
+	
+Admin
+	
+Office
+	
+1
+	
+true
+	
+1
+
+
+7
+	
+5f06d995-832d-42ba-96bd-7928ab9f099f
+	
+Vessel User
+	
+Ship
+	
+7
+	
+true
+	
+7
+
+
+8
+	
+5f06d995-832d-42ba-96bd-7928ab9f099g
+	
+External 1
+	
+Office
+	
+8
+	
+true
+	
+8
+
+
+9
+	
+5f06d995-832d-42ba-96bd-7928ab9f099s
+	
+External 2
+	
+Office
+	
+9
+	
+true
+	
+9
+
+
+10
+	
+5f06d995-832d-42ba-96bd-7928ab9f099u
+	
+External 3
+	
+Office
+	
+10
+	
+true
+	
+10
+
+
+11
+	
+5f06d995-832d-42ba-96bd-7928ab9f09io
+	
+External 4
+	
+Office
+	
+11
+	
+true
+	
+11
+
+
+12
+	
+5f06d995-832d-42ba-96bd-7928ab9f098o
+	
+External 5
+	
+Office
+	
+12
+	
+true
+	
+12
+
+
+13
+	
+b1dcced3-0c2a-11ee-b5dc-0ab7f96323de
+	
+Vessel User 2
+	
+Ship
+	
+13
+	
+true
+	
+13
+
+
+14
+	
+b1de8a10-0c2a-11ee-b5dc-0ab7f96323de
+	
+Vessel User 3
+	
+Ship
+	
+14
+	
+true
+	
+14
+
+
+15
+	
+b1df5bd7-0c2a-11ee-b5dc-0ab7f96323de
+	
+Vessel User 4
+	
+Ship
+	
+15
+	
+true
+	
+15
+
+
+2
+	
+102d9bb7-cd0f-4514-b6c7-09b5b5a99912
+	
+Vessel Management
+	
+Ship
+	
+6
+	
+true
+	
+6
+Expected Output
+Return one SQL script containing:
+CREATE TABLE admn_role_acess
+INSERT INTO admn_role_acess statements for all rows
+Use NOW() for created_at and updated_at.
+This script should be ready to execute once during database initialization.
