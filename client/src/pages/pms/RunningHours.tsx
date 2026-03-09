@@ -6,7 +6,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import { Search, FileSpreadsheet, Calendar, Users, Settings, Pencil } from "lucide-react";
+import { Search, FileSpreadsheet, Calendar, Users, Settings, Pencil, AlertTriangle } from "lucide-react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
@@ -77,6 +77,7 @@ const RunningHours = () => {
     dateUpdated: new Date().toISOString().split('T')[0],
     comments: ""
   });
+  const [showDiscardConfirm, setShowDiscardConfirm] = useState(false);
   
   // Child RH popup state
   const [isChildRHOpen, setIsChildRHOpen] = useState(false);
@@ -553,11 +554,48 @@ const RunningHours = () => {
   const openBulkUpdate = () => {
     setBulkUpdateData({});
     setBulkUpdateErrors({});
+    setBulkUpdateMode("setTotal");
     setBulkUpdateGlobal({
       dateUpdated: new Date().toISOString().split('T')[0],
       comments: ""
     });
     setIsBulkUpdateOpen(true);
+  };
+
+  const isBulkUpdateDirty = (() => {
+    const todayStr = new Date().toISOString().split('T')[0];
+    if (bulkUpdateGlobal.comments.trim() !== "") return true;
+    if (bulkUpdateGlobal.dateUpdated !== todayStr) return true;
+    for (const key of Object.keys(bulkUpdateData)) {
+      const row = bulkUpdateData[key];
+      if (row.value && row.value.trim() !== "") return true;
+      if (row.meterReplaced) return true;
+    }
+    return false;
+  })();
+
+  const handleBulkUpdateClose = () => {
+    if (isBulkUpdateDirty) {
+      setShowDiscardConfirm(true);
+    } else {
+      setIsBulkUpdateOpen(false);
+    }
+  };
+
+  const handleDiscardChanges = () => {
+    setShowDiscardConfirm(false);
+    setIsBulkUpdateOpen(false);
+    setBulkUpdateData({});
+    setBulkUpdateErrors({});
+    setBulkUpdateMode("setTotal");
+    setBulkUpdateGlobal({
+      dateUpdated: new Date().toISOString().split('T')[0],
+      comments: ""
+    });
+  };
+
+  const handleKeepEditing = () => {
+    setShowDiscardConfirm(false);
   };
 
   const handleBulkUpdateChange = (componentId: string, field: string, value: any) => {
@@ -1062,8 +1100,8 @@ const RunningHours = () => {
       </Dialog>
 
       {/* Bulk Update Dialog */}
-      <Dialog open={isBulkUpdateOpen} onOpenChange={setIsBulkUpdateOpen}>
-        <DialogContent className="w-[90vw] max-w-none h-[90vh] flex flex-col">
+      <Dialog open={isBulkUpdateOpen} onOpenChange={(open) => { if (!open) handleBulkUpdateClose(); }}>
+        <DialogContent className="w-[90vw] max-w-none h-[90vh] flex flex-col" onEscapeKeyDown={(e) => { if (showDiscardConfirm) e.preventDefault(); }}>
           <DialogHeader className="pb-4 space-y-3">
             <DialogTitle className="text-[#52baf3] text-xl">
               Bulk Update Running Hours
@@ -1199,7 +1237,7 @@ const RunningHours = () => {
           </div>
           
           <div className="flex justify-end gap-2 pt-4 border-t">
-            <Button variant="outline" onClick={() => setIsBulkUpdateOpen(false)}>
+            <Button variant="outline" onClick={handleBulkUpdateClose} data-testid="button-bulk-cancel">
               Cancel
             </Button>
             <Button 
@@ -1209,6 +1247,41 @@ const RunningHours = () => {
             >
               Save
             </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Unsaved Changes Confirmation Dialog */}
+      <Dialog open={showDiscardConfirm} onOpenChange={(open) => { if (!open) handleKeepEditing(); }}>
+        <DialogContent className="max-w-md" onPointerDownOutside={(e) => e.preventDefault()}>
+          <div className="flex flex-col items-center text-center space-y-4 py-2">
+            <div className="w-12 h-12 rounded-full bg-red-100 flex items-center justify-center">
+              <AlertTriangle className="h-6 w-6 text-red-600" />
+            </div>
+            <DialogHeader className="space-y-2">
+              <DialogTitle className="text-lg font-semibold" data-testid="text-unsaved-title">Unsaved Changes</DialogTitle>
+              <p className="text-sm text-gray-600" data-testid="text-unsaved-message">
+                You have unsaved running hour entries. If you close now, all entered values will be lost. Do you want to discard your changes?
+              </p>
+            </DialogHeader>
+            <div className="flex gap-3 w-full pt-2">
+              <Button
+                variant="destructive"
+                className="flex-1"
+                onClick={handleDiscardChanges}
+                data-testid="button-discard-changes"
+              >
+                Discard Changes
+              </Button>
+              <Button
+                variant="outline"
+                className="flex-1"
+                onClick={handleKeepEditing}
+                data-testid="button-keep-editing"
+              >
+                Keep Editing
+              </Button>
+            </div>
           </div>
         </DialogContent>
       </Dialog>
