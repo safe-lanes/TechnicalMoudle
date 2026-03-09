@@ -381,6 +381,8 @@ const RunningHours = () => {
   const handleSaveUpdate = () => {
     if (!selectedComponent) return;
     
+    if (individualValidationError) return;
+    
     // Validate date is provided
     if (!updateForm.dateUpdated || updateForm.dateUpdated.trim() === "") {
       toast({
@@ -563,14 +565,42 @@ const RunningHours = () => {
   };
 
   const handleBulkUpdateChange = (componentId: string, field: string, value: any) => {
-    setBulkUpdateData(prev => ({
-      ...prev,
-      [componentId]: {
-        ...prev[componentId],
-        [field]: value
-      }
-    }));
-    // Clear error when user starts typing
+    if (field === 'meterReplaced' && value === true) {
+      const component = runningHoursData.find(c => c.id === componentId);
+      const hasPriorReplacement = component?.meterReplacedLastRh && parseFloat(component.meterReplacedLastRh) > 0;
+      const currentRH = component 
+        ? (hasPriorReplacement 
+            ? (component.currentMeterRH || '0')
+            : component.runningHours.replace(" hrs", "").replace(/,/g, ""))
+        : "";
+      setBulkUpdateData(prev => ({
+        ...prev,
+        [componentId]: {
+          ...prev[componentId],
+          meterReplaced: true,
+          oldMeterFinal: currentRH,
+          newMeterStart: prev[componentId]?.newMeterStart || "0"
+        }
+      }));
+    } else if (field === 'meterReplaced' && value === false) {
+      setBulkUpdateData(prev => ({
+        ...prev,
+        [componentId]: {
+          ...prev[componentId],
+          meterReplaced: false,
+          oldMeterFinal: "",
+          newMeterStart: "0"
+        }
+      }));
+    } else {
+      setBulkUpdateData(prev => ({
+        ...prev,
+        [componentId]: {
+          ...prev[componentId],
+          [field]: value
+        }
+      }));
+    }
     if (bulkUpdateErrors[componentId] && field === 'value') {
       setBulkUpdateErrors(prev => {
         const newErrors = { ...prev };
@@ -580,7 +610,55 @@ const RunningHours = () => {
     }
   };
 
+  const getIndividualValidationError = (): string | null => {
+    if (!updateForm.newValue || updateForm.newValue.trim() === "") return null;
+    const newVal = parseFloat(updateForm.newValue);
+    if (isNaN(newVal)) return null;
+    if (updateMode === "setTotal") {
+      if (!meterReplaced) {
+        const currentRH = parseFloat(updateForm.oldValue.replace(/,/g, ''));
+        if (!isNaN(currentRH) && newVal < currentRH) {
+          return `New value cannot be less than current running hours (${currentRH.toLocaleString()} hrs). Use 'Meter Replaced' if the meter was reset.`;
+        }
+      }
+    } else if (updateMode === "addDelta") {
+      if (newVal <= 0) {
+        return "Delta value must be a positive number. Running hours can only increase.";
+      }
+    }
+    return null;
+  };
+
+  const getBulkRowValidationError = (componentId: string): string | null => {
+    const updateData = bulkUpdateData[componentId];
+    if (!updateData || !updateData.value || updateData.value.trim() === "") return null;
+    const inputValue = parseFloat(updateData.value.replace(/,/g, ''));
+    if (isNaN(inputValue)) return null;
+    if (bulkUpdateMode === "setTotal") {
+      if (!updateData.meterReplaced) {
+        const component = runningHoursData.find(c => c.id === componentId);
+        if (component) {
+          const currentRH = parseFloat(component.runningHours.replace(" hrs", "").replace(/,/g, ""));
+          if (!isNaN(currentRH) && inputValue < currentRH) {
+            return `New value cannot be less than current running hours (${currentRH.toLocaleString()} hrs). Use 'Meter Replaced' if the meter was reset.`;
+          }
+        }
+      }
+    } else if (bulkUpdateMode === "addDelta") {
+      if (inputValue <= 0) {
+        return "Delta value must be a positive number. Running hours can only increase.";
+      }
+    }
+    return null;
+  };
+
+  const individualValidationError = getIndividualValidationError();
+
+  const hasBulkValidationErrors = runningHoursData.some(item => getBulkRowValidationError(item.id) !== null);
+
   const handleBulkSave = () => {
+    if (hasBulkValidationErrors) return;
+    
     const errors: {[key: string]: string} = {};
     const updates = [];
     
@@ -623,6 +701,19 @@ const RunningHours = () => {
       // Block zero values in bulk update - must use individual update with renewal confirmation
       if (bulkUpdateMode === 'setTotal' && inputValue === 0) {
         errors[component.id] = "Cannot set RH to 0 in bulk update. Use individual update for renewal/replacement.";
+        continue;
+      }
+      
+      if (bulkUpdateMode === 'setTotal' && !updateData.meterReplaced) {
+        const currentRH = parseFloat(component.runningHours.replace(" hrs", "").replace(/,/g, ""));
+        if (!isNaN(currentRH) && inputValue < currentRH) {
+          errors[component.id] = `New value cannot be less than current running hours (${currentRH.toLocaleString()} hrs).`;
+          continue;
+        }
+      }
+      
+      if (bulkUpdateMode === 'addDelta' && inputValue <= 0) {
+        errors[component.id] = "Delta value must be a positive number.";
         continue;
       }
       
@@ -874,10 +965,13 @@ const RunningHours = () => {
                   type="number"
                   value={updateForm.newValue}
                   onChange={(e) => handleUpdateFormChange('newValue', e.target.value)}
-                  className="mt-1"
+                  className={`mt-1 ${individualValidationError ? 'border-red-500' : ''}`}
                   placeholder={updateMode === "addDelta" ? "100" : "20000"}
                   data-testid="input-new-value"
                 />
+                {individualValidationError && (
+                  <p className="text-red-500 text-xs mt-1" data-testid="text-validation-error">{individualValidationError}</p>
+                )}
               </div>
             </div>
             
@@ -956,6 +1050,7 @@ const RunningHours = () => {
             <Button 
               className="bg-[#52baf3] hover:bg-[#4aa3d9] text-white" 
               onClick={handleSaveUpdate}
+              disabled={!!individualValidationError}
             >
               Save
             </Button>
@@ -1018,8 +1113,9 @@ const RunningHours = () => {
             <div className="bg-white rounded-lg border border-gray-200">
               {/* Table Header */}
               <div className="bg-[#52baf3] text-white px-4 py-3">
-                <div className="grid grid-cols-5 gap-4 text-sm font-medium">
+                <div className="grid grid-cols-6 gap-4 text-sm font-medium">
                   <div>Component Name</div>
+                  <div>Component Code</div>
                   <div>Previous Running Hours</div>
                   <div>{bulkUpdateMode === "addDelta" ? "Delta Hours" : "Present Running Hours"}</div>
                   <div>Meter Replaced?</div>
@@ -1031,10 +1127,12 @@ const RunningHours = () => {
               <div className="divide-y divide-gray-200">
                 {runningHoursData.map((item) => {
                   const updateData = bulkUpdateData[item.id] || { value: "", meterReplaced: false };
+                  const bulkRowError = getBulkRowValidationError(item.id);
                   return (
                     <div key={item.id} className="px-4 py-3">
-                      <div className="grid grid-cols-5 gap-4 text-sm items-center">
+                      <div className="grid grid-cols-6 gap-4 text-sm items-center">
                         <div className="text-gray-900 font-medium">{item.component}</div>
+                        <div className="text-gray-700">{item.sfiCode || item.componentCode || "—"}</div>
                         <div className="text-gray-700">{item.runningHours}</div>
                         <div className="space-y-1">
                           <Input 
@@ -1042,8 +1140,13 @@ const RunningHours = () => {
                             value={updateData.value || ""}
                             onChange={(e) => handleBulkUpdateChange(item.id, 'value', e.target.value)}
                             placeholder={bulkUpdateMode === "addDelta" ? "Enter delta" : "Enter new value"}
-                            className="w-full"
+                            className={`w-full ${bulkRowError ? 'border-red-500' : ''}`}
                           />
+                          {bulkRowError && (
+                            <div className="text-red-500 text-xs" data-testid={`text-bulk-validation-error-${item.id}`}>
+                              {bulkRowError}
+                            </div>
+                          )}
                           {bulkUpdateErrors[item.id] && (
                             <div className="text-red-500 text-xs">
                               {bulkUpdateErrors[item.id]}
@@ -1099,6 +1202,7 @@ const RunningHours = () => {
             <Button 
               className="bg-[#52baf3] hover:bg-[#4aa3d9] text-white" 
               onClick={handleBulkSave}
+              disabled={hasBulkValidationErrors}
             >
               Save
             </Button>
