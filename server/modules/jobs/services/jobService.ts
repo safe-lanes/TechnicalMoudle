@@ -221,6 +221,9 @@ export async function updateJob(id: string, body: any) {
 
   let updateData = { ...body };
 
+  if (updateData.isActive === 'Yes') updateData.isActive = true;
+  if (updateData.isActive === 'No') updateData.isActive = false;
+
   // Component validation if changed
   let component: any = null;
   if (body.componentId) {
