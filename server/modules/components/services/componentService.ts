@@ -98,7 +98,7 @@ export async function create(data: any): Promise<Component> {
       if (!data.rhMasterComponentId) {
         throw new ValidationError('INHERITED counter type requires rhMasterComponentId');
       }
-      const masterComponent = await repo.findById(data.rhMasterComponentId);
+      const masterComponent = await repo.findByIdOrCode(data.rhMasterComponentId, data.vesselId);
       if (!masterComponent) {
         throw new ValidationError('Master component not found');
       }
@@ -188,7 +188,7 @@ export async function update(id: string, data: any, userId: string): Promise<Com
       if (effectiveMasterId === id) {
         throw new ValidationError('A component cannot inherit running hours from itself');
       }
-      const masterComponent = await repo.findById(effectiveMasterId);
+      const masterComponent = await repo.findByIdOrCode(effectiveMasterId, existingComponent.vesselId);
       if (!masterComponent) {
         throw new ValidationError('Master component not found');
       }

@@ -36,6 +36,20 @@ export async function findById(id: string): Promise<Component | undefined> {
   return augmented;
 }
 
+export async function findByIdOrCode(id: string, vesselId: string): Promise<Component | undefined> {
+  const byId = await storage.getComponent(id);
+  if (byId) {
+    const [augmented] = await augmentWithSortOrder([byId]);
+    return augmented;
+  }
+  const byCode = await storage.getComponentByCode(id, vesselId);
+  if (byCode) {
+    const [augmented] = await augmentWithSortOrder([byCode]);
+    return augmented;
+  }
+  return undefined;
+}
+
 export async function findAll(): Promise<Component[]> {
   const allVessels = await storage.getVessels();
   const allComponents: Component[] = [];
