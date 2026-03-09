@@ -7587,11 +7587,11 @@ export class PostgresStorage {
     const spare = await this.getSpare(spareId);
     if (!spare) return null;
     
-    const robTotal = await this.getSpareRobTotal(spare.id);
     const activeLocationNames = [spare.location, spare.location2].filter((n): n is string => !!n && n.trim() !== '');
     const locationsWithQty = activeLocationNames.length > 0
       ? await this.getSpareLocationsWithQty(spare.id, activeLocationNames)
       : [];
+    const robTotal = locationsWithQty.reduce((sum, l) => sum + l.qty, 0);
     const linkedComponents = await this.getLinkedComponentsForSpare(spare.id, spare.vesselId || undefined);
     
     const stockStatus: "OK" | "At Min" = robTotal <= (spare.min ?? 0) ? "At Min" : "OK";
