@@ -31,7 +31,7 @@ interface UIRoleProviderProps {
 
 export function UIRoleProvider({ children }: UIRoleProviderProps) {
   const { currentUser } = useAuth();
-  const [uiRole, setUIRoleState] = useState<UIRole>("Client_Admin");
+  const [uiRole, setUIRoleState] = useState<UIRole>("Sail_Admin");
 
   useEffect(() => {
     const plainUserType = localStorage.getItem("userType");
