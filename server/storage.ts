@@ -872,7 +872,7 @@ export interface IStorage {
   upsertSpareLocationStock(data: InsertSpareLocationStock): Promise<SpareLocationStock>;
   updateSpareLocationStockQty(spareId: number, locationId: number, qtyChange: number): Promise<SpareLocationStock>;
   getSpareRobTotal(spareId: number): Promise<number>;
-  getSpareLocationsWithQty(spareId: number): Promise<Array<{ locationId: number; locationName: string; qty: number }>>;
+  getSpareLocationsWithQty(spareId: number, activeLocationNames?: string[]): Promise<Array<{ locationId: number; locationName: string; qty: number }>>;
   getSparesAtLocation(locationId: number): Promise<Array<{ spareId: number; partCode: string; partName: string; qty: number }>>;
   getFullSparesAtLocation(locationId: number, vesselId: string): Promise<any[]>;
   getLocationsWithStock(vesselId: string): Promise<Array<{ id: number; locationName: string; sparesCount: number }>>;

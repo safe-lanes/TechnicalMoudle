@@ -2223,6 +2223,37 @@ export class PostgresStorage {
           console.warn(`[updateSpare] Failed to sync Location B spare_location_stock for spare ${id}: ${syncError.message}`);
         }
       }
+
+      const activeLocationIds: number[] = [];
+      if (updatedSpare.location) {
+        try {
+          const locA = await this.findLocationStrict(vesselId, updatedSpare.location);
+          activeLocationIds.push(locA.id);
+        } catch (_) {}
+      }
+      if (updatedSpare.location2) {
+        try {
+          const locB = await this.findLocationStrict(vesselId, updatedSpare.location2);
+          activeLocationIds.push(locB.id);
+        } catch (_) {}
+      }
+      try {
+        const allStockRows = await this.getSpareLocationStock(updatedSpare.id);
+        const orphanedRows = allStockRows.filter(r => !activeLocationIds.includes(r.locationId));
+        for (const orphan of orphanedRows) {
+          await db.delete(spareLocationStock).where(
+            and(
+              eq(spareLocationStock.spareId, updatedSpare.id),
+              eq(spareLocationStock.locationId, orphan.locationId)
+            )
+          );
+        }
+        if (orphanedRows.length > 0) {
+          console.log(`[updateSpare] Cleaned up ${orphanedRows.length} orphaned spare_location_stock entries for spare ${id}`);
+        }
+      } catch (cleanupError: any) {
+        console.warn(`[updateSpare] Failed to cleanup orphaned spare_location_stock for spare ${id}: ${cleanupError.message}`);
+      }
     }
     
     return updatedSpare;
@@ -7174,7 +7205,7 @@ export class PostgresStorage {
     return stockRecords.reduce((sum, s) => sum + s.qty, 0);
   }
 
-  async getSpareLocationsWithQty(spareId: number): Promise<Array<{ locationId: number; locationName: string; qty: number }>> {
+  async getSpareLocationsWithQty(spareId: number, activeLocationNames?: string[]): Promise<Array<{ locationId: number; locationName: string; qty: number }>> {
     const db = await getDb();
     const result = await db.select({
       locationId: spareLocationStock.locationId,
@@ -7184,6 +7215,11 @@ export class PostgresStorage {
     .from(spareLocationStock)
     .innerJoin(locations, eq(spareLocationStock.locationId, locations.id))
     .where(eq(spareLocationStock.spareId, spareId));
+    
+    if (activeLocationNames && activeLocationNames.length > 0) {
+      const normalizedNames = activeLocationNames.map(n => n.toLowerCase().trim());
+      return result.filter(r => normalizedNames.includes(r.locationName.toLowerCase().trim()));
+    }
     
     return result;
   }
@@ -7552,7 +7588,10 @@ export class PostgresStorage {
     if (!spare) return null;
     
     const robTotal = await this.getSpareRobTotal(spare.id);
-    const locationsWithQty = await this.getSpareLocationsWithQty(spare.id);
+    const activeLocationNames = [spare.location, spare.location2].filter((n): n is string => !!n && n.trim() !== '');
+    const locationsWithQty = activeLocationNames.length > 0
+      ? await this.getSpareLocationsWithQty(spare.id, activeLocationNames)
+      : [];
     const linkedComponents = await this.getLinkedComponentsForSpare(spare.id, spare.vesselId || undefined);
     
     const stockStatus: "OK" | "At Min" = robTotal <= (spare.min ?? 0) ? "At Min" : "OK";

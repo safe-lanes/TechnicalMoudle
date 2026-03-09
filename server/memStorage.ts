@@ -1163,7 +1163,7 @@ class MemStorage {
     return 0;
   }
   
-  async getSpareLocationsWithQty(spareId: number): Promise<Array<{ locationId: number; locationName: string; qty: number }>> {
+  async getSpareLocationsWithQty(spareId: number, activeLocationNames?: string[]): Promise<Array<{ locationId: number; locationName: string; qty: number }>> {
     console.log('[MemStorage] getSpareLocationsWithQty called - stub in file mode');
     return [];
   }
