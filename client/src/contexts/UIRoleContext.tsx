@@ -63,8 +63,7 @@ export function UIRoleProvider({ children }: UIRoleProviderProps) {
     }
   }, [currentUser]);
 
-  const setUIRole = (role: UIRole) => {
-    setUIRoleState(role);
+  const setUIRole = (_role: UIRole) => {
   };
 
   const value: UIRoleContextType = {

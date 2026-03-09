@@ -41,9 +41,9 @@ export function RoleSwitcher() {
         {VISIBLE_UI_ROLES.map((role) => (
           <DropdownMenuItem
             key={role}
-            onClick={() => setUIRole(role)}
-            className="flex items-center justify-between cursor-pointer"
+            className={`flex items-center justify-between ${uiRole === role ? "cursor-default font-medium" : "cursor-default opacity-50"}`}
             data-testid={`menu-role-${role.toLowerCase().replace("_", "-")}`}
+            onSelect={(e) => e.preventDefault()}
           >
             <span>{UI_ROLE_LABELS[role]}</span>
             {uiRole === role && <Check className="h-4 w-4 text-green-600" />}
