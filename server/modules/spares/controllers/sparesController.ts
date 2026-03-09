@@ -119,12 +119,33 @@ export async function updateSpare(req: Request, res: Response) {
 export async function deleteSpare(req: Request, res: Response) {
   try {
     await sparesService.deleteSpare(req.params.id);
-    res.json({ success: true });
+    res.json({ success: true, message: "Spare has been deactivated successfully" });
   } catch (error: any) {
     if (error.message?.includes('not found')) {
       return res.status(404).json({ error: error.message });
     }
     res.status(500).json({ error: "Failed to delete spare" });
+  }
+}
+
+// ── POST /spares/:vesselId/:id/inactivate ──
+
+export async function inactivateSpare(req: Request, res: Response) {
+  try {
+    const { vesselId, id } = req.params;
+    const result = await sparesService.inactivateSpare(id, vesselId);
+    res.json(result);
+  } catch (error: any) {
+    if (error.statusCode === 404 || error.message?.includes('not found')) {
+      return res.status(404).json({ error: error.message });
+    }
+    if (error.statusCode === 403) {
+      return res.status(403).json({ error: error.message });
+    }
+    if (error.statusCode === 400) {
+      return res.status(400).json({ error: error.message });
+    }
+    res.status(500).json({ error: "Failed to deactivate spare" });
   }
 }
 

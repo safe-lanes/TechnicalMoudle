@@ -8,7 +8,7 @@ import { Marker } from "@/components/Marker";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Search, ChevronRight, ChevronLeft, ChevronDown, Edit, Edit2, Trash2, Plus, PlusCircle, Square, FileSpreadsheet, X, Minus, AlertCircle, CheckCircle, HelpCircle, MapPin, Info, Download, Settings2, Check, ChevronsUpDown, ChevronsLeft, ChevronsRight, Expand, Minimize2 } from "lucide-react";
+import { Search, ChevronRight, ChevronLeft, ChevronDown, Edit, Edit2, Trash2, Plus, PlusCircle, Square, FileSpreadsheet, X, Minus, AlertCircle, CheckCircle, HelpCircle, MapPin, Info, Download, Settings2, Check, ChevronsUpDown, ChevronsLeft, ChevronsRight, Expand, Minimize2, RotateCcw } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import * as XLSX from "xlsx";
@@ -24,7 +24,7 @@ interface ComponentNode {
 }
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
@@ -165,6 +165,8 @@ const Spares: React.FC = () => {
   }, []); // Run only on mount
   
   // Dialog states
+  const [spareToDeactivate, setSpareToDeactivate] = useState<Spare | null>(null);
+  const [showDeactivateDialog, setShowDeactivateDialog] = useState(false);
   const [isAddSpareModalOpen, setIsAddSpareModalOpen] = useState(false);
   const [componentCodePopoverOpen, setComponentCodePopoverOpen] = useState(false);
   const [isBulkUpdateModalOpen, setIsBulkUpdateModalOpen] = useState(false);
@@ -998,11 +1000,19 @@ const Spares: React.FC = () => {
     setIsInfoModalOpen(true);
   };
 
-  // Handle delete spare
-  const handleDeleteSpare = (spareId: number) => {
-    if (confirm("Are you sure you want to delete this spare? This action cannot be undone.")) {
-      deleteSpareMutation.mutate(spareId);
+  const handleDeleteSpare = (spare: Spare) => {
+    setSpareToDeactivate(spare);
+    setShowDeactivateDialog(true);
+  };
+
+  const confirmDeactivateSpare = () => {
+    if (spareToDeactivate) {
+      deactivateSpareMutation.mutate(spareToDeactivate.id);
     }
+  };
+
+  const handleReactivateSpare = (spare: Spare) => {
+    reactivateSpareMutation.mutate(spare.id);
   };
 
   // Fetch spares data with linkedComponents for multi-component matching
@@ -1584,29 +1594,47 @@ const Spares: React.FC = () => {
     }
   });
 
-  // Delete spare mutation
-  const deleteSpareMutation = useMutation({
+  const deactivateSpareMutation = useMutation({
     mutationFn: async (spareId: number) => {
-      const response = await fetch(`/technical/api/spares/${vesselId}/${spareId}`, {
-        method: 'DELETE',
+      const response = await fetch(`/technical/api/spares/${vesselId}/${spareId}/inactivate`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
       });
-      
       if (!response.ok) {
         const error = await response.json();
-        throw new Error(error.error || 'Failed to delete spare');
+        throw new Error(error.error || 'Failed to deactivate spare');
       }
-      
       return response.json();
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['/technical/api/inventory/spares-with-inventory', vesselId] });
       queryClient.invalidateQueries({ queryKey: ['/technical/api/spares/history', vesselId] });
-      toast({ title: "Success", description: "Spare deleted successfully" });
+      toast({ title: "Success", description: data.message || "Spare deactivated successfully" });
+      setShowDeactivateDialog(false);
+      setSpareToDeactivate(null);
     },
     onError: (error: any) => {
       toast({ 
         title: "Error", 
-        description: error.message || "Failed to delete spare",
+        description: error.message || "Failed to deactivate spare",
+        variant: "destructive"
+      });
+    }
+  });
+
+  const reactivateSpareMutation = useMutation({
+    mutationFn: async (spareId: number) => {
+      return apiRequest('PATCH', `/technical/api/spares/${vesselId}/${spareId}`, { isActive: true });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/technical/api/inventory/spares-with-inventory', vesselId] });
+      queryClient.invalidateQueries({ queryKey: ['/technical/api/spares/history', vesselId] });
+      toast({ title: "Success", description: "Spare reactivated successfully" });
+    },
+    onError: (error: any) => {
+      toast({ 
+        title: "Error", 
+        description: error.message || "Failed to reactivate spare",
         variant: "destructive"
       });
     }
@@ -1684,8 +1712,18 @@ const Spares: React.FC = () => {
       });
     }
 
+    if (isVessel || isHeadOfDept) {
+      filtered = filtered.filter((spare: Spare) => spare.isActive !== false);
+    }
+
+    filtered = filtered.sort((a: Spare, b: Spare) => {
+      const aInactive = a.isActive === false ? 1 : 0;
+      const bInactive = b.isActive === false ? 1 : 0;
+      return aInactive - bInactive;
+    });
+
     return filtered;
-  }, [sparesData, selectedComponentId, searchTerm, criticalityFilter, stockFilter]);
+  }, [sparesData, selectedComponentId, searchTerm, criticalityFilter, stockFilter, isVessel, isHeadOfDept]);
 
   // Pagination calculations
   const totalPages = Math.ceil(filteredSpares.length / itemsPerPage);
@@ -2725,10 +2763,11 @@ const Spares: React.FC = () => {
                     const robB = spare.robLocationB ?? 0;
                     const locationDisplay = `${robA} / ${robB}`;
                     const isFirstRow = rowIndex === 0;
+                    const isInactive = spare.isActive === false;
                     return (
-                    <div key={spare.id} className="px-4 py-3 border-b border-gray-100 hover:bg-gray-50">
+                    <div key={spare.id} className={`px-4 py-3 border-b border-gray-100 ${isInactive ? 'opacity-50 bg-gray-50' : 'hover:bg-gray-50'}`}>
                       <div className="grid text-sm items-center min-w-max" style={{ gridTemplateColumns: FEATURES.IHM ? '110px 180px 220px 120px 80px 60px 60px 80px 100px 40px 160px' : '110px 180px 220px 120px 80px 60px 60px 80px 100px 160px', minWidth: 'max-content', gap: '12px' }}>
-                        <div className="px-2 text-gray-900" data-testid={isFirstRow ? "E24" : undefined}>{isFirstRow && <Marker id="E24" />}{spare.partCode}</div>
+                        <div className={`px-2 ${isInactive ? 'text-gray-400' : 'text-gray-900'}`} data-testid={isFirstRow ? "E24" : undefined}>{isFirstRow && <Marker id="E24" />}{spare.partCode}{isInactive && <span className="ml-1 text-xs text-gray-400">(Inactive)</span>}</div>
                         <div className="px-2 text-gray-700" data-testid={isFirstRow ? "E25" : undefined}>{isFirstRow && <Marker id="E25" />}{spare.partName}</div>
                         <div className="px-2 text-gray-700" data-testid={isFirstRow ? "E26" : undefined}>{isFirstRow && <Marker id="E26" />}{spare.componentName}</div>
                         <div className="px-2 text-blue-600 font-medium" data-testid={isFirstRow ? "E27" : undefined}>{isFirstRow && <Marker id="E27" />}{spare.partNumber || '-'}</div>
@@ -2818,16 +2857,28 @@ const Spares: React.FC = () => {
                           >
                             <Settings2 className="h-4 w-4 text-orange-500" />
                           </Button>
-                          {(isSailAdmin || isClientAdmin || isChangeMode) && (
+                          {(isSailAdmin || isClientAdmin || isChangeMode) && !isInactive && (
                             <Button 
                               size="sm" 
                               variant="ghost"
-                              onClick={() => handleDeleteSpare(spare.id)}
-                              title="Delete"
+                              onClick={() => handleDeleteSpare(spare)}
+                              title="Deactivate"
                               data-testid={isFirstRow ? "E36" : `button-delete-${spare.id}`}
                             >
                               {isFirstRow && <Marker id="E36" />}
                               <Trash2 className="h-4 w-4 text-red-500" />
+                            </Button>
+                          )}
+                          {(isSailAdmin || isClientAdmin) && isInactive && (
+                            <Button 
+                              size="sm" 
+                              variant="ghost"
+                              onClick={() => handleReactivateSpare(spare)}
+                              title="Reactivate"
+                              disabled={reactivateSpareMutation.isPending}
+                              data-testid={`button-reactivate-${spare.id}`}
+                            >
+                              <RotateCcw className="h-4 w-4 text-green-600" />
                             </Button>
                           )}
                         </div>
@@ -5545,6 +5596,29 @@ const Spares: React.FC = () => {
             <Button onClick={handleExportDownload} data-testid="button-download-export">
               <Download className="h-4 w-4 mr-1" />
               Download
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Deactivate Spare Confirmation Dialog */}
+      <Dialog open={showDeactivateDialog} onOpenChange={(open) => { setShowDeactivateDialog(open); if (!open) setSpareToDeactivate(null); }}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Deactivate Spare</DialogTitle>
+            <DialogDescription>
+              Are you sure you want to deactivate spare{' '}
+              <strong>{spareToDeactivate?.partCode}</strong> — {spareToDeactivate?.partName}?
+              The spare will be marked as inactive and hidden from Vessel and Head of Department views.
+              This action can be reversed by reactivating the spare.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button variant="outline" onClick={() => { setShowDeactivateDialog(false); setSpareToDeactivate(null); }} data-testid="button-cancel-deactivate">
+              Cancel
+            </Button>
+            <Button variant="destructive" onClick={confirmDeactivateSpare} disabled={deactivateSpareMutation.isPending} data-testid="button-confirm-deactivate">
+              {deactivateSpareMutation.isPending ? 'Deactivating...' : 'Deactivate'}
             </Button>
           </DialogFooter>
         </DialogContent>

@@ -2263,7 +2263,7 @@ export class PostgresStorage {
     const db = await getDb();
     const numId = Number(id);
     await db.update(spares)
-      .set({ deleted: true, updatedAt: new Date() })
+      .set({ isActive: false, updatedAt: new Date() })
       .where(or(eq(spares.suuid, id), ...(Number.isInteger(numId) && numId > 0 ? [eq(spares.id, numId)] : [])));
   }
 

@@ -53,6 +53,9 @@ router.get('/spares/:vesselId/history', asyncHandler(sparesCtrl.getSpareHistoryL
 // GET  /spares/:vesselId/low-stock — low stock spares
 router.get('/spares/:vesselId/low-stock', asyncHandler(sparesCtrl.getLowStockSpares));
 
+// POST /spares/:vesselId/:id/inactivate — soft delete (deactivate) spare
+router.post('/spares/:vesselId/:id/inactivate', asyncHandler(sparesCtrl.inactivateSpare));
+
 // POST /spares/:vesselId/:id/adjustment — adjust spare ROB at location
 router.post('/spares/:vesselId/:id/adjustment', asyncHandler(sparesCtrl.adjustSpareAtLocation));
 

@@ -86,6 +86,24 @@ export async function deleteSpare(id: string): Promise<void> {
   return repo.deleteSpare(id);
 }
 
+export async function inactivateSpare(id: string, vesselId: string): Promise<{ success: boolean; message: string }> {
+  const spare = await repo.getSpare(id);
+  if (!spare) {
+    throw Object.assign(new Error(`Spare with ID ${id} not found`), { statusCode: 404 });
+  }
+  if (spare.vesselId !== vesselId) {
+    throw Object.assign(new Error("Access denied: Spare does not belong to this vessel"), { statusCode: 403 });
+  }
+  if (spare.isActive === false) {
+    throw Object.assign(new Error("Spare is already inactive"), { statusCode: 400 });
+  }
+  await repo.updateSpare(id, { isActive: false });
+  return {
+    success: true,
+    message: `Spare "${spare.partName}" (${spare.partCode}) has been deactivated successfully`
+  };
+}
+
 // ── Location-specific Adjustment ──
 
 export async function adjustSpareAtLocationEndpoint(
