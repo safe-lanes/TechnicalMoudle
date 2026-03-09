@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { Search, ChevronRight, ChevronDown, ChevronUp, ChevronLeft, Edit2, FileText, ArrowLeft, Plus, Check, Package, X, AlertCircle, CheckCircle, HelpCircle, File, FileImage, FileCheck, Upload, Download, Lock, Wrench, User, ClipboardList, MessageSquare, MapPin, Pencil, Expand, Minimize2, GripVertical } from "lucide-react";
+import { Search, ChevronRight, ChevronDown, ChevronUp, ChevronLeft, Edit2, FileText, ArrowLeft, Plus, Check, Package, X, AlertCircle, CheckCircle, HelpCircle, File, FileImage, FileCheck, Upload, Download, Lock, Wrench, User, ClipboardList, MessageSquare, MapPin, Pencil, Expand, Minimize2, GripVertical, Trash2 } from "lucide-react";
 import { Marker } from "@/components/Marker";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
@@ -2125,7 +2125,12 @@ const Components: React.FC = () => {
   const { toast } = useToast();
   const { vesselId, setVesselId } = useVessel();
   const { data: vessels = [] } = useVessels();
-  const { isSailAdmin, isClientAdmin } = useUIRole();
+  const { isSailAdmin, isClientAdmin, isVessel, isHeadOfDept } = useUIRole();
+  
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [cascadeDialogOpen, setCascadeDialogOpen] = useState(false);
+  const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
+  const [activeChildrenCount, setActiveChildrenCount] = useState(0);
   
   const prevVesselIdRef = React.useRef(vesselId);
   React.useEffect(() => {
@@ -2144,6 +2149,52 @@ const Components: React.FC = () => {
     queryKey: [`/technical/api/components/${vesselId}`],
   });
   
+  const inactivateMutation = useMutation({
+    mutationFn: async ({ componentId, cascade }: { componentId: string; cascade: boolean }) => {
+      const response = await fetch(`/technical/api/components/${componentId}/inactivate`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ cascadeInactivate: cascade, userId: 'User' }),
+      });
+      const data = await response.json();
+      if (!response.ok) {
+        const error: any = new Error(data.error || 'Failed to deactivate component');
+        error.code = data.code;
+        error.activeChildrenCount = data.activeChildrenCount;
+        throw error;
+      }
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [`/technical/api/components/${vesselId}`] });
+      setDeleteDialogOpen(false);
+      setCascadeDialogOpen(false);
+      setPendingDeleteId(null);
+      setSelectedComponent(null);
+      toast({ title: "Component deactivated", description: "The component has been successfully deactivated." });
+    },
+    onError: (error: any) => {
+      if (error.code === 'ACTIVE_CHILDREN') {
+        setActiveChildrenCount(error.activeChildrenCount || 0);
+        setDeleteDialogOpen(false);
+        setCascadeDialogOpen(true);
+      } else {
+        toast({ title: "Deactivation failed", description: error.message, variant: "destructive" });
+      }
+    },
+  });
+
+  const handleDeleteComponent = () => {
+    if (!selectedComponent?.actualId) return;
+    setPendingDeleteId(selectedComponent.actualId);
+    setDeleteDialogOpen(true);
+  };
+
+  const confirmDelete = (cascade: boolean) => {
+    if (!pendingDeleteId) return;
+    inactivateMutation.mutate({ componentId: pendingDeleteId, cascade });
+  };
+
   // Build component tree from fetched data
   const componentTreeData = React.useMemo(() => {
     console.log('[TREE] Building tree from', fetchedComponents.length, 'components');
@@ -2291,6 +2342,10 @@ const Components: React.FC = () => {
       const filtered: ComponentNode[] = [];
       
       for (const node of nodes) {
+        const isInactive = (node as any).isActive === false;
+        const hideInactive = (isVessel || isHeadOfDept) && isInactive;
+        if (hideInactive) continue;
+
         // First, recursively filter children
         const filteredChildren = node.children ? filterTree(node.children) : [];
         
@@ -2326,7 +2381,7 @@ const Components: React.FC = () => {
     };
     
     return filterTree(componentTreeData);
-  }, [componentTreeData, searchTerm, criticalFilter]);
+  }, [componentTreeData, searchTerm, criticalFilter, isVessel, isHeadOfDept]);
 
   // Helper function to find component by ID
   const findComponentById = (id: string): ComponentNode | null => {
@@ -2952,8 +3007,9 @@ const Components: React.FC = () => {
                 <ChevronRight className="h-4 w-4 text-gray-400" />
               )}
             </button>
-            <span className="text-sm text-gray-700">
+            <span className={`text-sm ${(node as any).isActive === false ? 'text-gray-400 opacity-60' : 'text-gray-700'}`}>
               {node.name.startsWith(node.code + " ") ? node.name : `${node.code} ${node.name}`}
+              {(node as any).isActive === false && <span className="ml-1 text-xs text-gray-400">(Inactive)</span>}
             </span>
           </div>
           {hasChildren && isExpanded && (
@@ -3330,21 +3386,34 @@ const Components: React.FC = () => {
                     <Marker id="B7.1" /> {selectedComponent.code} {selectedComponent.name}
                   </h3>
                   {(isSailAdmin || isClientAdmin) && !isChangeRequestMode && !isChangeMode && (
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      className="text-[#52baf3] border-[#52baf3] hover:bg-[#52baf3] hover:text-white"
-                      onClick={() => {
-                        // Use actualId (database UUID) for API calls, and code for tree selection
-                        setEditingComponentId(selectedComponent.actualId || selectedComponent.id);
-                        setEditingComponentCode(selectedComponent.code);
-                        setShowAddEditFullPage(true);
-                      }}
-                      data-testid="B7.2"
-                    >
-                      <Marker id="B7.2" /> <Edit2 className="h-4 w-4 mr-1" />
-                      Edit Component
-                    </Button>
+                    <div className="flex items-center gap-2">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="text-[#52baf3] border-[#52baf3] hover:bg-[#52baf3] hover:text-white"
+                        onClick={() => {
+                          setEditingComponentId(selectedComponent.actualId || selectedComponent.id);
+                          setEditingComponentCode(selectedComponent.code);
+                          setShowAddEditFullPage(true);
+                        }}
+                        data-testid="B7.2"
+                      >
+                        <Marker id="B7.2" /> <Edit2 className="h-4 w-4 mr-1" />
+                        Edit Component
+                      </Button>
+                      {selectedComponent.actualId && (selectedComponent as any).isActive !== false && (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="text-red-500 border-red-300 hover:bg-red-50 hover:text-red-700"
+                          onClick={handleDeleteComponent}
+                          disabled={inactivateMutation.isPending}
+                          data-testid="btn-delete-component"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      )}
+                    </div>
                   )}
                 </div>
                 
@@ -3578,6 +3647,66 @@ const Components: React.FC = () => {
           </div>
         </div>
       )}
+      <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Deactivate Component</DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-gray-600" data-testid="text-delete-confirm-message">
+            Are you sure you want to deactivate this component? It will no longer appear for vessel and department users.
+          </p>
+          <div className="flex justify-end gap-2 mt-4">
+            <Button
+              variant="outline"
+              onClick={() => { setDeleteDialogOpen(false); setPendingDeleteId(null); }}
+              data-testid="btn-delete-cancel"
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={() => confirmDelete(false)}
+              disabled={inactivateMutation.isPending}
+              data-testid="btn-delete-confirm"
+            >
+              {inactivateMutation.isPending ? "Deactivating..." : "Deactivate"}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={cascadeDialogOpen} onOpenChange={setCascadeDialogOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Component Has Active Children</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-2" data-testid="text-cascade-confirm-message">
+            <p className="text-sm text-gray-600">
+              This component has {activeChildrenCount} active child component{activeChildrenCount !== 1 ? 's' : ''}.
+            </p>
+            <p className="text-sm text-gray-600">
+              Would you like to deactivate this component along with all its children?
+            </p>
+          </div>
+          <div className="flex justify-end gap-2 mt-4">
+            <Button
+              variant="outline"
+              onClick={() => { setCascadeDialogOpen(false); setPendingDeleteId(null); }}
+              data-testid="btn-cascade-cancel"
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={() => confirmDelete(true)}
+              disabled={inactivateMutation.isPending}
+              data-testid="btn-cascade-confirm"
+            >
+              {inactivateMutation.isPending ? "Deactivating..." : "Deactivate All"}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
