@@ -258,3 +258,48 @@ Eight validation and integrity rules for the Work Order form Part B, covering fr
 
 ### Environment Issues
 - None. Application compiles and runs normally. Vitest installed as dev dependency.
+
+---
+
+## 2026-03-07 → 2026-03-09 — WO Form Polish, Bug Fixes & UI Improvements
+
+### What We Built
+1. **Double-deduction spare consumption bug fix (production)**: Approval path now re-fetches WO from DB, queries prior CONSUME transactions by WO reference ID, uses `max(_deductedQty, priorTransactionTotal)` to determine effective already-consumed quantity, preventing duplicate stock deductions that caused INSUFFICIENT_STOCK errors in production.
+2. **A5 Work History (now A4)**: Added `findWorkOrdersByJobId` and `findWorkOrdersByComponent` to work order repository. `workOrderContextService.ts` now loads completed work orders for the same job (or same component for unplanned WOs), sorted by date desc, excluding current WO. Frontend shows last 2 entries collapsed by default, with "Show All History (N entries)" expand button and pagination (5 per page).
+3. **Multi-file upload**: All 4 document upload inputs (Risk Assessment, Safety Checklists, Operational Forms, Work Carried Out) now support selecting multiple files at once. Handler loops through all selected files, validates each individually, respects the 5-per-type limit, and uploads sequentially with proper toast feedback.
+4. **Compact document icons with hover popover**: Replaced cluttered file list rows (full filenames, sizes, action buttons) with inline file-type icons (image, PDF, spreadsheet, generic). On hover, a popover shows filename, file size, Preview button, and Delete button. Reusable `renderDocIcons` function used across all 4 document sections.
+5. **Part A read-only enforcement**: Fixed A2 (spare parts) and A3 (tools) sections that incorrectly showed edit/delete/add buttons for existing work orders. Changed all action visibility checks from `!isReadOnly` to `!isPartAReadOnly`. Add buttons now fully hidden (not just disabled) when Part A is read-only.
+6. **Removed A3 Required Tools & Equipment**: Hidden from both Work Order form and Job form (deferred to later phase). Renumbered A4 Safety Requirements → A3, A5 Work History → A4 in both forms.
+7. **Due date display in B2 section**: Added read-only due date label in the top-right corner of the B2.1 Work Duration heading area. Only shows for calendar-based work orders with a due date. Loads from `context.workOrder.dueDate`.
+
+### What's Working
+- **Double-deduction fix**: Tested via API — approval no longer double-deducts stock. Prior transaction lookup provides accurate already-consumed totals.
+- **Work History (A4)**: Verified via API — context endpoint returns completed WOs for same job. For FO PURIFIER NO.1 with 3 completed siblings, API returns 2 history entries (excluding current). Unplanned WO fallback uses `componentCode || component` for broader matching.
+- **Multi-file upload**: File picker allows Ctrl+Click / Shift+Click multi-select. Invalid files skipped individually with per-file error toasts. Partial upload notification when exceeding slot limit. Input resets on both success and failure.
+- **Compact doc icons**: File-type icons render inline. Hover popover shows filename, size, Preview/Delete. Works in all 4 sections.
+- **Part A read-only**: Verified — no action buttons or add buttons visible in A2/A3 for any existing work order, regardless of status.
+- **Section renumbering**: Safety Requirements shows as A3, Work History as A4 in both forms. No blank space where A3 tools was removed.
+- **Due date display**: Shows "Due Date: 08-Mar-2015" next to B2.1 heading for calendar-based WOs. Hidden when no due date.
+
+### What's Broken
+- Nothing broken from these changes.
+
+### What's Pending
+- The compact doc icon hover popover removed the download action (previously a Paperclip icon) — Preview replaces it for document viewing. If direct download is needed, consider re-adding it to the hover popover.
+- Work History (A4) data-testid markers still reference old A5 numbering (WOF.A5.x, JF.A5.x). These are internal markers and don't affect the visible UI, but may need updating if automated tests rely on them.
+- Safety Requirements (A3) data-testid markers still reference old A4 numbering (WOF.A4.x, JF.A4.x). Same consideration as above.
+
+### Key Files Changed
+- `server/modules/work-orders/services/workOrderService.ts` — Double-deduction fix: approval path re-fetches WO, queries prior transactions, uses max of _deductedQty vs transaction total
+- `server/modules/work-orders/services/workOrderContextService.ts` — Work history loading: queries by jobId or componentCode, filters completed, sorts by date, maps to template format
+- `server/modules/work-orders/repositories/workOrderRepository.ts` — Added `findWorkOrdersByJobId`, `findWorkOrdersByComponent`, `getSpareLocationStockItem`, `getInventoryTransactions`
+- `client/src/pages/pms/WorkOrderFormPage.tsx` — Multi-file upload (handler + `multiple` attr), compact doc icons (`renderDocIcons`, `getFileIcon`), Part A read-only fix (`isPartAReadOnly` guards), A3 tools section removed, A4→A3 / A5→A4 renumbering, due date state + display in B2, work history collapsed/paginated UI
+- `client/src/pages/pms/JobsFormPage.tsx` — A3 tools section removed, A4→A3 / A5→A4 renumbering
+
+### Environment Issues
+- None. Application compiles and runs normally.
+
+### Where to Resume
+- Consider updating data-testid markers for renamed sections (A3 Safety, A4 Work History) if automated tests reference them.
+- Monitor double-deduction fix in production after next deployment.
+- The "Required Tools & Equipment" section (removed A3) is deferred — will be re-added in a later phase.
