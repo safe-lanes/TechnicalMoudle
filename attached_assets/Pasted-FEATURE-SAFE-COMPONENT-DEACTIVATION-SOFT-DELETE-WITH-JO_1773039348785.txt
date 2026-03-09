@@ -1,0 +1,128 @@
+FEATURE: SAFE COMPONENT DEACTIVATION (SOFT DELETE) WITH JOB & SPARE VALIDATION
+
+Objective
+Implement a controlled deletion (soft delete) mechanism for components in the Component Tree for a specific vessel. The system must prevent deletion if active jobs or spares exist and enforce a proper cleanup process.
+
+Scope
+This deletion logic must apply ONLY to the selected vessel.
+
+Definitions
+Soft Delete = Update component record:
+is_active = No
+
+The component should not be physically deleted from the database.
+
+--------------------------------------------------
+
+1. Delete Button Behaviour
+
+When a user selects a component from the Tree View and clicks the "Delete" button:
+
+The system must perform validation checks before allowing deletion.
+
+--------------------------------------------------
+
+2. Validation Checks Before Deleting Component
+
+Check whether the selected component has:
+
+A. Active Jobs
+B. Linked Spares
+C. Active Work Orders (WO)
+
+--------------------------------------------------
+
+3. If Active Jobs or Spares Exist
+
+System must block deletion and show an error message.
+
+Example Message:
+
+"Component cannot be deleted because active Jobs or Spares are linked to this component.
+
+Please deactivate or delete the linked Jobs and Spares before deleting the component."
+
+No changes should be made to the component.
+
+--------------------------------------------------
+
+4. Correct Component Deletion Method
+
+Before deleting the component:
+
+User must first:
+
+Step 1  
+Deactivate or delete all linked Jobs for the component.
+
+Step 2  
+Deactivate or remove all linked Spares for the component.
+
+Once Jobs and Spares are cleared, the component can be deleted.
+
+--------------------------------------------------
+
+5. Work Order Handling Logic
+
+If the component has existing Work Orders:
+
+Case 1 – Active Work Order Exists
+The active WO should NOT be deleted.
+
+Allow the WO to continue until completion.
+
+Case 2 – Future WO Generation
+After the component, jobs, and spares are deactivated:
+
+The system must NOT generate any new Work Orders for that component.
+
+--------------------------------------------------
+
+6. Component Deactivation Logic
+
+Once validations pass:
+
+Update the component record:
+
+UPDATE components
+SET is_active = 'No'
+WHERE component_id = selected_component_id
+AND vessel_id = selected_vessel_id;
+
+--------------------------------------------------
+
+7. Tree View Behaviour
+
+After deactivation:
+
+Sail Admin / Client Admin
+• Component remains visible
+• Displayed as dull / grey
+• is_active = No
+
+Vessel Users / Head of Department
+• Component must NOT be visible
+
+--------------------------------------------------
+
+8. Vessel-Level Restriction
+
+Deletion must only affect the selected vessel.
+
+Ensure the query always includes:
+
+WHERE vessel_id = selected_vessel_id
+
+to prevent cross-vessel impact.
+
+--------------------------------------------------
+
+9. Deliverables
+
+• Delete button implementation
+• Job and Spare validation checks
+• Proper error message handling
+• Work Order continuation logic
+• Prevention of future WO generation
+• Vessel-specific deletion enforcement
+• Tree View inactive display handling
