@@ -165,8 +165,9 @@ const Spares: React.FC = () => {
   }, []); // Run only on mount
   
   // Dialog states
-  const [spareToDeactivate, setSpareToDeactivate] = useState<Spare | null>(null);
   const [showDeactivateDialog, setShowDeactivateDialog] = useState(false);
+  const [isBulkDeleteMode, setIsBulkDeleteMode] = useState(false);
+  const [selectedSpareIds, setSelectedSpareIds] = useState<Set<number>>(new Set());
   const [isAddSpareModalOpen, setIsAddSpareModalOpen] = useState(false);
   const [componentCodePopoverOpen, setComponentCodePopoverOpen] = useState(false);
   const [isBulkUpdateModalOpen, setIsBulkUpdateModalOpen] = useState(false);
@@ -1001,13 +1002,55 @@ const Spares: React.FC = () => {
   };
 
   const handleDeleteSpare = (spare: Spare) => {
-    setSpareToDeactivate(spare);
-    setShowDeactivateDialog(true);
+    setIsBulkDeleteMode(true);
+    setSelectedSpareIds(new Set([spare.id]));
   };
 
-  const confirmDeactivateSpare = () => {
-    if (spareToDeactivate) {
-      deactivateSpareMutation.mutate(spareToDeactivate.id);
+  const toggleSpareSelection = (spareId: number) => {
+    setSelectedSpareIds(prev => {
+      const next = new Set(prev);
+      if (next.has(spareId)) {
+        next.delete(spareId);
+      } else {
+        next.add(spareId);
+      }
+      return next;
+    });
+  };
+
+  const toggleSelectAll = () => {
+    const selectableOnPage = paginatedSpares.filter((s: Spare) => s.isActive !== false);
+    const allOnPageSelected = selectableOnPage.length > 0 && selectableOnPage.every((s: Spare) => selectedSpareIds.has(s.id));
+    if (allOnPageSelected) {
+      const newSet = new Set(selectedSpareIds);
+      selectableOnPage.forEach((s: Spare) => newSet.delete(s.id));
+      setSelectedSpareIds(newSet);
+    } else {
+      const newSet = new Set(selectedSpareIds);
+      selectableOnPage.forEach((s: Spare) => newSet.add(s.id));
+      setSelectedSpareIds(newSet);
+    }
+  };
+
+  useEffect(() => {
+    setIsBulkDeleteMode(false);
+    setSelectedSpareIds(new Set());
+  }, [vesselId]);
+
+  const exitBulkDeleteMode = () => {
+    setIsBulkDeleteMode(false);
+    setSelectedSpareIds(new Set());
+  };
+
+  const confirmBulkDeactivate = () => {
+    if (selectedSpareIds.size > 0) {
+      setShowDeactivateDialog(true);
+    }
+  };
+
+  const executeBulkDeactivate = () => {
+    if (selectedSpareIds.size > 0) {
+      bulkDeactivateMutation.mutate(Array.from(selectedSpareIds));
     }
   };
 
@@ -1594,31 +1637,46 @@ const Spares: React.FC = () => {
     }
   });
 
-  const deactivateSpareMutation = useMutation({
-    mutationFn: async (spareId: number) => {
-      const response = await fetch(`/technical/api/spares/${vesselId}/${spareId}/inactivate`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-      });
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.error || 'Failed to deactivate spare');
+  const bulkDeactivateMutation = useMutation({
+    mutationFn: async (spareIds: number[]) => {
+      const results: { id: number; success: boolean; message?: string }[] = [];
+      for (const spareId of spareIds) {
+        try {
+          const response = await fetch(`/technical/api/spares/${vesselId}/${spareId}/inactivate`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+          });
+          if (!response.ok) {
+            const error = await response.json();
+            results.push({ id: spareId, success: false, message: error.error });
+          } else {
+            results.push({ id: spareId, success: true });
+          }
+        } catch (e: any) {
+          results.push({ id: spareId, success: false, message: e.message });
+        }
       }
-      return response.json();
+      return results;
     },
-    onSuccess: (data) => {
+    onSuccess: (results) => {
       queryClient.invalidateQueries({ queryKey: ['/technical/api/inventory/spares-with-inventory', vesselId] });
       queryClient.invalidateQueries({ queryKey: ['/technical/api/spares/history', vesselId] });
-      toast({ title: "Success", description: data.message || "Spare deactivated successfully" });
+      const successCount = results.filter(r => r.success).length;
+      const failCount = results.filter(r => !r.success).length;
       setShowDeactivateDialog(false);
-      setSpareToDeactivate(null);
+      if (failCount === 0) {
+        toast({ title: "Success", description: `${successCount} spare(s) deactivated successfully` });
+        exitBulkDeleteMode();
+      } else if (successCount > 0) {
+        const failedIds = new Set(results.filter(r => !r.success).map(r => r.id));
+        setSelectedSpareIds(failedIds);
+        toast({ title: "Partial Success", description: `${successCount} deactivated, ${failCount} failed. Failed items remain selected.`, variant: "destructive" });
+      } else {
+        toast({ title: "Error", description: `All ${failCount} deactivation(s) failed. Please try again.`, variant: "destructive" });
+      }
     },
     onError: (error: any) => {
-      toast({ 
-        title: "Error", 
-        description: error.message || "Failed to deactivate spare",
-        variant: "destructive"
-      });
+      toast({ title: "Error", description: error.message || "Failed to deactivate spares", variant: "destructive" });
     }
   });
 
@@ -2539,17 +2597,36 @@ const Spares: React.FC = () => {
             <FileSpreadsheet className="h-4 w-4 mr-1" />
             Export
           </Button>
-          {/* Add Spare button - hidden for Vessel and Head of Dept view modes, but visible in change mode */}
-          {(isSailAdmin || isClientAdmin || isChangeMode) && (
-            <Button size="sm" className="bg-[#5dc86f] hover:bg-[#4db85f] text-white" onClick={() => setIsAddSpareModalOpen(true)} data-testid="E10">
-              <Marker id="E10" />
-              + Add Spare
-            </Button>
+          {isBulkDeleteMode ? (
+            <>
+              <Button
+                size="sm"
+                variant="destructive"
+                onClick={confirmBulkDeactivate}
+                disabled={selectedSpareIds.size === 0 || bulkDeactivateMutation.isPending}
+                data-testid="button-bulk-delete-confirm"
+              >
+                <Trash2 className="h-4 w-4 mr-1" />
+                Delete{selectedSpareIds.size > 0 ? ` (${selectedSpareIds.size})` : ''}
+              </Button>
+              <Button size="sm" variant="outline" onClick={exitBulkDeleteMode} data-testid="button-bulk-delete-cancel">
+                Cancel
+              </Button>
+            </>
+          ) : (
+            <>
+              {(isSailAdmin || isClientAdmin || isChangeMode) && (
+                <Button size="sm" className="bg-[#5dc86f] hover:bg-[#4db85f] text-white" onClick={() => setIsAddSpareModalOpen(true)} data-testid="E10">
+                  <Marker id="E10" />
+                  + Add Spare
+                </Button>
+              )}
+              <Button size="sm" className="bg-[#5dc86f] hover:bg-[#4db85f] text-white" onClick={openBulkUpdateModal} data-testid="E11">
+                <Marker id="E11" />
+                Bulk Update Spares
+              </Button>
+            </>
           )}
-          <Button size="sm" className="bg-[#5dc86f] hover:bg-[#4db85f] text-white" onClick={openBulkUpdateModal} data-testid="E11">
-            <Marker id="E11" />
-            Bulk Update Spares
-          </Button>
         </div>
       </div>
       {/* Search and Filters */}
@@ -2733,7 +2810,18 @@ const Spares: React.FC = () => {
               <div className="overflow-x-auto flex-1 flex flex-col">
                 {/* Inventory Table Header */}
                 <div className="px-4 py-3 border-b border-gray-200 bg-[#52baf3] min-w-max">
-                  <div className="grid text-sm font-semibold text-[#ffffff] min-w-max" style={{ gridTemplateColumns: FEATURES.IHM ? '110px 180px 220px 120px 80px 60px 60px 80px 100px 40px 160px' : '110px 180px 220px 120px 80px 60px 60px 80px 100px 160px', minWidth: 'max-content', gap: '12px' }}>
+                  <div className="grid text-sm font-semibold text-[#ffffff] min-w-max" style={{ gridTemplateColumns: isBulkDeleteMode ? (FEATURES.IHM ? '40px 110px 180px 220px 120px 80px 60px 60px 80px 100px 40px' : '40px 110px 180px 220px 120px 80px 60px 60px 80px 100px') : (FEATURES.IHM ? '110px 180px 220px 120px 80px 60px 60px 80px 100px 40px 160px' : '110px 180px 220px 120px 80px 60px 60px 80px 100px 160px'), minWidth: 'max-content', gap: '12px' }}>
+                  {isBulkDeleteMode && (
+                    <div className="px-2 flex items-center justify-center">
+                      <input
+                        type="checkbox"
+                        checked={(() => { const selectableOnPage = paginatedSpares.filter((s: Spare) => s.isActive !== false); return selectableOnPage.length > 0 && selectableOnPage.every((s: Spare) => selectedSpareIds.has(s.id)); })()}
+                        onChange={toggleSelectAll}
+                        className="h-4 w-4 rounded border-white accent-white cursor-pointer"
+                        data-testid="checkbox-select-all"
+                      />
+                    </div>
+                  )}
                   <div className="px-2 text-[#ffffff]" data-testid="E13"><Marker id="E13" />Part Code</div>
                   <div className="px-2" data-testid="E14"><Marker id="E14" />Part Name</div>
                   <div className="px-2" data-testid="E15"><Marker id="E15" />Component</div>
@@ -2744,7 +2832,7 @@ const Spares: React.FC = () => {
                   <div className="px-2 text-center" data-testid="E20"><Marker id="E20" />Stock</div>
                   <div className="px-2" data-testid="E21"><Marker id="E21" />Location</div>
                   {FEATURES.IHM && <div className="px-2 text-center" data-testid="E22"><Marker id="E22" />IHM</div>}
-                  <div className="px-2 text-center" data-testid="E23"><Marker id="E23" />Actions</div>
+                  {!isBulkDeleteMode && <div className="px-2 text-center" data-testid="E23"><Marker id="E23" />Actions</div>}
                 </div>
               </div>
 
@@ -2765,8 +2853,23 @@ const Spares: React.FC = () => {
                     const isFirstRow = rowIndex === 0;
                     const isInactive = spare.isActive === false;
                     return (
-                    <div key={spare.id} className={`px-4 py-3 border-b border-gray-100 ${isInactive ? 'opacity-50 bg-gray-50' : 'hover:bg-gray-50'}`}>
-                      <div className="grid text-sm items-center min-w-max" style={{ gridTemplateColumns: FEATURES.IHM ? '110px 180px 220px 120px 80px 60px 60px 80px 100px 40px 160px' : '110px 180px 220px 120px 80px 60px 60px 80px 100px 160px', minWidth: 'max-content', gap: '12px' }}>
+                    <div key={spare.id} className={`px-4 py-3 border-b border-gray-100 ${isInactive ? 'opacity-50 bg-gray-50' : 'hover:bg-gray-50'} ${isBulkDeleteMode && selectedSpareIds.has(spare.id) ? 'bg-red-50' : ''}`}>
+                      <div className="grid text-sm items-center min-w-max" style={{ gridTemplateColumns: isBulkDeleteMode ? (FEATURES.IHM ? '40px 110px 180px 220px 120px 80px 60px 60px 80px 100px 40px' : '40px 110px 180px 220px 120px 80px 60px 60px 80px 100px') : (FEATURES.IHM ? '110px 180px 220px 120px 80px 60px 60px 80px 100px 40px 160px' : '110px 180px 220px 120px 80px 60px 60px 80px 100px 160px'), minWidth: 'max-content', gap: '12px' }}>
+                        {isBulkDeleteMode && (
+                          <div className="px-2 flex items-center justify-center">
+                            {!isInactive ? (
+                              <input
+                                type="checkbox"
+                                checked={selectedSpareIds.has(spare.id)}
+                                onChange={() => toggleSpareSelection(spare.id)}
+                                className="h-4 w-4 rounded border-gray-300 cursor-pointer"
+                                data-testid={`checkbox-spare-${spare.id}`}
+                              />
+                            ) : (
+                              <span className="h-4 w-4" />
+                            )}
+                          </div>
+                        )}
                         <div className={`px-2 ${isInactive ? 'text-gray-400' : 'text-gray-900'}`} data-testid={isFirstRow ? "E24" : undefined}>{isFirstRow && <Marker id="E24" />}{spare.partCode}{isInactive && <span className="ml-1 text-xs text-gray-400">(Inactive)</span>}</div>
                         <div className="px-2 text-gray-700" data-testid={isFirstRow ? "E25" : undefined}>{isFirstRow && <Marker id="E25" />}{spare.partName}</div>
                         <div className="px-2 text-gray-700" data-testid={isFirstRow ? "E26" : undefined}>{isFirstRow && <Marker id="E26" />}{spare.componentName}</div>
@@ -2816,6 +2919,7 @@ const Spares: React.FC = () => {
                             )}
                           </div>
                         )}
+                        {!isBulkDeleteMode && (
                         <div className="px-2 flex gap-0.5 justify-center">
                           <Button 
                             size="sm" 
@@ -2882,6 +2986,7 @@ const Spares: React.FC = () => {
                             </Button>
                           )}
                         </div>
+                        )}
                       </div>
                     </div>
                     );
@@ -5602,23 +5707,32 @@ const Spares: React.FC = () => {
       </Dialog>
 
       {/* Deactivate Spare Confirmation Dialog */}
-      <Dialog open={showDeactivateDialog} onOpenChange={(open) => { setShowDeactivateDialog(open); if (!open) setSpareToDeactivate(null); }}>
+      <Dialog open={showDeactivateDialog} onOpenChange={(open) => { setShowDeactivateDialog(open); }}>
         <DialogContent className="max-w-md">
           <DialogHeader>
-            <DialogTitle>Deactivate Spare</DialogTitle>
+            <DialogTitle>Deactivate Spare{selectedSpareIds.size > 1 ? 's' : ''}</DialogTitle>
             <DialogDescription>
-              Are you sure you want to deactivate spare{' '}
-              <strong>{spareToDeactivate?.partCode}</strong> — {spareToDeactivate?.partName}?
-              The spare will be marked as inactive and hidden from Vessel and Head of Department views.
-              This action can be reversed by reactivating the spare.
+              {selectedSpareIds.size === 1 ? (
+                <>
+                  Are you sure you want to deactivate the selected spare?
+                  The spare will be marked as inactive and hidden from Vessel and Head of Department views.
+                  This action can be reversed by reactivating the spare.
+                </>
+              ) : (
+                <>
+                  Are you sure you want to deactivate <strong>{selectedSpareIds.size}</strong> selected spares?
+                  They will be marked as inactive and hidden from Vessel and Head of Department views.
+                  This action can be reversed by reactivating the spares.
+                </>
+              )}
             </DialogDescription>
           </DialogHeader>
           <DialogFooter className="gap-2 sm:gap-0">
-            <Button variant="outline" onClick={() => { setShowDeactivateDialog(false); setSpareToDeactivate(null); }} data-testid="button-cancel-deactivate">
+            <Button variant="outline" onClick={() => { setShowDeactivateDialog(false); }} data-testid="button-cancel-deactivate">
               Cancel
             </Button>
-            <Button variant="destructive" onClick={confirmDeactivateSpare} disabled={deactivateSpareMutation.isPending} data-testid="button-confirm-deactivate">
-              {deactivateSpareMutation.isPending ? 'Deactivating...' : 'Deactivate'}
+            <Button variant="destructive" onClick={executeBulkDeactivate} disabled={bulkDeactivateMutation.isPending} data-testid="button-confirm-deactivate">
+              {bulkDeactivateMutation.isPending ? 'Deactivating...' : `Deactivate${selectedSpareIds.size > 1 ? ` (${selectedSpareIds.size})` : ''}`}
             </Button>
           </DialogFooter>
         </DialogContent>
