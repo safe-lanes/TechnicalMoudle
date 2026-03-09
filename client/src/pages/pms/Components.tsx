@@ -1342,9 +1342,6 @@ interface SpareWithInventoryData {
 
 const SparesSection: React.FC<{ selectedComponent: ComponentNode | null }> = ({ selectedComponent }) => {
   const { isModifyMode } = useModifyMode();
-  const [editLocationDialogOpen, setEditLocationDialogOpen] = useState(false);
-  const [editingLocationA, setEditingLocationA] = useState('');
-  const [editingLocationB, setEditingLocationB] = useState('');
   const [spareDetailsOpen, setSpareDetailsOpen] = useState(false);
   const [selectedSpareDetails, setSelectedSpareDetails] = useState<SpareWithInventoryData | null>(null);
   
@@ -1381,44 +1378,6 @@ const SparesSection: React.FC<{ selectedComponent: ComponentNode | null }> = ({ 
     enabled: !!vesselId && !!selectedComponentCode,
   });
   
-  const { data: locationNames = { locationAName: 'Location A', locationBName: 'Location B' } } = useQuery<{
-    vesselId: string;
-    locationAName: string;
-    locationBName: string;
-  }>({
-    queryKey: [`/technical/api/vessel-location-names/${vesselId}`],
-    enabled: !!vesselId,
-  });
-  
-  const updateLocationNamesMutation = useMutation({
-    mutationFn: async (data: { locationAName: string; locationBName: string }) => {
-      const response = await fetch(`/technical/api/vessel-location-names/${vesselId}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ...data, updatedBy: 'User' }),
-      });
-      if (!response.ok) throw new Error('Failed to update location names');
-      return response.json();
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: [`/technical/api/vessel-location-names/${vesselId}`] });
-      setEditLocationDialogOpen(false);
-    },
-  });
-  
-  const handleEditLocations = () => {
-    setEditingLocationA(locationNames.locationAName);
-    setEditingLocationB(locationNames.locationBName);
-    setEditLocationDialogOpen(true);
-  };
-  
-  const handleSaveLocations = () => {
-    updateLocationNamesMutation.mutate({
-      locationAName: editingLocationA,
-      locationBName: editingLocationB,
-    });
-  };
-  
   const handleViewSpareDetails = (spareData: SpareWithInventoryData) => {
     setSelectedSpareDetails(spareData);
     setSpareDetailsOpen(true);
@@ -1429,20 +1388,6 @@ const SparesSection: React.FC<{ selectedComponent: ComponentNode | null }> = ({ 
       return <span className="px-3 py-1 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">At Min</span>;
     }
     return <span className="px-3 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">OK</span>;
-  };
-  
-  const getLocationQty = (locations: SpareWithInventoryData['locations'], locationName: string): number => {
-    const loc = locations.find(l => l.locationName.toLowerCase().includes(locationName.toLowerCase()) || 
-      l.locationName === locationNames.locationAName || l.locationName === locationNames.locationBName);
-    return loc?.qty || 0;
-  };
-  
-  const getLocationAQty = (locations: SpareWithInventoryData['locations']): number => {
-    return locations[0]?.qty || 0;
-  };
-  
-  const getLocationBQty = (locations: SpareWithInventoryData['locations']): number => {
-    return locations[1]?.qty || 0;
   };
   
   const getComponentDisplay = (linkedComponents: SpareWithInventoryData['linkedComponents']): string => {
@@ -1554,17 +1499,7 @@ const SparesSection: React.FC<{ selectedComponent: ComponentNode | null }> = ({ 
                   </PopoverTrigger>
                   <PopoverContent className="w-72 p-0" align="start">
                     <div className="p-3 border-b bg-gray-50">
-                      <div className="flex items-center justify-between">
-                        <h4 className="font-semibold text-sm text-gray-800">Storage Locations</h4>
-                        <button 
-                          onClick={handleEditLocations}
-                          className="text-xs text-blue-600 hover:text-blue-800 flex items-center gap-1"
-                          data-testid="edit-location-names-btn"
-                        >
-                          <Pencil className="h-3 w-3" />
-                          Edit Names
-                        </button>
-                      </div>
+                      <h4 className="font-semibold text-sm text-gray-800">Storage Locations</h4>
                     </div>
                     <div className="p-3 space-y-3">
                       {spareData.locations.length === 0 ? (
@@ -1666,59 +1601,6 @@ const SparesSection: React.FC<{ selectedComponent: ComponentNode | null }> = ({ 
       </>
       )}
       
-      {/* Edit Location Names Dialog */}
-      <Dialog open={editLocationDialogOpen} onOpenChange={setEditLocationDialogOpen}>
-        <DialogContent className="sm:max-w-[400px]">
-          <DialogHeader>
-            <DialogTitle>Edit Storage Location Names</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4 pt-4">
-            <div className="space-y-2">
-              <Label htmlFor="locationAName" className="flex items-center gap-2">
-                <div className="w-2 h-2 rounded-full bg-blue-500"></div>
-                Location A Name
-              </Label>
-              <Input
-                id="locationAName"
-                value={editingLocationA}
-                onChange={(e) => setEditingLocationA(e.target.value)}
-                placeholder="e.g., Engine Room Store"
-                data-testid="input-location-a-name"
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="locationBName" className="flex items-center gap-2">
-                <div className="w-2 h-2 rounded-full bg-green-500"></div>
-                Location B Name
-              </Label>
-              <Input
-                id="locationBName"
-                value={editingLocationB}
-                onChange={(e) => setEditingLocationB(e.target.value)}
-                placeholder="e.g., Deck Store"
-                data-testid="input-location-b-name"
-              />
-            </div>
-            <div className="flex justify-end gap-2 pt-4">
-              <Button 
-                variant="outline" 
-                onClick={() => setEditLocationDialogOpen(false)}
-                data-testid="btn-cancel-location-edit"
-              >
-                Cancel
-              </Button>
-              <Button 
-                onClick={handleSaveLocations}
-                disabled={updateLocationNamesMutation.isPending}
-                data-testid="btn-save-location-names"
-              >
-                {updateLocationNamesMutation.isPending ? 'Saving...' : 'Save Names'}
-              </Button>
-            </div>
-          </div>
-        </DialogContent>
-      </Dialog>
-
       {/* Spare Details Dialog (E1) */}
       <Dialog open={spareDetailsOpen} onOpenChange={setSpareDetailsOpen}>
         <DialogContent className="sm:max-w-[700px] max-h-[85vh] overflow-y-auto">
