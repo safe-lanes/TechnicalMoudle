@@ -151,7 +151,7 @@ const RunningHours = () => {
     componentCategory: parent.category || '',
     runningHours: `${parseFloat(parent.currentCumulativeRH || '0').toLocaleString()} hrs`,
     lastUpdated: formatProfessionalDateTime(parent.latestUpdate || parent.lastUpdated),
-    utilizationRate: null,
+    utilizationRate: parent.utilizationRate ?? 0,
     inheritedCount: parent.inheritedCount || 0,
     meterReplacedLastRh: parent.meterReplacedLastRh || null,
     meterReplacedDate: parent.meterReplacedDate || null,
@@ -308,7 +308,7 @@ const RunningHours = () => {
       "Component Category",
       "Running Hours (cumulative)",
       "Last Updated (local)",
-      "Utilization Rate (hrs/day)",
+      "Utilization Rate (%)",
       "Notes"
     ];
 
@@ -320,7 +320,7 @@ const RunningHours = () => {
       item.componentCategory,
       item.runningHours.replace(" hrs", ""),
       item.lastUpdated,
-      item.utilizationRate !== null && item.utilizationRate !== undefined ? item.utilizationRate.toString() : "",
+      `${(item.utilizationRate ?? 0).toFixed(1)}%`,
       "" // Notes field (empty for now)
     ]);
 
@@ -853,8 +853,16 @@ const RunningHours = () => {
                 <div className="text-gray-700" data-testid={index === 0 ? "D15" : undefined}>{index === 0 && <Marker id="D15" />}{item.componentCategory}</div>
                 <div className="text-gray-900 font-medium" data-testid={index === 0 ? "D16" : undefined}>{index === 0 && <Marker id="D16" />}{item.runningHours}</div>
                 <div className="text-gray-700" data-testid={index === 0 ? "D17" : undefined}>{index === 0 && <Marker id="D17" />}{item.lastUpdated}</div>
-                <div className="text-gray-700" title="Computed from last 30 days of RH entries" data-testid={index === 0 ? "D18" : undefined}>
-                  {index === 0 && <Marker id="D18" />}{item.utilizationRate !== null ? `${item.utilizationRate} hrs/day` : "—"}
+                <div
+                  className={`font-medium ${
+                    (item.utilizationRate ?? 0) >= 75 ? 'text-green-600' :
+                    (item.utilizationRate ?? 0) >= 40 ? 'text-amber-500' :
+                    'text-red-500'
+                  }`}
+                  title="Running Hours as a percentage of total vessel operational hours"
+                  data-testid={index === 0 ? "D18" : undefined}
+                >
+                  {index === 0 && <Marker id="D18" />}{((item.utilizationRate ?? 0)).toFixed(1)}%
                 </div>
                 <div className="flex items-center gap-2">
                   {item.inheritedCount && item.inheritedCount > 0 ? (

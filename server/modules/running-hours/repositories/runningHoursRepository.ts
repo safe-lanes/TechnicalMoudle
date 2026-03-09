@@ -15,6 +15,12 @@ export async function updateComponent(id: string, data: Partial<Component>): Pro
   return storage.updateComponent(id, data);
 }
 
+// ── Utilization Rate ──
+
+export async function getEarliestAuditTimestamp(vesselId: string): Promise<Date | null> {
+  return storage.getEarliestAuditTimestamp(vesselId);
+}
+
 // ── Running Hours Audit ──
 
 export async function getRunningHoursAudits(componentId: string, limit?: number): Promise<RunningHoursAudit[]> {

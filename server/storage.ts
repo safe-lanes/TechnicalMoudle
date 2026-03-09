@@ -249,6 +249,7 @@ export interface IStorage {
     activeWorkOrdersCount?: number;
   }>;
   createRunningHoursAudit(audit: InsertRunningHoursAudit): Promise<RunningHoursAudit>;
+  getEarliestAuditTimestamp(vesselId: string): Promise<Date | null>;
   getRunningHoursAudits(componentId: string, limit?: number): Promise<RunningHoursAudit[]>;
   getRunningHoursAuditsInDateRange(componentId: string, startDate: Date, endDate: Date): Promise<RunningHoursAudit[]>;
   

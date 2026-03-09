@@ -170,6 +170,7 @@ class MemStorage {
   }
 
   async createRunningHoursAudit(audit: any): Promise<any> { return { ...audit, id: this.getNextId('audits') }; }
+  async getEarliestAuditTimestamp(vesselId: string): Promise<Date | null> { return null; }
   async getRunningHoursAudits(componentId: string, limit?: number): Promise<any[]> { return []; }
   async getRunningHoursAuditsInDateRange(componentId: string, startDate: Date, endDate: Date): Promise<any[]> { return []; }
   async getRunningHourParents(vesselId: string): Promise<any[]> { return []; }

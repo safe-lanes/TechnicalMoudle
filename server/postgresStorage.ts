@@ -1640,6 +1640,14 @@ export class PostgresStorage {
     return result[0];
   }
 
+  async getEarliestAuditTimestamp(vesselId: string): Promise<Date | null> {
+    const db = await getDb();
+    const result = await db.select({ earliest: sql<Date>`MIN(${runningHoursAudit.enteredAtUTC})` })
+      .from(runningHoursAudit)
+      .where(eq(runningHoursAudit.vesselId, vesselId));
+    return result[0]?.earliest || null;
+  }
+
   async getRunningHoursAudits(componentId: string, limit?: number): Promise<RunningHoursAudit[]> {
     const db = await getDb();
     // Resolve componentId to cuuid (dual-lookup support)

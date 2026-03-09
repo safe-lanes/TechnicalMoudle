@@ -128,6 +128,12 @@ export async function listParents(vesselId: string) {
     component => component.rhCounterType === 'MASTER'
   );
 
+  const earliestAuditDate = await repo.getEarliestAuditTimestamp(vesselId);
+  const now = new Date();
+  const hoursElapsed = earliestAuditDate
+    ? (now.getTime() - new Date(earliestAuditDate).getTime()) / (1000 * 60 * 60)
+    : 0;
+
   // Format response with RH data and count inherited children using storage layer
   const parentsWithCounts = await Promise.all(
     masterComponents.map(async (component) => {
@@ -140,6 +146,12 @@ export async function listParents(vesselId: string) {
       const currentMeterRH = parseFloat(component.rhCurrentMaster || component.currentCumulativeRH || '0');
       const totalCumulativeRH = meterReplacedLastRh + currentMeterRH;
 
+      let utilizationRate = 0.0;
+      if (totalCumulativeRH > 0 && hoursElapsed > 0) {
+        utilizationRate = Math.min((totalCumulativeRH / hoursElapsed) * 100, 100.0);
+        utilizationRate = Math.round(utilizationRate * 10) / 10;
+      }
+
       return {
         ...component,
         sfiCode: component.componentCode || '',
@@ -148,7 +160,8 @@ export async function listParents(vesselId: string) {
         currentMeterRH: currentMeterRH.toFixed(2),
         meterReplacedLastRh: meterReplacedLastRh > 0 ? meterReplacedLastRh.toFixed(2) : null,
         meterReplacedDate: component.meterReplacedDate || null,
-        inheritedCount: inheritedComponents.length
+        inheritedCount: inheritedComponents.length,
+        utilizationRate
       };
     })
   );
