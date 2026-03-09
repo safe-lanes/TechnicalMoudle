@@ -1,6 +1,7 @@
 import { createContext, useContext, useState, useEffect, ReactNode } from "react";
 import type { PublicUser, UserRole } from "@shared/schema";
 import type { UIRole } from "@shared/uiRoles";
+import { mapLoggedRoleToUIRole } from "@shared/uiRoles";
 import { secureGetItem } from "@/utils/secureStorage";
 import { analyzeLocalStorage } from "@/utils/localStorageAnalyzer";
 import {
@@ -63,10 +64,26 @@ export function AuthProvider({ children }: AuthProviderProps) {
   const [userType, setUserType] = useState<UIRole | null>(null);
 
   useEffect(() => {
+    let resolvedUser: PublicUser | null = null;
+    let resolvedUserType: UIRole | null = null;
+
+    const plainUserType = localStorage.getItem("userType");
+    let plainProfile: { role?: string } | null = null;
+    try {
+      const raw = localStorage.getItem("userProfile");
+      if (raw) plainProfile = JSON.parse(raw);
+    } catch {
+      plainProfile = null;
+    }
+
+    if (plainUserType && plainProfile?.role) {
+      resolvedUserType = mapLoggedRoleToUIRole(plainUserType, plainProfile.role);
+    }
+
     const storedProfile = secureGetItem<PublicUser>("userProfile");
 
     if (storedProfile) {
-      setCurrentUser(storedProfile);
+      resolvedUser = storedProfile;
 
       const storedAccessData = getRoleAccessData();
       if (storedAccessData) {
@@ -75,17 +92,39 @@ export function AuthProvider({ children }: AuthProviderProps) {
         setRoleAccessDataState(generateRoleAccessData(storedProfile.role));
       }
 
-      const storedType = secureGetItem<UIRole>("userType");
-      if (storedType) {
-        setUserType(storedType);
-      } else {
-        setUserType(ROLE_TO_UI_TYPE[storedProfile.role] || "Vessel");
+      if (!resolvedUserType) {
+        const storedType = secureGetItem<UIRole>("userType");
+        if (storedType) {
+          resolvedUserType = storedType;
+        } else {
+          resolvedUserType = ROLE_TO_UI_TYPE[storedProfile.role] || "Vessel";
+        }
       }
+    } else if (plainProfile && plainUserType) {
+      const role = (plainProfile as any).role as UserRole || "Office";
+      const user: PublicUser = {
+        id: 0,
+        username: (plainProfile as any).username || "user",
+        fullName: (plainProfile as any).fullName || (plainProfile as any).name || "User",
+        email: (plainProfile as any).email || null,
+        role: role,
+        vesselId: (plainProfile as any).vesselId || null,
+        department: (plainProfile as any).department || null,
+        isActive: true,
+        crewDesignation: (plainProfile as any).crewDesignation || null,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      };
+      resolvedUser = user;
+      setRoleAccessDataState(generateRoleAccessData(role));
     } else {
-      setCurrentUser(DEFAULT_USER);
+      resolvedUser = DEFAULT_USER;
       setRoleAccessDataState(generateRoleAccessData(DEFAULT_USER.role));
-      setUserType(ROLE_TO_UI_TYPE[DEFAULT_USER.role]);
+      resolvedUserType = ROLE_TO_UI_TYPE[DEFAULT_USER.role];
     }
+
+    setCurrentUser(resolvedUser);
+    setUserType(resolvedUserType);
 
     try {
       analyzeLocalStorage();
