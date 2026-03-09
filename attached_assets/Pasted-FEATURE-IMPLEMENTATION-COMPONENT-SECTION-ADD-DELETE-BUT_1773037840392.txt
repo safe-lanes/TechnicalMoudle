@@ -1,0 +1,83 @@
+FEATURE IMPLEMENTATION – COMPONENT SECTION → ADD DELETE BUTTON (SOFT DELETE LOGIC)
+
+Objective:
+Add a "Delete" button in the highlighted location in the Component section. The delete function must perform a Soft Delete instead of permanently removing the component.
+
+Functional Behaviour:
+
+1. Delete Button Placement
+- Add a "Delete" button in the highlighted location within the Component section.
+- The button should work based on the component selected in the Tree View.
+
+2. Delete Action (Soft Delete)
+When a user selects a component from the Tree View and clicks the Delete button:
+
+The system should:
+- NOT permanently delete the record.
+- Update the component record by setting:
+
+    is_active = No
+
+3. Visibility Rules After Deletion
+
+A. Vessel View Mode
+- The deleted component (is_active = No) should NOT be visible.
+
+B. Head of Department (HOD) View Mode
+- The deleted component should NOT be visible.
+
+C. Sail Admin View Mode
+- The component should still be visible.
+- "is_active" must display as No.
+
+D. Client Admin View Mode
+- The component should still be visible.
+- "is_active" must display as No.
+
+4. Tree View Display Behaviour
+
+If a component has:
+    is_active = No
+
+Then:
+- The component should appear in the Tree View only for Sail Admin and Client Admin.
+- The component must appear visually dull / greyed out to indicate it is inactive.
+- The component must be hidden completely in Vessel and HOD views.
+
+5. Consistent Behaviour
+
+If a component is manually updated and:
+    is_active = No
+
+Then the system should apply the same rules automatically:
+
+- Hidden from Vessel View
+- Hidden from HOD View
+- Visible in Sail Admin and Client Admin
+- Displayed as dull/grey in Tree View
+
+6. Database Logic
+
+Ensure the delete action performs:
+
+UPDATE components
+SET is_active = 'No'
+WHERE component_id = selected_component_id;
+
+Do NOT perform a hard delete.
+
+7. Validation
+
+Before deletion:
+- Confirm a component is selected.
+- Prompt a confirmation message:
+
+"Are you sure you want to deactivate this component?"
+
+8. Deliverables
+
+- Delete button added in UI
+- Soft delete backend logic implemented
+- Role-based visibility implemented
+- Tree view dull/grey display for inactive components
+- Verification that inactive components are hidden from Vessel and HOD views
