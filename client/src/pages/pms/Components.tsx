@@ -1,5 +1,6 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { Search, ChevronRight, ChevronDown, ChevronUp, ChevronLeft, Edit2, FileText, ArrowLeft, Plus, Check, Package, X, AlertCircle, CheckCircle, HelpCircle, File, FileImage, FileCheck, Upload, Download, Lock, Wrench, User, ClipboardList, MessageSquare, MapPin, Pencil, Expand, Minimize2, GripVertical, Trash2 } from "lucide-react";
+import * as XLSX from "xlsx";
 import { Marker } from "@/components/Marker";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
@@ -2207,6 +2208,78 @@ const Components: React.FC = () => {
     inactivateMutation.mutate({ componentId: pendingDeleteId });
   };
 
+  const handleExportComponents = useCallback(() => {
+    if (!fetchedComponents || fetchedComponents.length === 0) {
+      toast({ title: "No Data", description: "No component data available to export.", variant: "destructive" });
+      return;
+    }
+
+    const toBoolYesNo = (val: any): string => {
+      if (val == null || val === '') return '';
+      if (typeof val === 'boolean') return val ? 'Yes' : 'No';
+      const s = String(val).toLowerCase().trim();
+      if (s === 'true' || s === 'yes' || s === '1') return 'Yes';
+      if (s === 'false' || s === 'no' || s === '0') return 'No';
+      return String(val);
+    };
+
+    const idToCodeMap = new Map<string, string>();
+    fetchedComponents.forEach((comp: any) => {
+      const code = comp.componentCode || comp.code || '';
+      if (comp.id || comp.cuuid) {
+        idToCodeMap.set(comp.id || comp.cuuid, code);
+      }
+    });
+
+    const resolveParentCode = (comp: any): string => {
+      const parentRef = comp.parentId || comp.parentComponent || '';
+      if (!parentRef) return '';
+      if (idToCodeMap.has(parentRef)) return idToCodeMap.get(parentRef) || parentRef;
+      return parentRef;
+    };
+
+    const exportData = fetchedComponents.map((comp: any) => ({
+      'Fleet Equipment Code': comp.fleetEquipmentCode || '',
+      'Fleet Equipment Name': comp.fleetEquipmentName || '',
+      'Parent Component Code': resolveParentCode(comp),
+      'Component Code': comp.componentCode || comp.code || '',
+      'Component Name': comp.name || comp.componentName || '',
+      'Component Category': comp.componentCategory || comp.category || '',
+      'Maker': comp.maker || '',
+      'Maker Code': comp.makerCode || '',
+      'Model': comp.model || '',
+      'Model Code': comp.modelCode || '',
+      'Serial No': comp.serialNo || '',
+      'Drawing No': comp.drawingNo || '',
+      'Location': comp.location || '',
+      'Criticality': toBoolYesNo(comp.critical),
+      'Condition Based': toBoolYesNo(comp.conditionBased),
+      'Installation Date': comp.installationDate || '',
+      'Commissioned Date': comp.commissionedDate || '',
+      'Rating': comp.rating || '',
+      'Equipment / System Department': comp.eqptSystemDept || comp.deptCategory || comp.department || '',
+      'Class item': comp.classItem || '',
+      'IS Active': toBoolYesNo(comp.isActive),
+      'Vessel Code': comp.vesselCode || '',
+      'IS Parent': toBoolYesNo(comp.isParent),
+      'Notes': comp.notes || '',
+      'RH Counter Type': comp.rhCounterType || '',
+      'RH Counter Source': comp.rhCounterSource || '',
+      'Running Hours': comp.runningHours || comp.currentCumulativeRH || '',
+      'Last Updated': comp.lastUpdated || comp.updatedAt || '',
+    }));
+
+    const ws = XLSX.utils.json_to_sheet(exportData);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Vessel_Component');
+
+    const timestamp = new Date().toISOString().slice(0, 10);
+    const filename = `components_export_${timestamp}.xlsx`;
+    XLSX.writeFile(wb, filename);
+
+    toast({ title: "Export Successful", description: `Exported ${exportData.length} components to ${filename}` });
+  }, [fetchedComponents, toast]);
+
   // Build component tree from fetched data
   const componentTreeData = React.useMemo(() => {
     console.log('[TREE] Building tree from', fetchedComponents.length, 'components');
@@ -3254,19 +3327,33 @@ const Components: React.FC = () => {
               <Marker id="B1" /> Components {isChangeMode ? '- Edit Mode' : isChangeRequestMode ? '- Change Request Mode' : ''}
             </h1>
           </div>
-          {(isSailAdmin || isClientAdmin) && !isChangeRequestMode && !isChangeMode && (
-            <Button 
-              className="bg-[#5dc86f] hover:bg-[#4db85f] text-white"
-              onClick={() => {
-                setEditingComponentId(null);
-                setEditingComponentCode(null);
-                setShowAddEditFullPage(true);
-              }}
-              data-testid="B5"
-            >
-              <Marker id="B5" /> + Add / Edit Component
-            </Button>
-          )}
+          <div className="flex items-center gap-2">
+            {!isChangeRequestMode && !isChangeMode && (
+              <Button
+                variant="outline"
+                className="border-green-500 text-green-600 hover:bg-green-50"
+                onClick={handleExportComponents}
+                disabled={!fetchedComponents || fetchedComponents.length === 0}
+                data-testid="button-export-components"
+              >
+                <Download className="h-4 w-4 mr-1" />
+                Export
+              </Button>
+            )}
+            {(isSailAdmin || isClientAdmin) && !isChangeRequestMode && !isChangeMode && (
+              <Button 
+                className="bg-[#5dc86f] hover:bg-[#4db85f] text-white"
+                onClick={() => {
+                  setEditingComponentId(null);
+                  setEditingComponentCode(null);
+                  setShowAddEditFullPage(true);
+                }}
+                data-testid="B5"
+              >
+                <Marker id="B5" /> + Add / Edit Component
+              </Button>
+            )}
+          </div>
         </div>
         
         {/* Filters Row */}
