@@ -772,8 +772,6 @@ export default function ComponentRegisterAddEdit({
     { key: 'eqptSystemCategory', label: 'Component Category' },
     { key: 'model', label: 'Model' },
     { key: 'modelCode', label: 'Model Code' },
-    { key: 'critical', label: 'Criticality' },
-    { key: 'conditionBased', label: 'Condition Based' },
     { key: 'eqptSystemDept', label: 'Equipment / System Department' },
     { key: 'isActive', label: 'Is Active' },
   ] as const;
