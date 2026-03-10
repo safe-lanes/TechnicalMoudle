@@ -2587,14 +2587,14 @@ const Spares: React.FC = () => {
         {/* Action Buttons */}
         <div className="flex gap-2 items-center">
           <Button 
-            variant="ghost" 
+            variant="outline" 
             size="sm"
-            className="text-blue-600"
+            className="text-xs text-[#8798ad] border-[#e1e8ed]"
             onClick={exportSparesToExcel}
             data-testid="E9"
           >
             <Marker id="E9" />
-            <FileSpreadsheet className="h-4 w-4 mr-1" />
+            <Download className="h-3.5 w-3.5 mr-1" />
             Export
           </Button>
           {isBulkDeleteMode ? (

@@ -3331,12 +3331,13 @@ const Components: React.FC = () => {
             {!isChangeRequestMode && !isChangeMode && (
               <Button
                 variant="outline"
-                className="border-green-500 text-green-600 hover:bg-green-50"
+                size="sm"
+                className="text-xs text-[#8798ad] border-[#e1e8ed]"
                 onClick={handleExportComponents}
                 disabled={!fetchedComponents || fetchedComponents.length === 0}
                 data-testid="button-export-components"
               >
-                <Download className="h-4 w-4 mr-1" />
+                <Download className="h-3.5 w-3.5 mr-1" />
                 Export
               </Button>
             )}

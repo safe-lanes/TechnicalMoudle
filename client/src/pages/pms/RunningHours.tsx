@@ -6,7 +6,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import { Search, FileSpreadsheet, Calendar, Users, Settings, Pencil, AlertTriangle } from "lucide-react";
+import { Search, FileSpreadsheet, Calendar, Users, Settings, Pencil, AlertTriangle, Download } from "lucide-react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
@@ -808,8 +808,8 @@ const RunningHours = () => {
             />
           </div>
 
-          <Button variant="outline" className="flex items-center gap-2" onClick={exportToCSV} data-testid="D3">
-            <Marker id="D3" /><FileSpreadsheet className="h-4 w-4" />
+          <Button variant="outline" size="sm" className="text-xs text-[#8798ad] border-[#e1e8ed]" onClick={exportToCSV} data-testid="D3">
+            <Marker id="D3" /><Download className="h-3.5 w-3.5 mr-1" />
             Export
           </Button>
 

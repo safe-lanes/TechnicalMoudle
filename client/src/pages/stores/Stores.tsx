@@ -1785,15 +1785,15 @@ const Stores: React.FC = () => {
                 {selectedStoreIds.size} item(s) selected
               </span>
               <Button 
-                variant="ghost" 
+                variant="outline" 
                 size="sm" 
-                className="text-blue-600"
+                className="text-xs text-[#8798ad] border-[#e1e8ed]"
                 onClick={viewMode === "history" ? exportHistoryToExcel : exportInventoryToExcel}
                 data-testid={viewMode === "inventory" ? getMarkerId(activeTab, "8") : viewMode === "history" ? getMarkerId(activeTab, "2.13") : "stores-loc-export"}
               >
                 {viewMode === "inventory" && <Marker id={getMarkerId(activeTab, "8")} />}
                 {viewMode === "history" && <Marker id={getMarkerId(activeTab, "2.13")} />}
-                <FileSpreadsheet className="h-4 w-4 mr-1" />
+                <Download className="h-3.5 w-3.5 mr-1" />
                 Export
               </Button>
               <Button
@@ -1818,15 +1818,15 @@ const Stores: React.FC = () => {
           ) : (
             <>
               <Button 
-                variant="ghost" 
+                variant="outline" 
                 size="sm" 
-                className="text-blue-600"
+                className="text-xs text-[#8798ad] border-[#e1e8ed]"
                 onClick={viewMode === "history" ? exportHistoryToExcel : exportInventoryToExcel}
                 data-testid={viewMode === "inventory" ? getMarkerId(activeTab, "8") : viewMode === "history" ? getMarkerId(activeTab, "2.13") : "stores-loc-export"}
               >
                 {viewMode === "inventory" && <Marker id={getMarkerId(activeTab, "8")} />}
                 {viewMode === "history" && <Marker id={getMarkerId(activeTab, "2.13")} />}
-                <FileSpreadsheet className="h-4 w-4 mr-1" />
+                <Download className="h-3.5 w-3.5 mr-1" />
                 Export
               </Button>
               <Button 
