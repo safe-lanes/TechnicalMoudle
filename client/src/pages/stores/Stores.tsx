@@ -3167,219 +3167,241 @@ const Stores: React.FC = () => {
         </DialogContent>
       </Dialog>
 
-      {/* View Item Details Modal (Read-Only) */}
+      {/* View Item Details Modal (Read-Only) - Structured layout matching Spares Details */}
       <Dialog open={isViewModalOpen} onOpenChange={setIsViewModalOpen}>
-        <DialogContent className="sm:max-w-[600px] max-h-[85vh] overflow-y-auto">
+        <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>Item Details</DialogTitle>
+            <DialogTitle className="flex items-center gap-2">
+              <Info className="h-5 w-5 text-blue-600" />
+              Item Details
+            </DialogTitle>
           </DialogHeader>
           {viewingItem && (
-          <div className="grid gap-4 py-4">
-            <div className="grid grid-cols-2 gap-4">
-              <div className="grid gap-2">
-                <Label>Item Code</Label>
-                <Input value={viewingItem.itemCode || ''} disabled className="bg-gray-100" data-testid="input-view-item-code" />
+            <div className="space-y-6">
+              <div className="bg-gray-50 rounded-lg p-4">
+                <h3 className="text-sm font-semibold text-gray-700 mb-3 border-b pb-2">Basic Information</h3>
+                <div className="grid grid-cols-2 gap-4 text-sm">
+                  <div data-testid="text-view-item-code">
+                    <span className="text-gray-500">Item Code:</span>
+                    <span className="ml-2 font-medium text-gray-900">{viewingItem.itemCode || '-'}</span>
+                  </div>
+                  <div data-testid="text-view-impa-code">
+                    <span className="text-gray-500">IMPA Code:</span>
+                    <span className="ml-2 font-medium text-gray-900">{viewingItem.impaCode || '-'}</span>
+                  </div>
+                  <div className="col-span-2" data-testid="text-view-item-name">
+                    <span className="text-gray-500">Item Name:</span>
+                    <span className="ml-2 font-medium text-gray-900">{viewingItem.itemName || '-'}</span>
+                  </div>
+                  <div data-testid="text-view-category">
+                    <span className="text-gray-500">Stores Category:</span>
+                    <span className="ml-2 font-medium text-gray-900">{viewingItem.storesCategory || '-'}</span>
+                  </div>
+                  <div data-testid="text-view-uom">
+                    <span className="text-gray-500">Unit of Measure:</span>
+                    <span className="ml-2 font-medium text-gray-900">{viewingItem.uom || '-'}</span>
+                  </div>
+                  <div className="col-span-2" data-testid="text-view-specification">
+                    <span className="text-gray-500">Specification:</span>
+                    <span className="ml-2 font-medium text-gray-900">{viewingItem.specification || '-'}</span>
+                  </div>
+                </div>
               </div>
-              <div className="grid gap-2">
-                <Label>IMPA Code</Label>
-                <Input value={viewingItem.impaCode || ''} disabled className="bg-gray-100" data-testid="input-view-impa-code" />
+
+              <div className="bg-blue-50 rounded-lg p-4">
+                <h3 className="text-sm font-semibold text-gray-700 mb-3 border-b pb-2">Stock Levels</h3>
+                <div className="grid grid-cols-2 gap-4 text-sm">
+                  <div data-testid="text-view-rob">
+                    <span className="text-gray-500">ROB (Total):</span>
+                    <span className="ml-2 font-medium text-gray-900">{viewingItem.rob ?? 0}</span>
+                  </div>
+                  <div data-testid="text-view-min">
+                    <span className="text-gray-500">Min Stock:</span>
+                    <span className="ml-2 font-medium text-gray-900">{viewingItem.min ?? 0}</span>
+                  </div>
+                  <div data-testid="text-view-max">
+                    <span className="text-gray-500">Max Stock:</span>
+                    <span className="ml-2 font-medium text-gray-900">{viewingItem.max ?? 0}</span>
+                  </div>
+                  <div data-testid="text-view-stock-status">
+                    <span className="text-gray-500">Stock Status:</span>
+                    <span className={`ml-2 px-2 py-0.5 rounded text-xs font-medium ${
+                      (viewingItem.rob ?? 0) >= (viewingItem.min ?? 0)
+                        ? 'bg-green-100 text-green-800'
+                        : 'bg-red-100 text-red-800'
+                    }`}>
+                      {(viewingItem.rob ?? 0) >= (viewingItem.min ?? 0) ? 'OK' : 'Low'}
+                    </span>
+                  </div>
+                  <div data-testid="text-view-is-active">
+                    <span className="text-gray-500">Is Active:</span>
+                    <span className={`ml-2 px-2 py-0.5 rounded text-xs font-medium ${
+                      viewingItem.isActive !== false
+                        ? 'bg-green-100 text-green-800'
+                        : 'bg-gray-100 text-gray-800'
+                    }`}>
+                      {viewingItem.isActive !== false ? 'Yes' : 'No'}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              <div className="bg-green-50 rounded-lg p-4">
+                <h3 className="text-sm font-semibold text-gray-700 mb-3 border-b pb-2">Location Details</h3>
+                <div className="grid grid-cols-2 gap-4 text-sm">
+                  <div data-testid="text-view-location-a">
+                    <span className="text-gray-500">Location A Name:</span>
+                    <span className="ml-2 font-medium text-gray-900">{viewingItem.locationAName || '-'}</span>
+                  </div>
+                  <div data-testid="text-view-rob-location-a">
+                    <span className="text-gray-500">ROB at Location A:</span>
+                    <span className="ml-2 font-medium text-gray-900">{viewingItem.robLocationA ?? 0}</span>
+                  </div>
+                  <div data-testid="text-view-location-b">
+                    <span className="text-gray-500">Location B Name:</span>
+                    <span className="ml-2 font-medium text-gray-900">{viewingItem.locationBName || '-'}</span>
+                  </div>
+                  <div data-testid="text-view-rob-location-b">
+                    <span className="text-gray-500">ROB at Location B:</span>
+                    <span className="ml-2 font-medium text-gray-900">{viewingItem.robLocationB ?? 0}</span>
+                  </div>
+                </div>
+              </div>
+
+              <div className="bg-yellow-50 rounded-lg p-4">
+                <h3 className="text-sm font-semibold text-gray-700 mb-3 border-b pb-2">Supplier & Costing</h3>
+                <div className="grid grid-cols-2 gap-4 text-sm">
+                  <div data-testid="text-view-supplier">
+                    <span className="text-gray-500">Supplier:</span>
+                    <span className="ml-2 font-medium text-gray-900">{viewingItem.supplier || '-'}</span>
+                  </div>
+                  <div data-testid="text-view-unit-cost">
+                    <span className="text-gray-500">Unit Cost:</span>
+                    <span className="ml-2 font-medium text-gray-900">{viewingItem.unitCost ?? 0}</span>
+                  </div>
+                  <div data-testid="text-view-last-order-date">
+                    <span className="text-gray-500">Last Order Date:</span>
+                    <span className="ml-2 font-medium text-gray-900">{viewingItem.lastOrderDate || '-'}</span>
+                  </div>
+                  <div data-testid="text-view-lead-time">
+                    <span className="text-gray-500">Lead Time:</span>
+                    <span className="ml-2 font-medium text-gray-900">{viewingItem.leadTime || '-'}</span>
+                  </div>
+                </div>
+              </div>
+
+              {FEATURES.IHM && (
+                <div className="bg-purple-50 rounded-lg p-4">
+                  <h3 className="text-sm font-semibold text-gray-700 mb-3 border-b pb-2">IHM (Inventory of Hazardous Materials)</h3>
+                  <div className="grid grid-cols-2 gap-4 text-sm">
+                    <div data-testid="text-view-ihm-presence">
+                      <span className="text-gray-500">IHM Presence:</span>
+                      <span className="ml-2 font-medium text-gray-900">{viewingItem.ihmPresence || 'Unknown'}</span>
+                    </div>
+                    <div data-testid="text-view-ihm-evidence">
+                      <span className="text-gray-500">IHM Evidence Type:</span>
+                      <span className="ml-2 font-medium text-gray-900">{viewingItem.ihmEvidenceType || 'None'}</span>
+                    </div>
+                    <div className="col-span-2" data-testid="text-view-ihm-details">
+                      <span className="text-gray-500">IHM Details:</span>
+                      <span className="ml-2 font-medium text-gray-900">{viewingItem.ihmDetails || '-'}</span>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {activeTab === "chemicals" && (
+                <div className="bg-orange-50 rounded-lg p-4">
+                  <h3 className="text-sm font-semibold text-gray-700 mb-3 border-b pb-2">Expiry & Date Information</h3>
+                  <div className="grid grid-cols-2 gap-4 text-sm">
+                    <div data-testid="text-view-manufacture-date">
+                      <span className="text-gray-500">Manufacture Date:</span>
+                      <span className="ml-2 font-medium text-gray-900">{viewingItem.manufactureDate || '-'}</span>
+                    </div>
+                    <div data-testid="text-view-expiry-date">
+                      <span className="text-gray-500">Expiry Date:</span>
+                      <span className="ml-2 font-medium text-gray-900">{viewingItem.expiryDate || '-'}</span>
+                    </div>
+                    <div data-testid="text-view-batch-number">
+                      <span className="text-gray-500">Batch Number:</span>
+                      <span className="ml-2 font-medium text-gray-900">{viewingItem.batchNumber || '-'}</span>
+                    </div>
+                    <div data-testid="text-view-lot-number">
+                      <span className="text-gray-500">Lot Number:</span>
+                      <span className="ml-2 font-medium text-gray-900">{viewingItem.lotNumber || '-'}</span>
+                    </div>
+                    <div data-testid="text-view-shelf-life">
+                      <span className="text-gray-500">Shelf Life (months):</span>
+                      <span className="ml-2 font-medium text-gray-900">{viewingItem.shelfLifeMonths || '-'}</span>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {activeTab === "chemicals" && (
+                <div className="bg-red-50 rounded-lg p-4">
+                  <h3 className="text-sm font-semibold text-gray-700 mb-3 border-b pb-2">Safety Data Sheet (SDS)</h3>
+                  <div className="grid grid-cols-2 gap-4 text-sm">
+                    <div data-testid="text-view-sds-reference">
+                      <span className="text-gray-500">SDS Reference Number:</span>
+                      <span className="ml-2 font-medium text-gray-900">{viewingItem.sdsReference || '-'}</span>
+                    </div>
+                    <div data-testid="text-view-sds-last-updated">
+                      <span className="text-gray-500">SDS Last Updated:</span>
+                      <span className="ml-2 font-medium text-gray-900">{viewingItem.sdsLastUpdated || '-'}</span>
+                    </div>
+                    <div data-testid="text-view-hazard-class">
+                      <span className="text-gray-500">Hazard Classification:</span>
+                      <span className="ml-2 font-medium text-gray-900">{viewingItem.hazardClassification || '-'}</span>
+                    </div>
+                    <div data-testid="text-view-un-number">
+                      <span className="text-gray-500">UN Number:</span>
+                      <span className="ml-2 font-medium text-gray-900">{viewingItem.unNumber || '-'}</span>
+                    </div>
+                    <div data-testid="text-view-flash-point">
+                      <span className="text-gray-500">Flash Point:</span>
+                      <span className="ml-2 font-medium text-gray-900">{viewingItem.flashPoint || '-'}</span>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {activeTab === "chemicals" && (
+                <div className="bg-teal-50 rounded-lg p-4">
+                  <h3 className="text-sm font-semibold text-gray-700 mb-3 border-b pb-2">Storage & Safety</h3>
+                  <div className="grid grid-cols-2 gap-4 text-sm">
+                    <div data-testid="text-view-temp-min">
+                      <span className="text-gray-500">Min Storage Temp (°C):</span>
+                      <span className="ml-2 font-medium text-gray-900">{viewingItem.storageTempMin || '-'}</span>
+                    </div>
+                    <div data-testid="text-view-temp-max">
+                      <span className="text-gray-500">Max Storage Temp (°C):</span>
+                      <span className="ml-2 font-medium text-gray-900">{viewingItem.storageTempMax || '-'}</span>
+                    </div>
+                    <div className="col-span-2" data-testid="text-view-ppe">
+                      <span className="text-gray-500">PPE Requirements:</span>
+                      <span className="ml-2 font-medium text-gray-900">{viewingItem.ppeRequirements || '-'}</span>
+                    </div>
+                    <div className="col-span-2" data-testid="text-view-disposal">
+                      <span className="text-gray-500">Disposal Instructions:</span>
+                      <span className="ml-2 font-medium text-gray-900">{viewingItem.disposalInstructions || '-'}</span>
+                    </div>
+                    <div data-testid="text-view-emergency-contact">
+                      <span className="text-gray-500">Emergency Contact:</span>
+                      <span className="ml-2 font-medium text-gray-900">{viewingItem.emergencyContact || '-'}</span>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              <div className="bg-gray-50 rounded-lg p-4">
+                <h3 className="text-sm font-semibold text-gray-700 mb-3 border-b pb-2">Remarks</h3>
+                <div className="text-sm" data-testid="text-view-remarks">
+                  <span className="text-gray-500">Remarks:</span>
+                  <span className="ml-2 font-medium text-gray-900">{viewingItem.remarks || '-'}</span>
+                </div>
               </div>
             </div>
-
-            <div className="grid gap-2">
-              <Label>Item Name</Label>
-              <Input value={viewingItem.itemName || ''} disabled className="bg-gray-100" data-testid="input-view-item-name" />
-            </div>
-
-            <div className="grid grid-cols-2 gap-4">
-              <div className="grid gap-2">
-                <Label>Stores Category</Label>
-                <Input value={viewingItem.storesCategory || ''} disabled className="bg-gray-100" data-testid="input-view-category" />
-              </div>
-              <div className="grid gap-2">
-                <Label>Unit of Measure</Label>
-                <Input value={viewingItem.uom || ''} disabled className="bg-gray-100" data-testid="input-view-uom" />
-              </div>
-            </div>
-
-            <div className="grid gap-2">
-              <Label>Specification</Label>
-              <Input value={viewingItem.specification || ''} disabled className="bg-gray-100" data-testid="input-view-specification" />
-            </div>
-
-            <div className="border-t pt-4">
-              <Label className="text-base font-semibold text-gray-700 mb-2 block">Stock Levels</Label>
-              <div className="grid grid-cols-3 gap-4">
-                <div className="grid gap-2">
-                  <Label>ROB (Total)</Label>
-                  <Input type="number" value={viewingItem.rob || 0} disabled className="bg-gray-100" data-testid="input-view-rob" />
-                </div>
-                <div className="grid gap-2">
-                  <Label>Min Stock</Label>
-                  <Input type="number" value={viewingItem.min || 0} disabled className="bg-gray-100" data-testid="input-view-min" />
-                </div>
-                <div className="grid gap-2">
-                  <Label>Max Stock</Label>
-                  <Input type="number" value={viewingItem.max || 0} disabled className="bg-gray-100" data-testid="input-view-max" />
-                </div>
-              </div>
-            </div>
-
-            <div className="border-t pt-4">
-              <Label className="text-base font-semibold text-gray-700 mb-2 block">Location Details</Label>
-              <div className="grid grid-cols-2 gap-4">
-                <div className="grid gap-2">
-                  <Label>Location A Name</Label>
-                  <Input value={viewingItem.locationAName || ''} disabled className="bg-gray-100" data-testid="input-view-location-a" />
-                </div>
-                <div className="grid gap-2">
-                  <Label>ROB at Location A</Label>
-                  <Input type="number" value={viewingItem.robLocationA || 0} disabled className="bg-gray-100" data-testid="input-view-rob-location-a" />
-                </div>
-                <div className="grid gap-2">
-                  <Label>Location B Name</Label>
-                  <Input value={viewingItem.locationBName || ''} disabled className="bg-gray-100" data-testid="input-view-location-b" />
-                </div>
-                <div className="grid gap-2">
-                  <Label>ROB at Location B</Label>
-                  <Input type="number" value={viewingItem.robLocationB || 0} disabled className="bg-gray-100" data-testid="input-view-rob-location-b" />
-                </div>
-              </div>
-            </div>
-
-            <div className="border-t pt-4">
-              <Label className="text-base font-semibold text-gray-700 mb-2 block">Supplier & Costing</Label>
-              <div className="grid grid-cols-2 gap-4">
-                <div className="grid gap-2">
-                  <Label>Supplier</Label>
-                  <Input value={viewingItem.supplier || ''} disabled className="bg-gray-100" data-testid="input-view-supplier" />
-                </div>
-                <div className="grid gap-2">
-                  <Label>Unit Cost</Label>
-                  <Input type="number" value={viewingItem.unitCost || 0} disabled className="bg-gray-100" data-testid="input-view-unit-cost" />
-                </div>
-                <div className="grid gap-2">
-                  <Label>Last Order Date</Label>
-                  <Input type="date" value={viewingItem.lastOrderDate || ''} disabled className="bg-gray-100" data-testid="input-view-last-order-date" />
-                </div>
-                <div className="grid gap-2">
-                  <Label>Lead Time</Label>
-                  <Input value={viewingItem.leadTime || ''} disabled className="bg-gray-100" data-testid="input-view-lead-time" />
-                </div>
-              </div>
-            </div>
-
-            {FEATURES.IHM && (
-              <div className="border-t pt-4">
-                <Label className="text-base font-semibold text-gray-700 mb-2 block">IHM (Inventory of Hazardous Materials)</Label>
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="grid gap-2">
-                    <Label>IHM Presence</Label>
-                    <Input value={viewingItem.ihmPresence || 'Unknown'} disabled className="bg-gray-100" data-testid="input-view-ihm-presence" />
-                  </div>
-                  <div className="grid gap-2">
-                    <Label>IHM Evidence Type</Label>
-                    <Input value={viewingItem.ihmEvidenceType || 'None'} disabled className="bg-gray-100" data-testid="input-view-ihm-evidence" />
-                  </div>
-                </div>
-                <div className="grid gap-2 mt-4">
-                  <Label>IHM Details</Label>
-                  <Textarea value={viewingItem.ihmDetails || ''} disabled className="bg-gray-100" rows={2} data-testid="textarea-view-ihm-details" />
-                </div>
-              </div>
-            )}
-
-            {activeTab === "chemicals" && (
-              <div className="border-t pt-4">
-                <Label className="text-base font-semibold text-gray-700 mb-2 block">Expiry & Date Information</Label>
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="grid gap-2">
-                    <Label>Manufacture Date</Label>
-                    <Input type="date" value={viewingItem.manufactureDate || ''} disabled className="bg-gray-100" data-testid="input-view-manufacture-date" />
-                  </div>
-                  <div className="grid gap-2">
-                    <Label>Expiry Date</Label>
-                    <Input type="date" value={viewingItem.expiryDate || ''} disabled className="bg-gray-100" data-testid="input-view-expiry-date" />
-                  </div>
-                  <div className="grid gap-2">
-                    <Label>Batch Number</Label>
-                    <Input value={viewingItem.batchNumber || ''} disabled className="bg-gray-100" data-testid="input-view-batch-number" />
-                  </div>
-                  <div className="grid gap-2">
-                    <Label>Lot Number</Label>
-                    <Input value={viewingItem.lotNumber || ''} disabled className="bg-gray-100" data-testid="input-view-lot-number" />
-                  </div>
-                  <div className="grid gap-2">
-                    <Label>Shelf Life (months)</Label>
-                    <Input type="number" value={viewingItem.shelfLifeMonths || ''} disabled className="bg-gray-100" data-testid="input-view-shelf-life" />
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {activeTab === "chemicals" && (
-              <div className="border-t pt-4">
-                <Label className="text-base font-semibold text-gray-700 mb-2 block">Safety Data Sheet (SDS)</Label>
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="grid gap-2">
-                    <Label>SDS Reference Number</Label>
-                    <Input value={viewingItem.sdsReference || ''} disabled className="bg-gray-100" data-testid="input-view-sds-reference" />
-                  </div>
-                  <div className="grid gap-2">
-                    <Label>SDS Last Updated</Label>
-                    <Input type="date" value={viewingItem.sdsLastUpdated || ''} disabled className="bg-gray-100" data-testid="input-view-sds-last-updated" />
-                  </div>
-                  <div className="grid gap-2">
-                    <Label>Hazard Classification</Label>
-                    <Input value={viewingItem.hazardClassification || ''} disabled className="bg-gray-100" data-testid="input-view-hazard-class" />
-                  </div>
-                  <div className="grid gap-2">
-                    <Label>UN Number</Label>
-                    <Input value={viewingItem.unNumber || ''} disabled className="bg-gray-100" data-testid="input-view-un-number" />
-                  </div>
-                  <div className="grid gap-2">
-                    <Label>Flash Point</Label>
-                    <Input value={viewingItem.flashPoint || ''} disabled className="bg-gray-100" data-testid="input-view-flash-point" />
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {activeTab === "chemicals" && (
-              <div className="border-t pt-4">
-                <Label className="text-base font-semibold text-gray-700 mb-2 block">Storage & Safety</Label>
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="grid gap-2">
-                    <Label>Min Storage Temp (°C)</Label>
-                    <Input value={viewingItem.storageTempMin || ''} disabled className="bg-gray-100" data-testid="input-view-temp-min" />
-                  </div>
-                  <div className="grid gap-2">
-                    <Label>Max Storage Temp (°C)</Label>
-                    <Input value={viewingItem.storageTempMax || ''} disabled className="bg-gray-100" data-testid="input-view-temp-max" />
-                  </div>
-                </div>
-                <div className="grid gap-2 mt-4">
-                  <Label>PPE Requirements</Label>
-                  <Textarea value={viewingItem.ppeRequirements || ''} disabled className="bg-gray-100" rows={2} data-testid="textarea-view-ppe" />
-                </div>
-                <div className="grid gap-2 mt-4">
-                  <Label>Disposal Instructions</Label>
-                  <Textarea value={viewingItem.disposalInstructions || ''} disabled className="bg-gray-100" rows={2} data-testid="textarea-view-disposal" />
-                </div>
-                <div className="grid gap-2 mt-4">
-                  <Label>Emergency Contact</Label>
-                  <Input value={viewingItem.emergencyContact || ''} disabled className="bg-gray-100" data-testid="input-view-emergency-contact" />
-                </div>
-              </div>
-            )}
-
-            <div className="border-t pt-4">
-              <div className="grid gap-2">
-                <Label>Remarks</Label>
-                <Textarea value={viewingItem.remarks || ''} disabled className="bg-gray-100" rows={2} data-testid="textarea-view-remarks" />
-              </div>
-            </div>
-          </div>
           )}
           <DialogFooter>
             <Button variant="outline" onClick={() => setIsViewModalOpen(false)} data-testid="button-view-close">
