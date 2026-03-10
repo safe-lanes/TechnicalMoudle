@@ -59,7 +59,7 @@ Preferred communication style: Simple, everyday language.
 -   **Spares By Location Independent Sync**: `spare_location_stock` syncs Location A and Location B independently.
 -   **Work Order B4 Spare Consumption Flow**: Spare consumption is recorded at save but inventory deduction occurs at approval time.
 -   **Skipped Cycle Detection (Layer 1)**: Calculates and stores `missed_cycles` on work order completion.
--   **Next Due Date Correction (Layer 2)**: Calculates `nextDueDate` using `originalDueDate` to prevent schedule drift.
+-   **Next Due Date Calculation**: `calculateNextDueDate()` always uses the actual completion date as the base: `nextDueDate = completionDate + frequencyInterval`. The `originalDueDate` parameter is kept for backward compatibility but not used in calculation. Running Hours jobs are unchanged.
 -   **Mandatory Backfill of Skipped Work Orders (Layer 3)**: Automatically creates SKIPPED history records for missed cycles in `component_maintenance_history`.
 -   **Mandatory CE Justification for Skipped Cycles (Layer 4B)**: Requires a written justification from the Chief Engineer for approving WOs with missed cycles.
 -   **Live Missed Cycles on WO List**: `missedCycles` calculated on-the-fly for overdue/due WOs in the list view.

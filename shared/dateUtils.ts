@@ -87,11 +87,12 @@ export function normalizeDateToDDMMMYYYY(dateInput: string | number | Date | nul
 }
 
 /**
- * Calculate next due date from last done date + interval
+ * Calculate next due date: completionDate + one frequency interval
  * ROBUSTNESS: Accepts any date format (DD-MMM-YYYY, ISO, Excel serial) and normalizes before calculation
- * @param lastDoneDate - Date in any format (DD-MMM-YYYY, ISO, Excel serial, etc.)
+ * @param lastDoneDate - Actual completion date in any format (DD-MMM-YYYY, ISO, Excel serial, etc.)
  * @param intervalValue - Numeric interval (e.g., "3", "6", "12")
  * @param intervalUnit - Unit: 'Days' | 'Weeks' | 'Months' | 'Years'
+ * @param originalDueDate - Retained for backward compatibility, not used in calculation
  * @returns Next due date in DD-MMM-YYYY format, or null if calculation fails
  */
 export function calculateNextDueDate(
@@ -105,27 +106,10 @@ export function calculateNextDueDate(
   }
 
   try {
-    let baseDate: string | null = null;
-
-    if (originalDueDate) {
-      const normalizedOriginal = normalizeDateToDDMMMYYYY(originalDueDate);
-      if (normalizedOriginal) {
-        const parsedOriginal = parse(normalizedOriginal, 'dd-MMM-yyyy', new Date());
-        if (isValid(parsedOriginal)) {
-          baseDate = normalizedOriginal;
-        }
-      }
-      if (!baseDate) {
-        console.warn('WARNING: originalDueDate provided but invalid, falling back to completionDate for next due calculation');
-      }
-    }
-
+    const baseDate = normalizeDateToDDMMMYYYY(lastDoneDate);
     if (!baseDate) {
-      baseDate = normalizeDateToDDMMMYYYY(lastDoneDate);
-      if (!baseDate) {
-        console.error('Failed to normalize lastDoneDate:', lastDoneDate);
-        return null;
-      }
+      console.error('Failed to normalize lastDoneDate:', lastDoneDate);
+      return null;
     }
 
     const parsedDate = parse(baseDate, 'dd-MMM-yyyy', new Date());
@@ -163,22 +147,7 @@ export function calculateNextDueDate(
         return null;
     }
 
-    let nextDue = add(parsedDate, { [durationKey]: numericInterval });
-
-    if (originalDueDate && lastDoneDate) {
-      const normalizedCompletion = normalizeDateToDDMMMYYYY(lastDoneDate);
-      if (normalizedCompletion) {
-        const completionDate = parse(normalizedCompletion, 'dd-MMM-yyyy', new Date());
-        if (isValid(completionDate)) {
-          let rollCount = 0;
-          const maxRolls = 1000;
-          while (nextDue <= completionDate && rollCount < maxRolls) {
-            nextDue = add(nextDue, { [durationKey]: numericInterval });
-            rollCount++;
-          }
-        }
-      }
-    }
+    const nextDue = add(parsedDate, { [durationKey]: numericInterval });
 
     return format(nextDue, 'dd-MMM-yyyy');
   } catch (error) {
