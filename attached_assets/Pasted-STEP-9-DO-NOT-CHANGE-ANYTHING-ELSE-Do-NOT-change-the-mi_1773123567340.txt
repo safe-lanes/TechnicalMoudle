@@ -1,0 +1,146 @@
+STEP 9 — DO NOT CHANGE ANYTHING ELSE
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+- Do NOT change the missedCycles calculation (that was Layer 1, already done)
+- Do NOT change anything related to Running Hours jobs
+- Do NOT block completions or change the approval workflow
+- Do NOT change the JobDueScanner logic
+- Do NOT touch the Work Orders list page or any other page not 
+  mentioned in this prompt
+- Only change the next due date calculation base, store original_due_date, 
+  and update the two UI display locations described in Steps 6 and 7
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+WORKED EXAMPLE — VERIFY YOUR IMPLEMENTATION AGAINST THIS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Use this example to manually verify your code is correct before 
+finishing:
+
+Scenario:
+  Job frequency:             1 Week (Calendar-based)
+  Original scheduled due:    01-Jan-2026  (nextDueDate on work_orders)
+  Completion date entered:   31-Jan-2026  (dateOfCompletion from user)
+
+OLD (WRONG) calculation:
+  base = 31-Jan-2026 (completion date)
+  nextDue = 31-Jan-2026 + 1 week = 07-Feb-2026  ← schedule drifted
+
+NEW (CORRECT) calculation:
+  base = 01-Jan-2026 (original due date)
+  nextDue = 01-Jan-2026 + 1 week = 08-Jan-2026  ← schedule snaps back
+
+What gets stored in the database:
+  work_orders.original_due_date      = 01-Jan-2026
+  work_orders.missed_cycles          = 4  (already done in Layer 1)
+  jobs.nextDueDate                   = 08-Jan-2026
+  component_maintenance_history.original_due_date = 01-Jan-2026
+
+What appears in the A1 banner (for a completed WO with missed cycles):
+  "⚠ SKIPPED CYCLES DETECTED
+   This work order was completed 4 cycles late. 4 job cycles were 
+   missed between the scheduled due date and the actual completion 
+   date. This has been recorded in the audit trail.
+   
+   The next due date has been automatically corrected to 08-Jan-2026 
+   based on the original scheduled due date of 01-Jan-2026, not the 
+   actual completion date. This prevents schedule drift."
+
+What appears in Part B, B2.1 (read-only view of completed WO):
+  "Scheduled Due Date:  01-Jan-2026"
+  "Actual Completion:   31-Jan-2026"
+
+Second worked example — on-time completion (verify no regression):
+
+Scenario:
+  Job frequency:             1 Month (Calendar-based)
+  Original scheduled due:    15-Feb-2026
+  Completion date entered:   14-Feb-2026  (completed 1 day early)
+
+NEW calculation:
+  base = 15-Feb-2026 (original due date)
+  nextDue = 15-Feb-2026 + 1 month = 15-Mar-2026  ← correct
+
+Verify: Even when completed early, the schedule stays anchored to 
+the original due date. Next due is ALWAYS originalDueDate + interval,
+regardless of whether the job was done early, on time, or late.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+EDGE CASES TO HANDLE
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Handle these carefully in your code:
+
+1. originalDueDate is null or undefined:
+   → Fall back to completionDate as the base (old behavior)
+   → Log a warning in the server console: 
+     "WARNING: originalDueDate missing for WO [id], 
+      falling back to completionDate for next due calculation"
+
+2. originalDueDate is in the future (job completed early):
+   → This is fine. Still use originalDueDate as base.
+   → nextDue = originalDueDate + interval (which will be in the future,
+     correct behavior)
+
+3. frequencyUnit is "Months" or "Years":
+   → Use date-fns addMonths() or addYears() functions
+   → Do NOT use a fixed number of days for months/years 
+     (months have different day counts)
+
+4. The work order has no associated job record (edge case):
+   → Fall back to completionDate + interval (old behavior)
+   → Log a warning in the server console
+
+5. Multiple completions of the same job over time:
+   → Each completion uses THAT WO's nextDueDate as originalDueDate
+   → The chain self-corrects: each new WO is created with the 
+     correct nextDueDate = previousOriginalDueDate + interval
+   → The schedule always stays anchored to the original planned dates
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+SUMMARY OF ALL FILES TO MODIFY
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Backend:
+1. shared/dateUtils.ts
+   → Add originalDueDate as 4th parameter to calculateNextDueDate()
+   → Change base date from completionDate to originalDueDate 
+     (with fallback)
+
+2. server/modules/work-orders/services/workOrderCompletionService.ts
+   → Capture originalDueDate = workOrder.nextDueDate before completion
+   → Pass it to calculateNextDueDate()
+   → Save original_due_date to work_orders update payload
+   → Save original_due_date to maintenance history payload
+
+3. server/modules/work-orders/services/workOrderService.ts
+   → Same changes as above for the single WO approval path
+
+4. server/modules/work-orders/services/workOrderBulkService.ts
+   → Same changes as above for the bulk approval path
+
+5. Database migration file
+   → Add original_due_date column to work_orders table
+   → Add original_due_date column to component_maintenance_history table
+
+6. shared/schema.ts (or equivalent types file)
+   → Add originalDueDate field to WorkOrder type
+   → Add originalDueDate field to ComponentMaintenanceHistory type
+
+7. Work order GET endpoint (workOrderContextService.ts)
+   → Ensure original_due_date is returned in the API response for 
+     both the work order object and the work history entries
+
+Frontend:
+8. client/src/pages/pms/WorkOrderFormPage.tsx
+   → In Section A1: Update the existing amber banner 
+     (when missedCycles >= 1) to add the "next due date corrected" 
+     message with original_due_date and new nextDueDate values
+   → In Section B2.1: When WO is completed (read-only), replace 
+     single "Due Date:" label with two lines:
+     "Scheduled Due Date: [original_due_date]" and 
+     "Actual Completion: [dateCompleted]"
+
+Please implement all of this now, run the migration, restart the app, 
+and confirm there are no compilation errors. Then provide a brief 
+summary of every file changed and what was changed in each file.
