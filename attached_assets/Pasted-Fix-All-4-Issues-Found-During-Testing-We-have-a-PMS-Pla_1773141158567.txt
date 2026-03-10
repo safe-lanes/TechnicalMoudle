@@ -1,0 +1,135 @@
+Fix All 4 Issues Found During Testing
+
+We have a PMS (Planned Maintenance System) application. We just finished testing the anti-skip fraud system and found the following issues that need to be fixed. Please fix ALL of them one by one in order of priority. Read everything carefully before starting.
+
+ISSUE 1 — CRITICAL: Layer 4B (CE Mandatory Justification) is NOT working
+What is supposed to happen:
+When a work order is submitted for approval AND the system detects that missedCycles >= 1 (meaning the crew completed the job late, skipping one or more scheduled cycles), the Chief Engineer must be FORCED to write a reason/justification BEFORE the Approve button becomes clickable. The Approve button must remain DISABLED until the justification is typed.
+
+What is actually happening:
+When a WO with 316 missed cycles goes to the Pending Approval page, there is ONLY a "Rejection Comments" text box (for when CE rejects). There is NO mandatory justification field for missed cycles. The green "Approve" button is fully active and clickable immediately — CE can approve a 316-cycle-late job with zero explanation. This is completely wrong.
+
+What you need to build:
+
+Step 1 — Find where the approval UI is rendered. This is the page/component shown when a WO has status "Pending Approval". It shows the full work order form with a green "Approve" button and red "Reject" button at the bottom.
+
+Step 2 — When this approval page loads, check the missedCycles value stored in the work order data. The missedCycles count was already calculated and saved when the crew submitted the form (Layer 2 already calculates this — 316 cycles in our test case).
+
+Step 3 — If missedCycles >= 1, do the following:
+
+Add a new mandatory section ABOVE the Approve/Reject buttons titled: "⚠️ Chief Engineer — Justification Required"
+
+Inside this section show a red/orange alert box that says: "This work order was completed {X} cycles late. You must provide a written reason before approving." (replace {X} with the actual missed cycle count)
+
+Below the alert, add a textarea input field with placeholder text: "Explain why this maintenance was delayed. Example: Spare parts not available, vessel in drydock, manpower shortage..."
+
+This textarea should have a minimum character requirement of 30 characters
+
+Add a character counter below the textarea showing "0 / 30 minimum"
+
+The green Approve button must be DISABLED (greyed out, not clickable) until the textarea has at least 30 characters typed in it
+
+When the CE types 30 or more characters, the Approve button automatically becomes ENABLED (turns green and clickable)
+
+When the CE clicks Approve after typing the justification, save the justification text to the database linked to this work order record — store it in a field called ceJustification or delayJustification
+
+Step 4 — If missedCycles === 0 (job done on time), do NOT show this section at all. The Approve button remains active and approval works normally with no extra steps.
+
+Step 5 — The "Rejection Comments" field that already exists should remain unchanged. It is separate — it is only used when CE chooses to reject.
+
+Where this UI appears: The approval section is at the very bottom of the work order form page, below the B4 Spare Parts Consumed section. It currently shows "Rejection Comments" + "Approve" button + "Reject" button. Your new "CE Justification Required" section should appear BETWEEN the B4 section and the Approve/Reject buttons.
+
+ISSUE 2 — IMPORTANT: Layer 3 (Audit Trail) is NOT recording missed cycles in Remarks
+What is supposed to happen:
+In Section A4 "Work History" on the work order form, there is a table showing all past completions of this job. It has columns: DATE | WORK ORDER | DESCRIPTION | PERFORMED BY | STATUS | REMARKS. Currently the REMARKS column shows "—" (dash/empty) for all entries.
+
+What should happen:
+When a work order is completed with missed cycles, the REMARKS field in the work history/audit trail entry should automatically store: "X cycles skipped — completed late" (where X is the missed cycle count). This way, anyone reviewing the history can see at a glance whether that particular completion was on time or late.
+
+What you need to do:
+Find where new work history entries are created (when a WO is saved/approved and added to the audit trail). At that point, check the missedCycles value. If missedCycles > 0, save the remarks as: "${missedCycles} cycles skipped — completed late". If missedCycles === 0, save remarks as "Completed on time" or leave as "—".
+
+ISSUE 3 — IMPORTANT: Missed Cycles Badge NOT visible in Work Order List
+What is supposed to happen:
+In the work order list (Overdue tab and Due tab), each row should show a badge/pill indicating how many cycles have been missed for that job. This helps the CE and Superintendent see at a glance which jobs are most overdue in terms of cycles missed, without needing to open each WO.
+
+What is actually happening:
+The list shows only an "Overdue" status badge (pink color) in the Status column. There is no missed cycle count badge visible anywhere in the row.
+
+What you need to build:
+In the work order list table rows (specifically for jobs in the Overdue tab and Due tab), add a small badge next to the Job Title OR in the Status column. The badge should show: "X cycles missed" in orange/red color. Example: if a weekly job was due 15-Feb-2020 and today is 10-Mar-2026, that is 316 weeks = 316 cycles missed. Show a badge "316 cycles missed" in red. If it is 0 cycles missed (due today or on time), do not show the badge.
+
+The formula to calculate missed cycles in the list:
+
+Get the job frequency (e.g., 1 Week, 1 Month, 3 Months)
+
+Get the Next Due Date from the work order
+
+Calculate how many full frequency periods have passed since the due date until today
+
+Show that number as the missed cycles badge
+
+This badge should appear in the work order list table — right below or next to the "Overdue" status badge in the Status column.
+
+ISSUE 4 — BUG: Next Due Date is NOT updating after Work Order completion
+What is supposed to happen:
+When a work order is completed and approved, the Next Due Date of the job should automatically recalculate and update. The new Next Due Date should be calculated from the COMPLETION DATE entered by the crew, plus the job frequency.
+
+Example: Job frequency = 1 Week. Crew entered completion date = 10-Mar-2026. New Next Due Date = 10-Mar-2026 + 7 days = 17-Mar-2026.
+
+What is actually happening:
+After completing and approving a WO, the Next Due Date in Part A (A1 Job Information section, "Next Due Date" field) still shows the old date (15-02-2020). It has not been updated.
+
+What you need to do:
+Find where work order approval is processed (the backend/API function that marks a WO as "Completed" when CE clicks Approve). At that point:
+
+Get the completion date that the crew entered
+
+Get the job frequency (number + unit — e.g., 1 Week, 1 Month, 3 Months, etc.)
+
+Calculate: New Next Due Date = Completion Date + Frequency
+
+Save this new Next Due Date back to the job/component record in the database so that the next time the WO form is opened, it shows the updated date
+
+TESTING INSTRUCTIONS — After fixing, test as follows:
+Test for Issue 1 (Layer 4B):
+
+Open any overdue work order (e.g., FO PURIFIER INSPECTION - 1W, due 15-Feb-2020)
+
+Fill in the form with Start Date and Completion Date both set to today (10-Mar-2026)
+
+This should trigger the 316 missed cycles warning (Layer 2 — already working)
+
+Save the form — it should go to Pending Approval
+
+Open the Pending Approval tab, click on the WO
+
+Scroll to the bottom — you should now see the new "CE Justification Required" section with the textarea
+
+Confirm the Approve button is GREYED OUT / DISABLED when the textarea is empty
+
+Type less than 30 characters — button should still be disabled
+
+Type 30+ characters — button should now turn green and become clickable
+
+Click Approve — should succeed and save the justification
+
+Test for Issue 4 (Next Due Date):
+
+After approving the above WO, go back to the work order form
+
+Check Part A, A1 section — "Next Due Date" should now show 17-Mar-2026 (10-Mar-2026 + 7 days for weekly job)
+
+Test for Issue 2 (Audit Trail Remarks):
+
+After approval, open the same WO and scroll to A4 Work History
+
+Click "Show All History" — the newest entry should show REMARKS: "316 cycles skipped — completed late"
+
+Test for Issue 3 (List Badge):
+
+Go to Work Orders → Overdue tab
+
+Each row in the list should now show a red badge like "316 cycles missed" next to the Status column
+
+Fix all 4 issues. Start with Issue 1 (most critical), then Issue 4, then Issue 2, then Issue 3. Tell me when all are done.
