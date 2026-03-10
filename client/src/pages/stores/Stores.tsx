@@ -3986,83 +3986,83 @@ const Stores: React.FC = () => {
                     <PopoverContent className="w-[280px] p-0" align="start">
                       <Command>
                         <CommandInput placeholder="Search locations..." value={invLocSearchA} onValueChange={setInvLocSearchA} data-testid="input-location-search-a" />
-                        <CommandList>
+                        <CommandList className="max-h-none">
                           <CommandEmpty>No locations found.</CommandEmpty>
-                          <CommandGroup heading="Locations" data-testid="list-locations-a">
-                            <CommandItem
-                              value="none"
-                              onSelect={() => {
-                                setEditingLocations(prev => ({
-                                  ...prev,
-                                  [locationDialogItem.id]: { ...prev[locationDialogItem.id], nameA: '' }
-                                }));
-                                setInvLocAPopoverOpen(false);
-                                setInvLocSearchA('');
-                              }}
-                            >
-                              <span className="text-muted-foreground">None</span>
-                              {!(editingLocations[locationDialogItem.id]?.nameA ?? locationNames.locationA) && (
-                                <Check className="ml-auto h-4 w-4 flex-shrink-0 text-green-600" />
-                              )}
-                            </CommandItem>
-                            {allVesselLocations.map((loc: any) => (
+                          <div className="max-h-[144px] overflow-y-auto">
+                            <CommandGroup heading="Locations" data-testid="list-locations-a">
                               <CommandItem
-                                key={loc.id}
-                                value={loc.locationName}
-                                data-testid={`item-location-a-${loc.id}`}
+                                value="none"
                                 onSelect={() => {
                                   setEditingLocations(prev => ({
                                     ...prev,
-                                    [locationDialogItem.id]: { ...prev[locationDialogItem.id], nameA: loc.locationName }
+                                    [locationDialogItem.id]: { ...prev[locationDialogItem.id], nameA: '' }
                                   }));
                                   setInvLocAPopoverOpen(false);
                                   setInvLocSearchA('');
                                 }}
                               >
-                                <MapPin className="mr-2 h-4 w-4 flex-shrink-0 text-muted-foreground" />
-                                <span className="truncate flex-1">{loc.locationName}</span>
-                                {(editingLocations[locationDialogItem.id]?.nameA ?? locationNames.locationA) === loc.locationName && (
-                                  <Check className="ml-2 h-4 w-4 flex-shrink-0 text-green-600" />
+                                <span className="text-muted-foreground">None</span>
+                                {!(editingLocations[locationDialogItem.id]?.nameA ?? locationNames.locationA) && (
+                                  <Check className="ml-auto h-4 w-4 flex-shrink-0 text-green-600" />
                                 )}
                               </CommandItem>
-                            ))}
-                          </CommandGroup>
-                          {invLocSearchA.trim() && !allVesselLocations.some((loc: any) => loc.locationName.toLowerCase() === invLocSearchA.trim().toLowerCase()) && (
-                            <CommandGroup>
-                              <CommandItem
-                                value={`create-${invLocSearchA.trim()}`}
-                                className="text-green-600"
-                                data-testid="button-create-new-location-a"
-                                onSelect={async () => {
-                                  const name = invLocSearchA.trim();
-                                  try {
-                                    const res = await fetch(`/technical/api/inventory/locations/${vesselId}`, {
-                                      method: 'POST',
-                                      headers: { 'Content-Type': 'application/json' },
-                                      body: JSON.stringify({ locationName: name, createdBy: 'System' }),
-                                    });
-                                    if (res.ok) {
-                                      queryClient.invalidateQueries({ queryKey: [`/technical/api/inventory/locations/${vesselId}`] });
-                                      setEditingLocations(prev => ({
-                                        ...prev,
-                                        [locationDialogItem.id]: { ...prev[locationDialogItem.id], nameA: name }
-                                      }));
-                                      toast({ title: "Location Created", description: `"${name}" created.` });
-                                    } else {
-                                      toast({ title: "Failed to create location", description: "Please try again.", variant: "destructive" });
-                                    }
-                                  } catch {
-                                    toast({ title: "Failed to create location", description: "Network error. Please try again.", variant: "destructive" });
-                                  }
-                                  setInvLocAPopoverOpen(false);
-                                  setInvLocSearchA('');
-                                }}
-                              >
-                                <Plus className="mr-2 h-4 w-4 text-green-600" />
-                                <span className="font-medium">Create "{invLocSearchA.trim()}"</span>
-                              </CommandItem>
+                              {allVesselLocations.map((loc: any) => (
+                                <CommandItem
+                                  key={loc.id}
+                                  value={loc.locationName}
+                                  data-testid={`item-location-a-${loc.id}`}
+                                  onSelect={() => {
+                                    setEditingLocations(prev => ({
+                                      ...prev,
+                                      [locationDialogItem.id]: { ...prev[locationDialogItem.id], nameA: loc.locationName }
+                                    }));
+                                    setInvLocAPopoverOpen(false);
+                                    setInvLocSearchA('');
+                                  }}
+                                >
+                                  <MapPin className="mr-2 h-4 w-4 flex-shrink-0 text-muted-foreground" />
+                                  <span className="truncate flex-1">{loc.locationName}</span>
+                                  {(editingLocations[locationDialogItem.id]?.nameA ?? locationNames.locationA) === loc.locationName && (
+                                    <Check className="ml-2 h-4 w-4 flex-shrink-0 text-green-600" />
+                                  )}
+                                </CommandItem>
+                              ))}
                             </CommandGroup>
-                          )}
+                          </div>
+                          <CommandGroup className="border-t" forceMount>
+                            <CommandItem
+                              onSelect={async () => {
+                                const name = invLocSearchA.trim();
+                                if (!name) return;
+                                try {
+                                  const res = await fetch(`/technical/api/inventory/locations/${vesselId}`, {
+                                    method: 'POST',
+                                    headers: { 'Content-Type': 'application/json' },
+                                    body: JSON.stringify({ locationName: name, createdBy: 'System' }),
+                                  });
+                                  if (res.ok) {
+                                    queryClient.invalidateQueries({ queryKey: [`/technical/api/inventory/locations/${vesselId}`] });
+                                    setEditingLocations(prev => ({
+                                      ...prev,
+                                      [locationDialogItem.id]: { ...prev[locationDialogItem.id], nameA: name }
+                                    }));
+                                    toast({ title: "Location Created", description: `"${name}" created.` });
+                                  } else {
+                                    toast({ title: "Failed to create location", description: "Please try again.", variant: "destructive" });
+                                  }
+                                } catch {
+                                  toast({ title: "Failed to create location", description: "Network error. Please try again.", variant: "destructive" });
+                                }
+                                setInvLocAPopoverOpen(false);
+                                setInvLocSearchA('');
+                              }}
+                              data-testid="button-create-new-location-a"
+                              forceMount
+                            >
+                              <Plus className="mr-2 h-4 w-4 text-green-600" />
+                              <span className="text-green-600 font-medium">Create New Location</span>
+                            </CommandItem>
+                          </CommandGroup>
                         </CommandList>
                       </Command>
                     </PopoverContent>
@@ -4102,83 +4102,83 @@ const Stores: React.FC = () => {
                     <PopoverContent className="w-[280px] p-0" align="start">
                       <Command>
                         <CommandInput placeholder="Search locations..." value={invLocSearchB} onValueChange={setInvLocSearchB} data-testid="input-location-search-b" />
-                        <CommandList>
+                        <CommandList className="max-h-none">
                           <CommandEmpty>No locations found.</CommandEmpty>
-                          <CommandGroup heading="Locations" data-testid="list-locations-b">
-                            <CommandItem
-                              value="none"
-                              onSelect={() => {
-                                setEditingLocations(prev => ({
-                                  ...prev,
-                                  [locationDialogItem.id]: { ...prev[locationDialogItem.id], nameB: '' }
-                                }));
-                                setInvLocBPopoverOpen(false);
-                                setInvLocSearchB('');
-                              }}
-                            >
-                              <span className="text-muted-foreground">None</span>
-                              {!(editingLocations[locationDialogItem.id]?.nameB ?? locationNames.locationB) && (
-                                <Check className="ml-auto h-4 w-4 flex-shrink-0 text-green-600" />
-                              )}
-                            </CommandItem>
-                            {allVesselLocations.map((loc: any) => (
+                          <div className="max-h-[144px] overflow-y-auto">
+                            <CommandGroup heading="Locations" data-testid="list-locations-b">
                               <CommandItem
-                                key={loc.id}
-                                value={loc.locationName}
-                                data-testid={`item-location-b-${loc.id}`}
+                                value="none"
                                 onSelect={() => {
                                   setEditingLocations(prev => ({
                                     ...prev,
-                                    [locationDialogItem.id]: { ...prev[locationDialogItem.id], nameB: loc.locationName }
+                                    [locationDialogItem.id]: { ...prev[locationDialogItem.id], nameB: '' }
                                   }));
                                   setInvLocBPopoverOpen(false);
                                   setInvLocSearchB('');
                                 }}
                               >
-                                <MapPin className="mr-2 h-4 w-4 flex-shrink-0 text-muted-foreground" />
-                                <span className="truncate flex-1">{loc.locationName}</span>
-                                {(editingLocations[locationDialogItem.id]?.nameB ?? locationNames.locationB) === loc.locationName && (
-                                  <Check className="ml-2 h-4 w-4 flex-shrink-0 text-green-600" />
+                                <span className="text-muted-foreground">None</span>
+                                {!(editingLocations[locationDialogItem.id]?.nameB ?? locationNames.locationB) && (
+                                  <Check className="ml-auto h-4 w-4 flex-shrink-0 text-green-600" />
                                 )}
                               </CommandItem>
-                            ))}
-                          </CommandGroup>
-                          {invLocSearchB.trim() && !allVesselLocations.some((loc: any) => loc.locationName.toLowerCase() === invLocSearchB.trim().toLowerCase()) && (
-                            <CommandGroup>
-                              <CommandItem
-                                value={`create-${invLocSearchB.trim()}`}
-                                className="text-green-600"
-                                data-testid="button-create-new-location-b"
-                                onSelect={async () => {
-                                  const name = invLocSearchB.trim();
-                                  try {
-                                    const res = await fetch(`/technical/api/inventory/locations/${vesselId}`, {
-                                      method: 'POST',
-                                      headers: { 'Content-Type': 'application/json' },
-                                      body: JSON.stringify({ locationName: name, createdBy: 'System' }),
-                                    });
-                                    if (res.ok) {
-                                      queryClient.invalidateQueries({ queryKey: [`/technical/api/inventory/locations/${vesselId}`] });
-                                      setEditingLocations(prev => ({
-                                        ...prev,
-                                        [locationDialogItem.id]: { ...prev[locationDialogItem.id], nameB: name }
-                                      }));
-                                      toast({ title: "Location Created", description: `"${name}" created.` });
-                                    } else {
-                                      toast({ title: "Failed to create location", description: "Please try again.", variant: "destructive" });
-                                    }
-                                  } catch {
-                                    toast({ title: "Failed to create location", description: "Network error. Please try again.", variant: "destructive" });
-                                  }
-                                  setInvLocBPopoverOpen(false);
-                                  setInvLocSearchB('');
-                                }}
-                              >
-                                <Plus className="mr-2 h-4 w-4 text-green-600" />
-                                <span className="font-medium">Create "{invLocSearchB.trim()}"</span>
-                              </CommandItem>
+                              {allVesselLocations.map((loc: any) => (
+                                <CommandItem
+                                  key={loc.id}
+                                  value={loc.locationName}
+                                  data-testid={`item-location-b-${loc.id}`}
+                                  onSelect={() => {
+                                    setEditingLocations(prev => ({
+                                      ...prev,
+                                      [locationDialogItem.id]: { ...prev[locationDialogItem.id], nameB: loc.locationName }
+                                    }));
+                                    setInvLocBPopoverOpen(false);
+                                    setInvLocSearchB('');
+                                  }}
+                                >
+                                  <MapPin className="mr-2 h-4 w-4 flex-shrink-0 text-muted-foreground" />
+                                  <span className="truncate flex-1">{loc.locationName}</span>
+                                  {(editingLocations[locationDialogItem.id]?.nameB ?? locationNames.locationB) === loc.locationName && (
+                                    <Check className="ml-2 h-4 w-4 flex-shrink-0 text-green-600" />
+                                  )}
+                                </CommandItem>
+                              ))}
                             </CommandGroup>
-                          )}
+                          </div>
+                          <CommandGroup className="border-t" forceMount>
+                            <CommandItem
+                              onSelect={async () => {
+                                const name = invLocSearchB.trim();
+                                if (!name) return;
+                                try {
+                                  const res = await fetch(`/technical/api/inventory/locations/${vesselId}`, {
+                                    method: 'POST',
+                                    headers: { 'Content-Type': 'application/json' },
+                                    body: JSON.stringify({ locationName: name, createdBy: 'System' }),
+                                  });
+                                  if (res.ok) {
+                                    queryClient.invalidateQueries({ queryKey: [`/technical/api/inventory/locations/${vesselId}`] });
+                                    setEditingLocations(prev => ({
+                                      ...prev,
+                                      [locationDialogItem.id]: { ...prev[locationDialogItem.id], nameB: name }
+                                    }));
+                                    toast({ title: "Location Created", description: `"${name}" created.` });
+                                  } else {
+                                    toast({ title: "Failed to create location", description: "Please try again.", variant: "destructive" });
+                                  }
+                                } catch {
+                                  toast({ title: "Failed to create location", description: "Network error. Please try again.", variant: "destructive" });
+                                }
+                                setInvLocBPopoverOpen(false);
+                                setInvLocSearchB('');
+                              }}
+                              data-testid="button-create-new-location-b"
+                              forceMount
+                            >
+                              <Plus className="mr-2 h-4 w-4 text-green-600" />
+                              <span className="text-green-600 font-medium">Create New Location</span>
+                            </CommandItem>
+                          </CommandGroup>
                         </CommandList>
                       </Command>
                     </PopoverContent>
