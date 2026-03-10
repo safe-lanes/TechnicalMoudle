@@ -1,0 +1,34 @@
+I am working on a Planned Maintenance System (PMS) for a maritime vessel management application. I need you to explain in full detail how the system currently handles Work Order due date calculations and job completion logic. Please answer the following specific questions:
+
+1. **Next Due Date Calculation Logic:**
+   - When a work order is marked as "completed", how is the next due date calculated?
+   - Is the next due date calculated from:
+     (a) The original/scheduled due date, OR
+     (b) The actual completion date entered by the user?
+   - Show me the exact code/function responsible for this calculation.
+
+2. **Job Frequency Types:**
+   - What frequency types are supported? (e.g., Daily, Weekly, Monthly, Quarterly, Running Hours-based, etc.)
+   - Where are these frequencies stored in the database/schema?
+
+3. **Completion Form:**
+   - What fields does the completion form capture? (e.g., completion date, remarks, done by, etc.)
+   - Is there any validation on the completion date field? (e.g., can a user enter a future date or a backdated date?)
+   - Is there any check against the original due date when the completion date is entered?
+
+4. **Work Order Generation:**
+   - After a job is completed, is a new work order automatically generated for the next cycle?
+   - How many past/skipped cycles can be bypassed without detection?
+
+5. **Database Schema:**
+   - Show me the relevant tables/models for: WorkOrders, Jobs/Tasks, Completion Records, and any audit/history tables.
+   - Is there a field that stores the "original due date" separately from the "completion date"?
+
+6. **Audit Trail:**
+   - Does the system currently log who completed a job, when it was completed, and what date was entered?
+   - Is there any existing mechanism to detect if a job was completed late or skipped?
+
+7. **Current Validations:**
+   - Are there any existing server-side or client-side validations that prevent backdating or skipping of jobs?
+
+Please provide code snippets for each relevant section and identify the files where this logic lives.
