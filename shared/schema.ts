@@ -1014,6 +1014,7 @@ export const workOrders = pgTable("work_orders", {
   wasRejected: boolean("was_rejected").notNull().default(false), // Tracks if WO was previously rejected (for red font display)
   missedCycles: integer("missed_cycles").default(0),
   originalDueDate: text("original_due_date"),
+  skippedCyclesJustification: text("skipped_cycles_justification"),
   
   // === WO Generation Cycle Snapshots (for duplicate protection and audit) ===
   // Driver type determines which cycle fields apply

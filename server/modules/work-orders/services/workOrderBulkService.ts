@@ -4,12 +4,29 @@ import { calculateMissedCycles, calculateNextDueDate } from '@shared/dateUtils';
 
 // ── Bulk Approve Work Orders ──
 
-export async function bulkApprove(workOrderIds: string[], approver?: string, approverRemarks?: string) {
+export async function bulkApprove(workOrderIds: string[], approver?: string, approverRemarks?: string, skippedCyclesJustification?: string) {
   if (!Array.isArray(workOrderIds) || workOrderIds.length === 0) {
     throw new ValidationError('workOrderIds array is required');
   }
 
   console.log(`📋 Bulk approving ${workOrderIds.length} work orders`);
+
+  const wosNeedingJustification: string[] = [];
+  for (const woId of workOrderIds) {
+    const wo = await repo.findById(woId);
+    if (wo && (wo.missedCycles || 0) >= 1) {
+      wosNeedingJustification.push(wo.workOrderNo || woId);
+    }
+  }
+  if (wosNeedingJustification.length > 0) {
+    const justification = (skippedCyclesJustification || '').trim();
+    if (!justification) {
+      throw new ValidationError(
+        `The following work orders have skipped maintenance cycles and require a written justification before approval: ${wosNeedingJustification.join(', ')}. Please provide a skippedCyclesJustification.`,
+        { code: 'JUSTIFICATION_REQUIRED', workOrderIds: wosNeedingJustification }
+      );
+    }
+  }
 
   const results: { success: string[]; failed: { id: string; error: string }[] } = {
     success: [],
@@ -67,6 +84,7 @@ export async function bulkApprove(workOrderIds: string[], approver?: string, app
         approvalAction: "approved",
         approver: approver || "Head of Dept",
         approverRemarks: approverRemarks,
+        skippedCyclesJustification: (missedCycles >= 1 && skippedCyclesJustification) ? skippedCyclesJustification : null,
         approvalDate: new Date().toISOString(),
         nextDueDate,
         nextDueReading,

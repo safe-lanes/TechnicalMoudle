@@ -106,8 +106,8 @@ export async function completeWorkOrder(req: Request, res: Response) {
 // ── Bulk Operations ──
 
 export async function bulkApprove(req: Request, res: Response) {
-  const { workOrderIds, approver, approverRemarks } = req.body;
-  const result = await woBulkService.bulkApprove(workOrderIds, approver, approverRemarks);
+  const { workOrderIds, approver, approverRemarks, skippedCyclesJustification } = req.body;
+  const result = await woBulkService.bulkApprove(workOrderIds, approver, approverRemarks, skippedCyclesJustification);
   res.json(result);
 }
 

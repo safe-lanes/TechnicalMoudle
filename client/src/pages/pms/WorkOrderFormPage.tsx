@@ -379,6 +379,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
   const [currentWorkOrderStatus, setCurrentWorkOrderStatus] = useState<string>('');
   const [rejectionComments, setRejectionComments] = useState('');
   const [isProcessingApproval, setIsProcessingApproval] = useState(false);
+  const [skippedCyclesJustification, setSkippedCyclesJustification] = useState('');
 
   // Track work order type to conditionally skip frequency validation for unplanned WOs
   const [workOrderType, setWorkOrderType] = useState<'Planned' | 'Unplanned'>('Planned');
@@ -2184,12 +2185,13 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
 
     setIsProcessingApproval(true);
     try {
+      const woMissed = (workOrderContext as any)?.workOrder?.missedCycles || 0;
       const payload: Record<string, any> = {
         status: 'Completed',
-        approvalAction: 'approved'
+        approvalAction: 'approved',
+        skippedCyclesJustification: woMissed >= 1 ? skippedCyclesJustification : null
       };
 
-      // Only set dateCompleted if we have an actual completion date from the form
       if (actualCompletionDate) {
         payload.dateCompleted = actualCompletionDate;
       }
@@ -4269,9 +4271,67 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
           </SectionBlock>
 
           {/* Approval Section - Only visible for Pending Approval work orders, hidden in embedded mode and vessel view */}
-          {!embedded && currentWorkOrderStatus === 'Pending Approval' && !isVessel && (
+          {!embedded && currentWorkOrderStatus === 'Pending Approval' && !isVessel && (() => {
+            const approvalMissedCycles = (workOrderContext as any)?.workOrder?.missedCycles || 0;
+            const approvalOriginalDueDate = (workOrderContext as any)?.workOrder?.originalDueDate || '';
+            const approvalDateCompleted = (workOrderContext as any)?.workOrder?.dateCompleted || (workOrderContext as any)?.workOrder?.completionDateTime || '';
+            const justificationValid = skippedCyclesJustification.trim().length >= 20;
+            const approveDisabled = isProcessingApproval || (approvalMissedCycles >= 1 && !justificationValid);
+
+            const formatDateForDisplay = (dateStr: string) => {
+              if (!dateStr) return '—';
+              try {
+                const d = new Date(dateStr);
+                if (isNaN(d.getTime())) return dateStr;
+                const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+                return `${String(d.getDate()).padStart(2,'0')}-${months[d.getMonth()]}-${d.getFullYear()}`;
+              } catch { return dateStr; }
+            };
+
+            return (
             <div className="bg-white rounded-lg border border-gray-200 shadow-sm p-6 mt-4" data-testid="WOF.B5.1"><Marker id="WOF.B5.1" />
               <div className="space-y-4">
+
+                {approvalMissedCycles >= 1 && (
+                  <>
+                    <div
+                      style={{ backgroundColor: '#FEF2F2', border: '1px solid #EF4444', borderLeft: '4px solid #EF4444' }}
+                      className="rounded-md p-4"
+                      data-testid="alert-skipped-cycles-justification"
+                    >
+                      <p style={{ color: '#991B1B' }} className="font-bold text-sm mb-2">🚨 MANDATORY ACKNOWLEDGEMENT REQUIRED</p>
+                      <p style={{ color: '#7F1D1D' }} className="text-sm leading-relaxed">
+                        This work order has <strong>{approvalMissedCycles}</strong> skipped maintenance cycle{approvalMissedCycles > 1 ? 's' : ''}.
+                        {approvalOriginalDueDate && <> The scheduled due date was <strong>{formatDateForDisplay(approvalOriginalDueDate)}</strong>.</>}
+                        {approvalDateCompleted && <> The work was completed on <strong>{formatDateForDisplay(approvalDateCompleted)}</strong>.</>}
+                      </p>
+                      <p style={{ color: '#7F1D1D' }} className="text-sm mt-2">
+                        As Chief Engineer, you must provide a written justification explaining why these maintenance cycles were missed before you can approve this work order.
+                      </p>
+                    </div>
+
+                    <div className="space-y-2" data-testid="field-skipped-cycles-justification">
+                      <Label style={{ color: '#991B1B' }} className="text-sm font-semibold">Justification for Skipped Cycles *</Label>
+                      <Textarea
+                        value={skippedCyclesJustification}
+                        onChange={(e) => setSkippedCyclesJustification(e.target.value)}
+                        maxLength={500}
+                        placeholder={`Required: Explain why ${approvalMissedCycles} maintenance cycle${approvalMissedCycles > 1 ? 's were' : ' was'} missed. Include operational reasons, vessel conditions, or any other relevant factors. This will be permanently recorded in the audit trail.`}
+                        style={{ border: '2px solid #EF4444', borderRadius: '6px' }}
+                        className="text-sm min-h-[120px] p-3 focus:border-[#DC2626] focus:ring-0 focus:outline-none"
+                        data-testid="input-skipped-cycles-justification"
+                      />
+                      <span
+                        className="text-xs text-right block"
+                        style={{ color: skippedCyclesJustification.trim().length < 20 ? '#EF4444' : '#6B7280' }}
+                        data-testid="text-justification-char-count"
+                      >
+                        {skippedCyclesJustification.trim().length} / 500 (minimum 20 characters required)
+                      </span>
+                    </div>
+                  </>
+                )}
+
                 {/* Rejection Comments */}
                 <div className="space-y-2" data-testid="WOF.B5.2"><Marker id="WOF.B5.2" />
                   <Label className="text-base font-semibold text-[#17a2b8]">Rejection Comments</Label>
@@ -4290,8 +4350,9 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                 <div className="flex justify-center gap-4 pt-2" data-testid="WOF.B5.3"><Marker id="WOF.B5.3" />
                   <Button
                     onClick={handleApprove}
-                    disabled={isProcessingApproval}
-                    className="bg-[#28a745] hover:bg-[#218838] text-white font-semibold px-8 py-2.5 h-auto text-sm rounded-full shadow-md min-w-[120px]"
+                    disabled={approveDisabled}
+                    className={`font-semibold px-8 py-2.5 h-auto text-sm rounded-full shadow-md min-w-[120px] ${approveDisabled && !isProcessingApproval ? 'bg-gray-400 cursor-not-allowed text-white' : 'bg-[#28a745] hover:bg-[#218838] text-white'}`}
+                    title={approvalMissedCycles >= 1 && !justificationValid ? 'Please provide justification for skipped cycles before approving' : undefined}
                     data-testid="WOF.B5.4"
                   >
                     <Marker id="WOF.B5.4" />
@@ -4308,6 +4369,15 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                   </Button>
                 </div>
               </div>
+            </div>
+            );
+          })()}
+
+          {/* Read-only CE Justification for completed WOs with skipped cycles */}
+          {currentWorkOrderStatus === 'Completed' && (workOrderContext as any)?.workOrder?.skippedCyclesJustification && (
+            <div className="mt-4 rounded-lg p-4" style={{ backgroundColor: '#FEF2F2', border: '1px solid #FECACA' }} data-testid="display-skipped-cycles-justification">
+              <Label style={{ color: '#991B1B' }} className="text-sm font-semibold block mb-2">CE Justification for Skipped Cycles</Label>
+              <p className="text-sm text-gray-800 whitespace-pre-wrap">{(workOrderContext as any).workOrder.skippedCyclesJustification}</p>
             </div>
           )}
 

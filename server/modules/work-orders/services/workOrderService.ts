@@ -675,6 +675,19 @@ export async function updateWorkOrder(id: string, body: any) {
     }
   }
 
+  if (updateData.approvalAction === 'approved' && updateData.status === 'Completed') {
+    const woMissedCycles = existingWO.missedCycles || 0;
+    if (woMissedCycles >= 1) {
+      const justification = (updateData.skippedCyclesJustification || '').trim();
+      if (!justification || justification.length < 20) {
+        throw new ValidationError(
+          `This work order has ${woMissedCycles} skipped maintenance cycle(s). The Chief Engineer must provide a written justification (minimum 20 characters) explaining why these cycles were missed before approval can be granted.`,
+          { code: 'JUSTIFICATION_REQUIRED', missedCycles: woMissedCycles }
+        );
+      }
+    }
+  }
+
   const workOrder = await repo.update(id, updateData);
 
   // ========== SPARE CONSUMPTION ON SAVE (Real-time ROB update) ==========

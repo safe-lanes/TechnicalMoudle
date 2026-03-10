@@ -1755,6 +1755,38 @@ const migrations: Migration[] = [
       ALTER TABLE "job_component_links"
         ALTER COLUMN updated_at SET DEFAULT NOW()
     `
+  },
+  {
+    id: '053_add_skipped_cycle_cols_to_work_orders',
+    name: 'Add missed_cycles and original_due_date to work_orders',
+    description: 'Adds Layer 1/2 skipped cycle detection columns to work_orders table',
+    sql: `
+      ALTER TABLE work_orders
+        ADD COLUMN IF NOT EXISTS missed_cycles INTEGER DEFAULT 0,
+        ADD COLUMN IF NOT EXISTS original_due_date TEXT
+    `
+  },
+  {
+    id: '054_add_skipped_cycle_cols_to_history',
+    name: 'Add skipped cycle columns to component_maintenance_history',
+    description: 'Adds Layer 1/2/3 skipped cycle detection and backfill columns to component_maintenance_history',
+    sql: `
+      ALTER TABLE component_maintenance_history
+        ADD COLUMN IF NOT EXISTS missed_cycles INTEGER DEFAULT 0,
+        ADD COLUMN IF NOT EXISTS original_due_date TEXT,
+        ADD COLUMN IF NOT EXISTS is_skipped BOOLEAN DEFAULT false,
+        ADD COLUMN IF NOT EXISTS skipped_cycle_date TEXT,
+        ADD COLUMN IF NOT EXISTS source_work_order_id TEXT
+    `
+  },
+  {
+    id: '055_add_skipped_cycles_justification',
+    name: 'Add skipped_cycles_justification to work_orders',
+    description: 'Adds Layer 4B mandatory CE justification column for late completions with skipped cycles',
+    sql: `
+      ALTER TABLE work_orders
+        ADD COLUMN IF NOT EXISTS skipped_cycles_justification TEXT
+    `
   }
 ];
 
