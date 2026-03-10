@@ -1676,6 +1676,9 @@ export const componentMaintenanceHistory = pgTable("component_maintenance_histor
   isComponentReplaced: boolean("is_component_replaced").notNull().default(false), // Special flag for component replacement
   missedCycles: integer("missed_cycles").default(0),
   originalDueDate: text("original_due_date"),
+  isSkipped: boolean("is_skipped").default(false),
+  skippedCycleDate: text("skipped_cycle_date"),
+  sourceWorkOrderId: text("source_work_order_id"),
   createdAt: timestamp("created_at").notNull().defaultNow(), // IMMUTABLE - no updates/deletes allowed
 }, (table) => ({
   componentIdIdx: index("idx_history_component_id").on(table.componentId),

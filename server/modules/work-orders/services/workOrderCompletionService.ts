@@ -252,6 +252,27 @@ export async function completeWorkOrder(
     console.error('Failed to create maintenance history record:', historyError);
   }
 
+  if (missedCycles >= 1 && workOrder.maintenanceBasis === 'Calendar' && component) {
+    try {
+      const { createSkippedCycleRecords } = await import('../utils/skippedCycleBackfill');
+      await createSkippedCycleRecords({
+        workOrderId: workOrder.wouuid || workOrder.id,
+        componentId: component.cuuid,
+        componentCode: workOrder.componentCode || component.componentCode || null,
+        vesselCode: workOrder.vesselId || component.vesselId || null,
+        jobId: workOrder.jobId || null,
+        jobCode: workOrder.jobCode || null,
+        jobTitle: workOrder.jobTitle || null,
+        originalDueDate,
+        missedCycles,
+        frequencyValue: workOrder.frequencyValue,
+        frequencyUnit: workOrder.frequencyUnit
+      });
+    } catch (err) {
+      console.error('[BACKFILL ERROR] Failed to create skipped cycle records:', err);
+    }
+  }
+
   // Auto-update parent job's cycle fields
   try {
     let job: any = null;

@@ -3077,15 +3077,30 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
               <span data-testid="WOF.A5.8"><Marker id="WOF.A5.8" /></span>
             </div>
             {(() => {
-              const allHistory = (templateData.workHistory || []).map((history: any) => ({
-                date: history.completionDate || history.workDate,
-                workOrder: history.woNo,
-                description: history.description || '-',
-                performedBy: history.performedBy,
-                status: history.status?.toLowerCase() === 'completed' ? ('completed' as const) : ('postponed' as const),
-                remarks: history.remarks || '-',
-                missedCycles: history.missedCycles || 0
-              }));
+              const allHistory = (templateData.workHistory || []).map((history: any) => {
+                if (history.isSkipped) {
+                  return {
+                    date: history.skippedCycleDate || history.completionDate || history.workDate,
+                    workOrder: '—',
+                    description: 'Cycle not performed',
+                    performedBy: '—',
+                    status: 'skipped' as const,
+                    remarks: `Automatically recorded. See WO: ${history.sourceWorkOrderId ? history.sourceWorkOrderId.slice(-8) : '—'}`,
+                    missedCycles: 0,
+                    isSkipped: true
+                  };
+                }
+                return {
+                  date: history.completionDate || history.workDate,
+                  workOrder: history.woNo,
+                  description: history.description || '-',
+                  performedBy: history.performedBy,
+                  status: history.status?.toLowerCase() === 'completed' ? ('completed' as const) : ('postponed' as const),
+                  remarks: history.remarks || '-',
+                  missedCycles: history.missedCycles || 0,
+                  isSkipped: false
+                };
+              });
               const totalCount = allHistory.length;
 
               if (!workHistoryExpanded) {
@@ -3100,11 +3115,19 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                         { key: 'performedBy', label: 'Performed By', width: '15%' },
                         { key: 'status', label: 'Status', width: '13%', render: (value: any, row: any) => (
                           <div className="flex flex-col gap-1">
-                            <StatusPill status={value} />
-                            {row?.missedCycles >= 1 && (
-                              <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-amber-500 text-white whitespace-nowrap" data-testid={`badge-history-skipped-${row.workOrder}`}>
-                                ⚠ {row.missedCycles} Skipped
+                            {value === 'skipped' ? (
+                              <span className="px-2 py-0.5 rounded-full text-xs font-medium text-white whitespace-nowrap" style={{ backgroundColor: '#EF4444' }} data-testid={`badge-status-skipped-${row.date}`}>
+                                SKIPPED
                               </span>
+                            ) : (
+                              <>
+                                <StatusPill status={value} />
+                                {row?.missedCycles >= 1 && (
+                                  <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-amber-500 text-white whitespace-nowrap" data-testid={`badge-history-skipped-${row.workOrder}`}>
+                                    ⚠ {row.missedCycles} Skipped
+                                  </span>
+                                )}
+                              </>
                             )}
                           </div>
                         )},
@@ -3143,11 +3166,19 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                       { key: 'performedBy', label: 'Performed By', width: '15%' },
                       { key: 'status', label: 'Status', width: '13%', render: (value: any, row: any) => (
                         <div className="flex flex-col gap-1">
-                          <StatusPill status={value} />
-                          {row?.missedCycles >= 1 && (
-                            <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-amber-500 text-white whitespace-nowrap" data-testid={`badge-history-skipped-${row.workOrder}`}>
-                              ⚠ {row.missedCycles} Skipped
+                          {value === 'skipped' ? (
+                            <span className="px-2 py-0.5 rounded-full text-xs font-medium text-white whitespace-nowrap" style={{ backgroundColor: '#EF4444' }} data-testid={`badge-status-skipped-${row.date}`}>
+                              SKIPPED
                             </span>
+                          ) : (
+                            <>
+                              <StatusPill status={value} />
+                              {row?.missedCycles >= 1 && (
+                                <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-amber-500 text-white whitespace-nowrap" data-testid={`badge-history-skipped-${row.workOrder}`}>
+                                  ⚠ {row.missedCycles} Skipped
+                                </span>
+                              )}
+                            </>
                           )}
                         </div>
                       )},

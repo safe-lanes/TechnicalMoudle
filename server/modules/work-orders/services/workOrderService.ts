@@ -845,6 +845,27 @@ export async function updateWorkOrder(id: string, body: any) {
         const originalDueDate = freshWorkOrder.nextDueDate || freshWorkOrder.dueDate || null;
         await repo.update(id, { missedCycles, originalDueDate });
 
+        if (missedCycles >= 1 && freshWorkOrder.maintenanceBasis === 'Calendar') {
+          try {
+            const { createSkippedCycleRecords } = await import('../utils/skippedCycleBackfill');
+            await createSkippedCycleRecords({
+              workOrderId: freshWorkOrder.wouuid || freshWorkOrder.id,
+              componentId: component.cuuid,
+              componentCode: freshWorkOrder.componentCode || component.componentCode || null,
+              vesselCode: freshWorkOrder.vesselId || component.vesselId || null,
+              jobId: freshWorkOrder.jobId || null,
+              jobCode: freshWorkOrder.jobCode || null,
+              jobTitle: freshWorkOrder.jobTitle || null,
+              originalDueDate,
+              missedCycles,
+              frequencyValue: freshWorkOrder.frequencyValue,
+              frequencyUnit: freshWorkOrder.frequencyUnit
+            });
+          } catch (err) {
+            console.error('[BACKFILL ERROR] Failed to create skipped cycle records:', err);
+          }
+        }
+
         // Create maintenance history record
         try {
           const existingHistory = await repo.findMaintenanceHistoryByWorkOrderId(freshWorkOrder.wouuid);

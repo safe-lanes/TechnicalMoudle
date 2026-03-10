@@ -80,6 +80,28 @@ export async function bulkApprove(workOrderIds: string[], approver?: string, app
       }
 
       await repo.update(workOrderId, updateData);
+
+      if (missedCycles >= 1 && existingWO.maintenanceBasis === 'Calendar') {
+        try {
+          const { createSkippedCycleRecords } = await import('../utils/skippedCycleBackfill');
+          await createSkippedCycleRecords({
+            workOrderId: existingWO.wouuid || workOrderId,
+            componentId: existingWO.componentId || '',
+            componentCode: existingWO.componentCode || null,
+            vesselCode: existingWO.vesselId || null,
+            jobId: existingWO.jobId || null,
+            jobCode: existingWO.jobCode || null,
+            jobTitle: existingWO.jobTitle || null,
+            originalDueDate,
+            missedCycles,
+            frequencyValue: existingWO.frequencyValue || '0',
+            frequencyUnit: existingWO.frequencyUnit || ''
+          });
+        } catch (err) {
+          console.error('[BACKFILL ERROR] Failed to create skipped cycle records (bulk):', err);
+        }
+      }
+
       results.success.push(workOrderId);
       console.log(`✅ Approved work order: ${workOrderId}`);
     } catch (err: any) {

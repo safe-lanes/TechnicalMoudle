@@ -130,7 +130,7 @@ export async function getWorkOrderContext(workOrderId: string) {
     return dateB.localeCompare(dateA);
   });
 
-  const workHistory = workHistoryWOs.map((wo: any) => ({
+  const workHistory: any[] = workHistoryWOs.map((wo: any) => ({
     woNo: wo.workOrderNo || wo.woExecutionId || wo.id || '-',
     assignedTo: wo.assignedTo || '-',
     performedBy: wo.performedBy || wo.assignedTo || '-',
@@ -141,8 +141,44 @@ export async function getWorkOrderContext(workOrderId: string) {
     description: wo.workCarriedOut || wo.jobTitle || 'Maintenance completed',
     remarks: wo.completionRemarks || wo.remarks || wo.jobExperienceNotes || '',
     missedCycles: wo.missedCycles || 0,
-    originalDueDate: wo.originalDueDate || null
+    originalDueDate: wo.originalDueDate || null,
+    isSkipped: false,
+    skippedCycleDate: null,
+    sourceWorkOrderId: null
   }));
+
+  if (job?.juuid) {
+    try {
+      const maintenanceHistoryRecords = await repo.findMaintenanceHistoryByJobId(job.juuid);
+      const skippedRecords = maintenanceHistoryRecords.filter((h: any) => h.isSkipped === true);
+      for (const h of skippedRecords) {
+        workHistory.push({
+          woNo: '-',
+          assignedTo: '-',
+          performedBy: '-',
+          workDate: h.skippedCycleDate || h.dateCompleted || '',
+          runDate: '',
+          completionDate: h.dateCompleted || h.skippedCycleDate || '',
+          status: 'SKIPPED',
+          description: h.workDescription || 'Cycle not performed',
+          remarks: h.remarks || '',
+          missedCycles: 0,
+          originalDueDate: h.originalDueDate || null,
+          isSkipped: true,
+          skippedCycleDate: h.skippedCycleDate || null,
+          sourceWorkOrderId: h.sourceWorkOrderId || null
+        });
+      }
+    } catch (err) {
+      console.error('[CONTEXT] Failed to fetch skipped maintenance history records:', err);
+    }
+  }
+
+  workHistory.sort((a: any, b: any) => {
+    const dateA = a.completionDate || a.workDate || '';
+    const dateB = b.completionDate || b.workDate || '';
+    return dateB.localeCompare(dateA);
+  });
 
   // Build templateData from job data (Part A - immutable from job definition)
   // This ensures Section A is populated from the job template

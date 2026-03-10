@@ -173,6 +173,10 @@ export async function findMaintenanceHistoryByWorkOrderId(woId: string) {
   return storage.getMaintenanceHistoryByWorkOrderId(woId);
 }
 
+export async function findMaintenanceHistoryByJobId(jobId: string) {
+  return storage.getMaintenanceHistoryByJobId(jobId);
+}
+
 // ── Job Component Links ──
 
 export async function updateJobComponentLinkTracking(vesselId: string, jobId: string, componentId: string, data: any) {
