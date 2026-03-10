@@ -15,7 +15,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
-import { Search, Edit2, Clock, Trash2, FileSpreadsheet, X, MessageSquare, Calendar, PlusCircle, MinusCircle, Download, AlertCircle, CheckCircle, HelpCircle, MapPin, ChevronDown, ChevronsUpDown, Plus, Check, RotateCcw } from "lucide-react";
+import { Search, Edit2, Clock, Trash2, FileSpreadsheet, X, MessageSquare, Calendar, PlusCircle, MinusCircle, Download, AlertCircle, CheckCircle, HelpCircle, MapPin, ChevronDown, ChevronsUpDown, Plus, Check, RotateCcw, Info } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
@@ -584,6 +584,10 @@ const Stores: React.FC = () => {
     }
   };
   
+  // View modal state (read-only item details)
+  const [isViewModalOpen, setIsViewModalOpen] = useState(false);
+  const [viewingItem, setViewingItem] = useState<StoreItem | null>(null);
+
   // Edit modal state
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [editingItem, setEditingItem] = useState<StoreItem | null>(null);
@@ -1050,6 +1054,12 @@ const Stores: React.FC = () => {
     });
   };
   
+  // Handle View Item Details (read-only)
+  const openViewModal = (item: StoreItem) => {
+    setViewingItem(item);
+    setIsViewModalOpen(true);
+  };
+
   // Handle Edit Item
   const openEditModal = (item: StoreItem) => {
     setEditingItem(item);
@@ -2304,6 +2314,18 @@ const Stores: React.FC = () => {
                     )
                   ) : (
                     <>
+                      <Button 
+                        variant="ghost" 
+                        size="sm" 
+                        className="h-7 w-7 p-0 hover:bg-gray-100"
+                        onClick={() => openViewModal(item)}
+                        aria-label="View Details"
+                        title="View Details"
+                        data-testid={index === 0 ? getMarkerId(activeTab, "30") : `button-info-${item.id}`}
+                      >
+                        {index === 0 && <Marker id={getMarkerId(activeTab, "30")} />}
+                        <Info className="h-4 w-4 text-blue-600" />
+                      </Button>
                       {!isVessel && (
                         <Button 
                           variant="ghost" 
@@ -2318,18 +2340,6 @@ const Stores: React.FC = () => {
                           <Edit2 className="h-4 w-4" />
                         </Button>
                       )}
-                      <Button 
-                        variant="ghost" 
-                        size="sm" 
-                        className="h-7 w-7 p-0 hover:bg-gray-100"
-                        onClick={() => openConsumeReceiveModal(item)}
-                        aria-label="Consume/Receive"
-                        title="Consume/Receive"
-                        data-testid={index === 0 ? getMarkerId(activeTab, "30") : `button-consume-receive-${item.id}`}
-                      >
-                        {index === 0 && <Marker id={getMarkerId(activeTab, "30")} />}
-                        <PlusCircle className="h-4 w-4" />
-                      </Button>
                       {!isVessel && (
                         <Button 
                           variant="ghost" 
@@ -3153,6 +3163,228 @@ const Stores: React.FC = () => {
             ) : (
               <Button onClick={saveEditItem} data-testid="button-edit-save">Save Changes</Button>
             )}
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* View Item Details Modal (Read-Only) */}
+      <Dialog open={isViewModalOpen} onOpenChange={setIsViewModalOpen}>
+        <DialogContent className="sm:max-w-[600px] max-h-[85vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Item Details</DialogTitle>
+          </DialogHeader>
+          {viewingItem && (
+          <div className="grid gap-4 py-4">
+            <div className="grid grid-cols-2 gap-4">
+              <div className="grid gap-2">
+                <Label>Item Code</Label>
+                <Input value={viewingItem.itemCode || ''} disabled className="bg-gray-100" data-testid="input-view-item-code" />
+              </div>
+              <div className="grid gap-2">
+                <Label>IMPA Code</Label>
+                <Input value={viewingItem.impaCode || ''} disabled className="bg-gray-100" data-testid="input-view-impa-code" />
+              </div>
+            </div>
+
+            <div className="grid gap-2">
+              <Label>Item Name</Label>
+              <Input value={viewingItem.itemName || ''} disabled className="bg-gray-100" data-testid="input-view-item-name" />
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div className="grid gap-2">
+                <Label>Stores Category</Label>
+                <Input value={viewingItem.storesCategory || ''} disabled className="bg-gray-100" data-testid="input-view-category" />
+              </div>
+              <div className="grid gap-2">
+                <Label>Unit of Measure</Label>
+                <Input value={viewingItem.uom || ''} disabled className="bg-gray-100" data-testid="input-view-uom" />
+              </div>
+            </div>
+
+            <div className="grid gap-2">
+              <Label>Specification</Label>
+              <Input value={viewingItem.specification || ''} disabled className="bg-gray-100" data-testid="input-view-specification" />
+            </div>
+
+            <div className="border-t pt-4">
+              <Label className="text-base font-semibold text-gray-700 mb-2 block">Stock Levels</Label>
+              <div className="grid grid-cols-3 gap-4">
+                <div className="grid gap-2">
+                  <Label>ROB (Total)</Label>
+                  <Input type="number" value={viewingItem.rob || 0} disabled className="bg-gray-100" data-testid="input-view-rob" />
+                </div>
+                <div className="grid gap-2">
+                  <Label>Min Stock</Label>
+                  <Input type="number" value={viewingItem.min || 0} disabled className="bg-gray-100" data-testid="input-view-min" />
+                </div>
+                <div className="grid gap-2">
+                  <Label>Max Stock</Label>
+                  <Input type="number" value={viewingItem.max || 0} disabled className="bg-gray-100" data-testid="input-view-max" />
+                </div>
+              </div>
+            </div>
+
+            <div className="border-t pt-4">
+              <Label className="text-base font-semibold text-gray-700 mb-2 block">Location Details</Label>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="grid gap-2">
+                  <Label>Location A Name</Label>
+                  <Input value={viewingItem.locationAName || ''} disabled className="bg-gray-100" data-testid="input-view-location-a" />
+                </div>
+                <div className="grid gap-2">
+                  <Label>ROB at Location A</Label>
+                  <Input type="number" value={viewingItem.robLocationA || 0} disabled className="bg-gray-100" data-testid="input-view-rob-location-a" />
+                </div>
+                <div className="grid gap-2">
+                  <Label>Location B Name</Label>
+                  <Input value={viewingItem.locationBName || ''} disabled className="bg-gray-100" data-testid="input-view-location-b" />
+                </div>
+                <div className="grid gap-2">
+                  <Label>ROB at Location B</Label>
+                  <Input type="number" value={viewingItem.robLocationB || 0} disabled className="bg-gray-100" data-testid="input-view-rob-location-b" />
+                </div>
+              </div>
+            </div>
+
+            <div className="border-t pt-4">
+              <Label className="text-base font-semibold text-gray-700 mb-2 block">Supplier & Costing</Label>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="grid gap-2">
+                  <Label>Supplier</Label>
+                  <Input value={viewingItem.supplier || ''} disabled className="bg-gray-100" data-testid="input-view-supplier" />
+                </div>
+                <div className="grid gap-2">
+                  <Label>Unit Cost</Label>
+                  <Input type="number" value={viewingItem.unitCost || 0} disabled className="bg-gray-100" data-testid="input-view-unit-cost" />
+                </div>
+                <div className="grid gap-2">
+                  <Label>Last Order Date</Label>
+                  <Input type="date" value={viewingItem.lastOrderDate || ''} disabled className="bg-gray-100" data-testid="input-view-last-order-date" />
+                </div>
+                <div className="grid gap-2">
+                  <Label>Lead Time</Label>
+                  <Input value={viewingItem.leadTime || ''} disabled className="bg-gray-100" data-testid="input-view-lead-time" />
+                </div>
+              </div>
+            </div>
+
+            {FEATURES.IHM && (
+              <div className="border-t pt-4">
+                <Label className="text-base font-semibold text-gray-700 mb-2 block">IHM (Inventory of Hazardous Materials)</Label>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="grid gap-2">
+                    <Label>IHM Presence</Label>
+                    <Input value={viewingItem.ihmPresence || 'Unknown'} disabled className="bg-gray-100" data-testid="input-view-ihm-presence" />
+                  </div>
+                  <div className="grid gap-2">
+                    <Label>IHM Evidence Type</Label>
+                    <Input value={viewingItem.ihmEvidenceType || 'None'} disabled className="bg-gray-100" data-testid="input-view-ihm-evidence" />
+                  </div>
+                </div>
+                <div className="grid gap-2 mt-4">
+                  <Label>IHM Details</Label>
+                  <Textarea value={viewingItem.ihmDetails || ''} disabled className="bg-gray-100" rows={2} data-testid="textarea-view-ihm-details" />
+                </div>
+              </div>
+            )}
+
+            {activeTab === "chemicals" && (
+              <div className="border-t pt-4">
+                <Label className="text-base font-semibold text-gray-700 mb-2 block">Expiry & Date Information</Label>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="grid gap-2">
+                    <Label>Manufacture Date</Label>
+                    <Input type="date" value={viewingItem.manufactureDate || ''} disabled className="bg-gray-100" data-testid="input-view-manufacture-date" />
+                  </div>
+                  <div className="grid gap-2">
+                    <Label>Expiry Date</Label>
+                    <Input type="date" value={viewingItem.expiryDate || ''} disabled className="bg-gray-100" data-testid="input-view-expiry-date" />
+                  </div>
+                  <div className="grid gap-2">
+                    <Label>Batch Number</Label>
+                    <Input value={viewingItem.batchNumber || ''} disabled className="bg-gray-100" data-testid="input-view-batch-number" />
+                  </div>
+                  <div className="grid gap-2">
+                    <Label>Lot Number</Label>
+                    <Input value={viewingItem.lotNumber || ''} disabled className="bg-gray-100" data-testid="input-view-lot-number" />
+                  </div>
+                  <div className="grid gap-2">
+                    <Label>Shelf Life (months)</Label>
+                    <Input type="number" value={viewingItem.shelfLifeMonths || ''} disabled className="bg-gray-100" data-testid="input-view-shelf-life" />
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {activeTab === "chemicals" && (
+              <div className="border-t pt-4">
+                <Label className="text-base font-semibold text-gray-700 mb-2 block">Safety Data Sheet (SDS)</Label>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="grid gap-2">
+                    <Label>SDS Reference Number</Label>
+                    <Input value={viewingItem.sdsReference || ''} disabled className="bg-gray-100" data-testid="input-view-sds-reference" />
+                  </div>
+                  <div className="grid gap-2">
+                    <Label>SDS Last Updated</Label>
+                    <Input type="date" value={viewingItem.sdsLastUpdated || ''} disabled className="bg-gray-100" data-testid="input-view-sds-last-updated" />
+                  </div>
+                  <div className="grid gap-2">
+                    <Label>Hazard Classification</Label>
+                    <Input value={viewingItem.hazardClassification || ''} disabled className="bg-gray-100" data-testid="input-view-hazard-class" />
+                  </div>
+                  <div className="grid gap-2">
+                    <Label>UN Number</Label>
+                    <Input value={viewingItem.unNumber || ''} disabled className="bg-gray-100" data-testid="input-view-un-number" />
+                  </div>
+                  <div className="grid gap-2">
+                    <Label>Flash Point</Label>
+                    <Input value={viewingItem.flashPoint || ''} disabled className="bg-gray-100" data-testid="input-view-flash-point" />
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {activeTab === "chemicals" && (
+              <div className="border-t pt-4">
+                <Label className="text-base font-semibold text-gray-700 mb-2 block">Storage & Safety</Label>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="grid gap-2">
+                    <Label>Min Storage Temp (°C)</Label>
+                    <Input value={viewingItem.storageTempMin || ''} disabled className="bg-gray-100" data-testid="input-view-temp-min" />
+                  </div>
+                  <div className="grid gap-2">
+                    <Label>Max Storage Temp (°C)</Label>
+                    <Input value={viewingItem.storageTempMax || ''} disabled className="bg-gray-100" data-testid="input-view-temp-max" />
+                  </div>
+                </div>
+                <div className="grid gap-2 mt-4">
+                  <Label>PPE Requirements</Label>
+                  <Textarea value={viewingItem.ppeRequirements || ''} disabled className="bg-gray-100" rows={2} data-testid="textarea-view-ppe" />
+                </div>
+                <div className="grid gap-2 mt-4">
+                  <Label>Disposal Instructions</Label>
+                  <Textarea value={viewingItem.disposalInstructions || ''} disabled className="bg-gray-100" rows={2} data-testid="textarea-view-disposal" />
+                </div>
+                <div className="grid gap-2 mt-4">
+                  <Label>Emergency Contact</Label>
+                  <Input value={viewingItem.emergencyContact || ''} disabled className="bg-gray-100" data-testid="input-view-emergency-contact" />
+                </div>
+              </div>
+            )}
+
+            <div className="border-t pt-4">
+              <div className="grid gap-2">
+                <Label>Remarks</Label>
+                <Textarea value={viewingItem.remarks || ''} disabled className="bg-gray-100" rows={2} data-testid="textarea-view-remarks" />
+              </div>
+            </div>
+          </div>
+          )}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsViewModalOpen(false)} data-testid="button-view-close">
+              Close
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
