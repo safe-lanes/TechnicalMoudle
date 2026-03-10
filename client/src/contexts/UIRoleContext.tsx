@@ -5,7 +5,7 @@ import { secureGetItem } from "@/utils/secureStorage";
 import { useAuth } from "@/contexts/AuthContext";
 
 interface UIRoleContextType {
-  uiRole: UIRole;
+  uiRole: UIRole | null;
   setUIRole: (role: UIRole) => void;
   isSailAdmin: boolean;
   isClientAdmin: boolean;
@@ -31,9 +31,17 @@ interface UIRoleProviderProps {
 
 export function UIRoleProvider({ children }: UIRoleProviderProps) {
   const { currentUser } = useAuth();
-  const [uiRole, setUIRoleState] = useState<UIRole>("Sail_Admin");
+  const [uiRole, setUIRoleState] = useState<UIRole | null>(null);
 
   useEffect(() => {
+    if (currentUser?.role) {
+      const mapped = CURRENT_USER_ROLE_TO_UI[currentUser.role];
+      if (mapped) {
+        setUIRoleState(mapped);
+        return;
+      }
+    }
+
     const plainUserType = localStorage.getItem("userType");
     let plainProfile: { role?: string } | null = null;
     try {
@@ -52,14 +60,6 @@ export function UIRoleProvider({ children }: UIRoleProviderProps) {
     if (storedRole && UI_ROLES.includes(storedRole)) {
       setUIRoleState(storedRole);
       return;
-    }
-
-    if (currentUser?.role) {
-      const mapped = CURRENT_USER_ROLE_TO_UI[currentUser.role];
-      if (mapped) {
-        setUIRoleState(mapped);
-        return;
-      }
     }
   }, [currentUser]);
 

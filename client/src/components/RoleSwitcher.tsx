@@ -34,7 +34,7 @@ export function RoleSwitcher() {
           </DropdownMenuTrigger>
         </TooltipTrigger>
         <TooltipContent side="bottom" className="bg-gray-900 text-white">
-          <p>{UI_ROLE_LABELS[uiRole]}</p>
+          <p>{uiRole ? UI_ROLE_LABELS[uiRole] : "Loading..."}</p>
         </TooltipContent>
       </Tooltip>
       <DropdownMenuContent align="end" className="w-40">

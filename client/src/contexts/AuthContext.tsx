@@ -4,14 +4,6 @@ import type { UIRole } from "@shared/uiRoles";
 import { mapLoggedRoleToUIRole } from "@shared/uiRoles";
 import { secureGetItem } from "@/utils/secureStorage";
 import { analyzeLocalStorage } from "@/utils/localStorageAnalyzer";
-import {
-  generateRoleAccessData,
-  getRoleAccessData,
-  canAccessModule as checkModuleAccess,
-  canPerformAction as checkAction,
-  type RoleAccessData,
-  type ModulePermissions,
-} from "@/utils/roleAccessData";
 
 const ROLE_TO_UI_TYPE: Record<UserRole, UIRole> = {
   Ship: "Vessel",
@@ -46,9 +38,6 @@ interface AuthContextType {
   canDownloadDocument: (shipDownloadable: boolean) => boolean;
   canModifyData: () => boolean;
   canApproveChanges: () => boolean;
-  roleAccessData: RoleAccessData | null;
-  canAccessModule: (moduleName: keyof RoleAccessData["modules"], permission: keyof ModulePermissions) => boolean;
-  canPerformAction: (actionName: keyof RoleAccessData["actions"]) => boolean;
   userType: UIRole | null;
   login: (user: PublicUser) => void;
   logout: () => void;
@@ -62,7 +51,6 @@ interface AuthProviderProps {
 
 export function AuthProvider({ children }: AuthProviderProps) {
   const [currentUser, setCurrentUser] = useState<PublicUser | null>(null);
-  const [roleAccessData, setRoleAccessDataState] = useState<RoleAccessData | null>(null);
   const [userType, setUserType] = useState<UIRole | null>(null);
 
   useEffect(() => {
@@ -86,13 +74,6 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
     if (storedProfile) {
       resolvedUser = storedProfile;
-
-      const storedAccessData = getRoleAccessData();
-      if (storedAccessData) {
-        setRoleAccessDataState(storedAccessData);
-      } else {
-        setRoleAccessDataState(generateRoleAccessData(storedProfile.role));
-      }
 
       if (!resolvedUserType) {
         const storedType = secureGetItem<UIRole>("userType");
@@ -119,10 +100,8 @@ export function AuthProvider({ children }: AuthProviderProps) {
         updatedAt: new Date(),
       };
       resolvedUser = user;
-      setRoleAccessDataState(generateRoleAccessData(role));
     } else {
       resolvedUser = DEFAULT_USER;
-      setRoleAccessDataState(generateRoleAccessData(DEFAULT_USER.role));
       resolvedUserType = ROLE_TO_UI_TYPE[DEFAULT_USER.role];
     }
 
@@ -184,16 +163,13 @@ export function AuthProvider({ children }: AuthProviderProps) {
       updatedAt: user.updatedAt,
     };
     const derivedUIType = ROLE_TO_UI_TYPE[user.role] || "Vessel";
-    const accessData = generateRoleAccessData(user.role);
 
     setCurrentUser(sanitizedUser);
-    setRoleAccessDataState(accessData);
     setUserType(derivedUIType);
   };
 
   const logout = () => {
     setCurrentUser(null);
-    setRoleAccessDataState(null);
     setUserType(null);
   };
 
@@ -208,9 +184,6 @@ export function AuthProvider({ children }: AuthProviderProps) {
     canDownloadDocument,
     canModifyData,
     canApproveChanges,
-    roleAccessData,
-    canAccessModule: (moduleName, permission) => checkModuleAccess(moduleName, permission, roleAccessData),
-    canPerformAction: (actionName) => checkAction(actionName, roleAccessData),
     userType,
     login,
     logout,
