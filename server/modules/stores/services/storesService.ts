@@ -155,6 +155,12 @@ export async function deleteStoresItem(itemId: string): Promise<void> {
   return repo.deleteStoresItem(itemId);
 }
 
+// ── Inactivate Store Item (soft delete via isActive=false) ──
+
+export async function inactivateStoresItem(itemId: string, vesselId?: string): Promise<void> {
+  return repo.inactivateStoresItem(itemId, vesselId);
+}
+
 // ── Batch Consume ──
 
 export async function batchConsume(

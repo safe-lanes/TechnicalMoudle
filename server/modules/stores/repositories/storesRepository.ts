@@ -23,6 +23,10 @@ export async function deleteStoresItem(id: string): Promise<void> {
   return storage.deleteStoresItem(id);
 }
 
+export async function inactivateStoresItem(id: string, vesselId?: string): Promise<void> {
+  return storage.inactivateStoresItem(id, vesselId);
+}
+
 // ── Stock Operations ──
 
 export async function consumeStoresItem(

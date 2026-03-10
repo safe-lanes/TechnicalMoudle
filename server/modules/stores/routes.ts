@@ -38,6 +38,9 @@ router.get('/stores/:vesselId/history', asyncHandler(storesCtrl.getTransactionHi
 // POST /stores/:vesselId/create — create store item (requireAuth)
 router.post('/stores/:vesselId/create', requireAuth, asyncHandler(storesCtrl.createStoresItem as any));
 
+// POST /stores/:vesselId/:id/inactivate — soft delete via isActive=false (requireAuth)
+router.post('/stores/:vesselId/:id/inactivate', requireAuth, asyncHandler(storesCtrl.inactivateStoresItem as any));
+
 // POST /stores/:vesselId/batch-consume — batch consume (requireAuth)
 router.post('/stores/:vesselId/batch-consume', requireAuth, asyncHandler(storesCtrl.batchConsume as any));
 

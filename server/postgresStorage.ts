@@ -3263,14 +3263,26 @@ export class PostgresStorage {
         .where(and(
           eq(storesItems.vesselId, vesselId),
           eq(storesItems.itemType, itemType),
-          eq(storesItems.deleted, false)
+          eq(storesItems.deleted, false),
+          eq(storesItems.isActive, true)
         ));
     }
     return await db.select().from(storesItems)
       .where(and(
         eq(storesItems.vesselId, vesselId),
-        eq(storesItems.deleted, false)
+        eq(storesItems.deleted, false),
+        eq(storesItems.isActive, true)
       ));
+  }
+
+  async inactivateStoresItem(id: string, vesselId?: string): Promise<void> {
+    const db = await getDb();
+    const numId = Number(id);
+    const idCondition = or(eq(storesItems.stuuid, id), ...(Number.isInteger(numId) && numId > 0 ? [eq(storesItems.id, numId)] : []));
+    const condition = vesselId ? and(idCondition, eq(storesItems.vesselId, vesselId)) : idCondition;
+    await db.update(storesItems)
+      .set({ isActive: false, updatedAt: new Date() })
+      .where(condition);
   }
 
   async getStoresItem(id: string): Promise<StoresItem | undefined> {

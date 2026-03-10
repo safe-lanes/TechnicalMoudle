@@ -646,6 +646,7 @@ export interface IStorage {
   createStoresItem(item: InsertStoresItem, userId?: string): Promise<StoresItem>;
   updateStoresItem(id: string, data: Partial<StoresItem>): Promise<StoresItem>;
   deleteStoresItem(id: string): Promise<void>;
+  inactivateStoresItem(id: string, vesselId?: string): Promise<void>;
   consumeStoresItem(id: string, quantity: number, location: 'A' | 'B', userId: string, remarks?: string, place?: string, dateLocal?: string, tz?: string): Promise<StoresItem>;
   receiveStoresItem(id: string, quantity: number, location: 'A' | 'B', userId: string, remarks?: string, ref?: string, place?: string, dateLocal?: string, tz?: string): Promise<StoresItem>;
   transferStoresItemLocation(id: string, newRobLocationA: string, newRobLocationB: string, userId: string, remarks?: string, place?: string, dateLocal?: string, tz?: string): Promise<{ item: StoresItem; isTransfer: boolean }>;

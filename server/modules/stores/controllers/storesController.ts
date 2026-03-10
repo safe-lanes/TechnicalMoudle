@@ -138,6 +138,18 @@ export async function deleteStoresItem(req: AuthenticatedRequest, res: Response)
   }
 }
 
+// ── POST /stores/:vesselId/:id/inactivate ──
+
+export async function inactivateStoresItem(req: AuthenticatedRequest, res: Response) {
+  try {
+    const { vesselId, id: itemId } = req.params;
+    await storesService.inactivateStoresItem(itemId, vesselId);
+    res.json({ success: true });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message || "Failed to inactivate stores item" });
+  }
+}
+
 // ── POST /stores/:vesselId/batch-consume ──
 
 export async function batchConsume(req: AuthenticatedRequest, res: Response) {
