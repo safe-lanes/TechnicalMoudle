@@ -3617,6 +3617,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                 </div>
 
                 {(() => {
+                  if (isPartBReadOnly) return null;
                   const maintenanceBasis = templateData.maintenanceBasis || (workOrderContext as any)?.maintenanceBasis;
                   if (maintenanceBasis === 'Running Hours') return null;
                   const completionDateVal = executionData.dateOfCompletion || (executionData.completionDateTime ? executionData.completionDateTime.split('T')[0] : '');
