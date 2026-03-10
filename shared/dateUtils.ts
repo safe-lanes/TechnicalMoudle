@@ -163,10 +163,23 @@ export function calculateNextDueDate(
         return null;
     }
 
-    // Calculate next due date
-    const nextDue = add(parsedDate, { [durationKey]: numericInterval });
-    
-    // Format back to DD-MMM-YYYY
+    let nextDue = add(parsedDate, { [durationKey]: numericInterval });
+
+    if (originalDueDate && lastDoneDate) {
+      const normalizedCompletion = normalizeDateToDDMMMYYYY(lastDoneDate);
+      if (normalizedCompletion) {
+        const completionDate = parse(normalizedCompletion, 'dd-MMM-yyyy', new Date());
+        if (isValid(completionDate)) {
+          let rollCount = 0;
+          const maxRolls = 1000;
+          while (nextDue <= completionDate && rollCount < maxRolls) {
+            nextDue = add(nextDue, { [durationKey]: numericInterval });
+            rollCount++;
+          }
+        }
+      }
+    }
+
     return format(nextDue, 'dd-MMM-yyyy');
   } catch (error) {
     console.error('Error calculating next due date:', { lastDoneDate, intervalValue, intervalUnit, error });

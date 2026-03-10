@@ -4275,7 +4275,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
             const approvalMissedCycles = (workOrderContext as any)?.workOrder?.missedCycles || 0;
             const approvalOriginalDueDate = (workOrderContext as any)?.workOrder?.originalDueDate || '';
             const approvalDateCompleted = (workOrderContext as any)?.workOrder?.dateCompleted || (workOrderContext as any)?.workOrder?.completionDateTime || '';
-            const justificationValid = skippedCyclesJustification.trim().length >= 20;
+            const justificationValid = skippedCyclesJustification.trim().length >= 30;
             const approveDisabled = isProcessingApproval || (approvalMissedCycles >= 1 && !justificationValid);
 
             const formatDateForDisplay = (dateStr: string) => {
@@ -4323,10 +4323,10 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                       />
                       <span
                         className="text-xs text-right block"
-                        style={{ color: skippedCyclesJustification.trim().length < 20 ? '#EF4444' : '#6B7280' }}
+                        style={{ color: skippedCyclesJustification.trim().length < 30 ? '#EF4444' : '#6B7280' }}
                         data-testid="text-justification-char-count"
                       >
-                        {skippedCyclesJustification.trim().length} / 500 (minimum 20 characters required)
+                        {skippedCyclesJustification.trim().length} / 500 (minimum 30 characters required)
                       </span>
                     </div>
                   </>

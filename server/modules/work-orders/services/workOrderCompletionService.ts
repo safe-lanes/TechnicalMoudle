@@ -239,7 +239,9 @@ export async function completeWorkOrder(
         status: 'Approved' as const,
         workDescription: executionData.workDone || workOrder.briefWorkDescription || null,
         sparesUsed: executionData.sparesUsed || null,
-        remarks: executionData.remarks || null,
+        remarks: missedCycles >= 1
+          ? `${missedCycles} cycles skipped — completed late${executionData.remarks ? '. ' + executionData.remarks : ''}`
+          : (executionData.remarks || 'Completed on time'),
         isComponentReplaced: false,
         missedCycles,
         originalDueDate

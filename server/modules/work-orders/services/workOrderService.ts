@@ -106,23 +106,34 @@ export async function listWorkOrders(vesselId?: string) {
           : (vesselSettings?.rhLeadHoursNonCritical ?? WORK_ORDER_THRESHOLDS.RH_LEAD_TIME_HOURS_NON_CRITICAL))
       : undefined;
 
+    const woComputedStatus = computeWorkOrderStatus({
+      dueDate: wo.dueDate,
+      dueRH,
+      currentRH,
+      isExecution: wo.isExecution,
+      status: wo.status,
+      completionDateTime: wo.dateCompleted,
+      maintenanceBasis: wo.maintenanceBasis || job?.maintenanceBasis || undefined,
+      vesselGraceSettings,
+      rhLeadTimeHours
+    });
+
+    let liveMissedCycles = wo.missedCycles || 0;
+    if (liveMissedCycles === 0 &&
+        (woComputedStatus === 'Overdue' || woComputedStatus === 'Due' || woComputedStatus === 'Due (Grace P)') &&
+        wo.maintenanceBasis !== 'Running Hours' &&
+        wo.dueDate && wo.frequencyValue && wo.frequencyUnit) {
+      liveMissedCycles = calculateMissedCycles(wo.dueDate, new Date().toISOString(), wo.frequencyValue, wo.frequencyUnit);
+    }
+
     return {
       ...wo,
       assignedTo: (wo.assignedTo && wo.assignedTo !== 'Unassigned')
         ? wo.assignedTo
         : (job?.assignedTo || 'Unassigned'),
       criticality: wo.criticality || job?.criticality || null,
-      computedStatus: computeWorkOrderStatus({
-        dueDate: wo.dueDate,
-        dueRH,
-        currentRH,
-        isExecution: wo.isExecution,
-        status: wo.status,
-        completionDateTime: wo.dateCompleted,
-        maintenanceBasis: wo.maintenanceBasis || job?.maintenanceBasis || undefined,
-        vesselGraceSettings,
-        rhLeadTimeHours
-      }),
+      computedStatus: woComputedStatus,
+      missedCycles: liveMissedCycles,
       leadTimeValue: job?.leadTimeValue ?? null,
       leadTimeUnit: job?.leadTimeUnit ?? null,
       dueRH: dueRH ?? null,
@@ -636,6 +647,23 @@ export async function updateWorkOrder(id: string, body: any) {
     console.log('📝 Capturing submittedDate for audit trail on submission/Pending Approval');
   }
 
+  if (isSubmissionAction || updateData.status === 'Pending Approval') {
+    const completionDateForCalc = updateData.completionDateTime || updateData.dateCompleted ||
+      existingWO.completionDateTime || existingWO.dateCompleted;
+    const dueDateForCalc = existingWO.nextDueDate || existingWO.dueDate;
+    if (completionDateForCalc && dueDateForCalc && existingWO.maintenanceBasis !== 'Running Hours') {
+      const preCalcMissed = calculateMissedCycles(
+        dueDateForCalc,
+        completionDateForCalc,
+        existingWO.frequencyValue || updateData.frequencyValue,
+        existingWO.frequencyUnit || updateData.frequencyUnit
+      );
+      updateData.missedCycles = preCalcMissed;
+      updateData.originalDueDate = dueDateForCalc;
+      console.log(`📝 Pre-calculated missedCycles at submission: ${preCalcMissed} (dueDate: ${dueDateForCalc}, completionDate: ${completionDateForCalc})`);
+    }
+  }
+
   console.log('📝 Cleaned update data keys:', Object.keys(updateData));
 
   // VALIDATION: For INHERITED components, check that RH doesn't exceed master component RH
@@ -676,15 +704,24 @@ export async function updateWorkOrder(id: string, body: any) {
   }
 
   if (updateData.approvalAction === 'approved' && updateData.status === 'Completed') {
-    const woMissedCycles = existingWO.missedCycles || 0;
-    const LAYER4B_CUTOFF = '2026-03-10T00:00:00.000Z';
-    const woCreatedAt = existingWO.createdAt || '';
-    const isPostLayer4B = woCreatedAt >= LAYER4B_CUTOFF;
-    if (woMissedCycles >= 1 && isPostLayer4B) {
+    let woMissedCycles = existingWO.missedCycles || 0;
+    if (woMissedCycles === 0 && existingWO.maintenanceBasis !== 'Running Hours') {
+      const approvalCompDate = existingWO.completionDateTime || existingWO.dateCompleted;
+      const approvalDueDate = existingWO.nextDueDate || existingWO.dueDate;
+      if (approvalCompDate && approvalDueDate && existingWO.frequencyValue && existingWO.frequencyUnit) {
+        woMissedCycles = calculateMissedCycles(approvalDueDate, approvalCompDate, existingWO.frequencyValue, existingWO.frequencyUnit);
+        if (woMissedCycles > 0) {
+          updateData.missedCycles = woMissedCycles;
+          updateData.originalDueDate = approvalDueDate;
+          console.log(`📝 Recalculated missedCycles at approval: ${woMissedCycles}`);
+        }
+      }
+    }
+    if (woMissedCycles >= 1) {
       const justification = (updateData.skippedCyclesJustification || '').trim();
-      if (!justification || justification.length < 20) {
+      if (!justification || justification.length < 30) {
         throw new ValidationError(
-          `This work order has ${woMissedCycles} skipped maintenance cycle(s). The Chief Engineer must provide a written justification (minimum 20 characters) explaining why these cycles were missed before approval can be granted.`,
+          `This work order has ${woMissedCycles} skipped maintenance cycle(s). The Chief Engineer must provide a written justification (minimum 30 characters) explaining why these cycles were missed before approval can be granted.`,
           { code: 'JUSTIFICATION_REQUIRED', missedCycles: woMissedCycles }
         );
       }
@@ -927,7 +964,9 @@ export async function updateWorkOrder(id: string, body: any) {
                   status: 'Approved' as const,
                   workDescription: freshWorkOrder.workCarriedOut || freshWorkOrder.briefWorkDescription || null,
                   sparesUsed: freshWorkOrder.consumedSpareParts ? JSON.stringify(freshWorkOrder.consumedSpareParts) : null,
-                  remarks: freshWorkOrder.remarks || freshWorkOrder.jobExperienceNotes || null,
+                  remarks: missedCycles >= 1
+                    ? `${missedCycles} cycles skipped — completed late${freshWorkOrder.remarks ? '. ' + freshWorkOrder.remarks : ''}`
+                    : (freshWorkOrder.remarks || freshWorkOrder.jobExperienceNotes || 'Completed on time'),
                   isComponentReplaced: false,
                   missedCycles,
                   originalDueDate

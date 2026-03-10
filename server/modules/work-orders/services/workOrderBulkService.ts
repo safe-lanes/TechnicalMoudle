@@ -11,8 +11,6 @@ export async function bulkApprove(workOrderIds: string[], approver?: string, app
 
   console.log(`📋 Bulk approving ${workOrderIds.length} work orders`);
 
-  const LAYER4B_CUTOFF = '2026-03-10T00:00:00.000Z';
-
   const results: { success: string[]; failed: { id: string; error: string }[] } = {
     success: [],
     failed: []
@@ -64,14 +62,12 @@ export async function bulkApprove(workOrderIds: string[], approver?: string, app
         console.log(`⚠️ Skipped cycle detection (bulk): ${missedCycles} cycle(s) missed for WO ${workOrderId}`);
       }
 
-      const woCreatedAt = existingWO.createdAt || '';
-      const isPostLayer4B = woCreatedAt >= LAYER4B_CUTOFF;
-      if (missedCycles >= 1 && isPostLayer4B) {
+      if (missedCycles >= 1) {
         const justification = (skippedCyclesJustification || '').trim();
-        if (!justification || justification.length < 20) {
+        if (!justification || justification.length < 30) {
           results.failed.push({
             id: workOrderId,
-            error: `Work order has ${missedCycles} skipped cycle(s) and requires a written justification (minimum 20 characters) before approval.`
+            error: `Work order has ${missedCycles} skipped cycle(s) and requires a written justification (minimum 30 characters) before approval.`
           });
           continue;
         }
