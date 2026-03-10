@@ -127,7 +127,7 @@ export function LocationSearchDropdown({
       <PopoverContent className="w-[300px] p-0" align="start">
         <Command shouldFilter={true}>
           <CommandInput placeholder="Search locations..." data-testid={testId ? `${testId}-search` : undefined} />
-          <CommandList>
+          <CommandList className="max-h-[144px] overflow-y-auto">
             {isLoading ? (
               <div className="flex items-center justify-center py-6">
                 <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
