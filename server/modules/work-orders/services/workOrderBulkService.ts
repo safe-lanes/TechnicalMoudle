@@ -11,22 +11,7 @@ export async function bulkApprove(workOrderIds: string[], approver?: string, app
 
   console.log(`📋 Bulk approving ${workOrderIds.length} work orders`);
 
-  const wosNeedingJustification: string[] = [];
-  for (const woId of workOrderIds) {
-    const wo = await repo.findById(woId);
-    if (wo && (wo.missedCycles || 0) >= 1) {
-      wosNeedingJustification.push(wo.workOrderNo || woId);
-    }
-  }
-  if (wosNeedingJustification.length > 0) {
-    const justification = (skippedCyclesJustification || '').trim();
-    if (!justification) {
-      throw new ValidationError(
-        `The following work orders have skipped maintenance cycles and require a written justification before approval: ${wosNeedingJustification.join(', ')}. Please provide a skippedCyclesJustification.`,
-        { code: 'JUSTIFICATION_REQUIRED', workOrderIds: wosNeedingJustification }
-      );
-    }
-  }
+  const LAYER4B_CUTOFF = '2026-03-10T00:00:00.000Z';
 
   const results: { success: string[]; failed: { id: string; error: string }[] } = {
     success: [],
@@ -77,6 +62,19 @@ export async function bulkApprove(workOrderIds: string[], approver?: string, app
           );
       if (missedCycles > 0) {
         console.log(`⚠️ Skipped cycle detection (bulk): ${missedCycles} cycle(s) missed for WO ${workOrderId}`);
+      }
+
+      const woCreatedAt = existingWO.createdAt || '';
+      const isPostLayer4B = woCreatedAt >= LAYER4B_CUTOFF;
+      if (missedCycles >= 1 && isPostLayer4B) {
+        const justification = (skippedCyclesJustification || '').trim();
+        if (!justification || justification.length < 20) {
+          results.failed.push({
+            id: workOrderId,
+            error: `Work order has ${missedCycles} skipped cycle(s) and requires a written justification (minimum 20 characters) before approval.`
+          });
+          continue;
+        }
       }
 
       const updateData: Record<string, any> = {

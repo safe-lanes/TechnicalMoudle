@@ -677,7 +677,10 @@ export async function updateWorkOrder(id: string, body: any) {
 
   if (updateData.approvalAction === 'approved' && updateData.status === 'Completed') {
     const woMissedCycles = existingWO.missedCycles || 0;
-    if (woMissedCycles >= 1) {
+    const LAYER4B_CUTOFF = '2026-03-10T00:00:00.000Z';
+    const woCreatedAt = existingWO.createdAt || '';
+    const isPostLayer4B = woCreatedAt >= LAYER4B_CUTOFF;
+    if (woMissedCycles >= 1 && isPostLayer4B) {
       const justification = (updateData.skippedCyclesJustification || '').trim();
       if (!justification || justification.length < 20) {
         throw new ValidationError(
