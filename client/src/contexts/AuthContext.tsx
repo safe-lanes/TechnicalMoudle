@@ -1,4 +1,10 @@
-import { createContext, useContext, useState, useEffect, ReactNode } from "react";
+import {
+  createContext,
+  useContext,
+  useState,
+  useEffect,
+  ReactNode,
+} from "react";
 import type { PublicUser, UserRole } from "@shared/schema";
 import type { UIRole } from "@shared/uiRoles";
 import { mapLoggedRoleToUIRole } from "@shared/uiRoles";
@@ -67,7 +73,10 @@ export function AuthProvider({ children }: AuthProviderProps) {
     }
 
     if (plainUserType && plainProfile?.role) {
-      resolvedUserType = mapLoggedRoleToUIRole(plainUserType, plainProfile.role);
+      resolvedUserType = mapLoggedRoleToUIRole(
+        plainUserType,
+        plainProfile.role,
+      );
     }
 
     const storedProfile = secureGetItem<PublicUser>("userProfile");
@@ -84,14 +93,20 @@ export function AuthProvider({ children }: AuthProviderProps) {
         }
       }
     } else if (plainProfile && plainUserType) {
-      const role = (plainProfile as any).role as UserRole || "Office";
+      const role = ((plainProfile as any).role as UserRole) || "Office";
       const user: PublicUser = {
         id: 0,
         username: (plainProfile as any).username || "user",
-        fullName: (plainProfile as any).fullName || (plainProfile as any).name || "User",
+        fullName:
+          (plainProfile as any).fullName ||
+          (plainProfile as any).name ||
+          "User",
         email: (plainProfile as any).email || null,
         role: role,
-        userType: (plainUserType === "Office" || plainUserType === "Ship") ? plainUserType : undefined,
+        userType:
+          plainUserType === "Office" || plainUserType === "Ship"
+            ? plainUserType
+            : undefined,
         vesselId: (plainProfile as any).vesselId || null,
         department: (plainProfile as any).department || null,
         isActive: true,
@@ -125,7 +140,8 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
   const isShipUser = currentUser?.role === "Ship";
   const isOfficeUser = currentUser?.role === "Office";
-  const isPMSAdmin = currentUser?.role === "PMS Admin" || currentUser?.role === "Sail Admin";
+  const isPMSAdmin =
+    currentUser?.role === "PMS Admin" || currentUser?.role === "Sail Admin";
 
   const canViewDocument = (shipViewable: boolean): boolean => {
     if (isPMSAdmin || isOfficeUser) return true;
