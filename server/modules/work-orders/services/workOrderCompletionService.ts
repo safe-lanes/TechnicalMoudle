@@ -1,5 +1,6 @@
 import * as repo from '../repositories/workOrderRepository';
 import { NotFoundError, ValidationError } from '../../shared/errors';
+import { calculateMissedCycles as calcMissedCyclesShared } from '@shared/dateUtils';
 
 // ── Complete Work Order ──
 
@@ -157,12 +158,25 @@ export async function completeWorkOrder(
     });
   }
 
+  const missedCycles = workOrder.maintenanceBasis === 'Running Hours'
+    ? 0
+    : calcMissedCyclesShared(
+        workOrder.nextDueDate,
+        dateOfCompletion,
+        workOrder.frequencyValue,
+        workOrder.frequencyUnit
+      );
+  if (missedCycles > 0) {
+    console.log(`⚠️ Skipped cycle detection: ${missedCycles} cycle(s) missed for WO ${workOrder.workOrderNo} (due: ${workOrder.nextDueDate}, completed: ${dateOfCompletion})`);
+  }
+
   // Update work order execution data
   const updatedWorkOrder = await repo.update(workOrderId, {
     ...executionData,
     runningHoursAtCompletion: runningHours ? parseInt(runningHours) : undefined,
     dateCompleted: dateOfCompletion,
-    status: 'Completed'
+    status: 'Completed',
+    missedCycles
   });
 
   // Auto-populate component_maintenance_history
@@ -224,7 +238,8 @@ export async function completeWorkOrder(
         workDescription: executionData.workDone || workOrder.briefWorkDescription || null,
         sparesUsed: executionData.sparesUsed || null,
         remarks: executionData.remarks || null,
-        isComponentReplaced: false
+        isComponentReplaced: false,
+        missedCycles
       };
 
       await repo.createMaintenanceHistory(historyPayload);
@@ -426,6 +441,7 @@ export async function completeWorkOrder(
   return {
     success: true,
     workOrder: updatedWorkOrder,
-    runningHoursUpdated: !!runningHours
+    runningHoursUpdated: !!runningHours,
+    missedCycles
   };
 }

@@ -1,5 +1,6 @@
 import * as repo from '../repositories/workOrderRepository';
 import { ValidationError } from '../../shared/errors';
+import { calculateMissedCycles } from '@shared/dateUtils';
 
 // ── Bulk Approve Work Orders ──
 
@@ -54,6 +55,19 @@ export async function bulkApprove(workOrderIds: string[], approver?: string, app
         nextDueReading = (parseInt(existingWO.currentReading) + parseInt(existingWO.frequencyValue || "0")).toString();
       }
 
+      const completionDateForCalc = actualCompletionDate || existingWO.completionDateTime || existingWO.dateCompleted;
+      const missedCycles = existingWO.maintenanceBasis === 'Running Hours'
+        ? 0
+        : calculateMissedCycles(
+            existingWO.nextDueDate || existingWO.dueDate,
+            completionDateForCalc,
+            existingWO.frequencyValue,
+            existingWO.frequencyUnit
+          );
+      if (missedCycles > 0) {
+        console.log(`⚠️ Skipped cycle detection (bulk): ${missedCycles} cycle(s) missed for WO ${workOrderId}`);
+      }
+
       const updateData: Record<string, any> = {
         status: "Completed",
         approvalAction: "approved",
@@ -62,7 +76,7 @@ export async function bulkApprove(workOrderIds: string[], approver?: string, app
         approvalDate: new Date().toISOString(),
         nextDueDate,
         nextDueReading,
-        // Clear wasRejected flag on successful approval
+        missedCycles,
         wasRejected: false
       };
 

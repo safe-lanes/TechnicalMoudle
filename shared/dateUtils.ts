@@ -1,4 +1,4 @@
-import { format, parse, add, isValid } from 'date-fns';
+import { format, parse, add, isValid, differenceInCalendarDays, differenceInMonths, differenceInYears } from 'date-fns';
 
 /**
  * Normalize various date formats to DD-MMM-YYYY format
@@ -156,6 +156,49 @@ export function calculateNextDueDate(
   } catch (error) {
     console.error('Error calculating next due date:', { lastDoneDate, intervalValue, intervalUnit, error });
     return null;
+  }
+}
+
+export function calculateMissedCycles(
+  scheduledDueDate: string | null | undefined,
+  completionDate: string | null | undefined,
+  frequencyValue: string | number | null | undefined,
+  frequencyUnit: string | null | undefined
+): number {
+  if (!scheduledDueDate || !completionDate || !frequencyValue || !frequencyUnit) return 0;
+
+  try {
+    const normalizedDue = normalizeDateToDDMMMYYYY(scheduledDueDate);
+    const normalizedCompletion = normalizeDateToDDMMMYYYY(completionDate);
+    if (!normalizedDue || !normalizedCompletion) return 0;
+
+    const dueDate = parse(normalizedDue, 'dd-MMM-yyyy', new Date());
+    const compDate = parse(normalizedCompletion, 'dd-MMM-yyyy', new Date());
+    if (!isValid(dueDate) || !isValid(compDate)) return 0;
+
+    const interval = typeof frequencyValue === 'number' ? frequencyValue : parseInt(String(frequencyValue), 10);
+    if (isNaN(interval) || interval <= 0) return 0;
+
+    const unit = frequencyUnit.toLowerCase();
+    let delay: number;
+
+    if (unit === 'days') {
+      delay = differenceInCalendarDays(compDate, dueDate);
+      return delay > 0 ? Math.floor(delay / interval) : 0;
+    } else if (unit === 'weeks') {
+      delay = differenceInCalendarDays(compDate, dueDate);
+      return delay > 0 ? Math.floor(delay / (interval * 7)) : 0;
+    } else if (unit === 'months') {
+      delay = differenceInMonths(compDate, dueDate);
+      return delay > 0 ? Math.floor(delay / interval) : 0;
+    } else if (unit === 'years') {
+      delay = differenceInYears(compDate, dueDate);
+      return delay > 0 ? Math.floor(delay / interval) : 0;
+    }
+    return 0;
+  } catch (err) {
+    console.error('Error calculating missed cycles:', err);
+    return 0;
   }
 }
 

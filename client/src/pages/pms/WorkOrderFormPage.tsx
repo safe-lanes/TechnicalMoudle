@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
-import { calculateNextDueDate, normalizeDateToDDMMMYYYY } from "@shared/dateUtils";
+import { calculateNextDueDate, normalizeDateToDDMMMYYYY, calculateMissedCycles } from "@shared/dateUtils";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -2451,6 +2451,33 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
             {/* A1. Job Information */}
             <div data-testid="WOF.A1.1"><Marker id="WOF.A1.1" /></div>
             <div data-testid="WOF.A1.2"><Marker id="WOF.A1.2" /></div>
+
+            {(() => {
+              const woMissedCycles = (workOrderContext as any)?.workOrder?.missedCycles || 0;
+              if (woMissedCycles >= 1) {
+                return (
+                  <div
+                    className="rounded-lg border-2 p-4 mb-4"
+                    style={{ backgroundColor: '#FEF3C7', borderColor: '#F59E0B' }}
+                    data-testid="banner-skipped-cycles"
+                  >
+                    <div className="flex items-start gap-3">
+                      <span className="text-lg">⚠</span>
+                      <div>
+                        <h4 className="font-semibold text-sm" style={{ color: '#92400E' }}>SKIPPED CYCLES DETECTED</h4>
+                        <p className="text-sm mt-1" style={{ color: '#92400E' }}>
+                          This work order was completed {woMissedCycles} cycle{woMissedCycles > 1 ? 's' : ''} late.{' '}
+                          {woMissedCycles} job cycle{woMissedCycles > 1 ? 's were' : ' was'} missed between the scheduled due date and the actual completion date.
+                          This has been recorded in the audit trail.
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                );
+              }
+              return null;
+            })()}
+
             <SectionBlock 
               id="work-order-info"
               number="A1"
@@ -3034,13 +3061,14 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
               <span data-testid="WOF.A5.8"><Marker id="WOF.A5.8" /></span>
             </div>
             {(() => {
-              const allHistory = (templateData.workHistory || []).map(history => ({
+              const allHistory = (templateData.workHistory || []).map((history: any) => ({
                 date: history.completionDate || history.workDate,
                 workOrder: history.woNo,
                 description: history.description || '-',
                 performedBy: history.performedBy,
                 status: history.status?.toLowerCase() === 'completed' ? ('completed' as const) : ('postponed' as const),
-                remarks: history.remarks || '-'
+                remarks: history.remarks || '-',
+                missedCycles: history.missedCycles || 0
               }));
               const totalCount = allHistory.length;
 
@@ -3054,7 +3082,16 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                         { key: 'workOrder', label: 'Work Order', width: '15%' },
                         { key: 'description', label: 'Description', width: '25%' },
                         { key: 'performedBy', label: 'Performed By', width: '15%' },
-                        { key: 'status', label: 'Status', width: '13%', render: (value) => <StatusPill status={value} /> },
+                        { key: 'status', label: 'Status', width: '13%', render: (value: any, row: any) => (
+                          <div className="flex flex-col gap-1">
+                            <StatusPill status={value} />
+                            {row?.missedCycles >= 1 && (
+                              <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-amber-500 text-white whitespace-nowrap" data-testid={`badge-history-skipped-${row.workOrder}`}>
+                                ⚠ {row.missedCycles} Skipped
+                              </span>
+                            )}
+                          </div>
+                        )},
                         { key: 'remarks', label: 'Remarks', width: '20%' }
                       ]}
                       data={displayData}
@@ -3088,7 +3125,16 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                       { key: 'workOrder', label: 'Work Order', width: '15%' },
                       { key: 'description', label: 'Description', width: '25%' },
                       { key: 'performedBy', label: 'Performed By', width: '15%' },
-                      { key: 'status', label: 'Status', width: '13%', render: (value) => <StatusPill status={value} /> },
+                      { key: 'status', label: 'Status', width: '13%', render: (value: any, row: any) => (
+                        <div className="flex flex-col gap-1">
+                          <StatusPill status={value} />
+                          {row?.missedCycles >= 1 && (
+                            <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-amber-500 text-white whitespace-nowrap" data-testid={`badge-history-skipped-${row.workOrder}`}>
+                              ⚠ {row.missedCycles} Skipped
+                            </span>
+                          )}
+                        </div>
+                      )},
                       { key: 'remarks', label: 'Remarks', width: '20%' }
                     ]}
                     data={displayData}
@@ -3535,6 +3581,31 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                     />
                   </div>
                 </div>
+
+                {(() => {
+                  const maintenanceBasis = templateData.maintenanceBasis || (workOrderContext as any)?.maintenanceBasis;
+                  if (maintenanceBasis === 'Running Hours') return null;
+                  const completionDateVal = executionData.dateOfCompletion || (executionData.completionDateTime ? executionData.completionDateTime.split('T')[0] : '');
+                  if (!completionDateVal || !workOrderDueDate) return null;
+                  const liveMissed = calculateMissedCycles(workOrderDueDate, completionDateVal, templateData.frequencyValue, templateData.frequencyUnit);
+                  if (liveMissed < 1) return null;
+                  return (
+                    <div
+                      className="rounded-lg border-2 p-3 mt-3"
+                      style={{ backgroundColor: '#FEF3C7', borderColor: '#F59E0B' }}
+                      data-testid="warning-live-skipped-cycles"
+                    >
+                      <div className="flex items-start gap-2">
+                        <span className="text-base">⚠</span>
+                        <p className="text-sm" style={{ color: '#92400E' }}>
+                          <strong>WARNING:</strong> {liveMissed} job cycle{liveMissed > 1 ? 's' : ''} will be marked as skipped.
+                          The completion date you entered is {liveMissed} cycle{liveMissed > 1 ? 's' : ''} past the scheduled due date.
+                          This will be flagged in the audit trail and visible to the Chief Engineer and Superintendent.
+                        </p>
+                      </div>
+                    </div>
+                  );
+                })()}
               </div>
 
               {/* Work Carried Out */}

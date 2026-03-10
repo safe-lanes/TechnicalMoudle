@@ -716,12 +716,18 @@ const WorkOrders: React.FC = () => {
                       </span>
                     </div>
                   ) : (
-                    <span className={`px-3 py-1 rounded-full text-xs font-medium ${getStatusBadgeColor(workOrder.computedStatus || workOrder.status || 'Active')}`}>
-                      {/* Display "Grace P" instead of "Due (Grace P)" for cleaner badge label */}
-                      {(workOrder.computedStatus || workOrder.status || 'Active') === 'Due (Grace P)' 
-                        ? 'Grace P' 
-                        : (workOrder.computedStatus || workOrder.status || 'Active')}
-                    </span>
+                    <div className="flex flex-col gap-1">
+                      <span className={`px-3 py-1 rounded-full text-xs font-medium ${getStatusBadgeColor(workOrder.computedStatus || workOrder.status || 'Active')}`}>
+                        {(workOrder.computedStatus || workOrder.status || 'Active') === 'Due (Grace P)' 
+                          ? 'Grace P' 
+                          : (workOrder.computedStatus || workOrder.status || 'Active')}
+                      </span>
+                      {(workOrder as any).missedCycles >= 1 && (
+                        <span className="px-3 py-1 rounded-full text-xs font-medium bg-amber-500 text-white" data-testid={`badge-skipped-cycles-${workOrder.id}`}>
+                          ⚠ {(workOrder as any).missedCycles} Cycle{(workOrder as any).missedCycles > 1 ? 's' : ''} Skipped
+                        </span>
+                      )}
+                    </div>
                   )}
                 </td>
                 {activeTab === "Completed" && (

@@ -139,7 +139,8 @@ export async function getWorkOrderContext(workOrderId: string) {
     completionDate: wo.completionDateTime || wo.dateCompleted || '',
     status: wo.status || 'Completed',
     description: wo.workCarriedOut || wo.jobTitle || 'Maintenance completed',
-    remarks: wo.completionRemarks || wo.remarks || wo.jobExperienceNotes || ''
+    remarks: wo.completionRemarks || wo.remarks || wo.jobExperienceNotes || '',
+    missedCycles: wo.missedCycles || 0
   }));
 
   // Build templateData from job data (Part A - immutable from job definition)

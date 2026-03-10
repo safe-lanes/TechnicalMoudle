@@ -3,6 +3,7 @@ import { NotFoundError, ValidationError } from '../../shared/errors';
 import { computeWorkOrderStatus } from '@shared/workOrders/status';
 import { WORK_ORDER_THRESHOLDS } from '@shared/workOrders/constants';
 import { computeSpareConsumptionDelta, ConsumedSpareEntry } from '../utils/spareConsumptionDelta';
+import { calculateMissedCycles } from '@shared/dateUtils';
 
 // ── List Work Orders with Enrichment ──
 
@@ -830,6 +831,19 @@ export async function updateWorkOrder(id: string, body: any) {
       }
 
       if (component) {
+        const missedCycles = freshWorkOrder.maintenanceBasis === 'Running Hours'
+          ? 0
+          : calculateMissedCycles(
+              freshWorkOrder.nextDueDate || freshWorkOrder.dueDate,
+              freshWorkOrder.completionDateTime || freshWorkOrder.dateCompleted || updateData.completionDateTime,
+              freshWorkOrder.frequencyValue,
+              freshWorkOrder.frequencyUnit
+            );
+        if (missedCycles > 0) {
+          console.log(`⚠️ Skipped cycle detection: ${missedCycles} cycle(s) missed for WO ${freshWorkOrder.workOrderNo}`);
+        }
+        await repo.update(id, { missedCycles });
+
         // Create maintenance history record
         try {
           const existingHistory = await repo.findMaintenanceHistoryByWorkOrderId(freshWorkOrder.wouuid);
@@ -876,7 +890,8 @@ export async function updateWorkOrder(id: string, body: any) {
                   workDescription: freshWorkOrder.workCarriedOut || freshWorkOrder.briefWorkDescription || null,
                   sparesUsed: freshWorkOrder.consumedSpareParts ? JSON.stringify(freshWorkOrder.consumedSpareParts) : null,
                   remarks: freshWorkOrder.remarks || freshWorkOrder.jobExperienceNotes || null,
-                  isComponentReplaced: false
+                  isComponentReplaced: false,
+                  missedCycles
                 };
 
                 await repo.createMaintenanceHistory(historyPayload);
