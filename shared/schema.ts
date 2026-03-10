@@ -5,7 +5,7 @@ import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
 // User roles enum - Ship (vessel-based user), Office (shore-based user), PMS Admin (full system access)
-export const userRoleEnum = pgEnum("user_role", ["Ship", "Office", "PMS Admin"]);
+export const userRoleEnum = pgEnum("user_role", ["Ship", "Office", "PMS Admin", "Sail Admin"]);
 
 export const users = pgTable("users", {
   id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
@@ -29,10 +29,11 @@ export const insertUserSchema = createInsertSchema(users).omit({
 
 export type InsertUser = z.infer<typeof insertUserSchema>;
 export type User = typeof users.$inferSelect;
-export type UserRole = "Ship" | "Office" | "PMS Admin";
+export type UserRole = "Ship" | "Office" | "PMS Admin" | "Sail Admin";
 
 export type PublicUser = Omit<User, "password"> & {
   crewDesignation?: string; // Extended field for crew designation/office position (from external user data)
+  userType?: "Office" | "Ship"; // Extended field for user type (Office = shore-based, Ship = vessel-based)
 };
 
 // Fleets Table - Fleet registry for grouping vessels

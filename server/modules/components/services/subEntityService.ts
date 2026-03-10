@@ -143,7 +143,7 @@ export async function updateRequisition(id: number, body: any, user: UserInfo) {
   const validatedData = insertComponentRequisitionSchema.partial().parse(body);
 
   // SECURITY: Prevent vesselCode/componentId modification for non-admins
-  if (user.role !== 'PMS Admin') {
+  if (user.role !== 'PMS Admin' && user.role !== 'Sail Admin') {
     delete (validatedData as any).vesselCode;
     delete (validatedData as any).componentId;
   }

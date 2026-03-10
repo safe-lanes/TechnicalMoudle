@@ -25,7 +25,7 @@ export async function listDocuments(componentId: string, user: UserInfo) {
 
   // Filter documents based on user role and permissions
   return documents.filter((doc: any) => {
-    if (user.role === 'PMS Admin' || user.role === 'Office') return true;
+    if (user.role === 'PMS Admin' || user.role === 'Sail Admin' || user.role === 'Office') return true;
     if (user.role === 'Ship') return doc.canShipView;
     return false;
   });

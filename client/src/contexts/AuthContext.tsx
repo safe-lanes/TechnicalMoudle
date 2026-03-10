@@ -17,6 +17,7 @@ const ROLE_TO_UI_TYPE: Record<UserRole, UIRole> = {
   Ship: "Vessel",
   Office: "Client_Admin",
   "PMS Admin": "Sail_Admin",
+  "Sail Admin": "Sail_Admin",
 };
 
 const DEFAULT_USER: PublicUser = {
@@ -24,7 +25,8 @@ const DEFAULT_USER: PublicUser = {
   username: "munawer.modak",
   fullName: "Munawer A. Modak",
   email: "ayush.agrawal@safe-lanes.com",
-  role: "Office",
+  role: "Sail Admin",
+  userType: "Office",
   vesselId: null,
   department: null,
   isActive: true,
@@ -108,6 +110,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
         fullName: (plainProfile as any).fullName || (plainProfile as any).name || "User",
         email: (plainProfile as any).email || null,
         role: role,
+        userType: (plainUserType === "Office" || plainUserType === "Ship") ? plainUserType : undefined,
         vesselId: (plainProfile as any).vesselId || null,
         department: (plainProfile as any).department || null,
         isActive: true,
@@ -143,7 +146,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
   const isShipUser = currentUser?.role === "Ship";
   const isOfficeUser = currentUser?.role === "Office";
-  const isPMSAdmin = currentUser?.role === "PMS Admin";
+  const isPMSAdmin = currentUser?.role === "PMS Admin" || currentUser?.role === "Sail Admin";
 
   const canViewDocument = (shipViewable: boolean): boolean => {
     if (isPMSAdmin || isOfficeUser) return true;
@@ -172,6 +175,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
       fullName: user.fullName,
       email: user.email,
       role: user.role,
+      userType: user.userType,
       vesselId: user.vesselId,
       department: user.department,
       isActive: user.isActive,

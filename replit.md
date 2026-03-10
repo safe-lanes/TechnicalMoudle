@@ -63,6 +63,7 @@ Preferred communication style: Simple, everyday language.
 -   **Work Order B4 Spare Consumption Flow**: Spare consumption is recorded at save but inventory deduction occurs at approval time.
 -   **Read-Only AES-Encrypted LocalStorage (Secure Auth Storage)**: The auth system reads AES-encrypted keys from `localStorage` but never writes to it. Static default users are used if `localStorage` is empty.
 -   **Automatic UI Role Detection**: The UI role is auto-detected on load using a priority chain: 1) Plain `localStorage.userType` + `localStorage.userProfile` (real app login), 2) Encrypted secure storage, 3) `currentUser.role` fallback (Replit dev mode). Role mapping: Office+`Sail Admin`→`Sail_Admin`, Office+`Super Admin`→`Client_Admin`, Ship+`Vessel Admin`→`Head_of_Dept`, Ship+`Vessel User`→`Vessel`. The dropdown role switcher remains functional as a temporary backup override. Mapping function: `mapLoggedRoleToUIRole()` in `shared/uiRoles.ts`.
+-   **User Role System**: `UserRole` type supports 4 values: `"Ship"`, `"Office"`, `"PMS Admin"`, `"Sail Admin"`. The `PublicUser` type includes an optional `userType` field (`"Office"` | `"Ship"`) to distinguish shore-based vs vessel-based users. The default user in dev mode is set to `role: "Sail Admin"` with `userType: "Office"`. "Sail Admin" has full admin permissions equivalent to "PMS Admin".
 
 ## External Dependencies
 

@@ -530,7 +530,7 @@ export default function DefectFormWizard({
     });
     
     // Auto-fill for Office and PMS Admin users when checkbox is checked
-    const canAutoFill = currentUser?.role === 'Office' || currentUser?.role === 'PMS Admin';
+    const canAutoFill = currentUser?.role === 'Office' || currentUser?.role === 'PMS Admin' || currentUser?.role === 'Sail Admin';
     if (isChecked && canAutoFill) {
       const today = new Date().toISOString().split('T')[0];
       console.log('[C2 Auto-fill] Applying auto-fill values:', { 

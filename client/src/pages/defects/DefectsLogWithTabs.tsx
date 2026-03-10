@@ -527,12 +527,12 @@ export default function DefectsLogWithTabs() {
   
   const canEdit = () => {
     const role = currentUser?.role || '';
-    return ["Master", "Chief Engineer", "Superintendent", "Admin", "Ship", "Office", "PMS Admin"].includes(role);
+    return ["Master", "Chief Engineer", "Superintendent", "Admin", "Ship", "Office", "PMS Admin", "Sail Admin"].includes(role);
   };
   
   const canLink = () => {
     const role = currentUser?.role || '';
-    return ["Chief Engineer", "Superintendent", "Admin", "Office", "PMS Admin"].includes(role);
+    return ["Chief Engineer", "Superintendent", "Admin", "Office", "PMS Admin", "Sail Admin"].includes(role);
   };
   
   const handleViewClick = (defect: Defect) => {
@@ -582,7 +582,7 @@ export default function DefectsLogWithTabs() {
   
   const canVerify = () => {
     const role = currentUser?.role || '';
-    return ['Office', 'PMS Admin'].includes(role);
+    return ['Office', 'PMS Admin', 'Sail Admin'].includes(role);
   };
   
   const verifyMutation = useMutation({

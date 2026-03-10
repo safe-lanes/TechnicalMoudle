@@ -487,7 +487,7 @@ export default function DefectsCoC() {
 
   const canVerify = useCallback(() => {
     const role = currentUser?.role || '';
-    return ['Office', 'PMS Admin'].includes(role);
+    return ['Office', 'PMS Admin', 'Sail Admin'].includes(role);
   }, [currentUser?.role]);
 
   const verifyMutation = useMutation({

@@ -46,7 +46,7 @@ interface AdminOnlyProps {
 
 export function AdminOnly({ children, fallback = null }: AdminOnlyProps) {
   return (
-    <RoleGuard roles="PMS Admin" fallback={fallback}>
+    <RoleGuard roles={["PMS Admin", "Sail Admin"]} fallback={fallback}>
       {children}
     </RoleGuard>
   );
@@ -59,7 +59,7 @@ interface OfficeOrAdminProps {
 
 export function OfficeOrAdmin({ children, fallback = null }: OfficeOrAdminProps) {
   return (
-    <RoleGuard roles={["Office", "PMS Admin"]} fallback={fallback}>
+    <RoleGuard roles={["Office", "PMS Admin", "Sail Admin"]} fallback={fallback}>
       {children}
     </RoleGuard>
   );

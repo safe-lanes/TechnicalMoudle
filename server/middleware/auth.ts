@@ -32,9 +32,9 @@ export const requireRole = (roles: UserRole | UserRole[]) => {
   };
 };
 
-export const requirePMSAdmin = requireRole("PMS Admin");
+export const requirePMSAdmin = requireRole(["PMS Admin", "Sail Admin"]);
 
-export const requireOfficeOrAdmin = requireRole(["Office", "PMS Admin"]);
+export const requireOfficeOrAdmin = requireRole(["Office", "PMS Admin", "Sail Admin"]);
 
 export const requireShipUser = requireRole("Ship");
 
@@ -43,7 +43,7 @@ export const requireVesselAccess = (req: AuthenticatedRequest, res: Response, ne
     return res.status(401).json({ error: "Unauthorized - Authentication required" });
   }
 
-  if (req.user.role === "PMS Admin" || req.user.role === "Office") {
+  if (req.user.role === "PMS Admin" || req.user.role === "Sail Admin" || req.user.role === "Office") {
     return next();
   }
 

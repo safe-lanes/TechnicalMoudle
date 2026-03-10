@@ -124,8 +124,38 @@ const SHIP_ACCESS: RoleAccessData = {
   vesselAccess: "assigned",
 };
 
+const SAIL_ADMIN_ACCESS: RoleAccessData = {
+  roleId: "role-sail-admin",
+  roleName: "Sail Admin",
+  modules: {
+    pms: { read: true, write: true, approve: true, admin: true },
+    defects: { read: true, write: true, approve: true, admin: true },
+    spares: { read: true, write: true, approve: true, admin: true },
+    stores: { read: true, write: true, approve: true, admin: true },
+    reports: { read: true, write: true, approve: true, admin: true },
+    admin: { read: true, write: true, approve: true, admin: true },
+    certSurveys: { read: true, write: true, approve: true, admin: true },
+  },
+  actions: {
+    createWorkOrder: true,
+    editWorkOrder: true,
+    deleteWorkOrder: true,
+    approveWorkOrder: true,
+    createDefect: true,
+    editDefect: true,
+    closeDefect: true,
+    approveDefect: true,
+    manageFleet: true,
+    manageUsers: true,
+    bulkImport: true,
+    exportData: true,
+  },
+  vesselAccess: "all",
+};
+
 const ROLE_ACCESS_MAP: Record<UserRole, RoleAccessData> = {
   "PMS Admin": PMS_ADMIN_ACCESS,
+  "Sail Admin": SAIL_ADMIN_ACCESS,
   Office: OFFICE_ACCESS,
   Ship: SHIP_ACCESS,
 };
