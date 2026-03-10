@@ -1777,7 +1777,8 @@ const Spares: React.FC = () => {
     filtered = filtered.sort((a: Spare, b: Spare) => {
       const aInactive = a.isActive === false ? 1 : 0;
       const bInactive = b.isActive === false ? 1 : 0;
-      return aInactive - bInactive;
+      if (aInactive !== bInactive) return aInactive - bInactive;
+      return (a.partCode || '').localeCompare(b.partCode || '', undefined, { numeric: true });
     });
 
     return filtered;
