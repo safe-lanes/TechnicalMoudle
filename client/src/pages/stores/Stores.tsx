@@ -14,7 +14,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
-import { Search, Edit2, Clock, Trash2, FileSpreadsheet, X, MessageSquare, Calendar, PlusCircle, MinusCircle, Download, AlertCircle, CheckCircle, HelpCircle, MapPin, ChevronDown, ChevronsUpDown, Plus, Check } from "lucide-react";
+import { Search, Edit2, Clock, Trash2, FileSpreadsheet, X, MessageSquare, Calendar, PlusCircle, MinusCircle, Download, AlertCircle, CheckCircle, HelpCircle, MapPin, ChevronDown, ChevronsUpDown, Plus, Check, RotateCcw } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
@@ -71,6 +71,7 @@ interface StoreItem {
   manufactureDate?: string;
   sdsReference?: string;
   shelfLifeMonths?: number;
+  isActive?: boolean;
 }
 
 interface StoresHistoryItem {
@@ -128,6 +129,7 @@ interface StoresApiItem {
   manufactureDate?: string;
   sdsReference?: string;
   shelfLifeMonths?: number;
+  isActive?: boolean;
 }
 
 const Stores: React.FC = () => {
@@ -360,6 +362,7 @@ const Stores: React.FC = () => {
           hazardClassification: item.hazardClassification || '',
           manufactureDate: item.manufactureDate || '',
           sdsReference: item.sdsReference || '',
+          isActive: item.isActive !== false,
         };
       });
       setItems(mappedItems);
@@ -740,8 +743,9 @@ const Stores: React.FC = () => {
 
   const filteredItems = useMemo(() => {
     const updatedItems = updateItemsStock(items);
-    return updatedItems.filter(item => {
-      if (item.isArchived) return false; // Hide archived items
+    const filtered = updatedItems.filter(item => {
+      if (item.isArchived) return false;
+      if ((isVessel || isHeadOfDept) && item.isActive === false) return false;
       const matchesTab = item.category === activeTab;
       const matchesSearch = item.itemName.toLowerCase().includes(searchTerm.toLowerCase()) ||
                            item.itemCode.toLowerCase().includes(searchTerm.toLowerCase());
@@ -750,7 +754,13 @@ const Stores: React.FC = () => {
       
       return matchesTab && matchesSearch && matchesCategory && matchesStock;
     });
-  }, [activeTab, searchTerm, categoryFilter, stockFilter, items]);
+    filtered.sort((a, b) => {
+      const aInactive = a.isActive === false ? 1 : 0;
+      const bInactive = b.isActive === false ? 1 : 0;
+      return aInactive - bInactive;
+    });
+    return filtered;
+  }, [activeTab, searchTerm, categoryFilter, stockFilter, items, isVessel, isHeadOfDept]);
 
   // Filter items for bulk update modal search
   const bulkModalFilteredItems = useMemo(() => {
@@ -1977,7 +1987,7 @@ const Stores: React.FC = () => {
         {/* Table Body */}
         <div className="divide-y divide-gray-200">
           {filteredItems.map((item, index) => (
-            <div key={item.id} className={`hover:bg-gray-50 ${isDeleteSelectionMode && selectedStoreIds.has(item.id) ? 'bg-red-50' : ''}`}>
+            <div key={item.id} className={`hover:bg-gray-50 ${isDeleteSelectionMode && selectedStoreIds.has(item.id) ? 'bg-red-50' : ''} ${item.isActive === false ? 'opacity-50' : ''}`}>
               <div className="grid gap-4 items-center text-sm py-3 px-4" style={{gridTemplateColumns: (() => {
                 const base = activeTab === 'chemicals' ? (FEATURES.IHM ? '2fr 2fr 2fr 0.8fr 0.8fr 0.8fr 0.8fr 1fr 0.8fr 0.8fr 0.8fr 0.6fr' : '2fr 2fr 2fr 0.8fr 0.8fr 0.8fr 0.8fr 1fr 0.8fr 0.8fr 0.8fr') : (FEATURES.IHM ? '2fr 2fr 2fr 0.8fr 0.8fr 0.8fr 0.8fr 1fr 0.6fr' : '2fr 2fr 2fr 0.8fr 0.8fr 0.8fr 0.8fr 1.5fr');
                 if (isDeleteSelectionMode) return `40px ${base}`;
@@ -2095,45 +2105,72 @@ const Stores: React.FC = () => {
                 )}
                 {!isDeleteSelectionMode && (
                 <div className="flex gap-1 items-center justify-end pr-2 whitespace-nowrap">
-                  {!isVessel && (
-                    <Button 
-                      variant="ghost" 
-                      size="sm" 
-                      className="h-7 w-7 p-0 hover:bg-gray-100"
-                      onClick={() => openEditModal(item)}
-                      aria-label="Edit Item"
-                      title="Edit"
-                      data-testid={index === 0 ? getMarkerId(activeTab, "29") : `button-edit-${item.id}`}
-                    >
-                      {index === 0 && <Marker id={getMarkerId(activeTab, "29")} />}
-                      <Edit2 className="h-4 w-4" />
-                    </Button>
-                  )}
-                  <Button 
-                    variant="ghost" 
-                    size="sm" 
-                    className="h-7 w-7 p-0 hover:bg-gray-100"
-                    onClick={() => openConsumeReceiveModal(item)}
-                    aria-label="Consume/Receive"
-                    title="Consume/Receive"
-                    data-testid={index === 0 ? getMarkerId(activeTab, "30") : `button-consume-receive-${item.id}`}
-                  >
-                    {index === 0 && <Marker id={getMarkerId(activeTab, "30")} />}
-                    <PlusCircle className="h-4 w-4" />
-                  </Button>
-                  {!isVessel && (
-                    <Button 
-                      variant="ghost" 
-                      size="sm" 
-                      className="h-7 w-7 p-0 hover:bg-gray-100"
-                      onClick={() => enterDeleteSelectionMode(item.id)}
-                      aria-label="Delete Item"
-                      title="Delete"
-                      data-testid={index === 0 ? getMarkerId(activeTab, "31") : `button-delete-${item.id}`}
-                    >
-                      {index === 0 && <Marker id={getMarkerId(activeTab, "31")} />}
-                      <Trash2 className="h-4 w-4 text-red-500" />
-                    </Button>
+                  {item.isActive === false ? (
+                    !isVessel && (
+                      <Button 
+                        variant="ghost" 
+                        size="sm" 
+                        className="h-7 p-1 hover:bg-green-50 text-green-600"
+                        onClick={async () => {
+                          try {
+                            await apiRequest('PUT', `/technical/api/stores/item/${item.id}`, { isActive: true });
+                            queryClient.invalidateQueries({ queryKey: [`/technical/api/stores/${vesselId}?itemType=${activeTab}`] });
+                            toast({ title: "Success", description: "Item restored" });
+                          } catch (error) {
+                            toast({ title: "Error", description: "Failed to restore item", variant: "destructive" });
+                          }
+                        }}
+                        aria-label="Restore Item"
+                        title="Restore"
+                        data-testid={`button-restore-${item.id}`}
+                      >
+                        <RotateCcw className="h-4 w-4 mr-1" />
+                        <span className="text-xs">Restore</span>
+                      </Button>
+                    )
+                  ) : (
+                    <>
+                      {!isVessel && (
+                        <Button 
+                          variant="ghost" 
+                          size="sm" 
+                          className="h-7 w-7 p-0 hover:bg-gray-100"
+                          onClick={() => openEditModal(item)}
+                          aria-label="Edit Item"
+                          title="Edit"
+                          data-testid={index === 0 ? getMarkerId(activeTab, "29") : `button-edit-${item.id}`}
+                        >
+                          {index === 0 && <Marker id={getMarkerId(activeTab, "29")} />}
+                          <Edit2 className="h-4 w-4" />
+                        </Button>
+                      )}
+                      <Button 
+                        variant="ghost" 
+                        size="sm" 
+                        className="h-7 w-7 p-0 hover:bg-gray-100"
+                        onClick={() => openConsumeReceiveModal(item)}
+                        aria-label="Consume/Receive"
+                        title="Consume/Receive"
+                        data-testid={index === 0 ? getMarkerId(activeTab, "30") : `button-consume-receive-${item.id}`}
+                      >
+                        {index === 0 && <Marker id={getMarkerId(activeTab, "30")} />}
+                        <PlusCircle className="h-4 w-4" />
+                      </Button>
+                      {!isVessel && (
+                        <Button 
+                          variant="ghost" 
+                          size="sm" 
+                          className="h-7 w-7 p-0 hover:bg-gray-100"
+                          onClick={() => enterDeleteSelectionMode(item.id)}
+                          aria-label="Delete Item"
+                          title="Delete"
+                          data-testid={index === 0 ? getMarkerId(activeTab, "31") : `button-delete-${item.id}`}
+                        >
+                          {index === 0 && <Marker id={getMarkerId(activeTab, "31")} />}
+                          <Trash2 className="h-4 w-4 text-red-500" />
+                        </Button>
+                      )}
+                    </>
                   )}
                 </div>
                 )}
@@ -2248,7 +2285,7 @@ const Stores: React.FC = () => {
                   const editKey = `${item.id}-${side}`;
                   const editingLocRobVal = editingLocRobValues[editKey];
                   return (
-                    <div key={item.id} className="px-4 py-3 border-b border-gray-100 hover:bg-gray-50">
+                    <div key={item.id} className={`px-4 py-3 border-b border-gray-100 hover:bg-gray-50 ${item.isActive === false ? 'opacity-50 pointer-events-none' : ''}`}>
                       <div className="grid text-sm items-center min-w-max" style={{ gridTemplateColumns: FEATURES.IHM ? '120px 200px 160px 80px 80px 80px 80px 160px 100px 40px' : '120px 200px 160px 80px 80px 80px 80px 160px 100px', minWidth: 'max-content', gap: '12px' }}>
                         <div className="px-2 text-gray-900">{item.itemCode}</div>
                         <div className="px-2 text-gray-700">{item.itemName}</div>

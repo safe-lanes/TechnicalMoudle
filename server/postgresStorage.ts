@@ -3263,15 +3263,13 @@ export class PostgresStorage {
         .where(and(
           eq(storesItems.vesselId, vesselId),
           eq(storesItems.itemType, itemType),
-          eq(storesItems.deleted, false),
-          eq(storesItems.isActive, true)
+          eq(storesItems.deleted, false)
         ));
     }
     return await db.select().from(storesItems)
       .where(and(
         eq(storesItems.vesselId, vesselId),
-        eq(storesItems.deleted, false),
-        eq(storesItems.isActive, true)
+        eq(storesItems.deleted, false)
       ));
   }
 
