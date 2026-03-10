@@ -2164,6 +2164,9 @@ const Components: React.FC = () => {
       if (!response.ok) {
         const error: any = new Error(data.error || 'Failed to deactivate component');
         error.code = data.code;
+        error.activeChildrenCount = data.activeChildrenCount;
+        error.activeJobsCount = data.activeJobsCount;
+        error.linkedSparesCount = data.linkedSparesCount;
         throw error;
       }
       return data;
@@ -2180,7 +2183,15 @@ const Components: React.FC = () => {
     },
     onError: (error: any) => {
       setDeleteDialogOpen(false);
-      setValidationErrorMessage(error.message);
+      let message = error.message;
+      if (error.code === 'ACTIVE_CHILDREN') {
+        message = `This component has ${error.activeChildrenCount || ''} active child component(s). Please deactivate the child components first before deactivating this component.`;
+      } else if (error.code === 'ACTIVE_JOBS') {
+        message = `This component cannot be deactivated because it has ${error.activeJobsCount || ''} active Job(s) linked to it. Please deactivate or delete all linked Jobs first.`;
+      } else if (error.code === 'ACTIVE_SPARES' || error.code === 'LINKED_SPARES') {
+        message = `This component cannot be deactivated because it has ${error.linkedSparesCount || ''} active Spare(s) linked to it. Please deactivate or delete all linked Spares first.`;
+      }
+      setValidationErrorMessage(message);
       setValidationErrorDialogOpen(true);
     },
   });

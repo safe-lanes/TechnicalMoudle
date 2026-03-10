@@ -1011,16 +1011,39 @@ export class PostgresStorage {
       };
     }
     
-    const linkedSpares = await db.select().from(spareComponentLinks)
-      .where(eq(spareComponentLinks.componentId, component.cuuid));
+    const activeSpareIds = new Set<number>();
     
-    if (linkedSpares.length > 0) {
+    const directSpares = await db.select({ id: spares.id }).from(spares)
+      .where(and(
+        eq(spares.componentId, component.cuuid),
+        eq(spares.isActive, true),
+        eq(spares.vesselId, vesselId)
+      ));
+    for (const s of directSpares) {
+      activeSpareIds.add(s.id);
+    }
+    
+    const linkedActiveSpares = await db.select({ id: spares.id }).from(spareComponentLinks)
+      .innerJoin(spares, and(
+        or(
+          eq(spares.suuid, spareComponentLinks.spareUuid),
+          eq(spares.id, spareComponentLinks.spareId)
+        ),
+        eq(spares.isActive, true),
+        eq(spares.vesselId, vesselId)
+      ))
+      .where(eq(spareComponentLinks.componentId, component.cuuid));
+    for (const row of linkedActiveSpares) {
+      activeSpareIds.add(row.id);
+    }
+    
+    if (activeSpareIds.size > 0) {
       return {
         success: false,
-        message: `Component cannot be deleted because ${linkedSpares.length} Spare(s) are linked. Please remove the linked Spares before deleting the component.`,
-        code: 'LINKED_SPARES',
+        message: `Component cannot be deleted because ${activeSpareIds.size} active Spare(s) are linked. Please deactivate or delete the linked Spares before deleting the component.`,
+        code: 'ACTIVE_SPARES',
         componentsInactivated: 0,
-        linkedSparesCount: linkedSpares.length,
+        linkedSparesCount: activeSpareIds.size,
       };
     }
     
