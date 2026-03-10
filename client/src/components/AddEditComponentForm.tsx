@@ -520,7 +520,7 @@ const AddEditComponentForm: React.FC<AddEditComponentFormProps> = ({
     }
   }, [componentData.componentCode]);
 
-  const PARENT_OPTIONAL_FIELDS = ['model', 'modelCode', 'critical', 'conditionBased', 'eqptSystemDept'];
+  const PARENT_OPTIONAL_FIELDS = ['model', 'modelCode', 'eqptSystemDept'];
 
   const ALL_MANDATORY_FIELDS = [
     { key: 'parentComponent', label: 'Parent Component Code' },
@@ -986,32 +986,30 @@ const AddEditComponentForm: React.FC<AddEditComponentFormProps> = ({
                               />
                             </div>
                             <div>
-                              <label className="text-xs font-medium text-gray-600 block mb-1">Criticality{!isParentComponent && <span className="text-red-500 ml-0.5">*</span>}</label>
+                              <label className="text-xs font-medium text-gray-600 block mb-1">Criticality</label>
                               <select
                                 value={componentData.critical}
                                 onChange={(e) => handleFieldChange('critical', e.target.value)}
-                                className={`text-sm w-full px-2 py-1 border rounded ${validationErrors.critical ? 'border-red-500 text-red-700' : 'text-[#52BAF3] border-[#52BAF3]'}`}
+                                className="text-sm w-full px-2 py-1 border rounded text-[#52BAF3] border-[#52BAF3]"
                                 data-testid="select-criticality"
                               >
                                 <option value="">Select</option>
                                 <option value="Yes">Yes</option>
                                 <option value="No">No</option>
                               </select>
-                              {validationErrors.critical && <span className="text-xs text-red-500" data-testid="validation-error-critical">This field is required</span>}
                             </div>
                             <div>
-                              <label className="text-xs font-medium text-gray-600 block mb-1">Condition Based{!isParentComponent && <span className="text-red-500 ml-0.5">*</span>}</label>
+                              <label className="text-xs font-medium text-gray-600 block mb-1">Condition Based</label>
                               <select
                                 value={componentData.conditionBased}
                                 onChange={(e) => handleFieldChange('conditionBased', e.target.value)}
-                                className={`text-sm w-full px-2 py-1 border rounded ${validationErrors.conditionBased ? 'border-red-500 text-red-700' : 'text-[#52BAF3] border-[#52BAF3]'}`}
+                                className="text-sm w-full px-2 py-1 border rounded text-[#52BAF3] border-[#52BAF3]"
                                 data-testid="select-condition-based"
                               >
                                 <option value="">Select</option>
                                 <option value="Yes">Yes</option>
                                 <option value="No">No</option>
                               </select>
-                              {validationErrors.conditionBased && <span className="text-xs text-red-500" data-testid="validation-error-conditionBased">This field is required</span>}
                             </div>
                             <div>
                               <label className="text-xs font-medium text-gray-600 block mb-1">Installation Date</label>

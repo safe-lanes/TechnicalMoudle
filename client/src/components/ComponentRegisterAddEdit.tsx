@@ -763,7 +763,7 @@ export default function ComponentRegisterAddEdit({
     });
   };
 
-  const PARENT_OPTIONAL_FIELDS = ['model', 'modelCode', 'critical', 'conditionBased', 'eqptSystemDept'];
+  const PARENT_OPTIONAL_FIELDS = ['model', 'modelCode', 'eqptSystemDept'];
 
   const ALL_MANDATORY_FIELDS = [
     { key: 'parentComponent', label: 'Parent Component Code' },
@@ -1407,32 +1407,30 @@ export default function ComponentRegisterAddEdit({
                     />
                   </div>
                   <div>
-                    <label className="text-xs font-medium text-gray-600 mb-1 block">Criticality{!isParentComponent && <span className="text-red-500 ml-0.5">*</span>}</label>
+                    <label className="text-xs font-medium text-gray-600 mb-1 block">Criticality</label>
                     <select
                       value={componentData.critical}
                       onChange={(e) => handleFieldChange('critical', e.target.value)}
-                      className={`h-8 w-full text-sm px-2 border rounded ${validationErrors.critical ? 'border-red-500' : 'border-gray-200'}`}
+                      className="h-8 w-full text-sm px-2 border rounded border-gray-200"
                       data-testid="select-criticality-field"
                     >
                       <option value="">Select</option>
                       <option value="Yes">Yes</option>
                       <option value="No">No</option>
                     </select>
-                    {validationErrors.critical && <span className="text-xs text-red-500" data-testid="validation-error-critical">This field is required</span>}
                   </div>
                   <div>
-                    <label className="text-xs font-medium text-gray-600 mb-1 block">Condition Based{!isParentComponent && <span className="text-red-500 ml-0.5">*</span>}</label>
+                    <label className="text-xs font-medium text-gray-600 mb-1 block">Condition Based</label>
                     <select
                       value={componentData.conditionBased}
                       onChange={(e) => handleFieldChange('conditionBased', e.target.value)}
-                      className={`h-8 w-full text-sm px-2 border rounded ${validationErrors.conditionBased ? 'border-red-500' : 'border-gray-200'}`}
+                      className="h-8 w-full text-sm px-2 border rounded border-gray-200"
                       data-testid="select-condition-based"
                     >
                       <option value="">Select</option>
                       <option value="Yes">Yes</option>
                       <option value="No">No</option>
                     </select>
-                    {validationErrors.conditionBased && <span className="text-xs text-red-500" data-testid="validation-error-conditionBased">This field is required</span>}
                   </div>
                   <div>
                     <label className="text-xs font-medium text-gray-600 mb-1 block">Installation Date</label>
