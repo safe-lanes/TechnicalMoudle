@@ -162,10 +162,6 @@ const Stores: React.FC = () => {
   const [originalStoreData, setOriginalStoreData] = useState<StoreItem | null>(null);
   const [isSubmittingChangeRequest, setIsSubmittingChangeRequest] = useState(false);
   
-  // Bulk delete mode state
-  const [isBulkDeleteMode, setIsBulkDeleteMode] = useState(false);
-  const [selectedStoreIds, setSelectedStoreIds] = useState<Set<number>>(new Set());
-  const [showBulkDeleteConfirm, setShowBulkDeleteConfirm] = useState(false);
   
   // Enable modify footer when in modify mode
   useEffect(() => {
@@ -200,7 +196,6 @@ const Stores: React.FC = () => {
   useEffect(() => {
     setSelectedLocationName(null);
     setLocationTabSearch("");
-    exitBulkDeleteMode();
   }, [vesselId, activeTab]);
 
   // Fetch stores items from API - uses default TanStack Query fetcher
@@ -1439,92 +1434,27 @@ const Stores: React.FC = () => {
     }
   };
   
-  // Handle Delete (using apiRequest for consistency with Spares pattern)
+  // Handle Delete (soft delete via isActive=false)
   const handleDelete = async (item: StoreItem) => {
-    if (confirm(`Delete ${item.itemName}? This action cannot be undone.`)) {
+    if (confirm(`Delete ${item.itemName}? This item will be removed from the active list.`)) {
       try {
-        await apiRequest('DELETE', `/technical/api/stores/item/${item.id}`);
+        const response = await fetch(`/technical/api/stores/${vesselId}/${item.id}/inactivate`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+        });
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => ({}));
+          throw new Error(errorData.message || 'Failed to delete item');
+        }
         
         queryClient.invalidateQueries({ queryKey: [`/technical/api/stores/${vesselId}?itemType=${activeTab}`] });
         queryClient.invalidateQueries({ queryKey: [`/technical/api/stores/${vesselId}/history`, activeTab] });
         toast({ title: "Success", description: "Item deleted" });
-      } catch (error) {
+      } catch (error: any) {
         console.error('Failed to delete item:', error);
-        toast({ title: "Error", description: "Failed to delete item", variant: "destructive" });
+        toast({ title: "Error", description: error.message || "Failed to delete item", variant: "destructive" });
       }
     }
-  };
-
-  // Bulk delete mode helpers
-  const exitBulkDeleteMode = () => {
-    setIsBulkDeleteMode(false);
-    setSelectedStoreIds(new Set());
-    setShowBulkDeleteConfirm(false);
-  };
-
-  const toggleStoreSelection = (storeId: number) => {
-    setSelectedStoreIds(prev => {
-      const next = new Set(prev);
-      if (next.has(storeId)) next.delete(storeId);
-      else next.add(storeId);
-      return next;
-    });
-  };
-
-  const toggleSelectAll = () => {
-    const allSelected = filteredItems.length > 0 && filteredItems.every((item: StoreItem) => selectedStoreIds.has(item.id));
-    const newSet = new Set(selectedStoreIds);
-    if (allSelected) {
-      filteredItems.forEach((item: StoreItem) => newSet.delete(item.id));
-    } else {
-      filteredItems.forEach((item: StoreItem) => newSet.add(item.id));
-    }
-    setSelectedStoreIds(newSet);
-  };
-
-  const confirmBulkDeactivate = () => {
-    if (selectedStoreIds.size === 0) {
-      toast({ title: "No items selected", description: "Please select at least one item to delete.", variant: "destructive" });
-      return;
-    }
-    setShowBulkDeleteConfirm(true);
-  };
-
-  const bulkDeactivateMutation = useMutation({
-    mutationFn: async (storeIds: number[]) => {
-      const results = [];
-      for (const storeId of storeIds) {
-        try {
-          const response = await fetch(`/technical/api/stores/${vesselId}/${storeId}/inactivate`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-          });
-          results.push({ id: storeId, success: response.ok });
-        } catch (e) {
-          results.push({ id: storeId, success: false });
-        }
-      }
-      return results;
-    },
-    onSuccess: (results) => {
-      queryClient.invalidateQueries({ queryKey: [`/technical/api/stores/${vesselId}?itemType=${activeTab}`] });
-      queryClient.invalidateQueries({ queryKey: [`/technical/api/stores/${vesselId}/history`, activeTab] });
-      const successCount = results.filter(r => r.success).length;
-      const failCount = results.filter(r => !r.success).length;
-      if (failCount === 0) {
-        exitBulkDeleteMode();
-        toast({ title: "Success", description: `${successCount} item(s) deleted successfully.` });
-      } else {
-        const failedIds = new Set(results.filter(r => !r.success).map(r => r.id));
-        setSelectedStoreIds(failedIds);
-        setShowBulkDeleteConfirm(false);
-        toast({ title: "Partial failure", description: `${successCount} succeeded, ${failCount} failed. Failed items remain selected.`, variant: "destructive" });
-      }
-    },
-  });
-
-  const executeBulkDeactivate = () => {
-    bulkDeactivateMutation.mutate(Array.from(selectedStoreIds));
   };
 
   return (
@@ -1607,76 +1537,36 @@ const Stores: React.FC = () => {
         </div>
         
         <div className="flex items-center gap-2">
-          {isBulkDeleteMode ? (
-            <>
-              <span className="text-sm text-gray-600 mr-2" data-testid="text-selected-count">
-                {selectedStoreIds.size} item(s) selected
-              </span>
-              <Button
-                variant="destructive"
-                size="sm"
-                onClick={confirmBulkDeactivate}
-                disabled={selectedStoreIds.size === 0 || bulkDeactivateMutation.isPending}
-                data-testid="button-delete-selected"
-              >
-                <Trash2 className="h-4 w-4 mr-1" />
-                Delete Selected
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={exitBulkDeleteMode}
-                data-testid="button-cancel-bulk-delete"
-              >
-                Cancel
-              </Button>
-            </>
-          ) : (
-            <>
-              <Button 
-                variant="ghost" 
-                size="sm" 
-                className="text-blue-600"
-                onClick={viewMode === "history" ? exportHistoryToExcel : exportInventoryToExcel}
-                data-testid={viewMode === "inventory" ? getMarkerId(activeTab, "8") : viewMode === "history" ? getMarkerId(activeTab, "2.13") : "stores-loc-export"}
-              >
-                {viewMode === "inventory" && <Marker id={getMarkerId(activeTab, "8")} />}
-                {viewMode === "history" && <Marker id={getMarkerId(activeTab, "2.13")} />}
-                <FileSpreadsheet className="h-4 w-4 mr-1" />
-                Export
-              </Button>
-              {viewMode === "inventory" && !isVessel && (
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="text-red-600"
-                  onClick={() => setIsBulkDeleteMode(true)}
-                  data-testid="button-bulk-delete-mode"
-                >
-                  <Trash2 className="h-4 w-4 mr-1" />
-                  Delete
-                </Button>
-              )}
-              <Button 
-                className="bg-[#5dc86f] hover:bg-[#4db85f] text-white" 
-                onClick={openAddStoreModal}
-                data-testid={viewMode === "inventory" ? getMarkerId(activeTab, "3a") : getMarkerId(activeTab, "2.6a")}
-              >
-                {viewMode === "inventory" && <Marker id={getMarkerId(activeTab, "3a")} />}
-                {viewMode === "history" && <Marker id={getMarkerId(activeTab, "2.6a")} />}
-                + Add Store
-              </Button>
-              <Button 
-                className="bg-[#5dc86f] hover:bg-[#4db85f] text-white" 
-                onClick={openBulkUpdateModal}
-                data-testid={viewMode === "inventory" ? getMarkerId(activeTab, "3") : getMarkerId(activeTab, "2.6")}
-              >
-                {viewMode === "inventory" && <Marker id={getMarkerId(activeTab, "3")} />}
-                {viewMode === "history" && <Marker id={getMarkerId(activeTab, "2.6")} />}
-                + Bulk Update {activeTab.charAt(0).toUpperCase() + activeTab.slice(1)}
-              </Button>
-            </>
-          )}
+          <Button 
+            variant="ghost" 
+            size="sm" 
+            className="text-blue-600"
+            onClick={viewMode === "history" ? exportHistoryToExcel : exportInventoryToExcel}
+            data-testid={viewMode === "inventory" ? getMarkerId(activeTab, "8") : viewMode === "history" ? getMarkerId(activeTab, "2.13") : "stores-loc-export"}
+          >
+            {viewMode === "inventory" && <Marker id={getMarkerId(activeTab, "8")} />}
+            {viewMode === "history" && <Marker id={getMarkerId(activeTab, "2.13")} />}
+            <FileSpreadsheet className="h-4 w-4 mr-1" />
+            Export
+          </Button>
+          <Button 
+            className="bg-[#5dc86f] hover:bg-[#4db85f] text-white" 
+            onClick={openAddStoreModal}
+            data-testid={viewMode === "inventory" ? getMarkerId(activeTab, "3a") : getMarkerId(activeTab, "2.6a")}
+          >
+            {viewMode === "inventory" && <Marker id={getMarkerId(activeTab, "3a")} />}
+            {viewMode === "history" && <Marker id={getMarkerId(activeTab, "2.6a")} />}
+            + Add Store
+          </Button>
+          <Button 
+            className="bg-[#5dc86f] hover:bg-[#4db85f] text-white" 
+            onClick={openBulkUpdateModal}
+            data-testid={viewMode === "inventory" ? getMarkerId(activeTab, "3") : getMarkerId(activeTab, "2.6")}
+          >
+            {viewMode === "inventory" && <Marker id={getMarkerId(activeTab, "3")} />}
+            {viewMode === "history" && <Marker id={getMarkerId(activeTab, "2.6")} />}
+            + Bulk Update {activeTab.charAt(0).toUpperCase() + activeTab.slice(1)}
+          </Button>
         </div>
       </div>
 
@@ -1939,22 +1829,7 @@ const Stores: React.FC = () => {
         <div className="bg-white rounded-lg shadow overflow-hidden">
         {/* Table Header */}
         <div className="bg-[#52baf3] text-white p-4">
-          <div className="grid gap-4 items-center text-sm font-medium" style={{gridTemplateColumns: (() => {
-            const base = activeTab === 'chemicals' ? (FEATURES.IHM ? '2fr 2fr 2fr 0.8fr 0.8fr 0.8fr 0.8fr 1fr 0.8fr 0.8fr 0.8fr 0.6fr' : '2fr 2fr 2fr 0.8fr 0.8fr 0.8fr 0.8fr 1fr 0.8fr 0.8fr 0.8fr') : (FEATURES.IHM ? '2fr 2fr 2fr 0.8fr 0.8fr 0.8fr 0.8fr 1fr 0.6fr' : '2fr 2fr 2fr 0.8fr 0.8fr 0.8fr 0.8fr 1.5fr');
-            if (isBulkDeleteMode) return `40px ${base}`;
-            return `${base} 1fr`;
-          })()}}>
-            {isBulkDeleteMode && (
-              <div className="flex items-center justify-center">
-                <input
-                  type="checkbox"
-                  checked={filteredItems.length > 0 && filteredItems.every((item: StoreItem) => selectedStoreIds.has(item.id))}
-                  onChange={toggleSelectAll}
-                  className="h-4 w-4 rounded border-white cursor-pointer accent-white"
-                  data-testid="checkbox-select-all"
-                />
-              </div>
-            )}
+          <div className="grid gap-4 items-center text-sm font-medium" style={{gridTemplateColumns: activeTab === 'chemicals' ? (FEATURES.IHM ? '2fr 2fr 2fr 0.8fr 0.8fr 0.8fr 0.8fr 1fr 0.8fr 0.8fr 0.8fr 0.6fr 1fr' : '2fr 2fr 2fr 0.8fr 0.8fr 0.8fr 0.8fr 1fr 0.8fr 0.8fr 0.8fr 1fr') : (FEATURES.IHM ? '2fr 2fr 2fr 0.8fr 0.8fr 0.8fr 0.8fr 1fr 0.6fr 1fr' : '2fr 2fr 2fr 0.8fr 0.8fr 0.8fr 0.8fr 1.5fr 1fr')}}>
             <div data-testid={getMarkerId(activeTab, "10")}>
               <Marker id={getMarkerId(activeTab, "10")} />
               {activeTab === "lubes" ? "Lube Grade" : 
@@ -1982,30 +1857,15 @@ const Stores: React.FC = () => {
             {activeTab === "chemicals" && <div className="text-center">Batch #</div>}
             {activeTab === "chemicals" && <div className="text-center">Hazard</div>}
             {FEATURES.IHM && <div className="text-center" data-testid={getMarkerId(activeTab, "18")}><Marker id={getMarkerId(activeTab, "18")} />IHM</div>}
-            {!isBulkDeleteMode && <div className="text-right pr-2" data-testid={getMarkerId(activeTab, "19")}><Marker id={getMarkerId(activeTab, "19")} />Actions</div>}
+            <div className="text-right pr-2" data-testid={getMarkerId(activeTab, "19")}><Marker id={getMarkerId(activeTab, "19")} />Actions</div>
           </div>
         </div>
 
         {/* Table Body */}
         <div className="divide-y divide-gray-200">
           {filteredItems.map((item, index) => (
-            <div key={item.id} className={`hover:bg-gray-50 ${isBulkDeleteMode && selectedStoreIds.has(item.id) ? 'bg-red-50' : ''}`}>
-              <div className="grid gap-4 items-center text-sm py-3 px-4" style={{gridTemplateColumns: (() => {
-                const base = activeTab === 'chemicals' ? (FEATURES.IHM ? '2fr 2fr 2fr 0.8fr 0.8fr 0.8fr 0.8fr 1fr 0.8fr 0.8fr 0.8fr 0.6fr' : '2fr 2fr 2fr 0.8fr 0.8fr 0.8fr 0.8fr 1fr 0.8fr 0.8fr 0.8fr') : (FEATURES.IHM ? '2fr 2fr 2fr 0.8fr 0.8fr 0.8fr 0.8fr 1fr 0.6fr' : '2fr 2fr 2fr 0.8fr 0.8fr 0.8fr 0.8fr 1.5fr');
-                if (isBulkDeleteMode) return `40px ${base}`;
-                return `${base} 1fr`;
-              })()}}>
-                {isBulkDeleteMode && (
-                  <div className="flex items-center justify-center">
-                    <input
-                      type="checkbox"
-                      checked={selectedStoreIds.has(item.id)}
-                      onChange={() => toggleStoreSelection(item.id)}
-                      className="h-4 w-4 rounded border-gray-300 cursor-pointer"
-                      data-testid={`checkbox-store-${item.id}`}
-                    />
-                  </div>
-                )}
+            <div key={item.id} className="hover:bg-gray-50">
+              <div className="grid gap-4 items-center text-sm py-3 px-4" style={{gridTemplateColumns: activeTab === 'chemicals' ? (FEATURES.IHM ? '2fr 2fr 2fr 0.8fr 0.8fr 0.8fr 0.8fr 1fr 0.8fr 0.8fr 0.8fr 0.6fr 1fr' : '2fr 2fr 2fr 0.8fr 0.8fr 0.8fr 0.8fr 1fr 0.8fr 0.8fr 0.8fr 1fr') : (FEATURES.IHM ? '2fr 2fr 2fr 0.8fr 0.8fr 0.8fr 0.8fr 1fr 0.6fr 1fr' : '2fr 2fr 2fr 0.8fr 0.8fr 0.8fr 0.8fr 1.5fr 1fr')}}>
                 <div className="font-medium text-gray-900 truncate" data-testid={index === 0 ? getMarkerId(activeTab, "20") : undefined}>
                   {index === 0 && <Marker id={getMarkerId(activeTab, "20")} />}
                   {item.itemCode}
@@ -2105,7 +1965,6 @@ const Stores: React.FC = () => {
                     )}
                   </div>
                 )}
-                {!isBulkDeleteMode && (
                 <div className="flex gap-1 items-center justify-end pr-2 whitespace-nowrap">
                   {!isVessel && (
                     <Button 
@@ -2148,7 +2007,6 @@ const Stores: React.FC = () => {
                     </Button>
                   )}
                 </div>
-                )}
               </div>
             </div>
           ))}
@@ -3996,30 +3854,6 @@ const Stores: React.FC = () => {
       </div>
       
       {/* Modify Mode Footer */}
-      <Dialog open={showBulkDeleteConfirm} onOpenChange={setShowBulkDeleteConfirm}>
-        <DialogContent className="max-w-sm">
-          <DialogHeader>
-            <DialogTitle>Confirm Delete</DialogTitle>
-          </DialogHeader>
-          <p className="text-sm text-gray-600" data-testid="text-bulk-delete-confirm">
-            Are you sure you want to delete {selectedStoreIds.size} selected item(s)? Items will be deactivated and hidden from the list.
-          </p>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setShowBulkDeleteConfirm(false)} data-testid="button-cancel-confirm">
-              Cancel
-            </Button>
-            <Button
-              variant="destructive"
-              onClick={executeBulkDeactivate}
-              disabled={bulkDeactivateMutation.isPending}
-              data-testid="button-confirm-delete"
-            >
-              {bulkDeactivateMutation.isPending ? "Deleting..." : "Delete"}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
       <ModifyStickyFooter
         isVisible={isModifyMode && showModifySubmitFooter}
         hasChanges={originalStoreData !== null && getStoreChangedFields().length > 0}
