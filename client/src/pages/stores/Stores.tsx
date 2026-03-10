@@ -4,6 +4,7 @@ import { useVessel } from "@/contexts/VesselContext";
 import { useUIRole } from "@/contexts/UIRoleContext";
 import { useChangeMode } from "@/contexts/ChangeModeContext";
 import { Marker } from "@/components/Marker";
+import { LocationSearchDropdown } from "@/components/LocationSearchDropdown";
 import { useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -2771,13 +2772,13 @@ const Stores: React.FC = () => {
               <Label className="text-base font-semibold text-gray-700 mb-2 block">Location Details</Label>
               <div className="grid grid-cols-2 gap-4">
                 <div className="grid gap-2">
-                  <Label htmlFor="editLocationA">Location A Name</Label>
-                  <Input
-                    id="editLocationA"
+                  <Label>Location A Name</Label>
+                  <LocationSearchDropdown
+                    vesselId={vesselId}
                     value={editForm.locationA}
-                    onChange={(e) => setEditForm({...editForm, locationA: e.target.value})}
-                    placeholder="e.g., Engine Room Store"
-                    data-testid="input-edit-location-a"
+                    onChange={(val) => setEditForm({...editForm, locationA: val})}
+                    placeholder="Select location..."
+                    data-testid="dropdown-edit-location-a"
                   />
                 </div>
                 <div className="grid gap-2">
@@ -2792,13 +2793,13 @@ const Stores: React.FC = () => {
                   />
                 </div>
                 <div className="grid gap-2">
-                  <Label htmlFor="editLocationB">Location B Name</Label>
-                  <Input
-                    id="editLocationB"
+                  <Label>Location B Name</Label>
+                  <LocationSearchDropdown
+                    vesselId={vesselId}
                     value={editForm.locationB}
-                    onChange={(e) => setEditForm({...editForm, locationB: e.target.value})}
-                    placeholder="e.g., Deck Store"
-                    data-testid="input-edit-location-b"
+                    onChange={(val) => setEditForm({...editForm, locationB: val})}
+                    placeholder="Select location..."
+                    data-testid="dropdown-edit-location-b"
                   />
                 </div>
                 <div className="grid gap-2">
@@ -3297,13 +3298,13 @@ const Stores: React.FC = () => {
               <Label className="text-base font-semibold text-gray-700 mb-2 block">Location Details</Label>
               <div className="grid grid-cols-2 gap-4">
                 <div className="grid gap-2">
-                  <Label htmlFor="addLocationA">Location A Name</Label>
-                  <Input
-                    id="addLocationA"
+                  <Label>Location A Name</Label>
+                  <LocationSearchDropdown
+                    vesselId={vesselId}
                     value={addStoreForm.locationA}
-                    onChange={(e) => setAddStoreForm({...addStoreForm, locationA: e.target.value})}
-                    placeholder="e.g., Engine Room Store"
-                    data-testid="input-add-store-location-a"
+                    onChange={(val) => setAddStoreForm({...addStoreForm, locationA: val})}
+                    placeholder="Select location..."
+                    data-testid="dropdown-add-store-location-a"
                   />
                 </div>
                 <div className="grid gap-2">
@@ -3318,13 +3319,13 @@ const Stores: React.FC = () => {
                   />
                 </div>
                 <div className="grid gap-2">
-                  <Label htmlFor="addLocationB">Location B Name</Label>
-                  <Input
-                    id="addLocationB"
+                  <Label>Location B Name</Label>
+                  <LocationSearchDropdown
+                    vesselId={vesselId}
                     value={addStoreForm.locationB}
-                    onChange={(e) => setAddStoreForm({...addStoreForm, locationB: e.target.value})}
-                    placeholder="e.g., Deck Store"
-                    data-testid="input-add-store-location-b"
+                    onChange={(val) => setAddStoreForm({...addStoreForm, locationB: val})}
+                    placeholder="Select location..."
+                    data-testid="dropdown-add-store-location-b"
                   />
                 </div>
                 <div className="grid gap-2">
