@@ -837,7 +837,8 @@ const Stores: React.FC = () => {
     filtered.sort((a, b) => {
       const aInactive = a.isActive === false ? 1 : 0;
       const bInactive = b.isActive === false ? 1 : 0;
-      return aInactive - bInactive;
+      if (aInactive !== bInactive) return aInactive - bInactive;
+      return (a.itemCode || '').localeCompare(b.itemCode || '', undefined, { numeric: true });
     });
     return filtered;
   }, [activeTab, searchTerm, categoryFilter, stockFilter, items, isVessel, isHeadOfDept]);
