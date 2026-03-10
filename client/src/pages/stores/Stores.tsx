@@ -161,6 +161,8 @@ const Stores: React.FC = () => {
   const [showModifySubmitFooter, setShowModifySubmitFooter] = useState(false);
   const [originalStoreData, setOriginalStoreData] = useState<StoreItem | null>(null);
   const [isSubmittingChangeRequest, setIsSubmittingChangeRequest] = useState(false);
+  const [isDeleteSelectionMode, setIsDeleteSelectionMode] = useState(false);
+  const [selectedStoreIds, setSelectedStoreIds] = useState<Set<number>>(new Set());
   
   
   // Enable modify footer when in modify mode
@@ -196,7 +198,16 @@ const Stores: React.FC = () => {
   useEffect(() => {
     setSelectedLocationName(null);
     setLocationTabSearch("");
+    setIsDeleteSelectionMode(false);
+    setSelectedStoreIds(new Set());
   }, [vesselId, activeTab]);
+
+  useEffect(() => {
+    if (viewMode !== 'inventory') {
+      setIsDeleteSelectionMode(false);
+      setSelectedStoreIds(new Set());
+    }
+  }, [viewMode]);
 
   // Fetch stores items from API - uses default TanStack Query fetcher
   // The query key includes the full URL with query parameters
@@ -1434,26 +1445,73 @@ const Stores: React.FC = () => {
     }
   };
   
-  // Handle Delete (soft delete via isActive=false)
-  const handleDelete = async (item: StoreItem) => {
-    if (confirm(`Delete ${item.itemName}? This item will be removed from the active list.`)) {
+  const enterDeleteSelectionMode = (preselectedId?: number) => {
+    setIsDeleteSelectionMode(true);
+    setSelectedStoreIds(preselectedId ? new Set([preselectedId]) : new Set());
+  };
+
+  const exitDeleteSelectionMode = () => {
+    setIsDeleteSelectionMode(false);
+    setSelectedStoreIds(new Set());
+  };
+
+  const toggleStoreSelection = (storeId: number) => {
+    setSelectedStoreIds(prev => {
+      const next = new Set(prev);
+      if (next.has(storeId)) next.delete(storeId);
+      else next.add(storeId);
+      return next;
+    });
+  };
+
+  const toggleSelectAll = () => {
+    const allSelected = filteredItems.length > 0 && filteredItems.every((item: StoreItem) => selectedStoreIds.has(item.id));
+    if (allSelected) {
+      setSelectedStoreIds(new Set());
+    } else {
+      setSelectedStoreIds(new Set(filteredItems.map((item: StoreItem) => item.id)));
+    }
+  };
+
+  const [isDeletingSelected, setIsDeletingSelected] = useState(false);
+
+  const executeDeleteSelected = async () => {
+    const visibleIds = new Set(filteredItems.map((item: StoreItem) => item.id));
+    const idsToDelete = Array.from(selectedStoreIds).filter(id => visibleIds.has(id));
+    if (idsToDelete.length === 0) {
+      toast({ title: "No items selected", description: "Please select at least one item to delete.", variant: "destructive" });
+      return;
+    }
+    setIsDeletingSelected(true);
+    let successCount = 0;
+    let failCount = 0;
+    const failedIds = new Set<number>();
+    for (const storeId of idsToDelete) {
       try {
-        const response = await fetch(`/technical/api/stores/${vesselId}/${item.id}/inactivate`, {
+        const response = await fetch(`/technical/api/stores/${vesselId}/${storeId}/inactivate`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
         });
-        if (!response.ok) {
-          const errorData = await response.json().catch(() => ({}));
-          throw new Error(errorData.message || 'Failed to delete item');
+        if (response.ok) {
+          successCount++;
+        } else {
+          failCount++;
+          failedIds.add(storeId);
         }
-        
-        queryClient.invalidateQueries({ queryKey: [`/technical/api/stores/${vesselId}?itemType=${activeTab}`] });
-        queryClient.invalidateQueries({ queryKey: [`/technical/api/stores/${vesselId}/history`, activeTab] });
-        toast({ title: "Success", description: "Item deleted" });
-      } catch (error: any) {
-        console.error('Failed to delete item:', error);
-        toast({ title: "Error", description: error.message || "Failed to delete item", variant: "destructive" });
+      } catch {
+        failCount++;
+        failedIds.add(storeId);
       }
+    }
+    queryClient.invalidateQueries({ queryKey: [`/technical/api/stores/${vesselId}?itemType=${activeTab}`] });
+    queryClient.invalidateQueries({ queryKey: [`/technical/api/stores/${vesselId}/history`, activeTab] });
+    setIsDeletingSelected(false);
+    if (failCount === 0) {
+      exitDeleteSelectionMode();
+      toast({ title: "Success", description: `${successCount} item(s) deleted successfully.` });
+    } else {
+      setSelectedStoreIds(failedIds);
+      toast({ title: "Partial failure", description: `${successCount} succeeded, ${failCount} failed. Failed items remain selected.`, variant: "destructive" });
     }
   };
 
@@ -1537,36 +1595,76 @@ const Stores: React.FC = () => {
         </div>
         
         <div className="flex items-center gap-2">
-          <Button 
-            variant="ghost" 
-            size="sm" 
-            className="text-blue-600"
-            onClick={viewMode === "history" ? exportHistoryToExcel : exportInventoryToExcel}
-            data-testid={viewMode === "inventory" ? getMarkerId(activeTab, "8") : viewMode === "history" ? getMarkerId(activeTab, "2.13") : "stores-loc-export"}
-          >
-            {viewMode === "inventory" && <Marker id={getMarkerId(activeTab, "8")} />}
-            {viewMode === "history" && <Marker id={getMarkerId(activeTab, "2.13")} />}
-            <FileSpreadsheet className="h-4 w-4 mr-1" />
-            Export
-          </Button>
-          <Button 
-            className="bg-[#5dc86f] hover:bg-[#4db85f] text-white" 
-            onClick={openAddStoreModal}
-            data-testid={viewMode === "inventory" ? getMarkerId(activeTab, "3a") : getMarkerId(activeTab, "2.6a")}
-          >
-            {viewMode === "inventory" && <Marker id={getMarkerId(activeTab, "3a")} />}
-            {viewMode === "history" && <Marker id={getMarkerId(activeTab, "2.6a")} />}
-            + Add Store
-          </Button>
-          <Button 
-            className="bg-[#5dc86f] hover:bg-[#4db85f] text-white" 
-            onClick={openBulkUpdateModal}
-            data-testid={viewMode === "inventory" ? getMarkerId(activeTab, "3") : getMarkerId(activeTab, "2.6")}
-          >
-            {viewMode === "inventory" && <Marker id={getMarkerId(activeTab, "3")} />}
-            {viewMode === "history" && <Marker id={getMarkerId(activeTab, "2.6")} />}
-            + Bulk Update {activeTab.charAt(0).toUpperCase() + activeTab.slice(1)}
-          </Button>
+          {isDeleteSelectionMode ? (
+            <>
+              <span className="text-sm text-gray-600 mr-2" data-testid="text-selected-count">
+                {selectedStoreIds.size} item(s) selected
+              </span>
+              <Button 
+                variant="ghost" 
+                size="sm" 
+                className="text-blue-600"
+                onClick={viewMode === "history" ? exportHistoryToExcel : exportInventoryToExcel}
+                data-testid={viewMode === "inventory" ? getMarkerId(activeTab, "8") : viewMode === "history" ? getMarkerId(activeTab, "2.13") : "stores-loc-export"}
+              >
+                {viewMode === "inventory" && <Marker id={getMarkerId(activeTab, "8")} />}
+                {viewMode === "history" && <Marker id={getMarkerId(activeTab, "2.13")} />}
+                <FileSpreadsheet className="h-4 w-4 mr-1" />
+                Export
+              </Button>
+              <Button
+                variant="destructive"
+                size="sm"
+                onClick={executeDeleteSelected}
+                disabled={selectedStoreIds.size === 0 || isDeletingSelected}
+                data-testid="button-delete-selected"
+              >
+                <Trash2 className="h-4 w-4 mr-1" />
+                {isDeletingSelected ? "Deleting..." : "Delete"}
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={exitDeleteSelectionMode}
+                data-testid="button-cancel-delete-selection"
+              >
+                Cancel
+              </Button>
+            </>
+          ) : (
+            <>
+              <Button 
+                variant="ghost" 
+                size="sm" 
+                className="text-blue-600"
+                onClick={viewMode === "history" ? exportHistoryToExcel : exportInventoryToExcel}
+                data-testid={viewMode === "inventory" ? getMarkerId(activeTab, "8") : viewMode === "history" ? getMarkerId(activeTab, "2.13") : "stores-loc-export"}
+              >
+                {viewMode === "inventory" && <Marker id={getMarkerId(activeTab, "8")} />}
+                {viewMode === "history" && <Marker id={getMarkerId(activeTab, "2.13")} />}
+                <FileSpreadsheet className="h-4 w-4 mr-1" />
+                Export
+              </Button>
+              <Button 
+                className="bg-[#5dc86f] hover:bg-[#4db85f] text-white" 
+                onClick={openAddStoreModal}
+                data-testid={viewMode === "inventory" ? getMarkerId(activeTab, "3a") : getMarkerId(activeTab, "2.6a")}
+              >
+                {viewMode === "inventory" && <Marker id={getMarkerId(activeTab, "3a")} />}
+                {viewMode === "history" && <Marker id={getMarkerId(activeTab, "2.6a")} />}
+                + Add Store
+              </Button>
+              <Button 
+                className="bg-[#5dc86f] hover:bg-[#4db85f] text-white" 
+                onClick={openBulkUpdateModal}
+                data-testid={viewMode === "inventory" ? getMarkerId(activeTab, "3") : getMarkerId(activeTab, "2.6")}
+              >
+                {viewMode === "inventory" && <Marker id={getMarkerId(activeTab, "3")} />}
+                {viewMode === "history" && <Marker id={getMarkerId(activeTab, "2.6")} />}
+                + Bulk Update {activeTab.charAt(0).toUpperCase() + activeTab.slice(1)}
+              </Button>
+            </>
+          )}
         </div>
       </div>
 
@@ -1829,7 +1927,22 @@ const Stores: React.FC = () => {
         <div className="bg-white rounded-lg shadow overflow-hidden">
         {/* Table Header */}
         <div className="bg-[#52baf3] text-white p-4">
-          <div className="grid gap-4 items-center text-sm font-medium" style={{gridTemplateColumns: activeTab === 'chemicals' ? (FEATURES.IHM ? '2fr 2fr 2fr 0.8fr 0.8fr 0.8fr 0.8fr 1fr 0.8fr 0.8fr 0.8fr 0.6fr 1fr' : '2fr 2fr 2fr 0.8fr 0.8fr 0.8fr 0.8fr 1fr 0.8fr 0.8fr 0.8fr 1fr') : (FEATURES.IHM ? '2fr 2fr 2fr 0.8fr 0.8fr 0.8fr 0.8fr 1fr 0.6fr 1fr' : '2fr 2fr 2fr 0.8fr 0.8fr 0.8fr 0.8fr 1.5fr 1fr')}}>
+          <div className="grid gap-4 items-center text-sm font-medium" style={{gridTemplateColumns: (() => {
+            const base = activeTab === 'chemicals' ? (FEATURES.IHM ? '2fr 2fr 2fr 0.8fr 0.8fr 0.8fr 0.8fr 1fr 0.8fr 0.8fr 0.8fr 0.6fr' : '2fr 2fr 2fr 0.8fr 0.8fr 0.8fr 0.8fr 1fr 0.8fr 0.8fr 0.8fr') : (FEATURES.IHM ? '2fr 2fr 2fr 0.8fr 0.8fr 0.8fr 0.8fr 1fr 0.6fr' : '2fr 2fr 2fr 0.8fr 0.8fr 0.8fr 0.8fr 1.5fr');
+            if (isDeleteSelectionMode) return `40px ${base}`;
+            return `${base} 1fr`;
+          })()}}>
+            {isDeleteSelectionMode && (
+              <div className="flex items-center justify-center">
+                <input
+                  type="checkbox"
+                  checked={filteredItems.length > 0 && filteredItems.every((item: StoreItem) => selectedStoreIds.has(item.id))}
+                  onChange={toggleSelectAll}
+                  className="h-4 w-4 rounded border-white cursor-pointer accent-white"
+                  data-testid="checkbox-select-all"
+                />
+              </div>
+            )}
             <div data-testid={getMarkerId(activeTab, "10")}>
               <Marker id={getMarkerId(activeTab, "10")} />
               {activeTab === "lubes" ? "Lube Grade" : 
@@ -1857,15 +1970,30 @@ const Stores: React.FC = () => {
             {activeTab === "chemicals" && <div className="text-center">Batch #</div>}
             {activeTab === "chemicals" && <div className="text-center">Hazard</div>}
             {FEATURES.IHM && <div className="text-center" data-testid={getMarkerId(activeTab, "18")}><Marker id={getMarkerId(activeTab, "18")} />IHM</div>}
-            <div className="text-right pr-2" data-testid={getMarkerId(activeTab, "19")}><Marker id={getMarkerId(activeTab, "19")} />Actions</div>
+            {!isDeleteSelectionMode && <div className="text-right pr-2" data-testid={getMarkerId(activeTab, "19")}><Marker id={getMarkerId(activeTab, "19")} />Actions</div>}
           </div>
         </div>
 
         {/* Table Body */}
         <div className="divide-y divide-gray-200">
           {filteredItems.map((item, index) => (
-            <div key={item.id} className="hover:bg-gray-50">
-              <div className="grid gap-4 items-center text-sm py-3 px-4" style={{gridTemplateColumns: activeTab === 'chemicals' ? (FEATURES.IHM ? '2fr 2fr 2fr 0.8fr 0.8fr 0.8fr 0.8fr 1fr 0.8fr 0.8fr 0.8fr 0.6fr 1fr' : '2fr 2fr 2fr 0.8fr 0.8fr 0.8fr 0.8fr 1fr 0.8fr 0.8fr 0.8fr 1fr') : (FEATURES.IHM ? '2fr 2fr 2fr 0.8fr 0.8fr 0.8fr 0.8fr 1fr 0.6fr 1fr' : '2fr 2fr 2fr 0.8fr 0.8fr 0.8fr 0.8fr 1.5fr 1fr')}}>
+            <div key={item.id} className={`hover:bg-gray-50 ${isDeleteSelectionMode && selectedStoreIds.has(item.id) ? 'bg-red-50' : ''}`}>
+              <div className="grid gap-4 items-center text-sm py-3 px-4" style={{gridTemplateColumns: (() => {
+                const base = activeTab === 'chemicals' ? (FEATURES.IHM ? '2fr 2fr 2fr 0.8fr 0.8fr 0.8fr 0.8fr 1fr 0.8fr 0.8fr 0.8fr 0.6fr' : '2fr 2fr 2fr 0.8fr 0.8fr 0.8fr 0.8fr 1fr 0.8fr 0.8fr 0.8fr') : (FEATURES.IHM ? '2fr 2fr 2fr 0.8fr 0.8fr 0.8fr 0.8fr 1fr 0.6fr' : '2fr 2fr 2fr 0.8fr 0.8fr 0.8fr 0.8fr 1.5fr');
+                if (isDeleteSelectionMode) return `40px ${base}`;
+                return `${base} 1fr`;
+              })()}}>
+                {isDeleteSelectionMode && (
+                  <div className="flex items-center justify-center">
+                    <input
+                      type="checkbox"
+                      checked={selectedStoreIds.has(item.id)}
+                      onChange={() => toggleStoreSelection(item.id)}
+                      className="h-4 w-4 rounded border-gray-300 cursor-pointer"
+                      data-testid={`checkbox-store-${item.id}`}
+                    />
+                  </div>
+                )}
                 <div className="font-medium text-gray-900 truncate" data-testid={index === 0 ? getMarkerId(activeTab, "20") : undefined}>
                   {index === 0 && <Marker id={getMarkerId(activeTab, "20")} />}
                   {item.itemCode}
@@ -1965,6 +2093,7 @@ const Stores: React.FC = () => {
                     )}
                   </div>
                 )}
+                {!isDeleteSelectionMode && (
                 <div className="flex gap-1 items-center justify-end pr-2 whitespace-nowrap">
                   {!isVessel && (
                     <Button 
@@ -1997,7 +2126,7 @@ const Stores: React.FC = () => {
                       variant="ghost" 
                       size="sm" 
                       className="h-7 w-7 p-0 hover:bg-gray-100"
-                      onClick={() => handleDelete(item)}
+                      onClick={() => enterDeleteSelectionMode(item.id)}
                       aria-label="Delete Item"
                       title="Delete"
                       data-testid={index === 0 ? getMarkerId(activeTab, "31") : `button-delete-${item.id}`}
@@ -2007,6 +2136,7 @@ const Stores: React.FC = () => {
                     </Button>
                   )}
                 </div>
+                )}
               </div>
             </div>
           ))}
