@@ -303,3 +303,54 @@ Eight validation and integrity rules for the Work Order form Part B, covering fr
 - Consider updating data-testid markers for renamed sections (A3 Safety, A4 Work History) if automated tests reference them.
 - Monitor double-deduction fix in production after next deployment.
 - The "Required Tools & Equipment" section (removed A3) is deferred — will be re-added in a later phase.
+
+---
+
+## 2026-03-09 — Running Hours Improvements, Spares Bulk Delete, Component/Job Management, Role Switcher, Unsaved Changes Warning
+
+### What We Built
+1. **Running Hours validation & autofill** — Improved running hours updates with validation logic and autofill behavior for the individual Update RH modal.
+2. **Equipment utilization rates** — Added calculation and display of utilization rates on the Running Hours page.
+3. **Dynamic component counts** — Updated the Running Hours display to show dynamic "Showing X components" count labels.
+4. **Unsaved changes warning (Bulk Update RH modal)** — Implemented a confirmation dialog that intercepts all close paths (× button, Cancel, backdrop click, Escape key) when the user has unsaved data in the Bulk Update Running Hours modal. Dirty state is detected by checking if any running hours input has a value, any Meter Replaced checkbox is ticked, the Comments field has text, or the Date Updated was changed from today. "Discard Changes" fully resets the modal; "Keep Editing" preserves all entered data.
+5. **Spares soft delete & bulk delete** — Implemented soft delete for spares (hiding from certain users) and added bulk delete functionality with new selection options.
+6. **Component management** — Added ability to deactivate components and hide them from certain users, with safeguards to prevent accidental data loss. Improved component saving by resolving legacy component codes. Removed spares section from the component editing screen. Updated component registration to indicate unavailable features.
+7. **Job management** — Added ability to deactivate jobs with confirmation dialog, updated UI to reflect active/inactive status, moved inactive jobs to bottom of component list.
+8. **Role switcher** — Made the role switcher read-only to reflect the logged-in user's actual role. Set default user role to Sail Admin for new applications.
+9. **Login improvements** — Updated login system to detect user roles from multiple sources.
+10. **Spare parts fixes** — Fixed issues with spare parts inventory tracking and stock validation. Ensured displayed inventory quantities match actual location totals. Improved spare location display and data cleanup. Removed ability to edit storage location names from the popover. Preserved line breaks when displaying component notes.
+
+### What's Working
+- **Unsaved changes warning**: All four close paths (×, Cancel, backdrop, Escape) correctly intercepted. Clean state closes immediately. Dirty state shows confirmation dialog. "Keep Editing" preserves all entered values. "Discard Changes" resets modal to fresh state. Escape while confirmation is showing acts as "Keep Editing". After successful Save, modal resets cleanly.
+- **Utilization rates**: Calculated and displayed per-component on the Running Hours page.
+- **Dynamic counts**: Component count label updates correctly based on filtered data.
+- **Spares bulk delete**: Selection UI and delete flow working.
+- **Component/job deactivation**: Confirmation dialogs, status display, and list ordering all functional.
+- **Role switcher**: Correctly reflects logged-in user role as read-only.
+
+### What's Broken
+- Nothing broken from this session's changes.
+
+### What's Pending
+- No backend-side validation added for the unsaved changes warning (pure frontend feature — no backend needed).
+- Data-testid markers for renamed WO form sections (A3 Safety, A4 Work History) still reference old numbering — not addressed this session.
+- Consider adding E2E tests specifically for the individual Update RH modal (only the Bulk Update modal was addressed).
+
+### Key Files Changed
+- `client/src/pages/pms/RunningHours.tsx` — Unsaved changes warning (dirty state detection, `handleBulkUpdateClose`, `handleDiscardChanges`, `handleKeepEditing`, confirmation dialog UI), utilization rates, dynamic component counts, validation & autofill improvements.
+- `client/src/pages/spares/SparesNew.tsx` — Soft delete, bulk delete functionality, selection options.
+- `client/src/pages/pms/Components.tsx` — Component deactivation, spares section removal, registration updates.
+- `client/src/pages/pms/JobsFormPage.tsx` — Job deactivation, inactive job ordering.
+- `client/src/components/RoleSwitcher.tsx` — Read-only role display.
+- `shared/uiRoles.ts` — Default role configuration.
+- `server/postgresStorage.ts` — Backend support for soft delete, deactivation, inventory fixes.
+- `server/storage.ts` — Storage interface updates.
+- Multiple other files across 67 files total (3,118 insertions, 760 deletions).
+
+### Environment Issues
+- None. Application compiles and runs normally. HMR picks up changes without errors.
+
+### Where to Resume
+- Consider adding the unsaved changes warning to other modals that have similar data-loss risk (e.g., individual Update RH modal if needed in the future).
+- Monitor spares soft delete behavior in production to ensure hidden items are properly excluded from relevant views.
+- Continue with any remaining Running Hours page enhancements or other PMS module work.
