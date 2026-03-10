@@ -170,13 +170,15 @@ export async function completeWorkOrder(
     console.log(`⚠️ Skipped cycle detection: ${missedCycles} cycle(s) missed for WO ${workOrder.workOrderNo} (due: ${workOrder.nextDueDate}, completed: ${dateOfCompletion})`);
   }
 
-  // Update work order execution data
+  const originalDueDate = workOrder.nextDueDate || workOrder.dueDate || null;
+
   const updatedWorkOrder = await repo.update(workOrderId, {
     ...executionData,
     runningHoursAtCompletion: runningHours ? parseInt(runningHours) : undefined,
     dateCompleted: dateOfCompletion,
     status: 'Completed',
-    missedCycles
+    missedCycles,
+    originalDueDate
   });
 
   // Auto-populate component_maintenance_history
@@ -239,7 +241,8 @@ export async function completeWorkOrder(
         sparesUsed: executionData.sparesUsed || null,
         remarks: executionData.remarks || null,
         isComponentReplaced: false,
-        missedCycles
+        missedCycles,
+        originalDueDate
       };
 
       await repo.createMaintenanceHistory(historyPayload);
@@ -299,7 +302,7 @@ export async function completeWorkOrder(
         jobUpdates.lastDoneDate = dateOfCompletion;
 
         if (job.frequencyValue && job.frequencyUnit) {
-          const nextDue = calculateNextDueDate(dateOfCompletion, job.frequencyValue, job.frequencyUnit);
+          const nextDue = calculateNextDueDate(dateOfCompletion, job.frequencyValue, job.frequencyUnit, originalDueDate);
           if (nextDue) {
             linkUpdates.nextDueDate = nextDue;
             jobUpdates.nextDueDate = nextDue;

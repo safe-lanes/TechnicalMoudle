@@ -842,7 +842,8 @@ export async function updateWorkOrder(id: string, body: any) {
         if (missedCycles > 0) {
           console.log(`⚠️ Skipped cycle detection: ${missedCycles} cycle(s) missed for WO ${freshWorkOrder.workOrderNo}`);
         }
-        await repo.update(id, { missedCycles });
+        const originalDueDate = freshWorkOrder.nextDueDate || freshWorkOrder.dueDate || null;
+        await repo.update(id, { missedCycles, originalDueDate });
 
         // Create maintenance history record
         try {
@@ -891,7 +892,8 @@ export async function updateWorkOrder(id: string, body: any) {
                   sparesUsed: freshWorkOrder.consumedSpareParts ? JSON.stringify(freshWorkOrder.consumedSpareParts) : null,
                   remarks: freshWorkOrder.remarks || freshWorkOrder.jobExperienceNotes || null,
                   isComponentReplaced: false,
-                  missedCycles
+                  missedCycles,
+                  originalDueDate
                 };
 
                 await repo.createMaintenanceHistory(historyPayload);
@@ -953,7 +955,7 @@ export async function updateWorkOrder(id: string, body: any) {
               const linkUpdates: any = { lastDoneDate: dateOfCompletionNorm, updatedAt: new Date() };
 
               if (job.frequencyValue && job.frequencyUnit) {
-                const nextDue = calculateNextDueDate(dateOfCompletionNorm, job.frequencyValue, job.frequencyUnit);
+                const nextDue = calculateNextDueDate(dateOfCompletionNorm, job.frequencyValue, job.frequencyUnit, freshWorkOrder.nextDueDate || freshWorkOrder.dueDate);
                 if (nextDue) {
                   calendarUpdates.nextDueDate = nextDue;
                   linkUpdates.nextDueDate = nextDue;

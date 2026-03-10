@@ -1,6 +1,6 @@
 import * as repo from '../repositories/workOrderRepository';
 import { ValidationError } from '../../shared/errors';
-import { calculateMissedCycles } from '@shared/dateUtils';
+import { calculateMissedCycles, calculateNextDueDate } from '@shared/dateUtils';
 
 // ── Bulk Approve Work Orders ──
 
@@ -36,20 +36,14 @@ export async function bulkApprove(workOrderIds: string[], approver?: string, app
       let nextDueDate = undefined;
       let nextDueReading = undefined;
 
+      const originalDueDate = existingWO.nextDueDate || existingWO.dueDate || null;
+
       if (existingWO.maintenanceBasis === "Calendar" && actualCompletionDate) {
-        const completionDate = new Date(actualCompletionDate);
-        if (!isNaN(completionDate.getTime())) {
-          const freq = parseInt(existingWO.frequencyValue || "0");
-          if (existingWO.frequencyUnit === "Days") {
-            completionDate.setDate(completionDate.getDate() + freq);
-          } else if (existingWO.frequencyUnit === "Weeks") {
-            completionDate.setDate(completionDate.getDate() + (freq * 7));
-          } else if (existingWO.frequencyUnit === "Months") {
-            completionDate.setMonth(completionDate.getMonth() + freq);
-          } else if (existingWO.frequencyUnit === "Years") {
-            completionDate.setFullYear(completionDate.getFullYear() + freq);
+        if (existingWO.frequencyValue && existingWO.frequencyUnit) {
+          const computed = calculateNextDueDate(actualCompletionDate, existingWO.frequencyValue, existingWO.frequencyUnit, originalDueDate);
+          if (computed) {
+            nextDueDate = computed;
           }
-          nextDueDate = completionDate.toISOString().split('T')[0];
         }
       } else if (existingWO.maintenanceBasis === "Running Hours" && existingWO.currentReading) {
         nextDueReading = (parseInt(existingWO.currentReading) + parseInt(existingWO.frequencyValue || "0")).toString();
@@ -77,6 +71,7 @@ export async function bulkApprove(workOrderIds: string[], approver?: string, app
         nextDueDate,
         nextDueReading,
         missedCycles,
+        originalDueDate,
         wasRejected: false
       };
 

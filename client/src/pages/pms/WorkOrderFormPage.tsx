@@ -2470,6 +2470,22 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                           {woMissedCycles} job cycle{woMissedCycles > 1 ? 's were' : ' was'} missed between the scheduled due date and the actual completion date.
                           This has been recorded in the audit trail.
                         </p>
+                        {(() => {
+                          const woOriginalDueDate = (workOrderContext as any)?.workOrder?.originalDueDate;
+                          const jobNextDueDate = templateData?.nextDueDate;
+                          if (woOriginalDueDate && jobNextDueDate) {
+                            const formattedOriginal = normalizeDateToDDMMMYYYY(woOriginalDueDate) || woOriginalDueDate;
+                            const formattedNextDue = normalizeDateToDDMMMYYYY(jobNextDueDate) || jobNextDueDate;
+                            return (
+                              <p className="text-sm mt-2" style={{ color: '#92400E' }} data-testid="text-next-due-corrected">
+                                The next due date has been automatically corrected to{' '}
+                                <span className="font-semibold">{formattedNextDue}</span> based on the original scheduled due date of{' '}
+                                <span className="font-semibold">{formattedOriginal}</span>, not the actual completion date. This prevents schedule drift.
+                              </p>
+                            );
+                          }
+                          return null;
+                        })()}
                       </div>
                     </div>
                   </div>
@@ -3431,11 +3447,29 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
               <div data-testid="WOF.B2.3"><Marker id="WOF.B2.3" />
                 <div className="flex items-center justify-between mb-4">
                   <h4 className="text-sm font-medium text-gray-700" data-testid="WOF.B2.4"><Marker id="WOF.B2.4" />B2.1 Work Duration:</h4>
-                  {workOrderDueDate && (
-                    <span className="text-sm text-gray-500 font-medium" data-testid="text-due-date">
-                      Due Date: <span className="text-gray-700">{workOrderDueDate}</span>
-                    </span>
-                  )}
+                  {(() => {
+                    const woOrigDueDate = (workOrderContext as any)?.workOrder?.originalDueDate;
+                    const woDateCompleted = (workOrderContext as any)?.workOrder?.dateCompleted || (workOrderContext as any)?.workOrder?.completionDateTime;
+                    const isCompleted = currentWorkOrderStatus === 'Completed';
+                    if (isCompleted && woOrigDueDate) {
+                      const formattedScheduled = normalizeDateToDDMMMYYYY(woOrigDueDate) || woOrigDueDate;
+                      const formattedCompletion = woDateCompleted ? (normalizeDateToDDMMMYYYY(woDateCompleted) || woDateCompleted) : '-';
+                      return (
+                        <div className="text-sm text-gray-500 font-medium text-right" data-testid="text-due-date-detail">
+                          <div>Scheduled Due Date: <span className="text-gray-700">{formattedScheduled}</span></div>
+                          <div>Actual Completion: <span className="text-gray-700">{formattedCompletion}</span></div>
+                        </div>
+                      );
+                    }
+                    if (workOrderDueDate) {
+                      return (
+                        <span className="text-sm text-gray-500 font-medium" data-testid="text-due-date">
+                          Due Date: <span className="text-gray-700">{workOrderDueDate}</span>
+                        </span>
+                      );
+                    }
+                    return null;
+                  })()}
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   <div className="space-y-2">

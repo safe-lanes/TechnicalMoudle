@@ -97,25 +97,40 @@ export function normalizeDateToDDMMMYYYY(dateInput: string | number | Date | nul
 export function calculateNextDueDate(
   lastDoneDate: string | number | null | undefined,
   intervalValue: string | number | null | undefined,
-  intervalUnit: string | null | undefined
+  intervalUnit: string | null | undefined,
+  originalDueDate?: string | number | null | undefined
 ): string | null {
   if (!lastDoneDate || !intervalValue || !intervalUnit) {
     return null;
   }
 
   try {
-    // CRITICAL FIX: Normalize input date to DD-MMM-YYYY first
-    // This handles Excel serials, ISO dates, and any other format
-    const normalizedDate = normalizeDateToDDMMMYYYY(lastDoneDate);
-    if (!normalizedDate) {
-      console.error('Failed to normalize lastDoneDate:', lastDoneDate);
-      return null;
+    let baseDate: string | null = null;
+
+    if (originalDueDate) {
+      const normalizedOriginal = normalizeDateToDDMMMYYYY(originalDueDate);
+      if (normalizedOriginal) {
+        const parsedOriginal = parse(normalizedOriginal, 'dd-MMM-yyyy', new Date());
+        if (isValid(parsedOriginal)) {
+          baseDate = normalizedOriginal;
+        }
+      }
+      if (!baseDate) {
+        console.warn('WARNING: originalDueDate provided but invalid, falling back to completionDate for next due calculation');
+      }
     }
 
-    // Parse the normalized date (DD-MMM-YYYY format)
-    const parsedDate = parse(normalizedDate, 'dd-MMM-yyyy', new Date());
+    if (!baseDate) {
+      baseDate = normalizeDateToDDMMMYYYY(lastDoneDate);
+      if (!baseDate) {
+        console.error('Failed to normalize lastDoneDate:', lastDoneDate);
+        return null;
+      }
+    }
+
+    const parsedDate = parse(baseDate, 'dd-MMM-yyyy', new Date());
     if (!isValid(parsedDate)) {
-      console.error('Failed to parse normalized date:', normalizedDate);
+      console.error('Failed to parse base date:', baseDate);
       return null;
     }
     

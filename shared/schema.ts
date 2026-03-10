@@ -1013,6 +1013,7 @@ export const workOrders = pgTable("work_orders", {
   approvalAction: text("approval_action"), // 'approved' | 'rejected' - action taken by approver
   wasRejected: boolean("was_rejected").notNull().default(false), // Tracks if WO was previously rejected (for red font display)
   missedCycles: integer("missed_cycles").default(0),
+  originalDueDate: text("original_due_date"),
   
   // === WO Generation Cycle Snapshots (for duplicate protection and audit) ===
   // Driver type determines which cycle fields apply
@@ -1674,6 +1675,7 @@ export const componentMaintenanceHistory = pgTable("component_maintenance_histor
   remarks: text("remarks"),
   isComponentReplaced: boolean("is_component_replaced").notNull().default(false), // Special flag for component replacement
   missedCycles: integer("missed_cycles").default(0),
+  originalDueDate: text("original_due_date"),
   createdAt: timestamp("created_at").notNull().defaultNow(), // IMMUTABLE - no updates/deletes allowed
 }, (table) => ({
   componentIdIdx: index("idx_history_component_id").on(table.componentId),
