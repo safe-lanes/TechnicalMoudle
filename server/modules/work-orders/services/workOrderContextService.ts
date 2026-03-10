@@ -147,30 +147,79 @@ export async function getWorkOrderContext(workOrderId: string) {
     sourceWorkOrderId: null
   }));
 
-  if (job?.juuid) {
+  const existingWoIds = new Set(workHistoryWOs.map((wo: any) => wo.wouuid).filter(Boolean));
+
+  if (workOrder.wouuid && workOrder.status === 'Completed') {
     try {
-      const maintenanceHistoryRecords = await repo.findMaintenanceHistoryByJobId(job.juuid);
-      const skippedRecords = maintenanceHistoryRecords.filter((h: any) => h.isSkipped === true);
-      for (const h of skippedRecords) {
+      const ownHistory = await repo.findMaintenanceHistoryByWorkOrderId(workOrder.wouuid);
+      if (ownHistory && !existingWoIds.has(workOrder.wouuid)) {
+        existingWoIds.add(workOrder.wouuid);
         workHistory.push({
-          woNo: '-',
+          woNo: ownHistory.workOrderNo || workOrder.workOrderNo || '-',
           assignedTo: '-',
-          performedBy: '-',
-          workDate: h.skippedCycleDate || h.dateCompleted || '',
-          runDate: '',
-          completionDate: h.dateCompleted || h.skippedCycleDate || '',
-          status: 'SKIPPED',
-          description: h.workDescription || 'Cycle not performed',
-          remarks: h.remarks || '',
-          missedCycles: 0,
-          originalDueDate: h.originalDueDate || null,
-          isSkipped: true,
-          skippedCycleDate: h.skippedCycleDate || null,
-          sourceWorkOrderId: h.sourceWorkOrderId || null
+          performedBy: ownHistory.performedBy || workOrder.performedBy || '-',
+          workDate: ownHistory.dateCompleted || '',
+          runDate: ownHistory.runningHoursAtCompletion?.toString() || '',
+          completionDate: ownHistory.dateCompleted || '',
+          status: ownHistory.status === 'Approved' ? 'Completed' : (ownHistory.status || 'Completed'),
+          description: ownHistory.workDescription || ownHistory.jobTitle || 'Maintenance completed',
+          remarks: ownHistory.remarks || '',
+          missedCycles: ownHistory.missedCycles || 0,
+          originalDueDate: ownHistory.originalDueDate || null,
+          isSkipped: false,
+          skippedCycleDate: null,
+          sourceWorkOrderId: null
         });
       }
     } catch (err) {
-      console.error('[CONTEXT] Failed to fetch skipped maintenance history records:', err);
+      console.error('[CONTEXT] Failed to fetch own maintenance history record:', err);
+    }
+  }
+
+  if (job?.juuid) {
+    try {
+      const maintenanceHistoryRecords = await repo.findMaintenanceHistoryByJobId(job.juuid);
+
+      for (const h of maintenanceHistoryRecords) {
+        if (h.isSkipped) {
+          workHistory.push({
+            woNo: '-',
+            assignedTo: '-',
+            performedBy: '-',
+            workDate: h.skippedCycleDate || h.dateCompleted || '',
+            runDate: '',
+            completionDate: h.dateCompleted || h.skippedCycleDate || '',
+            status: 'SKIPPED',
+            description: h.workDescription || 'Cycle not performed',
+            remarks: h.remarks || '',
+            missedCycles: 0,
+            originalDueDate: h.originalDueDate || null,
+            isSkipped: true,
+            skippedCycleDate: h.skippedCycleDate || null,
+            sourceWorkOrderId: h.sourceWorkOrderId || null
+          });
+        } else if (h.workOrderId && !existingWoIds.has(h.workOrderId)) {
+          existingWoIds.add(h.workOrderId);
+          workHistory.push({
+            woNo: h.workOrderNo || '-',
+            assignedTo: '-',
+            performedBy: h.performedBy || '-',
+            workDate: h.dateCompleted || '',
+            runDate: h.runningHoursAtCompletion?.toString() || '',
+            completionDate: h.dateCompleted || '',
+            status: h.status === 'Approved' ? 'Completed' : (h.status || 'Completed'),
+            description: h.workDescription || h.jobTitle || 'Maintenance completed',
+            remarks: h.remarks || '',
+            missedCycles: h.missedCycles || 0,
+            originalDueDate: h.originalDueDate || null,
+            isSkipped: false,
+            skippedCycleDate: null,
+            sourceWorkOrderId: null
+          });
+        }
+      }
+    } catch (err) {
+      console.error('[CONTEXT] Failed to fetch maintenance history records:', err);
     }
   }
 

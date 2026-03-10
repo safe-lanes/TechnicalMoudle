@@ -64,7 +64,7 @@ Preferred communication style: Simple, everyday language.
 -   **Mandatory CE Justification for Skipped Cycles (Layer 4B)**: Requires a written justification from the Chief Engineer for approving WOs with missed cycles.
 -   **Live Missed Cycles on WO List**: `missedCycles` calculated on-the-fly for overdue/due WOs in the list view.
 -   **Auto-Populated Maintenance History Remarks**: Remarks are auto-populated for maintenance history based on `missedCycles`.
--   **Next Due Date Roll-Forward**: `calculateNextDueDate()` rolls forward to ensure next due dates are always in the future.
+-   **A4 Work History Display**: The context service now includes the current WO's own maintenance history record (from `component_maintenance_history`) in the work history display, plus non-skipped records from other WOs via deduplication. Previously, the current WO was excluded and only SKIPPED records were shown from the history table. Maintenance history payloads now include `jobId` and `jobCode` for proper linking.
 -   **Read-Only AES-Encrypted LocalStorage**: Auth system reads AES-encrypted keys from `localStorage` but does not write to it.
 -   **Automatic UI Role Detection**: UI role is auto-detected on load with a priority chain and can be overridden by a dropdown switcher.
 -   **User Role System**: Supports `UserRole` types ("Ship", "Office", "PMS Admin", "Sail Admin") with specific permissions.

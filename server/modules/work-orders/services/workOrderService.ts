@@ -952,6 +952,8 @@ export async function updateWorkOrder(id: string, body: any) {
                   componentId: component.cuuid,
                   componentCode: freshWorkOrder.componentCode || component.componentCode,
                   vesselCode: freshWorkOrder.vesselId,
+                  jobId: freshWorkOrder.jobId || null,
+                  jobCode: freshWorkOrder.workOrderNo?.match(/^(.+?)-\d+\.\d+/)?.[1] || null,
                   workOrderId: freshWorkOrder.wouuid,
                   workOrderNo: freshWorkOrder.workOrderNo || `WO-${freshWorkOrder.id}`,
                   jobTitle: freshWorkOrder.jobTitle,
