@@ -982,16 +982,27 @@ export class PostgresStorage {
     }
     
     const activeJobIds = new Set<string>();
+    const componentCode = component.componentCode;
     const directJobs = await db.select().from(jobs)
       .where(and(
-        or(eq(jobs.componentId, component.cuuid), eq(jobs.componentId, component.id)),
+        or(
+          eq(jobs.componentId, component.cuuid),
+          eq(jobs.componentId, component.id),
+          ...(componentCode ? [eq(jobs.componentCode, componentCode)] : [])
+        ),
         eq(jobs.isActive, true),
         eq(jobs.vesselId, vesselId)
       ));
     for (const job of directJobs) {
       activeJobIds.add(job.juuid);
     }
-    const linkedJobs = await this.getJobComponentLinksByComponent(component.cuuid);
+    const linkedJobsByCuuid = await this.getJobComponentLinksByComponent(component.cuuid);
+    const linkedJobsById = component.id !== component.cuuid ? await this.getJobComponentLinksByComponent(component.id) : [];
+    const linkedJobsMap = new Map<string, typeof linkedJobsByCuuid[0]>();
+    for (const link of [...linkedJobsByCuuid, ...linkedJobsById]) {
+      linkedJobsMap.set(link.jobId, link);
+    }
+    const linkedJobs = Array.from(linkedJobsMap.values());
     for (const link of linkedJobs) {
       const jobResult = await db.select().from(jobs)
         .where(and(eq(jobs.juuid, link.jobId), eq(jobs.isActive, true), eq(jobs.vesselId, vesselId)))
@@ -1015,7 +1026,10 @@ export class PostgresStorage {
     
     const directSpares = await db.select({ id: spares.id }).from(spares)
       .where(and(
-        eq(spares.componentId, component.cuuid),
+        or(
+          eq(spares.componentId, component.cuuid),
+          ...(componentCode ? [eq(spares.componentCode, componentCode)] : [])
+        ),
         eq(spares.isActive, true),
         eq(spares.vesselId, vesselId)
       ));
@@ -1032,7 +1046,10 @@ export class PostgresStorage {
         eq(spares.isActive, true),
         eq(spares.vesselId, vesselId)
       ))
-      .where(eq(spareComponentLinks.componentId, component.cuuid));
+      .where(or(
+        eq(spareComponentLinks.componentId, component.cuuid),
+        ...(component.id !== component.cuuid ? [eq(spareComponentLinks.componentId, component.id)] : [])
+      ));
     for (const row of linkedActiveSpares) {
       activeSpareIds.add(row.id);
     }
@@ -1048,7 +1065,6 @@ export class PostgresStorage {
     }
     
     let activeWorkOrdersCount = 0;
-    const componentCode = component.componentCode;
     if (componentCode) {
       const woResults = await db.select().from(workOrders)
         .where(and(
