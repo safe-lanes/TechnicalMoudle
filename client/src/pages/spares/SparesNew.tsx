@@ -2810,7 +2810,7 @@ const Spares: React.FC = () => {
               <div className="overflow-x-auto flex-1 flex flex-col">
                 {/* Inventory Table Header */}
                 <div className="px-4 py-3 border-b border-gray-200 bg-[#52baf3] min-w-max">
-                  <div className="grid text-sm font-semibold text-[#ffffff] min-w-max" style={{ gridTemplateColumns: isBulkDeleteMode ? (FEATURES.IHM ? '40px 110px 180px 220px 120px 80px 60px 60px 80px 100px 40px' : '40px 110px 180px 220px 120px 80px 60px 60px 80px 100px') : (FEATURES.IHM ? '110px 180px 220px 120px 80px 60px 60px 80px 100px 40px 160px' : '110px 180px 220px 120px 80px 60px 60px 80px 100px 160px'), minWidth: 'max-content', gap: '12px' }}>
+                  <div className="grid text-sm font-semibold text-[#ffffff] min-w-max" style={{ gridTemplateColumns: isBulkDeleteMode ? (FEATURES.IHM ? '40px 110px 180px 220px 120px 80px 60px 60px 80px 100px 40px' : '40px 110px 180px 220px 120px 80px 60px 60px 80px 100px') : (FEATURES.IHM ? '110px 180px 220px 120px 80px 60px 60px 80px 100px 40px 130px' : '110px 180px 220px 120px 80px 60px 60px 80px 100px 130px'), minWidth: 'max-content', gap: '12px' }}>
                   {isBulkDeleteMode && (
                     <div className="px-2 flex items-center justify-center">
                       <input
@@ -2854,7 +2854,7 @@ const Spares: React.FC = () => {
                     const isInactive = spare.isActive === false;
                     return (
                     <div key={spare.id} className={`px-4 py-3 border-b border-gray-100 ${isInactive ? 'opacity-50 bg-gray-50' : 'hover:bg-gray-50'} ${isBulkDeleteMode && selectedSpareIds.has(spare.id) ? 'bg-red-50' : ''}`}>
-                      <div className="grid text-sm items-center min-w-max" style={{ gridTemplateColumns: isBulkDeleteMode ? (FEATURES.IHM ? '40px 110px 180px 220px 120px 80px 60px 60px 80px 100px 40px' : '40px 110px 180px 220px 120px 80px 60px 60px 80px 100px') : (FEATURES.IHM ? '110px 180px 220px 120px 80px 60px 60px 80px 100px 40px 160px' : '110px 180px 220px 120px 80px 60px 60px 80px 100px 160px'), minWidth: 'max-content', gap: '12px' }}>
+                      <div className="grid text-sm items-center min-w-max" style={{ gridTemplateColumns: isBulkDeleteMode ? (FEATURES.IHM ? '40px 110px 180px 220px 120px 80px 60px 60px 80px 100px 40px' : '40px 110px 180px 220px 120px 80px 60px 60px 80px 100px') : (FEATURES.IHM ? '110px 180px 220px 120px 80px 60px 60px 80px 100px 40px 130px' : '110px 180px 220px 120px 80px 60px 60px 80px 100px 130px'), minWidth: 'max-content', gap: '12px' }}>
                         {isBulkDeleteMode && (
                           <div className="px-2 flex items-center justify-center">
                             {!isInactive ? (
@@ -2943,15 +2943,6 @@ const Spares: React.FC = () => {
                               <Edit2 className="h-4 w-4" />
                             </Button>
                           )}
-                          <Button 
-                            size="sm" 
-                            variant="ghost"
-                            onClick={() => openConsumeReceiveModal(spare)}
-                            title="Consume/Receive"
-                            data-testid={`button-plus-${spare.id}`}
-                          >
-                            <PlusCircle className="h-4 w-4" />
-                          </Button>
                           <Button 
                             size="sm" 
                             variant="ghost"
