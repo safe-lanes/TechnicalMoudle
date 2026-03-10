@@ -52,6 +52,7 @@ interface StoreItem {
   uom?: string;
   rob: number;
   min: number;
+  max?: number;
   stock: string;
   location: string;
   category: "stores" | "lubes" | "chemicals" | "others";
@@ -61,16 +62,31 @@ interface StoreItem {
   robLocationB?: number;
   locationAName?: string;
   locationBName?: string;
-  // IHM fields
+  impaCode?: string;
+  specification?: string;
+  unitCost?: number;
+  supplier?: string;
+  lastOrderDate?: string;
+  leadTime?: string;
   ihmPresence?: typeof IHM_PRESENCE[number];
   ihmEvidenceType?: typeof IHM_EVIDENCE_TYPES[number];
-  // Chemical fields
+  ihmDetails?: string;
   expiryDate?: string;
   batchNumber?: string;
+  lotNumber?: string;
   hazardClassification?: string;
   manufactureDate?: string;
   sdsReference?: string;
+  sdsLastUpdated?: string;
   shelfLifeMonths?: number;
+  unNumber?: string;
+  flashPoint?: string;
+  storageTempMin?: string;
+  storageTempMax?: string;
+  disposalInstructions?: string;
+  ppeRequirements?: string;
+  emergencyContact?: string;
+  remarks?: string;
   isActive?: boolean;
 }
 
@@ -99,13 +115,13 @@ const UOM_OPTIONS = [
   "Other"
 ];
 
-// API response type for stores items
 interface StoresApiItem {
   id: number;
   itemCode: string;
   itemName: string;
   impaCode?: string;
   category?: string;
+  specification?: string;
   uom?: string;
   totalRob?: number;
   rob?: number;
@@ -117,18 +133,33 @@ interface StoresApiItem {
   robLocationB?: number;
   min?: number;
   max?: number;
+  unitCost?: number;
+  supplier?: string;
+  lastOrderDate?: string;
+  leadTime?: string;
   itemType?: string;
   vesselId?: string;
   notes?: string;
+  remarks?: string;
   isArchived?: boolean;
   ihmPresence?: string;
   ihmEvidenceType?: string;
+  ihmDetails?: string;
   expiryDate?: string;
   batchNumber?: string;
+  lotNumber?: string;
   hazardClassification?: string;
   manufactureDate?: string;
   sdsReference?: string;
+  sdsLastUpdated?: string;
   shelfLifeMonths?: number;
+  unNumber?: string;
+  flashPoint?: string;
+  storageTempMin?: string;
+  storageTempMax?: string;
+  disposalInstructions?: string;
+  ppeRequirements?: string;
+  emergencyContact?: string;
   isActive?: boolean;
 }
 
@@ -355,13 +386,32 @@ const Stores: React.FC = () => {
           robLocationB: locationBRob,
           locationAName: item.locationA || '',
           locationBName: item.locationB || '',
+          impaCode: item.impaCode || '',
+          specification: item.specification || '',
+          max: Number(item.max ?? 0) || 0,
+          unitCost: Number(item.unitCost ?? 0) || 0,
+          supplier: item.supplier || '',
+          lastOrderDate: item.lastOrderDate || '',
+          leadTime: item.leadTime || '',
           ihmPresence: (item.ihmPresence as typeof IHM_PRESENCE[number]) || 'Unknown',
           ihmEvidenceType: (item.ihmEvidenceType as typeof IHM_EVIDENCE_TYPES[number]) || 'None',
+          ihmDetails: item.ihmDetails || '',
           expiryDate: item.expiryDate || '',
           batchNumber: item.batchNumber || '',
+          lotNumber: item.lotNumber || '',
           hazardClassification: item.hazardClassification || '',
           manufactureDate: item.manufactureDate || '',
           sdsReference: item.sdsReference || '',
+          sdsLastUpdated: item.sdsLastUpdated || '',
+          shelfLifeMonths: item.shelfLifeMonths || 0,
+          unNumber: item.unNumber || '',
+          flashPoint: item.flashPoint || '',
+          storageTempMin: item.storageTempMin || '',
+          storageTempMax: item.storageTempMax || '',
+          disposalInstructions: item.disposalInstructions || '',
+          ppeRequirements: item.ppeRequirements || '',
+          emergencyContact: item.emergencyContact || '',
+          remarks: item.remarks || '',
           isActive: item.isActive !== false,
         };
       });
@@ -537,20 +587,45 @@ const Stores: React.FC = () => {
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [editingItem, setEditingItem] = useState<StoreItem | null>(null);
   const [editForm, setEditForm] = useState({
+    itemCode: "",
+    impaCode: "",
     itemName: "",
+    category: "",
+    specification: "",
     uom: "",
     customUom: "",
+    rob: 0,
     min: 0,
+    max: 0,
+    robLocationA: 0,
+    robLocationB: 0,
+    locationA: "",
+    locationB: "",
+    unitCost: 0,
+    supplier: "",
+    lastOrderDate: "",
+    leadTime: "",
     location: "",
     notes: "",
+    remarks: "",
     ihmPresence: 'Unknown' as 'Unknown' | 'Present' | 'Not Present',
     ihmEvidenceType: 'None' as 'None' | 'MD' | 'SDoC' | 'Test',
+    ihmDetails: "",
     expiryDate: "",
     batchNumber: "",
+    lotNumber: "",
     hazardClassification: "",
     sdsReference: "",
+    sdsLastUpdated: "",
     manufactureDate: "",
     shelfLifeMonths: 0,
+    unNumber: "",
+    flashPoint: "",
+    storageTempMin: "",
+    storageTempMax: "",
+    disposalInstructions: "",
+    ppeRequirements: "",
+    emergencyContact: "",
   });
   
   // Add Store modal state
@@ -979,20 +1054,45 @@ const Stores: React.FC = () => {
     setEditingItem(item);
     const isCustomUom = !UOM_OPTIONS.includes(item.uom || "");
     setEditForm({
+      itemCode: item.itemCode || '',
+      impaCode: item.impaCode || '',
       itemName: item.itemName,
+      category: item.storesCategory || '',
+      specification: item.specification || '',
       uom: isCustomUom ? "Other" : (item.uom || ""),
       customUom: isCustomUom ? (item.uom || "") : "",
+      rob: item.rob || 0,
       min: item.min,
+      max: item.max || 0,
+      robLocationA: item.robLocationA || 0,
+      robLocationB: item.robLocationB || 0,
+      locationA: item.locationAName || '',
+      locationB: item.locationBName || '',
+      unitCost: item.unitCost || 0,
+      supplier: item.supplier || '',
+      lastOrderDate: item.lastOrderDate || '',
+      leadTime: item.leadTime || '',
       location: item.location,
       notes: item.notes || "",
+      remarks: item.remarks || '',
       ihmPresence: item.ihmPresence || 'Unknown',
       ihmEvidenceType: item.ihmEvidenceType || 'None',
+      ihmDetails: item.ihmDetails || '',
       expiryDate: item.expiryDate || '',
       batchNumber: item.batchNumber || '',
+      lotNumber: item.lotNumber || '',
       hazardClassification: item.hazardClassification || '',
       sdsReference: item.sdsReference || '',
+      sdsLastUpdated: item.sdsLastUpdated || '',
       manufactureDate: item.manufactureDate || '',
       shelfLifeMonths: item.shelfLifeMonths || 0,
+      unNumber: item.unNumber || '',
+      flashPoint: item.flashPoint || '',
+      storageTempMin: item.storageTempMin || '',
+      storageTempMax: item.storageTempMax || '',
+      disposalInstructions: item.disposalInstructions || '',
+      ppeRequirements: item.ppeRequirements || '',
+      emergencyContact: item.emergencyContact || '',
     });
     
     // In modify mode, store original data for change tracking
@@ -1012,10 +1112,37 @@ const Stores: React.FC = () => {
     
     const fieldsToCheck = [
       { key: 'itemName', original: originalStoreData.itemName, current: editForm.itemName },
+      { key: 'impaCode', original: originalStoreData.impaCode || '', current: editForm.impaCode },
+      { key: 'category', original: originalStoreData.storesCategory || '', current: editForm.category },
+      { key: 'specification', original: originalStoreData.specification || '', current: editForm.specification },
       { key: 'uom', original: originalStoreData.uom, current: uom },
       { key: 'min', original: String(originalStoreData.min), current: String(editForm.min) },
-      { key: 'location', original: originalStoreData.location, current: editForm.location },
-      { key: 'notes', original: originalStoreData.notes || '', current: editForm.notes }
+      { key: 'max', original: String(originalStoreData.max || 0), current: String(editForm.max) },
+      { key: 'locationA', original: originalStoreData.locationAName || '', current: editForm.locationA },
+      { key: 'locationB', original: originalStoreData.locationBName || '', current: editForm.locationB },
+      { key: 'unitCost', original: String(originalStoreData.unitCost || 0), current: String(editForm.unitCost) },
+      { key: 'supplier', original: originalStoreData.supplier || '', current: editForm.supplier },
+      { key: 'lastOrderDate', original: originalStoreData.lastOrderDate || '', current: editForm.lastOrderDate },
+      { key: 'leadTime', original: originalStoreData.leadTime || '', current: editForm.leadTime },
+      { key: 'remarks', original: originalStoreData.remarks || '', current: editForm.remarks },
+      { key: 'ihmPresence', original: originalStoreData.ihmPresence || 'Unknown', current: editForm.ihmPresence },
+      { key: 'ihmEvidenceType', original: originalStoreData.ihmEvidenceType || 'None', current: editForm.ihmEvidenceType },
+      { key: 'ihmDetails', original: originalStoreData.ihmDetails || '', current: editForm.ihmDetails },
+      { key: 'expiryDate', original: originalStoreData.expiryDate || '', current: editForm.expiryDate },
+      { key: 'batchNumber', original: originalStoreData.batchNumber || '', current: editForm.batchNumber },
+      { key: 'lotNumber', original: originalStoreData.lotNumber || '', current: editForm.lotNumber },
+      { key: 'hazardClassification', original: originalStoreData.hazardClassification || '', current: editForm.hazardClassification },
+      { key: 'manufactureDate', original: originalStoreData.manufactureDate || '', current: editForm.manufactureDate },
+      { key: 'sdsReference', original: originalStoreData.sdsReference || '', current: editForm.sdsReference },
+      { key: 'sdsLastUpdated', original: originalStoreData.sdsLastUpdated || '', current: editForm.sdsLastUpdated },
+      { key: 'shelfLifeMonths', original: String(originalStoreData.shelfLifeMonths || 0), current: String(editForm.shelfLifeMonths) },
+      { key: 'unNumber', original: originalStoreData.unNumber || '', current: editForm.unNumber },
+      { key: 'flashPoint', original: originalStoreData.flashPoint || '', current: editForm.flashPoint },
+      { key: 'storageTempMin', original: originalStoreData.storageTempMin || '', current: editForm.storageTempMin },
+      { key: 'storageTempMax', original: originalStoreData.storageTempMax || '', current: editForm.storageTempMax },
+      { key: 'disposalInstructions', original: originalStoreData.disposalInstructions || '', current: editForm.disposalInstructions },
+      { key: 'ppeRequirements', original: originalStoreData.ppeRequirements || '', current: editForm.ppeRequirements },
+      { key: 'emergencyContact', original: originalStoreData.emergencyContact || '', current: editForm.emergencyContact },
     ];
     
     for (const field of fieldsToCheck) {
@@ -1238,39 +1365,85 @@ const Stores: React.FC = () => {
     try {
       // Build update payload for API
       const updatePayload: Record<string, any> = {
+        impaCode: editForm.impaCode.trim() || null,
         itemName: editForm.itemName,
+        category: editForm.category || null,
+        specification: editForm.specification.trim() || null,
         uom: uom,
         min: editForm.min,
-        locationA: editForm.location, // Map location to locationA for storage
-        remarks: editForm.notes,
+        max: editForm.max || null,
+        locationA: editForm.locationA.trim() || null,
+        locationB: editForm.locationB.trim() || null,
+        unitCost: editForm.unitCost || null,
+        supplier: editForm.supplier.trim() || null,
+        lastOrderDate: editForm.lastOrderDate || null,
+        leadTime: editForm.leadTime.trim() || null,
+        remarks: editForm.remarks.trim() || null,
         ihmPresence: editForm.ihmPresence || 'Unknown',
         ihmEvidenceType: editForm.ihmEvidenceType || 'None',
+        ihmDetails: editForm.ihmDetails.trim() || null,
         expiryDate: activeTab === 'chemicals' ? (editForm.expiryDate || null) : undefined,
         batchNumber: activeTab === 'chemicals' ? (editForm.batchNumber || null) : undefined,
+        lotNumber: activeTab === 'chemicals' ? (editForm.lotNumber || null) : undefined,
         hazardClassification: activeTab === 'chemicals' ? (editForm.hazardClassification || null) : undefined,
         sdsReference: activeTab === 'chemicals' ? (editForm.sdsReference || null) : undefined,
+        sdsLastUpdated: activeTab === 'chemicals' ? (editForm.sdsLastUpdated || null) : undefined,
         manufactureDate: activeTab === 'chemicals' ? (editForm.manufactureDate || null) : undefined,
         shelfLifeMonths: activeTab === 'chemicals' ? (editForm.shelfLifeMonths || null) : undefined,
+        unNumber: activeTab === 'chemicals' ? (editForm.unNumber || null) : undefined,
+        flashPoint: activeTab === 'chemicals' ? (editForm.flashPoint || null) : undefined,
+        storageTempMin: activeTab === 'chemicals' ? (editForm.storageTempMin || null) : undefined,
+        storageTempMax: activeTab === 'chemicals' ? (editForm.storageTempMax || null) : undefined,
+        disposalInstructions: activeTab === 'chemicals' ? (editForm.disposalInstructions || null) : undefined,
+        ppeRequirements: activeTab === 'chemicals' ? (editForm.ppeRequirements || null) : undefined,
+        emergencyContact: activeTab === 'chemicals' ? (editForm.emergencyContact || null) : undefined,
       };
       
       // Call API to persist changes
       await apiRequest('PATCH', `/technical/api/stores/${vesselId}/${editingItem.id}`, updatePayload);
       
-      // Invalidate cache to refetch updated data
-      queryClient.invalidateQueries({ queryKey: [`/technical/api/stores/${vesselId}`] });
+      queryClient.invalidateQueries({ queryKey: [`/technical/api/stores/${vesselId}?itemType=${activeTab}`] });
+      queryClient.invalidateQueries({ queryKey: [`/technical/api/stores/${vesselId}/history`, activeTab] });
       
       // Update local state optimistically
       const updatedItems = items.map(item => {
         if (item.id === editingItem.id) {
           const updatedItem = {
             ...item,
+            impaCode: editForm.impaCode,
             itemName: editForm.itemName,
+            storesCategory: editForm.category,
+            specification: editForm.specification,
             uom: uom,
             min: editForm.min,
-            location: editForm.location,
-            notes: editForm.notes,
+            max: editForm.max,
+            locationAName: editForm.locationA,
+            locationBName: editForm.locationB,
+            location: editForm.locationA,
+            unitCost: editForm.unitCost,
+            supplier: editForm.supplier,
+            lastOrderDate: editForm.lastOrderDate,
+            leadTime: editForm.leadTime,
+            remarks: editForm.remarks,
+            notes: editForm.remarks,
             ihmPresence: editForm.ihmPresence,
-            ihmEvidenceType: editForm.ihmEvidenceType
+            ihmEvidenceType: editForm.ihmEvidenceType,
+            ihmDetails: editForm.ihmDetails,
+            expiryDate: editForm.expiryDate,
+            batchNumber: editForm.batchNumber,
+            lotNumber: editForm.lotNumber,
+            hazardClassification: editForm.hazardClassification,
+            manufactureDate: editForm.manufactureDate,
+            sdsReference: editForm.sdsReference,
+            sdsLastUpdated: editForm.sdsLastUpdated,
+            shelfLifeMonths: editForm.shelfLifeMonths,
+            unNumber: editForm.unNumber,
+            flashPoint: editForm.flashPoint,
+            storageTempMin: editForm.storageTempMin,
+            storageTempMax: editForm.storageTempMax,
+            disposalInstructions: editForm.disposalInstructions,
+            ppeRequirements: editForm.ppeRequirements,
+            emergencyContact: editForm.emergencyContact,
           };
           
           // Recalculate stock status
@@ -2463,147 +2636,393 @@ const Stores: React.FC = () => {
 
       {/* Edit Item Modal */}
       <Dialog open={isEditModalOpen} onOpenChange={setIsEditModalOpen}>
-        <DialogContent className="sm:max-w-[425px]">
+        <DialogContent className="sm:max-w-[600px] max-h-[85vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Edit Item</DialogTitle>
           </DialogHeader>
           <div className="grid gap-4 py-4">
+            <div className="grid grid-cols-2 gap-4">
+              <div className="grid gap-2">
+                <Label htmlFor="editItemCode">Item Code</Label>
+                <Input
+                  id="editItemCode"
+                  value={editForm.itemCode}
+                  disabled
+                  className="bg-gray-100"
+                  data-testid="input-edit-item-code"
+                />
+              </div>
+              <div className="grid gap-2">
+                <Label htmlFor="editImpaCode">IMPA Code</Label>
+                <Input
+                  id="editImpaCode"
+                  value={editForm.impaCode}
+                  onChange={(e) => setEditForm({...editForm, impaCode: e.target.value})}
+                  placeholder="e.g., 123456"
+                  data-testid="input-edit-impa-code"
+                />
+              </div>
+            </div>
+
             <div className="grid gap-2">
-              <Label htmlFor="itemName">Item Name</Label>
+              <Label htmlFor="editItemName">Item Name <span className="text-red-500">*</span></Label>
               <Input
-                id="itemName"
+                id="editItemName"
                 value={editForm.itemName}
                 onChange={(e) => setEditForm({...editForm, itemName: e.target.value})}
+                data-testid="input-edit-item-name"
               />
             </div>
-            <div className="grid gap-2">
-              <Label htmlFor="uom">Unit of Measure</Label>
-              <Select 
-                value={editForm.uom} 
-                onValueChange={(value) => setEditForm({...editForm, uom: value})}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Select UOM" />
-                </SelectTrigger>
-                <SelectContent>
-                  {UOM_OPTIONS.map(opt => (
-                    <SelectItem key={opt} value={opt}>{opt}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              {editForm.uom === "Other" && (
-                <Input
-                  placeholder="Enter custom UOM"
-                  value={editForm.customUom}
-                  onChange={(e) => setEditForm({...editForm, customUom: e.target.value})}
-                />
-              )}
+
+            <div className="grid grid-cols-2 gap-4">
+              <div className="grid gap-2">
+                <Label htmlFor="editCategory">Stores Category</Label>
+                <Select
+                  value={editForm.category}
+                  onValueChange={(value) => setEditForm({...editForm, category: value})}
+                >
+                  <SelectTrigger data-testid="select-edit-category">
+                    <SelectValue placeholder="Select category" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {STORE_CATEGORY_OPTIONS.map(cat => (
+                      <SelectItem key={cat} value={cat}>{cat}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="grid gap-2">
+                <Label htmlFor="editUom">Unit of Measure</Label>
+                <Select
+                  value={editForm.uom}
+                  onValueChange={(value) => setEditForm({...editForm, uom: value})}
+                >
+                  <SelectTrigger data-testid="select-edit-uom">
+                    <SelectValue placeholder="Select UOM" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {UOM_OPTIONS.map(opt => (
+                      <SelectItem key={opt} value={opt}>{opt}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                {editForm.uom === "Other" && (
+                  <Input
+                    placeholder="Enter custom UOM"
+                    value={editForm.customUom}
+                    onChange={(e) => setEditForm({...editForm, customUom: e.target.value})}
+                    data-testid="input-edit-custom-uom"
+                  />
+                )}
+              </div>
             </div>
+
             <div className="grid gap-2">
-              <Label htmlFor="min">Minimum Stock</Label>
+              <Label htmlFor="editSpecification">Specification</Label>
               <Input
-                id="min"
-                type="number"
-                min="0"
-                value={editForm.min}
-                onChange={(e) => setEditForm({...editForm, min: parseInt(e.target.value) || 0})}
+                id="editSpecification"
+                value={editForm.specification}
+                onChange={(e) => setEditForm({...editForm, specification: e.target.value})}
+                placeholder="Technical specs (size, dimensions, material)"
+                data-testid="input-edit-specification"
               />
             </div>
-            <div className="grid gap-2">
-              <Label htmlFor="location">Location</Label>
-              <Input
-                id="location"
-                value={editForm.location}
-                onChange={(e) => setEditForm({...editForm, location: e.target.value})}
-              />
+
+            <div className="border-t pt-4">
+              <Label className="text-base font-semibold text-gray-700 mb-2 block">Stock Levels</Label>
+              <div className="grid grid-cols-3 gap-4">
+                <div className="grid gap-2">
+                  <Label htmlFor="editRob">ROB (Total)</Label>
+                  <Input
+                    id="editRob"
+                    type="number"
+                    value={editForm.rob}
+                    disabled
+                    className="bg-gray-100"
+                    data-testid="input-edit-rob"
+                  />
+                </div>
+                <div className="grid gap-2">
+                  <Label htmlFor="editMin">Min Stock</Label>
+                  <Input
+                    id="editMin"
+                    type="number"
+                    min="0"
+                    value={editForm.min}
+                    onChange={(e) => setEditForm({...editForm, min: parseFloat(e.target.value) || 0})}
+                    data-testid="input-edit-min"
+                  />
+                </div>
+                <div className="grid gap-2">
+                  <Label htmlFor="editMax">Max Stock</Label>
+                  <Input
+                    id="editMax"
+                    type="number"
+                    min="0"
+                    value={editForm.max}
+                    onChange={(e) => setEditForm({...editForm, max: parseFloat(e.target.value) || 0})}
+                    data-testid="input-edit-max"
+                  />
+                </div>
+              </div>
             </div>
-            <div className="grid gap-2">
-              <Label htmlFor="notes">Notes</Label>
-              <Textarea
-                id="notes"
-                value={editForm.notes}
-                onChange={(e) => setEditForm({...editForm, notes: e.target.value})}
-                rows={3}
-              />
+
+            <div className="border-t pt-4">
+              <Label className="text-base font-semibold text-gray-700 mb-2 block">Location Details</Label>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="grid gap-2">
+                  <Label htmlFor="editLocationA">Location A Name</Label>
+                  <Input
+                    id="editLocationA"
+                    value={editForm.locationA}
+                    onChange={(e) => setEditForm({...editForm, locationA: e.target.value})}
+                    placeholder="e.g., Engine Room Store"
+                    data-testid="input-edit-location-a"
+                  />
+                </div>
+                <div className="grid gap-2">
+                  <Label htmlFor="editRobLocationA">ROB at Location A</Label>
+                  <Input
+                    id="editRobLocationA"
+                    type="number"
+                    value={editForm.robLocationA}
+                    disabled
+                    className="bg-gray-100"
+                    data-testid="input-edit-rob-location-a"
+                  />
+                </div>
+                <div className="grid gap-2">
+                  <Label htmlFor="editLocationB">Location B Name</Label>
+                  <Input
+                    id="editLocationB"
+                    value={editForm.locationB}
+                    onChange={(e) => setEditForm({...editForm, locationB: e.target.value})}
+                    placeholder="e.g., Deck Store"
+                    data-testid="input-edit-location-b"
+                  />
+                </div>
+                <div className="grid gap-2">
+                  <Label htmlFor="editRobLocationB">ROB at Location B</Label>
+                  <Input
+                    id="editRobLocationB"
+                    type="number"
+                    value={editForm.robLocationB}
+                    disabled
+                    className="bg-gray-100"
+                    data-testid="input-edit-rob-location-b"
+                  />
+                </div>
+              </div>
             </div>
-            
-            {/* IHM Fields */}
+
+            <div className="border-t pt-4">
+              <Label className="text-base font-semibold text-gray-700 mb-2 block">Supplier & Costing</Label>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="grid gap-2">
+                  <Label htmlFor="editSupplier">Supplier</Label>
+                  <Input
+                    id="editSupplier"
+                    value={editForm.supplier}
+                    onChange={(e) => setEditForm({...editForm, supplier: e.target.value})}
+                    placeholder="Supplier name"
+                    data-testid="input-edit-supplier"
+                  />
+                </div>
+                <div className="grid gap-2">
+                  <Label htmlFor="editUnitCost">Unit Cost</Label>
+                  <Input
+                    id="editUnitCost"
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    value={editForm.unitCost}
+                    onChange={(e) => setEditForm({...editForm, unitCost: parseFloat(e.target.value) || 0})}
+                    data-testid="input-edit-unit-cost"
+                  />
+                </div>
+                <div className="grid gap-2">
+                  <Label htmlFor="editLastOrderDate">Last Order Date</Label>
+                  <Input
+                    id="editLastOrderDate"
+                    type="date"
+                    value={editForm.lastOrderDate}
+                    onChange={(e) => setEditForm({...editForm, lastOrderDate: e.target.value})}
+                    data-testid="input-edit-last-order-date"
+                  />
+                </div>
+                <div className="grid gap-2">
+                  <Label htmlFor="editLeadTime">Lead Time</Label>
+                  <Input
+                    id="editLeadTime"
+                    value={editForm.leadTime}
+                    onChange={(e) => setEditForm({...editForm, leadTime: e.target.value})}
+                    placeholder="e.g., 2 weeks"
+                    data-testid="input-edit-lead-time"
+                  />
+                </div>
+              </div>
+            </div>
+
             {FEATURES.IHM && (
-              <>
-                <div className="grid gap-2">
-                  <Label htmlFor="ihmPresence">IHM Presence</Label>
-                  <Select 
-                    value={editForm.ihmPresence || "Unknown"} 
-                    onValueChange={(value) => setEditForm({...editForm, ihmPresence: value as typeof IHM_PRESENCE[number]})}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select IHM presence" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {IHM_PRESENCE.map(status => (
-                        <SelectItem key={status} value={status}>{status}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="grid gap-2">
-                  <Label htmlFor="ihmEvidenceType">IHM Evidence Type</Label>
-                  <Select 
-                    value={editForm.ihmEvidenceType || "None"} 
-                    onValueChange={(value) => setEditForm({...editForm, ihmEvidenceType: value as typeof IHM_EVIDENCE_TYPES[number]})}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select evidence type" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {IHM_EVIDENCE_TYPES.map(type => (
-                        <SelectItem key={type} value={type}>{type}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              </>
-            )}
-            {activeTab === "chemicals" && (
               <div className="border-t pt-4">
-                <Label className="text-base font-semibold text-gray-700 mb-2 block">Chemical Expiry & Safety</Label>
+                <Label className="text-base font-semibold text-gray-700 mb-2 block">IHM (Inventory of Hazardous Materials)</Label>
                 <div className="grid grid-cols-2 gap-4">
                   <div className="grid gap-2">
-                    <Label>Expiry Date</Label>
-                    <Input type="date" value={editForm.expiryDate} onChange={(e) => {
-                      setEditForm({...editForm, expiryDate: e.target.value});
-                      const shelfLife = editForm.shelfLifeMonths || 0;
-                      if (e.target.value && editForm.manufactureDate && shelfLife > 0) {
-                        const calc = calculateExpiryFromManufacture(editForm.manufactureDate, shelfLife);
-                        if (calc && e.target.value !== calc) {
-                          setExpiryAutoWarning(`Auto-calculated expiry would be ${calc}. You've entered a different date.`);
+                    <Label htmlFor="editIhmPresence">IHM Presence</Label>
+                    <Select
+                      value={editForm.ihmPresence || "Unknown"}
+                      onValueChange={(value) => setEditForm({...editForm, ihmPresence: value as typeof IHM_PRESENCE[number]})}
+                    >
+                      <SelectTrigger data-testid="select-edit-ihm-presence">
+                        <SelectValue placeholder="Select IHM presence" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {IHM_PRESENCE.map(status => (
+                          <SelectItem key={status} value={status}>{status}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="grid gap-2">
+                    <Label htmlFor="editIhmEvidenceType">IHM Evidence Type</Label>
+                    <Select
+                      value={editForm.ihmEvidenceType || "None"}
+                      onValueChange={(value) => setEditForm({...editForm, ihmEvidenceType: value as typeof IHM_EVIDENCE_TYPES[number]})}
+                    >
+                      <SelectTrigger data-testid="select-edit-ihm-evidence">
+                        <SelectValue placeholder="Select evidence type" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {IHM_EVIDENCE_TYPES.map(type => (
+                          <SelectItem key={type} value={type}>{type}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+                <div className="grid gap-2 mt-4">
+                  <Label htmlFor="editIhmDetails">IHM Details</Label>
+                  <Textarea
+                    id="editIhmDetails"
+                    value={editForm.ihmDetails}
+                    onChange={(e) => setEditForm({...editForm, ihmDetails: e.target.value})}
+                    placeholder="IHM related information"
+                    rows={2}
+                    data-testid="textarea-edit-ihm-details"
+                  />
+                </div>
+              </div>
+            )}
+
+            {activeTab === "chemicals" && (
+              <div className="border-t pt-4">
+                <Label className="text-base font-semibold text-gray-700 mb-2 block">Expiry & Date Information</Label>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="grid gap-2">
+                    <Label htmlFor="editManufactureDate">Manufacture Date</Label>
+                    <Input
+                      id="editManufactureDate"
+                      type="date"
+                      value={editForm.manufactureDate}
+                      onChange={(e) => handleEditManufactureDateChange(e.target.value)}
+                      data-testid="input-edit-manufacture-date"
+                    />
+                  </div>
+                  <div className="grid gap-2">
+                    <Label htmlFor="editExpiryDate">Expiry Date</Label>
+                    <Input
+                      id="editExpiryDate"
+                      type="date"
+                      value={editForm.expiryDate}
+                      onChange={(e) => {
+                        setEditForm({...editForm, expiryDate: e.target.value});
+                        const shelfLife = editForm.shelfLifeMonths || 0;
+                        if (e.target.value && editForm.manufactureDate && shelfLife > 0) {
+                          const calc = calculateExpiryFromManufacture(editForm.manufactureDate, shelfLife);
+                          if (calc && e.target.value !== calc) {
+                            setExpiryAutoWarning(`Auto-calculated expiry would be ${calc}. You've entered a different date.`);
+                          } else {
+                            setExpiryAutoWarning("");
+                          }
                         } else {
                           setExpiryAutoWarning("");
                         }
-                      } else {
-                        setExpiryAutoWarning("");
-                      }
-                    }} data-testid="input-edit-expiry-date" />
+                      }}
+                      data-testid="input-edit-expiry-date"
+                    />
                     {expiryAutoWarning && (
                       <p className="text-xs text-amber-600 mt-1">{expiryAutoWarning}</p>
                     )}
                   </div>
                   <div className="grid gap-2">
-                    <Label>Batch Number</Label>
-                    <Input value={editForm.batchNumber} onChange={(e) => setEditForm({...editForm, batchNumber: e.target.value})} data-testid="input-edit-batch-number" />
+                    <Label htmlFor="editBatchNumber">Batch Number</Label>
+                    <Input
+                      id="editBatchNumber"
+                      value={editForm.batchNumber}
+                      onChange={(e) => setEditForm({...editForm, batchNumber: e.target.value})}
+                      placeholder="e.g., BT-2025-001"
+                      data-testid="input-edit-batch-number"
+                    />
                   </div>
                   <div className="grid gap-2">
-                    <Label>Manufacture Date</Label>
-                    <Input type="date" value={editForm.manufactureDate} onChange={(e) => handleEditManufactureDateChange(e.target.value)} data-testid="input-edit-manufacture-date" />
+                    <Label htmlFor="editLotNumber">Lot Number</Label>
+                    <Input
+                      id="editLotNumber"
+                      value={editForm.lotNumber}
+                      onChange={(e) => setEditForm({...editForm, lotNumber: e.target.value})}
+                      placeholder="e.g., LOT-001"
+                      data-testid="input-edit-lot-number"
+                    />
                   </div>
                   <div className="grid gap-2">
-                    <Label>Shelf Life (months)</Label>
-                    <Input type="number" min="0" value={editForm.shelfLifeMonths || ""} onChange={(e) => handleEditShelfLifeChange(parseInt(e.target.value) || 0)} placeholder="e.g., 24" data-testid="input-edit-shelf-life" />
+                    <Label htmlFor="editShelfLife">Shelf Life (months)</Label>
+                    <Input
+                      id="editShelfLife"
+                      type="number"
+                      min="0"
+                      value={editForm.shelfLifeMonths || ""}
+                      onChange={(e) => handleEditShelfLifeChange(parseInt(e.target.value) || 0)}
+                      placeholder="e.g., 24"
+                      data-testid="input-edit-shelf-life"
+                    />
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {activeTab === "chemicals" && (
+              <div className="border-t pt-4">
+                <Label className="text-base font-semibold text-gray-700 mb-2 block">Safety Data Sheet (SDS)</Label>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="grid gap-2">
+                    <Label htmlFor="editSdsReference">SDS Reference Number</Label>
+                    <Input
+                      id="editSdsReference"
+                      value={editForm.sdsReference}
+                      onChange={(e) => setEditForm({...editForm, sdsReference: e.target.value})}
+                      placeholder="e.g., SDS-2025-001"
+                      data-testid="input-edit-sds-reference"
+                    />
                   </div>
                   <div className="grid gap-2">
-                    <Label>Hazard Classification</Label>
-                    <Select value={editForm.hazardClassification} onValueChange={(value) => setEditForm({...editForm, hazardClassification: value})}>
-                      <SelectTrigger data-testid="select-edit-hazard-class"><SelectValue placeholder="Select hazard class" /></SelectTrigger>
+                    <Label htmlFor="editSdsLastUpdated">SDS Last Updated</Label>
+                    <Input
+                      id="editSdsLastUpdated"
+                      type="date"
+                      value={editForm.sdsLastUpdated}
+                      onChange={(e) => setEditForm({...editForm, sdsLastUpdated: e.target.value})}
+                      data-testid="input-edit-sds-last-updated"
+                    />
+                  </div>
+                  <div className="grid gap-2">
+                    <Label htmlFor="editHazardClass">Hazard Classification</Label>
+                    <Select
+                      value={editForm.hazardClassification}
+                      onValueChange={(value) => setEditForm({...editForm, hazardClassification: value})}
+                    >
+                      <SelectTrigger data-testid="select-edit-hazard-class">
+                        <SelectValue placeholder="Select hazard class" />
+                      </SelectTrigger>
                       <SelectContent>
                         <SelectItem value="None">None</SelectItem>
                         <SelectItem value="Flammable">Flammable</SelectItem>
@@ -2616,12 +3035,106 @@ const Stores: React.FC = () => {
                     </Select>
                   </div>
                   <div className="grid gap-2">
-                    <Label>SDS Reference</Label>
-                    <Input value={editForm.sdsReference} onChange={(e) => setEditForm({...editForm, sdsReference: e.target.value})} data-testid="input-edit-sds-reference" />
+                    <Label htmlFor="editUnNumber">UN Number</Label>
+                    <Input
+                      id="editUnNumber"
+                      value={editForm.unNumber}
+                      onChange={(e) => setEditForm({...editForm, unNumber: e.target.value})}
+                      placeholder="e.g., UN1234"
+                      data-testid="input-edit-un-number"
+                    />
+                  </div>
+                  <div className="grid gap-2">
+                    <Label htmlFor="editFlashPoint">Flash Point</Label>
+                    <Input
+                      id="editFlashPoint"
+                      value={editForm.flashPoint}
+                      onChange={(e) => setEditForm({...editForm, flashPoint: e.target.value})}
+                      placeholder="e.g., 23°C"
+                      data-testid="input-edit-flash-point"
+                    />
                   </div>
                 </div>
               </div>
             )}
+
+            {activeTab === "chemicals" && (
+              <div className="border-t pt-4">
+                <Label className="text-base font-semibold text-gray-700 mb-2 block">Storage & Safety</Label>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="grid gap-2">
+                    <Label htmlFor="editStorageTempMin">Min Storage Temp (°C)</Label>
+                    <Input
+                      id="editStorageTempMin"
+                      type="number"
+                      step="0.1"
+                      value={editForm.storageTempMin}
+                      onChange={(e) => setEditForm({...editForm, storageTempMin: e.target.value})}
+                      placeholder="e.g., 5"
+                      data-testid="input-edit-temp-min"
+                    />
+                  </div>
+                  <div className="grid gap-2">
+                    <Label htmlFor="editStorageTempMax">Max Storage Temp (°C)</Label>
+                    <Input
+                      id="editStorageTempMax"
+                      type="number"
+                      step="0.1"
+                      value={editForm.storageTempMax}
+                      onChange={(e) => setEditForm({...editForm, storageTempMax: e.target.value})}
+                      placeholder="e.g., 25"
+                      data-testid="input-edit-temp-max"
+                    />
+                  </div>
+                </div>
+                <div className="grid gap-2 mt-4">
+                  <Label htmlFor="editPpeRequirements">PPE Requirements</Label>
+                  <Textarea
+                    id="editPpeRequirements"
+                    value={editForm.ppeRequirements}
+                    onChange={(e) => setEditForm({...editForm, ppeRequirements: e.target.value})}
+                    placeholder="e.g., Safety goggles, chemical-resistant gloves, apron"
+                    rows={2}
+                    data-testid="textarea-edit-ppe"
+                  />
+                </div>
+                <div className="grid gap-2 mt-4">
+                  <Label htmlFor="editDisposalInstructions">Disposal Instructions</Label>
+                  <Textarea
+                    id="editDisposalInstructions"
+                    value={editForm.disposalInstructions}
+                    onChange={(e) => setEditForm({...editForm, disposalInstructions: e.target.value})}
+                    placeholder="Disposal instructions per MARPOL/local regulations"
+                    rows={2}
+                    data-testid="textarea-edit-disposal"
+                  />
+                </div>
+                <div className="grid gap-2 mt-4">
+                  <Label htmlFor="editEmergencyContact">Emergency Contact</Label>
+                  <Input
+                    id="editEmergencyContact"
+                    value={editForm.emergencyContact}
+                    onChange={(e) => setEditForm({...editForm, emergencyContact: e.target.value})}
+                    placeholder="Emergency contact information"
+                    data-testid="input-edit-emergency-contact"
+                  />
+                </div>
+              </div>
+            )}
+
+            <div className="border-t pt-4">
+              <div className="grid gap-2">
+                <Label htmlFor="editRemarks">Remarks</Label>
+                <Textarea
+                  id="editRemarks"
+                  value={editForm.remarks}
+                  onChange={(e) => setEditForm({...editForm, remarks: e.target.value})}
+                  placeholder="Additional notes"
+                  rows={2}
+                  data-testid="textarea-edit-remarks"
+                />
+              </div>
+            </div>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setIsEditModalOpen(false)}>
@@ -2637,7 +3150,7 @@ const Stores: React.FC = () => {
                 {isSubmittingChangeRequest ? "Submitting..." : "Save for Approval"}
               </Button>
             ) : (
-              <Button onClick={saveEditItem}>Save Changes</Button>
+              <Button onClick={saveEditItem} data-testid="button-edit-save">Save Changes</Button>
             )}
           </DialogFooter>
         </DialogContent>
