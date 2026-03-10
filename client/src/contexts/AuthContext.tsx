@@ -16,6 +16,9 @@ const ROLE_TO_UI_TYPE: Record<UserRole, UIRole> = {
   Office: "Client_Admin",
   "PMS Admin": "Sail_Admin",
   "Sail Admin": "Sail_Admin",
+  "Super Admin": "Client_Admin",
+  "Vessel Admin": "Head_of_Dept",
+  "Vessel User": "Vessel",
 };
 
 const DEFAULT_USER: PublicUser = {
@@ -23,8 +26,8 @@ const DEFAULT_USER: PublicUser = {
   username: "munawer.modak",
   fullName: "Munawer A. Modak",
   email: "ayush.agrawal@safe-lanes.com",
-  role: "Ship",
-  userType: "Ship",
+  role: "Sail Admin",
+  userType: "Office",
   vesselId: null,
   department: null,
   isActive: true,
