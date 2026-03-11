@@ -124,7 +124,7 @@ export async function listParents(vesselId: string, period: string = 'monthly') 
   const allComponents = await repo.getComponents(vesselId);
 
   const masterComponents = allComponents.filter(
-    component => component.rhCounterType === 'MASTER'
+    component => component.rhCounterType === 'MASTER' && component.isActive !== false
   );
 
   const periodHoursMap: Record<string, number> = {
@@ -139,7 +139,8 @@ export async function listParents(vesselId: string, period: string = 'monthly') 
 
   const parentsWithCounts = await Promise.all(
     masterComponents.map(async (component) => {
-      const inheritedComponents = await repo.getInheritedComponents(component.cuuid, vesselId);
+      const allInheritedComponents = await repo.getInheritedComponents(component.cuuid, vesselId);
+      const inheritedComponents = allInheritedComponents.filter((c: any) => c.isActive !== false);
 
       const meterReplacedLastRh = parseFloat(component.meterReplacedLastRh || '0');
       const currentMeterRH = parseFloat(component.rhCurrentMaster || component.currentCumulativeRH || '0');
@@ -188,11 +189,10 @@ export async function listChildren(parentCode: string, vesselId: string) {
     throw new NotFoundError('Parent component not found');
   }
 
-  // Use storage layer method which handles all ID formats
   const children = await repo.getInheritedComponents(parent.cuuid, vesselId);
+  const activeChildren = children.filter((child: any) => child.isActive !== false);
 
-  // Format response with RH data for each child
-  const childrenWithRH = children.map(child => {
+  const childrenWithRH = activeChildren.map(child => {
     const displayRH = child.currentCumulativeRH || child.rhCurrentInheritedCached || '0.00';
     return {
       id: child.id,

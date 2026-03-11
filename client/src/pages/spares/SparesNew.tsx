@@ -1152,8 +1152,10 @@ const Spares: React.FC = () => {
     // Skip main categories (1-8) as they're already in the map from hardcoded mainCategories
     clonedComponents.forEach((comp: any) => {
       const code = comp.componentCode || comp.id;
-      // Skip if this is a main category (single digit 1-8) - already in map
       if (code.match(/^[1-8]$/)) {
+        return;
+      }
+      if (comp.isActive === false) {
         return;
       }
       // Spread comp first, then override id/code to use componentCode (not database id)
