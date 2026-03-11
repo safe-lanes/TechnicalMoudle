@@ -1,0 +1,198 @@
+DO NOT START CODING UNTIL YOU HAVE READ EVERYTHING.
+
+BACKGROUND — WHAT IS WRONG WITH THE CURRENT FORMULA
+
+You have correctly identified that the current formula is flawed:
+
+text
+utilizationRate = (totalCumulativeRH / hoursElapsed) × 100
+where hoursElapsed = wall-clock hours since the earliest audit record for the vessel.
+
+This is wrong because:
+
+Cumulative lifetime hours of a component (e.g., Main Engine at 4,020 hrs) can easily exceed the audit tracking period, causing >100% results that need capping — which makes the metric meaningless
+
+The denominator is shared across all components regardless of whether a component was even running during that period
+
+It mixes lifetime accumulated hours with a calendar elapsed time — these are incompatible concepts
+
+WHAT THE NEW FORMULA MUST BE
+
+The new formula must be period-based:
+
+text
+Utilization Rate = (Hours the component ran IN the selected period / Total hours in that period) × 100
+Where:
+
+"Hours the component ran in the period" = the sum of running hours added (delta) to this component's RH log during the selected period. This means: look at the running hours audit entries (RH update logs) for this component, filter only those entries within the selected period, and sum up all the delta (hours added) values. Do NOT use cumulative total hours — use only the incremental hours logged in the period.
+
+"Total hours in that period" = fixed calendar hours for the selected period:
+
+Weekly = 168 hours (7 × 24)
+
+Monthly = 720 hours (30 × 24)
+
+Quarterly = 2,160 hours (90 × 24)
+
+Yearly = 8,760 hours (365 × 24)
+
+The result is capped at 100% maximum (in case of data entry errors)
+
+Round to 1 decimal place
+
+Example: Main Diesel Engine. If in the last 30 days, crew logged RH updates totalling 480 hours added → Utilization = 480 / 720 × 100 = 66.7%. This makes sense — the engine ran for 66.7% of the month.
+
+WHAT YOU NEED TO BUILD — STEP BY STEP
+
+STEP 1 — ADD A PERIOD SELECTOR TO THE RUNNING HOURS UI
+
+In client/src/pages/pms/RunningHours.tsx (or wherever the Running Hours page is rendered), add a period selector dropdown in the filter bar at the top of the page — next to the existing Search Component input and Export/Clear buttons.
+
+The dropdown must have these 4 options:
+
+text
+Value: "weekly"   → Label: "Weekly (7 days)"
+Value: "monthly"  → Label: "Monthly (30 days)"     ← set as DEFAULT
+Value: "quarterly" → Label: "Quarterly (90 days)"
+Value: "yearly"   → Label: "Yearly (365 days)"
+Default selected option on page load: Monthly (30 days)
+
+When the user changes the period, the Utilization Rate column must immediately recalculate and refresh without a full page reload
+
+The dropdown label should be prefixed with a small clock icon (⏱️ or similar) and labeled "Utilization Period:"
+
+The selected period must be passed as a query parameter to the API call that fetches running hours data. Pass it as ?period=monthly (or weekly/quarterly/yearly)
+
+STEP 2 — UPDATE THE BACKEND API ENDPOINT
+
+In the running hours API endpoint (likely GET /api/vessels/:vesselId/running-hours or similar — find the correct route), accept a new query parameter: period with values weekly, monthly, quarterly, yearly. Default to monthly if not provided.
+
+Map the period to its hour count:
+
+javascript
+const periodHours = {
+  weekly: 168,       // 7 × 24
+  monthly: 720,      // 30 × 24
+  quarterly: 2160,   // 90 × 24
+  yearly: 8760       // 365 × 24
+};
+Calculate the period start date:
+
+javascript
+const now = new Date();
+const periodStartDate = new Date(now.getTime() - (periodHours[period] * 60 * 60 * 1000));
+STEP 3 — UPDATE THE UTILIZATION RATE CALCULATION IN THE SERVICE
+
+In server/modules/running-hours/services/runningHoursService.ts, replace the existing utilizationRate calculation logic (around lines 149–152) with the new period-based calculation.
+
+For each component, do the following:
+
+Query the running hours audit/log table (the table that stores each RH update event — check your existing schema for the audit log table name). Filter entries where:
+
+componentId = current component's id (or componentCode — use whichever the audit table uses to link to components)
+
+createdAt >= periodStartDate (only entries within the selected period)
+
+Sum up all the delta values (the hours-added per update) from those filtered entries. Call this hoursRunInPeriod.
+
+IMPORTANT: If your audit table does not store a delta column (hours added per update), you need to calculate it. Look at how the RH update is stored. If each audit entry stores the new total value and the old total value, then delta = newValue - oldValue. If the audit table only stores the new total without a delta, then for each audit entry within the period, compute delta = entry.newValue - previousEntry.newValue (i.e., difference from the prior entry). Use whatever approach fits your existing schema — do not change the audit schema just for this.
+
+Calculate utilization:
+
+javascript
+const totalPeriodHours = periodHours[period]; // 168, 720, 2160, or 8760
+const utilizationRate = Math.min((hoursRunInPeriod / totalPeriodHours) * 100, 100.0);
+const utilizationRateRounded = Math.round(utilizationRate * 10) / 10; // 1 decimal
+Return utilizationRateRounded as the utilizationRate field in the API response for each component.
+
+Also return hoursRunInPeriod as a new field called periodRunningHours in the API response — this will be useful for display.
+
+STEP 4 — UPDATE THE UI TO SHOW PERIOD CONTEXT
+
+In the Running Hours page table, make two small UI updates:
+
+Update A — Utilization Rate column header:
+Change the column header from just "Utilization Rate" to:
+
+text
+"Utilization Rate ([period])"
+Where [period] is the currently selected label. Examples:
+
+When "Monthly" is selected: column header shows "Utilization Rate (Monthly)"
+
+When "Weekly" is selected: "Utilization Rate (Weekly)"
+
+When "Yearly" is selected: "Utilization Rate (Yearly)"
+
+Update B — Tooltip or sub-text on each utilization value:
+When the user hovers over a utilization rate value (e.g., 66.7%), show a tooltip that says:
+
+text
+"Ran [hoursRunInPeriod] hrs out of [totalPeriodHours] hrs available this [period]"
+Example tooltip: "Ran 480 hrs out of 720 hrs available this month"
+
+If hoursRunInPeriod is 0 (no RH updates logged in the period), the utilization shows 0.0% and tooltip says "No running hours logged in this period."
+
+STEP 5 — HANDLE EDGE CASES
+
+Handle these cases gracefully:
+
+Component has no RH audit entries in the selected period: Show 0.0% utilization. Do NOT fall back to the old formula. Zero means zero hours were logged — the crew hasn't updated the running hours for this component in the selected period.
+
+Component has no RH audit entries at all (brand new component): Show 0.0% and tooltip "No running hours recorded yet."
+
+hoursRunInPeriod somehow exceeds totalPeriodHours due to data entry error: Cap at 100.0% using Math.min.
+
+Period parameter is invalid or missing: Default to monthly silently.
+
+The delta calculation results in a negative number (e.g., a meter replacement was entered): Skip negative deltas — only sum positive deltas. A negative delta means the meter was reset (replaced), not that the machine ran in reverse.
+
+STEP 6 — VERIFY WITH THESE SPECIFIC CHECKS
+
+After implementing, verify the following in the live app:
+
+Go to /pms/running-hrs → confirm the period dropdown is visible at the top of the page with "Monthly (30 days)" selected by default
+
+Check Main Diesel Engine (601.001) which currently shows 4,020 hrs total:
+
+With "Monthly" selected: the utilization should show the hours logged via RH updates in the last 30 days, divided by 720. If no updates were logged in the last 30 days in the audit table, it should show 0.0% — NOT 100%
+
+The old result of 100% must be gone
+
+Change the period dropdown to "Weekly" → confirm the utilization values update for all components without page reload
+
+Change to "Yearly" → confirm values update again
+
+The column header must update dynamically: "Utilization Rate (Weekly)", "Utilization Rate (Monthly)", etc.
+
+Hover over any utilization value → tooltip appears with "Ran X hrs out of Y hrs available this [period]"
+
+A component with 0 RH updates in the period must show 0.0% not the old capped 100%
+
+STEP 7 — DO NOT BREAK THE EXISTING RH UPDATE FLOW
+
+The existing "Update Running Hours" modal (gear icon → Set Total / Add Delta → Save) must continue to work exactly as before. Do not change:
+
+The RH update modal
+
+The audit log writing logic
+
+The currentMeterRH or meterReplacedLastRh cumulative fields on the component
+
+The "Running Hours" (cumulative total) column — it must still show the lifetime total hours as it does now
+
+Only the Utilization Rate calculation and display is changing. Everything else stays the same.
+
+STEP 8 — REPORT BACK WITH THIS SPECIFIC INFORMATION
+
+After completing the implementation, tell me:
+
+What is the name of the audit log table/model you used to fetch the period's running hours? (e.g., running_hours_audit, rh_logs, etc.)
+
+Does the audit table have a delta column already, or did you have to compute it from old/new values?
+
+What does the Main Diesel Engine show now for Monthly utilization? (Give me the actual number)
+
+What does the S-Band Radar (100 hrs total) show for Monthly utilization now?
+
+Confirm the period dropdown is visible and switching periods updates the values in real-time.
