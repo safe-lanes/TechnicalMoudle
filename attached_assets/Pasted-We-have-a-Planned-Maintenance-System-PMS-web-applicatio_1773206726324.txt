@@ -1,0 +1,288 @@
+We have a Planned Maintenance System (PMS) web application. Work orders (WOs) have already been implemented with the following features from previous layers:
+
+Layer 1: missedCycles is calculated for each WO and displayed as an orange badge on the WO list
+
+Layer 2: Next Due Date is auto-calculated from completion date (cannot be manually changed)
+
+Layer 3: Work History (A4 section) records every completion with date, performed by, description, status, remarks
+
+Layer 4B: When missedCycles >= 1, the CE must type a justification in a "CE Justification for Skipped Cycles" field before approving. This field is stored in the database.
+
+Each work order has these relevant fields already in the database:
+
+dueDate — the original due date of the WO
+
+completionDate — the date the crew entered as the completion date in Part B
+
+missedCycles — integer, pre-calculated (how many cycles were skipped)
+
+status — can be: planned, due, overdue, pending_approval, completed
+
+ceJustification — text field (from Layer 4B)
+
+approvedBy — who approved
+
+approvedAt — when approved
+
+WHAT YOU NEED TO IMPLEMENT — LAYER 5: APPROVAL WORKFLOW HARDENING
+
+This layer adds tiered approval logic based on how many days late the completion is, and also handles the skipped cycles case. Read every requirement carefully.
+
+STEP 1 — ADD NEW DATABASE FIELDS
+
+Add the following new fields to the work order model/schema (wherever WO data is stored — check existing schema files):
+
+text
+daysLate: Integer, default 0
+  — calculated as: completionDate minus dueDate in days. If completionDate <= dueDate, daysLate = 0.
+
+approvalTier: String, default "standard"
+  — possible values: "standard", "ce_with_justification", "superintendent_notification", "superintendent_locked"
+
+superintendentAcknowledged: Boolean, default false
+  — set to true only when the Superintendent explicitly clicks Acknowledge in the system
+
+superintendentAcknowledgedAt: Timestamp, nullable
+
+superintendentNotifiedAt: Timestamp, nullable
+  — set when the system first flags the WO to Superintendent
+
+ceApprovalRemarks: String, nullable
+  — the CE's typed remarks during approval (separate from ceJustification which crew fills)
+
+approvalBlockReason: String, nullable
+  — human-readable text explaining WHY the WO is blocked (e.g. "Awaiting Superintendent acknowledgment")
+STEP 2 — ADD TIER CALCULATION LOGIC
+
+Create a function (call it calculateApprovalTier) that must be called AUTOMATICALLY whenever a work order is submitted for approval (i.e., when status changes to pending_approval).
+
+This function calculates daysLate and sets approvalTier according to these exact rules:
+
+text
+Rule 1 — missedCycles >= 1 (skipped cycles detected):
+  → approvalTier = "superintendent_locked"
+  → This OVERRIDES all other rules. Even if daysLate is only 2, if missedCycles >= 1, it is superintendent_locked.
+  → superintendentAcknowledged must be false (reset it)
+  → Set superintendentNotifiedAt = current timestamp
+
+Rule 2 — missedCycles == 0 AND daysLate > 14:
+  → approvalTier = "superintendent_notification"
+  → superintendentNotifiedAt = current timestamp
+  → superintendentAcknowledged = false
+
+Rule 3 — missedCycles == 0 AND daysLate >= 7 AND daysLate <= 14:
+  → approvalTier = "ce_with_justification"
+
+Rule 4 — missedCycles == 0 AND daysLate >= 0 AND daysLate < 7:
+  → approvalTier = "standard"
+Store daysLate and approvalTier in the database when this function runs.
+
+STEP 3 — APPROVAL GATE LOGIC (BACKEND)
+
+In the API endpoint that handles WO approval (the endpoint where CE clicks "Approve"), add the following blocking logic BEFORE allowing the approval to go through:
+
+text
+Check A — If approvalTier == "superintendent_locked":
+  → BLOCK approval completely
+  → Return error: "This work order has skipped cycles detected. It is locked pending Superintendent acknowledgment. The CE cannot approve until the Superintendent has acknowledged."
+  → The WO status must remain "pending_approval" — do NOT change it
+
+Check B — If approvalTier == "superintendent_notification":
+  → DO NOT block CE approval
+  → But REQUIRE ceApprovalRemarks to be non-empty (minimum 20 characters)
+  → If ceApprovalRemarks is empty or less than 20 characters, return error: "This completion is more than 14 days late. You must enter detailed remarks (minimum 20 characters) before approving."
+  → After CE approves: set status = "completed", log approval, AND trigger superintendent notification (see Step 5)
+
+Check C — If approvalTier == "ce_with_justification":
+  → REQUIRE ceApprovalRemarks to be non-empty (minimum 10 characters)
+  → If ceApprovalRemarks is empty or too short, return error: "This completion is 7–14 days late. Approval remarks are mandatory."
+  → After CE approves: set status = "completed", log approval normally
+
+Check D — If approvalTier == "standard":
+  → No extra requirements. CE can approve normally (ceApprovalRemarks optional)
+  → After CE approves: set status = "completed"
+STEP 4 — SUPERINTENDENT ACKNOWLEDGE ENDPOINT
+
+Create a new API endpoint:
+
+text
+POST /api/work-orders/:id/superintendent-acknowledge
+This endpoint:
+
+Checks that approvalTier == "superintendent_locked" on the WO — if not, return error "This WO does not require Superintendent acknowledgment"
+
+Sets superintendentAcknowledged = true
+
+Sets superintendentAcknowledgedAt = current timestamp
+
+Sets approvalTier = "ce_with_justification" — IMPORTANT: after Superintendent acknowledges, the WO is NOT immediately approved. It drops down to the next tier so the CE must still approve with mandatory remarks.
+
+Does NOT change the WO status — it remains "pending_approval" so CE still needs to approve
+
+Returns success with message: "Superintendent has acknowledged. The Chief Engineer can now approve with mandatory remarks."
+
+STEP 5 — SUPERINTENDENT NOTIFICATION (IN-APP)
+
+We do not have email in this system. Therefore "Superintendent notification" means an in-app notification/flag. Do the following:
+
+Create a new database table/collection called superintendent_notifications with fields:
+
+text
+id, workOrderId, workOrderCode, jobTitle, componentName, vesselName, daysLate, missedCycles, approvalTier, createdAt, acknowledgedAt, isAcknowledged (boolean default false)
+When superintendentNotifiedAt is set (i.e., when approvalTier is superintendent_locked or superintendent_notification), insert a record into superintendent_notifications.
+
+Create a new API endpoint:
+
+text
+GET /api/superintendent/notifications
+This returns all unacknowledged superintendent notifications sorted by createdAt descending.
+
+text
+GET /api/superintendent/notifications/all
+This returns all notifications (acknowledged + unacknowledged).
+
+STEP 6 — UI CHANGES: NON-DISMISSIBLE APPROVAL WARNING BANNER
+
+In the Work Order form (the same page where CE sees the "Approve" button in the Pending Approval view), add the following UI logic:
+
+When the WO is in pending_approval status, BEFORE showing the Approve button, display a prominent banner at the TOP of Part B (above B1). This banner is NON-DISMISSIBLE (no close button, no way to hide it).
+
+The banner content must be dynamically generated based on daysLate, missedCycles, and approvalTier:
+
+text
+If approvalTier == "superintendent_locked":
+  Background color: RED (#dc2626)
+  Icon: 🔒
+  Title: "APPROVAL LOCKED — SUPERINTENDENT ACTION REQUIRED"
+  Body text: "This completion is [daysLate] days late. [missedCycles] cycle(s) were missed. This work order is LOCKED and cannot be approved by the Chief Engineer until the Superintendent has acknowledged it in the system. Please notify the Superintendent immediately."
+  Show a disabled "Approve" button with text "Locked — Awaiting Superintendent"
+  Do NOT show the normal Approve button at all
+
+If approvalTier == "superintendent_notification":
+  Background color: ORANGE (#ea580c)  
+  Icon: ⚠️
+  Title: "HIGH LATENESS — SUPERINTENDENT HAS BEEN NOTIFIED"
+  Body text: "This completion is [daysLate] days late. [missedCycles] cycles were missed. The Superintendent has been automatically notified. Chief Engineer approval is permitted but DETAILED REMARKS ARE MANDATORY (minimum 20 characters)."
+  Show the Approve button (enabled) but the ceApprovalRemarks field must be filled before it works
+
+If approvalTier == "ce_with_justification":
+  Background color: YELLOW (#ca8a04), dark text
+  Icon: ⚠️
+  Title: "LATE COMPLETION — REMARKS REQUIRED"
+  Body text: "This completion is [daysLate] days late. [missedCycles] cycles were missed. Chief Engineer approval remarks are mandatory before this work order can be approved."
+  Show the Approve button (enabled) but remarks must be filled
+
+If approvalTier == "standard":
+  Background color: BLUE (#2563eb)
+  Icon: ℹ️
+  Title: "PENDING CHIEF ENGINEER APPROVAL"
+  Body text: "This completion is [daysLate] days late. Please review and approve."
+  If daysLate == 0, body text: "This completion was on time. Please review and approve."
+  Show the Approve button normally
+STEP 7 — UI CHANGES: APPROVAL FORM FIELDS
+
+In the same Pending Approval view of the WO form, below the banner (in Part B, near the bottom where the existing Approve button is), add the following fields:
+
+Field 1: CE Approval Remarks (new field, separate from the existing ceJustification field from Layer 4B)
+
+Label: "CE Approval Remarks *"
+
+Type: Textarea
+
+Placeholder: "Enter your remarks regarding this work order completion..."
+
+Show character count (e.g., "0 / 500")
+
+If approvalTier is ce_with_justification: mark as REQUIRED, show red asterisk, show helper text "Minimum 10 characters required"
+
+If approvalTier is superintendent_notification: mark as REQUIRED, show red asterisk, show helper text "Minimum 20 characters required (completion is >14 days late)"
+
+If approvalTier is standard: mark as OPTIONAL, show "(Optional)" label
+
+If approvalTier is superintendent_locked: show the field as DISABLED with text "Locked — Superintendent action required first"
+
+Field 2: Approval Tier Display (read-only info field, always visible when in pending_approval)
+
+Label: "Approval Tier"
+
+Show a colored badge matching the tier:
+
+standard = green badge "Standard Approval"
+
+ce_with_justification = yellow badge "CE Approval + Remarks"
+
+superintendent_notification = orange badge "CE Approval + Superintendent Notified"
+
+superintendent_locked = red badge "🔒 Locked — Superintendent Required"
+
+STEP 8 — UI CHANGES: SUPERINTENDENT DASHBOARD PAGE
+
+Create a new page at route /pms/superintendent (add it to the left sidebar under "Work orders" as "Superintendent" with a shield icon 🛡️ or a flag icon).
+
+This page shows a table of all superintendent notifications with the following columns:
+
+text
+Column 1: Work Order Code (clickable link to open that WO)
+Column 2: Job Title
+Column 3: Component
+Column 4: Days Late (show in red if >14, orange if 7-14)
+Column 5: Missed Cycles (show in orange badge if >= 1, just "0" if none)
+Column 6: Tier (colored badge same as above)
+Column 7: Notified At (date/time)
+Column 8: Status — either red "Awaiting Acknowledgment" button or green "Acknowledged (date)" text
+Column 9: Action — show "Acknowledge" button (blue) if not yet acknowledged, show "Acknowledged ✓" (grey, disabled) if already acknowledged
+When the "Acknowledge" button is clicked:
+
+Call POST /api/work-orders/:id/superintendent-acknowledge
+
+Show a confirmation modal FIRST: "Are you sure you want to acknowledge WO [code]? This will allow the Chief Engineer to proceed with approval. The WO had [missedCycles] missed cycles and was [daysLate] days late."
+
+On confirm: update the row status to "Acknowledged" and disable the button
+
+The page title should be: "Superintendent Notifications"
+Sub-heading: "Work orders requiring shore-side acknowledgment before CE can approve"
+
+Also show a summary at the top:
+
+Total Pending Acknowledgment: [N] (red counter)
+
+Total Acknowledged This Month: [N] (green counter)
+
+STEP 9 — WIRE EVERYTHING TOGETHER
+
+Make sure the following flow works end-to-end:
+
+text
+FLOW A — Skipped Cycles (missedCycles >= 1):
+1. Crew completes WO in Part B, enters completion date and work details, clicks Save/Submit
+2. System calls calculateApprovalTier → sets approvalTier = "superintendent_locked"
+3. WO moves to "Pending Approval" tab
+4. CE opens WO → sees RED locked banner with exact message
+5. CE cannot click Approve (button is disabled/locked)
+6. Superintendent opens /pms/superintendent page → sees notification row
+7. Superintendent clicks "Acknowledge" → confirmation modal → confirms
+8. System sets superintendentAcknowledged=true, approvalTier drops to "ce_with_justification"
+9. CE refreshes WO → now sees YELLOW banner "Remarks Required" instead of red
+10. CE types remarks (min 10 chars) → clicks Approve → WO completed
+
+FLOW B — >14 Days Late (no missed cycles):
+1. Crew submits WO completion
+2. calculateApprovalTier → approvalTier = "superintendent_notification"
+3. Superintendent notification record is created automatically
+4. CE opens WO → sees ORANGE banner, Approve button is enabled
+5. CE MUST type remarks (min 20 chars) before approving
+6. CE approves → WO completed → Superintendent notification remains in their dashboard as FYI
+
+FLOW C — 7–14 Days Late:
+1. Crew submits WO
+2. approvalTier = "ce_with_justification"
+3. No superintendent notification
+4. CE opens WO → sees YELLOW banner
+5. CE types remarks (min 10 chars) → approves
+
+FLOW D — 0–6 Days Late:
+1. Crew submits WO
+2. approvalTier = "standard"
+3. CE opens WO → sees BLUE info banner
+4. CE approves with optional remarks
+STEP 10 — UPDATE THE PENDING APPROVAL TAB IN WO LIST
