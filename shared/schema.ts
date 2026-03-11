@@ -3005,3 +3005,28 @@ export const insertMasterUserSchema = createInsertSchema(masterUsers).omit({
 
 export type InsertMasterUser = z.infer<typeof insertMasterUserSchema>;
 export type MasterUser = typeof masterUsers.$inferSelect;
+
+export const admnRoleMaster = pgTable("admn_role_master", {
+  id: integer("id").primaryKey(),
+  ruid: text("ruid").notNull().unique(),
+  assignedRole: text("assigned_role").notNull(),
+  roletype: text("roletype").notNull(),
+  orderby: integer("orderby"),
+  isActive: boolean("is_active").default(true),
+  sortOrder: integer("sort_order"),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow(),
+  createdByUuid: text("created_by_uuid"),
+  updatedByUuid: text("updated_by_uuid"),
+  isDeleted: boolean("is_deleted").default(false),
+  isSync: boolean("is_sync").default(false),
+});
+
+export const insertAdmnRoleMasterSchema = createInsertSchema(admnRoleMaster).omit({
+  ruid: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type InsertAdmnRoleMaster = z.infer<typeof insertAdmnRoleMasterSchema>;
+export type AdmnRoleMaster = typeof admnRoleMaster.$inferSelect;
