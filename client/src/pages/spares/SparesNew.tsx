@@ -1159,6 +1159,7 @@ const Spares: React.FC = () => {
       // Spread comp first, then override id/code to use componentCode (not database id)
       const node: ComponentNode = {
         ...comp,
+        actualId: comp.id,
         id: code,
         code: code,
         name: comp.name,
@@ -1259,12 +1260,12 @@ const Spares: React.FC = () => {
   }, [fetchedComponents]);
 
   const flattenedComponents = useMemo(() => {
-    const result: { id: string; code: string; name: string; fleetEquipmentCode?: string }[] = [];
+    const result: { id: string; code: string; name: string; fleetEquipmentCode?: string; actualId?: string }[] = [];
     const flatten = (nodes: ComponentNode[]) => {
       for (const node of nodes) {
         const hasChildren = node.children && node.children.length > 0;
         if (!hasChildren) {
-          result.push({ id: node.id, code: node.code, name: node.name, fleetEquipmentCode: node.fleetEquipmentCode });
+          result.push({ id: node.id, code: node.code, name: node.name, fleetEquipmentCode: node.fleetEquipmentCode, actualId: node.actualId });
         }
         if (node.children) flatten(node.children);
       }
@@ -2413,7 +2414,7 @@ const Spares: React.FC = () => {
       partName: addSpareForm.partName,
       partNumber: addSpareForm.partNumber || undefined,
       uom: addSpareForm.uom || undefined,
-      componentId: addSpareForm.componentId,
+      componentId: component?.actualId || addSpareForm.componentId,
       componentCode: component?.code || undefined,
       componentName: component?.name || "Unknown",
       fleetEquipmentCode: component?.fleetEquipmentCode || undefined,
