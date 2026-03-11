@@ -2216,19 +2216,21 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
       const componentCuuid = urlParams.get('componentCuuid') || templateData.componentCode;
       const componentName = templateData.componentName || templateData.componentCode;
 
-      // Generate a unique job number (format: JOB-XXXXXXX)
-      const timestamp = Date.now().toString(36).toUpperCase();
-      const random = Math.random().toString(36).substring(2, 5).toUpperCase();
-      const jobNo = `JOB-${timestamp}${random}`;
+      if (!templateData.woTemplateCode?.trim()) {
+        toast({
+          title: "Validation Error",
+          description: "Job Code is required",
+          variant: "destructive",
+        });
+        return;
+      }
 
-      // Build job payload matching the jobs schema
-      // Note: All fields are strings as per the schema (frequencyValue is text type)
       const jobPayload = {
         vesselId: contextVesselId,
         componentId: componentCuuid,
         componentCode: templateData.componentCode,
         componentName: componentName,
-        jobNo: jobNo,
+        jobNo: templateData.woTemplateCode.trim(),
         jobTitle: templateData.woTitle,
         maintenanceBasis: templateData.maintenanceBasis,
         frequencyValue: normalizedFrequency, // Keep as string
@@ -2707,7 +2709,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                     value={templateData.woTemplateCode}
                     onChange={(e) => handleTemplateChange('woTemplateCode', e.target.value)}
                     className="text-sm"
-                    placeholder="Auto-generated"
+                    placeholder="Enter job code"
                     disabled={isPartAReadOnly}
                     data-testid="WOF.A1.10"
                   />
