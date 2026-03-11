@@ -457,6 +457,9 @@ const Spares: React.FC = () => {
     let successCount = 0;
     const errors: string[] = [];
 
+    const selectedLocObj = vesselLocations.find((l: any) => l.id === selectedLocationId) || allVesselLocations.find((l: any) => l.id === selectedLocationId);
+    const locationName = selectedLocObj?.locationName || selectedLocObj?.name || `Location #${selectedLocationId}`;
+
     for (const spare of sparesToSave) {
       const newValue = parseInt(editingLocRob[spare.id]);
       const currentQty = spare.locationQty ?? 0;
@@ -473,7 +476,7 @@ const Spares: React.FC = () => {
             eventType: 'ADJUST_CORRECTION',
             qtyChange,
             referenceType: 'MANUAL',
-            referenceNote: 'Location ROB adjustment via Location tab',
+            referenceNote: `Adjustment at ${locationName}: ${currentQty}→${newValue}`,
             userId: 'System'
           }),
         });
