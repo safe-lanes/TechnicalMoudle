@@ -1,0 +1,113 @@
+TASK: ANALYSIS AND CORRECTION – HISTORY EVENT TYPE FOR INVENTORY TRANSACTIONS (SPARES & STORES)
+
+Objective:
+
+Currently, when spares are **Consumed** or **Received** through the **Inventory Transaction section**, the **History Event** is being saved as **"Adjustment"**.  
+
+However, the correct event type should reflect the actual transaction, such as **Consume** or **Receive**.
+
+A detailed analysis must be carried out to identify the root cause and implement the correct event classification.
+
+Scope:
+
+• Spares Section  
+• Stores Section
+
+--------------------------------------------------
+
+1. Issue Verification
+
+Investigate the current behavior where:
+
+• Spare items consumed through Inventory Transaction are recorded in History as **Adjustment**.
+• Spare items received through Inventory Transaction are recorded in History as **Adjustment**.
+
+This behavior must be verified in both **Spares** and **Stores** modules.
+
+--------------------------------------------------
+
+2. Investigation Points
+
+Perform a detailed analysis of:
+
+• Inventory Transaction module logic
+• History/Event logging mechanism
+• Backend service/API responsible for saving history events
+• Event type mapping during transaction execution
+• Database fields used to store event types
+
+Verify why **Consume** and **Receive** transactions are being stored as **Adjustment**.
+
+--------------------------------------------------
+
+3. Root Cause Identification
+
+Identify the exact reason for incorrect event logging, such as:
+
+• Incorrect event type mapping
+• Default event value set as "Adjustment"
+• Missing logic for transaction type differentiation
+• API/service passing wrong event parameter
+• Shared function forcing Adjustment event type
+
+--------------------------------------------------
+
+4. Correct Event Mapping
+
+The History Event should reflect the actual transaction type.
+
+Required mapping:
+
+Inventory Transaction Type → History Event
+
+• Consume → Event Type = Consume  
+• Receive → Event Type = Receive  
+• Adjustment → Event Type = Adjustment (only when actual adjustment occurs)
+
+--------------------------------------------------
+
+5. Implementation Plan
+
+Prepare a detailed implementation plan including:
+
+• Required backend logic correction
+• API/service updates
+• Event type mapping corrections
+• Database update logic
+• Validation rules
+
+Ensure the event type is passed correctly during transaction execution.
+
+--------------------------------------------------
+
+6. Apply Same Correction for Stores
+
+Carry out the same analysis and correction in the **Stores section**.
+
+Ensure that:
+
+• Store item **Consume transactions** save history event as **Consume**
+• Store item **Receive transactions** save history event as **Receive**
+• Only true adjustments are recorded as **Adjustment**
+
+--------------------------------------------------
+
+7. Validation
+
+After implementation verify:
+
+• Spare consume transactions create **Consume event**
+• Spare receive transactions create **Receive event**
+• Store consume transactions create **Consume event**
+• Store receive transactions create **Receive event**
+• Adjustment events appear only when actual adjustments are performed
+
+--------------------------------------------------
+
+Expected Result
+
+• History events correctly reflect actual transaction types
+• Consume transactions logged as "Consume"
+• Receive transactions logged as "Receive"
+• Adjustment used only for adjustment transactions
+• Same logic applied consistently for both Spares and Stores
