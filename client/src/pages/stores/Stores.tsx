@@ -1910,9 +1910,10 @@ const Stores: React.FC = () => {
       {viewMode === "location" ? (
       <div className="flex gap-3 items-center mb-4">
         {(isSailAdmin || isClientAdmin || isChangeMode) && (
-          <div>
+          <div className="flex items-center gap-2">
+            <span className="text-sm font-medium text-gray-600">Vessel:</span>
             <Select value={vesselId === 'all' ? '' : vesselId} onValueChange={setVesselId}>
-              <SelectTrigger className="w-48" data-testid="stores-loc-vessel-selector">
+              <SelectTrigger className="w-[200px]" data-testid="stores-loc-vessel-selector">
                 <SelectValue placeholder="Choose vessel" />
               </SelectTrigger>
               <SelectContent>
@@ -1988,9 +1989,10 @@ const Stores: React.FC = () => {
       <div className="flex gap-3 items-center mb-4">
         {/* Vessel selector - visible for Sail Admin, Client Admin, or in change mode */}
         {(isSailAdmin || isClientAdmin || isChangeMode) && (
-          <div>
+          <div className="flex items-center gap-2">
+            <span className="text-sm font-medium text-gray-600">Vessel:</span>
             <Select value={vesselId === 'all' ? '' : vesselId} onValueChange={setVesselId}>
-              <SelectTrigger className="w-48" data-testid={getMarkerId(activeTab, "4")}>
+              <SelectTrigger className="w-[200px]" data-testid={getMarkerId(activeTab, "4")}>
                 <Marker id={getMarkerId(activeTab, "4")} />
                 <SelectValue placeholder="Choose vessel" />
               </SelectTrigger>
