@@ -371,18 +371,21 @@ export default function MaintenancePlanner({ onBack, globalFilters }: Maintenanc
           <div className="flex items-center gap-3">
             {/* Vessel Selector - Only visible for Client Admin */}
             {isClientAdmin && (
-              <Select value={vesselId === 'all' ? '' : vesselId} onValueChange={setVesselId}>
-                <SelectTrigger className="w-48" data-testid="select-vessel">
-                  <SelectValue placeholder="Choose vessel" />
-                </SelectTrigger>
-                <SelectContent>
-                  {vessels.map(vessel => (
-                    <SelectItem key={vessel.id} value={vessel.id}>
-                      {vessel.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <div className="flex items-center gap-2">
+                <span className="text-sm font-medium text-gray-600">Vessel:</span>
+                <Select value={vesselId === 'all' ? '' : vesselId} onValueChange={setVesselId}>
+                  <SelectTrigger className="w-[200px]" data-testid="select-vessel">
+                    <SelectValue placeholder="Choose vessel" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {vessels.map(vessel => (
+                      <SelectItem key={vessel.id} value={vessel.id}>
+                        {vessel.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
             )}
             <Button
               variant="outline"

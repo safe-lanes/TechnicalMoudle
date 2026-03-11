@@ -519,19 +519,22 @@ const WorkOrders: React.FC = () => {
       <div className="flex items-center gap-3">
         {/* Vessel selector - visible for Sail Admin and Client Admin view modes */}
         {(isSailAdmin || isClientAdmin) && (
-          <Select value={vesselId === 'all' ? '' : vesselId} onValueChange={setVesselId}>
-            <SelectTrigger className="w-48" data-testid="C15">
-              <Marker id="C15" />
-              <SelectValue placeholder="Choose vessel" />
-            </SelectTrigger>
-            <SelectContent>
-              {vessels.map(vessel => (
-                <SelectItem key={vessel.id} value={vessel.id}>
-                  {vessel.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          <div className="flex items-center gap-2">
+            <span className="text-sm font-medium text-gray-600">Vessel:</span>
+            <Select value={vesselId === 'all' ? '' : vesselId} onValueChange={setVesselId}>
+              <SelectTrigger className="w-[200px]" data-testid="C15">
+                <Marker id="C15" />
+                <SelectValue placeholder="Choose vessel" />
+              </SelectTrigger>
+              <SelectContent>
+                {vessels.map(vessel => (
+                  <SelectItem key={vessel.id} value={vessel.id}>
+                    {vessel.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
         )}
 
         <div className="relative flex-1 max-w-sm" data-testid="C10">

@@ -2645,10 +2645,11 @@ const Spares: React.FC = () => {
       <div className="flex gap-3 items-center mb-4">
         {/* Vessel selector - visible for Sail Admin, Client Admin, or in change mode */}
         {(isSailAdmin || isClientAdmin || isChangeMode) && (
-          <div className="relative" data-testid="E4">
+          <div className="flex items-center gap-2" data-testid="E4">
             <Marker id="E4" />
+            <span className="text-sm font-medium text-gray-600">Vessel:</span>
             <Select value={vesselId === 'all' ? '' : vesselId} onValueChange={setVesselId}>
-              <SelectTrigger className="w-48">
+              <SelectTrigger className="w-[200px]">
                 <SelectValue placeholder="Choose vessel" />
               </SelectTrigger>
               <SelectContent>

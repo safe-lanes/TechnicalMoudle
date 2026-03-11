@@ -107,12 +107,10 @@ const GlobalFilters: React.FC<GlobalFiltersProps> = ({
     <div className={cn("mb-4", className)} data-testid="G7">
       <div className="flex flex-col md:flex-row md:items-end gap-3">
         {/* Vessel Selection */}
-        <div className="flex-1 min-w-[140px]">
-          <Label className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-1 block" data-testid="G8">
-            Vessel
-          </Label>
+        <div className="flex items-center gap-2" data-testid="G8">
+          <span className="text-sm font-medium text-gray-600">Vessel:</span>
           <Select value={filters.vessel} onValueChange={handleVesselChange}>
-            <SelectTrigger data-testid="G9" className="h-9">
+            <SelectTrigger data-testid="G9" className="w-[200px]">
               <SelectValue placeholder="All Vessels" />
             </SelectTrigger>
             <SelectContent>
