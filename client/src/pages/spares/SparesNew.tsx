@@ -1159,7 +1159,7 @@ const Spares: React.FC = () => {
       // Spread comp first, then override id/code to use componentCode (not database id)
       const node: ComponentNode = {
         ...comp,
-        actualId: comp.id,
+        actualId: comp.cuuid || comp.id,
         id: code,
         code: code,
         name: comp.name,
