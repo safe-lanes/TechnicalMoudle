@@ -380,6 +380,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
   const [rejectionComments, setRejectionComments] = useState('');
   const [isProcessingApproval, setIsProcessingApproval] = useState(false);
   const [skippedCyclesJustification, setSkippedCyclesJustification] = useState('');
+  const [ceApprovalRemarks, setCeApprovalRemarks] = useState('');
 
   // Track work order type to conditionally skip frequency validation for unplanned WOs
   const [workOrderType, setWorkOrderType] = useState<'Planned' | 'Unplanned'>('Planned');
@@ -2189,7 +2190,8 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
       const payload: Record<string, any> = {
         status: 'Completed',
         approvalAction: 'approved',
-        skippedCyclesJustification: woMissed >= 1 ? skippedCyclesJustification : null
+        skippedCyclesJustification: woMissed >= 1 ? skippedCyclesJustification : null,
+        ceApprovalRemarks: ceApprovalRemarks.trim() || null
       };
 
       if (actualCompletionDate) {
@@ -4275,8 +4277,16 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
             const approvalMissedCycles = (workOrderContext as any)?.workOrder?.missedCycles || 0;
             const approvalOriginalDueDate = (workOrderContext as any)?.workOrder?.originalDueDate || '';
             const approvalDateCompleted = (workOrderContext as any)?.workOrder?.dateCompleted || (workOrderContext as any)?.workOrder?.completionDateTime || '';
+            const approvalDaysLate = (workOrderContext as any)?.workOrder?.daysLate || 0;
+            const approvalTier: string = (workOrderContext as any)?.workOrder?.approvalTier || 'standard';
             const justificationValid = skippedCyclesJustification.trim().length >= 30;
-            const approveDisabled = isProcessingApproval || (approvalMissedCycles >= 1 && !justificationValid);
+
+            const ceRemarksRequired = approvalTier === 'superintendent_notification' || approvalTier === 'ce_with_justification';
+            const ceRemarksMinLength = approvalTier === 'superintendent_notification' ? 20 : approvalTier === 'ce_with_justification' ? 10 : 0;
+            const ceRemarksValid = !ceRemarksRequired || ceApprovalRemarks.trim().length >= ceRemarksMinLength;
+            const isSuptLocked = approvalTier === 'superintendent_locked';
+
+            const approveDisabled = isProcessingApproval || isSuptLocked || (approvalMissedCycles >= 1 && !justificationValid) || !ceRemarksValid;
 
             const formatDateForDisplay = (dateStr: string) => {
               if (!dateStr) return '—';
@@ -4288,10 +4298,76 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
               } catch { return dateStr; }
             };
 
+            const tierBannerConfig = (() => {
+              switch (approvalTier) {
+                case 'superintendent_locked':
+                  return {
+                    bg: '#dc2626', color: '#ffffff',
+                    title: 'APPROVAL LOCKED \u2014 SUPERINTENDENT ACTION REQUIRED',
+                    body: `This completion is ${approvalDaysLate} days late. ${approvalMissedCycles} cycle(s) were missed. This work order is LOCKED and cannot be approved by the Chief Engineer until the Superintendent has acknowledged it in the system. Please notify the Superintendent immediately.`
+                  };
+                case 'superintendent_notification':
+                  return {
+                    bg: '#ea580c', color: '#ffffff',
+                    title: 'HIGH LATENESS \u2014 SUPERINTENDENT HAS BEEN NOTIFIED',
+                    body: `This completion is ${approvalDaysLate} days late. ${approvalMissedCycles} cycles were missed. The Superintendent has been automatically notified. Chief Engineer approval is permitted but DETAILED REMARKS ARE MANDATORY (minimum 20 characters).`
+                  };
+                case 'ce_with_justification':
+                  return {
+                    bg: '#ca8a04', color: '#1a1a1a',
+                    title: 'LATE COMPLETION \u2014 REMARKS REQUIRED',
+                    body: `This completion is ${approvalDaysLate} days late. ${approvalMissedCycles} cycles were missed. Chief Engineer approval remarks are mandatory before this work order can be approved.`
+                  };
+                default:
+                  return {
+                    bg: '#2563eb', color: '#ffffff',
+                    title: 'PENDING CHIEF ENGINEER APPROVAL',
+                    body: approvalDaysLate === 0
+                      ? 'This completion was on time. Please review and approve.'
+                      : `This completion is ${approvalDaysLate} days late. Please review and approve.`
+                  };
+              }
+            })();
+
+            const tierBadgeConfig = (() => {
+              switch (approvalTier) {
+                case 'superintendent_locked':
+                  return { bg: '#dc2626', color: '#ffffff', label: '\uD83D\uDD12 Locked \u2014 Superintendent Required' };
+                case 'superintendent_notification':
+                  return { bg: '#ea580c', color: '#ffffff', label: 'CE Approval + Superintendent Notified' };
+                case 'ce_with_justification':
+                  return { bg: '#ca8a04', color: '#1a1a1a', label: 'CE Approval + Remarks' };
+                default:
+                  return { bg: '#16a34a', color: '#ffffff', label: 'Standard Approval' };
+              }
+            })();
+
             return (
             <div className="bg-white rounded-lg border border-gray-200 shadow-sm p-6 mt-4" data-testid="WOF.B5.1"><Marker id="WOF.B5.1" />
               <div className="space-y-4">
 
+                {/* Layer 5: Approval Tier Banner */}
+                <div
+                  style={{ backgroundColor: tierBannerConfig.bg, color: tierBannerConfig.color }}
+                  className="rounded-md p-4"
+                  data-testid="banner-approval-tier"
+                >
+                  <p className="font-bold text-sm mb-2" data-testid="text-approval-tier-title">{tierBannerConfig.title}</p>
+                  <p className="text-sm leading-relaxed" data-testid="text-approval-tier-body">{tierBannerConfig.body}</p>
+                </div>
+
+                {/* Layer 5: Approval Tier Badge */}
+                <div className="flex items-center gap-2" data-testid="approval-tier-badge-container">
+                  <span
+                    style={{ backgroundColor: tierBadgeConfig.bg, color: tierBadgeConfig.color }}
+                    className="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold"
+                    data-testid="badge-approval-tier"
+                  >
+                    {tierBadgeConfig.label}
+                  </span>
+                </div>
+
+                {/* Layer 4B: Skipped Cycles Justification (existing - preserved) */}
                 {approvalMissedCycles >= 1 && (
                   <>
                     <div
@@ -4299,7 +4375,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                       className="rounded-md p-4"
                       data-testid="alert-skipped-cycles-justification"
                     >
-                      <p style={{ color: '#991B1B' }} className="font-bold text-sm mb-2">🚨 MANDATORY ACKNOWLEDGEMENT REQUIRED</p>
+                      <p style={{ color: '#991B1B' }} className="font-bold text-sm mb-2">MANDATORY ACKNOWLEDGEMENT REQUIRED</p>
                       <p style={{ color: '#7F1D1D' }} className="text-sm leading-relaxed">
                         This work order has <strong>{approvalMissedCycles}</strong> skipped maintenance cycle{approvalMissedCycles > 1 ? 's' : ''}.
                         {approvalOriginalDueDate && <> The scheduled due date was <strong>{formatDateForDisplay(approvalOriginalDueDate)}</strong>.</>}
@@ -4332,6 +4408,39 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                   </>
                 )}
 
+                {/* Layer 5: CE Approval Remarks */}
+                <div className="space-y-2" data-testid="field-ce-approval-remarks">
+                  <Label className="text-sm font-semibold">
+                    CE Approval Remarks
+                    {ceRemarksRequired && <span className="text-red-600 ml-1">*</span>}
+                    {!ceRemarksRequired && !isSuptLocked && <span className="text-gray-400 ml-1">(Optional)</span>}
+                  </Label>
+                  <Textarea
+                    value={ceApprovalRemarks}
+                    onChange={(e) => setCeApprovalRemarks(e.target.value)}
+                    maxLength={500}
+                    disabled={isSuptLocked}
+                    placeholder={isSuptLocked
+                      ? 'Locked \u2014 Superintendent action required first'
+                      : ceRemarksRequired
+                        ? `Enter approval remarks (minimum ${ceRemarksMinLength} characters)...`
+                        : 'Enter optional approval remarks...'
+                    }
+                    className={`text-sm min-h-[100px] ${isSuptLocked ? 'bg-gray-100 cursor-not-allowed' : ''} ${ceRemarksRequired && ceApprovalRemarks.trim().length < ceRemarksMinLength ? 'border-red-400' : 'border-gray-200'}`}
+                    data-testid="input-ce-approval-remarks"
+                  />
+                  <div className="flex justify-between items-center">
+                    {approvalTier === 'superintendent_notification' && (
+                      <span className="text-xs text-red-500" data-testid="text-ce-remarks-helper">Minimum 20 characters required (completion is &gt;14 days late)</span>
+                    )}
+                    {approvalTier === 'ce_with_justification' && (
+                      <span className="text-xs text-red-500" data-testid="text-ce-remarks-helper">Minimum 10 characters required</span>
+                    )}
+                    {approvalTier !== 'superintendent_notification' && approvalTier !== 'ce_with_justification' && <span />}
+                    <span className="text-xs text-gray-400" data-testid="text-ce-remarks-char-count">{ceApprovalRemarks.length} / 500</span>
+                  </div>
+                </div>
+
                 {/* Rejection Comments */}
                 <div className="space-y-2" data-testid="WOF.B5.2"><Marker id="WOF.B5.2" />
                   <Label className="text-base font-semibold text-[#17a2b8]">Rejection Comments</Label>
@@ -4348,16 +4457,26 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
 
                 {/* Approve / Reject Buttons */}
                 <div className="flex justify-center gap-4 pt-2" data-testid="WOF.B5.3"><Marker id="WOF.B5.3" />
-                  <Button
-                    onClick={handleApprove}
-                    disabled={approveDisabled}
-                    className={`font-semibold px-8 py-2.5 h-auto text-sm rounded-full shadow-md min-w-[120px] ${approveDisabled && !isProcessingApproval ? 'bg-gray-400 cursor-not-allowed text-white' : 'bg-[#28a745] hover:bg-[#218838] text-white'}`}
-                    title={approvalMissedCycles >= 1 && !justificationValid ? 'Please provide justification for skipped cycles before approving' : undefined}
-                    data-testid="WOF.B5.4"
-                  >
-                    <Marker id="WOF.B5.4" />
-                    {isProcessingApproval ? 'Processing...' : 'Approve'}
-                  </Button>
+                  {isSuptLocked ? (
+                    <Button
+                      disabled
+                      className="bg-gray-400 cursor-not-allowed text-white font-semibold px-8 py-2.5 h-auto text-sm rounded-full shadow-md min-w-[120px]"
+                      data-testid="button-locked-awaiting-superintendent"
+                    >
+                      Locked — Awaiting Superintendent
+                    </Button>
+                  ) : (
+                    <Button
+                      onClick={handleApprove}
+                      disabled={approveDisabled}
+                      className={`font-semibold px-8 py-2.5 h-auto text-sm rounded-full shadow-md min-w-[120px] ${approveDisabled && !isProcessingApproval ? 'bg-gray-400 cursor-not-allowed text-white' : 'bg-[#28a745] hover:bg-[#218838] text-white'}`}
+                      title={approvalMissedCycles >= 1 && !justificationValid ? 'Please provide justification for skipped cycles before approving' : !ceRemarksValid ? `Please enter at least ${ceRemarksMinLength} characters in CE Approval Remarks` : undefined}
+                      data-testid="WOF.B5.4"
+                    >
+                      <Marker id="WOF.B5.4" />
+                      {isProcessingApproval ? 'Processing...' : 'Approve'}
+                    </Button>
+                  )}
                   <Button
                     onClick={handleReject}
                     disabled={isProcessingApproval}

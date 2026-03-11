@@ -4,6 +4,64 @@ import { computeWorkOrderStatus } from '@shared/workOrders/status';
 import { WORK_ORDER_THRESHOLDS } from '@shared/workOrders/constants';
 import { computeSpareConsumptionDelta, ConsumedSpareEntry } from '../utils/spareConsumptionDelta';
 import { calculateMissedCycles } from '@shared/dateUtils';
+import { storage } from '../../../storage';
+
+export function calculateApprovalTier(dueDate: string | null | undefined, completionDate: string | null | undefined, missedCycles: number) {
+  let daysLate = 0;
+  if (dueDate && completionDate) {
+    const due = new Date(dueDate);
+    const comp = new Date(completionDate);
+    const diffMs = comp.getTime() - due.getTime();
+    daysLate = Math.max(0, Math.floor(diffMs / (1000 * 60 * 60 * 24)));
+  }
+
+  let approvalTier = 'standard';
+  let superintendentNotifiedAt: string | null = null;
+  let superintendentAcknowledged = false;
+  let approvalBlockReason: string | null = null;
+
+  if (missedCycles >= 1) {
+    approvalTier = 'superintendent_locked';
+    superintendentAcknowledged = false;
+    superintendentNotifiedAt = new Date().toISOString();
+    approvalBlockReason = 'Awaiting Superintendent acknowledgment';
+  } else if (daysLate > 14) {
+    approvalTier = 'superintendent_notification';
+    superintendentNotifiedAt = new Date().toISOString();
+    superintendentAcknowledged = false;
+  } else if (daysLate >= 7) {
+    approvalTier = 'ce_with_justification';
+  } else {
+    approvalTier = 'standard';
+  }
+
+  return { daysLate, approvalTier, superintendentNotifiedAt, superintendentAcknowledged, approvalBlockReason };
+}
+
+export async function createSuperintendentNotificationForWO(wo: any, daysLate: number, missedCycles: number, approvalTier: string) {
+  try {
+    const existing = await storage.getAllSuperintendentNotifications();
+    const woId = wo.wouuid || wo.id;
+    const duplicate = existing.find((n: any) => n.workOrderId === woId && n.approvalTier === approvalTier && !n.isAcknowledged);
+    if (duplicate) {
+      console.log(`📢 Superintendent notification already exists for WO ${wo.workOrderNo || wo.id} (tier: ${approvalTier}), skipping`);
+      return;
+    }
+    await storage.createSuperintendentNotification({
+      workOrderId: woId,
+      workOrderCode: wo.workOrderNo || wo.id,
+      jobTitle: wo.jobTitle || '',
+      componentName: wo.componentCode || wo.component || '',
+      vesselName: wo.vesselId || '',
+      daysLate,
+      missedCycles,
+      approvalTier,
+    });
+    console.log(`📢 Superintendent notification created for WO ${wo.workOrderNo || wo.id} (tier: ${approvalTier})`);
+  } catch (err: any) {
+    console.error(`⚠️ Failed to create superintendent notification: ${err.message}`);
+  }
+}
 
 // ── List Work Orders with Enrichment ──
 
@@ -662,6 +720,25 @@ export async function updateWorkOrder(id: string, body: any) {
       updateData.originalDueDate = dueDateForCalc;
       console.log(`📝 Pre-calculated missedCycles at submission: ${preCalcMissed} (dueDate: ${dueDateForCalc}, completionDate: ${completionDateForCalc})`);
     }
+
+    // Layer 5: Calculate approval tier when transitioning to Pending Approval
+    const tierCompDate = updateData.completionDateTime || updateData.dateCompleted ||
+      existingWO.completionDateTime || existingWO.dateCompleted;
+    const tierDueDate = existingWO.nextDueDate || existingWO.dueDate;
+    const tierMissedCycles = updateData.missedCycles ?? existingWO.missedCycles ?? 0;
+    const tierResult = calculateApprovalTier(tierDueDate, tierCompDate, tierMissedCycles);
+    updateData.daysLate = tierResult.daysLate;
+    updateData.approvalTier = tierResult.approvalTier;
+    updateData.superintendentNotifiedAt = tierResult.superintendentNotifiedAt;
+    updateData.superintendentAcknowledged = tierResult.superintendentAcknowledged;
+    updateData.approvalBlockReason = tierResult.approvalBlockReason;
+    console.log(`📝 Layer 5: approvalTier=${tierResult.approvalTier}, daysLate=${tierResult.daysLate}, missedCycles=${tierMissedCycles}`);
+
+    // Create superintendent notification if needed
+    if (tierResult.approvalTier === 'superintendent_locked' || tierResult.approvalTier === 'superintendent_notification') {
+      const woForNotification = { ...existingWO, ...updateData };
+      await createSuperintendentNotificationForWO(woForNotification, tierResult.daysLate, tierMissedCycles, tierResult.approvalTier);
+    }
   }
 
   console.log('📝 Cleaned update data keys:', Object.keys(updateData));
@@ -703,7 +780,9 @@ export async function updateWorkOrder(id: string, body: any) {
     }
   }
 
-  if (updateData.approvalAction === 'approved' && updateData.status === 'Completed') {
+  const isApprovalTransition = (updateData.approvalAction === 'approved' && updateData.status === 'Completed') ||
+    (updateData.status === 'Completed' && existingWO.status === 'Pending Approval');
+  if (isApprovalTransition) {
     let woMissedCycles = existingWO.missedCycles || 0;
     if (woMissedCycles === 0 && existingWO.maintenanceBasis !== 'Running Hours') {
       const approvalCompDate = existingWO.completionDateTime || existingWO.dateCompleted;
@@ -723,6 +802,35 @@ export async function updateWorkOrder(id: string, body: any) {
         throw new ValidationError(
           `This work order has ${woMissedCycles} skipped maintenance cycle(s). The Chief Engineer must provide a written justification (minimum 30 characters) explaining why these cycles were missed before approval can be granted.`,
           { code: 'JUSTIFICATION_REQUIRED', missedCycles: woMissedCycles }
+        );
+      }
+    }
+
+    // Layer 5: Approval gate logic based on approvalTier
+    const currentTier = existingWO.approvalTier || 'standard';
+    const ceRemarks = (updateData.ceApprovalRemarks || '').trim();
+
+    if (currentTier === 'superintendent_locked') {
+      throw new ValidationError(
+        'This work order has skipped cycles detected. It is locked pending Superintendent acknowledgment. The CE cannot approve until the Superintendent has acknowledged.',
+        { code: 'SUPERINTENDENT_LOCKED' }
+      );
+    }
+
+    if (currentTier === 'superintendent_notification') {
+      if (!ceRemarks || ceRemarks.length < 20) {
+        throw new ValidationError(
+          'This completion is more than 14 days late. You must enter detailed remarks (minimum 20 characters) before approving.',
+          { code: 'CE_REMARKS_REQUIRED', minLength: 20 }
+        );
+      }
+    }
+
+    if (currentTier === 'ce_with_justification') {
+      if (!ceRemarks || ceRemarks.length < 10) {
+        throw new ValidationError(
+          'This completion is 7–14 days late. Approval remarks are mandatory.',
+          { code: 'CE_REMARKS_REQUIRED', minLength: 10 }
         );
       }
     }

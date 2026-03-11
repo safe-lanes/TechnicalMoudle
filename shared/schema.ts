@@ -1,5 +1,5 @@
 
-import { pgTable, text, integer, boolean, timestamp, decimal, index, uniqueIndex, json, jsonb, numeric, primaryKey, unique, pgEnum } from "drizzle-orm/pg-core";
+import { pgTable, text, integer, boolean, timestamp, decimal, index, uniqueIndex, json, jsonb, numeric, primaryKey, unique, pgEnum, serial } from "drizzle-orm/pg-core";
 import { sql } from "drizzle-orm";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
@@ -1015,7 +1015,16 @@ export const workOrders = pgTable("work_orders", {
   missedCycles: integer("missed_cycles").default(0),
   originalDueDate: text("original_due_date"),
   skippedCyclesJustification: text("skipped_cycles_justification"),
-  
+
+  // === Layer 5: Approval Workflow Hardening ===
+  daysLate: integer("days_late").default(0),
+  approvalTier: text("approval_tier").default("standard"),
+  superintendentAcknowledged: boolean("superintendent_acknowledged").default(false),
+  superintendentAcknowledgedAt: text("superintendent_acknowledged_at"),
+  superintendentNotifiedAt: text("superintendent_notified_at"),
+  ceApprovalRemarks: text("ce_approval_remarks"),
+  approvalBlockReason: text("approval_block_reason"),
+
   // === WO Generation Cycle Snapshots (for duplicate protection and audit) ===
   // Driver type determines which cycle fields apply
   driverType: text("driver_type"), // 'RH' | 'CALENDAR' - from job's maintenanceBasis
@@ -1067,6 +1076,30 @@ export type WorkOrderWithLeadTime = WorkOrder & {
   leadTimeValue?: number | null;
   leadTimeUnit?: string | null;
 };
+
+// === Superintendent Notifications (Layer 5) ===
+export const superintendentNotifications = pgTable("superintendent_notifications", {
+  id: serial("id").primaryKey(),
+  workOrderId: text("work_order_id").notNull(),
+  workOrderCode: text("work_order_code"),
+  jobTitle: text("job_title"),
+  componentName: text("component_name"),
+  vesselName: text("vessel_name"),
+  daysLate: integer("days_late").default(0),
+  missedCycles: integer("missed_cycles").default(0),
+  approvalTier: text("approval_tier"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  acknowledgedAt: timestamp("acknowledged_at"),
+  isAcknowledged: boolean("is_acknowledged").default(false),
+});
+
+export const insertSuperintendentNotificationSchema = createInsertSchema(superintendentNotifications).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type InsertSuperintendentNotification = z.infer<typeof insertSuperintendentNotificationSchema>;
+export type SuperintendentNotification = typeof superintendentNotifications.$inferSelect;
 
 // Work Order Executions Table - for tracking historical maintenance records
 export const workOrderExecutions = pgTable("work_order_executions", {

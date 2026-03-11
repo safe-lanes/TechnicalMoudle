@@ -6,6 +6,7 @@ import * as woBulkService from '../services/workOrderBulkService';
 import * as woAutoService from '../services/workOrderAutoService';
 import * as executionService from '../services/executionService';
 import { ValidationError } from '../../shared/errors';
+import { storage } from '../../../storage';
 
 // ── Core Work Order CRUD ──
 
@@ -178,4 +179,52 @@ export async function updateExecution(req: Request, res: Response) {
     }
     throw error;
   }
+}
+
+// ── Superintendent Endpoints (Layer 5) ──
+
+export async function superintendentAcknowledge(req: Request, res: Response) {
+  try {
+    const wo = await woService.getWorkOrder(req.params.id);
+    if (!wo) {
+      return res.status(404).json({ error: 'Work order not found' });
+    }
+
+    if (wo.approvalTier !== 'superintendent_locked') {
+      return res.status(400).json({ error: 'This WO does not require Superintendent acknowledgment' });
+    }
+
+    await woService.updateWorkOrder(req.params.id, {
+      superintendentAcknowledged: true,
+      superintendentAcknowledgedAt: new Date().toISOString(),
+      approvalTier: 'ce_with_justification',
+      approvalBlockReason: null,
+    });
+
+    const notifications = await storage.getAllSuperintendentNotifications();
+    const matchingNotification = notifications.find(
+      (n: any) => (n.workOrderId === wo.wouuid || n.workOrderId === wo.id) && !n.isAcknowledged
+    );
+    if (matchingNotification) {
+      await storage.acknowledgeSuperintendentNotification(matchingNotification.id);
+    }
+
+    res.json({
+      success: true,
+      message: 'Superintendent has acknowledged. The Chief Engineer can now approve with mandatory remarks.',
+    });
+  } catch (error: any) {
+    console.error('Superintendent acknowledge error:', error);
+    throw error;
+  }
+}
+
+export async function getSuperintendentNotifications(req: Request, res: Response) {
+  const notifications = await storage.getSuperintendentNotifications();
+  res.json(notifications);
+}
+
+export async function getAllSuperintendentNotifications(req: Request, res: Response) {
+  const notifications = await storage.getAllSuperintendentNotifications();
+  res.json(notifications);
 }

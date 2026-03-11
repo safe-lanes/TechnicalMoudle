@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from "react";
-import { Search, Plus, Pen, Timer, AlertTriangle, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Eye, X } from "lucide-react";
+import { Search, Plus, Pen, Timer, AlertTriangle, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Eye, X, Lock } from "lucide-react";
 import { useLocation } from "wouter";
 import { useVessel } from "@/contexts/VesselContext";
 import { useQuery, useMutation } from "@tanstack/react-query";
@@ -602,6 +602,37 @@ const WorkOrders: React.FC = () => {
         </Button>
       </div>
 
+      {/* Pending Approval Summary Stat Bar */}
+      {activeTab === "Pending Approval" && (() => {
+        const lockedCount = filteredWorkOrders.filter(wo => (wo as any).approvalTier === "superintendent_locked").length;
+        const notifiedCount = filteredWorkOrders.filter(wo => (wo as any).approvalTier === "superintendent_notification").length;
+        const ceRemarksCount = filteredWorkOrders.filter(wo => (wo as any).approvalTier === "ce_with_justification").length;
+        const standardCount = filteredWorkOrders.filter(wo => !(wo as any).approvalTier || (wo as any).approvalTier === "standard").length;
+        const statCards = [
+          { icon: Lock, label: "Locked (Supt. Required)", count: lockedCount, bg: "bg-red-100 dark:bg-red-900/30", text: "text-red-800 dark:text-red-300", testId: "stat-locked" },
+          { icon: AlertTriangle, label: "Supt. Notified", count: notifiedCount, bg: "bg-orange-100 dark:bg-orange-900/30", text: "text-orange-800 dark:text-orange-300", testId: "stat-supt-notified" },
+          { icon: Pen, label: "CE Remarks Required", count: ceRemarksCount, bg: "bg-yellow-100 dark:bg-yellow-900/30", text: "text-yellow-800 dark:text-yellow-300", testId: "stat-ce-remarks" },
+          { icon: Eye, label: "Standard Approval", count: standardCount, bg: "bg-green-100 dark:bg-green-900/30", text: "text-green-800 dark:text-green-300", testId: "stat-standard" },
+        ];
+        return (
+          <div className="grid grid-cols-4 gap-3" data-testid="pending-approval-stat-bar">
+            {statCards.map((card) => (
+              <div
+                key={card.testId}
+                className={`flex items-center gap-3 rounded-md px-4 py-3 ${card.count === 0 ? "bg-gray-100 dark:bg-gray-800 opacity-60" : card.bg}`}
+                data-testid={card.testId}
+              >
+                <card.icon className={`h-5 w-5 ${card.count === 0 ? "text-gray-400" : card.text}`} />
+                <div>
+                  <div className={`text-xl font-bold ${card.count === 0 ? "text-gray-400" : card.text}`} data-testid={`${card.testId}-count`}>{card.count}</div>
+                  <div className={`text-xs ${card.count === 0 ? "text-gray-400" : card.text}`}>{card.label}</div>
+                </div>
+              </div>
+            ))}
+          </div>
+        );
+      })()}
+
       {/* Work Orders Table */}
       <div className="flex-1 overflow-auto bg-white">
         <table className="w-full text-sm">
@@ -618,7 +649,16 @@ const WorkOrders: React.FC = () => {
                 <Marker id="C20" />
                 {activeTab === "Pending Approval" || activeTab === "Completed" ? "Submitted Date" : "Due Date"}
               </th>
+              {activeTab === "Pending Approval" && (
+                <th className="text-left py-3 px-4 font-medium" data-testid="th-days-late">Days Late</th>
+              )}
+              {activeTab === "Pending Approval" && (
+                <th className="text-left py-3 px-4 font-medium" data-testid="th-approval-tier">Approval Tier</th>
+              )}
               <th className="text-left py-3 px-4 font-medium" data-testid="C21"><Marker id="C21" />Status</th>
+              {activeTab === "Completed" && (
+                <th className="text-left py-3 px-4 font-medium" data-testid="th-completed-approval-tier">Approval Tier</th>
+              )}
               {activeTab === "Completed" && (
                 <th className="text-left py-3 px-4 font-medium" data-testid="C22"><Marker id="C22" />Date Completed</th>
               )}
@@ -701,6 +741,28 @@ const WorkOrders: React.FC = () => {
                     })()}
                   </div>
                 </td>
+                {activeTab === "Pending Approval" && (
+                  <td className="py-3 px-4" data-testid={`cell-days-late-${workOrder.id}`}>
+                    {(() => {
+                      const daysLate = (workOrder as any).daysLate;
+                      if (daysLate == null || daysLate === 0) return <span className="text-green-600 text-xs font-medium">On Time</span>;
+                      if (daysLate >= 1 && daysLate <= 6) return <span className="text-yellow-600 text-xs font-medium">{daysLate} days late</span>;
+                      if (daysLate >= 7 && daysLate <= 14) return <span className="text-orange-600 text-xs font-medium">{daysLate} days late</span>;
+                      return <span className="text-red-600 text-xs font-bold">{daysLate} days late <AlertTriangle className="inline h-3 w-3" /></span>;
+                    })()}
+                  </td>
+                )}
+                {activeTab === "Pending Approval" && (
+                  <td className="py-3 px-4" data-testid={`cell-approval-tier-${workOrder.id}`}>
+                    {(() => {
+                      const tier = (workOrder as any).approvalTier;
+                      if (tier === "superintendent_locked") return <span className="px-2 py-0.5 rounded text-xs font-medium bg-red-100 text-red-800"><Lock className="inline h-3 w-3 mr-0.5" /> Locked</span>;
+                      if (tier === "superintendent_notification") return <span className="px-2 py-0.5 rounded text-xs font-medium bg-orange-100 text-orange-800">Supt. Notified</span>;
+                      if (tier === "ce_with_justification") return <span className="px-2 py-0.5 rounded text-xs font-medium bg-yellow-100 text-yellow-800">CE + Remarks</span>;
+                      return <span className="px-2 py-0.5 rounded text-xs font-medium bg-green-100 text-green-800">Standard</span>;
+                    })()}
+                  </td>
+                )}
                 <td className="py-3 px-4" data-testid={index === 0 ? "C29" : undefined}>
                   {index === 0 && <Marker id="C29" />}
                   {/* PRIORITY: Show workflow status badges (Rejected, Pending Approval) over computed status */}
@@ -731,6 +793,17 @@ const WorkOrders: React.FC = () => {
                   )}
                 </td>
                 {activeTab === "Completed" && (
+                  <td className="py-3 px-4" data-testid={`cell-completed-approval-tier-${workOrder.id}`}>
+                    {(() => {
+                      const tier = (workOrder as any).approvalTier;
+                      if (tier === "superintendent_locked") return <span className="px-2 py-0.5 rounded text-xs font-medium bg-red-100 text-red-800"><Lock className="inline h-3 w-3 mr-0.5" /> Locked</span>;
+                      if (tier === "superintendent_notification") return <span className="px-2 py-0.5 rounded text-xs font-medium bg-orange-100 text-orange-800">Supt. Notified</span>;
+                      if (tier === "ce_with_justification") return <span className="px-2 py-0.5 rounded text-xs font-medium bg-yellow-100 text-yellow-800">CE + Remarks</span>;
+                      return <span className="px-2 py-0.5 rounded text-xs font-medium bg-green-100 text-green-800">Standard</span>;
+                    })()}
+                  </td>
+                )}
+                {activeTab === "Completed" && (
                   <td className="py-3 px-4 text-gray-900" data-testid={index === 0 ? "C30" : undefined}>
                     {index === 0 && <Marker id="C30" />}
                     {formatProfessionalDate(workOrder.dateCompleted)}
@@ -738,50 +811,59 @@ const WorkOrders: React.FC = () => {
                 )}
                 <td className="py-3 px-4">
                   <div className="flex items-center justify-center gap-2">
-                    {/* Hide Edit and Postpone buttons for Completed work orders (immutable records) */}
-                    {(workOrder.computedStatus || workOrder.status) !== "Completed" && (
+                    {activeTab === "Pending Approval" && (workOrder as any).approvalTier === "superintendent_locked" ? (
+                      <div className="relative group" data-testid={`locked-action-${workOrder.id}`}>
+                        <Lock className="h-4 w-4 text-gray-400" />
+                        <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2 py-1 bg-gray-900 text-white text-xs rounded whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10">
+                          Locked — Awaiting Superintendent acknowledgment
+                        </div>
+                      </div>
+                    ) : (
                       <>
-                        <button 
-                          className="p-1 hover:bg-gray-200 rounded"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handlePencilClick(workOrder);
-                          }}
-                          title="Edit Template"
-                          data-testid={index === 0 ? "C31" : `button-edit-wo-${workOrder.id}`}
-                        >
-                          {index === 0 && <Marker id="C31" />}
-                          <Pen className="h-4 w-4 text-gray-600" />
-                        </button>
-                        {!isVessel && (workOrder.computedStatus || workOrder.status) !== "Pending Approval" && (
+                        {(workOrder.computedStatus || workOrder.status) !== "Completed" && (
+                          <>
+                            <button 
+                              className="p-1 hover:bg-gray-200 rounded"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handlePencilClick(workOrder);
+                              }}
+                              title="Edit Template"
+                              data-testid={index === 0 ? "C31" : `button-edit-wo-${workOrder.id}`}
+                            >
+                              {index === 0 && <Marker id="C31" />}
+                              <Pen className="h-4 w-4 text-gray-600" />
+                            </button>
+                            {!isVessel && (workOrder.computedStatus || workOrder.status) !== "Pending Approval" && (
+                              <button 
+                                className="p-1 hover:bg-gray-200 rounded"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleTimerClick(workOrder);
+                                }}
+                                title="Postpone Work Order"
+                                data-testid={index === 0 ? "C32" : `button-postpone-wo-${workOrder.id}`}
+                              >
+                                {index === 0 && <Marker id="C32" />}
+                                <Timer className="h-4 w-4 text-gray-600" />
+                              </button>
+                            )}
+                          </>
+                        )}
+                        {(workOrder.computedStatus || workOrder.status) === "Completed" && (
                           <button 
                             className="p-1 hover:bg-gray-200 rounded"
                             onClick={(e) => {
                               e.stopPropagation();
-                              handleTimerClick(workOrder);
+                              handleWorkOrderClick(workOrder);
                             }}
-                            title="Postpone Work Order"
-                            data-testid={index === 0 ? "C32" : `button-postpone-wo-${workOrder.id}`}
+                            title="View Work Order"
+                            data-testid={`button-view-wo-${workOrder.id}`}
                           >
-                            {index === 0 && <Marker id="C32" />}
-                            <Timer className="h-4 w-4 text-gray-600" />
+                            <Eye className="h-4 w-4 text-gray-600" />
                           </button>
                         )}
                       </>
-                    )}
-                    {/* View button - always available (clicking the row also opens view) */}
-                    {(workOrder.computedStatus || workOrder.status) === "Completed" && (
-                      <button 
-                        className="p-1 hover:bg-gray-200 rounded"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleWorkOrderClick(workOrder);
-                        }}
-                        title="View Work Order"
-                        data-testid={`button-view-wo-${workOrder.id}`}
-                      >
-                        <Eye className="h-4 w-4 text-gray-600" />
-                      </button>
                     )}
                   </div>
                 </td>

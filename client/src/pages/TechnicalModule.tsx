@@ -12,6 +12,7 @@ import JobsSelector from "./modify-pms/JobsSelector";
 import Spares from "./spares/SparesNew";
 import Stores from "./stores/Stores";
 import PMSAdmin from "./pms/PMSAdmin";
+import SuperintendentPage from "./pms/SuperintendentPage";
 import ReportsModule from "./reports/ReportsModule";
 import DefectsLogWithTabs from "./defects/DefectsLogWithTabs";
 import DefectsDashboard from "./defects/DefectsDashboard";
@@ -147,6 +148,8 @@ export const TechnicalModule = () => {
             <ModifyPMS />
           ) : selectedSubModule === "pms" && selectedMenuItem === "modify-pms/jobs" ? (
             <JobsSelector />
+          ) : selectedSubModule === "pms" && selectedMenuItem === "superintendent" ? (
+            <SuperintendentPage />
           ) : selectedSubModule === "pms" && selectedMenuItem === "admin" ? (
             <PMSAdmin />
           ) : selectedSubModule === "pms" && selectedMenuItem.startsWith("maintenance-records") ? (

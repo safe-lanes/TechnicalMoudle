@@ -170,6 +170,9 @@ import {
   workOrderPostponements,
   type WorkOrderPostponement,
   type InsertWorkOrderPostponement,
+  superintendentNotifications,
+  type SuperintendentNotification,
+  type InsertSuperintendentNotification,
 } from "@shared/schema";
 
 export function sortObjectKeys(obj: any): any {
@@ -536,6 +539,12 @@ export interface IStorage {
   bulkUpsertWorkOrders(workOrders: InsertWorkOrder[]): Promise<{ created: number; updated: number }>;
   
   
+  // Superintendent Notification methods
+  createSuperintendentNotification(notification: InsertSuperintendentNotification): Promise<SuperintendentNotification>;
+  getSuperintendentNotifications(): Promise<SuperintendentNotification[]>;
+  getAllSuperintendentNotifications(): Promise<SuperintendentNotification[]>;
+  acknowledgeSuperintendentNotification(id: number): Promise<SuperintendentNotification>;
+
   // Work Order Execution methods
   getWorkOrderExecutions(componentId: string): Promise<WorkOrderExecution[]>;
   getWorkOrderExecutionById(id: string): Promise<WorkOrderExecution | null>;

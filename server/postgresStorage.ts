@@ -184,6 +184,9 @@ import {
   fleetSpares,
   type FleetSpares,
   type InsertFleetSpares,
+  superintendentNotifications,
+  type SuperintendentNotification,
+  type InsertSuperintendentNotification,
 } from '@shared/schema';
 
 /**
@@ -5612,6 +5615,36 @@ export class PostgresStorage {
       .where(eq(auditLog.userId, userId))
       .orderBy(desc(auditLog.timestamp))
       .limit(limit);
+  }
+
+  // ============= SUPERINTENDENT NOTIFICATIONS (Layer 5) =============
+
+  async createSuperintendentNotification(notification: InsertSuperintendentNotification): Promise<SuperintendentNotification> {
+    const db = await getDb();
+    const [result] = await db.insert(superintendentNotifications).values(notification).returning();
+    return result;
+  }
+
+  async getSuperintendentNotifications(): Promise<SuperintendentNotification[]> {
+    const db = await getDb();
+    return await db.select().from(superintendentNotifications)
+      .where(eq(superintendentNotifications.isAcknowledged, false))
+      .orderBy(desc(superintendentNotifications.createdAt));
+  }
+
+  async getAllSuperintendentNotifications(): Promise<SuperintendentNotification[]> {
+    const db = await getDb();
+    return await db.select().from(superintendentNotifications)
+      .orderBy(desc(superintendentNotifications.createdAt));
+  }
+
+  async acknowledgeSuperintendentNotification(id: number): Promise<SuperintendentNotification> {
+    const db = await getDb();
+    const [result] = await db.update(superintendentNotifications)
+      .set({ isAcknowledged: true, acknowledgedAt: new Date() })
+      .where(eq(superintendentNotifications.id, id))
+      .returning();
+    return result;
   }
 
   // ============= WORK ORDER EXECUTIONS (Original) =============

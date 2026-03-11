@@ -46,6 +46,17 @@ router.patch('/work-orders/:id', asyncHandler(woCtrl.updateWorkOrder));
 // DELETE /work-orders/:id — delete work order
 router.delete('/work-orders/:id', asyncHandler(woCtrl.deleteWorkOrder));
 
+// ── Superintendent Endpoints (Layer 5) ──
+
+// POST /work-orders/:id/superintendent-acknowledge
+router.post('/work-orders/:id/superintendent-acknowledge', asyncHandler(woCtrl.superintendentAcknowledge));
+
+// GET /superintendent/notifications — unacknowledged only
+router.get('/superintendent/notifications', asyncHandler(woCtrl.getSuperintendentNotifications));
+
+// GET /superintendent/notifications/all — all notifications
+router.get('/superintendent/notifications/all', asyncHandler(woCtrl.getAllSuperintendentNotifications));
+
 // ── Work Order Completion ──
 
 // POST /work-orders/:id/complete — complete a work order
