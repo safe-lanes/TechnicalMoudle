@@ -703,7 +703,7 @@ const JobsFormPage: React.FC = () => {
                     isModifyMode={isModifyMode}
                     isEditMode={isEditMode}
                     type="select"
-                    options={['Inspection', 'Overhaul', 'Service', 'Repair', 'Test', 'Calibration', 'Survey', 'Other']}
+                    options={['Inspection', 'Overhaul', 'Service', 'Test', 'Renew/Replace', 'Measurement/Calibration', 'Megger Test', 'Cleaning', 'Lubrication', 'Survey', 'Analysis', 'Checks']}
                     labelMarker="JF.A1.15"
                     valueMarker="JF.A1.16"
                   />
@@ -716,7 +716,7 @@ const JobsFormPage: React.FC = () => {
                     isModifyMode={isModifyMode}
                     isEditMode={isEditMode}
                     type="select"
-                    options={['Chief Engineer', '2nd Engineer', '3rd Engineer', '4th Engineer', 'Electrician', 'Fitter', 'Bosun', 'Chief Officer', '2nd Officer']}
+                    options={['Master', 'Chief Officer', '2nd Officer', '3rd Officer', 'Chief Engineer', '2nd Engineer', '3rd Engineer', '4th Engineer', 'Deck Cadet', 'Engine Cadet', 'Bosun', 'Pumpman', 'Electrician', 'Fitter', 'Able Seaman', 'Ordinary Seaman', 'Oiler', 'Wiper', 'Cook', 'Steward']}
                     labelMarker="JF.A1.17"
                     valueMarker="JF.A1.18"
                   />
@@ -729,7 +729,7 @@ const JobsFormPage: React.FC = () => {
                     isModifyMode={isModifyMode}
                     isEditMode={isEditMode}
                     type="select"
-                    options={['Chief Engineer', 'Master', 'Technical Superintendent', '2nd Engineer']}
+                    options={['Master', 'Chief Officer', '2nd Officer', '3rd Officer', 'Chief Engineer', '2nd Engineer', '3rd Engineer', '4th Engineer', 'Deck Cadet', 'Engine Cadet', 'Bosun', 'Pumpman', 'Electrician', 'Fitter', 'Able Seaman', 'Ordinary Seaman', 'Oiler', 'Wiper', 'Cook', 'Steward']}
                     labelMarker="JF.A1.19"
                     valueMarker="JF.A1.20"
                   />
@@ -742,7 +742,7 @@ const JobsFormPage: React.FC = () => {
                     isModifyMode={isModifyMode}
                     isEditMode={isEditMode}
                     type="select"
-                    options={['High', 'Medium', 'Low']}
+                    options={['Low', 'Medium', 'High', 'Critical']}
                     labelMarker="JF.A1.21"
                     valueMarker="JF.A1.22"
                   />
