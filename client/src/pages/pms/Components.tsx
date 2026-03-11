@@ -1033,8 +1033,9 @@ const WorkOrdersSection: React.FC<{ componentCode: string; componentName: string
   };
 
   const handleAddWorkOrder = () => {
-    // Navigate to new job template page for this component (template mode shows only Part A)
-    setLocation(`/pms/work-order/new/${componentCode}?mode=template&componentName=${encodeURIComponent(componentName)}`);
+    const params = new URLSearchParams({ mode: 'template', componentName });
+    if (componentId) params.set('componentCuuid', componentId);
+    setLocation(`/pms/work-order/new/${componentCode}?${params.toString()}`);
   };
 
   const handleRowClick = (job: any) => {
@@ -2323,7 +2324,7 @@ const Components: React.FC = () => {
         ...comp,  // Include all component data FIRST
         id: code,  // Override with componentCode for tree display
         code: code,  // Override with componentCode
-        actualId: comp.id,  // Preserve the actual database UUID for API calls
+        actualId: comp.cuuid || comp.id,  // Preserve the actual database UUID (cuuid) for API calls
         name: comp.name,
         critical: comp.critical === "Yes" || comp.critical === true,  // Normalize to boolean
         children: []
@@ -3591,6 +3592,7 @@ const Components: React.FC = () => {
                             <WorkOrdersSection 
                               componentCode={selectedComponent?.code || ""} 
                               componentName={selectedComponent?.name || ""} 
+                              componentId={selectedComponent?.actualId}
                             />
                           ) : section.id === "D" ? (
                             <MaintenanceHistorySection selectedComponent={selectedComponent} />

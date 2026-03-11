@@ -2213,9 +2213,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
         return;
       }
 
-      // Use componentCode as componentId (they are often the same in this system)
-      // componentName defaults to componentCode if not provided
-      const componentId = templateData.componentCode;
+      const componentCuuid = urlParams.get('componentCuuid') || templateData.componentCode;
       const componentName = templateData.componentName || templateData.componentCode;
 
       // Generate a unique job number (format: JOB-XXXXXXX)
@@ -2227,7 +2225,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
       // Note: All fields are strings as per the schema (frequencyValue is text type)
       const jobPayload = {
         vesselId: contextVesselId,
-        componentId: componentId,
+        componentId: componentCuuid,
         componentCode: templateData.componentCode,
         componentName: componentName,
         jobNo: jobNo,

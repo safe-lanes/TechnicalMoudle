@@ -130,8 +130,10 @@ export async function getJob(id: string) {
 export async function createJob(body: any) {
   const { insertJobSchema } = await import('@shared/schema');
   const { calculateNextDueDate, normalizeDateToDDMMMYYYY } = await import('@shared/dateUtils');
+  const { z } = await import('zod');
 
-  let jobData = insertJobSchema.parse(body);
+  const jobCreateSchema = insertJobSchema.extend({ juuid: z.string().optional() });
+  let jobData = jobCreateSchema.parse(body);
 
   // Component validation
   let component: any = null;
