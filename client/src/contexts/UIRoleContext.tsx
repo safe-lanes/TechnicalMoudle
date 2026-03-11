@@ -24,9 +24,17 @@ export function UIRoleProvider({ children }: UIRoleProviderProps) {
   const [uiRole, setUIRoleState] = useState<UIRole | null>(null);
 
   useEffect(() => {
+    const isDev = import.meta.env.DEV;
+
     if (!currentUser) {
+      if (isDev) console.log("[UIRoleContext] No currentUser, setting uiRole to null");
       setUIRoleState(null);
       return;
+    }
+
+    if (isDev) {
+      console.log("[UIRoleContext] ── UIRole Resolution Start ──");
+      console.log("[UIRoleContext] currentUser from AuthContext:", { role: currentUser.role, userType: currentUser.userType });
     }
 
     const encryptedUserType = secureGetItem<string>("userType");
@@ -38,8 +46,12 @@ export function UIRoleProvider({ children }: UIRoleProviderProps) {
       encryptedProfileRole = null;
     }
 
+    if (isDev) console.log("[UIRoleContext] secureGetItem: userType=", encryptedUserType, ", profileRole=", encryptedProfileRole);
+
     if (encryptedUserType && encryptedProfileRole) {
-      setUIRoleState(mapLoggedRoleToUIRole(encryptedUserType, encryptedProfileRole));
+      const result = mapLoggedRoleToUIRole(encryptedUserType, encryptedProfileRole);
+      if (isDev) console.log("[UIRoleContext] ENCRYPTED path → mapLoggedRoleToUIRole(", encryptedUserType, ",", encryptedProfileRole, ") =", result);
+      setUIRoleState(result);
       return;
     }
 
@@ -52,15 +64,22 @@ export function UIRoleProvider({ children }: UIRoleProviderProps) {
         plainProfileRole = parsed?.role || null;
       }
     } catch {
+      if (isDev) console.log("[UIRoleContext] Plain JSON.parse failed (likely encrypted)");
       plainProfileRole = null;
     }
 
+    if (isDev) console.log("[UIRoleContext] Plain path: userType=", plainUserType, ", profileRole=", plainProfileRole);
+
     if (plainUserType && plainProfileRole) {
-      setUIRoleState(mapLoggedRoleToUIRole(plainUserType, plainProfileRole));
+      const result = mapLoggedRoleToUIRole(plainUserType, plainProfileRole);
+      if (isDev) console.log("[UIRoleContext] PLAIN path → mapLoggedRoleToUIRole(", plainUserType, ",", plainProfileRole, ") =", result);
+      setUIRoleState(result);
       return;
     }
 
-    setUIRoleState(mapLoggedRoleToUIRole(currentUser.userType, currentUser.role));
+    const fallbackResult = mapLoggedRoleToUIRole(currentUser.userType, currentUser.role);
+    if (isDev) console.log("[UIRoleContext] FALLBACK (currentUser) → mapLoggedRoleToUIRole(", currentUser.userType, ",", currentUser.role, ") =", fallbackResult);
+    setUIRoleState(fallbackResult);
   }, [currentUser]);
 
   const setUIRole = (_role: UIRole) => {
@@ -80,9 +99,22 @@ export function UIRoleProvider({ children }: UIRoleProviderProps) {
   );
 }
 
+const FALLBACK_CONTEXT: UIRoleContextType = {
+  uiRole: null,
+  setUIRole: () => {},
+  isSailAdmin: false,
+  isClientAdmin: false,
+  isHeadOfDept: false,
+  isVessel: false,
+};
+
 export function useUIRole() {
   const context = useContext(UIRoleContext);
   if (context === undefined) {
+    if (import.meta.env.DEV && import.meta.hot) {
+      console.warn("[useUIRole] Called outside UIRoleProvider (likely HMR). Using safe fallback.");
+      return FALLBACK_CONTEXT;
+    }
     throw new Error("useUIRole must be used within a UIRoleProvider");
   }
   return context;

@@ -60,12 +60,29 @@ export function AuthProvider({ children }: AuthProviderProps) {
   useEffect(() => {
     let resolvedUser: PublicUser | null = null;
     let resolvedUserType: UIRole | null = null;
+    let resolvedPath = "NONE";
+    const isDev = import.meta.env.DEV;
+
+    if (isDev) console.log("[AuthContext] ── Role Resolution Start ──");
+
+    const rawUserProfile = localStorage.getItem("userProfile");
+    const rawUserType = localStorage.getItem("userType");
+    if (isDev) {
+      console.log("[AuthContext] Raw localStorage userProfile exists:", rawUserProfile !== null, rawUserProfile ? `(length: ${rawUserProfile.length}, starts: ${rawUserProfile.substring(0, 20)}...)` : "");
+      console.log("[AuthContext] Raw localStorage userType exists:", rawUserType !== null, rawUserType ? `(value: ${rawUserType.substring(0, 30)})` : "");
+    }
 
     const encryptedProfile = secureGetItem<Record<string, any>>("userProfile");
     const encryptedUserType = secureGetItem<string>("userType");
+    if (isDev) {
+      console.log("[AuthContext] secureGetItem userProfile:", encryptedProfile ? `{id: ${encryptedProfile.id}, role: ${encryptedProfile.role}}` : "null");
+      console.log("[AuthContext] secureGetItem userType:", encryptedUserType);
+    }
 
     if (encryptedUserType && encryptedProfile?.role) {
+      resolvedPath = "ENCRYPTED";
       resolvedUserType = mapLoggedRoleToUIRole(encryptedUserType, encryptedProfile.role);
+      if (isDev) console.log("[AuthContext] ENCRYPTED path → mapLoggedRoleToUIRole(", encryptedUserType, ",", encryptedProfile.role, ") =", resolvedUserType);
 
       const role = (encryptedProfile.role as UserRole) || "Office";
       resolvedUser = {
@@ -86,17 +103,28 @@ export function AuthProvider({ children }: AuthProviderProps) {
         updatedAt: new Date(),
       };
     } else {
+      if (isDev) console.log("[AuthContext] Encrypted path SKIPPED (encryptedUserType:", encryptedUserType, ", encryptedProfile?.role:", encryptedProfile?.role, ")");
+
+      if (rawUserProfile && !encryptedProfile) {
+        if (isDev) console.log("[AuthContext] ⚠ Raw data EXISTS but decryption FAILED — likely VITE_STORAGE_SECRET key mismatch");
+      }
+
       const plainUserType = localStorage.getItem("userType");
       let plainProfile: Record<string, any> | null = null;
       try {
         const raw = localStorage.getItem("userProfile");
         if (raw) plainProfile = JSON.parse(raw);
       } catch {
+        if (isDev) console.log("[AuthContext] Plain path: JSON.parse of userProfile FAILED (likely encrypted data)");
         plainProfile = null;
       }
 
+      if (isDev) console.log("[AuthContext] Plain path: userType=", plainUserType, ", profile?.role=", plainProfile?.role);
+
       if (plainUserType && plainProfile?.role) {
+        resolvedPath = "PLAIN";
         resolvedUserType = mapLoggedRoleToUIRole(plainUserType, plainProfile.role);
+        if (isDev) console.log("[AuthContext] PLAIN path → mapLoggedRoleToUIRole(", plainUserType, ",", plainProfile.role, ") =", resolvedUserType);
 
         const role = (plainProfile.role as UserRole) || "Office";
         resolvedUser = {
@@ -116,12 +144,23 @@ export function AuthProvider({ children }: AuthProviderProps) {
           createdAt: new Date(),
           updatedAt: new Date(),
         };
+      } else {
+        if (isDev) console.log("[AuthContext] Plain path SKIPPED (plainUserType:", plainUserType, ", plainProfile?.role:", plainProfile?.role, ")");
       }
     }
 
     if (!resolvedUser) {
+      resolvedPath = "DEFAULT_USER";
       resolvedUser = DEFAULT_USER;
       resolvedUserType = mapLoggedRoleToUIRole(DEFAULT_USER.userType, DEFAULT_USER.role);
+      if (isDev) console.log("[AuthContext] DEFAULT_USER fallback → mapLoggedRoleToUIRole(", DEFAULT_USER.userType, ",", DEFAULT_USER.role, ") =", resolvedUserType);
+    }
+
+    if (isDev) {
+      console.log("[AuthContext] ── Resolution Complete ──");
+      console.log("[AuthContext] Path used:", resolvedPath);
+      console.log("[AuthContext] Resolved user:", { id: resolvedUser.id, role: resolvedUser.role, userType: resolvedUser.userType });
+      console.log("[AuthContext] Resolved UIRole:", resolvedUserType);
     }
 
     setCurrentUser(resolvedUser);
