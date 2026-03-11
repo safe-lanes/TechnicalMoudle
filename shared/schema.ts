@@ -1025,6 +1025,15 @@ export const workOrders = pgTable("work_orders", {
   ceApprovalRemarks: text("ce_approval_remarks"),
   approvalBlockReason: text("approval_block_reason"),
 
+  // === Layer 7: Running Hours Validation & Isolation ===
+  completionRH: decimal("completion_rh", { precision: 10, scale: 2 }),
+  completionRHValidated: boolean("completion_rh_validated"),
+  completionRHSource: text("completion_rh_source"),
+  completionRHValidationDetails: jsonb("completion_rh_validation_details"),
+  rhJustification: text("rh_justification"),
+  rhJustificationProvidedBy: text("rh_justification_provided_by"),
+  rhJustificationDate: timestamp("rh_justification_date"),
+
   // === WO Generation Cycle Snapshots (for duplicate protection and audit) ===
   // Driver type determines which cycle fields apply
   driverType: text("driver_type"), // 'RH' | 'CALENDAR' - from job's maintenanceBasis

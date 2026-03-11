@@ -229,6 +229,70 @@ export class WorkOrderService {
    * Update an existing work order
    */
   async updateWorkOrder(id: string, updates: Partial<InsertWorkOrder>): Promise<WorkOrder> {
+    const updatesAny = updates as any;
+
+    // Layer 7: When transitioning to Pending Approval with RH data, apply isolation logic
+    if (updatesAny.status === 'Pending Approval' && updatesAny.currentReading) {
+      const runningHours = parseInt(updatesAny.currentReading);
+      if (!isNaN(runningHours) && runningHours > 0) {
+        // Store completion RH snapshot on the work order
+        updatesAny.completionRH = String(runningHours);
+        updatesAny.completionRHValidated = true;
+        updatesAny.completionRHSource = updatesAny.completionRHSource || 'MANUAL_ENTRY';
+        updatesAny.runningHoursAtCompletion = runningHours;
+
+        // Store justification fields if provided
+        if (updatesAny.rhJustification) {
+          updatesAny.rhJustificationProvidedBy = updatesAny.performedBy || 'System';
+          updatesAny.rhJustificationDate = new Date();
+        }
+
+        // Create audit trail for the RH snapshot (isolated — does NOT modify RH Module)
+        try {
+          const wo = await storage.getWorkOrder(id);
+          if (wo) {
+            const { validateRHEntry } = await import('../modules/running-hours/services/rhTimelineValidationService');
+            const allComponents = wo.vesselId ? await storage.getComponents(wo.vesselId) : [];
+            const component = allComponents.find((c: any) => c.name === wo.component || c.componentCode === (wo as any).componentCode);
+
+            if (component) {
+              const completionDate = updatesAny.dateOfCompletion || updatesAny.completionDateTime?.split('T')[0] || new Date().toISOString().split('T')[0];
+              const validation = await validateRHEntry(component.cuuid, completionDate, runningHours);
+
+              updatesAny.completionRHValidationDetails = {
+                isValid: validation.isValid,
+                validationDate: new Date().toISOString(),
+                validRange: validation.validRange,
+                utilizationRate: validation.utilizationRate,
+                requiresJustification: validation.requiresJustification,
+                validationErrors: validation.anomalyFlags
+              };
+
+              // Create read-only audit entry (ISOLATION: no setComponentRunningHours call)
+              const previousRH = parseInt(component.currentCumulativeRH || '0');
+              await storage.createRunningHoursAudit({
+                componentId: component.cuuid,
+                vesselId: wo.vesselId || component.vesselId,
+                previousRH: String(previousRH),
+                newRH: String(runningHours),
+                cumulativeRH: String(runningHours),
+                dateUpdatedLocal: completionDate,
+                dateUpdatedTZ: 'UTC',
+                enteredAtUTC: new Date(),
+                userId: updatesAny.performedBy || 'System',
+                source: 'workorder',
+                notes: `RH snapshot via WO save: ${wo.workOrderNo || wo.id} (ISOLATED)`,
+                meterReplaced: false
+              });
+              console.log(`📋 [Layer 7] RH snapshot ${runningHours} saved for WO ${wo.workOrderNo || id}. No RH Module modification.`);
+            }
+          }
+        } catch (err: any) {
+          console.warn(`⚠️ [Layer 7] RH audit trail creation failed: ${err.message}`);
+        }
+      }
+    }
+
     return storage.updateWorkOrder(id, updates);
   }
 

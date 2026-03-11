@@ -1,5 +1,6 @@
 import { Request, Response } from 'express';
 import * as rhService from '../services/runningHoursService';
+import * as rhTimelineValidation from '../services/rhTimelineValidationService';
 import { ValidationError } from '../../shared/errors';
 
 // ── Running Hours Audits (from routes.ts) ──
@@ -149,6 +150,67 @@ export async function listInheritedComponents(req: Request, res: Response) {
   } catch (error: any) {
     console.error("Error fetching inherited components:", error);
     res.status(500).json({ error: "Failed to fetch inherited components" });
+  }
+}
+
+// ── RH Timeline Validation Endpoints (Layer 7) ──
+
+export async function getValidRange(req: Request, res: Response) {
+  try {
+    const machineryId = req.query.machineryId as string;
+    const completionDate = req.query.completionDate as string;
+    if (!machineryId || !completionDate) {
+      return res.status(400).json({ error: 'machineryId and completionDate are required' });
+    }
+    const result = await rhTimelineValidation.getValidRange(machineryId, completionDate);
+    res.json(result);
+  } catch (error: any) {
+    console.error('Error getting valid range:', error);
+    res.status(500).json({ error: error.message || 'Failed to get valid range' });
+  }
+}
+
+export async function validateRHEntry(req: Request, res: Response) {
+  try {
+    const { machineryId, completionDate, runningHours } = req.body;
+    if (!machineryId || !completionDate || runningHours === undefined) {
+      return res.status(400).json({ error: 'machineryId, completionDate, and runningHours are required' });
+    }
+    const result = await rhTimelineValidation.validateRHEntry(machineryId, completionDate, Number(runningHours));
+    res.json(result);
+  } catch (error: any) {
+    console.error('Error validating RH entry:', error);
+    res.status(500).json({ error: error.message || 'Failed to validate RH entry' });
+  }
+}
+
+export async function getRHTimeline(req: Request, res: Response) {
+  try {
+    const machineryId = req.query.machineryId as string;
+    if (!machineryId) {
+      return res.status(400).json({ error: 'machineryId is required' });
+    }
+    const dateFrom = req.query.dateFrom as string | undefined;
+    const dateTo = req.query.dateTo as string | undefined;
+    const result = await rhTimelineValidation.getRHTimeline(machineryId, dateFrom, dateTo);
+    res.json(result);
+  } catch (error: any) {
+    console.error('Error getting RH timeline:', error);
+    res.status(500).json({ error: error.message || 'Failed to get RH timeline' });
+  }
+}
+
+export async function getCurrentRH(req: Request, res: Response) {
+  try {
+    const machineryId = req.query.machineryId as string;
+    if (!machineryId) {
+      return res.status(400).json({ error: 'machineryId is required' });
+    }
+    const result = await rhTimelineValidation.getCurrentRH(machineryId);
+    res.json(result);
+  } catch (error: any) {
+    console.error('Error getting current RH:', error);
+    res.status(500).json({ error: error.message || 'Failed to get current RH' });
   }
 }
 

@@ -1179,34 +1179,9 @@ export async function updateWorkOrder(id: string, body: any) {
 
                 await repo.updateJob(job.juuid, rhUpdates);
 
-                // UPDATE COMPONENT RUNNING HOURS on work order approval
-                try {
-                  const counterType = (component.rhCounterType || '').toUpperCase();
-                  const isInherited = counterType === 'INHERITED';
-                  const isMaster = counterType === 'MASTER';
-
-                  if (isInherited) {
-                    await repo.setComponentRunningHours({
-                      componentId: component.cuuid,
-                      newRHValue: currentRH,
-                      updateSource: 'WO_COMPLETION',
-                      userId: freshWorkOrder.performedBy || freshWorkOrder.approver || 'System',
-                      lastUpdatedDate: dateOfCompletionNorm || new Date().toISOString().split('T')[0]
-                    });
-                    console.log(`✅ Updated INHERITED component ${component.componentCode} RH to ${currentRH} (Section B update only, master unchanged)`);
-                  } else if (isMaster || !counterType) {
-                    await repo.setComponentRunningHours({
-                      componentId: component.cuuid,
-                      newRHValue: currentRH,
-                      updateSource: 'WO_COMPLETION',
-                      userId: freshWorkOrder.performedBy || freshWorkOrder.approver || 'System',
-                      lastUpdatedDate: dateOfCompletionNorm || new Date().toISOString().split('T')[0]
-                    });
-                    console.log(`✅ Updated component ${component.componentCode} RH to ${currentRH}`);
-                  }
-                } catch (rhUpdateError) {
-                  console.error(`Failed to update component running hours:`, rhUpdateError);
-                }
+                // Layer 7 ISOLATION: Work orders NEVER write back to the RH Module
+                // Only create a read-only audit trail entry as a snapshot
+                console.log(`📋 [Layer 7] RH snapshot ${currentRH} recorded for WO ${freshWorkOrder.workOrderNo || freshWorkOrder.id}. Component RH NOT modified (isolation).`);
               }
             }
           }

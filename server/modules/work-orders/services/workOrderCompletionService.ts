@@ -2,6 +2,7 @@ import * as repo from '../repositories/workOrderRepository';
 import { NotFoundError, ValidationError } from '../../shared/errors';
 import { calculateMissedCycles as calcMissedCyclesShared } from '@shared/dateUtils';
 import { detectAndLogAnomalies } from './anomalyDetectionService';
+import { validateRHEntry } from '../../running-hours/services/rhTimelineValidationService';
 
 // ── Complete Work Order ──
 
@@ -91,70 +92,87 @@ export async function completeWorkOrder(
     throw new ValidationError('Running hours is required for RH-based maintenance work orders');
   }
 
-  // Backend validation and update
+  // === Layer 7: RH Validation & Isolation ===
+  // Work orders NEVER write back to the RH Module. They only store snapshots.
+  let rhValidationDetails: any = null;
+  let completionRHSource = 'MANUAL_ENTRY';
+
   if (runningHours) {
     const newRH = parseInt(runningHours);
-
-    // CRITICAL: Validate this is a sub-component, not a parent
-    if (!component.parentId) {
-      throw new ValidationError('Work orders can only update sub-component running hours. Parent component RH must be updated through the Running Hours module.');
-    }
-
-    // CRITICAL: Capture original RH BEFORE updating
-    const previousRH = parseInt(component.currentCumulativeRH);
-
-    // Ensure complete metadata for audit
+    const completionDateForValidation = dateOfCompletion || new Date().toISOString().split('T')[0];
     const componentVesselId = workOrder.vesselId || component.vesselId || 'V001';
+    const previousRH = parseInt(component.currentCumulativeRH || '0');
 
     // Validate against parent (sub-component RH must never exceed parent RH)
-    const parentComponent = await repo.findComponent(component.parentId as string);
-    if (parentComponent) {
-      const parentRH = parseInt(parentComponent.currentCumulativeRH);
-      if (newRH > parentRH) {
-        throw new ValidationError(`Sub-component running hours (${newRH}) cannot exceed parent component's running hours (${parentRH})`);
+    if (component.parentId) {
+      const parentComponent = await repo.findComponent(component.parentId as string);
+      if (parentComponent) {
+        const parentRH = parseInt(parentComponent.currentCumulativeRH);
+        if (newRH > parentRH) {
+          throw new ValidationError(`Sub-component running hours (${newRH}) cannot exceed parent component's running hours (${parentRH})`);
+        }
       }
     }
 
-    // Validate no decrease
-    if (newRH < previousRH) {
-      throw new ValidationError(`Running hours cannot decrease from ${previousRH} to ${newRH}`);
+    // Use timeline-based validation (forward + backward checks, 24 hrs/day max)
+    const validation = await validateRHEntry(component.cuuid, completionDateForValidation, newRH);
+
+    if (!validation.isValid) {
+      throw new ValidationError(validation.errorMessage, {
+        code: validation.validationStatus,
+        validRange: validation.validRange,
+        previousEntry: validation.previousEntry,
+        nextEntry: validation.nextEntry,
+        utilizationRate: validation.utilizationRate,
+        daysBetweenPrevious: validation.daysBetweenPrevious,
+        daysBetweenNext: validation.daysBetweenNext,
+        maxPossibleIncrease: validation.maxPossibleIncrease,
+        actualIncrease: validation.actualIncrease
+      });
     }
 
-    // Validate realistic delta (max 25 hrs/day)
-    if (dateOfCompletion && component.lastUpdated) {
-      const completionDate = new Date(dateOfCompletion);
-      const lastUpdate = new Date(component.lastUpdated);
-      const daysDiff = Math.max(1, (completionDate.getTime() - lastUpdate.getTime()) / (1000 * 60 * 60 * 24));
-      const hoursDelta = newRH - previousRH;
-      const maxAllowed = daysDiff * 25;
-
-      if (hoursDelta > maxAllowed) {
-        throw new ValidationError(`Running hours increase of ${hoursDelta} hrs over ${daysDiff.toFixed(1)} days exceeds realistic limit (max ${maxAllowed.toFixed(0)} hrs at 25 hrs/day)`);
-      }
+    // If high utilization, require justification
+    if (validation.requiresJustification && !body.rhJustification) {
+      throw new ValidationError(
+        `High machinery utilization detected (${validation.utilizationRate.toFixed(1)} hrs/day). Justification is required.`,
+        {
+          code: 'HIGH_UTILIZATION',
+          validRange: validation.validRange,
+          utilizationRate: validation.utilizationRate,
+          requiresJustification: true
+        }
+      );
     }
 
-    // Update running hours using the CENTRALIZED function
-    await repo.setComponentRunningHours({
-      componentId: component.cuuid,
-      newRHValue: newRH,
-      updateSource: 'WO_COMPLETION',
-      userId: executionData.performedBy || 'System',
-      lastUpdatedDate: dateOfCompletion || new Date().toISOString().split('T')[0]
-    });
+    rhValidationDetails = {
+      isValid: validation.isValid,
+      validationDate: new Date().toISOString(),
+      validRange: validation.validRange,
+      utilizationRate: validation.utilizationRate,
+      requiresJustification: validation.requiresJustification,
+      validationErrors: validation.anomalyFlags
+    };
 
-    // Record running hours audit entry
+    // Determine RH source
+    if (body.completionRHSource) {
+      completionRHSource = body.completionRHSource;
+    }
+
+    // ISOLATION: Do NOT call repo.setComponentRunningHours() — work orders never modify RH Module
+
+    // Record audit trail entry for historical tracking (read-only snapshot, source = 'workorder')
     await repo.createRunningHoursAudit({
       componentId: component.cuuid,
       vesselId: componentVesselId,
       previousRH: previousRH.toString(),
       newRH: newRH.toString(),
       cumulativeRH: newRH.toString(),
-      dateUpdatedLocal: dateOfCompletion || new Date().toISOString().split('T')[0],
+      dateUpdatedLocal: completionDateForValidation,
       dateUpdatedTZ: 'UTC',
       enteredAtUTC: new Date(),
       userId: executionData.performedBy || 'System',
       source: 'workorder',
-      notes: `Updated via work order completion: ${workOrder.templateCode}`,
+      notes: `RH snapshot via work order completion: ${workOrder.templateCode} (ISOLATED - does not modify RH Module)`,
       meterReplaced: false
     });
   }
@@ -179,7 +197,14 @@ export async function completeWorkOrder(
     dateCompleted: dateOfCompletion,
     status: 'Completed',
     missedCycles,
-    originalDueDate
+    originalDueDate,
+    completionRH: runningHours ? runningHours : undefined,
+    completionRHValidated: runningHours ? true : undefined,
+    completionRHSource: runningHours ? completionRHSource : undefined,
+    completionRHValidationDetails: rhValidationDetails || undefined,
+    rhJustification: body.rhJustification || undefined,
+    rhJustificationProvidedBy: body.rhJustification ? (executionData.performedBy || 'System') : undefined,
+    rhJustificationDate: body.rhJustification ? new Date() : undefined
   });
 
   // Auto-populate component_maintenance_history

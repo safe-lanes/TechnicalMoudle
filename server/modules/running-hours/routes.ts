@@ -10,6 +10,20 @@ const router = Router();
 // to prevent Express from matching "parents", "cascade", etc. as componentId
 // ══════════════════════════════════════════════════════════
 
+// ── Layer 7: RH Timeline Validation Endpoints ──
+
+// GET  /running-hours/valid-range — calculate valid RH range for a completion date
+router.get('/running-hours/valid-range', asyncHandler(rhCtrl.getValidRange));
+
+// POST /running-hours/validate — validate a proposed RH entry
+router.post('/running-hours/validate', asyncHandler(rhCtrl.validateRHEntry));
+
+// GET  /running-hours/timeline — get complete RH timeline for a machinery
+router.get('/running-hours/timeline', asyncHandler(rhCtrl.getRHTimeline));
+
+// GET  /running-hours/current — get current RH from module
+router.get('/running-hours/current', asyncHandler(rhCtrl.getCurrentRH));
+
 // ── Running Hours: Specific Paths First ──
 
 // GET  /running-hours/parents — list MASTER components with inherited counts

@@ -30,7 +30,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { FileText, ArrowLeft, Plus, Eye, Upload, Download, Menu, Check, X, Edit2, Trash2, Copy, Loader2, Paperclip, Image as ImageIcon, FileSpreadsheet } from "lucide-react";
+import { FileText, ArrowLeft, Plus, Eye, Upload, Download, Menu, Check, X, Edit2, Trash2, Copy, Loader2, Paperclip, Image as ImageIcon, FileSpreadsheet, BarChart3, AlertTriangle, CheckCircle2 } from "lucide-react";
+import RHTimelineViewer from "@/components/pms/RHTimelineViewer";
 import sailLogo from "@assets/SAIL logo Transparent_1753957135582.png";
 import {
   Sheet,
@@ -445,6 +446,25 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
   const WORK_HISTORY_COLLAPSED_COUNT = 2;
   const WORK_HISTORY_PAGE_SIZE = 5;
 
+  // Layer 7: RH Validation & Isolation state
+  const [rhValidation, setRhValidation] = useState<{
+    status: 'idle' | 'loading' | 'valid' | 'invalid' | 'warning';
+    message: string;
+    validRange: { min: number; max: number } | null;
+    utilizationRate: number;
+    previousEntry: { date: string; runningHours: number } | null;
+    nextEntry: { date: string; runningHours: number } | null;
+    validationDetails: any;
+  }>({ status: 'idle', message: '', validRange: null, utilizationRate: 0, previousEntry: null, nextEntry: null, validationDetails: null });
+  const [rhJustificationModalOpen, setRhJustificationModalOpen] = useState(false);
+  const [rhJustificationText, setRhJustificationText] = useState('');
+  const [rhJustificationConfirmed, setRhJustificationConfirmed] = useState(false);
+  const [rhErrorModalOpen, setRhErrorModalOpen] = useState(false);
+  const [rhErrorDetails, setRhErrorDetails] = useState<any>(null);
+  const [rhTimelineOpen, setRhTimelineOpen] = useState(false);
+  const [pendingSaveAfterJustification, setPendingSaveAfterJustification] = useState(false);
+  const rhValidationTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   // Store work order number from context (e.g., MKR-IN-00001.WO-2025-001)
   const [workOrderNo, setWorkOrderNo] = useState("");
   const [workOrderDueDate, setWorkOrderDueDate] = useState("");
@@ -516,6 +536,12 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
       setExecutionData(prev => ({ ...prev, woExecutionId: generateWOExecutionId() }));
     }
   }, []);
+
+  useEffect(() => {
+    if (pendingSaveAfterJustification && rhJustificationText.length >= 20) {
+      handleSave();
+    }
+  }, [pendingSaveAfterJustification]);
 
   useEffect(() => {
     if (workOrderId && resolvedMode !== 'template') {
@@ -787,6 +813,65 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
     }
   };
 
+  const performRHValidation = async (rhValue: string, completionDate?: string) => {
+    const context = workOrderContext as any;
+    const componentId = context?.component?.cuuid;
+    if (!componentId || !rhValue || isNaN(Number(rhValue))) {
+      setRhValidation({ status: 'idle', message: '', validRange: null, utilizationRate: 0, previousEntry: null, nextEntry: null, validationDetails: null });
+      return;
+    }
+    const dateToUse = completionDate || executionData.completionDateTime?.split('T')[0] || executionData.dateOfCompletion || new Date().toISOString().split('T')[0];
+    setRhValidation(prev => ({ ...prev, status: 'loading', message: 'Validating...' }));
+    try {
+      const res = await fetch('/technical/api/running-hours/validate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ machineryId: componentId, completionDate: dateToUse, runningHours: Number(rhValue) })
+      });
+      const result = await res.json();
+      if (result.isValid) {
+        setRhValidation({
+          status: result.requiresJustification ? 'warning' : 'valid',
+          message: result.errorMessage,
+          validRange: result.validRange,
+          utilizationRate: result.utilizationRate,
+          previousEntry: result.previousEntry,
+          nextEntry: result.nextEntry,
+          validationDetails: result
+        });
+      } else {
+        setRhValidation({
+          status: 'invalid',
+          message: result.errorMessage,
+          validRange: result.validRange,
+          utilizationRate: result.utilizationRate,
+          previousEntry: result.previousEntry,
+          nextEntry: result.nextEntry,
+          validationDetails: result
+        });
+      }
+    } catch {
+      setRhValidation(prev => ({ ...prev, status: 'idle', message: '' }));
+    }
+  };
+
+  const fetchCurrentRHFromModule = async () => {
+    const context = workOrderContext as any;
+    const componentId = context?.component?.cuuid;
+    if (!componentId) return;
+    try {
+      const res = await fetch(`/technical/api/running-hours/current?machineryId=${encodeURIComponent(componentId)}`);
+      const result = await res.json();
+      if (result.currentRH !== undefined) {
+        setExecutionData(prev => ({ ...prev, currentReading: String(result.currentRH) }));
+        toast({ title: "RH Fetched", description: `Current running hours (${result.currentRH}) fetched from RH Module. Last updated: ${new Date(result.lastUpdated).toLocaleDateString()}.` });
+        performRHValidation(String(result.currentRH));
+      }
+    } catch {
+      toast({ title: "Error", description: "Failed to fetch current running hours from module.", variant: "destructive" });
+    }
+  };
+
   const handleExecutionChange = (field: string, value: string) => {
     setExecutionData(prev => {
       const newData = {
@@ -798,8 +883,19 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
         setCurrentReadingWarningAcknowledged(false);
       }
 
+      if (field === 'currentReading') {
+        if (rhValidationTimeoutRef.current) clearTimeout(rhValidationTimeoutRef.current);
+        rhValidationTimeoutRef.current = setTimeout(() => performRHValidation(value), 500);
+      }
+
       if (field === 'startDateTime' || field === 'completionDateTime') {
         autoCalcTotalTime(newData);
+      }
+
+      if ((field === 'completionDateTime' || field === 'dateOfCompletion') && newData.currentReading) {
+        const newDate = field === 'completionDateTime' ? value.split('T')[0] : value;
+        if (rhValidationTimeoutRef.current) clearTimeout(rhValidationTimeoutRef.current);
+        rhValidationTimeoutRef.current = setTimeout(() => performRHValidation(newData.currentReading, newDate), 500);
       }
 
       if (field === 'noOfPersons') {
@@ -1998,30 +2094,16 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
             }
           }
 
-          if (newRunningHours < component.currentCumulativeRH) {
-            toast({
-              title: "Validation Error",
-              description: `Running hours cannot decrease from ${component.currentCumulativeRH} to ${newRunningHours}. If meter was replaced, please use the Running Hours module.`,
-              variant: "destructive",
-            });
+          // Layer 7: Use server-side timeline validation
+          if (rhValidation.status === 'invalid') {
+            setRhErrorDetails(rhValidation.validationDetails);
+            setRhErrorModalOpen(true);
             return;
           }
 
-          if (executionData.dateOfCompletion && component.lastUpdated) {
-            const completionDateCheck = new Date(executionData.dateOfCompletion);
-            const lastUpdate = new Date(component.lastUpdated);
-            const daysDiff = Math.max(1, (completionDateCheck.getTime() - lastUpdate.getTime()) / (1000 * 60 * 60 * 24));
-            const hoursDelta = newRunningHours - component.currentCumulativeRH;
-            const maxAllowed = daysDiff * 25;
-
-            if (hoursDelta > maxAllowed) {
-              toast({
-                title: "Validation Error",
-                description: `Running hours increase of ${hoursDelta} hrs over ${daysDiff.toFixed(1)} days exceeds realistic limit (max ${maxAllowed.toFixed(0)} hrs at 25 hrs/day). Please verify the entered value.`,
-                variant: "destructive",
-              });
-              return;
-            }
+          if (rhValidation.status === 'warning' && !pendingSaveAfterJustification) {
+            setRhJustificationModalOpen(true);
+            return;
           }
         }
       }
@@ -2052,11 +2134,19 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
           ...templateData,
           ...saveExecutionData,
           nextDueDate: recalculatedNextDueDate,
-          // If completion data is filled, set status to "Pending Approval"
-          // Otherwise keep current status (likely "Active" or "Due")
-          status: hasCompletionData ? 'Pending Approval' : undefined
+          status: hasCompletionData ? 'Pending Approval' : undefined,
+          // Layer 7: Include RH justification if provided via modal
+          ...(pendingSaveAfterJustification && rhJustificationText ? {
+            rhJustification: rhJustificationText,
+            completionRHSource: 'MANUAL_ENTRY'
+          } : {})
         })
       });
+
+      // Reset justification state after save attempt
+      if (pendingSaveAfterJustification) {
+        setPendingSaveAfterJustification(false);
+      }
 
       const result = await response.json();
 
@@ -3911,17 +4001,106 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
 
               <div className="space-y-2">
                 <Label className="text-sm text-[#8798ad]" data-testid="WOF.B3.5"><Marker id="WOF.B3.5" />Current Reading{(workOrderContext as any)?.maintenanceBasis === 'Running Hours' && <span className="text-red-500"> *</span>}</Label>
-                <Input
-                  type="number"
-                  min="0"
-                  value={executionData.currentReading}
-                  onChange={(e) => handleExecutionChange('currentReading', e.target.value)}
-                  disabled={isPartBReadOnly}
-                  className="text-sm"
-                  data-testid="WOF.B3.6"
-                />
+                <div className="flex gap-2">
+                  <Input
+                    type="number"
+                    min="0"
+                    value={executionData.currentReading}
+                    onChange={(e) => handleExecutionChange('currentReading', e.target.value)}
+                    disabled={isPartBReadOnly}
+                    className={`text-sm flex-1 ${
+                      rhValidation.status === 'valid' ? 'border-green-400 focus:ring-green-400' :
+                      rhValidation.status === 'invalid' ? 'border-red-400 focus:ring-red-400' :
+                      rhValidation.status === 'warning' ? 'border-orange-400 focus:ring-orange-400' :
+                      ''
+                    }`}
+                    data-testid="WOF.B3.6"
+                  />
+                  {!isPartBReadOnly && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={fetchCurrentRHFromModule}
+                      className="shrink-0 text-xs"
+                      data-testid="button-fetch-rh"
+                      title="Fetch Current RH from Module"
+                    >
+                      <BarChart3 className="h-3.5 w-3.5 mr-1" />
+                      Fetch RH
+                    </Button>
+                  )}
+                </div>
+
+                {/* RH Valid Range Helper */}
+                {rhValidation.validRange && (
+                  <div className="text-xs text-blue-600 bg-blue-50 px-2 py-1 rounded" data-testid="text-rh-valid-range">
+                    Valid range: {rhValidation.validRange.min.toFixed(0)} to {rhValidation.validRange.max === Infinity ? '∞' : rhValidation.validRange.max.toFixed(0)} hours
+                    {rhValidation.previousEntry && (
+                      <span className="ml-1 text-blue-500">
+                        | Last: {rhValidation.previousEntry.runningHours.toFixed(0)} hrs on {new Date(rhValidation.previousEntry.date).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}
+                      </span>
+                    )}
+                  </div>
+                )}
+
+                {/* Live Validation Feedback */}
+                {rhValidation.status === 'loading' && (
+                  <div className="text-xs text-gray-500 flex items-center gap-1" data-testid="text-rh-validating">
+                    <Loader2 className="h-3 w-3 animate-spin" /> Validating...
+                  </div>
+                )}
+                {rhValidation.status === 'valid' && (
+                  <div className="text-xs text-green-600 flex items-center gap-1" data-testid="text-rh-valid">
+                    <CheckCircle2 className="h-3 w-3" /> {rhValidation.message}
+                  </div>
+                )}
+                {rhValidation.status === 'invalid' && (
+                  <div className="text-xs text-red-600 flex items-center gap-1" data-testid="text-rh-invalid">
+                    <X className="h-3 w-3" /> Invalid: {rhValidation.validRange ? `Valid range: ${rhValidation.validRange.min.toFixed(0)} to ${rhValidation.validRange.max === Infinity ? '∞' : rhValidation.validRange.max.toFixed(0)} hours` : rhValidation.message}
+                  </div>
+                )}
+                {rhValidation.status === 'warning' && (
+                  <div className="text-xs text-orange-600 flex items-center gap-1" data-testid="text-rh-warning">
+                    <AlertTriangle className="h-3 w-3" /> High utilization: {rhValidation.utilizationRate.toFixed(1)} hrs/day — justification required
+                  </div>
+                )}
               </div>
             </div>
+
+            {/* Completion RH Info (for completed WOs) */}
+            {(workOrderContext as any)?.workOrder?.status === 'Completed' && (workOrderContext as any)?.workOrder?.completionRH && (
+              <div className="mt-3 p-3 bg-gray-50 rounded-lg text-sm" data-testid="rh-completion-info">
+                <div className="font-medium text-gray-700 mb-1">Completion RH Information</div>
+                <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs text-gray-600">
+                  <div>Running Hours: <span className="font-medium text-gray-900">{(workOrderContext as any).workOrder.completionRH} hrs</span>
+                    {(workOrderContext as any).workOrder.completionRHValidated && <CheckCircle2 className="inline h-3 w-3 text-green-500 ml-1" />}
+                  </div>
+                  <div>Source: <span className="font-medium">{(workOrderContext as any).workOrder.completionRHSource || 'Manual'}</span></div>
+                  {(workOrderContext as any).workOrder.completionRHValidationDetails?.utilizationRate > 0 && (
+                    <div>Avg Usage: <span className="font-medium">{(workOrderContext as any).workOrder.completionRHValidationDetails.utilizationRate.toFixed(1)} hrs/day</span></div>
+                  )}
+                  {(workOrderContext as any).workOrder.rhJustification && (
+                    <div className="col-span-2">Justification: <span className="font-medium text-orange-700">{(workOrderContext as any).workOrder.rhJustification}</span></div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* View RH Timeline Button */}
+            {(workOrderContext as any)?.component?.cuuid && (
+              <div className="mt-2 flex justify-end">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setRhTimelineOpen(true)}
+                  className="text-xs text-blue-600 hover:text-blue-800"
+                  data-testid="button-view-rh-timeline"
+                >
+                  <BarChart3 className="h-3.5 w-3.5 mr-1" />
+                  View RH Timeline
+                </Button>
+              </div>
+            )}
           </SectionBlock>
 
           {/* B4. Spare Parts Consumed */}
@@ -4929,6 +5108,148 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Layer 7: RH Justification Modal */}
+      <Dialog open={rhJustificationModalOpen} onOpenChange={setRhJustificationModalOpen}>
+        <DialogContent className="max-w-lg" data-testid="rh-justification-modal">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-orange-600">
+              <AlertTriangle className="h-5 w-5" />
+              High Machinery Utilization Detected
+            </DialogTitle>
+            <DialogDescription className="text-sm pt-2">
+              <div className="space-y-2">
+                <div className="text-gray-700">
+                  <strong>Component:</strong> {(workOrderContext as any)?.component?.name || templateData.componentName}
+                  {templateData.componentCode && <span className="text-gray-500 ml-1">({templateData.componentCode})</span>}
+                </div>
+                <div className="text-gray-700">
+                  <strong>Running Hours Entered:</strong> {executionData.currentReading} hours
+                </div>
+                <div className="text-gray-700">
+                  <strong>Average Usage Rate:</strong> {rhValidation.utilizationRate.toFixed(1)} hours/day
+                </div>
+                <p className="text-gray-600 mt-2">
+                  This indicates the machinery ran nearly continuously ({rhValidation.utilizationRate.toFixed(1)} out of 24 hours per day).
+                  Please provide justification for this high utilization:
+                </p>
+              </div>
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-3 py-2">
+            <Textarea
+              placeholder="Provide justification (minimum 20 characters)&#10;Example: Continuous voyage/sea passage, Emergency operation, Load testing..."
+              value={rhJustificationText}
+              onChange={(e) => setRhJustificationText(e.target.value)}
+              className="min-h-[100px] text-sm"
+              data-testid="input-rh-justification"
+            />
+            <span className="text-xs text-gray-400">{rhJustificationText.length} / 20 minimum characters</span>
+
+            <div className="flex items-center gap-2 mt-2">
+              <Checkbox
+                id="rh-confirm"
+                checked={rhJustificationConfirmed}
+                onCheckedChange={(checked) => setRhJustificationConfirmed(!!checked)}
+                data-testid="checkbox-rh-confirm"
+              />
+              <label htmlFor="rh-confirm" className="text-sm text-gray-700 cursor-pointer">
+                I confirm this running hours entry is accurate
+              </label>
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setRhJustificationModalOpen(false);
+                setPendingSaveAfterJustification(false);
+              }}
+              data-testid="button-rh-justification-cancel"
+            >
+              Cancel
+            </Button>
+            <Button
+              disabled={rhJustificationText.length < 20 || !rhJustificationConfirmed}
+              onClick={() => {
+                setRhJustificationModalOpen(false);
+                setPendingSaveAfterJustification(true);
+              }}
+              className="bg-orange-600 hover:bg-orange-700"
+              data-testid="button-rh-justification-confirm"
+            >
+              Confirm and Save
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Layer 7: RH Error Modal */}
+      <Dialog open={rhErrorModalOpen} onOpenChange={setRhErrorModalOpen}>
+        <DialogContent className="max-w-lg" data-testid="rh-error-modal">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-red-600">
+              <X className="h-5 w-5" />
+              Invalid Running Hours Entry
+            </DialogTitle>
+            <DialogDescription className="text-sm pt-2">
+              You cannot save this work order because the Running Hours value is physically impossible.
+            </DialogDescription>
+          </DialogHeader>
+
+          {rhErrorDetails && (
+            <div className="space-y-3 py-2 text-sm">
+              <div className="bg-red-50 p-3 rounded-lg space-y-1">
+                <div className="font-medium text-red-800">Issue: {rhErrorDetails.validationStatus?.replace(/_/g, ' ')}</div>
+                {rhErrorDetails.previousEntry && (
+                  <div className="text-red-700">Previous RH Entry: {rhErrorDetails.previousEntry.runningHours} hrs on {new Date(rhErrorDetails.previousEntry.date).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}</div>
+                )}
+                {rhErrorDetails.nextEntry && (
+                  <div className="text-red-700">Next RH Entry: {rhErrorDetails.nextEntry.runningHours} hrs on {new Date(rhErrorDetails.nextEntry.date).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}</div>
+                )}
+                {rhErrorDetails.daysBetweenPrevious > 0 && (
+                  <>
+                    <div className="text-red-700">Days Between: {rhErrorDetails.daysBetweenPrevious} days</div>
+                    <div className="text-red-700">Your Increase: {rhErrorDetails.actualIncrease?.toFixed(0)} hours</div>
+                    <div className="text-red-700">Maximum Possible: {rhErrorDetails.maxPossibleIncrease?.toFixed(0)} hours ({rhErrorDetails.daysBetweenPrevious} days × 24 hrs/day)</div>
+                  </>
+                )}
+              </div>
+              {rhErrorDetails.validRange && (
+                <div className="bg-blue-50 p-3 rounded-lg text-blue-800">
+                  Valid RH Range: <strong>{rhErrorDetails.validRange.min?.toFixed(0)} to {rhErrorDetails.validRange.max === Infinity ? '∞' : rhErrorDetails.validRange.max?.toFixed(0)} hours</strong>
+                </div>
+              )}
+              <p className="text-gray-500 text-xs">
+                Possible reasons: Incorrect running hours value, wrong completion date, or outdated RH data. Check the RH Module for the latest value.
+              </p>
+            </div>
+          )}
+
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setRhErrorModalOpen(false)}
+              data-testid="button-rh-error-close"
+            >
+              Correct Entry and Try Again
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Layer 7: RH Timeline Viewer */}
+      {(workOrderContext as any)?.component?.cuuid && (
+        <RHTimelineViewer
+          machineryId={(workOrderContext as any).component.cuuid}
+          machineryName={(workOrderContext as any).component.name || templateData.componentName || 'Component'}
+          machineryCode={templateData.componentCode}
+          open={rhTimelineOpen}
+          onOpenChange={setRhTimelineOpen}
+        />
+      )}
     </div>
   );
 };
