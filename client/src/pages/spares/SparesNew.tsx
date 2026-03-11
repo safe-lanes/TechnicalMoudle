@@ -1477,7 +1477,7 @@ const Spares: React.FC = () => {
   // Create spare mutation
   const createSpareMutation = useMutation({
     mutationFn: async (data: any) => {
-      return apiRequest('POST', '/technical/api/spares', data);
+      return apiRequest('POST', `/technical/api/spares/${vesselId}`, data);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/technical/api/inventory/spares-with-inventory', vesselId] });
