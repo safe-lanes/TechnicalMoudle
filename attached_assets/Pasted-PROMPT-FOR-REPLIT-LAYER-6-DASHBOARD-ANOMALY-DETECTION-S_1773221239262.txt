@@ -1,0 +1,374 @@
+PROMPT FOR REPLIT - LAYER 6: DASHBOARD ANOMALY DETECTION SYSTEM
+
+OBJECTIVE:
+Implement a comprehensive Dashboard Anomaly Detection tile on the PMS Dashboard that provides Superintendent and Chief Engineer with real-time visibility of ALL backdating, missed cycles, and suspicious completion patterns across ALL work orders. This dashboard tile must aggregate and display anomalies system-wide.
+
+WHERE THIS WILL BE VISIBLE:
+
+Main Location: PMS Dashboard at /pms/dashboard - Add a new tile called "⚠️ Work Order Anomalies"
+
+Tile Position: Place it in a prominent position on the dashboard (top row or second row) alongside existing tiles like "Superintendent Notifications", "Work Orders Overview", etc.
+
+Tile Size: Make it a wider tile (similar width to other important tiles) to accommodate the anomaly list
+
+Navigation: Clicking on individual anomaly entries should navigate to the specific work order detail page
+
+DETAILED IMPLEMENTATION REQUIREMENTS:
+
+1. DATABASE SCHEMA ADDITIONS:
+
+Create a new collection workOrderAnomalies with the following structure:
+
+javascript
+{
+  _id: ObjectId,
+  workOrderId: String,           // Reference to work order
+  workOrderCode: String,          // e.g., "WO-1772771032260-ljwlxe4tz"
+  componentCode: String,          // e.g., "702.005.02"
+  componentName: String,          // e.g., "Main Engine"
+  jobTitle: String,               // e.g., "Weekly Inspection"
+  anomalyType: String,            // "BACKDATING", "MISSED_CYCLES", "SUSPICIOUS_PATTERN", "MULTIPLE_ANOMALIES"
+  severity: String,               // "HIGH", "MEDIUM", "LOW"
+  detectedAt: Date,               // When anomaly was detected
+  completionDate: Date,           // Actual completion date entered
+  dueDate: Date,                  // Original due date
+  daysLate: Number,               // How many days late
+  missedCycles: Number,           // Number of cycles missed
+  anomalyDetails: {
+    backdatingInfo: {
+      hasBackdating: Boolean,
+      daysBackdated: Number,
+      backdatedDate: Date
+    },
+    missedCyclesInfo: {
+      hasMissedCycles: Boolean,
+      cyclesSkipped: Number,
+      expectedCompletionDate: Date,
+      actualCompletionDate: Date
+    },
+    patternInfo: {
+      hasPattern: Boolean,
+      patternDescription: String,  // e.g., "Multiple backdated entries in same week"
+      relatedWorkOrders: [String]  // Related WO codes showing pattern
+    }
+  },
+  status: String,                  // "PENDING_REVIEW", "ACKNOWLEDGED", "JUSTIFIED", "RESOLVED"
+  reviewedBy: String,              // User who reviewed
+  reviewedAt: Date,
+  justification: String,           // CE/Superintendent justification
+  isResolved: Boolean,
+  createdAt: Date,
+  updatedAt: Date
+}
+2. BACKEND API ENDPOINTS:
+
+Create the following API endpoints:
+
+A. GET /api/pms/anomalies/dashboard
+
+Purpose: Fetch all active anomalies for dashboard display
+
+Query Parameters:
+
+status (optional): Filter by status (PENDING_REVIEW, ACKNOWLEDGED, etc.)
+
+severity (optional): Filter by severity (HIGH, MEDIUM, LOW)
+
+limit (optional): Number of records to return (default: 10)
+
+dateFrom (optional): Filter anomalies detected from this date
+
+dateTo (optional): Filter anomalies detected until this date
+
+Response: Array of anomaly objects sorted by severity (HIGH first) then by detectedAt (newest first)
+
+Access: Available to Superintendent and Chief Engineer roles only
+
+B. POST /api/pms/anomalies/detect
+
+Purpose: Triggered automatically when a work order is completed
+
+Logic:
+
+Check for backdating (Part A flag from Layer 1)
+
+Check for missed cycles (Part B badge from Layer 2)
+
+Check for suspicious patterns (analyze last 30 days of completions for same component)
+
+Calculate severity:
+
+HIGH: missedCycles >= 3 OR daysLate >= 21 OR backdating >= 7 days
+
+MEDIUM: missedCycles >= 2 OR daysLate >= 14 OR backdating >= 3 days
+
+LOW: missedCycles == 1 OR daysLate >= 7 OR backdating >= 1 day
+
+Create anomaly record in workOrderAnomalies collection
+
+Send notification to Superintendent (integrate with existing notification system)
+
+C. GET /api/pms/anomalies/statistics
+
+Purpose: Get summary statistics for dashboard tile header
+
+Response:
+
+javascript
+{
+  totalPending: Number,
+  totalHigh: Number,
+  totalMedium: Number,
+  totalLow: Number,
+  lastDetected: Date,
+  trendPercentage: Number  // Increase/decrease vs last month
+}
+D. PATCH /api/pms/anomalies/:anomalyId/acknowledge
+
+Purpose: Mark anomaly as acknowledged by Superintendent
+
+Request Body:
+
+javascript
+{
+  acknowledgedBy: String,
+  notes: String  // Optional
+}
+3. FRONTEND - DASHBOARD TILE COMPONENT:
+
+File Location: Create new component at src/components/pms/dashboard/AnomalyDetectionTile.jsx (or similar path based on your project structure)
+
+Component Structure:
+
+jsx
+// Key elements the component must include:
+
+1. HEADER SECTION:
+   - Tile title: "⚠️ Work Order Anomalies"
+   - Summary badges showing counts:
+     * Total Pending (red badge)
+     * High Severity (dark red)
+     * Medium Severity (orange)
+     * Low Severity (yellow)
+   - Refresh button to reload data
+   - Filter dropdown (All, High, Medium, Low)
+
+2. ANOMALY LIST SECTION:
+   - Display maximum 10 most recent anomalies
+   - Each anomaly card should show:
+     * Severity indicator (colored left border: Red=HIGH, Orange=MEDIUM, Yellow=LOW)
+     * Work Order Code (clickable link to WO detail page)
+     * Component Code and Name
+     * Job Title
+     * Anomaly Type badges (e.g., "BACKDATING", "MISSED CYCLES")
+     * Key metrics:
+       - Days Late: X days
+       - Missed Cycles: X cycles (if applicable)
+       - Backdated: X days (if applicable)
+     * Completion Date vs Due Date comparison
+     * Detection timestamp ("Detected 2 hours ago")
+     * Quick action buttons:
+       - "View Details" (navigate to WO page)
+       - "Acknowledge" (for Superintendent only)
+
+3. FOOTER SECTION:
+   - "View All Anomalies" link (navigate to dedicated anomalies page - to be created later)
+   - Last updated timestamp
+
+4. EMPTY STATE:
+   - If no anomalies: Show green checkmark icon with message "No anomalies detected. All work orders are on track! ✅"
+Styling Requirements:
+
+Use consistent color scheme with rest of dashboard
+
+Severity colors:
+
+HIGH: #DC2626 (red)
+
+MEDIUM: #F59E0B (orange)
+
+LOW: #FCD34D (yellow)
+
+Responsive design: Stack anomaly cards on mobile
+
+Smooth transitions when filtering
+
+Loading skeleton while fetching data
+
+4. AUTOMATIC ANOMALY DETECTION INTEGRATION:
+
+Where to integrate detection logic:
+
+In your existing work order completion flow (likely in workOrderController.js or similar), ADD the anomaly detection call AFTER successful completion:
+
+javascript
+// Pseudo-code location
+async function completeWorkOrder(workOrderId, completionData) {
+  // ... existing completion logic ...
+  
+  // Save completion data
+  await workOrder.save();
+  
+  // NEW: Trigger anomaly detection
+  await detectAndLogAnomalies(workOrder, completionData);
+  
+  // ... rest of existing logic (notifications, etc.) ...
+}
+Anomaly Detection Logic (detectAndLogAnomalies function):
+
+javascript
+1. Extract completion date, due date, frequency from work order
+2. Calculate:
+   - daysLate = completionDate - dueDate
+   - missedCycles = get from Part B calculation (already implemented in Layer 2)
+   - isBackdated = check if Part A flag exists (already implemented in Layer 1)
+
+3. Check for suspicious patterns:
+   - Query last 5 completions of same component/job in last 30 days
+   - If 3+ completions have backdating: Flag as "SUSPICIOUS_PATTERN"
+   - If consecutive completions show increasing delay: Flag pattern
+
+4. Determine anomaly types:
+   - If isBackdated: Add "BACKDATING" to types
+   - If missedCycles > 0: Add "MISSED_CYCLES" to types  
+   - If pattern detected: Add "SUSPICIOUS_PATTERN" to types
+
+5. If any anomaly type exists:
+   - Calculate severity (HIGH/MEDIUM/LOW as per rules above)
+   - Create anomaly record in database
+   - Send notification to Superintendent
+   - Return anomaly object
+
+6. If no anomalies: Return null (no action needed)
+5. NOTIFICATION INTEGRATION:
+
+When anomaly is detected and severity is HIGH:
+
+Create notification in existing superintendentNotifications collection
+
+Notification message format: "⚠️ HIGH severity anomaly detected in Work Order [WO-CODE]: [ANOMALY_TYPES]. Review required."
+
+Link notification to anomaly detail (WO page with anomaly info highlighted)
+
+6. PERMISSIONS & ACCESS CONTROL:
+
+View Access: Superintendent, Chief Engineer, Admin roles only
+
+Acknowledge Access: Superintendent role only
+
+API Security: Add role-based middleware to all anomaly endpoints
+
+Error Handling: Return 403 Forbidden if unauthorized user tries to access
+
+7. DATA RETENTION:
+
+Keep all anomaly records for audit trail (do not auto-delete)
+
+Mark as "RESOLVED" when:
+
+Superintendent acknowledges + provides justification (if required by Layer 4B), OR
+
+Work order is re-completed within acceptable timeframe
+
+Include "Resolved" filter option in dashboard for historical view
+
+8. TESTING REQUIREMENTS:
+
+After implementation, the system should handle these test scenarios:
+
+Test Case 1: High Severity Backdating
+
+Complete a weekly work order 25 days late with backdating of 10 days
+
+Expected: HIGH severity anomaly created with both "BACKDATING" and "MISSED_CYCLES" types
+
+Dashboard should show this anomaly at top of list
+
+Test Case 2: Pattern Detection
+
+Complete 3 work orders for same component within 1 week, all backdated
+
+Expected: SUSPICIOUS_PATTERN anomaly created
+
+Anomaly details should list all 3 related WO codes
+
+Test Case 3: Low Severity
+
+Complete a monthly work order 8 days late, no backdating
+
+Expected: LOW severity anomaly created with only "MISSED_CYCLES" type
+
+Test Case 4: No Anomaly
+
+Complete a work order on time (within due date)
+
+Expected: No anomaly created, dashboard shows "No anomalies" message
+
+Test Case 5: Acknowledgement
+
+Superintendent clicks "Acknowledge" on HIGH severity anomaly
+
+Expected: Anomaly status changes to "ACKNOWLEDGED", disappears from pending count
+
+9. SPECIFIC UI ELEMENT VISIBILITY:
+
+Make sure these elements are clearly visible:
+
+✅ On Dashboard (/pms/dashboard):
+
+New tile "⚠️ Work Order Anomalies" should be visible immediately after login for Superintendent/CE
+
+Tile should show live count of pending anomalies in header
+
+Scrollable list of top 10 anomalies inside tile
+
+Each anomaly should have colored left border matching severity
+
+"View All Anomalies" link at bottom of tile
+
+✅ On Work Order Detail Page (when anomaly exists):
+
+Show anomaly alert banner at top of page (if WO has associated anomaly)
+
+Banner should display: Severity, Anomaly Types, Detection Date
+
+Link to navigate back to dashboard anomalies
+
+✅ Empty State:
+
+If no anomalies exist, show friendly green checkmark message
+
+This should be visible immediately (don't show loading forever)
+
+10. ERROR HANDLING:
+
+If API fails to fetch anomalies: Show error message in tile "Unable to load anomalies. Retry?"
+
+If detection fails during completion: Log error but don't block work order completion
+
+If acknowledge fails: Show toast notification "Failed to acknowledge anomaly"
+
+SUMMARY CHECKLIST FOR REPLIT:
+
+□ Create workOrderAnomalies database collection with proper schema
+□ Implement 4 API endpoints (GET dashboard, POST detect, GET statistics, PATCH acknowledge)
+□ Create AnomalyDetectionTile component with all UI elements
+□ Integrate automatic detection in work order completion flow
+□ Add anomaly notification to Superintendent system
+□ Implement role-based access control
+□ Add "View All Anomalies" link (page creation can be Phase 2)
+□ Test all 5 test scenarios
+□ Ensure dashboard tile is visible on /pms/dashboard
+□ Ensure color-coded severity indicators work correctly
+
+IMPORTANT NOTES:
+
+This layer builds on Layer 1 (Part A backdating flags) and Layer 2 (Part B missed cycles badges) - reuse that existing data
+
+Do NOT modify existing work order completion flow logic, only ADD anomaly detection as additional step
+
+Keep dashboard tile lightweight - fetch only top 10 anomalies to avoid performance issues
+
+Use existing notification system infrastructure (don't create duplicate notification mechanism)
+
+Please implement Layer 6 exactly as specified above. Write clean, well-commented code and test thoroughly with the 5 test cases.
