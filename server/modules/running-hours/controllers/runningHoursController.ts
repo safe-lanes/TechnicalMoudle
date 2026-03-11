@@ -26,6 +26,10 @@ export async function createAudit(req: Request, res: Response) {
 
 export async function cascadeUpdate(req: Request, res: Response) {
   try {
+    const user = (req as any).user;
+    if (!req.body.userId || req.body.userId === 'admin' || req.body.userId === 'system') {
+      req.body.userId = user?.fullName || user?.username || req.body.userId || 'system';
+    }
     const result = await rhService.cascadeUpdate(req.body);
     res.json(result);
   } catch (error: any) {
