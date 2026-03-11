@@ -1787,47 +1787,6 @@ const migrations: Migration[] = [
       ALTER TABLE work_orders
         ADD COLUMN IF NOT EXISTS skipped_cycles_justification TEXT
     `
-  },
-  {
-    id: '056_create_admn_role_acess',
-    name: 'Create admn_role_acess table with seed data',
-    description: 'Creates the admn_role_acess table for application role configuration and seeds it with 15 role definitions',
-    sql: `
-      CREATE TABLE IF NOT EXISTS admn_role_acess (
-        id INTEGER PRIMARY KEY,
-        ruid UUID NOT NULL UNIQUE DEFAULT gen_random_uuid(),
-        assigned_role VARCHAR NOT NULL,
-        roletype VARCHAR NOT NULL,
-        orderby INTEGER,
-        is_active BOOLEAN NOT NULL DEFAULT true,
-        sort_order INTEGER,
-        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-        updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-        created_by_uuid UUID,
-        updated_by_uuid UUID,
-        is_deleted BOOLEAN NOT NULL DEFAULT false,
-        is_sync BOOLEAN NOT NULL DEFAULT false
-      );
-
-      INSERT INTO admn_role_acess (id, ruid, assigned_role, roletype, orderby, is_active, sort_order)
-      VALUES
-        (1,  gen_random_uuid(), 'Admin',             'Office', 1,  true, 1),
-        (2,  gen_random_uuid(), 'Vessel Management', 'Ship',   6,  true, 6),
-        (3,  gen_random_uuid(), 'User',              'Office', 2,  true, 2),
-        (4,  gen_random_uuid(), 'Sail Admin',        'Office', 3,  true, 3),
-        (5,  gen_random_uuid(), 'Super Admin',       'Office', 4,  true, 4),
-        (6,  gen_random_uuid(), 'Vessel Admin',      'Ship',   5,  true, 5),
-        (7,  gen_random_uuid(), 'Vessel User',       'Ship',   7,  true, 7),
-        (8,  gen_random_uuid(), 'External 1',        'Office', 8,  true, 8),
-        (9,  gen_random_uuid(), 'External 2',        'Office', 9,  true, 9),
-        (10, gen_random_uuid(), 'External 3',        'Office', 10, true, 10),
-        (11, gen_random_uuid(), 'External 4',        'Office', 11, true, 11),
-        (12, gen_random_uuid(), 'External 5',        'Office', 12, true, 12),
-        (13, gen_random_uuid(), 'Vessel User 2',     'Ship',   13, true, 13),
-        (14, gen_random_uuid(), 'Vessel User 3',     'Ship',   14, true, 14),
-        (15, gen_random_uuid(), 'Vessel User 4',     'Ship',   15, true, 15)
-      ON CONFLICT (id) DO NOTHING;
-    `
   }
 ];
 
