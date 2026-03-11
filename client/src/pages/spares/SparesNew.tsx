@@ -465,6 +465,11 @@ const Spares: React.FC = () => {
       const currentQty = spare.locationQty ?? 0;
       const qtyChange = newValue - currentQty;
 
+      const eventType = qtyChange > 0 ? 'RECEIVE' : 'CONSUME';
+      const referenceNote = qtyChange > 0
+        ? `Received at ${locationName}: ${currentQty}→${newValue}`
+        : `Consumed from ${locationName}: ${currentQty}→${newValue}`;
+
       try {
         const res = await fetch('/technical/api/inventory/transactions', {
           method: 'POST',
@@ -473,10 +478,10 @@ const Spares: React.FC = () => {
             vesselId,
             spareId: spare.id,
             locationId: selectedLocationId,
-            eventType: 'ADJUST_CORRECTION',
+            eventType,
             qtyChange,
             referenceType: 'MANUAL',
-            referenceNote: `Adjustment at ${locationName}: ${currentQty}→${newValue}`,
+            referenceNote,
             userId: 'System'
           }),
         });
