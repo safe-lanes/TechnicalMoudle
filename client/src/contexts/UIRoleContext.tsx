@@ -3,7 +3,6 @@ import type { UIRole } from "@shared/uiRoles";
 import { mapLoggedRoleToUIRole } from "@shared/uiRoles";
 import { secureGetItem } from "@/utils/secureStorage";
 import { useAuth } from "@/contexts/AuthContext";
-import { extractRole } from "@/utils/profileExtractor";
 
 interface UIRoleContextType {
   uiRole: UIRole | null;
@@ -25,34 +24,22 @@ export function UIRoleProvider({ children }: UIRoleProviderProps) {
   const [uiRole, setUIRoleState] = useState<UIRole | null>(null);
 
   useEffect(() => {
-    const isDev = import.meta.env.DEV;
-
     if (!currentUser) {
-      if (isDev) console.log("[UIRoleContext] No currentUser, setting uiRole to null");
       setUIRoleState(null);
       return;
-    }
-
-    if (isDev) {
-      console.log("[UIRoleContext] ── UIRole Resolution Start ──");
-      console.log("[UIRoleContext] currentUser from AuthContext:", { role: currentUser.role, userType: currentUser.userType });
     }
 
     const encryptedUserType = secureGetItem<string>("userType");
     let encryptedProfileRole: string | null = null;
     try {
       const encryptedProfile = secureGetItem<Record<string, any>>("userProfile");
-      encryptedProfileRole = extractRole(encryptedProfile);
+      encryptedProfileRole = encryptedProfile?.role || null;
     } catch {
       encryptedProfileRole = null;
     }
 
-    if (isDev) console.log("[UIRoleContext] secureGetItem: userType=", encryptedUserType, ", extractedRole=", encryptedProfileRole);
-
     if (encryptedUserType && encryptedProfileRole) {
-      const result = mapLoggedRoleToUIRole(encryptedUserType, encryptedProfileRole);
-      if (isDev) console.log("[UIRoleContext] ENCRYPTED path → mapLoggedRoleToUIRole(", encryptedUserType, ",", encryptedProfileRole, ") =", result);
-      setUIRoleState(result);
+      setUIRoleState(mapLoggedRoleToUIRole(encryptedUserType, encryptedProfileRole));
       return;
     }
 
@@ -62,25 +49,18 @@ export function UIRoleProvider({ children }: UIRoleProviderProps) {
       const raw = localStorage.getItem("userProfile");
       if (raw) {
         const parsed = JSON.parse(raw);
-        plainProfileRole = extractRole(parsed);
+        plainProfileRole = parsed?.role || null;
       }
     } catch {
-      if (isDev) console.log("[UIRoleContext] Plain JSON.parse failed (likely encrypted)");
       plainProfileRole = null;
     }
 
-    if (isDev) console.log("[UIRoleContext] Plain path: userType=", plainUserType, ", extractedRole=", plainProfileRole);
-
     if (plainUserType && plainProfileRole) {
-      const result = mapLoggedRoleToUIRole(plainUserType, plainProfileRole);
-      if (isDev) console.log("[UIRoleContext] PLAIN path → mapLoggedRoleToUIRole(", plainUserType, ",", plainProfileRole, ") =", result);
-      setUIRoleState(result);
+      setUIRoleState(mapLoggedRoleToUIRole(plainUserType, plainProfileRole));
       return;
     }
 
-    const fallbackResult = mapLoggedRoleToUIRole(currentUser.userType, currentUser.role);
-    if (isDev) console.log("[UIRoleContext] FALLBACK (currentUser) → mapLoggedRoleToUIRole(", currentUser.userType, ",", currentUser.role, ") =", fallbackResult);
-    setUIRoleState(fallbackResult);
+    setUIRoleState(mapLoggedRoleToUIRole(currentUser.userType, currentUser.role));
   }, [currentUser]);
 
   const setUIRole = (_role: UIRole) => {
@@ -113,7 +93,6 @@ export function useUIRole() {
   const context = useContext(UIRoleContext);
   if (context === undefined) {
     if (import.meta.env.DEV && import.meta.hot) {
-      console.warn("[useUIRole] Called outside UIRoleProvider (likely HMR). Using safe fallback.");
       return FALLBACK_CONTEXT;
     }
     throw new Error("useUIRole must be used within a UIRoleProvider");

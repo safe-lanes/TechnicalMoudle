@@ -48,7 +48,15 @@ export function secureGetItem<T>(key: string): T | null {
     return null;
   }
   try {
-    return decryptValue<T>(raw);
+    const decrypted = decryptValue(raw) as string;
+    if (typeof decrypted === "string") {
+      try {
+        return JSON.parse(decrypted) as T;
+      } catch {
+        return decrypted as unknown as T;
+      }
+    }
+    return decrypted as T;
   } catch {
     console.warn(`Failed to decrypt "${key}" from localStorage.`);
     return null;
