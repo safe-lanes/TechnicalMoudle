@@ -1,0 +1,310 @@
+DO NOT START CODING UNTIL YOU HAVE READ EVERYTHING.
+
+BACKGROUND — WHAT IS LAYER 6
+
+Layers 1–5 built the foundation of the PMS anti-fraud system:
+
+Layer 1: Missed cycles badge
+
+Layer 2: Next due date auto-calculation
+
+Layer 3: Work history audit trail
+
+Layer 4B: CE mandatory justification
+
+Layer 5: Tiered approval workflow with superintendent locks
+
+Layer 6 adds the final piece: a dashboard-level anomaly detection panel that gives the Superintendent and Chief Engineer a bird's-eye view of compliance patterns and potential manipulation across the entire vessel's maintenance system — without having to manually inspect each individual work order.
+
+This is a read-only, analytical dashboard widget that surfaces red flags by analyzing patterns across all work orders.
+
+WHERE THIS SHOULD APPEAR
+
+Add this as a new section on the PMS Dashboard (/pms/dashboard). Place it below the existing "Superintendent Notifications" tile but above the "Watch List" section.
+
+The section should be:
+
+Full-width (spans the entire dashboard width, not a small tile)
+
+Titled: "Compliance Anomaly Detection"
+
+Sub-heading: "Patterns indicating potential maintenance schedule manipulation"
+
+Expandable/collapsible (optional enhancement — if easy to implement, allow users to collapse this section to reduce clutter)
+
+WHAT METRICS TO TRACK — 4 KEY ANOMALIES
+
+The panel must display 4 metrics in a horizontal row of cards. Each metric card shows:
+
+An icon
+
+A large number (the count/percentage)
+
+A label
+
+A severity indicator (green = good, yellow = moderate concern, red = high concern)
+
+On hover or click: a tooltip/modal with details (e.g., which crew members, which WOs)
+
+Here are the 4 metrics:
+
+METRIC 1 — Cycle Skip Rate
+What it detects: Work orders where missedCycles > 0, grouped by crew member (performed by).
+
+Calculation:
+
+text
+For each crew member (rank):
+  - Count WOs where missedCycles >= 1 AND performedBy = this crew member
+  - Calculate percentage: (WOs with missed cycles / Total WOs completed by this crew member) × 100
+  - If percentage > 20% → RED alert
+  - If percentage 10–20% → YELLOW warning
+  - If percentage < 10% → GREEN (acceptable)
+Card Display:
+
+text
+Icon: ⚠️ (warning triangle)
+Title: "Cycle Skip Rate"
+Large Number: Show the HIGHEST percentage among all crew members (e.g., "28%")
+Label: "[RankName] has highest skip rate" (e.g., "2nd Engineer has highest skip rate")
+Color: Red if > 20%, Yellow if 10–20%, Green if < 10%
+On Click/Hover Details:
+Show a breakdown table:
+
+text
+| Crew Member (Rank) | Total WOs Completed | WOs with Skipped Cycles | Skip Rate |
+|--------------------|---------------------|------------------------|-----------|
+| 2nd Engineer       | 50                  | 14                     | 28% (RED) |
+| 3rd Engineer       | 30                  | 3                      | 10% (YELLOW) |
+| Chief Engineer     | 20                  | 1                      | 5% (GREEN) |
+METRIC 2 — Backdating Frequency
+What it detects: How often completion dates are entered significantly in the past (more than 7 days before "today").
+
+Calculation:
+
+text
+For each completed WO:
+  - completionDate = the date entered in Part B
+  - submittedDate = the date the WO was actually submitted (moved to pending_approval status) — use the `updatedAt` or `submittedAt` timestamp from the database
+  - daysDiff = submittedDate - completionDate (in days)
+  - If daysDiff > 7 → this is a backdated entry
+
+Backdating Frequency = (Count of backdated WOs / Total completed WOs in last 30 days) × 100
+Card Display:
+
+text
+Icon: 📅 (calendar icon)
+Title: "Backdating Frequency"
+Large Number: Percentage (e.g., "15%")
+Label: "of WOs completed with backdated entries"
+Color: Red if > 15%, Yellow if 5–15%, Green if < 5%
+On Click/Hover Details:
+Show a list of the most recent backdated WOs:
+
+text
+| WO Code | Job Title | Completion Date | Submitted Date | Days Backdated | Performed By |
+|---------|-----------|-----------------|----------------|----------------|--------------|
+| WO-123  | ME Check  | 01-Feb-2026     | 10-Mar-2026    | 37 days        | 2nd Engineer |
+| WO-456  | Purifier  | 20-Feb-2026     | 10-Mar-2026    | 18 days        | 3rd Engineer |
+METRIC 3 — Last-Minute Bulk Completions
+What it detects: Crew completing 5+ overdue work orders in a single day (common end-of-month pattern where crew rushes to clear backlogs before audits).
+
+Calculation:
+
+text
+For each day in the last 90 days:
+  - Count how many WOs moved to "completed" status on that day
+  - If count >= 5 AND at least 3 of those WOs were overdue (dueDate < completionDate) → flag as "bulk completion event"
+
+Metric = Count of bulk completion events in the last 90 days
+Card Display:
+
+text
+Icon: 📊 (bar chart icon)
+Title: "Bulk Completion Events"
+Large Number: Count (e.g., "3 events")
+Label: "Last 90 days — clustering at month-end"
+Color: Red if >= 3 events, Yellow if 1–2 events, Green if 0 events
+On Click/Hover Details:
+Show each bulk completion event:
+
+text
+| Date       | WOs Completed | Overdue WOs | Performed By      |
+|------------|---------------|-------------|-------------------|
+| 28-Feb-26  | 8             | 6           | 2nd Engineer      |
+| 31-Jan-26  | 7             | 5           | 3rd Engineer      |
+| 29-Dec-25  | 6             | 4           | 2nd Engineer      |
+METRIC 4 — Schedule Drift
+What it detects: How far the actual maintenance schedule has drifted from the planned schedule over time.
+
+Calculation:
+
+text
+For all WOs completed in the last 90 days:
+  - Calculate: daysLate = completionDate - dueDate (in days)
+  - Average drift = Sum of daysLate for all completed WOs / Total completed WOs
+  - If average drift > 14 days → RED
+  - If average drift 7–14 days → YELLOW
+  - If average drift < 7 days → GREEN
+Card Display:
+
+text
+Icon: 📉 (trending down icon)
+Title: "Schedule Drift"
+Large Number: Average days late (e.g., "12 days")
+Label: "Average lateness across all jobs"
+Color: Red if > 14 days, Yellow if 7–14, Green if < 7
+On Click/Hover Details:
+Show a line chart or simple stats:
+
+text
+Last 90 days schedule drift:
+  - Average: 12 days late
+  - Median: 8 days late
+  - Worst: 45 days late (WO-789, ME Turbocharger Inspection)
+  - Best: On time (15 WOs completed within due date)
+
+Trend: Drift increasing by 2 days per month (RED — getting worse)
+STEP 1 — CREATE THE BACKEND API ENDPOINT
+
+Add a new endpoint:
+
+text
+GET /technical/api/dashboard/compliance-anomalies
+This endpoint must calculate and return all 4 metrics in a single response:
+
+json
+{
+  "cycleSkipRate": {
+    "highestRate": 28,
+    "highestRank": "2nd Engineer",
+    "severity": "red",
+    "breakdown": [
+      { "rank": "2nd Engineer", "totalWOs": 50, "skippedWOs": 14, "rate": 28 },
+      { "rank": "3rd Engineer", "totalWOs": 30, "skippedWOs": 3, "rate": 10 }
+    ]
+  },
+  "backdatingFrequency": {
+    "percentage": 15,
+    "severity": "red",
+    "recentBackdated": [
+      { "woCode": "WO-123", "jobTitle": "...", "completionDate": "...", "submittedDate": "...", "daysDiff": 37, "performedBy": "..." }
+    ]
+  },
+  "bulkCompletions": {
+    "eventCount": 3,
+    "severity": "red",
+    "events": [
+      { "date": "2026-02-28", "totalCompleted": 8, "overdueCompleted": 6, "performedBy": "2nd Engineer" }
+    ]
+  },
+  "scheduleDrift": {
+    "averageDaysLate": 12,
+    "severity": "yellow",
+    "median": 8,
+    "worst": { "woCode": "WO-789", "daysLate": 45 },
+    "trend": "increasing"
+  }
+}
+Implement this in server/modules/work-orders/controllers/workOrderController.ts and add the route in server/modules/work-orders/routes.ts.
+
+Use the existing work orders table and work history audit data to calculate these metrics. Write efficient SQL queries with proper filtering (e.g., only last 30/90 days where needed).
+
+STEP 2 — ADD THE UI COMPONENT TO THE DASHBOARD
+
+In client/src/pages/pms/Dashboard.tsx, add a new section below the Superintendent Notifications tile and above the Watch List.
+
+The section structure:
+
+text
+<ComplianceAnomalyPanel>
+  <SectionHeader>
+    Icon: 🔍
+    Title: "Compliance Anomaly Detection"
+    Sub-heading: "Patterns indicating potential maintenance schedule manipulation"
+  </SectionHeader>
+
+  <MetricsGrid> (horizontal 4-column grid)
+    <MetricCard severity="red">
+      <Icon>⚠️</Icon>
+      <LargeNumber>28%</LargeNumber>
+      <Label>Cycle Skip Rate</Label>
+      <SubLabel>2nd Engineer has highest skip rate</SubLabel>
+      <ClickableDetailsLink>View Details</ClickableDetailsLink>
+    </MetricCard>
+
+    <MetricCard severity="red">
+      (Backdating Frequency card)
+    </MetricCard>
+
+    <MetricCard severity="red">
+      (Bulk Completions card)
+    </MetricCard>
+
+    <MetricCard severity="yellow">
+      (Schedule Drift card)
+    </MetricCard>
+  </MetricsGrid>
+</ComplianceAnomalyPanel>
+Styling:
+
+Each metric card has a colored left border (3px thick): green, yellow, or red based on severity
+
+Cards have a light grey background (#f9fafb)
+
+Large number is bold, 32px font
+
+Labels are 14px, grey text
+
+On hover, card elevates slightly (box-shadow)
+
+Click Behavior:
+When a metric card is clicked, open a modal (or expandable panel below the card) showing the detailed breakdown table/chart as specified in each metric's "On Click/Hover Details" section above.
+
+STEP 3 — HANDLE EDGE CASES
+
+No data available: If there are no completed WOs in the time period, show all cards as grey with "—" (dash) and label "Insufficient data"
+
+All metrics GREEN: If all 4 metrics are green (good compliance), show a success banner at the top: "✅ No compliance anomalies detected. Maintenance schedule is on track."
+
+API Performance: The calculation can be heavy if there are thousands of WOs. Add caching on the backend — cache the result for 1 hour, invalidate cache only when a new WO is completed or approved. Use whatever caching mechanism you already have (Redis, in-memory, etc.).
+
+Role-Based Visibility: If you have role-based access control, only show this panel to users with Superintendent or Chief Engineer roles. If the user is a regular crew member (2nd/3rd Engineer), either hide the panel completely OR show it but with limited details (e.g., don't show which specific crew member has the highest skip rate — just show aggregate numbers).
+
+STEP 4 — TEST DATA
+
+After implementing, you may not have enough real data to see meaningful anomalies. For testing purposes, you can:
+
+Use the existing Layer 5 test WOs (TEST-L5-LOCKED, etc.) which have missedCycles = 4 and daysLate = 35 — these should contribute to the Cycle Skip Rate and Schedule Drift metrics
+
+Optionally seed a few more test WOs with:
+
+Various performedBy ranks
+
+missedCycles > 0
+
+Backdated completion dates (completion date 20+ days before today)
+
+Multiple WOs completed on the same date (to trigger bulk completion detection)
+
+STEP 5 — VERIFY BEFORE REPORTING BACK
+
+Go to /pms/dashboard → confirm the "Compliance Anomaly Detection" section appears below the Superintendent Notifications tile
+
+Confirm all 4 metric cards are visible in a horizontal row
+
+Confirm each card shows:
+
+Correct icon
+
+A number (even if it's 0 or "—")
+
+A colored border (green/yellow/red based on severity)
+
+Click on one of the cards → confirm a modal or detail panel opens showing the breakdown
+
+If all metrics are green, confirm the success banner appears
+
+Refresh the page → confirm the data loads correctly (no flickering or errors)
+
+Report back with a screenshot of the dashboard showing the new Compliance Anomaly Detection panel.
