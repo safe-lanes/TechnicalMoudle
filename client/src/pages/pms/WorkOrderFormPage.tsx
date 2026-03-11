@@ -2313,6 +2313,35 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
           </span>
         </div>
       )}
+      {!embedded && currentWorkOrderStatus === 'Pending Approval' && (() => {
+        const topTier: string = (workOrderContext as any)?.workOrder?.approvalTier || 'standard';
+        const topDaysLate = (workOrderContext as any)?.workOrder?.daysLate || 0;
+        const topMissedCycles = (workOrderContext as any)?.workOrder?.missedCycles || 0;
+        const topBannerMap: Record<string, { bg: string; text: string; message: string }> = {
+          superintendent_locked: {
+            bg: 'bg-red-600', text: 'text-white',
+            message: `🔒 LOCKED — ${topMissedCycles} missed cycle(s). Awaiting Superintendent acknowledgment before CE can approve.`
+          },
+          superintendent_notification: {
+            bg: 'bg-orange-600', text: 'text-white',
+            message: `⚠️ SUPERINTENDENT NOTIFIED — ${topDaysLate} days late. CE must approve with detailed remarks (min 20 chars).`
+          },
+          ce_with_justification: {
+            bg: 'bg-yellow-50', text: 'text-yellow-900',
+            message: `⚠️ REMARKS REQUIRED — ${topDaysLate} days late. CE must provide approval remarks.`
+          },
+          standard: {
+            bg: 'bg-blue-600', text: 'text-white',
+            message: 'ℹ️ PENDING APPROVAL — Awaiting Chief Engineer review.'
+          }
+        };
+        const cfg = topBannerMap[topTier] || topBannerMap.standard;
+        return (
+          <div className={`sticky top-0 z-50 ${cfg.bg} border-b px-4 py-2`} data-testid="banner-top-approval-tier">
+            <span className={`text-sm font-medium ${cfg.text}`}>{cfg.message}</span>
+          </div>
+        );
+      })()}
       {/* Top Header Bar - Professional maritime header with logo and actions */}
       <div className="bg-white border-b border-gray-200 shadow-sm">
         <div className="px-6 py-4">
@@ -4314,13 +4343,13 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                   };
                 case 'ce_with_justification':
                   return {
-                    bg: '#ca8a04', color: '#1a1a1a',
-                    title: 'LATE COMPLETION \u2014 REMARKS REQUIRED',
+                    bg: '#854d0e', color: '#ffffff',
+                    title: 'LATE COMPLETION \u2014 CE REMARKS REQUIRED',
                     body: `This completion is ${approvalDaysLate} days late. ${approvalMissedCycles} cycles were missed. Chief Engineer approval remarks are mandatory before this work order can be approved.`
                   };
                 default:
                   return {
-                    bg: '#2563eb', color: '#ffffff',
+                    bg: '#1d4ed8', color: '#ffffff',
                     title: 'PENDING CHIEF ENGINEER APPROVAL',
                     body: approvalDaysLate === 0
                       ? 'This completion was on time. Please review and approve.'
@@ -4336,7 +4365,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                 case 'superintendent_notification':
                   return { bg: '#ea580c', color: '#ffffff', label: 'CE Approval + Superintendent Notified' };
                 case 'ce_with_justification':
-                  return { bg: '#ca8a04', color: '#1a1a1a', label: 'CE Approval + Remarks' };
+                  return { bg: '#854d0e', color: '#ffffff', label: 'CE Approval + Remarks' };
                 default:
                   return { bg: '#16a34a', color: '#ffffff', label: 'Standard Approval' };
               }
@@ -4430,13 +4459,25 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                     data-testid="input-ce-approval-remarks"
                   />
                   <div className="flex justify-between items-center">
+                    {isSuptLocked && (
+                      <span className="text-xs text-gray-500" data-testid="text-ce-remarks-helper">🔒 Locked — cannot enter remarks until Superintendent acknowledges</span>
+                    )}
                     {approvalTier === 'superintendent_notification' && (
-                      <span className="text-xs text-red-500" data-testid="text-ce-remarks-helper">Minimum 20 characters required (completion is &gt;14 days late)</span>
+                      <span className="text-xs text-red-500" data-testid="text-ce-remarks-helper">
+                        {ceApprovalRemarks.trim().length < 20
+                          ? `Detailed remarks required — minimum 20 characters (currently ${ceApprovalRemarks.trim().length} characters)`
+                          : 'Required — minimum 20 characters (completion is >14 days late)'}
+                      </span>
                     )}
                     {approvalTier === 'ce_with_justification' && (
-                      <span className="text-xs text-red-500" data-testid="text-ce-remarks-helper">Minimum 10 characters required</span>
+                      <span className="text-xs text-red-500" data-testid="text-ce-remarks-helper">
+                        {ceApprovalRemarks.trim().length < 10
+                          ? `Approval remarks required — minimum 10 characters (currently ${ceApprovalRemarks.trim().length} characters)`
+                          : 'Required — minimum 10 characters (completion is 7–14 days late)'}
+                      </span>
                     )}
-                    {approvalTier !== 'superintendent_notification' && approvalTier !== 'ce_with_justification' && <span />}
+                    {approvalTier === 'standard' && <span className="text-xs text-gray-400">Optional</span>}
+                    {!approvalTier && <span className="text-xs text-gray-400">Optional</span>}
                     <span className="text-xs text-gray-400" data-testid="text-ce-remarks-char-count">{ceApprovalRemarks.length} / 500</span>
                   </div>
                 </div>

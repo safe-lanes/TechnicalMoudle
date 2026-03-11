@@ -56,7 +56,7 @@ export default function SuperintendentPage() {
     },
   });
 
-  const pendingCount = allNotifications.filter((n: any) => !n.isAcknowledged && n.approvalTier === 'superintendent_locked').length;
+  const pendingCount = allNotifications.filter((n: any) => !n.isAcknowledged).length;
   const now = new Date();
   const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
   const acknowledgedThisMonth = allNotifications.filter(
