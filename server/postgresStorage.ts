@@ -6066,6 +6066,7 @@ export class PostgresStorage {
     value: number;
     dateUpdated: string;
     comments?: string;
+    userId?: string;
     meterReplaced?: boolean;
     oldMeterFinal?: string;
     newMeterStart?: string;
@@ -6076,7 +6077,7 @@ export class PostgresStorage {
     renewalEvidenceUrls?: string[];
   }): Promise<{ updatedComponents: number; auditsCreated: number; workOrdersGenerated: number; workOrders: any[] }> {
     const db = await getDb();
-    const { parentComponentId, mode, value, dateUpdated, comments, meterReplaced, oldMeterFinal, newMeterStart, isRenewalReset, renewalActionType, renewalReason, renewalReference, renewalEvidenceUrls } = params;
+    const { parentComponentId, mode, value, dateUpdated, comments, userId, meterReplaced, oldMeterFinal, newMeterStart, isRenewalReset, renewalActionType, renewalReason, renewalReference, renewalEvidenceUrls } = params;
     const now = new Date();
     
     // First resolve the parent component (dual-lookup: cuuid or legacy id)
@@ -6190,7 +6191,7 @@ export class PostgresStorage {
         dateUpdatedLocal: dateUpdated,
         dateUpdatedTZ: 'UTC',
         enteredAtUTC: now,
-        userId: 'system',
+        userId: userId || 'system',
         source: 'cascade',
         notes: meterReplaced 
           ? `Meter replaced. Old meter final: ${oldMeterFinal || currentRH}. New meter start: ${newMeterStart || value}. ${comments || ''}`
@@ -6261,7 +6262,7 @@ export class PostgresStorage {
               dateUpdatedLocal: dateUpdated,
               dateUpdatedTZ: 'UTC',
               enteredAtUTC: now,
-              userId: 'system',
+              userId: userId || 'system',
               source: 'inherited_cascade',
               comments: `Inherited delta ${delta} from MASTER ${parent.componentCode || parent.name}`,
             });
@@ -6313,7 +6314,7 @@ export class PostgresStorage {
         dateUpdatedLocal: dateUpdated,
         dateUpdatedTZ: 'UTC',
         enteredAtUTC: now,
-        userId: 'system',
+        userId: userId || 'system',
         source: 'cascade',
         comments: comments,
       });

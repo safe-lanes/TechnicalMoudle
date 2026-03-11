@@ -269,6 +269,7 @@ export interface IStorage {
     value: number;
     dateUpdated: string;
     comments?: string;
+    userId?: string;
     meterReplaced?: boolean;
     oldMeterFinal?: string;
     newMeterStart?: string;
