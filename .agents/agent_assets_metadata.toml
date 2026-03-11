@@ -1,0 +1,8 @@
+uploads = []
+generated = []
+
+[[outputs]]
+id = "WPl5KD0Kdd6EfeDK5UXYw"
+uri = "file://PMS_Global_Codes_and_Fixed_Values.xlsx"
+type = "table"
+title = "PMS Global Codes and Fixed Values"
