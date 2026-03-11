@@ -29,12 +29,36 @@ export const insertUserSchema = createInsertSchema(users).omit({
 
 export type InsertUser = z.infer<typeof insertUserSchema>;
 export type User = typeof users.$inferSelect;
-export type UserRole = "Ship" | "Office" | "PMS Admin" | "Sail Admin" | "Super Admin" | "Vessel Admin" | "Vessel User";
+export type UserRole = "Ship" | "Office" | "PMS Admin" | "Sail Admin" | "Super Admin" | "Vessel Admin" | "Vessel User" | "Admin" | "User" | "Vessel Management" | "Vessel User 2" | "Vessel User 3" | "Vessel User 4" | "External 1" | "External 2" | "External 3" | "External 4" | "External 5";
 
 export type PublicUser = Omit<User, "password"> & {
   crewDesignation?: string; // Extended field for crew designation/office position (from external user data)
   userType?: "Office" | "Ship"; // Extended field for user type (Office = shore-based, Ship = vessel-based)
 };
+
+export const admnRoleAcess = pgTable("admn_role_acess", {
+  id: integer("id").primaryKey(),
+  ruid: text("ruid").notNull().unique(),
+  assignedRole: text("assigned_role").notNull(),
+  roletype: text("roletype").notNull(),
+  orderby: integer("orderby"),
+  isActive: boolean("is_active").notNull().default(true),
+  sortOrder: integer("sort_order"),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  createdByUuid: text("created_by_uuid"),
+  updatedByUuid: text("updated_by_uuid"),
+  isDeleted: boolean("is_deleted").notNull().default(false),
+  isSync: boolean("is_sync").notNull().default(false),
+});
+
+export const insertAdmnRoleAcessSchema = createInsertSchema(admnRoleAcess).omit({
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type InsertAdmnRoleAcess = z.infer<typeof insertAdmnRoleAcessSchema>;
+export type AdmnRoleAcess = typeof admnRoleAcess.$inferSelect;
 
 // Fleets Table - Fleet registry for grouping vessels
 export const fleets = pgTable("fleets", {

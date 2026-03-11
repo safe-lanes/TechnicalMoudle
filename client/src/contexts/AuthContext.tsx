@@ -19,6 +19,17 @@ const ROLE_TO_UI_TYPE: Record<UserRole, UIRole> = {
   "Super Admin": "Client_Admin",
   "Vessel Admin": "Head_of_Dept",
   "Vessel User": "Vessel",
+  Admin: "Client_Admin",
+  User: "Client_Admin",
+  "Vessel Management": "Head_of_Dept",
+  "Vessel User 2": "Vessel",
+  "Vessel User 3": "Vessel",
+  "Vessel User 4": "Vessel",
+  "External 1": "Client_Admin",
+  "External 2": "Client_Admin",
+  "External 3": "Client_Admin",
+  "External 4": "Client_Admin",
+  "External 5": "Client_Admin",
 };
 
 const DEFAULT_USER: PublicUser = {

@@ -19,12 +19,12 @@ export const UI_ROLE_LABELS: Record<UIRole, string> = {
 
 export function mapLoggedRoleToUIRole(userType: string, profileRole: string): UIRole {
   if (userType === "Office") {
-    if (profileRole === "Sail Admin") return "Sail_Admin";
+    if (profileRole === "Sail Admin" || profileRole === "PMS Admin") return "Sail_Admin";
     return "Client_Admin";
   }
 
   if (userType === "Ship") {
-    if (profileRole === "Vessel Admin") return "Head_of_Dept";
+    if (profileRole === "Vessel Admin" || profileRole === "Vessel Management") return "Head_of_Dept";
     return "Vessel";
   }
 
