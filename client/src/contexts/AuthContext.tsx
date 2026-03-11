@@ -10,6 +10,11 @@ import type { UIRole } from "@shared/uiRoles";
 import { mapLoggedRoleToUIRole } from "@shared/uiRoles";
 import { analyzeLocalStorage } from "@/utils/localStorageAnalyzer";
 
+// To test different roles, change role + userType below:
+//   role: "Sail Admin",   userType: "Office"  → Dropdown: Sail Admin
+//   role: "Super Admin",  userType: "Office"  → Dropdown: Client Admin
+//   role: "Vessel Admin", userType: "Ship"    → Dropdown: Head of Dept
+//   role: "Vessel User",  userType: "Ship"    → Dropdown: Vessel
 const DEFAULT_USER: PublicUser = {
   id: 1,
   username: "munawer.modak",
