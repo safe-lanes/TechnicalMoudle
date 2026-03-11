@@ -20,7 +20,7 @@ const DEFAULT_USER: PublicUser = {
   username: "munawer.modak",
   fullName: "Munawer A. Modak",
   email: "ayush.agrawal@safe-lanes.com",
-  role: "Sail Admin",
+  role: "Super Admin",
   userType: "Office",
   vesselId: null,
   department: null,
@@ -93,7 +93,10 @@ export function AuthProvider({ children }: AuthProviderProps) {
       };
     } else {
       resolvedUser = DEFAULT_USER;
-      resolvedUserType = mapLoggedRoleToUIRole(DEFAULT_USER.userType, DEFAULT_USER.role);
+      resolvedUserType = mapLoggedRoleToUIRole(
+        DEFAULT_USER.userType,
+        DEFAULT_USER.role,
+      );
     }
 
     setCurrentUser(resolvedUser);
