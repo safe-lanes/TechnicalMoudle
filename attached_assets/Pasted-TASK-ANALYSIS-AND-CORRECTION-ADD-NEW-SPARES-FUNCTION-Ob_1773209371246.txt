@@ -1,0 +1,99 @@
+TASK: ANALYSIS AND CORRECTION – ADD NEW SPARES FUNCTION
+
+Objective:
+
+Perform a detailed analysis of the **Add New Spares** function to understand how the function currently works, where the data is stored, and why the data is not being saved.
+
+Scope:
+
+• Spares Module  
+• Add New Spares Function
+
+--------------------------------------------------
+
+1. Functional Analysis
+
+Investigate the current implementation of the **Add New Spares** function.
+
+Verify the following:
+
+• How the Add New Spares form is triggered  
+• What fields are captured in the form  
+• Which backend API/service processes the save request  
+• Which database table is intended to store the spare data
+
+--------------------------------------------------
+
+2. Data Storage Verification
+
+Identify:
+
+• The database table where the spare records should be stored  
+• The fields used for storing spare information  
+• Whether the save query is being triggered when the form is submitted
+
+--------------------------------------------------
+
+3. Self Testing
+
+Perform a self-test on the **Add New Spares** function.
+
+Test Steps:
+
+• Open Add New Spares form  
+• Enter required spare details  
+• Submit the form  
+
+Observation:
+
+• The spare record is **not being saved in the database**.
+
+Finding:
+
+• As of now, the **Add New Spares function is not saving the data**.
+
+--------------------------------------------------
+
+4. Root Cause Investigation
+
+Identify why the data is not being saved.
+
+Check the following:
+
+• Whether the backend save API is triggered  
+• Whether the vessel ID is passed in the request  
+• Whether the insert query is executed  
+• Whether any validation is blocking the save operation  
+• Whether any database constraints are failing
+
+--------------------------------------------------
+
+5. Correct Implementation Approach
+
+The **Add New Spares function must follow the Vessel Concept**.
+
+Implementation Rule:
+
+• When a new spare is added, the spare must be linked to the **selected vessel**.
+
+Required Logic:
+
+• The system must capture the **selected vessel from the vessel dropdown**.
+• The spare record must be saved with the **corresponding vessel_id**.
+•	Should be linked with selected component.
+
+--------------------------------------------------
+
+6. Expected Behaviour
+
+• When a user selects a vessel and adds a spare, the spare must be saved for that specific vessel.
+• Spare records should be retrievable based on the vessel selection.
+
+--------------------------------------------------
+
+Expected Result
+
+• Add New Spares function successfully saves data
+• Spare records are stored in the correct database table
+• Spare records are linked to the selected vessel
+• Vessel-based filtering works correctly
