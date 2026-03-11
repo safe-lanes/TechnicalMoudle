@@ -31,6 +31,7 @@ import { useVessels } from "@/hooks/useVessels";
 import { BulkApproveModal } from "@/components/BulkApproveModal";
 import { FleetVesselContextBar } from "@/components/FleetVesselContextBar";
 import { SemiCircleGauge } from "@/components/SemiCircleGauge";
+import { ComplianceAnomalyPanel } from "./ComplianceAnomalyPanel";
 
 interface Spare {
   id: number;
@@ -1523,6 +1524,11 @@ const Dashboard = () => {
               <ChevronRight className="w-5 h-5" style={{ color: '#9e9e9e' }} />
             </div>
           </div>
+        )}
+
+        {/* Compliance Anomaly Detection Panel (Layer 6) */}
+        {activeTab === 'overview' && (
+          <ComplianceAnomalyPanel vesselId={vesselId} />
         )}
 
         {/* Pending Approval Section (Head of Dept) - shown below layout */}

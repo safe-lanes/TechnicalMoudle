@@ -5,6 +5,7 @@ import * as woCompletionService from '../services/workOrderCompletionService';
 import * as woBulkService from '../services/workOrderBulkService';
 import * as woAutoService from '../services/workOrderAutoService';
 import * as executionService from '../services/executionService';
+import * as complianceAnomalyService from '../services/complianceAnomalyService';
 import { ValidationError } from '../../shared/errors';
 import { storage } from '../../../storage';
 
@@ -227,6 +228,17 @@ export async function getSuperintendentNotifications(req: Request, res: Response
 export async function getAllSuperintendentNotifications(req: Request, res: Response) {
   const notifications = await storage.getAllSuperintendentNotifications();
   res.json(notifications);
+}
+
+export async function getComplianceAnomalies(req: Request, res: Response) {
+  try {
+    const vesselId = req.query.vesselId as string | undefined;
+    const result = await complianceAnomalyService.getComplianceAnomalies(vesselId);
+    res.json(result);
+  } catch (error: any) {
+    console.error('Compliance anomaly calculation error:', error);
+    res.status(500).json({ error: 'Failed to calculate compliance anomalies' });
+  }
 }
 
 export async function getSuperintendentNotificationsSummary(req: Request, res: Response) {

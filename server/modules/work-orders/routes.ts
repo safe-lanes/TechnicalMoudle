@@ -26,6 +26,11 @@ const upload = multer({
   },
 });
 
+// ── Dashboard Analytics ──
+
+// GET /dashboard/compliance-anomalies — compliance anomaly detection metrics
+router.get('/dashboard/compliance-anomalies', asyncHandler(woCtrl.getComplianceAnomalies));
+
 // ── Core Work Order CRUD ──
 
 // GET  /work-orders — list all (optional ?vesselId= filter)
