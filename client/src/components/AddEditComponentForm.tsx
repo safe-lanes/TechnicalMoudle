@@ -520,15 +520,13 @@ const AddEditComponentForm: React.FC<AddEditComponentFormProps> = ({
     }
   }, [componentData.componentCode]);
 
-  const PARENT_OPTIONAL_FIELDS = ['model', 'modelCode', 'eqptSystemDept'];
+  const PARENT_OPTIONAL_FIELDS = ['eqptSystemDept'];
 
   const ALL_MANDATORY_FIELDS = [
     { key: 'parentComponent', label: 'Parent Component Code' },
     { key: 'componentCode', label: 'Component Code' },
     { key: 'componentName', label: 'Component Name' },
     { key: 'componentCategory', label: 'Component Category' },
-    { key: 'model', label: 'Model' },
-    { key: 'modelCode', label: 'Model Code' },
     { key: 'eqptSystemDept', label: 'Equipment / System Department' },
     { key: 'isActive', label: 'Is Active' },
   ] as const;
@@ -930,26 +928,24 @@ const AddEditComponentForm: React.FC<AddEditComponentFormProps> = ({
                           {/* Row 3: Model, Model Code, Serial No, Drawing No */}
                           <div className="grid grid-cols-4 gap-4">
                             <div>
-                              <label className="text-xs font-medium text-gray-600 block mb-1">Model{!isParentComponent && <span className="text-red-500 ml-0.5">*</span>}</label>
+                              <label className="text-xs font-medium text-gray-600 block mb-1">Model</label>
                               <input
                                 type="text"
                                 value={componentData.model}
                                 onChange={(e) => handleFieldChange('model', e.target.value)}
-                                className={`text-sm w-full px-2 py-1 border rounded ${validationErrors.model ? 'border-red-500 text-red-700' : 'text-[#52BAF3] border-[#52BAF3]'}`}
+                                className="text-sm w-full px-2 py-1 border rounded text-[#52BAF3] border-[#52BAF3]"
                                 data-testid="input-model"
                               />
-                              {validationErrors.model && <span className="text-xs text-red-500" data-testid="validation-error-model">This field is required</span>}
                             </div>
                             <div>
-                              <label className="text-xs font-medium text-gray-600 block mb-1">Model Code{!isParentComponent && <span className="text-red-500 ml-0.5">*</span>}</label>
+                              <label className="text-xs font-medium text-gray-600 block mb-1">Model Code</label>
                               <input
                                 type="text"
                                 value={componentData.modelCode}
                                 onChange={(e) => handleFieldChange('modelCode', e.target.value)}
-                                className={`text-sm w-full px-2 py-1 border rounded ${validationErrors.modelCode ? 'border-red-500 text-red-700' : 'text-[#52BAF3] border-[#52BAF3]'}`}
+                                className="text-sm w-full px-2 py-1 border rounded text-[#52BAF3] border-[#52BAF3]"
                                 data-testid="input-model-code"
                               />
-                              {validationErrors.modelCode && <span className="text-xs text-red-500" data-testid="validation-error-modelCode">This field is required</span>}
                             </div>
                             <div>
                               <label className="text-xs font-medium text-gray-600 block mb-1">Serial No</label>

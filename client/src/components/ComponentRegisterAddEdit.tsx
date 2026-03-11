@@ -763,15 +763,13 @@ export default function ComponentRegisterAddEdit({
     });
   };
 
-  const PARENT_OPTIONAL_FIELDS = ['model', 'modelCode', 'eqptSystemDept'];
+  const PARENT_OPTIONAL_FIELDS = ['eqptSystemDept'];
 
   const ALL_MANDATORY_FIELDS = [
     { key: 'parentComponent', label: 'Parent Component Code' },
     { key: 'componentCode', label: 'Component Code' },
     { key: 'componentName', label: 'Component Name' },
     { key: 'eqptSystemCategory', label: 'Component Category' },
-    { key: 'model', label: 'Model' },
-    { key: 'modelCode', label: 'Model Code' },
     { key: 'eqptSystemDept', label: 'Equipment / System Department' },
     { key: 'isActive', label: 'Is Active' },
   ] as const;
@@ -1357,24 +1355,22 @@ export default function ComponentRegisterAddEdit({
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 mb-4">
                   <div>
-                    <label className="text-xs font-medium text-gray-600 mb-1 block">Model{!isParentComponent && <span className="text-red-500 ml-0.5">*</span>}</label>
+                    <label className="text-xs font-medium text-gray-600 mb-1 block">Model</label>
                     <Input
                       value={componentData.model}
                       onChange={(e) => handleFieldChange('model', e.target.value)}
-                      className={`h-8 text-sm ${validationErrors.model ? 'border-red-500' : ''}`}
+                      className="h-8 text-sm"
                       data-testid="input-model"
                     />
-                    {validationErrors.model && <span className="text-xs text-red-500" data-testid="validation-error-model">This field is required</span>}
                   </div>
                   <div>
-                    <label className="text-xs font-medium text-gray-600 mb-1 block">Model Code{!isParentComponent && <span className="text-red-500 ml-0.5">*</span>}</label>
+                    <label className="text-xs font-medium text-gray-600 mb-1 block">Model Code</label>
                     <Input
                       value={componentData.modelCode}
                       onChange={(e) => handleFieldChange('modelCode', e.target.value)}
-                      className={`h-8 text-sm ${validationErrors.modelCode ? 'border-red-500' : ''}`}
+                      className="h-8 text-sm"
                       data-testid="input-model-code"
                     />
-                    {validationErrors.modelCode && <span className="text-xs text-red-500" data-testid="validation-error-modelCode">This field is required</span>}
                   </div>
                   <div>
                     <label className="text-xs font-medium text-gray-600 mb-1 block">Serial No</label>

@@ -53,17 +53,13 @@ export async function getById(id: string): Promise<Component | undefined> {
 
 export async function create(data: any): Promise<Component> {
   const isParent = data.isParent === true || data.isParent === 'Yes';
-  const parentOptionalKeys = ['model', 'modelCode', 'critical', 'conditionBased', 'eqptSystemDept'];
+  const parentOptionalKeys = ['eqptSystemDept'];
 
   const allMandatoryFields: { key: string; label: string; isBoolean?: boolean }[] = [
     { key: 'name', label: 'Component Name' },
     { key: 'componentCode', label: 'Component Code' },
     { key: 'parentId', label: 'Parent Component Code' },
     { key: 'componentCategory', label: 'Component Category' },
-    { key: 'model', label: 'Model' },
-    { key: 'modelCode', label: 'Model Code' },
-    { key: 'critical', label: 'Criticality', isBoolean: true },
-    { key: 'conditionBased', label: 'Condition Based', isBoolean: true },
     { key: 'eqptSystemDept', label: 'Equipment / System Department' },
     { key: 'isActive', label: 'Is Active', isBoolean: true },
   ];
@@ -134,17 +130,13 @@ export async function update(id: string, data: any, userId: string): Promise<Com
   }
 
   const effectiveIsParent = data.isParent !== undefined ? (data.isParent === true || data.isParent === 'Yes') : (existingComponent as any).isParent === true;
-  const parentOptionalKeys = ['model', 'modelCode', 'critical', 'conditionBased', 'eqptSystemDept'];
+  const parentOptionalKeys = ['eqptSystemDept'];
 
   const allMandatoryPatchFields: { key: string; label: string; isBoolean?: boolean }[] = [
     { key: 'name', label: 'Component Name' },
     { key: 'componentCode', label: 'Component Code' },
     { key: 'parentId', label: 'Parent Component Code' },
     { key: 'componentCategory', label: 'Component Category' },
-    { key: 'model', label: 'Model' },
-    { key: 'modelCode', label: 'Model Code' },
-    { key: 'critical', label: 'Criticality', isBoolean: true },
-    { key: 'conditionBased', label: 'Condition Based', isBoolean: true },
     { key: 'eqptSystemDept', label: 'Equipment / System Department' },
     { key: 'isActive', label: 'Is Active', isBoolean: true },
   ];
