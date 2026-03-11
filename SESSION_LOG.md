@@ -354,3 +354,96 @@ Eight validation and integrity rules for the Work Order form Part B, covering fr
 - Consider adding the unsaved changes warning to other modals that have similar data-loss risk (e.g., individual Update RH modal if needed in the future).
 - Monitor spares soft delete behavior in production to ensure hidden items are properly excluded from relevant views.
 - Continue with any remaining Running Hours page enhancements or other PMS module work.
+
+---
+
+## 2026-03-10 — Stores, Components, Work Orders & Roles Enhancements
+
+### What We Built
+1. **Stores module improvements** — Added searchable location dropdowns, expanded item editing fields, soft delete for store items with role-based visibility, interactive multi-select delete mode, item details view matching spares structure, removed consume/receive button.
+2. **Component management** — Added Excel export for component data, prevented deletion when active jobs or spares are linked, improved validation to prevent cross-vessel data corruption.
+3. **Work order improvements** — Added skipped cycle detection and reporting, mandatory justification for skipped maintenance cycles, automatic backfill for missed maintenance cycles, fixed warning messages on completed WOs, updated date calculations to use original due dates, improved work history to include current WO and job details, made criticality/condition fields optional.
+4. **Sorting & UX** — Added ascending sort by item code in stores, sorted spare items by part code, unified export button design across modules.
+5. **Roles & permissions** — Granted full admin privileges to Sail Admin role, expanded user roles for testing (vessel admin, super admin), updated role mappings and auth context, updated default user role/type.
+
+### What's Working
+- Store item soft delete with role-based visibility
+- Multi-select delete mode for store items
+- Searchable location dropdowns in store forms
+- Component Excel export
+- Component deletion safeguards (blocks when jobs/spares linked)
+- Skipped cycle detection and justification requirement
+- Automatic backfill for missed maintenance cycles
+- Work history showing current WO and job details
+- Sail Admin full privileges
+
+### What's Broken
+- Nothing broken from this session's changes.
+
+### What's Pending
+- Role system is partially implemented — role mappings expanded but full RBAC enforcement across all modules still in progress.
+
+### Key Files Changed
+- `client/src/pages/stores/StoresNew.tsx` — Soft delete, item details view, searchable dropdowns, multi-select delete
+- `client/src/pages/pms/Components.tsx` — Excel export, deletion safeguards, cross-vessel validation
+- `client/src/pages/pms/WorkOrderFormPage.tsx` — Skipped cycle detection, justification requirement, missed cycle backfill, date calculation fixes
+- `server/postgresStorage.ts` — Backend support for soft delete, validation, backfill logic
+- `shared/uiRoles.ts` — Role mappings and default role updates
+- `client/src/contexts/AuthContext.tsx` — Auth context role detection updates
+
+### Environment Issues
+- None.
+
+### Where to Resume
+- Continue RBAC implementation across remaining modules.
+- Consider E2E tests for store soft delete and component deletion safeguards.
+
+---
+
+## 2026-03-11 — Running Hours Layer 7, Dashboard Enhancements & "Last Updated By" Column
+
+### What We Built
+1. **Running Hours / Work Order isolation (Layer 7)** — Implemented 8-task validation and isolation system (T001–T008) ensuring Work Orders never modify component running hours directly. WOs store snapshot values in `completionRH` only; actual RH updates go through the dedicated Running Hours page. Includes timeline validation, anomaly detection, audit trail integration, and comprehensive test coverage.
+2. **Dashboard — Compliance anomaly detection panel** — Added anomaly detection system for work orders with visual alerts on the PMS dashboard.
+3. **Dashboard — Superintendent notification tile** — Added superintendent notification tile with improved functionality.
+4. **Running Hours — Period-based utilization rates** — Added monthly/weekly/daily utilization rate calculations with color-coded display.
+5. **Dashboard — System banners & notification counts** — Updated system banners and notification count displays for improved clarity.
+6. **Tiered approval workflow** — Implemented tiered approval workflow with superintendent acknowledgment for work orders.
+7. **Admin roles table** — Added schema definition and system table for application roles, seeded initial data.
+8. **"Last Updated By" column on Running Hours page** — Added 10th column showing the name of the person who last updated each component's running hours, sourced from the latest audit trail entry. Included in CSV export.
+9. **userId bug fix (critical)** — Fixed root-cause issue where `cascadeRunningHoursUpdate` in `postgresStorage.ts` had `userId: 'system'` hardcoded in all 3 audit insert statements. Now correctly passes the real user's name through the entire chain: frontend sends `currentUser.fullName`, controller applies server-side fallback (overrides `'admin'`/`'system'` with `req.user.fullName`), and storage uses the passed `userId`.
+
+### What's Working
+- **Layer 7 isolation**: Work orders do NOT modify component running hours — fully isolated.
+- **"Last Updated By" column**: Correctly shows real user name (e.g., "Munawer A. Modak") for all new updates going forward. Verified end-to-end: frontend → controller → storage → DB audit → API response → column display.
+- **Utilization rates**: Period-based calculations display correctly with color coding.
+- **Anomaly detection**: Dashboard panel shows compliance anomalies.
+- **Superintendent notifications**: Tile functional on dashboard.
+- **Tiered approval**: Workflow with superintendent acknowledgment operational.
+- **CSV export**: "Last Updated By" included in Running Hours export.
+
+### What's Broken
+- Nothing broken from this session's changes.
+
+### What's Pending
+- Historical audit entries created before the userId fix still show "system" — these are legacy entries from data imports/propagation and will remain as-is. Only new updates going forward show real user names.
+- FO PURIFIER NO.2 still shows "system" in the Last Updated By column until someone updates it again (at which point it will capture the real user name).
+
+### Key Files Changed
+- `client/src/pages/pms/RunningHours.tsx` — Added "Last Updated By" column (10th column), included in CSV export, frontend sends `currentUser.fullName` in all cascade mutation calls via `useAuth()`.
+- `server/postgresStorage.ts` — Fixed 3 hardcoded `userId: 'system'` in `cascadeRunningHoursUpdate` audit inserts to use passed `userId`; added `lastUpdatedBy` subquery in `listParents()`.
+- `server/modules/running-hours/controllers/runningHoursController.ts` — Added server-side fallback: if `userId` is missing/`'admin'`/`'system'`, uses `req.user.fullName || req.user.username`.
+- `server/modules/running-hours/services/runningHoursService.ts` — Layer 7 validation service.
+- `server/modules/running-hours/services/rhTimelineValidationService.ts` — Timeline validation for RH anomaly detection.
+- `client/src/pages/pms/WorkOrderFormPage.tsx` — Layer 7: WO form no longer calls `setComponentRunningHours()`.
+- `client/src/components/pms/RHTimelineViewer.tsx` — Timeline viewer component for RH audit visualization.
+- `shared/schema.ts` — `cascadeRunningHoursSchema` with `userId` field.
+- `server/storage.ts` — Storage interface updates for `listParents` return type.
+
+### Environment Issues
+- None. Application compiles and runs normally.
+
+### Where to Resume
+- Task #1 ("Last Updated By" column) is functionally complete. User should verify by performing a new RH update — the column should now show their real name.
+- Consider a one-time data migration script to backfill historical "system" audit entries with actual user names (if that data is recoverable from other sources).
+- Continue with any additional PMS module enhancements or next planned tasks.
