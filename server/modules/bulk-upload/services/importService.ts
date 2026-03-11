@@ -342,6 +342,11 @@ export async function performImport(
       return aDepth - bDepth;
     });
 
+    // Step 3b: Prefetch maker list for validation
+    const makerListItems = await storage.getMakerList();
+    const validMakerNames = new Set(makerListItems.map(m => (m.makerName || '').toLowerCase().trim()));
+    console.log(`📦 Prefetched ${makerListItems.length} makers for validation`);
+
     // Step 4: Process each data row individually with authoritative state capture
     for (const row of sortedData) {
       const componentCode = String(row['Component Code'] || row['Generated Code'] || row['Original SFI Code']).trim();
@@ -349,6 +354,12 @@ export async function performImport(
       const rowNum = row['__meta']?.rowNumber || 0;
 
       try {
+        const makerValue = (row['Maker'] || row['Maker Name'] || '').toString().trim();
+        if (makerValue && !validMakerNames.has(makerValue.toLowerCase())) {
+          result.skipped++;
+          result.rowResults.push({ rowNumber: rowNum, primaryIdentifier: componentCode, action: 'skipped', error: `Maker '${makerValue}' not found in Maker List. Please add the maker first.` });
+          continue;
+        }
         if (mode === 'add') {
           if (!existingComponent) {
             const newComponent = await createComponentFromRow(row, vesselId);
