@@ -133,6 +133,7 @@ export default function ComponentRegisterAddEdit({
     lastUpdated: "",
   });
 
+  const originalIsActiveRef = useRef<string | null>(null);
   const [rhSourceOpen, setRhSourceOpen] = useState(false);
 
   const { data: masterComponents = [] } = useQuery<any[]>({
@@ -492,7 +493,7 @@ export default function ComponentRegisterAddEdit({
         rhMasterComponentId: comp.rhMasterComponentId || "",
         lastUpdated: comp.lastUpdated || comp.rhLastUpdated || "",
       });
-      // Use propComponentCode if provided (passed from parent), otherwise use fetched comp.componentCode
+      originalIsActiveRef.current = comp.isActive === false ? "No" : "Yes";
       const compCode = propComponentCode || comp.componentCode || comp.id;
       setSelectedTreeNode(compCode);
       
@@ -880,7 +881,31 @@ export default function ComponentRegisterAddEdit({
       };
 
       if (isEditMode && !isAddingNew && componentId) {
-        await apiRequest('PATCH', `/technical/api/components/${componentId}`, payload);
+        const isDeactivating = originalIsActiveRef.current === "Yes" && componentData.isActive === "No";
+        if (isDeactivating) {
+          try {
+            await apiRequest('POST', `/technical/api/components/${componentId}/inactivate`, {
+              vesselId: vesselId || payload.vesselId,
+            });
+          } catch (inactivateError: any) {
+            let errorMsg = "Component has active linked items. Deactivate them first.";
+            try {
+              const parsed = JSON.parse(inactivateError.message.replace(/^\d+:\s*/, ''));
+              errorMsg = parsed.error || errorMsg;
+            } catch {}
+            toast({
+              title: "Cannot Deactivate",
+              description: errorMsg,
+              variant: "destructive",
+            });
+            setIsSaving(false);
+            return;
+          }
+          const { isActive: _removed, ...patchPayload } = payload;
+          await apiRequest('PATCH', `/technical/api/components/${componentId}`, patchPayload);
+        } else {
+          await apiRequest('PATCH', `/technical/api/components/${componentId}`, payload);
+        }
         toast({
           title: "Component Updated",
           description: "Component has been updated successfully.",
