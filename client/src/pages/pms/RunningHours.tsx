@@ -18,6 +18,7 @@ import { useLocation } from "wouter";
 import { formatProfessionalDateTime } from "@/lib/dateUtils";
 import { useVessel } from "@/contexts/VesselContext";
 import { useUIRole } from "@/contexts/UIRoleContext";
+import { useAuth } from "@/contexts/AuthContext";
 import { Marker } from "@/components/Marker";
 import ZeroRHConfirmationDialog from "@/components/ZeroRHConfirmationDialog";
 import MeterReplacedConfirmationDialog from "@/components/MeterReplacedConfirmationDialog";
@@ -72,6 +73,7 @@ const periodNoun: Record<string, string> = {
 
 const RunningHours = () => {
   const [, navigate] = useLocation();
+  const { currentUser } = useAuth();
   const [searchTerm, setSearchTerm] = useState("");
   const [utilizationPeriod, setUtilizationPeriod] = useState<string>("monthly");
   const [isUpdateDialogOpen, setIsUpdateDialogOpen] = useState(false);
@@ -224,6 +226,7 @@ const RunningHours = () => {
           value: update.value,
           dateUpdated: update.dateUpdated,
           comments: update.comments || '',
+          userId: currentUser?.fullName || currentUser?.username || 'system',
           meterReplaced: update.meterReplaced,
           oldMeterFinal: update.oldMeterFinal,
           newMeterStart: update.newMeterStart
@@ -259,7 +262,8 @@ const RunningHours = () => {
     mutationFn: async (data: { componentId: string; newRHValue: number; comments?: string }) => {
       return await apiRequest('PUT', `/technical/api/running-hours/child/${data.componentId}`, {
         newRHValue: data.newRHValue,
-        comments: data.comments || ''
+        comments: data.comments || '',
+        userId: currentUser?.fullName || currentUser?.username || 'system'
       });
     },
     onSuccess: () => {
@@ -493,6 +497,7 @@ const RunningHours = () => {
       value: newValue,
       dateUpdated: dateLocal,
       comments: updateForm.comments,
+      userId: currentUser?.fullName || currentUser?.username || 'system',
       meterReplaced,
       oldMeterFinal: meterReplaced ? updateForm.oldMeterFinal : undefined,
       newMeterStart: meterReplaced ? updateForm.newMeterStart : undefined,
@@ -518,6 +523,7 @@ const RunningHours = () => {
       value: 0,
       dateUpdated: pendingZeroRHUpdate.dateLocal,
       comments: pendingZeroRHUpdate.comments,
+      userId: currentUser?.fullName || currentUser?.username || 'system',
       meterReplaced: true,
       isRenewalReset: true,
       renewalActionType: renewalData.renewalActionType,
