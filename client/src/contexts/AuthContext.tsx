@@ -8,6 +8,7 @@ import {
 import type { PublicUser, UserRole } from "@shared/schema";
 import type { UIRole } from "@shared/uiRoles";
 import { mapLoggedRoleToUIRole } from "@shared/uiRoles";
+import { secureGetItem } from "@/utils/secureStorage";
 import { analyzeLocalStorage } from "@/utils/localStorageAnalyzer";
 
 // To test different roles, change role + userType below:
@@ -20,7 +21,7 @@ const DEFAULT_USER: PublicUser = {
   username: "munawer.modak",
   fullName: "Munawer A. Modak",
   email: "ayush.agrawal@safe-lanes.com",
-  role: "Super Admin",
+  role: "Sail Admin",
   userType: "Office",
   vesselId: null,
   department: null,
@@ -60,43 +61,67 @@ export function AuthProvider({ children }: AuthProviderProps) {
     let resolvedUser: PublicUser | null = null;
     let resolvedUserType: UIRole | null = null;
 
-    const plainUserType = localStorage.getItem("userType");
-    let plainProfile: Record<string, any> | null = null;
-    try {
-      const raw = localStorage.getItem("userProfile");
-      if (raw) plainProfile = JSON.parse(raw);
-    } catch {
-      plainProfile = null;
-    }
+    const encryptedProfile = secureGetItem<Record<string, any>>("userProfile");
+    const encryptedUserType = secureGetItem<string>("userType");
 
-    if (plainUserType && plainProfile?.role) {
-      const profileRole = plainProfile.role;
-      resolvedUserType = mapLoggedRoleToUIRole(plainUserType, profileRole);
+    if (encryptedUserType && encryptedProfile?.role) {
+      resolvedUserType = mapLoggedRoleToUIRole(encryptedUserType, encryptedProfile.role);
 
-      const role = (profileRole as UserRole) || "Office";
+      const role = (encryptedProfile.role as UserRole) || "Office";
       resolvedUser = {
-        id: plainProfile.id || 0,
-        username: plainProfile.username || "user",
-        fullName: plainProfile.fullName || plainProfile.name || "User",
-        email: plainProfile.email || null,
+        id: encryptedProfile.id || 0,
+        username: encryptedProfile.username || "user",
+        fullName: encryptedProfile.fullName || encryptedProfile.name || "User",
+        email: encryptedProfile.email || null,
         role: role,
         userType:
-          plainUserType === "Office" || plainUserType === "Ship"
-            ? plainUserType
+          encryptedUserType === "Office" || encryptedUserType === "Ship"
+            ? encryptedUserType
             : undefined,
-        vesselId: plainProfile.vesselId || null,
-        department: plainProfile.department || null,
+        vesselId: encryptedProfile.vesselId || null,
+        department: encryptedProfile.department || null,
         isActive: true,
-        crewDesignation: plainProfile.crewDesignation || null,
+        crewDesignation: encryptedProfile.crewDesignation || null,
         createdAt: new Date(),
         updatedAt: new Date(),
       };
     } else {
+      const plainUserType = localStorage.getItem("userType");
+      let plainProfile: Record<string, any> | null = null;
+      try {
+        const raw = localStorage.getItem("userProfile");
+        if (raw) plainProfile = JSON.parse(raw);
+      } catch {
+        plainProfile = null;
+      }
+
+      if (plainUserType && plainProfile?.role) {
+        resolvedUserType = mapLoggedRoleToUIRole(plainUserType, plainProfile.role);
+
+        const role = (plainProfile.role as UserRole) || "Office";
+        resolvedUser = {
+          id: plainProfile.id || 0,
+          username: plainProfile.username || "user",
+          fullName: plainProfile.fullName || plainProfile.name || "User",
+          email: plainProfile.email || null,
+          role: role,
+          userType:
+            plainUserType === "Office" || plainUserType === "Ship"
+              ? plainUserType
+              : undefined,
+          vesselId: plainProfile.vesselId || null,
+          department: plainProfile.department || null,
+          isActive: true,
+          crewDesignation: plainProfile.crewDesignation || null,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        };
+      }
+    }
+
+    if (!resolvedUser) {
       resolvedUser = DEFAULT_USER;
-      resolvedUserType = mapLoggedRoleToUIRole(
-        DEFAULT_USER.userType,
-        DEFAULT_USER.role,
-      );
+      resolvedUserType = mapLoggedRoleToUIRole(DEFAULT_USER.userType, DEFAULT_USER.role);
     }
 
     setCurrentUser(resolvedUser);

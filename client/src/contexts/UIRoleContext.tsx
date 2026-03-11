@@ -1,6 +1,7 @@
 import { createContext, useContext, useState, useEffect, ReactNode } from "react";
 import type { UIRole } from "@shared/uiRoles";
 import { mapLoggedRoleToUIRole } from "@shared/uiRoles";
+import { secureGetItem } from "@/utils/secureStorage";
 import { useAuth } from "@/contexts/AuthContext";
 
 interface UIRoleContextType {
@@ -25,6 +26,20 @@ export function UIRoleProvider({ children }: UIRoleProviderProps) {
   useEffect(() => {
     if (!currentUser) {
       setUIRoleState(null);
+      return;
+    }
+
+    const encryptedUserType = secureGetItem<string>("userType");
+    let encryptedProfileRole: string | null = null;
+    try {
+      const encryptedProfile = secureGetItem<Record<string, any>>("userProfile");
+      encryptedProfileRole = encryptedProfile?.role || null;
+    } catch {
+      encryptedProfileRole = null;
+    }
+
+    if (encryptedUserType && encryptedProfileRole) {
+      setUIRoleState(mapLoggedRoleToUIRole(encryptedUserType, encryptedProfileRole));
       return;
     }
 
