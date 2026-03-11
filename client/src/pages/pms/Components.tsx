@@ -953,7 +953,7 @@ const JobRow: React.FC<{
   );
 };
 
-const WorkOrdersSection: React.FC<{ componentCode: string; componentName: string; componentId?: string }> = ({ componentCode, componentName, componentId }) => {
+const WorkOrdersSection: React.FC<{ componentCode: string; componentName: string; componentId?: string; isComponentActive?: boolean }> = ({ componentCode, componentName, componentId, isComponentActive }) => {
   const [, setLocation] = useLocation();
   const { toast } = useToast();
   const { vesselId } = useVessel();
@@ -1047,7 +1047,7 @@ const WorkOrdersSection: React.FC<{ componentCode: string; componentName: string
   return (
     <>
       <div className="overflow-x-auto">
-        {(isSailAdmin || isChangeMode || isChangeRequestMode) && (
+        {(isSailAdmin || isChangeMode || isChangeRequestMode) && isComponentActive !== false && (
         <div className="flex justify-end mb-3">
           <Button
             onClick={handleAddWorkOrder}
@@ -3593,6 +3593,7 @@ const Components: React.FC = () => {
                               componentCode={selectedComponent?.code || ""} 
                               componentName={selectedComponent?.name || ""} 
                               componentId={selectedComponent?.actualId}
+                              isComponentActive={selectedComponent?.isActive}
                             />
                           ) : section.id === "D" ? (
                             <MaintenanceHistorySection selectedComponent={selectedComponent} />
