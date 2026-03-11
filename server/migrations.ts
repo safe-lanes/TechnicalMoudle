@@ -1787,6 +1787,47 @@ const migrations: Migration[] = [
       ALTER TABLE work_orders
         ADD COLUMN IF NOT EXISTS skipped_cycles_justification TEXT
     `
+  },
+  {
+    id: '056_admn_role_master',
+    name: 'Create admn_role_master table with seed data',
+    description: 'Creates the admn_role_master system initialization table for application role configuration and seeds 15 role records',
+    sql: `
+      CREATE TABLE IF NOT EXISTS admn_role_master (
+        id INTEGER PRIMARY KEY,
+        ruid UUID NOT NULL UNIQUE DEFAULT gen_random_uuid(),
+        assigned_role VARCHAR NOT NULL,
+        roletype VARCHAR NOT NULL,
+        orderby INTEGER,
+        is_active BOOLEAN DEFAULT true,
+        sort_order INTEGER,
+        created_at TIMESTAMPTZ DEFAULT NOW(),
+        updated_at TIMESTAMPTZ DEFAULT NOW(),
+        created_by_uuid UUID,
+        updated_by_uuid UUID,
+        is_deleted BOOLEAN DEFAULT false,
+        is_sync BOOLEAN DEFAULT false
+      );
+
+      INSERT INTO admn_role_master (id, ruid, assigned_role, roletype, orderby, is_active, sort_order, created_at, updated_at, is_deleted, is_sync)
+      VALUES
+        (1,  gen_random_uuid(), 'Admin',             'Office', 1,  true, 1,  NOW(), NOW(), false, false),
+        (2,  gen_random_uuid(), 'Vessel Management', 'Ship',   6,  true, 6,  NOW(), NOW(), false, false),
+        (3,  gen_random_uuid(), 'User',              'Office', 2,  true, 2,  NOW(), NOW(), false, false),
+        (4,  gen_random_uuid(), 'Sail Admin',        'Office', 3,  true, 3,  NOW(), NOW(), false, false),
+        (5,  gen_random_uuid(), 'Super Admin',       'Office', 4,  true, 4,  NOW(), NOW(), false, false),
+        (6,  gen_random_uuid(), 'Vessel Admin',      'Ship',   5,  true, 5,  NOW(), NOW(), false, false),
+        (7,  gen_random_uuid(), 'Vessel User',       'Ship',   7,  true, 7,  NOW(), NOW(), false, false),
+        (8,  gen_random_uuid(), 'External 1',        'Office', 8,  true, 8,  NOW(), NOW(), false, false),
+        (9,  gen_random_uuid(), 'External 2',        'Office', 9,  true, 9,  NOW(), NOW(), false, false),
+        (10, gen_random_uuid(), 'External 3',        'Office', 10, true, 10, NOW(), NOW(), false, false),
+        (11, gen_random_uuid(), 'External 4',        'Office', 11, true, 11, NOW(), NOW(), false, false),
+        (12, gen_random_uuid(), 'External 5',        'Office', 12, true, 12, NOW(), NOW(), false, false),
+        (13, gen_random_uuid(), 'Vessel User 2',     'Ship',   13, true, 13, NOW(), NOW(), false, false),
+        (14, gen_random_uuid(), 'Vessel User 3',     'Ship',   14, true, 14, NOW(), NOW(), false, false),
+        (15, gen_random_uuid(), 'Vessel User 4',     'Ship',   15, true, 15, NOW(), NOW(), false, false)
+      ON CONFLICT (id) DO NOTHING;
+    `
   }
 ];
 
