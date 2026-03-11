@@ -2,8 +2,6 @@ import { decryptValue, LOCAL_STORAGE_KEYS } from "./secureStorage";
 
 type LocalStorageKey = (typeof LOCAL_STORAGE_KEYS)[number];
 
-const SENSITIVE_KEYS: LocalStorageKey[] = ["credentials"];
-
 const SENSITIVE_FIELDS = ["token", "refreshToken", "password", "secret", "apiKey"];
 
 interface AnalysisResult {
@@ -129,16 +127,11 @@ function analyzeKey(key: LocalStorageKey): AnalysisResult {
     result.encryptionType = detection.type;
 
     if (result.isEncrypted) {
-      const { decrypted, method } = tryDecrypt(rawValue, detection.type);
+      const { decrypted } = tryDecrypt(rawValue, detection.type);
       result.parsedValue = decrypted;
-      console.log(`  Encryption type: ${detection.type}`);
-      console.log(`  Decryption method: ${method}`);
     } else {
       const { parsed } = tryParse(rawValue);
       result.parsedValue = parsed;
-      if (detection.type !== "none") {
-        console.log(`  Format detected: ${detection.type}`);
-      }
     }
   } catch (error) {
     result.error = error instanceof Error ? error.message : String(error);
@@ -152,56 +145,9 @@ export function analyzeLocalStorage(): void {
     return;
   }
 
-  console.log("═══════════════════════════════════════════════════════════");
-  console.log("  LocalStorage Role-Based Access Data Analysis");
-  console.log("═══════════════════════════════════════════════════════════");
-
-  const results: AnalysisResult[] = [];
-
   for (const key of LOCAL_STORAGE_KEYS) {
-    const result = analyzeKey(key);
-    results.push(result);
-
-    console.log("");
-    console.log(`── ${key} ──────────────────────────────────`);
-
-    if (!result.exists) {
-      console.log(`  Key "${key}" not found in localStorage`);
-      continue;
-    }
-
-    if (result.error) {
-      console.log(`  Error reading "${key}": ${result.error}`);
-      continue;
-    }
-
-    const isSensitive = SENSITIVE_KEYS.includes(key);
-    const displayValue = isSensitive ? maskSensitiveValue(result.parsedValue) : result.parsedValue;
-
-    if (result.isEncrypted) {
-      console.log(`  Value is encrypted (${result.encryptionType})`);
-      console.log(`  Decrypted ${key}:`, displayValue);
-    } else {
-      console.log(`  Decrypted ${key}:`, displayValue);
-    }
+    analyzeKey(key);
   }
-
-  console.log("");
-  console.log("═══════════════════════════════════════════════════════════");
-  console.log("  Summary");
-  console.log("═══════════════════════════════════════════════════════════");
-
-  const found = results.filter((r) => r.exists);
-  const missing = results.filter((r) => !r.exists);
-  const encrypted = results.filter((r) => r.isEncrypted);
-  const errors = results.filter((r) => r.error);
-
-  console.log(`  Total keys checked: ${results.length}`);
-  console.log(`  Found: ${found.length}`);
-  console.log(`  Missing: ${missing.length}${missing.length > 0 ? ` (${missing.map((r) => r.key).join(", ")})` : ""}`);
-  console.log(`  Encrypted: ${encrypted.length}`);
-  console.log(`  Errors: ${errors.length}`);
-  console.log("═══════════════════════════════════════════════════════════");
 }
 
 export function getLocalStorageRoleData(): Record<LocalStorageKey, unknown> {
