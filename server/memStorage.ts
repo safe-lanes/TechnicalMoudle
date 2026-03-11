@@ -173,6 +173,7 @@ class MemStorage {
   async getEarliestAuditTimestamp(vesselId: string): Promise<Date | null> { return null; }
   async getRunningHoursAudits(componentId: string, limit?: number): Promise<any[]> { return []; }
   async getRunningHoursAuditsInDateRange(componentId: string, startDate: Date, endDate: Date): Promise<any[]> { return []; }
+  async sumPositiveDeltasInPeriod(componentId: string, startDate: Date, endDate: Date): Promise<number> { return 0; }
   async getRunningHourParents(vesselId: string): Promise<any[]> { return []; }
   
   /**

@@ -21,6 +21,10 @@ export async function getEarliestAuditTimestamp(vesselId: string): Promise<Date 
   return storage.getEarliestAuditTimestamp(vesselId);
 }
 
+export async function sumPositiveDeltasInPeriod(componentId: string, startDate: Date, endDate: Date): Promise<number> {
+  return storage.sumPositiveDeltasInPeriod(componentId, startDate, endDate);
+}
+
 // ── Running Hours Audit ──
 
 export async function getRunningHoursAudits(componentId: string, limit?: number): Promise<RunningHoursAudit[]> {

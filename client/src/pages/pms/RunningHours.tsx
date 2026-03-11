@@ -6,7 +6,8 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import { Search, FileSpreadsheet, Calendar, Users, Settings, Pencil, AlertTriangle, Download } from "lucide-react";
+import { Search, FileSpreadsheet, Calendar, Users, Settings, Pencil, AlertTriangle, Download, Clock } from "lucide-react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
@@ -40,15 +41,38 @@ interface RunningHoursData {
   runningHours: string;
   lastUpdated: string;
   utilizationRate?: number | null;
+  periodRunningHours?: number | null;
   inheritedCount?: number;
   meterReplacedLastRh?: string | null;
   meterReplacedDate?: string | null;
   currentMeterRH?: string;
 }
 
+const periodLabels: Record<string, string> = {
+  weekly: 'Weekly',
+  monthly: 'Monthly',
+  quarterly: 'Quarterly',
+  yearly: 'Yearly'
+};
+
+const periodTotalHours: Record<string, number> = {
+  weekly: 168,
+  monthly: 720,
+  quarterly: 2160,
+  yearly: 8760
+};
+
+const periodNoun: Record<string, string> = {
+  weekly: 'week',
+  monthly: 'month',
+  quarterly: 'quarter',
+  yearly: 'year'
+};
+
 const RunningHours = () => {
   const [, navigate] = useLocation();
   const [searchTerm, setSearchTerm] = useState("");
+  const [utilizationPeriod, setUtilizationPeriod] = useState<string>("monthly");
   const [isUpdateDialogOpen, setIsUpdateDialogOpen] = useState(false);
   const [selectedComponent, setSelectedComponent] = useState<RunningHoursData | null>(null);
   
@@ -134,9 +158,9 @@ const RunningHours = () => {
   
   // Fetch parent components with RH-based child jobs
   const { data: rawRunningHoursData = [], isLoading: isLoadingParents, refetch } = useQuery<any[]>({
-    queryKey: ['/technical/api/running-hours/parents', vesselId],
+    queryKey: ['/technical/api/running-hours/parents', vesselId, utilizationPeriod],
     queryFn: async () => {
-      const response = await fetch(`/technical/api/running-hours/parents?vesselId=${vesselId}`);
+      const response = await fetch(`/technical/api/running-hours/parents?vesselId=${vesselId}&period=${utilizationPeriod}`);
       if (!response.ok) throw new Error('Failed to fetch running hour parents');
       return response.json();
     },
@@ -153,6 +177,7 @@ const RunningHours = () => {
     runningHours: `${parseFloat(parent.currentCumulativeRH || '0').toLocaleString()} hrs`,
     lastUpdated: formatProfessionalDateTime(parent.latestUpdate || parent.lastUpdated),
     utilizationRate: parent.utilizationRate ?? 0,
+    periodRunningHours: parent.periodRunningHours ?? 0,
     inheritedCount: parent.inheritedCount || 0,
     meterReplacedLastRh: parent.meterReplacedLastRh || null,
     meterReplacedDate: parent.meterReplacedDate || null,
@@ -305,11 +330,11 @@ const RunningHours = () => {
       "Component Category",
       "Running Hours (cumulative)",
       "Last Updated (local)",
-      "Utilization Rate (%)",
+      `Utilization Rate % (${periodLabels[utilizationPeriod] || 'Monthly'})`,
+      `Period Running Hours (${periodLabels[utilizationPeriod] || 'Monthly'})`,
       "Notes"
     ];
 
-    // Prepare CSV rows
     const rows = filteredRunningHoursData.map(item => [
       vesselId,
       item.component,
@@ -318,7 +343,8 @@ const RunningHours = () => {
       item.runningHours.replace(" hrs", ""),
       item.lastUpdated,
       `${(item.utilizationRate ?? 0).toFixed(1)}%`,
-      "" // Notes field (empty for now)
+      `${(item.periodRunningHours ?? 0)}`,
+      ""
     ]);
 
     // Convert to CSV format
@@ -808,6 +834,22 @@ const RunningHours = () => {
             />
           </div>
 
+          <div className="flex items-center gap-2" data-testid="utilization-period-selector">
+            <Clock className="h-4 w-4 text-gray-500" />
+            <span className="text-sm text-gray-600 whitespace-nowrap">Utilization Period:</span>
+            <Select value={utilizationPeriod} onValueChange={setUtilizationPeriod}>
+              <SelectTrigger className="w-[180px] h-9" data-testid="select-utilization-period">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="weekly" data-testid="period-weekly">Weekly (7 days)</SelectItem>
+                <SelectItem value="monthly" data-testid="period-monthly">Monthly (30 days)</SelectItem>
+                <SelectItem value="quarterly" data-testid="period-quarterly">Quarterly (90 days)</SelectItem>
+                <SelectItem value="yearly" data-testid="period-yearly">Yearly (365 days)</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
           <Button variant="outline" size="sm" className="text-xs text-[#8798ad] border-[#e1e8ed]" onClick={exportToCSV} data-testid="D3">
             <Marker id="D3" /><Download className="h-3.5 w-3.5 mr-1" />
             Export
@@ -829,7 +871,7 @@ const RunningHours = () => {
             <div data-testid="D8"><Marker id="D8" />Component Category</div>
             <div data-testid="D9"><Marker id="D9" />Running Hours</div>
             <div data-testid="D10"><Marker id="D10" />Last Updated</div>
-            <div data-testid="D11"><Marker id="D11" />Utilization Rate</div>
+            <div data-testid="D11"><Marker id="D11" />Utilization Rate ({periodLabels[utilizationPeriod] || 'Monthly'})</div>
             <div data-testid="D22">Inherited RH</div>
             <div className="col-span-2" data-testid="D12"><Marker id="D12" />Update RH</div>
           </div>
@@ -889,7 +931,11 @@ const RunningHours = () => {
                     (item.utilizationRate ?? 0) >= 40 ? 'text-amber-500' :
                     'text-red-500'
                   }`}
-                  title="Running Hours as a percentage of total vessel operational hours"
+                  title={
+                    (item.periodRunningHours ?? 0) > 0
+                      ? `Ran ${item.periodRunningHours} hrs out of ${periodTotalHours[utilizationPeriod]} hrs available this ${periodNoun[utilizationPeriod]}`
+                      : 'No running hours logged in this period'
+                  }
                   data-testid={index === 0 ? "D18" : undefined}
                 >
                   {index === 0 && <Marker id="D18" />}{((item.utilizationRate ?? 0)).toFixed(1)}%

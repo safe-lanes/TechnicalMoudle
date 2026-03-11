@@ -1711,7 +1711,6 @@ export class PostgresStorage {
     endDate: Date
   ): Promise<RunningHoursAudit[]> {
     const db = await getDb();
-    // Resolve componentId to cuuid (dual-lookup support)
     const comp = await this.getComponent(componentId);
     const resolvedId = comp ? comp.cuuid : componentId;
     return await db.select().from(runningHoursAudit)
@@ -1721,6 +1720,26 @@ export class PostgresStorage {
         lte(runningHoursAudit.enteredAtUTC, endDate)
       ))
       .orderBy(desc(runningHoursAudit.enteredAtUTC));
+  }
+
+  async sumPositiveDeltasInPeriod(
+    componentId: string,
+    startDate: Date,
+    endDate: Date
+  ): Promise<number> {
+    const db = await getDb();
+    const comp = await this.getComponent(componentId);
+    const resolvedId = comp ? comp.cuuid : componentId;
+    const result = await db.select({
+      total: sql<string>`COALESCE(SUM(CASE WHEN (CAST(${runningHoursAudit.newRH} AS numeric) - CAST(${runningHoursAudit.previousRH} AS numeric)) > 0 THEN (CAST(${runningHoursAudit.newRH} AS numeric) - CAST(${runningHoursAudit.previousRH} AS numeric)) ELSE 0 END), 0)`
+    })
+      .from(runningHoursAudit)
+      .where(and(
+        or(eq(runningHoursAudit.componentId, resolvedId), eq(runningHoursAudit.componentId, componentId)),
+        gte(runningHoursAudit.enteredAtUTC, startDate),
+        lte(runningHoursAudit.enteredAtUTC, endDate)
+      ));
+    return parseFloat(result[0]?.total || '0');
   }
 
   // ============= MODULE 4: JOBS =============

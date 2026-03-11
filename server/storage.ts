@@ -255,6 +255,7 @@ export interface IStorage {
   getEarliestAuditTimestamp(vesselId: string): Promise<Date | null>;
   getRunningHoursAudits(componentId: string, limit?: number): Promise<RunningHoursAudit[]>;
   getRunningHoursAuditsInDateRange(componentId: string, startDate: Date, endDate: Date): Promise<RunningHoursAudit[]>;
+  sumPositiveDeltasInPeriod(componentId: string, startDate: Date, endDate: Date): Promise<number>;
   
   // New: Get parent components with running-hour based child jobs
   getRunningHourParents(vesselId: string): Promise<Array<Component & { childCount: number; latestUpdate?: string }>>;

@@ -120,37 +120,35 @@ export async function cascadeUpdate(body: unknown) {
 // Running Hours Parents (from runningHoursRoutes.ts)
 // ══════════════════════════════════════════════════════════
 
-export async function listParents(vesselId: string) {
+export async function listParents(vesselId: string, period: string = 'monthly') {
   const allComponents = await repo.getComponents(vesselId);
 
-  // Filter to only show components with rhCounterType = 'MASTER'
   const masterComponents = allComponents.filter(
     component => component.rhCounterType === 'MASTER'
   );
 
-  const earliestAuditDate = await repo.getEarliestAuditTimestamp(vesselId);
+  const periodHoursMap: Record<string, number> = {
+    weekly: 168,
+    monthly: 720,
+    quarterly: 2160,
+    yearly: 8760
+  };
+  const totalPeriodHours = periodHoursMap[period] || periodHoursMap.monthly;
   const now = new Date();
-  const hoursElapsed = earliestAuditDate
-    ? (now.getTime() - new Date(earliestAuditDate).getTime()) / (1000 * 60 * 60)
-    : 0;
+  const periodStartDate = new Date(now.getTime() - totalPeriodHours * 60 * 60 * 1000);
 
-  // Format response with RH data and count inherited children using storage layer
   const parentsWithCounts = await Promise.all(
     masterComponents.map(async (component) => {
-      // Use storage layer method which handles all ID formats (composite, code, uuid)
       const inheritedComponents = await repo.getInheritedComponents(component.cuuid, vesselId);
 
-      // Calculate total cumulative RH (includes meter replacement history)
-      // Total = meterReplacedLastRh + current meter reading
       const meterReplacedLastRh = parseFloat(component.meterReplacedLastRh || '0');
       const currentMeterRH = parseFloat(component.rhCurrentMaster || component.currentCumulativeRH || '0');
       const totalCumulativeRH = meterReplacedLastRh + currentMeterRH;
 
-      let utilizationRate = 0.0;
-      if (totalCumulativeRH > 0 && hoursElapsed > 0) {
-        utilizationRate = Math.min((totalCumulativeRH / hoursElapsed) * 100, 100.0);
-        utilizationRate = Math.round(utilizationRate * 10) / 10;
-      }
+      const hoursRunInPeriod = await repo.sumPositiveDeltasInPeriod(component.cuuid, periodStartDate, now);
+      const utilizationRate = totalPeriodHours > 0
+        ? Math.round(Math.min((hoursRunInPeriod / totalPeriodHours) * 100, 100.0) * 10) / 10
+        : 0;
 
       return {
         ...component,
@@ -161,7 +159,8 @@ export async function listParents(vesselId: string) {
         meterReplacedLastRh: meterReplacedLastRh > 0 ? meterReplacedLastRh.toFixed(2) : null,
         meterReplacedDate: component.meterReplacedDate || null,
         inheritedCount: inheritedComponents.length,
-        utilizationRate
+        utilizationRate,
+        periodRunningHours: Math.round(hoursRunInPeriod * 10) / 10
       };
     })
   );
