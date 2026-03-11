@@ -150,6 +150,9 @@ export async function listParents(vesselId: string, period: string = 'monthly') 
         ? Math.round(Math.min((hoursRunInPeriod / totalPeriodHours) * 100, 100.0) * 10) / 10
         : 0;
 
+      const latestAudits = await repo.getRunningHoursAudits(component.cuuid, 1);
+      const lastUpdatedBy = latestAudits.length > 0 ? (latestAudits[0].userId || null) : null;
+
       return {
         ...component,
         sfiCode: component.componentCode || '',
@@ -160,7 +163,8 @@ export async function listParents(vesselId: string, period: string = 'monthly') 
         meterReplacedDate: component.meterReplacedDate || null,
         inheritedCount: inheritedComponents.length,
         utilizationRate,
-        periodRunningHours: Math.round(hoursRunInPeriod * 10) / 10
+        periodRunningHours: Math.round(hoursRunInPeriod * 10) / 10,
+        lastUpdatedBy
       };
     })
   );

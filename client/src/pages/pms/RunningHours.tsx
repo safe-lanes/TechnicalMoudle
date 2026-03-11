@@ -46,6 +46,7 @@ interface RunningHoursData {
   meterReplacedLastRh?: string | null;
   meterReplacedDate?: string | null;
   currentMeterRH?: string;
+  lastUpdatedBy?: string | null;
 }
 
 const periodLabels: Record<string, string> = {
@@ -181,7 +182,8 @@ const RunningHours = () => {
     inheritedCount: parent.inheritedCount || 0,
     meterReplacedLastRh: parent.meterReplacedLastRh || null,
     meterReplacedDate: parent.meterReplacedDate || null,
-    currentMeterRH: parent.currentMeterRH || '0'
+    currentMeterRH: parent.currentMeterRH || '0',
+    lastUpdatedBy: parent.lastUpdatedBy || null
   })) : [];
 
   const filteredRunningHoursData = runningHoursData.filter(item =>
@@ -332,6 +334,7 @@ const RunningHours = () => {
       "Last Updated (local)",
       `Utilization Rate % (${periodLabels[utilizationPeriod] || 'Monthly'})`,
       `Period Running Hours (${periodLabels[utilizationPeriod] || 'Monthly'})`,
+      "Last Updated By",
       "Notes"
     ];
 
@@ -344,6 +347,7 @@ const RunningHours = () => {
       item.lastUpdated,
       `${(item.utilizationRate ?? 0).toFixed(1)}%`,
       `${(item.periodRunningHours ?? 0)}`,
+      item.lastUpdatedBy || "",
       ""
     ]);
 
@@ -865,7 +869,7 @@ const RunningHours = () => {
       <div className="flex-1 overflow-y-auto bg-white rounded-lg border border-gray-200">
         {/* Table Header */}
         <div className="bg-[#52baf3] text-white px-4 py-3">
-          <div className="grid grid-cols-9 gap-4 text-sm font-medium">
+          <div className="grid grid-cols-10 gap-4 text-sm font-medium">
             <div data-testid="D6"><Marker id="D6" />Component Name</div>
             <div data-testid="D7"><Marker id="D7" />Component Code</div>
             <div data-testid="D8"><Marker id="D8" />Component Category</div>
@@ -873,7 +877,8 @@ const RunningHours = () => {
             <div data-testid="D10"><Marker id="D10" />Last Updated</div>
             <div data-testid="D11"><Marker id="D11" />Utilization Rate ({periodLabels[utilizationPeriod] || 'Monthly'})</div>
             <div data-testid="D22">Inherited RH</div>
-            <div className="col-span-2" data-testid="D12"><Marker id="D12" />Update RH</div>
+            <div data-testid="D12"><Marker id="D12" />Update RH</div>
+            <div data-testid="D24">Last Updated By</div>
           </div>
         </div>
 
@@ -902,7 +907,7 @@ const RunningHours = () => {
             
             return filteredRunningHoursData.map((item, index) => (
               <div key={item.id} className="px-4 py-3 hover:bg-gray-50">
-              <div className="grid grid-cols-9 gap-4 text-sm items-center">
+              <div className="grid grid-cols-10 gap-4 text-sm items-center">
                 <div className="text-gray-900" data-testid={index === 0 ? "D13" : undefined}>{index === 0 && <Marker id="D13" />}{item.component}</div>
                 <div data-testid={index === 0 ? "D14" : undefined}>
                   {index === 0 && <Marker id="D14" />}
@@ -957,7 +962,7 @@ const RunningHours = () => {
                     <span className="text-gray-400 text-xs">—</span>
                   )}
                 </div>
-                <div className="col-span-2 flex gap-2">
+                <div className="flex gap-2">
                   <Button 
                     variant="outline" 
                     size="sm" 
@@ -968,6 +973,9 @@ const RunningHours = () => {
                   >
                     {index === 0 && <Marker id="D19" />}<Settings className="h-4 w-4 text-gray-600" />
                   </Button>
+                </div>
+                <div className="text-gray-700 truncate" title={item.lastUpdatedBy || ''} data-testid={`text-last-updated-by-${item.id}`}>
+                  {item.lastUpdatedBy || <span className="text-gray-400">—</span>}
                 </div>
               </div>
             </div>
