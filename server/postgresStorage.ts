@@ -2804,12 +2804,21 @@ export class PostgresStorage {
       return { spare: updated[0], isTransfer: true };
     }
     
-    // Not a true transfer - create ADJUSTMENT history entry
-    // This handles: single location changes, net ROB increases/decreases
+    // Not a true transfer - classify based on net ROB change direction
     const netChange = (newLocA + newLocB) - (oldLocA + oldLocB);
-    const adjustmentRemarks = remarks || (netChange >= 0 
-      ? `Adjustment: +${netChange} (Location A: ${oldLocA}→${newLocA}, Location B: ${oldLocB}→${newLocB})`
-      : `Adjustment: ${netChange} (Location A: ${oldLocA}→${newLocA}, Location B: ${oldLocB}→${newLocB})`);
+    let eventType: string;
+    let eventRemarks: string;
+
+    if (netChange < 0) {
+      eventType = 'CONSUME';
+      eventRemarks = remarks || `Consumed ${Math.abs(netChange)} units (Location A: ${oldLocA}→${newLocA}, Location B: ${oldLocB}→${newLocB})`;
+    } else if (netChange > 0) {
+      eventType = 'RECEIVE';
+      eventRemarks = remarks || `Received ${netChange} units (Location A: ${oldLocA}→${newLocA}, Location B: ${oldLocB}→${newLocB})`;
+    } else {
+      eventType = 'ADJUSTMENT';
+      eventRemarks = remarks || `Adjustment (Location A: ${oldLocA}→${newLocA}, Location B: ${oldLocB}→${newLocB})`;
+    }
     
     await this.createSpareHistory({
       timestampUTC: new Date(),
@@ -2822,11 +2831,11 @@ export class PostgresStorage {
       componentCode: spare.componentCode ?? null,
       componentName: spare.componentName,
       componentSpareCode: spare.componentSpareCode ?? null,
-      eventType: 'ADJUSTMENT',
+      eventType,
       qtyChange: netChange,
       robAfter: newTotalRob,
       userId,
-      remarks: adjustmentRemarks,
+      remarks: eventRemarks,
       reference: null,
       dateLocal: dateLocal ?? null,
       tz: tz ?? null,
@@ -3610,12 +3619,21 @@ export class PostgresStorage {
       return { item: updated[0], isTransfer: true };
     }
     
-    // Not a true transfer - create ADJUSTMENT ledger entry
-    // This handles: single location changes, net ROB increases/decreases
+    // Not a true transfer - classify based on net ROB change direction
     const netChange = (newLocA + newLocB) - (oldLocA + oldLocB);
-    const adjustmentRemarks = remarks || (netChange >= 0 
-      ? `Adjustment: +${netChange} (Location A: ${oldLocA}→${newLocA}, Location B: ${oldLocB}→${newLocB})`
-      : `Adjustment: ${netChange} (Location A: ${oldLocA}→${newLocA}, Location B: ${oldLocB}→${newLocB})`);
+    let eventType: string;
+    let eventRemarks: string;
+
+    if (netChange < 0) {
+      eventType = 'CONSUME';
+      eventRemarks = remarks || `Consumed ${Math.abs(netChange)} units (Location A: ${oldLocA}→${newLocA}, Location B: ${oldLocB}→${newLocB})`;
+    } else if (netChange > 0) {
+      eventType = 'RECEIVE';
+      eventRemarks = remarks || `Received ${netChange} units (Location A: ${oldLocA}→${newLocA}, Location B: ${oldLocB}→${newLocB})`;
+    } else {
+      eventType = 'ADJUSTMENT';
+      eventRemarks = remarks || `Adjustment (Location A: ${oldLocA}→${newLocA}, Location B: ${oldLocB}→${newLocB})`;
+    }
     
     await this.insertStoresLedgerEntry({
       vesselId: item.vesselId,
@@ -3625,7 +3643,7 @@ export class PostgresStorage {
       partCode: item.itemCode,
       itemName: item.itemName,
       uom: item.uom,
-      eventType: 'ADJUSTMENT',
+      eventType,
       qtyChangeBase: String(netChange),
       qtyDisplay: String(netChange),
       robAfterBase: String(newTotalRob),
@@ -3634,7 +3652,7 @@ export class PostgresStorage {
       timestampUTC: new Date(),
       place: place,
       userId: userId,
-      remarks: adjustmentRemarks,
+      remarks: eventRemarks,
     });
 
     return { item: updated[0], isTransfer: false };
