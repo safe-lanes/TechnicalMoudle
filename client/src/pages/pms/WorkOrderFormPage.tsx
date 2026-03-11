@@ -176,6 +176,16 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
   const workOrderContext = resolvedMode === 'template' ? jobContext : woContext;
   const isContextLoading = resolvedMode === 'template' ? isJobContextLoading : isWoContextLoading;
 
+  const { data: woAnomalies } = useQuery<Array<{ id: number; severity: string; anomalyType: string; daysLate: number; missedCycles: number; detectedAt: string; status: string }>>({
+    queryKey: ['/technical/api/anomalies/work-order', workOrderId],
+    queryFn: async () => {
+      const res = await fetch(`/technical/api/anomalies/work-order/${workOrderId}`);
+      if (!res.ok) return [];
+      return res.json();
+    },
+    enabled: !!workOrderId && resolvedMode !== 'template',
+  });
+
   // Extract vesselId from context for spares query
   const vesselId = workOrderContext ? (workOrderContext as any).templateData?.vesselId || (workOrderContext as any).workOrder?.vesselId : null;
 
@@ -2339,6 +2349,38 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
         return (
           <div className={`sticky top-0 z-50 ${cfg.bg} border-b px-4 py-2`} data-testid="banner-top-approval-tier">
             <span className={`text-sm font-medium ${cfg.text}`}>{cfg.message}</span>
+          </div>
+        );
+      })()}
+      {!embedded && workOrderId && (() => {
+        const anomalyData = woAnomalies;
+        if (!anomalyData || anomalyData.length === 0) return null;
+        const topAnomaly = anomalyData[0];
+        const sevColors: Record<string, { bg: string; text: string; border: string }> = {
+          HIGH: { bg: 'bg-red-50', text: 'text-red-800', border: 'border-red-300' },
+          MEDIUM: { bg: 'bg-orange-50', text: 'text-orange-800', border: 'border-orange-300' },
+          LOW: { bg: 'bg-yellow-50', text: 'text-yellow-800', border: 'border-yellow-300' },
+        };
+        const sc = sevColors[topAnomaly.severity] || sevColors.LOW;
+        const typeLabels: Record<string, string> = {
+          BACKDATING: 'Backdating',
+          MISSED_CYCLES: 'Missed Cycles',
+          SUSPICIOUS_PATTERN: 'Suspicious Pattern',
+          MULTIPLE_ANOMALIES: 'Multiple Anomalies',
+        };
+        return (
+          <div className={`sticky top-0 z-40 ${sc.bg} border-b ${sc.border} px-4 py-2 flex items-center gap-2`} data-testid="banner-anomaly-alert">
+            <span className={`text-sm font-bold ${sc.text}`}>
+              ⚠️ {topAnomaly.severity} ANOMALY:
+            </span>
+            <span className={`text-sm ${sc.text}`}>
+              {typeLabels[topAnomaly.anomalyType] || topAnomaly.anomalyType}
+              {topAnomaly.daysLate > 0 ? ` — ${topAnomaly.daysLate} days late` : ''}
+              {topAnomaly.missedCycles > 0 ? ` — ${topAnomaly.missedCycles} missed cycles` : ''}
+            </span>
+            <span className={`text-xs ${sc.text} opacity-70 ml-auto`}>
+              Detected: {topAnomaly.detectedAt ? new Date(topAnomaly.detectedAt).toLocaleDateString() : 'N/A'}
+            </span>
           </div>
         );
       })()}

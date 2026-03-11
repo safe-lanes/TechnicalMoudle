@@ -3039,6 +3039,41 @@ export const insertMasterUserSchema = createInsertSchema(masterUsers).omit({
 export type InsertMasterUser = z.infer<typeof insertMasterUserSchema>;
 export type MasterUser = typeof masterUsers.$inferSelect;
 
+// === Work Order Anomalies (Layer 6 — Anomaly Detection System) ===
+export const workOrderAnomalies = pgTable("work_order_anomalies", {
+  id: serial("id").primaryKey(),
+  workOrderId: text("work_order_id").notNull(),
+  workOrderCode: text("work_order_code"),
+  componentCode: text("component_code"),
+  componentName: text("component_name"),
+  jobTitle: text("job_title"),
+  vesselId: text("vessel_id"),
+  anomalyType: text("anomaly_type").notNull(),
+  severity: text("severity").notNull(),
+  detectedAt: timestamp("detected_at").notNull().defaultNow(),
+  completionDate: text("completion_date"),
+  dueDate: text("due_date"),
+  daysLate: integer("days_late").default(0),
+  missedCycles: integer("missed_cycles").default(0),
+  anomalyDetails: json("anomaly_details"),
+  status: text("status").notNull().default("PENDING_REVIEW"),
+  reviewedBy: text("reviewed_by"),
+  reviewedAt: timestamp("reviewed_at"),
+  justification: text("justification"),
+  isResolved: boolean("is_resolved").default(false),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+});
+
+export const insertWorkOrderAnomalySchema = createInsertSchema(workOrderAnomalies).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type InsertWorkOrderAnomaly = z.infer<typeof insertWorkOrderAnomalySchema>;
+export type WorkOrderAnomaly = typeof workOrderAnomalies.$inferSelect;
+
 export const admnRoleMaster = pgTable("admn_role_master", {
   id: integer("id").primaryKey(),
   ruid: text("ruid").notNull().unique(),

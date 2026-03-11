@@ -1865,7 +1865,43 @@ const migrations: Migration[] = [
     `
   },
   {
-    id: '059_layer5_test_data_seed',
+    id: '060_work_order_anomalies_table',
+    name: 'Create work_order_anomalies table',
+    description: 'Creates the work_order_anomalies table for Layer 6 anomaly detection system',
+    sql: `
+      CREATE TABLE IF NOT EXISTS work_order_anomalies (
+        id SERIAL PRIMARY KEY,
+        work_order_id TEXT NOT NULL,
+        work_order_code TEXT,
+        component_code TEXT,
+        component_name TEXT,
+        job_title TEXT,
+        vessel_id TEXT,
+        anomaly_type TEXT NOT NULL,
+        severity TEXT NOT NULL,
+        detected_at TIMESTAMP NOT NULL DEFAULT NOW(),
+        completion_date TEXT,
+        due_date TEXT,
+        days_late INTEGER DEFAULT 0,
+        missed_cycles INTEGER DEFAULT 0,
+        anomaly_details JSON,
+        status TEXT NOT NULL DEFAULT 'PENDING_REVIEW',
+        reviewed_by TEXT,
+        reviewed_at TIMESTAMP,
+        justification TEXT,
+        is_resolved BOOLEAN DEFAULT false,
+        created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+        updated_at TIMESTAMP NOT NULL DEFAULT NOW()
+      );
+      CREATE INDEX IF NOT EXISTS idx_wo_anomalies_work_order_id ON work_order_anomalies (work_order_id);
+      CREATE INDEX IF NOT EXISTS idx_wo_anomalies_vessel_id ON work_order_anomalies (vessel_id);
+      CREATE INDEX IF NOT EXISTS idx_wo_anomalies_status ON work_order_anomalies (status);
+      CREATE INDEX IF NOT EXISTS idx_wo_anomalies_severity ON work_order_anomalies (severity);
+      CREATE INDEX IF NOT EXISTS idx_wo_anomalies_detected_at ON work_order_anomalies (detected_at DESC)
+    `
+  },
+  {
+    id: '061_placeholder',
     name: 'Seed Layer 5 test work orders for all approval tiers',
     description: 'Creates 4 test WOs in Pending Approval status covering all approval tiers, plus superintendent notifications',
     sql: `

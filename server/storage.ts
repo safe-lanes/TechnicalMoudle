@@ -173,6 +173,8 @@ import {
   superintendentNotifications,
   type SuperintendentNotification,
   type InsertSuperintendentNotification,
+  type WorkOrderAnomaly,
+  type InsertWorkOrderAnomaly,
 } from "@shared/schema";
 
 export function sortObjectKeys(obj: any): any {
@@ -545,6 +547,27 @@ export interface IStorage {
   getSuperintendentNotifications(): Promise<SuperintendentNotification[]>;
   getAllSuperintendentNotifications(): Promise<SuperintendentNotification[]>;
   acknowledgeSuperintendentNotification(id: number): Promise<SuperintendentNotification>;
+
+  // Work Order Anomaly methods (Layer 6)
+  createWorkOrderAnomaly(anomaly: InsertWorkOrderAnomaly): Promise<WorkOrderAnomaly>;
+  getWorkOrderAnomalies(filters?: {
+    status?: string;
+    severity?: string;
+    vesselId?: string;
+    limit?: number;
+    dateFrom?: Date;
+    dateTo?: Date;
+  }): Promise<WorkOrderAnomaly[]>;
+  getWorkOrderAnomalyByWorkOrderId(workOrderId: string): Promise<WorkOrderAnomaly[]>;
+  acknowledgeWorkOrderAnomaly(id: number, reviewedBy: string, notes?: string): Promise<WorkOrderAnomaly>;
+  getWorkOrderAnomalyStatistics(vesselId?: string): Promise<{
+    totalPending: number;
+    totalHigh: number;
+    totalMedium: number;
+    totalLow: number;
+    lastDetected: Date | null;
+    trendPercentage: number;
+  }>;
 
   // Work Order Execution methods
   getWorkOrderExecutions(componentId: string): Promise<WorkOrderExecution[]>;

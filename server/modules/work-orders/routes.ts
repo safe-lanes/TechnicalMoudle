@@ -31,6 +31,20 @@ const upload = multer({
 // GET /dashboard/compliance-anomalies — compliance anomaly detection metrics
 router.get('/dashboard/compliance-anomalies', asyncHandler(woCtrl.getComplianceAnomalies));
 
+// ── Anomaly Detection Dashboard (Layer 6) ──
+
+// GET /anomalies/dashboard — list anomalies for dashboard tile
+router.get('/anomalies/dashboard', asyncHandler(woCtrl.getAnomaliesDashboard));
+
+// GET /anomalies/statistics — summary counts for dashboard header
+router.get('/anomalies/statistics', asyncHandler(woCtrl.getAnomalyStatistics));
+
+// PATCH /anomalies/:anomalyId/acknowledge — mark anomaly as acknowledged
+router.patch('/anomalies/:anomalyId/acknowledge', asyncHandler(woCtrl.acknowledgeAnomaly));
+
+// GET /anomalies/work-order/:workOrderId — anomalies for a specific WO
+router.get('/anomalies/work-order/:workOrderId', asyncHandler(woCtrl.getAnomalyForWorkOrder));
+
 // ── Core Work Order CRUD ──
 
 // GET  /work-orders — list all (optional ?vesselId= filter)

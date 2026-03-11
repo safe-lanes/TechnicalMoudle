@@ -27,6 +27,7 @@ import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianG
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { WorkOrder } from "@shared/schema";
+import AnomalyDetectionTile from "./AnomalyDetectionTile";
 import { useVessels } from "@/hooks/useVessels";
 import { BulkApproveModal } from "@/components/BulkApproveModal";
 import { FleetVesselContextBar } from "@/components/FleetVesselContextBar";
@@ -1529,6 +1530,11 @@ const Dashboard = () => {
         {/* Compliance Anomaly Detection Panel (Layer 6) */}
         {activeTab === 'overview' && (
           <ComplianceAnomalyPanel vesselId={vesselId} />
+        )}
+
+        {/* Work Order Anomalies Tile (Layer 6 — Individual Anomaly Events) */}
+        {activeTab === 'overview' && (
+          <AnomalyDetectionTile vesselId={vesselId} />
         )}
 
         {/* Pending Approval Section (Head of Dept) - shown below layout */}

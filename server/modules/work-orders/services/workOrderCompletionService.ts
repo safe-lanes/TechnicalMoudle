@@ -1,6 +1,7 @@
 import * as repo from '../repositories/workOrderRepository';
 import { NotFoundError, ValidationError } from '../../shared/errors';
 import { calculateMissedCycles as calcMissedCyclesShared } from '@shared/dateUtils';
+import { detectAndLogAnomalies } from './anomalyDetectionService';
 
 // ── Complete Work Order ──
 
@@ -462,6 +463,12 @@ export async function completeWorkOrder(
         }
       }
     }
+  }
+
+  try {
+    await detectAndLogAnomalies(updatedWorkOrder, body, missedCycles);
+  } catch (anomalyError) {
+    console.error('[WorkOrderCompletion] Anomaly detection failed (non-blocking):', anomalyError);
   }
 
   return {

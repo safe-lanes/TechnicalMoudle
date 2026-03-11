@@ -241,6 +241,81 @@ export async function getComplianceAnomalies(req: Request, res: Response) {
   }
 }
 
+export async function getAnomaliesDashboard(req: Request, res: Response) {
+  try {
+    const { status, severity, vesselId, limit, dateFrom, dateTo } = req.query;
+    let parsedDateFrom: Date | undefined;
+    let parsedDateTo: Date | undefined;
+    if (dateFrom) {
+      parsedDateFrom = new Date(dateFrom as string);
+      if (isNaN(parsedDateFrom.getTime())) {
+        return res.status(400).json({ error: 'Invalid dateFrom parameter' });
+      }
+    }
+    if (dateTo) {
+      parsedDateTo = new Date(dateTo as string);
+      if (isNaN(parsedDateTo.getTime())) {
+        return res.status(400).json({ error: 'Invalid dateTo parameter' });
+      }
+    }
+    const anomalies = await storage.getWorkOrderAnomalies({
+      status: status as string | undefined,
+      severity: severity as string | undefined,
+      vesselId: vesselId as string | undefined,
+      limit: limit ? parseInt(limit as string, 10) : 10,
+      dateFrom: parsedDateFrom,
+      dateTo: parsedDateTo,
+    });
+    res.json(anomalies);
+  } catch (error: any) {
+    console.error('Failed to fetch anomalies dashboard:', error);
+    res.status(500).json({ error: 'Failed to fetch anomalies' });
+  }
+}
+
+export async function getAnomalyStatistics(req: Request, res: Response) {
+  try {
+    const vesselId = req.query.vesselId as string | undefined;
+    const stats = await storage.getWorkOrderAnomalyStatistics(vesselId);
+    res.json(stats);
+  } catch (error: any) {
+    console.error('Failed to fetch anomaly statistics:', error);
+    res.status(500).json({ error: 'Failed to fetch anomaly statistics' });
+  }
+}
+
+export async function acknowledgeAnomaly(req: Request, res: Response) {
+  try {
+    const anomalyId = parseInt(req.params.anomalyId, 10);
+    if (isNaN(anomalyId)) {
+      return res.status(400).json({ error: 'Invalid anomaly ID' });
+    }
+    const { acknowledgedBy, notes } = req.body;
+    if (!acknowledgedBy) {
+      return res.status(400).json({ error: 'acknowledgedBy is required' });
+    }
+    const result = await storage.acknowledgeWorkOrderAnomaly(anomalyId, acknowledgedBy, notes);
+    if (!result) {
+      return res.status(404).json({ error: 'Anomaly not found' });
+    }
+    res.json(result);
+  } catch (error: any) {
+    console.error('Failed to acknowledge anomaly:', error);
+    res.status(500).json({ error: 'Failed to acknowledge anomaly' });
+  }
+}
+
+export async function getAnomalyForWorkOrder(req: Request, res: Response) {
+  try {
+    const workOrderId = req.params.workOrderId;
+    const anomalies = await storage.getWorkOrderAnomalyByWorkOrderId(workOrderId);
+    res.json(anomalies);
+  } catch (error: any) {
+    console.error('Failed to fetch anomalies for work order:', error);
+    res.status(500).json({ error: 'Failed to fetch anomalies for work order' });
+  }
+}
+
 export async function getSuperintendentNotificationsSummary(req: Request, res: Response) {
   const [unacknowledged, all] = await Promise.all([
     storage.getSuperintendentNotifications(),

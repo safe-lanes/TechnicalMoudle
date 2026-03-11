@@ -1589,6 +1589,26 @@ class MemStorage {
     );
     return link || null;
   }
+  async createWorkOrderAnomaly(anomaly: any): Promise<any> {
+    console.log('MemStorage stub: createWorkOrderAnomaly');
+    return { id: 1, ...anomaly, createdAt: new Date(), updatedAt: new Date() };
+  }
+
+  async getWorkOrderAnomalies(_filters?: any): Promise<any[]> {
+    return [];
+  }
+
+  async getWorkOrderAnomalyByWorkOrderId(_workOrderId: string): Promise<any[]> {
+    return [];
+  }
+
+  async acknowledgeWorkOrderAnomaly(_id: number, _reviewedBy: string, _notes?: string): Promise<any> {
+    return { id: _id, status: 'ACKNOWLEDGED' };
+  }
+
+  async getWorkOrderAnomalyStatistics(_vesselId?: string): Promise<any> {
+    return { totalPending: 0, totalHigh: 0, totalMedium: 0, totalLow: 0, lastDetected: null, trendPercentage: 0 };
+  }
 }
 
 export const memStorage = new MemStorage();

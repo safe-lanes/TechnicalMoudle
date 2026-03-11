@@ -187,6 +187,9 @@ import {
   superintendentNotifications,
   type SuperintendentNotification,
   type InsertSuperintendentNotification,
+  workOrderAnomalies,
+  type WorkOrderAnomaly,
+  type InsertWorkOrderAnomaly,
 } from '@shared/schema';
 
 /**
@@ -5664,6 +5667,132 @@ export class PostgresStorage {
       .where(eq(superintendentNotifications.id, id))
       .returning();
     return result;
+  }
+
+  // ============= WORK ORDER ANOMALIES (Layer 6) =============
+
+  async createWorkOrderAnomaly(anomaly: InsertWorkOrderAnomaly): Promise<WorkOrderAnomaly> {
+    const db = await getDb();
+    const [result] = await db.insert(workOrderAnomalies).values(anomaly).returning();
+    return result;
+  }
+
+  async getWorkOrderAnomalies(filters?: {
+    status?: string;
+    severity?: string;
+    vesselId?: string;
+    limit?: number;
+    dateFrom?: Date;
+    dateTo?: Date;
+  }): Promise<WorkOrderAnomaly[]> {
+    const db = await getDb();
+    const conditions: any[] = [];
+
+    if (filters?.status) {
+      conditions.push(eq(workOrderAnomalies.status, filters.status));
+    }
+    if (filters?.severity) {
+      conditions.push(eq(workOrderAnomalies.severity, filters.severity));
+    }
+    if (filters?.vesselId) {
+      conditions.push(eq(workOrderAnomalies.vesselId, filters.vesselId));
+    }
+    if (filters?.dateFrom) {
+      conditions.push(sql`${workOrderAnomalies.detectedAt} >= ${filters.dateFrom}`);
+    }
+    if (filters?.dateTo) {
+      conditions.push(sql`${workOrderAnomalies.detectedAt} <= ${filters.dateTo}`);
+    }
+
+    const query = db.select().from(workOrderAnomalies);
+    const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
+    const results = whereClause
+      ? await query.where(whereClause)
+          .orderBy(
+            sql`CASE ${workOrderAnomalies.severity} WHEN 'HIGH' THEN 1 WHEN 'MEDIUM' THEN 2 WHEN 'LOW' THEN 3 ELSE 4 END`,
+            desc(workOrderAnomalies.detectedAt)
+          )
+          .limit(filters?.limit || 50)
+      : await query
+          .orderBy(
+            sql`CASE ${workOrderAnomalies.severity} WHEN 'HIGH' THEN 1 WHEN 'MEDIUM' THEN 2 WHEN 'LOW' THEN 3 ELSE 4 END`,
+            desc(workOrderAnomalies.detectedAt)
+          )
+          .limit(filters?.limit || 50);
+    return results;
+  }
+
+  async getWorkOrderAnomalyByWorkOrderId(workOrderId: string): Promise<WorkOrderAnomaly[]> {
+    const db = await getDb();
+    return await db.select().from(workOrderAnomalies)
+      .where(eq(workOrderAnomalies.workOrderId, workOrderId))
+      .orderBy(desc(workOrderAnomalies.detectedAt));
+  }
+
+  async acknowledgeWorkOrderAnomaly(id: number, reviewedBy: string, notes?: string): Promise<WorkOrderAnomaly> {
+    const db = await getDb();
+    const [result] = await db.update(workOrderAnomalies)
+      .set({
+        status: 'ACKNOWLEDGED',
+        reviewedBy,
+        reviewedAt: new Date(),
+        justification: notes || null,
+        updatedAt: new Date(),
+      })
+      .where(eq(workOrderAnomalies.id, id))
+      .returning();
+    return result;
+  }
+
+  async getWorkOrderAnomalyStatistics(vesselId?: string): Promise<{
+    totalPending: number;
+    totalHigh: number;
+    totalMedium: number;
+    totalLow: number;
+    lastDetected: Date | null;
+    trendPercentage: number;
+  }> {
+    const db = await getDb();
+    const conditions: any[] = [];
+    if (vesselId) {
+      conditions.push(eq(workOrderAnomalies.vesselId, vesselId));
+    }
+
+    const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
+    const allAnomalies = whereClause
+      ? await db.select().from(workOrderAnomalies).where(whereClause)
+      : await db.select().from(workOrderAnomalies);
+
+    const pending = allAnomalies.filter(a => a.status === 'PENDING_REVIEW');
+    const lastDetected = allAnomalies.length > 0
+      ? allAnomalies.reduce((latest, a) => {
+          const d = a.detectedAt ? new Date(a.detectedAt) : new Date(0);
+          return d > latest ? d : latest;
+        }, new Date(0))
+      : null;
+
+    const now = new Date();
+    const thisMonth = allAnomalies.filter(a => {
+      const d = a.detectedAt ? new Date(a.detectedAt) : null;
+      return d && d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
+    }).length;
+    const lastMonthDate = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+    const lastMonth = allAnomalies.filter(a => {
+      const d = a.detectedAt ? new Date(a.detectedAt) : null;
+      return d && d.getMonth() === lastMonthDate.getMonth() && d.getFullYear() === lastMonthDate.getFullYear();
+    }).length;
+    const trendPercentage = lastMonth > 0
+      ? Math.round(((thisMonth - lastMonth) / lastMonth) * 100)
+      : thisMonth > 0 ? 100 : 0;
+
+    return {
+      totalPending: pending.length,
+      totalHigh: pending.filter(a => a.severity === 'HIGH').length,
+      totalMedium: pending.filter(a => a.severity === 'MEDIUM').length,
+      totalLow: pending.filter(a => a.severity === 'LOW').length,
+      lastDetected: lastDetected && lastDetected.getTime() > 0 ? lastDetected : null,
+      trendPercentage,
+    };
   }
 
   // ============= WORK ORDER EXECUTIONS (Original) =============
