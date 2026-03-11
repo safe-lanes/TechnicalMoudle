@@ -31,7 +31,8 @@ export type InsertUser = z.infer<typeof insertUserSchema>;
 export type User = typeof users.$inferSelect;
 export type UserRole = "Ship" | "Office" | "PMS Admin" | "Sail Admin" | "Super Admin" | "Vessel Admin" | "Vessel User";
 
-export type PublicUser = Omit<User, "password"> & {
+export type PublicUser = Omit<User, "password" | "role"> & {
+  role: UserRole;
   crewDesignation?: string; // Extended field for crew designation/office position (from external user data)
   userType?: "Office" | "Ship"; // Extended field for user type (Office = shore-based, Ship = vessel-based)
 };
