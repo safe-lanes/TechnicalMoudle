@@ -1208,6 +1208,16 @@ export async function performImport(
       // vesselCode is for display/tracking only
       const canonicalVesselId = vesselId || vesselCodeFromExcel;
       
+      const ALLOWED_TASK_TYPES = ['Inspection', 'Overhaul', 'Service', 'Test', 'Renew/Replace', 'Measurement/Calibration', 'Megger Test', 'Cleaning', 'Lubrication', 'Survey', 'Analysis', 'Checks'];
+      const normalizedTaskType = row['Task Type'] ? String(row['Task Type']).trim() : '';
+      if (normalizedTaskType && !ALLOWED_TASK_TYPES.includes(normalizedTaskType)) {
+        const _jobCodeTT = row['Job Code'] ? String(row['Job Code']).trim() : `row-${_jobRowNum}`;
+        result.skipped++;
+        result.rowResults.push({ rowNumber: _jobRowNum, primaryIdentifier: _jobCodeTT, action: 'skipped', error: `Invalid Task Type '${normalizedTaskType}'. Allowed values: ${ALLOWED_TASK_TYPES.join(', ')}` });
+        console.warn(`⚠️ Skipping job ${_jobCodeTT}: Invalid Task Type '${normalizedTaskType}'`);
+        continue;
+      }
+      
       // Map Excel columns to job schema fields (21-column specification)
       // Normalize Last Done date from Excel (handles various formats including Excel serials)
       const rawLastDone = row['Last Done Date'];
@@ -1382,7 +1392,7 @@ export async function performImport(
         fleetEquipmentCode: row['Fleet Equipment Code'] || null,
         fleetEquipmentName: row['Fleet Equipment Name'] || null,
         jobTitle: row['WO Title'],          // Job title from WO Title column
-        maintenanceType: row['Task Type'],  // maintenanceType from Task Type column
+        maintenanceType: normalizedTaskType || null,  // maintenanceType from Task Type column (normalized)
         maintenanceBasis: maintenanceBasis,
         frequencyValue: frequencyValue ? parseFloat(frequencyValue) : null,
         frequencyUnit: frequencyUnit,
@@ -1844,6 +1854,15 @@ export async function performImport(
         console.warn(`⚠️ Skipping row with missing required fields: jobCode=${jobCode}`);
         result.skipped++;
         result.rowResults.push({ rowNumber: _fjRowNum, primaryIdentifier: jobCode || `row-${_fjRowNum}`, action: 'skipped', error: 'Missing required fields' });
+        continue;
+      }
+      
+      const ALLOWED_TASK_TYPES_FLEET = ['Inspection', 'Overhaul', 'Service', 'Test', 'Renew/Replace', 'Measurement/Calibration', 'Megger Test', 'Cleaning', 'Lubrication', 'Survey', 'Analysis', 'Checks'];
+      const trimmedTaskType = String(taskType).trim();
+      if (!ALLOWED_TASK_TYPES_FLEET.includes(trimmedTaskType)) {
+        result.skipped++;
+        result.rowResults.push({ rowNumber: _fjRowNum, primaryIdentifier: jobCode, action: 'skipped', error: `Invalid Task Type '${trimmedTaskType}'. Allowed values: ${ALLOWED_TASK_TYPES_FLEET.join(', ')}` });
+        console.warn(`⚠️ Skipping fleet job ${jobCode}: Invalid Task Type '${trimmedTaskType}'`);
         continue;
       }
       

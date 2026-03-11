@@ -2784,7 +2784,14 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                       <SelectItem value="Overhaul">Overhaul</SelectItem>
                       <SelectItem value="Service">Service</SelectItem>
                       <SelectItem value="Test">Test</SelectItem>
-                      <SelectItem value="Calibration">Calibration</SelectItem>
+                      <SelectItem value="Renew/Replace">Renew/Replace</SelectItem>
+                      <SelectItem value="Measurement/Calibration">Measurement/Calibration</SelectItem>
+                      <SelectItem value="Megger Test">Megger Test</SelectItem>
+                      <SelectItem value="Cleaning">Cleaning</SelectItem>
+                      <SelectItem value="Lubrication">Lubrication</SelectItem>
+                      <SelectItem value="Survey">Survey</SelectItem>
+                      <SelectItem value="Analysis">Analysis</SelectItem>
+                      <SelectItem value="Checks">Checks</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
