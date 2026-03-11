@@ -70,9 +70,9 @@ Preferred communication style: Simple, everyday language.
 -   **Live Missed Cycles on WO List**: `missedCycles` calculated on-the-fly for overdue/due WOs in the list view.
 -   **Auto-Populated Maintenance History Remarks**: Remarks are auto-populated for maintenance history based on `missedCycles`.
 -   **A4 Work History Display**: The context service now includes the current WO's own maintenance history record (from `component_maintenance_history`) in the work history display, plus non-skipped records from other WOs via deduplication. Previously, the current WO was excluded and only SKIPPED records were shown from the history table. Maintenance history payloads now include `jobId` and `jobCode` for proper linking.
--   **Read-Only AES-Encrypted LocalStorage**: Auth system reads AES-encrypted keys from `localStorage` but does not write to it.
--   **Automatic UI Role Detection**: UI role is auto-detected on load with a priority chain and can be overridden by a dropdown switcher.
--   **User Role System**: Supports `UserRole` types ("Ship", "Office", "PMS Admin", "Sail Admin") with specific permissions.
+-   **UI Role Detection (Single Source of Truth)**: The UI role is determined by `mapLoggedRoleToUIRole(userType, profileRole)` in `shared/uiRoles.ts`. Priority: 1) `localStorage.userType` + `localStorage.userProfile.role` (real login data), 2) `currentUser.userType` + `currentUser.role` (fallback). Mapping: Office+Sail Admin→Sail_Admin, Office+anything else→Client_Admin, Ship+Vessel Admin→Head_of_Dept, Ship+anything else→Vessel, unknown userType→null. The role dropdown in `RoleSwitcher.tsx` is a visual indicator only (no manual switching). Both `AuthContext.tsx` and `UIRoleContext.tsx` use the same `mapLoggedRoleToUIRole` function — no duplicate mapping tables.
+-   **User Role System**: `UserRole` type supports 7 values: "Ship", "Office", "PMS Admin", "Sail Admin", "Super Admin", "Vessel Admin", "Vessel User". `PublicUser.userType` is "Office" or "Ship". Default dev user: role "Sail Admin", userType "Office".
+-   **Role Master Table (admn_role_master)**: Migration `056_admn_role_master` seeds 15 role records. System initialization table — not used by UI role logic currently.
 
 ## External Dependencies
 

@@ -8,18 +8,7 @@ import {
 import type { PublicUser, UserRole } from "@shared/schema";
 import type { UIRole } from "@shared/uiRoles";
 import { mapLoggedRoleToUIRole } from "@shared/uiRoles";
-import { secureGetItem } from "@/utils/secureStorage";
 import { analyzeLocalStorage } from "@/utils/localStorageAnalyzer";
-
-const ROLE_TO_UI_TYPE: Record<UserRole, UIRole> = {
-  Ship: "Vessel",
-  Office: "Client_Admin",
-  "PMS Admin": "Sail_Admin",
-  "Sail Admin": "Sail_Admin",
-  "Super Admin": "Client_Admin",
-  "Vessel Admin": "Head_of_Dept",
-  "Vessel User": "Vessel",
-};
 
 const DEFAULT_USER: PublicUser = {
   id: 1,
@@ -67,7 +56,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
     let resolvedUserType: UIRole | null = null;
 
     const plainUserType = localStorage.getItem("userType");
-    let plainProfile: { role?: string } | null = null;
+    let plainProfile: Record<string, any> | null = null;
     try {
       const raw = localStorage.getItem("userProfile");
       if (raw) plainProfile = JSON.parse(raw);
@@ -76,51 +65,30 @@ export function AuthProvider({ children }: AuthProviderProps) {
     }
 
     if (plainUserType && plainProfile?.role) {
-      resolvedUserType = mapLoggedRoleToUIRole(
-        plainUserType,
-        plainProfile.role,
-      );
-    }
+      const profileRole = plainProfile.role;
+      resolvedUserType = mapLoggedRoleToUIRole(plainUserType, profileRole);
 
-    const storedProfile = secureGetItem<PublicUser>("userProfile");
-
-    if (storedProfile) {
-      resolvedUser = storedProfile;
-
-      if (!resolvedUserType) {
-        const storedType = secureGetItem<UIRole>("userType");
-        if (storedType) {
-          resolvedUserType = storedType;
-        } else {
-          resolvedUserType = ROLE_TO_UI_TYPE[storedProfile.role] || "Vessel";
-        }
-      }
-    } else if (plainProfile && plainUserType) {
-      const role = ((plainProfile as any).role as UserRole) || "Office";
-      const user: PublicUser = {
-        id: 0,
-        username: (plainProfile as any).username || "user",
-        fullName:
-          (plainProfile as any).fullName ||
-          (plainProfile as any).name ||
-          "User",
-        email: (plainProfile as any).email || null,
+      const role = (profileRole as UserRole) || "Office";
+      resolvedUser = {
+        id: plainProfile.id || 0,
+        username: plainProfile.username || "user",
+        fullName: plainProfile.fullName || plainProfile.name || "User",
+        email: plainProfile.email || null,
         role: role,
         userType:
           plainUserType === "Office" || plainUserType === "Ship"
             ? plainUserType
             : undefined,
-        vesselId: (plainProfile as any).vesselId || null,
-        department: (plainProfile as any).department || null,
+        vesselId: plainProfile.vesselId || null,
+        department: plainProfile.department || null,
         isActive: true,
-        crewDesignation: (plainProfile as any).crewDesignation || null,
+        crewDesignation: plainProfile.crewDesignation || null,
         createdAt: new Date(),
         updatedAt: new Date(),
       };
-      resolvedUser = user;
     } else {
       resolvedUser = DEFAULT_USER;
-      resolvedUserType = ROLE_TO_UI_TYPE[DEFAULT_USER.role];
+      resolvedUserType = mapLoggedRoleToUIRole(DEFAULT_USER.userType, DEFAULT_USER.role);
     }
 
     setCurrentUser(resolvedUser);
@@ -141,8 +109,8 @@ export function AuthProvider({ children }: AuthProviderProps) {
     return currentUser.role === role;
   };
 
-  const isShipUser = currentUser?.role === "Ship";
-  const isOfficeUser = currentUser?.role === "Office";
+  const isShipUser = currentUser?.userType === "Ship";
+  const isOfficeUser = currentUser?.userType === "Office";
   const isPMSAdmin =
     currentUser?.role === "PMS Admin" || currentUser?.role === "Sail Admin";
 
@@ -181,7 +149,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
       createdAt: user.createdAt,
       updatedAt: user.updatedAt,
     };
-    const derivedUIType = ROLE_TO_UI_TYPE[user.role] || "Vessel";
+    const derivedUIType = mapLoggedRoleToUIRole(user.userType, user.role);
 
     setCurrentUser(sanitizedUser);
     setUserType(derivedUIType);

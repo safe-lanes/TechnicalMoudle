@@ -1,7 +1,6 @@
 import { createContext, useContext, useState, useEffect, ReactNode } from "react";
 import type { UIRole } from "@shared/uiRoles";
-import { UI_ROLES, mapLoggedRoleToUIRole } from "@shared/uiRoles";
-import { secureGetItem } from "@/utils/secureStorage";
+import { mapLoggedRoleToUIRole } from "@shared/uiRoles";
 import { useAuth } from "@/contexts/AuthContext";
 
 interface UIRoleContextType {
@@ -15,16 +14,6 @@ interface UIRoleContextType {
 
 const UIRoleContext = createContext<UIRoleContextType | undefined>(undefined);
 
-const CURRENT_USER_ROLE_TO_UI: Record<string, UIRole> = {
-  "Ship": "Vessel",
-  "Office": "Client_Admin",
-  "PMS Admin": "Sail_Admin",
-  "Sail Admin": "Sail_Admin",
-  "Super Admin": "Client_Admin",
-  "Vessel Admin": "Head_of_Dept",
-  "Vessel User": "Vessel",
-};
-
 interface UIRoleProviderProps {
   children: ReactNode;
 }
@@ -34,33 +23,29 @@ export function UIRoleProvider({ children }: UIRoleProviderProps) {
   const [uiRole, setUIRoleState] = useState<UIRole | null>(null);
 
   useEffect(() => {
-    if (currentUser?.role) {
-      const mapped = CURRENT_USER_ROLE_TO_UI[currentUser.role];
-      if (mapped) {
-        setUIRoleState(mapped);
-        return;
-      }
+    if (!currentUser) {
+      setUIRoleState(null);
+      return;
     }
 
     const plainUserType = localStorage.getItem("userType");
-    let plainProfile: { role?: string } | null = null;
+    let plainProfileRole: string | null = null;
     try {
       const raw = localStorage.getItem("userProfile");
-      if (raw) plainProfile = JSON.parse(raw);
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        plainProfileRole = parsed?.role || null;
+      }
     } catch {
-      plainProfile = null;
+      plainProfileRole = null;
     }
 
-    if (plainUserType && plainProfile?.role) {
-      setUIRoleState(mapLoggedRoleToUIRole(plainUserType, plainProfile.role));
+    if (plainUserType && plainProfileRole) {
+      setUIRoleState(mapLoggedRoleToUIRole(plainUserType, plainProfileRole));
       return;
     }
 
-    const storedRole = secureGetItem<UIRole>("userType");
-    if (storedRole && UI_ROLES.includes(storedRole)) {
-      setUIRoleState(storedRole);
-      return;
-    }
+    setUIRoleState(mapLoggedRoleToUIRole(currentUser.userType, currentUser.role));
   }, [currentUser]);
 
   const setUIRole = (_role: UIRole) => {
