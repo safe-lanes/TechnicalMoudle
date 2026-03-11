@@ -41,7 +41,6 @@ const menuConfigs: Record<string, MenuItem[]> = {
     { id: "dashboard", label: "Dashboard", icon: LayoutDashboard },
     { id: "components", label: "Components", icon: Package },
     { id: "work-orders", label: "Work orders", icon: ClipboardList },
-    { id: "superintendent", label: "Superintendent", icon: Shield },
     { id: "running-hrs", label: "Running Hrs", icon: Clock },
     { id: "spares", label: "Spares", icon: Archive },
     { id: "stores", label: "Stores", icon: Store },

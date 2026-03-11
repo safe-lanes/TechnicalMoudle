@@ -57,6 +57,9 @@ router.get('/superintendent/notifications', asyncHandler(woCtrl.getSuperintenden
 // GET /superintendent/notifications/all — all notifications
 router.get('/superintendent/notifications/all', asyncHandler(woCtrl.getAllSuperintendentNotifications));
 
+// GET /superintendent/notifications/summary — lightweight counts for dashboard tile
+router.get('/superintendent/notifications/summary', asyncHandler(woCtrl.getSuperintendentNotificationsSummary));
+
 // ── Work Order Completion ──
 
 // POST /work-orders/:id/complete — complete a work order

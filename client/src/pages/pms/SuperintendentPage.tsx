@@ -51,6 +51,7 @@ export default function SuperintendentPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/technical/api/superintendent/notifications/all"] });
       queryClient.invalidateQueries({ queryKey: ["/technical/api/superintendent/notifications"] });
+      queryClient.invalidateQueries({ queryKey: ["/technical/api/superintendent/notifications/summary"] });
       queryClient.invalidateQueries({ queryKey: ["/technical/api/work-orders"] });
       setConfirmDialog({ open: false, notification: null });
     },

@@ -228,3 +228,23 @@ export async function getAllSuperintendentNotifications(req: Request, res: Respo
   const notifications = await storage.getAllSuperintendentNotifications();
   res.json(notifications);
 }
+
+export async function getSuperintendentNotificationsSummary(req: Request, res: Response) {
+  const [unacknowledged, all] = await Promise.all([
+    storage.getSuperintendentNotifications(),
+    storage.getAllSuperintendentNotifications(),
+  ]);
+
+  const now = new Date();
+  const currentMonth = now.getMonth();
+  const currentYear = now.getFullYear();
+
+  const pendingCount = unacknowledged.length;
+  const acknowledgedThisMonthCount = all.filter((n: any) => {
+    if (!n.isAcknowledged || !n.acknowledgedAt) return false;
+    const ackDate = new Date(n.acknowledgedAt);
+    return ackDate.getMonth() === currentMonth && ackDate.getFullYear() === currentYear;
+  }).length;
+
+  res.json({ pendingCount, acknowledgedThisMonthCount });
+}
