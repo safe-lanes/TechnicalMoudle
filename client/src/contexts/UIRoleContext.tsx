@@ -3,6 +3,7 @@ import type { UIRole } from "@shared/uiRoles";
 import { mapLoggedRoleToUIRole } from "@shared/uiRoles";
 import { secureGetItem } from "@/utils/secureStorage";
 import { useAuth } from "@/contexts/AuthContext";
+import { extractRole } from "@/utils/profileExtractor";
 
 interface UIRoleContextType {
   uiRole: UIRole | null;
@@ -41,12 +42,12 @@ export function UIRoleProvider({ children }: UIRoleProviderProps) {
     let encryptedProfileRole: string | null = null;
     try {
       const encryptedProfile = secureGetItem<Record<string, any>>("userProfile");
-      encryptedProfileRole = encryptedProfile?.role || null;
+      encryptedProfileRole = extractRole(encryptedProfile);
     } catch {
       encryptedProfileRole = null;
     }
 
-    if (isDev) console.log("[UIRoleContext] secureGetItem: userType=", encryptedUserType, ", profileRole=", encryptedProfileRole);
+    if (isDev) console.log("[UIRoleContext] secureGetItem: userType=", encryptedUserType, ", extractedRole=", encryptedProfileRole);
 
     if (encryptedUserType && encryptedProfileRole) {
       const result = mapLoggedRoleToUIRole(encryptedUserType, encryptedProfileRole);
@@ -61,14 +62,14 @@ export function UIRoleProvider({ children }: UIRoleProviderProps) {
       const raw = localStorage.getItem("userProfile");
       if (raw) {
         const parsed = JSON.parse(raw);
-        plainProfileRole = parsed?.role || null;
+        plainProfileRole = extractRole(parsed);
       }
     } catch {
       if (isDev) console.log("[UIRoleContext] Plain JSON.parse failed (likely encrypted)");
       plainProfileRole = null;
     }
 
-    if (isDev) console.log("[UIRoleContext] Plain path: userType=", plainUserType, ", profileRole=", plainProfileRole);
+    if (isDev) console.log("[UIRoleContext] Plain path: userType=", plainUserType, ", extractedRole=", plainProfileRole);
 
     if (plainUserType && plainProfileRole) {
       const result = mapLoggedRoleToUIRole(plainUserType, plainProfileRole);

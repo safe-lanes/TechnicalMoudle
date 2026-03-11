@@ -10,6 +10,7 @@ import type { UIRole } from "@shared/uiRoles";
 import { mapLoggedRoleToUIRole } from "@shared/uiRoles";
 import { secureGetItem } from "@/utils/secureStorage";
 import { analyzeLocalStorage } from "@/utils/localStorageAnalyzer";
+import { extractRole, extractProfileFields } from "@/utils/profileExtractor";
 
 // To test different roles, change role + userType below:
 //   role: "Sail Admin",   userType: "Office"  → Dropdown: Sail Admin
@@ -75,35 +76,56 @@ export function AuthProvider({ children }: AuthProviderProps) {
     const encryptedProfile = secureGetItem<Record<string, any>>("userProfile");
     const encryptedUserType = secureGetItem<string>("userType");
     if (isDev) {
-      console.log("[AuthContext] secureGetItem userProfile:", encryptedProfile ? `{id: ${encryptedProfile.id}, role: ${encryptedProfile.role}}` : "null");
       console.log("[AuthContext] secureGetItem userType:", encryptedUserType);
+      if (encryptedProfile) {
+        const topKeys = Object.keys(encryptedProfile);
+        console.log("[AuthContext] secureGetItem userProfile TOP-LEVEL KEYS:", topKeys);
+        for (const key of topKeys) {
+          const val = encryptedProfile[key];
+          if (val && typeof val === "object" && !Array.isArray(val)) {
+            const subKeys = Object.keys(val).slice(0, 15);
+            console.log(`[AuthContext]   └─ ${key} (object) subkeys:`, subKeys);
+            if (val.role) console.log(`[AuthContext]   ★ FOUND role at profile.${key}.role =`, val.role);
+            if (val.id) console.log(`[AuthContext]   ★ FOUND id at profile.${key}.id =`, val.id);
+          } else if (key === "role") {
+            console.log(`[AuthContext]   ★ FOUND role at profile.role =`, val);
+          } else if (key === "id") {
+            console.log(`[AuthContext]   ★ FOUND id at profile.id =`, val);
+          }
+        }
+      } else {
+        console.log("[AuthContext] secureGetItem userProfile: null");
+      }
     }
 
-    if (encryptedUserType && encryptedProfile?.role) {
-      resolvedPath = "ENCRYPTED";
-      resolvedUserType = mapLoggedRoleToUIRole(encryptedUserType, encryptedProfile.role);
-      if (isDev) console.log("[AuthContext] ENCRYPTED path → mapLoggedRoleToUIRole(", encryptedUserType, ",", encryptedProfile.role, ") =", resolvedUserType);
+    const encryptedRole = extractRole(encryptedProfile);
+    if (isDev) console.log("[AuthContext] extractRole from decrypted profile:", encryptedRole);
 
-      const role = (encryptedProfile.role as UserRole) || "Office";
+    if (encryptedUserType && encryptedRole) {
+      resolvedPath = "ENCRYPTED";
+      resolvedUserType = mapLoggedRoleToUIRole(encryptedUserType, encryptedRole);
+      if (isDev) console.log("[AuthContext] ENCRYPTED path → mapLoggedRoleToUIRole(", encryptedUserType, ",", encryptedRole, ") =", resolvedUserType);
+
+      const fields = extractProfileFields(encryptedProfile);
       resolvedUser = {
-        id: encryptedProfile.id || 0,
-        username: encryptedProfile.username || "user",
-        fullName: encryptedProfile.fullName || encryptedProfile.name || "User",
-        email: encryptedProfile.email || null,
-        role: role,
+        id: fields.id,
+        username: fields.username,
+        fullName: fields.fullName,
+        email: fields.email,
+        role: (encryptedRole as UserRole) || "Office",
         userType:
           encryptedUserType === "Office" || encryptedUserType === "Ship"
             ? encryptedUserType
             : undefined,
-        vesselId: encryptedProfile.vesselId || null,
-        department: encryptedProfile.department || null,
+        vesselId: fields.vesselId,
+        department: fields.department,
         isActive: true,
-        crewDesignation: encryptedProfile.crewDesignation || null,
+        crewDesignation: fields.crewDesignation,
         createdAt: new Date(),
         updatedAt: new Date(),
       };
     } else {
-      if (isDev) console.log("[AuthContext] Encrypted path SKIPPED (encryptedUserType:", encryptedUserType, ", encryptedProfile?.role:", encryptedProfile?.role, ")");
+      if (isDev) console.log("[AuthContext] Encrypted path SKIPPED (encryptedUserType:", encryptedUserType, ", extractedRole:", encryptedRole, ")");
 
       if (rawUserProfile && !encryptedProfile) {
         if (isDev) console.log("[AuthContext] ⚠ Raw data EXISTS but decryption FAILED — likely VITE_STORAGE_SECRET key mismatch");
@@ -119,33 +141,34 @@ export function AuthProvider({ children }: AuthProviderProps) {
         plainProfile = null;
       }
 
-      if (isDev) console.log("[AuthContext] Plain path: userType=", plainUserType, ", profile?.role=", plainProfile?.role);
+      const plainRole = extractRole(plainProfile);
+      if (isDev) console.log("[AuthContext] Plain path: userType=", plainUserType, ", extractedRole=", plainRole);
 
-      if (plainUserType && plainProfile?.role) {
+      if (plainUserType && plainRole) {
         resolvedPath = "PLAIN";
-        resolvedUserType = mapLoggedRoleToUIRole(plainUserType, plainProfile.role);
-        if (isDev) console.log("[AuthContext] PLAIN path → mapLoggedRoleToUIRole(", plainUserType, ",", plainProfile.role, ") =", resolvedUserType);
+        resolvedUserType = mapLoggedRoleToUIRole(plainUserType, plainRole);
+        if (isDev) console.log("[AuthContext] PLAIN path → mapLoggedRoleToUIRole(", plainUserType, ",", plainRole, ") =", resolvedUserType);
 
-        const role = (plainProfile.role as UserRole) || "Office";
+        const fields = extractProfileFields(plainProfile);
         resolvedUser = {
-          id: plainProfile.id || 0,
-          username: plainProfile.username || "user",
-          fullName: plainProfile.fullName || plainProfile.name || "User",
-          email: plainProfile.email || null,
-          role: role,
+          id: fields.id,
+          username: fields.username,
+          fullName: fields.fullName,
+          email: fields.email,
+          role: (plainRole as UserRole) || "Office",
           userType:
             plainUserType === "Office" || plainUserType === "Ship"
               ? plainUserType
               : undefined,
-          vesselId: plainProfile.vesselId || null,
-          department: plainProfile.department || null,
+          vesselId: fields.vesselId,
+          department: fields.department,
           isActive: true,
-          crewDesignation: plainProfile.crewDesignation || null,
+          crewDesignation: fields.crewDesignation,
           createdAt: new Date(),
           updatedAt: new Date(),
         };
       } else {
-        if (isDev) console.log("[AuthContext] Plain path SKIPPED (plainUserType:", plainUserType, ", plainProfile?.role:", plainProfile?.role, ")");
+        if (isDev) console.log("[AuthContext] Plain path SKIPPED (plainUserType:", plainUserType, ", extractedRole:", plainRole, ")");
       }
     }
 
