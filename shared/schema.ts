@@ -1070,6 +1070,7 @@ export const workOrders = pgTable("work_orders", {
 
 export const insertWorkOrderSchema = createInsertSchema(workOrders).omit({
   id: true,
+  wouuid: true,
   createdAt: true,
   updatedAt: true,
 }).extend({
