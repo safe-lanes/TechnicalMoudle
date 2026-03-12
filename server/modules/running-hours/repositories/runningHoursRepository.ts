@@ -25,7 +25,7 @@ export async function sumPositiveDeltasInPeriod(componentId: string, startDate: 
   return storage.sumPositiveDeltasInPeriod(componentId, startDate, endDate);
 }
 
-export async function getRunningHoursAtDate(componentId: string, targetDate: Date): Promise<{ runningHours: number; enteredAtUTC: Date } | null> {
+export async function getRunningHoursAtDate(componentId: string, targetDate: Date): Promise<{ runningHours: number; enteredAtUTC: Date; isFallback?: boolean } | null> {
   return storage.getRunningHoursAtDate(componentId, targetDate);
 }
 

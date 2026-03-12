@@ -48,9 +48,23 @@ interface RunningHoursData {
   meterReplacedDate?: string | null;
   currentMeterRH?: string;
   lastUpdatedBy?: string | null;
+  rhAtPeriodStart?: number | null;
+  periodStartDate?: string | null;
+  maxPossibleHours?: number | null;
+  periodDays?: number | null;
+  dataQualityWarning?: string | null;
+  averageDailyHours?: number | null;
+  currentCumulativeRHRaw?: number | null;
 }
 
 const periodLabels: Record<string, string> = {
+  weekly: 'Weekly (Last 7 days)',
+  monthly: 'Monthly (Last 30 days)',
+  quarterly: 'Quarterly (Last 90 days)',
+  yearly: 'Yearly (Last 365 days)'
+};
+
+const periodShortLabels: Record<string, string> = {
   weekly: 'Weekly',
   monthly: 'Monthly',
   quarterly: 'Quarterly',
@@ -185,7 +199,14 @@ const RunningHours = () => {
     meterReplacedLastRh: parent.meterReplacedLastRh || null,
     meterReplacedDate: parent.meterReplacedDate || null,
     currentMeterRH: parent.currentMeterRH || '0',
-    lastUpdatedBy: parent.lastUpdatedBy || null
+    lastUpdatedBy: parent.lastUpdatedBy || null,
+    rhAtPeriodStart: parent.rhAtPeriodStart ?? null,
+    periodStartDate: parent.periodStartDate ?? null,
+    maxPossibleHours: parent.maxPossibleHours ?? null,
+    periodDays: parent.periodDays ?? null,
+    dataQualityWarning: parent.dataQualityWarning ?? null,
+    averageDailyHours: parent.averageDailyHours ?? null,
+    currentCumulativeRHRaw: parseFloat(parent.currentCumulativeRH || '0')
   })) : [];
 
   const filteredRunningHoursData = runningHoursData.filter(item =>
@@ -336,8 +357,8 @@ const RunningHours = () => {
       "Component Category",
       "Running Hours (cumulative)",
       "Last Updated (local)",
-      `Utilization Rate % (${periodLabels[utilizationPeriod] || 'Monthly'})`,
-      `Period Running Hours (${periodLabels[utilizationPeriod] || 'Monthly'})`,
+      `Utilization Rate % (${periodShortLabels[utilizationPeriod] || 'Monthly'})`,
+      `Period Running Hours (${periodShortLabels[utilizationPeriod] || 'Monthly'})`,
       "Last Updated By",
       "Notes"
     ];
@@ -848,14 +869,14 @@ const RunningHours = () => {
             <Clock className="h-4 w-4 text-gray-500" />
             <span className="text-sm text-gray-600 whitespace-nowrap">Utilization Period:</span>
             <Select value={utilizationPeriod} onValueChange={setUtilizationPeriod}>
-              <SelectTrigger className="w-[180px] h-9" data-testid="select-utilization-period">
+              <SelectTrigger className="w-[220px] h-9" data-testid="select-utilization-period">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="weekly" data-testid="period-weekly">Weekly (7 days)</SelectItem>
-                <SelectItem value="monthly" data-testid="period-monthly">Monthly (30 days)</SelectItem>
-                <SelectItem value="quarterly" data-testid="period-quarterly">Quarterly (90 days)</SelectItem>
-                <SelectItem value="yearly" data-testid="period-yearly">Yearly (365 days)</SelectItem>
+                <SelectItem value="weekly" data-testid="period-weekly">Weekly (Last 7 days)</SelectItem>
+                <SelectItem value="monthly" data-testid="period-monthly">Monthly (Last 30 days)</SelectItem>
+                <SelectItem value="quarterly" data-testid="period-quarterly">Quarterly (Last 90 days)</SelectItem>
+                <SelectItem value="yearly" data-testid="period-yearly">Yearly (Last 365 days)</SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -881,7 +902,7 @@ const RunningHours = () => {
             <div data-testid="D8"><Marker id="D8" />Component Category</div>
             <div data-testid="D9"><Marker id="D9" />Running Hours</div>
             <div data-testid="D10"><Marker id="D10" />Last Updated</div>
-            <div data-testid="D11"><Marker id="D11" />Utilization Rate ({periodLabels[utilizationPeriod] || 'Monthly'})</div>
+            <div data-testid="D11"><Marker id="D11" />Utilization Rate ({periodShortLabels[utilizationPeriod] || 'Monthly'})</div>
             <div data-testid="D22">Inherited RH</div>
             <div data-testid="D12"><Marker id="D12" />Update RH</div>
             <div data-testid="D24">Last Updated By</div>
@@ -937,19 +958,53 @@ const RunningHours = () => {
                 <div className="text-gray-900 font-medium" data-testid={index === 0 ? "D16" : undefined}>{index === 0 && <Marker id="D16" />}{item.runningHours}</div>
                 <div className="text-gray-700" data-testid={index === 0 ? "D17" : undefined}>{index === 0 && <Marker id="D17" />}{item.lastUpdated}</div>
                 <div
-                  className={`font-medium ${
-                    (item.utilizationRate ?? 0) >= 75 ? 'text-green-600' :
-                    (item.utilizationRate ?? 0) >= 40 ? 'text-amber-500' :
-                    'text-red-500'
-                  }`}
-                  title={
-                    (item.periodRunningHours ?? 0) > 0
-                      ? `Ran ${item.periodRunningHours} hrs out of ${periodTotalHours[utilizationPeriod]} hrs available this ${periodNoun[utilizationPeriod]}`
-                      : 'No running hours logged in this period'
-                  }
+                  className="flex items-center gap-1"
                   data-testid={index === 0 ? "D18" : undefined}
                 >
-                  {index === 0 && <Marker id="D18" />}{((item.utilizationRate ?? 0)).toFixed(1)}%
+                  {index === 0 && <Marker id="D18" />}
+                  <span
+                    className={`font-medium ${
+                      (item.utilizationRate ?? 0) === 0 ? 'text-gray-400' :
+                      (item.utilizationRate ?? 0) <= 50 ? 'text-green-600' :
+                      (item.utilizationRate ?? 0) <= 75 ? 'text-yellow-600' :
+                      (item.utilizationRate ?? 0) <= 90 ? 'text-orange-500' :
+                      'text-red-600'
+                    }`}
+                    title={(() => {
+                      const rate = item.utilizationRate ?? 0;
+                      const periodStart = item.periodStartDate ? new Date(item.periodStartDate).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : '—';
+                      const today = new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+                      const days = item.periodDays ?? 0;
+                      const currentRH = item.currentCumulativeRHRaw?.toLocaleString() ?? '0';
+                      const rhStart = item.rhAtPeriodStart?.toLocaleString() ?? '0';
+                      const rhAccum = item.periodRunningHours ?? 0;
+                      const maxHrs = item.maxPossibleHours ?? 0;
+                      const avgDaily = item.averageDailyHours ?? 0;
+                      const pLabel = periodShortLabels[utilizationPeriod] || 'Monthly';
+                      let tooltip = `${pLabel} Utilization: ${rate.toFixed(1)}%\n\nCalculation Details:\n━━━━━━━━━━━━━━━━━━━━━━\nPeriod: ${periodStart} to ${today} (${days} days)\nCurrent RH: ${currentRH} hrs\nRH at Period Start: ${rhStart} hrs\nRH Accumulated: ${rhAccum} hrs\nMaximum Possible: ${maxHrs.toLocaleString()} hrs (${days} days × 24 hrs/day)\n\nFormula: (${rhAccum} / ${maxHrs.toLocaleString()}) × 100 = ${rate.toFixed(1)}%`;
+                      if (avgDaily > 0) {
+                        tooltip += `\n\nInterpretation: This machinery ran on average ${avgDaily} hours per day over the last ${days} days.`;
+                      }
+                      if (item.dataQualityWarning) {
+                        const warnings: Record<string, string> = {
+                          'no_baseline': '⚠️ No audit data before period start — used oldest available entry as baseline.',
+                          'no_audit_history': '⚠️ No audit history found — used 0 as baseline.',
+                          'meter_reset': '⚠️ Meter reset detected — RH decreased during this period.',
+                          'capped_100': '⚠️ Calculated rate exceeded 100% — capped at 100.0%.'
+                        };
+                        tooltip += `\n\n${warnings[item.dataQualityWarning] || '⚠️ Data quality issue detected.'}`;
+                      }
+                      return tooltip;
+                    })()}
+                  >
+                    {((item.utilizationRate ?? 0)).toFixed(1)}%
+                  </span>
+                  {item.dataQualityWarning && (
+                    <AlertTriangle
+                      className="h-3.5 w-3.5 text-amber-500 flex-shrink-0"
+                      data-testid={`warning-utilization-${item.id}`}
+                    />
+                  )}
                 </div>
                 <div className="flex items-center gap-2">
                   {item.inheritedCount && item.inheritedCount > 0 ? (

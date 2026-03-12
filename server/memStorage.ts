@@ -174,7 +174,7 @@ class MemStorage {
   async getRunningHoursAudits(componentId: string, limit?: number): Promise<any[]> { return []; }
   async getRunningHoursAuditsInDateRange(componentId: string, startDate: Date, endDate: Date): Promise<any[]> { return []; }
   async sumPositiveDeltasInPeriod(componentId: string, startDate: Date, endDate: Date): Promise<number> { return 0; }
-  async getRunningHoursAtDate(componentId: string, targetDate: Date): Promise<{ runningHours: number; enteredAtUTC: Date } | null> { return null; }
+  async getRunningHoursAtDate(componentId: string, targetDate: Date): Promise<{ runningHours: number; enteredAtUTC: Date; isFallback?: boolean } | null> { return null; }
   async getRunningHourParents(vesselId: string): Promise<any[]> { return []; }
   
   /**

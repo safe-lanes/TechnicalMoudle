@@ -1748,30 +1748,50 @@ export class PostgresStorage {
   async getRunningHoursAtDate(
     componentId: string,
     targetDate: Date
-  ): Promise<{ runningHours: number; enteredAtUTC: Date } | null> {
+  ): Promise<{ runningHours: number; enteredAtUTC: Date; isFallback?: boolean } | null> {
     const db = await getDb();
     const comp = await this.getComponent(componentId);
     const resolvedId = comp ? comp.cuuid : componentId;
+    const idCondition = or(eq(runningHoursAudit.componentId, resolvedId), eq(runningHoursAudit.componentId, componentId));
+
     const result = await db.select({
       runningHours: runningHoursAudit.cumulativeRH,
       enteredAtUTC: runningHoursAudit.enteredAtUTC
     })
       .from(runningHoursAudit)
       .where(and(
-        or(eq(runningHoursAudit.componentId, resolvedId), eq(runningHoursAudit.componentId, componentId)),
+        idCondition,
         lte(runningHoursAudit.enteredAtUTC, targetDate)
       ))
       .orderBy(desc(runningHoursAudit.enteredAtUTC))
       .limit(1);
 
-    if (result.length === 0) {
-      return null;
+    if (result.length > 0) {
+      return {
+        runningHours: parseFloat(result[0].runningHours || '0'),
+        enteredAtUTC: result[0].enteredAtUTC,
+        isFallback: false
+      };
     }
 
-    return {
-      runningHours: parseFloat(result[0].runningHours || '0'),
-      enteredAtUTC: result[0].enteredAtUTC
-    };
+    const fallback = await db.select({
+      runningHours: runningHoursAudit.cumulativeRH,
+      enteredAtUTC: runningHoursAudit.enteredAtUTC
+    })
+      .from(runningHoursAudit)
+      .where(idCondition)
+      .orderBy(asc(runningHoursAudit.enteredAtUTC))
+      .limit(1);
+
+    if (fallback.length > 0) {
+      return {
+        runningHours: parseFloat(fallback[0].runningHours || '0'),
+        enteredAtUTC: fallback[0].enteredAtUTC,
+        isFallback: true
+      };
+    }
+
+    return null;
   }
 
   // ============= MODULE 4: JOBS =============

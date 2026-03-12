@@ -127,15 +127,16 @@ export async function listParents(vesselId: string, period: string = 'monthly') 
     component => component.rhCounterType === 'MASTER' && component.isActive !== false
   );
 
-  const periodHoursMap: Record<string, number> = {
-    weekly: 168,
-    monthly: 720,
-    quarterly: 2160,
-    yearly: 8760
+  const periodDaysMap: Record<string, number> = {
+    weekly: 7,
+    monthly: 30,
+    quarterly: 90,
+    yearly: 365
   };
-  const totalPeriodHours = periodHoursMap[period] || periodHoursMap.monthly;
+  const periodDays = periodDaysMap[period] || periodDaysMap.monthly;
+  const totalPeriodHours = periodDays * 24;
   const now = new Date();
-  const periodStartDate = new Date(now.getTime() - totalPeriodHours * 60 * 60 * 1000);
+  const periodStartDate = new Date(now.getTime() - periodDays * 24 * 60 * 60 * 1000);
 
   const parentsWithCounts = await Promise.all(
     masterComponents.map(async (component) => {
@@ -150,13 +151,41 @@ export async function listParents(vesselId: string, period: string = 'monthly') 
 
       let utilizationRate = 0;
       let periodRunningHours = 0;
-      if (historicalEntry && totalPeriodHours > 0) {
-        const rhIncrease = totalCumulativeRH - historicalEntry.runningHours;
-        if (rhIncrease > 0) {
-          utilizationRate = Math.round(Math.min((rhIncrease / totalPeriodHours) * 100, 100.0) * 10) / 10;
-          periodRunningHours = Math.round(rhIncrease * 10) / 10;
+      let rhAtPeriodStart = 0;
+      let dataQualityWarning: string | null = null;
+
+      if (totalCumulativeRH === 0) {
+        rhAtPeriodStart = 0;
+      } else if (historicalEntry) {
+        rhAtPeriodStart = historicalEntry.runningHours;
+        if (historicalEntry.isFallback) {
+          dataQualityWarning = 'no_baseline';
+        }
+      } else {
+        rhAtPeriodStart = 0;
+        if (totalCumulativeRH > 0) {
+          dataQualityWarning = 'no_audit_history';
         }
       }
+
+      const rhIncrease = totalCumulativeRH - rhAtPeriodStart;
+
+      if (rhIncrease < 0) {
+        utilizationRate = 0;
+        periodRunningHours = 0;
+        dataQualityWarning = 'meter_reset';
+      } else if (rhIncrease > 0 && totalPeriodHours > 0) {
+        const rawRate = (rhIncrease / totalPeriodHours) * 100;
+        if (rawRate > 100) {
+          dataQualityWarning = 'capped_100';
+        }
+        utilizationRate = Math.round(Math.min(rawRate, 100.0) * 10) / 10;
+        periodRunningHours = Math.round(rhIncrease * 10) / 10;
+      }
+
+      const averageDailyHours = periodDays > 0 && periodRunningHours > 0
+        ? Math.round((periodRunningHours / periodDays) * 10) / 10
+        : 0;
 
       const latestAudits = await repo.getRunningHoursAudits(component.cuuid, 1);
       const lastUpdatedBy = latestAudits.length > 0 ? (latestAudits[0].userId || null) : null;
@@ -172,12 +201,17 @@ export async function listParents(vesselId: string, period: string = 'monthly') 
         inheritedCount: inheritedComponents.length,
         utilizationRate,
         periodRunningHours,
-        lastUpdatedBy
+        lastUpdatedBy,
+        rhAtPeriodStart: Math.round(rhAtPeriodStart * 100) / 100,
+        periodStartDate: periodStartDate.toISOString(),
+        maxPossibleHours: totalPeriodHours,
+        periodDays,
+        dataQualityWarning,
+        averageDailyHours
       };
     })
   );
 
-  // Sort by component code for consistent ordering
   parentsWithCounts.sort((a, b) => (a.componentCode || '').localeCompare(b.componentCode || ''));
 
   return parentsWithCounts;

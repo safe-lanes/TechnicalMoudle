@@ -47,7 +47,7 @@ Preferred communication style: Simple, everyday language.
 -   **Inventory Transaction Location Picker**: Interactive, searchable comboboxes for selecting and creating locations.
 -   **Component Mandatory Field Validation**: Add/Edit Component forms enforce 10 mandatory fields with conditional logic.
 -   **RH Counter Type & Source Selection**: Components can define `rhCounterType` and `rhMasterComponentId` with searchable dropdowns.
--   **Period-Based Utilization Rate**: Calculated using a two-point meter reading formula, with configurable periods (Weekly, Monthly, Quarterly, Yearly).
+-   **Period-Based Utilization Rate**: Calculated using a two-point meter reading formula: `min(((currentRH - rhAtPeriodStart) / maxPeriodHours) × 100, 100)`. Uses rolling windows (7/30/90/365 days). Fallback logic: if no audit entry before period start, uses oldest available entry; if no audit history exists, uses 0 as baseline. Returns metadata (rhAtPeriodStart, periodStartDate, maxPossibleHours, dataQualityWarning, averageDailyHours) for detailed tooltip. Color coding: gray (0%), green (0.1-50%), yellow (51-75%), orange (76-90%), red (91-100%). Warning indicators for data quality issues (meter reset, capped at 100%, no baseline).
 -   **Component Tree Management**: Supports drag-and-drop reordering and reparenting.
 -   **Soft Delete for Entities**: Functionality for deactivating Components, Jobs, Spares, and Store Items, retaining data with specific rules for dependencies and visibility.
 -   **Work Order Part B Validation & Integrity Rules**: Enforces 8 validation rules including read-only states, character limits, draft save logic, and audit trails.

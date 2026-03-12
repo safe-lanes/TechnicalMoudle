@@ -258,7 +258,7 @@ export interface IStorage {
   getRunningHoursAudits(componentId: string, limit?: number): Promise<RunningHoursAudit[]>;
   getRunningHoursAuditsInDateRange(componentId: string, startDate: Date, endDate: Date): Promise<RunningHoursAudit[]>;
   sumPositiveDeltasInPeriod(componentId: string, startDate: Date, endDate: Date): Promise<number>;
-  getRunningHoursAtDate(componentId: string, targetDate: Date): Promise<{ runningHours: number; enteredAtUTC: Date } | null>;
+  getRunningHoursAtDate(componentId: string, targetDate: Date): Promise<{ runningHours: number; enteredAtUTC: Date; isFallback?: boolean } | null>;
   
   // New: Get parent components with running-hour based child jobs
   getRunningHourParents(vesselId: string): Promise<Array<Component & { childCount: number; latestUpdate?: string }>>;
