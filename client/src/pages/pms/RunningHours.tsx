@@ -35,6 +35,7 @@ interface ChildRHData {
 
 interface RunningHoursData {
   id: string;
+  cuuid: string;
   component: string;
   componentCode?: string;
   sfiCode?: string;
@@ -129,6 +130,8 @@ const RunningHours = () => {
   const [historyDateFrom, setHistoryDateFrom] = useState("");
   const [historyDateTo, setHistoryDateTo] = useState("");
   const [historyComponentFilter, setHistoryComponentFilter] = useState("");
+  const [selectedHistoryComponent, setSelectedHistoryComponent] = useState<RunningHoursData | null>(null);
+  const [historyComponentSearch, setHistoryComponentSearch] = useState("");
   
   // Child RH popup state
   const [isChildRHOpen, setIsChildRHOpen] = useState(false);
@@ -197,6 +200,7 @@ const RunningHours = () => {
   // Map API data to display format
   const runningHoursData: RunningHoursData[] = Array.isArray(rawRunningHoursData) ? rawRunningHoursData.map((parent: any) => ({
     id: parent.id,
+    cuuid: parent.cuuid || parent.id,
     component: parent.name || '',
     componentCode: parent.componentCode || '',
     sfiCode: parent.sfiCode || '',
@@ -223,7 +227,11 @@ const RunningHours = () => {
     !searchTerm || item.component.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  // Fetch running hours history
+  const filteredHistoryComponents = runningHoursData.filter(item =>
+    !historyComponentSearch || item.component.toLowerCase().includes(historyComponentSearch.toLowerCase()) ||
+    (item.componentCode || '').toLowerCase().includes(historyComponentSearch.toLowerCase())
+  );
+
   const { data: historyResult, isLoading: isLoadingHistory } = useQuery<{
     data: any[];
     total: number;
@@ -231,7 +239,7 @@ const RunningHours = () => {
     pageSize: number;
     totalPages: number;
   }>({
-    queryKey: ['/technical/api/running-hours/history', vesselId, historyPage, historyItemsPerPage, historySortOrder, historySearch, historyDateFrom, historyDateTo, historyComponentFilter],
+    queryKey: ['/technical/api/running-hours/history', vesselId, historyPage, historyItemsPerPage, historySortOrder, historySearch, historyDateFrom, historyDateTo, selectedHistoryComponent?.cuuid],
     queryFn: async () => {
       const params = new URLSearchParams({
         vesselId: vesselId || '',
@@ -242,17 +250,22 @@ const RunningHours = () => {
       if (historySearch) params.set('search', historySearch);
       if (historyDateFrom) params.set('dateFrom', historyDateFrom);
       if (historyDateTo) params.set('dateTo', historyDateTo);
-      if (historyComponentFilter) params.set('componentId', historyComponentFilter);
+      if (selectedHistoryComponent) params.set('componentId', selectedHistoryComponent.cuuid);
       const response = await fetch(`/technical/api/running-hours/history?${params.toString()}`);
       if (!response.ok) throw new Error('Failed to fetch history');
       return response.json();
     },
-    enabled: activeTab === 'history'
+    enabled: activeTab === 'history' && !!selectedHistoryComponent
   });
 
   useEffect(() => {
     setHistoryPage(1);
-  }, [historyItemsPerPage, historySearch, historyDateFrom, historyDateTo, historyComponentFilter, vesselId]);
+  }, [historyItemsPerPage, historySearch, historyDateFrom, historyDateTo, selectedHistoryComponent, vesselId]);
+
+  useEffect(() => {
+    setSelectedHistoryComponent(null);
+    setHistoryComponentSearch("");
+  }, [vesselId]);
 
   const goToHistoryPage = (page: number) => {
     const totalPages = historyResult?.totalPages || 1;
@@ -268,7 +281,7 @@ const RunningHours = () => {
     if (historySearch) params.set('search', historySearch);
     if (historyDateFrom) params.set('dateFrom', historyDateFrom);
     if (historyDateTo) params.set('dateTo', historyDateTo);
-    if (historyComponentFilter) params.set('componentId', historyComponentFilter);
+    if (selectedHistoryComponent) params.set('componentId', selectedHistoryComponent.cuuid);
     window.open(`/technical/api/running-hours/history/export?${params.toString()}`, '_blank');
   };
 
@@ -276,8 +289,24 @@ const RunningHours = () => {
     setHistorySearch("");
     setHistoryDateFrom("");
     setHistoryDateTo("");
-    setHistoryComponentFilter("");
     setHistoryPage(1);
+  };
+
+  const handleSelectHistoryComponent = (item: RunningHoursData) => {
+    setSelectedHistoryComponent(item);
+    setHistoryPage(1);
+    setHistorySearch("");
+    setHistoryDateFrom("");
+    setHistoryDateTo("");
+    setHistorySortOrder("desc");
+  };
+
+  const handleBackToComponentList = () => {
+    setSelectedHistoryComponent(null);
+    setHistoryPage(1);
+    setHistorySearch("");
+    setHistoryDateFrom("");
+    setHistoryDateTo("");
   };
 
   const formatHistoryDate = (dateStr: string | null) => {
@@ -1001,13 +1030,41 @@ const RunningHours = () => {
           </div>
         )}
 
-        {/* Search and Filter Row - History Tab */}
-        {activeTab === 'history' && (
+        {/* Search Row - History Tab (component list) */}
+        {activeTab === 'history' && !selectedHistoryComponent && (
           <div className="flex items-center gap-3 flex-wrap">
-            <div className="relative flex-1 max-w-xs" data-testid="history-search-wrapper">
+            <div className="relative flex-1 max-w-sm" data-testid="history-component-search-wrapper">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
               <Input
-                placeholder="Search by component, user, source..."
+                placeholder="Search Component"
+                value={historyComponentSearch}
+                onChange={(e) => setHistoryComponentSearch(e.target.value)}
+                className="pl-10 h-9"
+                data-testid="input-history-component-search"
+              />
+            </div>
+          </div>
+        )}
+
+        {/* Search and Filter Row - History Tab (individual component history) */}
+        {activeTab === 'history' && selectedHistoryComponent && (
+          <div className="flex items-center gap-3 flex-wrap">
+            <Button variant="outline" size="sm" onClick={handleBackToComponentList} className="h-9 flex items-center gap-1.5" data-testid="button-back-to-components">
+              <ChevronLeft className="h-4 w-4" />
+              Back
+            </Button>
+
+            <div className="flex items-center gap-2 text-sm font-medium text-gray-900">
+              <span>{selectedHistoryComponent.component}</span>
+              <span className="text-gray-400">({selectedHistoryComponent.componentCode})</span>
+            </div>
+
+            <div className="flex-1" />
+
+            <div className="relative max-w-xs" data-testid="history-search-wrapper">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+              <Input
+                placeholder="Search history..."
                 value={historySearch}
                 onChange={(e) => setHistorySearch(e.target.value)}
                 className="pl-10 h-9"
@@ -1036,18 +1093,6 @@ const RunningHours = () => {
               />
             </div>
 
-            <Select value={historyComponentFilter || "all"} onValueChange={(val) => setHistoryComponentFilter(val === "all" ? "" : val)}>
-              <SelectTrigger className="w-[200px] h-9" data-testid="select-history-component">
-                <SelectValue placeholder="All Components" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Components</SelectItem>
-                {runningHoursData.map(item => (
-                  <SelectItem key={item.id} value={item.id}>{item.component}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-
             <Button variant="outline" size="sm" className="text-xs text-[#8798ad] border-[#e1e8ed] h-9" onClick={exportHistoryToCSV} data-testid="button-export-history">
               <Download className="h-3.5 w-3.5 mr-1" />
               Export CSV
@@ -1060,12 +1105,69 @@ const RunningHours = () => {
         )}
       </div>
 
-      {/* History Tab */}
-      {activeTab === 'history' && (
+      {/* History Tab - Component List (Step 1) */}
+      {activeTab === 'history' && !selectedHistoryComponent && (
         <div className="flex-1 flex flex-col overflow-hidden bg-white rounded-lg border border-gray-200">
-          {/* History Table Header */}
           <div className="bg-[#52baf3] text-white px-4 py-3 flex-shrink-0">
-            <div className="grid grid-cols-7 gap-4 text-sm font-medium">
+            <div className="grid grid-cols-6 gap-4 text-sm font-medium">
+              <div>Component Name</div>
+              <div>Component Code</div>
+              <div>Component Category</div>
+              <div>Running Hours</div>
+              <div>Last Updated</div>
+              <div className="text-center">Actions</div>
+            </div>
+          </div>
+          <div className="overflow-y-auto flex-1">
+            {isLoadingParents ? (
+              <div className="p-8 text-center text-gray-500">Loading components...</div>
+            ) : !filteredHistoryComponents.length ? (
+              <div className="p-8 text-center text-gray-500">
+                {historyComponentSearch ? 'No components match your search.' : 'No components available.'}
+              </div>
+            ) : (
+              filteredHistoryComponents.map((item) => (
+                <div key={item.id} className="px-4 py-3 border-b border-gray-100 hover:bg-gray-50 cursor-pointer" onClick={() => handleSelectHistoryComponent(item)} data-testid={`history-component-row-${item.id}`}>
+                  <div className="grid grid-cols-6 gap-4 text-sm items-center">
+                    <div className="text-gray-900 font-medium truncate" title={item.component} data-testid={`history-comp-name-${item.id}`}>
+                      {item.component}
+                    </div>
+                    <div className="text-gray-700" data-testid={`history-comp-code-${item.id}`}>
+                      {item.componentCode}
+                    </div>
+                    <div className="text-gray-600" data-testid={`history-comp-cat-${item.id}`}>
+                      {item.componentCategory}
+                    </div>
+                    <div className="text-gray-900" data-testid={`history-comp-rh-${item.id}`}>
+                      {item.runningHours}
+                    </div>
+                    <div className="text-gray-600 text-xs" data-testid={`history-comp-updated-${item.id}`}>
+                      {item.lastUpdated}
+                    </div>
+                    <div className="text-center">
+                      <Button variant="outline" size="sm" className="h-7 text-xs text-[#52baf3] border-[#52baf3] hover:bg-[#52baf3] hover:text-white" data-testid={`button-view-history-${item.id}`}>
+                        <History className="h-3.5 w-3.5 mr-1" />
+                        View History
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+          <div className="flex justify-start px-4 py-2 text-sm text-gray-400">
+            {historyComponentSearch
+              ? `Showing ${filteredHistoryComponents.length} of ${runningHoursData.length} components`
+              : `Showing ${runningHoursData.length} components`}
+          </div>
+        </div>
+      )}
+
+      {/* History Tab - Individual Component History (Step 2) */}
+      {activeTab === 'history' && selectedHistoryComponent && (
+        <div className="flex-1 flex flex-col overflow-hidden bg-white rounded-lg border border-gray-200">
+          <div className="bg-[#52baf3] text-white px-4 py-3 flex-shrink-0">
+            <div className="grid grid-cols-8 gap-4 text-sm font-medium">
               <div
                 className="flex items-center gap-1 cursor-pointer select-none"
                 onClick={() => setHistorySortOrder(prev => prev === 'desc' ? 'asc' : 'desc')}
@@ -1075,6 +1177,7 @@ const RunningHours = () => {
                 <ArrowUpDown className="h-3.5 w-3.5" />
               </div>
               <div>Component Code</div>
+              <div>Component Name</div>
               <div className="text-right">Previous RH</div>
               <div className="text-right">New RH</div>
               <div className="text-right">Change</div>
@@ -1083,26 +1186,28 @@ const RunningHours = () => {
             </div>
           </div>
 
-          {/* History Table Body */}
           <div className="overflow-y-auto flex-1">
             {isLoadingHistory ? (
               <div className="p-8 text-center text-gray-500">Loading history...</div>
             ) : !historyResult?.data?.length ? (
               <div className="p-8 text-center text-gray-500">
-                No history records found.
-                {(historySearch || historyDateFrom || historyDateTo || historyComponentFilter) && (
+                No history records found for this component.
+                {(historySearch || historyDateFrom || historyDateTo) && (
                   <span> <button onClick={clearHistoryFilters} className="text-blue-600 underline" data-testid="link-clear-history-filters">Clear filters</button></span>
                 )}
               </div>
             ) : (
               historyResult.data.map((row: any) => (
                 <div key={row.id} className="px-4 py-3 border-b border-gray-100 hover:bg-gray-50" data-testid={`history-row-${row.id}`}>
-                  <div className="grid grid-cols-7 gap-4 text-sm items-center">
+                  <div className="grid grid-cols-8 gap-4 text-sm items-center">
                     <div className="text-gray-900" data-testid={`history-date-${row.id}`}>
                       {formatHistoryDate(row.updatedAt)}
                     </div>
-                    <div className="text-gray-700" data-testid={`history-component-${row.id}`}>
+                    <div className="text-gray-700" data-testid={`history-code-${row.id}`}>
                       {row.componentCode}
+                    </div>
+                    <div className="text-gray-700 truncate" title={row.componentName || ''} data-testid={`history-name-${row.id}`}>
+                      {row.componentName || '-'}
                     </div>
                     <div className="text-right text-gray-700" data-testid={`history-prev-rh-${row.id}`}>
                       {parseFloat(row.previousRh || '0').toLocaleString()} hrs
@@ -1134,7 +1239,6 @@ const RunningHours = () => {
             )}
           </div>
 
-          {/* History Pagination Footer */}
           {historyResult && historyResult.total > 0 && (
             <div className="p-4 bg-gray-50 border-t border-gray-200 flex items-center justify-between flex-shrink-0" data-testid="history-pagination-footer">
               <div className="flex items-center gap-2 text-sm text-gray-600">

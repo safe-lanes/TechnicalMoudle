@@ -282,10 +282,11 @@ export async function exportHistory(req: Request, res: Response) {
       dateTo,
     });
 
-    const headers = ['Date', 'Component Code', 'Previous RH', 'New RH', 'Change (Delta)', 'Updated By', 'Source', 'Notes'];
+    const headers = ['Date', 'Component Code', 'Component Name', 'Previous RH', 'New RH', 'Change (Delta)', 'Updated By', 'Source', 'Notes'];
     const rows = result.data.map(row => [
       row.updatedAt ? new Date(row.updatedAt).toISOString().split('T')[0] : '',
       row.componentCode,
+      row.componentName || '',
       row.previousRh,
       row.newRh,
       row.deltaRh,
