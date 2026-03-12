@@ -25,6 +25,10 @@ export async function sumPositiveDeltasInPeriod(componentId: string, startDate: 
   return storage.sumPositiveDeltasInPeriod(componentId, startDate, endDate);
 }
 
+export async function getRunningHoursAtDate(componentId: string, targetDate: Date): Promise<{ runningHours: number; enteredAtUTC: Date } | null> {
+  return storage.getRunningHoursAtDate(componentId, targetDate);
+}
+
 // ── Running Hours Audit ──
 
 export async function getRunningHoursAudits(componentId: string, limit?: number): Promise<RunningHoursAudit[]> {

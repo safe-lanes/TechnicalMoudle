@@ -146,10 +146,16 @@ export async function listParents(vesselId: string, period: string = 'monthly') 
       const currentMeterRH = parseFloat(component.rhCurrentMaster || component.currentCumulativeRH || '0');
       const totalCumulativeRH = meterReplacedLastRh + currentMeterRH;
 
-      const hoursRunInPeriod = await repo.sumPositiveDeltasInPeriod(component.cuuid, periodStartDate, now);
-      const utilizationRate = totalPeriodHours > 0
-        ? Math.round(Math.min((hoursRunInPeriod / totalPeriodHours) * 100, 100.0) * 10) / 10
-        : 0;
+      const historicalEntry = await repo.getRunningHoursAtDate(component.cuuid, periodStartDate);
+      const rhAtPeriodStart = historicalEntry ? historicalEntry.runningHours : 0;
+      const rhIncrease = totalCumulativeRH - rhAtPeriodStart;
+
+      let utilizationRate = 0;
+      let periodRunningHours = 0;
+      if (rhIncrease > 0 && totalPeriodHours > 0) {
+        utilizationRate = Math.round(Math.min((rhIncrease / totalPeriodHours) * 100, 100.0) * 10) / 10;
+        periodRunningHours = Math.round(rhIncrease * 10) / 10;
+      }
 
       const latestAudits = await repo.getRunningHoursAudits(component.cuuid, 1);
       const lastUpdatedBy = latestAudits.length > 0 ? (latestAudits[0].userId || null) : null;
@@ -164,7 +170,7 @@ export async function listParents(vesselId: string, period: string = 'monthly') 
         meterReplacedDate: component.meterReplacedDate || null,
         inheritedCount: inheritedComponents.length,
         utilizationRate,
-        periodRunningHours: Math.round(hoursRunInPeriod * 10) / 10,
+        periodRunningHours,
         lastUpdatedBy
       };
     })

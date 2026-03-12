@@ -1745,6 +1745,35 @@ export class PostgresStorage {
     return parseFloat(result[0]?.total || '0');
   }
 
+  async getRunningHoursAtDate(
+    componentId: string,
+    targetDate: Date
+  ): Promise<{ runningHours: number; enteredAtUTC: Date } | null> {
+    const db = await getDb();
+    const comp = await this.getComponent(componentId);
+    const resolvedId = comp ? comp.cuuid : componentId;
+    const result = await db.select({
+      runningHours: runningHoursAudit.newRH,
+      enteredAtUTC: runningHoursAudit.enteredAtUTC
+    })
+      .from(runningHoursAudit)
+      .where(and(
+        or(eq(runningHoursAudit.componentId, resolvedId), eq(runningHoursAudit.componentId, componentId)),
+        lte(runningHoursAudit.enteredAtUTC, targetDate)
+      ))
+      .orderBy(desc(runningHoursAudit.enteredAtUTC))
+      .limit(1);
+
+    if (result.length === 0) {
+      return null;
+    }
+
+    return {
+      runningHours: parseFloat(result[0].runningHours || '0'),
+      enteredAtUTC: result[0].enteredAtUTC
+    };
+  }
+
   // ============= MODULE 4: JOBS =============
 
   async getJobs(vesselId?: string, componentId?: string): Promise<Job[]> {
