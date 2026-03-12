@@ -1002,6 +1002,14 @@ const RunningHours = () => {
                   {item.dataQualityWarning && (
                     <AlertTriangle
                       className="h-3.5 w-3.5 text-amber-500 flex-shrink-0"
+                      title={
+                        ({
+                          'no_baseline': 'No audit data before period start — used oldest available entry as baseline.',
+                          'no_audit_history': 'No audit history found — used 0 as baseline.',
+                          'meter_reset': 'Meter reset detected — RH decreased during this period.',
+                          'capped_100': 'Calculated rate exceeded 100% — capped at 100.0%.'
+                        } as Record<string, string>)[item.dataQualityWarning] || 'Data quality issue detected.'
+                      }
                       data-testid={`warning-utilization-${item.id}`}
                     />
                   )}
