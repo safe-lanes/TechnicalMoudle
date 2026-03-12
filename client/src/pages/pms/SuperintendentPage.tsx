@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
-import { Shield, ExternalLink, Check } from "lucide-react";
+import { Shield, ExternalLink, Check, ArrowLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -66,9 +66,14 @@ export default function SuperintendentPage() {
 
   return (
     <div className="space-y-6" data-testid="superintendent-page">
-      <div>
-        <h1 className="text-2xl font-semibold text-gray-900" data-testid="text-page-title">Superintendent Notifications</h1>
-        <p className="text-sm text-gray-500 mt-1" data-testid="text-page-subtitle">Work orders requiring shore-side acknowledgment before CE can approve</p>
+      <div className="flex items-center gap-4">
+        <Button variant="ghost" onClick={() => setLocation("/pms/dashboard")} data-testid="button-back-dashboard">
+          <ArrowLeft className="h-4 w-4 mr-2" /> Back to Dashboard
+        </Button>
+        <div>
+          <h1 className="text-2xl font-semibold text-gray-900" data-testid="text-page-title">Superintendent Notifications</h1>
+          <p className="text-sm text-gray-500 mt-1" data-testid="text-page-subtitle">Work orders requiring shore-side acknowledgment before CE can approve</p>
+        </div>
       </div>
 
       <div className="grid grid-cols-2 gap-4">
