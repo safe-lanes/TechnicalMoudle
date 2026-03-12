@@ -1,0 +1,316 @@
+FIX RUNNING HOURS UTILIZATION RATE CALCULATION (CRITICAL CORRECTION)
+
+PROBLEM IDENTIFIED:
+
+The current utilization rate calculation is fundamentally incorrect for a maritime Planned Maintenance System.
+
+Current Implementation (WRONG):
+
+text
+utilizationRate = (Sum of positive RH deltas in audit trail during period / Period hours) × 100
+Why this is wrong:
+
+Depends on update frequency, not actual usage
+
+If crew doesn't update RH daily → Shows 0% even if machinery is running
+
+Measures "data entry activity" instead of "machinery utilization"
+
+Useless for operations: A generator running 24/7 shows 0% if RH hasn't been updated recently
+
+Example of the problem:
+
+S-Band Radar last updated: 25-Jan-2026 (RH: 100 hrs)
+
+Today: 12-Mar-2026 (still showing RH: 100 hrs because no updates)
+
+Reality: Machinery might be running constantly
+
+Current system shows: 0.0% utilization ❌ (because no audit entries in last 7 days)
+
+What it SHOULD show: Calculation based on actual RH change from period start
+
+CORRECT IMPLEMENTATION FOR MARITIME PMS:
+
+Formula:
+text
+utilizationRate = min(((CurrentRH - RHatPeriodStart) / MaxPossibleHours) × 100, 100.0)
+
+Where:
+- CurrentRH = Latest running hours value for the component (from components table)
+- RHatPeriodStart = Running hours value at the start of the selected period
+- MaxPossibleHours = Period days × 24 hrs/day
+Key Difference:
+Aspect	Current (WRONG)	Correct (MARITIME PMS)
+What it measures	RH updates logged in audit trail	Actual machinery usage
+Data source	running_hours_audit entries in period	Cumulative RH values (current vs period start)
+If no updates	Shows 0%	Shows actual utilization based on RH difference
+Use case	Software activity tracking	Machinery operation tracking
+IMPLEMENTATION REQUIREMENTS:
+
+1. Change Database Query Logic
+Current query (WRONG):
+
+sql
+-- Sums audit deltas in period
+SELECT COALESCE(SUM(CASE 
+  WHEN (new_rh - previous_rh) > 0 
+  THEN (new_rh - previous_rh)
+  ELSE 0 
+END), 0)
+FROM running_hours_audit
+WHERE entered_at_utc >= :periodStartDate AND entered_at_utc <= :now
+NEW query (CORRECT):
+
+sql
+-- Get current RH
+SELECT currentCumulativeRH 
+FROM components 
+WHERE id = :componentId
+
+-- Get RH at period start (closest entry to period start date)
+SELECT runningHours, enteredAtUTC
+FROM running_hours_audit
+WHERE componentId = :componentId 
+  AND enteredAtUTC <= :periodStartDate
+ORDER BY enteredAtUTC DESC
+LIMIT 1
+2. Updated Calculation Logic
+File: server/modules/running-hours/services/runningHoursService.ts
+
+Replace the calculation in listParents function (around lines 123-177):
+
+javascript
+// NEW APPROACH - Calculate utilization based on actual RH change
+
+async function calculateUtilizationRate(component, period) {
+  // 1. Get current RH from component
+  const currentRH = component.currentCumulativeRH || 0;
+  
+  // 2. Calculate period start date (rolling window)
+  const now = new Date();
+  const periodHours = PERIOD_HOURS_MAP[period]; // 168 for weekly, etc.
+  const periodStartDate = new Date(now.getTime() - (periodHours * 60 * 60 * 1000));
+  
+  // 3. Get RH at period start from audit trail
+  const historicalRHEntry = await storage.getRunningHoursAtDate(
+    component.id, 
+    periodStartDate
+  );
+  
+  // If no historical data, use oldest available or 0
+  const rhAtPeriodStart = historicalRHEntry?.runningHours || 0;
+  
+  // 4. Calculate RH increase during period
+  const rhIncrease = currentRH - rhAtPeriodStart;
+  
+  // 5. Handle edge cases
+  if (rhIncrease < 0) {
+    // RH decreased (meter reset/replacement) - show 0% or N/A
+    return { rate: 0, warning: 'RH_DECREASED' };
+  }
+  
+  // 6. Calculate utilization rate
+  const maxPossibleHours = periodHours; // Already in hours (168, 720, etc.)
+  let utilizationRate = (rhIncrease / maxPossibleHours) * 100;
+  
+  // 7. Cap at 100% (data quality check)
+  if (utilizationRate > 100) {
+    console.warn(`Utilization >100% for ${component.name}: ${utilizationRate}% (${rhIncrease} hrs in ${maxPossibleHours} hrs)`);
+    utilizationRate = 100;
+  }
+  
+  // 8. Round to 1 decimal
+  utilizationRate = Math.round(utilizationRate * 10) / 10;
+  
+  return {
+    rate: utilizationRate,
+    details: {
+      currentRH,
+      rhAtPeriodStart,
+      rhIncrease,
+      periodDays: periodHours / 24,
+      maxPossibleHours: periodHours,
+      periodStartDate: periodStartDate.toISOString(),
+      periodEndDate: now.toISOString()
+    }
+  };
+}
+3. Add New Storage Method
+File: server/postgresStorage.ts
+
+Add this method to get RH at a specific date:
+
+typescript
+async getRunningHoursAtDate(
+  componentId: string, 
+  targetDate: Date
+): Promise<{ runningHours: number; enteredAtUTC: Date } | null> {
+  // Get the closest RH entry at or before the target date
+  const result = await this.db
+    .select({
+      runningHours: runningHoursAudit.newRh,
+      enteredAtUTC: runningHoursAudit.enteredAtUtc
+    })
+    .from(runningHoursAudit)
+    .where(
+      and(
+        eq(runningHoursAudit.componentId, componentId),
+        lte(runningHoursAudit.enteredAtUtc, targetDate)
+      )
+    )
+    .orderBy(desc(runningHoursAudit.enteredAtUtc))
+    .limit(1);
+  
+  if (result.length === 0) {
+    // No historical data - return null or oldest available
+    // Alternatively, return the component's initial RH (usually 0)
+    return null;
+  }
+  
+  return {
+    runningHours: parseFloat(result[0].runningHours),
+    enteredAtUTC: result[0].enteredAtUTC
+  };
+}
+EXAMPLES WITH CORRECTED CALCULATION:
+
+Example 1: S-Band Radar (From Screenshot)
+Given:
+
+Current RH: 100 hrs
+
+Last Updated: 25-Jan-2026
+
+Today: 12-Mar-2026
+
+Period: Weekly (7 days = 168 hrs)
+
+Corrected Calculation:
+
+Step 1: Get current RH
+
+text
+currentRH = 100 hrs
+Step 2: Get RH at period start (05-Mar-2026, 7 days ago)
+
+text
+Query: Get closest RH entry on or before 05-Mar-2026
+Result: Entry from 25-Jan-2026 with RH = 100 hrs
+(No entries between 25-Jan and now, so use 25-Jan entry)
+
+rhAtPeriodStart = 100 hrs
+Step 3: Calculate increase
+
+text
+rhIncrease = 100 - 100 = 0 hrs
+Step 4: Calculate rate
+
+text
+utilizationRate = (0 / 168) × 100 = 0.0%
+Result: 0.0% ✅ (Correct! The machinery hasn't accumulated any running hours)
+
+Example 2: Realistic Scenario (Machinery Actually Running)
+Given:
+
+Current RH: 620 hrs (12-Mar-2026)
+
+RH on 05-Mar-2026: 520 hrs
+
+Period: Weekly (168 hrs)
+
+Calculation:
+
+text
+rhIncrease = 620 - 520 = 100 hrs
+utilizationRate = (100 / 168) × 100 = 59.5%
+Result: 59.5% ✅ (Machinery ran 100 hours out of possible 168 = good utilization)
+
+Example 3: High Utilization
+Given:
+
+Current RH: 1000 hrs
+
+RH 7 days ago: 850 hrs
+
+Calculation:
+
+text
+rhIncrease = 1000 - 850 = 150 hrs
+utilizationRate = (150 / 168) × 100 = 89.3%
+Result: 89.3% ✅ (Machinery running almost 24/7 - very high utilization)
+
+Example 4: Continuous Operation
+Given:
+
+Current RH: 2000 hrs
+
+RH 7 days ago: 1832 hrs
+
+Calculation:
+
+text
+rhIncrease = 2000 - 1832 = 168 hrs
+utilizationRate = (168 / 168) × 100 = 100.0%
+Result: 100.0% ✅ (Machinery ran exactly 24 hrs/day for 7 days = maximum utilization)
+
+EDGE CASES TO HANDLE:
+
+Case 1: No Historical Data (New Component)
+javascript
+if (!historicalRHEntry) {
+  // New component or no audit history
+  // Option A: Return 0% or "N/A"
+  // Option B: Use current RH as baseline (assumes started from 0)
+  return { rate: 0, warning: 'INSUFFICIENT_HISTORY' };
+}
+Case 2: RH Decreased (Meter Replacement)
+javascript
+if (rhIncrease < 0) {
+  // Meter was replaced/reset
+  return { rate: 0, warning: 'RH_RESET_DETECTED' };
+}
+Case 3: Over 100% Utilization
+javascript
+if (utilizationRate > 100) {
+  // Data quality issue - physically impossible
+  console.error(`Data error: ${component.name} shows ${utilizationRate}%`);
+  return { rate: 100, warning: 'EXCEEDED_PHYSICAL_LIMIT' };
+}
+TESTING REQUIREMENTS:
+
+After implementation, test these scenarios:
+
+Component with recent RH updates: Should show correct %
+
+Component with old updates (like S-Band Radar): Should show 0% (correct - no increase)
+
+Component running 24/7: Should show ~100%
+
+New component: Should handle gracefully
+
+Change period dropdown: Rates should recalculate correctly
+
+Meter reset scenario: Should not show negative %
+
+CRITICAL DIFFERENCES SUMMARY:
+
+What Changed	Old (Wrong)	New (Correct)
+Data source	running_hours_audit deltas in period	Current RH vs RH at period start
+Query	SUM(audit deltas in period)	Two-point comparison (start vs end)
+Dependency	Requires frequent RH updates	Works with any update frequency
+Meaning	"How many RH entries were logged"	"How much did the machinery actually run"
+Real-world utility	Low (misleading)	High (actionable insights)
+FINAL NOTE:
+
+The current implementation treats running hours like a transaction log (summing individual entries).
+
+The correct maritime approach treats running hours as a cumulative meter reading (comparing start vs end values).
+
+This is analogous to:
+
+❌ Wrong: Adding up every time you check your car's odometer
+
+✅ Right: Subtracting last week's odometer reading from today's
+
+Please implement the corrected logic ASAP as the current utilization rates are essentially meaningless for operations.
