@@ -147,14 +147,15 @@ export async function listParents(vesselId: string, period: string = 'monthly') 
       const totalCumulativeRH = meterReplacedLastRh + currentMeterRH;
 
       const historicalEntry = await repo.getRunningHoursAtDate(component.cuuid, periodStartDate);
-      const rhAtPeriodStart = historicalEntry ? historicalEntry.runningHours : 0;
-      const rhIncrease = totalCumulativeRH - rhAtPeriodStart;
 
       let utilizationRate = 0;
       let periodRunningHours = 0;
-      if (rhIncrease > 0 && totalPeriodHours > 0) {
-        utilizationRate = Math.round(Math.min((rhIncrease / totalPeriodHours) * 100, 100.0) * 10) / 10;
-        periodRunningHours = Math.round(rhIncrease * 10) / 10;
+      if (historicalEntry && totalPeriodHours > 0) {
+        const rhIncrease = totalCumulativeRH - historicalEntry.runningHours;
+        if (rhIncrease > 0) {
+          utilizationRate = Math.round(Math.min((rhIncrease / totalPeriodHours) * 100, 100.0) * 10) / 10;
+          periodRunningHours = Math.round(rhIncrease * 10) / 10;
+        }
       }
 
       const latestAudits = await repo.getRunningHoursAudits(component.cuuid, 1);
