@@ -946,7 +946,7 @@ export async function validateData(type: string, data: any[], mode: string, vess
       }
 
       // Task Type - required
-      const validTaskTypes = ['Inspection', 'Overhaul', 'Service', 'Testing', 'Repair', 'Replacement', 'Cleaning', 'Calibration'];
+      const validTaskTypes = ['Inspection', 'Overhaul', 'Service', 'Test', 'Renew/Replace', 'Measurement/Calibration', 'Megger Test', 'Cleaning', 'Lubrication', 'Survey', 'Analysis', 'Checks'];
       if (!row['Task Type']) {
         errors.push(`Row ${rowNum}: Task Type is required`);
       } else if (!validTaskTypes.includes(row['Task Type'])) {
