@@ -3109,3 +3109,29 @@ export const insertAdmnRoleMasterSchema = createInsertSchema(admnRoleMaster).omi
 
 export type InsertAdmnRoleMaster = z.infer<typeof insertAdmnRoleMasterSchema>;
 export type AdmnRoleMaster = typeof admnRoleMaster.$inferSelect;
+
+export const admMenumasterAc = pgTable("adm_menumaster_ac", {
+  id: integer("id").primaryKey(),
+  muid: text("muid").notNull().unique(),
+  name: text("name").notNull(),
+  displayName: text("display_name").notNull(),
+  route: text("route"),
+  parentMenu: text("parent_menu"),
+  isActive: boolean("is_active").default(true),
+  sortOrder: integer("sort_order"),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow(),
+  createdByUuid: text("created_by_uuid"),
+  updatedByUuid: text("updated_by_uuid"),
+  isDeleted: boolean("is_deleted").default(false),
+  isSync: boolean("is_sync").default(false),
+});
+
+export const insertAdmMenumasterAcSchema = createInsertSchema(admMenumasterAc).omit({
+  muid: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type InsertAdmMenumasterAc = z.infer<typeof insertAdmMenumasterAcSchema>;
+export type AdmMenumasterAc = typeof admMenumasterAc.$inferSelect;

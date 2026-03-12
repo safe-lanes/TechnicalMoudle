@@ -1968,6 +1968,30 @@ const migrations: Migration[] = [
       ALTER TABLE work_orders ADD COLUMN IF NOT EXISTS effective_rh_at_generation DECIMAL(10,2);
       ALTER TABLE work_orders ADD COLUMN IF NOT EXISTS rh_last_done_snapshot DECIMAL(10,2);
     `
+  },
+  {
+    id: '064_adm_menumaster_ac',
+    name: 'Create adm_menumaster_ac table',
+    description: 'Creates the adm_menumaster_ac table for application UI menu master definitions with self-referencing parent_menu foreign key',
+    sql: `
+      CREATE TABLE IF NOT EXISTS adm_menumaster_ac (
+        id INTEGER PRIMARY KEY,
+        muid UUID NOT NULL UNIQUE DEFAULT gen_random_uuid(),
+        name VARCHAR NOT NULL,
+        display_name VARCHAR NOT NULL,
+        route VARCHAR,
+        parent_menu UUID,
+        is_active BOOLEAN DEFAULT true,
+        sort_order INTEGER,
+        created_at TIMESTAMPTZ DEFAULT NOW(),
+        updated_at TIMESTAMPTZ DEFAULT NOW(),
+        created_by_uuid UUID,
+        updated_by_uuid UUID,
+        is_deleted BOOLEAN DEFAULT false,
+        is_sync BOOLEAN DEFAULT false,
+        FOREIGN KEY (parent_menu) REFERENCES adm_menumaster_ac(muid)
+      );
+    `
   }
 ];
 
