@@ -1753,7 +1753,7 @@ export class PostgresStorage {
     const comp = await this.getComponent(componentId);
     const resolvedId = comp ? comp.cuuid : componentId;
     const result = await db.select({
-      runningHours: runningHoursAudit.newRH,
+      runningHours: runningHoursAudit.cumulativeRH,
       enteredAtUTC: runningHoursAudit.enteredAtUTC
     })
       .from(runningHoursAudit)
