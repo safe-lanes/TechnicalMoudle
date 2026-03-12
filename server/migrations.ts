@@ -1953,6 +1953,21 @@ const migrations: Migration[] = [
       ALTER TABLE work_orders ADD COLUMN IF NOT EXISTS completion_rh_source TEXT;
       ALTER TABLE work_orders ADD COLUMN IF NOT EXISTS completion_rh_validation_details JSONB;
     `
+  },
+  {
+    id: '063_rh_justification_and_snapshot_columns',
+    name: 'Add RH justification and WO snapshot columns to work_orders',
+    description: 'Adds rh_justification, rh_justification_provided_by, rh_justification_date, and RH snapshot columns (cycle_due_rh_snapshot, generate_rh_snapshot, due_rh_snapshot, effective_rh_at_generation, rh_last_done_snapshot) for Layer 7 isolation',
+    sql: `
+      ALTER TABLE work_orders ADD COLUMN IF NOT EXISTS rh_justification TEXT;
+      ALTER TABLE work_orders ADD COLUMN IF NOT EXISTS rh_justification_provided_by TEXT;
+      ALTER TABLE work_orders ADD COLUMN IF NOT EXISTS rh_justification_date TIMESTAMP;
+      ALTER TABLE work_orders ADD COLUMN IF NOT EXISTS cycle_due_rh_snapshot DECIMAL(10,2);
+      ALTER TABLE work_orders ADD COLUMN IF NOT EXISTS generate_rh_snapshot DECIMAL(10,2);
+      ALTER TABLE work_orders ADD COLUMN IF NOT EXISTS due_rh_snapshot DECIMAL(10,2);
+      ALTER TABLE work_orders ADD COLUMN IF NOT EXISTS effective_rh_at_generation DECIMAL(10,2);
+      ALTER TABLE work_orders ADD COLUMN IF NOT EXISTS rh_last_done_snapshot DECIMAL(10,2);
+    `
   }
 ];
 
