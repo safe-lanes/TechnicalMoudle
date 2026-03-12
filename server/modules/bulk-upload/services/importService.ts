@@ -510,6 +510,7 @@ export async function performImport(
                 await storage.createSpareComponentLink({
                   vesselId: sparesVesselId,
                   spareId: existingSpare.id,
+                  spareUuid: existingSpare.suuid,
                   componentId: component.cuuid,
                   linkedBy: 'system-bulk-import',
                 });
@@ -714,10 +715,10 @@ export async function performImport(
               const linkAlreadyExists = existingLinks.some(link => link.componentId === component.cuuid);
               
               if (!linkAlreadyExists) {
-                // Create new link for this component
                 await storage.createSpareComponentLink({
                   vesselId: sparesVesselId,
                   spareId: existingSpare.id,
+                  spareUuid: existingSpare.suuid,
                   componentId: component.cuuid,
                   linkedBy: 'system-bulk-import',
                 });

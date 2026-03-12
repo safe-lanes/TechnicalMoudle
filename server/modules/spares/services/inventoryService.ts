@@ -1,5 +1,6 @@
 import * as repo from '../repositories/inventoryRepository';
 import { inventoryTransactionSchema } from '../schemas';
+import { storage } from '../../../storage';
 import type {
   Location, InsertLocation,
   SpareComponentLink, InsertSpareComponentLink,
@@ -70,9 +71,18 @@ export async function createSpareComponentLink(body: any): Promise<SpareComponen
     );
   }
 
+  const spare = await storage.getSpare(String(spareId));
+  if (!spare) {
+    throw Object.assign(
+      new Error(`Spare ${spareId} not found`),
+      { statusCode: 404 }
+    );
+  }
+
   return repo.createSpareComponentLink({
     vesselId,
     spareId: parseInt(spareId),
+    spareUuid: spare.suuid,
     componentId,
     linkedBy: createdBy || 'system',
   });
