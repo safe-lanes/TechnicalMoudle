@@ -14,6 +14,17 @@ Preferred communication style: Simple, everyday language.
 -   **Immutable Tables**: Certain tables (e.g., `component_maintenance_history`) are INSERT-only audit trails enforced by database triggers.
 -   **Dual Migration System**: Combines frozen code-based migrations (`server/migrations.ts`) with auto-generated Drizzle SQL migrations (`migrations/*.sql`). Schema changes are made in `shared/schema.ts`.
 -   **Migration Discipline Rule**: Every new column in `shared/schema.ts` requires a corresponding, idempotent migration in `server/migrations.ts`.
+
+**Migration Discipline Rule (MANDATORY):**
+Every time a new column is added to `shared/schema.ts`, a corresponding migration MUST be added to `server/migrations.ts` in the SAME code change. No exceptions.
+
+Checklist before any feature is marked complete:
+- [ ] New column in `shared/schema.ts` → migration entry in `server/migrations.ts`
+- [ ] Migration uses `ADD COLUMN IF NOT EXISTS`
+- [ ] Migration tested: runs clean on fresh DB, skips on existing
+- [ ] `replit.md` updated with new column purpose
+
+Past misses on this fork: `completion_rh` column was added to schema but migration was skipped. This must not repeat.
 -   **Database Safety Patterns**: Migrations include safety guards (`IF NOT EXISTS`, `IF EXISTS`) and orphan cleanup.
 -   **API Route Prefix**: All API endpoints use the `/technical/api` prefix.
 -   **Vessel Data Source Strategy**: Supports fetching vessel data from local and external sources with fallback.

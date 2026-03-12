@@ -1942,6 +1942,17 @@ const migrations: Migration[] = [
         END IF;
       END $$;
     `
+  },
+  {
+    id: '062_completion_rh_columns',
+    name: 'Add completion_rh columns to work_orders',
+    description: 'Adds completion_rh, completion_rh_validated, completion_rh_source, and completion_rh_validation_details columns for Layer 7 RH snapshot isolation',
+    sql: `
+      ALTER TABLE work_orders ADD COLUMN IF NOT EXISTS completion_rh DECIMAL(10,2);
+      ALTER TABLE work_orders ADD COLUMN IF NOT EXISTS completion_rh_validated BOOLEAN;
+      ALTER TABLE work_orders ADD COLUMN IF NOT EXISTS completion_rh_source TEXT;
+      ALTER TABLE work_orders ADD COLUMN IF NOT EXISTS completion_rh_validation_details JSONB;
+    `
   }
 ];
 
