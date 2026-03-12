@@ -7672,17 +7672,6 @@ export class PostgresStorage {
   }): Promise<{ transaction: InventoryTransaction; newLocationQty: number; newTotalRob: number }> {
     const db = await getDb();
     
-    // Validate reference requirements based on event type
-    // CONSUME events MUST have WORK_ORDER reference type for full traceability
-    if (input.eventType === 'CONSUME') {
-      if (input.referenceType !== 'WORK_ORDER') {
-        throw new Error('CONSUME events require referenceType WORK_ORDER for traceability');
-      }
-      if (!input.referenceId) {
-        throw new Error('CONSUME events require a valid work order reference ID');
-      }
-    }
-    
     // Validate location exists
     const location = await this.getLocationById(input.locationId);
     if (!location) {
