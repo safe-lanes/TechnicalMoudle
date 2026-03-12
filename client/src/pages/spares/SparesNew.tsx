@@ -193,8 +193,6 @@ const Spares: React.FC = () => {
   const [isReceiveModalOpen, setIsReceiveModalOpen] = useState(false);
   const [isAdjustModalOpen, setIsAdjustModalOpen] = useState(false);
   const [isInfoModalOpen, setIsInfoModalOpen] = useState(false);
-  const [isExportModalOpen, setIsExportModalOpen] = useState(false);
-  const [exportType, setExportType] = useState<"unique" | "distribution">("unique");
   const [selectedSpare, setSelectedSpare] = useState<Spare | null>(null);
   
   // Form states
@@ -1983,69 +1981,32 @@ const Spares: React.FC = () => {
         description: `Exported ${data.length} history records to ${filename}` 
       });
     } else {
-      setExportType("unique");
-      setIsExportModalOpen(true);
-    }
-  };
-
-  const handleExportDownload = () => {
-    const now = new Date();
-    const timestamp = now.toISOString().replace(/[-:]/g, '').replace('T', '_').slice(0, 15);
-
-    if (exportType === "unique") {
-      const filename = `spares_master_${vesselId}_${timestamp}.xlsx`;
-      const seenPartCodes = new Set<string>();
-      const rows: Record<string, any>[] = [];
+      const now2 = new Date();
+      const ts = now2.toISOString().replace(/[-:]/g, '').replace('T', '_').slice(0, 15);
+      const fname = `spares_master_${vesselId}_${ts}.xlsx`;
+      const seenCodes = new Set<string>();
+      const exportRows: Record<string, any>[] = [];
 
       for (const spare of filteredSpares) {
-        if (seenPartCodes.has(spare.partCode)) continue;
-        seenPartCodes.add(spare.partCode);
-        rows.push(mapSpareToTemplateRow(spare));
+        if (seenCodes.has(spare.partCode)) continue;
+        seenCodes.add(spare.partCode);
+        exportRows.push(mapSpareToTemplateRow(spare));
       }
 
-      const headers = SPARES_TEMPLATE_FIELDS.map(f => f.header);
-      const ws = XLSX.utils.json_to_sheet(rows, { header: headers });
-      const colWidths = SPARES_TEMPLATE_FIELDS.map(f => ({ wch: f.width }));
-      ws['!cols'] = colWidths;
-      const wb = XLSX.utils.book_new();
-      XLSX.utils.book_append_sheet(wb, ws, 'Unique Spare Master');
-      XLSX.writeFile(wb, filename);
+      const hdrs = SPARES_TEMPLATE_FIELDS.map(f => f.header);
+      const ws2 = XLSX.utils.json_to_sheet(exportRows, { header: hdrs });
+      ws2['!cols'] = SPARES_TEMPLATE_FIELDS.map(f => ({ wch: f.width }));
+      const wb2 = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb2, ws2, 'Unique Spare Master');
+      XLSX.writeFile(wb2, fname);
 
       toast({
         title: "Export Successful",
-        description: `Exported ${rows.length} unique spare master entries to ${filename}`
-      });
-    } else {
-      const filename = `spares_distribution_${vesselId}_${timestamp}.xlsx`;
-      const rows: Record<string, any>[] = [];
-
-      for (const spare of filteredSpares) {
-        const linked = (spare as any).linkedComponents as Array<{ componentId: string; componentCode: string; componentName: string }> | undefined;
-        if (linked && linked.length > 0) {
-          for (const comp of linked) {
-            rows.push(mapSpareToTemplateRow(spare, comp.componentCode, comp.componentName));
-          }
-        } else {
-          rows.push(mapSpareToTemplateRow(spare));
-        }
-      }
-
-      const headers = SPARES_TEMPLATE_FIELDS.map(f => f.header);
-      const ws = XLSX.utils.json_to_sheet(rows, { header: headers });
-      const colWidths = SPARES_TEMPLATE_FIELDS.map(f => ({ wch: f.width }));
-      ws['!cols'] = colWidths;
-      const wb = XLSX.utils.book_new();
-      XLSX.utils.book_append_sheet(wb, ws, 'Component-Spare Distribution');
-      XLSX.writeFile(wb, filename);
-
-      toast({
-        title: "Export Successful",
-        description: `Exported ${rows.length} component-spare distribution entries to ${filename}`
+        description: `Exported ${exportRows.length} unique spare master entries to ${fname}`
       });
     }
-
-    setIsExportModalOpen(false);
   };
+
 
   // Open consume modal
   const openConsumeModal = (spare: Spare) => {
@@ -5662,53 +5623,6 @@ const Spares: React.FC = () => {
         </DialogContent>
       </Dialog>
       
-      {/* Export Type Selection Modal */}
-      <Dialog open={isExportModalOpen} onOpenChange={setIsExportModalOpen}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle>Select Export Type</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4 py-4">
-            <label className="flex items-center gap-3 p-3 rounded-md border cursor-pointer hover-elevate" data-testid="radio-unique-spare-master">
-              <input
-                type="radio"
-                name="exportType"
-                value="unique"
-                checked={exportType === "unique"}
-                onChange={() => setExportType("unique")}
-                className="h-4 w-4 text-blue-600"
-              />
-              <div>
-                <div className="font-medium text-sm">Unique Spare Master Entries</div>
-                <div className="text-xs text-muted-foreground">One row per unique Part Code, no duplicates</div>
-              </div>
-            </label>
-            <label className="flex items-center gap-3 p-3 rounded-md border cursor-pointer hover-elevate" data-testid="radio-component-spare-distribution">
-              <input
-                type="radio"
-                name="exportType"
-                value="distribution"
-                checked={exportType === "distribution"}
-                onChange={() => setExportType("distribution")}
-                className="h-4 w-4 text-blue-600"
-              />
-              <div>
-                <div className="font-medium text-sm">Component-Spare Distribution Entries</div>
-                <div className="text-xs text-muted-foreground">Expanded rows per component-spare mapping</div>
-              </div>
-            </label>
-          </div>
-          <DialogFooter className="flex gap-2">
-            <Button variant="outline" onClick={() => setIsExportModalOpen(false)} data-testid="button-cancel-export">
-              Cancel
-            </Button>
-            <Button onClick={handleExportDownload} data-testid="button-download-export">
-              <Download className="h-4 w-4 mr-1" />
-              Download
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
 
       {/* Deactivate Spare Confirmation Dialog */}
       <Dialog open={showDeactivateDialog} onOpenChange={(open) => { setShowDeactivateDialog(open); }}>
