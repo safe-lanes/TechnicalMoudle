@@ -231,3 +231,79 @@ export async function propagateAll(req: Request, res: Response) {
     res.status(500).json({ error: "Failed to propagate running hours" });
   }
 }
+
+// ── Running Hours History ──
+
+export async function getHistory(req: Request, res: Response) {
+  try {
+    const vesselId = (req.query.vesselId as string) || '';
+    const componentId = req.query.componentId as string | undefined;
+    const page = parseInt(req.query.page as string) || 1;
+    const pageSize = Math.min(parseInt(req.query.pageSize as string) || 10, 100);
+    const sortOrder = (req.query.sortOrder as string) === 'asc' ? 'asc' as const : 'desc' as const;
+    const search = req.query.search as string | undefined;
+    const dateFrom = req.query.dateFrom as string | undefined;
+    const dateTo = req.query.dateTo as string | undefined;
+
+    const result = await rhService.getRunningHoursHistory({
+      vesselId,
+      componentId,
+      page,
+      pageSize,
+      sortOrder,
+      search,
+      dateFrom,
+      dateTo,
+    });
+    res.json(result);
+  } catch (error: any) {
+    console.error("Error fetching running hours history:", error);
+    res.status(500).json({ error: "Failed to fetch running hours history" });
+  }
+}
+
+export async function exportHistory(req: Request, res: Response) {
+  try {
+    const vesselId = (req.query.vesselId as string) || '';
+    const componentId = req.query.componentId as string | undefined;
+    const sortOrder = (req.query.sortOrder as string) === 'asc' ? 'asc' as const : 'desc' as const;
+    const search = req.query.search as string | undefined;
+    const dateFrom = req.query.dateFrom as string | undefined;
+    const dateTo = req.query.dateTo as string | undefined;
+
+    const result = await rhService.getRunningHoursHistory({
+      vesselId,
+      componentId,
+      page: 1,
+      pageSize: 10000,
+      sortOrder,
+      search,
+      dateFrom,
+      dateTo,
+    });
+
+    const headers = ['Date', 'Component Code', 'Previous RH', 'New RH', 'Change (Delta)', 'Updated By', 'Source', 'Notes'];
+    const rows = result.data.map(row => [
+      row.updatedAt ? new Date(row.updatedAt).toISOString().split('T')[0] : '',
+      row.componentCode,
+      row.previousRh,
+      row.newRh,
+      row.deltaRh,
+      row.updatedBy,
+      row.updateSource,
+      row.notes || ''
+    ]);
+
+    const csvContent = [
+      headers.join(','),
+      ...rows.map(row => row.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(','))
+    ].join('\n');
+
+    res.setHeader('Content-Type', 'text/csv');
+    res.setHeader('Content-Disposition', `attachment; filename="running_hours_history_${new Date().toISOString().split('T')[0]}.csv"`);
+    res.send(csvContent);
+  } catch (error: any) {
+    console.error("Error exporting running hours history:", error);
+    res.status(500).json({ error: "Failed to export running hours history" });
+  }
+}

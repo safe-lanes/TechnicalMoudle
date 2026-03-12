@@ -1,4 +1,7 @@
 import { storage } from '../../../storage';
+import { getDb } from '../../../db';
+import { runningHoursAudit } from '@shared/schema';
+import { desc, asc, eq, and, gte, lte, or, ilike, sql } from 'drizzle-orm';
 import type { InsertRunningHoursAudit, RunningHoursAudit, Component } from '@shared/schema';
 
 // ── Component Queries ──
@@ -89,4 +92,121 @@ export async function updateMasterRunningHours(params: {
   inheritedUpdated: number;
 }> {
   return storage.updateMasterRunningHours(params);
+}
+
+// ── Running Hours History (from running_hours_audit) ──
+
+export interface RHHistoryQuery {
+  vesselId: string;
+  componentId?: string;
+  page: number;
+  pageSize: number;
+  sortOrder: 'asc' | 'desc';
+  search?: string;
+  dateFrom?: string;
+  dateTo?: string;
+}
+
+export interface RHHistoryRow {
+  id: number;
+  updatedAt: Date | null;
+  componentCode: string | null;
+  componentName: string | null;
+  previousRh: string;
+  newRh: string;
+  deltaRh: string;
+  updatedBy: string;
+  updateSource: string;
+  notes: string | null;
+}
+
+export interface RHHistoryResult {
+  data: RHHistoryRow[];
+  total: number;
+  page: number;
+  pageSize: number;
+  totalPages: number;
+}
+
+export async function getRunningHoursHistory(query: RHHistoryQuery): Promise<RHHistoryResult> {
+  const db = await getDb();
+
+  const conditions: any[] = [];
+
+  if (query.componentId) {
+    conditions.push(eq(runningHoursAudit.componentId, query.componentId));
+  } else if (query.vesselId) {
+    conditions.push(eq(runningHoursAudit.vesselId, query.vesselId));
+  }
+
+  if (query.dateFrom) {
+    conditions.push(gte(runningHoursAudit.enteredAtUTC, new Date(query.dateFrom)));
+  }
+  if (query.dateTo) {
+    const endDate = new Date(query.dateTo);
+    endDate.setHours(23, 59, 59, 999);
+    conditions.push(lte(runningHoursAudit.enteredAtUTC, endDate));
+  }
+
+  if (query.search) {
+    const searchPattern = `%${query.search}%`;
+    conditions.push(
+      or(
+        ilike(runningHoursAudit.componentCode, searchPattern),
+        ilike(runningHoursAudit.componentName, searchPattern),
+        ilike(runningHoursAudit.userId, searchPattern),
+        ilike(runningHoursAudit.source, searchPattern),
+        ilike(runningHoursAudit.notes, searchPattern)
+      )!
+    );
+  }
+
+  const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
+
+  const [countResult] = await db
+    .select({ count: sql<number>`count(*)` })
+    .from(runningHoursAudit)
+    .where(whereClause);
+
+  const total = Number(countResult?.count || 0);
+  const totalPages = Math.ceil(total / query.pageSize);
+  const offset = (query.page - 1) * query.pageSize;
+
+  const orderBy = query.sortOrder === 'asc'
+    ? asc(runningHoursAudit.enteredAtUTC)
+    : desc(runningHoursAudit.enteredAtUTC);
+
+  const rows = await db
+    .select()
+    .from(runningHoursAudit)
+    .where(whereClause)
+    .orderBy(orderBy)
+    .limit(query.pageSize)
+    .offset(offset);
+
+  const data: RHHistoryRow[] = rows.map(row => {
+    const prevRH = parseFloat(row.previousRH || '0');
+    const newRH = parseFloat(row.newRH || '0');
+    const delta = newRH - prevRH;
+    return {
+      id: row.id,
+      updatedAt: row.enteredAtUTC,
+      componentCode: row.componentCode,
+      componentName: row.componentName,
+      previousRh: row.previousRH,
+      newRh: row.newRH,
+      deltaRh: delta.toFixed(2),
+      updatedBy: row.userId,
+      updateSource: row.source,
+      notes: row.notes,
+    };
+  });
+
+  return {
+    data,
+    total,
+    page: query.page,
+    pageSize: query.pageSize,
+    totalPages,
+  };
 }

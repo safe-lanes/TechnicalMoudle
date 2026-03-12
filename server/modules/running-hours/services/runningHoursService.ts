@@ -1,4 +1,5 @@
 import * as repo from '../repositories/runningHoursRepository';
+import type { RHHistoryQuery, RHHistoryResult } from '../repositories/runningHoursRepository';
 import { validateRunningHoursIncrease, canAdminOverride } from '../utils/rhValidation';
 import { NotFoundError, ValidationError } from '../../shared/errors';
 import { z } from 'zod';
@@ -693,4 +694,12 @@ export async function propagateAll(vesselId: string, userId: string) {
     totalInheritedUpdated,
     details: results
   };
+}
+
+// ══════════════════════════════════════════════════════════
+// Running Hours History
+// ══════════════════════════════════════════════════════════
+
+export async function getRunningHoursHistory(query: RHHistoryQuery): Promise<RHHistoryResult> {
+  return repo.getRunningHoursHistory(query);
 }

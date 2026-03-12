@@ -10,6 +10,10 @@ const router = Router();
 // to prevent Express from matching "parents", "cascade", etc. as componentId
 // ══════════════════════════════════════════════════════════
 
+// ── Running Hours History ──
+router.get('/running-hours/history', asyncHandler(rhCtrl.getHistory));
+router.get('/running-hours/history/export', asyncHandler(rhCtrl.exportHistory));
+
 // ── Layer 7: RH Timeline Validation Endpoints ──
 
 // GET  /running-hours/valid-range — calculate valid RH range for a completion date

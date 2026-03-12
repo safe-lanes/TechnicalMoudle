@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -6,7 +6,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import { Search, FileSpreadsheet, Calendar, Users, Settings, Pencil, AlertTriangle, Download, Clock } from "lucide-react";
+import { Search, FileSpreadsheet, Calendar, Users, Settings, Pencil, AlertTriangle, Download, Clock, History, ArrowUpDown, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
@@ -120,6 +120,16 @@ const RunningHours = () => {
   });
   const [showDiscardConfirm, setShowDiscardConfirm] = useState(false);
   
+  // History view state
+  const [activeTab, setActiveTab] = useState<"main" | "history">("main");
+  const [historyPage, setHistoryPage] = useState(1);
+  const [historyItemsPerPage, setHistoryItemsPerPage] = useState(10);
+  const [historySortOrder, setHistorySortOrder] = useState<"asc" | "desc">("desc");
+  const [historySearch, setHistorySearch] = useState("");
+  const [historyDateFrom, setHistoryDateFrom] = useState("");
+  const [historyDateTo, setHistoryDateTo] = useState("");
+  const [historyComponentFilter, setHistoryComponentFilter] = useState("");
+  
   // Child RH popup state
   const [isChildRHOpen, setIsChildRHOpen] = useState(false);
   const [selectedParentForChildRH, setSelectedParentForChildRH] = useState<RunningHoursData | null>(null);
@@ -212,6 +222,83 @@ const RunningHours = () => {
   const filteredRunningHoursData = runningHoursData.filter(item =>
     !searchTerm || item.component.toLowerCase().includes(searchTerm.toLowerCase())
   );
+
+  // Fetch running hours history
+  const { data: historyResult, isLoading: isLoadingHistory } = useQuery<{
+    data: any[];
+    total: number;
+    page: number;
+    pageSize: number;
+    totalPages: number;
+  }>({
+    queryKey: ['/technical/api/running-hours/history', vesselId, historyPage, historyItemsPerPage, historySortOrder, historySearch, historyDateFrom, historyDateTo, historyComponentFilter],
+    queryFn: async () => {
+      const params = new URLSearchParams({
+        vesselId: vesselId || '',
+        page: String(historyPage),
+        pageSize: String(historyItemsPerPage),
+        sortOrder: historySortOrder,
+      });
+      if (historySearch) params.set('search', historySearch);
+      if (historyDateFrom) params.set('dateFrom', historyDateFrom);
+      if (historyDateTo) params.set('dateTo', historyDateTo);
+      if (historyComponentFilter) params.set('componentId', historyComponentFilter);
+      const response = await fetch(`/technical/api/running-hours/history?${params.toString()}`);
+      if (!response.ok) throw new Error('Failed to fetch history');
+      return response.json();
+    },
+    enabled: activeTab === 'history'
+  });
+
+  useEffect(() => {
+    setHistoryPage(1);
+  }, [historyItemsPerPage, historySearch, historyDateFrom, historyDateTo, historyComponentFilter, vesselId]);
+
+  const goToHistoryPage = (page: number) => {
+    const totalPages = historyResult?.totalPages || 1;
+    const p = Math.max(1, Math.min(page, totalPages));
+    setHistoryPage(p);
+  };
+
+  const exportHistoryToCSV = () => {
+    const params = new URLSearchParams({
+      vesselId: vesselId || '',
+      sortOrder: historySortOrder,
+    });
+    if (historySearch) params.set('search', historySearch);
+    if (historyDateFrom) params.set('dateFrom', historyDateFrom);
+    if (historyDateTo) params.set('dateTo', historyDateTo);
+    if (historyComponentFilter) params.set('componentId', historyComponentFilter);
+    window.open(`/technical/api/running-hours/history/export?${params.toString()}`, '_blank');
+  };
+
+  const clearHistoryFilters = () => {
+    setHistorySearch("");
+    setHistoryDateFrom("");
+    setHistoryDateTo("");
+    setHistoryComponentFilter("");
+    setHistoryPage(1);
+  };
+
+  const formatHistoryDate = (dateStr: string | null) => {
+    if (!dateStr) return '-';
+    try {
+      const date = new Date(dateStr);
+      if (isNaN(date.getTime())) return '-';
+      return date.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) + ' ' +
+        date.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', hour12: false });
+    } catch { return '-'; }
+  };
+
+  const getSourceBadgeStyle = (source: string) => {
+    switch (source?.toLowerCase()) {
+      case 'manual': return 'bg-blue-100 text-blue-800';
+      case 'cascade': return 'bg-purple-100 text-purple-800';
+      case 'bulk_import': return 'bg-orange-100 text-orange-800';
+      case 'work_order': return 'bg-green-100 text-green-800';
+      default: return 'bg-gray-100 text-gray-800';
+    }
+  };
 
   // Cascade update mutation
   const cascadeUpdateMutation = useMutation({
@@ -841,58 +928,269 @@ const RunningHours = () => {
       {/* Header - Fixed */}
       <div className="flex-shrink-0 space-y-6 mb-6">
         <div className="flex items-center justify-between">
-          <h1 className="text-2xl font-bold text-gray-900" data-testid="D1"><Marker id="D1" />Running Hours</h1>
-          <Button 
-            className="bg-[#5dc86f] hover:bg-[#4db85f] text-white"
-            onClick={openBulkUpdate}
-            data-testid="D5"
-          >
-            <Marker id="D5" /><span className="mr-2">+</span>
-            Bulk Update RH
-          </Button>
+          <div className="flex items-center gap-4">
+            <h1 className="text-2xl font-bold text-gray-900" data-testid="D1"><Marker id="D1" />Running Hours</h1>
+            <div className="flex items-center gap-1 bg-gray-100 rounded-lg p-1" data-testid="rh-tab-switcher">
+              <button
+                onClick={() => setActiveTab("main")}
+                className={`px-4 py-1.5 rounded-md text-sm font-medium transition-colors ${activeTab === 'main' ? 'bg-[#52baf3] text-white' : 'text-gray-700 hover:bg-gray-200'}`}
+                data-testid="tab-main"
+              >
+                Overview
+              </button>
+              <button
+                onClick={() => setActiveTab("history")}
+                className={`px-4 py-1.5 rounded-md text-sm font-medium transition-colors flex items-center gap-1.5 ${activeTab === 'history' ? 'bg-[#52baf3] text-white' : 'text-gray-700 hover:bg-gray-200'}`}
+                data-testid="tab-history"
+              >
+                <History className="h-3.5 w-3.5" />
+                History
+              </button>
+            </div>
+          </div>
+          {activeTab === 'main' && (
+            <Button 
+              className="bg-[#5dc86f] hover:bg-[#4db85f] text-white"
+              onClick={openBulkUpdate}
+              data-testid="D5"
+            >
+              <Marker id="D5" /><span className="mr-2">+</span>
+              Bulk Update RH
+            </Button>
+          )}
         </div>
 
-        {/* Search and Export Row */}
-        <div className="flex items-center gap-4">
-          <div className="relative flex-1 max-w-md" data-testid="D2">
-            <Marker id="D2" />
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
-            <Input
-              placeholder="Search Component"
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="pl-10"
-            />
-          </div>
+        {/* Search and Export Row - Main Tab */}
+        {activeTab === 'main' && (
+          <div className="flex items-center gap-4">
+            <div className="relative flex-1 max-w-md" data-testid="D2">
+              <Marker id="D2" />
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+              <Input
+                placeholder="Search Component"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="pl-10"
+              />
+            </div>
 
-          <div className="flex items-center gap-2" data-testid="utilization-period-selector">
-            <Clock className="h-4 w-4 text-gray-500" />
-            <span className="text-sm text-gray-600 whitespace-nowrap">Utilization Period:</span>
-            <Select value={utilizationPeriod} onValueChange={setUtilizationPeriod}>
-              <SelectTrigger className="w-[220px] h-9" data-testid="select-utilization-period">
-                <SelectValue />
+            <div className="flex items-center gap-2" data-testid="utilization-period-selector">
+              <Clock className="h-4 w-4 text-gray-500" />
+              <span className="text-sm text-gray-600 whitespace-nowrap">Utilization Period:</span>
+              <Select value={utilizationPeriod} onValueChange={setUtilizationPeriod}>
+                <SelectTrigger className="w-[220px] h-9" data-testid="select-utilization-period">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="weekly" data-testid="period-weekly">Weekly (Last 7 days)</SelectItem>
+                  <SelectItem value="monthly" data-testid="period-monthly">Monthly (Last 30 days)</SelectItem>
+                  <SelectItem value="quarterly" data-testid="period-quarterly">Quarterly (Last 90 days)</SelectItem>
+                  <SelectItem value="yearly" data-testid="period-yearly">Yearly (Last 365 days)</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <Button variant="outline" size="sm" className="text-xs text-[#8798ad] border-[#e1e8ed]" onClick={exportToCSV} data-testid="D3">
+              <Marker id="D3" /><Download className="h-3.5 w-3.5 mr-1" />
+              Export
+            </Button>
+
+            <Button variant="outline" onClick={clearFilters} className="flex items-center gap-2" data-testid="D4">
+              <Marker id="D4" />Clear
+            </Button>
+          </div>
+        )}
+
+        {/* Search and Filter Row - History Tab */}
+        {activeTab === 'history' && (
+          <div className="flex items-center gap-3 flex-wrap">
+            <div className="relative flex-1 max-w-xs" data-testid="history-search-wrapper">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+              <Input
+                placeholder="Search by component, user, source..."
+                value={historySearch}
+                onChange={(e) => setHistorySearch(e.target.value)}
+                className="pl-10 h-9"
+                data-testid="input-history-search"
+              />
+            </div>
+
+            <div className="flex items-center gap-2">
+              <Calendar className="h-4 w-4 text-gray-500" />
+              <Input
+                type="date"
+                value={historyDateFrom}
+                onChange={(e) => setHistoryDateFrom(e.target.value)}
+                className="h-9 w-[140px] text-sm"
+                placeholder="From"
+                data-testid="input-history-date-from"
+              />
+              <span className="text-gray-400 text-sm">to</span>
+              <Input
+                type="date"
+                value={historyDateTo}
+                onChange={(e) => setHistoryDateTo(e.target.value)}
+                className="h-9 w-[140px] text-sm"
+                placeholder="To"
+                data-testid="input-history-date-to"
+              />
+            </div>
+
+            <Select value={historyComponentFilter || "all"} onValueChange={(val) => setHistoryComponentFilter(val === "all" ? "" : val)}>
+              <SelectTrigger className="w-[200px] h-9" data-testid="select-history-component">
+                <SelectValue placeholder="All Components" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="weekly" data-testid="period-weekly">Weekly (Last 7 days)</SelectItem>
-                <SelectItem value="monthly" data-testid="period-monthly">Monthly (Last 30 days)</SelectItem>
-                <SelectItem value="quarterly" data-testid="period-quarterly">Quarterly (Last 90 days)</SelectItem>
-                <SelectItem value="yearly" data-testid="period-yearly">Yearly (Last 365 days)</SelectItem>
+                <SelectItem value="all">All Components</SelectItem>
+                {runningHoursData.map(item => (
+                  <SelectItem key={item.id} value={item.id}>{item.component}</SelectItem>
+                ))}
               </SelectContent>
             </Select>
+
+            <Button variant="outline" size="sm" className="text-xs text-[#8798ad] border-[#e1e8ed] h-9" onClick={exportHistoryToCSV} data-testid="button-export-history">
+              <Download className="h-3.5 w-3.5 mr-1" />
+              Export CSV
+            </Button>
+
+            <Button variant="outline" size="sm" onClick={clearHistoryFilters} className="h-9" data-testid="button-clear-history-filters">
+              Clear
+            </Button>
           </div>
-
-          <Button variant="outline" size="sm" className="text-xs text-[#8798ad] border-[#e1e8ed]" onClick={exportToCSV} data-testid="D3">
-            <Marker id="D3" /><Download className="h-3.5 w-3.5 mr-1" />
-            Export
-          </Button>
-
-          <Button variant="outline" onClick={clearFilters} className="flex items-center gap-2" data-testid="D4">
-            <Marker id="D4" />Clear
-          </Button>
-        </div>
+        )}
       </div>
 
-      {/* Table - Scrollable */}
+      {/* History Tab */}
+      {activeTab === 'history' && (
+        <div className="flex-1 flex flex-col overflow-hidden bg-white rounded-lg border border-gray-200">
+          {/* History Table Header */}
+          <div className="bg-[#52baf3] text-white px-4 py-3 flex-shrink-0">
+            <div className="grid grid-cols-7 gap-4 text-sm font-medium">
+              <div
+                className="flex items-center gap-1 cursor-pointer select-none"
+                onClick={() => setHistorySortOrder(prev => prev === 'desc' ? 'asc' : 'desc')}
+                data-testid="header-sort-date"
+              >
+                Date/Time
+                <ArrowUpDown className="h-3.5 w-3.5" />
+              </div>
+              <div>Component Code</div>
+              <div className="text-right">Previous RH</div>
+              <div className="text-right">New RH</div>
+              <div className="text-right">Change</div>
+              <div>Updated By</div>
+              <div>Source</div>
+            </div>
+          </div>
+
+          {/* History Table Body */}
+          <div className="overflow-y-auto flex-1">
+            {isLoadingHistory ? (
+              <div className="p-8 text-center text-gray-500">Loading history...</div>
+            ) : !historyResult?.data?.length ? (
+              <div className="p-8 text-center text-gray-500">
+                No history records found.
+                {(historySearch || historyDateFrom || historyDateTo || historyComponentFilter) && (
+                  <span> <button onClick={clearHistoryFilters} className="text-blue-600 underline" data-testid="link-clear-history-filters">Clear filters</button></span>
+                )}
+              </div>
+            ) : (
+              historyResult.data.map((row: any) => (
+                <div key={row.id} className="px-4 py-3 border-b border-gray-100 hover:bg-gray-50" data-testid={`history-row-${row.id}`}>
+                  <div className="grid grid-cols-7 gap-4 text-sm items-center">
+                    <div className="text-gray-900" data-testid={`history-date-${row.id}`}>
+                      {formatHistoryDate(row.updatedAt)}
+                    </div>
+                    <div className="text-gray-700" data-testid={`history-component-${row.id}`}>
+                      {row.componentCode}
+                    </div>
+                    <div className="text-right text-gray-700" data-testid={`history-prev-rh-${row.id}`}>
+                      {parseFloat(row.previousRh || '0').toLocaleString()} hrs
+                    </div>
+                    <div className="text-right text-gray-900 font-medium" data-testid={`history-new-rh-${row.id}`}>
+                      {parseFloat(row.newRh || '0').toLocaleString()} hrs
+                    </div>
+                    <div className={`text-right font-semibold ${parseFloat(row.deltaRh || '0') < 0 ? 'text-red-600' : parseFloat(row.deltaRh || '0') > 0 ? 'text-green-600' : 'text-gray-400'}`}
+                      data-testid={`history-delta-${row.id}`}
+                    >
+                      {parseFloat(row.deltaRh || '0') > 0 ? '+' : ''}{parseFloat(row.deltaRh || '0').toLocaleString()} hrs
+                    </div>
+                    <div className="text-gray-700 truncate" title={row.updatedBy} data-testid={`history-user-${row.id}`}>
+                      {row.updatedBy || '-'}
+                    </div>
+                    <div data-testid={`history-source-${row.id}`}>
+                      <span className={`px-2 py-1 rounded text-xs ${getSourceBadgeStyle(row.updateSource)}`}>
+                        {(row.updateSource || '').toUpperCase()}
+                      </span>
+                      {row.notes && (
+                        <span className="ml-2 text-gray-400 text-xs" title={row.notes}>
+                          ({row.notes.length > 20 ? row.notes.slice(0, 20) + '...' : row.notes})
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+
+          {/* History Pagination Footer */}
+          {historyResult && historyResult.total > 0 && (
+            <div className="p-4 bg-gray-50 border-t border-gray-200 flex items-center justify-between flex-shrink-0" data-testid="history-pagination-footer">
+              <div className="flex items-center gap-2 text-sm text-gray-600">
+                <span>Show</span>
+                <Select value={String(historyItemsPerPage)} onValueChange={(val) => { setHistoryItemsPerPage(Number(val)); setHistoryPage(1); }}>
+                  <SelectTrigger className="w-20 h-8" data-testid="select-history-items-per-page">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="10">10</SelectItem>
+                    <SelectItem value="25">25</SelectItem>
+                    <SelectItem value="50">50</SelectItem>
+                    <SelectItem value="100">100</SelectItem>
+                  </SelectContent>
+                </Select>
+                <span>items per page</span>
+              </div>
+              <div className="flex items-center gap-2 text-sm text-gray-600" data-testid="history-pagination-info">
+                <span>
+                  Showing {((historyResult.page - 1) * historyResult.pageSize) + 1} - {Math.min(historyResult.page * historyResult.pageSize, historyResult.total)} of {historyResult.total} records
+                </span>
+              </div>
+              <div className="flex items-center gap-1">
+                <Button variant="outline" size="sm" onClick={() => goToHistoryPage(1)} disabled={historyResult.page === 1} className="h-8 w-8 p-0" data-testid="history-pagination-first">
+                  <ChevronsLeft className="h-4 w-4" />
+                </Button>
+                <Button variant="outline" size="sm" onClick={() => goToHistoryPage(historyResult.page - 1)} disabled={historyResult.page === 1} className="h-8 w-8 p-0" data-testid="history-pagination-prev">
+                  <ChevronLeft className="h-4 w-4" />
+                </Button>
+                <div className="flex items-center gap-1 px-2">
+                  <span className="text-sm text-gray-600">Page</span>
+                  <Input
+                    type="number"
+                    min={1}
+                    max={historyResult.totalPages || 1}
+                    value={historyPage}
+                    onChange={(e) => { const v = parseInt(e.target.value); if (!isNaN(v)) goToHistoryPage(v); }}
+                    className="w-14 h-8 text-center"
+                    data-testid="input-history-page-number"
+                  />
+                  <span className="text-sm text-gray-600">of {historyResult.totalPages || 1}</span>
+                </div>
+                <Button variant="outline" size="sm" onClick={() => goToHistoryPage(historyResult.page + 1)} disabled={historyResult.page >= historyResult.totalPages} className="h-8 w-8 p-0" data-testid="history-pagination-next">
+                  <ChevronRight className="h-4 w-4" />
+                </Button>
+                <Button variant="outline" size="sm" onClick={() => goToHistoryPage(historyResult.totalPages)} disabled={historyResult.page >= historyResult.totalPages} className="h-8 w-8 p-0" data-testid="history-pagination-last">
+                  <ChevronsRight className="h-4 w-4" />
+                </Button>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Main Table - Scrollable */}
+      {activeTab === 'main' && (<>
       <div className="flex-1 overflow-y-auto bg-white rounded-lg border border-gray-200">
         {/* Table Header */}
         <div className="bg-[#52baf3] text-white px-4 py-3">
@@ -1060,6 +1358,7 @@ const RunningHours = () => {
           ? `Showing ${filteredRunningHoursData.length} of ${runningHoursData.length} components`
           : `Showing ${runningHoursData.length} components`}
       </div>
+      </>)}
 
       {/* Update Running Hours Dialog */}
       <Dialog open={isUpdateDialogOpen} onOpenChange={setIsUpdateDialogOpen}>
