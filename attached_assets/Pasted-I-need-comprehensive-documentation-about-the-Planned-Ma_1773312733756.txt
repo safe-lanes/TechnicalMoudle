@@ -1,0 +1,54 @@
+I need comprehensive documentation about the Planned Maintenance System (PMS) next due date calculation logic and rules to solve an anti-fraud problem.
+
+PROBLEM CONTEXT:
+In our PMS, when a work order is completed, the crew enters the completion date in the work order form. The system then calculates the next due date based on that completion date and the job frequency. This creates a fraud vulnerability:
+
+- Example: A weekly job (7-day frequency) should be done every 7 days
+- If crew skips 3 weeks and completes the form on day 28 (end of month)
+- System calculates next due date as: day 28 + 7 days = day 35
+- This effectively skips 3 weeks of required maintenance
+- Crew can manipulate dates to reduce workload
+
+The same issue applies to:
+1. Calendar-based jobs (Daily, Weekly, Monthly, Yearly)
+2. Running Hours based jobs (equipment runtime)
+
+REQUIRED INFORMATION:
+Please provide detailed documentation covering:
+
+1. CURRENT NEXT DUE DATE CALCULATION LOGIC:
+   - How is next due date calculated for calendar-based jobs?
+   - How is next due RH (Running Hours) calculated for RH-based jobs?
+   - Where in the codebase is this calculation happening?
+   - What data points are used (completion date, frequency, current RH, etc.)?
+
+2. DATABASE SCHEMA:
+   - Work order table structure
+   - Component/Job master table structure
+   - Fields storing: due_date, next_due_date, frequency, maintenance_basis, completion_date, running_hours
+   - Relationships between tables
+
+3. WORK ORDER COMPLETION FLOW:
+   - Step-by-step process when crew completes a work order
+   - When is completion date entered?
+   - When is next due date calculated?
+   - Any validation currently in place?
+
+4. MAINTENANCE BASIS TYPES:
+   - List all maintenance basis types (Calendar, Running Hours, etc.)
+   - Frequency units for each (Days, Weeks, Months, Years, Hours)
+   - How each type calculates next due date
+
+5. HISTORICAL DATA:
+   - Is work order history maintained?
+   - Can we track: previous due dates, actual completion dates, delays?
+   - Is this data accessible for fraud detection?
+
+Please search through the codebase and provide:
+- File paths and function names
+- Code snippets of calculation logic
+- Database schema definitions
+- API endpoints related to work order completion
+- Any existing validation or business rules
+
+This information will help me design fraud detection mechanisms to identify when crew members are manipulating dates to skip required maintenance work.

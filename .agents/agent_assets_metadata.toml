@@ -6,3 +6,9 @@ id = "WPl5KD0Kdd6EfeDK5UXYw"
 uri = "file://PMS_Global_Codes_and_Fixed_Values.xlsx"
 type = "table"
 title = "PMS Global Codes and Fixed Values"
+
+[[outputs]]
+id = "lIEc0y-LZG6JheyziVbRT"
+uri = "file://.local/pms-next-due-date-documentation.md"
+type = "text"
+title = "PMS Next Due Date Calculation — Complete Technical Documentation"
