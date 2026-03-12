@@ -1,0 +1,324 @@
+Provide a detailed technical report explaining the current implementation of the Running Hours Utilization Rate calculation. We need to understand what logic is being used so we can identify and fix any issues.
+
+WHAT WE NEED FROM YOU:
+
+Please provide a comprehensive explanation of how the Utilization Rate is currently being calculated in the Running Hours module. Include:
+
+1. CODE LOCATION
+Where is the utilization rate calculated?
+
+File path(s) for backend calculation logic
+
+File path(s) for frontend display logic
+
+API endpoint(s) involved
+
+Database queries used
+
+Example format:
+
+text
+Backend: server/modules/running-hours/services/utilizationService.ts (line 45-78)
+Frontend: client/src/pages/pms/RunningHoursPage.tsx (line 234-256)
+API: GET /api/pms/running-hours (returns utilizationRate field)
+2. CURRENT CALCULATION FORMULA
+What is the exact formula being used?
+
+Please provide:
+
+The mathematical formula in plain text
+
+Variable names and what they represent
+
+Any constants or multipliers used
+
+Example format:
+
+javascript
+// Current formula (explain in detail):
+utilizationRate = (X / Y) × 100
+
+Where:
+- X = _____ (explain what this is)
+- Y = _____ (explain what this is)
+3. DATA SOURCES
+Where does the data come from?
+
+For each variable in the formula, explain:
+
+A. Current Running Hours:
+
+Which database table/field?
+
+Example: components.currentCumulativeRH or components.runningHours
+
+B. Historical Running Hours:
+
+Do you query the running_hours_audit table?
+
+If yes, what is the SQL query?
+
+If no, where do you get historical data from?
+
+C. Time Period:
+
+How do you determine the time period (7 days, 30 days, etc.)?
+
+Is it based on the "Utilization Period" dropdown selection?
+
+What happens when the user changes the dropdown?
+
+D. Dates:
+
+What dates are used for "start" and "end" of the period?
+
+Are they hardcoded or dynamic?
+
+4. STEP-BY-STEP CALCULATION EXAMPLE
+Walk through a real example from the current system.
+
+Using the S-Band Radar from the screenshot:
+
+Component Name: S-Band Radar
+
+Component Code: 411.001
+
+Current Running Hours: 100 hrs
+
+Last Updated: 25-Jan-2026 05:30
+
+Utilization Period: Weekly (7 days)
+
+Current Displayed Rate: 0.0% ❌
+
+Please show:
+
+Step 1: What data is fetched?
+
+text
+Current RH: _____ hrs (from table: _____, field: _____)
+Historical RH: _____ hrs (from table: _____, field: _____, date: _____)
+Period: _____ days
+Step 2: What calculation is performed?
+
+text
+Formula used: _____
+Plugging in values: _____
+Result: _____
+Step 3: What is the final output?
+
+text
+Utilization Rate displayed: _____ %
+Expected value: _____ %
+Step 4: Why is the result 0.0%?
+
+text
+Explain why the calculation returns 0.0% instead of the expected value.
+Possible reasons:
+- Missing historical data?
+- Query returning null?
+- Division by zero?
+- Wrong time period calculation?
+- Other issue?
+5. DATABASE QUERIES
+Show the actual database queries being executed.
+
+A. Query to get current RH:
+
+sql
+-- Paste the actual SQL query here
+SELECT _____ FROM _____ WHERE _____
+B. Query to get historical RH:
+
+sql
+-- Paste the actual SQL query here
+SELECT _____ FROM _____ WHERE _____ AND date = _____
+C. Do these queries return data?
+
+Show example results
+
+If queries return null/empty, explain why
+
+6. PERIOD DROPDOWN LOGIC
+How does the "Utilization Period" dropdown work?
+
+Current options visible:
+
+Weekly (7 days) ← Currently selected
+
+Questions:
+
+What happens when "Weekly (7 days)" is selected?
+
+Does it trigger an API call?
+
+Does it recalculate utilization rates?
+
+What parameters are sent?
+
+What other period options exist?
+
+Daily, Monthly, Quarterly, Yearly?
+
+Or just Weekly?
+
+How is the period used in the calculation?
+
+Is "7 days" used to calculate max possible hours (7 × 24 = 168)?
+
+Is it used to determine which historical date to query?
+
+7. POTENTIAL ISSUES IDENTIFIED
+Based on the current implementation, what could be causing the 0.0% issue?
+
+Please check and report on each of these possibilities:
+
+Issue 1: Missing Historical Data
+
+Check: Does running_hours_audit table exist?
+
+Check: Does it have entries for these components?
+
+Check: Are there entries dated 7 days ago (around 05-Mar-2026)?
+
+Issue 2: Query Returns Null
+
+Check: Does the historical RH query return null?
+
+Check: What happens when null is returned? (Division by null = 0?)
+
+Issue 3: Last Updated Date Problem
+
+The "Last Updated" column shows 25-Jan-2026 (very old)
+
+Today is 12-Mar-2026 (46 days ago!)
+
+Question: Is the system comparing today's RH with RH from 7 days ago, but no RH updates have been made since 25-Jan?
+
+If no RH changes in the last 7 days → Increase = 0 → Utilization = 0% ✓ (This might be correct!)
+
+Issue 4: Wrong Formula
+
+Check: Is the formula using the correct numerator and denominator?
+
+Check: Is there a division by zero somewhere?
+
+Issue 5: Frontend Display Bug
+
+Check: Is the backend calculation correct but frontend display shows 0.0%?
+
+Check: Is the utilizationRate field being passed from backend to frontend?
+
+8. AUDIT TRAIL VERIFICATION
+Check the running_hours_audit table:
+
+Please run these queries and provide results:
+
+Query 1: Check if audit table has data
+
+sql
+SELECT COUNT(*) FROM running_hours_audit;
+Result: _____ rows
+
+Query 2: Check S-Band Radar audit history
+
+sql
+SELECT * FROM running_hours_audit 
+WHERE componentId = 'S-Band-Radar-ID' 
+ORDER BY date DESC 
+LIMIT 10;
+Result: (paste results)
+
+Query 3: Check if there are any RH entries in the last 7 days
+
+sql
+SELECT componentId, runningHours, date 
+FROM running_hours_audit 
+WHERE date >= DATE_SUB(CURDATE(), INTERVAL 7 DAY)
+ORDER BY date DESC;
+Result: (paste results)
+
+If these queries return empty → This is the root cause!
+
+9. EXPECTED BEHAVIOR vs ACTUAL BEHAVIOR
+Fill in this comparison table:
+
+Aspect	Expected Behavior	Actual Behavior	Match?
+Formula	(RH Increase in Period / Max Possible Hours) × 100	[Your formula here]	✅ / ❌
+RH Increase	Current RH - RH at period start	[How you calculate it]	✅ / ❌
+Max Possible	Period Days × 24	[How you calculate it]	✅ / ❌
+Period Days	7 (from dropdown)	[What you use]	✅ / ❌
+Historical Query	Gets RH from 7 days ago	[What query does]	✅ / ❌
+Display Format	XX.X% (one decimal)	0.0%	✅ / ❌
+10. CODE SNIPPETS
+Please provide the relevant code snippets:
+
+A. Utilization Rate Calculation Function:
+
+javascript
+// Paste the actual function that calculates utilization rate
+function calculateUtilizationRate(component, period) {
+  // ... your code here ...
+}
+B. API Endpoint Handler:
+
+javascript
+// Paste the API endpoint that returns utilization rate
+router.get('/running-hours', async (req, res) => {
+  // ... your code here ...
+});
+C. Frontend Display Code:
+
+jsx
+// Paste the code that displays the utilization rate column
+<TableCell>
+  {/* How is utilizationRate rendered? */}
+</TableCell>
+11. TESTING DATA
+Provide test data for debugging:
+
+For S-Band Radar (411.001):
+
+text
+Current Date: 12-Mar-2026
+Current RH: 100 hrs
+Last Updated: 25-Jan-2026
+
+Query: What was RH on 05-Mar-2026 (7 days ago)?
+Result: _____ hrs (or NULL if no data)
+
+If NULL → Explain: No RH updates since 25-Jan, so no change in last 7 days → 0% is correct!
+
+If a value exists → Show the calculation
+12. SUMMARY & DIAGNOSIS
+Based on your investigation, answer these questions:
+
+Is the 0.0% result CORRECT or INCORRECT?
+
+If correct: Explain why (e.g., no RH changes in period)
+
+If incorrect: Explain the bug
+
+What is the root cause of the issue?
+
+Missing data?
+
+Wrong formula?
+
+Query error?
+
+Display bug?
+
+What needs to be fixed?
+
+List specific issues found
+
+Prioritize by severity
+
+Are there any other issues noticed?
+
+Performance problems?
+
+Data quality issues?
+
+UI/UX issues?
