@@ -1752,6 +1752,13 @@ export class PostgresStorage {
     const db = await getDb();
     const comp = await this.getComponent(componentId);
     const resolvedId = comp ? comp.cuuid : componentId;
+
+    const parsedDateExpr = sql`CASE 
+      WHEN ${runningHoursAudit.dateUpdatedLocal} ~ '^\d{4}-\d{2}-\d{2}' 
+        THEN TO_TIMESTAMP(${runningHoursAudit.dateUpdatedLocal}, 'YYYY-MM-DD')
+      ELSE TO_TIMESTAMP(REPLACE(${runningHoursAudit.dateUpdatedLocal}, ' ', '-'), 'DD-Mon-YYYY-HH24:MI')
+    END`;
+
     const idCondition = or(eq(runningHoursAudit.componentId, resolvedId), eq(runningHoursAudit.componentId, componentId));
 
     const result = await db.select({
@@ -1761,9 +1768,9 @@ export class PostgresStorage {
       .from(runningHoursAudit)
       .where(and(
         idCondition,
-        lte(runningHoursAudit.enteredAtUTC, targetDate)
+        sql`${parsedDateExpr} <= ${targetDate}`
       ))
-      .orderBy(desc(runningHoursAudit.enteredAtUTC))
+      .orderBy(sql`${parsedDateExpr} DESC`)
       .limit(1);
 
     if (result.length > 0) {
@@ -1779,8 +1786,11 @@ export class PostgresStorage {
       enteredAtUTC: runningHoursAudit.enteredAtUTC
     })
       .from(runningHoursAudit)
-      .where(idCondition)
-      .orderBy(asc(runningHoursAudit.enteredAtUTC))
+      .where(and(
+        idCondition,
+        sql`${parsedDateExpr} > ${targetDate}`
+      ))
+      .orderBy(sql`${parsedDateExpr} ASC`)
       .limit(1);
 
     if (fallback.length > 0) {
