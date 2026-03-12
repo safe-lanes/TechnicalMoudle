@@ -21,6 +21,7 @@ import { saveImportHistory } from '../../../services/fileBasedImportHistory';
 
 export async function processSpareInventory(params: {
   spareId: number;
+  spareUuid: string;
   vesselId: string;
   componentId: string;
   locationAName: string | null;
@@ -30,7 +31,7 @@ export async function processSpareInventory(params: {
   isNewSpare: boolean;
   userId: string;
 }): Promise<void> {
-  const { spareId, vesselId, componentId, locationAName, locationBName, robLocationA, robLocationB, isNewSpare, userId } = params;
+  const { spareId, spareUuid, vesselId, componentId, locationAName, locationBName, robLocationA, robLocationB, isNewSpare, userId } = params;
 
   try {
     // 1. Create spare-component link (if not exists)
@@ -39,6 +40,7 @@ export async function processSpareInventory(params: {
     if (!alreadyLinked) {
       await storage.createSpareComponentLink({
         spareId,
+        spareUuid,
         componentId,
         vesselId,
         linkedBy: userId,
@@ -61,17 +63,17 @@ export async function processSpareInventory(params: {
         await storage.upsertSpareLocationStock({
           vesselId,
           spareId,
+          spareUuid,
           locationId: locationA.id,
           qty: robLocationA,
         });
 
-        // Create opening balance transaction for NEW spares with non-zero qty
-        // Use ADJUST event since this is an import operation, not a normal receive
         if (isNewSpare && robLocationA > 0) {
           const newTotalRobA = currentTotalRobA + robLocationA;
           await storage.createInventoryTransaction({
             vesselId,
             spareId,
+            spareUuid,
             locationId: locationA.id,
             eventType: 'ADJUST',
             qtyChange: robLocationA,
@@ -103,16 +105,17 @@ export async function processSpareInventory(params: {
         await storage.upsertSpareLocationStock({
           vesselId,
           spareId,
+          spareUuid,
           locationId: locationB.id,
           qty: robLocationB,
         });
 
-        // Create opening balance transaction for NEW spares with non-zero qty
         if (isNewSpare && robLocationB > 0) {
           const newTotalRobB = currentTotalRobB + robLocationB;
           await storage.createInventoryTransaction({
             vesselId,
             spareId,
+            spareUuid,
             locationId: locationB.id,
             eventType: 'ADJUST',
             qtyChange: robLocationB,
@@ -590,6 +593,7 @@ export async function performImport(
           // Process inventory: create location entities, links, and stock records
           await processSpareInventory({
             spareId: newSpare.id,
+            spareUuid: newSpare.suuid,
             vesselId: sparesVesselId,
             componentId: component.cuuid,
             locationAName: row['Location A'] ? String(row['Location A']).trim() : null,
@@ -669,6 +673,7 @@ export async function performImport(
           // Process inventory for updated spare (updates links and stock, no opening balance)
           await processSpareInventory({
             spareId: updatedSpare.id,
+            spareUuid: updatedSpare.suuid,
             vesselId: sparesVesselId,
             componentId: component.cuuid,
             locationAName: row['Location A'] ? String(row['Location A']).trim() : existingSpare.location,
@@ -760,6 +765,7 @@ export async function performImport(
               // Process inventory for upsert-updated spare
               await processSpareInventory({
                 spareId: updatedSpare.id,
+                spareUuid: updatedSpare.suuid,
                 vesselId: sparesVesselId,
                 componentId: component.cuuid,
                 locationAName: row['Location A'] ? String(row['Location A']).trim() : existingSpare.location,
@@ -821,6 +827,7 @@ export async function performImport(
             // Process inventory for upsert-created spare
             await processSpareInventory({
               spareId: newSpare.id,
+              spareUuid: newSpare.suuid,
               vesselId: sparesVesselId,
               componentId: component.cuuid,
               locationAName: row['Location A'] ? String(row['Location A']).trim() : null,
