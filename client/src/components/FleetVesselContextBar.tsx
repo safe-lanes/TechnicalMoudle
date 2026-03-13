@@ -26,51 +26,15 @@ export function FleetVesselContextBar({
 }: FleetVesselContextBarProps) {
   const currentYear = new Date().getFullYear();
 
-  const pillBase: React.CSSProperties = {
-    padding: '5px 18px',
-    fontSize: '13px',
-    fontWeight: 600,
-    cursor: 'pointer',
-    transition: 'all 0.15s',
-    borderRadius: '20px',
-  };
-
-  const tabPillActive: React.CSSProperties = {
-    ...pillBase,
-    backgroundColor: '#1a2b4a',
-    color: '#ffffff',
-    border: 'none',
-  };
-
-  const tabPillInactive: React.CSSProperties = {
-    ...pillBase,
-    backgroundColor: '#e2e8f0',
-    color: '#64748b',
-    border: 'none',
-  };
-
-  const vesselPillActive: React.CSSProperties = {
-    ...pillBase,
-    padding: '5px 16px',
-    backgroundColor: '#1a2b4a',
-    color: '#ffffff',
-    border: 'none',
-  };
-
-  const vesselPillInactive: React.CSSProperties = {
-    ...pillBase,
-    padding: '5px 16px',
-    backgroundColor: '#ffffff',
-    color: '#374151',
-    border: '1px solid #e2e8f0',
-  };
+  const tabActiveClass = 'px-4 py-1.5 rounded-md text-sm font-medium transition-colors cursor-pointer bg-[#52baf3] text-white';
+  const tabInactiveClass = 'px-4 py-1.5 rounded-md text-sm font-medium transition-colors cursor-pointer text-gray-700 hover:bg-gray-200';
 
   return (
     <div
       style={{ background: '#FFFFFF', borderBottom: '1px solid #e5e7eb', padding: '10px 20px' }}
       data-testid="bar-fleet-vessel-context"
     >
-      <div className="flex items-center justify-between flex-wrap gap-y-2">
+      <div className="flex items-center justify-between flex-wrap gap-y-2 relative">
         <div className="flex items-center gap-4">
           <h1 style={{ fontSize: '20px', fontWeight: 600, color: '#1a2b4a', margin: 0 }} data-testid="text-dashboard-title">
             Dashboard
@@ -100,33 +64,35 @@ export function FleetVesselContextBar({
               ))}
             </select>
           )}
+        </div>
 
-          <div style={{ display: 'flex', gap: '4px' }}>
+        <div className="absolute left-1/2 -translate-x-1/2 flex items-center gap-2">
+          <div className="bg-gray-100 rounded-md p-1 flex items-center gap-1">
             <button
-              style={activeTab === 'overview' ? tabPillActive : tabPillInactive}
+              className={activeTab === 'overview' ? tabActiveClass : tabInactiveClass}
               onClick={() => onTabChange?.('overview')}
               data-testid="tab-overview"
             >
               Overview
             </button>
             <button
-              style={activeTab === 'management' ? tabPillActive : tabPillInactive}
+              className={activeTab === 'management' ? tabActiveClass : tabInactiveClass}
               onClick={() => onTabChange?.('management')}
               data-testid="tab-management"
             >
               Management
             </button>
           </div>
-          <div style={{ display: 'flex', gap: '4px' }}>
+          <div className="bg-gray-100 rounded-md p-1 flex items-center gap-1">
             <button
-              style={isAllVessels ? vesselPillActive : vesselPillInactive}
+              className={isAllVessels ? tabActiveClass : tabInactiveClass}
               onClick={() => onAllVesselsChange(true)}
               data-testid="toggle-all-vessels"
             >
               All Vessel
             </button>
             <button
-              style={!isAllVessels ? vesselPillActive : vesselPillInactive}
+              className={!isAllVessels ? tabActiveClass : tabInactiveClass}
               onClick={() => onAllVesselsChange(false)}
               data-testid="toggle-my-vessel"
             >
@@ -139,7 +105,6 @@ export function FleetVesselContextBar({
           <div style={{ fontSize: '18px', fontWeight: 700, color: '#1a2b4a' }} data-testid="text-current-year">
             {currentYear}
           </div>
-
         </div>
       </div>
     </div>

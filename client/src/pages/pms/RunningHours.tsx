@@ -958,26 +958,26 @@ const RunningHours = () => {
     <div className="flex flex-col" style={{ height: 'calc(100vh - 120px)' }}>
       {/* Header - Fixed */}
       <div className="flex-shrink-0 space-y-6 mb-6">
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between relative">
           <div className="flex items-center gap-4">
             <h1 className="text-2xl font-bold text-gray-900" data-testid="D1"><Marker id="D1" />Running Hours</h1>
-            <div className="flex items-center gap-1 bg-gray-100 rounded-lg p-1" data-testid="rh-tab-switcher">
-              <button
-                onClick={() => setActiveTab("main")}
-                className={`px-4 py-1.5 rounded-md text-sm font-medium transition-colors ${activeTab === 'main' ? 'bg-[#52baf3] text-white' : 'text-gray-700 hover:bg-gray-200'}`}
-                data-testid="tab-main"
-              >
-                Overview
-              </button>
-              <button
-                onClick={() => setActiveTab("history")}
-                className={`px-4 py-1.5 rounded-md text-sm font-medium transition-colors flex items-center gap-1.5 ${activeTab === 'history' ? 'bg-[#52baf3] text-white' : 'text-gray-700 hover:bg-gray-200'}`}
-                data-testid="tab-history"
-              >
-                <History className="h-3.5 w-3.5" />
-                History
-              </button>
-            </div>
+          </div>
+          <div className="absolute left-1/2 -translate-x-1/2 bg-gray-100 rounded-md p-1 flex items-center gap-1" data-testid="rh-tab-switcher">
+            <button
+              onClick={() => setActiveTab("main")}
+              className={`px-4 py-1.5 rounded-md text-sm font-medium transition-colors ${activeTab === 'main' ? 'bg-[#52baf3] text-white' : 'text-gray-700 hover:bg-gray-200'}`}
+              data-testid="tab-main"
+            >
+              Overview
+            </button>
+            <button
+              onClick={() => setActiveTab("history")}
+              className={`px-4 py-1.5 rounded-md text-sm font-medium transition-colors flex items-center gap-1.5 ${activeTab === 'history' ? 'bg-[#52baf3] text-white' : 'text-gray-700 hover:bg-gray-200'}`}
+              data-testid="tab-history"
+            >
+              <History className="h-3.5 w-3.5" />
+              History
+            </button>
           </div>
           {activeTab === 'main' && (
             <Button 
