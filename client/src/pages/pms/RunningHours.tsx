@@ -1012,7 +1012,7 @@ const RunningHours = () => {
               </div>
             )}
 
-            <div className="relative w-80" data-testid="D2">
+            <div className="relative w-72" data-testid="D2">
               <Marker id="D2" />
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
               <Input
@@ -1027,7 +1027,7 @@ const RunningHours = () => {
               <Clock className="h-4 w-4 text-gray-500" />
               <span className="text-sm text-gray-600 whitespace-nowrap">Utilization Period:</span>
               <Select value={utilizationPeriod} onValueChange={setUtilizationPeriod}>
-                <SelectTrigger className="w-[220px] h-9" data-testid="select-utilization-period">
+                <SelectTrigger className="w-[180px] h-9" data-testid="select-utilization-period">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>

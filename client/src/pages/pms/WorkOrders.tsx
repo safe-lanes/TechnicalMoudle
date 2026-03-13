@@ -536,7 +536,7 @@ const WorkOrders: React.FC = () => {
           </div>
         )}
 
-        <div className="relative w-80" data-testid="C10">
+        <div className="relative w-72" data-testid="C10">
           <Marker id="C10" />
           <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
           <Input

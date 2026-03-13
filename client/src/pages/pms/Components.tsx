@@ -3359,7 +3359,7 @@ const Components: React.FC = () => {
         </div>
         
         {/* Filters Row */}
-        <div className="flex gap-4 mb-4">
+        <div className="flex items-center gap-3 flex-wrap mb-4">
           {(isSailAdmin || isClientAdmin || isChangeMode || isChangeRequestMode) && (
           <div className="flex items-center gap-2" data-testid="B2">
             <Marker id="B2" />
@@ -3378,7 +3378,18 @@ const Components: React.FC = () => {
             </Select>
           </div>
           )}
-          
+
+          <div className="relative w-72" data-testid="B4">
+            <Marker id="B4" />
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+            <Input
+              placeholder="Search by Name, SFI Code, Fleet Equipment Code, Maker, or Se..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className={`pl-10 ${isChangeRequestMode ? 'border-white bg-white/10 text-white placeholder:text-white/70' : ''}`}
+            />
+          </div>
+
           <div className="flex items-center gap-2" data-testid="B3">
             <Marker id="B3" />
             <span className={`text-sm font-medium ${isChangeRequestMode ? 'text-white' : 'text-gray-600'}`}>Critical Item:</span>
@@ -3392,16 +3403,6 @@ const Components: React.FC = () => {
                 <SelectItem value="non-critical">Non-Critical</SelectItem>
               </SelectContent>
             </Select>
-          </div>
-          
-          <div className="flex items-center gap-2 flex-1" data-testid="B4">
-            <Marker id="B4" />
-            <Input
-              placeholder="Search by Name, SFI Code, Fleet Equipment Code, Maker, or Serial Number..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className={`max-w-md ${isChangeRequestMode ? 'border-white bg-white/10 text-white placeholder:text-white/70' : ''}`}
-            />
           </div>
         </div>
       </div>
