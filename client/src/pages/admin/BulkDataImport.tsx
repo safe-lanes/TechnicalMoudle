@@ -226,7 +226,7 @@ const getVesselName = (entry: any): string => {
 };
 
 export default function BulkDataImport() {
-  const { isSailAdmin } = useUIRole();
+  const { isSailAdmin, isClientAdmin } = useUIRole();
   const { data: vesselMasterEntries = [] } = useExternalVessels();
   // Fleet mode is only available for Sail Admin
   const [isFleetModeState, setIsFleetModeState] = useState(false);
@@ -261,7 +261,7 @@ export default function BulkDataImport() {
   return (
     <div>
       {/* Filter Bar - Vessel Selector above content */}
-      {!isFleetMode && (
+      {(isSailAdmin || isClientAdmin) && !isFleetMode && (
         <div className="flex items-center gap-3 flex-wrap mb-4">
           <div className="flex items-center gap-2">
             <span className="text-sm font-medium text-gray-600">Vessel:</span>
@@ -295,7 +295,7 @@ export default function BulkDataImport() {
         </div>
       )}
 
-      <div className={`flex gap-6 ${isFleetMode ? 'h-[calc(100vh-140px)]' : 'h-[calc(100vh-188px)]'}`}>
+      <div className={`flex gap-6 ${(isSailAdmin || isClientAdmin) && !isFleetMode ? 'h-[calc(100vh-188px)]' : 'h-[calc(100vh-140px)]'}`}>
       {/* Left Sidebar - Templates */}
       <div className="w-[200px] flex-shrink-0">
         <div className="bg-white rounded-lg shadow-sm h-full flex flex-col">
