@@ -5724,16 +5724,21 @@ export class PostgresStorage {
     return result;
   }
 
-  async getSuperintendentNotifications(): Promise<SuperintendentNotification[]> {
+  async getSuperintendentNotifications(vesselName?: string): Promise<SuperintendentNotification[]> {
     const db = await getDb();
+    const conditions = [eq(superintendentNotifications.isAcknowledged, false)];
+    if (vesselName) {
+      conditions.push(eq(superintendentNotifications.vesselName, vesselName));
+    }
     return await db.select().from(superintendentNotifications)
-      .where(eq(superintendentNotifications.isAcknowledged, false))
+      .where(and(...conditions))
       .orderBy(desc(superintendentNotifications.createdAt));
   }
 
-  async getAllSuperintendentNotifications(): Promise<SuperintendentNotification[]> {
+  async getAllSuperintendentNotifications(vesselName?: string): Promise<SuperintendentNotification[]> {
     const db = await getDb();
     return await db.select().from(superintendentNotifications)
+      .where(vesselName ? eq(superintendentNotifications.vesselName, vesselName) : undefined)
       .orderBy(desc(superintendentNotifications.createdAt));
   }
 

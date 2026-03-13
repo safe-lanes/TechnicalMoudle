@@ -317,9 +317,17 @@ export async function getAnomalyForWorkOrder(req: Request, res: Response) {
 }
 
 export async function getSuperintendentNotificationsSummary(req: Request, res: Response) {
+  const vesselId = req.query.vesselId as string | undefined;
+  let vesselName: string | undefined;
+  if (vesselId && vesselId !== 'all') {
+    const vessels = await storage.getVessels();
+    const vessel = vessels.find(v => v.id === vesselId);
+    vesselName = vessel?.name;
+  }
+
   const [unacknowledged, all] = await Promise.all([
-    storage.getSuperintendentNotifications(),
-    storage.getAllSuperintendentNotifications(),
+    storage.getSuperintendentNotifications(vesselName),
+    storage.getAllSuperintendentNotifications(vesselName),
   ]);
 
   const now = new Date();

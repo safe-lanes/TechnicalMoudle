@@ -489,7 +489,16 @@ const Dashboard = () => {
   });
 
   const { data: superintendentSummary } = useQuery<{ pendingCount: number; acknowledgedThisMonthCount: number }>({
-    queryKey: ['/technical/api/superintendent/notifications/summary'],
+    queryKey: ['/technical/api/superintendent/notifications/summary', vesselId],
+    queryFn: async () => {
+      const url = isAllVessels
+        ? '/technical/api/superintendent/notifications/summary'
+        : `/technical/api/superintendent/notifications/summary?vesselId=${vesselId}`;
+      const response = await fetch(url);
+      if (!response.ok) throw new Error('Failed to fetch superintendent summary');
+      return response.json();
+    },
+    enabled: !!vesselId,
   });
 
   // Helper: Calculate stock status

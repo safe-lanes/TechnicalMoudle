@@ -546,8 +546,8 @@ export interface IStorage {
   
   // Superintendent Notification methods
   createSuperintendentNotification(notification: InsertSuperintendentNotification): Promise<SuperintendentNotification>;
-  getSuperintendentNotifications(): Promise<SuperintendentNotification[]>;
-  getAllSuperintendentNotifications(): Promise<SuperintendentNotification[]>;
+  getSuperintendentNotifications(vesselName?: string): Promise<SuperintendentNotification[]>;
+  getAllSuperintendentNotifications(vesselName?: string): Promise<SuperintendentNotification[]>;
   acknowledgeSuperintendentNotification(id: number): Promise<SuperintendentNotification>;
 
   // Work Order Anomaly methods (Layer 6)
