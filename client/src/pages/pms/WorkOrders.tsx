@@ -711,6 +711,7 @@ const WorkOrders: React.FC = () => {
         </div>
         
         <div className="flex gap-2 items-center">
+          {isSailAdmin && (
           <Button 
             variant="outline" 
             size="sm"
@@ -721,6 +722,7 @@ const WorkOrders: React.FC = () => {
             <Download className="h-3.5 w-3.5 mr-1" />
             Export
           </Button>
+          )}
           {isSailAdmin && (
           <Button 
             size="sm" 

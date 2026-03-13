@@ -1,9 +1,11 @@
 import { MessageCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useChat } from "@/hooks/useChat";
+import { useUIRole } from "@/contexts/UIRoleContext";
 import { ChatPanel } from "./ChatPanel";
 
 export function ChatButton() {
+  const { isSailAdmin } = useUIRole();
   const {
     messages,
     isLoading,
@@ -14,6 +16,8 @@ export function ChatButton() {
     closeChat,
     clearMessages,
   } = useChat();
+
+  if (!isSailAdmin) return null;
 
   return (
     <>

@@ -1541,12 +1541,12 @@ const Dashboard = () => {
         )}
 
         {/* Compliance Anomaly Detection Panel (Layer 6) */}
-        {activeTab === 'overview' && (
+        {activeTab === 'overview' && isSailAdmin && (
           <ComplianceAnomalyPanel vesselId={vesselId} />
         )}
 
         {/* Work Order Anomalies Tile (Layer 6 — Individual Anomaly Events) */}
-        {activeTab === 'overview' && (
+        {activeTab === 'overview' && isSailAdmin && (
           <AnomalyDetectionTile vesselId={vesselId} />
         )}
 
