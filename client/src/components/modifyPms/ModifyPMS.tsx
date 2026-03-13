@@ -276,13 +276,13 @@ export function ModifyPMS() {
         </div>
         <Button
           variant="outline"
+          className="text-gray-600"
           onClick={() => {
             setSearchQuery("");
             setStatusFilter("all");
           }}
           data-testid="button-clear-filters-modify"
         >
-          <X className="h-4 w-4 mr-1" />
           Clear
         </Button>
       </div>
