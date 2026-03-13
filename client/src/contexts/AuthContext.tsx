@@ -60,7 +60,10 @@ export function AuthProvider({ children }: AuthProviderProps) {
     const encryptedUserType = secureGetItem<string>("userType");
 
     if (encryptedUserType && encryptedProfile?.role) {
-      resolvedUserType = mapLoggedRoleToUIRole(encryptedUserType, encryptedProfile.role);
+      resolvedUserType = mapLoggedRoleToUIRole(
+        encryptedUserType,
+        encryptedProfile.role,
+      );
 
       const role = (encryptedProfile.role as UserRole) || "Office";
       resolvedUser = {
@@ -91,7 +94,10 @@ export function AuthProvider({ children }: AuthProviderProps) {
       }
 
       if (plainUserType && plainProfile?.role) {
-        resolvedUserType = mapLoggedRoleToUIRole(plainUserType, plainProfile.role);
+        resolvedUserType = mapLoggedRoleToUIRole(
+          plainUserType,
+          plainProfile.role,
+        );
 
         const role = (plainProfile.role as UserRole) || "Office";
         resolvedUser = {
@@ -116,7 +122,10 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
     if (!resolvedUser) {
       resolvedUser = DEFAULT_USER;
-      resolvedUserType = mapLoggedRoleToUIRole(DEFAULT_USER.userType, DEFAULT_USER.role);
+      resolvedUserType = mapLoggedRoleToUIRole(
+        DEFAULT_USER.userType,
+        DEFAULT_USER.role,
+      );
     }
 
     setCurrentUser(resolvedUser);
