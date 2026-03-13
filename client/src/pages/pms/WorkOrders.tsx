@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from "react";
-import { Search, Plus, Pen, Timer, AlertTriangle, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Eye, Lock } from "lucide-react";
+import { Search, Plus, Pen, Timer, AlertTriangle, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Eye, Lock, Download, FileText, Loader2 } from "lucide-react";
 import { useLocation } from "wouter";
 import { useVessel } from "@/contexts/VesselContext";
 import { useQuery, useMutation } from "@tanstack/react-query";
@@ -13,6 +13,12 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import PostponeWorkOrderDialog from "@/components/PostponeWorkOrderDialog";
 import UnplannedWorkOrderForm from "@/components/UnplannedWorkOrderForm";
 import { useModifyMode } from "@/hooks/useModifyMode";
@@ -25,6 +31,9 @@ import { useVessels } from "@/hooks/useVessels";
 import { formatProfessionalDate, calculateLeadTimeStatus } from "@/lib/dateUtils";
 import { Marker } from "@/components/Marker";
 import { useUIRole } from "@/contexts/UIRoleContext";
+import * as XLSX from "xlsx";
+import { pdfReportGenerator } from "@/lib/pdfReportGenerator";
+import { format } from "date-fns";
 
 // Extend WorkOrderWithLeadTime to include computed status and RH data from backend
 type WorkOrderWithHydratedData = WorkOrderWithLeadTime & {
@@ -449,9 +458,221 @@ const WorkOrders: React.FC = () => {
   };
 
   const handleAddWorkOrderClick = () => {
-    // Navigate to new work order page (full-screen)
-    // Note: We'll need to update the route to handle creating new work orders without a component
     setLocation('/pms/work-order/new/general');
+  };
+
+  const [exportDialogOpen, setExportDialogOpen] = useState(false);
+  const [exportingType, setExportingType] = useState<string | null>(null);
+
+  const vesselName = useMemo(() => {
+    if (!vesselId) return 'All Vessels';
+    const vessel = vessels.find(v => v.id === vesselId);
+    return vessel?.name || vesselId;
+  }, [vesselId, vessels]);
+
+  const exportWorkOrdersExcel = () => {
+    setExportingType('wo-excel');
+    try {
+      const now = new Date();
+      const timestamp = format(now, 'yyyyMMdd_HHmm');
+      const rows = safeWorkOrdersList.map((wo, idx) => ({
+        'S.No': idx + 1,
+        'Component': wo.component || '-',
+        'Work Order No': wo.workOrderNo || wo.templateCode || '-',
+        'Job Title': wo.jobTitle || '-',
+        'Assigned To': wo.assignedTo || '-',
+        'Due Date': wo.dueDate ? formatProfessionalDate(wo.dueDate) : '-',
+        'Status': wo.computedStatus || wo.status || '-',
+        'Criticality': wo.criticality || '-',
+        'Maintenance Basis': wo.maintenanceBasis || '-',
+        'Frequency': wo.frequencyValue ? `${wo.frequencyValue} ${wo.frequencyUnit || ''}`.trim() : '-',
+      }));
+
+      const ws = XLSX.utils.json_to_sheet(rows);
+      ws['!cols'] = [
+        { wch: 6 }, { wch: 30 }, { wch: 35 }, { wch: 40 }, { wch: 18 },
+        { wch: 14 }, { wch: 14 }, { wch: 12 }, { wch: 16 }, { wch: 14 },
+      ];
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, 'All Work Orders');
+      XLSX.writeFile(wb, `${vesselName}_All_Work_Orders_${timestamp}.xlsx`);
+
+      toast({ title: "Export Complete", description: `Exported ${rows.length} work orders to Excel` });
+    } catch (err) {
+      toast({ title: "Export Failed", description: "Failed to export work orders to Excel" });
+    }
+    setExportingType(null);
+  };
+
+  const exportWorkOrdersPdf = () => {
+    setExportingType('wo-pdf');
+    try {
+      const columns = [
+        { header: 'S.No', field: 'sNo', width: 10 },
+        { header: 'Component', field: 'component', width: 40 },
+        { header: 'Work Order No', field: 'workOrderNo', width: 45 },
+        { header: 'Job Title', field: 'jobTitle', width: 50 },
+        { header: 'Assigned To', field: 'assignedTo', width: 25 },
+        { header: 'Due Date', field: 'dueDate', width: 22 },
+        { header: 'Status', field: 'status', width: 18 },
+        { header: 'Criticality', field: 'criticality', width: 16 },
+      ];
+
+      const data = safeWorkOrdersList.map((wo, idx) => ({
+        sNo: idx + 1,
+        component: wo.component || '-',
+        workOrderNo: wo.workOrderNo || wo.templateCode || '-',
+        jobTitle: wo.jobTitle || '-',
+        assignedTo: wo.assignedTo || '-',
+        dueDate: wo.dueDate ? formatProfessionalDate(wo.dueDate) : '-',
+        status: wo.computedStatus || wo.status || '-',
+        criticality: wo.criticality || '-',
+      }));
+
+      const statusCounts = safeWorkOrdersList.reduce((acc, wo) => {
+        const s = wo.computedStatus || wo.status || 'Unknown';
+        acc[s] = (acc[s] || 0) + 1;
+        return acc;
+      }, {} as Record<string, number>);
+
+      const summary = [
+        { label: 'Total Work Orders', value: safeWorkOrdersList.length },
+        { label: 'Planned', value: statusCounts['Active'] || 0 },
+        { label: 'Due', value: (statusCounts['Due'] || 0) + (statusCounts['Due (Grace P)'] || 0) },
+        { label: 'Overdue', value: statusCounts['Overdue'] || 0 },
+        { label: 'Completed', value: statusCounts['Completed'] || 0 },
+      ];
+
+      pdfReportGenerator.generateReport(
+        { title: 'All Work Orders', subtitle: 'Complete work order listing', vessel: vesselName, orientation: 'landscape' },
+        columns,
+        data,
+        summary
+      );
+
+      toast({ title: "Export Complete", description: `Exported ${data.length} work orders to PDF` });
+    } catch (err) {
+      toast({ title: "Export Failed", description: "Failed to export work orders to PDF" });
+    }
+    setExportingType(null);
+  };
+
+  const exportDistributedJobsExcel = () => {
+    setExportingType('dj-excel');
+    try {
+      const now = new Date();
+      const timestamp = format(now, 'yyyyMMdd_HHmm');
+
+      const rankStats: Record<string, { assignedJobs: number; totalManhours: number; completedJobs: number; overdueJobs: number }> = {};
+      safeWorkOrdersList.forEach(wo => {
+        const rank = wo.assignedTo?.trim() || 'Unassigned';
+        if (!rankStats[rank]) {
+          rankStats[rank] = { assignedJobs: 0, totalManhours: 0, completedJobs: 0, overdueJobs: 0 };
+        }
+        rankStats[rank].assignedJobs++;
+        const manhours = parseFloat(wo.estimatedManhours || '0') || 0;
+        rankStats[rank].totalManhours += manhours;
+        const effectiveStatus = wo.computedStatus || wo.status || 'Active';
+        if (effectiveStatus === 'Completed') rankStats[rank].completedJobs++;
+        if (effectiveStatus === 'Overdue') rankStats[rank].overdueJobs++;
+      });
+
+      const totalJobs = safeWorkOrdersList.length;
+      const rows = Object.entries(rankStats)
+        .sort((a, b) => b[1].assignedJobs - a[1].assignedJobs)
+        .map(([rank, stats], idx) => ({
+          'S.No': idx + 1,
+          'Rank / Assigned To': rank,
+          'Assigned Jobs': stats.assignedJobs,
+          'Completed Jobs': stats.completedJobs,
+          'Overdue Jobs': stats.overdueJobs,
+          'Completion Rate (%)': stats.assignedJobs > 0 ? `${Math.round((stats.completedJobs / stats.assignedJobs) * 100)}%` : '0%',
+          'Total Manhours': stats.totalManhours.toFixed(1),
+          'Workload (%)': totalJobs > 0 ? `${Math.round((stats.assignedJobs / totalJobs) * 100)}%` : '0%',
+        }));
+
+      const ws = XLSX.utils.json_to_sheet(rows);
+      ws['!cols'] = [
+        { wch: 6 }, { wch: 25 }, { wch: 14 }, { wch: 16 }, { wch: 14 },
+        { wch: 18 }, { wch: 16 }, { wch: 14 },
+      ];
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, 'Distributed Jobs');
+      XLSX.writeFile(wb, `${vesselName}_Distributed_Jobs_${timestamp}.xlsx`);
+
+      toast({ title: "Export Complete", description: `Exported ${rows.length} rank distributions to Excel` });
+    } catch (err) {
+      toast({ title: "Export Failed", description: "Failed to export distributed jobs to Excel" });
+    }
+    setExportingType(null);
+  };
+
+  const exportDistributedJobsPdf = () => {
+    setExportingType('dj-pdf');
+    try {
+      const rankStats: Record<string, { assignedJobs: number; totalManhours: number; completedJobs: number; overdueJobs: number }> = {};
+      safeWorkOrdersList.forEach(wo => {
+        const rank = wo.assignedTo?.trim() || 'Unassigned';
+        if (!rankStats[rank]) {
+          rankStats[rank] = { assignedJobs: 0, totalManhours: 0, completedJobs: 0, overdueJobs: 0 };
+        }
+        rankStats[rank].assignedJobs++;
+        const manhours = parseFloat(wo.estimatedManhours || '0') || 0;
+        rankStats[rank].totalManhours += manhours;
+        const effectiveStatus = wo.computedStatus || wo.status || 'Active';
+        if (effectiveStatus === 'Completed') rankStats[rank].completedJobs++;
+        if (effectiveStatus === 'Overdue') rankStats[rank].overdueJobs++;
+      });
+
+      const totalJobs = safeWorkOrdersList.length;
+      const columns = [
+        { header: 'S.No', field: 'sNo', width: 10 },
+        { header: 'Rank / Assigned To', field: 'rank', width: 40 },
+        { header: 'Assigned Jobs', field: 'assignedJobs', width: 22 },
+        { header: 'Completed', field: 'completedJobs', width: 22 },
+        { header: 'Overdue', field: 'overdueJobs', width: 18 },
+        { header: 'Completion Rate', field: 'completionRate', width: 24 },
+        { header: 'Total Manhours', field: 'totalManhours', width: 24 },
+        { header: 'Workload %', field: 'workloadPct', width: 20 },
+      ];
+
+      const data = Object.entries(rankStats)
+        .sort((a, b) => b[1].assignedJobs - a[1].assignedJobs)
+        .map(([rank, stats], idx) => ({
+          sNo: idx + 1,
+          rank,
+          assignedJobs: stats.assignedJobs,
+          completedJobs: stats.completedJobs,
+          overdueJobs: stats.overdueJobs,
+          completionRate: stats.assignedJobs > 0 ? `${Math.round((stats.completedJobs / stats.assignedJobs) * 100)}%` : '0%',
+          totalManhours: stats.totalManhours.toFixed(1),
+          workloadPct: totalJobs > 0 ? `${Math.round((stats.assignedJobs / totalJobs) * 100)}%` : '0%',
+        }));
+
+      const totalCompleted = Object.values(rankStats).reduce((sum, s) => sum + s.completedJobs, 0);
+      const totalOverdue = Object.values(rankStats).reduce((sum, s) => sum + s.overdueJobs, 0);
+      const totalManhours = Object.values(rankStats).reduce((sum, s) => sum + s.totalManhours, 0);
+
+      const summary = [
+        { label: 'Total Jobs', value: totalJobs },
+        { label: 'Total Ranks', value: Object.keys(rankStats).length },
+        { label: 'Completed', value: totalCompleted },
+        { label: 'Overdue', value: totalOverdue },
+        { label: 'Total Manhours', value: totalManhours.toFixed(1) },
+      ];
+
+      pdfReportGenerator.generateReport(
+        { title: 'Crew Workload Distribution', subtitle: 'Job distribution across crew ranks', vessel: vesselName, orientation: 'landscape' },
+        columns,
+        data,
+        summary
+      );
+
+      toast({ title: "Export Complete", description: `Exported ${data.length} rank distributions to PDF` });
+    } catch (err) {
+      toast({ title: "Export Failed", description: "Failed to export distributed jobs to PDF" });
+    }
+    setExportingType(null);
   };
 
   return (
@@ -489,7 +710,17 @@ const WorkOrders: React.FC = () => {
           })}
         </div>
         
-        <div className="flex gap-2">
+        <div className="flex gap-2 items-center">
+          <Button 
+            variant="outline" 
+            size="sm"
+            className="text-xs text-[#8798ad] border-[#e1e8ed]"
+            onClick={() => setExportDialogOpen(true)}
+            data-testid="button-export-wo"
+          >
+            <Download className="h-3.5 w-3.5 mr-1" />
+            Export
+          </Button>
           {isSailAdmin && (
           <Button 
             size="sm" 
@@ -987,6 +1218,75 @@ const WorkOrders: React.FC = () => {
           }
         }}
       />
+
+      <Dialog open={exportDialogOpen} onOpenChange={setExportDialogOpen}>
+        <DialogContent className="sm:max-w-md" data-testid="dialog-export-wo">
+          <DialogHeader>
+            <DialogTitle className="text-lg font-semibold">Export Work Orders</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 pt-2">
+            <div className="border rounded-lg p-4 space-y-3" data-testid="export-section-distributed-jobs">
+              <div className="flex items-center gap-2">
+                <FileText className="h-4 w-4 text-[#1E5A8E]" />
+                <span className="font-medium text-gray-900">Export All Distributed Jobs</span>
+              </div>
+              <p className="text-sm text-gray-500">Crew workload distribution across ranks with completion rates and manhours</p>
+              <div className="flex gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={exportDistributedJobsExcel}
+                  disabled={!!exportingType}
+                  data-testid="button-export-dj-excel"
+                >
+                  {exportingType === 'dj-excel' ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <Download className="h-4 w-4 mr-1" />}
+                  Excel
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={exportDistributedJobsPdf}
+                  disabled={!!exportingType}
+                  data-testid="button-export-dj-pdf"
+                >
+                  {exportingType === 'dj-pdf' ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <FileText className="h-4 w-4 mr-1" />}
+                  PDF
+                </Button>
+              </div>
+            </div>
+
+            <div className="border rounded-lg p-4 space-y-3" data-testid="export-section-all-wo">
+              <div className="flex items-center gap-2">
+                <FileText className="h-4 w-4 text-[#1E5A8E]" />
+                <span className="font-medium text-gray-900">Export All Work Orders</span>
+              </div>
+              <p className="text-sm text-gray-500">Complete listing of all work orders with status, due dates, and assignments</p>
+              <div className="flex gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={exportWorkOrdersExcel}
+                  disabled={!!exportingType}
+                  data-testid="button-export-wo-excel"
+                >
+                  {exportingType === 'wo-excel' ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <Download className="h-4 w-4 mr-1" />}
+                  Excel
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={exportWorkOrdersPdf}
+                  disabled={!!exportingType}
+                  data-testid="button-export-wo-pdf"
+                >
+                  {exportingType === 'wo-pdf' ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <FileText className="h-4 w-4 mr-1" />}
+                  PDF
+                </Button>
+              </div>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       {/* Modify Mode Sticky Footer */}
       {isModifyMode && (

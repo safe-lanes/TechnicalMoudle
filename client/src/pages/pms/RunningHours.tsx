@@ -980,14 +980,26 @@ const RunningHours = () => {
             </button>
           </div>
           {activeTab === 'main' && (
-            <Button 
-              className="bg-[#5dc86f] hover:bg-[#4db85f] text-white"
-              onClick={openBulkUpdate}
-              data-testid="D5"
-            >
-              <Marker id="D5" /><span className="mr-2">+</span>
-              Bulk Update RH
-            </Button>
+            <div className="flex gap-2 items-center">
+              <Button 
+                variant="outline" 
+                size="sm"
+                className="text-xs text-[#8798ad] border-[#e1e8ed]"
+                onClick={exportToCSV}
+                data-testid="D3"
+              >
+                <Marker id="D3" /><Download className="h-3.5 w-3.5 mr-1" />
+                Export
+              </Button>
+              <Button 
+                className="bg-[#5dc86f] hover:bg-[#4db85f] text-white"
+                onClick={openBulkUpdate}
+                data-testid="D5"
+              >
+                <Marker id="D5" /><span className="mr-2">+</span>
+                Bulk Update RH
+              </Button>
+            </div>
           )}
         </div>
 
@@ -1038,11 +1050,6 @@ const RunningHours = () => {
                 </SelectContent>
               </Select>
             </div>
-
-            <Button variant="outline" size="sm" className="text-xs text-[#8798ad] border-[#e1e8ed]" onClick={exportToCSV} data-testid="D3">
-              <Marker id="D3" /><Download className="h-3.5 w-3.5 mr-1" />
-              Export
-            </Button>
 
             <Button variant="outline" onClick={clearFilters} className="text-gray-600" data-testid="D4">
               <Marker id="D4" />Clear
