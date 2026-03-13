@@ -4,7 +4,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Button } from "@/components/ui/button";
-import { FileSpreadsheet, Ship, History } from "lucide-react";
+import { FileSpreadsheet, Ship, History, X } from "lucide-react";
 import MachineryComponentUpload from "./MachineryComponentUpload";
 import JobUpload from "./JobUpload";
 import SparesUpload from "./bulk/SparesUpload";
@@ -259,7 +259,43 @@ export default function BulkDataImport() {
   const currentMarkers = PAGE_MARKERS_BY_TEMPLATE[selectedVesselTemplate];
 
   return (
-    <div className="flex gap-6 h-[calc(100vh-140px)]">
+    <div>
+      {/* Filter Bar - Vessel Selector above content */}
+      {!isFleetMode && (
+        <div className="flex items-center gap-3 flex-wrap mb-4">
+          <div className="flex items-center gap-2">
+            <span className="text-sm font-medium text-gray-600">Vessel:</span>
+            <Select value={selectedVessel} onValueChange={(value) => setSelectedVessel(value)}>
+              <SelectTrigger className="w-[200px]" data-testid={currentMarkers.vesselDropdown}>
+                <SelectValue placeholder="Choose vessel..." />
+              </SelectTrigger>
+              <SelectContent>
+                {vesselMasterEntries
+                  .filter((entry: any) => getVesselEntryId(entry))
+                  .map((entry: any) => {
+                    const entryId = getVesselEntryId(entry);
+                    const vesselName = getVesselName(entry);
+                    return (
+                      <SelectItem key={entryId} value={entryId} data-testid={`vessel-${entryId}`}>
+                        {vesselName}
+                      </SelectItem>
+                    );
+                  })}
+              </SelectContent>
+            </Select>
+          </div>
+          <Button
+            variant="outline"
+            onClick={() => setSelectedVessel('')}
+            data-testid="button-clear-filters-admin"
+          >
+            <X className="h-4 w-4 mr-1" />
+            Clear
+          </Button>
+        </div>
+      )}
+
+      <div className={`flex gap-6 ${isFleetMode ? 'h-[calc(100vh-140px)]' : 'h-[calc(100vh-188px)]'}`}>
       {/* Left Sidebar - Templates */}
       <div className="w-[200px] flex-shrink-0">
         <div className="bg-white rounded-lg shadow-sm h-full flex flex-col">
@@ -307,36 +343,6 @@ export default function BulkDataImport() {
         {/* Vessel Selector Header */}
         <div className="bg-white border-b px-6 py-4">
           <div className="flex items-center gap-4">
-            {/* Vessel Selector - Hidden when Fleet Data Import is ON */}
-            {!isFleetMode && (
-              <>
-                <Ship className="h-5 w-5 text-sky-600" />
-                <div className="flex items-center gap-3">
-                  <Label htmlFor="vessel-select" className="text-sm font-medium text-gray-700" data-testid={currentMarkers.vesselLabel}>
-                    Select Vessel:
-                  </Label>
-                  <Select value={selectedVessel} onValueChange={(value) => setSelectedVessel(value)}>
-                    <SelectTrigger id="vessel-select" className="w-64" data-testid={currentMarkers.vesselDropdown}>
-                      <SelectValue placeholder="Choose vessel..." />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {vesselMasterEntries
-                        .filter((entry: any) => getVesselEntryId(entry))
-                        .map((entry: any) => {
-                          const entryId = getVesselEntryId(entry);
-                          const vesselName = getVesselName(entry);
-                          return (
-                            <SelectItem key={entryId} value={entryId} data-testid={`vessel-${entryId}`}>
-                              {vesselName}
-                            </SelectItem>
-                          );
-                        })}
-                    </SelectContent>
-                  </Select>
-                </div>
-              </>
-            )}
-            
             {/* Fleet Data Import Toggle - Only visible for Sail Admin */}
             {isSailAdmin && (
               <div className="flex items-center gap-2 px-4 py-2 border rounded-full bg-gray-50" data-testid={currentMarkers.fleetToggle}>
@@ -420,6 +426,7 @@ export default function BulkDataImport() {
             )
           )}
         </div>
+      </div>
       </div>
     </div>
   );

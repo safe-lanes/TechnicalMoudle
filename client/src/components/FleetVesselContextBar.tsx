@@ -76,6 +76,32 @@ export function FleetVesselContextBar({
           <h1 style={{ fontSize: '20px', fontWeight: 600, color: '#1a2b4a', margin: 0 }} data-testid="text-dashboard-title">
             Dashboard
           </h1>
+
+          {!isAllVessels && (
+            <select
+              value={vesselId}
+              onChange={(e) => onVesselChange(e.target.value)}
+              style={{
+                padding: '5px 10px',
+                fontSize: '12px',
+                border: '1px solid #e2e8f0',
+                borderRadius: '6px',
+                background: '#FFFFFF',
+                color: '#374151',
+                cursor: 'pointer',
+                outline: 'none',
+                height: '32px',
+              }}
+              data-testid="select-context-vessel"
+            >
+              {vessels.map(v => (
+                <option key={v.id} value={v.id} data-testid={`option-vessel-${v.id}`}>
+                  {v.name}
+                </option>
+              ))}
+            </select>
+          )}
+
           <div style={{ display: 'flex', gap: '4px' }}>
             <button
               style={activeTab === 'overview' ? tabPillActive : tabPillInactive}
@@ -108,31 +134,6 @@ export function FleetVesselContextBar({
               My Vessel
             </button>
           </div>
-
-          {!isAllVessels && (
-            <select
-              value={vesselId}
-              onChange={(e) => onVesselChange(e.target.value)}
-              style={{
-                padding: '5px 10px',
-                fontSize: '12px',
-                border: '1px solid #e2e8f0',
-                borderRadius: '6px',
-                background: '#FFFFFF',
-                color: '#374151',
-                cursor: 'pointer',
-                outline: 'none',
-                height: '32px',
-              }}
-              data-testid="select-context-vessel"
-            >
-              {vessels.map(v => (
-                <option key={v.id} value={v.id} data-testid={`option-vessel-${v.id}`}>
-                  {v.name}
-                </option>
-              ))}
-            </select>
-          )}
         </div>
 
         <div className="flex items-center gap-3">

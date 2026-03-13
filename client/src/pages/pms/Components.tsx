@@ -3404,6 +3404,17 @@ const Components: React.FC = () => {
               </SelectContent>
             </Select>
           </div>
+          <Button
+            variant="outline"
+            onClick={() => {
+              setSearchTerm("");
+              setCriticalFilter("all");
+            }}
+            data-testid="button-clear-filters-components"
+          >
+            <X className="h-4 w-4 mr-1" />
+            Clear
+          </Button>
         </div>
       </div>
 

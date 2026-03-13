@@ -274,6 +274,17 @@ export function ModifyPMS() {
             </Button>
           ))}
         </div>
+        <Button
+          variant="outline"
+          onClick={() => {
+            setSearchQuery("");
+            setStatusFilter("all");
+          }}
+          data-testid="button-clear-filters-modify"
+        >
+          <X className="h-4 w-4 mr-1" />
+          Clear
+        </Button>
       </div>
 
       {/* Main Content - Two Column Layout */}
