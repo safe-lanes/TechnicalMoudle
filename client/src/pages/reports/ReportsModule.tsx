@@ -331,7 +331,7 @@ const ReportsModule = () => {
             dateOnly
           />
           <Button
-            variant="ghost"
+            variant="outline"
             size="sm"
             onClick={handleClearAll}
             className="text-gray-600"
