@@ -1,0 +1,217 @@
+Standardize Filter Bar Layout Across All PMS Modules
+
+text
+OBJECTIVE: UI Consistency and Professional Look
+This is a PURE UI/UX REPOSITIONING task. NO backend logic changes. NO functionality changes. ONLY move existing UI elements to maintain consistent layout across all modules.
+
+PROBLEM:
+The filter bars (Vessel dropdown + Search bar + other filters) are positioned differently across PMS modules, making the software look unprofessional and inconsistent.
+
+STANDARD LAYOUT (Reference: Components Module):
+Row 1: [Vessel Dropdown] [Additional Filter (if any)] [Search Bar - takes remaining width]
+Row 2 (if needed): [Other filters and action buttons]
+
+Current inconsistencies:
+- Work Orders: Has Vessel + Search correctly, but too many filters cramped in one row
+- Running Hours: MISSING Vessel dropdown entirely, Search on left
+- Spares: Good layout (Vessel + Search)
+- Stores: Good layout (Vessel + Search)
+- Reports: Search on left, Vessel in middle (REVERSED)
+- Modify PMS: MISSING Vessel dropdown entirely, only has Search Status
+
+DETAILED IMPLEMENTATION REQUIREMENTS:
+
+═══════════════════════════════════════════════════════════
+MODULE 1: COMPONENTS (✓ ALREADY CORRECT - USE AS REFERENCE)
+═══════════════════════════════════════════════════════════
+Current Layout (KEEP AS IS):
+Row 1: [Vessel: Vessel 11 ▼] [Critical Item: All Items ▼] [Search by Name, SFI Code, Fleet Equipment Code, Maker, or... 🔍]
+
+REFERENCE THIS STRUCTURE FOR ALL OTHER MODULES
+
+═══════════════════════════════════════════════════════════
+MODULE 2: WORK ORDERS
+═══════════════════════════════════════════════════════════
+Current Layout (INCORRECT):
+Row 1: [Vessel: Vessel 11 ▼] [🔍 Search] [Period ▼] [All Ranks ▼] [Criticality ▼] [✕ Clear]
+
+Target Layout (CORRECT):
+Row 1: [Vessel: Vessel 11 ▼] [🔍 Search work orders...]
+Row 2: [Period ▼] [All Ranks ▼] [Criticality ▼] [✕ Clear]
+
+Changes Required:
+1. Move Search bar to be IMMEDIATELY after Vessel dropdown
+2. Expand Search bar width to take available space
+3. Move Period, All Ranks, Criticality, Clear to a second row
+4. Maintain all existing functionality - only reposition elements
+5. Keep all dropdown options and Clear button logic unchanged
+
+Files to modify:
+- client/src/pages/pms/WorkOrders.tsx (or similar component)
+- Update CSS/Tailwind classes for layout only
+
+═══════════════════════════════════════════════════════════
+MODULE 3: RUNNING HOURS
+═══════════════════════════════════════════════════════════
+Current Layout (INCORRECT):
+Row 1: [🔍 Search Component] [Utilization Period: Monthly (Last 30 days) ▼] [Export] [Clear]
+❌ MISSING: Vessel dropdown
+
+Target Layout (CORRECT):
+Row 1: [Vessel: Vessel 11 ▼] [🔍 Search Component...]
+Row 2: [Utilization Period: Monthly (Last 30 days) ▼] [Export] [Clear]
+
+Changes Required:
+1. ADD Vessel dropdown as first element (copy from Components module)
+2. Move Search bar to be immediately after Vessel dropdown
+3. Move Utilization Period, Export, Clear to second row
+4. Vessel dropdown should filter Running Hours by selected vessel
+5. Maintain all existing search and filter functionality
+
+Files to modify:
+- client/src/pages/pms/RunningHours.tsx
+- Add vessel state management
+- Connect vessel filter to data fetching logic
+
+═══════════════════════════════════════════════════════════
+MODULE 4: SPARES INVENTORY (✓ ALREADY CORRECT)
+═══════════════════════════════════════════════════════════
+Current Layout (CORRECT):
+Row 1: [Vessel: Vessel 11 ▼] [🔍 Search parts or components...] [Criticality ▼] [Stock ▼] [Clear]
+
+NO CHANGES NEEDED - This is already following the standard
+
+═══════════════════════════════════════════════════════════
+MODULE 5: STORES INVENTORY (✓ ALREADY CORRECT)
+═══════════════════════════════════════════════════════════
+Current Layout (CORRECT):
+Row 1: [Vessel: Vessel 11 ▼] [🔍 Search] [All Categories ▼] [Stock ▼] [Clear]
+
+NO CHANGES NEEDED - This is already following the standard
+
+═══════════════════════════════════════════════════════════
+MODULE 6: REPORTS
+═══════════════════════════════════════════════════════════
+Current Layout (INCORRECT):
+Row 1: [🔍 Search reports...] [Vessel: All Vessels ▼] [Date Range selector] [Clear]
+
+Target Layout (CORRECT):
+Row 1: [Vessel: All Vessels ▼] [🔍 Search reports...]
+Row 2: [Date Range selector] [Clear]
+
+Changes Required:
+1. SWAP positions: Move Vessel dropdown to FIRST position
+2. Move Search bar to be immediately after Vessel dropdown
+3. Move Date Range selector and Clear to second row
+4. Expand Search bar width
+5. Keep all existing functionality unchanged
+
+Files to modify:
+- client/src/pages/pms/Reports.tsx
+
+═══════════════════════════════════════════════════════════
+MODULE 7: MODIFY PMS (Change Requests)
+═══════════════════════════════════════════════════════════
+Current Layout (INCORRECT):
+Row 1: [🔍 Search Status] [All] [Pending Approval] [Approved] [Rejected]
+❌ MISSING: Vessel dropdown
+
+Target Layout (CORRECT):
+Row 1: [Vessel: Vessel 11 ▼] [🔍 Search change requests...]
+Row 2: [All] [Pending Approval] [Approved] [Rejected]
+
+Changes Required:
+1. ADD Vessel dropdown as first element
+2. Rename search placeholder from "Search Status" to "Search change requests..."
+3. Move search bar to be immediately after Vessel dropdown
+4. Move status filter tabs (All, Pending Approval, etc.) to second row
+5. Vessel dropdown should filter change requests by vessel
+
+Files to modify:
+- client/src/pages/pms/ModifyPMS.tsx
+- Add vessel filtering logic
+
+═══════════════════════════════════════════════════════════
+DESIGN SPECIFICATIONS
+═══════════════════════════════════════════════════════════
+
+VESSEL DROPDOWN:
+- Width: Fixed ~200px
+- Label: "Vessel:"
+- Default: "Vessel 11" (or "All Vessels" for Reports)
+- Dropdown options: List of available vessels
+- Styling: Match existing Components module dropdown
+
+SEARCH BAR:
+- Width: Flex-grow to fill remaining space
+- Icon: Magnifying glass (🔍) on the left
+- Placeholder text (module-specific):
+  * Components: "Search by Name, SFI Code, Fleet Equipment Code, Maker, or..."
+  * Work Orders: "Search work orders..."
+  * Running Hours: "Search Component"
+  * Spares: "Search parts or components..."
+  * Stores: "Search"
+  * Reports: "Search reports..."
+  * Modify PMS: "Search change requests..."
+- Styling: Match existing Components module search bar
+
+SPACING & ALIGNMENT:
+- Gap between elements: 12px (gap-3 in Tailwind)
+- All elements vertically centered (items-center)
+- Row 1 and Row 2 should have 8px vertical gap
+- Maintain existing padding around filter bar container
+
+═══════════════════════════════════════════════════════════
+CRITICAL REQUIREMENTS
+═══════════════════════════════════════════════════════════
+
+✓ DO:
+- Only reposition existing UI elements
+- Maintain all existing functionality and logic
+- Keep all filter options and their behaviors unchanged
+- Use existing component styles and classes
+- Test each module after changes to ensure filters work
+- Ensure responsive design on smaller screens
+
+✗ DO NOT:
+- Change any backend API calls or data fetching logic
+- Modify filter functionality or dropdown options
+- Change button behaviors or click handlers
+- Alter state management (unless adding vessel filter where missing)
+- Break existing features or create bugs
+- Change color schemes, fonts, or visual styling
+
+═══════════════════════════════════════════════════════════
+TESTING CHECKLIST (For Each Module)
+═══════════════════════════════════════════════════════════
+
+After implementation, verify:
+□ Vessel dropdown is first element (leftmost)
+□ Search bar is second element (immediately after vessel)
+□ Search bar expands to fill available width
+□ Additional filters are properly positioned (row 2 if needed)
+□ Vessel filter actually filters data correctly
+□ Search functionality works as before
+□ All other filters work as before
+□ Layout is responsive on mobile/tablet
+□ No visual glitches or overlapping elements
+□ Consistent appearance across all 7 modules
+
+═══════════════════════════════════════════════════════════
+IMPLEMENTATION ORDER
+═══════════════════════════════════════════════════════════
+
+Priority 1 (Critical - Missing Vessel):
+1. Running Hours - Add vessel dropdown + reposition
+2. Modify PMS - Add vessel dropdown + reposition
+
+Priority 2 (Incorrect positioning):
+3. Reports - Swap vessel and search positions
+4. Work Orders - Move filters to second row
+
+Priority 3 (Already correct):
+5. Components - No changes (reference)
+6. Spares - No changes
+7. Stores - No changes
+
+Start with Priority 1 modules first, then move to Priority 2.
