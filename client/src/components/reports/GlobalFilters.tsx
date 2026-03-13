@@ -131,6 +131,7 @@ const GlobalFilters: React.FC<GlobalFiltersProps> = ({
   }
 
   if (dateOnly) {
+    const hasDateFilter = !!(filters.dateRange.from || filters.dateRange.to);
     return (
       <div className={cn("", className)} data-testid="G7-date">
         <div className="flex items-center gap-3">
@@ -234,18 +235,6 @@ const GlobalFilters: React.FC<GlobalFiltersProps> = ({
               </PopoverContent>
             </Popover>
           </div>
-          {getActiveFiltersCount() > 0 && (
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={onReset}
-              className="flex items-center gap-1"
-              data-testid="button-reset-filters"
-            >
-              <RotateCcw className="h-3 w-3" />
-              Reset
-            </Button>
-          )}
         </div>
       </div>
     );
