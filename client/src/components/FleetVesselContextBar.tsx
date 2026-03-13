@@ -1,4 +1,3 @@
-import { SlidersHorizontal } from "lucide-react";
 
 interface Vessel {
   id: string;
@@ -141,25 +140,6 @@ export function FleetVesselContextBar({
             {currentYear}
           </div>
 
-          <button
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '4px',
-              padding: '6px 12px',
-              fontSize: '12px',
-              fontWeight: 600,
-              border: '1px solid #e2e8f0',
-              borderRadius: '8px',
-              background: '#FFFFFF',
-              color: '#374151',
-              cursor: 'pointer',
-            }}
-            data-testid="button-filters"
-          >
-            <SlidersHorizontal style={{ width: '14px', height: '14px' }} />
-            Filters
-          </button>
         </div>
       </div>
     </div>
