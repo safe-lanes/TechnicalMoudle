@@ -915,8 +915,12 @@ const Dashboard = () => {
 
   const dotMatrixVesselData = useMemo(() => {
     if (vessels.length === 0) return [];
+    if (!isAllVessels) {
+      const selected = vessels.find(v => v.id === vesselId);
+      return selected ? [selected] : [];
+    }
     return vessels.slice(0, 8);
-  }, [vessels]);
+  }, [vessels, isAllVessels, vesselId]);
 
   const dotMatrixWoQueries = useQueries({
     queries: dotMatrixVesselData.map(vessel => ({
