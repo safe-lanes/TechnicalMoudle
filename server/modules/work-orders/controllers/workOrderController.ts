@@ -321,8 +321,11 @@ export async function getSuperintendentNotificationsSummary(req: Request, res: R
   let vesselName: string | undefined;
   if (vesselId && vesselId !== 'all') {
     const vessels = await storage.getVessels();
-    const vessel = vessels.find(v => v.id === vesselId);
-    vesselName = vessel?.name;
+    const vessel = vessels.find(v => v.id === vesselId || v.vuuid === vesselId);
+    if (!vessel) {
+      return res.json({ pendingCount: 0, acknowledgedThisMonthCount: 0 });
+    }
+    vesselName = vessel.name;
   }
 
   const [unacknowledged, all] = await Promise.all([
