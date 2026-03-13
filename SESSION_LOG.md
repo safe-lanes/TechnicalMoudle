@@ -447,3 +447,85 @@ Eight validation and integrity rules for the Work Order form Part B, covering fr
 - Task #1 ("Last Updated By" column) is functionally complete. User should verify by performing a new RH update — the column should now show their real name.
 - Consider a one-time data migration script to backfill historical "system" audit entries with actual user names (if that data is recoverable from other sources).
 - Continue with any additional PMS module enhancements or next planned tasks.
+
+---
+
+## 2026-03-12 — Running Hours History Feature (Backend + Frontend)
+
+### What We Built
+- Full "Running Hours History" feature — a two-step UI flow for viewing audit history of component running hours.
+- **Step 1 — Component List**: History tab shows all components in a table (same structure as Overview) with a "View History" button per row.
+- **Step 2 — Individual History**: Clicking "View History" opens that component's audit trail in an 8-column table: Date/Time, Component Code, Component Name, Previous RH, New RH, Change (color-coded ▲/▼), Updated By, Source.
+- Backend API: `/technical/api/running-hours/history` endpoint queries `running_hours_audit` table (22,100 records), maps fields (`cuuid`→`componentId`, `enteredAtUTC`→`updatedAt`, computed `deltaRh`), supports pagination, date range filters, search, and sort.
+- Backend CSV export: `/technical/api/running-hours/history/export` includes Component Name column.
+- Fixed critical bug: `item.id` from parents API is `COMP-XXXXX` format, NOT the `cuuid` needed for audit queries. Resolved by mapping `parent.cuuid` separately and using it as `componentId`.
+
+### What's Working
+- **Two-step navigation**: Component list → individual history → Back button → component list. Fully functional.
+- **Pagination**: 10/25/50/100 per page, page navigation controls.
+- **Date range filtering**: Start date and end date filters on history records.
+- **Search**: Filters by component code, component name, or user name on individual history view.
+- **Sort**: Ascending/descending sort by date.
+- **CSV export**: Downloads all filtered history records including Component Name.
+- **Color-coded changes**: Positive changes shown in green with ▲, negative in red with ▼, zero changes in gray.
+- **Component Name column**: Visible in both the history table and CSV export.
+- **Last Updated By column**: Shows real user names (e.g., "Munawer A. Modak") in Overview table.
+- **All e2e tests pass**: Two-step navigation, filters, pagination, search, sort, and Overview tab all verified.
+
+### What's Broken
+- Nothing broken from this session's changes.
+
+### What's Pending
+- Task queue shows 3 tasks (Task #1, #5, #6) stuck in Active/Draft states. The work is fully implemented in the codebase, but the task tracking system doesn't have a programmatic "complete" or "cancel" function. These are cosmetic tracking artifacts — they don't affect the application. Manual cancel from UI also failed ("Failed to cancel task, please try again").
+
+### Key Files Changed
+- `client/src/pages/pms/RunningHours.tsx` — Two-step History UI (component list + individual history), Component Name column, back navigation, search, filters, pagination, CSV export button.
+- `server/modules/running-hours/controllers/runningHoursController.ts` — History API endpoint with pagination/filters/sort; CSV export endpoint with Component Name column.
+- `server/modules/running-hours/services/runningHoursService.ts` — Service layer for history queries with field mapping (`cuuid`→`componentId`, `enteredAtUTC`→`updatedAt`, computed `deltaRh`).
+- `server/modules/running-hours/repositories/runningHoursRepository.ts` — Repository queries against `running_hours_audit` table.
+- `server/modules/running-hours/routes.ts` — Route registration for `/history` and `/history/export`.
+- `shared/schema.ts` — Types for `RunningHoursAudit` and history API response.
+
+### Environment Issues
+- None. Application compiles and runs normally. HMR picks up changes without issues.
+
+### Where to Resume
+- Consider clearing stuck task queue items (Task #1, #5, #6) if Replit support resolves the cancellation issue.
+- Default vessel on load is "Alejandro" which has no history data. Test with Vessel 4 (744535d0-..., 202 records) or Vessel 3 (7440571a-..., 20,928 records).
+- Potential enhancements: add chart/graph visualization of running hours trends, export history for all components at once, or add inline editing of running hours from the history view.
+
+---
+
+## 2026-03-13 — Session Wrap-up & Task Queue Cleanup
+
+### What We Built
+- No new features — this session focused on verifying all previous work is complete and attempting to clear stuck task queue items.
+
+### What's Working
+- All features from previous sessions remain fully functional:
+  - Running Hours History (two-step flow, pagination, search, filters, sort, CSV export)
+  - Component Name column in history table and CSV
+  - Last Updated By column in Overview table
+  - Utilization rate calculations with color coding
+  - Work Order form validations (Part B, B1 sections)
+- API verified: `lastUpdatedBy` returns real names, history API returns correct data with `componentName`.
+- E2e test passed: full History flow (component list → history → back), Last Updated By column visible and populated.
+
+### What's Broken
+- **Task queue stuck**: Tasks #1, #5, #6 remain in Active/Draft states in the task panel. Cannot be cancelled manually (UI shows "Failed to cancel task, please try again") or programmatically (no cancel/complete API available). This is a platform-level issue, not a code issue. All underlying work is done.
+
+### What's Pending
+- Clearing stuck task queue items — waiting on platform fix or support intervention.
+- No code-level work pending for the Running Hours module.
+
+### Key Files Changed
+- No code files changed this session. Only task metadata was updated (titles prefixed with "COMPLETED").
+
+### Environment Issues
+- Task tracking system limitation: tasks assigned to main agent and built directly on main branch have no completion pathway in the task system (designed for task-agent merge flow). This causes tasks to appear stuck.
+
+### Where to Resume
+- All Running Hours features are complete. Ready for next feature request.
+- If task queue items need clearing, contact Replit support.
+- Key test vessels: Vessel 4 (744535d0-841a-11ed-aa7c-7003bca91a86) for history data, Vessel 3 (7440571a-841a-11ed-aa7c-7003bca91a86) for large dataset testing.
+- `localStorage.setItem('selectedVesselId', 'UUID')` to switch vessels programmatically in browser console.
