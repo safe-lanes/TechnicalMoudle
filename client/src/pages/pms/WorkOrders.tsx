@@ -1221,6 +1221,7 @@ const WorkOrders: React.FC = () => {
         }}
       />
 
+      {isSailAdmin && (
       <Dialog open={exportDialogOpen} onOpenChange={setExportDialogOpen}>
         <DialogContent className="sm:max-w-md" data-testid="dialog-export-wo">
           <DialogHeader>
@@ -1289,6 +1290,7 @@ const WorkOrders: React.FC = () => {
           </div>
         </DialogContent>
       </Dialog>
+      )}
 
       {/* Modify Mode Sticky Footer */}
       {isModifyMode && (
