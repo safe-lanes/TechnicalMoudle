@@ -824,19 +824,22 @@ export async function getLsaFfaMasterList(
     allComponents = await repo.getComponents(vesselId);
   }
 
-  let filteredComponents = allComponents.filter((c: any) =>
-    c.eqptSystemDept === 'LSA' || c.eqptSystemDept === 'FFA'
-  );
+  const getEffectiveDept = (c: any) => c.eqptSystemDept || c.deptCategory || c.department || '';
+
+  let filteredComponents = allComponents.filter((c: any) => {
+    const dept = getEffectiveDept(c);
+    return dept === 'LSA' || dept === 'FFA';
+  });
 
   if (equipmentType && equipmentType !== 'all') {
-    filteredComponents = filteredComponents.filter((c: any) => c.eqptSystemDept === equipmentType);
+    filteredComponents = filteredComponents.filter((c: any) => getEffectiveDept(c) === equipmentType);
   }
 
   const data = filteredComponents.map((c: any, i: number) => ({
     sno: i + 1,
     componentCode: c.componentCode || '-',
     componentName: c.name || '-',
-    equipmentType: c.eqptSystemDept || '-',
+    equipmentType: getEffectiveDept(c) || '-',
     location: c.location || '-',
     maker: c.maker || '-',
     model: c.model || '-',
@@ -848,8 +851,8 @@ export async function getLsaFfaMasterList(
     vesselId: c.vesselId || '-'
   }));
 
-  const lsaCount = filteredComponents.filter(c => c.eqptSystemDept === 'LSA').length;
-  const ffaCount = filteredComponents.filter(c => c.eqptSystemDept === 'FFA').length;
+  const lsaCount = filteredComponents.filter(c => getEffectiveDept(c) === 'LSA').length;
+  const ffaCount = filteredComponents.filter(c => getEffectiveDept(c) === 'FFA').length;
   const activeCount = filteredComponents.filter(c => c.isActive !== false).length;
   const inactiveCount = filteredComponents.filter(c => c.isActive === false).length;
 
@@ -934,12 +937,15 @@ export async function getLsaFfaMaintenanceSchedule(
     allComponents = await repo.getComponents(vesselId);
   }
 
-  let lsaFfaComponents = allComponents.filter((c: any) =>
-    c.eqptSystemDept === 'LSA' || c.eqptSystemDept === 'FFA'
-  );
+  const getEffectiveDept = (c: any) => c.eqptSystemDept || c.deptCategory || c.department || '';
+
+  let lsaFfaComponents = allComponents.filter((c: any) => {
+    const dept = getEffectiveDept(c);
+    return dept === 'LSA' || dept === 'FFA';
+  });
 
   if (equipmentType && equipmentType !== 'all') {
-    lsaFfaComponents = lsaFfaComponents.filter((c: any) => c.eqptSystemDept === equipmentType);
+    lsaFfaComponents = lsaFfaComponents.filter((c: any) => getEffectiveDept(c) === equipmentType);
   }
 
   const lsaFfaComponentIds = new Set(lsaFfaComponents.map((c: any) => c.cuuid));
@@ -1042,7 +1048,7 @@ export async function getLsaFfaMaintenanceSchedule(
       jobId: job.juuid,
       componentCode: comp.componentCode || '-',
       componentName: comp.name || '-',
-      equipmentType: comp.eqptSystemDept || '-',
+      equipmentType: getEffectiveDept(comp) || '-',
       location: comp.location || '-',
       jobCode: job.jobNo || '-',
       jobTitle: job.jobTitle || '-',
