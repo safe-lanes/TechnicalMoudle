@@ -591,6 +591,7 @@ const WorkOrders: React.FC = () => {
 
         <Button
           variant="outline"
+          className="text-gray-600"
           onClick={() => {
             setSearchTerm("");
             setSelectedPeriod("");

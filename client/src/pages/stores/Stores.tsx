@@ -1963,7 +1963,7 @@ const Stores: React.FC = () => {
           </Select>
         </div>
         <Button 
-          variant="ghost" 
+          variant="outline" 
           size="sm" 
           className="text-gray-600"
           onClick={() => {
@@ -2046,7 +2046,7 @@ const Stores: React.FC = () => {
           </Select>
         </div>
         <Button 
-          variant="ghost" 
+          variant="outline" 
           size="sm" 
           className="text-gray-600"
           onClick={() => {

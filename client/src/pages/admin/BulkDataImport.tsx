@@ -4,7 +4,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Button } from "@/components/ui/button";
-import { FileSpreadsheet, Ship, History, X } from "lucide-react";
+import { FileSpreadsheet, Ship, History } from "lucide-react";
 import MachineryComponentUpload from "./MachineryComponentUpload";
 import JobUpload from "./JobUpload";
 import SparesUpload from "./bulk/SparesUpload";
@@ -286,10 +286,10 @@ export default function BulkDataImport() {
           </div>
           <Button
             variant="outline"
+            className="text-gray-600"
             onClick={() => setSelectedVessel('')}
             data-testid="button-clear-filters-admin"
           >
-            <X className="h-4 w-4 mr-1" />
             Clear
           </Button>
         </div>

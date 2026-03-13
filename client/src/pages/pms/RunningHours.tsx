@@ -1044,7 +1044,7 @@ const RunningHours = () => {
               Export
             </Button>
 
-            <Button variant="outline" onClick={clearFilters} className="flex items-center gap-2" data-testid="D4">
+            <Button variant="outline" onClick={clearFilters} className="text-gray-600" data-testid="D4">
               <Marker id="D4" />Clear
             </Button>
           </div>
@@ -1118,7 +1118,7 @@ const RunningHours = () => {
               Export CSV
             </Button>
 
-            <Button variant="outline" size="sm" onClick={clearHistoryFilters} className="h-9" data-testid="button-clear-history-filters">
+            <Button variant="outline" size="sm" onClick={clearHistoryFilters} className="h-9 text-gray-600" data-testid="button-clear-history-filters">
               Clear
             </Button>
           </div>

@@ -3406,6 +3406,7 @@ const Components: React.FC = () => {
           </div>
           <Button
             variant="outline"
+            className="text-gray-600"
             onClick={() => {
               setSearchTerm("");
               setCriticalFilter("all");
