@@ -1,0 +1,220 @@
+CRITICAL ASSESSMENT:
+After reviewing all modules, there are FOUR major issues to fix:
+
+ISSUE 1: COMPONENTS - Search bar is in WRONG POSITION (not next to vessel dropdown)
+ISSUE 2: DASHBOARD - Vessel filter is CENTERED (should be left-aligned)
+ISSUE 3: WORK ORDERS - Filters wrapping to two rows
+ISSUE 4: RUNNING HOURS - Filters wrapping to two rows
+
+═══════════════════════════════════════════════════════════
+ISSUE 1: COMPONENTS - SEARCH BAR POSITION IS COMPLETELY WRONG
+═══════════════════════════════════════════════════════════
+
+CURRENT LAYOUT (COMPLETELY WRONG):
+[Vessel: Vessel 11 ▼] [Critical Item: All Items ▼]        [Search by Name, SFI Code... 🔍]
+                                                            ↑ Search is FAR to the right
+
+The search bar is positioned at the far right of the screen, separated from the filter dropdowns. This is completely inconsistent with every other module.
+
+CORRECT LAYOUT (must match Spares/Stores pattern):
+[Vessel: Vessel 11 ▼] [🔍 Search by Name, SFI Code...] [Critical Item: All Items ▼]
+                      ↑ Search should be IMMEDIATELY after Vessel dropdown
+
+REFERENCE - SPARES MODULE (Perfect):
+[Vessel: Vessel 11 ▼] [🔍 Search parts or components...] [Criticality ▼] [Stock ▼] [Clear]
+
+REFERENCE - STORES MODULE (Perfect):
+[Vessel: Vessel 11 ▼] [🔍 Search] [All Categories ▼] [Stock ▼] [Clear]
+
+REQUIRED FIX FOR COMPONENTS:
+The filter bar layout order must be changed from:
+1. Vessel dropdown
+2. Critical Item dropdown  
+3. Search bar (far right)
+
+TO:
+1. Vessel dropdown (left)
+2. Search bar (immediately after vessel)
+3. Critical Item dropdown (after search)
+
+This creates a consistent left-to-right flow: Vessel → Search → Other Filters
+
+All elements should be in ONE SINGLE ROW with proper spacing between them.
+
+═══════════════════════════════════════════════════════════
+ISSUE 2: DASHBOARD - VESSEL FILTER CENTERED (should be left)
+═══════════════════════════════════════════════════════════
+
+CURRENT LAYOUT (WRONG - Centered):
+The vessel filter controls are positioned in the CENTER of the dashboard header.
+
+Header layout:
+[Overview] [Management]    [All Vessel] [My Vessel] [Vessel 11 ▼]    [2026] [Filters]
+                           ↑ These vessel controls are centered ↑
+
+This is inconsistent with ALL other modules where vessel filters are LEFT-ALIGNED.
+
+REQUIRED LAYOUT (CORRECT - Left-aligned):
+LEFT SIDE: [Overview] [Management] [All Vessel] [My Vessel] [Vessel 11 ▼]
+RIGHT SIDE: [2026] [Filters]
+
+The vessel controls should be grouped on the LEFT side of the header, using a flex layout with justify-between to push the year selector and Filters button to the RIGHT side.
+
+═══════════════════════════════════════════════════════════
+ISSUE 3: WORK ORDERS - FILTERS WRAPPING TO TWO ROWS
+═══════════════════════════════════════════════════════════
+
+CURRENT LAYOUT (Wrong - 2 rows):
+Row 1: [Vessel: Vessel 11 ▼] [🔍 Search work orders...] [Period ▼] [All Ranks ▼]
+Row 2: [Criticality ▼] [✕ Clear]
+
+TARGET LAYOUT (Correct - 1 row):
+[Vessel: Vessel 11 ▼] [🔍 Search] [Period ▼] [All Ranks ▼] [Criticality ▼] [Clear]
+
+SOLUTION:
+Reduce search bar width to allow all filters to fit in single row. Search bar should be approximately 280-320px wide (same as Spares/Stores), not wider.
+
+═══════════════════════════════════════════════════════════
+ISSUE 4: RUNNING HOURS - FILTERS WRAPPING TO TWO ROWS
+═══════════════════════════════════════════════════════════
+
+CURRENT LAYOUT (Wrong - 2 rows):
+Row 1: [Vessel: Vessel 11 ▼] [🔍 Search Component]
+Row 2: [🕐 Utilization Period: Monthly (Last 30 days) ▼] [Export] [Clear]
+
+TARGET LAYOUT (Correct - 1 row):
+[Vessel: Vessel 11 ▼] [🔍 Search] [Utilization Period ▼] [Export] [Clear]
+
+SOLUTION:
+Reduce search bar width and/or utilization period dropdown width to fit all elements in single row.
+
+═══════════════════════════════════════════════════════════
+STANDARDIZED FILTER BAR PATTERN (Apply to ALL modules):
+═══════════════════════════════════════════════════════════
+
+LAYOUT ORDER (Left to Right):
+1. Vessel dropdown (FIRST - always on the left)
+2. Search bar (SECOND - immediately after vessel)
+3. Other filters (THIRD - after search)
+4. Action buttons like Clear (LAST - on the right)
+
+SINGLE ROW REQUIREMENT:
+All filter elements must fit in ONE SINGLE ROW on desktop screens (1920x1080 and 1366x768).
+
+ELEMENT SIZING:
+- Vessel dropdown: Fixed width ~192px (w-48)
+- Search bar: Fixed width ~280-320px (w-72 to w-80)
+- Other dropdowns: Auto width or fixed (w-32 to w-48)
+- Spacing: 12px gap between elements (gap-3)
+
+═══════════════════════════════════════════════════════════
+DETAILED FIXES REQUIRED:
+═══════════════════════════════════════════════════════════
+
+FILE 1: client/src/pages/pms/Components.tsx
+
+CRITICAL CHANGE: Reorder filter elements
+
+Current filter order:
+<div className="flex gap-3">
+  <VesselDropdown />
+  <CriticalItemDropdown />
+  <SearchBar />  {/* ← This is positioned far right */}
+</div>
+
+Required filter order:
+<div className="flex gap-3 items-center">
+  <VesselDropdown className="w-48" />
+  <SearchBar className="w-80" placeholder="Search by Name, SFI Code, Fleet Equipment Code, Maker, or..." />
+  <CriticalItemDropdown className="w-40" />
+</div>
+
+The search bar MUST be positioned as the SECOND element, immediately after the Vessel dropdown, NOT after the Critical Item dropdown.
+
+───────────────────────────────────────────────────────────
+
+FILE 2: client/src/pages/pms/Dashboard.tsx
+
+Change header layout from centered to left-aligned:
+
+Current (centered):
+<div className="flex justify-center items-center gap-4">
+  <Overview />
+  <Management />
+  <AllVessel />
+  <MyVessel />
+  <VesselDropdown />
+  <Year />
+  <Filters />
+</div>
+
+Required (left-aligned with right section):
+<div className="flex justify-between items-center">
+  <div className="flex gap-4 items-center">
+    <Overview />
+    <Management />
+    <AllVessel />
+    <MyVessel />
+    <VesselDropdown />
+  </div>
+  <div className="flex gap-4 items-center">
+    <Year />
+    <Filters />
+  </div>
+</div>
+
+───────────────────────────────────────────────────────────
+
+FILE 3: client/src/pages/pms/WorkOrders.tsx
+
+Reduce search bar width to prevent wrapping:
+
+Current:
+<SearchBar className="w-96" />  {/* Too wide - causes wrapping */}
+
+Required:
+<SearchBar className="w-72" />  {/* Narrower - fits in single row */}
+
+───────────────────────────────────────────────────────────
+
+FILE 4: client/src/pages/pms/RunningHours.tsx
+
+Reduce search bar width:
+
+Current:
+<SearchBar className="flex-1" />  {/* Takes too much space */}
+
+Required:
+<SearchBar className="w-72" />  {/* Fixed width - allows other filters to fit */}
+
+═══════════════════════════════════════════════════════════
+VERIFICATION CHECKLIST:
+═══════════════════════════════════════════════════════════
+
+After making changes, verify:
+
+COMPONENTS MODULE:
+□ Search bar is positioned IMMEDIATELY AFTER vessel dropdown (2nd position)
+□ Critical Item dropdown comes AFTER search bar (3rd position)
+□ Layout order: [Vessel] [Search] [Critical Item]
+□ All elements in SINGLE ROW
+□ Matches the pattern of Spares/Stores modules
+
+DASHBOARD:
+□ Vessel controls (Overview, Management, All Vessel, My Vessel, dropdown) are LEFT-ALIGNED
+□ Year selector and Filters button are RIGHT-ALIGNED
+□ No centering of vessel controls
+
+WORK ORDERS:
+□ All filters in SINGLE ROW (no wrapping)
+□ Search bar is narrow enough to fit all elements
+
+RUNNING HOURS:
+□ All filters in SINGLE ROW (no wrapping)
+□ Utilization Period, Export, Clear are in same row as Vessel and Search
+
+CROSS-MODULE CONSISTENCY:
+□ ALL modules follow pattern: [Vessel] [Search] [Other Filters]
+□ Search is ALWAYS the 2nd element (after vessel)
+□ All modules use single-row layout
+□ Consistent spacing and sizing across all modules
