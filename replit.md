@@ -37,6 +37,7 @@ Preferred communication style: Simple, everyday language.
 -   **Component Styling**: Standardized styling for various chart types and interactive elements.
 -   **Table Styling**: Specific styling for overdue and dot matrix tables.
 -   **Scrollbars**: Custom WebKit scrollbar styling.
+-   **Standardized Filter Bar Layout**: All PMS modules follow a consistent two-row filter bar pattern. Row 1: Vessel dropdown (role-gated for isSailAdmin/isClientAdmin) + Search bar (flex-grow, full width). Row 2: Module-specific filters (period, status tabs, date range, etc.). Applied to Components, Work Orders, Running Hours, Reports, and Modify PMS modules.
 
 ### Feature Specifications
 -   **Spare-Component Sibling Link Distribution**: Spares linked to a component are automatically linked to all sibling components.

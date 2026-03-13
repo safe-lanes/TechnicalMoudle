@@ -18,6 +18,7 @@ import { useLocation } from "wouter";
 import { formatProfessionalDateTime } from "@/lib/dateUtils";
 import { useVessel } from "@/contexts/VesselContext";
 import { useUIRole } from "@/contexts/UIRoleContext";
+import { useVessels } from "@/hooks/useVessels";
 import { useAuth } from "@/contexts/AuthContext";
 import { Marker } from "@/components/Marker";
 import ZeroRHConfirmationDialog from "@/components/ZeroRHConfirmationDialog";
@@ -164,8 +165,9 @@ const RunningHours = () => {
   } | null>(null);
   
   const { toast } = useToast();
-  const { vesselId } = useVessel(); // Get vessel ID from context
-  const { isSailAdmin } = useUIRole(); // Get role for visibility control
+  const { vesselId, setVesselId } = useVessel();
+  const { isSailAdmin, isClientAdmin } = useUIRole();
+  const { data: vessels = [] } = useVessels();
   
   // Fetch children RH data when popup is open
   const { data: childrenRHData, isLoading: isLoadingChildren } = useQuery<{
@@ -989,10 +991,28 @@ const RunningHours = () => {
           )}
         </div>
 
-        {/* Search and Export Row - Main Tab */}
+        {/* Filters Row 1: Vessel + Search - Main Tab */}
         {activeTab === 'main' && (
-          <div className="flex items-center gap-4">
-            <div className="relative flex-1 max-w-md" data-testid="D2">
+          <div className="flex items-center gap-3">
+            {(isSailAdmin || isClientAdmin) && (
+              <div className="flex items-center gap-2">
+                <span className="text-sm font-medium text-gray-600">Vessel:</span>
+                <Select value={vesselId === 'all' ? '' : vesselId} onValueChange={setVesselId}>
+                  <SelectTrigger className="w-[200px]" data-testid="vessel-selector-rh">
+                    <SelectValue placeholder="Choose vessel" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {vessels.map(vessel => (
+                      <SelectItem key={vessel.id} value={vessel.id}>
+                        {vessel.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+
+            <div className="relative flex-1" data-testid="D2">
               <Marker id="D2" />
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
               <Input
@@ -1002,7 +1022,12 @@ const RunningHours = () => {
                 className="pl-10"
               />
             </div>
+          </div>
+        )}
 
+        {/* Filters Row 2: Utilization Period, Export, Clear - Main Tab */}
+        {activeTab === 'main' && (
+          <div className="flex items-center gap-3 mt-2">
             <div className="flex items-center gap-2" data-testid="utilization-period-selector">
               <Clock className="h-4 w-4 text-gray-500" />
               <span className="text-sm text-gray-600 whitespace-nowrap">Utilization Period:</span>

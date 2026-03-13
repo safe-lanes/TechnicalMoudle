@@ -56,6 +56,7 @@ import { useChangeMode } from "@/contexts/ChangeModeContext";
 import { useToast } from "@/hooks/use-toast";
 import { useVessel } from "@/contexts/VesselContext";
 import { useUIRole } from "@/contexts/UIRoleContext";
+import { useVessels } from "@/hooks/useVessels";
 
 interface RevisionHistoryEntry {
   revisionNumber: number;
@@ -126,8 +127,9 @@ export default function ModifyPMS() {
   const [, setLocation] = useLocation();
   const { enterChangeMode } = useChangeMode();
   const { toast } = useToast();
-  const { vesselId } = useVessel();
-  const { isVessel, isHeadOfDept } = useUIRole();
+  const { vesselId, setVesselId } = useVessel();
+  const { isVessel, isHeadOfDept, isSailAdmin, isClientAdmin } = useUIRole();
+  const { data: vessels = [] } = useVessels();
   const [categoryFilter, setCategoryFilter] = useState<string>('all');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState('');
@@ -414,18 +416,39 @@ export default function ModifyPMS() {
         )}
       </div>
 
-      {/* Search Row */}
+      {/* Filters Row 1: Vessel + Search */}
       <div className="flex items-center gap-3">
-        <div className="relative">
+        {(isSailAdmin || isClientAdmin) && (
+          <div className="flex items-center gap-2">
+            <span className="text-sm font-medium text-gray-600">Vessel:</span>
+            <Select value={vesselId === 'all' ? '' : vesselId} onValueChange={setVesselId}>
+              <SelectTrigger className="w-[200px]" data-testid="vessel-selector-modify">
+                <SelectValue placeholder="Choose vessel" />
+              </SelectTrigger>
+              <SelectContent>
+                {vessels.map(vessel => (
+                  <SelectItem key={vessel.id} value={vessel.id}>
+                    {vessel.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        )}
+        <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
           <Input
-            placeholder="Search Status"
+            placeholder="Search change requests..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="pl-10 w-48 border-gray-300 bg-white"
+            className="pl-10 border-gray-300 bg-white"
             data-testid="input-search-status"
           />
         </div>
+      </div>
+
+      {/* Filters Row 2: Status tabs */}
+      <div className="flex items-center gap-3 mt-2">
         <div className="flex items-center gap-1" data-testid="status-filter-tabs">
           {([
             { label: 'All', value: 'all' },
