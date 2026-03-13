@@ -3412,7 +3412,6 @@ const Components: React.FC = () => {
             }}
             data-testid="button-clear-filters-components"
           >
-            <X className="h-4 w-4 mr-1" />
             Clear
           </Button>
         </div>
