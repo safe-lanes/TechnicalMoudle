@@ -515,8 +515,8 @@ const WorkOrders: React.FC = () => {
         </div>
       </div>
 
-      {/* Filters - Row 1: Vessel + Search */}
-      <div className="flex items-center gap-3">
+      {/* Filters - Single Row */}
+      <div className="flex items-center gap-3 flex-wrap">
         {(isSailAdmin || isClientAdmin) && (
           <div className="flex items-center gap-2">
             <span className="text-sm font-medium text-gray-600">Vessel:</span>
@@ -536,7 +536,7 @@ const WorkOrders: React.FC = () => {
           </div>
         )}
 
-        <div className="relative flex-1" data-testid="C10">
+        <div className="relative w-80" data-testid="C10">
           <Marker id="C10" />
           <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
           <Input
@@ -546,10 +546,7 @@ const WorkOrders: React.FC = () => {
             className="pl-10"
           />
         </div>
-      </div>
 
-      {/* Filters - Row 2: Period, Rank, Criticality, Clear */}
-      <div className="flex items-center gap-3 mt-2">
         <Select value={selectedPeriod} onValueChange={setSelectedPeriod}>
           <SelectTrigger className="w-36" data-testid="C11">
             <Marker id="C11" />

@@ -991,9 +991,9 @@ const RunningHours = () => {
           )}
         </div>
 
-        {/* Filters Row 1: Vessel + Search - Main Tab */}
+        {/* Filters - Single Row - Main Tab */}
         {activeTab === 'main' && (
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-3 flex-wrap">
             {(isSailAdmin || isClientAdmin) && (
               <div className="flex items-center gap-2">
                 <span className="text-sm font-medium text-gray-600">Vessel:</span>
@@ -1012,7 +1012,7 @@ const RunningHours = () => {
               </div>
             )}
 
-            <div className="relative flex-1" data-testid="D2">
+            <div className="relative w-80" data-testid="D2">
               <Marker id="D2" />
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
               <Input
@@ -1022,12 +1022,7 @@ const RunningHours = () => {
                 className="pl-10"
               />
             </div>
-          </div>
-        )}
 
-        {/* Filters Row 2: Utilization Period, Export, Clear - Main Tab */}
-        {activeTab === 'main' && (
-          <div className="flex items-center gap-3 mt-2">
             <div className="flex items-center gap-2" data-testid="utilization-period-selector">
               <Clock className="h-4 w-4 text-gray-500" />
               <span className="text-sm text-gray-600 whitespace-nowrap">Utilization Period:</span>

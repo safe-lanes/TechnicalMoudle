@@ -92,13 +92,6 @@ export function FleetVesselContextBar({
               Management
             </button>
           </div>
-        </div>
-
-        <div style={{ fontSize: '18px', fontWeight: 700, color: '#1a2b4a' }} data-testid="text-current-year">
-          {currentYear}
-        </div>
-
-        <div className="flex items-center gap-3">
           <div style={{ display: 'flex', gap: '4px' }}>
             <button
               style={isAllVessels ? vesselPillActive : vesselPillInactive}
@@ -140,6 +133,12 @@ export function FleetVesselContextBar({
               ))}
             </select>
           )}
+        </div>
+
+        <div className="flex items-center gap-3">
+          <div style={{ fontSize: '18px', fontWeight: 700, color: '#1a2b4a' }} data-testid="text-current-year">
+            {currentYear}
+          </div>
 
           <button
             style={{

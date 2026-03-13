@@ -227,8 +227,8 @@ export function ModifyPMS() {
         </Button>
       </div>
 
-      {/* Filters Row 1: Vessel + Search */}
-      <div className="flex items-center gap-3">
+      {/* Filters - Single Row */}
+      <div className="flex items-center gap-3 flex-wrap">
         {(isSailAdmin || isClientAdmin) && (
           <div className="flex items-center gap-2">
             <span className="text-sm font-medium text-gray-600">Vessel:</span>
@@ -246,7 +246,7 @@ export function ModifyPMS() {
             </Select>
           </div>
         )}
-        <div className="relative flex-1">
+        <div className="relative w-80">
           <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
           <Input
             placeholder="Search change requests..."
@@ -256,10 +256,6 @@ export function ModifyPMS() {
             data-testid="input-search-status"
           />
         </div>
-      </div>
-
-      {/* Filters Row 2: Status tabs */}
-      <div className="flex items-center gap-3 mt-2">
         <div className="flex items-center gap-1" data-testid="status-filter-tabs">
           {[
             { label: 'All', value: 'all' },

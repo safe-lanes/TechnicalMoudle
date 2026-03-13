@@ -37,7 +37,7 @@ Preferred communication style: Simple, everyday language.
 -   **Component Styling**: Standardized styling for various chart types and interactive elements.
 -   **Table Styling**: Specific styling for overdue and dot matrix tables.
 -   **Scrollbars**: Custom WebKit scrollbar styling.
--   **Standardized Filter Bar Layout**: All PMS modules follow a consistent two-row filter bar pattern. Row 1: Vessel dropdown (role-gated for isSailAdmin/isClientAdmin) + Search bar (flex-grow, full width). Row 2: Module-specific filters (period, status tabs, date range, etc.). Applied to Components, Work Orders, Running Hours, Reports, and Modify PMS modules.
+-   **Standardized Filter Bar Layout**: All PMS modules follow a consistent single-row filter bar pattern matching the Spares/Components reference: [Vessel dropdown (role-gated, w-[200px])] [Search bar (fixed w-80)] [Module-specific filters] [Clear/action buttons]. Uses `flex-wrap` for responsive wrapping. Dashboard header uses `justify-between` with vessel controls left-aligned and year/filters right-aligned.
 
 ### Feature Specifications
 -   **Spare-Component Sibling Link Distribution**: Spares linked to a component are automatically linked to all sibling components.

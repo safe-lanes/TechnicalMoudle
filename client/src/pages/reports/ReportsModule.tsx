@@ -304,8 +304,8 @@ const ReportsModule = () => {
           )}
         </div>
 
-        {/* Filters Row 1: Vessel + Search */}
-        <div className="flex items-center gap-3">
+        {/* Filters - Single Row */}
+        <div className="flex items-center gap-3 flex-wrap">
           <GlobalFilters
             filters={globalFilters}
             onFiltersChange={handleFiltersChange}
@@ -313,7 +313,7 @@ const ReportsModule = () => {
             className="border-0 shadow-none bg-transparent p-0 mb-0 flex-shrink-0"
             vesselOnly
           />
-          <div className="relative flex-1">
+          <div className="relative w-80">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
             <Input
               placeholder="Search reports..."
@@ -323,15 +323,11 @@ const ReportsModule = () => {
               data-testid="G3"
             />
           </div>
-        </div>
-
-        {/* Filters Row 2: Date Range + Clear */}
-        <div className="flex items-center gap-3 mt-2">
           <GlobalFilters
             filters={globalFilters}
             onFiltersChange={handleFiltersChange}
             onReset={handleFiltersReset}
-            className="border-0 shadow-none bg-transparent p-0 mb-0 flex-1"
+            className="border-0 shadow-none bg-transparent p-0 mb-0"
             dateOnly
           />
           <Button
