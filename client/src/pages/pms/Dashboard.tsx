@@ -734,16 +734,48 @@ const Dashboard = () => {
   }, [workOrdersData]);
 
   const maintenanceTrendData = useMemo(() => {
-    const months = [
-      { month: 'Oct 2025', monthShort: 'Oct', completedPercent: 45, outstandingPercent: 35, overduePercent: 30 },
-      { month: 'Nov 2025', monthShort: 'Nov', completedPercent: 42, outstandingPercent: 38, overduePercent: 33 },
-      { month: 'Dec 2025', monthShort: 'Dec', completedPercent: 48, outstandingPercent: 32, overduePercent: 35 },
-      { month: 'Jan 2026', monthShort: 'Jan', completedPercent: 40, outstandingPercent: 40, overduePercent: 38 },
-      { month: 'Feb 2026', monthShort: 'Feb', completedPercent: 44, outstandingPercent: 36, overduePercent: 32 },
-      { month: 'Mar 2026', monthShort: 'Mar', completedPercent: 49, outstandingPercent: 33, overduePercent: 30 },
-    ];
-    return { months, delta: 3 };
-  }, []);
+    const safeWOs = workOrdersData.filter(wo => wo !== null && wo !== undefined);
+    const now = new Date();
+    const months: { month: string; monthShort: string; completedPercent: number; outstandingPercent: number; overduePercent: number; totalPlanned: number; completed: number; outstanding: number; overdue: number }[] = [];
+
+    for (let i = 5; i >= 0; i--) {
+      const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+      const monthName = format(d, 'MMM yyyy');
+      const monthShort = format(d, 'MMM');
+      const targetMonth = d.getMonth();
+      const targetYear = d.getFullYear();
+
+      const monthlyWOs = safeWOs.filter(wo => {
+        if (wo.isExecution) return false;
+        const dueDate = parseFlexibleDate(wo.dueDate);
+        if (!dueDate) return false;
+        return dueDate.getMonth() === targetMonth && dueDate.getFullYear() === targetYear;
+      });
+
+      const totalPlanned = monthlyWOs.length;
+      const completedCount = monthlyWOs.filter(wo => (wo as any).computedStatus === 'Completed').length;
+      const overdueCount = monthlyWOs.filter(wo => (wo as any).computedStatus === 'Overdue').length;
+      const outstandingCount = totalPlanned - completedCount - overdueCount;
+
+      months.push({
+        month: monthName,
+        monthShort,
+        completedPercent: totalPlanned > 0 ? Math.round((completedCount / totalPlanned) * 100) : 0,
+        outstandingPercent: totalPlanned > 0 ? Math.round((outstandingCount / totalPlanned) * 100) : 0,
+        overduePercent: totalPlanned > 0 ? Math.round((overdueCount / totalPlanned) * 100) : 0,
+        totalPlanned,
+        completed: completedCount,
+        outstanding: outstandingCount,
+        overdue: overdueCount,
+      });
+    }
+
+    const currentOutstanding = months.length >= 1 ? months[months.length - 1].outstandingPercent : 0;
+    const prevOutstanding = months.length >= 2 ? months[months.length - 2].outstandingPercent : 0;
+    const delta = currentOutstanding - prevOutstanding;
+
+    return { months, delta };
+  }, [workOrdersData]);
 
   const runningHoursKPIs = useMemo(() => {
     const totalTracked = rhParentsData.length;
