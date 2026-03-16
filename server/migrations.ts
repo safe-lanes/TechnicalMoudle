@@ -2050,8 +2050,8 @@ const migrations: Migration[] = [
     sql: `
       CREATE TABLE IF NOT EXISTS adm_role_menu_access (
         id INTEGER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
-        role_ruid TEXT NOT NULL REFERENCES admn_role_master(ruid),
-        menu_muid TEXT NOT NULL REFERENCES adm_menumaster_ac(muid),
+        role_ruid TEXT NOT NULL,
+        menu_muid TEXT NOT NULL,
         can_view BOOLEAN DEFAULT false,
         can_create BOOLEAN DEFAULT false,
         can_edit BOOLEAN DEFAULT false,
