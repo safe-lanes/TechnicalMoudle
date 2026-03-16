@@ -1992,6 +1992,56 @@ const migrations: Migration[] = [
         FOREIGN KEY (parent_menu) REFERENCES adm_menumaster_ac(muid)
       );
     `
+  },
+  {
+    id: '065_seed_adm_menumaster_ac',
+    name: 'Seed adm_menumaster_ac with menu structure',
+    description: 'Seeds 24 menu entries: 4 top-level modules and 20 sub-modules with sequential IDs and sort_order',
+    sql: `
+      INSERT INTO adm_menumaster_ac (id, muid, name, display_name, route, parent_menu, is_active, sort_order, created_at, updated_at, is_deleted, is_sync)
+      VALUES
+        (1, gen_random_uuid(), 'pms',          'PMS',             '/pms',          NULL, true, 1, NOW(), NOW(), false, false),
+        (2, gen_random_uuid(), 'defects',      'Defects',         '/defects',      NULL, true, 2, NOW(), NOW(), false, false),
+        (3, gen_random_uuid(), 'cert-surveys', 'Cert. & Surveys', '/cert-surveys', NULL, true, 3, NOW(), NOW(), false, false),
+        (4, gen_random_uuid(), 'admin',        'Admin',           '/admin',        NULL, true, 4, NOW(), NOW(), false, false)
+      ON CONFLICT (id) DO NOTHING;
+
+      INSERT INTO adm_menumaster_ac (id, muid, name, display_name, route, parent_menu, is_active, sort_order, created_at, updated_at, is_deleted, is_sync)
+      VALUES
+        (5,  gen_random_uuid(), 'pms-dashboard',   'Dashboard',   '/pms/dashboard',   (SELECT muid FROM adm_menumaster_ac WHERE id = 1), true, 5,  NOW(), NOW(), false, false),
+        (6,  gen_random_uuid(), 'pms-components',  'Components',  '/pms/components',  (SELECT muid FROM adm_menumaster_ac WHERE id = 1), true, 6,  NOW(), NOW(), false, false),
+        (7,  gen_random_uuid(), 'pms-work-orders', 'Work Orders', '/pms/work-orders', (SELECT muid FROM adm_menumaster_ac WHERE id = 1), true, 7,  NOW(), NOW(), false, false),
+        (8,  gen_random_uuid(), 'pms-running-hrs', 'Running Hrs', '/pms/running-hrs', (SELECT muid FROM adm_menumaster_ac WHERE id = 1), true, 8,  NOW(), NOW(), false, false),
+        (9,  gen_random_uuid(), 'pms-spares',      'Spares',      '/spares',          (SELECT muid FROM adm_menumaster_ac WHERE id = 1), true, 9,  NOW(), NOW(), false, false),
+        (10, gen_random_uuid(), 'pms-stores',      'Stores',      '/stores',          (SELECT muid FROM adm_menumaster_ac WHERE id = 1), true, 10, NOW(), NOW(), false, false),
+        (11, gen_random_uuid(), 'pms-reports',     'Reports',     '/pms/reports',     (SELECT muid FROM adm_menumaster_ac WHERE id = 1), true, 11, NOW(), NOW(), false, false),
+        (12, gen_random_uuid(), 'pms-modify-pms',  'Modify PMS',  '/pms/modify-pms',  (SELECT muid FROM adm_menumaster_ac WHERE id = 1), true, 12, NOW(), NOW(), false, false),
+        (13, gen_random_uuid(), 'pms-admin',       'Admin',       '/pms/admin',       (SELECT muid FROM adm_menumaster_ac WHERE id = 1), true, 13, NOW(), NOW(), false, false)
+      ON CONFLICT (id) DO NOTHING;
+
+      INSERT INTO adm_menumaster_ac (id, muid, name, display_name, route, parent_menu, is_active, sort_order, created_at, updated_at, is_deleted, is_sync)
+      VALUES
+        (14, gen_random_uuid(), 'defects-dashboard', 'Dashboard',         '/defects',           (SELECT muid FROM adm_menumaster_ac WHERE id = 2), true, 14, NOW(), NOW(), false, false),
+        (15, gen_random_uuid(), 'defects-active',    'Defect Log',        '/defects/active',    (SELECT muid FROM adm_menumaster_ac WHERE id = 2), true, 15, NOW(), NOW(), false, false),
+        (16, gen_random_uuid(), 'defects-coc',       'CoC',               '/defects/coc',       (SELECT muid FROM adm_menumaster_ac WHERE id = 2), true, 16, NOW(), NOW(), false, false),
+        (17, gen_random_uuid(), 'defects-recurring', 'Recurring Defects', '/defects/recurring', (SELECT muid FROM adm_menumaster_ac WHERE id = 2), true, 17, NOW(), NOW(), false, false),
+        (18, gen_random_uuid(), 'defects-resolved',  'Resolved Defects',  '/defects/resolved',  (SELECT muid FROM adm_menumaster_ac WHERE id = 2), true, 18, NOW(), NOW(), false, false),
+        (19, gen_random_uuid(), 'defects-reports',   'Reports',           '/defects/reports',   (SELECT muid FROM adm_menumaster_ac WHERE id = 2), true, 19, NOW(), NOW(), false, false)
+      ON CONFLICT (id) DO NOTHING;
+
+      INSERT INTO adm_menumaster_ac (id, muid, name, display_name, route, parent_menu, is_active, sort_order, created_at, updated_at, is_deleted, is_sync)
+      VALUES
+        (20, gen_random_uuid(), 'cert-certificates', 'Certificates', '/cert-surveys/certificates', (SELECT muid FROM adm_menumaster_ac WHERE id = 3), true, 20, NOW(), NOW(), false, false),
+        (21, gen_random_uuid(), 'cert-surveys-page', 'Surveys',      '/cert-surveys/surveys',      (SELECT muid FROM adm_menumaster_ac WHERE id = 3), true, 21, NOW(), NOW(), false, false)
+      ON CONFLICT (id) DO NOTHING;
+
+      INSERT INTO adm_menumaster_ac (id, muid, name, display_name, route, parent_menu, is_active, sort_order, created_at, updated_at, is_deleted, is_sync)
+      VALUES
+        (22, gen_random_uuid(), 'admin-masters',            'Masters',              '/admin/masters',            (SELECT muid FROM adm_menumaster_ac WHERE id = 4), true, 22, NOW(), NOW(), false, false),
+        (23, gen_random_uuid(), 'admin-ships-certificates', 'Ship''s Certificates', '/admin/ships-certificates', (SELECT muid FROM adm_menumaster_ac WHERE id = 4), true, 23, NOW(), NOW(), false, false),
+        (24, gen_random_uuid(), 'admin-ships-surveys',      'Ship''s Surveys',      '/admin/ships-surveys',      (SELECT muid FROM adm_menumaster_ac WHERE id = 4), true, 24, NOW(), NOW(), false, false)
+      ON CONFLICT (id) DO NOTHING;
+    `
   }
 ];
 
