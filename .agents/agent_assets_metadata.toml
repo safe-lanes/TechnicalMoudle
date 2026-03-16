@@ -18,3 +18,9 @@ id = "0AJJfs5bR5IFznhaH5iFo"
 uri = "file://PMS_Test_Cases_Comprehensive.xlsx"
 type = "table"
 title = "PMS UAT Test Cases - Comprehensive (405 test cases)"
+
+[[outputs]]
+id = "pR1gHwnnFo_vEbxgzpiEL"
+uri = "file://SAIL_PMS_Module_User_Manual.docx"
+type = "word_document"
+title = "SAIL PMS Module - User Manual"

@@ -1,0 +1,73 @@
+TASK: CREATE DETAILED USER GUIDE DOCUMENT (REFERENCE-BASED)
+
+Objective:
+
+Create a complete and well-structured **User Guide document** by using the **attached reference document** as the base format and style. The new document should follow the same structure, formatting, and documentation approach as the attached file.
+
+Instructions:
+
+1. Reference Analysis
+
+• Carefully analyze the attached reference document.
+• Understand the structure, formatting style, headings hierarchy, writing style, and section organization used in the document.
+
+2. Document Structure
+
+• Replicate the same document structure used in the reference file, including:
+
+  - Title page structure
+  - Table of contents
+  - Section hierarchy
+  - Numbering format
+  - Headings and sub-headings
+  - Screenshot placement format
+  - Step-by-step instruction style
+  - Notes / tips / warnings formatting (if present)
+
+3. Content Creation
+
+• Write the User Guide in a **clear, step-by-step instructional format** suitable for end users.
+• Provide detailed explanations of how each function works.
+• Include logical workflow explanations wherever needed.
+
+4. Screenshot Guidance
+
+• Wherever the reference document includes screenshots:
+  - Add placeholders for screenshots
+  - Indicate where screenshots should be inserted
+  - Add short captions explaining the screenshot purpose
+
+5. Writing Style
+
+• Use clear professional documentation language.
+• Keep instructions structured and sequential.
+• Ensure the guide is understandable for operational users.
+
+6. Formatting
+
+Follow the same formatting pattern as the reference document for:
+
+• Headings and numbering
+• Font hierarchy
+• Section spacing
+• Bullet and numbered lists
+• Screenshot captions
+• Tables (if applicable)
+
+7. Document Quality
+
+Ensure the document:
+
+• Is detailed and comprehensive
+• Follows a logical flow
+• Maintains consistent formatting throughout
+• Is suitable as a formal product User Guide
+
+8. Output
+
+Generate a **complete User Guide document** following the reference document structure and formatting style.
+
+Important Instruction:
+
+Do **not limit or define the module coverage manually**.  
+The system should analyze and structure the guide appropriately based on the reference document format.
