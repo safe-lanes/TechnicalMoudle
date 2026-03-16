@@ -1,0 +1,310 @@
+The **Access Control write implementation is complete**.
+Now implement the **read + enforcement phase** so that **logged-in users can only access modules based on their assigned permissions**.
+
+Do **NOT modify the database schema**.
+Use the **existing tables and APIs**.
+
+---
+
+# Objective
+
+When a user navigates to a module or page:
+
+1. Detect the **logged-in user's role**
+2. Fetch the **permissions assigned to that role**
+3. Verify if the user has **view access for the requested module**
+4. Allow or deny access accordingly
+
+The system must dynamically enforce permissions using the **existing access control tables**.
+
+---
+
+# Tables Involved
+
+### 1️⃣ Role Table
+
+```
+admn_role_master
+```
+
+Contains all system roles.
+
+Key column:
+
+```
+ruid (UUID)
+```
+
+This uniquely identifies each role.
+
+Example roles:
+
+```
+Admin
+Sail Admin
+Super Admin
+Vessel Admin
+Vessel User
+External 1–5
+```
+
+---
+
+### 2️⃣ Menu Table
+
+```
+adm_menumaster_ac
+```
+
+Defines all **application modules and submodules**.
+
+Important columns:
+
+```
+muid          → unique menu identifier
+parent_menu   → parent module UUID
+display_name  → module name shown in UI
+route         → frontend route path
+```
+
+Example structure:
+
+```
+PMS
+   Dashboard
+   Components
+   Work Orders
+
+Defects
+   Dashboard
+   Defect Log
+```
+
+---
+
+### 3️⃣ Permission Table
+
+```
+adm_role_menu_access
+```
+
+This table connects **roles to menu items**.
+
+Columns:
+
+```
+role_ruid
+menu_muid
+can_view
+can_create
+can_edit
+can_delete
+```
+
+Each row represents **permissions for one role on one menu item**.
+
+Example row:
+
+```
+role_ruid = Vessel Admin
+menu_muid = Components
+
+can_view = true
+can_create = false
+can_edit = true
+can_delete = false
+```
+
+---
+
+# Access Control Logic
+
+When a user logs in:
+
+### Step 1 — Detect Role
+
+The application already knows the logged-in role:
+
+```
+localStorage.userProfile.role
+```
+
+Use this to fetch the corresponding:
+
+```
+ruid
+```
+
+from:
+
+```
+admn_role_master
+```
+
+---
+
+### Step 2 — Fetch Role Permissions
+
+Call the existing API:
+
+```
+GET /admin/access-control/:roleRuid
+```
+
+This returns all menu permissions for the role.
+
+Example response:
+
+```
+[
+  {
+    menu_muid: "...",
+    can_view: true,
+    can_create: false,
+    can_edit: true,
+    can_delete: false
+  }
+]
+```
+
+Store this data in **frontend state or memory**.
+
+---
+
+# Navigation Enforcement
+
+Whenever the user navigates to a module:
+
+1. Identify the **route**
+2. Find the corresponding **menu_muid** from `adm_menumaster_ac`
+3. Check permissions for that role
+
+---
+
+### Rule
+
+```
+If can_view === true
+   → Allow navigation
+
+If can_view === false OR no record exists
+   → Block access
+```
+
+---
+
+# Blocked Access Behavior
+
+If a user tries to access a module without permission:
+
+Options:
+
+```
+Redirect → Dashboard
+```
+
+or
+
+```
+Show "Access Denied" page
+```
+
+---
+
+# UI Menu Filtering
+
+The sidebar menu should also respect permissions.
+
+Menu items must be **visible only if**:
+
+```
+can_view = true
+```
+
+So the sidebar should be built by:
+
+```
+1. Fetch all menu items
+2. Fetch role permissions
+3. Filter menu items where can_view = true
+```
+
+---
+
+# Permission Matrix Concept
+
+Roles come from:
+
+```
+admn_role_master
+```
+
+Modules come from:
+
+```
+adm_menumaster_ac
+```
+
+Permissions come from:
+
+```
+adm_role_menu_access
+```
+
+So effectively:
+
+```
+Role
+   ↓
+Permissions
+   ↓
+Allowed Menu Items
+   ↓
+Allowed Navigation
+```
+
+---
+
+# Final Expected Behavior
+
+When a user logs in:
+
+1️⃣ The system identifies the **user role**
+2️⃣ Fetches **role permissions**
+3️⃣ Builds the **sidebar menu dynamically**
+4️⃣ Allows navigation only to **permitted modules**
+5️⃣ Blocks access to unauthorized modules
+
+Example:
+
+```
+User Role → Vessel User
+```
+
+Allowed:
+
+```
+PMS Dashboard
+Components
+Work Orders
+```
+
+Hidden / Blocked:
+
+```
+Admin
+Access Control
+Modify PMS
+```
+
+---
+
+# Important
+
+Do **NOT modify**:
+
+• role detection logic
+• existing APIs
+• database structure
+
+Only implement the **permission enforcement during navigation and menu rendering**.
