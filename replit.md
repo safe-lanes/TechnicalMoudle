@@ -70,6 +70,7 @@ Preferred communication style: Simple, everyday language.
 -   **UI Role Detection (Single Source of Truth)**: UI role is determined by `mapLoggedRoleToUIRole(userType, profileRole)` for consistent role mapping.
 -   **User Role System**: Supports 7 `UserRole` values ("Ship", "Office", "PMS Admin", "Sail Admin", "Super Admin", "Vessel Admin", "Vessel User").
 -   **Role Master Table (admn_role_master)**: Seeds 15 role records during migration.
+-   **Access Control System**: Three-table architecture (`admn_role_master`, `adm_menumaster_ac`, `adm_role_menu_access`) for role-based menu permissions. Admin UI at `/admin/access-control` allows assigning view/create/edit/delete permissions per role per menu item. Frontend enforcement via `PermissionsContext` dynamically filters top navigation, sidebar menus, and blocks unauthorized page access. When no permissions are configured for a role, all access is granted (backwards-compatible). API: `GET /admin/role-by-name/:roleName`, `GET /admin/roles`, `GET /admin/menu-items`, `GET/PUT /admin/access-control/:roleRuid`.
 
 ## External Dependencies
 

@@ -21,6 +21,19 @@ router.get('/admin/menu-items', async (_req: Request, res: Response) => {
   }
 });
 
+router.get('/admin/role-by-name/:roleName', async (req: Request, res: Response) => {
+  try {
+    const { roleName } = req.params;
+    const role = await storage.getRoleByName(roleName);
+    if (!role) {
+      return res.status(404).json({ error: 'Role not found' });
+    }
+    res.json(role);
+  } catch (error: any) {
+    res.status(500).json({ error: 'Failed to fetch role', details: error.message });
+  }
+});
+
 router.get('/admin/access-control/:roleRuid', async (req: Request, res: Response) => {
   try {
     const { roleRuid } = req.params;

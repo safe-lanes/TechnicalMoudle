@@ -948,6 +948,7 @@ export interface IStorage {
   getSparesWithInventoryByComponent(componentId: string): Promise<SpareWithInventory[]>;
   getSparesWithInventoryByComponentCode(vesselId: string, componentCode: string): Promise<SpareWithInventory[]>;
 
+  getRoleByName(roleName: string): Promise<AdmnRoleMaster | undefined>;
   getActiveRoles(): Promise<AdmnRoleMaster[]>;
   getActiveMenuItems(): Promise<AdmMenumasterAc[]>;
   getRoleMenuPermissions(roleRuid: string): Promise<AdmRoleMenuAccess[]>;

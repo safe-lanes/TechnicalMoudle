@@ -10,6 +10,7 @@ import { ChangeModeProvider } from "@/contexts/ChangeModeContext";
 import { VesselProvider } from "@/contexts/VesselContext";
 import { OfflineProvider } from "@/contexts/OfflineContext";
 import { MarkerProvider } from "@/contexts/MarkerContext";
+import { PermissionsProvider } from "@/contexts/PermissionsContext";
 import { TechnicalModule } from "./pages/TechnicalModule";
 import Alerts from "./pages/admin/Alerts";
 import TestE2E from "./pages/TestE2E";
@@ -29,6 +30,7 @@ function App() {
       <AuthProvider>
         <UIRoleProvider>
           <QueryClientProvider client={queryClient}>
+            <PermissionsProvider>
             <VesselProvider>
               <OfflineProvider>
                 <ChangeRequestProvider>
@@ -97,6 +99,7 @@ function App() {
                 </ChangeRequestProvider>
               </OfflineProvider>
             </VesselProvider>
+          </PermissionsProvider>
           </QueryClientProvider>
         </UIRoleProvider>
       </AuthProvider>

@@ -1,6 +1,7 @@
 import React from "react";
 import { cn } from "@/lib/utils";
 import { useLocation } from "wouter";
+import { usePermissions } from "@/contexts/PermissionsContext";
 import {
   LayoutDashboard,
   Package,
@@ -82,7 +83,9 @@ export const SideMenuBar: React.FC<SideMenuBarProps> = ({
   subModule,
 }) => {
   const [, setLocation] = useLocation();
-  const menuItems = menuConfigs[subModule] || menuConfigs.pms;
+  const { canViewSidebarItem } = usePermissions();
+  const allMenuItems = menuConfigs[subModule] || menuConfigs.pms;
+  const menuItems = allMenuItems.filter((item) => canViewSidebarItem(subModule, item.id));
 
   const handleItemClick = (itemId: string) => {
     // Use navigation for routing

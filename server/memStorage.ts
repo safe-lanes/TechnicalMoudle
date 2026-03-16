@@ -1611,6 +1611,10 @@ class MemStorage {
     return { totalPending: 0, totalHigh: 0, totalMedium: 0, totalLow: 0, lastDetected: null, trendPercentage: 0 };
   }
 
+  async getRoleByName(_roleName: string): Promise<any | undefined> {
+    return undefined;
+  }
+
   async getActiveRoles(): Promise<any[]> {
     return [];
   }

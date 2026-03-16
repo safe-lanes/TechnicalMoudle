@@ -12,6 +12,7 @@ import { cn } from "@/lib/utils";
 import sailLogoPath from "@assets/SAIL logo Transparent_1753957135582.png";
 import { SyncStatusIndicator } from "./SyncStatusIndicator";
 import { RoleSwitcher } from "./RoleSwitcher";
+import { usePermissions } from "@/contexts/PermissionsContext";
 import {
   DropdownMenu,
   DropdownMenuTrigger,
@@ -28,6 +29,8 @@ export const TopMenuBar: React.FC<TopMenuBarProps> = ({
   selectedSubModule, 
   onSubModuleChange 
 }) => {
+  const { hasAnyChildAccess, isLoading: permissionsLoading } = usePermissions();
+
   const menuItems = [
     {
       id: "module",
@@ -70,7 +73,10 @@ export const TopMenuBar: React.FC<TopMenuBarProps> = ({
         
         <div className="w-8"></div>
         
-        {menuItems.map((item) => {
+        {menuItems.filter((item) => {
+          if (item.isModule) return true;
+          return hasAnyChildAccess(item.id);
+        }).map((item) => {
           const Icon = item.icon;
           const isSelected = item.id === selectedSubModule;
           

@@ -2,6 +2,8 @@ import { useState, useEffect } from "react";
 import { TopMenuBar } from "@/components/TopMenuBar";
 import { SideMenuBar } from "@/components/SideMenuBar";
 import { useUIRole } from "@/contexts/UIRoleContext";
+import { usePermissions } from "@/contexts/PermissionsContext";
+import { ShieldX } from "lucide-react";
 import Dashboard from "./pms/Dashboard";
 import Components from "./pms/Components";
 import WorkOrders from "./pms/WorkOrders";
@@ -34,6 +36,7 @@ export const TechnicalModule = () => {
   const [location, setLocation] = useLocation();
   const params = useParams();
   const { isSailAdmin } = useUIRole();
+  const { canViewSidebarItem, isConfigured: permissionsConfigured } = usePermissions();
   
   // Derive state from URL
   const getStateFromUrl = () => {
@@ -133,7 +136,34 @@ export const TechnicalModule = () => {
         
         {/* Main Content Area */}
         <div className="flex-1 p-6 min-h-0 overflow-auto">
-          {selectedSubModule === "pms" && selectedMenuItem === "dashboard" ? (
+          {permissionsConfigured && !canViewSidebarItem(selectedSubModule, selectedMenuItem) ? (
+            <div className="flex items-center justify-center h-full min-h-[400px]" data-testid="access-denied">
+              <div className="text-center">
+                <ShieldX className="h-16 w-16 text-red-400 mx-auto mb-4" />
+                <h2 className="text-2xl font-semibold text-gray-600 mb-2" data-testid="text-access-denied-title">Access Denied</h2>
+                <p className="text-gray-500 mb-4" data-testid="text-access-denied-description">You do not have permission to access this page.</p>
+                <button
+                  onClick={() => {
+                    if (canViewSidebarItem("pms", "dashboard")) {
+                      setLocation("/pms/dashboard");
+                    } else {
+                      const fallbackRoutes = [
+                        { sub: "pms", item: "components", path: "/pms/components" },
+                        { sub: "pms", item: "work-orders", path: "/pms/work-orders" },
+                        { sub: "admin", item: "masters", path: "/admin/masters" },
+                      ];
+                      const found = fallbackRoutes.find(r => canViewSidebarItem(r.sub, r.item));
+                      setLocation(found?.path ?? "/pms/dashboard");
+                    }
+                  }}
+                  className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
+                  data-testid="btn-go-dashboard"
+                >
+                  Go to Dashboard
+                </button>
+              </div>
+            </div>
+          ) : selectedSubModule === "pms" && selectedMenuItem === "dashboard" ? (
             <Dashboard />
           ) : selectedSubModule === "pms" && selectedMenuItem === "components" ? (
             <Components />

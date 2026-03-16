@@ -8193,6 +8193,15 @@ export class PostgresStorage {
     return { synced, errors };
   }
 
+  async getRoleByName(roleName: string): Promise<AdmnRoleMaster | undefined> {
+    const db = await getDb();
+    const result = await db
+      .select()
+      .from(admnRoleMaster)
+      .where(and(eq(admnRoleMaster.assignedRole, roleName), eq(admnRoleMaster.isActive, true)));
+    return result[0];
+  }
+
   async getActiveRoles(): Promise<AdmnRoleMaster[]> {
     const db = await getDb();
     return db
