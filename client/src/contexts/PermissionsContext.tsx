@@ -97,6 +97,28 @@ const ROUTE_TO_MENU_NAME: Record<string, string> = {
   "/admin/access-control": "admin-access-control",
 };
 
+const CHILD_ROUTE_PATTERNS: Array<{ pattern: RegExp; parentMenuName: string }> = [
+  { pattern: /^\/pms\/modify-pms\//, parentMenuName: "pms-modify-pms" },
+  { pattern: /^\/pms\/work-orders\//, parentMenuName: "pms-work-orders" },
+  { pattern: /^\/pms\/components\//, parentMenuName: "pms-components" },
+  { pattern: /^\/defects\/new$/, parentMenuName: "defects-active" },
+  { pattern: /^\/defects\/edit\//, parentMenuName: "defects-active" },
+  { pattern: /^\/admin\/masters\//, parentMenuName: "admin-masters" },
+  { pattern: /^\/admin\/ships-certificates\//, parentMenuName: "admin-ships-certificates" },
+  { pattern: /^\/admin\/ships-surveys\//, parentMenuName: "admin-ships-surveys" },
+];
+
+function resolveRouteToMenuName(route: string): string | null {
+  const exact = ROUTE_TO_MENU_NAME[route];
+  if (exact) return exact;
+
+  for (const { pattern, parentMenuName } of CHILD_ROUTE_PATTERNS) {
+    if (pattern.test(route)) return parentMenuName;
+  }
+
+  return null;
+}
+
 export function PermissionsProvider({ children }: { children: ReactNode }) {
   const { currentUser } = useAuth();
   const [permissions, setPermissions] = useState<Map<string, MenuPermission>>(new Map());
@@ -196,7 +218,7 @@ export function PermissionsProvider({ children }: { children: ReactNode }) {
       if (!shouldDeny) return true;
       if (status === "error") return false;
       const muid = getMenuMuidByName(menuName);
-      if (!muid) return true;
+      if (!muid) return false;
       const perm = permissions.get(muid);
       return perm?.canView ?? false;
     },
@@ -207,8 +229,8 @@ export function PermissionsProvider({ children }: { children: ReactNode }) {
     (route: string): boolean => {
       if (!shouldDeny) return true;
       if (status === "error") return false;
-      const menuName = ROUTE_TO_MENU_NAME[route];
-      if (!menuName) return true;
+      const menuName = resolveRouteToMenuName(route);
+      if (!menuName) return false;
       return canViewMenu(menuName);
     },
     [shouldDeny, status, canViewMenu]
@@ -219,10 +241,10 @@ export function PermissionsProvider({ children }: { children: ReactNode }) {
       if (!shouldDeny) return true;
       if (status === "error") return false;
       const parentMuid = getMenuMuidByName(parentModule);
-      if (!parentMuid) return true;
+      if (!parentMuid) return false;
 
       const children = menuItems.filter((m) => m.parentMenu === parentMuid);
-      if (children.length === 0) return true;
+      if (children.length === 0) return false;
 
       return children.some((child) => {
         const perm = permissions.get(child.muid);
@@ -247,9 +269,9 @@ export function PermissionsProvider({ children }: { children: ReactNode }) {
       if (!shouldDeny) return true;
       if (status === "error") return false;
       const moduleMap = MENU_NAME_MAP[subModule];
-      if (!moduleMap) return true;
+      if (!moduleMap) return false;
       const menuName = moduleMap[itemId];
-      if (!menuName) return true;
+      if (!menuName) return false;
       return canViewMenu(menuName);
     },
     [shouldDeny, status, canViewMenu]
