@@ -1,0 +1,661 @@
+Part E: RH Validation - Backward Time Travel (3-4 test cases)
+
+RH Cannot Go Backward:
+
+Previous RH: 500 (01-Mar-2026)
+
+Completion Date: 05-Mar-2026
+
+Enter RH: 480 (20 hrs LESS than previous)
+
+Expected: Red border, Error "Running hours cannot go backward", "Previous entry was 500 hrs - your value must be higher", Cannot save
+
+RH Same as Previous (Zero Increase):
+
+Previous RH: 500
+
+Enter RH: 500 (no increase)
+
+Expected: Warning "Running hours show no increase. Confirm machinery was not operated.", Allow save with warning
+
+Part F: RH Validation - High Utilization (≥20 hrs/day) (6-8 test cases)
+
+High Utilization Warning:
+
+Previous RH: 500 (01-Mar-2026)
+
+Completion Date: 03-Mar-2026 (2 days later)
+
+Enter RH: 545 (increase of 45 hrs)
+
+Average: 45 ÷ 2 = 22.5 hrs/day (≥20 threshold)
+
+Expected: Orange border, Warning message "High utilization detected (22.5 hrs/day)", Justification modal opens automatically
+
+Justification Modal - High Utilization:
+
+Modal title: "High Machinery Utilization Detected"
+
+Shows: Component name, Entered RH, Average usage rate
+
+Justification text area (min 20 characters required)
+
+Character counter displayed
+
+Example reasons shown: "Continuous voyage", "Emergency operation", etc.
+
+Confirmation checkbox: "I confirm this RH entry is accurate"
+
+Cancel and "Confirm and Save" buttons
+
+Cannot save without ≥20 char justification AND checkbox checked
+
+After justification: Work order saves successfully
+
+Justification stored in rhJustification field
+
+Part G: RH Validation - Real-time Helper Text (4-5 test cases)
+
+Valid Range Helper Text:
+
+Before user types anything
+
+Shows: "Valid Running Hours range for [date]: [MIN] to [MAX] hours"
+
+Shows: "Last recorded: [PREVIOUS RH] hrs on [PREVIOUS DATE]"
+
+Example: "Valid RH range for 11-Mar-2026: 500 to 620 hours. Last recorded: 500 hrs on 01-Mar-2026"
+
+Live Validation Feedback:
+
+As user types, validation updates in real-time (debounced)
+
+Green text: "Valid entry (12.5 hrs/day average usage)"
+
+Red text: "Invalid: Exceeds maximum possible increase of 24 hrs/day. Valid range: 500-620 hours"
+
+Orange text: "Warning: High utilization detected (22 hrs/day average). Justification required"
+
+Input Border Color Coding:
+
+Gray border: No value entered yet
+
+Green border: Valid RH value
+
+Orange border: Valid but high utilization (warning)
+
+Red border: Invalid RH value (cannot save)
+
+Part H: RH Validation - Date Change Re-validation (2-3 test cases)
+
+RH Re-validates When Completion Date Changes:
+
+Enter completion date: 06-Mar-2026
+
+Enter RH: 560 (valid for this date)
+
+Change completion date to: 03-Mar-2026
+
+Expected: RH re-validates automatically, May become invalid if out of new valid range, Helper text updates with new valid range
+
+Part I: RH Isolation - No Write Back to RH Module (5-6 test cases)
+
+CRITICAL TEST: RH Isolation Verification:
+
+Check Component current RH in RH Module: 620 hrs
+
+Complete work order with RH: 560 hrs
+
+Save and approve work order
+
+Navigate to RH Module
+
+Check Component current RH again
+
+Expected: Component RH still shows 620 hrs (UNCHANGED), Work order record stores completionRH: 560 (snapshot only), Audit trail created with source: WORKORDER, RH Module data NEVER modified by work order
+
+Multiple Work Orders - RH Isolation:
+
+Complete 3 work orders for same component with different RH values
+
+Check RH Module after each completion
+
+Expected: RH Module value NEVER changes from work order submissions
+
+Part J: RH Timeline Viewer (8-10 test cases)
+
+Open RH Timeline Viewer:
+
+Click "View RH Timeline" button in B3 section
+
+Modal/dialog opens
+
+Shows table with columns: Date, RH Value, Change, Hrs/Day, Source, Status
+
+Shows line chart visualization (Recharts)
+
+Timeline sorted chronologically
+
+RH Timeline Data Display:
+
+All RH entries from RH Module shown
+
+All RH entries from work orders shown
+
+Source column shows: "RH MODULE", "WORK ORDER", etc.
+
+Change column shows RH increase from previous entry
+
+Hrs/Day column shows average daily usage
+
+Status column shows validation status: "Validated", "High Util", etc.
+
+RH Timeline Filters:
+
+Filter by date range: Last 30/60/90 days
+
+Custom date range picker
+
+Filter by source: RH Module only, Work Orders only, All
+
+Results update immediately
+
+RH Timeline Chart:
+
+Line chart shows RH trend over time
+
+X-axis: Dates
+
+Y-axis: Running Hours value
+
+Hover over points shows details
+
+Chart responsive to window size
+
+Color-coded by source: blue (RH Module), green (Work Orders)
+
+RH Timeline Navigation:
+
+Click on timeline entry: Highlights in table
+
+Click on work order entry: Navigate to that work order (optional)
+
+Close button to dismiss modal
+
+Export timeline to Excel/CSV (optional)
+
+Part K: RH Display on Completed Work Order (3-4 test cases)
+
+Work Order Detail Page - RH Metadata Display:
+
+Open completed work order with RH data
+
+Shows section: "Completion Information - Running Hours"
+
+Displays:
+
+completionRH: 560 hrs (Validated)
+
+Previous RH: 500 hrs (01-Mar-2026)
+
+Average usage: 12 hrs/day
+
+RH Source: Auto-fetched from RH Module
+
+Validated at: 11-Mar-2026 14:35
+
+If high utilization: Shows icon and justification text
+
+"View RH Timeline" button present
+
+Part L: RH Error Modals (4-5 test cases)
+
+Error Modal for Invalid Backward Violation:
+
+Title: "Invalid Running Hours Entry"
+
+Issue: "Exceeds maximum increase rate"
+
+Details section shows:
+
+Previous RH Entry: 500 hours (01-Mar-2026)
+
+Your Completion Date: 06-Mar-2026
+
+Your RH Entry: 700 hours
+
+Days Between: 5 days
+
+Your Increase: 200 hours
+
+Maximum Possible: 120 hours (5 days × 24 hrs/day)
+
+Excess: 80 hours
+
+Shows: "Valid RH Range: 500 to 620 hours"
+
+Buttons: "Correct Entry" and "Try Again"
+
+Modal blocks save until corrected
+
+Error Modal for Forward Violation:
+
+Similar structure
+
+Shows conflict with next RH entry
+
+Explains forward rate calculation
+
+Cannot save until corrected
+
+Section 10: Work Order Approval Workflow (8-10 test cases)
+
+Submit for Approval
+
+Approve Work Order (Chief Engineer role)
+
+Add approval comments
+
+Reject Work Order (with reason mandatory, min 10 characters)
+
+Approval permissions by role
+
+Next due date generation
+
+New planned work order created if recurring
+
+Section 11: Export Functionality (2-3 test cases)
+
+Export work orders to Excel
+
+Export filtered results
+
+Exported file contains correct columns
+
+Expected Total: 160-180 test cases
+
+SHEET 3: RUNNING HOURS MODULE
+Actual UI Elements to Test:
+
+Overview / History tabs
+
+Vessel dropdown filter
+
+Search Component bar
+
+Utilization Period dropdown (Monthly - Last 30 days)
+
+Clear button
+
+Export button
+
+"+ Bulk Update RH" button
+
+Table columns: Component Name, Component Code, Component Category, Running Hours, Last Updated, Utilization Rate (Monthly), Inherited RH, Update RH, Last Updated By
+
+"Showing X components" counter
+
+History button (opens historical RH records with same UI as Spares history)
+
+Test Coverage Sections:
+
+Section 1: Running Hours Dashboard - Overview Tab (8-10 test cases)
+
+View all machinery with RH tracking
+
+Vessel filter
+
+Search by component name/code
+
+Utilization Period filter (Last 30/60/90 days, Monthly, etc.)
+
+Clear button
+
+Utilization Rate display with color coding:
+
+Green: 0-50% (low utilization)
+
+Yellow: 51-75% (medium)
+
+Orange: 76-90% (high)
+
+Red: 91-100% (very high)
+
+Tooltip shows calculation details
+
+Component count display
+
+Section 2: Update Running Hours (10-12 test cases)
+
+Click "Update RH" icon for a component
+
+Enter new RH value
+
+Enter update date
+
+Add notes/comments (optional)
+
+Save update
+
+Success message shown
+
+RH value updates in list
+
+Timestamp updated
+
+Audit trail created
+
+RH Update Validation:
+
+Try to enter RH lower than current: Error "RH cannot decrease"
+
+Try to enter non-numeric value: Error "Enter valid number"
+
+Try to enter negative value: Error "RH must be positive"
+
+Cannot update with future date: Error message
+
+Section 3: Bulk RH Update (5-6 test cases)
+
+Click "+ Bulk Update RH" button
+
+Select multiple components (checkboxes)
+
+Enter RH values for each selected component
+
+Update date (common for all)
+
+Save all updates
+
+All RH values updated
+
+Audit trail for each component
+
+Section 4: RH History Timeline (10-12 test cases)
+
+Click "History" button
+
+Navigate to History tab
+
+View list of all machinery (same as main RH screen)
+
+Click on any component
+
+Opens historical RH records page
+
+Shows RH history table with columns: Date, RH Value, Change, Source, Updated By
+
+Sort by date (newest/oldest)
+
+Filter by date range
+
+Filter by source: Manual Update, Work Order, Auto Update
+
+Export history to Excel
+
+Pagination if applicable
+
+Component name displayed in history page header
+
+Section 5: RH-Based Job Due Dates (6-8 test cases)
+
+List all jobs based on running hours
+
+Shows: Component, Job, Due at RH, Current RH, RH Remaining
+
+Color coding:
+
+Red: Overdue
+
+Orange: Due soon (≤50 RH remaining)
+
+Green: Upcoming
+
+Sort by RH remaining
+
+RH alerts/warnings
+
+Jobs RH overdue show red alert badge
+
+Clicking alert navigates to job/component
+
+Section 6: Utilization Calculation (4-5 test cases)
+
+Period Selector dropdown
+
+Select period (This Month, Last Month, This Quarter, This Year, Custom Range)
+
+Utilization rates recalculate for selected period
+
+Chart updates to show selected period
+
+Formula verification: (RH in period ÷ Days in period ÷ 24) × 100
+
+Example: 720 RH in 30 days = (720 ÷ 30 ÷ 24) × 100 = 100%
+
+Section 7: Export Reports (2-3 test cases)
+
+Export to Excel button
+
+Export to PDF button
+
+Export includes: All components, Current RH, Last updated, Utilization rates
+
+File downloads with timestamped name
+
+Expected Total: 45-55 test cases
+
+SHEET 4: SPARES MODULE
+Actual UI Elements to Test:
+
+Inventory / Location / History tabs
+
+Vessel dropdown filter
+
+Search bar (search parts or components)
+
+Criticality dropdown filter
+
+Stock dropdown filter
+
+Clear button
+
+Export button
+
+"+ Add Spare" button
+
+"+ Bulk Update Spares" button
+
+Component tree (left panel) - same 8 categories as Components module
+
+Expand/Collapse buttons
+
+Spares table columns: Part Code, Part Name, Component, Part Number, Critical, ROB, Min, Stock, Location, IHM, Actions
+
+Pagination (if applicable)
+
+Test Coverage Sections:
+
+Section 1: Spares List Navigation (10-12 test cases)
+
+View all spares
+
+Vessel filter selection
+
+Search by part number or description
+
+Component tree navigation (expand/collapse categories)
+
+Click on component to filter spares
+
+Criticality filter
+
+Stock filter (All, OK, At Min, Low, Critical)
+
+Clear button resets all filters
+
+Multiple filter combinations
+
+Total spares count displayed
+
+Export functionality
+
+Stock Status Indicators:
+
+Green badge: OK (stock ≥ min stock)
+
+Orange badge: At Min (stock = min stock)
+
+Red badge: Low (stock < min stock)
+
+Dark red badge: Critical (stock = 0)
+
+Section 2: Add New Spare Part (12-15 test cases)
+
+Click "+ Add Spare"
+
+Form fields:
+
+Part Number (mandatory, unique)
+
+Description (mandatory)
+
+Category dropdown
+
+Current Stock (numeric, default 0)
+
+Min Stock (numeric, mandatory)
+
+Max Stock (numeric, mandatory)
+
+Unit of Measurement
+
+Location dropdown
+
+ROB (Remaining on Board) checkbox
+
+Critical checkbox
+
+IHM checkbox
+
+Notes
+
+Save spare part
+
+Success message
+
+Spare appears in list
+
+Spare Part Validation:
+
+Duplicate part number: Error "Part number already exists"
+
+Max stock < Min stock: Error "Max stock must be greater than min stock"
+
+Current stock > Max stock: Warning "Stock exceeds maximum"
+
+Negative values: Error "Stock cannot be negative"
+
+Empty mandatory fields: Highlight with error messages
+
+Section 3: Edit Spare Part (5-6 test cases)
+
+Click Edit on spare part
+
+Modify fields
+
+Save changes
+
+Confirmation message
+
+Changes reflected in list
+
+Audit trail created
+
+Section 4: Location Tab (6-8 test cases)
+
+Navigate to Location tab
+
+View spares grouped by location
+
+Location-wise stock summary
+
+Filter by location
+
+Add/update location
+
+Location dropdown options
+
+Section 5: History Tab (8-10 test cases)
+
+Navigate to History tab
+
+View list of all spares (same as Inventory tab)
+
+Click on any spare part
+
+Opens transaction history page
+
+Shows transaction table with columns: Date, Type (In/Out), Quantity, Balance After, Source, User
+
+Sort by date
+
+Filter by transaction type (Stock In, Stock Out, Adjustment)
+
+Export history to Excel
+
+Pagination if applicable
+
+Part name displayed in history page header
+
+Section 6: Stock Transactions (10-12 test cases)
+
+Add Stock (Stock In):
+
+Click "Stock In" action
+
+Enter quantity to add
+
+Enter transaction date
+
+Enter received from (supplier/store)
+
+Add invoice number (optional)
+
+Add notes (optional)
+
+Save transaction
+
+Current stock increases
+
+Transaction recorded in history
+
+Remove Stock (Stock Out):
+
+Click "Stock Out" action
+
+Enter quantity to remove
+
+Enter transaction date
+
+Enter issued to (work order/department)
+
+Link to work order if applicable
+
+Add notes
+
+Save transaction
+
+Current stock decreases
+
+Transaction recorded
+
+Stock Transaction Validation:
+
+Try to remove more than current stock: Error "Insufficient stock. Current stock: X"
+
+Try to remove negative quantity: Error
+
+Try to add more than max stock: Warning "Stock will exceed maximum X"
+
+Future date transaction: Error

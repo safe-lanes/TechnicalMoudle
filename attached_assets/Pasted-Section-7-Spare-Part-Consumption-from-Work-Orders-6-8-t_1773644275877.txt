@@ -1,0 +1,872 @@
+Section 7: Spare Part Consumption from Work Orders (6-8 test cases)
+
+Link Spare to Work Order:
+
+In work order Part B4 "Spare Parts Consumed" section
+
+Search for spare part (autocomplete)
+
+Select spare from dropdown
+
+Enter quantity used
+
+Location dropdown
+
+Comments
+
+Save work order
+
+Spare stock automatically decreases
+
+Transaction created with source: "Work Order [WO-CODE]"
+
+Insufficient Stock Warning:
+
+Try to use 5 qty when stock is 3
+
+Warning message: "Current stock (3) is less than requested (5). Continue anyway?"
+
+Can proceed but flagged
+
+Transaction still recorded
+
+Section 8: Low Stock Alerts (4-5 test cases)
+
+Low Stock Dashboard Widget:
+
+Shows count of low stock items
+
+Shows count of critical stock (0 qty) items
+
+Click to filter spares list
+
+Red highlighting for critical items
+
+Low Stock Notifications:
+
+When stock falls below minimum: Alert generated
+
+Alert appears in notifications
+
+Alert sent to designated role (Chief Engineer/Admin)
+
+Section 9: Bulk Update Spares (4-5 test cases)
+
+Click "+ Bulk Update Spares"
+
+Select multiple spares
+
+Update stock values
+
+Update date (common)
+
+Save all updates
+
+Validation for each spare
+
+Success message
+
+Section 10: Criticality & ROB Management (4-5 test cases)
+
+Mark spare as Critical
+
+Mark spare as ROB (Remaining on Board)
+
+Filter by Critical items
+
+Filter by ROB items
+
+ROB/Critical highlighting in list
+
+Section 11: IHM (Inventory of Hazardous Materials) (3-4 test cases)
+
+Mark spare as IHM
+
+IHM checkbox functionality
+
+Filter by IHM items
+
+IHM badge/indicator in list
+
+Expected Total: 50-60 test cases
+
+SHEET 5: STORES MODULE
+Actual UI Elements to Test:
+
+Category tabs: Stores, Lubes, Chemicals, Others
+
+Inventory / Location / History tabs (sub-navigation)
+
+Vessel dropdown filter
+
+Search bar
+
+All Categories dropdown filter
+
+Stock dropdown filter
+
+Clear button
+
+"+ Add Store" button
+
+"+ Bulk Update Stores" button
+
+Table columns: Item Code, Item Name, Stores Category, UOM, ROB, Min, Stock, Location, IHM, Actions
+
+Pagination (if applicable)
+
+Test Coverage Sections:
+
+Section 1: Stores Category Navigation (6-8 test cases)
+
+Navigate between category tabs: Stores, Lubes, Chemicals, Others
+
+View items per category
+
+Category count badges (if present)
+
+Vessel filter per category
+
+Search within category
+
+Clear filters
+
+Section 2: Stores Inventory List (10-12 test cases)
+
+View all store items
+
+Vessel filter selection
+
+Search by item code or description
+
+All Categories dropdown filter
+
+Stock filter (All, OK, At Min, Low, Critical)
+
+Clear button resets all filters
+
+Multiple filter combinations
+
+Total items count displayed
+
+Stock status indicators (same color coding as Spares)
+
+Export functionality
+
+Pagination
+
+Section 3: Add Store Item (12-15 test cases)
+
+Click "+ Add Store"
+
+Form fields:
+
+Item Code (unique, mandatory)
+
+Item Name/Description (mandatory)
+
+Stores Category dropdown (Stores, Lubes, Chemicals, Others)
+
+Quantity (numeric, default 0)
+
+Min Stock (numeric, mandatory)
+
+Max Stock (numeric, mandatory)
+
+Unit of Measurement (UOM): kg, ltr, pcs, etc.
+
+Location dropdown
+
+ROB checkbox
+
+IHM checkbox
+
+Notes
+
+Save item
+
+Item appears in list
+
+Success message
+
+Store Item Validation:
+
+Duplicate item code: Error "Item code already exists"
+
+Max < Min: Error "Max stock must be greater than min stock"
+
+Current > Max: Warning "Stock exceeds maximum"
+
+Negative values: Error "Stock cannot be negative"
+
+Empty mandatory fields: Error highlighting
+
+Section 4: Edit Store Item (5-6 test cases)
+
+Click Edit action
+
+Modify fields
+
+Save changes
+
+Confirmation message
+
+Changes reflected in list
+
+Audit trail created
+
+Section 5: Location Tab (6-8 test cases)
+
+Navigate to Location tab
+
+View stores grouped by location
+
+Location-wise stock summary
+
+Filter by location
+
+Add/update location
+
+Location dropdown management
+
+Section 6: History Tab (8-10 test cases)
+
+Navigate to History tab
+
+View list of all store items (same as Inventory tab)
+
+Click on any store item
+
+Opens transaction history page
+
+Transaction table columns: Date, Type (In/Out), Quantity, Balance After, Source, User
+
+Sort by date
+
+Filter by transaction type
+
+Export history to Excel
+
+Pagination
+
+Item name displayed in history header
+
+Section 7: Stock Transactions (10-12 test cases)
+
+Stock In Transaction:
+
+Click "Stock In"
+
+Enter quantity received
+
+Enter transaction date
+
+Enter supplier details
+
+Invoice number (optional)
+
+Notes (optional)
+
+Save
+
+Quantity increases
+
+Transaction recorded
+
+Stock Out Transaction:
+
+Click "Stock Out"
+
+Enter quantity issued
+
+Enter transaction date
+
+Enter issued to (department/work order)
+
+Link to work order (optional)
+
+Notes
+
+Save
+
+Quantity decreases
+
+Transaction recorded
+
+Transaction Validation:
+
+Remove more than available: Error "Insufficient stock"
+
+Negative quantity: Error
+
+Exceed max on add: Warning
+
+Future date: Error
+
+Invalid data types: Validation errors
+
+Section 8: Category-Specific Features (5-6 test cases)
+
+Lubes Category:
+
+View only lubes
+
+Lube-specific fields (if any)
+
+Running hours consumption tracking (if integrated)
+
+Chemicals Category:
+
+View only chemicals
+
+Safety data sheet links (if present)
+
+Expiry date tracking (if present)
+
+Others Category:
+
+View miscellaneous items
+
+General consumables
+
+Section 9: Bulk Update Stores (4-5 test cases)
+
+Click "+ Bulk Update Stores"
+
+Select multiple items
+
+Update stock values
+
+Common update date
+
+Save all
+
+Validation per item
+
+Success confirmation
+
+Section 10: Low Stock Management (4-5 test cases)
+
+Low stock alerts
+
+Critical stock (qty = 0) alerts
+
+Dashboard integration
+
+Notifications to roles
+
+Reorder recommendations (if present)
+
+Expected Total: 45-55 test cases
+
+SHEET 6: REPORTS MODULE
+Actual UI Elements to Test:
+
+Vessel dropdown filter (All Vessels by default)
+
+Search reports bar
+
+Date range selector
+
+Clear button
+
+"Schedule Reports" button
+
+"Export Queue" button
+
+Report category cards:
+
+Maintenance Planner (1 report)
+
+Maintenance & Work Orders (10 reports)
+
+Running Hours & Condition (2 reports)
+
+Inventory - Spares (3 reports)
+
+Inventory - Stores/Lubes/Chemicals (5 reports)
+
+IHM - Inventory of Hazardous Materials (1 report)
+
+Modify PMS - Change Requests (1 report)
+
+Critical Equipment (2 reports)
+
+LSA/FFA Equipment (2 reports)
+
+Test Coverage Sections:
+
+Section 1: Reports Dashboard Navigation (8-10 test cases)
+
+View all report categories
+
+Vessel filter (All Vessels / specific vessel)
+
+Search reports by name/keyword
+
+Date range selector functionality
+
+Clear button resets filters
+
+Click on report category card
+
+View reports within category
+
+Report count badges accuracy
+
+Section 2: Maintenance Planner Reports (3-4 test cases)
+
+Navigate to Maintenance Planner category (1 report)
+
+Select report
+
+Configure parameters (vessel, date range)
+
+Generate report
+
+View report output (consolidated planning view with calendar and RH-based jobs)
+
+Export to Excel/PDF
+
+Report accuracy verification
+
+Section 3: Maintenance & Work Orders Reports (15-18 test cases)
+
+10 reports in this category
+
+Test each report type:
+
+Due jobs report
+
+Overdue tasks report
+
+Completion summaries
+
+Work performance reports
+
+Delay analysis
+
+Missed cycles report
+
+Backdating report
+
+Crew performance
+
+Component-wise maintenance history
+
+Other work order reports
+
+For each report:
+
+Select vessel
+
+Select date range
+
+Additional filters (if available)
+
+Generate report
+
+Verify data accuracy
+
+Export functionality (Excel/PDF)
+
+Report formatting
+
+Section 4: Running Hours & Condition Reports (4-5 test cases)
+
+2 reports in this category
+
+RH Utilization Report:
+
+Select vessel
+
+Select period
+
+Generate report
+
+Utilization rate per component
+
+Bar chart visualization
+
+Average utilization across fleet
+
+Export
+
+Equipment utilization and anomalies report:
+
+Condition monitoring trends
+
+Abnormal RH increases detection
+
+Export
+
+Section 5: Inventory - Spares Reports (6-8 test cases)
+
+3 reports in this category
+
+Spares Consumption Report:
+
+Date range selection
+
+Spare part filter (optional - all if blank)
+
+Generate report
+
+Shows: Part No, Description, Qty Used, Value, Used in WOs
+
+Total consumption value
+
+Most consumed spares ranking
+
+Export
+
+Low Stock Report:
+
+Auto-generated
+
+All spares below min stock
+
+Critical stock (qty = 0)
+
+Recommended order quantity
+
+Export for procurement
+
+Reorder proposals report
+
+Section 6: Inventory - Stores/Lubes/Chemicals Reports (8-10 test cases)
+
+5 reports in this category
+
+Stores consumption report
+
+Lubes tracking report
+
+Chemical expiry report (if applicable)
+
+Stock levels report
+
+Movement analysis report
+
+For each: vessel filter, date range, generate, verify, export
+
+Section 7: IHM Reports (3-4 test cases)
+
+1 report: Inventory of Hazardous Materials
+
+Generate IHM report
+
+Shows all items marked as IHM (from Spares and Stores)
+
+Hazardous materials tracking
+
+Evidence documentation
+
+Compliance reporting
+
+Export functionality
+
+Section 8: Modify PMS - Change Requests Reports (3-4 test cases)
+
+1 report: Change request status and audit trail
+
+View change requests
+
+Status tracking (Pending, Approved, Rejected)
+
+Approved changes audit trail
+
+Filter by status
+
+Export
+
+Section 9: Critical Equipment Reports (4-5 test cases)
+
+2 reports in this category
+
+Safety-critical components tracking
+
+Compliance reports
+
+Maintenance status
+
+Export functionality
+
+Section 10: LSA/FFA Equipment Reports (4-5 test cases)
+
+2 reports: Life-Saving Appliances / Fire-Fighting Appliances
+
+LSA equipment tracking
+
+FFA equipment tracking
+
+Statutory compliance reporting
+
+Due dates for inspections
+
+Export
+
+Section 11: Report Scheduling (6-8 test cases)
+
+Click "Schedule Reports" button
+
+Select report type
+
+Set frequency (Daily/Weekly/Monthly)
+
+Select day of week (for weekly)
+
+Select date of month (for monthly)
+
+Set time for generation
+
+Add email recipients
+
+Save schedule
+
+Verify auto-generation
+
+View scheduled reports list
+
+Edit schedule
+
+Pause schedule
+
+Delete schedule
+
+View last generation timestamp
+
+Section 12: Export Queue (4-5 test cases)
+
+Click "Export Queue" button
+
+View queued exports
+
+Download completed exports
+
+Cancel pending exports
+
+Export history
+
+File retention period
+
+Expected Total: 50-60 test cases
+
+SHEET 7: DASHBOARD & ADMIN MODULE
+Actual UI Elements to Test:
+
+Dashboard:
+
+Vessel dropdown filter
+
+Overview / Management / All Vessel / My Vessel tabs
+
+Year selector (2026)
+
+Dashboard widgets/tiles:
+
+Work Order KPIs (Overdue WOs, Completion Rate, Outstanding Tasks)
+
+Work Order Status & Trends (Status Distribution pie chart, 6-month trend)
+
+Inventory & Fleet Analysis (Total Spares, Low Stock, Critical Low Stock, Total Components, Stores Inventory)
+
+Spares Stock Status (pie chart)
+
+Superintendent Notifications (Pending, Acknowledged counts)
+
+Scroll functionality for multiple widgets
+
+Admin:
+
+Tabs: Bulk Data Import, Alerts, Forms, Master Data
+
+Vessel dropdown filter
+
+Clear button
+
+Test Coverage Sections:
+
+Section 1: Dashboard Overview Tab (15-18 test cases)
+
+Vessel Filter:
+
+Select different vessels from dropdown
+
+Dashboard data updates for selected vessel
+
+"All Vessels" option shows combined data
+
+"My Vessel" shows user's assigned vessel
+
+All widgets update based on vessel selection
+
+Work Order KPIs Widget:
+
+Overdue WOs tile:
+
+Shows count of overdue work orders
+
+Shows percentage of total
+
+Circular progress indicator
+
+Color: Red for high percentage
+
+Click tile: Navigate to Overdue WOs list
+
+Count matches actual overdue count
+
+Completion Rate tile:
+
+Shows completion percentage
+
+Shows total WOs vs completed
+
+Updates in real-time
+
+Outstanding Tasks tile:
+
+Shows pending tasks count
+
+Shows trend vs last month
+
+Click: Navigate to tasks
+
+Work Order Status Distribution:
+
+Status pie chart displays
+
+Shows distribution: Overdue, Due, Pending Approval, Completed
+
+Color-coded segments
+
+Click segment: Filter work orders by that status
+
+Legend shows counts
+
+Hover shows percentage
+
+Count badges on tabs match pie chart data
+
+6-Month Trend Chart:
+
+Shows completion %, outstanding %, overdue % over 6 months
+
+X-axis: Months (Oct to Mar)
+
+Y-axis: Percentage
+
+Multiple lines color-coded
+
+Hover shows exact values
+
+Identifies improving/declining trends
+
+Inventory & Fleet Analysis Widget:
+
+Total Spares count: Click navigates to Spares module
+
+Low Stock count: Red highlighting if count > 0, Click navigates to filtered spares
+
+Critical Low Stock count: Dark red highlighting, Click navigates to critical spares
+
+Total Components count displayed
+
+Stores Inventory count displayed
+
+Spares Stock Status Pie Chart:
+
+Shows distribution: OK, At Min, Low, Critical
+
+Color-coded segments
+
+Click segment: Filter spares by status
+
+Superintendent Notifications Tile:
+
+Pending Acknowledgment count badge
+
+Red highlighting
+
+Click: Navigate to Superintendent page
+
+Acknowledged This Month count
+
+Click: View acknowledged list
+
+Section 2: Dashboard Management Tab (if present) (5-6 test cases)
+
+Navigate to Management tab
+
+View management-specific widgets
+
+Vessel filter functionality
+
+Data accuracy
+
+Section 3: Dashboard All Vessel / My Vessel Tabs (4-5 test cases)
+
+"All Vessel" tab: Shows fleet-wide data
+
+"My Vessel" tab: Shows user's assigned vessel only
+
+Data filtering accuracy
+
+Widget updates
+
+Section 4: Dashboard Refresh & Real-time Updates (4-5 test cases)
+
+Auto-refresh (every 5 minutes or configured interval)
+
+Refresh indicator shown
+
+Counts and charts update
+
+Manual refresh button (if available)
+
+Loading indicators
+
+Section 5: Dashboard Responsive Design (4-5 test cases)
+
+Desktop view: Grid layout, all widgets visible
+
+Tablet view: Tiles stack appropriately, charts resize
+
+Scroll functionality
+
+Widget visibility
+
+Charts render properly
+
+Section 6: Admin - Bulk Data Import (15-18 test cases)
+
+Templates Available:
+
+Machinery Components
+
+Jobs
+
+Spares
+
+Stores
+
+Locations
+
+For Each Template:
+
+Click template
+
+"Download Template" button
+
+Download CSV/Excel template
+
+Upload functionality:
+
+Click "Upload" button
+
+Select file
+
+File validation (format, size)
+
+Field Mapping Guide

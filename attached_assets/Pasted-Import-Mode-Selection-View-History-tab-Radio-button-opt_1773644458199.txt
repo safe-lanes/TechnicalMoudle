@@ -1,0 +1,627 @@
+Import Mode Selection:
+
+View "History" tab
+
+Radio button options:
+
+"Add Only" (Only create new records, skip existing ones)
+
+"Update Only" (Only update existing records, skip new ones)
+
+"Add + Update (Recommended)" (Create new records and update existing ones)
+
+Select import mode
+
+Verify mode selection
+
+Upload Process:
+
+Browse and select file
+
+File size validation (max 10MB or configured limit)
+
+File format validation (.csv, .xlsx only)
+
+Preview uploaded data (if available)
+
+Column mapping verification
+
+Data validation errors displayed
+
+Proceed with import
+
+Progress indicator shown
+
+Success/error summary after import
+
+Import statistics: X records added, Y updated, Z failed
+
+Import History:
+
+Click "Import History" button
+
+View all previous imports
+
+Shows: Date, Template Type, Records Imported, Status, Imported By
+
+Download error logs for failed imports
+
+Filter by template type
+
+Filter by date range
+
+Export import history
+
+Fleet Data Import Toggle:
+
+"Fleet Data Import" toggle switch
+
+When enabled: "All imports will be associated with the selected vessel"
+
+Vessel selection required
+
+Import applies to selected vessel only
+
+Validation & Error Handling:
+
+Duplicate records: Skip or error based on mode
+
+Invalid data format: Error message with row number
+
+Missing mandatory fields: Error list
+
+Invalid foreign keys (e.g., non-existent component): Error
+
+Data type mismatches: Validation errors
+
+Empty file upload: Error "No data found"
+
+Wrong template format: Error "Invalid template format"
+
+Section 7: Admin - Alerts Configuration (12-15 test cases)
+
+Policies Tab:
+
+View Alert Policies table
+
+Columns: Alert Type, Description, Email, In-App, Priority
+
+Configure which alerts are enabled
+
+Enable/disable Email delivery per alert type
+
+Enable/disable In-App notification per alert type
+
+Set Priority (High/Medium/Low) per alert type
+
+"Save Alert Configuration" button
+
+Save changes
+
+Confirmation message
+
+Configuration persists
+
+Alert Types to Configure:
+
+Work order overdue alerts
+
+Work order pending approval alerts
+
+Low stock alerts
+
+Critical stock (0 qty) alerts
+
+Superintendent notifications
+
+Anomaly detection alerts
+
+Report generation alerts
+
+Running hours high utilization alerts
+
+Missed cycles alerts
+
+Backdating alerts
+
+Quiet Hours Configuration:
+
+"Enable Quiet Hours" toggle
+
+When enabled: Non-critical alerts held during quiet hours
+
+Only High priority alerts bypass quiet hours
+
+Set quiet hours time range (e.g., 10 PM - 6 AM)
+
+Save configuration
+
+Escalation Configuration:
+
+"Enable Escalation" toggle
+
+Configure alert escalation for unacknowledged high priority alerts
+
+Set escalation time threshold
+
+Set escalation recipients
+
+Save escalation settings
+
+History Tab:
+
+Navigate to History tab
+
+View all sent alerts
+
+Columns: Date, Alert Type, Recipient, Status, Delivery Method
+
+Filter by alert type
+
+Filter by date range
+
+Filter by status (Sent, Failed, Pending)
+
+Export alert history
+
+Section 8: Admin - Forms Tab (if present) (6-8 test cases)
+
+Navigate to Forms tab
+
+View available forms
+
+Create custom forms (if available)
+
+Edit form templates
+
+Delete forms
+
+Form field configuration
+
+Form permissions
+
+Section 9: Admin - Master Data Tab (10-12 test cases)
+
+Master Data Management:
+
+Navigate to Master Data tab
+
+View master data categories:
+
+Vessels
+
+Ranks/Roles
+
+Departments
+
+Locations
+
+Categories
+
+Units of Measurement (UOM)
+
+Frequencies
+
+Other master data
+
+For Each Master Data Type:
+
+View list of entries
+
+Add new entry
+
+Edit existing entry
+
+Delete entry (if no dependencies)
+
+Cannot delete if in use (error message)
+
+Search/filter entries
+
+Export master data
+
+Import master data (bulk)
+
+Vessel Master Data:
+
+Add vessel: Name, Code, Type, IMO Number, etc.
+
+Edit vessel details
+
+Assign users to vessels
+
+Vessel activation/deactivation
+
+Ranks/Roles Master Data:
+
+Add rank: Chief Engineer, 3rd Engineer, etc.
+
+Edit rank details
+
+Assign permissions to ranks
+
+Role hierarchy
+
+Locations Master Data:
+
+Add location codes
+
+Edit locations
+
+Associate with vessels
+
+Location hierarchy (if applicable)
+
+Section 10: User Profile & Settings (6-8 test cases)
+
+View Profile:
+
+Click user icon in header
+
+View user information: Name, Role, Vessel, Email
+
+Edit profile button
+
+Update name, email, contact details
+
+Save changes
+
+Profile picture upload (if available)
+
+Change Password:
+
+Navigate to change password
+
+Enter current password
+
+Enter new password (min 8 characters, complexity rules)
+
+Confirm new password
+
+Passwords must match validation
+
+Save new password
+
+Success message
+
+Old password no longer works
+
+New password works
+
+User Preferences:
+
+Notification preferences
+
+Language selection (if multi-language)
+
+Date/time format preferences
+
+Dashboard layout preferences (if customizable)
+
+Save preferences
+
+Logout:
+
+Logout button
+
+Session ends
+
+Redirect to login page
+
+Cannot access pages without login
+
+Login with credentials to re-access
+
+Section 11: Notifications Center (8-10 test cases)
+
+Notifications Icon:
+
+Bell icon in header
+
+Badge shows unread count
+
+Click: Open notifications panel
+
+Notifications List:
+
+View all notifications
+
+Notification types:
+
+Work order overdue
+
+Work order pending approval
+
+Low stock alert
+
+Superintendent notification
+
+Anomaly detected
+
+Report generated
+
+System notifications
+
+Notification Details:
+
+Each notification shows:
+
+Type icon
+
+Message/description
+
+Timestamp (e.g., "2 hours ago")
+
+Read/Unread status
+
+Action button (View, Acknowledge, etc.)
+
+Notification Actions:
+
+Click notification: Marked as read
+
+Badge count decreases
+
+Notification styling changes (unread → read)
+
+Action button navigates to relevant page (e.g., View WO, View Report)
+
+Delete Notification:
+
+Delete button on each notification
+
+Confirmation dialog (optional)
+
+Notification removed from list
+
+Clear All Notifications:
+
+"Clear All" button
+
+Confirmation: "Clear all notifications?"
+
+All notifications removed
+
+Empty state message shown
+
+Mark All as Read:
+
+"Mark All as Read" button
+
+All unread notifications marked as read
+
+Badge count becomes 0
+
+Section 12: Search Functionality (if available) (4-5 test cases)
+
+Global Search:
+
+Search bar in header
+
+Search across modules: Work Orders, Components, Spares, Stores
+
+Type query: Dropdown shows results
+
+Results categorized by module
+
+Click result: Navigate to item detail page
+
+Shows result type badge (WO/Component/Spare/Store)
+
+No results message if query returns nothing
+
+Section 13: Error Handling & Edge Cases (8-10 test cases)
+
+Network Error:
+
+Disconnect network/simulate offline
+
+Dashboard shows error: "Unable to load data"
+
+Retry button available
+
+Reconnect: Data loads successfully
+
+Session Timeout:
+
+Leave dashboard idle for timeout period (e.g., 30 minutes)
+
+Session expires
+
+Redirect to login page
+
+Message: "Session expired. Please login again."
+
+Login with credentials: Redirect to dashboard
+
+Permission Errors:
+
+Login as user with restricted permissions
+
+Protected widgets not visible OR show "Access Denied"
+
+Cannot perform unauthorized actions
+
+Role-based access control (RBAC) enforced
+
+Data Loading Errors:
+
+API failure simulation
+
+Error message displayed
+
+Retry mechanism
+
+Fallback to cached data (if available)
+
+Invalid Data Entry:
+
+Enter invalid data in forms
+
+Client-side validation errors
+
+Server-side validation errors
+
+User-friendly error messages
+
+Browser Compatibility:
+
+Test on Chrome, Firefox, Edge, Safari
+
+Responsive design on different screen sizes
+
+Mobile browser compatibility
+
+Expected Total for Dashboard & Admin: 90-110 test cases
+
+TOTAL EXPECTED TEST CASES ACROSS ALL MODULES: 450-550 test cases
+
+IMPLEMENTATION INSTRUCTIONS FOR REPLIT:
+
+Step 1: Install Required NPM Package
+
+bash
+npm install xlsx
+Step 2: Create Node.js Script
+
+Create a script that:
+
+Creates Excel workbook using xlsx library
+
+Creates 7 sheets (Components, Work Orders, Running Hours, Spares, Stores, Reports, Dashboard & Admin)
+
+Populates each sheet with test cases as specified above
+
+Applies formatting:
+
+Header row: Bold, white text, dark blue background (#1F4E78), centered, text wrap
+
+Data rows: Alternating white and light gray (#F2F2F2)
+
+Borders: Thin borders (#D3D3D3) on all cells, medium on header
+
+Column widths as specified
+
+Adds data validation:
+
+Priority column: Dropdown (High, Medium, Low)
+
+Pass/Fail column: Dropdown (Pass, Fail, Blocked, Not Tested)
+
+Test Date column: Date format
+
+Adds conditional formatting:
+
+Pass/Fail column: Green for "Pass", Red for "Fail", Yellow for "Blocked"/"Not Tested"
+
+Freezes header row on all sheets
+
+Adds auto-filters to header rows
+
+Sets print settings:
+
+Fit to 1 page wide
+
+Repeat header row on each page
+
+Portrait orientation (Landscape for Work Orders sheet)
+
+Saves file as PMS_UAT_TestCases_Comprehensive.xlsx
+
+Step 3: File Placement
+
+Save the generated Excel file in project root or /docs folder
+
+Provide download link or file path in response
+
+CRITICAL REMINDERS FOR TEST CASE GENERATION:
+
+Verify Against Live Application:
+
+Before generating test cases, navigate to each module in the live PMS application
+
+Take screenshots of actual UI elements
+
+Document actual button names, filter options, dropdown values
+
+DO NOT create test cases for features that don't exist
+
+Test Case Quality Requirements:
+
+Every test step must be executable by a non-technical tester
+
+Use actual field names, button labels, and navigation paths from the UI
+
+Include specific test data (dates, values, text)
+
+Expected results must be verifiable and specific
+
+No assumptions - all steps must be based on actual implementation
+
+Priority Assignment:
+
+High Priority: Core functionality, critical workflows, data integrity, security, Layer 1-7 features
+
+Medium Priority: Important features, user experience, filters, search, export
+
+Low Priority: Nice-to-have features, cosmetic issues, optional fields
+
+Test Case Independence:
+
+Each test case should be executable independently
+
+Include preconditions if necessary
+
+Don't assume data from previous test cases
+
+Coverage Requirements:
+
+Test both positive scenarios (valid inputs, happy path) and negative scenarios (invalid inputs, edge cases, error conditions)
+
+Test all user roles: 3rd Engineer, Chief Engineer, Superintendent, Admin
+
+Test all validation rules
+
+Test all edge cases: empty fields, max length, special characters, very old dates, future dates, large numbers, negative numbers, zero, concurrent users
+
+Module-Specific Focus Areas:
+
+Components: Tree navigation, detail sections (A-H), filters, add/edit
+
+Work Orders: All 7 Layers (Backdating, Missed Cycles, RH Validation, CE Remarks, Superintendent Notifications, Dashboard Anomalies, RH Timeline), status tabs, completion workflow
+
+Running Hours: History tab implementation, utilization calculation, RH isolation from work orders
+
+Spares: History tab, stock transactions, component linking
+
+Stores: Category tabs, history tab, transactions
+
+Reports: All 27+ reports, scheduling, export queue
+
+Dashboard & Admin: All widgets, vessel filtering, bulk import, alerts configuration
+
+Formatting Consistency:
+
+Use numbered steps: "1. Click..., 2. Enter..., 3. Verify..."
+
+Be specific with values: "Enter RH: 560" not "Enter a value"
+
+Use exact button/field names from UI: "+ Add / Edit Component" not "Add Component"
+
+Include expected error messages verbatim
+
+FINAL DELIVERABLE:
+
+An Excel file named PMS_UAT_TestCases_Comprehensive.xlsx with:
+
+7 professionally formatted sheets
+
+450-550 comprehensive test cases
+
+Ready for immediate client UAT execution
+
+All test cases verified against actual PMS implementation
+
+Complete coverage of every feature, button, filter, validation, workflow, and edge case
+
+This document will serve as the definitive UAT testing guide for production deployment sign-off.

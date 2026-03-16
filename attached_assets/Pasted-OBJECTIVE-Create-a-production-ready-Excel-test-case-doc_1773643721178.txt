@@ -1,0 +1,581 @@
+OBJECTIVE:
+Create a production-ready Excel test case document (.xlsx file) for the entire PMS (Planned Maintenance System) application based on ACTUAL UI implementation. This document will be used by the client for User Acceptance Testing (UAT) before production deployment.
+
+CRITICAL INSTRUCTION:
+Before generating test cases, you MUST thoroughly explore each module in the live application to understand the actual UI, buttons, filters, fields, and workflows. DO NOT create test cases for features that don't exist. All test steps must be executable against the current implementation.
+
+OUTPUT REQUIREMENT:
+Generate a single Excel file named PMS_UAT_TestCases_Comprehensive.xlsx with 7 separate sheets (one per module), professional formatting, and comprehensive test coverage of every actual feature.
+
+EXCEL FILE STRUCTURE:
+
+Create 7 sheets in the following order:
+
+Sheet 1: Components Module
+
+Sheet 2: Work Orders Module
+
+Sheet 3: Running Hours Module
+
+Sheet 4: Spares Module
+
+Sheet 5: Stores Module
+
+Sheet 6: Reports Module
+
+Sheet 7: Dashboard & Admin
+
+COLUMN STRUCTURE FOR EACH SHEET:
+
+Column	Header	Width	Description
+A	Test Case ID	15	Unique identifier (e.g., COMP-001, WO-001)
+B	Module/Section	20	Sub-module or section name
+C	Test Scenario	35	What is being tested
+D	Priority	10	High/Medium/Low
+E	Test Steps	50	Detailed step-by-step instructions (numbered)
+F	Test Data	30	Sample data to use for testing
+G	Expected Result	40	What should happen
+H	Actual Result	40	Empty - for tester to fill
+I	Pass/Fail	10	Empty - for tester to fill
+J	Comments/Issues	30	Empty - for tester to fill
+K	Tester Name	15	Empty - for tester to fill
+L	Test Date	12	Empty - for tester to fill
+FORMATTING REQUIREMENTS:
+
+Header Row:
+
+Bold, white text on dark blue background (#1F4E78)
+
+Centered, text wrap enabled
+
+Font: Arial 11pt Bold
+
+Data Rows:
+
+Alternating white and light gray (#F2F2F2) backgrounds
+
+Font: Arial 10pt
+
+Minimum row height: 25
+
+Text wrap enabled for Test Steps, Expected Result, and Actual Result columns
+
+Borders:
+
+All cells: Thin borders (#D3D3D3)
+
+Header row: Medium borders
+
+Additional Formatting:
+
+Freeze header row on each sheet
+
+Auto-filter enabled on header row
+
+Conditional formatting for Pass/Fail column:
+
+Green background for "Pass"
+
+Red background for "Fail"
+
+Yellow background for "Blocked" or "Not Tested"
+
+Data validation dropdowns:
+
+Priority: High, Medium, Low
+
+Pass/Fail: Pass, Fail, Blocked, Not Tested
+
+Test Date: Date picker
+
+DETAILED TEST CASE REQUIREMENTS BY MODULE:
+
+SHEET 1: COMPONENTS MODULE
+Actual UI Elements to Test:
+
+Vessel dropdown filter (top bar, left side)
+
+Search bar (searches by Name, SFI Code, Fleet Equipment Code, Maker, Serial No)
+
+Critical Item dropdown filter (All Items, Critical Items, etc.)
+
+Clear button
+
+Export button
+
+"+ Add / Edit Component" button
+
+Component tree (left panel):
+
+Ship General
+
+Hull
+
+Equipment for Cargo
+
+Ship's Equipment
+
+Equipment for Crew & Passengers
+
+Machinery Main Components
+
+Systems for Machinery Main Components
+
+Ship Common Systems
+
+Edit and Expand/Collapse buttons
+
+Component detail view (right panel) with sections:
+
+A. Component Information
+
+B. Running Hours & Condition Monitoring
+
+C. Jobs
+
+D. Maintenance History
+
+E. Spares
+
+F. Drawings & Manuals (Coming soon)
+
+G. Classification & Regulatory Data (Coming soon)
+
+H. Requisitions (Coming soon)
+
+Test Coverage Sections:
+
+Section 1: Filters & Search (8-10 test cases)
+
+Vessel filter selection and data refresh
+
+Search functionality (partial match, exact match, no results)
+
+Critical Item filter
+
+Clear button resets all filters
+
+Multiple filter combinations
+
+Section 2: Component Tree Navigation (6-8 test cases)
+
+Expand/collapse categories
+
+Click on component to view details
+
+Edit button functionality
+
+Navigation between components
+
+Section 3: Component Details View (10-12 test cases)
+
+View component information fields (all fields displayed correctly)
+
+Running Hours section (RH Counter Type, Source, Hours, Last Updated)
+
+Jobs section (table with Job Code, Title, Task Type, Frequency, Last Done, Next Due, Actions)
+
+"Add Job" button
+
+Maintenance History section
+
+Spares section (linked spares displayed)
+
+Navigation to Spares module link
+
+Section 4: Add/Edit Component (12-15 test cases)
+
+Click "+ Add / Edit Component"
+
+Form field validations (mandatory fields, format validation)
+
+Component code uniqueness
+
+Save functionality
+
+Cancel functionality
+
+Edit existing component
+
+Field pre-population on edit
+
+Section 5: Export Functionality (2-3 test cases)
+
+Export to Excel/CSV
+
+Exported file contains correct data
+
+Filtered data export
+
+Expected Total: 40-50 test cases
+
+SHEET 2: WORK ORDERS MODULE
+Actual UI Elements to Test:
+
+Status tabs: Planned, Due (with count badge), Overdue (with count badge), Pending Approval, Completed (with count badge)
+
+Vessel dropdown filter
+
+Search bar (search work orders)
+
+Period dropdown filter
+
+All Ranks dropdown filter
+
+Criticality dropdown filter
+
+Clear button
+
+Export button
+
+"+ Unplanned W.O" button
+
+Pagination controls (bottom): Show dropdown (10/25/50/100 items per page), Page navigation
+
+Work order table columns: Component, Work Order No, Job Title, Assigned to, Due Date, Status, Actions
+
+Test Coverage Sections:
+
+Section 1: Work Order List & Filters (15-18 test cases)
+
+View all status tabs (Planned, Due, Overdue, Pending Approval, Completed)
+
+Count badges accuracy
+
+Vessel filter
+
+Period filter (This Month, Last Month, This Quarter, etc.)
+
+Rank filter (All Ranks, 3rd Engineer, Chief Engineer, etc.)
+
+Criticality filter
+
+Search by work order code/component/job
+
+Clear button
+
+Multiple filter combinations
+
+Pagination (10, 25, 50, 100 items per page)
+
+Page navigation (first, previous, next, last)
+
+Section 2: Create Unplanned Work Order (10-12 test cases)
+
+Click "+ Unplanned W.O"
+
+Form field validations
+
+Select component dropdown
+
+Select job dropdown (filtered by component)
+
+Set due date
+
+Assign to rank
+
+Set priority/criticality
+
+Save work order
+
+Cancel action
+
+Work order code auto-generation
+
+Section 3: View Work Order Details (8-10 test cases)
+
+Click on work order to view
+
+Display all sections (Part A, Part B, etc.)
+
+View job details
+
+View completion information
+
+View running hours section
+
+View spare parts consumed
+
+View attachments
+
+View approval status
+
+Section 4: Complete Work Order - Part A (15-18 test cases)
+
+Fill completion date
+
+Start date and time
+
+Completion time
+
+Performed by (rank selection)
+
+Number of persons in team
+
+Auto-calculate total time taken
+
+Auto-calculate man-hours
+
+Work carried out description (max 2000 characters)
+
+Character counter display
+
+Job experience/notes field
+
+Upload attachments (images, PDFs)
+
+Remove attachments
+
+File size validation (max 5 MB)
+
+File type validation (.jpg, .jpeg, .png, .pdf only)
+
+Maximum 5 files per section
+
+Section 5: Complete Work Order - Part B (10-12 test cases)
+
+Safety checklists section (Yes/No/NA radio buttons)
+
+Upload risk assessment document
+
+Upload safety checklist
+
+Upload operational forms
+
+Work details section
+
+Spare parts consumed (add/remove rows)
+
+Spare part autocomplete search
+
+Quantity validation
+
+Location dropdown
+
+Comments field
+
+Section 6: LAYER 1 - Backdating Detection (8-10 test cases)
+
+Complete on due date (no flag)
+
+Complete before due date (no flag)
+
+Complete 1 day late (no flag)
+
+Complete 5 days late, enter completion date 3 days ago (BACKDATED - 3 days flag appears)
+
+Complete 10 days late, enter completion date 7 days ago (BACKDATED - 7 days flag)
+
+Complete 30 days late, enter completion date 20 days ago (BACKDATED - 20 days, high severity)
+
+Visual indicators (red flag icon, days backdated count, tooltip, red background in Part A)
+
+Backdating appears in work history
+
+Section 7: LAYER 2 - Missed Cycles Tracking (15-20 test cases)
+
+Weekly Frequency (7 days):
+
+Complete on time (0-7 days late): 0 missed cycles, no badge
+
+Complete 8-14 days late: 1 missed cycle, orange badge "1 Cycle Skipped"
+
+Complete 15-21 days late: 2 missed cycles, red badge "2 Cycles Skipped"
+
+Complete 22-28 days late: 3+ missed cycles, red badge "3 Cycles Skipped"
+
+Monthly Frequency (30 days):
+
+Complete on time (0-30 days late): 0 missed cycles
+
+Complete 31-60 days late: 1 missed cycle
+
+Complete 61-90 days late: 2 missed cycles
+
+Complete 91+ days late: 3+ missed cycles
+
+Quarterly Frequency (90 days):
+
+Test similar patterns
+
+Yearly Frequency (365 days):
+
+Test similar patterns
+
+Running Hours Based:
+
+Due at 1000 RH, completed at 1005 RH: 0 missed cycles
+
+Due at 1000 RH, completed at 1055 RH (50 RH interval): 1 missed cycle
+
+Due at 1000 RH, completed at 1120 RH: 2+ missed cycles
+
+Badge Display:
+
+Badge appears in Part B section
+
+Badge color coding (Orange for 1-2 cycles, Red for 3+ cycles)
+
+Badge count accuracy
+
+Badge persists in work history
+
+Badge shows in work order list
+
+Next Due Date Calculation:
+
+Next due calculated from completion date (not original due date)
+
+Verify for calendar-based jobs
+
+Verify for RH-based jobs
+
+Section 8: LAYER 4B - CE Remarks Mandatory (8-10 test cases)
+
+Low Severity (No CE Remarks Required):
+
+Complete WO 5 days late, 0 missed cycles: CE remarks optional
+
+Complete WO 10 days late, 1 missed cycle: CE remarks optional
+
+Complete on time with backdating 3 days: CE remarks optional
+
+High Severity (CE Remarks MANDATORY):
+
+Complete WO 21+ days late: CE remarks section appears, mandatory
+
+Complete WO with 3+ missed cycles: CE remarks mandatory
+
+Complete WO with 7+ days backdating: CE remarks mandatory
+
+Try to save without CE remarks: Error "Chief Engineer remarks mandatory for high severity delays"
+
+CE Remarks Validation:
+
+Minimum 20 characters required
+
+Character counter displayed
+
+Cannot save with <20 characters
+
+Error message shown
+
+Placeholder text
+
+CE remarks highlighted in yellow in Part B
+
+Shows who entered remarks and timestamp
+
+Persists in work history
+
+Visible to Superintendent in notifications
+
+Section 9: LAYER 7 - Running Hours Validation & Isolation (40-45 test cases)
+
+Part A: RH Fetch Functionality (4-5 test cases)
+
+"Fetch RH" button visible in B3 section
+
+Click Fetch RH button
+
+Current RH auto-filled from RH Module
+
+Loading indicator shown
+
+Success message "RH fetched from module"
+
+RH Source marked as "AUTO-FETCHED"
+
+Timestamp of fetch shown
+
+Works for RH-based components only
+
+Disabled for calendar-based components
+
+Part B: RH Validation - Valid Entries (5-6 test cases)
+
+Valid RH Entry Within Range:
+
+Previous RH: 500 (01-Mar-2026)
+
+Next RH: 620 (21-Mar-2026)
+
+Completion Date: 11-Mar-2026 (10 days from previous, 10 days before next)
+
+Enter RH: 560
+
+Expected: Green border, "Valid entry" message, Average 12 hrs/day
+
+Valid RH Entry Near Previous:
+
+Previous RH: 500 (01-Mar-2026)
+
+Completion Date: 02-Mar-2026 (1 day later)
+
+Enter RH: 520
+
+Expected: Valid (20 hrs/day, under 24 max)
+
+Valid RH Entry Near Next:
+
+Next RH: 620 (21-Mar-2026)
+
+Completion Date: 20-Mar-2026 (1 day before next)
+
+Enter RH: 600
+
+Expected: Valid (20 hrs/day forward rate)
+
+Part C: RH Validation - Invalid Backward Violations (4-5 test cases)
+
+Backward Violation Exceeds 24 hrs/day:
+
+Previous RH: 500 (01-Mar-2026)
+
+Completion Date: 06-Mar-2026 (5 days later)
+
+Max increase: 5 days × 24 = 120 hrs
+
+Enter RH: 700 (increase of 200 hrs)
+
+Expected: Red border, Error modal "Physically impossible - exceeds 24 hrs/day", Valid range shown (500-620), Cannot save
+
+Backward Violation Extreme Case:
+
+Previous RH: 500 (01-Mar-2026)
+
+Completion Date: 03-Mar-2026 (2 days later)
+
+Enter RH: 1000 (increase of 500 hrs in 2 days!)
+
+Expected: Red border, Error "Would require 250 hrs/day", Cannot save
+
+Part D: RH Validation - Invalid Forward Violations (4-5 test cases)
+
+Forward Violation Conflicts with Future Entry:
+
+Previous RH: 500 (01-Mar-2026)
+
+Next RH: 620 (11-Mar-2026)
+
+Completion Date: 09-Mar-2026 (2 days before next)
+
+Enter RH: 550
+
+Check: Next requires (620-550) = 70 hrs in 2 days = 35 hrs/day
+
+Expected: Red border, Error "Conflicts with future RH entry", Max possible in 2 days = 48 hrs, Cannot save
+
+Forward Violation Too Low:
+
+Previous RH: 500 (01-Mar-2026)
+
+Next RH: 620 (11-Mar-2026)
+
+Completion Date: 09-Mar-2026
+
+Enter RH: 520 (too low)
+
+Would need 100 hrs in 2 days to reach next
+
+Expected: Invalid forward rate error
