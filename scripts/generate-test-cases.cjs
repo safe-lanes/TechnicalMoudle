@@ -14,18 +14,18 @@ const THIN_BORDER = {
 };
 
 const COLUMNS = [
-  { header: 'TEST CASE ID', key: 'id', width: 15 },
-  { header: 'MODULE/SECTION', key: 'section', width: 20 },
-  { header: 'TEST SCENARIO', key: 'scenario', width: 35 },
-  { header: 'PRIORITY', key: 'priority', width: 10 },
-  { header: 'TEST STEPS', key: 'steps', width: 50 },
-  { header: 'TEST DATA', key: 'testData', width: 30 },
-  { header: 'EXPECTED RESULT', key: 'expected', width: 40 },
-  { header: 'ACTUAL RESULT', key: 'actual', width: 40 },
-  { header: 'PASS/FAIL', key: 'passFail', width: 10 },
-  { header: 'COMMENTS/ISSUES', key: 'comments', width: 30 },
-  { header: 'TESTER NAME', key: 'tester', width: 15 },
-  { header: 'TEST DATE', key: 'testDate', width: 12 },
+  { header: 'Test Case ID', key: 'id', width: 15 },
+  { header: 'Module/Section', key: 'section', width: 20 },
+  { header: 'Test Scenario', key: 'scenario', width: 35 },
+  { header: 'Priority', key: 'priority', width: 10 },
+  { header: 'Test Steps', key: 'steps', width: 50 },
+  { header: 'Test Data', key: 'testData', width: 30 },
+  { header: 'Expected Result', key: 'expected', width: 40 },
+  { header: 'Actual Result', key: 'actual', width: 40 },
+  { header: 'Pass/Fail', key: 'passFail', width: 10 },
+  { header: 'Comments/Issues', key: 'comments', width: 30 },
+  { header: 'Tester Name', key: 'tester', width: 15 },
+  { header: 'Test Date', key: 'testDate', width: 12 },
 ];
 
 function tc(id, section, scenario, priority, steps, testData, expected) {
