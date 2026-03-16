@@ -529,3 +529,41 @@ Eight validation and integrity rules for the Work Order form Part B, covering fr
 - If task queue items need clearing, contact Replit support.
 - Key test vessels: Vessel 4 (744535d0-841a-11ed-aa7c-7003bca91a86) for history data, Vessel 3 (7440571a-841a-11ed-aa7c-7003bca91a86) for large dataset testing.
 - `localStorage.setItem('selectedVesselId', 'UUID')` to switch vessels programmatically in browser console.
+
+---
+
+## 2026-03-13 (Friday) — Sail Admin Role-Based Visibility Controls
+
+### What We Built
+- Restricted three UI elements to be visible only for the "Sail Admin" role. All other roles (Client Admin, Head of Dept, Vessel) — regardless of whether the user is Office or Ship type — now have these elements completely hidden.
+- The three elements controlled:
+  1. **Chatbot floating button** (bottom-right corner chat assistant widget)
+  2. **Export button** on the Work Orders (W.O) page, including the export dialog
+  3. **Anomaly sections** on the Dashboard Overview tab: Compliance Anomaly Detection panel and Work Order Anomalies tile
+
+### What's Working
+- **Chatbot**: `ChatButton` component returns `null` when the user is not Sail Admin. Both the floating button and the chat panel are fully hidden.
+- **Export (Work Orders)**: The Export button and the Export dialog are wrapped in `isSailAdmin` conditionals. Non-Sail Admin users see no Export button and cannot open the export dialog.
+- **Anomaly sections (Dashboard)**: Both `ComplianceAnomalyPanel` and `AnomalyDetectionTile` are gated behind `isSailAdmin` in addition to the existing `activeTab === 'overview'` check. No empty space or layout artifacts for non-Sail Admin roles.
+- All checks use the existing `useUIRole()` hook and its `isSailAdmin` boolean flag — no new role logic introduced.
+- E2e test confirmed all three elements render correctly for the default Sail Admin role.
+
+### What's Broken
+- Nothing broken from this session's changes.
+- The RoleSwitcher component in the top nav is display-only (shows current role but cannot switch). This is pre-existing behavior, not introduced by this session.
+
+### What's Pending
+- No code-level work pending for this feature.
+- To fully test non-Sail Admin hiding in the browser, you need to log in as a non-Sail Admin user (the dev default is Sail Admin). The RoleSwitcher does not allow interactive switching.
+
+### Key Files Changed
+- `client/src/components/chat/ChatButton.tsx` — Added `useUIRole` import, `isSailAdmin` check, early `return null` for non-Sail Admin.
+- `client/src/pages/pms/WorkOrders.tsx` — Wrapped Export button (line ~717) and Export dialog (line ~1227) in `{isSailAdmin && (...)}` conditionals.
+- `client/src/pages/pms/Dashboard.tsx` — Added `&& isSailAdmin` to both `ComplianceAnomalyPanel` and `AnomalyDetectionTile` render conditions (lines ~1547, ~1552).
+
+### Environment Issues
+- None. Application compiles and runs normally.
+
+### Where to Resume
+- All Sail Admin visibility controls are complete. Ready for next feature request.
+- If interactive role-switching for testing is needed, the `setUIRole` function in `UIRoleContext.tsx` is currently a no-op — it could be implemented to allow dev-mode role switching via the RoleSwitcher dropdown.
