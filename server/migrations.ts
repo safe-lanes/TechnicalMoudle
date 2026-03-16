@@ -2042,6 +2042,38 @@ const migrations: Migration[] = [
         (24, gen_random_uuid(), 'admin-ships-surveys',      'Ship''s Surveys',      '/admin/ships-surveys',      (SELECT muid FROM adm_menumaster_ac WHERE id = 4), true, 24, NOW(), NOW(), false, false)
       ON CONFLICT (id) DO NOTHING;
     `
+  },
+  {
+    id: '066_adm_role_menu_access',
+    name: 'Create adm_role_menu_access junction table',
+    description: 'Junction table for role-menu permission mappings with can_view, can_create, can_edit, can_delete booleans',
+    sql: `
+      CREATE TABLE IF NOT EXISTS adm_role_menu_access (
+        id INTEGER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+        role_ruid TEXT NOT NULL,
+        menu_muid TEXT NOT NULL,
+        can_view BOOLEAN DEFAULT false,
+        can_create BOOLEAN DEFAULT false,
+        can_edit BOOLEAN DEFAULT false,
+        can_delete BOOLEAN DEFAULT false,
+        created_at TIMESTAMPTZ DEFAULT NOW(),
+        updated_at TIMESTAMPTZ DEFAULT NOW(),
+        created_by_uuid TEXT,
+        updated_by_uuid TEXT,
+        UNIQUE(role_ruid, menu_muid)
+      );
+    `
+  },
+  {
+    id: '067_seed_access_control_menu',
+    name: 'Add Access Control menu entry',
+    description: 'Adds Access Control sub-module under Admin (id=25, sort_order=25)',
+    sql: `
+      INSERT INTO adm_menumaster_ac (id, muid, name, display_name, route, parent_menu, is_active, sort_order, created_at, updated_at, is_deleted, is_sync)
+      VALUES
+        (25, gen_random_uuid(), 'admin-access-control', 'Access Control', '/admin/access-control', (SELECT muid FROM adm_menumaster_ac WHERE id = 4), true, 25, NOW(), NOW(), false, false)
+      ON CONFLICT (id) DO NOTHING;
+    `
   }
 ];
 

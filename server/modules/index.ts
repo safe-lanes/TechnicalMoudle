@@ -16,6 +16,7 @@ import alertRoutes from './alerts/routes';
 import formRoutes from './forms/routes';
 import chatbotRoutes from './chatbot/routes';
 import miscRoutes from './misc/routes';
+import accessControlRoutes from './access-control/routes';
 
 const moduleRouter = Router();
 
@@ -37,5 +38,6 @@ moduleRouter.use(alertRoutes);
 moduleRouter.use(formRoutes);
 moduleRouter.use(chatbotRoutes);
 moduleRouter.use(miscRoutes);
+moduleRouter.use(accessControlRoutes);
 
 export default moduleRouter;

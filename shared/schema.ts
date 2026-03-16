@@ -3135,3 +3135,28 @@ export const insertAdmMenumasterAcSchema = createInsertSchema(admMenumasterAc).o
 
 export type InsertAdmMenumasterAc = z.infer<typeof insertAdmMenumasterAcSchema>;
 export type AdmMenumasterAc = typeof admMenumasterAc.$inferSelect;
+
+export const admRoleMenuAccess = pgTable("adm_role_menu_access", {
+  id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
+  roleRuid: text("role_ruid").notNull(),
+  menuMuid: text("menu_muid").notNull(),
+  canView: boolean("can_view").default(false),
+  canCreate: boolean("can_create").default(false),
+  canEdit: boolean("can_edit").default(false),
+  canDelete: boolean("can_delete").default(false),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow(),
+  createdByUuid: text("created_by_uuid"),
+  updatedByUuid: text("updated_by_uuid"),
+}, (table) => [
+  unique().on(table.roleRuid, table.menuMuid),
+]);
+
+export const insertAdmRoleMenuAccessSchema = createInsertSchema(admRoleMenuAccess).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type InsertAdmRoleMenuAccess = z.infer<typeof insertAdmRoleMenuAccessSchema>;
+export type AdmRoleMenuAccess = typeof admRoleMenuAccess.$inferSelect;

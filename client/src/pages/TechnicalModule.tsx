@@ -28,6 +28,7 @@ import { useLocation, useParams } from "wouter";
 import DataMasters from "./admin/DataMasters";
 import ShipsCertificatesAdmin from "./admin/ShipsCertificatesAdmin";
 import ShipsSurveysAdmin from "./admin/ShipsSurveysAdmin";
+import AccessControl from "./admin/AccessControl";
 
 export const TechnicalModule = () => {
   const [location, setLocation] = useLocation();
@@ -160,6 +161,8 @@ export const TechnicalModule = () => {
             <ShipsCertificatesAdmin />
           ) : selectedSubModule === "admin" && selectedMenuItem === "ships-surveys" ? (
             <ShipsSurveysAdmin />
+          ) : selectedSubModule === "admin" && selectedMenuItem === "access-control" ? (
+            <AccessControl />
           ) : selectedSubModule === "admin" ? (
             <PMSAdmin />
           ) : selectedSubModule === "pms" && selectedMenuItem === "reports" ? (
