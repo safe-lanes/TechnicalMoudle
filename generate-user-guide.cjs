@@ -60,7 +60,7 @@ async function build() {
     "1.3  Work Orders", "  1.3.1  Opening Screen", "  1.3.2  Status Tabs", "  1.3.3  Due Work Orders", "  1.3.4  Overdue Work Orders", "  1.3.5  Pending Approval", "  1.3.6  Completed Work Orders", "  1.3.7  How to Create an Unplanned Work Order", "  1.3.8  How to Postpone a Work Order", "  1.3.9  How to Approve / Reject a Work Order", "  1.3.10  Export Dialog",
     "1.4  Running Hours", "  1.4.1  Opening Screen", "  1.4.2  How to Update Running Hours", "  1.4.3  How to Perform Bulk Update", "  1.4.4  Running Hours History",
     "1.5  Spares (Inventory)", "  1.5.1  Opening Screen", "  1.5.2  Location View", "  1.5.3  History View", "  1.5.4  How to Add a Spare Part", "  1.5.5  How to Consume / Receive Spares", "  1.5.6  How to Export Spares",
-    "1.6  Stores", "  1.6.1  Opening Screen", "  1.6.2  Lubes", "  1.6.3  Chemicals", "  1.6.4  How to Add / Receive / Consume Store Items",
+    "1.6  Stores", "  1.6.1  Opening Screen", "  1.6.2  Lubes", "  1.6.3  Chemicals", "  1.6.4  Others", "  1.6.5  How to Add / Receive / Consume Store Items",
     "1.7  Defects", "  1.7.1  Defect Log", "  1.7.2  How to Report a New Defect", "  1.7.3  How to Close and Verify a Defect", "  1.7.4  Condition of Class (CoC)",
     "1.8  Certificates & Surveys", "  1.8.1  Certificates", "  1.8.2  Surveys", "  1.8.3  How to Edit and Manage Attachments",
     "1.9  Reports", "  1.9.1  Opening Screen", "  1.9.2  How to Generate and Export Reports",
@@ -117,13 +117,16 @@ async function build() {
 
   c.push(h2("1.2.3  Component Details"));
   c.push(para("When a component is selected, the right panel shows collapsible sections:"));
-  c.push(bullet("A. Component Information \u2013 Fleet Equipment Code/Name, Component Code/Name, Maker, Model, Serial No, Category, Criticality, Department."));
-  c.push(bullet("B. Running Hours \u2013 Counter Type (Master/Inherited/None), Current RH, Last Updated."));
-  c.push(bullet("C. Jobs \u2013 Maintenance tasks with Job Code, Title, Frequency, Due Date. \u201CGenerate WO\u201D and \u201CAdd Job\u201D available."));
-  c.push(bullet("D. Maintenance History \u2013 Read-only log of completed work orders."));
-  c.push(bullet("E. Spares \u2013 Linked spare parts with current ROB."));
+  c.push(await img("components_details"));
+  c.push(fig("Figure 1.2.3 \u2013 Component Details. (1) Component tree with selected item, (2) Component Information section, (3) Jobs section, (4) Spares section."));
+  c.push(bullet("(1) Component Tree \u2013 Expanded hierarchy with selected component highlighted."));
+  c.push(bullet("(2) Component Information \u2013 Fleet Equipment Code/Name, Component Code/Name, Maker, Model, Serial No, Category, Criticality, Department."));
+  c.push(bullet("(3) Jobs \u2013 Maintenance tasks with Job Code, Title, Frequency, Due Date. \u201CGenerate WO\u201D and \u201CAdd Job\u201D available."));
+  c.push(bullet("(4) Spares & Maintenance History \u2013 Linked spare parts with current ROB, and read-only log of completed work orders."));
 
   c.push(h2("1.2.4  How to Add / Edit a Component"));
+  c.push(await img("components_add"));
+  c.push(fig("Figure 1.2.4 \u2013 Add/Edit Component Form. (1) Component registration form with required fields."));
   c.push(step(1, "Click \u201C+ Add / Edit Component\u201D (top-right)."));
   c.push(step(2, "Fill required fields: Component Code, Name, Parent, Department."));
   c.push(step(3, "Click \u201CSave\u201D."));
@@ -179,6 +182,8 @@ async function build() {
   c.push(bullet("(2) Table \u2013 Read-only archive with completion dates and outcomes."));
 
   c.push(h2("1.3.7  How to Create an Unplanned Work Order"));
+  c.push(await img("workorders_unplanned"));
+  c.push(fig("Figure 1.3.7 \u2013 Unplanned Work Order Form. (1) Form with Component, Job Title, Task Type, Assigned To, Priority, Description fields."));
   c.push(step(1, "Click \u201C+ Unplanned W.O\u201D (top-right)."));
   c.push(step(2, "Select Component, enter Job Title, Task Type, Assigned To, Priority, Description."));
   c.push(step(3, "Click \u201CCreate\u201D."));
@@ -221,6 +226,8 @@ async function build() {
   c.push(note("Updates cascade to child components with Inherited RH type."));
 
   c.push(h2("1.4.3  How to Perform Bulk Update"));
+  c.push(await img("runninghours_bulk"));
+  c.push(fig("Figure 1.4.3 \u2013 Bulk Update Running Hours. (1) Bulk update form with multiple component fields."));
   c.push(step(1, "Click \u201C+ Bulk Update RH\u201D."));
   c.push(step(2, "Enter values for multiple components in the form."));
   c.push(step(3, "Click \u201CSave All\u201D."));
@@ -257,6 +264,8 @@ async function build() {
   c.push(bullet("(2) Transaction ledger \u2013 Date, Type (Consume/Receive), Spare Part, Quantity, Balance, Work Order Reference, Updated By."));
 
   c.push(h2("1.5.4  How to Add a Spare Part"));
+  c.push(await img("spares_add"));
+  c.push(fig("Figure 1.5.4 \u2013 Add Spare Part Form. (1) Form with Part Code, Name, Number, Component, Min/Max, Unit fields."));
   c.push(step(1, "Click \u201C+ Add Spare\u201D."));
   c.push(step(2, "Enter Part Code, Name, Number, Component, Min/Max, Unit, Location quantities."));
   c.push(step(3, "Click \u201CSave\u201D."));
@@ -295,7 +304,13 @@ async function build() {
   c.push(bullet("(1) Chemicals tab \u2013 Filters to onboard chemicals with additional fields: Hazard Classification, UN Number, Flash Point."));
   c.push(bullet("(2) Table \u2013 Includes chemical-specific safety data columns."));
 
-  c.push(h2("1.6.4  How to Add / Receive / Consume Store Items"));
+  c.push(h2("1.6.4  Others"));
+  c.push(await img("stores_others"));
+  c.push(fig("Figure 1.6.4 \u2013 Stores \u2013 Others Tab. (1) Others category selected, (2) Miscellaneous items inventory."));
+  c.push(bullet("(1) Others tab \u2013 Filters the table to show miscellaneous items not in Stores/Lubes/Chemicals."));
+  c.push(bullet("(2) Table \u2013 Same columns as other categories."));
+
+  c.push(h2("1.6.5  How to Add / Receive / Consume Store Items"));
   c.push(para("Add:"));
   c.push(step(1, "Click \u201C+ Add Store\u201D."));
   c.push(step(2, "Fill Item Code, Name, IMPA Code, Category, Unit, Min Level."));
@@ -321,6 +336,8 @@ async function build() {
   c.push(bullet("(5) + New Defect \u2013 Start defect reporting wizard."));
 
   c.push(h2("1.7.2  How to Report a New Defect"));
+  c.push(await img("defects_new"));
+  c.push(fig("Figure 1.7.2 \u2013 New Defect Form (Part A). (1) Defect reporting wizard with vessel, component, category, description, severity fields."));
   c.push(para("Part A \u2013 Initial Report:"));
   c.push(step(1, "Click \u201C+ New Defect\u201D."));
   c.push(step(2, "Enter: Vessel, Date, Component, Category, Description, Severity, Attachments (photos/documents)."));
@@ -436,6 +453,6 @@ async function build() {
   fs.writeFileSync("SAIL_PMS_Module_User_Manual.docx", buf);
   console.log("Done! SAIL_PMS_Module_User_Manual.docx");
   console.log("Size: " + (buf.length / 1024).toFixed(1) + " KB");
-  console.log("Embedded images: 28");
+  console.log("Embedded images: 35");
 }
 build().catch(e => { console.error(e); process.exit(1); });
