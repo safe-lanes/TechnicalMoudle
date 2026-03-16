@@ -101,12 +101,23 @@ const CHILD_ROUTE_PATTERNS: Array<{ pattern: RegExp; parentMenuName: string }> =
   { pattern: /^\/pms\/modify-pms\//, parentMenuName: "pms-modify-pms" },
   { pattern: /^\/pms\/work-orders\//, parentMenuName: "pms-work-orders" },
   { pattern: /^\/pms\/components\//, parentMenuName: "pms-components" },
+  { pattern: /^\/pms\/maintenance-records/, parentMenuName: "pms-components" },
+  { pattern: /^\/pms\/superintendent/, parentMenuName: "pms-work-orders" },
   { pattern: /^\/defects\/new$/, parentMenuName: "defects-active" },
   { pattern: /^\/defects\/edit\//, parentMenuName: "defects-active" },
   { pattern: /^\/admin\/masters\//, parentMenuName: "admin-masters" },
   { pattern: /^\/admin\/ships-certificates\//, parentMenuName: "admin-ships-certificates" },
   { pattern: /^\/admin\/ships-surveys\//, parentMenuName: "admin-ships-surveys" },
 ];
+
+const MODULE_ENTRY_ROUTES: Record<string, string> = {
+  "/": "pms",
+  "/pms": "pms",
+  "/admin": "admin",
+  "/defects": "defects",
+  "/cert-surveys": "cert-surveys",
+  "/reports": "pms",
+};
 
 function resolveRouteToMenuName(route: string): string | null {
   const exact = ROUTE_TO_MENU_NAME[route];
@@ -117,6 +128,26 @@ function resolveRouteToMenuName(route: string): string | null {
   }
 
   return null;
+}
+
+const SIDEBAR_ITEM_PARENT_MAP: Record<string, Record<string, string>> = {
+  pms: {
+    "modify-pms/jobs": "modify-pms",
+    "superintendent": "work-orders",
+  },
+  defects: {
+    "new": "defect-log",
+    "edit": "defect-log",
+  },
+};
+
+function resolveSidebarItemId(subModule: string, itemId: string): string {
+  if (subModule === "pms" && itemId.startsWith("maintenance-records")) {
+    return "components";
+  }
+  const parentMap = SIDEBAR_ITEM_PARENT_MAP[subModule];
+  if (parentMap && parentMap[itemId]) return parentMap[itemId];
+  return itemId;
 }
 
 export function PermissionsProvider({ children }: { children: ReactNode }) {
@@ -225,17 +256,6 @@ export function PermissionsProvider({ children }: { children: ReactNode }) {
     [shouldDeny, status, permissions, getMenuMuidByName]
   );
 
-  const canViewRoute = useCallback(
-    (route: string): boolean => {
-      if (!shouldDeny) return true;
-      if (status === "error") return false;
-      const menuName = resolveRouteToMenuName(route);
-      if (!menuName) return false;
-      return canViewMenu(menuName);
-    },
-    [shouldDeny, status, canViewMenu]
-  );
-
   const hasAnyChildAccess = useCallback(
     (parentModule: string): boolean => {
       if (!shouldDeny) return true;
@@ -254,6 +274,21 @@ export function PermissionsProvider({ children }: { children: ReactNode }) {
     [shouldDeny, status, permissions, menuItems, getMenuMuidByName]
   );
 
+  const canViewRoute = useCallback(
+    (route: string): boolean => {
+      if (!shouldDeny) return true;
+      if (status === "error") return false;
+
+      const moduleParent = MODULE_ENTRY_ROUTES[route];
+      if (moduleParent) return hasAnyChildAccess(moduleParent);
+
+      const menuName = resolveRouteToMenuName(route);
+      if (!menuName) return false;
+      return canViewMenu(menuName);
+    },
+    [shouldDeny, status, canViewMenu, hasAnyChildAccess]
+  );
+
   const getPermission = useCallback(
     (menuName: string): MenuPermission | null => {
       if (!isConfigured) return null;
@@ -268,9 +303,10 @@ export function PermissionsProvider({ children }: { children: ReactNode }) {
     (subModule: string, itemId: string): boolean => {
       if (!shouldDeny) return true;
       if (status === "error") return false;
+      const resolvedId = resolveSidebarItemId(subModule, itemId);
       const moduleMap = MENU_NAME_MAP[subModule];
       if (!moduleMap) return false;
-      const menuName = moduleMap[itemId];
+      const menuName = moduleMap[resolvedId];
       if (!menuName) return false;
       return canViewMenu(menuName);
     },
