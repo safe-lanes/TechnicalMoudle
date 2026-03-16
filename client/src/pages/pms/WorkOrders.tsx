@@ -108,6 +108,16 @@ const WorkOrders: React.FC = () => {
     },
     enabled: !!vesselId, // Only fetch when vesselId is available
   });
+
+  const { data: allVesselJobs = [] } = useQuery<any[]>({
+    queryKey: ['/technical/api/jobs', vesselId],
+    queryFn: async () => {
+      const response = await fetch(`/technical/api/jobs?vesselId=${vesselId}`);
+      if (!response.ok) throw new Error('Failed to fetch jobs');
+      return await response.json();
+    },
+    enabled: !!vesselId,
+  });
   
   // Create work order mutation
   const createWorkOrderMutation = useMutation({
@@ -557,120 +567,71 @@ const WorkOrders: React.FC = () => {
     setExportingType(null);
   };
 
-  const exportDistributedJobsExcel = () => {
-    setExportingType('dj-excel');
+  const exportComponentJobsExcel = () => {
+    if (!allVesselJobs || allVesselJobs.length === 0) {
+      toast({ title: "No Data", description: "No component jobs available to export.", variant: "destructive" });
+      return;
+    }
+    setExportingType('cj-excel');
     try {
       const now = new Date();
       const timestamp = format(now, 'yyyyMMdd_HHmm');
+      const vessel = vessels.find(v => v.id === vesselId);
+      const vCode = (vessel as any)?.vesselCode || (vessel as any)?.code || '';
 
-      const rankStats: Record<string, { assignedJobs: number; totalManhours: number; completedJobs: number; overdueJobs: number }> = {};
-      safeWorkOrdersList.forEach(wo => {
-        const rank = wo.assignedTo?.trim() || 'Unassigned';
-        if (!rankStats[rank]) {
-          rankStats[rank] = { assignedJobs: 0, totalManhours: 0, completedJobs: 0, overdueJobs: 0 };
+      const rows = allVesselJobs.map((job: any) => {
+        let sparePartsStr = '';
+        if (Array.isArray(job.requiredSpareParts) && job.requiredSpareParts.length > 0) {
+          sparePartsStr = job.requiredSpareParts
+            .map((sp: any) => {
+              const code = sp.partCode || sp.spareCode || sp.code || '';
+              const qty = sp.quantity || sp.qty || 1;
+              return code ? `${code}:${qty}` : '';
+            })
+            .filter(Boolean)
+            .join(', ');
         }
-        rankStats[rank].assignedJobs++;
-        const manhours = parseFloat(wo.estimatedManhours || '0') || 0;
-        rankStats[rank].totalManhours += manhours;
-        const effectiveStatus = wo.computedStatus || wo.status || 'Active';
-        if (effectiveStatus === 'Completed') rankStats[rank].completedJobs++;
-        if (effectiveStatus === 'Overdue') rankStats[rank].overdueJobs++;
-      });
 
-      const totalJobs = safeWorkOrdersList.length;
-      const rows = Object.entries(rankStats)
-        .sort((a, b) => b[1].assignedJobs - a[1].assignedJobs)
-        .map(([rank, stats], idx) => ({
-          'S.No': idx + 1,
-          'Rank / Assigned To': rank,
-          'Assigned Jobs': stats.assignedJobs,
-          'Completed Jobs': stats.completedJobs,
-          'Overdue Jobs': stats.overdueJobs,
-          'Completion Rate (%)': stats.assignedJobs > 0 ? `${Math.round((stats.completedJobs / stats.assignedJobs) * 100)}%` : '0%',
-          'Total Manhours': stats.totalManhours.toFixed(1),
-          'Workload (%)': totalJobs > 0 ? `${Math.round((stats.assignedJobs / totalJobs) * 100)}%` : '0%',
-        }));
+        return {
+          'Fleet Equipment Code': job.fleetEquipmentCode || '',
+          'Component Code': job.componentCode || '',
+          'Component Name': job.componentName || '',
+          'Job Code': job.jobNo || '',
+          'Job Title': job.jobTitle || '',
+          'Job Description': job.jobDescription || job.briefWorkDescription || '',
+          'Department': job.department || '',
+          'Responsible Rank': job.assignedTo || '',
+          'Schedule Type': job.maintenanceBasis || job.frequencyType || '',
+          'Calendar Interval': job.frequencyValue || '',
+          'Interval Unit': job.frequencyUnit || '',
+          'RH Interval': job.intervalRunningHour != null ? String(job.intervalRunningHour) : (job.maintenanceBasis === 'Running Hours' ? (job.frequencyValue || '') : ''),
+          'Last Done Date': job.lastDoneDate || '',
+          'Last Done RH': job.lastDoneRH || '',
+          'Critical Yes/No': job.criticality === 'Yes' || job.criticality === true ? 'Yes' : (job.criticality === 'No' || job.criticality === false ? 'No' : (job.criticality || '')),
+          'Estimated Hours': job.estimatedManHours != null ? String(job.estimatedManHours) : '',
+          'Spare Parts Required': sparePartsStr,
+          'IS Active': job.isActive === true ? 'Yes' : (job.isActive === false ? 'No' : (job.isActive || '')),
+          'Vessel Code': vCode,
+          'Maker Code': '',
+          'Class Survey Code': '',
+        };
+      });
 
       const ws = XLSX.utils.json_to_sheet(rows);
       ws['!cols'] = [
-        { wch: 6 }, { wch: 25 }, { wch: 14 }, { wch: 16 }, { wch: 14 },
-        { wch: 18 }, { wch: 16 }, { wch: 14 },
+        { wch: 20 }, { wch: 18 }, { wch: 30 }, { wch: 15 }, { wch: 40 },
+        { wch: 50 }, { wch: 15 }, { wch: 20 }, { wch: 15 }, { wch: 18 },
+        { wch: 15 }, { wch: 15 }, { wch: 15 }, { wch: 15 }, { wch: 15 },
+        { wch: 15 }, { wch: 30 }, { wch: 12 }, { wch: 12 }, { wch: 15 },
+        { wch: 18 },
       ];
       const wb = XLSX.utils.book_new();
-      XLSX.utils.book_append_sheet(wb, ws, 'Distributed Jobs');
-      XLSX.writeFile(wb, `${vesselName}_Distributed_Jobs_${timestamp}.xlsx`);
+      XLSX.utils.book_append_sheet(wb, ws, 'Vessel_Job');
+      XLSX.writeFile(wb, `${vesselName}_Component_Jobs_${timestamp}.xlsx`);
 
-      toast({ title: "Export Complete", description: `Exported ${rows.length} rank distributions to Excel` });
+      toast({ title: "Export Complete", description: `Exported ${rows.length} component jobs to Excel` });
     } catch (err) {
-      toast({ title: "Export Failed", description: "Failed to export distributed jobs to Excel" });
-    }
-    setExportingType(null);
-  };
-
-  const exportDistributedJobsPdf = () => {
-    setExportingType('dj-pdf');
-    try {
-      const rankStats: Record<string, { assignedJobs: number; totalManhours: number; completedJobs: number; overdueJobs: number }> = {};
-      safeWorkOrdersList.forEach(wo => {
-        const rank = wo.assignedTo?.trim() || 'Unassigned';
-        if (!rankStats[rank]) {
-          rankStats[rank] = { assignedJobs: 0, totalManhours: 0, completedJobs: 0, overdueJobs: 0 };
-        }
-        rankStats[rank].assignedJobs++;
-        const manhours = parseFloat(wo.estimatedManhours || '0') || 0;
-        rankStats[rank].totalManhours += manhours;
-        const effectiveStatus = wo.computedStatus || wo.status || 'Active';
-        if (effectiveStatus === 'Completed') rankStats[rank].completedJobs++;
-        if (effectiveStatus === 'Overdue') rankStats[rank].overdueJobs++;
-      });
-
-      const totalJobs = safeWorkOrdersList.length;
-      const columns = [
-        { header: 'S.No', field: 'sNo', width: 10 },
-        { header: 'Rank / Assigned To', field: 'rank', width: 40 },
-        { header: 'Assigned Jobs', field: 'assignedJobs', width: 22 },
-        { header: 'Completed', field: 'completedJobs', width: 22 },
-        { header: 'Overdue', field: 'overdueJobs', width: 18 },
-        { header: 'Completion Rate', field: 'completionRate', width: 24 },
-        { header: 'Total Manhours', field: 'totalManhours', width: 24 },
-        { header: 'Workload %', field: 'workloadPct', width: 20 },
-      ];
-
-      const data = Object.entries(rankStats)
-        .sort((a, b) => b[1].assignedJobs - a[1].assignedJobs)
-        .map(([rank, stats], idx) => ({
-          sNo: idx + 1,
-          rank,
-          assignedJobs: stats.assignedJobs,
-          completedJobs: stats.completedJobs,
-          overdueJobs: stats.overdueJobs,
-          completionRate: stats.assignedJobs > 0 ? `${Math.round((stats.completedJobs / stats.assignedJobs) * 100)}%` : '0%',
-          totalManhours: stats.totalManhours.toFixed(1),
-          workloadPct: totalJobs > 0 ? `${Math.round((stats.assignedJobs / totalJobs) * 100)}%` : '0%',
-        }));
-
-      const totalCompleted = Object.values(rankStats).reduce((sum, s) => sum + s.completedJobs, 0);
-      const totalOverdue = Object.values(rankStats).reduce((sum, s) => sum + s.overdueJobs, 0);
-      const totalManhours = Object.values(rankStats).reduce((sum, s) => sum + s.totalManhours, 0);
-
-      const summary = [
-        { label: 'Total Jobs', value: totalJobs },
-        { label: 'Total Ranks', value: Object.keys(rankStats).length },
-        { label: 'Completed', value: totalCompleted },
-        { label: 'Overdue', value: totalOverdue },
-        { label: 'Total Manhours', value: totalManhours.toFixed(1) },
-      ];
-
-      pdfReportGenerator.generateReport(
-        { title: 'Crew Workload Distribution', subtitle: 'Job distribution across crew ranks', vessel: vesselName, orientation: 'landscape' },
-        columns,
-        data,
-        summary
-      );
-
-      toast({ title: "Export Complete", description: `Exported ${data.length} rank distributions to PDF` });
-    } catch (err) {
-      toast({ title: "Export Failed", description: "Failed to export distributed jobs to PDF" });
+      toast({ title: "Export Failed", description: "Failed to export component jobs to Excel" });
     }
     setExportingType(null);
   };
@@ -1228,32 +1189,22 @@ const WorkOrders: React.FC = () => {
             <DialogTitle className="text-lg font-semibold">Export Work Orders</DialogTitle>
           </DialogHeader>
           <div className="space-y-4 pt-2">
-            <div className="border rounded-lg p-4 space-y-3" data-testid="export-section-distributed-jobs">
+            <div className="border rounded-lg p-4 space-y-3" data-testid="export-section-component-jobs">
               <div className="flex items-center gap-2">
                 <FileText className="h-4 w-4 text-[#1E5A8E]" />
-                <span className="font-medium text-gray-900">Export All Distributed Jobs</span>
+                <span className="font-medium text-gray-900">Export Component Jobs</span>
               </div>
-              <p className="text-sm text-gray-500">Crew workload distribution across ranks with completion rates and manhours</p>
+              <p className="text-sm text-gray-500">All jobs linked to components for this vessel in import sheet format</p>
               <div className="flex gap-2">
                 <Button
                   variant="outline"
                   size="sm"
-                  onClick={exportDistributedJobsExcel}
-                  disabled={!!exportingType}
-                  data-testid="button-export-dj-excel"
+                  onClick={exportComponentJobsExcel}
+                  disabled={!!exportingType || allVesselJobs.length === 0}
+                  data-testid="button-export-cj-excel"
                 >
-                  {exportingType === 'dj-excel' ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <Download className="h-4 w-4 mr-1" />}
+                  {exportingType === 'cj-excel' ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <Download className="h-4 w-4 mr-1" />}
                   Excel
-                </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={exportDistributedJobsPdf}
-                  disabled={!!exportingType}
-                  data-testid="button-export-dj-pdf"
-                >
-                  {exportingType === 'dj-pdf' ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <FileText className="h-4 w-4 mr-1" />}
-                  PDF
                 </Button>
               </div>
             </div>
