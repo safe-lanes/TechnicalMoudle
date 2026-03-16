@@ -397,6 +397,16 @@ const reportsData = [
   tc('RPT-023','Report Formatting','PDF formatting','Medium','1. Download PDF report\n2. Verify formatting','Any PDF report','Headers, tables, charts formatted professionally. Print-ready'),
   tc('RPT-024','Report Formatting','Excel formatting','Medium','1. Download Excel report\n2. Verify formatting','Any Excel report','Proper column headers, data types, filters. Professional appearance'),
   tc('RPT-025','Report Generation','Multiple format export','Low','1. Export same report as both Excel and PDF\n2. Compare','Same report, both formats','Both files contain same data. Formatting appropriate for each format'),
+  tc('RPT-026','Compliance Reports','CE remarks report','Medium','1. Generate CE remarks report\n2. Set date range\n3. Verify entries','Date: 01-Jan to 31-Mar-2026','Shows all WOs with CE remarks, severity levels, associated delays and missed cycles'),
+  tc('RPT-027','Compliance Reports','Superintendent acknowledgment report','Medium','1. Generate superintendent acknowledgment report\n2. Verify pending vs acknowledged','N/A','Shows pending and acknowledged notifications. Timestamps, response times, acknowledgment rates'),
+  tc('RPT-028','Scheduled Reports','Schedule a recurring report','Medium','1. Select report type\n2. Set frequency (Daily/Weekly/Monthly)\n3. Set recipients\n4. Save schedule','Report: Overdue WOs\nFrequency: Weekly\nRecipient: admin@test.com','Report schedule saved. Confirmation message. Schedule appears in scheduled reports list'),
+  tc('RPT-029','Scheduled Reports','Edit scheduled report','Medium','1. Find existing scheduled report\n2. Click Edit\n3. Modify frequency or recipients\n4. Save','Change: Weekly to Monthly','Schedule updated. Next run date recalculated'),
+  tc('RPT-030','Scheduled Reports','Delete scheduled report','Low','1. Find scheduled report\n2. Click Delete\n3. Confirm deletion','Click: Delete','Schedule removed. No future reports generated'),
+  tc('RPT-031','Custom Reports','Custom date range spanning years','Medium','1. Set date range from 2025 to 2026\n2. Generate report','From: 01-Jul-2025\nTo: 31-Mar-2026','Report includes data across year boundary. No data truncation'),
+  tc('RPT-032','Report Filters','Rank filter in reports','Medium','1. Filter report by assigned rank\n2. Verify results','Rank: Chief Engineer','Only WOs assigned to selected rank appear in report'),
+  tc('RPT-033','Report Filters','Criticality filter in reports','Medium','1. Filter by High criticality\n2. Verify results','Criticality: High','Only high-criticality WOs shown in report'),
+  tc('RPT-034','Report Generation','Loading indicator during generation','Low','1. Generate large report\n2. Observe loading behavior','All data, all vessels','Loading spinner/progress shown during generation. UI remains responsive'),
+  tc('RPT-035','Report Formatting','Chart legends and labels','Low','1. View report with chart visualizations\n2. Verify legends and axis labels','Any chart report','Charts have proper legends, axis labels, and title. Colors match data series'),
 ];
 
 // ── DASHBOARD & NOTIFICATIONS ──
@@ -473,6 +483,7 @@ async function buildWorkbook() {
   ];
 
   const moduleCounts = {};
+  const summaryWs = wb.addWorksheet('Summary');
 
   for (const mod of modules) {
     if (mod.name === 'Summary') continue;
@@ -512,7 +523,6 @@ async function buildWorkbook() {
       }
     }
 
-    const priorityCol = ws.getColumn('priority');
     for (let r = 2; r <= mod.data.length + 1; r++) {
       ws.getCell(r, 4).dataValidation = {
         type: 'list',
@@ -549,23 +559,7 @@ async function buildWorkbook() {
     moduleCounts[mod.name] = mod.data.length;
   }
 
-  // ── SUMMARY SHEET ──
-  const summary = wb.addWorksheet('Summary');
-  wb.worksheets.forEach((ws, idx) => {
-    if (ws.name === 'Summary') {
-      const currentPos = wb.worksheets.indexOf(ws);
-      if (currentPos > 0) {
-        wb.removeWorksheet(ws.id);
-        const s = wb.addWorksheet('Summary', { properties: {} });
-        buildSummarySheet(s, moduleCounts);
-        const sheets = wb.worksheets;
-        const summaryWs = sheets[sheets.length - 1];
-      }
-    }
-  });
-  buildSummarySheet(summary, moduleCounts);
-
-  const orderedNames = ['Summary', 'Components Module', 'Work Orders Module', 'Running Hours Module', 'Spares Module', 'Stores Module', 'Reports Module', 'Dashboard & Notifications'];
+  buildSummarySheet(summaryWs, moduleCounts);
 
   const outPath = path.join(__dirname, '..', 'PMS_Test_Cases_Comprehensive.xlsx');
   await wb.xlsx.writeFile(outPath);
@@ -631,15 +625,26 @@ function buildSummarySheet(ws, moduleCounts) {
 
   let r = 6;
   let total = 0;
+  const sheetNameMap = {
+    'Components Module': `'Components Module'`,
+    'Work Orders Module': `'Work Orders Module'`,
+    'Running Hours Module': `'Running Hours Module'`,
+    'Spares Module': `'Spares Module'`,
+    'Stores Module': `'Stores Module'`,
+    'Reports Module': `'Reports Module'`,
+    'Dashboard & Notifications': `'Dashboard & Notifications'`,
+  };
   for (const [label, sheet] of moduleList) {
     const count = moduleCounts[sheet] || 0;
     total += count;
+    const sheetRef = sheetNameMap[sheet];
     ws.getCell(r, 1).value = label;
     ws.getCell(r, 2).value = sheet;
     ws.getCell(r, 3).value = count;
-    ws.getCell(r, 4).value = '';
-    ws.getCell(r, 5).value = '';
-    ws.getCell(r, 6).value = '';
+    ws.getCell(r, 4).value = { formula: `COUNTIF(${sheetRef}!I:I,"Pass")` };
+    ws.getCell(r, 5).value = { formula: `COUNTIF(${sheetRef}!I:I,"Fail")` };
+    ws.getCell(r, 6).value = { formula: `IF(C${r}=0,0,ROUND(D${r}/C${r}*100,1))` };
+    ws.getCell(r, 6).numFmt = '0.0"%"';
     const row = ws.getRow(r);
     row.font = DATA_FONT;
     row.fill = (r % 2 === 0) ? GRAY_FILL : WHITE_FILL;
@@ -649,10 +654,18 @@ function buildSummarySheet(ws, moduleCounts) {
     r++;
   }
 
+  const totalRowNum = r;
   ws.getCell(r, 1).value = 'TOTAL';
   ws.getCell(r, 1).font = { name: 'Arial', size: 11, bold: true };
-  ws.getCell(r, 3).value = total;
+  ws.getCell(r, 3).value = { formula: `SUM(C6:C${r - 1})` };
   ws.getCell(r, 3).font = { name: 'Arial', size: 11, bold: true };
+  ws.getCell(r, 4).value = { formula: `SUM(D6:D${r - 1})` };
+  ws.getCell(r, 4).font = { name: 'Arial', size: 11, bold: true };
+  ws.getCell(r, 5).value = { formula: `SUM(E6:E${r - 1})` };
+  ws.getCell(r, 5).font = { name: 'Arial', size: 11, bold: true };
+  ws.getCell(r, 6).value = { formula: `IF(C${r}=0,0,ROUND(D${r}/C${r}*100,1))` };
+  ws.getCell(r, 6).font = { name: 'Arial', size: 11, bold: true };
+  ws.getCell(r, 6).numFmt = '0.0"%"';
   const totalRow = ws.getRow(r);
   totalRow.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE8F0FE' } };
   totalRow.height = 25;
