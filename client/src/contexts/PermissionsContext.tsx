@@ -1,5 +1,7 @@
 import { createContext, useContext, useState, useEffect, useCallback, ReactNode } from "react";
 import { useAuth } from "@/contexts/AuthContext";
+import { useLocation } from "wouter";
+import { ShieldX } from "lucide-react";
 
 interface MenuPermission {
   menuMuid: string;
@@ -99,12 +101,19 @@ const ROUTE_TO_MENU_NAME: Record<string, string> = {
 
 const CHILD_ROUTE_PATTERNS: Array<{ pattern: RegExp; parentMenuName: string }> = [
   { pattern: /^\/pms\/modify-pms\//, parentMenuName: "pms-modify-pms" },
+  { pattern: /^\/pms\/work-order/, parentMenuName: "pms-work-orders" },
   { pattern: /^\/pms\/work-orders\//, parentMenuName: "pms-work-orders" },
+  { pattern: /^\/pms\/job\//, parentMenuName: "pms-work-orders" },
   { pattern: /^\/pms\/components\//, parentMenuName: "pms-components" },
   { pattern: /^\/pms\/maintenance-records/, parentMenuName: "pms-components" },
   { pattern: /^\/pms\/superintendent/, parentMenuName: "pms-work-orders" },
+  { pattern: /^\/spares\/bulk-update/, parentMenuName: "pms-spares" },
+  { pattern: /^\/stores\/bulk-update/, parentMenuName: "pms-stores" },
   { pattern: /^\/defects\/new$/, parentMenuName: "defects-active" },
   { pattern: /^\/defects\/edit\//, parentMenuName: "defects-active" },
+  { pattern: /^\/defects\/view\//, parentMenuName: "defects-active" },
+  { pattern: /^\/defects\/close\//, parentMenuName: "defects-active" },
+  { pattern: /^\/admin\/fleet-component-editor/, parentMenuName: "admin-masters" },
   { pattern: /^\/admin\/masters\//, parentMenuName: "admin-masters" },
   { pattern: /^\/admin\/ships-certificates\//, parentMenuName: "admin-ships-certificates" },
   { pattern: /^\/admin\/ships-surveys\//, parentMenuName: "admin-ships-surveys" },
@@ -335,4 +344,38 @@ export function usePermissions() {
     throw new Error("usePermissions must be used within a PermissionsProvider");
   }
   return context;
+}
+
+export function ProtectedRoute({ children }: { children: ReactNode }) {
+  const [location, setLocation] = useLocation();
+  const { canViewRoute, status } = usePermissions();
+
+  if (status === "loading") {
+    return null;
+  }
+
+  if ((status === "configured" || status === "error") && !canViewRoute(location)) {
+    return (
+      <div className="flex items-center justify-center min-h-screen bg-gray-50" data-testid="access-denied-standalone">
+        <div className="text-center">
+          <ShieldX className="h-16 w-16 text-red-400 mx-auto mb-4" />
+          <h2 className="text-2xl font-semibold text-gray-600 mb-2" data-testid="text-access-denied-title">Access Denied</h2>
+          <p className="text-gray-500 mb-4" data-testid="text-access-denied-description">
+            {status === "error"
+              ? "Unable to verify your permissions. Please try again later."
+              : "You do not have permission to access this page."}
+          </p>
+          <button
+            onClick={() => setLocation("/pms/dashboard")}
+            className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
+            data-testid="btn-go-dashboard"
+          >
+            Go to Dashboard
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  return <>{children}</>;
 }
