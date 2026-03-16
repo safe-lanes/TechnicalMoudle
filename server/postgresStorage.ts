@@ -190,6 +190,12 @@ import {
   workOrderAnomalies,
   type WorkOrderAnomaly,
   type InsertWorkOrderAnomaly,
+  admnRoleMaster,
+  admMenumasterAc,
+  admRoleMenuAccess,
+  type AdmnRoleMaster,
+  type AdmMenumasterAc,
+  type AdmRoleMenuAccess,
 } from '@shared/schema';
 
 /**
@@ -8185,6 +8191,58 @@ export class PostgresStorage {
 
     console.log(`[reconcileSpareLocationStock] Vessel ${vesselId}: synced ${synced} spares, ${errors} errors`);
     return { synced, errors };
+  }
+
+  async getActiveRoles(): Promise<AdmnRoleMaster[]> {
+    const db = await getDb();
+    return db
+      .select()
+      .from(admnRoleMaster)
+      .where(eq(admnRoleMaster.isActive, true))
+      .orderBy(asc(admnRoleMaster.sortOrder));
+  }
+
+  async getActiveMenuItems(): Promise<AdmMenumasterAc[]> {
+    const db = await getDb();
+    return db
+      .select()
+      .from(admMenumasterAc)
+      .where(eq(admMenumasterAc.isActive, true))
+      .orderBy(asc(admMenumasterAc.sortOrder));
+  }
+
+  async getRoleMenuPermissions(roleRuid: string): Promise<AdmRoleMenuAccess[]> {
+    const db = await getDb();
+    return db
+      .select()
+      .from(admRoleMenuAccess)
+      .where(eq(admRoleMenuAccess.roleRuid, roleRuid));
+  }
+
+  async saveRoleMenuPermissions(roleRuid: string, permissions: Array<{
+    menuMuid: string;
+    canView: boolean;
+    canCreate: boolean;
+    canEdit: boolean;
+    canDelete: boolean;
+  }>): Promise<{ count: number }> {
+    const db = await getDb();
+    await db.transaction(async (tx) => {
+      await tx.delete(admRoleMenuAccess).where(eq(admRoleMenuAccess.roleRuid, roleRuid));
+      if (permissions.length > 0) {
+        const rows = permissions.map((p) => ({
+          roleRuid,
+          menuMuid: p.menuMuid,
+          canView: p.canView ?? false,
+          canCreate: p.canCreate ?? false,
+          canEdit: p.canEdit ?? false,
+          canDelete: p.canDelete ?? false,
+          updatedAt: new Date(),
+        }));
+        await tx.insert(admRoleMenuAccess).values(rows);
+      }
+    });
+    return { count: permissions.length };
   }
 }
 

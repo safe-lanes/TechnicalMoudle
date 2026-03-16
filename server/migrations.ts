@@ -2050,8 +2050,8 @@ const migrations: Migration[] = [
     sql: `
       CREATE TABLE IF NOT EXISTS adm_role_menu_access (
         id INTEGER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
-        role_ruid TEXT NOT NULL,
-        menu_muid TEXT NOT NULL,
+        role_ruid TEXT NOT NULL REFERENCES admn_role_master(ruid),
+        menu_muid TEXT NOT NULL REFERENCES adm_menumaster_ac(muid),
         can_view BOOLEAN DEFAULT false,
         can_create BOOLEAN DEFAULT false,
         can_edit BOOLEAN DEFAULT false,
@@ -2062,6 +2062,39 @@ const migrations: Migration[] = [
         updated_by_uuid TEXT,
         UNIQUE(role_ruid, menu_muid)
       );
+    `
+  },
+  {
+    id: '066b_adm_role_menu_access_fks',
+    name: 'Add FK constraints to adm_role_menu_access',
+    description: 'Alters columns to UUID type and adds foreign key constraints referencing admn_role_master(ruid) and adm_menumaster_ac(muid)',
+    sql: `
+      DO $$
+      BEGIN
+        ALTER TABLE adm_role_menu_access
+          ALTER COLUMN role_ruid TYPE uuid USING role_ruid::uuid,
+          ALTER COLUMN menu_muid TYPE uuid USING menu_muid::uuid;
+
+        IF NOT EXISTS (
+          SELECT 1 FROM information_schema.table_constraints
+          WHERE constraint_name = 'adm_role_menu_access_role_ruid_fkey'
+          AND table_name = 'adm_role_menu_access'
+        ) THEN
+          ALTER TABLE adm_role_menu_access
+            ADD CONSTRAINT adm_role_menu_access_role_ruid_fkey
+            FOREIGN KEY (role_ruid) REFERENCES admn_role_master(ruid);
+        END IF;
+
+        IF NOT EXISTS (
+          SELECT 1 FROM information_schema.table_constraints
+          WHERE constraint_name = 'adm_role_menu_access_menu_muid_fkey'
+          AND table_name = 'adm_role_menu_access'
+        ) THEN
+          ALTER TABLE adm_role_menu_access
+            ADD CONSTRAINT adm_role_menu_access_menu_muid_fkey
+            FOREIGN KEY (menu_muid) REFERENCES adm_menumaster_ac(muid);
+        END IF;
+      END $$;
     `
   },
   {

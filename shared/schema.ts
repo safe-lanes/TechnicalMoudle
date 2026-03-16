@@ -3138,8 +3138,8 @@ export type AdmMenumasterAc = typeof admMenumasterAc.$inferSelect;
 
 export const admRoleMenuAccess = pgTable("adm_role_menu_access", {
   id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
-  roleRuid: text("role_ruid").notNull(),
-  menuMuid: text("menu_muid").notNull(),
+  roleRuid: text("role_ruid").notNull().references(() => admnRoleMaster.ruid),
+  menuMuid: text("menu_muid").notNull().references(() => admMenumasterAc.muid),
   canView: boolean("can_view").default(false),
   canCreate: boolean("can_create").default(false),
   canEdit: boolean("can_edit").default(false),

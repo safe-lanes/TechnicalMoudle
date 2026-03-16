@@ -175,6 +175,9 @@ import {
   type InsertSuperintendentNotification,
   type WorkOrderAnomaly,
   type InsertWorkOrderAnomaly,
+  type AdmnRoleMaster,
+  type AdmMenumasterAc,
+  type AdmRoleMenuAccess,
 } from "@shared/schema";
 
 export function sortObjectKeys(obj: any): any {
@@ -944,6 +947,17 @@ export interface IStorage {
   getSparesWithInventoryByVessel(vesselId: string): Promise<SpareWithInventory[]>;
   getSparesWithInventoryByComponent(componentId: string): Promise<SpareWithInventory[]>;
   getSparesWithInventoryByComponentCode(vesselId: string, componentCode: string): Promise<SpareWithInventory[]>;
+
+  getActiveRoles(): Promise<AdmnRoleMaster[]>;
+  getActiveMenuItems(): Promise<AdmMenumasterAc[]>;
+  getRoleMenuPermissions(roleRuid: string): Promise<AdmRoleMenuAccess[]>;
+  saveRoleMenuPermissions(roleRuid: string, permissions: Array<{
+    menuMuid: string;
+    canView: boolean;
+    canCreate: boolean;
+    canEdit: boolean;
+    canDelete: boolean;
+  }>): Promise<{ count: number }>;
 }
 
 // Helper function to normalize and validate immediateCause structure

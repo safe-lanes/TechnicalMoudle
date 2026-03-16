@@ -1610,6 +1610,22 @@ class MemStorage {
   async getWorkOrderAnomalyStatistics(_vesselId?: string): Promise<any> {
     return { totalPending: 0, totalHigh: 0, totalMedium: 0, totalLow: 0, lastDetected: null, trendPercentage: 0 };
   }
+
+  async getActiveRoles(): Promise<any[]> {
+    return [];
+  }
+
+  async getActiveMenuItems(): Promise<any[]> {
+    return [];
+  }
+
+  async getRoleMenuPermissions(_roleRuid: string): Promise<any[]> {
+    return [];
+  }
+
+  async saveRoleMenuPermissions(_roleRuid: string, permissions: any[]): Promise<{ count: number }> {
+    return { count: permissions.length };
+  }
 }
 
 export const memStorage = new MemStorage();
