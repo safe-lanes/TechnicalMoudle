@@ -19,9 +19,12 @@ interface MenuItem {
   sortOrder: number | null;
 }
 
+type PermissionStatus = "loading" | "unconfigured" | "configured" | "error";
+
 interface PermissionsContextType {
   isLoading: boolean;
   isConfigured: boolean;
+  status: PermissionStatus;
   canViewRoute: (route: string) => boolean;
   canViewMenu: (menuName: string) => boolean;
   hasAnyChildAccess: (parentModule: string) => boolean;
@@ -98,22 +101,19 @@ export function PermissionsProvider({ children }: { children: ReactNode }) {
   const { currentUser } = useAuth();
   const [permissions, setPermissions] = useState<Map<string, MenuPermission>>(new Map());
   const [menuItems, setMenuItems] = useState<MenuItem[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [isConfigured, setIsConfigured] = useState(false);
+  const [status, setStatus] = useState<PermissionStatus>("loading");
 
   useEffect(() => {
     if (!currentUser?.role) {
       setPermissions(new Map());
       setMenuItems([]);
-      setIsConfigured(false);
-      setIsLoading(false);
+      setStatus("unconfigured");
       return;
     }
 
-    setIsLoading(true);
+    setStatus("loading");
     setPermissions(new Map());
     setMenuItems([]);
-    setIsConfigured(false);
 
     const fetchPermissions = async () => {
       try {
@@ -123,7 +123,8 @@ export function PermissionsProvider({ children }: { children: ReactNode }) {
         ]);
 
         if (!menuRes.ok) {
-          setIsLoading(false);
+          console.error("Failed to fetch menu items:", menuRes.status);
+          setStatus("error");
           return;
         }
 
@@ -131,8 +132,12 @@ export function PermissionsProvider({ children }: { children: ReactNode }) {
         setMenuItems(menuData);
 
         if (!roleRes.ok) {
-          setIsConfigured(false);
-          setIsLoading(false);
+          if (roleRes.status === 404) {
+            setStatus("unconfigured");
+          } else {
+            console.error("Failed to fetch role:", roleRes.status);
+            setStatus("error");
+          }
           return;
         }
 
@@ -141,20 +146,18 @@ export function PermissionsProvider({ children }: { children: ReactNode }) {
 
         const permsRes = await fetch(`/technical/api/admin/access-control/${ruid}`);
         if (!permsRes.ok) {
-          setIsConfigured(false);
-          setIsLoading(false);
+          console.error("Failed to fetch permissions:", permsRes.status);
+          setStatus("error");
           return;
         }
 
         const permsData = await permsRes.json();
 
         if (!permsData || permsData.length === 0) {
-          setIsConfigured(false);
-          setIsLoading(false);
+          setStatus("unconfigured");
           return;
         }
 
-        setIsConfigured(true);
         const permsMap = new Map<string, MenuPermission>();
         for (const p of permsData) {
           permsMap.set(p.menuMuid, {
@@ -166,16 +169,19 @@ export function PermissionsProvider({ children }: { children: ReactNode }) {
           });
         }
         setPermissions(permsMap);
+        setStatus("configured");
       } catch (error) {
         console.error("Failed to fetch permissions:", error);
-        setIsConfigured(false);
-      } finally {
-        setIsLoading(false);
+        setStatus("error");
       }
     };
 
     fetchPermissions();
   }, [currentUser?.role]);
+
+  const isLoading = status === "loading";
+  const isConfigured = status === "configured";
+  const shouldDeny = status === "configured" || status === "error";
 
   const getMenuMuidByName = useCallback(
     (menuName: string): string | null => {
@@ -187,28 +193,31 @@ export function PermissionsProvider({ children }: { children: ReactNode }) {
 
   const canViewMenu = useCallback(
     (menuName: string): boolean => {
-      if (!isConfigured) return true;
+      if (!shouldDeny) return true;
+      if (status === "error") return false;
       const muid = getMenuMuidByName(menuName);
       if (!muid) return true;
       const perm = permissions.get(muid);
       return perm?.canView ?? false;
     },
-    [isConfigured, permissions, getMenuMuidByName]
+    [shouldDeny, status, permissions, getMenuMuidByName]
   );
 
   const canViewRoute = useCallback(
     (route: string): boolean => {
-      if (!isConfigured) return true;
+      if (!shouldDeny) return true;
+      if (status === "error") return false;
       const menuName = ROUTE_TO_MENU_NAME[route];
       if (!menuName) return true;
       return canViewMenu(menuName);
     },
-    [isConfigured, canViewMenu]
+    [shouldDeny, status, canViewMenu]
   );
 
   const hasAnyChildAccess = useCallback(
     (parentModule: string): boolean => {
-      if (!isConfigured) return true;
+      if (!shouldDeny) return true;
+      if (status === "error") return false;
       const parentMuid = getMenuMuidByName(parentModule);
       if (!parentMuid) return true;
 
@@ -220,7 +229,7 @@ export function PermissionsProvider({ children }: { children: ReactNode }) {
         return perm?.canView ?? false;
       });
     },
-    [isConfigured, permissions, menuItems, getMenuMuidByName]
+    [shouldDeny, status, permissions, menuItems, getMenuMuidByName]
   );
 
   const getPermission = useCallback(
@@ -235,19 +244,21 @@ export function PermissionsProvider({ children }: { children: ReactNode }) {
 
   const canViewSidebarItem = useCallback(
     (subModule: string, itemId: string): boolean => {
-      if (!isConfigured) return true;
+      if (!shouldDeny) return true;
+      if (status === "error") return false;
       const moduleMap = MENU_NAME_MAP[subModule];
       if (!moduleMap) return true;
       const menuName = moduleMap[itemId];
       if (!menuName) return true;
       return canViewMenu(menuName);
     },
-    [isConfigured, canViewMenu]
+    [shouldDeny, status, canViewMenu]
   );
 
   const value: PermissionsContextType = {
     isLoading,
     isConfigured,
+    status,
     canViewRoute,
     canViewMenu,
     hasAnyChildAccess,

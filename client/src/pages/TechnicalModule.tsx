@@ -36,7 +36,7 @@ export const TechnicalModule = () => {
   const [location, setLocation] = useLocation();
   const params = useParams();
   const { isSailAdmin } = useUIRole();
-  const { canViewSidebarItem, canViewRoute, isConfigured: permissionsConfigured } = usePermissions();
+  const { canViewSidebarItem, canViewRoute, status: permissionStatus } = usePermissions();
   
   // Derive state from URL
   const getStateFromUrl = () => {
@@ -136,12 +136,16 @@ export const TechnicalModule = () => {
         
         {/* Main Content Area */}
         <div className="flex-1 p-6 min-h-0 overflow-auto">
-          {permissionsConfigured && (!canViewRoute(location) || !canViewSidebarItem(selectedSubModule, selectedMenuItem)) ? (
+          {(permissionStatus === "configured" || permissionStatus === "error") && (!canViewRoute(location) || !canViewSidebarItem(selectedSubModule, selectedMenuItem)) ? (
             <div className="flex items-center justify-center h-full min-h-[400px]" data-testid="access-denied">
               <div className="text-center">
                 <ShieldX className="h-16 w-16 text-red-400 mx-auto mb-4" />
                 <h2 className="text-2xl font-semibold text-gray-600 mb-2" data-testid="text-access-denied-title">Access Denied</h2>
-                <p className="text-gray-500 mb-4" data-testid="text-access-denied-description">You do not have permission to access this page.</p>
+                <p className="text-gray-500 mb-4" data-testid="text-access-denied-description">
+                  {permissionStatus === "error"
+                    ? "Unable to verify your permissions. Please try again later."
+                    : "You do not have permission to access this page."}
+                </p>
                 <button
                   onClick={() => {
                     if (canViewSidebarItem("pms", "dashboard")) {
