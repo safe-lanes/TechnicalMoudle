@@ -190,20 +190,22 @@ export async function listWorkOrders(vesselId?: string) {
       ? componentsByCodeMap.get(`${woVesselId}:${wo.componentCode}`)
       : (wo.component ? componentsMap.get(wo.component) : null);
 
-    // Resolve dueRH with fallback chain: link.nextDueRH → wo.nextDueReading → computed(lastDoneRH + interval)
+    // Resolve dueRH with fallback chain: link.nextDueRH → computed(lastDoneRH + interval) → wo.nextDueReading
     const componentId = component?.cuuid || component?.id;
     const linkKey = (wo.jobId && componentId) ? `${wo.jobId}:${componentId}` : null;
     const linkData = linkKey ? linksByJobComponent.get(linkKey) : null;
     let dueRH: number | undefined;
     if (wo.maintenanceBasis === 'Running Hours') {
-      dueRH = parseRH(linkData?.nextDueRH)
-        ?? parseRH(wo.nextDueReading);
+      dueRH = parseRH(linkData?.nextDueRH);
       if (dueRH == null) {
-        const lastDone = parseRH(linkData?.lastDoneRH) ?? parseRH(job?.lastDoneRH) ?? 0;
+        const lastDone = parseRH(linkData?.lastDoneRH) ?? parseRH(job?.lastDoneRH);
         const interval = parseRH(job?.intervalRunningHour);
-        if (interval != null && interval > 0) {
+        if (lastDone != null && interval != null && interval > 0) {
           dueRH = lastDone + interval;
         }
+      }
+      if (dueRH == null) {
+        dueRH = parseRH(wo.nextDueReading);
       }
     }
     const currentRH = wo.maintenanceBasis === 'Running Hours'
@@ -323,7 +325,7 @@ export async function getWorkOrder(id: string) {
     return isNaN(num) ? undefined : num;
   };
 
-  // Resolve dueRH with fallback chain: link.nextDueRH → wo.nextDueReading → computed(lastDoneRH + interval)
+  // Resolve dueRH with fallback chain: link.nextDueRH → computed(lastDoneRH + interval) → wo.nextDueReading
   let linkNextDueRH: string | null = null;
   let linkLastDoneRH: string | null = null;
   const compId = component?.cuuid || component?.id;
@@ -340,14 +342,16 @@ export async function getWorkOrder(id: string) {
 
   let dueRH: number | undefined;
   if (workOrder.maintenanceBasis === 'Running Hours') {
-    dueRH = parseRH(linkNextDueRH)
-      ?? parseRH(workOrder.nextDueReading);
+    dueRH = parseRH(linkNextDueRH);
     if (dueRH == null) {
-      const lastDone = parseRH(linkLastDoneRH) ?? parseRH(job?.lastDoneRH) ?? 0;
+      const lastDone = parseRH(linkLastDoneRH) ?? parseRH(job?.lastDoneRH);
       const interval = parseRH(job?.intervalRunningHour);
-      if (interval != null && interval > 0) {
+      if (lastDone != null && interval != null && interval > 0) {
         dueRH = lastDone + interval;
       }
+    }
+    if (dueRH == null) {
+      dueRH = parseRH(workOrder.nextDueReading);
     }
   }
   const currentRH = workOrder.maintenanceBasis === 'Running Hours'

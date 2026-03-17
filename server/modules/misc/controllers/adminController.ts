@@ -970,6 +970,29 @@ export async function repairRhTracking(req: Request, res: Response) {
           after: { lastDoneRH: jobLevelLastDone, nextDueRH: jobLevelNextDue },
         });
       }
+
+      const noLinkActiveWOs = allWOs.filter((wo: any) =>
+        wo.jobId === job.juuid &&
+        !FINALIZED.has((wo.status || '').toLowerCase().trim())
+      );
+      for (const wo of noLinkActiveWOs) {
+        const storedNextDueReading = parseFloat(wo.nextDueReading || '0');
+        if (storedNextDueReading !== jobLevelNextDue) {
+          if (!dryRun) {
+            await db.update(workOrdersTable)
+              .set({ nextDueReading: jobLevelNextDue.toString() })
+              .where(eq(workOrdersTable.id, wo.id));
+          }
+          wosRepaired++;
+          repairs.push({
+            type: 'workOrder',
+            workOrderNo: wo.workOrderNo,
+            jobNo: job.jobNo,
+            before: { nextDueReading: storedNextDueReading },
+            after: { nextDueReading: jobLevelNextDue },
+          });
+        }
+      }
     }
   }
 
