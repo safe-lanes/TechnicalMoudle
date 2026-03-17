@@ -2107,6 +2107,32 @@ const migrations: Migration[] = [
         (25, gen_random_uuid(), 'admin-access-control', 'Access Control', '/admin/access-control', (SELECT muid FROM adm_menumaster_ac WHERE id = 4), true, 25, NOW(), NOW(), false, false)
       ON CONFLICT (id) DO NOTHING;
     `
+  },
+  {
+    id: '068_superintendent_notifications_backdating_days',
+    name: 'Add backdating_days column to superintendent_notifications',
+    description: 'Adds backdating_days integer column for tracking backdating severity in superintendent notifications',
+    sql: `ALTER TABLE superintendent_notifications ADD COLUMN IF NOT EXISTS backdating_days INTEGER DEFAULT 0`
+  },
+  {
+    id: '069_fix_superintendent_notifications_vessel_name',
+    name: 'Fix vessel_name data in superintendent_notifications',
+    description: 'Corrects vessel_name values that contain UUIDs instead of actual vessel names by looking up the vessels table',
+    sql: `
+      UPDATE superintendent_notifications sn
+      SET vessel_name = v.name
+      FROM vessels v
+      WHERE sn.vessel_name = v.vuuid
+        AND sn.vessel_name IS NOT NULL
+        AND sn.vessel_name != '';
+      UPDATE superintendent_notifications sn
+      SET vessel_name = v.name
+      FROM vessels v
+      WHERE sn.vessel_name = CAST(v.id AS TEXT)
+        AND sn.vessel_name IS NOT NULL
+        AND sn.vessel_name != ''
+        AND sn.vessel_name NOT IN (SELECT name FROM vessels)
+    `
   }
 ];
 

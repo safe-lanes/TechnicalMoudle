@@ -1098,6 +1098,7 @@ export const superintendentNotifications = pgTable("superintendent_notifications
   vesselName: text("vessel_name"),
   daysLate: integer("days_late").default(0),
   missedCycles: integer("missed_cycles").default(0),
+  backdatingDays: integer("backdating_days").default(0),
   approvalTier: text("approval_tier"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   acknowledgedAt: timestamp("acknowledged_at"),

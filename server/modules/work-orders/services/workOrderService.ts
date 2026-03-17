@@ -6,7 +6,22 @@ import { computeSpareConsumptionDelta, ConsumedSpareEntry } from '../utils/spare
 import { calculateMissedCycles } from '@shared/dateUtils';
 import { storage } from '../../../storage';
 
-export function calculateApprovalTier(dueDate: string | null | undefined, completionDate: string | null | undefined, missedCycles: number) {
+function calculateBackdatingDaysForApproval(completionDate: string | null | undefined, submittedDate: string | null | undefined): number {
+  if (!completionDate) return 0;
+  const comp = new Date(completionDate);
+  if (isNaN(comp.getTime())) return 0;
+  const reference = submittedDate ? new Date(submittedDate) : new Date();
+  if (isNaN(reference.getTime())) return 0;
+  const diffMs = reference.getTime() - comp.getTime();
+  return Math.max(0, Math.floor(diffMs / (1000 * 60 * 60 * 24)));
+}
+
+export function calculateApprovalTier(
+  dueDate: string | null | undefined,
+  completionDate: string | null | undefined,
+  missedCycles: number,
+  backdatingDays: number = 0
+) {
   let daysLate = 0;
   if (dueDate && completionDate) {
     const due = new Date(dueDate);
@@ -20,44 +35,57 @@ export function calculateApprovalTier(dueDate: string | null | undefined, comple
   let superintendentAcknowledged = false;
   let approvalBlockReason: string | null = null;
 
-  if (missedCycles >= 1) {
+  if (missedCycles >= 3 || daysLate >= 21 || backdatingDays >= 7) {
     approvalTier = 'superintendent_locked';
     superintendentAcknowledged = false;
     superintendentNotifiedAt = new Date().toISOString();
     approvalBlockReason = 'Awaiting Superintendent acknowledgment';
-  } else if (daysLate > 14) {
+  } else if (missedCycles === 2 || (daysLate >= 14 && daysLate < 21) || (backdatingDays >= 3 && backdatingDays < 7)) {
     approvalTier = 'superintendent_notification';
     superintendentNotifiedAt = new Date().toISOString();
     superintendentAcknowledged = false;
-  } else if (daysLate >= 7) {
+  } else if (missedCycles === 1 || (daysLate >= 7 && daysLate < 14) || (backdatingDays >= 1 && backdatingDays < 3)) {
     approvalTier = 'ce_with_justification';
   } else {
     approvalTier = 'standard';
   }
 
-  return { daysLate, approvalTier, superintendentNotifiedAt, superintendentAcknowledged, approvalBlockReason };
+  return { daysLate, backdatingDays, approvalTier, superintendentNotifiedAt, superintendentAcknowledged, approvalBlockReason };
 }
 
-export async function createSuperintendentNotificationForWO(wo: any, daysLate: number, missedCycles: number, approvalTier: string) {
+async function resolveVesselName(vesselId: string | null | undefined): Promise<string> {
+  if (!vesselId) return '';
+  try {
+    const vessels = await storage.getVessels();
+    const vessel = vessels.find(v => v.id === vesselId || v.vuuid === vesselId);
+    return vessel?.name || vesselId;
+  } catch {
+    return vesselId;
+  }
+}
+
+export async function createSuperintendentNotificationForWO(wo: any, daysLate: number, missedCycles: number, approvalTier: string, backdatingDays: number = 0) {
   try {
     const existing = await storage.getAllSuperintendentNotifications();
     const woId = wo.wouuid || wo.id;
-    const duplicate = existing.find((n: any) => n.workOrderId === woId && n.approvalTier === approvalTier && !n.isAcknowledged);
+    const duplicate = existing.find((n: any) => n.workOrderId === woId && !n.isAcknowledged);
     if (duplicate) {
       console.log(`📢 Superintendent notification already exists for WO ${wo.workOrderNo || wo.id} (tier: ${approvalTier}), skipping`);
       return;
     }
+    const vesselName = await resolveVesselName(wo.vesselId);
     await storage.createSuperintendentNotification({
       workOrderId: woId,
       workOrderCode: wo.workOrderNo || wo.id,
       jobTitle: wo.jobTitle || '',
       componentName: wo.componentCode || wo.component || '',
-      vesselName: wo.vesselId || '',
+      vesselName,
       daysLate,
       missedCycles,
+      backdatingDays,
       approvalTier,
     });
-    console.log(`📢 Superintendent notification created for WO ${wo.workOrderNo || wo.id} (tier: ${approvalTier})`);
+    console.log(`📢 Superintendent notification created for WO ${wo.workOrderNo || wo.id} (tier: ${approvalTier}, vessel: ${vesselName})`);
   } catch (err: any) {
     console.error(`⚠️ Failed to create superintendent notification: ${err.message}`);
   }
@@ -726,18 +754,22 @@ export async function updateWorkOrder(id: string, body: any) {
       existingWO.completionDateTime || existingWO.dateCompleted;
     const tierDueDate = existingWO.nextDueDate || existingWO.dueDate;
     const tierMissedCycles = updateData.missedCycles ?? existingWO.missedCycles ?? 0;
-    const tierResult = calculateApprovalTier(tierDueDate, tierCompDate, tierMissedCycles);
+    const tierBackdatingDays = calculateBackdatingDaysForApproval(
+      tierCompDate,
+      updateData.submittedDate || existingWO.submittedDate
+    );
+    const tierResult = calculateApprovalTier(tierDueDate, tierCompDate, tierMissedCycles, tierBackdatingDays);
     updateData.daysLate = tierResult.daysLate;
     updateData.approvalTier = tierResult.approvalTier;
     updateData.superintendentNotifiedAt = tierResult.superintendentNotifiedAt;
     updateData.superintendentAcknowledged = tierResult.superintendentAcknowledged;
     updateData.approvalBlockReason = tierResult.approvalBlockReason;
-    console.log(`📝 Layer 5: approvalTier=${tierResult.approvalTier}, daysLate=${tierResult.daysLate}, missedCycles=${tierMissedCycles}`);
+    console.log(`📝 Layer 5: approvalTier=${tierResult.approvalTier}, daysLate=${tierResult.daysLate}, missedCycles=${tierMissedCycles}, backdatingDays=${tierBackdatingDays}`);
 
     // Create superintendent notification if needed
     if (tierResult.approvalTier === 'superintendent_locked' || tierResult.approvalTier === 'superintendent_notification') {
       const woForNotification = { ...existingWO, ...updateData };
-      await createSuperintendentNotificationForWO(woForNotification, tierResult.daysLate, tierMissedCycles, tierResult.approvalTier);
+      await createSuperintendentNotificationForWO(woForNotification, tierResult.daysLate, tierMissedCycles, tierResult.approvalTier, tierBackdatingDays);
     }
   }
 
@@ -812,7 +844,7 @@ export async function updateWorkOrder(id: string, body: any) {
 
     if (currentTier === 'superintendent_locked') {
       throw new ValidationError(
-        'This work order has skipped cycles detected. It is locked pending Superintendent acknowledgment. The CE cannot approve until the Superintendent has acknowledged.',
+        'This work order has high severity issues (3+ missed cycles, 21+ days late, or 7+ days backdating). It is locked pending Superintendent acknowledgment. The CE cannot approve until the Superintendent has acknowledged.',
         { code: 'SUPERINTENDENT_LOCKED' }
       );
     }
@@ -820,7 +852,7 @@ export async function updateWorkOrder(id: string, body: any) {
     if (currentTier === 'superintendent_notification') {
       if (!ceRemarks || ceRemarks.length < 20) {
         throw new ValidationError(
-          'This completion is more than 14 days late. You must enter detailed remarks (minimum 20 characters) before approving.',
+          'This work order has medium severity issues (2 missed cycles, 14–20 days late, or 3–6 days backdating). You must enter detailed remarks (minimum 20 characters) before approving.',
           { code: 'CE_REMARKS_REQUIRED', minLength: 20 }
         );
       }
@@ -829,7 +861,7 @@ export async function updateWorkOrder(id: string, body: any) {
     if (currentTier === 'ce_with_justification') {
       if (!ceRemarks || ceRemarks.length < 10) {
         throw new ValidationError(
-          'This completion is 7–14 days late. Approval remarks are mandatory.',
+          'This work order has low severity issues (1 missed cycle, 7–13 days late, or 1–2 days backdating). Approval remarks are mandatory (minimum 10 characters).',
           { code: 'CE_REMARKS_REQUIRED', minLength: 10 }
         );
       }

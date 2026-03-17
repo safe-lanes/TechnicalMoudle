@@ -159,18 +159,34 @@ export async function detectAndLogAnomalies(
 
     if (severity === 'HIGH') {
       try {
-        await storage.createSuperintendentNotification({
-          workOrderId: workOrder.id,
-          workOrderCode: workOrder.workOrderNo || workOrder.id,
-          jobTitle: workOrder.jobTitle || 'Unknown Job',
-          componentName: workOrder.component || workOrder.componentCode || 'Unknown',
-          vesselName: workOrder.vesselId || '',
-          daysLate,
-          missedCycles,
-          approvalTier: 'anomaly_detection',
-          isAcknowledged: false,
-        });
-        console.log(`[AnomalyDetection] Superintendent notification created for HIGH severity anomaly on WO ${workOrder.workOrderNo}`);
+        const existingNotifs = await storage.getAllSuperintendentNotifications();
+        const woId = workOrder.id;
+        const hasDuplicate = existingNotifs.find((n: any) => n.workOrderId === woId && !n.isAcknowledged);
+        if (hasDuplicate) {
+          console.log(`[AnomalyDetection] Superintendent notification already exists for WO ${workOrder.workOrderNo}, skipping duplicate`);
+        } else {
+          let vesselName = workOrder.vesselId || '';
+          if (vesselName) {
+            try {
+              const vessels = await storage.getVessels();
+              const vessel = vessels.find((v: any) => v.id === vesselName || v.vuuid === vesselName);
+              if (vessel?.name) vesselName = vessel.name;
+            } catch {}
+          }
+          await storage.createSuperintendentNotification({
+            workOrderId: workOrder.id,
+            workOrderCode: workOrder.workOrderNo || workOrder.id,
+            jobTitle: workOrder.jobTitle || 'Unknown Job',
+            componentName: workOrder.component || workOrder.componentCode || 'Unknown',
+            vesselName,
+            daysLate,
+            missedCycles,
+            backdatingDays,
+            approvalTier: 'anomaly_detection',
+            isAcknowledged: false,
+          });
+          console.log(`[AnomalyDetection] Superintendent notification created for HIGH severity anomaly on WO ${workOrder.workOrderNo} (vessel: ${vesselName})`);
+        }
       } catch (notifError) {
         console.error('[AnomalyDetection] Failed to create superintendent notification:', notifError);
       }

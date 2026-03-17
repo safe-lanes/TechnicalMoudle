@@ -4538,10 +4538,10 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
             const approvalTier: string = (workOrderContext as any)?.workOrder?.approvalTier || 'standard';
             const justificationValid = skippedCyclesJustification.trim().length >= 30;
 
-            const ceRemarksRequired = approvalTier === 'superintendent_notification' || approvalTier === 'ce_with_justification';
-            const ceRemarksMinLength = approvalTier === 'superintendent_notification' ? 20 : approvalTier === 'ce_with_justification' ? 10 : 0;
-            const ceRemarksValid = !ceRemarksRequired || ceApprovalRemarks.trim().length >= ceRemarksMinLength;
             const isSuptLocked = approvalTier === 'superintendent_locked';
+            const ceRemarksRequired = approvalTier === 'superintendent_locked' || approvalTier === 'superintendent_notification' || approvalTier === 'ce_with_justification';
+            const ceRemarksMinLength = (approvalTier === 'superintendent_locked' || approvalTier === 'superintendent_notification') ? 20 : approvalTier === 'ce_with_justification' ? 10 : 0;
+            const ceRemarksValid = !ceRemarksRequired || ceApprovalRemarks.trim().length >= ceRemarksMinLength;
 
             const approveDisabled = isProcessingApproval || isSuptLocked || (approvalMissedCycles >= 1 && !justificationValid) || !ceRemarksValid;
 
@@ -4560,20 +4560,20 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                 case 'superintendent_locked':
                   return {
                     bg: '#dc2626', color: '#ffffff',
-                    title: 'APPROVAL LOCKED \u2014 SUPERINTENDENT ACTION REQUIRED',
-                    body: `This completion is ${approvalDaysLate} days late. ${approvalMissedCycles} cycle(s) were missed. This work order is LOCKED and cannot be approved by the Chief Engineer until the Superintendent has acknowledged it in the system. Please notify the Superintendent immediately.`
+                    title: 'HIGH SEVERITY \u2014 APPROVAL LOCKED \u2014 SUPERINTENDENT ACTION REQUIRED',
+                    body: `This work order has high severity issues (${approvalMissedCycles >= 3 ? `${approvalMissedCycles} missed cycles` : ''}${approvalDaysLate >= 21 ? `${approvalMissedCycles >= 3 ? ', ' : ''}${approvalDaysLate} days late` : ''}). It is LOCKED and cannot be approved by the Chief Engineer until the Superintendent has acknowledged it. CE remarks are mandatory (minimum 20 characters).`
                   };
                 case 'superintendent_notification':
                   return {
                     bg: '#ea580c', color: '#ffffff',
-                    title: 'HIGH LATENESS \u2014 SUPERINTENDENT HAS BEEN NOTIFIED',
-                    body: `This completion is ${approvalDaysLate} days late. ${approvalMissedCycles} cycles were missed. The Superintendent has been automatically notified. Chief Engineer approval is permitted but DETAILED REMARKS ARE MANDATORY (minimum 20 characters).`
+                    title: 'MEDIUM SEVERITY \u2014 SUPERINTENDENT HAS BEEN NOTIFIED',
+                    body: `This work order has medium severity issues (${approvalMissedCycles === 2 ? `${approvalMissedCycles} missed cycles` : ''}${approvalDaysLate >= 14 ? `${approvalMissedCycles === 2 ? ', ' : ''}${approvalDaysLate} days late` : ''}). The Superintendent has been automatically notified. Chief Engineer approval is permitted but DETAILED REMARKS ARE MANDATORY (minimum 20 characters).`
                   };
                 case 'ce_with_justification':
                   return {
                     bg: '#854d0e', color: '#ffffff',
-                    title: 'LATE COMPLETION \u2014 CE REMARKS REQUIRED',
-                    body: `This completion is ${approvalDaysLate} days late. ${approvalMissedCycles} cycles were missed. Chief Engineer approval remarks are mandatory before this work order can be approved.`
+                    title: 'LOW SEVERITY \u2014 CE REMARKS REQUIRED',
+                    body: `This work order has low severity issues (${approvalMissedCycles === 1 ? `${approvalMissedCycles} missed cycle` : ''}${approvalDaysLate >= 7 ? `${approvalMissedCycles === 1 ? ', ' : ''}${approvalDaysLate} days late` : ''}). Chief Engineer approval remarks are mandatory (minimum 10 characters).`
                   };
                 default:
                   return {
@@ -4690,18 +4690,18 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                     {isSuptLocked && (
                       <span className="text-xs text-gray-500" data-testid="text-ce-remarks-helper">🔒 Locked — cannot enter remarks until Superintendent acknowledges</span>
                     )}
-                    {approvalTier === 'superintendent_notification' && (
+                    {(approvalTier === 'superintendent_locked' || approvalTier === 'superintendent_notification') && (
                       <span className="text-xs text-red-500" data-testid="text-ce-remarks-helper">
                         {ceApprovalRemarks.trim().length < 20
                           ? `Detailed remarks required — minimum 20 characters (currently ${ceApprovalRemarks.trim().length} characters)`
-                          : 'Required — minimum 20 characters (completion is >14 days late)'}
+                          : `Required — minimum 20 characters (${approvalTier === 'superintendent_locked' ? 'high' : 'medium'} severity)`}
                       </span>
                     )}
                     {approvalTier === 'ce_with_justification' && (
                       <span className="text-xs text-red-500" data-testid="text-ce-remarks-helper">
                         {ceApprovalRemarks.trim().length < 10
                           ? `Approval remarks required — minimum 10 characters (currently ${ceApprovalRemarks.trim().length} characters)`
-                          : 'Required — minimum 10 characters (completion is 7–14 days late)'}
+                          : 'Required — minimum 10 characters (low severity)'}
                       </span>
                     )}
                     {approvalTier === 'standard' && <span className="text-xs text-gray-400">Optional</span>}
