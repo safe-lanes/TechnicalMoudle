@@ -298,12 +298,24 @@ export class JobDueScannerService {
         // Use component-specific lastDoneRH from link table, fall back to job-level
         const rhLastDone = parseFloat(linkedComponent.lastDoneRH || job.lastDoneRH || '0');
         
+        // Compute per-component current RH from the linked component's own record
+        let componentCurrentRH = rhEffectiveCurrent;
+        const linkedComp = await getComponentFromCache(linkedComponent.componentId, job.vesselId);
+        if (linkedComp) {
+          const lcCounterType = linkedComp.rhCounterType;
+          if (lcCounterType === 'MASTER') {
+            componentCurrentRH = parseFloat(linkedComp.rhCurrentMaster || '0');
+          } else if (lcCounterType === 'INHERITED') {
+            componentCurrentRH = parseFloat(linkedComp.rhCurrentInheritedCached || '0');
+          }
+        }
+
         // Calculate per-component cycle values
         const rhDue = rhLastDone + frequencyRH;
         const rhGenerate = Math.max(0, rhDue - leadTimeRH);
 
-        // Check auto-generation condition per component
-        if (rhEffectiveCurrent < rhGenerate) {
+        // Check auto-generation condition per component using component's own current RH
+        if (componentCurrentRH < rhGenerate) {
           skipReasons.belowThreshold++;
           continue;
         }
@@ -340,7 +352,7 @@ export class JobDueScannerService {
           assignedTo: job.assignedTo || 'Unassigned',
           dueDate: undefined, // RH-based jobs don't have calendar due date
           nextDueReading: String(rhDue), // Store the due RH value
-          currentReading: String(rhEffectiveCurrent), // Store current RH at generation time
+          currentReading: String(componentCurrentRH), // Store per-component current RH at generation time
           status: 'Due', // Start as Due since trigger condition is met
           taskType: job.maintenanceType,
           maintenanceBasis: job.maintenanceBasis,
