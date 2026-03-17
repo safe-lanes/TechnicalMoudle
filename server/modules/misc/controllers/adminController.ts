@@ -926,50 +926,27 @@ export async function repairRhTracking(req: Request, res: Response) {
       }
     }
 
-    if (jobNeedsUpdate || (links.length === 0 && job.componentId)) {
-      const storedJobLastDone = parseFloat(job.lastDoneRH || '0');
-      const storedJobNextDue = parseFloat(job.nextDueRH || '0');
-
-      if (links.length === 0 && job.componentId) {
-        const comp = componentMap.get(job.componentId);
-        const currentRH = comp
-          ? parseFloat(comp.rhCurrentMaster || comp.rhCurrentInheritedCached || comp.currentCumulativeRH || '0')
-          : 0;
-        const completedWOs = allWOs.filter((wo: any) =>
-          wo.jobId === job.juuid &&
-          FINALIZED.has((wo.status || '').toLowerCase().trim())
-        );
-        const latestCompleted = completedWOs.sort((a: any, b: any) => {
-          const aRH = parseFloat(a.runningHours || a.currentReading || '0');
-          const bRH = parseFloat(b.runningHours || b.currentReading || '0');
-          return bRH - aRH;
-        })[0];
-        if (latestCompleted) {
-          jobLevelLastDone = parseFloat(latestCompleted.runningHours || latestCompleted.currentReading || '0');
-        } else {
-          const cyclesPassed = currentRH > 0 ? Math.floor(currentRH / interval) : 0;
-          jobLevelLastDone = cyclesPassed * interval;
-        }
-        jobLevelNextDue = jobLevelLastDone + interval;
+    if (links.length === 0 && job.componentId) {
+      const comp = componentMap.get(job.componentId);
+      const currentRH = comp
+        ? parseFloat(comp.rhCurrentMaster || comp.rhCurrentInheritedCached || comp.currentCumulativeRH || '0')
+        : 0;
+      const completedWOs = allWOs.filter((wo: any) =>
+        wo.jobId === job.juuid &&
+        FINALIZED.has((wo.status || '').toLowerCase().trim())
+      );
+      const latestCompleted = completedWOs.sort((a: any, b: any) => {
+        const aRH = parseFloat(a.runningHours || a.currentReading || '0');
+        const bRH = parseFloat(b.runningHours || b.currentReading || '0');
+        return bRH - aRH;
+      })[0];
+      if (latestCompleted) {
+        jobLevelLastDone = parseFloat(latestCompleted.runningHours || latestCompleted.currentReading || '0');
+      } else {
+        const cyclesPassed = currentRH > 0 ? Math.floor(currentRH / interval) : 0;
+        jobLevelLastDone = cyclesPassed * interval;
       }
-
-      if (storedJobLastDone !== jobLevelLastDone || storedJobNextDue !== jobLevelNextDue) {
-        if (!dryRun) {
-          await db.update(jobsTable)
-            .set({
-              lastDoneRH: jobLevelLastDone.toString(),
-              nextDueRH: jobLevelNextDue.toString(),
-            })
-            .where(eq(jobsTable.juuid, job.juuid));
-        }
-        jobsRepaired++;
-        repairs.push({
-          type: 'job',
-          jobNo: job.jobNo,
-          before: { lastDoneRH: storedJobLastDone, nextDueRH: storedJobNextDue },
-          after: { lastDoneRH: jobLevelLastDone, nextDueRH: jobLevelNextDue },
-        });
-      }
+      jobLevelNextDue = jobLevelLastDone + interval;
 
       const noLinkActiveWOs = allWOs.filter((wo: any) =>
         wo.jobId === job.juuid &&
@@ -992,6 +969,28 @@ export async function repairRhTracking(req: Request, res: Response) {
             after: { nextDueReading: jobLevelNextDue },
           });
         }
+      }
+    }
+
+    {
+      const storedJobLastDone = parseFloat(job.lastDoneRH || '0');
+      const storedJobNextDue = parseFloat(job.nextDueRH || '0');
+      if (storedJobLastDone !== jobLevelLastDone || storedJobNextDue !== jobLevelNextDue) {
+        if (!dryRun) {
+          await db.update(jobsTable)
+            .set({
+              lastDoneRH: jobLevelLastDone.toString(),
+              nextDueRH: jobLevelNextDue.toString(),
+            })
+            .where(eq(jobsTable.juuid, job.juuid));
+        }
+        jobsRepaired++;
+        repairs.push({
+          type: 'job',
+          jobNo: job.jobNo,
+          before: { lastDoneRH: storedJobLastDone, nextDueRH: storedJobNextDue },
+          after: { lastDoneRH: jobLevelLastDone, nextDueRH: jobLevelNextDue },
+        });
       }
     }
   }
