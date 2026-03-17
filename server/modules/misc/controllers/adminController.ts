@@ -839,7 +839,6 @@ export async function repairRhTracking(req: Request, res: Response) {
     const interval = job.intervalRunningHour || 0;
     let jobLevelLastDone = parseFloat(job.lastDoneRH || '0');
     let jobLevelNextDue = parseFloat(job.nextDueRH || '0');
-    let jobNeedsUpdate = false;
 
     for (const link of links) {
       const comp = componentMap.get(link.componentId);
@@ -897,7 +896,6 @@ export async function repairRhTracking(req: Request, res: Response) {
       if (correctLastDone > jobLevelLastDone) {
         jobLevelLastDone = correctLastDone;
         jobLevelNextDue = correctNextDue;
-        jobNeedsUpdate = true;
       }
 
       const activeWOs = allWOs.filter((wo: any) =>
