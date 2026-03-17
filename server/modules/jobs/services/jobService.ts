@@ -194,8 +194,8 @@ export async function createJob(body: any) {
       throw new ValidationError('Running Hours jobs require a valid numeric intervalRunningHour greater than 0');
     }
 
-    const userProvidedLastDoneRH = !!jobData.lastDoneRH;
-    const rawLastDoneRH = jobData.lastDoneRH || (component?.runningHours ? String(component.runningHours) : null);
+    const userProvidedLastDoneRH = jobData.lastDoneRH !== null && jobData.lastDoneRH !== undefined && jobData.lastDoneRH !== '';
+    const rawLastDoneRH = userProvidedLastDoneRH ? jobData.lastDoneRH : (component?.runningHours != null ? String(component.runningHours) : null);
     if (!rawLastDoneRH) {
       throw new ValidationError('Running Hours jobs require lastDoneRH or component must have runningHours to calculate nextDueRH');
     }
