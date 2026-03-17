@@ -1,4 +1,4 @@
-const XLSX = require('xlsx');
+const ExcelJS = require('exceljs');
 const path = require('path');
 
 const INPUT_FILE = path.join(__dirname, 'attached_assets', 'PMS_Test_Cases_Comprehensive_(1)_1773732351055.xlsx');
@@ -855,50 +855,59 @@ function generateDashboardHowToTest(id, section, scenario, steps, testData, expe
   return instructions[id] || `HOW TO TEST:\n1. Navigate to PMS > Dashboard.\n2. ${steps.replace(/\n/g, '\n')}\nVERIFY: ${expected}`;
 }
 
-// Main execution
-try {
-  const wb = XLSX.readFile(INPUT_FILE, { cellFormula: true, cellStyles: true, cellNF: true });
-  const sheets = wb.SheetNames;
-  
+async function main() {
+  const wb = new ExcelJS.Workbook();
+  await wb.xlsx.readFile(INPUT_FILE);
+
   let totalProcessed = 0;
 
-  for (const sheetName of sheets) {
-    if (sheetName === 'Summary') continue;
+  for (const ws of wb.worksheets) {
+    if (ws.name === 'Summary') continue;
 
-    const ws = wb.Sheets[sheetName];
-    const data = XLSX.utils.sheet_to_json(ws);
-    
-    if (data.length === 0) continue;
+    const headerRow = ws.getRow(1);
+    const headers = [];
+    headerRow.eachCell({ includeEmpty: true }, (cell, colNumber) => {
+      headers[colNumber] = cell.value;
+    });
 
-    // Get the range of the sheet
-    const range = XLSX.utils.decode_range(ws['!ref']);
-    
-    // Add header for column M (index 12)
-    const headerCell = XLSX.utils.encode_cell({ r: 0, c: 12 });
-    ws[headerCell] = { t: 's', v: 'How to Test' };
-    
-    // Add How to Test for each row
-    for (let i = 0; i < data.length; i++) {
-      const row = data[i];
-      const howToTest = generateHowToTest(row);
-      const cellRef = XLSX.utils.encode_cell({ r: i + 1, c: 12 });
-      ws[cellRef] = { t: 's', v: howToTest };
+    if (headers.length === 0) continue;
+
+    const headerStyle = headerRow.getCell(1).style;
+
+    const colM = 13;
+    const headerCell = headerRow.getCell(colM);
+    headerCell.value = 'How to Test';
+    headerCell.style = JSON.parse(JSON.stringify(headerStyle));
+
+    const rowCount = ws.rowCount;
+    for (let r = 2; r <= rowCount; r++) {
+      const row = ws.getRow(r);
+      const testCase = {};
+      headers.forEach((h, colIdx) => {
+        if (h) {
+          const cell = row.getCell(colIdx);
+          testCase[h] = cell.value != null ? String(cell.value) : '';
+        }
+      });
+
+      if (!testCase['Test Case ID']) continue;
+
+      const howToTest = generateHowToTest(testCase);
+      const cell = row.getCell(colM);
+      cell.value = howToTest;
+      cell.alignment = { wrapText: true, vertical: 'top' };
       totalProcessed++;
     }
 
-    // Update the range to include column M
-    range.e.c = Math.max(range.e.c, 12);
-    ws['!ref'] = XLSX.utils.encode_range(range);
-
-    // Set column M width
-    if (!ws['!cols']) ws['!cols'] = [];
-    ws['!cols'][12] = { wch: 80 };
+    ws.getColumn(colM).width = 80;
   }
 
-  XLSX.writeFile(wb, OUTPUT_FILE, { cellFormula: true, bookSST: true });
+  await wb.xlsx.writeFile(OUTPUT_FILE);
   console.log(`SUCCESS: Generated How-to-Test instructions for ${totalProcessed} test cases.`);
   console.log(`Output file: ${OUTPUT_FILE}`);
-} catch (error) {
-  console.error('ERROR:', error.message);
-  process.exit(1);
 }
+
+main().catch(err => {
+  console.error('ERROR:', err.message);
+  process.exit(1);
+});
