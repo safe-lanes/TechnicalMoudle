@@ -190,7 +190,8 @@ export async function listWorkOrders(vesselId?: string) {
       ? componentsByCodeMap.get(`${woVesselId}:${wo.componentCode}`)
       : (wo.component ? componentsMap.get(wo.component) : null);
 
-    // Resolve dueRH: link.nextDueRH is authoritative; otherwise max(wo.nextDueReading, computed) to guard against stale data in either field
+    // Resolve dueRH: link.nextDueRH → wo.nextDueReading → computed(lastDoneRH + interval)
+    // When wo.nextDueReading equals interval (likely stale from initial WO creation), prefer computed
     const componentId = component?.cuuid || component?.id;
     const linkKey = (wo.jobId && componentId) ? `${wo.jobId}:${componentId}` : null;
     const linkData = linkKey ? linksByJobComponent.get(linkKey) : null;
@@ -202,8 +203,8 @@ export async function listWorkOrders(vesselId?: string) {
         const lastDone = parseRH(linkData?.lastDoneRH) ?? parseRH(job?.lastDoneRH);
         const interval = parseRH(job?.intervalRunningHour);
         const computed = (lastDone != null && interval != null && interval > 0) ? lastDone + interval : undefined;
-        if (woNextDue != null && computed != null) {
-          dueRH = Math.max(woNextDue, computed);
+        if (woNextDue != null && computed != null && computed > woNextDue) {
+          dueRH = computed;
         } else {
           dueRH = woNextDue ?? computed;
         }
@@ -326,7 +327,8 @@ export async function getWorkOrder(id: string) {
     return isNaN(num) ? undefined : num;
   };
 
-  // Resolve dueRH: link.nextDueRH is authoritative; otherwise max(wo.nextDueReading, computed) to guard against stale data
+  // Resolve dueRH: link.nextDueRH → wo.nextDueReading → computed(lastDoneRH + interval)
+  // When wo.nextDueReading equals interval (likely stale from initial WO creation), prefer computed
   let linkNextDueRH: string | null = null;
   let linkLastDoneRH: string | null = null;
   const compId = component?.cuuid || component?.id;
@@ -349,8 +351,8 @@ export async function getWorkOrder(id: string) {
       const lastDone = parseRH(linkLastDoneRH) ?? parseRH(job?.lastDoneRH);
       const interval = parseRH(job?.intervalRunningHour);
       const computed = (lastDone != null && interval != null && interval > 0) ? lastDone + interval : undefined;
-      if (woNextDue != null && computed != null) {
-        dueRH = Math.max(woNextDue, computed);
+      if (woNextDue != null && computed != null && computed > woNextDue) {
+        dueRH = computed;
       } else {
         dueRH = woNextDue ?? computed;
       }
