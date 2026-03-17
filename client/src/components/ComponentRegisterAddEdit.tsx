@@ -478,7 +478,7 @@ export default function ComponentRegisterAddEdit({
         // Row 5
         commissionedDate: comp.commissionedDate || "",
         rating: comp.rating || "",
-        eqptSystemDept: comp.eqptSystemDept || "",
+        eqptSystemDept: comp.eqptSystemDept || comp.deptCategory || comp.department || "",
         // Row 6
         runningHours: comp.runningHours?.toString() || comp.currentCumulativeRH?.toString() || "",
         isActive: comp.isActive === false ? "No" : "Yes",
@@ -982,7 +982,7 @@ export default function ComponentRegisterAddEdit({
       // Row 5
       commissionedDate: comp.commissionedDate || "",
       rating: comp.rating || "",
-      eqptSystemDept: comp.eqptSystemDept || "",
+      eqptSystemDept: comp.eqptSystemDept || comp.deptCategory || comp.department || "",
       // Row 6
       runningHours: comp.runningHours?.toString() || comp.currentCumulativeRH?.toString() || "",
       isActive: comp.isActive === false ? "No" : "Yes",
