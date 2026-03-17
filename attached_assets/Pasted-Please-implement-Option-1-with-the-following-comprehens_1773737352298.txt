@@ -1,0 +1,218 @@
+Please implement Option 1 with the following comprehensive fixes:
+
+Part 1: Immediate Fix - Filter Completed Work Orders from Overdue Tab
+Backend Changes:
+
+Update Work Orders List Query/API Endpoint:
+
+File: workOrderController.ts or relevant controller
+
+Modify the query for the Overdue tab to include:
+
+sql
+WHERE 
+  due_date < CURRENT_DATE 
+  AND status NOT IN ('Completed', 'Approved', 'Closed', 'Cancelled')
+  AND (other existing filters...)
+Ensure this filter is applied BEFORE computing display status
+
+Update Status Computation Logic:
+
+If stored status = "Completed"/"Approved"/"Closed", the computed status should ALWAYS be "Completed", regardless of due date
+
+Never compute "Overdue" for work orders with completed stored status
+
+Add Database Query for Data Cleanup:
+
+Identify all work orders with this conflict:
+
+sql
+SELECT * FROM work_orders 
+WHERE status IN ('Completed', 'Approved', 'Closed', 'Cancelled')
+  AND due_date < CURRENT_DATE;
+Provide count of affected work orders
+
+Create data migration script to handle these cases (see Part 3)
+
+Frontend Changes:
+
+Update Status Badge Component:
+
+Prioritize stored status over computed status
+
+If workOrder.status === 'Completed', always show green "Completed" badge
+
+Never override stored "Completed" status with computed "Overdue"
+
+Update Overdue Tab Count Badge:
+
+Ensure count reflects work orders with:
+
+Stored status NOT completed AND
+
+Due date in past
+
+Part 2: Backend Validation Enhancement
+Update Work Order Save/Edit Validation:
+
+Current validation (causing the error):
+
+typescript
+if (isCompletedStatus(workOrder.status)) {
+  throw new ValidationError('Cannot modify completed work order');
+}
+Improve this to provide clearer error:
+
+typescript
+if (isCompletedStatus(workOrder.status)) {
+  throw new ValidationError(
+    `Cannot modify work order: This work order is marked as ${workOrder.status}. ` +
+    `If you need to re-complete this work order, please contact your administrator.`
+  );
+}
+Add conflict detection:
+
+typescript
+// Detect and log data inconsistency
+if (isCompletedStatus(workOrder.status) && isDisplayedAsOverdue(workOrder)) {
+  logger.warn(`Data inconsistency detected: Work Order ${workOrder.code} has ` +
+    `stored status "${workOrder.status}" but is displayed as Overdue. ` +
+    `Due date: ${workOrder.dueDate}, Current date: ${new Date()}`);
+}
+Part 3: Data Migration Script
+Create a data cleanup/migration script to handle existing conflicted work orders:
+
+Approach A: Archive Completed Work Orders (Recommended)
+
+For work orders with stored status = "Completed" AND due date in past:
+
+Keep status as "Completed"
+
+Add flag is_archived = true or similar
+
+Ensure they don't appear in any active tabs (Overdue, Due, Planned)
+
+Make them visible only in Completed tab or Work History
+
+Approach B: Reset Recurring Work Orders
+
+For completed work orders that should have generated new recurring instances:
+
+Verify if next occurrence exists
+
+If not, create new planned work order for next cycle
+
+Keep old work order as "Completed" with past due date
+
+Script Requirements:
+
+Query all affected work orders
+
+Log details for audit trail
+
+Apply fix based on work order type (one-time vs recurring)
+
+Provide summary report of changes
+
+Part 4: Future Prevention
+Add Database Constraints/Checks:
+
+Status Transition Validation:
+
+Add validation to prevent invalid status transitions
+
+Example: Cannot change from "Completed" to "Active" without proper workflow
+
+Recurring Work Order Logic:
+
+When marking work order as "Completed", if it's recurring:
+
+Create NEW work order with next due date
+
+Keep old work order as "Completed" with original due date
+
+Ensure no single work order has both "Completed" status AND future due date recalculation
+
+Audit Trail:
+
+Log all status changes with timestamp, user, and reason
+
+Track when due dates are recalculated
+
+DELIVERABLES REQUESTED:
+Analysis Report:
+
+Count of affected work orders (stored status = Completed but showing as Overdue)
+
+Breakdown by vessel
+
+List of work order codes affected
+
+Code Changes:
+
+Updated work order list query (backend)
+
+Updated status computation logic (backend + frontend)
+
+Enhanced validation with better error messages
+
+Data Migration Script:
+
+Script to identify and fix conflicted work orders
+
+Dry-run mode to preview changes
+
+Execution mode to apply changes
+
+Rollback capability
+
+Documentation:
+
+Updated status lifecycle diagram
+
+Explanation of stored vs computed status
+
+How to handle similar issues in future
+
+Verification Steps:
+
+Test queries to verify fix
+
+Confirmation that Overdue tab no longer shows completed work orders
+
+Confirmation that user can complete actual overdue work orders (status = Active)
+
+TESTING REQUIREMENTS:
+After implementing the fix, please verify:
+
+Overdue Tab:
+
+Contains only work orders with stored status IN ('Active', 'Planned', 'Pending Approval')
+
+Count badge matches actual overdue count
+
+No completed work orders appear
+
+Completed Tab:
+
+All work orders with stored status = 'Completed' appear here
+
+Past due dates don't affect display status
+
+Work Order Detail Page:
+
+Status badge always reflects stored status accurately
+
+No conflicting status displays
+
+Recurring Work Orders:
+
+When completed and approved, new planned work order is created
+
+Old work order remains in Completed status
+
+New work order has future due date and "Planned" status
+
+PRIORITY: CRITICAL - This affects UAT testing and core workflow functionality.
+
+Please provide the analysis report first, then implement the fix with all deliverables listed above.
