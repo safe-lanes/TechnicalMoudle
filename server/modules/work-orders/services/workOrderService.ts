@@ -190,7 +190,7 @@ export async function listWorkOrders(vesselId?: string) {
       ? componentsByCodeMap.get(`${woVesselId}:${wo.componentCode}`)
       : (wo.component ? componentsMap.get(wo.component) : null);
 
-    // Resolve dueRH with fallback chain: link.nextDueRH → computed(lastDoneRH + interval) → wo.nextDueReading
+    // Resolve dueRH: link.nextDueRH is authoritative; otherwise max(wo.nextDueReading, computed) to guard against stale data in either field
     const componentId = component?.cuuid || component?.id;
     const linkKey = (wo.jobId && componentId) ? `${wo.jobId}:${componentId}` : null;
     const linkData = linkKey ? linksByJobComponent.get(linkKey) : null;
@@ -198,14 +198,15 @@ export async function listWorkOrders(vesselId?: string) {
     if (wo.maintenanceBasis === 'Running Hours') {
       dueRH = parseRH(linkData?.nextDueRH);
       if (dueRH == null) {
+        const woNextDue = parseRH(wo.nextDueReading);
         const lastDone = parseRH(linkData?.lastDoneRH) ?? parseRH(job?.lastDoneRH);
         const interval = parseRH(job?.intervalRunningHour);
-        if (lastDone != null && interval != null && interval > 0) {
-          dueRH = lastDone + interval;
+        const computed = (lastDone != null && interval != null && interval > 0) ? lastDone + interval : undefined;
+        if (woNextDue != null && computed != null) {
+          dueRH = Math.max(woNextDue, computed);
+        } else {
+          dueRH = woNextDue ?? computed;
         }
-      }
-      if (dueRH == null) {
-        dueRH = parseRH(wo.nextDueReading);
       }
     }
     const currentRH = wo.maintenanceBasis === 'Running Hours'
@@ -325,7 +326,7 @@ export async function getWorkOrder(id: string) {
     return isNaN(num) ? undefined : num;
   };
 
-  // Resolve dueRH with fallback chain: link.nextDueRH → computed(lastDoneRH + interval) → wo.nextDueReading
+  // Resolve dueRH: link.nextDueRH is authoritative; otherwise max(wo.nextDueReading, computed) to guard against stale data
   let linkNextDueRH: string | null = null;
   let linkLastDoneRH: string | null = null;
   const compId = component?.cuuid || component?.id;
@@ -344,14 +345,15 @@ export async function getWorkOrder(id: string) {
   if (workOrder.maintenanceBasis === 'Running Hours') {
     dueRH = parseRH(linkNextDueRH);
     if (dueRH == null) {
+      const woNextDue = parseRH(workOrder.nextDueReading);
       const lastDone = parseRH(linkLastDoneRH) ?? parseRH(job?.lastDoneRH);
       const interval = parseRH(job?.intervalRunningHour);
-      if (lastDone != null && interval != null && interval > 0) {
-        dueRH = lastDone + interval;
+      const computed = (lastDone != null && interval != null && interval > 0) ? lastDone + interval : undefined;
+      if (woNextDue != null && computed != null) {
+        dueRH = Math.max(woNextDue, computed);
+      } else {
+        dueRH = woNextDue ?? computed;
       }
-    }
-    if (dueRH == null) {
-      dueRH = parseRH(workOrder.nextDueReading);
     }
   }
   const currentRH = workOrder.maintenanceBasis === 'Running Hours'
