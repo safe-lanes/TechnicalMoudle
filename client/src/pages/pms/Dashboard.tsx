@@ -1573,12 +1573,12 @@ const Dashboard = () => {
         )}
 
         {/* Compliance Anomaly Detection Panel (Layer 6) */}
-        {activeTab === 'overview' && isSailAdmin && (
+        {activeTab === 'overview' && (
           <ComplianceAnomalyPanel vesselId={vesselId} />
         )}
 
         {/* Work Order Anomalies Tile (Layer 6 — Individual Anomaly Events) */}
-        {activeTab === 'overview' && isSailAdmin && (
+        {activeTab === 'overview' && (
           <AnomalyDetectionTile vesselId={vesselId} />
         )}
 
