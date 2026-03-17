@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { useVessel } from "@/contexts/VesselContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { useUIRole } from "@/contexts/UIRoleContext";
+import { usePermissions } from "@/contexts/PermissionsContext";
 import { AdminOnly } from "@/components/RoleGuard";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -2132,6 +2133,10 @@ const Components: React.FC = () => {
   const { vesselId, setVesselId } = useVessel();
   const { data: vessels = [] } = useVessels();
   const { isSailAdmin, isClientAdmin, isVessel, isHeadOfDept } = useUIRole();
+  const { canCreate: canCreatePerm, canEdit: canEditPerm, canDelete: canDeletePerm } = usePermissions();
+  const canCreateComponent = canCreatePerm("pms-components");
+  const canEditComponent = canEditPerm("pms-components");
+  const canDeleteComponent = canDeletePerm("pms-components");
   
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [validationErrorDialogOpen, setValidationErrorDialogOpen] = useState(false);
@@ -3342,7 +3347,7 @@ const Components: React.FC = () => {
                 Export
               </Button>
             )}
-            {(isSailAdmin || isClientAdmin) && !isChangeRequestMode && !isChangeMode && (
+            {(isSailAdmin || isClientAdmin) && !isChangeRequestMode && !isChangeMode && (canCreateComponent || canEditComponent) && (
               <Button 
                 className="bg-[#5dc86f] hover:bg-[#4db85f] text-white"
                 onClick={() => {
@@ -3452,6 +3457,7 @@ const Components: React.FC = () => {
                   </>
                 ) : (
                   <>
+                    {canEditComponent && (
                     <button
                       onClick={handleEnterEditMode}
                       className="flex items-center gap-1 px-2 py-0.5 text-xs rounded hover:bg-white/20 transition-colors"
@@ -3460,6 +3466,7 @@ const Components: React.FC = () => {
                       <Pencil className="h-3 w-3" />
                       Edit
                     </button>
+                    )}
                     <button
                       onClick={handleExpandSelected}
                       className="flex items-center gap-1 px-2 py-0.5 text-xs rounded hover:bg-white/20 transition-colors"
@@ -3498,8 +3505,9 @@ const Components: React.FC = () => {
                   <h3 className="text-lg font-semibold text-[#15569e]" data-testid="B7.1">
                     <Marker id="B7.1" /> {selectedComponent.code} {selectedComponent.name}
                   </h3>
-                  {(isSailAdmin || isClientAdmin) && !isChangeRequestMode && !isChangeMode && (
+                  {(isSailAdmin || isClientAdmin) && !isChangeRequestMode && !isChangeMode && (canEditComponent || canDeleteComponent) && (
                     <div className="flex items-center gap-2">
+                      {canEditComponent && (
                       <Button
                         size="sm"
                         variant="outline"
@@ -3514,7 +3522,8 @@ const Components: React.FC = () => {
                         <Marker id="B7.2" /> <Edit2 className="h-4 w-4 mr-1" />
                         Edit Component
                       </Button>
-                      {selectedComponent.actualId && (selectedComponent as any).isActive !== false && (
+                      )}
+                      {canDeleteComponent && selectedComponent.actualId && (selectedComponent as any).isActive !== false && (
                         <Button
                           size="sm"
                           variant="outline"

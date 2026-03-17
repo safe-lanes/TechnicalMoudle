@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { useLocation } from "wouter";
 import { ArrowLeft, Plus, Edit2, ChevronRight, ChevronDown, Search, Upload, Eye, Download, Trash2, FileText, Loader2, Check, ChevronsUpDown, X, ChevronUp } from "lucide-react";
+import { usePermissions } from "@/contexts/PermissionsContext";
 import { Card, CardHeader, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -57,6 +58,7 @@ export default function ComponentRegisterAddEdit({
   const { vesselId, setVesselId } = useVessel();
   const { data: vessels = [] } = useVessels();
   const { options: departmentOptions } = useDepartmentOptions();
+  const { canCreate: canCreatePerm, canEdit: canEditPerm } = usePermissions();
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedTreeNode, setSelectedTreeNode] = useState<string | null>(null);
   const [expandedNodes, setExpandedNodes] = useState<Set<string>>(new Set());
@@ -1203,7 +1205,7 @@ export default function ComponentRegisterAddEdit({
         </div>
         <Button
           onClick={handleSave}
-          disabled={isSaving}
+          disabled={isSaving || (isEditMode ? !canEditPerm("pms-components") : !canCreatePerm("pms-components"))}
           className="bg-green-600 hover:bg-green-700 text-white h-8"
           data-testid="button-save"
         >
@@ -1903,7 +1905,7 @@ export default function ComponentRegisterAddEdit({
               <div className="flex justify-end pt-4">
                 <Button
                   onClick={handleSave}
-                  disabled={isSaving}
+                  disabled={isSaving || (isEditMode ? !canEditPerm("pms-components") : !canCreatePerm("pms-components"))}
                   className="bg-green-600 hover:bg-green-700 text-white px-8"
                   data-testid="button-submit"
                 >

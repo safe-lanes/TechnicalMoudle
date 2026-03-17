@@ -29,6 +29,9 @@ interface PermissionsContextType {
   status: PermissionStatus;
   canViewRoute: (route: string) => boolean;
   canViewMenu: (menuName: string) => boolean;
+  canCreate: (menuName: string) => boolean;
+  canEdit: (menuName: string) => boolean;
+  canDelete: (menuName: string) => boolean;
   hasAnyChildAccess: (parentModule: string) => boolean;
   getPermission: (menuName: string) => MenuPermission | null;
   canViewSidebarItem: (subModule: string, itemId: string) => boolean;
@@ -265,6 +268,42 @@ export function PermissionsProvider({ children }: { children: ReactNode }) {
     [shouldDeny, status, permissions, getMenuMuidByName]
   );
 
+  const canCreate = useCallback(
+    (menuName: string): boolean => {
+      if (!shouldDeny) return true;
+      if (status === "error") return false;
+      const muid = getMenuMuidByName(menuName);
+      if (!muid) return false;
+      const perm = permissions.get(muid);
+      return perm?.canCreate ?? false;
+    },
+    [shouldDeny, status, permissions, getMenuMuidByName]
+  );
+
+  const canEdit = useCallback(
+    (menuName: string): boolean => {
+      if (!shouldDeny) return true;
+      if (status === "error") return false;
+      const muid = getMenuMuidByName(menuName);
+      if (!muid) return false;
+      const perm = permissions.get(muid);
+      return perm?.canEdit ?? false;
+    },
+    [shouldDeny, status, permissions, getMenuMuidByName]
+  );
+
+  const canDelete = useCallback(
+    (menuName: string): boolean => {
+      if (!shouldDeny) return true;
+      if (status === "error") return false;
+      const muid = getMenuMuidByName(menuName);
+      if (!muid) return false;
+      const perm = permissions.get(muid);
+      return perm?.canDelete ?? false;
+    },
+    [shouldDeny, status, permissions, getMenuMuidByName]
+  );
+
   const hasAnyChildAccess = useCallback(
     (parentModule: string): boolean => {
       if (!shouldDeny) return true;
@@ -328,6 +367,9 @@ export function PermissionsProvider({ children }: { children: ReactNode }) {
     status,
     canViewRoute,
     canViewMenu,
+    canCreate,
+    canEdit,
+    canDelete,
     hasAnyChildAccess,
     getPermission,
     canViewSidebarItem,
