@@ -818,7 +818,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
     const context = workOrderContext as any;
     const componentId = context?.component?.cuuid;
     if (!componentId || !rhValue || isNaN(Number(rhValue))) {
-      setRhValidation({ status: 'idle', message: '', validRange: null, utilizationRate: 0, previousEntry: null, nextEntry: null, validationDetails: null });
+      setRhValidation(prev => ({ status: 'idle', message: '', validRange: null, utilizationRate: 0, previousEntry: null, nextEntry: null, validationDetails: null, componentActualRH: prev.componentActualRH }));
       return;
     }
     const dateToUse = completionDate || executionData.completionDateTime?.split('T')[0] || executionData.dateOfCompletion || new Date().toISOString().split('T')[0];
@@ -854,7 +854,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
         });
       }
     } catch {
-      setRhValidation(prev => ({ ...prev, status: 'idle', message: '' }));
+      setRhValidation(prev => ({ ...prev, status: 'idle', message: '', componentActualRH: prev.componentActualRH }));
     }
   };
 
@@ -1963,8 +1963,8 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
 
       if ((workOrderContext as any)?.maintenanceBasis === 'Running Hours' && currentRHValue) {
         const enteredRH = Number(currentRHValue);
-        const capRH = rhValidation.componentActualRH;
-        if (capRH !== null && !isNaN(enteredRH) && enteredRH > capRH) {
+        const capRH = rhValidation.componentActualRH ?? (executionData.previousReading ? Number(executionData.previousReading) : null);
+        if (capRH !== null && !isNaN(enteredRH) && !isNaN(capRH) && enteredRH > capRH) {
           hardErrors.push(`Running hours entered (${enteredRH}) exceeds the component's actual running hours (${capRH}). Please update the component's running hours in the Running Hours module first.`);
         }
       }
