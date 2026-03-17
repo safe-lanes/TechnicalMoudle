@@ -63,7 +63,7 @@ export default function AccessControl() {
 
   const menuTree = useMemo(() => {
     if (!menuItemsQuery.data) return [];
-    const items = menuItemsQuery.data;
+    const items = menuItemsQuery.data.filter((i) => i.name !== "admin-access-control");
     const parents = items.filter((i) => !i.parentMenu).sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0));
     return parents.map((parent) => ({
       ...parent,
