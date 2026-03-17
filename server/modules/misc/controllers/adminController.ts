@@ -828,7 +828,6 @@ export async function repairRhTracking(req: Request, res: Response) {
 
   const allWOs = await storage.getWorkOrders(vesselId || undefined);
   const FINALIZED = new Set(['completed', 'approved', 'closed', 'cancelled', 'canceled']);
-  const ACTIVE = new Set(['due', 'overdue', 'planned', 'active']);
 
   let jobsRepaired = 0;
   let linksRepaired = 0;
@@ -904,7 +903,7 @@ export async function repairRhTracking(req: Request, res: Response) {
       const activeWOs = allWOs.filter((wo: any) =>
         wo.jobId === job.juuid &&
         wo.componentCode === compCode &&
-        ACTIVE.has((wo.status || '').toLowerCase().trim())
+        !FINALIZED.has((wo.status || '').toLowerCase().trim())
       );
       for (const wo of activeWOs) {
         const storedNextDueReading = parseFloat(wo.nextDueReading || '0');

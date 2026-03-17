@@ -190,13 +190,23 @@ export async function listWorkOrders(vesselId?: string) {
       ? componentsByCodeMap.get(`${woVesselId}:${wo.componentCode}`)
       : (wo.component ? componentsMap.get(wo.component) : null);
 
-    // Resolve dueRH with fallback chain: link.nextDueRH → wo.cycleDueRhSnapshot → wo.nextDueReading → job.nextDueRH
+    // Resolve dueRH with fallback chain: link.nextDueRH → wo.nextDueReading → computed(lastDoneRH + interval)
     const componentId = component?.cuuid || component?.id;
     const linkKey = (wo.jobId && componentId) ? `${wo.jobId}:${componentId}` : null;
     const linkData = linkKey ? linksByJobComponent.get(linkKey) : null;
-    const dueRH = wo.maintenanceBasis === 'Running Hours'
-      ? (parseRH(linkData?.nextDueRH) ?? parseRH(wo.cycleDueRhSnapshot) ?? parseRH(wo.nextDueReading) ?? parseRH(job?.nextDueRH))
-      : undefined;
+    let dueRH: number | undefined;
+    if (wo.maintenanceBasis === 'Running Hours') {
+      dueRH = parseRH(linkData?.nextDueRH)
+        ?? parseRH(wo.nextDueReading)
+        ?? parseRH(job?.nextDueRH);
+      if (dueRH == null) {
+        const lastDone = parseRH(linkData?.lastDoneRH) ?? parseRH(job?.lastDoneRH) ?? 0;
+        const interval = parseRH(job?.intervalRunningHour);
+        if (interval != null && interval > 0) {
+          dueRH = lastDone + interval;
+        }
+      }
+    }
     const currentRH = wo.maintenanceBasis === 'Running Hours'
       ? (parseRH(component?.currentCumulativeRH) ?? parseRH(wo.currentReading))
       : undefined;
@@ -314,8 +324,9 @@ export async function getWorkOrder(id: string) {
     return isNaN(num) ? undefined : num;
   };
 
-  // Resolve dueRH with fallback chain: link.nextDueRH → wo.cycleDueRhSnapshot → wo.nextDueReading → job.nextDueRH
+  // Resolve dueRH with fallback chain: link.nextDueRH → wo.nextDueReading → computed(lastDoneRH + interval)
   let linkNextDueRH: string | null = null;
+  let linkLastDoneRH: string | null = null;
   const compId = component?.cuuid || component?.id;
   if (workOrder.maintenanceBasis === 'Running Hours' && workOrder.jobId && compId) {
     const links = await storage.getJobComponentLinksByJob(workOrder.jobId);
@@ -323,11 +334,24 @@ export async function getWorkOrder(id: string) {
     if (link?.nextDueRH) {
       linkNextDueRH = link.nextDueRH;
     }
+    if (link?.lastDoneRH) {
+      linkLastDoneRH = link.lastDoneRH;
+    }
   }
 
-  const dueRH = workOrder.maintenanceBasis === 'Running Hours'
-    ? (parseRH(linkNextDueRH) ?? parseRH(workOrder.cycleDueRhSnapshot) ?? parseRH(workOrder.nextDueReading) ?? parseRH(job?.nextDueRH))
-    : undefined;
+  let dueRH: number | undefined;
+  if (workOrder.maintenanceBasis === 'Running Hours') {
+    dueRH = parseRH(linkNextDueRH)
+      ?? parseRH(workOrder.nextDueReading)
+      ?? parseRH(job?.nextDueRH);
+    if (dueRH == null) {
+      const lastDone = parseRH(linkLastDoneRH) ?? parseRH(job?.lastDoneRH) ?? 0;
+      const interval = parseRH(job?.intervalRunningHour);
+      if (interval != null && interval > 0) {
+        dueRH = lastDone + interval;
+      }
+    }
+  }
   const currentRH = workOrder.maintenanceBasis === 'Running Hours'
     ? (parseRH(component?.currentCumulativeRH) ?? parseRH(workOrder.currentReading))
     : undefined;
