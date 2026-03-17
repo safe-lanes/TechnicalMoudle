@@ -4038,8 +4038,8 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
               <div className="space-y-2">
                 <Label className="text-sm text-[#8798ad]" data-testid="text-component-actual-rh-label">Component Actual RH</Label>
                 <Input
-                  value={rhValidation.componentActualRH !== null ? `${rhValidation.componentActualRH} hrs` : (executionData.previousReading ? `${executionData.previousReading} hrs` : '—')}
-                  className="text-sm bg-amber-50 border-amber-200 font-semibold text-amber-800"
+                  value={rhValidation.componentActualRH !== null ? `${rhValidation.componentActualRH} hrs` : 'Fetching...'}
+                  className={`text-sm font-semibold ${rhValidation.componentActualRH !== null ? 'bg-amber-50 border-amber-200 text-amber-800' : 'bg-gray-50 border-gray-200 text-gray-400 italic'}`}
                   disabled
                   data-testid="text-component-actual-rh"
                 />

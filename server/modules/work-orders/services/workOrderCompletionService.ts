@@ -114,8 +114,11 @@ export async function completeWorkOrder(
       }
     }
 
-    const componentActualRH = component.currentCumulativeRH !== null && component.currentCumulativeRH !== undefined
-      ? parseInt(component.currentCumulativeRH)
+    const rhSource = component.rhCounterType === 'INHERITED'
+      ? (component.rhCurrentInheritedCached || component.currentCumulativeRH)
+      : (component.rhCurrentMaster || component.currentCumulativeRH);
+    const componentActualRH = rhSource !== null && rhSource !== undefined
+      ? parseInt(rhSource)
       : null;
     if (componentActualRH !== null && !isNaN(componentActualRH) && newRH > componentActualRH) {
       throw new ValidationError(
@@ -125,6 +128,7 @@ export async function completeWorkOrder(
           code: 'EXCEEDS_COMPONENT_RH',
           enteredRH: newRH,
           componentActualRH,
+          rhCounterType: component.rhCounterType || 'MASTER',
           componentCode: component.componentCode || workOrder.componentCode
         }
       );

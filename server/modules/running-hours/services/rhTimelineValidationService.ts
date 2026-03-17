@@ -420,9 +420,18 @@ export async function getCurrentRH(machineryId: string): Promise<{
     throw new Error(`Component not found: ${machineryId}`);
   }
 
-  const currentRH = parseFloat(component.currentCumulativeRH || '0');
-  const lastUpdated = component.lastUpdated
-    || component.rhMasterUpdatedAt?.toISOString()
+  let rhSource: string | null;
+  let rhLastUpdated: Date | string | null;
+  if (component.rhCounterType === 'INHERITED') {
+    rhSource = component.rhCurrentInheritedCached || component.currentCumulativeRH;
+    rhLastUpdated = component.rhInheritedUpdatedAt || component.rhMasterUpdatedAt;
+  } else {
+    rhSource = component.rhCurrentMaster || component.currentCumulativeRH;
+    rhLastUpdated = component.rhMasterUpdatedAt;
+  }
+  const currentRH = parseFloat(rhSource || '0');
+  const lastUpdated = (rhLastUpdated ? (typeof rhLastUpdated === 'string' ? rhLastUpdated : rhLastUpdated.toISOString()) : null)
+    || component.lastUpdated
     || component.updatedAt?.toISOString()
     || new Date().toISOString();
 
