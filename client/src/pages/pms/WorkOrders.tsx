@@ -482,7 +482,7 @@ const WorkOrders: React.FC = () => {
         'Job Title': wo.jobTitle || '-',
         'Assigned To': wo.assignedTo || '-',
         'Due Date': wo.maintenanceBasis === 'Running Hours'
-          ? (() => { const rh = wo.dueRH ?? (wo.nextDueReading ? Number(wo.nextDueReading) : null); return rh != null && !isNaN(rh) ? `${rh.toLocaleString()} RH` : '-'; })()
+          ? (() => { const rh = wo.dueRH ?? (wo.nextDueReading != null ? Number(wo.nextDueReading) : null); return rh != null && !isNaN(rh) ? `${rh.toLocaleString()} RH` : '-'; })()
           : (wo.dueDate ? formatProfessionalDate(wo.dueDate) : '-'),
         'Status': getEffectiveStatus(wo),
         'Criticality': wo.criticality || '-',
@@ -527,7 +527,7 @@ const WorkOrders: React.FC = () => {
         jobTitle: wo.jobTitle || '-',
         assignedTo: wo.assignedTo || '-',
         dueDate: wo.maintenanceBasis === 'Running Hours'
-          ? (() => { const rh = wo.dueRH ?? (wo.nextDueReading ? Number(wo.nextDueReading) : null); return rh != null && !isNaN(rh) ? `${rh.toLocaleString()} RH` : '-'; })()
+          ? (() => { const rh = wo.dueRH ?? (wo.nextDueReading != null ? Number(wo.nextDueReading) : null); return rh != null && !isNaN(rh) ? `${rh.toLocaleString()} RH` : '-'; })()
           : (wo.dueDate ? formatProfessionalDate(wo.dueDate) : '-'),
         status: getEffectiveStatus(wo),
         criticality: wo.criticality || '-',
@@ -911,21 +911,27 @@ const WorkOrders: React.FC = () => {
                       )
                       : workOrder.maintenanceBasis === "Running Hours"
                         ? (() => {
-                          const rhTarget = workOrder.dueRH ?? (workOrder.nextDueReading ? Number(workOrder.nextDueReading) : null);
-                          const rhCurrent = workOrder.currentRH ?? (workOrder.currentReading ? Number(workOrder.currentReading) : null);
+                          const rhTarget = workOrder.dueRH ?? (workOrder.nextDueReading != null ? Number(workOrder.nextDueReading) : null);
+                          const rhCurrent = workOrder.currentRH ?? (workOrder.currentReading != null ? Number(workOrder.currentReading) : null);
+                          const hasTarget = rhTarget != null && !isNaN(rhTarget);
+                          const hasCurrent = rhCurrent != null && !isNaN(rhCurrent);
                           return (
                           <div className="relative group">
                             <span className="text-gray-900 font-medium" data-testid={`text-rh-due-${workOrder.id}`}>
-                              {rhTarget != null && !isNaN(rhTarget) ? `${rhTarget.toLocaleString()} RH` : '—'}
+                              {hasTarget ? `${rhTarget.toLocaleString()} RH` : '—'}
                             </span>
-                            {rhTarget != null && !isNaN(rhTarget) && rhCurrent != null && !isNaN(rhCurrent) && (
+                            {hasTarget && (
                               <div className="absolute bottom-full left-0 mb-2 px-3 py-2 bg-gray-900 text-white text-xs rounded shadow-lg whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10">
                                 <div className="flex flex-col gap-1">
-                                  <span>Next Due: {rhTarget.toLocaleString()} RH</span>
-                                  <span>Current: {rhCurrent.toLocaleString()} RH</span>
-                                  <span className={rhTarget - rhCurrent <= 0 ? 'text-red-300 font-semibold' : 'text-green-300'}>
-                                    Remaining: {(rhTarget - rhCurrent).toLocaleString()} RH
-                                  </span>
+                                  <span>Next Due RH: {rhTarget.toLocaleString()}</span>
+                                  <span>Current RH: {hasCurrent ? rhCurrent.toLocaleString() : '—'}</span>
+                                  {hasCurrent ? (
+                                    <span className={rhTarget - rhCurrent <= 0 ? 'text-red-300 font-semibold' : 'text-green-300'}>
+                                      Remaining RH: {(rhTarget - rhCurrent).toLocaleString()}
+                                    </span>
+                                  ) : (
+                                    <span className="text-gray-400">Remaining RH: —</span>
+                                  )}
                                 </div>
                               </div>
                             )}
