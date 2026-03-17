@@ -194,6 +194,7 @@ export async function createJob(body: any) {
       throw new ValidationError('Running Hours jobs require a valid numeric intervalRunningHour greater than 0');
     }
 
+    const userProvidedLastDoneRH = !!jobData.lastDoneRH;
     const rawLastDoneRH = jobData.lastDoneRH || (component?.runningHours ? String(component.runningHours) : null);
     if (!rawLastDoneRH) {
       throw new ValidationError('Running Hours jobs require lastDoneRH or component must have runningHours to calculate nextDueRH');
@@ -210,6 +211,34 @@ export async function createJob(body: any) {
       nextDueRH: calculatedNextDueRH,
       lastDoneRH: String(lastRH)
     };
+
+    if (!userProvidedLastDoneRH && component) {
+      try {
+        await repo.createAuditLog({
+          timestamp: new Date().toISOString(),
+          userId: 'system',
+          vesselCode: jobData.vesselId || '',
+          componentCode: component.componentCode || '',
+          entityType: 'job',
+          entityId: jobData.jobNo || '',
+          actionType: 'rh_default',
+          fieldName: 'lastDoneRH',
+          oldValue: null,
+          newValue: String(lastRH),
+          source: 'job_creation_default',
+          payload: {
+            componentId: component.cuuid || component.id,
+            componentName: component.name,
+            componentRunningHours: component.runningHours,
+            defaultedFrom: 'component.runningHours',
+            intervalRH,
+            calculatedNextDueRH
+          }
+        });
+      } catch (auditErr) {
+        console.warn('[Job Create] Failed to log lastDoneRH default audit:', auditErr);
+      }
+    }
   }
 
   const job = await repo.create(jobData);

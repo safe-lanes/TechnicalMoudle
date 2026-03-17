@@ -114,6 +114,20 @@ export async function completeWorkOrder(
       }
     }
 
+    const componentActualRH = parseInt(component.currentCumulativeRH || '0');
+    if (componentActualRH > 0 && newRH > componentActualRH) {
+      throw new ValidationError(
+        `Running hours entered (${newRH}) exceeds the component's actual running hours (${componentActualRH}). ` +
+        `Please update the component's running hours first in the Running Hours module before completing this work order.`,
+        {
+          code: 'EXCEEDS_COMPONENT_RH',
+          enteredRH: newRH,
+          componentActualRH,
+          componentCode: component.componentCode || workOrder.componentCode
+        }
+      );
+    }
+
     // Use timeline-based validation (forward + backward checks, 24 hrs/day max)
     const validation = await validateRHEntry(component.cuuid, completionDateForValidation, newRH);
 

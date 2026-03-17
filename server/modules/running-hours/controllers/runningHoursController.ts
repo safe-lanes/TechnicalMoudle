@@ -181,7 +181,29 @@ export async function validateRHEntry(req: Request, res: Response) {
       return res.status(400).json({ error: 'machineryId, completionDate, and runningHours are required' });
     }
     const result = await rhTimelineValidation.validateRHEntry(machineryId, completionDate, Number(runningHours));
-    res.json(result);
+
+    let componentActualRH: number | null = null;
+    try {
+      const currentRHData = await rhTimelineValidation.getCurrentRH(machineryId);
+      componentActualRH = currentRHData.currentRH;
+    } catch {}
+
+    const enteredRH = Number(runningHours);
+    let exceedsComponentRH = false;
+    if (componentActualRH !== null && componentActualRH > 0 && enteredRH > componentActualRH) {
+      exceedsComponentRH = true;
+    }
+
+    res.json({
+      ...result,
+      componentActualRH,
+      exceedsComponentRH,
+      ...(exceedsComponentRH && result.isValid ? {
+        isValid: false,
+        validationStatus: 'EXCEEDS_COMPONENT_RH',
+        errorMessage: `Running hours entered (${enteredRH}) exceeds the component's actual running hours (${componentActualRH}). Please update the component's running hours first in the Running Hours module.`
+      } : {})
+    });
   } catch (error: any) {
     console.error('Error validating RH entry:', error);
     res.status(500).json({ error: error.message || 'Failed to validate RH entry' });

@@ -75,3 +75,9 @@ export async function findMaintenanceHistoryByJobId(jobId: string) {
 export async function findMaintenanceHistoryByJobCode(jobNo: string) {
   return storage.getMaintenanceHistoryByJobCode(jobNo);
 }
+
+// ── Audit Log ──
+
+export async function createAuditLog(data: any) {
+  return storage.createAuditLog(data);
+}

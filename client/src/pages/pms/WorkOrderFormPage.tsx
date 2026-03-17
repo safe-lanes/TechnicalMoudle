@@ -455,7 +455,8 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
     previousEntry: { date: string; runningHours: number } | null;
     nextEntry: { date: string; runningHours: number } | null;
     validationDetails: any;
-  }>({ status: 'idle', message: '', validRange: null, utilizationRate: 0, previousEntry: null, nextEntry: null, validationDetails: null });
+    componentActualRH: number | null;
+  }>({ status: 'idle', message: '', validRange: null, utilizationRate: 0, previousEntry: null, nextEntry: null, validationDetails: null, componentActualRH: null });
   const [rhJustificationModalOpen, setRhJustificationModalOpen] = useState(false);
   const [rhJustificationText, setRhJustificationText] = useState('');
   const [rhJustificationConfirmed, setRhJustificationConfirmed] = useState(false);
@@ -837,7 +838,8 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
           utilizationRate: result.utilizationRate,
           previousEntry: result.previousEntry,
           nextEntry: result.nextEntry,
-          validationDetails: result
+          validationDetails: result,
+          componentActualRH: result.componentActualRH ?? null
         });
       } else {
         setRhValidation({
@@ -847,7 +849,8 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
           utilizationRate: result.utilizationRate,
           previousEntry: result.previousEntry,
           nextEntry: result.nextEntry,
-          validationDetails: result
+          validationDetails: result,
+          componentActualRH: result.componentActualRH ?? null
         });
       }
     } catch {
@@ -871,6 +874,20 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
       toast({ title: "Error", description: "Failed to fetch current running hours from module.", variant: "destructive" });
     }
   };
+
+  useEffect(() => {
+    const context = workOrderContext as any;
+    const componentId = context?.component?.cuuid;
+    if (!componentId) return;
+    fetch(`/technical/api/running-hours/current?machineryId=${encodeURIComponent(componentId)}`)
+      .then(res => res.json())
+      .then(result => {
+        if (result.currentRH !== undefined) {
+          setRhValidation(prev => ({ ...prev, componentActualRH: result.currentRH }));
+        }
+      })
+      .catch(() => {});
+  }, [(workOrderContext as any)?.component?.cuuid]);
 
   const handleExecutionChange = (field: string, value: string) => {
     setExecutionData(prev => {
@@ -3995,7 +4012,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
             number="B3"
             title="Running Hours"
           >
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div className="space-y-2">
                 <Label className="text-sm text-[#8798ad]" data-testid="WOF.B3.3"><Marker id="WOF.B3.3" />Previous reading</Label>
                 <Input
@@ -4004,6 +4021,19 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                   disabled
                   data-testid="WOF.B3.4"
                 />
+              </div>
+
+              <div className="space-y-2">
+                <Label className="text-sm text-[#8798ad]" data-testid="text-component-actual-rh-label">Component Actual RH</Label>
+                <Input
+                  value={rhValidation.componentActualRH !== null ? `${rhValidation.componentActualRH} hrs` : (executionData.previousReading ? `${executionData.previousReading} hrs` : '—')}
+                  className="text-sm bg-amber-50 border-amber-200 font-semibold text-amber-800"
+                  disabled
+                  data-testid="text-component-actual-rh"
+                />
+                <div className="text-xs text-amber-600" data-testid="text-rh-cap-hint">
+                  Maximum allowed value for Current Reading
+                </div>
               </div>
 
               <div className="space-y-2">
@@ -4041,7 +4071,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                 {/* RH Valid Range Helper */}
                 {rhValidation.validRange && (
                   <div className="text-xs text-blue-600 bg-blue-50 px-2 py-1 rounded" data-testid="text-rh-valid-range">
-                    Valid range: {rhValidation.validRange.min.toFixed(0)} to {rhValidation.validRange.max === Infinity ? '∞' : rhValidation.validRange.max.toFixed(0)} hours
+                    Valid range: {rhValidation.validRange.min.toFixed(0)} to {rhValidation.componentActualRH !== null && rhValidation.componentActualRH > 0 ? rhValidation.componentActualRH : (rhValidation.validRange.max === Infinity ? '∞' : rhValidation.validRange.max.toFixed(0))} hours
                     {rhValidation.previousEntry && (
                       <span className="ml-1 text-blue-500">
                         | Last: {rhValidation.previousEntry.runningHours.toFixed(0)} hrs on {new Date(rhValidation.previousEntry.date).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}
@@ -4061,7 +4091,12 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                     <CheckCircle2 className="h-3 w-3" /> {rhValidation.message}
                   </div>
                 )}
-                {rhValidation.status === 'invalid' && (
+                {rhValidation.status === 'invalid' && rhValidation.validationDetails?.validationStatus === 'EXCEEDS_COMPONENT_RH' && (
+                  <div className="text-xs text-red-600 flex items-center gap-1" data-testid="text-rh-exceeds-component">
+                    <X className="h-3 w-3" /> Cannot exceed component's actual RH ({rhValidation.componentActualRH} hrs). Update RH in the Running Hours module first.
+                  </div>
+                )}
+                {rhValidation.status === 'invalid' && rhValidation.validationDetails?.validationStatus !== 'EXCEEDS_COMPONENT_RH' && (
                   <div className="text-xs text-red-600 flex items-center gap-1" data-testid="text-rh-invalid">
                     <X className="h-3 w-3" /> Invalid: {rhValidation.validRange ? `Valid range: ${rhValidation.validRange.min.toFixed(0)} to ${rhValidation.validRange.max === Infinity ? '∞' : rhValidation.validRange.max.toFixed(0)} hours` : rhValidation.message}
                   </div>
