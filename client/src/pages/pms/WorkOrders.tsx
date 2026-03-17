@@ -183,34 +183,33 @@ const WorkOrders: React.FC = () => {
 
   const safeWorkOrdersList = (workOrdersList || []).filter(wo => wo !== null && wo !== undefined);
   
-  // Use computedStatus for tab counts (automatic status calculation)
-  // Planned tab shows work orders with Active status (not yet in warning window) + Postponed items
-  // Due tab shows only items within warning window (≤30 days / ≤720 RH) but NOT past due
-  // Overdue tab shows both Grace P (within tolerance) and Overdue (breach) items
+  const FINALIZED_STATUSES = new Set(['Completed', 'Approved', 'Closed', 'Cancelled', 'Canceled']);
+  const isStoredCompleted = (wo: any) => FINALIZED_STATUSES.has(wo.status);
+  const getEffectiveStatus = (wo: any) => {
+    if (isStoredCompleted(wo)) return 'Completed';
+    return wo.computedStatus || wo.status || 'Active';
+  };
+
   const tabs = [
     { id: "Planned", label: "Planned", count: safeWorkOrdersList.filter(wo => {
       if (wo.isExecution) return false;
-      const effectiveStatus = wo.computedStatus || wo.status || 'Active';
+      const effectiveStatus = getEffectiveStatus(wo);
       return effectiveStatus === "Active" || effectiveStatus === "Postponed";
     }).length },
     { id: "Due", label: "Due", count: safeWorkOrdersList.filter(wo => {
-      // Allow rejected executions (they need rework), but exclude other executions
       const isRejectedExecution = wo.isExecution && wo.status === 'Rejected';
       if (wo.isExecution && !isRejectedExecution) return false;
-      const effectiveStatus = wo.computedStatus || wo.status || 'Active';
-      // Due tab: items within warning window + Grace P (past due but within tolerance)
+      const effectiveStatus = getEffectiveStatus(wo);
       return effectiveStatus === "Due" || effectiveStatus === "Due (Grace P)";
     }).length },
     { id: "Overdue", label: "Overdue", count: safeWorkOrdersList.filter(wo => {
-      // Allow rejected executions (they need rework), but exclude other executions
       const isRejectedExecution = wo.isExecution && wo.status === 'Rejected';
       if (wo.isExecution && !isRejectedExecution) return false;
-      const effectiveStatus = wo.computedStatus || wo.status || 'Active';
-      // Overdue tab: only breach items (past tolerance/grace period)
+      const effectiveStatus = getEffectiveStatus(wo);
       return effectiveStatus === "Overdue";
     }).length },
-    { id: "Pending Approval", label: "Pending Approval", count: safeWorkOrdersList.filter(wo => wo.computedStatus === "Pending Approval").length },
-    { id: "Completed", label: "Completed", count: safeWorkOrdersList.filter(wo => wo.computedStatus === "Completed").length }
+    { id: "Pending Approval", label: "Pending Approval", count: safeWorkOrdersList.filter(wo => getEffectiveStatus(wo) === "Pending Approval").length },
+    { id: "Completed", label: "Completed", count: safeWorkOrdersList.filter(wo => getEffectiveStatus(wo) === "Completed").length }
   ];
 
   const getStatusBadgeColor = (status: string) => {
@@ -243,28 +242,19 @@ const WorkOrders: React.FC = () => {
     }
   };
 
-  // Filter work orders using computedStatus (automatic real-time status)
   const filteredWorkOrders = safeWorkOrdersList.filter(wo => {
-    // Ensure computedStatus is always defined (defensive check)
-    const effectiveStatus = wo.computedStatus || wo.status || 'Active';
+    const effectiveStatus = getEffectiveStatus(wo);
     
     if (activeTab === "Planned") {
-      // Planned tab: Show templates with Active status + Postponed items
-      // Note: Rejected work orders now appear in Due/Overdue/Active tabs based on their computed due date status
       if (wo.isExecution) return false;
-      // Only show Active and Postponed statuses in Planned tab
       if (effectiveStatus !== "Active" && effectiveStatus !== "Postponed") return false;
     } else if (activeTab === "Due") {
-      // Allow rejected executions (they need rework), but exclude other executions
       const isRejectedExecution = wo.isExecution && wo.status === 'Rejected';
       if (wo.isExecution && !isRejectedExecution) return false;
-      // Due tab: items within warning window + Grace P (past due but within tolerance)
       if (effectiveStatus !== "Due" && effectiveStatus !== "Due (Grace P)") return false;
     } else if (activeTab === "Overdue") {
-      // Allow rejected executions (they need rework), but exclude other executions
       const isRejectedExecution = wo.isExecution && wo.status === 'Rejected';
       if (wo.isExecution && !isRejectedExecution) return false;
-      // Overdue tab: only breach items (past tolerance/grace period)
       if (effectiveStatus !== "Overdue") return false;
     } else if (activeTab === "Completed") {
       if (effectiveStatus !== "Completed") return false;
@@ -492,7 +482,7 @@ const WorkOrders: React.FC = () => {
         'Job Title': wo.jobTitle || '-',
         'Assigned To': wo.assignedTo || '-',
         'Due Date': wo.dueDate ? formatProfessionalDate(wo.dueDate) : '-',
-        'Status': wo.computedStatus || wo.status || '-',
+        'Status': getEffectiveStatus(wo),
         'Criticality': wo.criticality || '-',
         'Maintenance Basis': wo.maintenanceBasis || '-',
         'Frequency': wo.frequencyValue ? `${wo.frequencyValue} ${wo.frequencyUnit || ''}`.trim() : '-',
@@ -535,12 +525,12 @@ const WorkOrders: React.FC = () => {
         jobTitle: wo.jobTitle || '-',
         assignedTo: wo.assignedTo || '-',
         dueDate: wo.dueDate ? formatProfessionalDate(wo.dueDate) : '-',
-        status: wo.computedStatus || wo.status || '-',
+        status: getEffectiveStatus(wo),
         criticality: wo.criticality || '-',
       }));
 
       const statusCounts = safeWorkOrdersList.reduce((acc, wo) => {
-        const s = wo.computedStatus || wo.status || 'Unknown';
+        const s = getEffectiveStatus(wo);
         acc[s] = (acc[s] || 0) + 1;
         return acc;
       }, {} as Record<string, number>);
@@ -975,10 +965,10 @@ const WorkOrders: React.FC = () => {
                     </div>
                   ) : (
                     <div className="flex flex-col gap-1">
-                      <span className={`px-3 py-1 rounded-full text-xs font-medium ${getStatusBadgeColor(workOrder.computedStatus || workOrder.status || 'Active')}`}>
-                        {(workOrder.computedStatus || workOrder.status || 'Active') === 'Due (Grace P)' 
+                      <span className={`px-3 py-1 rounded-full text-xs font-medium ${getStatusBadgeColor(getEffectiveStatus(workOrder))}`}>
+                        {getEffectiveStatus(workOrder) === 'Due (Grace P)' 
                           ? 'Grace P' 
-                          : (workOrder.computedStatus || workOrder.status || 'Active')}
+                          : getEffectiveStatus(workOrder)}
                       </span>
                       {(workOrder as any).missedCycles >= 1 && (
                         <span className="px-3 py-1 rounded-full text-xs font-medium bg-amber-500 text-white" data-testid={`badge-skipped-cycles-${workOrder.id}`}>
@@ -1016,7 +1006,7 @@ const WorkOrders: React.FC = () => {
                       </div>
                     ) : (
                       <>
-                        {(workOrder.computedStatus || workOrder.status) !== "Completed" && (
+                        {getEffectiveStatus(workOrder) !== "Completed" && (
                           <>
                             <button 
                               className="p-1 hover:bg-gray-200 rounded"
@@ -1030,7 +1020,7 @@ const WorkOrders: React.FC = () => {
                               {index === 0 && <Marker id="C31" />}
                               <Pen className="h-4 w-4 text-gray-600" />
                             </button>
-                            {!isVessel && (workOrder.computedStatus || workOrder.status) !== "Pending Approval" && (
+                            {!isVessel && getEffectiveStatus(workOrder) !== "Pending Approval" && (
                               <button 
                                 className="p-1 hover:bg-gray-200 rounded"
                                 onClick={(e) => {
@@ -1046,7 +1036,7 @@ const WorkOrders: React.FC = () => {
                             )}
                           </>
                         )}
-                        {(workOrder.computedStatus || workOrder.status) === "Completed" && (
+                        {getEffectiveStatus(workOrder) === "Completed" && (
                           <button 
                             className="p-1 hover:bg-gray-200 rounded"
                             onClick={(e) => {

@@ -534,11 +534,20 @@ export async function updateWorkOrder(id: string, body: any) {
     const disallowedFields = requestedFields.filter((f: string) => !allowedFieldsForCompletedWO.includes(f));
 
     if (disallowedFields.length > 0) {
+      const storedStatus = existingWO.status || 'Completed';
+      const dueDate = existingWO.dueDate;
+      if (dueDate && new Date(dueDate) < new Date()) {
+        console.warn(
+          `⚠️ Data inconsistency: WO ${existingWO.workOrderNo} has stored status "${storedStatus}" ` +
+          `but due date ${dueDate} is in the past. This WO may have appeared as Overdue in the UI.`
+        );
+      }
       console.warn(`⚠️ Attempted to modify completed WO ${existingWO.workOrderNo}: ${disallowedFields.join(', ')}`);
       throw new ValidationError(
-        'Cannot modify completed work order',
+        `Cannot modify work order: This work order is marked as "${storedStatus}" and cannot be modified. Only remarks can be added. If you need to re-complete this work order, please contact your administrator.`,
         {
-          message: `Work Order ${existingWO.workOrderNo} is completed and cannot be modified. Only remarks can be added.`,
+          message: `Work Order ${existingWO.workOrderNo} is marked as "${storedStatus}" and cannot be modified.`,
+          storedStatus,
           disallowedFields
         }
       );
