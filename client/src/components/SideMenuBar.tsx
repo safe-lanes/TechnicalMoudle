@@ -88,7 +88,7 @@ export const SideMenuBar: React.FC<SideMenuBarProps> = ({
   const { isSailAdmin } = useUIRole();
   const allMenuItems = menuConfigs[subModule] || menuConfigs.pms;
   const menuItems = allMenuItems.filter((item) => {
-    if (item.id === "access-control" && !isSailAdmin) return false;
+    if (item.id === "access-control") return isSailAdmin;
     return canViewSidebarItem(subModule, item.id);
   });
 
