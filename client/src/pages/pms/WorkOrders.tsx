@@ -481,7 +481,9 @@ const WorkOrders: React.FC = () => {
         'Work Order No': wo.workOrderNo || wo.templateCode || '-',
         'Job Title': wo.jobTitle || '-',
         'Assigned To': wo.assignedTo || '-',
-        'Due Date': wo.dueDate ? formatProfessionalDate(wo.dueDate) : '-',
+        'Due Date': wo.maintenanceBasis === 'Running Hours'
+          ? (wo.dueRH != null ? `${Number(wo.dueRH).toLocaleString()} RH` : '-')
+          : (wo.dueDate ? formatProfessionalDate(wo.dueDate) : '-'),
         'Status': getEffectiveStatus(wo),
         'Criticality': wo.criticality || '-',
         'Maintenance Basis': wo.maintenanceBasis || '-',
@@ -524,7 +526,9 @@ const WorkOrders: React.FC = () => {
         workOrderNo: wo.workOrderNo || wo.templateCode || '-',
         jobTitle: wo.jobTitle || '-',
         assignedTo: wo.assignedTo || '-',
-        dueDate: wo.dueDate ? formatProfessionalDate(wo.dueDate) : '-',
+        dueDate: wo.maintenanceBasis === 'Running Hours'
+          ? (wo.dueRH != null ? `${Number(wo.dueRH).toLocaleString()} RH` : '-')
+          : (wo.dueDate ? formatProfessionalDate(wo.dueDate) : '-'),
         status: getEffectiveStatus(wo),
         criticality: wo.criticality || '-',
       }));
@@ -881,7 +885,14 @@ const WorkOrders: React.FC = () => {
                 )}
                 <td className={`py-3 px-4 ${textColorClass}`} data-testid={index === 0 ? "C26" : undefined}>
                   {index === 0 && <Marker id="C26" />}
-                  {workOrder.jobTitle}
+                  <div className="flex items-center gap-1.5">
+                    <span>{workOrder.jobTitle}</span>
+                    {workOrder.maintenanceBasis === "Running Hours" && (
+                      <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold bg-blue-50 text-blue-700 border border-blue-200 whitespace-nowrap" data-testid={`badge-rh-${workOrder.id}`}>
+                        RH
+                      </span>
+                    )}
+                  </div>
                 </td>
                 <td className={`py-3 px-4 ${textColorClass}`} data-testid={index === 0 ? "C27" : undefined}>
                   {index === 0 && <Marker id="C27" />}
@@ -890,41 +901,69 @@ const WorkOrders: React.FC = () => {
                 <td className="py-3 px-4" data-testid={index === 0 ? "C28" : undefined}>
                   {index === 0 && <Marker id="C28" />}
                   <div className="flex items-center gap-2">
-                    <span className="text-gray-900">
-                      {(activeTab === "Pending Approval" || activeTab === "Completed")
-                        ? (workOrder.submittedDate 
+                    {(activeTab === "Pending Approval" || activeTab === "Completed")
+                      ? (
+                        <span className="text-gray-900">
+                          {workOrder.submittedDate 
                             ? formatProfessionalDate(workOrder.submittedDate)
-                            : '—')
-                        : workOrder.dueDate 
-                          ? formatProfessionalDate(workOrder.dueDate)
-                          : '—'}
-                    </span>
-                    {activeTab !== "Pending Approval" && activeTab !== "Completed" && workOrder.dueDate && workOrder.leadTimeValue && workOrder.leadTimeUnit && (() => {
-                      const leadTimeStatus = calculateLeadTimeStatus(
-                        workOrder.dueDate,
-                        workOrder.leadTimeValue,
-                        workOrder.leadTimeUnit
-                      );
-                      
-                      if (leadTimeStatus.isInLeadTimePeriod) {
-                        return (
+                            : '—'}
+                        </span>
+                      )
+                      : workOrder.maintenanceBasis === "Running Hours"
+                        ? (
                           <div className="relative group">
-                            <AlertTriangle 
-                              className={`h-4 w-4 ${
-                                leadTimeStatus.daysUntilDue !== null && leadTimeStatus.daysUntilDue <= 3 ? 'text-red-600' : 
-                                leadTimeStatus.daysUntilDue !== null && leadTimeStatus.daysUntilDue <= 7 ? 'text-orange-500' : 
-                                'text-yellow-500'
-                              }`}
-                              data-testid={`icon-lead-time-warning-${workOrder.id}`}
-                            />
-                            <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2 py-1 bg-gray-900 text-white text-xs rounded whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10">
-                              {leadTimeStatus.daysUntilDue} day{leadTimeStatus.daysUntilDue !== 1 ? 's' : ''} until due
-                            </div>
+                            <span className="text-gray-900 font-medium" data-testid={`text-rh-due-${workOrder.id}`}>
+                              {workOrder.dueRH != null ? `${Number(workOrder.dueRH).toLocaleString()} RH` : '—'}
+                            </span>
+                            {workOrder.dueRH != null && workOrder.currentRH != null && (
+                              <div className="absolute bottom-full left-0 mb-2 px-3 py-2 bg-gray-900 text-white text-xs rounded shadow-lg whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10">
+                                <div className="flex flex-col gap-1">
+                                  <span>Next Due: {Number(workOrder.dueRH).toLocaleString()} RH</span>
+                                  <span>Current: {Number(workOrder.currentRH).toLocaleString()} RH</span>
+                                  <span className={workOrder.dueRH - workOrder.currentRH <= 0 ? 'text-red-300 font-semibold' : 'text-green-300'}>
+                                    Remaining: {(workOrder.dueRH - workOrder.currentRH).toLocaleString()} RH
+                                  </span>
+                                </div>
+                              </div>
+                            )}
                           </div>
-                        );
-                      }
-                      return null;
-                    })()}
+                        )
+                        : (
+                          <>
+                            <span className="text-gray-900">
+                              {workOrder.dueDate 
+                                ? formatProfessionalDate(workOrder.dueDate)
+                                : '—'}
+                            </span>
+                            {workOrder.dueDate && workOrder.leadTimeValue && workOrder.leadTimeUnit && (() => {
+                              const leadTimeStatus = calculateLeadTimeStatus(
+                                workOrder.dueDate,
+                                workOrder.leadTimeValue,
+                                workOrder.leadTimeUnit
+                              );
+                              
+                              if (leadTimeStatus.isInLeadTimePeriod) {
+                                return (
+                                  <div className="relative group">
+                                    <AlertTriangle 
+                                      className={`h-4 w-4 ${
+                                        leadTimeStatus.daysUntilDue !== null && leadTimeStatus.daysUntilDue <= 3 ? 'text-red-600' : 
+                                        leadTimeStatus.daysUntilDue !== null && leadTimeStatus.daysUntilDue <= 7 ? 'text-orange-500' : 
+                                        'text-yellow-500'
+                                      }`}
+                                      data-testid={`icon-lead-time-warning-${workOrder.id}`}
+                                    />
+                                    <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2 py-1 bg-gray-900 text-white text-xs rounded whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10">
+                                      {leadTimeStatus.daysUntilDue} day{leadTimeStatus.daysUntilDue !== 1 ? 's' : ''} until due
+                                    </div>
+                                  </div>
+                                );
+                              }
+                              return null;
+                            })()}
+                          </>
+                        )
+                    }
                   </div>
                 </td>
                 {activeTab === "Pending Approval" && (
