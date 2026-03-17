@@ -482,7 +482,7 @@ const WorkOrders: React.FC = () => {
         'Job Title': wo.jobTitle || '-',
         'Assigned To': wo.assignedTo || '-',
         'Due Date': wo.maintenanceBasis === 'Running Hours'
-          ? (wo.dueRH != null ? `${Number(wo.dueRH).toLocaleString()} RH` : '-')
+          ? (() => { const rh = wo.dueRH ?? (wo.nextDueReading ? Number(wo.nextDueReading) : null); return rh != null && !isNaN(rh) ? `${rh.toLocaleString()} RH` : '-'; })()
           : (wo.dueDate ? formatProfessionalDate(wo.dueDate) : '-'),
         'Status': getEffectiveStatus(wo),
         'Criticality': wo.criticality || '-',
@@ -527,7 +527,7 @@ const WorkOrders: React.FC = () => {
         jobTitle: wo.jobTitle || '-',
         assignedTo: wo.assignedTo || '-',
         dueDate: wo.maintenanceBasis === 'Running Hours'
-          ? (wo.dueRH != null ? `${Number(wo.dueRH).toLocaleString()} RH` : '-')
+          ? (() => { const rh = wo.dueRH ?? (wo.nextDueReading ? Number(wo.nextDueReading) : null); return rh != null && !isNaN(rh) ? `${rh.toLocaleString()} RH` : '-'; })()
           : (wo.dueDate ? formatProfessionalDate(wo.dueDate) : '-'),
         status: getEffectiveStatus(wo),
         criticality: wo.criticality || '-',
@@ -910,24 +910,28 @@ const WorkOrders: React.FC = () => {
                         </span>
                       )
                       : workOrder.maintenanceBasis === "Running Hours"
-                        ? (
+                        ? (() => {
+                          const rhTarget = workOrder.dueRH ?? (workOrder.nextDueReading ? Number(workOrder.nextDueReading) : null);
+                          const rhCurrent = workOrder.currentRH ?? (workOrder.currentReading ? Number(workOrder.currentReading) : null);
+                          return (
                           <div className="relative group">
                             <span className="text-gray-900 font-medium" data-testid={`text-rh-due-${workOrder.id}`}>
-                              {workOrder.dueRH != null ? `${Number(workOrder.dueRH).toLocaleString()} RH` : '—'}
+                              {rhTarget != null && !isNaN(rhTarget) ? `${rhTarget.toLocaleString()} RH` : '—'}
                             </span>
-                            {workOrder.dueRH != null && workOrder.currentRH != null && (
+                            {rhTarget != null && !isNaN(rhTarget) && rhCurrent != null && !isNaN(rhCurrent) && (
                               <div className="absolute bottom-full left-0 mb-2 px-3 py-2 bg-gray-900 text-white text-xs rounded shadow-lg whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10">
                                 <div className="flex flex-col gap-1">
-                                  <span>Next Due: {Number(workOrder.dueRH).toLocaleString()} RH</span>
-                                  <span>Current: {Number(workOrder.currentRH).toLocaleString()} RH</span>
-                                  <span className={workOrder.dueRH - workOrder.currentRH <= 0 ? 'text-red-300 font-semibold' : 'text-green-300'}>
-                                    Remaining: {(workOrder.dueRH - workOrder.currentRH).toLocaleString()} RH
+                                  <span>Next Due: {rhTarget.toLocaleString()} RH</span>
+                                  <span>Current: {rhCurrent.toLocaleString()} RH</span>
+                                  <span className={rhTarget - rhCurrent <= 0 ? 'text-red-300 font-semibold' : 'text-green-300'}>
+                                    Remaining: {(rhTarget - rhCurrent).toLocaleString()} RH
                                   </span>
                                 </div>
                               </div>
                             )}
                           </div>
-                        )
+                          );
+                        })()
                         : (
                           <>
                             <span className="text-gray-900">
