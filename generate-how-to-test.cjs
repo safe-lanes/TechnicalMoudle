@@ -857,7 +857,7 @@ function generateDashboardHowToTest(id, section, scenario, steps, testData, expe
 
 // Main execution
 try {
-  const wb = XLSX.readFile(INPUT_FILE);
+  const wb = XLSX.readFile(INPUT_FILE, { cellFormula: true, cellStyles: true, cellNF: true });
   const sheets = wb.SheetNames;
   
   let totalProcessed = 0;
@@ -895,7 +895,7 @@ try {
     ws['!cols'][12] = { wch: 80 };
   }
 
-  XLSX.writeFile(wb, OUTPUT_FILE);
+  XLSX.writeFile(wb, OUTPUT_FILE, { cellFormula: true, bookSST: true });
   console.log(`SUCCESS: Generated How-to-Test instructions for ${totalProcessed} test cases.`);
   console.log(`Output file: ${OUTPUT_FILE}`);
 } catch (error) {
