@@ -1,0 +1,140 @@
+ FIX NEXT DUE RH CALCULATION LOGIC
+text
+CRITICAL BUG: NEXT DUE RH CALCULATION IS COMPLETELY WRONG
+
+PROBLEM IDENTIFIED:
+Work Order: FO PURIFIER, OIL CHANGE - 250H
+- Frequency: 250 Hours  
+- Current Component RH: 2,001 hours
+- Next Due RH shown: 250 Hours ← WRONG!
+- Correct Next Due RH should be: 2,250 Hours (or 2,000 + 250)
+
+ROOT CAUSE:
+The system is storing "Next Due RH = 250" which is just the frequency value, NOT the actual next due running hour count.
+
+CORRECT LOGIC:
+
+Next Due RH = Last Completed RH + Frequency
+
+Examples:
+- Job never done before, component at 0 RH → Next Due RH = 0 + 250 = 250 RH
+- Job completed at 250 RH, component now at 400 RH → Next Due RH = 250 + 250 = 500 RH  
+- Job completed at 2000 RH, component now at 2001 RH → Next Due RH = 2000 + 250 = 2,250 RH
+
+REQUIRED FIX:
+
+1. **Add lastCompletedRH field to Work Order model:**
+
+```javascript
+// WorkOrder schema
+{
+  maintenanceBasis: String,
+  frequency: Number,
+  nextDueRH: Number,  // This should be lastCompletedRH + frequency
+  lastCompletedRH: Number,  // ← ADD THIS FIELD
+  // ... other fields
+}
+Fix Work Order Completion Logic:
+
+When Part B is completed for a Running Hours job:
+
+javascript
+// In work order completion handler
+if (workOrder.maintenanceBasis === "Running Hours") {
+  const currentReading = partB.runningHours.currentReading; // e.g., 2001
+  
+  // Create next work order
+  const nextWorkOrder = await WorkOrder.create({
+    ...workOrder,
+    lastCompletedRH: currentReading, // Record when it was done
+    nextDueRH: currentReading + workOrder.frequency, // 2001 + 250 = 2251
+    status: "Planned"
+  });
+  
+  // Mark current as completed
+  workOrder.status = "Completed";
+  workOrder.completedAtRH = currentReading;
+  await workOrder.save();
+}
+Fix Initial Work Order Creation:
+
+When creating the FIRST work order for a component:
+
+javascript
+// Initial work order generation
+const firstWorkOrder = await WorkOrder.create({
+  component: component._id,
+  frequency: 250,
+  maintenanceBasis: "Running Hours",
+  lastCompletedRH: 0, // First time, assume never done
+  nextDueRH: 250, // First due at 250 hours
+  status: "Planned"
+});
+Fix Work Order Auto-Generation:
+
+Update the JobDueScanner to calculate correctly:
+
+javascript
+// Check if RH job is due
+if (job.maintenanceBasis === "Running Hours") {
+  const currentRH = component.currentRunningHours;
+  const nextDueRH = job.lastCompletedRH + job.frequency;
+  
+  if (currentRH >= nextDueRH - leadTime) {
+    // Generate new work order
+    await WorkOrder.create({
+      ...job,
+      lastCompletedRH: job.lastCompletedRH, // Keep track of last completion
+      nextDueRH: nextDueRH,
+      status: "Planned"
+    });
+  }
+}
+Data Migration for Existing Work Orders:
+
+Fix all existing work orders with incorrect nextDueRH:
+
+javascript
+// One-time migration script
+const rhWorkOrders = await WorkOrder.find({
+  maintenanceBasis: "Running Hours",
+  status: { $in: ["Planned", "Due", "Overdue"] }
+});
+
+for (const wo of rhWorkOrders) {
+  const component = await Component.findById(wo.component);
+  const currentRH = component.currentRunningHours;
+  
+  // Find last completed work order for this component/job
+  const lastCompleted = await WorkOrder.findOne({
+    component: wo.component,
+    jobCode: wo.jobCode,
+    status: "Completed"
+  }).sort({ completedAt: -1 });
+  
+  if (lastCompleted && lastCompleted.completedAtRH) {
+    wo.lastCompletedRH = lastCompleted.completedAtRH;
+    wo.nextDueRH = lastCompleted.completedAtRH + wo.frequency;
+  } else {
+    // Never completed before - calculate from current RH
+    const cyclesPassed = Math.floor(currentRH / wo.frequency);
+    wo.lastCompletedRH = cyclesPassed * wo.frequency;
+    wo.nextDueRH = (cyclesPassed + 1) * wo.frequency;
+  }
+  
+  await wo.save();
+  console.log(`Fixed WO ${wo.workOrderNo}: nextDueRH = ${wo.nextDueRH}`);
+}
+EXPECTED RESULT AFTER FIX:
+
+For FO PURIFIER, NO.1 (current RH = 2,001):
+
+Last Completed RH: 2,000 hours (or calculate from history)
+
+Next Due RH: 2,250 hours
+
+Remaining RH: 2,250 - 2,001 = +249 hours (shows in Due tab as "+249 RH")
+
+Please implement this fix and run the data migration script for Vessel 11.
+
+text
