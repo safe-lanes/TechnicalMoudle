@@ -1507,16 +1507,16 @@ const Dashboard = () => {
         )}
 
         {/* Superintendent Notifications Tile */}
-        {activeTab === 'overview' && (superintendentSummary?.pendingCount ?? 0) > 0 && (
+        {activeTab === 'overview' && (isSailAdmin || (superintendentSummary?.pendingCount ?? 0) > 0) && (
           <div style={{ padding: '16px 16px 0 16px' }}>
             <div
               onClick={() => setLocation('/pms/superintendent')}
               style={{
-                background: superintendentSummary.pendingCount > 0 ? '#fff4e6' : '#f5f5f5',
+                background: (superintendentSummary?.pendingCount ?? 0) > 0 ? '#fff4e6' : '#f5f5f5',
                 borderRadius: '8px',
                 padding: '20px',
                 cursor: 'pointer',
-                border: superintendentSummary.pendingCount > 0 ? '1px solid #ffe0b2' : '1px solid #e0e0e0',
+                border: (superintendentSummary?.pendingCount ?? 0) > 0 ? '1px solid #ffe0b2' : '1px solid #e0e0e0',
                 display: 'flex',
                 alignItems: 'center',
                 gap: '20px',
@@ -1530,7 +1530,7 @@ const Dashboard = () => {
                 width: '48px',
                 height: '48px',
                 borderRadius: '12px',
-                background: superintendentSummary.pendingCount > 0 ? '#ff6d00' : '#9e9e9e',
+                background: (superintendentSummary?.pendingCount ?? 0) > 0 ? '#ff6d00' : '#9e9e9e',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
@@ -1545,12 +1545,12 @@ const Dashboard = () => {
                 <div style={{ display: 'flex', gap: '32px', alignItems: 'baseline' }}>
                   <div>
                     <span
-                      style={{ fontSize: '28px', fontWeight: 700, color: superintendentSummary.pendingCount > 0 ? '#d32f2f' : '#757575' }}
+                      style={{ fontSize: '28px', fontWeight: 700, color: (superintendentSummary?.pendingCount ?? 0) > 0 ? '#d32f2f' : '#757575' }}
                       data-testid="text-pending-count"
                     >
-                      {superintendentSummary.pendingCount}
+                      {superintendentSummary?.pendingCount ?? 0}
                     </span>
-                    <span style={{ fontSize: '12px', color: superintendentSummary.pendingCount > 0 ? '#d32f2f' : '#757575', marginLeft: '6px' }}>
+                    <span style={{ fontSize: '12px', color: (superintendentSummary?.pendingCount ?? 0) > 0 ? '#d32f2f' : '#757575', marginLeft: '6px' }}>
                       Pending Acknowledgment
                     </span>
                   </div>
@@ -1559,7 +1559,7 @@ const Dashboard = () => {
                       style={{ fontSize: '18px', fontWeight: 600, color: '#2e7d32' }}
                       data-testid="text-acknowledged-count"
                     >
-                      {superintendentSummary.acknowledgedThisMonthCount}
+                      {superintendentSummary?.acknowledgedThisMonthCount ?? 0}
                     </span>
                     <span style={{ fontSize: '12px', color: '#2e7d32', marginLeft: '6px' }}>
                       Acknowledged This Month

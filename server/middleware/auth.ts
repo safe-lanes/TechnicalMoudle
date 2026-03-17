@@ -67,10 +67,10 @@ export const requireVesselAccess = (req: AuthenticatedRequest, res: Response, ne
 export const mockAuthMiddleware = (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
   req.user = {
     id: 1,
-    username: "admin",
-    fullName: "PMS Administrator",
+    username: "sail_admin",
+    fullName: "Sail Administrator",
     email: "admin@seafarer.com",
-    role: "PMS Admin",
+    role: "Sail Admin",
     vesselId: null,
     isActive: true,
     createdAt: new Date(),
