@@ -244,9 +244,6 @@ export class JobDueScannerService {
         rhEffectiveCurrent = parseFloat(component.rhCurrentInheritedCached || '0');
       }
 
-      // Get RH_last_done from job (stored at last WO completion)
-      const rhLastDone = parseFloat(job.lastDoneRH || '0');
-      
       // F = frequency_rh
       const frequencyRH = job.intervalRunningHour || 0;
       if (frequencyRH <= 0) continue;
@@ -255,32 +252,14 @@ export class JobDueScannerService {
       const settings = await getSettingsForVessel(job.vesselId);
       const leadTimeRH = getRhLeadHours(job, settings);
 
-      // Calculate cycle values
-      // RH_due = RH_last_done + F
-      const rhDue = rhLastDone + frequencyRH;
-      // RH_generate = RH_due - LT
-      const rhGenerate = Math.max(0, rhDue - leadTimeRH);
-
-      // Check auto-generation condition: RH_effective_current >= RH_generate
-      if (rhEffectiveCurrent < rhGenerate) {
-        skipReasons.belowThreshold++;
-        continue;
-      }
-
       // LEGACY FALLBACK: Check if job has any active WO with NULL/empty componentCode
       // If so, block ALL generation for this job to protect legacy data
-      // Check by both jobId AND jobNo (vessel-scoped) to catch legacy WOs without jobId
       const legacyBlockingWO = allWorkOrders.find(wo => {
         if (!isBlockingStatus(wo.status)) return false;
-        if (wo.componentCode && wo.componentCode !== '') return false; // Not a legacy WO
-        
-        // Match by jobId (modern WOs)
+        if (wo.componentCode && wo.componentCode !== '') return false;
         if (wo.jobId === job.juuid) return true;
-
-        // Match by vessel-scoped jobNo (legacy WOs without jobId)
         const woJobNo = extractJobNoFromWorkOrderNo(wo.workOrderNo);
         if (woJobNo === job.jobNo && wo.vesselId === job.vesselId) return true;
-
         return false;
       });
 
@@ -289,8 +268,7 @@ export class JobDueScannerService {
         continue;
       }
       
-      // All RH timing checks passed - now get ALL linked components for this job
-      // FIX: Get linked components from job_component_links table (many-to-many relationship)
+      // Get ALL linked components for this job (with RH tracking data)
       const linkedComponents = await storage.getLinkedComponentsForJob(job.juuid);
 
       // If no linked components found, fall back to job's primary component
@@ -307,13 +285,26 @@ export class JobDueScannerService {
         continue;
       }
       
-      // Generate a work order for EACH linked component
+      // Generate a work order for EACH linked component (with per-component RH tracking)
       for (const linkedComponent of linkedComponents) {
         const componentCode = linkedComponent.componentCode;
         const componentName = linkedComponent.componentName;
         
         if (!componentCode) {
           console.warn(`⚠️ No component code for linked component of RH job ${job.jobNo} - skipping`);
+          continue;
+        }
+
+        // Use component-specific lastDoneRH from link table, fall back to job-level
+        const rhLastDone = parseFloat(linkedComponent.lastDoneRH || job.lastDoneRH || '0');
+        
+        // Calculate per-component cycle values
+        const rhDue = rhLastDone + frequencyRH;
+        const rhGenerate = Math.max(0, rhDue - leadTimeRH);
+
+        // Check auto-generation condition per component
+        if (rhEffectiveCurrent < rhGenerate) {
+          skipReasons.belowThreshold++;
           continue;
         }
         

@@ -7392,12 +7392,14 @@ export class PostgresStorage {
       ));
   }
 
-  async getLinkedComponentsForJob(jobId: string): Promise<Array<{ componentId: string; componentCode: string; componentName: string }>> {
+  async getLinkedComponentsForJob(jobId: string): Promise<Array<{ componentId: string; componentCode: string; componentName: string; lastDoneRH?: string | null; nextDueRH?: string | null }>> {
     const db = await getDb();
     const links = await db.select({
       componentId: jobComponentLinks.componentId,
       componentCode: components.componentCode,
       componentName: components.name,
+      lastDoneRH: jobComponentLinks.lastDoneRH,
+      nextDueRH: jobComponentLinks.nextDueRH,
     })
     .from(jobComponentLinks)
     .innerJoin(components, eq(jobComponentLinks.componentId, components.cuuid))
@@ -7407,6 +7409,8 @@ export class PostgresStorage {
       componentId: l.componentId,
       componentCode: l.componentCode || '',
       componentName: l.componentName || '',
+      lastDoneRH: l.lastDoneRH,
+      nextDueRH: l.nextDueRH,
     }));
   }
 

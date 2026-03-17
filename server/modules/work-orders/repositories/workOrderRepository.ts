@@ -183,6 +183,10 @@ export async function updateJobComponentLinkTracking(vesselId: string, jobId: st
   return storage.updateJobComponentLinkTracking(vesselId, jobId, componentId, data);
 }
 
+export async function findAllJobComponentLinks() {
+  return storage.getAllJobComponentLinks();
+}
+
 export async function findLinkedComponentsForJob(jobId: string) {
   if (typeof storage.getLinkedComponentsForJob === 'function') {
     return storage.getLinkedComponentsForJob(jobId);

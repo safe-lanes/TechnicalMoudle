@@ -4,7 +4,7 @@ import { getDb } from '../../../db';
 import { computeWorkOrderStatus } from '@shared/workOrders/status';
 import { WORK_ORDER_THRESHOLDS } from '@shared/workOrders/constants';
 import { buildExternalMasterDataUrl } from '../../../config/externalApi';
-import { sql } from 'drizzle-orm';
+import { sql, eq, and } from 'drizzle-orm';
 import {
   vessels as vesselsTable,
   vesselTypes as vesselTypesTable,
@@ -12,6 +12,10 @@ import {
   ports as portsTable,
   fleetGroups as fleetGroupsTable,
   masterUsers as masterUsersTable,
+  jobs as jobsTable,
+  jobComponentLinks as jobComponentLinksTable,
+  workOrders as workOrdersTable,
+  components as componentsTable,
 } from '@shared/schema';
 
 // ── GET/POST /admin/job-due-scan ──
@@ -641,5 +645,346 @@ export async function populatePostponementHistory(req: Request, res: Response) {
     skipped,
     errors: errors.slice(0, 10),
     message: `Created ${created} postponement history records (${skipped} skipped, ${errors.length} errors)`
+  });
+}
+
+// ── GET /admin/rh-diagnostic ──
+
+export async function rhDiagnostic(req: Request, res: Response) {
+  const vesselId = req.query.vesselId as string;
+  if (!vesselId) {
+    return res.status(400).json({ error: 'vesselId query parameter is required' });
+  }
+
+  const db = await getDb();
+  const allJobs = await storage.getJobs(vesselId);
+  const rhJobs = allJobs.filter(j => j.maintenanceBasis === 'Running Hours' && j.intervalRunningHour && j.intervalRunningHour > 0);
+
+  const allLinks = await storage.getAllJobComponentLinks();
+  const linksByJob = new Map<string, any[]>();
+  for (const link of allLinks) {
+    if (link.vesselId === vesselId) {
+      if (!linksByJob.has(link.jobId)) linksByJob.set(link.jobId, []);
+      linksByJob.get(link.jobId)!.push(link);
+    }
+  }
+
+  const allComponents = await storage.getComponents(vesselId);
+  const componentMap = new Map<string, any>();
+  for (const c of allComponents) {
+    componentMap.set(c.cuuid, c);
+    if (c.componentCode) componentMap.set(c.componentCode, c);
+  }
+
+  const allWOs = await storage.getWorkOrders(vesselId);
+  const rhWOs = allWOs.filter((wo: any) => wo.maintenanceBasis === 'Running Hours');
+
+  const FINALIZED = new Set(['completed', 'approved', 'closed', 'cancelled', 'canceled']);
+  const diagnosticRows: any[] = [];
+
+  for (const job of rhJobs) {
+    const links = linksByJob.get(job.juuid) || [];
+    const interval = job.intervalRunningHour || 0;
+
+    for (const link of links) {
+      const comp = componentMap.get(link.componentId);
+      const currentRH = comp
+        ? parseFloat(comp.rhCurrentMaster || comp.rhCurrentInheritedCached || comp.currentCumulativeRH || '0')
+        : 0;
+
+      const linkLastDone = parseFloat(link.lastDoneRH || '0');
+      const linkNextDue = parseFloat(link.nextDueRH || '0');
+      const jobLastDone = parseFloat(job.lastDoneRH || '0');
+      const jobNextDue = parseFloat(job.nextDueRH || '0');
+
+      const completedWOs = rhWOs.filter((wo: any) =>
+        wo.jobId === job.juuid &&
+        wo.componentCode === (link.componentCode || comp?.componentCode) &&
+        FINALIZED.has((wo.status || '').toLowerCase().trim())
+      );
+      const latestCompleted = completedWOs.sort((a: any, b: any) => {
+        const aRH = parseFloat(a.runningHours || a.currentReading || '0');
+        const bRH = parseFloat(b.runningHours || b.currentReading || '0');
+        return bRH - aRH;
+      })[0];
+      let actualLastDoneRH: number;
+      if (latestCompleted) {
+        actualLastDoneRH = parseFloat(latestCompleted.runningHours || latestCompleted.currentReading || '0');
+      } else {
+        const cyclesPassed = currentRH > 0 ? Math.floor(currentRH / interval) : 0;
+        actualLastDoneRH = cyclesPassed * interval;
+      }
+      const correctNextDue = actualLastDoneRH + interval;
+
+      const needsRepair = linkNextDue !== correctNextDue || linkLastDone !== actualLastDoneRH;
+
+      diagnosticRows.push({
+        jobNo: job.jobNo,
+        jobTitle: job.jobTitle,
+        componentCode: link.componentCode || comp?.componentCode || '?',
+        componentName: comp?.name || '?',
+        interval,
+        currentRH,
+        stored: {
+          linkLastDoneRH: linkLastDone,
+          linkNextDueRH: linkNextDue,
+          jobLastDoneRH: jobLastDone,
+          jobNextDueRH: jobNextDue,
+        },
+        computed: {
+          actualLastDoneRH,
+          correctNextDueRH: correctNextDue,
+          remaining: correctNextDue - currentRH,
+        },
+        needsRepair,
+        completedWOCount: completedWOs.length,
+        latestCompletedWO: latestCompleted?.workOrderNo || null,
+      });
+    }
+
+    if (links.length === 0 && job.componentId) {
+      const comp = componentMap.get(job.componentId);
+      const currentRH = comp
+        ? parseFloat(comp.rhCurrentMaster || comp.rhCurrentInheritedCached || comp.currentCumulativeRH || '0')
+        : 0;
+      const jobLastDone = parseFloat(job.lastDoneRH || '0');
+      const jobNextDue = parseFloat(job.nextDueRH || '0');
+      const correctNextDue = jobLastDone + interval;
+
+      diagnosticRows.push({
+        jobNo: job.jobNo,
+        jobTitle: job.jobTitle,
+        componentCode: job.componentCode || comp?.componentCode || '?',
+        componentName: comp?.name || '?',
+        interval,
+        currentRH,
+        stored: {
+          linkLastDoneRH: null,
+          linkNextDueRH: null,
+          jobLastDoneRH: jobLastDone,
+          jobNextDueRH: jobNextDue,
+        },
+        computed: {
+          actualLastDoneRH: jobLastDone,
+          correctNextDueRH: correctNextDue,
+          remaining: correctNextDue - currentRH,
+        },
+        needsRepair: jobNextDue !== correctNextDue,
+        completedWOCount: 0,
+        latestCompletedWO: null,
+        noLink: true,
+      });
+    }
+  }
+
+  const needsRepairCount = diagnosticRows.filter(r => r.needsRepair).length;
+
+  res.json({
+    vesselId,
+    totalRhJobs: rhJobs.length,
+    totalDiagnosticRows: diagnosticRows.length,
+    needsRepairCount,
+    rows: diagnosticRows,
+  });
+}
+
+// ── POST /admin/repair-rh-tracking ──
+
+export async function repairRhTracking(req: Request, res: Response) {
+  const vesselId = req.body?.vesselId || req.query.vesselId;
+  const dryRun = req.body?.dryRun !== false;
+  
+  console.log(`🔧 [RH REPAIR] Starting${dryRun ? ' DRY RUN' : ' LIVE'} repair${vesselId ? ` for vessel ${vesselId}` : ' for ALL vessels'}`);
+  
+  const db = await getDb();
+
+  const allJobs = await storage.getJobs(vesselId || undefined);
+  const rhJobs = allJobs.filter(j => j.maintenanceBasis === 'Running Hours' && j.intervalRunningHour && j.intervalRunningHour > 0);
+
+  const allLinks = await storage.getAllJobComponentLinks();
+  const linksByJob = new Map<string, any[]>();
+  for (const link of allLinks) {
+    if (!vesselId || link.vesselId === vesselId) {
+      if (!linksByJob.has(link.jobId)) linksByJob.set(link.jobId, []);
+      linksByJob.get(link.jobId)!.push(link);
+    }
+  }
+
+  const allComponents = vesselId
+    ? await storage.getComponents(vesselId)
+    : await (async () => {
+        const vesselIds = Array.from(new Set(rhJobs.map(j => j.vesselId).filter(Boolean))) as string[];
+        const comps: any[] = [];
+        for (const vid of vesselIds) {
+          comps.push(...await storage.getComponents(vid));
+        }
+        return comps;
+      })();
+  const componentMap = new Map<string, any>();
+  for (const c of allComponents) {
+    componentMap.set(c.cuuid, c);
+    if (c.componentCode) componentMap.set(c.componentCode, c);
+  }
+
+  const allWOs = await storage.getWorkOrders(vesselId || undefined);
+  const FINALIZED = new Set(['completed', 'approved', 'closed', 'cancelled', 'canceled']);
+  const ACTIVE = new Set(['due', 'overdue', 'planned', 'active']);
+
+  let jobsRepaired = 0;
+  let linksRepaired = 0;
+  let wosRepaired = 0;
+  const repairs: any[] = [];
+
+  for (const job of rhJobs) {
+    const links = linksByJob.get(job.juuid) || [];
+    const interval = job.intervalRunningHour || 0;
+    let jobLevelLastDone = parseFloat(job.lastDoneRH || '0');
+    let jobLevelNextDue = parseFloat(job.nextDueRH || '0');
+    let jobNeedsUpdate = false;
+
+    for (const link of links) {
+      const comp = componentMap.get(link.componentId);
+      const compCode = link.componentCode || comp?.componentCode;
+      const currentRH = comp
+        ? parseFloat(comp.rhCurrentMaster || comp.rhCurrentInheritedCached || comp.currentCumulativeRH || '0')
+        : 0;
+
+      const completedWOs = allWOs.filter((wo: any) =>
+        wo.jobId === job.juuid &&
+        wo.componentCode === compCode &&
+        FINALIZED.has((wo.status || '').toLowerCase().trim())
+      );
+      const latestCompleted = completedWOs.sort((a: any, b: any) => {
+        const aRH = parseFloat(a.runningHours || a.currentReading || '0');
+        const bRH = parseFloat(b.runningHours || b.currentReading || '0');
+        return bRH - aRH;
+      })[0];
+
+      let correctLastDone: number;
+      if (latestCompleted) {
+        correctLastDone = parseFloat(latestCompleted.runningHours || latestCompleted.currentReading || '0');
+      } else {
+        const cyclesPassed = currentRH > 0 ? Math.floor(currentRH / interval) : 0;
+        correctLastDone = cyclesPassed * interval;
+      }
+      const correctNextDue = correctLastDone + interval;
+
+      const storedLastDone = parseFloat(link.lastDoneRH || '0');
+      const storedNextDue = parseFloat(link.nextDueRH || '0');
+
+      if (storedLastDone !== correctLastDone || storedNextDue !== correctNextDue) {
+        if (!dryRun) {
+          await db.update(jobComponentLinksTable)
+            .set({
+              lastDoneRH: correctLastDone.toString(),
+              nextDueRH: correctNextDue.toString(),
+              updatedAt: new Date(),
+            })
+            .where(and(
+              eq(jobComponentLinksTable.jobId, job.juuid),
+              eq(jobComponentLinksTable.componentId, link.componentId)
+            ));
+        }
+        linksRepaired++;
+        repairs.push({
+          type: 'link',
+          jobNo: job.jobNo,
+          componentCode: compCode,
+          before: { lastDoneRH: storedLastDone, nextDueRH: storedNextDue },
+          after: { lastDoneRH: correctLastDone, nextDueRH: correctNextDue },
+        });
+      }
+
+      if (correctLastDone > jobLevelLastDone) {
+        jobLevelLastDone = correctLastDone;
+        jobLevelNextDue = correctNextDue;
+        jobNeedsUpdate = true;
+      }
+
+      const activeWOs = allWOs.filter((wo: any) =>
+        wo.jobId === job.juuid &&
+        wo.componentCode === compCode &&
+        ACTIVE.has((wo.status || '').toLowerCase().trim())
+      );
+      for (const wo of activeWOs) {
+        const storedNextDueReading = parseFloat(wo.nextDueReading || '0');
+        if (storedNextDueReading !== correctNextDue) {
+          if (!dryRun) {
+            await db.update(workOrdersTable)
+              .set({ nextDueReading: correctNextDue.toString() })
+              .where(eq(workOrdersTable.id, wo.id));
+          }
+          wosRepaired++;
+          repairs.push({
+            type: 'workOrder',
+            workOrderNo: wo.workOrderNo,
+            jobNo: job.jobNo,
+            componentCode: compCode,
+            before: { nextDueReading: storedNextDueReading },
+            after: { nextDueReading: correctNextDue },
+          });
+        }
+      }
+    }
+
+    if (jobNeedsUpdate || (links.length === 0 && job.componentId)) {
+      const storedJobLastDone = parseFloat(job.lastDoneRH || '0');
+      const storedJobNextDue = parseFloat(job.nextDueRH || '0');
+
+      if (links.length === 0 && job.componentId) {
+        const comp = componentMap.get(job.componentId);
+        const currentRH = comp
+          ? parseFloat(comp.rhCurrentMaster || comp.rhCurrentInheritedCached || comp.currentCumulativeRH || '0')
+          : 0;
+        const completedWOs = allWOs.filter((wo: any) =>
+          wo.jobId === job.juuid &&
+          FINALIZED.has((wo.status || '').toLowerCase().trim())
+        );
+        const latestCompleted = completedWOs.sort((a: any, b: any) => {
+          const aRH = parseFloat(a.runningHours || a.currentReading || '0');
+          const bRH = parseFloat(b.runningHours || b.currentReading || '0');
+          return bRH - aRH;
+        })[0];
+        if (latestCompleted) {
+          jobLevelLastDone = parseFloat(latestCompleted.runningHours || latestCompleted.currentReading || '0');
+        } else {
+          const cyclesPassed = currentRH > 0 ? Math.floor(currentRH / interval) : 0;
+          jobLevelLastDone = cyclesPassed * interval;
+        }
+        jobLevelNextDue = jobLevelLastDone + interval;
+      }
+
+      if (storedJobLastDone !== jobLevelLastDone || storedJobNextDue !== jobLevelNextDue) {
+        if (!dryRun) {
+          await db.update(jobsTable)
+            .set({
+              lastDoneRH: jobLevelLastDone.toString(),
+              nextDueRH: jobLevelNextDue.toString(),
+            })
+            .where(eq(jobsTable.juuid, job.juuid));
+        }
+        jobsRepaired++;
+        repairs.push({
+          type: 'job',
+          jobNo: job.jobNo,
+          before: { lastDoneRH: storedJobLastDone, nextDueRH: storedJobNextDue },
+          after: { lastDoneRH: jobLevelLastDone, nextDueRH: jobLevelNextDue },
+        });
+      }
+    }
+  }
+
+  console.log(`🔧 [RH REPAIR] ${dryRun ? 'DRY RUN' : 'LIVE'} complete: ${jobsRepaired} jobs, ${linksRepaired} links, ${wosRepaired} WOs repaired`);
+
+  res.json({
+    success: true,
+    dryRun,
+    vesselId: vesselId || 'all',
+    totalRhJobs: rhJobs.length,
+    jobsRepaired,
+    linksRepaired,
+    wosRepaired,
+    repairs: repairs.slice(0, 200),
+    message: `${dryRun ? '[DRY RUN] Would repair' : 'Repaired'} ${jobsRepaired} jobs, ${linksRepaired} links, ${wosRepaired} work orders`,
   });
 }
