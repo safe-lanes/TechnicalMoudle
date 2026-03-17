@@ -1507,7 +1507,7 @@ const Dashboard = () => {
         )}
 
         {/* Superintendent Notifications Tile */}
-        {activeTab === 'overview' && (isSailAdmin || (superintendentSummary?.pendingCount ?? 0) > 0) && (
+        {activeTab === 'overview' && (
           <div style={{ padding: '16px 16px 0 16px' }}>
             <div
               onClick={() => setLocation('/pms/superintendent')}
