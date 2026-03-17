@@ -197,8 +197,7 @@ export async function listWorkOrders(vesselId?: string) {
     let dueRH: number | undefined;
     if (wo.maintenanceBasis === 'Running Hours') {
       dueRH = parseRH(linkData?.nextDueRH)
-        ?? parseRH(wo.nextDueReading)
-        ?? parseRH(job?.nextDueRH);
+        ?? parseRH(wo.nextDueReading);
       if (dueRH == null) {
         const lastDone = parseRH(linkData?.lastDoneRH) ?? parseRH(job?.lastDoneRH) ?? 0;
         const interval = parseRH(job?.intervalRunningHour);
@@ -342,8 +341,7 @@ export async function getWorkOrder(id: string) {
   let dueRH: number | undefined;
   if (workOrder.maintenanceBasis === 'Running Hours') {
     dueRH = parseRH(linkNextDueRH)
-      ?? parseRH(workOrder.nextDueReading)
-      ?? parseRH(job?.nextDueRH);
+      ?? parseRH(workOrder.nextDueReading);
     if (dueRH == null) {
       const lastDone = parseRH(linkLastDoneRH) ?? parseRH(job?.lastDoneRH) ?? 0;
       const interval = parseRH(job?.intervalRunningHour);
