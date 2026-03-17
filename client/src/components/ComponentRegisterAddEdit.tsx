@@ -811,6 +811,15 @@ export default function ComponentRegisterAddEdit({
   };
 
   const handleSave = async () => {
+    const requiredPerm = isEditMode ? canEditPerm("pms-components") : canCreatePerm("pms-components");
+    if (!requiredPerm) {
+      toast({
+        title: "Permission Denied",
+        description: isEditMode ? "You do not have permission to edit components." : "You do not have permission to create components.",
+        variant: "destructive",
+      });
+      return;
+    }
     if (!validateMandatoryFields()) {
       toast({
         title: "Validation Error",

@@ -2491,9 +2491,8 @@ const Components: React.FC = () => {
     return searchInTree(componentTreeData);
   };
   
-  // Check for modify mode from URL parameter
   const urlParams = new URLSearchParams(window.location.search);
-  const isModifyMode = urlParams.get('modify') === '1';
+  const isModifyMode = urlParams.get('modify') === '1' && canEditComponent;
 
   // Check for preview changes mode and load change request data
   useEffect(() => {
@@ -3347,7 +3346,7 @@ const Components: React.FC = () => {
                 Export
               </Button>
             )}
-            {(isSailAdmin || isClientAdmin) && !isChangeRequestMode && !isChangeMode && (canCreateComponent || canEditComponent) && (
+            {(isSailAdmin || isClientAdmin) && !isChangeRequestMode && !isChangeMode && canCreateComponent && (
               <Button 
                 className="bg-[#5dc86f] hover:bg-[#4db85f] text-white"
                 onClick={() => {
