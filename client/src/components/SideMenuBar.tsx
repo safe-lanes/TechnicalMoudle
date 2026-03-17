@@ -2,6 +2,7 @@ import React from "react";
 import { cn } from "@/lib/utils";
 import { useLocation } from "wouter";
 import { usePermissions } from "@/contexts/PermissionsContext";
+import { useUIRole } from "@/contexts/UIRoleContext";
 import {
   LayoutDashboard,
   Package,
@@ -84,8 +85,12 @@ export const SideMenuBar: React.FC<SideMenuBarProps> = ({
 }) => {
   const [, setLocation] = useLocation();
   const { canViewSidebarItem } = usePermissions();
+  const { isSailAdmin } = useUIRole();
   const allMenuItems = menuConfigs[subModule] || menuConfigs.pms;
-  const menuItems = allMenuItems.filter((item) => canViewSidebarItem(subModule, item.id));
+  const menuItems = allMenuItems.filter((item) => {
+    if (item.id === "access-control" && !isSailAdmin) return false;
+    return canViewSidebarItem(subModule, item.id);
+  });
 
   const handleItemClick = (itemId: string) => {
     // Use navigation for routing

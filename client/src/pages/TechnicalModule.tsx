@@ -195,8 +195,23 @@ export const TechnicalModule = () => {
             <ShipsCertificatesAdmin />
           ) : selectedSubModule === "admin" && selectedMenuItem === "ships-surveys" ? (
             <ShipsSurveysAdmin />
-          ) : selectedSubModule === "admin" && selectedMenuItem === "access-control" ? (
+          ) : selectedSubModule === "admin" && selectedMenuItem === "access-control" && isSailAdmin ? (
             <AccessControl />
+          ) : selectedSubModule === "admin" && selectedMenuItem === "access-control" && !isSailAdmin ? (
+            <div className="flex items-center justify-center h-full min-h-[400px]" data-testid="access-denied-sail-admin-only">
+              <div className="text-center">
+                <ShieldX className="h-16 w-16 text-red-400 mx-auto mb-4" />
+                <h2 className="text-2xl font-semibold text-gray-600 mb-2" data-testid="text-access-denied-title">Access Denied</h2>
+                <p className="text-gray-500 mb-4" data-testid="text-access-denied-description">Access Control is restricted to Sail Admin only.</p>
+                <button
+                  onClick={() => setLocation("/admin/masters")}
+                  className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
+                  data-testid="btn-go-masters"
+                >
+                  Go to Masters
+                </button>
+              </div>
+            </div>
           ) : selectedSubModule === "admin" ? (
             <PMSAdmin />
           ) : selectedSubModule === "pms" && selectedMenuItem === "reports" ? (
