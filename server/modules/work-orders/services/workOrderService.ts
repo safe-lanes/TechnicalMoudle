@@ -536,11 +536,14 @@ export async function updateWorkOrder(id: string, body: any) {
     if (disallowedFields.length > 0) {
       const storedStatus = existingWO.status || 'Completed';
       const dueDate = existingWO.dueDate;
-      if (dueDate && new Date(dueDate) < new Date()) {
-        console.warn(
-          `⚠️ Data inconsistency: WO ${existingWO.workOrderNo} has stored status "${storedStatus}" ` +
-          `but due date ${dueDate} is in the past. This WO may have appeared as Overdue in the UI.`
-        );
+      if (dueDate) {
+        const parsedDue = new Date(dueDate);
+        if (!isNaN(parsedDue.getTime()) && parsedDue < new Date()) {
+          console.warn(
+            `⚠️ Data inconsistency: WO ${existingWO.workOrderNo} has stored status "${storedStatus}" ` +
+            `but due date ${dueDate} is in the past. This WO may have appeared as Overdue in the UI.`
+          );
+        }
       }
       console.warn(`⚠️ Attempted to modify completed WO ${existingWO.workOrderNo}: ${disallowedFields.join(', ')}`);
       throw new ValidationError(

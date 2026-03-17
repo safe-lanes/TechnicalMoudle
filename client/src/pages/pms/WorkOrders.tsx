@@ -183,8 +183,8 @@ const WorkOrders: React.FC = () => {
 
   const safeWorkOrdersList = (workOrdersList || []).filter(wo => wo !== null && wo !== undefined);
   
-  const FINALIZED_STATUSES = new Set(['Completed', 'Approved', 'Closed', 'Cancelled', 'Canceled']);
-  const isStoredCompleted = (wo: any) => FINALIZED_STATUSES.has(wo.status);
+  const FINALIZED_STATUSES = new Set(['completed', 'approved', 'closed', 'cancelled', 'canceled']);
+  const isStoredCompleted = (wo: any) => wo.status && FINALIZED_STATUSES.has(wo.status.toLowerCase().trim());
   const getEffectiveStatus = (wo: any) => {
     if (isStoredCompleted(wo)) return 'Completed';
     return wo.computedStatus || wo.status || 'Active';
