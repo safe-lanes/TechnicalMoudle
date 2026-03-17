@@ -190,7 +190,7 @@ export async function validateRHEntry(req: Request, res: Response) {
 
     const enteredRH = Number(runningHours);
     let exceedsComponentRH = false;
-    if (componentActualRH !== null && componentActualRH > 0 && enteredRH > componentActualRH) {
+    if (componentActualRH !== null && !isNaN(componentActualRH) && enteredRH > componentActualRH) {
       exceedsComponentRH = true;
     }
 

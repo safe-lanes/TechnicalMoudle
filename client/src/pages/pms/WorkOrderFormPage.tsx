@@ -1961,6 +1961,18 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
         }
       }
 
+      if ((workOrderContext as any)?.maintenanceBasis === 'Running Hours' && currentRHValue) {
+        const enteredRH = Number(currentRHValue);
+        const capRH = rhValidation.componentActualRH;
+        if (capRH !== null && !isNaN(enteredRH) && enteredRH > capRH) {
+          hardErrors.push(`Running hours entered (${enteredRH}) exceeds the component's actual running hours (${capRH}). Please update the component's running hours in the Running Hours module first.`);
+        }
+      }
+
+      if (rhValidation.status === 'invalid') {
+        hardErrors.push(rhValidation.message || 'Running hours validation failed. Please correct the Current Reading value.');
+      }
+
       if (hardErrors.length > 0) {
         toast({
           title: "Validation Error",

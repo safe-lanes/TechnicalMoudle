@@ -114,8 +114,10 @@ export async function completeWorkOrder(
       }
     }
 
-    const componentActualRH = parseInt(component.currentCumulativeRH || '0');
-    if (componentActualRH > 0 && newRH > componentActualRH) {
+    const componentActualRH = component.currentCumulativeRH !== null && component.currentCumulativeRH !== undefined
+      ? parseInt(component.currentCumulativeRH)
+      : null;
+    if (componentActualRH !== null && !isNaN(componentActualRH) && newRH > componentActualRH) {
       throw new ValidationError(
         `Running hours entered (${newRH}) exceeds the component's actual running hours (${componentActualRH}). ` +
         `Please update the component's running hours first in the Running Hours module before completing this work order.`,
