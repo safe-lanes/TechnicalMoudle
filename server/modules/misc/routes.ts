@@ -31,7 +31,7 @@ router.post('/admin/migrate-inventory', asyncHandler(adminCtrl.migrateInventory)
 router.post('/admin/sync-work-order-status', asyncHandler(adminCtrl.syncWorkOrderStatus));
 router.post('/admin/sync-masters', requirePMSAdmin, asyncHandler(adminCtrl.syncMasters));
 router.post('/admin/populate-postponement-history', asyncHandler(adminCtrl.populatePostponementHistory));
-router.get('/admin/rh-diagnostic', asyncHandler(adminCtrl.rhDiagnostic));
-router.post('/admin/repair-rh-tracking', asyncHandler(adminCtrl.repairRhTracking));
+router.get('/admin/rh-diagnostic', requirePMSAdmin, asyncHandler(adminCtrl.rhDiagnostic));
+router.post('/admin/repair-rh-tracking', requirePMSAdmin, asyncHandler(adminCtrl.repairRhTracking));
 
 export default router;
