@@ -21,12 +21,13 @@ function calculateDaysLate(dueDate: string | null | undefined, completionDate: s
   return Math.max(0, Math.floor(diffMs / (1000 * 60 * 60 * 24)));
 }
 
-function calculateBackdatingDays(completionDate: string | null | undefined): number {
+function calculateBackdatingDays(completionDate: string | null | undefined, submittedDate?: string | null): number {
   if (!completionDate) return 0;
   const comp = new Date(completionDate);
-  const now = new Date();
   if (isNaN(comp.getTime())) return 0;
-  const diffMs = now.getTime() - comp.getTime();
+  const reference = submittedDate ? new Date(submittedDate) : new Date();
+  if (isNaN(reference.getTime())) return 0;
+  const diffMs = reference.getTime() - comp.getTime();
   return Math.max(0, Math.floor(diffMs / (1000 * 60 * 60 * 24)));
 }
 
@@ -45,7 +46,8 @@ export async function detectAndLogAnomalies(
     const completionDate = completionData.dateOfCompletion || workOrder.completionDateTime || workOrder.dateCompleted;
     const dueDate = workOrder.dueDate;
     const daysLate = calculateDaysLate(dueDate, completionDate);
-    const backdatingDays = calculateBackdatingDays(completionDate);
+    const submittedDate = (workOrder as any).submittedDate || (workOrder as any).updatedAt;
+    const backdatingDays = calculateBackdatingDays(completionDate, submittedDate);
 
     const anomalyTypes: AnomalyType[] = [];
 
@@ -160,8 +162,8 @@ export async function detectAndLogAnomalies(
     if (severity === 'HIGH') {
       try {
         const existingNotifs = await storage.getAllSuperintendentNotifications();
-        const woId = workOrder.id;
-        const hasDuplicate = existingNotifs.find((n: any) => n.workOrderId === woId && !n.isAcknowledged);
+        const canonicalWoId = (workOrder as any).wouuid || workOrder.id;
+        const hasDuplicate = existingNotifs.find((n: any) => n.workOrderId === canonicalWoId && !n.isAcknowledged);
         if (hasDuplicate) {
           console.log(`[AnomalyDetection] Superintendent notification already exists for WO ${workOrder.workOrderNo}, skipping duplicate`);
         } else {
@@ -174,7 +176,7 @@ export async function detectAndLogAnomalies(
             } catch {}
           }
           await storage.createSuperintendentNotification({
-            workOrderId: workOrder.id,
+            workOrderId: canonicalWoId,
             workOrderCode: workOrder.workOrderNo || workOrder.id,
             jobTitle: workOrder.jobTitle || 'Unknown Job',
             componentName: workOrder.component || workOrder.componentCode || 'Unknown',
