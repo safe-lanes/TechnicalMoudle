@@ -1,858 +1,1037 @@
 const ExcelJS = require('exceljs');
 const path = require('path');
 
-const INPUT_FILE = path.join(__dirname, 'attached_assets', 'PMS_Test_Cases_Comprehensive_(1)_1773732351055.xlsx');
+const INPUT_FILE = path.join(__dirname, 'attached_assets', 'PMS_Test_Cases_Comprehensive_1773808572368.xlsx');
 const OUTPUT_FILE = path.join(__dirname, 'PMS_Test_Cases_With_HowToTest.xlsx');
 
-function generateHowToTest(testCase) {
-  const id = testCase['Test Case ID'] || '';
-  const section = testCase['Module/Section'] || '';
-  const scenario = testCase['Test Scenario'] || '';
-  const steps = testCase['Test Steps'] || '';
-  const testData = testCase['Test Data'] || '';
-  const expected = testCase['Expected Result'] || '';
+const NAV = {
+  components: 'PMS > Components (left sidebar)',
+  workOrders: 'PMS > Work orders (left sidebar)',
+  runningHrs: 'PMS > Running Hrs (left sidebar)',
+  spares: 'PMS > Spares (left sidebar)',
+  stores: 'PMS > Stores (left sidebar)',
+  reports: 'PMS > Reports (left sidebar)',
+  dashboard: 'PMS > Dashboard (left sidebar)',
+  admin: 'PMS > Admin (left sidebar)',
+  superintendent: 'PMS > Superintendent page',
+};
 
-  if (id.startsWith('COMP-')) return generateComponentHowToTest(id, section, scenario, steps, testData, expected);
-  if (id.startsWith('WO-')) return generateWorkOrderHowToTest(id, section, scenario, steps, testData, expected);
-  if (id.startsWith('RH-')) return generateRunningHoursHowToTest(id, section, scenario, steps, testData, expected);
-  if (id.startsWith('SP-')) return generateSparesHowToTest(id, section, scenario, steps, testData, expected);
-  if (id.startsWith('ST-')) return generateStoresHowToTest(id, section, scenario, steps, testData, expected);
-  if (id.startsWith('RPT-')) return generateReportsHowToTest(id, section, scenario, steps, testData, expected);
-  if (id.startsWith('DASH-')) return generateDashboardHowToTest(id, section, scenario, steps, testData, expected);
-  return 'No instructions available for this test case.';
+function generateStructuredHowToTest(tc) {
+  const id = tc['Test Case ID'] || '';
+  const section = tc['Module/Section'] || '';
+  const scenario = tc['Test Scenario'] || '';
+  const steps = tc['Test Steps'] || '';
+  const testData = tc['Test Data'] || '';
+  const expected = tc['Expected Result'] || '';
+
+  if (id.startsWith('COMP-')) return genCOMP(id, section, scenario, steps, testData, expected);
+  if (id.startsWith('WO-')) return genWO(id, section, scenario, steps, testData, expected);
+  if (id.startsWith('RH-')) return genRH(id, section, scenario, steps, testData, expected);
+  if (id.startsWith('SP-')) return genSP(id, section, scenario, steps, testData, expected);
+  if (id.startsWith('ST-')) return genST(id, section, scenario, steps, testData, expected);
+  if (id.startsWith('RPT-')) return genRPT(id, section, scenario, steps, testData, expected);
+  if (id.startsWith('DASH-')) return genDASH(id, section, scenario, steps, testData, expected);
+
+  return buildGeneric(id, scenario, section, steps, testData, expected);
 }
 
-function generateComponentHowToTest(id, section, scenario, steps, testData, expected) {
-  const instructions = {
-    'COMP-001': `HOW TO TEST:\n1. Log in to RSMS and click "PMS" in the top menu bar.\n2. In the left sidebar, click "Components" to open the Components page.\n3. In the top-right vessel dropdown, select a vessel (e.g., "Vessel 11").\n4. Wait for the component tree to load in the left panel.\n5. VERIFY: The component tree displays a hierarchical list of components grouped under main categories (1-Engine, 2-Deck, etc.).\n6. VERIFY: Each component shows its code and name (e.g., "702.005.01 - FO Separators No.01").\n7. VERIFY: Clicking on any component in the tree reveals its details in the right panel (Component Information section).\n8. VERIFY: The total component count is displayed at the top of the tree panel.`,
-
-    'COMP-002': `HOW TO TEST:\n1. Navigate to PMS > Components from the sidebar.\n2. Select a vessel from the dropdown to load components.\n3. Look for the items-per-page dropdown at the bottom of the component tree (if pagination exists) or count the visible components.\n4. The component tree in RSMS uses a hierarchical tree view rather than a flat paginated list. Nodes are expanded/collapsed by clicking the chevron arrows.\n5. VERIFY: If a pagination control exists, select "10" and confirm only 10 top-level items display per page.\n6. VERIFY: Navigation controls (Next/Previous) work if pagination is present.\nNOTE: The current RSMS component view uses an expandable tree structure. If no explicit pagination dropdown exists, document this as "Tree view - pagination not applicable" in the Comments column.`,
-
-    'COMP-003': `HOW TO TEST:\n1. Navigate to PMS > Components from the sidebar.\n2. Select a vessel from the dropdown.\n3. If the component tree has a pagination or items-per-page selector at the bottom, select "25".\n4. VERIFY: Up to 25 top-level items are displayed per page.\nNOTE: If the tree view does not have explicit page-size controls, note "Tree view without pagination selector" in Comments.`,
-
-    'COMP-004': `HOW TO TEST:\n1. Navigate to PMS > Components and select a vessel.\n2. If pagination controls exist, select "50" from the items-per-page dropdown.\n3. VERIFY: Up to 50 items display per page.\nNOTE: Same caveat as COMP-002/003 regarding tree view pagination.`,
-
-    'COMP-005': `HOW TO TEST:\n1. Navigate to PMS > Components and select a vessel.\n2. If pagination controls exist, select "100" from the items-per-page dropdown.\n3. VERIFY: Up to 100 items display per page and performance remains acceptable (page loads within a few seconds).\nNOTE: Same caveat as COMP-002/003 regarding tree view pagination.`,
-
-    'COMP-006': `HOW TO TEST:\n1. Navigate to PMS > Components and select a vessel.\n2. Look at the component tree — it is sorted by component code by default (e.g., 101, 102, 201, 301, etc.).\n3. If a sort toggle or column header for "Code" exists, click it to change sort direction.\n4. VERIFY: Components are ordered by their numeric component code.\n5. VERIFY: After toggling sort, the order reverses (descending) or returns to ascending.`,
-
-    'COMP-007': `HOW TO TEST:\n1. Navigate to PMS > Components and select a vessel.\n2. If a sort option for "Component Name" exists (column header or dropdown), click it.\n3. VERIFY: Components rearrange alphabetically by name.\n4. VERIFY: Clicking again reverses the order (Z-A).\nNOTE: The tree view may not support sorting by name independently. If not available, note in Comments.`,
-
-    'COMP-008': `HOW TO TEST:\n1. Navigate to PMS > Components and select a vessel with components loaded.\n2. Locate the search bar at the top of the component tree panel (magnifying glass icon).\n3. Type a component code (e.g., "702.005") into the search bar.\n4. VERIFY: The tree filters to show only components whose code matches or contains "702.005".\n5. VERIFY: Parent nodes auto-expand to reveal matching child components.\n6. Clear the search field and VERIFY that the full tree reappears.`,
-
-    'COMP-009': `HOW TO TEST:\n1. Navigate to PMS > Components and select a vessel.\n2. In the search bar at the top of the tree panel, type a component name (e.g., "pump" or "separator").\n3. VERIFY: The tree filters to show only components whose name contains the search text.\n4. VERIFY: Matching components are highlighted or their parent nodes auto-expand.\n5. Clear the search and VERIFY the full tree returns.`,
-
-    'COMP-010': `HOW TO TEST:\n1. Navigate to PMS > Components.\n2. Locate the vessel dropdown in the top-right area of the page (or the global vessel selector bar).\n3. Select a different vessel (e.g., switch from "Vessel 11" to "Vessel 14").\n4. VERIFY: The component tree refreshes and shows components for the newly selected vessel.\n5. VERIFY: Component count updates to reflect the new vessel's data.\n6. Switch back to the original vessel and VERIFY the tree reloads correctly.`,
-
-    'COMP-011': `HOW TO TEST:\n1. Navigate to PMS > Components and select a vessel.\n2. Look for a "Maintenance Basis" filter dropdown or checkbox above or beside the component tree.\n3. If the filter exists, select "Calendar" and VERIFY only calendar-based components show.\n4. Select "Running Hours" and VERIFY only RH-based components show.\nNOTE: The current RSMS Components page may not have a maintenance basis filter at the component list level (maintenance basis is a Job-level concept). If this filter does not exist, note "Filter not available — maintenance basis is at Job level" in Comments.`,
-
-    'COMP-012': `HOW TO TEST:\n1. Navigate to PMS > Components and select a vessel.\n2. Look for a component count display near the top of the tree panel (e.g., "Total Components: 3622" or a count shown in the header area).\n3. VERIFY: The count is visible and matches the actual number of components loaded.\n4. Apply a search filter (e.g., type "pump") and VERIFY the count updates to reflect filtered results.`,
-
-    'COMP-013': `HOW TO TEST:\n1. Navigate to PMS > Components on a desktop browser.\n2. VERIFY: The page has a two-panel layout — tree on the left, details on the right.\n3. Resize the browser window to tablet width (768px).\n4. VERIFY: The layout adjusts appropriately — panels may stack vertically or the tree may collapse.\n5. Resize to mobile width (375px).\n6. VERIFY: Content remains accessible and readable; no horizontal scrollbar overflow.\n7. VERIFY: All buttons and interactive elements are still tappable/clickable.`,
-
-    'COMP-014': `HOW TO TEST:\n1. Navigate to PMS > Components and select a vessel.\n2. Look for the "+ Add / Edit Component" button (blue button with plus icon) in the header area of the Components page.\n3. Click the button.\n4. VERIFY: The Add/Edit Component form opens, showing a component tree on the left and a blank form on the right.\n5. VERIFY: The form has sections: Component Information (Section A), and additional sections like Running Hours & Condition Monitoring (Section B).\n6. VERIFY: The form title shows "Add / Edit Component" or similar heading.`,
-
-    'COMP-015': `HOW TO TEST:\n1. Navigate to PMS > Components and click "+ Add / Edit Component".\n2. In the component tree on the left, click a parent component (e.g., "702 - Fuel Oil System") to set it as the parent.\n3. The form should auto-populate:\n   - Parent Component Code (from selected parent)\n   - Component Code (auto-generated, e.g., "702.006")\n   - Component Category (auto-derived from code)\n4. Fill in all mandatory fields:\n   - Component Name: "Test Component ABC"\n   - Equipment/System Department: select "Engine" from dropdown\n   - Maker: type or select a maker\n5. Set Criticality to "Yes" or "No".\n6. Click the "Save" button at the bottom of the form.\n7. VERIFY: A success toast message appears ("Component saved successfully" or similar).\n8. VERIFY: The new component appears in the tree under the parent you selected.`,
-
-    'COMP-016': `HOW TO TEST:\n1. Navigate to PMS > Components and click "+ Add / Edit Component".\n2. Select a parent component in the tree.\n3. Leave the Component Name field empty.\n4. Leave the Equipment/System Department as "Select" (no selection).\n5. Click the "Save" button.\n6. VERIFY: Validation errors appear — red border/text around the empty required fields.\n7. VERIFY: A message like "This field is required" appears next to each missing mandatory field.\n8. VERIFY: The form does NOT save — no success message appears.`,
-
-    'COMP-017': `HOW TO TEST:\n1. Navigate to PMS > Components and click "+ Add / Edit Component".\n2. Select a parent component in the tree.\n3. Note the auto-generated component code (e.g., "702.006").\n4. Try to manually type an invalid code format (e.g., "ABC" or "1.2.3.4.5.6").\n5. VERIFY: The system either prevents invalid input, shows a validation error, or the code field is read-only/auto-generated.\n6. VERIFY: Valid codes follow the hierarchical format (e.g., "X01", "X01.001", "X01.001.01").`,
-
-    'COMP-018': `HOW TO TEST:\n1. Navigate to PMS > Components and click "+ Add / Edit Component".\n2. Select a parent component in the tree.\n3. Note the auto-generated component code.\n4. Manually change the component code to match an existing component's code (e.g., "702.005.01").\n5. Fill in all required fields and click "Save".\n6. VERIFY: The system shows an error message indicating the component code already exists (e.g., "Duplicate component code").\n7. VERIFY: The form does NOT save with a duplicate code.`,
-
-    'COMP-019': `HOW TO TEST:\n1. Navigate to PMS > Components and click "+ Add / Edit Component".\n2. Select a parent and fill required fields.\n3. In the Component Name field, type a very short name (e.g., "A" — 1 character).\n4. Click Save and check if a minimum length validation error appears.\n5. Clear the name and type a very long name (200+ characters).\n6. Click Save.\n7. VERIFY: If there is a max length, an appropriate error appears. If no limit, the name saves correctly.\n8. VERIFY: Minimum and maximum length constraints (if any) are clearly communicated.`,
-
-    'COMP-020': `HOW TO TEST:\n1. Navigate to PMS > Components and click "+ Add / Edit Component".\n2. Select a parent component and fill required fields (name, department, etc.).\n3. This test verifies that a component can have jobs with "Calendar" maintenance basis.\n4. After saving the component, add a job to it with maintenance basis set to "Calendar".\n5. Set the frequency (e.g., "3 Months") and a due date.\n6. VERIFY: The job is created successfully with Calendar basis.\n7. VERIFY: The job appears in the component's jobs list showing "Calendar" as the maintenance type.`,
-
-    'COMP-021': `HOW TO TEST:\n1. Navigate to PMS > Components and click "+ Add / Edit Component".\n2. Select a parent component and fill required fields.\n3. After saving the component, go to the Running Hours & Condition Monitoring section (Section B in the form).\n4. Set the RH Counter Type to "Master" or "Inherited".\n5. Add a job with maintenance basis "Running Hours".\n6. Set the frequency (e.g., "500 RH").\n7. VERIFY: The job is created with Running Hours basis.\n8. VERIFY: The component now shows RH tracking information in its details.`,
-
-    'COMP-022': `HOW TO TEST:\n1. Navigate to PMS > Components and click "+ Add / Edit Component".\n2. Select a parent and fill required fields.\n3. Find the "Class Item" dropdown (in the form, near the bottom of Section A).\n4. Change it from "No" to "Yes".\n5. Save the component.\n6. VERIFY: The Class Item field shows "Yes" when viewing the saved component.\n7. Change it back to "No" and save again.\n8. VERIFY: The field correctly toggles between Yes/No.`,
-
-    'COMP-023': `HOW TO TEST:\n1. Navigate to PMS > Components and click "+ Add / Edit Component".\n2. Select a parent component.\n3. Find the "Equipment / System Department" dropdown.\n4. Click the dropdown and VERIFY it shows options: Engine, Deck, Electrical, Galley, LSA, FFA.\n5. Select "Engine" and VERIFY it is selected.\n6. Change to "Deck" and VERIFY the selection updates.\n7. Save the component and reopen it.\n8. VERIFY: The department selection persisted correctly after save.`,
-
-    'COMP-024': `HOW TO TEST:\n1. Navigate to PMS > Components and click "+ Add / Edit Component".\n2. Select a parent component.\n3. Find the "Criticality" dropdown (shows "Yes" / "No" options).\n4. Select "Yes" (Critical).\n5. Save the component.\n6. VERIFY: In the component tree and detail view, the component shows a criticality indicator (red badge or "Yes" label).\n7. Edit the component and change criticality to "No".\n8. VERIFY: The criticality indicator updates accordingly.`,
-
-    'COMP-025': `HOW TO TEST:\n1. Navigate to PMS > Components and click "+ Add / Edit Component".\n2. Fill in all required fields for a new component.\n3. Locate the "Save" button (bottom of the form).\n4. Click Save.\n5. VERIFY: The button shows a loading state (spinner) while saving.\n6. VERIFY: A success toast appears after save completes.\n7. VERIFY: The form data is persisted — reopening the component shows the saved values.\n8. VERIFY: Clicking Save with no changes still succeeds (idempotent save).`,
-
-    'COMP-026': `HOW TO TEST:\n1. Navigate to PMS > Components and click "+ Add / Edit Component".\n2. Begin filling in fields (type a name, select a department, etc.).\n3. Find and click the "Back" arrow button (top-left of the Add/Edit form, arrow icon).\n4. VERIFY: The form closes and you return to the main Components tree view.\n5. VERIFY: The partially entered data is NOT saved — opening the form again shows a blank form.\n6. VERIFY: No error messages appear during cancellation.`,
-
-    'COMP-027': `HOW TO TEST:\n1. Navigate to PMS > Components and click "+ Add / Edit Component".\n2. Fill in all required fields and click "Save".\n3. VERIFY: A green success toast notification appears at the top or bottom-right of the screen.\n4. VERIFY: The message reads something like "Component saved successfully" or "Component created".\n5. VERIFY: The toast auto-dismisses after a few seconds or can be manually closed.`,
-
-    'COMP-028': `HOW TO TEST:\n1. Navigate to PMS > Components and click "+ Add / Edit Component".\n2. Create and save a new component successfully.\n3. After save completes:\n4. VERIFY: You are either redirected back to the Components list/tree view, OR the form stays open showing the saved component in edit mode.\n5. VERIFY: The newly created component is visible in the component tree.\n6. VERIFY: You can click on the new component in the tree to see its details.`,
-
-    'COMP-029': `HOW TO TEST:\n1. Navigate to PMS > Components and select a vessel.\n2. Click on any existing component in the tree (e.g., "702.005.01 - FO Separators No.01").\n3. In the component details panel (right side), look for an Edit button or the "+ Add / Edit Component" button.\n4. Click it to open the component in editing mode.\n5. VERIFY: The Add/Edit Component form opens with the selected component pre-loaded.\n6. VERIFY: All fields are populated with the component's existing data.\n7. VERIFY: The component tree on the left highlights/selects the component being edited.`,
-
-    'COMP-030': `HOW TO TEST:\n1. Navigate to PMS > Components, select a vessel, and click on a component to view its details.\n2. Click the edit button to open the Add/Edit Component form.\n3. VERIFY each field is pre-populated with saved data:\n   - Component Code matches (e.g., "702.005.01")\n   - Component Name matches (e.g., "FO Separators No.01")\n   - Parent Component Code is correct\n   - Maker, Model, Serial No fields show saved values\n   - Equipment/System Department dropdown shows the correct selection\n   - Criticality shows "Yes" or "No" correctly\n   - Class Item shows saved value\n   - Running Hours section shows current RH data\n4. VERIFY: No fields show blank when they should have data.`,
-
-    'COMP-031': `HOW TO TEST:\n1. Open an existing component in the Add/Edit Component form.\n2. Locate the Component Name field.\n3. Change the name from its current value to a new name (e.g., add " - Updated" to the end).\n4. Click "Save".\n5. VERIFY: Success toast appears.\n6. VERIFY: The component tree updates to show the new name.\n7. VERIFY: Opening the component again shows the updated name.\n8. Revert the name back to the original and save again to clean up.`,
-
-    'COMP-032': `HOW TO TEST:\n1. Open an existing component in the Add/Edit Component form.\n2. Modify one or more fields (e.g., change the maker, update the model).\n3. Click "Save".\n4. VERIFY: A success message appears.\n5. VERIFY: Changes are persisted — close and reopen the component to confirm.\n6. VERIFY: The component tree reflects any visible changes (e.g., if name was changed).\n7. VERIFY: Modified fields show their new values, not the old ones.`,
-
-    'COMP-033': `HOW TO TEST:\n1. Open an existing component in the Add/Edit Component form.\n2. Modify some fields (change name, maker, etc.).\n3. Instead of clicking Save, click the "Back" arrow button.\n4. VERIFY: You return to the Components tree view.\n5. Click on the same component again to view its details.\n6. VERIFY: All values remain as they were BEFORE your edits — changes were NOT saved.\n7. VERIFY: No partial data was persisted.`,
-
-    'COMP-034': `HOW TO TEST:\n1. Open an existing component that has associated work orders or jobs.\n2. Look at the Jobs tab or section in the component details.\n3. Confirm at least one job exists for this component.\n4. Try to modify the Component Code field in the edit form.\n5. VERIFY: The Component Code field is either read-only (grayed out) or shows a warning that it cannot be changed when jobs exist.\n6. VERIFY: If you somehow change the code and try to save, the system blocks the change with an error message.\nNOTE: Component code changes could break job/WO associations, so the system should prevent this.`,
-
-    'COMP-035': `HOW TO TEST:\n1. Open an existing component and make a change (e.g., update the model name).\n2. Click "Save".\n3. VERIFY: A confirmation/success message appears indicating the update was saved.\n4. VERIFY: The message is clear (e.g., "Component updated successfully").\n5. VERIFY: The toast notification auto-dismisses after a few seconds.\n6. VERIFY: No error messages appear alongside the success message.`,
-
-    'COMP-036': `HOW TO TEST:\n1. First, create a new test component with no jobs attached:\n   - Navigate to PMS > Components, click "+ Add / Edit Component"\n   - Create a simple component (e.g., name: "Test Delete Component")\n   - Save it\n2. Now try to delete this component:\n   - Select the component in the tree\n   - Look for a Delete button (trash icon) in the edit form or component details\n   - Click Delete\n3. VERIFY: A confirmation dialog appears asking "Are you sure you want to delete?"\n4. Click "Yes" / "Confirm".\n5. VERIFY: The component is removed from the tree.\n6. VERIFY: A success message confirms deletion.`,
-
-    'COMP-037': `HOW TO TEST:\n1. Navigate to PMS > Components and select a component that has active/planned work orders.\n2. Try to delete this component (look for Delete button).\n3. VERIFY: The system prevents deletion with a clear error message (e.g., "Cannot delete: component has active work orders").\n4. VERIFY: The component remains in the tree — it was NOT deleted.\n5. VERIFY: The error message explains WHY deletion was blocked.`,
-
-    'COMP-038': `HOW TO TEST:\n1. Navigate to PMS > Components and select a component that has only completed (historical) work orders — no active or planned ones.\n2. Try to delete this component.\n3. VERIFY: The system either allows deletion (with a warning about losing history) or prevents it (to preserve maintenance records).\n4. Document the actual behavior: Does the system allow or prevent deletion when only completed jobs exist?\n5. VERIFY: If deletion is allowed, the historical records are handled appropriately (archived or cascade-deleted).`,
-
-    'COMP-039': `HOW TO TEST:\n1. Navigate to PMS > Components and select a component.\n2. Click the Delete button.\n3. VERIFY: A confirmation dialog/modal appears before deletion occurs.\n4. VERIFY: The dialog clearly states what will be deleted (component name/code).\n5. VERIFY: The dialog has both "Confirm" and "Cancel" buttons.\n6. VERIFY: No deletion occurs until you explicitly confirm.\n7. Click "Confirm" to verify the deletion proceeds.`,
-
-    'COMP-040': `HOW TO TEST:\n1. Navigate to PMS > Components and select a component.\n2. Click the Delete button.\n3. When the confirmation dialog appears, click "Cancel" (not Confirm).\n4. VERIFY: The dialog closes.\n5. VERIFY: The component is still present in the tree — it was NOT deleted.\n6. VERIFY: All component data is intact (click it to view details).\n7. VERIFY: No error messages appear.`,
-
-    'COMP-041': `HOW TO TEST:\n1. Navigate to PMS > Components and select a vessel.\n2. In the component tree (left panel), click on any component (e.g., "702.005.01 - FO Separators No.01").\n3. VERIFY: The right panel updates to show the Component Information section.\n4. VERIFY: The selected component is highlighted in the tree.\n5. VERIFY: Details load without errors.\n6. Click on a different component and VERIFY the details panel updates to show the newly selected component.`,
-
-    'COMP-042': `HOW TO TEST:\n1. Navigate to PMS > Components, select a vessel, and click on a component.\n2. In the right detail panel, VERIFY these fields are displayed:\n   - Component Code\n   - Component Name\n   - Component Category\n   - Maker\n   - Model\n   - Serial No\n   - Drawing No\n   - Location\n   - Criticality (with colored badge — red for Yes, gray for No)\n   - Condition Based (Yes/No)\n   - Installation Date\n   - Commissioned Date\n   - Rating\n   - Equipment/System Department\n   - Running Hours\n   - Is Active status\n   - Class Item\n   - Notes\n3. VERIFY: Fields with no data show as blank (not "undefined" or "null").\n4. Additional fields visible for Sail Admin: Fleet Equipment Code, Fleet Equipment Name, Parent Component Code, Maker Code, Model Code.`,
-
-    'COMP-043': `HOW TO TEST:\n1. Navigate to PMS > Components, select a vessel, and click on a component that has jobs.\n2. In the right detail panel, look for a "Jobs" section or tab.\n3. VERIFY: The associated jobs list is displayed showing job titles, maintenance basis (Calendar/RH), frequency, and status.\n4. VERIFY: Each job entry is clickable to navigate to the job details.\n5. VERIFY: If the component has no jobs, the section shows an empty state message (e.g., "No jobs found").`,
-
-    'COMP-044': `HOW TO TEST:\n1. Navigate to PMS > Components, select a vessel, and click on a component.\n2. Look for a "Maintenance History" section or tab in the detail panel.\n3. VERIFY: Historical work orders and maintenance activities for this component are listed.\n4. VERIFY: Each entry shows: work order number, job title, completion date, status.\n5. VERIFY: History is sorted by date (most recent first).\n6. VERIFY: If no history exists, an appropriate empty state is shown.`,
-
-    'COMP-045': `HOW TO TEST:\n1. Navigate to PMS > Components and select a vessel.\n2. Apply some filters (type "pump" in search bar, or select a criticality filter).\n3. Note which filters are active and your scroll position.\n4. Click on a component to view its details (or open the Add/Edit form).\n5. Click the "Back" button (left arrow) to return to the component list.\n6. VERIFY: The search text is still in the search bar.\n7. VERIFY: Any active filters are still applied.\n8. VERIFY: The component tree shows the same filtered results as before.\n9. VERIFY: You do not need to re-select the vessel.`,
-
-    'COMP-046': `HOW TO TEST:\n1. Navigate to PMS > Components and select a vessel.\n2. Click on a component to view its details.\n3. In the Jobs section, look for an "Add Job" or "+" button.\n4. Click it to open the job creation form.\n5. Fill in the required job fields:\n   - Job Title (e.g., "Annual Inspection")\n   - Maintenance Basis (Calendar or Running Hours)\n   - Frequency (e.g., "12 Months")\n   - Assigned To rank\n6. Save the job.\n7. VERIFY: The job appears in the component's jobs list.\n8. VERIFY: A corresponding work order template is created in the Work Orders page.`,
-
-    'COMP-047': `HOW TO TEST:\n1. Navigate to PMS > Components and select a vessel.\n2. Click on a component that has multiple jobs assigned.\n3. Look at the Jobs section in the detail panel.\n4. VERIFY: All jobs for this component are listed.\n5. VERIFY: Each job shows its title, maintenance basis, frequency, and status.\n6. VERIFY: You can click on individual jobs to see their full details.\n7. VERIFY: Jobs are properly linked to work orders.`,
-
-    'COMP-048': `HOW TO TEST:\n1. Navigate to PMS > Components and select a component.\n2. Add or edit a job for this component.\n3. Test different frequency configurations:\n   a. Calendar basis: Set frequency to "3 Months" and VERIFY it saves.\n   b. Calendar basis: Change to "6 Months" and VERIFY.\n   c. Calendar basis: Try "1 Year" and VERIFY.\n   d. Running Hours basis: Set frequency to "500" RH and VERIFY.\n   e. Running Hours basis: Change to "2000" RH and VERIFY.\n4. VERIFY: Each frequency value is saved and displayed correctly.\n5. VERIFY: The corresponding work order due dates recalculate based on the new frequency.`,
-
-    'COMP-049': `HOW TO TEST:\n1. Navigate to PMS > Components and click "+ Add / Edit Component".\n2. Select a parent component.\n3. In the Component Name field, enter a very long name (200+ characters):\n   "Main Engine Cylinder Head Assembly Including Exhaust Valve Mechanism And Fuel Injection System With Associated Piping And Control Instrumentation For Continuous Monitoring Of Temperature Pressure And Flow Rate Parameters During Normal Sea Going Operation"\n4. Fill other required fields and click "Save".\n5. VERIFY: The component saves successfully (no error).\n6. VERIFY: In the component tree, the long name is truncated with ellipsis ("...") to fit the layout.\n7. VERIFY: Hovering over the truncated name shows the full name in a tooltip.\n8. VERIFY: The full name is visible in the detail panel on the right side.\n9. VERIFY: No layout breakage — panels, buttons remain properly aligned.`,
-
-    'COMP-050': `HOW TO TEST:\n1. Navigate to PMS > Components and click "+ Add / Edit Component".\n2. Select a parent component.\n3. In the Component Name field, enter a name with special characters:\n   'Test & Component "Alpha" <Beta> / Gamma (100%) #1'\n4. Fill other required fields and click "Save".\n5. VERIFY: The component saves without error.\n6. VERIFY: Special characters are preserved when viewing the component (not escaped or garbled).\n7. VERIFY: The component appears correctly in the tree and detail views.\n8. VERIFY: Search still works when searching for the special characters (e.g., search for "&" or "#1").`
-  };
-
-  return instructions[id] || `HOW TO TEST:\n1. Navigate to PMS > Components from the sidebar.\n2. ${steps.replace(/\n/g, '\n3. ')}\n4. VERIFY: ${expected}`;
+function fmt(id, scenario, goal, setupSteps, actionSteps, intermediateSteps, finalSteps, checks, whatToVerify, edgeCases) {
+  let out = `How to Test: ${id} — ${scenario}\n\n`;
+  out += `Goal:\n• ${goal}\n\n`;
+  out += `Steps:\n\n`;
+  out += `Step 1 — Setup / Pre-condition\n`;
+  setupSteps.forEach(s => { out += `• ${s}\n`; });
+  out += `\nStep 2 — Action\n`;
+  actionSteps.forEach(s => { out += `• ${s}\n`; });
+  if (intermediateSteps && intermediateSteps.length > 0) {
+    out += `\nStep 3 — Intermediate Action\n`;
+    intermediateSteps.forEach(s => { out += `• ${s}\n`; });
+  }
+  if (finalSteps && finalSteps.length > 0) {
+    out += `\nStep ${intermediateSteps && intermediateSteps.length > 0 ? '4' : '3'} — Final Action / Navigation\n`;
+    finalSteps.forEach(s => { out += `• ${s}\n`; });
+  }
+  const verifyStep = intermediateSteps && intermediateSteps.length > 0 ? '5' : (finalSteps && finalSteps.length > 0 ? '4' : '3');
+  out += `\nStep ${verifyStep} — Verification\n\n`;
+  out += `Check | Expected\n`;
+  out += `------|----------\n`;
+  checks.forEach(c => { out += `${c[0]} | ${c[1]}\n`; });
+  out += `\nWhat to Verify:\n`;
+  whatToVerify.forEach(v => { out += `• ${v}\n`; });
+  out += `\nEdge Cases:\n`;
+  edgeCases.forEach(e => { out += `• ${e}\n`; });
+  return out;
 }
 
-function generateWorkOrderHowToTest(id, section, scenario, steps, testData, expected) {
-  const instructions = {
-    'WO-001': `HOW TO TEST:\n1. Log in to RSMS and click "PMS" in the top menu bar.\n2. In the left sidebar, click "Work orders".\n3. Select a vessel from the vessel dropdown.\n4. VERIFY: The Work Orders list page loads showing a table with columns: Work Order No, Job Title, Component, Assigned To, Due Date, Status.\n5. VERIFY: Status tabs appear at the top: Planned, Due, Overdue, Pending Approval, Completed — each with a count badge.\n6. VERIFY: The "Planned" tab is selected by default.\n7. VERIFY: Work orders are listed with their current data.`,
+function genCOMP(id, section, scenario, steps, testData, expected) {
+  const n = parseInt(id.replace('COMP-', ''));
+  const nav = NAV.components;
 
-    'WO-002': `HOW TO TEST:\n1. Navigate to PMS > Work orders and select a vessel.\n2. Click the "Planned" tab at the top.\n3. VERIFY: Only work orders with "Active" or "Postponed" status are shown.\n4. VERIFY: The count badge on the "Planned" tab matches the number of rows displayed.\n5. VERIFY: No "Due", "Overdue", "Pending Approval", or "Completed" items appear in this tab.`,
+  if (n === 1) return fmt(id, scenario,
+    'Verify the Components list page loads correctly and displays all components in a hierarchical tree with proper columns.',
+    ['Log in to RSMS as a user with PMS access.', `Navigate to ${nav}.`, 'Select a vessel from the vessel dropdown (e.g., "Vessel 11").'],
+    ['Wait for the component tree to load in the left panel.', 'Observe the hierarchical tree structure showing component codes and names.'],
+    ['Click on any component in the tree to view its details in the right panel.'],
+    ['Scroll through the tree to verify all components are loaded.'],
+    [['Component Tree', 'Displays hierarchical list grouped under main categories (1-Engine, 2-Deck, etc.)'],
+     ['Component Entry', 'Shows code and name (e.g., "702.005.01 - FO Separators No.01")'],
+     ['Detail Panel', 'Right panel updates with Component Information when a tree node is clicked'],
+     ['Component Count', 'Total count is displayed at the top of the tree panel']],
+    ['Component tree loads without errors or blank areas', 'All columns (Code, Name, Department) are visible', 'No "undefined" or "null" values appear in component entries', 'Smooth scrolling through the tree'],
+    ['Refresh the page (F5) and verify the tree reloads correctly.', 'Try selecting a vessel with zero components — verify an empty state message appears.', 'Use browser back button after navigating to a component detail — verify tree state is preserved.']
+  );
 
-    'WO-003': `HOW TO TEST:\n1. Navigate to PMS > Work orders and select a vessel.\n2. Click the "Due" tab.\n3. VERIFY: Only work orders within the warning window (due within 30 days for Calendar, or within 720 RH for Running Hours) are displayed.\n4. VERIFY: Items that are past their due date but within grace period ("Grace P") also appear here.\n5. VERIFY: The count badge matches the number of visible rows.\n6. VERIFY: Status badges show "Due" or "Due (Grace P)" in yellow/orange.`,
-
-    'WO-004': `HOW TO TEST:\n1. Navigate to PMS > Work orders and select a vessel.\n2. Click the "Overdue" tab.\n3. VERIFY: Only work orders that have breached their due date AND exceeded the grace period are shown.\n4. VERIFY: Status badges show "Overdue" in red.\n5. VERIFY: The count badge on the tab matches the row count.\n6. VERIFY: These represent items that need immediate attention.`,
-
-    'WO-005': `HOW TO TEST:\n1. Navigate to PMS > Work orders and select a vessel.\n2. Click the "Pending Approval" tab.\n3. VERIFY: Only work orders submitted for approval (completed by crew but not yet approved by superintendent) are shown.\n4. VERIFY: Status badges show "Pending Approval" in purple.\n5. VERIFY: The count badge matches.\n6. VERIFY: Each work order in this tab should have completion details already filled in.`,
-
-    'WO-006': `HOW TO TEST:\n1. Navigate to PMS > Work orders and select a vessel.\n2. Click the "Completed" tab.\n3. VERIFY: Only work orders with "Completed" status (approved and closed) are shown.\n4. VERIFY: Status badges show "Completed" in green.\n5. VERIFY: The count badge matches.\n6. VERIFY: These work orders have both completion data and approval information.`,
-
-    'WO-007': `HOW TO TEST:\n1. Navigate to PMS > Work orders and select a vessel.\n2. Look at each status tab: Planned, Due, Overdue, Pending Approval, Completed.\n3. VERIFY: Each tab has a numeric count badge next to its label.\n4. VERIFY: The counts are non-negative numbers.\n5. Add up all tab counts and compare with the total number of non-execution work orders.\n6. VERIFY: Counts update dynamically when work orders change status (e.g., after approving a pending WO, the Pending Approval count decreases and Completed count increases).`,
-
-    'WO-008': `HOW TO TEST:\n1. Navigate to PMS > Work orders.\n2. Locate the vessel filter dropdown (top area of the page or global vessel selector).\n3. Select "Vessel 11" and note the work orders displayed.\n4. Switch to "Vessel 14" and VERIFY the list refreshes with different work orders.\n5. Switch to "All Vessels" (if available) and VERIFY work orders from multiple vessels appear.\n6. VERIFY: Tab counts update to reflect the selected vessel's data.`,
-
-    'WO-009': `HOW TO TEST:\n1. Navigate to PMS > Work orders and select a vessel.\n2. Locate the "Period" filter dropdown.\n3. Select different period options (e.g., "This Month", "This Quarter", "This Year").\n4. VERIFY: Work orders filter to show only items within the selected period.\n5. For RH-based periods (if available): select "RH - Next 250 hrs", "RH - Next 500 hrs", "RH - Next 1000 hrs".\n6. VERIFY: Only Running Hours-based work orders appear when an RH filter is selected, and only those within the specified threshold.\n7. Clear the period filter and VERIFY all work orders return.`,
-
-    'WO-010': `HOW TO TEST:\n1. Navigate to PMS > Work orders and select a vessel.\n2. Locate the "Rank" filter dropdown.\n3. VERIFY: The dropdown lists ranks/roles found in existing work orders (e.g., "Chief Engineer", "2nd Engineer", "Bosun").\n4. Select a rank (e.g., "Chief Engineer").\n5. VERIFY: Only work orders assigned to that rank are displayed.\n6. Clear the filter and VERIFY all work orders return.`,
-
-    'WO-011': `HOW TO TEST:\n1. Navigate to PMS > Work orders and select a vessel.\n2. Locate the "Criticality" filter dropdown.\n3. Select "Critical".\n4. VERIFY: Only work orders marked as critical (criticality = "Yes") are shown.\n5. Select "Non-Critical".\n6. VERIFY: Only non-critical work orders appear.\n7. Clear the filter and VERIFY all work orders return.`,
-
-    'WO-012': `HOW TO TEST:\n1. Navigate to PMS > Work orders and select a vessel.\n2. Apply multiple filters simultaneously:\n   - Set Period to a specific range\n   - Set Rank to a specific role\n   - Set Criticality to "Critical"\n   - Type a search term in the search bar\n3. VERIFY: Results reflect ALL filters combined (AND logic).\n4. VERIFY: Tab counts update to reflect the filtered subset.\n5. Clear one filter at a time and VERIFY the results expand appropriately.`,
-
-    'WO-013': `HOW TO TEST:\n1. Navigate to PMS > Work orders and select a vessel.\n2. Apply several filters (period, rank, criticality, search text).\n3. Look for a "Clear All" or "Clear Filters" button.\n4. Click it.\n5. VERIFY: All filters reset to their default (empty/all) state.\n6. VERIFY: The full unfiltered list of work orders reappears.\n7. VERIFY: The search bar is cleared.`,
-
-    'WO-014': `HOW TO TEST:\n1. Navigate to PMS > Work orders and select a vessel.\n2. Locate the search bar (magnifying glass icon).\n3. Type a work order code/number (e.g., "WO-702").\n4. VERIFY: The list filters to show only work orders matching the search term.\n5. VERIFY: Partial matches work (typing "702" shows all WOs containing "702").\n6. Clear the search and VERIFY all work orders return.`,
-
-    'WO-015': `HOW TO TEST:\n1. Navigate to PMS > Work orders and select a vessel.\n2. In the search bar, type a component name (e.g., "Separator" or "Pump").\n3. VERIFY: Work orders associated with components matching that name are displayed.\n4. VERIFY: The search matches against the "Component" column.\n5. Clear the search and VERIFY the full list returns.`,
-
-    'WO-016': `HOW TO TEST:\n1. Navigate to PMS > Work orders and select a vessel.\n2. In the search bar, type a job title (e.g., "Inspection" or "Overhaul").\n3. VERIFY: Work orders with matching job titles are displayed.\n4. VERIFY: Partial matches work.\n5. Clear the search and VERIFY the full list returns.`,
-
-    'WO-017': `HOW TO TEST:\n1. Navigate to PMS > Work orders and select a vessel with many work orders.\n2. Look at the bottom of the work orders table for pagination controls.\n3. VERIFY: Page navigation buttons appear (First, Previous, Next, Last or page numbers).\n4. VERIFY: An items-per-page dropdown is available (10, 25, 50, 100).\n5. Click "Next" and VERIFY the next page of work orders loads.\n6. Change items per page to 25 and VERIFY the page size changes.\n7. VERIFY: The current page indicator shows the correct page number.`,
-
-    'WO-018': `HOW TO TEST:\n1. Navigate to PMS > Work orders and select a vessel.\n2. Click on column headers in the work orders table to sort.\n3. Click "Due Date" header and VERIFY work orders sort by date.\n4. Click again to toggle between ascending/descending.\n5. Try sorting by "Work Order No" and VERIFY alphabetical/numeric sorting.\n6. Try sorting by "Status" and VERIFY grouping by status.\n7. VERIFY: A sort indicator (arrow up/down) appears on the active sort column.`,
-
-    'WO-019': `HOW TO TEST:\n1. Log in as a Sail Admin user.\n2. Navigate to PMS > Work orders and select a vessel.\n3. Look for an "Export" button (download icon) in the toolbar area.\n4. Click it and select "Excel" or "Export to Excel".\n5. VERIFY: An Excel (.xlsx) file downloads.\n6. Open the downloaded file.\n7. VERIFY: It contains columns matching the on-screen table (Work Order No, Job Title, Component, Assigned To, Due Date, Status, etc.).\n8. VERIFY: All work orders (not just the current page) are exported.\n9. VERIFY: The file name includes the vessel name and timestamp.`,
-
-    'WO-020': `HOW TO TEST:\n1. Log in as a Sail Admin user.\n2. Navigate to PMS > Work orders and select a vessel.\n3. Click the Export button and select "PDF" or "Export to PDF".\n4. VERIFY: A PDF file downloads (or opens in a new tab).\n5. VERIFY: The PDF contains a formatted table of work orders.\n6. VERIFY: Headers, vessel name, and date are included in the PDF.`,
-
-    'WO-021': `HOW TO TEST:\n1. Log in as a Sail Admin user.\n2. Navigate to PMS > Work orders and select a vessel.\n3. Look for "Distributed Jobs" export option in the Export menu.\n4. Click to export as Excel.\n5. VERIFY: The exported file contains jobs distributed/sorted by assigned rank.\n6. VERIFY: Jobs are grouped or separated by responsible person/rank.`,
-
-    'WO-022': `HOW TO TEST:\n1. Log in as a Sail Admin user.\n2. Navigate to PMS > Work orders and select a vessel.\n3. Export Distributed Jobs as PDF.\n4. VERIFY: A PDF file downloads with jobs organized by assigned rank.\n5. VERIFY: The PDF is properly formatted for printing/distribution.`,
-
-    'WO-023': `HOW TO TEST:\n1. Log in as a NON-Sail Admin user (e.g., Client Admin, Vessel User, or Head of Dept).\n2. Navigate to PMS > Work orders.\n3. Look for the Export button in the toolbar.\n4. VERIFY: The Export button is NOT visible for this user role.\n5. VERIFY: There is no way to trigger Excel/PDF export.\n6. Log in as Sail Admin and VERIFY the Export button IS visible.`,
-
-    'WO-024': `HOW TO TEST:\n1. Navigate to PMS > Work orders and select a vessel.\n2. Look at the Status column in the work orders table.\n3. VERIFY badge colors match these statuses:\n   - "Planned" / "Active" = sky blue\n   - "Due" = yellow\n   - "Due (Grace P)" = orange\n   - "Overdue" = red\n   - "Pending Approval" = purple\n   - "Completed" = green\n   - "Postponed" = blue\n   - "Rejected" = red\n   - "Draft" = gray\n4. VERIFY: Each status has a distinct, readable color badge.\n5. VERIFY: Badge text matches the actual status.`,
-
-    'WO-025': `HOW TO TEST:\n1. Navigate to PMS > Work orders and select a vessel.\n2. Look for a work order count display (e.g., "Showing 1-10 of 145" at the bottom, or tab counts).\n3. VERIFY: The total count is visible and accurate.\n4. Apply a filter and VERIFY the count updates to reflect filtered results.\n5. VERIFY: Tab count badges sum up correctly.`,
-
-    'WO-026': `HOW TO TEST:\n1. Navigate to PMS > Work orders.\n2. Look for a "+ Add Work Order" or "Create Work Order" button (plus icon in toolbar).\n3. Click it.\n4. VERIFY: A new work order creation form opens.\n5. VERIFY: The form has fields for: Component, Job, Assigned To, Due Date, etc.\n6. VERIFY: Some fields may auto-populate based on selected component/job.`,
-
-    'WO-027': `HOW TO TEST:\n1. Start creating a new work order (click "+ Add Work Order").\n2. In the "Component" dropdown or selector, browse the available components.\n3. Select a component (e.g., "702.005.01 - FO Separators No.01").\n4. VERIFY: The component is selected and displayed in the field.\n5. VERIFY: Selecting a component may filter the available jobs to only those associated with that component.`,
-
-    'WO-028': `HOW TO TEST:\n1. Start creating a new work order.\n2. First select a component.\n3. Then look at the "Job" dropdown.\n4. VERIFY: Only jobs associated with the selected component are shown.\n5. Select a job.\n6. VERIFY: The job details (title, maintenance basis, frequency) are reflected in the form.\n7. Change the component and VERIFY the job dropdown updates to show the new component's jobs.`,
-
-    'WO-029': `HOW TO TEST:\n1. Start creating a new work order.\n2. Select a component and a job.\n3. VERIFY: The following fields auto-populate based on the job:\n   - Job Title\n   - Maintenance Basis (Calendar or Running Hours)\n   - Frequency Value and Unit\n   - Assigned To (from job default)\n   - Criticality (from component)\n4. VERIFY: Auto-populated fields can still be manually overridden if needed.`,
-
-    'WO-030': `HOW TO TEST:\n1. Start creating a new work order.\n2. Leave the Component field empty and click Save.\n3. VERIFY: A validation error appears for the Component field.\n4. Select a component but leave the Job field empty and click Save.\n5. VERIFY: A validation error appears for the Job field.\n6. Fill all required fields and click Save.\n7. VERIFY: No validation errors — the work order saves successfully.`,
-
-    'WO-031': `HOW TO TEST:\n1. Create a new work order by selecting a component and job.\n2. After saving, look at the generated Work Order number/code.\n3. VERIFY: The code follows the template format (e.g., "WO-702.005.01-INS-M3" based on component code, task type, and frequency).\n4. VERIFY: Each new work order gets a unique code.\n5. Create another work order for the same component and VERIFY the codes are different.`,
-
-    'WO-032': `HOW TO TEST:\n1. Navigate to PMS > Work orders and select a vessel.\n2. Click on any work order row in the table.\n3. VERIFY: The work order detail page opens (full-screen view).\n4. VERIFY: The URL changes to /pms/work-order/{id}.\n5. VERIFY: The detail page shows comprehensive work order information.`,
-
-    'WO-033': `HOW TO TEST:\n1. Open a work order by clicking on it in the list.\n2. Look for "Part A - Job Details" section.\n3. VERIFY: Part A displays:\n   - Component name and code\n   - Job title\n   - Work order number / template code\n   - Maintenance basis (Calendar/RH)\n   - Frequency\n   - Due date / due reading\n   - Assigned to\n   - Criticality\n   - Job description/instructions\n4. VERIFY: All fields show data (no "undefined" or empty for fields that should have values).`,
-
-    'WO-034': `HOW TO TEST:\n1. Open a work order (preferably one in "Due" or "Overdue" status).\n2. Look for "Part B - Completion" section.\n3. VERIFY: Part B displays or allows entry of:\n   - Date work completed\n   - Work done description\n   - Current reading (for RH-based WOs)\n   - Materials/spares used\n   - Remarks\n   - Attachments section\n4. VERIFY: For Planned/Active WOs, Part B fields are editable.\n5. VERIFY: For Completed WOs, Part B shows saved completion data.`,
-
-    'WO-035': `HOW TO TEST:\n1. Open a work order detail page.\n2. Look for a "Work History" or "A4 - History" section.\n3. VERIFY: Previous completions for the same job/component are listed.\n4. VERIFY: Each history entry shows: date completed, work done, who completed it.\n5. VERIFY: History is sorted by date (most recent first).\n6. VERIFY: If no history exists, an appropriate message is shown.`,
-
-    'WO-036': `HOW TO TEST:\n1. Navigate to PMS > Work orders.\n2. Click on a work order that has "Planned" or "Active" status.\n3. VERIFY: The form fields are editable (not locked).\n4. Modify a field (e.g., change the Assigned To).\n5. Save the changes.\n6. VERIFY: A success message appears.\n7. Reopen the work order and VERIFY the change persisted.`,
-
-    'WO-037': `HOW TO TEST:\n1. Navigate to PMS > Work orders > Completed tab.\n2. Click on a completed work order.\n3. VERIFY: The form fields are read-only/locked (grayed out or no edit controls).\n4. Try to modify any field.\n5. VERIFY: Modifications are not possible — the form prevents edits.\n6. VERIFY: A visual indicator shows the WO is locked (e.g., lock icon or "Completed" badge).`,
-
-    'WO-038': `HOW TO TEST:\n1. Navigate to PMS > Work orders > Pending Approval tab.\n2. Click on a pending approval work order.\n3. VERIFY: The completion data (Part B) is read-only.\n4. Try to modify Part B fields.\n5. VERIFY: Modifications are blocked — the WO is locked pending superintendent review.\n6. VERIFY: Only the Approve/Reject buttons are actionable.`,
-
-    'WO-039': `HOW TO TEST:\n1. Open a work order in "Due" or "Overdue" status.\n2. In Part B (Completion section), find the "Start Date" field.\n3. Enter a start date.\n4. VERIFY: The date picker allows selecting a valid date.\n5. VERIFY: The start date cannot be in the future (if validation exists).\n6. VERIFY: The start date saves correctly.`,
-
-    'WO-040': `HOW TO TEST:\n1. Open a work order and go to Part B - Completion.\n2. Fill in the "Date Completed" or "Completion Date" field.\n3. VERIFY: The date can be entered via date picker.\n4. VERIFY: Completion date must be on or after the start date (if both fields exist).\n5. Fill in the "Work Done" description.\n6. VERIFY: The text area accepts multi-line input.`,
-
-    'WO-041': `HOW TO TEST:\n1. Open a Running Hours-based work order.\n2. In Part B, find the "Current Reading" field.\n3. Enter the current running hours value.\n4. VERIFY: Only numeric values are accepted.\n5. VERIFY: The value must be greater than or equal to the previous reading.\n6. VERIFY: The field shows the unit "hrs" or similar indicator.`,
-
-    'WO-042': `HOW TO TEST:\n1. Open a work order in Due/Overdue status.\n2. Fill in Part B1 completion fields (start date, work done, etc.).\n3. VERIFY: Part B1 contains the basic completion information.\n4. Look for Part B2 section (additional completion details).\n5. Fill in Part B2 fields if present.\n6. VERIFY: Both sections are required before submission.`,
-
-    'WO-043': `HOW TO TEST:\n1. Open a work order and fill Part B completion fields.\n2. Click "Submit for Approval" button.\n3. VERIFY: A confirmation dialog appears.\n4. Confirm the submission.\n5. VERIFY: The work order status changes to "Pending Approval".\n6. VERIFY: The WO moves from Due/Overdue tab to the Pending Approval tab.\n7. VERIFY: A success toast message appears.`,
-
-    'WO-044': `HOW TO TEST:\n1. Open a work order and fill Part B completion.\n2. For Calendar-based WOs, after submission and approval, check the next due date.\n3. VERIFY: The next due date = completion date + frequency (e.g., if frequency is 3 months and completed on Jan 15, next due is Apr 15).\n4. VERIFY: The next due date is calculated automatically.`,
-
-    'WO-045': `HOW TO TEST:\n1. Open an RH-based work order and complete it.\n2. Enter a current reading (e.g., 5000 hrs).\n3. Submit and get it approved.\n4. VERIFY: The next due reading = current reading + frequency (e.g., if frequency is 500 RH and current is 5000, next due is 5500).\n5. VERIFY: The calculation appears in the work order details.`,
-  };
-
-  if (instructions[id]) return instructions[id];
-
-  const num = parseInt(id.replace('WO-', ''));
-  
-  if (num >= 46 && num <= 62) {
-    return generateWOCompletionTest(id, num, section, scenario, steps, testData, expected);
-  }
-  if (num >= 63 && num <= 69) {
-    return generateWOLayer1Test(id, num, section, scenario, steps, testData, expected);
-  }
-  if (num >= 70 && num <= 82) {
-    return generateWOLayer2Test(id, num, section, scenario, steps, testData, expected);
-  }
-  if (num >= 83 && num <= 91) {
-    return generateWOLayer3Test(id, num, section, scenario, steps, testData, expected);
-  }
-  if (num >= 92 && num <= 97) {
-    return generateWOLayer4Test(id, num, section, scenario, steps, testData, expected);
-  }
-  if (num >= 98 && num <= 102) {
-    return generateWOLayer5Test(id, num, section, scenario, steps, testData, expected);
-  }
-  if (num >= 103 && num <= 114) {
-    return generateWOLayer6Test(id, num, section, scenario, steps, testData, expected);
-  }
-  if (num >= 115 && num <= 136) {
-    return generateWOLayer7Test(id, num, section, scenario, steps, testData, expected);
-  }
-  if (num >= 137 && num <= 144) {
-    return generateWOApprovalTest(id, num, section, scenario, steps, testData, expected);
-  }
-  if (num >= 145 && num <= 153) {
-    return generateWOAttachmentTest(id, num, section, scenario, steps, testData, expected);
-  }
-  if (num >= 154 && num <= 168) {
-    return generateWOMiscTest(id, num, section, scenario, steps, testData, expected);
+  if (n >= 2 && n <= 5) {
+    const sizes = { 2: '10', 3: '25', 4: '50', 5: '100' };
+    const size = sizes[n];
+    return fmt(id, scenario,
+      `Verify that the component list displays exactly ${size} items per page when the "${size}" page size is selected.`,
+      ['Log in to RSMS.', `Navigate to ${nav}.`, 'Select a vessel with many components (50+ components).'],
+      ['Locate the items-per-page dropdown at the bottom of the component tree or table.', `Select "${size}" from the dropdown.`],
+      ['Count the number of visible top-level items in the current page.'],
+      ['Click Next/Previous page buttons to verify pagination navigation.'],
+      [['Items Displayed', `Exactly ${size} items (or fewer on the last page) are shown`],
+       ['Page Controls', 'Next/Previous buttons are functional and update the view'],
+       ['Page Indicator', `Shows correct page number (e.g., "Page 1 of X")`]],
+      ['Items-per-page dropdown retains the selected value after page navigation', 'No duplicate items appear across pages', 'Smooth page transitions without flickering'],
+      ['Select the last page — verify it shows the remaining items (possibly fewer than ' + size + ').', 'Note: The current RSMS component view uses an expandable tree structure. If no explicit pagination dropdown exists, document "Tree view — pagination not applicable" in Comments.']
+    );
   }
 
-  return `HOW TO TEST:\n1. Navigate to PMS > Work orders from the sidebar.\n2. ${steps.replace(/\n/g, '\n')}\nVERIFY: ${expected}`;
+  if (n === 6) return fmt(id, scenario,
+    'Verify that components can be sorted by component code in ascending and descending order.',
+    ['Log in to RSMS.', `Navigate to ${nav}.`, 'Select a vessel to load components.'],
+    ['Click on the "Code" column header in the component list/tree.'],
+    ['Observe the sort order of components.', 'Click the "Code" column header again to toggle sort direction.'],
+    ['Verify both ascending and descending sort orders.'],
+    [['First Click', 'Components sort in ascending order by code (101, 102, 201, 301, etc.)'],
+     ['Second Click', 'Components sort in descending order by code (901, 801, 701, etc.)'],
+     ['Sort Indicator', 'An arrow icon (▲/▼) appears on the Code column header']],
+    ['Sort order persists when navigating between pages (if paginated)', 'No data loss or duplication after sorting', 'Sort indicator is visually clear'],
+    ['Sort by code, then apply a search filter — verify the filter works on the sorted data.', 'Sort while the tree is expanded — verify child components maintain proper hierarchy.']
+  );
+
+  if (n === 7) return fmt(id, scenario,
+    'Verify that components can be sorted by component name in ascending and descending order.',
+    ['Log in to RSMS.', `Navigate to ${nav}.`, 'Select a vessel to load components.'],
+    ['Click on the "Name" column header.'],
+    ['Observe the sort order — components should rearrange alphabetically.', 'Click again to toggle to reverse alphabetical.'],
+    [],
+    [['First Click', 'Components sort A-Z by name'],
+     ['Second Click', 'Components sort Z-A by name'],
+     ['Sort Indicator', 'Arrow icon appears on the Name column header']],
+    ['Sort is case-insensitive', 'No data loss after sorting', 'Sort indicator is visible'],
+    ['Sort by name, then switch vessel — verify new vessel data also loads sorted.', 'If name sorting is not supported in the tree view, document this in Comments.']
+  );
+
+  if (n === 8) return fmt(id, scenario,
+    'Verify that searching by component code filters the component tree to show only matching results.',
+    ['Log in to RSMS.', `Navigate to ${nav}.`, 'Select a vessel to load components.'],
+    ['Locate the search bar at the top of the component tree panel (magnifying glass icon).', 'Type a known component code (e.g., "702.005") into the search bar.'],
+    ['Observe the tree filtering in real-time as you type.'],
+    ['Clear the search field and verify the full tree reappears.'],
+    [['Search Results', 'Tree filters to show only components whose code matches or contains "702.005"'],
+     ['Parent Expansion', 'Parent nodes auto-expand to reveal matching child components'],
+     ['Clear Search', 'Full tree reappears when the search field is cleared'],
+     ['Result Count', 'Component count updates to reflect filtered results']],
+    ['Search updates as the user types (real-time filtering)', 'No error messages during search', 'Empty search shows all components'],
+    ['Search for a code that does not exist — verify "No results" or empty state is shown.', 'Search with special characters (e.g., ".") — verify it works correctly.', 'Search, then navigate to component detail and back — verify search text is preserved.']
+  );
+
+  if (n === 9) return fmt(id, scenario,
+    'Verify that searching by component name filters the component tree to show only matching results.',
+    ['Log in to RSMS.', `Navigate to ${nav}.`, 'Select a vessel to load components.'],
+    ['In the search bar, type a component name keyword (e.g., "pump" or "separator").'],
+    ['Observe the tree filtering to show matching components.'],
+    ['Clear the search and verify the full tree returns.'],
+    [['Search Results', 'Tree shows only components whose name contains the search text'],
+     ['Matching', 'Search is case-insensitive — "Pump" and "pump" return same results'],
+     ['Clear', 'Full tree reappears when search field is cleared']],
+    ['Partial matches work (typing "sep" shows "Separator")', 'Parent nodes auto-expand for matching children', 'No errors during name search'],
+    ['Search for a name with spaces (e.g., "Main Engine") — verify multi-word search works.', 'Search with very long text (100+ chars) — verify no UI breakage.']
+  );
+
+  if (n === 10) return fmt(id, scenario,
+    'Verify that selecting a different vessel from the dropdown correctly filters and loads components for that vessel.',
+    ['Log in to RSMS.', `Navigate to ${nav}.`],
+    ['Select a vessel from the vessel dropdown (e.g., "Vessel 11").', 'Wait for components to load.', 'Note the component count and tree structure.'],
+    ['Switch to a different vessel (e.g., "Vessel 14") using the dropdown.'],
+    ['Verify the tree refreshes with the new vessel\'s components.'],
+    [['Tree Refresh', 'Component tree updates to show components for the newly selected vessel'],
+     ['Count Update', 'Component count changes to reflect the new vessel\'s total'],
+     ['Data Isolation', 'No components from the previous vessel appear in the new list']],
+    ['Vessel dropdown retains the selected vessel after page interactions', 'Component details panel clears or updates when vessel changes', 'No loading errors during vessel switch'],
+    ['Rapidly switch between vessels — verify no race condition or mixed data.', 'Select a vessel with zero components — verify empty state is shown.']
+  );
+
+  if (n === 11) return fmt(id, scenario,
+    'Verify that components can be filtered by maintenance basis type (Calendar vs Running Hours).',
+    ['Log in to RSMS.', `Navigate to ${nav}.`, 'Select a vessel.'],
+    ['Look for a "Maintenance Basis" filter dropdown or checkbox near the component tree.', 'Select "Calendar" from the filter.'],
+    ['Observe the filtered component list.', 'Switch the filter to "Running Hours".'],
+    ['Clear the filter and verify all components reappear.'],
+    [['Calendar Filter', 'Only calendar-based maintenance components are shown'],
+     ['Running Hours Filter', 'Only RH-based maintenance components are shown'],
+     ['Clear Filter', 'All components reappear when the filter is removed']],
+    ['Filter count updates to reflect filtered results', 'No UI errors when switching filters', 'Filter state is visually indicated'],
+    ['Note: Maintenance basis is a Job-level concept in RSMS. If this filter does not exist at the Component list level, document "Filter not available — maintenance basis is at Job level" in Comments.']
+  );
+
+  if (n === 12) return fmt(id, scenario,
+    'Verify that the total component count is displayed and updates dynamically when filters are applied.',
+    ['Log in to RSMS.', `Navigate to ${nav}.`, 'Select a vessel.'],
+    ['Look for a total count display near the top of the tree panel (e.g., "Total Components: 3622").'],
+    ['Apply a search filter (e.g., type "pump" in the search bar).'],
+    ['Clear the filter and verify the count returns to the original total.'],
+    [['Count Visibility', 'Total component count is visible in the header area of the tree panel'],
+     ['Count Accuracy', 'Count matches the actual number of components loaded'],
+     ['Count Update', 'Count dynamically updates when search or filters are applied'],
+     ['Count Reset', 'Count returns to original total when filters are cleared']],
+    ['Count is a non-negative integer', 'Count does not show "NaN" or "undefined"', 'Count updates immediately (not after a delay)'],
+    ['Apply multiple filters simultaneously — verify count reflects the combined filter result.', 'Switch vessel — verify count updates to new vessel\'s total.']
+  );
+
+  if (n === 13) return fmt(id, scenario,
+    'Verify that the Components page layout adapts correctly to different screen sizes (desktop, tablet, mobile).',
+    ['Log in to RSMS.', `Navigate to ${nav}.`, 'Select a vessel to load components.'],
+    ['View the page on a desktop browser at full width (1920px).', 'Verify the two-panel layout: tree on left, details on right.'],
+    ['Resize the browser to tablet width (768px).', 'Verify layout adapts — panels may stack vertically or tree may collapse.'],
+    ['Resize to mobile width (375px).', 'Verify content is accessible and readable.'],
+    [['Desktop (1920px)', 'Two-panel layout: tree on left, details on right. Full width utilized.'],
+     ['Tablet (768px)', 'Layout adjusts — panels stack or tree collapses. All content accessible.'],
+     ['Mobile (375px)', 'Content stacks vertically. No horizontal scrollbar overflow. Buttons tappable.']],
+    ['No overlapping elements at any screen size', 'All buttons and interactive elements remain clickable/tappable', 'Text is readable without zooming', 'No horizontal scroll overflow'],
+    ['Rotate a tablet between portrait and landscape — verify layout adjusts.', 'On mobile, verify the sidebar menu is accessible via hamburger icon.']
+  );
+
+  if (n === 14) return fmt(id, scenario,
+    'Verify that clicking the "Add / Edit Component" button opens the component registration form with all sections visible.',
+    ['Log in to RSMS.', `Navigate to ${nav}.`, 'Select a vessel.'],
+    ['Locate the pencil icon (Edit Components) button in the header area of the Components page.', 'Click the button.'],
+    [],
+    ['Verify the Add/Edit Component form opens.'],
+    [['Form Opens', 'Add/Edit Component form opens showing a component tree on the left and a blank form on the right'],
+     ['Section A', 'Component Information section is visible with all fields'],
+     ['Section B', 'Running Hours & Condition Monitoring section is visible (collapsible)'],
+     ['Section C', 'Jobs section is visible (collapsible)'],
+     ['Save Button', '"Save" button is visible at the bottom of the form'],
+     ['Back Button', 'Back arrow button is visible at top-left']],
+    ['All form fields are empty/default for a new component', 'Form layout is clean with no overlapping elements', 'Section headers are clickable to expand/collapse'],
+    ['Open the form while no vessel is selected — verify the system prompts vessel selection or shows an error.', 'Open the form on a mobile device — verify the form is usable with smaller screen.']
+  );
+
+  if (n === 15) return fmt(id, scenario,
+    'Verify that a new component can be created successfully when all mandatory fields are filled in correctly.',
+    ['Log in to RSMS.', `Navigate to ${nav}.`, 'Click the Edit Components (pencil) button to open the Add/Edit Component form.'],
+    ['In the component tree on the left, click a parent component (e.g., "702 - Fuel Oil System") to set it as the parent.', 'Fill in mandatory fields:', '  - Component Name: "Test Component ABC"', '  - Equipment/System Department: Select "Engine" from dropdown', '  - Criticality: Select "Yes" or "No"'],
+    ['Fill optional fields as desired (Maker, Model, Serial No, etc.).'],
+    ['Click the "Save" button at the bottom of the form.'],
+    [['Auto-Generated Code', 'Component Code is auto-generated based on parent (e.g., "702.006")'],
+     ['Success Message', 'Green success toast notification appears ("Component saved successfully")'],
+     ['Tree Update', 'New component appears in the tree under the selected parent'],
+     ['Form State', 'Form either clears for next entry or shows the saved component in edit mode']],
+    ['All mandatory fields are validated before save', 'Auto-generated code follows hierarchical format', 'No duplicate codes are created', 'Success toast auto-dismisses after a few seconds'],
+    ['Try saving with all fields at their minimum valid values.', 'Try saving with extremely long component name (200+ chars) — verify it saves.', 'Try rapid double-click on Save — verify no duplicate component is created.']
+  );
+
+  if (n === 16) return fmt(id, scenario,
+    'Verify that form validation prevents saving when mandatory fields are left empty.',
+    ['Log in to RSMS.', `Navigate to ${nav}.`, 'Open the Add/Edit Component form.'],
+    ['Select a parent component in the tree.', 'Leave the Component Name field empty.', 'Leave the Equipment/System Department as "Select" (no selection).'],
+    [],
+    ['Click the "Save" button.'],
+    [['Validation Errors', 'Red border/text appears around each empty required field'],
+     ['Error Messages', '"This field is required" message appears next to each missing mandatory field'],
+     ['Save Blocked', 'Form does NOT save — no success message appears'],
+     ['Focus', 'Focus may jump to the first invalid field']],
+    ['All mandatory fields show validation errors simultaneously', 'Error messages are descriptive and clear', 'Form data entered in optional fields is preserved (not cleared)'],
+    ['Fill one mandatory field but leave others empty — verify per-field validation works.', 'Fill all fields, clear one, then save — verify only the cleared field shows error.']
+  );
+
+  if (n >= 17 && n <= 19) {
+    const validationScenarios = {
+      17: { goal: 'Verify that the component code field enforces the correct hierarchical format.', action: 'Try to manually type an invalid code format (e.g., "ABC" or "1.2.3.4.5.6").', checks: [['Invalid Code Input', 'System prevents invalid input, shows validation error, or code field is read-only/auto-generated'], ['Valid Format', 'Codes follow hierarchical format (e.g., "X01", "X01.001", "X01.001.01")']], edge: 'If the code field is read-only (auto-generated), document this behavior in Comments.' },
+      18: { goal: 'Verify that the system prevents duplicate component codes from being created.', action: 'Manually change the component code to match an existing component\'s code (e.g., "702.005.01").', checks: [['Duplicate Error', 'System shows error message indicating the component code already exists'], ['Save Blocked', 'Form does NOT save with a duplicate code']], edge: 'Try creating two new components simultaneously (two browser tabs) with the same code — verify at least one fails.' },
+      19: { goal: 'Verify that component name field enforces proper length constraints (minimum and maximum).', action: 'Type a very short name (1 character "A"), then a very long name (200+ characters).', checks: [['Min Length', 'If minimum length validation exists, an error appears for 1-char names'], ['Max Length', 'If max length exists, an error appears for 200+ char names; otherwise saves correctly']], edge: 'Try pasting a name with only whitespace — verify it is rejected or trimmed.' },
+    };
+    const v = validationScenarios[n];
+    return fmt(id, scenario, v.goal,
+      ['Log in to RSMS.', `Navigate to ${nav}.`, 'Open the Add/Edit Component form.', 'Select a parent component.'],
+      [v.action, 'Fill in all other required fields.'],
+      [],
+      ['Click "Save" and observe the result.'],
+      v.checks,
+      ['Error messages are clear and specific', 'Form does not save with invalid data', 'No backend errors appear'],
+      [v.edge]
+    );
+  }
+
+  if (n >= 20 && n <= 21) {
+    const basis = n === 20 ? 'Calendar' : 'Running Hours';
+    const freq = n === 20 ? '"3 Months" and a due date' : '"500 RH"';
+    return fmt(id, scenario,
+      `Verify that a component can be created with ${basis}-based maintenance jobs.`,
+      ['Log in to RSMS.', `Navigate to ${nav}.`, 'Open the Add/Edit Component form.', 'Select a parent component and fill all required fields.'],
+      ['Save the component.', `Navigate to the Jobs section (Section C) of the saved component.`, `Add a new job with maintenance basis set to "${basis}".`],
+      [`Set the frequency to ${freq}.`, 'Fill in job title and assigned rank.'],
+      ['Save the job.'],
+      [[`Job Created`, `Job is created with ${basis} basis`],
+       ['Job Display', `Job appears in the component\'s jobs list showing "${basis}" as the maintenance type`],
+       ['Frequency', `Frequency shows "${freq.replace(/"/g, '')}"`]],
+      ['Job is correctly linked to the component', `${basis} badge is displayed on the job`, 'No errors during job creation'],
+      [`Create a job with ${basis} basis and a frequency of 0 — verify validation prevents this.`, `Create multiple jobs on the same component with different ${basis} frequencies — verify all save correctly.`]
+    );
+  }
+
+  if (n >= 22 && n <= 24) {
+    const fields = {
+      22: { field: 'Class Item', values: 'Yes/No', check: [['Set to Yes', 'Class Item field shows "Yes" when viewing the saved component'], ['Set to No', 'Class Item field correctly shows "No"'], ['Persistence', 'Selection persists after save and reload']] },
+      23: { field: 'Equipment / System Department', values: 'Engine, Deck, Electrical, Galley, LSA, FFA', check: [['Dropdown Options', 'Shows all options: Engine, Deck, Electrical, Galley, LSA, FFA'], ['Selection', 'Selected value is highlighted/displayed in the dropdown'], ['Persistence', 'Department selection persists after save and reload']] },
+      24: { field: 'Criticality', values: 'Yes/No', check: [['Critical (Yes)', 'Component shows criticality indicator (red badge or "Yes" label)'], ['Non-Critical (No)', 'Criticality indicator shows "No" or gray badge'], ['Persistence', 'Criticality selection persists after save and reload']] },
+    };
+    const f = fields[n];
+    return fmt(id, scenario,
+      `Verify that the "${f.field}" dropdown works correctly and persists selections after save.`,
+      ['Log in to RSMS.', `Navigate to ${nav}.`, 'Open the Add/Edit Component form.', 'Select a parent component.'],
+      [`Locate the "${f.field}" dropdown in the form.`, `Click the dropdown and verify it shows options: ${f.values}.`, 'Select one option.'],
+      ['Fill in remaining required fields.'],
+      ['Click "Save".', 'Reopen the component and verify the selection persisted.'],
+      f.check,
+      ['Dropdown opens and closes smoothly', 'Selected value is visually confirmed', 'No unexpected resets of the field'],
+      [`Change the ${f.field} value, save, then change it again — verify each change persists correctly.`, `Open two components side-by-side (if possible) and set different ${f.field} values — verify no cross-contamination.`]
+    );
+  }
+
+  if (n >= 25 && n <= 28) {
+    const scenarios = {
+      25: { goal: 'Verify the Save button works correctly — shows loading state, triggers success toast, and persists data.', action: ['Fill in all required fields for a new component.', 'Click the "Save" button.'], checks: [['Loading State', 'Button shows a spinner/loading indicator while saving'], ['Success Toast', 'Green success toast appears after save completes'], ['Data Persistence', 'Reopening the component shows all saved values'], ['Idempotent', 'Clicking Save again with no changes still succeeds']], edge: 'Click Save rapidly multiple times — verify no duplicate components are created.' },
+      26: { goal: 'Verify the Back/Cancel button discards unsaved changes and returns to the component tree.', action: ['Begin filling in fields (type a name, select a department).', 'Click the "Back" arrow button (top-left of the form).'], checks: [['Navigation', 'Form closes and user returns to the main Components tree view'], ['Data Discarded', 'Partially entered data is NOT saved — form shows blank when reopened'], ['No Errors', 'No error messages appear during cancellation']], edge: 'Fill in all fields, press browser Back button instead — verify the same behavior.' },
+      27: { goal: 'Verify that a success notification appears after saving a component.', action: ['Fill in all required fields and click "Save".'], checks: [['Toast Appears', 'Green success toast notification appears at the screen edge'], ['Toast Text', 'Message reads "Component saved successfully" or similar'], ['Auto-Dismiss', 'Toast auto-dismisses after a few seconds or can be manually closed']], edge: 'Save multiple components in quick succession — verify each shows its own toast.' },
+      28: { goal: 'Verify correct post-save navigation — user can find the newly created component.', action: ['Create and save a new component.', 'After save, observe navigation behavior.'], checks: [['Redirect', 'User is either redirected to component tree or stays in edit mode showing saved component'], ['Visibility', 'Newly created component is visible in the component tree'], ['Clickable', 'Clicking the new component in the tree shows its details']], edge: 'Create a component, navigate away, then return to Components — verify the new component is still there.' },
+    };
+    const s = scenarios[n];
+    return fmt(id, scenario, s.goal,
+      ['Log in to RSMS.', `Navigate to ${nav}.`, 'Open the Add/Edit Component form.', 'Select a parent component.'],
+      s.action, [], [],
+      s.checks,
+      ['No UI errors or console errors', 'Smooth user experience', 'Data integrity maintained'],
+      [s.edge]
+    );
+  }
+
+  if (n >= 29 && n <= 33) {
+    const editScenarios = {
+      29: { goal: 'Verify that clicking on an existing component opens it in editing mode with all data pre-loaded.', setup: ['Select a vessel and click on a component in the tree (e.g., "702.005.01 - FO Separators No.01").'], action: ['Look for the Edit Components (pencil) button or "+ Add / Edit Component" button.', 'Click it to open the component in editing mode.'], checks: [['Form Opens', 'Add/Edit Component form opens with the selected component pre-loaded'], ['Fields Populated', 'All fields show the component\'s existing data'], ['Tree Highlight', 'Component tree on the left highlights the component being edited']], edge: 'Open edit mode for a component, then click a different component in the tree — verify the form updates to the newly selected component.' },
+      30: { goal: 'Verify that all component fields display their correct saved values when opened in edit mode.', setup: ['Select a vessel and open an existing component in edit mode.'], action: ['Examine each field in the form and compare with the expected saved values.'], checks: [['Component Code', 'Matches saved code (e.g., "702.005.01")'], ['Component Name', 'Matches saved name (e.g., "FO Separators No.01")'], ['Department', 'Dropdown shows saved department (Engine/Deck/etc.)'], ['Criticality', 'Shows saved value (Yes/No)'], ['Maker/Model/Serial', 'Show saved values or blank if not set'], ['Running Hours', 'Shows current RH value for RH-tracked components']], edge: 'Open a component with all optional fields empty — verify no "undefined" or "null" appears.' },
+      31: { goal: 'Verify that the component name can be modified and the change persists after save.', setup: ['Select a vessel and open an existing component in edit mode.'], action: ['Locate the Component Name field.', 'Change the name (e.g., append " - Updated").', 'Click "Save".'], checks: [['Success Toast', 'Success toast appears'], ['Tree Update', 'Component tree updates to show the new name'], ['Persistence', 'Reopening the component shows the updated name']], edge: 'Change the name to be identical to another component\'s name — verify whether duplicates are allowed for names.' },
+      32: { goal: 'Verify that modifications to component fields (maker, model, etc.) persist after save.', setup: ['Select a vessel and open an existing component in edit mode.'], action: ['Modify one or more fields (e.g., change the maker, update the model).', 'Click "Save".'], checks: [['Success Message', 'Success toast appears'], ['Changes Persisted', 'Close and reopen — modified fields show new values'], ['Other Fields', 'Unmodified fields retain their original values']], edge: 'Modify a field, save, immediately modify another field, save again — verify both changes persist.' },
+      33: { goal: 'Verify that clicking Back/Cancel without saving discards all unsaved edits.', setup: ['Select a vessel and open an existing component in edit mode.'], action: ['Modify some fields (change name, maker, etc.).', 'Click the "Back" arrow button instead of Save.'], checks: [['Return', 'User returns to the Components tree view'], ['Data Unchanged', 'Clicking the same component shows original values — edits NOT saved'], ['No Partial Save', 'No partial data was persisted']], edge: 'Modify fields, navigate away using sidebar menu instead of Back button — verify changes are discarded.' },
+    };
+    const s = editScenarios[n];
+    return fmt(id, scenario, s.goal,
+      ['Log in to RSMS.', `Navigate to ${nav}.`, ...s.setup],
+      s.action, [], [],
+      s.checks,
+      ['No UI errors during edit operations', 'Form is responsive and interactive', 'No unexpected field resets'],
+      [s.edge]
+    );
+  }
+
+  if (n >= 34 && n <= 40) {
+    const miscScenarios = {
+      34: { goal: 'Verify that the component code cannot be changed when the component has associated jobs/work orders.', action: 'Try to modify the Component Code field in the edit form.', checks: [['Code Field', 'Component Code field is read-only (grayed out) or shows a warning when jobs exist'], ['Save Blocked', 'If code is changed, save is blocked with error message']], edge: 'Try changing code on a component with only completed (historical) WOs.' },
+      35: { goal: 'Verify that a clear confirmation/success message appears after updating a component.', action: 'Make a change and click "Save".', checks: [['Message Appears', 'Confirmation/success message is displayed'], ['Message Text', 'Text is clear (e.g., "Component updated successfully")'], ['Auto-Dismiss', 'Toast auto-dismisses after a few seconds']], edge: 'Save two different components quickly — verify each gets its own success message.' },
+      36: { goal: 'Verify that a component with no associated jobs can be deleted successfully.', action: 'Create a test component with no jobs, then click Delete button.', checks: [['Confirmation', 'Confirmation dialog appears asking "Are you sure?"'], ['Deletion', 'Component is removed from the tree after confirming'], ['Success Message', 'Success message confirms deletion']], edge: 'Delete the component, then immediately try to search for it — verify it no longer appears.' },
+      37: { goal: 'Verify that the system prevents deletion of components with active work orders.', action: 'Select a component with active/planned work orders and try to delete.', checks: [['Error Message', 'System prevents deletion with clear message (e.g., "Cannot delete: component has active work orders")'], ['Component Retained', 'Component remains in the tree — NOT deleted']], edge: 'Try deleting a parent component whose children have active WOs.' },
+      38: { goal: 'Verify the system behavior when deleting a component with only completed (historical) work orders.', action: 'Select a component with only completed WOs and try to delete.', checks: [['System Behavior', 'System either allows deletion (with warning) or prevents it (to preserve records)'], ['History Handling', 'Historical records are handled appropriately']], edge: 'Document the actual behavior — does the system allow or prevent deletion when only completed jobs exist?' },
+      39: { goal: 'Verify that a confirmation dialog appears before component deletion.', action: 'Click the Delete button on a component.', checks: [['Dialog Appears', 'Confirmation dialog/modal appears before deletion'], ['Dialog Content', 'Dialog states what will be deleted (component name/code)'], ['Two Buttons', 'Both "Confirm" and "Cancel" buttons are present']], edge: 'Press Escape key when the dialog is open — verify it closes without deleting.' },
+      40: { goal: 'Verify that clicking Cancel on the delete confirmation preserves the component.', action: 'Click Delete, then click "Cancel" on the confirmation dialog.', checks: [['Dialog Closes', 'Confirmation dialog closes'], ['Component Intact', 'Component is still present in the tree — NOT deleted'], ['Data Intact', 'All component data is unchanged']], edge: 'Click Delete, Cancel, then Delete again, Cancel again — verify component survives multiple cancel cycles.' },
+    };
+    const s = miscScenarios[n];
+    return fmt(id, scenario, s.goal,
+      ['Log in to RSMS.', `Navigate to ${nav}.`, 'Select a vessel and identify a target component.'],
+      [s.action], [], [],
+      s.checks,
+      ['No UI errors or console errors', 'Correct dialog behavior', 'Data integrity maintained'],
+      [s.edge]
+    );
+  }
+
+  if (n >= 41 && n <= 50) {
+    const detailScenarios = {
+      41: { goal: 'Verify that clicking a component in the tree displays its detail information in the right panel.', checks: [['Detail Panel', 'Right panel updates with Component Information section'], ['Highlighting', 'Selected component is highlighted in the tree'], ['Smooth Load', 'Details load without errors or delays']] },
+      42: { goal: 'Verify that the component detail view displays all expected fields with correct data.', checks: [['Component Code/Name', 'Displayed correctly'], ['Maker/Model/Serial', 'Show saved values'], ['Criticality', 'Colored badge — red for Yes, gray for No'], ['Department', 'Shows Equipment/System Department'], ['Running Hours', 'Current RH value displayed for tracked components']] },
+      43: { goal: 'Verify that associated jobs are displayed for a component with linked maintenance jobs.', checks: [['Jobs List', 'Jobs section shows all associated jobs'], ['Job Details', 'Each job shows title, maintenance basis, frequency, status'], ['Empty State', 'If no jobs exist, an appropriate empty message appears']] },
+      44: { goal: 'Verify that maintenance history records are displayed for a component.', checks: [['History List', 'Previous work orders and maintenance activities are listed'], ['Entry Details', 'Each entry shows: WO number, job title, completion date, status'], ['Sort Order', 'History sorted by date (most recent first)']] },
+      45: { goal: 'Verify that filters and search state are preserved when navigating back from component details.', checks: [['Search Preserved', 'Search text is still in the search bar'], ['Filters Active', 'Any active filters are still applied'], ['Vessel Selected', 'Same vessel is still selected']] },
+      46: { goal: 'Verify that a new job can be added to a component from the component detail view.', checks: [['Add Job Form', 'Job creation form opens with fields for title, basis, frequency, rank'], ['Job Created', 'New job appears in the component\'s jobs list'], ['WO Template', 'Corresponding work order template is created']] },
+      47: { goal: 'Verify that all jobs for a component with multiple assigned jobs are displayed correctly.', checks: [['All Jobs Listed', 'All jobs appear in the Jobs section'], ['Job Details', 'Each shows title, maintenance basis, frequency, status'], ['Clickable', 'Individual jobs can be clicked for full details']] },
+      48: { goal: 'Verify that different frequency configurations work correctly for component jobs.', checks: [['Calendar 3M', '3-month frequency saves and displays correctly'], ['Calendar 6M/1Y', '6-month and 1-year frequencies work'], ['RH 500/2000', 'Running hours frequencies (500, 2000) save correctly'], ['Due Date Calc', 'Work order due dates recalculate based on new frequency']] },
+      49: { goal: 'Verify that long component names (200+ characters) are handled correctly without layout breakage.', checks: [['Saves', 'Component saves successfully with 200+ char name'], ['Tree Truncation', 'Long name is truncated with ellipsis ("...") in the tree'], ['Tooltip', 'Hovering over truncated name shows full name'], ['Detail Panel', 'Full name visible in the detail panel']] },
+      50: { goal: 'Verify that component names with special characters (&, <, >, ", #, %) are handled correctly.', checks: [['Saves', 'Component saves without error'], ['Display', 'Special characters preserved — not escaped or garbled'], ['Search', 'Searching for special characters returns the component']] },
+    };
+    const s = detailScenarios[n];
+    return fmt(id, scenario, s.goal,
+      ['Log in to RSMS.', `Navigate to ${nav}.`, 'Select a vessel with components loaded.'],
+      ['Click on a component in the tree to view its details.', 'Navigate to the relevant section (Component Information, Jobs, Maintenance History, etc.).'],
+      [], [],
+      s.checks,
+      ['No "undefined" or "null" values in display', 'No UI errors or layout breakage', 'Data matches what was saved'],
+      ['Use browser back button to navigate — verify state preservation.', 'Open the same component in two browser tabs — verify data consistency.']
+    );
+  }
+
+  return buildGeneric(id, scenario, section, steps, testData, expected);
 }
 
-function generateWOCompletionTest(id, num, section, scenario, steps, testData, expected) {
-  const map = {
-    46: `HOW TO TEST:\n1. Open a work order in Due status.\n2. Go to Part B2 (Completion section).\n3. Fill in the "Remarks" field with notes about the work performed.\n4. VERIFY: The text area accepts multi-line input.\n5. VERIFY: Remarks can include detailed descriptions of work completed.\n6. Fill in spare parts used (if applicable).\n7. VERIFY: Spare parts can be selected from the spares linked to the component.`,
-    47: `HOW TO TEST:\n1. Open a work order in Due status.\n2. In Part B, look for the safety-related fields.\n3. Fill in safety precautions taken.\n4. VERIFY: Safety fields accept text input.\n5. VERIFY: Fields are saved correctly when the WO is submitted.`,
-    48: `HOW TO TEST:\n1. Open a work order in Due status.\n2. Fill in all Part B1 fields (basic completion info).\n3. Fill in all Part B2 fields (additional details).\n4. Click "Submit for Approval".\n5. VERIFY: All fields validate correctly.\n6. VERIFY: The WO status changes to "Pending Approval".\n7. VERIFY: A success message appears.`,
-    49: `HOW TO TEST:\n1. Open a work order and fill Part B completion fields.\n2. Enter the completion date.\n3. For Calendar-based WOs, VERIFY the next due date is calculated.\n4. For RH-based WOs, enter the current reading and VERIFY the next due reading is calculated.\n5. VERIFY: The calculation follows the formula: next due = completion point + frequency.`,
-    50: `HOW TO TEST:\n1. Open a work order.\n2. Fill Part B and submit for approval.\n3. Wait for or simulate superintendent approval.\n4. VERIFY: After approval, the WO status becomes "Completed".\n5. VERIFY: A new work order (next cycle) is automatically generated for the same job.\n6. VERIFY: The new WO has the calculated next due date.`,
-    51: `HOW TO TEST:\n1. Open a work order in Due/Overdue status.\n2. In Part B1 (primary completion section), fill in:\n   - Date work was started\n   - Date work was completed\n   - Description of work done\n3. VERIFY: All Part B1 fields accept input.\n4. VERIFY: Date fields use a date picker.\n5. VERIFY: The work done text field supports multi-line input.`,
-    52: `HOW TO TEST:\n1. Open a work order and go to Part B1.\n2. Enter a completion date that is BEFORE the start date.\n3. Try to submit.\n4. VERIFY: A validation error prevents submission (completion date must be >= start date).\n5. Fix the dates so completion is after or equal to start.\n6. VERIFY: Submission proceeds successfully.`,
-    53: `HOW TO TEST:\n1. Open an RH-based work order.\n2. In Part B1, find the "Current Reading" or "Completion Reading" field.\n3. Enter the current cumulative running hours.\n4. VERIFY: The system accepts the value.\n5. VERIFY: If the value is less than the previous reading, a validation error appears.\n6. VERIFY: The next due reading is calculated (current + frequency).`,
-    54: `HOW TO TEST:\n1. Open a work order and go to Part B1.\n2. Leave required fields empty (e.g., completion date, work done).\n3. Click "Submit".\n4. VERIFY: Validation errors highlight the empty required fields.\n5. VERIFY: A message like "This field is required" appears.\n6. VERIFY: The form does NOT submit until all required B1 fields are filled.`,
-    55: `HOW TO TEST:\n1. Open a work order in Due status.\n2. Fill in Part B1 completion fields.\n3. Look for Part B1 "Remarks" or "Additional Notes" field.\n4. Enter remarks.\n5. VERIFY: The field saves correctly.\n6. VERIFY: Remarks appear when reviewing the completed WO.`,
-    56: `HOW TO TEST:\n1. Open a work order.\n2. Fill all Part B1 fields with valid data.\n3. Submit the work order.\n4. VERIFY: Part B1 data is saved and displayed correctly when reopening the WO.\n5. VERIFY: All entered values match what was submitted.`,
-    57: `HOW TO TEST:\n1. Open a work order with existing Part B1 data (previously saved draft).\n2. VERIFY: Previously saved B1 fields are pre-populated.\n3. Modify some fields.\n4. Save again.\n5. VERIFY: Updated values are persisted correctly.`,
-    58: `HOW TO TEST:\n1. Open a work order in Due/Overdue status.\n2. Scroll to Part B2 (secondary completion details).\n3. Fill in any condition assessment fields.\n4. VERIFY: Dropdown or text fields accept input.\n5. VERIFY: Condition ratings (if present) have clear options (Good, Fair, Poor, etc.).`,
-    59: `HOW TO TEST:\n1. Open a work order and go to Part B2.\n2. Fill in findings/observations.\n3. VERIFY: The text area accepts detailed multi-line input.\n4. VERIFY: Content is preserved when saving.\n5. VERIFY: Special characters in findings are handled correctly.`,
-    60: `HOW TO TEST:\n1. Open a work order and go to Part B2.\n2. Fill in recommendations or follow-up actions.\n3. VERIFY: The field accepts text input.\n4. VERIFY: Content saves and displays correctly after submission.`,
-    61: `HOW TO TEST:\n1. Open a work order.\n2. Fill all Part B2 fields.\n3. VERIFY: Part B2 fields work independently from Part B1.\n4. VERIFY: Both sections can be saved together.\n5. Submit the complete work order.\n6. VERIFY: All Part B2 data is included in the submitted work order.`,
-    62: `HOW TO TEST:\n1. Open a work order.\n2. Fill Part B1 but leave Part B2 fields empty.\n3. Try to submit.\n4. VERIFY: If Part B2 fields are required, validation errors appear.\n5. VERIFY: If Part B2 fields are optional, the WO submits successfully with only Part B1 filled.\n6. Document which B2 fields are required vs optional.`
-  };
-  return map[num] || `HOW TO TEST:\n1. Navigate to PMS > Work orders.\n2. Open a work order.\n3. ${steps.replace(/\n/g, '\n')}\nVERIFY: ${expected}`;
+function genWO(id, section, scenario, steps, testData, expected) {
+  const n = parseInt(id.replace('WO-', ''));
+  const nav = NAV.workOrders;
+
+  if (n >= 1 && n <= 7) {
+    const tabScenarios = {
+      1: { goal: 'Verify the Work Orders list page loads correctly with all status tabs and columns.', tab: null, checks: [['Page Load', 'Work Orders page loads with table columns: Component, Work Order No, Job Title, Assigned To, Due Date, Status'], ['Status Tabs', 'Tabs visible: Planned, Due, Overdue, Pending Approval, Completed — each with count badge'], ['Default Tab', '"Planned" tab is selected by default']] },
+      2: { goal: 'Verify the "Planned" tab shows only work orders with Active or Postponed status.', tab: 'Planned', checks: [['Status Filter', 'Only work orders with "Active" or "Postponed" status are shown'], ['Count Match', 'Count badge on "Planned" tab matches the number of rows'], ['No Cross-Tab', 'No Due, Overdue, Pending Approval, or Completed items appear']] },
+      3: { goal: 'Verify the "Due" tab shows only work orders within the warning window.', tab: 'Due', checks: [['Due Items', 'Work orders within 30 days (Calendar) or 720 RH (Running Hours) of due date'], ['Status Badge', 'Status badges show "Due" or "Due (Grace P)" in yellow/orange'], ['Count Match', 'Tab count badge matches visible rows']] },
+      4: { goal: 'Verify the "Overdue" tab shows only work orders past their due date and grace period.', tab: 'Overdue', checks: [['Overdue Items', 'Only work orders that breached due date AND exceeded grace period'], ['Status Badge', 'Status badges show "Overdue" in red'], ['Count Match', 'Tab count matches row count']] },
+      5: { goal: 'Verify the "Pending Approval" tab shows only work orders submitted for superintendent review.', tab: 'Pending Approval', checks: [['Pending Items', 'Only work orders submitted for approval but not yet reviewed'], ['Status Badge', 'Status badges show "Pending Approval" in purple'], ['Completion Data', 'Each WO has completion details already filled in']] },
+      6: { goal: 'Verify the "Completed" tab shows only approved and closed work orders.', tab: 'Completed', checks: [['Completed Items', 'Only approved and closed work orders'], ['Status Badge', 'Status badges show "Completed" in green'], ['Approval Info', 'Work orders show both completion data and approval information']] },
+      7: { goal: 'Verify that each status tab displays an accurate count badge.', tab: null, checks: [['Count Badges', 'Each tab has a numeric count badge next to its label'], ['Non-Negative', 'All counts are non-negative numbers'], ['Dynamic Update', 'Counts update when WO status changes (e.g., after approval)']] },
+    };
+    const s = tabScenarios[n];
+    return fmt(id, scenario, s.goal,
+      ['Log in to RSMS.', `Navigate to ${nav}.`, 'Select a vessel from the vessel dropdown.'],
+      s.tab ? [`Click the "${s.tab}" tab at the top of the work orders table.`, 'Observe the displayed work orders.'] : ['Observe all status tabs and their count badges.', 'Click through each tab to verify content.'],
+      [], [],
+      s.checks,
+      ['Tab switching is instant with no loading delay', 'No data from other tabs "bleeds" into the active tab', 'Counts are consistent'],
+      ['Switch rapidly between tabs — verify no race condition or mixed data.', 'Apply a filter, then switch tabs — verify the filter applies consistently.']
+    );
+  }
+
+  if (n >= 8 && n <= 13) {
+    const filterScenarios = {
+      8: { goal: 'Verify the vessel filter correctly scopes work orders to the selected vessel.', action: 'Select different vessels from the vessel dropdown.', checks: [['Vessel Switch', 'Work orders refresh for the newly selected vessel'], ['Data Isolation', 'No cross-vessel data appears'], ['Count Update', 'Tab counts update to reflect the selected vessel']] },
+      9: { goal: 'Verify the Period filter correctly narrows work orders by time/RH range.', action: 'Select different period options (e.g., "Due in next 7 days", "Due in next 30 days", "rh-250", "rh-500").', checks: [['Calendar Period', 'Only WOs within the selected calendar period appear'], ['RH Period', 'Only RH-based WOs within the specified threshold appear when RH filter selected'], ['Clear', 'All work orders return when period filter is cleared']] },
+      10: { goal: 'Verify the Rank filter correctly shows only work orders assigned to the selected rank.', action: 'Select a rank from the Rank dropdown (e.g., "Chief Engineer").', checks: [['Rank Filter', 'Only work orders assigned to the selected rank appear'], ['Options', 'Dropdown lists all ranks found in existing work orders'], ['Clear', 'All work orders return when rank filter is cleared']] },
+      11: { goal: 'Verify the Criticality filter correctly shows only critical or non-critical work orders.', action: 'Select "Critical" from the Criticality dropdown, then "Non-Critical".', checks: [['Critical', 'Only work orders marked as critical (criticality = "Yes") are shown'], ['Non-Critical', 'Only non-critical work orders appear'], ['Clear', 'All work orders return when filter is cleared']] },
+      12: { goal: 'Verify that multiple filters can be combined with AND logic.', action: 'Apply Period + Rank + Criticality + search text simultaneously.', checks: [['Combined', 'Results reflect ALL filters combined (AND logic)'], ['Count Update', 'Tab counts update to reflect the filtered subset'], ['Progressive', 'Clearing one filter at a time expands results appropriately']] },
+      13: { goal: 'Verify that "Clear All" resets all active filters to their default state.', action: 'Apply several filters, then click the "Clear" button.', checks: [['Filters Reset', 'All filters return to default (empty/all) state'], ['Full List', 'Full unfiltered list of work orders reappears'], ['Search Cleared', 'Search bar is cleared']] },
+    };
+    const s = filterScenarios[n];
+    return fmt(id, scenario, s.goal,
+      ['Log in to RSMS.', `Navigate to ${nav}.`, 'Select a vessel.'],
+      [s.action], [], [],
+      s.checks,
+      ['Filter state is visually indicated in the dropdown', 'No UI errors during filtering', 'Filter changes are instant'],
+      ['Apply filters, refresh the page (F5) — verify filters reset or persist as expected.', 'Apply filters that result in zero matches — verify empty state is shown.']
+    );
+  }
+
+  if (n >= 14 && n <= 25) {
+    const searchSortScenarios = {
+      14: { goal: 'Verify search by work order code/number filters the list correctly.', action: 'Type a work order code (e.g., "WO-702") in the search bar.', checks: [['Filter', 'List shows only WOs matching the search term'], ['Partial Match', 'Typing "702" shows all WOs containing "702"'], ['Clear', 'Full list returns when search is cleared']] },
+      15: { goal: 'Verify search by component name filters work orders correctly.', action: 'Type a component name (e.g., "Separator" or "Pump") in the search bar.', checks: [['Filter', 'WOs associated with matching components are displayed'], ['Column Match', 'Search matches against the Component column'], ['Clear', 'Full list returns when search is cleared']] },
+      16: { goal: 'Verify search by job title filters work orders correctly.', action: 'Type a job title (e.g., "Inspection" or "Overhaul") in the search bar.', checks: [['Filter', 'WOs with matching job titles are displayed'], ['Partial Match', 'Partial title matches work'], ['Clear', 'Full list returns when search is cleared']] },
+      17: { goal: 'Verify pagination controls work correctly on the work orders table.', action: 'Look at the bottom of the table for pagination controls.', checks: [['Navigation', 'Page buttons (First, Previous, Next, Last) are functional'], ['Page Size', 'Items-per-page dropdown is available (10, 25, 50, 100)'], ['Indicator', 'Current page indicator shows correct page number']] },
+      18: { goal: 'Verify column sorting works on the work orders table.', action: 'Click column headers (Due Date, Work Order No, Status) to sort.', checks: [['Date Sort', 'WOs sort by due date ascending/descending'], ['Code Sort', 'WOs sort alphabetically by work order number'], ['Sort Indicator', 'Arrow icon (▲/▼) appears on the active sort column']] },
+      19: { goal: 'Verify Excel export works for Sail Admin users.', action: 'Click the Export button and select "Export to Excel".', checks: [['Download', 'An .xlsx file downloads'], ['Columns', 'File contains columns matching the on-screen table'], ['All Data', 'All work orders (not just current page) are exported']] },
+      20: { goal: 'Verify PDF export works for Sail Admin users.', action: 'Click the Export button and select "Export to PDF".', checks: [['Download', 'A PDF file downloads or opens in new tab'], ['Content', 'PDF contains formatted table of work orders'], ['Headers', 'Vessel name, date, and headers are included']] },
+      21: { goal: 'Verify "Distributed Jobs" Excel export works correctly.', action: 'Click Export and select Distributed Jobs Excel option.', checks: [['Download', 'File downloads with jobs sorted/grouped by assigned rank'], ['Grouping', 'Jobs are separated by responsible person/rank']] },
+      22: { goal: 'Verify "Distributed Jobs" PDF export works correctly.', action: 'Click Export and select Distributed Jobs PDF option.', checks: [['Download', 'PDF downloads with jobs organized by assigned rank'], ['Format', 'PDF is properly formatted for printing/distribution']] },
+      23: { goal: 'Verify that the Export button is NOT visible for non-Sail Admin users.', action: 'Log in as a non-Sail Admin user and check for the Export button.', checks: [['Non-Admin', 'Export button is NOT visible for Client Admin, Vessel User, Head of Dept'], ['Admin', 'Export button IS visible when logged in as Sail Admin']] },
+      24: { goal: 'Verify that status badges use correct color coding across all work order statuses.', action: 'Observe the Status column badges across different tabs.', checks: [['Active/Planned', 'Sky blue badge'], ['Due', 'Yellow badge'], ['Overdue', 'Red badge'], ['Pending Approval', 'Purple badge'], ['Completed', 'Green badge'], ['Postponed', 'Blue badge']] },
+      25: { goal: 'Verify work order count is displayed and accurate.', action: 'Look for count display (e.g., "Showing 1-10 of 145" or tab counts).', checks: [['Count Visible', 'Total count is displayed and accurate'], ['Filter Update', 'Count updates with filters'], ['Tab Sum', 'Tab counts sum up correctly']] },
+    };
+    const s = searchSortScenarios[n];
+    return fmt(id, scenario, s.goal,
+      ['Log in to RSMS.', `Navigate to ${nav}.`, 'Select a vessel.'],
+      [s.action], [], [],
+      s.checks,
+      ['No UI errors during operation', 'Smooth transitions', 'Data accuracy maintained'],
+      ['Perform the action with no data loaded — verify graceful empty state.', 'Try the action across different browsers — verify consistent behavior.']
+    );
+  }
+
+  if (n >= 26 && n <= 31) {
+    const createScenarios = {
+      26: { goal: 'Verify the Add Work Order form opens correctly.', action: 'Click the "+" (Add Work Order) button.', checks: [['Form Opens', 'New work order creation form opens'], ['Fields', 'Form has fields for Component, Job, Assigned To, Due Date'], ['Auto-populate', 'Some fields may auto-populate based on selections']] },
+      27: { goal: 'Verify component selection works in the Add Work Order form.', action: 'Browse and select a component from the dropdown/selector.', checks: [['Selection', 'Component is selected and displayed in the field'], ['Job Filter', 'Available jobs filter to those associated with the selected component']] },
+      28: { goal: 'Verify job selection correctly shows only jobs for the selected component.', action: 'Select a component, then look at the Job dropdown.', checks: [['Filtered Jobs', 'Only jobs for the selected component are shown'], ['Job Details', 'Selecting a job populates title, basis, frequency'], ['Component Change', 'Changing component updates the job dropdown']] },
+      29: { goal: 'Verify that selecting a component and job auto-populates related fields.', action: 'Select a component and then a job.', checks: [['Title', 'Job Title auto-populates'], ['Basis', 'Maintenance Basis (Calendar/RH) is set'], ['Frequency', 'Frequency value and unit are populated'], ['Assigned To', 'Default rank is populated from job definition']] },
+      30: { goal: 'Verify validation prevents saving with missing required fields.', action: 'Leave Component and Job fields empty, click Save.', checks: [['Component Error', 'Validation error appears for empty Component'], ['Job Error', 'Validation error for empty Job'], ['All Fields', 'When all required fields filled, save succeeds']] },
+      31: { goal: 'Verify auto-generated work order codes follow the template format.', action: 'Create a new work order and observe the generated code.', checks: [['Format', 'Code follows template format (e.g., "WO-702.005.01-INS-M3")'], ['Unique', 'Each new WO gets a unique code'], ['Consistent', 'Multiple WOs for same component have different codes']] },
+    };
+    const s = createScenarios[n];
+    return fmt(id, scenario, s.goal,
+      ['Log in to RSMS.', `Navigate to ${nav}.`, 'Select a vessel.'],
+      [s.action], [], [],
+      s.checks,
+      ['Form is responsive and interactive', 'No errors during creation flow', 'Auto-population is accurate'],
+      ['Try creating a WO for a component with no jobs — verify appropriate message appears.']
+    );
+  }
+
+  if (n >= 32 && n <= 45) {
+    const detailScenarios = {
+      32: { goal: 'Verify clicking a work order row opens its detail page.', checks: [['Navigation', 'Work order detail page opens'], ['URL', 'URL changes to /pms/work-order/{id}'], ['Content', 'Comprehensive WO information is displayed']] },
+      33: { goal: 'Verify Part A (Job Details) displays all expected fields.', checks: [['Component', 'Component name and code are shown'], ['Job Info', 'Job title, WO number, template code displayed'], ['Schedule', 'Maintenance basis, frequency, due date/reading shown'], ['Assignment', 'Assigned to, criticality displayed']] },
+      34: { goal: 'Verify Part B (Completion section) displays or allows entry of completion data.', checks: [['Editable', 'For Due/Overdue WOs, Part B fields are editable'], ['Fields', 'Date completed, work done, current reading (RH), attachments section visible'], ['Read-only', 'For Completed WOs, Part B shows saved data in read-only mode']] },
+      35: { goal: 'Verify the Work History section shows previous completions.', checks: [['History List', 'Previous completions for the same job/component are listed'], ['Details', 'Each entry shows date, description, who completed it'], ['Sort', 'History sorted by date (most recent first)']] },
+      36: { goal: 'Verify that Planned/Active WO fields are editable.', checks: [['Editable', 'Form fields are NOT locked'], ['Modify', 'Fields can be modified and saved'], ['Persist', 'Changes persist after save']] },
+      37: { goal: 'Verify that Completed WO fields are locked/read-only.', checks: [['Locked', 'All form fields are read-only (grayed out)'], ['No Edit', 'Modifications are not possible'], ['Indicator', 'Visual indicator shows WO is locked']] },
+      38: { goal: 'Verify that Pending Approval WO completion data is read-only.', checks: [['Read-only', 'Part B completion data cannot be modified'], ['Buttons', 'Only Approve/Reject buttons are actionable']] },
+      39: { goal: 'Verify start date entry in Part B completion section.', checks: [['Date Picker', 'Date picker allows selecting a valid date'], ['Saves', 'Start date saves correctly']] },
+      40: { goal: 'Verify completion date and work done entry in Part B.', checks: [['Date Entry', 'Completion date can be entered via date picker'], ['Date Validation', 'Completion date must be on or after start date'], ['Text Area', 'Work done text area accepts multi-line input']] },
+      41: { goal: 'Verify current RH reading entry for Running Hours-based work orders.', checks: [['Numeric Only', 'Only numeric values are accepted'], ['Validation', 'Value must be >= previous reading'], ['Unit', 'Field shows "hrs" or similar indicator']] },
+      42: { goal: 'Verify Part B1 and B2 completion sections work together.', checks: [['B1 Fields', 'Part B1 contains basic completion information'], ['B2 Fields', 'Part B2 contains additional completion details'], ['Both Required', 'Both sections are required before submission']] },
+      43: { goal: 'Verify the Submit for Approval workflow works correctly.', checks: [['Confirmation', 'Confirmation dialog appears before submission'], ['Status Change', 'WO status changes to "Pending Approval"'], ['Tab Move', 'WO moves from Due/Overdue to Pending Approval tab'], ['Toast', 'Success toast message appears']] },
+      44: { goal: 'Verify next due date calculation for Calendar-based WOs after approval.', checks: [['Next Due', 'Next due date = completion date + frequency'], ['Auto-calc', 'Calculation is automatic, not manual'], ['Display', 'Next due date appears in the WO details']] },
+      45: { goal: 'Verify next due reading calculation for RH-based WOs after approval.', checks: [['Next Due', 'Next due reading = current reading + frequency'], ['Auto-calc', 'Calculation is automatic'], ['Display', 'Calculated value appears in WO details']] },
+    };
+    const s = detailScenarios[n];
+    return fmt(id, scenario, s.goal,
+      ['Log in to RSMS.', `Navigate to ${nav}.`, 'Select a vessel and open a work order.'],
+      ['Navigate to the relevant section of the work order detail page.'], [], [],
+      s.checks,
+      ['No "undefined" or blank values for populated fields', 'No UI errors or console errors', 'Data integrity maintained'],
+      ['Open the same WO in two browser tabs — verify data consistency.', 'Use browser back button from WO detail — verify return to WO list with filters preserved.']
+    );
+  }
+
+  if (n >= 46 && n <= 62) {
+    return buildGenericWOCompletion(id, n, scenario, steps, testData, expected);
+  }
+
+  if (n >= 63 && n <= 69) {
+    return buildGenericWOLayer(id, n, scenario, 'Layer 1 — Backdating Detection', steps, expected, 'Backdating',
+      'This layer detects when work orders are completed with significantly backdated dates.',
+      ['Complete a work order with a date significantly in the past', 'Check for backdating warnings or flags']);
+  }
+
+  if (n >= 70 && n <= 82) {
+    return buildGenericWOLayer(id, n, scenario, 'Layer 2 — Missed Cycle Detection', steps, expected, 'Missed Cycles',
+      'This layer identifies jobs where one or more maintenance cycles were skipped.',
+      ['Identify a job with expected regular cycles', 'Check for missed cycle indicators in the anomaly detection panel']);
+  }
+
+  if (n >= 83 && n <= 91) {
+    return buildGenericWOLayer(id, n, scenario, 'Layer 3 — Work History Validation', steps, expected, 'Work History',
+      'This layer validates the completeness and consistency of work order history records.',
+      ['Open a work order and view its work history (Section A4)', 'Verify history entries are complete and chronologically ordered']);
+  }
+
+  if (n >= 92 && n <= 97) {
+    return buildGenericWOLayer(id, n, scenario, 'Layer 4B — CE Remarks', steps, expected, 'CE Remarks',
+      'This layer verifies Chief Engineer remarks functionality in work order completion.',
+      ['Open a work order in completion mode', 'Locate and interact with the CE Remarks field']);
+  }
+
+  if (n >= 98 && n <= 102) {
+    return buildGenericWOLayer(id, n, scenario, 'Layer 5 — Superintendent Notifications', steps, expected, 'Superintendent',
+      'This layer verifies the superintendent notification and acknowledgment workflow.',
+      ['Submit a work order for approval', 'Navigate to PMS > Superintendent page and check for notifications']);
+  }
+
+  if (n >= 103 && n <= 114) {
+    return buildGenericWOLayer(id, n, scenario, 'Layer 6 — Anomaly Detection Panel', steps, expected, 'Anomaly Detection',
+      'This layer verifies the Compliance Anomaly Detection panel on the Dashboard (Sail Admin only).',
+      ['Log in as Sail Admin', 'Navigate to PMS > Dashboard and scroll to the Compliance Anomaly Detection panel']);
+  }
+
+  if (n >= 115 && n <= 136) {
+    return buildGenericWOLayer(id, n, scenario, 'Layer 7 — Running Hours Validation', steps, expected, 'RH Validation',
+      'This layer validates running hours input during work order completion.',
+      ['Open an RH-based work order', 'Enter various running hours values and observe validation behavior']);
+  }
+
+  if (n >= 137 && n <= 144) {
+    const approvalScenarios = {
+      137: { goal: 'Verify the Approve workflow for pending work orders.', action: 'Click the "Approve" button (green, checkmark icon).', checks: [['Status Change', 'WO status changes to "Completed"'], ['Tab Move', 'WO moves to the Completed tab'], ['Success', 'Success message appears']] },
+      138: { goal: 'Verify the Reject workflow for pending work orders.', action: 'Click the "Reject" button (red, X icon).', checks: [['Comments Required', 'Rejection comments field appears (mandatory)'], ['Status Change', 'WO status changes to "Rejected"'], ['Rework', 'WO moves back for rework']] },
+      139: { goal: 'Verify whether approver remarks are mandatory or optional during approval.', action: 'Try to approve without entering remarks.', checks: [['Mandatory', 'If remarks required, system requires them before approval'], ['Optional', 'If optional, approval proceeds without remarks']] },
+      140: { goal: 'Verify that rejection comments are mandatory when rejecting a WO.', action: 'Try to reject without entering comments.', checks: [['Comments Required', 'Error appears if comments are empty'], ['With Comments', 'Rejection succeeds when comments are provided']] },
+      141: { goal: 'Verify that approving a WO automatically generates the next cycle work order.', action: 'Approve a work order.', checks: [['Next Cycle', 'New WO is auto-generated for the next period'], ['Due Date', 'New WO has correct next due date/reading'], ['Planned Tab', 'New WO appears in the Planned tab']] },
+      142: { goal: 'Verify the rework flow for rejected work orders.', action: 'Open a rejected WO and modify fields for resubmission.', checks: [['Rejection Reason', 'Rejection reason is displayed'], ['Editable', 'Part B fields are editable for rework'], ['Resubmit', 'Resubmission returns WO to "Pending Approval"']] },
+      143: { goal: 'Verify Bulk Approve functionality on the Dashboard.', action: 'Select multiple pending WOs and click "Bulk Approve".', checks: [['Bulk Action', 'All selected WOs are approved simultaneously'], ['Status Update', 'Each WO status changes to "Completed"'], ['Next Cycles', 'Next cycle WOs are generated for each']] },
+      144: { goal: 'Verify that only users with approval permissions can see Approve/Reject buttons.', action: 'Log in as different user roles.', checks: [['Non-Admin', 'Approve/Reject buttons NOT visible for Vessel User'], ['Admin', 'Buttons visible for Superintendent/Sail Admin']] },
+    };
+    const s = approvalScenarios[n];
+    return fmt(id, scenario, s.goal,
+      ['Log in to RSMS.', `Navigate to ${nav} > Pending Approval tab.`, 'Select a vessel.'],
+      [s.action], [], [],
+      s.checks,
+      ['No UI errors during approval flow', 'Status transitions are smooth', 'Data integrity maintained'],
+      ['Try approving/rejecting the same WO twice — verify the system prevents double-action.']
+    );
+  }
+
+  if (n >= 145 && n <= 153) {
+    const attachScenarios = {
+      145: { goal: 'Verify file upload to a work order works correctly.', checks: [['Upload', 'File uploads with progress indicator'], ['Display', 'File appears in attachments list with name, size, date'], ['Success', 'Upload completes without errors']] },
+      146: { goal: 'Verify uploaded attachments can be viewed/downloaded.', checks: [['Download', 'File downloads or opens in new tab'], ['Integrity', 'File content is intact (not corrupted)']] },
+      147: { goal: 'Verify file size limit enforcement for attachments.', checks: [['Oversized', 'Error for files exceeding size limit (e.g., > 25MB)'], ['Valid Size', 'Files within limit upload successfully']] },
+      148: { goal: 'Verify file type validation for attachments.', checks: [['Invalid Type', 'Error for unsupported types (e.g., .exe)'], ['Valid Types', 'Supported types (PDF, images, Word) upload successfully']] },
+      149: { goal: 'Verify attachment deletion with confirmation dialog.', checks: [['Confirmation', 'Delete confirmation dialog appears'], ['Deleted', 'Attachment removed from list after confirmation']] },
+      150: { goal: 'Verify multiple file attachments can be uploaded to a single WO.', checks: [['Multiple', 'All files (3+) upload successfully'], ['Individual', 'Each file can be viewed or deleted independently']] },
+      151: { goal: 'Verify handling of attachments with very long filenames (100+ chars).', checks: [['Upload', 'File uploads without error'], ['Display', 'Filename truncated with ellipsis, full name on hover']] },
+      152: { goal: 'Verify handling of attachments with special characters in filename.', checks: [['Upload', 'File with special chars uploads successfully'], ['Display', 'Filename displays correctly'], ['Download', 'File downloads with original name']] },
+      153: { goal: 'Verify attachment behavior on completed/approved work orders.', checks: [['Visible', 'Existing attachments are accessible'], ['Upload Policy', 'New uploads are either allowed or blocked for completed WOs']] },
+    };
+    const s = attachScenarios[n];
+    return fmt(id, scenario, s.goal,
+      ['Log in to RSMS.', `Navigate to ${nav}.`, 'Open a work order detail page.'],
+      ['Scroll to the Attachments section.', 'Perform the attachment operation.'], [], [],
+      s.checks,
+      ['No UI errors during file operations', 'File integrity maintained', 'Consistent behavior across browsers'],
+      ['Try uploading during a network slowdown — verify timeout handling.', 'Upload a 0-byte file — verify handling.']
+    );
+  }
+
+  if (n >= 154 && n <= 168) {
+    return buildGenericWOMisc(id, n, scenario, steps, testData, expected);
+  }
+
+  return buildGeneric(id, scenario, section, steps, testData, expected);
 }
 
-function generateWOLayer1Test(id, num, section, scenario, steps, testData, expected) {
-  const map = {
-    63: `HOW TO TEST:\n1. Open a work order in Due/Overdue status.\n2. In Part B, enter a completion date that is significantly in the past (e.g., 30+ days ago).\n3. Submit the work order.\n4. VERIFY: The system detects the backdating and triggers Layer 1 validation.\n5. VERIFY: A warning appears indicating the completion date is backdated.\n6. VERIFY: The work order may be flagged for superintendent review.`,
-    64: `HOW TO TEST:\n1. Open a work order and complete it with today's date.\n2. VERIFY: No backdating warning appears.\n3. Now open another work order and enter a date 7 days ago.\n4. VERIFY: The system's backdating threshold — does a warning appear at 7 days? 14 days? 30 days?\n5. Document the actual threshold for backdating detection.`,
-    65: `HOW TO TEST:\n1. Complete a work order with a backdated date (e.g., 45 days ago).\n2. VERIFY: The backdating is flagged in the system.\n3. Check the superintendent notifications.\n4. VERIFY: The superintendent receives a notification about the backdated completion.\n5. VERIFY: The notification includes the WO number and the extent of backdating.`,
-    66: `HOW TO TEST:\n1. Complete a work order with a severely backdated date (e.g., 90+ days ago).\n2. VERIFY: The system shows a clear warning about the extreme backdating.\n3. VERIFY: The severity of the warning increases with the extent of backdating.\n4. Check if additional approvals are required for severely backdated completions.`,
-    67: `HOW TO TEST:\n1. Complete a work order with a backdated date.\n2. Try to change the date after submission.\n3. VERIFY: Once submitted, the completion date cannot be modified.\n4. VERIFY: The backdating record is immutable in the system history.`,
-    68: `HOW TO TEST:\n1. Log in as a Sail Admin.\n2. Navigate to the Dashboard.\n3. Look for anomaly detection or compliance section.\n4. VERIFY: Backdated work orders appear in the anomaly list.\n5. VERIFY: Each backdated WO shows the backdating duration.\n6. VERIFY: The anomaly can be acknowledged or flagged for further review.`,
-    69: `HOW TO TEST:\n1. Complete multiple work orders: some with today's date, some backdated.\n2. Navigate to Reports or Dashboard anomaly section.\n3. VERIFY: The system accurately identifies which WOs are backdated.\n4. VERIFY: Non-backdated WOs are NOT flagged as anomalies.\n5. VERIFY: The backdating count/statistics are accurate.`
-  };
-  return map[num] || `HOW TO TEST:\n1. Navigate to PMS > Work orders.\n2. Test Layer 1 (Backdating) validation.\n3. ${steps.replace(/\n/g, '\n')}\nVERIFY: ${expected}`;
+function buildGenericWOCompletion(id, n, scenario, steps, testData, expected) {
+  return fmt(id, scenario,
+    `Verify ${scenario.toLowerCase()} functionality in the work order completion workflow.`,
+    ['Log in to RSMS.', `Navigate to ${NAV.workOrders}.`, 'Select a vessel.', 'Open a work order in Due or Overdue status.'],
+    ['Navigate to Part B (Completion section) of the work order.', 'Fill in the relevant completion fields as described in the test steps.'],
+    ['Verify field validation rules and constraints.'],
+    ['Submit the work order for approval (if completing all required fields).'],
+    [['Field Input', `${scenario} fields accept valid input`],
+     ['Validation', 'Invalid input is rejected with clear error messages'],
+     ['Save/Submit', 'Data is persisted correctly when saved or submitted'],
+     ['Display', 'Saved data displays correctly when the WO is reopened']],
+    ['No UI errors during data entry', 'Fields retain values during the session', 'Validation messages are clear and specific', 'No unexpected field resets'],
+    ['Enter boundary values (empty, minimum, maximum) in the fields.', 'Fill fields with special characters — verify they are preserved.', 'Navigate away without saving — verify unsaved changes are warned about or discarded.']
+  );
 }
 
-function generateWOLayer2Test(id, num, section, scenario, steps, testData, expected) {
-  const map = {
-    70: `HOW TO TEST:\n1. Identify a work order that was previously completed (has a history cycle).\n2. Look for the next cycle of the same job.\n3. Skip completing the current cycle and try to complete a future one.\n4. VERIFY: The system detects the missed cycle.\n5. VERIFY: A warning or flag appears indicating cycles were skipped.`,
-    71: `HOW TO TEST:\n1. Find a job with regular cycles (e.g., 3-month intervals).\n2. Check the work order history.\n3. VERIFY: All cycles are accounted for — no gaps in the completion chain.\n4. If a cycle was missed, VERIFY the system flags it in the anomaly detection.`,
-    72: `HOW TO TEST:\n1. Create a scenario where multiple consecutive cycles are missed.\n2. Navigate to the anomaly or compliance section.\n3. VERIFY: The system identifies the specific cycles that were skipped.\n4. VERIFY: The missed cycle count is accurate.\n5. VERIFY: The severity indicator reflects the number of missed cycles.`,
-    73: `HOW TO TEST:\n1. Complete a work order normally (no missed cycles).\n2. VERIFY: No missed cycle warning appears.\n3. VERIFY: The work history shows a continuous chain of completions.\n4. VERIFY: The anomaly section does NOT flag this job for missed cycles.`,
-    74: `HOW TO TEST:\n1. Find a work order with a missed cycle flag.\n2. Go back and complete the missed cycle retroactively.\n3. VERIFY: The missed cycle flag is cleared or updated.\n4. VERIFY: The compliance status improves after the catch-up completion.`,
-    75: `HOW TO TEST:\n1. Navigate to the Dashboard anomaly section (Sail Admin only).\n2. Look for the "Cycle Skip Rate" card.\n3. VERIFY: The card shows the percentage of jobs with missed cycles.\n4. VERIFY: Clicking the card shows details of affected work orders.`,
-    76: `HOW TO TEST:\n1. Check missed cycle detection for Calendar-based work orders.\n2. VERIFY: The system correctly identifies missed calendar cycles based on due dates and completion dates.\n3. Repeat for Running Hours-based work orders.\n4. VERIFY: RH-based missed cycles are detected based on reading thresholds.`,
-    77: `HOW TO TEST:\n1. Find a job that has exactly one missed cycle.\n2. VERIFY: The system accurately counts it as 1 missed cycle.\n3. Find a job with 3 missed cycles.\n4. VERIFY: The count shows exactly 3.\n5. VERIFY: The counts are reliable and consistent across views.`,
-    78: `HOW TO TEST:\n1. View the missed cycles for a specific vessel.\n2. VERIFY: Only cycles for that vessel are shown.\n3. Switch to another vessel.\n4. VERIFY: The data updates to reflect the new vessel's missed cycles.\n5. VERIFY: Cross-vessel contamination does not occur.`,
-    79: `HOW TO TEST:\n1. Navigate to the compliance or anomaly panel.\n2. Look at missed cycle data for multiple jobs.\n3. VERIFY: Sorting and filtering of missed cycles works correctly.\n4. VERIFY: You can filter by severity, component, or date range.`,
-    80: `HOW TO TEST:\n1. Complete all overdue work orders for a specific component.\n2. VERIFY: The missed cycle indicators clear for that component.\n3. VERIFY: The overall compliance rate improves.\n4. VERIFY: The dashboard reflects the updated compliance status.`,
-    81: `HOW TO TEST:\n1. Open a work order that has been flagged for missed cycles.\n2. Check the work order detail page.\n3. VERIFY: A visual indicator (badge, warning icon) shows the missed cycle flag.\n4. VERIFY: The flag provides context (e.g., "2 cycles missed" or "Last completed: 6 months ago").`,
-    82: `HOW TO TEST:\n1. Navigate to the anomaly detection section.\n2. Review the missed cycle rate across all vessels.\n3. VERIFY: The overall rate is calculated correctly.\n4. VERIFY: Trends over time are visible (if a trend chart exists).\n5. VERIFY: The data refreshes when new completions are recorded.`
-  };
-  return map[num] || `HOW TO TEST:\n1. Navigate to PMS > Work orders.\n2. Test Layer 2 (Missed Cycles) validation.\n3. ${steps.replace(/\n/g, '\n')}\nVERIFY: ${expected}`;
+function buildGenericWOLayer(id, n, scenario, layerName, steps, expected, category, description, actions) {
+  return fmt(id, scenario,
+    `Verify ${scenario.toLowerCase()} — ${layerName}.`,
+    ['Log in to RSMS.', `Navigate to ${NAV.workOrders} or ${NAV.dashboard} as appropriate.`, 'Select a vessel.'],
+    actions,
+    ['Verify the detection/validation results.'],
+    ['Cross-reference with the anomaly detection panel on the Dashboard (Sail Admin only).'],
+    [['Detection', `${category} condition is correctly identified by the system`],
+     ['Display', `${category} information is clearly displayed to the user`],
+     ['Accuracy', 'No false positives — normal operations are NOT flagged'],
+     ['Severity', 'Severity level is appropriate for the detected condition']],
+    [`${category} detection is accurate`, 'Visual indicators are clear and distinct', 'No UI errors during detection/display', 'Data is consistent across views'],
+    [`Test with a borderline case — verify the system correctly classifies it.`, 'Test with a clearly normal case — verify no false flags appear.', `Verify ${category.toLowerCase()} data is visible to Sail Admin only (if role-restricted).`]
+  );
 }
 
-function generateWOLayer3Test(id, num, section, scenario, steps, testData, expected) {
-  const map = {
-    83: `HOW TO TEST:\n1. Open a work order and view its work history (Section A4).\n2. VERIFY: The history section lists all previous completions for the same job.\n3. VERIFY: Each history entry shows: completion date, work done description, who completed it.\n4. VERIFY: History is sorted chronologically (most recent first).`,
-    84: `HOW TO TEST:\n1. Open a work order with extensive history (5+ previous completions).\n2. VERIFY: All historical entries are accessible (scroll or pagination).\n3. VERIFY: Performance is acceptable — no excessive loading time.\n4. VERIFY: Each entry is clearly separated and readable.`,
-    85: `HOW TO TEST:\n1. Open a work order and check its history.\n2. Compare the "work done" descriptions across multiple cycles.\n3. VERIFY: The system does NOT flag identical descriptions as anomalous (if the same work is done each cycle, that can be normal).\n4. VERIFY: Suspiciously short or copy-pasted descriptions may trigger Layer 3 analysis.`,
-    86: `HOW TO TEST:\n1. Complete a work order with a detailed work description.\n2. After approval, verify it appears in the work history.\n3. VERIFY: The new entry is added at the top of the history list.\n4. VERIFY: The entry contains: date, description, current reading (for RH WOs), who completed it.`,
-    87: `HOW TO TEST:\n1. Open a work order with history entries.\n2. Check that each entry includes timestamps.\n3. VERIFY: Dates are formatted consistently (e.g., "15 Mar 2026").\n4. VERIFY: Time information is included where relevant.\n5. VERIFY: History entries cannot be modified after approval.`,
-    88: `HOW TO TEST:\n1. Open a work order history.\n2. Check for completeness of records.\n3. VERIFY: No history entries are missing (compare with the expected number of cycles based on job creation date and frequency).\n4. VERIFY: Each completion has a corresponding history entry.`,
-    89: `HOW TO TEST:\n1. Navigate to a component's detail page.\n2. Check the maintenance history section.\n3. VERIFY: All work orders completed for this component appear in the history.\n4. VERIFY: History spans across different jobs for the same component.\n5. VERIFY: The history provides a comprehensive maintenance record.`,
-    90: `HOW TO TEST:\n1. Open a work order history for a job with RH-based maintenance.\n2. VERIFY: Each entry shows the running hours reading at completion.\n3. VERIFY: RH readings increase monotonically (each entry has a higher reading than the previous).\n4. VERIFY: Any anomalies in RH progression are flagged.`,
-    91: `HOW TO TEST:\n1. Export work history data if an export option is available.\n2. VERIFY: Exported data matches on-screen history.\n3. VERIFY: All fields are included in the export.\n4. If no export exists, note this in Comments.\n5. VERIFY: History data is consistent between the WO detail view and the component maintenance history view.`
+function buildGenericWOMisc(id, n, scenario, steps, testData, expected) {
+  const miscScenarios = {
+    154: { goal: 'Verify Save Draft preserves partial completion data without changing WO status.', checks: [['Draft Saved', 'Data saved without status change'], ['Persistence', 'Draft data preserved on reopen']] },
+    155: { goal: 'Verify draft data persists across browser sessions.', checks: [['Session Persist', 'Draft data survives browser close/reopen'], ['Submit', 'Final submission includes both draft and new data']] },
+    156: { goal: 'Verify completed WOs are fully immutable (all fields locked).', checks: [['All Locked', 'All fields are read-only'], ['No Edit', 'No edit buttons available'], ['Indicator', 'Lock icon or "Completed" indicator visible']] },
+    157: { goal: 'Verify approval details are locked on completed work orders.', checks: [['Approval Locked', 'Approver name, date, remarks are immutable'], ['Completion Locked', 'Completion data is also locked']] },
+    158: { goal: 'Verify character limit enforcement in text fields.', checks: [['Limit Reached', 'System indicates when limit is reached'], ['Indicator', 'Character count or remaining chars shown']] },
+    159: { goal: 'Verify text fields accept various character types without corruption.', checks: [['All Chars', 'Letters, numbers, symbols, Unicode accepted'], ['No Corruption', 'Saved text displays exactly as entered']] },
+    160: { goal: 'Verify cross-field validation catches conflicting values.', checks: [['Conflict Detection', 'System catches conflicts (e.g., completion before start date)'], ['Error Message', 'Clear message explains the issue']] },
+    161: { goal: 'Verify Calendar vs RH conditional field display.', checks: [['Calendar WO', 'Shows due date, hides RH fields'], ['RH WO', 'Shows reading fields, hides calendar date']] },
+    162: { goal: 'Verify criticality reflects component criticality setting.', checks: [['Reflection', 'WO criticality matches component\'s setting'], ['Update', 'Criticality changes propagate correctly']] },
+    163: { goal: 'Verify AI chatbot is accessible for Sail Admin users.', checks: [['Button Visible', 'Chat button (message icon) visible in bottom-right'], ['Panel Opens', 'Chat panel opens when clicked'], ['Responds', 'AI responds to maintenance questions']] },
+    164: { goal: 'Verify chatbot provides accurate WO-specific information.', checks: [['Specific Info', 'Chatbot details match actual WO data'], ['Accuracy', 'Response is factually correct']] },
+    165: { goal: 'Verify chatbot understands maritime/PMS context.', checks: [['Context', 'Chatbot provides helpful PMS-related responses'], ['Follow-ups', 'Suggested follow-up prompts appear']] },
+    166: { goal: 'Verify chatbot handles irrelevant questions gracefully.', checks: [['No Crash', 'Chatbot responds without errors'], ['Redirect', 'Politely redirects to PMS topics']] },
+    167: { goal: 'Verify chatbot is NOT visible for non-Sail Admin users.', checks: [['Non-Admin', 'Chat button NOT visible for non-Sail Admin'], ['Admin', 'Chat button IS visible for Sail Admin']] },
+    168: { goal: 'Verify chatbot maintains multi-turn conversation context.', checks: [['Context', 'Follow-up questions relate to previous context'], ['History', 'Conversation history visible in chat panel']] },
   };
-  return map[num] || `HOW TO TEST:\n1. Navigate to PMS > Work orders.\n2. Test Layer 3 (Work History) validation.\n3. ${steps.replace(/\n/g, '\n')}\nVERIFY: ${expected}`;
+  const s = miscScenarios[n] || { goal: `Verify ${scenario.toLowerCase()}.`, checks: [['Result', expected]] };
+  return fmt(id, scenario, s.goal,
+    ['Log in to RSMS.', `Navigate to ${NAV.workOrders}.`, 'Select a vessel.'],
+    ['Perform the actions described for this test scenario.'], [], [],
+    s.checks,
+    ['No UI errors', 'Consistent behavior', 'Data integrity maintained'],
+    ['Test across different user roles to verify role-based behavior.', 'Try the action on different browsers — verify consistent behavior.']
+  );
 }
 
-function generateWOLayer4Test(id, num, section, scenario, steps, testData, expected) {
-  const map = {
-    92: `HOW TO TEST:\n1. Open a work order that has been completed and approved.\n2. Navigate to the approval section.\n3. Look for the Chief Engineer (CE) remarks field.\n4. VERIFY: CE remarks are displayed if entered during completion.\n5. VERIFY: The remarks field shows who entered them and when.`,
-    93: `HOW TO TEST:\n1. Open a work order in completion mode (Part B).\n2. Find the "CE Remarks" or "Chief Engineer Comments" field.\n3. Enter remarks.\n4. VERIFY: The field accepts multi-line text input.\n5. VERIFY: Remarks are saved when the WO is submitted.\n6. VERIFY: Remarks appear in the approved/completed WO view.`,
-    94: `HOW TO TEST:\n1. Complete a work order WITHOUT entering CE remarks.\n2. Submit for approval.\n3. VERIFY: The system either allows submission without CE remarks (if optional) or requires them (if mandatory).\n4. Document whether CE remarks are required or optional.`,
-    95: `HOW TO TEST:\n1. Complete a work order with CE remarks.\n2. Get it approved.\n3. VERIFY: The CE remarks are visible in the completed WO.\n4. VERIFY: Remarks cannot be modified after approval.\n5. VERIFY: The superintendent can see the CE remarks when reviewing.`,
-    96: `HOW TO TEST:\n1. Enter very long CE remarks (500+ characters).\n2. Submit the work order.\n3. VERIFY: The full text is saved and displayed correctly.\n4. VERIFY: No text truncation occurs.\n5. VERIFY: The display area expands to show all content.`,
-    97: `HOW TO TEST:\n1. Enter CE remarks with special characters (&, <, >, ", etc.).\n2. Submit the work order.\n3. VERIFY: Special characters are preserved correctly.\n4. VERIFY: No HTML injection or display issues occur.\n5. VERIFY: The remarks render exactly as entered.`
-  };
-  return map[num] || `HOW TO TEST:\n1. Open a work order.\n2. Test Layer 4B (CE Remarks) functionality.\n3. ${steps.replace(/\n/g, '\n')}\nVERIFY: ${expected}`;
+function genRH(id, section, scenario, steps, testData, expected) {
+  const n = parseInt(id.replace('RH-', ''));
+  const nav = NAV.runningHrs;
+
+  if (n >= 1 && n <= 8) {
+    const mainViewScenarios = {
+      1: { goal: 'Verify the Running Hours dashboard loads correctly with all expected columns.', checks: [['Page Load', 'Table loads showing parent components with RH tracking'], ['Columns', 'Shows: Component, Code, Category, Running Hours, Last Updated, Utilization Rate, Period RH'], ['Utilization', 'Utilization rate column has progress bar visualization']] },
+      2: { goal: 'Verify utilization rate calculation and visual display.', checks: [['Percentage', 'Each component shows a percentage value'], ['Color Coding', 'Progress bar: green (normal), amber (moderate), red (high)'], ['Period', 'Period selector changes the utilization calculation']] },
+      3: { goal: 'Verify "Last Updated" dates are displayed correctly.', checks: [['Format', 'Dates in readable format (e.g., "15 Mar 2026 14:30")'], ['Accuracy', 'Recent updates show recent dates'], ['No Errors', 'No "Invalid Date" or "NaN" values']] },
+      4: { goal: 'Verify the search bar filters components correctly.', checks: [['Search', 'Table filters to matching components'], ['Clear', 'All components reappear when search is cleared']] },
+      5: { goal: 'Verify vessel filter refreshes data for the selected vessel.', checks: [['Refresh', 'Data refreshes for newly selected vessel'], ['Equipment', 'Component list changes to reflect new vessel']] },
+      6: { goal: 'Verify the utilization period selector (Weekly/Monthly/Quarterly/Yearly) works correctly.', checks: [['Weekly', 'Utilization rates reflect weekly data (168 hrs max)'], ['Monthly', 'Rates reflect monthly data (720 hrs max)'], ['Quarterly/Yearly', 'Rates update for each selected period'], ['Column Header', 'Header updates to show selected period']] },
+      7: { goal: 'Verify inherited children display for parent components with RH inheritance.', checks: [['Child Count', 'Icon/button shows count of inherited child components'], ['Popup', 'Clicking shows child components with their RH values'], ['Match', 'Child RH values match parent for inherited components']] },
+      8: { goal: 'Verify data quality warnings for suspicious RH data.', checks: [['Warning', 'Warning indicator for extremely high utilization (>100%)'], ['Context', 'Warning provides context about the issue'], ['Normal', 'Normal components do NOT show false warnings']] },
+    };
+    const s = mainViewScenarios[n];
+    return fmt(id, scenario, s.goal,
+      ['Log in to RSMS.', `Navigate to ${nav}.`, 'Select a vessel from the vessel dropdown.'],
+      ['Observe the Running Hours table and its columns.', 'Interact with the relevant controls/filters.'], [], [],
+      s.checks,
+      ['Table loads without errors', 'All data is formatted correctly', 'No "NaN" or "undefined" values'],
+      ['Switch vessels rapidly — verify no data mix-up.', 'Test with a vessel that has no RH-tracked components — verify empty state.']
+    );
+  }
+
+  if (n >= 9 && n <= 17) {
+    const updateScenarios = {
+      9: { goal: 'Verify the individual RH update dialog works correctly.', checks: [['Dialog Opens', '"Update Running Hours - [Component Name]" dialog opens'], ['Fields', 'Shows current value, new value input, date, comments'], ['Update', 'RH updates in the table after saving'], ['Toast', 'Success toast appears']] },
+      10: { goal: 'Verify "Set Total" vs "Add Delta" update modes.', checks: [['Set Total', 'Entering 5500 sets RH to exactly 5500'], ['Add Delta', 'Entering 100 increases RH by 100 (5500→5600)'], ['Mode Toggle', 'RadioGroup switches between modes correctly']] },
+      11: { goal: 'Verify validation prevents entering RH less than current reading.', checks: [['Lower Value', 'Validation error or confirmation dialog appears'], ['Zero Entry', 'Entering 0 triggers "Zero RH Renewal Confirmation" dialog with reason required']] },
+      12: { goal: 'Verify meter replacement flow in RH update.', checks: [['Checkbox', '"Meter Replaced" checkbox reveals old/new meter fields'], ['Calculation', 'New cumulative RH = old cumulative + new meter reading'], ['History', 'Meter replacement recorded in history']] },
+      13: { goal: 'Verify date handling in RH updates.', checks: [['Auto-fill', 'System auto-fills today\'s date or requires date entry'], ['Future Date', 'Future dates may be prevented'], ['Past Date', 'Valid past dates are accepted']] },
+      14: { goal: 'Verify comments are saved with RH updates.', checks: [['Accept', 'Comments field accepts text input'], ['Saved', 'Comments appear in RH history entry'], ['Persist', 'Comments persist after page reload']] },
+      15: { goal: 'Verify cascading RH updates to inherited child components.', checks: [['Parent Update', 'Parent RH updates correctly'], ['Children Update', 'All inherited children auto-update to match parent'], ['Cascade', 'Cascade works for all child levels']] },
+      16: { goal: 'Verify the Bulk Update dialog for updating multiple components simultaneously.', checks: [['Dialog Opens', '"Bulk Update Running Hours" dialog opens with all RH components listed'], ['Multi-Entry', 'Values can be entered for multiple components'], ['Save All', '"Save" button updates all components simultaneously'], ['Success', 'Success message confirms bulk update']] },
+      17: { goal: 'Verify error handling in bulk update with mixed valid/invalid values.', checks: [['Valid', 'Components with valid values update successfully'], ['Invalid', 'Components with invalid values show errors'], ['Clear Errors', 'System clearly indicates which updates failed and why']] },
+    };
+    const s = updateScenarios[n];
+    return fmt(id, scenario, s.goal,
+      ['Log in to RSMS.', `Navigate to ${nav}.`, 'Select a vessel.'],
+      ['Click the Update (pencil) icon for a component, or click "Bulk Update".', 'Fill in the RH update form fields.'],
+      [], ['Click "Save" and verify the result.'],
+      s.checks,
+      ['No data corruption during updates', 'Values are formatted correctly', 'History is updated'],
+      ['Try entering non-numeric text — verify only numbers are accepted.', 'Try updating while another user is updating the same component — verify no conflict.']
+    );
+  }
+
+  if (n >= 18 && n <= 35) {
+    const historyExportScenarios = {
+      18: { goal: 'Verify the RH History tab displays update history correctly.', c: [['History Tab', 'Opens showing RH update history'], ['Entry Details', 'Each entry shows: date, old value, new value, source, updated by']] },
+      19: { goal: 'Verify RH history sort order (most recent first by default).', c: [['Default Sort', 'Most recent entries appear first'], ['Toggle', 'Clicking sort toggle changes to ascending order']] },
+      20: { goal: 'Verify date filtering in RH history.', c: [['Date Range', 'Only entries within selected range shown'], ['Clear', 'All entries reappear when filters cleared']] },
+      21: { goal: 'Verify search functionality in RH history.', c: [['Search', 'History entries filter by search term'], ['Matching', 'Matching entries are shown or highlighted']] },
+      22: { goal: 'Verify pagination in RH history.', c: [['Pagination', 'Page navigation works (Next, Previous)'], ['Page Size', 'Items per page can be changed'], ['Count', 'Total entry count is accurate']] },
+      23: { goal: 'Verify RH timeline visualization (if available).', c: [['Timeline', 'Shows RH progression over time'], ['Data Points', 'Correspond to actual RH update events']] },
+      24: { goal: 'Verify meter replacement events in RH timeline.', c: [['Distinct', 'Meter replacements visually distinct on timeline'], ['Cumulative', 'Total line shows correct progression across meter changes']] },
+      25: { goal: 'Verify RH integration with maintenance schedule.', c: [['Due Reading', 'As RH increases, jobs approach due readings'], ['Calculation', 'Due readings = last completion reading + frequency']] },
+      26: { goal: 'Verify RH-based WO status changes when RH exceeds due reading.', c: [['Status Change', 'WO status changes to "Due" or "Overdue" when RH exceeds threshold'], ['Dashboard', 'Dashboard overdue count updates']] },
+      27: { goal: 'Verify weekly utilization period calculation.', c: [['Weekly', 'Data reflects last 7 days (168 hrs max)'], ['Label', 'Column header shows "Weekly"']] },
+      28: { goal: 'Verify monthly utilization period calculation.', c: [['Monthly', 'Data reflects last 30 days (720 hrs max)'], ['Period RH', 'Shows hours accumulated in last month']] },
+      29: { goal: 'Verify quarterly and yearly utilization calculations.', c: [['Quarterly', '90 days (2160 hrs max)'], ['Yearly', '365 days (8760 hrs max)'], ['Recalculate', 'Percentages recalculate for each period']] },
+      30: { goal: 'Verify CSV export of running hours data.', c: [['Download', 'CSV file downloads'], ['Content', 'Contains all visible RH data'], ['Columns', 'Vessel, Component, Code, Category, RH, Last Updated, Utilization, Period RH']] },
+      31: { goal: 'Verify history export respects filters.', c: [['Filtered', 'Export contains only filtered history data'], ['Respect Filters', 'Applied filters are reflected in export']] },
+      32: { goal: 'Verify numeric precision in exported data.', c: [['Precision', 'No loss of numeric precision'], ['Dates', 'Dates in readable format'], ['Names', 'Component names/codes not truncated']] },
+      33: { goal: 'Verify export handles large datasets (50+ components).', c: [['Complete', 'All components included in export'], ['Opens', 'File opens without errors in Excel'], ['Performance', 'Export completes in < 30 seconds']] },
+      34: { goal: 'Verify handling of 0 running hours.', c: [['Zero to New', '0-to-new-value transition works correctly'], ['No Math Errors', 'No division-by-zero in utilization calculations']] },
+      35: { goal: 'Verify handling of extremely large RH values.', c: [['Large Values', 'System accepts or shows reasonable upper limit error'], ['Display', 'Large numbers formatted correctly (commas)'], ['Utilization', 'Calculations remain accurate']] },
+    };
+    const s = historyExportScenarios[n];
+    return fmt(id, scenario, s.goal,
+      ['Log in to RSMS.', `Navigate to ${nav}.`, 'Select a vessel.'],
+      ['Navigate to the relevant tab or control for this test.'], [], [],
+      s.c,
+      ['No errors or data corruption', 'Consistent with on-screen data', 'Performance is acceptable'],
+      ['Test with edge case data (0 RH, max RH, special characters in comments).', 'Verify behavior across different user roles.']
+    );
+  }
+
+  return buildGeneric(id, scenario, section, steps, testData, expected);
 }
 
-function generateWOLayer5Test(id, num, section, scenario, steps, testData, expected) {
-  const map = {
-    98: `HOW TO TEST:\n1. Complete a work order and submit for approval.\n2. Log in as a superintendent (or check the superintendent notifications page).\n3. Navigate to PMS > Superintendent page (from sidebar).\n4. VERIFY: A notification appears for the newly submitted work order.\n5. VERIFY: The notification includes: WO number, job title, vessel, submission date.`,
-    99: `HOW TO TEST:\n1. Navigate to the Superintendent Notifications page.\n2. VERIFY: Pending work orders for approval are listed.\n3. VERIFY: Each entry shows key details (WO number, component, vessel).\n4. VERIFY: The list can be sorted or filtered.\n5. VERIFY: Clicking on a notification navigates to the WO detail page.`,
-    100: `HOW TO TEST:\n1. Submit multiple work orders for approval from different vessels.\n2. Navigate to the Superintendent page.\n3. VERIFY: All pending approvals appear in the list.\n4. VERIFY: They can be filtered by vessel.\n5. VERIFY: The count of pending items is accurate.`,
-    101: `HOW TO TEST:\n1. Navigate to the Superintendent page.\n2. Approve a work order.\n3. VERIFY: The notification for that WO is removed or marked as acknowledged.\n4. VERIFY: The pending count decreases by one.\n5. VERIFY: The approved WO appears in the Completed tab on the Work Orders page.`,
-    102: `HOW TO TEST:\n1. Navigate to the Superintendent page.\n2. Look for backdated or anomalous work orders in the notifications.\n3. VERIFY: Anomalous WOs are highlighted differently (warning icon or different color).\n4. VERIFY: The notification explains why the WO is flagged (e.g., "Backdated by 45 days").\n5. VERIFY: The superintendent can still approve or reject these flagged WOs.`
-  };
-  return map[num] || `HOW TO TEST:\n1. Navigate to PMS > Superintendent page.\n2. Test Layer 5 (Superintendent Notification) functionality.\n3. ${steps.replace(/\n/g, '\n')}\nVERIFY: ${expected}`;
+function genSP(id, section, scenario, steps, testData, expected) {
+  const n = parseInt(id.replace('SP-', ''));
+  const nav = NAV.spares;
+
+  if (n >= 1 && n <= 11) {
+    const listScenarios = {
+      1: { goal: 'Verify the Spares list page loads correctly with all expected columns and tabs.', checks: [['Page Load', 'Spares page loads showing table with tabs: Inventory, Location, History'], ['Columns', 'Shows: Part Code, Part Name, Component, Part Number, Critical, ROB, Min, Stock, Location'], ['Buttons', '"+ Add Spare", "Export", "Bulk Update Spares" buttons visible']] },
+      2: { goal: 'Verify pagination controls work correctly on the spares table.', checks: [['Navigation', 'Page buttons work (Next, Previous, page numbers)'], ['Page Size', 'Items per page can be changed'], ['Count', 'Total count displayed']] },
+      3: { goal: 'Verify search by part number filters spares correctly.', checks: [['Filter', 'Table shows only matching parts'], ['Partial', 'Partial number matches work'], ['Clear', 'Full list returns when search cleared']] },
+      4: { goal: 'Verify search by part name filters spares correctly.', checks: [['Filter', 'Matching spare parts displayed'], ['Partial', 'Partial name matches work'], ['Clear', 'Full list returns when search cleared']] },
+      5: { goal: 'Verify filter by component works correctly.', checks: [['Component Filter', 'Only spares linked to selected component shown'], ['Clear', 'All spares return when filter cleared']] },
+      6: { goal: 'Verify total spares count display and dynamic update.', checks: [['Count Visible', 'Total spares count displayed in the table header or footer area'], ['Accurate', 'Count matches the actual number of rows in the table'], ['Filter Update', 'Count dynamically updates when search or filters are applied'], ['Clear Reset', 'Count returns to original total when filters are cleared']] },
+      7: { goal: 'Verify low stock indicator highlighting for spares where ROB <= Min Stock.', checks: [['Flagged', 'Spares where ROB <= Min Stock are highlighted or have a "Low" status badge'], ['Color', 'Low stock indicator uses visible color (red or amber in the Stock column)'], ['Normal', 'Spares with adequate stock show "OK" or green indicator']] },
+      8: { goal: 'Verify column sorting works on the spares table.', checks: [['Sort Click', 'Clicking column headers sorts the table'], ['Toggle', 'Ascending/descending toggle works'], ['Indicator', 'Sort indicator arrow appears on active column']] },
+      9: { goal: 'Verify vessel filter changes refresh spares data.', checks: [['Refresh', 'Spares list updates for selected vessel'], ['Data Change', 'Counts and data reflect new vessel']] },
+      10: { goal: 'Verify the Export button downloads spares data.', checks: [['Download', 'File downloads (Excel or CSV)'], ['Content', 'Exported data matches on-screen data']] },
+      11: { goal: 'Verify the Criticality filter shows only critical or non-critical spares.', checks: [['Critical', 'Selecting "Critical" shows only critical spares'], ['Non-critical', 'Selecting "Non-critical" shows only non-critical spares'], ['All', 'Selecting "All" shows all spares']] },
+    };
+    const s = listScenarios[n];
+    return fmt(id, scenario, s.goal,
+      ['Log in to RSMS.', `Navigate to ${nav}.`, 'Select a vessel from the vessel dropdown.'],
+      ['Observe the spares table and interact with the relevant controls.'], [], [],
+      s.checks,
+      ['Table loads without errors', 'All data is formatted correctly', 'No "undefined" or blank values for populated fields'],
+      ['Switch vessel rapidly — verify no mixed data.', 'Apply filters that return zero results — verify empty state message appears.']
+    );
+  }
+
+  if (n >= 12 && n <= 40) {
+    const crudScenarios = {
+      12: { goal: 'Verify the Add Spare form opens and creates a spare part successfully.', checks: [['Form', '"+ Add Spare" button opens the add form'], ['Fields', 'Required fields: Part Code, Part Name, Component, UOM, Min Stock, ROB'], ['Save', 'Spare created and appears in list'], ['Toast', 'Success toast message appears']] },
+      13: { goal: 'Verify form validation prevents saving with missing required fields.', checks: [['Validation', 'Errors appear for empty required fields'], ['Blocked', 'Form does NOT save until all required fields filled']] },
+      14: { goal: 'Verify the system prevents duplicate part numbers.', checks: [['Duplicate Error', 'Error message for duplicate part number'], ['Blocked', 'System prevents creating duplicate']] },
+      15: { goal: 'Verify ROB field rejects negative values.', checks: [['Negative', 'System rejects negative ROB values'], ['Zero', 'Zero is accepted (no stock on hand)']] },
+      16: { goal: 'Verify the Critical flag saves correctly.', checks: [['Critical Yes', 'Spare marked as critical in the list'], ['Reports', 'Critical spares included in critical stock reports']] },
+      17: { goal: 'Verify editing an existing spare part saves changes.', checks: [['Edit', 'Spare details open for editing'], ['Save', 'Changes saved and reflected in list'], ['Toast', 'Success message appears']] },
+      18: { goal: 'Verify Min Stock level change updates low stock indicators.', checks: [['Saved', 'New min stock saved'], ['Indicator Update', 'Low stock indicators update based on new threshold']] },
+      19: { goal: 'Verify Stock In (Receive) operation increases ROB.', checks: [['ROB Increase', 'ROB increases by entered quantity'], ['History', 'Transaction recorded in stock history']] },
+      20: { goal: 'Verify Stock Out (Issue) operation decreases ROB.', checks: [['ROB Decrease', 'ROB decreases by issued quantity'], ['History', 'Transaction recorded in history']] },
+      21: { goal: 'Verify system prevents issuing more than available stock.', checks: [['Prevented', 'System blocks issuing more than ROB'], ['Error', '"Insufficient stock" error message appears']] },
+      22: { goal: 'Verify stock transaction history records both In and Out operations.', checks: [['In Record', 'Stock In appears with "Received" type'], ['Out Record', 'Stock Out appears with "Consumed" type'], ['Details', 'Both show quantities, dates, and notes']] },
+      23: { goal: 'Verify ROB calculations are mathematically correct after multiple transactions.', checks: [['Balance', 'Running ROB balance is correct after each transaction'], ['Audit', 'History shows accurate audit trail']] },
+      24: { goal: 'Verify WO-linked spare consumption decreases ROB.', checks: [['ROB Decrease', 'ROB decreases by consumed quantity after WO submission'], ['Source', 'Transaction source shows "Work Order" in history']] },
+      25: { goal: 'Verify only component-linked spares are available for WO consumption.', checks: [['Filtered', 'Only spares for the WO\'s component available for selection'], ['ROB Update', 'ROB updates correctly after WO submission']] },
+      26: { goal: 'Verify stock transaction history displays all past transactions.', checks: [['Chronological', 'All transactions listed chronologically'], ['Details', 'Each shows: date, type, quantity, balance, source, notes']] },
+      27: { goal: 'Verify date filtering in stock history.', checks: [['Date Range', 'Only transactions within range shown'], ['Clear', 'All transactions return when cleared']] },
+      28: { goal: 'Verify sort order in stock history (newest first by default).', checks: [['Default', 'Newest first by default'], ['Toggle', 'Oldest first when ascending selected']] },
+      29: { goal: 'Verify running balance accuracy across all transaction types.', checks: [['Balance', 'Running balance correct at each point'], ['All Types', 'Manual in, manual out, WO consumption all represented']] },
+      30: { goal: 'Verify low stock visual indicator for spares at or below minimum.', checks: [['Indicator', 'Low stock spares have visible badge/icon/highlighting'], ['Color', 'Red or amber color used'], ['Dashboard', 'Dashboard count matches low-stock spares']] },
+      31: { goal: 'Verify low stock indicator toggles correctly when ROB crosses Min threshold.', checks: [['Below Min', 'Indicator appears when ROB <= Min'], ['Above Min', 'Indicator removed when ROB > Min']] },
+      32: { goal: 'Verify Dashboard low stock tiles match actual spare data.', checks: [['Low Stock Count', 'Matches spares where ROB <= Min'], ['Critical Low Stock', 'Matches critical spares where ROB <= Min'], ['Click Through', 'Clicking tile navigates to filtered spares list']] },
+      33: { goal: 'Verify category filtering for spares.', checks: [['Category Filter', 'Only spares in selected category shown'], ['Options', 'Category dropdown shows available categories']] },
+      34: { goal: 'Verify spare category assignment and editing.', checks: [['Assign', 'Spare appears under correct category'], ['Change', 'Spare moves to new category when edited']] },
+      35: { goal: 'Verify ROB display accuracy and units.', checks: [['Non-negative', 'ROB values are non-negative integers'], ['Unit', 'Unit of measure shown alongside ROB'], ['Accurate', 'ROB reflects all stock transactions']] },
+      36: { goal: 'Verify ROB updates immediately and persists after page reload.', checks: [['Immediate', 'ROB updates immediately in the UI'], ['Persist', 'Value persists after page refresh'], ['Accurate', 'Matches expected balance']] },
+      37: { goal: 'Verify deletion of a spare with no transaction history.', checks: [['Confirmation', 'Confirmation dialog appears'], ['Deleted', 'Spare removed from list'], ['Success', 'Success message appears']] },
+      38: { goal: 'Verify deletion prevention for spares with existing transactions/WO links.', checks: [['Prevented', 'System prevents deletion with error message'], ['Retained', 'Spare remains in the list']] },
+      39: { goal: 'Verify Cancel on delete confirmation preserves the spare.', checks: [['Not Deleted', 'Spare NOT deleted after Cancel'], ['Data Intact', 'All data remains unchanged']] },
+      40: { goal: 'Verify bulk import of spares (if available).', checks: [['Import', 'Valid spares imported from CSV/Excel file'], ['Validation', 'Invalid entries flagged with specific errors'], ['Summary', 'Import summary shows count imported vs rejected']] },
+    };
+    const s = crudScenarios[n];
+    return fmt(id, scenario, s.goal,
+      ['Log in to RSMS.', `Navigate to ${nav}.`, 'Select a vessel.'],
+      ['Perform the operation described for this test case.'], [], [],
+      s.checks,
+      ['No UI errors during operation', 'Data integrity maintained', 'ROB calculations are correct'],
+      ['Test with boundary values (0, negative, very large numbers).', 'Test with special characters in names/notes.', 'Verify behavior across different user roles.']
+    );
+  }
+
+  return buildGeneric(id, scenario, section, steps, testData, expected);
 }
 
-function generateWOLayer6Test(id, num, section, scenario, steps, testData, expected) {
-  const map = {
-    103: `HOW TO TEST:\n1. Log in as a Sail Admin user.\n2. Navigate to PMS > Dashboard.\n3. Scroll down to the "Compliance Anomaly Detection" panel (only visible to Sail Admin).\n4. VERIFY: The anomaly panel loads and shows detection results.\n5. VERIFY: Anomalies are categorized (Cycle Skip, Backdating, Bulk Completion, Schedule Drift).\n6. VERIFY: Each anomaly card shows a count and severity indicator.`,
-    104: `HOW TO TEST:\n1. Log in as a Sail Admin and go to the Dashboard.\n2. In the Anomaly Detection panel, look at individual anomaly entries.\n3. VERIFY: Each entry shows: vessel, component, job, anomaly type, severity.\n4. VERIFY: Clicking an anomaly shows more details or navigates to the relevant WO.\n5. VERIFY: Anomalies can be filtered by type or severity.`,
-    105: `HOW TO TEST:\n1. Log in as a Sail Admin and navigate to Dashboard.\n2. In the Anomaly panel, look for the "Cycle Skip Rate" card.\n3. VERIFY: It shows the percentage/count of jobs with skipped cycles.\n4. VERIFY: The rate is calculated across the selected vessel(s).\n5. VERIFY: Clicking shows details of which jobs have skipped cycles.`,
-    106: `HOW TO TEST:\n1. In the Anomaly Detection panel, look for the "Backdating Frequency" card.\n2. VERIFY: It shows how many work orders were completed with backdated dates.\n3. VERIFY: The count/percentage is accurate.\n4. VERIFY: Details show which WOs were backdated and by how much.`,
-    107: `HOW TO TEST:\n1. In the Anomaly Detection panel, look for the "Bulk Completion Events" card.\n2. VERIFY: It flags instances where many work orders were completed on the same date.\n3. VERIFY: The threshold for "bulk" is reasonable (e.g., 5+ WOs on the same day).\n4. VERIFY: Details show the date and the WOs involved.`,
-    108: `HOW TO TEST:\n1. In the Anomaly Detection panel, look for the "Schedule Drift" card.\n2. VERIFY: It identifies jobs whose actual completion significantly drifts from their scheduled date.\n3. VERIFY: Both early and late completions are detected.\n4. VERIFY: The drift amount is shown (e.g., "15 days late" or "20 days early").`,
-    109: `HOW TO TEST:\n1. Log in as a Sail Admin.\n2. Navigate to the Dashboard anomaly panel.\n3. Use the severity filter dropdown to filter anomalies.\n4. Select "High" severity.\n5. VERIFY: Only high-severity anomalies are shown.\n6. Select "Medium" and VERIFY the list updates.\n7. Select "All" and VERIFY all anomalies reappear.`,
-    110: `HOW TO TEST:\n1. In the Anomaly panel, click the "Refresh" button.\n2. VERIFY: Anomaly data refreshes (loading spinner appears briefly).\n3. VERIFY: Any new anomalies since last load appear after refresh.\n4. VERIFY: The refresh completes without errors.`,
-    111: `HOW TO TEST:\n1. Generate an anomaly by completing a work order with a significantly backdated date.\n2. Navigate to the Dashboard anomaly panel.\n3. VERIFY: The new anomaly appears in the list.\n4. VERIFY: The anomaly type matches (e.g., "Backdating").\n5. VERIFY: The severity level is appropriate.`,
-    112: `HOW TO TEST:\n1. In the Anomaly panel, check anomalies for multiple vessels.\n2. Switch between vessels using the vessel filter.\n3. VERIFY: Anomalies are vessel-specific.\n4. VERIFY: "All Vessels" shows combined anomalies.\n5. VERIFY: No cross-vessel data leakage.`,
-    113: `HOW TO TEST:\n1. Review the anomaly detection accuracy.\n2. Find a known good work order (completed on time, no issues).\n3. VERIFY: It is NOT flagged as an anomaly.\n4. Find a known problematic work order.\n5. VERIFY: It IS correctly flagged.\n6. Document any false positives or false negatives.`,
-    114: `HOW TO TEST:\n1. Open the Anomaly panel.\n2. Review the overall anomaly summary.\n3. VERIFY: Summary counts match the detail counts.\n4. VERIFY: The panel provides actionable information.\n5. VERIFY: All anomaly types are represented in the summary.`
+function genST(id, section, scenario, steps, testData, expected) {
+  const n = parseInt(id.replace('ST-', ''));
+  const nav = NAV.stores;
+
+  const storeScenarios = {
+    1: { goal: 'Verify the Stores inventory page loads with category tabs and all expected columns.', checks: [['Page Load', 'Stores page loads with tabs: Stores, Lubes, Chemicals, Others'], ['View Modes', 'View modes available: Inventory, Location, History'], ['Columns', 'Shows: Item Code, Item Name, Category, UOM, ROB, Min, Stock, Location'], ['Buttons', '"+ Add Item", "Export", "Bulk Update" buttons visible']] },
+    2: { goal: 'Verify search by item code filters store items correctly.', checks: [['Filter', 'Table shows only matching items'], ['Clear', 'Full list returns when search cleared']] },
+    3: { goal: 'Verify search by item name filters store items correctly.', checks: [['Filter', 'Matching items displayed'], ['Partial', 'Partial name matches work']] },
+    4: { goal: 'Verify pagination controls work on the stores table.', checks: [['Navigation', 'Pagination works (Next, Previous)'], ['Page Size', 'Items per page can be changed']] },
+    5: { goal: 'Verify column sorting works on the stores table.', checks: [['Sort', 'Sorting works for Item Code, Name, ROB'], ['Indicators', 'Sort indicators appear']] },
+    6: { goal: 'Verify the Add Item form creates a new store item successfully.', checks: [['Form', '"+ Add Item" opens form with General Info, Stock Levels, Location, etc.'], ['Required Fields', 'Item Code, Item Name, Category, UOM, Min Stock, ROB'], ['Save', 'Item created and appears in list'], ['Toast', 'Success message appears']] },
+    7: { goal: 'Verify form validation for required fields when adding store items.', checks: [['Validation', 'Errors appear for empty required fields'], ['Blocked', 'Form does NOT save until all required fields filled']] },
+    8: { goal: 'Verify duplicate item code prevention.', checks: [['Duplicate', 'Error message for duplicate item code'], ['Blocked', 'System prevents creating duplicate']] },
+    9: { goal: 'Verify store item creation with minimum and maximum data.', checks: [['Minimum', 'Item saves with only required fields'], ['Maximum', 'Item saves with all optional fields filled']] },
+    10: { goal: 'Verify stock quantity adjustment (stock in and stock out).', checks: [['Stock In', 'ROB increases with positive adjustment'], ['Stock Out', 'ROB decreases with negative adjustment'], ['History', 'Transactions recorded in history']] },
+    11: { goal: 'Verify system prevents stock going below zero.', checks: [['Prevented', 'System blocks going below 0'], ['Error', 'Error message appears']] },
+    12: { goal: 'Verify updated quantity persists after page refresh.', checks: [['Immediate', 'Change reflected immediately'], ['Persist', 'Value persists after refresh']] },
+    13: { goal: 'Verify category filters/tabs work for stores.', checks: [['Filter', 'Only items in selected category shown'], ['Tabs', 'Stores, Lubes, Chemicals, Others tabs filter correctly']] },
+    14: { goal: 'Verify new store item category assignment.', checks: [['Category', 'Item appears under correct category tab'], ['Management', 'Category options are available']] },
+    15: { goal: 'Verify store item category change.', checks: [['Move', 'Item moves to new category on edit'], ['Old Category', 'Old category no longer shows item']] },
+    16: { goal: 'Verify category management operations.', checks: [['Add', 'New categories can be created'], ['Delete Empty', 'Empty categories can be deleted'], ['Delete Non-Empty', 'System prevents or handles deletion of categories with items']] },
+    17: { goal: 'Verify store item transaction history display.', checks: [['History', 'All past quantity changes listed'], ['Details', 'Each shows: date, type, quantity, balance, notes'], ['Sort', 'Sorted by date (newest first)']] },
+    18: { goal: 'Verify date filtering in store transaction history.', checks: [['Date Range', 'Only transactions within range shown'], ['Clear', 'All entries return when cleared']] },
+    19: { goal: 'Verify running balance accuracy across multiple transactions.', checks: [['Balance', 'Running balance correct at each point'], ['All Accounted', 'All transactions accounted for']] },
+    20: { goal: 'Verify editing an existing store item saves changes.', checks: [['Edit', 'Item details open for editing'], ['Save', 'Changes saved and reflected'], ['Toast', 'Success message appears']] },
+    21: { goal: 'Verify Min Stock level change updates low stock indicators.', checks: [['Saved', 'New min stock saved'], ['Indicator', 'Low stock warning appears if ROB now below new min']] },
+    22: { goal: 'Verify bulk update/import for store items.', checks: [['Upload', 'File with multiple items can be uploaded'], ['Valid', 'Valid items imported/updated'], ['Invalid', 'Invalid entries flagged with errors']] },
+    23: { goal: 'Verify deletion of a store item with no transaction history.', checks: [['Confirmation', 'Confirmation dialog appears'], ['Deleted', 'Item removed from list'], ['Toast', 'Success message appears']] },
+    24: { goal: 'Verify deletion behavior for items with transaction history.', checks: [['Prevention', 'System prevents deletion or warns about losing history'], ['Document', 'Document actual behavior in Comments']] },
+    25: { goal: 'Verify handling of long names (200+ chars) and special characters.', checks: [['Long Name', 'Saves successfully, displays correctly (truncated if needed)'], ['Special Chars', 'Characters preserved correctly']] },
   };
-  return map[num] || `HOW TO TEST:\n1. Log in as Sail Admin.\n2. Navigate to PMS > Dashboard.\n3. Test Layer 6 (Anomaly Detection) functionality.\n4. ${steps.replace(/\n/g, '\n')}\nVERIFY: ${expected}`;
+  const s = storeScenarios[n] || { goal: `Verify ${scenario.toLowerCase()}.`, checks: [['Result', expected]] };
+  return fmt(id, scenario, s.goal,
+    ['Log in to RSMS.', `Navigate to ${nav}.`, 'Select a vessel.'],
+    ['Navigate to the relevant tab/view and perform the test action.'], [], [],
+    s.checks,
+    ['No UI errors during operation', 'Data integrity maintained', 'Category tabs work correctly', 'Stock calculations are accurate'],
+    ['Test with boundary values (0, negative, very large numbers).', 'Test with special characters in item names/codes.', 'Switch between category tabs rapidly — verify no data mix.']
+  );
 }
 
-function generateWOLayer7Test(id, num, section, scenario, steps, testData, expected) {
-  const map = {
-    115: `HOW TO TEST:\n1. Open an RH-based work order.\n2. Go to Part B and find the "Current Reading" field.\n3. Enter a valid running hours value (e.g., 5000).\n4. VERIFY: The value is accepted.\n5. VERIFY: The next due reading is calculated (current + frequency).\n6. Submit the work order.\n7. VERIFY: RH validation passes — no errors.`,
-    116: `HOW TO TEST:\n1. Open an RH-based work order.\n2. Enter a Current Reading that is LESS than the previous reading.\n3. Try to submit.\n4. VERIFY: Layer 7 RH validation triggers.\n5. VERIFY: An error message appears (e.g., "Current reading cannot be less than previous reading").\n6. VERIFY: The submission is blocked.`,
-    117: `HOW TO TEST:\n1. Open an RH-based work order.\n2. Enter a Current Reading of exactly 0.\n3. Try to submit.\n4. VERIFY: A Zero RH Renewal confirmation dialog appears.\n5. VERIFY: The dialog asks for the reason (Renewal Action Type).\n6. VERIFY: You must provide a reason before proceeding.`,
-    118: `HOW TO TEST:\n1. Open an RH-based work order.\n2. Enter an extremely high Current Reading (e.g., 999999).\n3. VERIFY: The system validates the value against reasonable limits.\n4. VERIFY: A warning appears if the jump is unreasonably large.\n5. Document the system's behavior for extreme values.`,
-    119: `HOW TO TEST:\n1. Open an RH-based work order.\n2. Enter a negative value for Current Reading.\n3. VERIFY: The system rejects negative values.\n4. VERIFY: An appropriate error message appears.\n5. VERIFY: Only positive numbers (and zero with justification) are accepted.`,
-    120: `HOW TO TEST:\n1. Open an RH-based work order.\n2. Enter a Current Reading with decimal places (e.g., 5000.5).\n3. VERIFY: Decimal values are either accepted or rounded.\n4. VERIFY: The system handles the decimal consistently.\n5. Document whether decimals are supported.`,
-    121: `HOW TO TEST:\n1. Open an RH-based work order.\n2. Enter a Current Reading equal to the previous reading (no change).\n3. Try to submit.\n4. VERIFY: The system either accepts it (valid: equipment was not run) or flags it.\n5. Document the behavior for zero-delta readings.`,
-    122: `HOW TO TEST:\n1. Complete an RH-based work order with a valid reading.\n2. Check the running hours for the component.\n3. VERIFY: The component's cumulative running hours updated to match the entered value.\n4. VERIFY: Child components (inherited RH) also updated if applicable.\n5. VERIFY: The RH history shows the new entry.`,
-    123: `HOW TO TEST:\n1. Open an RH-based work order.\n2. Enter a Current Reading that represents a jump > 200% of expected utilization.\n3. VERIFY: Layer 7 flags this as a suspicious reading.\n4. VERIFY: A warning message appears asking to confirm the value.\n5. VERIFY: The user can either correct the value or confirm it's accurate.`,
-    124: `HOW TO TEST:\n1. Open an RH-based work order.\n2. Enter a Current Reading that passes basic validation (> previous reading).\n3. VERIFY: The system also checks against the utilization rate.\n4. VERIFY: If the daily average implied by the new reading exceeds 24 hours, a validation error appears.\n5. VERIFY: Physically impossible readings are blocked.`,
-    125: `HOW TO TEST:\n1. Complete an RH-based work order with a meter replacement scenario.\n2. Check the "Meter Replaced" option.\n3. Enter the old meter's final reading and the new meter's starting reading.\n4. VERIFY: The system calculates the new cumulative RH correctly.\n5. VERIFY: The meter replacement is recorded in the RH history.`,
-    126: `HOW TO TEST:\n1. Enter an RH reading and submit the work order.\n2. After submission, try to modify the RH reading.\n3. VERIFY: Once submitted, the RH reading cannot be changed.\n4. VERIFY: The reading is immutable in the work order history.`,
-    127: `HOW TO TEST:\n1. Complete multiple RH-based work orders for different components.\n2. VERIFY: Each component's RH updates independently.\n3. VERIFY: No cross-contamination of RH values between components.\n4. VERIFY: Each work order correctly references its own component's RH.`,
-    128: `HOW TO TEST:\n1. Open an RH-based work order.\n2. Check if the current running hours of the component are pre-populated.\n3. VERIFY: The "Previous Reading" or "Current Component RH" is displayed for reference.\n4. VERIFY: This value matches the component's actual current RH.\n5. VERIFY: The user can see the context for what value to enter.`,
-    129: `HOW TO TEST:\n1. Open an RH-based work order.\n2. Enter a valid current reading and submit.\n3. Check that the RH update is isolated to this specific component.\n4. VERIFY: Other components' RH values are NOT affected.\n5. VERIFY: Only inherited children (if applicable) update automatically.`,
-    130: `HOW TO TEST:\n1. Open an RH-based work order for a component with inherited RH children.\n2. Update the running hours.\n3. VERIFY: The parent component's RH updates.\n4. VERIFY: All inherited children also update to match.\n5. VERIFY: Non-inherited children are NOT affected.`,
-    131: `HOW TO TEST:\n1. Navigate to PMS > Running Hrs.\n2. Select a component and view its RH history.\n3. VERIFY: A timeline or chart shows RH progression over time.\n4. VERIFY: Each data point corresponds to an RH update event.\n5. VERIFY: The timeline is chronologically ordered.`,
-    132: `HOW TO TEST:\n1. View the RH timeline for a component.\n2. Look for meter replacement events in the timeline.\n3. VERIFY: Meter replacements are clearly marked (different color or icon).\n4. VERIFY: The timeline shows the old meter's final reading and new meter's start.\n5. VERIFY: The cumulative total remains accurate across meter changes.`,
-    133: `HOW TO TEST:\n1. View the RH timeline for a component with many updates.\n2. VERIFY: The timeline handles large datasets (50+ entries) without performance issues.\n3. VERIFY: Scrolling or pagination works if the timeline is long.\n4. VERIFY: All entries are accessible and readable.`,
-    134: `HOW TO TEST:\n1. Navigate to PMS > Running Hrs.\n2. Select a component.\n3. VERIFY: The current running hours display shows:\n   - Current cumulative RH\n   - Last updated date\n   - Utilization rate (percentage)\n   - Period running hours\n4. VERIFY: All values are formatted correctly (commas for thousands, "hrs" suffix).`,
-    135: `HOW TO TEST:\n1. Try to enter an invalid RH value in a work order (e.g., text instead of number).\n2. VERIFY: An error modal or inline error appears.\n3. VERIFY: The error message clearly explains the issue.\n4. VERIFY: The form prevents submission with invalid data.`,
-    136: `HOW TO TEST:\n1. Trigger multiple RH validation errors simultaneously.\n2. VERIFY: Each error is displayed clearly.\n3. VERIFY: Error messages don't overlap or hide each other.\n4. VERIFY: The user can address each error individually.\n5. VERIFY: After fixing all errors, submission proceeds normally.`
+function genRPT(id, section, scenario, steps, testData, expected) {
+  const n = parseInt(id.replace('RPT-', ''));
+  const nav = NAV.reports;
+
+  const reportScenarios = {
+    1: { goal: 'Verify the Reports module loads with all report category cards.', checks: [['Page Load', 'Reports page opens with category cards'], ['Categories', 'Cards include: Maintenance Planner, Maintenance & Work Orders, Running Hours & Condition, Inventory - Spares, Inventory - Stores, IHM, Modify PMS, Critical Equipment, LSA/FFA Equipment'], ['Filters', 'Global filters visible: Vessel, Search, Date Range']] },
+    2: { goal: 'Verify Work Order Status report generation.', checks: [['WO by Status', 'Report shows WOs grouped by status (Planned, Due, Overdue, Completed)'], ['Counts', 'Counts and percentages are accurate'], ['Data Match', 'Report matches Work Orders page data']] },
+    3: { goal: 'Verify Work Order Completion report with date range.', checks: [['Date Filter', 'Only WOs completed within the range included'], ['Details', 'Completion details (date, who, work done) shown']] },
+    4: { goal: 'Verify Overdue Work Orders report.', checks: [['All Overdue', 'All overdue WOs listed'], ['Days Overdue', 'Report shows days overdue for each WO'], ['Highlighted', 'Critical overdue items highlighted']] },
+    5: { goal: 'Verify Work Order Trend report with monthly data.', checks: [['Trends', 'Monthly trends shown (completions vs due vs overdue)'], ['Chart', 'Chart accurately represents the data'], ['Date Range', 'Date range can be adjusted']] },
+    6: { goal: 'Verify Component/Equipment report.', checks: [['Component List', 'Report lists all components with key information'], ['Hierarchy', 'Component hierarchy maintained'], ['Critical', 'Critical components highlighted']] },
+    7: { goal: 'Verify Component Maintenance History report.', checks: [['History', 'All maintenance activities listed chronologically'], ['Details', 'WO number, job title, completion date, work done included']] },
+    8: { goal: 'Verify Running Hours report.', checks: [['Current RH', 'Current RH for all tracked components listed'], ['Utilization', 'Utilization rates shown'], ['Last Updated', 'Last updated dates accurate']] },
+    9: { goal: 'Verify RH History report for a specific component.', checks: [['Events', 'All RH update events listed'], ['Values', 'Old and new values shown for each update'], ['Source', 'Source (manual, cascade, WO) indicated']] },
+    10: { goal: 'Verify RH Utilization report.', checks: [['Rates', 'Utilization rates by component shown'], ['Period', 'Selected period reflected'], ['High Usage', 'High-utilization components highlighted']] },
+    11: { goal: 'Verify Spares/Inventory report.', checks: [['All Spares', 'All spare parts listed with current ROB'], ['Min Stock', 'Min stock levels shown'], ['Low Stock', 'Low stock items flagged']] },
+    12: { goal: 'Verify Spares Consumption report.', checks: [['Consumption', 'All spare consumption listed for date range'], ['Quantities', 'Quantities consumed are accurate'], ['WO Link', 'Report shows which WOs consumed spares']] },
+    13: { goal: 'Verify Critical Spares report.', checks: [['Critical Only', 'Only critical spares included'], ['Stock Levels', 'Current stock levels shown'], ['Below Min', 'Items below minimum highlighted']] },
+    14: { goal: 'Verify Compliance Summary report.', checks: [['Compliance Rate', 'Overall PMS compliance rate shown'], ['Calculation', 'Rate = completed on-time / total due'], ['Filters', 'Can be filtered by vessel and date range']] },
+    15: { goal: 'Verify compliance by department breakdown.', checks: [['Per Department', 'Each department has its own compliance rate'], ['Totals Match', 'Department totals match overall rate']] },
+    16: { goal: 'Verify compliance by component category breakdown.', checks: [['Per Category', 'Each category shows compliance rate'], ['Low Compliance', 'Categories with low compliance highlighted']] },
+    17: { goal: 'Verify compliance trend over consecutive months.', checks: [['Trend Visible', 'Trend is visible across months'], ['Changes', 'Month-over-month changes are clear']] },
+    18: { goal: 'Verify report filter options (Vessel, Date Range, Department, Component).', checks: [['Vessel', 'Data scoped to selected vessel'], ['Date Range', 'Only data within range included'], ['Multiple', 'Multiple filters can be combined']] },
+    19: { goal: 'Verify unfiltered reports show all data.', checks: [['All Data', 'Unfiltered report shows all data'], ['Consistency', 'Filtered and unfiltered reports are consistent']] },
+    20: { goal: 'Verify invalid filter combination handling.', checks: [['Validation', 'Error for "From" date after "To" date'], ['No Report', 'No report generated with invalid filters']] },
+    21: { goal: 'Verify report generation loading state and rendering.', checks: [['Loading', 'Loading indicator appears during generation'], ['Rendered', 'Report renders in preview area'], ['Performance', 'Generation completes in reasonable time']] },
+    22: { goal: 'Verify report export to Excel and PDF.', checks: [['Excel', 'Excel file downloads with report data'], ['PDF', 'PDF file downloads with formatted report']] },
+    23: { goal: 'Verify PDF export formatting quality.', checks: [['Headers/Footers', 'Proper formatting with headers, footers, page numbers'], ['Tables', 'Tables are readable and not cut off'], ['Charts', 'Charts render correctly in export']] },
+    24: { goal: 'Verify report header content.', checks: [['Title', 'Report title included'], ['Vessel', 'Vessel name displayed'], ['Date Range', 'Date range shown'], ['Generation Date', 'Generation timestamp included']] },
+    25: { goal: 'Verify report handles large datasets without errors.', checks: [['Volume', 'Report handles high volume without errors'], ['Complete', 'All data included (no truncation)'], ['Performance', 'Generates within 30 seconds']] },
+    26: { goal: 'Verify deterministic report generation (same params = same results).', checks: [['Identical', 'Two reports with same parameters produce identical results'], ['No Random', 'No random variations occur']] },
+    27: { goal: 'Verify compliance rate calculation accuracy.', checks: [['Match', 'Calculated rates match manual calculation'], ['Percentages', 'Percentages add up correctly']] },
+    28: { goal: 'Verify scheduled reports functionality.', checks: [['Schedule', 'If available, schedule is saved and indicates next generation time'], ['Availability', 'If not available, note "Scheduled Reports not implemented"']] },
+    29: { goal: 'Verify email delivery of scheduled reports.', checks: [['Email', 'If available, reports sent to configured recipients with attachment'], ['Availability', 'If not available, note "Email delivery not implemented"']] },
+    30: { goal: 'Verify schedule editing and deletion.', checks: [['Edit', 'Schedule frequency can be changed'], ['Delete', 'Schedule can be removed']] },
+    31: { goal: 'Verify custom report builder (if available).', checks: [['Custom Fields', 'If available, custom fields/columns can be selected'], ['Generate', 'Custom report generates with selected fields only'], ['Availability', 'If not available, note "Custom Reports not implemented"']] },
+    32: { goal: 'Verify combined filter behavior on reports.', checks: [['AND Logic', 'Combined filters use AND logic'], ['Clear All', 'Clearing filters shows unfiltered data']] },
+    33: { goal: 'Verify exported files reflect applied filters.', checks: [['Filtered Export', 'Export contains only filtered data'], ['Filter Indication', 'Filters noted in export header']] },
+    34: { goal: 'Verify multiple report types generate without errors.', checks: [['All Types', 'Each report type loads and generates'], ['Loading State', 'Loading indicators shown during generation'], ['Errors', 'Error messages appear if data unavailable']] },
+    35: { goal: 'Verify Excel and PDF exports contain identical data.', checks: [['Same Data', 'Both formats contain same data'], ['Excel Sortable', 'Excel has sortable columns'], ['PDF Formatted', 'PDF has proper page breaks and formatting']] },
   };
-  return map[num] || `HOW TO TEST:\n1. Open an RH-based work order.\n2. Test Layer 7 (Running Hours Validation) functionality.\n3. ${steps.replace(/\n/g, '\n')}\nVERIFY: ${expected}`;
+  const s = reportScenarios[n] || { goal: `Verify ${scenario.toLowerCase()}.`, checks: [['Result', expected]] };
+  return fmt(id, scenario, s.goal,
+    ['Log in to RSMS.', `Navigate to ${nav}.`, 'Select a vessel if applicable.'],
+    ['Select the appropriate report category and type.', 'Apply filters as needed and generate the report.'],
+    [], [],
+    s.checks,
+    ['Report loads without errors', 'Data is accurate and complete', 'Export functions work correctly', 'No UI errors during report generation'],
+    ['Generate a report with no data in the selected range — verify empty state message.', 'Export a report while filters are applied — verify export reflects filters.', 'Test report generation across different user roles.']
+  );
 }
 
-function generateWOApprovalTest(id, num, section, scenario, steps, testData, expected) {
-  const map = {
-    137: `HOW TO TEST:\n1. Navigate to PMS > Work orders > Pending Approval tab.\n2. Open a work order pending approval.\n3. Look for the "Approve" button (usually green, with a checkmark icon).\n4. Click "Approve".\n5. If prompted, enter approver remarks.\n6. Confirm the approval.\n7. VERIFY: The WO status changes to "Completed".\n8. VERIFY: The WO moves to the Completed tab.\n9. VERIFY: A success message appears.`,
-    138: `HOW TO TEST:\n1. Navigate to PMS > Work orders > Pending Approval tab.\n2. Open a work order pending approval.\n3. Look for the "Reject" button (usually red, with an X icon).\n4. Click "Reject".\n5. VERIFY: A rejection comments field appears (mandatory).\n6. Enter a reason for rejection.\n7. Confirm the rejection.\n8. VERIFY: The WO status changes to "Rejected".\n9. VERIFY: The WO moves back to the appropriate status tab for rework.`,
-    139: `HOW TO TEST:\n1. Try to approve a work order without entering remarks.\n2. VERIFY: If remarks are mandatory, the system requires them before approval.\n3. VERIFY: If remarks are optional, approval proceeds without them.\n4. Document which scenario applies.`,
-    140: `HOW TO TEST:\n1. Try to reject a work order without entering rejection comments.\n2. VERIFY: The system requires rejection comments (mandatory).\n3. VERIFY: An error appears if comments are empty.\n4. Enter comments and retry.\n5. VERIFY: Rejection proceeds successfully with comments.`,
-    141: `HOW TO TEST:\n1. Approve a work order.\n2. VERIFY: After approval, a new work order cycle is automatically generated for the next period.\n3. VERIFY: The new WO has the correct next due date/reading.\n4. VERIFY: The new WO appears in the Planned tab.`,
-    142: `HOW TO TEST:\n1. Open a rejected work order.\n2. VERIFY: The rejection reason is displayed.\n3. VERIFY: The completion fields (Part B) are editable again for rework.\n4. Modify the necessary fields.\n5. Resubmit the work order.\n6. VERIFY: The WO goes back to "Pending Approval" status.`,
-    143: `HOW TO TEST:\n1. Navigate to the Dashboard.\n2. Look for a "Bulk Approve" option or button.\n3. If available, select multiple pending work orders.\n4. Click "Bulk Approve".\n5. VERIFY: All selected WOs are approved simultaneously.\n6. VERIFY: Each WO's status changes to "Completed".\n7. VERIFY: Next cycle WOs are generated for each.`,
-    144: `HOW TO TEST:\n1. Log in as a user without approval permissions (e.g., Vessel User).\n2. Navigate to a pending approval work order.\n3. VERIFY: The Approve/Reject buttons are NOT visible.\n4. VERIFY: Only users with superintendent/admin role can see approval buttons.\n5. Log in as superintendent/admin and VERIFY buttons appear.`
-  };
-  return map[num] || `HOW TO TEST:\n1. Navigate to PMS > Work orders > Pending Approval.\n2. Test the approval workflow.\n3. ${steps.replace(/\n/g, '\n')}\nVERIFY: ${expected}`;
+function genDASH(id, section, scenario, steps, testData, expected) {
+  const n = parseInt(id.replace('DASH-', ''));
+  const nav = NAV.dashboard;
+
+  if (n >= 1 && n <= 4) {
+    const layoutScenarios = {
+      1: { goal: 'Verify the PMS Dashboard loads with all expected widgets, KPI tiles, and charts.', checks: [['Page Load', 'Dashboard loads with overview tiles, charts, and widgets'], ['KPIs', 'Overdue WOs, Completion Rate, Outstanding Tasks gauges visible'], ['Charts', 'Status Distribution donut chart and 6-Month Trend chart visible'], ['Inventory', 'Inventory Quick Stats (Total Spares, Low Stock, Critical Low Stock, etc.) visible']] },
+      2: { goal: 'Verify vessel-specific dashboard data loads when selecting a vessel.', checks: [['Data Update', 'All tiles, charts, and widgets reflect the selected vessel'], ['Vessel Switch', 'Switching to a different vessel refreshes all data']] },
+      3: { goal: 'Verify "All Vessels" view shows aggregated fleet data with benchmarking.', checks: [['Aggregated', 'Dashboard shows combined data across all vessels'], ['Fleet Table', 'Fleet Comparison — Vessel Benchmarking table appears on Management tab'], ['Drill Down', 'Clicking vessel name in fleet table drills down']] },
+      4: { goal: 'Verify the overall dashboard layout organization.', checks: [['Column 1', 'Work Order KPIs (Overdue, Completion Rate, Outstanding)'], ['Column 2', 'Status Distribution chart, Trend chart, Overdue WOs table'], ['Column 3', 'Inventory stats, Stock Status chart, Vessel Analysis grid']] },
+    };
+    const s = layoutScenarios[n];
+    return fmt(id, scenario, s.goal,
+      ['Log in to RSMS.', `Navigate to ${nav}.`],
+      ['Select a vessel from the dropdown.', 'Observe all dashboard sections.'],
+      [], [],
+      s.checks,
+      ['Dashboard loads without errors', 'All widgets render correctly', 'No blank or "undefined" values', 'Charts are interactive (hover shows tooltips)'],
+      ['Refresh the page — verify dashboard reloads correctly.', 'Test on different screen sizes — verify responsive layout.']
+    );
+  }
+
+  if (n >= 5 && n <= 22) {
+    const widgetScenarios = {
+      5: { goal: 'Verify the Overdue WOs KPI tile displays accurate count and percentage.', checks: [['Count', 'Shows correct number of overdue work orders'], ['Match', 'Matches Overdue tab count on Work Orders page'], ['Indicator', 'Red color indicator if overdue count > 0']] },
+      6: { goal: 'Verify the Completion Rate KPI tile shows accurate percentage.', checks: [['Percentage', 'Shows percentage value'], ['Calculation', 'Rate = completed on time / total due × 100'], ['Gauge', 'Semi-circle gauge reflects the rate']] },
+      7: { goal: 'Verify the Outstanding Tasks KPI tile displays accurate count.', checks: [['Count', 'Shows count of open/pending work orders'], ['Consistent', 'Count matches Work Orders page data']] },
+      8: { goal: 'Verify the Status Distribution donut chart displays correct proportions.', checks: [['Slices', 'Shows: Overdue, Due, Pending Approval, Completed, Planned'], ['Proportional', 'Slice sizes match actual counts'], ['Legend', 'Legend visible identifying each slice']] },
+      9: { goal: 'Verify clicking a pie chart segment navigates to filtered Work Orders page.', checks: [['Navigation', 'Clicking navigates to Work Orders page'], ['Filter', 'Correct status tab is pre-selected']] },
+      10: { goal: 'Verify pie chart tooltip shows exact count and percentage on hover.', checks: [['Tooltip', 'Tooltip shows count and percentage'], ['Accurate', 'Values match actual data'], ['Positioned', 'Tooltip positioned correctly']] },
+      11: { goal: 'Verify the 6-Month Maintenance Trend chart displays historical data.', checks: [['Lines', 'Shows Completed %, Outstanding %, Overdue % lines'], ['Monthly', 'Each month has a data point'], ['Labels', 'X-axis shows month labels, Y-axis shows percentages']] },
+      12: { goal: 'Verify trend chart tooltip shows exact values on hover.', checks: [['Tooltip', 'Shows exact value for the hovered month'], ['Formatted', 'Values formatted correctly (counts as integers, rates as %)'], ['Accurate', 'Matches actual monthly data']] },
+      13: { goal: 'Verify the Top Overdue WOs widget lists the most overdue items.', checks: [['Listed', 'Most overdue work orders shown'], ['Details', 'Each shows: WO number, equipment, "Overdue" badge'], ['Sorted', 'Sorted by days/hours overdue (most urgent first)']] },
+      14: { goal: 'Verify clicking a WO in the overdue widget navigates to its detail page.', checks: [['Navigation', 'Navigates to Work Order detail page'], ['Correct WO', 'The correct work order is displayed'], ['Back', 'Back button returns to Dashboard']] },
+      15: { goal: 'Verify "View All" link in overdue widget navigates to full overdue list.', checks: [['Navigation', 'Navigates to Work Orders page'], ['Overdue Tab', 'Overdue tab is pre-selected']] },
+      16: { goal: 'Verify "Total Spares" count tile in Inventory Quick Stats.', checks: [['Count', 'Shows total number of spare parts'], ['Match', 'Matches Spares page total']] },
+      17: { goal: 'Verify "Low Stock" count tile.', checks: [['Count', 'Shows spares where ROB <= Min Stock'], ['Match', 'Matches actual low stock count on Spares page'], ['Warning', 'Warning color (amber/red) if low stock items exist']] },
+      18: { goal: 'Verify "Critical Low Stock" count tile.', checks: [['Count', 'Shows critical spares that are also below minimum'], ['Subset', 'This is a subset of Low Stock count'], ['Urgent', 'Urgent styling if critical low stock items exist']] },
+      19: { goal: 'Verify "Total Components" count tile.', checks: [['Count', 'Shows total components for selected vessel'], ['Match', 'Matches Components page total']] },
+      20: { goal: 'Verify "Stores Inventory" count tile.', checks: [['Count', 'Shows total store items'], ['Match', 'Matches Stores page total']] },
+      21: { goal: 'Verify the Spares Stock Status donut chart.', checks: [['Segments', 'Shows: Adequate, Low Stock, Critical Low Stock'], ['Colors', 'Distinct colors for each segment'], ['Legend', 'Legend visible']] },
+      22: { goal: 'Verify clicking Stock Status chart navigates to filtered Spares page.', checks: [['Navigation', 'Clicking segment navigates to Spares page'], ['Filter', 'Spares filtered by clicked stock status']] },
+    };
+    const s = widgetScenarios[n];
+    return fmt(id, scenario, s.goal,
+      ['Log in to RSMS.', `Navigate to ${nav}.`, 'Select a vessel.'],
+      ['Locate the relevant widget/tile/chart on the Dashboard.', 'Interact with it (hover, click) as needed.'],
+      [], [],
+      s.checks,
+      ['Widget displays accurate data', 'No "NaN" or "undefined" values', 'Interactive elements work smoothly', 'Data matches other module pages'],
+      ['Switch vessels — verify widget updates.', 'Verify widget with zero data — check for proper empty/zero state display.']
+    );
+  }
+
+  if (n >= 23 && n <= 35) {
+    const advancedScenarios = {
+      23: { goal: 'Verify the Watch List widget displays monitored items.', checks: [['Display', 'Shows items marked for monitoring with Overdue/Critical badges'], ['Visibility', 'Document if not visible — note "Watch List not visible" in Comments']] },
+      24: { goal: 'Verify the Superintendent Notifications tile shows pending actions count.', checks: [['Count', 'Shows count of pending superintendent actions'], ['Match', 'Matches Superintendent page data']] },
+      25: { goal: 'Verify clicking Superintendent tile navigates to the Superintendent page.', checks: [['Navigation', 'Navigates to Superintendent Notifications page'], ['Pending', 'Pending items displayed']] },
+      26: { goal: 'Verify the Compliance Anomaly Detection panel is visible for Sail Admin.', checks: [['Visible', 'Panel visible with categories: Cycle Skip Rate, Backdating Frequency, Bulk Completion Events, Schedule Drift'], ['Severity', 'Each category has count and severity indicator (Good/Warning/Alert)'], ['Expandable', 'Individual anomaly entries can be expanded']] },
+      27: { goal: 'Verify the Anomaly Detection panel is NOT visible for non-Sail Admin users.', checks: [['Non-Admin', 'Panel NOT visible for Client Admin, Vessel User, Head of Dept'], ['Admin', 'Panel IS visible for Sail Admin']] },
+      28: { goal: 'Verify the "Cycle Skip Rate" anomaly card.', checks: [['Percentage', 'Shows percentage/count of jobs with skipped cycles'], ['Details', 'Clicking shows which jobs/components have skipped cycles'], ['Accuracy', 'Rate is calculated accurately']] },
+      29: { goal: 'Verify the "Backdating Frequency" anomaly card.', checks: [['Count', 'Shows count of backdated WOs'], ['Details', 'Each backdated WO listed with backdating amount'], ['Accuracy', 'Count is accurate']] },
+      30: { goal: 'Verify the "Bulk Completion Events" anomaly card.', checks: [['Detection', 'Flags dates with unusually high WO completions'], ['Details', 'Shows specific dates and WO counts'], ['Threshold', 'Threshold is reasonable (e.g., 5+ WOs same day)']] },
+      31: { goal: 'Verify the "Schedule Drift" anomaly card.', checks: [['Detection', 'Identifies jobs consistently completed early or late'], ['Details', 'Shows average drift amount'], ['Both Directions', 'Both early and late drift detected']] },
+      32: { goal: 'Verify the Work Order Anomalies tile with severity badges.', checks: [['Tile', 'Shows total anomaly count'], ['Badges', 'HIGH, MED, LOW severity badges visible'], ['Click', 'Clicking scrolls to or navigates to anomaly panel']] },
+      33: { goal: 'Verify anomaly tile is NOT visible for non-Sail Admin users.', checks: [['Non-Admin', 'Anomaly tile NOT visible'], ['Admin', 'Tile IS visible for Sail Admin']] },
+      34: { goal: 'Verify severity filter dropdown in Anomaly panel.', checks: [['High', 'Only high-severity anomalies shown'], ['Medium', 'Only medium-severity shown'], ['All', 'All anomalies shown when "All" selected']] },
+      35: { goal: 'Verify Refresh button in Anomaly panel.', checks: [['Loading', 'Loading indicator appears during refresh'], ['Updated', 'Data refreshes with new anomalies'], ['No Errors', 'Refresh completes without errors']] },
+    };
+    const s = advancedScenarios[n];
+    return fmt(id, scenario, s.goal,
+      ['Log in to RSMS (as Sail Admin for anomaly-related tests).', `Navigate to ${nav}.`],
+      ['Locate the relevant widget/panel.', 'Interact with it as described.'],
+      [], [],
+      s.checks,
+      ['Data is accurate and consistent', 'Role-based visibility works correctly', 'No UI errors', 'Interactive elements respond properly'],
+      ['Log in as different user roles — verify role-based visibility.', 'Test with vessels that have no anomalies — verify clean state.']
+    );
+  }
+
+  if (n >= 36 && n <= 52) {
+    const systemScenarios = {
+      36: { goal: 'Verify vessel filter updates all dashboard sections.', checks: [['All Updated', 'All tiles, charts, and widgets update for selected vessel'], ['All Vessels', 'Aggregated data shown for "All Vessels"']] },
+      37: { goal: 'Verify "Clear Filters" resets all dashboard filters.', checks: [['Reset', 'All filters reset to defaults'], ['Default View', 'Dashboard shows default view']] },
+      38: { goal: 'Verify year selector functionality (if available).', checks: [['Year Change', 'Data updates to reflect selected year'], ['Availability', 'If not available, note "Year selector not present"']] },
+      39: { goal: 'Verify notification bell icon and badge in the header.', checks: [['Bell Icon', 'Notification bell visible in header'], ['Badge', 'Unread count badge appears if notifications exist'], ['Availability', 'If no bell, note "Notification bell not implemented"']] },
+      40: { goal: 'Verify notification panel opens and displays notifications.', checks: [['Panel Opens', 'Notification dropdown opens on click'], ['Listed', 'Recent notifications listed with title, description, timestamp'], ['Close', 'Panel closes on click outside']] },
+      41: { goal: 'Verify different notification types are displayed.', checks: [['Types', 'Different types: WO approvals, overdue alerts, stock warnings'], ['Distinct', 'Each type has distinct icon or color']] },
+      42: { goal: 'Verify mark-as-read functionality for notifications.', checks: [['Read', 'Notification visual changes (no longer bold)'], ['Count', 'Unread count badge decreases'], ['Persist', 'Read status persists after refresh']] },
+      43: { goal: 'Verify user profile dropdown displays correct user information.', checks: [['Opens', 'Profile dropdown opens on click'], ['Info', 'Shows: user name, role, email'], ['Role', 'Displayed role matches actual role']] },
+      44: { goal: 'Verify logout functionality.', checks: [['Redirect', 'Redirected to login page'], ['Protected', 'Cannot access protected pages after logout'], ['Re-login', 'Logging back in works correctly']] },
+      45: { goal: 'Verify desktop layout (1920px+) utilizes full width.', checks: [['Full Width', 'Layout uses full width'], ['KPI Row', 'KPI tiles in a row'], ['Charts', 'Charts display at full size']] },
+      46: { goal: 'Verify tablet layout (~768px) adapts correctly.', checks: [['Adapt', 'Layout adapts — tiles may stack'], ['Charts', 'Charts resize to fit'], ['No Scroll', 'No horizontal scrolling needed']] },
+      47: { goal: 'Verify mobile layout (~375px) is fully functional.', checks: [['Stack', 'Content stacks vertically'], ['Readable', 'All tiles and charts readable'], ['Navigation', 'Sidebar collapses to hamburger menu'], ['Touch', 'Touch targets adequately sized']] },
+      48: { goal: 'Verify graceful error handling on network disconnection.', checks: [['Error Message', 'Appropriate error message shown (e.g., "Unable to load data")'], ['No Crash', 'Page does not crash'], ['Recovery', 'Dashboard loads normally after reconnection']] },
+      49: { goal: 'Verify session timeout handling.', checks: [['Redirect', 'Redirected to login page on timeout'], ['Message', '"Session expired" message shown']] },
+      50: { goal: 'Verify role-based data visibility.', checks: [['Vessel User', 'Sees vessel-specific data only'], ['Client Admin', 'Sees data for assigned company vessels'], ['Sail Admin', 'Sees all data including anomaly detection']] },
+      51: { goal: 'Verify AI chatbot is accessible for Sail Admin users.', checks: [['Button', 'Chat button (message icon) visible in bottom-right for Sail Admin'], ['Panel', 'Chat panel opens when clicked'], ['Responds', 'AI responds to queries']] },
+      52: { goal: 'Verify chatbot is NOT visible for non-Sail Admin users.', checks: [['Non-Admin', 'Chat button NOT visible'], ['Admin', 'Chat button IS visible for Sail Admin']] },
+    };
+    const s = systemScenarios[n];
+    return fmt(id, scenario, s.goal,
+      ['Log in to RSMS.', `Navigate to ${nav}.`],
+      ['Perform the actions relevant to this test scenario.'], [], [],
+      s.checks,
+      ['No UI errors or console errors', 'Correct behavior across user roles', 'Responsive layout works', 'Data is accurate'],
+      ['Test across different browsers and screen sizes.', 'Verify behavior with slow network connection.', 'Test role-based features by switching user accounts.']
+    );
+  }
+
+  return buildGeneric(id, scenario, section, steps, testData, expected);
 }
 
-function generateWOAttachmentTest(id, num, section, scenario, steps, testData, expected) {
-  const map = {
-    145: `HOW TO TEST:\n1. Open a work order detail page.\n2. Scroll to the Attachments section.\n3. Click "Upload" or the attachment button.\n4. Select a file from your computer (e.g., a PDF or image).\n5. VERIFY: The file uploads successfully with a progress indicator.\n6. VERIFY: The uploaded file appears in the attachments list.\n7. VERIFY: File name, size, and upload date are displayed.`,
-    146: `HOW TO TEST:\n1. Open a work order with an attachment.\n2. Click on the attachment to view/download it.\n3. VERIFY: The file downloads or opens in a new tab.\n4. VERIFY: The file content is intact (not corrupted).\n5. VERIFY: PDF files open correctly, images display properly.`,
-    147: `HOW TO TEST:\n1. Open a work order.\n2. Try to upload a file larger than the size limit (e.g., > 25MB).\n3. VERIFY: An error message appears indicating the file is too large.\n4. VERIFY: The upload is blocked.\n5. Try a file within the limit and VERIFY it uploads successfully.`,
-    148: `HOW TO TEST:\n1. Open a work order.\n2. Try to upload an unsupported file type (e.g., .exe or .zip).\n3. VERIFY: An error message appears (e.g., "Invalid file type").\n4. VERIFY: Only supported types are accepted (PDF, images, Word docs).\n5. Upload a valid file type and VERIFY it succeeds.`,
-    149: `HOW TO TEST:\n1. Open a work order with attachments.\n2. Click the delete/remove button on an attachment.\n3. VERIFY: A confirmation dialog appears.\n4. Confirm deletion.\n5. VERIFY: The attachment is removed from the list.\n6. VERIFY: A success message appears.`,
-    150: `HOW TO TEST:\n1. Open a work order.\n2. Upload multiple attachments (3+).\n3. VERIFY: All files upload successfully.\n4. VERIFY: All files appear in the attachments list.\n5. VERIFY: Each file can be individually viewed or deleted.`,
-    151: `HOW TO TEST:\n1. Upload a file with a very long filename (100+ characters).\n2. VERIFY: The file uploads without error.\n3. VERIFY: The filename is displayed (possibly truncated with ellipsis).\n4. VERIFY: The full filename is visible on hover or download.`,
-    152: `HOW TO TEST:\n1. Upload a file with special characters in the filename (e.g., "report & summary (final) #1.pdf").\n2. VERIFY: The file uploads successfully.\n3. VERIFY: The filename displays correctly.\n4. VERIFY: The file can be downloaded with its original name.`,
-    153: `HOW TO TEST:\n1. Open a completed/approved work order.\n2. Check the attachments section.\n3. VERIFY: Existing attachments are still visible and accessible.\n4. Try to upload a new attachment.\n5. VERIFY: Uploading to a completed WO is either allowed (for record-keeping) or blocked (to maintain immutability).\n6. Document the actual behavior.`
-  };
-  return map[num] || `HOW TO TEST:\n1. Open a work order.\n2. Test attachment functionality.\n3. ${steps.replace(/\n/g, '\n')}\nVERIFY: ${expected}`;
-}
-
-function generateWOMiscTest(id, num, section, scenario, steps, testData, expected) {
-  const map = {
-    154: `HOW TO TEST:\n1. Open a work order in editing mode.\n2. Fill in some Part B fields but do NOT submit.\n3. Look for a "Save Draft" button.\n4. Click Save Draft.\n5. VERIFY: The data is saved without changing the WO status.\n6. Close the work order and reopen it.\n7. VERIFY: Draft data is preserved — fields show previously saved values.`,
-    155: `HOW TO TEST:\n1. Save a draft work order (partially filled Part B).\n2. Close the browser or navigate away.\n3. Reopen the work order.\n4. VERIFY: Draft data is still there.\n5. Continue filling in fields and submit.\n6. VERIFY: The final submission includes both draft and newly entered data.`,
-    156: `HOW TO TEST:\n1. Open a completed and approved work order.\n2. Try to modify any field (Part A or Part B).\n3. VERIFY: All fields are read-only/locked.\n4. VERIFY: No edit buttons are available.\n5. VERIFY: The work order record is immutable after approval.\n6. VERIFY: A lock icon or "Completed" indicator is visible.`,
-    157: `HOW TO TEST:\n1. Open a completed work order.\n2. Check that the approval details are locked (approver name, date, remarks).\n3. VERIFY: Approval fields cannot be modified.\n4. VERIFY: The completion data (dates, readings, work done) is also locked.\n5. VERIFY: Only viewing is possible — no editing.`,
-    158: `HOW TO TEST:\n1. Open a work order and go to a text field (e.g., Work Done, Remarks).\n2. Enter text up to the character limit.\n3. VERIFY: The system indicates when the limit is reached.\n4. VERIFY: Text beyond the limit is either blocked or truncated.\n5. VERIFY: The character count or remaining characters indicator is visible (if implemented).`,
-    159: `HOW TO TEST:\n1. Open a work order text field (Job Title, Remarks, etc.).\n2. Enter text with various character types (letters, numbers, symbols, Unicode).\n3. VERIFY: All standard characters are accepted.\n4. VERIFY: No character causes an error or data corruption.\n5. VERIFY: Saved text displays exactly as entered.`,
-    160: `HOW TO TEST:\n1. Open a work order.\n2. Set conflicting field values (e.g., completion date before start date).\n3. Try to save/submit.\n4. VERIFY: Cross-field validation catches the conflict.\n5. VERIFY: A clear error message explains the issue.\n6. Fix the conflict and VERIFY submission succeeds.`,
-    161: `HOW TO TEST:\n1. Open an RH-based work order.\n2. VERIFY: Calendar-specific fields (due date) are hidden or disabled.\n3. VERIFY: RH-specific fields (current reading, due reading) are visible.\n4. Open a Calendar-based work order.\n5. VERIFY: RH-specific fields are hidden or disabled.\n6. VERIFY: Calendar-specific fields (due date) are visible.`,
-    162: `HOW TO TEST:\n1. Open a work order where the component's criticality is "Yes".\n2. VERIFY: The work order reflects the criticality (displayed as "Critical").\n3. Change the component's criticality.\n4. VERIFY: Existing work orders update to reflect the change (or remain as they were at creation).`,
-    163: `HOW TO TEST:\n1. Log in as a Sail Admin user.\n2. Look for the chat button (message icon) in the bottom-right corner of the screen.\n3. VERIFY: The chat button is visible.\n4. Click it to open the chat panel.\n5. VERIFY: The chat panel opens with an AI assistant.\n6. Type a question about work orders (e.g., "How many overdue work orders are there?").\n7. VERIFY: The chatbot responds with relevant information.`,
-    164: `HOW TO TEST:\n1. Open the chatbot panel.\n2. Ask about a specific work order (e.g., "Show me work order WO-702.005.01-INS-M3").\n3. VERIFY: The chatbot provides details about the specified work order.\n4. VERIFY: The response is accurate and matches the actual data.`,
-    165: `HOW TO TEST:\n1. Open the chatbot panel.\n2. Ask a maintenance-related question (e.g., "Which components need urgent attention?").\n3. VERIFY: The chatbot provides a helpful response.\n4. VERIFY: Suggested follow-up prompts appear.\n5. VERIFY: The chatbot understands maritime/PMS context.`,
-    166: `HOW TO TEST:\n1. Open the chatbot panel.\n2. Type an irrelevant or nonsensical question.\n3. VERIFY: The chatbot responds gracefully (doesn't crash or show errors).\n4. VERIFY: It either redirects to PMS-related topics or provides a polite "I can help with..." message.`,
-    167: `HOW TO TEST:\n1. Log in as a NON-Sail Admin user.\n2. Look for the chat button.\n3. VERIFY: The chat button is NOT visible for non-Sail Admin users.\n4. Log in as Sail Admin.\n5. VERIFY: The chat button IS visible.`,
-    168: `HOW TO TEST:\n1. Open the chatbot panel.\n2. Have a multi-turn conversation (ask a question, get a response, ask a follow-up).\n3. VERIFY: The chatbot maintains context across messages.\n4. VERIFY: Follow-up questions relate to the previous context.\n5. VERIFY: The conversation history is visible in the chat panel.`
-  };
-  return map[num] || `HOW TO TEST:\n1. Navigate to PMS > Work orders.\n2. ${steps.replace(/\n/g, '\n')}\nVERIFY: ${expected}`;
-}
-
-function generateRunningHoursHowToTest(id, section, scenario, steps, testData, expected) {
-  const instructions = {
-    'RH-001': `HOW TO TEST:\n1. Log in to RSMS and click "PMS" in the top menu bar.\n2. In the left sidebar, click "Running Hrs".\n3. Select a vessel from the vessel dropdown.\n4. VERIFY: The Running Hours dashboard loads showing a table of parent components with RH tracking.\n5. VERIFY: Each row shows: Component, Component Code, Category, Running Hours (cumulative), Last Updated, Utilization Rate, Period Running Hours.\n6. VERIFY: The utilization rate column has a progress bar visualization.`,
-
-    'RH-002': `HOW TO TEST:\n1. Navigate to PMS > Running Hrs.\n2. Look at the "Utilization Rate" column.\n3. VERIFY: Each component shows a percentage value.\n4. VERIFY: The utilization rate has a colored progress bar (green for normal, amber for moderate, red for high).\n5. VERIFY: The period selector (Weekly/Monthly/Quarterly/Yearly) changes the utilization calculation.\n6. Change the period and VERIFY utilization rates update.`,
-
-    'RH-003': `HOW TO TEST:\n1. Navigate to PMS > Running Hrs.\n2. Look at each component's "Last Updated" column.\n3. VERIFY: Dates are displayed in a readable format (e.g., "15 Mar 2026 14:30").\n4. VERIFY: Components with recent updates show recent dates.\n5. VERIFY: No dates show as "Invalid Date" or "NaN".`,
-
-    'RH-004': `HOW TO TEST:\n1. Navigate to PMS > Running Hrs.\n2. Use the search bar at the top to filter components.\n3. Type a component name (e.g., "Main Engine").\n4. VERIFY: The table filters to show only matching components.\n5. Clear the search and VERIFY all components reappear.`,
-
-    'RH-005': `HOW TO TEST:\n1. Navigate to PMS > Running Hrs.\n2. Change the vessel dropdown.\n3. VERIFY: The running hours data refreshes for the newly selected vessel.\n4. VERIFY: Component list changes to reflect the new vessel's equipment.`,
-
-    'RH-006': `HOW TO TEST:\n1. Navigate to PMS > Running Hrs.\n2. Find the period selector (Weekly/Monthly/Quarterly/Yearly dropdown).\n3. Select "Weekly".\n4. VERIFY: Utilization rates and period running hours update to show weekly data.\n5. Switch to "Quarterly".\n6. VERIFY: Values change to reflect the quarterly period.\n7. VERIFY: The column header updates to show the selected period.`,
-
-    'RH-007': `HOW TO TEST:\n1. Navigate to PMS > Running Hrs.\n2. Look for a component that shows "Inherited" children count.\n3. Click on it (or look for a child-components icon/button).\n4. VERIFY: A popup or expandable section shows the child components that inherit RH from this parent.\n5. VERIFY: Each child shows its current cumulative RH.\n6. VERIFY: Child RH values match the parent (for inherited components).`,
-
-    'RH-008': `HOW TO TEST:\n1. Navigate to PMS > Running Hrs.\n2. Check for components with data quality warnings.\n3. VERIFY: If a component has suspicious data (e.g., extremely high utilization > 100%), a warning indicator appears.\n4. VERIFY: The warning provides context about the issue.\n5. VERIFY: Normal components do NOT show false warnings.`,
-
-    'RH-009': `HOW TO TEST:\n1. Navigate to PMS > Running Hrs.\n2. Click the pencil/edit icon on a component row.\n3. VERIFY: An update dialog opens.\n4. The dialog shows:\n   - Component name\n   - Current (old) running hours value\n   - Field to enter new value\n   - Date updated field\n   - Comments field\n5. Enter a new RH value (higher than current).\n6. Fill in the date and comments.\n7. Click "Update".\n8. VERIFY: Running hours update in the table.\n9. VERIFY: A success toast appears.`,
-
-    'RH-010': `HOW TO TEST:\n1. Open the RH update dialog for a component.\n2. Note the "Update Mode" options: "Set Total" and "Add Delta".\n3. Select "Set Total" and enter a new cumulative value (e.g., 5500).\n4. Click Update.\n5. VERIFY: The component's RH changes to exactly 5500.\n6. Now open the dialog again, select "Add Delta" and enter a delta (e.g., 100).\n7. Click Update.\n8. VERIFY: The component's RH increases by 100 (now 5600).`,
-
-    'RH-011': `HOW TO TEST:\n1. Open the RH update dialog for a component.\n2. Enter a value LESS than the current reading.\n3. Click Update.\n4. VERIFY: A validation error or confirmation dialog appears.\n5. VERIFY: The system warns that the new value is lower (potential data entry error).\n6. If entering 0, VERIFY a "Zero RH Renewal Confirmation" dialog appears asking for the renewal reason.`,
-
-    'RH-012': `HOW TO TEST:\n1. Open the RH update dialog.\n2. Check the "Meter Replaced" checkbox.\n3. VERIFY: Additional fields appear: "Old Meter Final Reading" and "New Meter Start Reading".\n4. Enter the old meter's final reading and the new meter's start value.\n5. Click Update.\n6. VERIFY: The system calculates new cumulative RH correctly (old cumulative + new meter reading).\n7. VERIFY: The meter replacement is recorded in history.`,
-
-    'RH-013': `HOW TO TEST:\n1. Open the RH update dialog.\n2. Enter a new value and leave the "Date Updated" field empty.\n3. VERIFY: The system either auto-fills today's date or requires you to enter a date.\n4. Enter a future date.\n5. VERIFY: The system may prevent future dates (document behavior).\n6. Enter a valid past date.\n7. VERIFY: The update saves with the specified date.`,
-
-    'RH-014': `HOW TO TEST:\n1. Open the RH update dialog.\n2. Enter a valid new RH value.\n3. Add comments explaining the update (e.g., "Monthly RH reading").\n4. Click Update.\n5. VERIFY: The comments are saved.\n6. Check the RH history and VERIFY the comments appear in the entry.`,
-
-    'RH-015': `HOW TO TEST:\n1. Update RH for a parent component that has inherited children.\n2. VERIFY: The parent's RH updates.\n3. VERIFY: All inherited children automatically update to match the parent.\n4. Check individual child RH values.\n5. VERIFY: Cascade update worked correctly for all children.`,
-
-    'RH-016': `HOW TO TEST:\n1. Navigate to PMS > Running Hrs.\n2. Look for a "Bulk Update" button.\n3. Click it.\n4. VERIFY: A bulk update dialog or mode opens.\n5. Enter RH values for multiple components.\n6. Set a common date and comments.\n7. Click "Save All" or equivalent.\n8. VERIFY: All components update simultaneously.\n9. VERIFY: A success message confirms the bulk update.`,
-
-    'RH-017': `HOW TO TEST:\n1. Open the Bulk Update dialog.\n2. Enter valid values for some components and invalid values for others (e.g., negative number).\n3. Click Save All.\n4. VERIFY: Components with valid values update successfully.\n5. VERIFY: Components with invalid values show errors.\n6. VERIFY: The system clearly indicates which updates failed and why.`,
-
-    'RH-018': `HOW TO TEST:\n1. Navigate to PMS > Running Hrs.\n2. Click the "History" tab (next to the main RH view).\n3. VERIFY: The history tab opens showing RH update history.\n4. Select a component from the list.\n5. VERIFY: A history table shows all past RH updates for that component.\n6. VERIFY: Each entry shows: date, old value, new value, source (manual/cascade/work_order), updated by.`,
-
-    'RH-019': `HOW TO TEST:\n1. Open the RH History tab and select a component.\n2. Check the sort order.\n3. VERIFY: History is sorted by date (most recent first by default).\n4. Click the sort toggle to change to ascending.\n5. VERIFY: Oldest entries appear first.\n6. Toggle back and VERIFY descending order returns.`,
-
-    'RH-020': `HOW TO TEST:\n1. Open the RH History tab.\n2. Use the date filter fields (From/To dates).\n3. Enter a date range.\n4. VERIFY: Only history entries within that date range are shown.\n5. Clear the filters and VERIFY all entries reappear.`,
-
-    'RH-021': `HOW TO TEST:\n1. Open the RH History tab.\n2. Search for a specific component or keyword.\n3. VERIFY: The search filters history entries.\n4. VERIFY: Matching entries are highlighted or filtered.`,
-
-    'RH-022': `HOW TO TEST:\n1. Open the RH History tab for a component.\n2. Check the pagination controls at the bottom.\n3. VERIFY: Pagination works (Next, Previous, page numbers).\n4. Change items per page and VERIFY the display updates.\n5. VERIFY: Total entry count is accurate.`,
-
-    'RH-023': `HOW TO TEST:\n1. Navigate to PMS > Running Hrs (main view).\n2. Look for an RH timeline visualization (if available).\n3. VERIFY: The timeline shows RH progression over time.\n4. VERIFY: Data points correspond to actual RH update events.\n5. If no timeline exists on this page, check the component detail page for RH charts.`,
-
-    'RH-024': `HOW TO TEST:\n1. View the RH timeline for a component.\n2. Look for meter replacement events.\n3. VERIFY: Meter replacements are visually distinct on the timeline.\n4. VERIFY: The cumulative total line shows the correct progression across meter changes.\n5. VERIFY: Hovering over data points shows details.`,
-
-    'RH-025': `HOW TO TEST:\n1. Navigate to PMS > Running Hrs.\n2. Find a component with RH-based maintenance jobs.\n3. Check the RH values.\n4. VERIFY: As RH increases, associated jobs approach their due readings.\n5. Navigate to Work Orders and check RH-based WOs.\n6. VERIFY: Due readings are calculated as: last completion reading + frequency.\n7. VERIFY: Status changes from Active to Due when approaching the due reading.`,
-
-    'RH-026': `HOW TO TEST:\n1. Update a component's RH to a value that exceeds a job's due reading.\n2. Navigate to Work Orders.\n3. VERIFY: The RH-based work order's status changes to "Due" or "Overdue".\n4. VERIFY: The computed status reflects the new RH reality.\n5. VERIFY: The dashboard overdue count updates if applicable.`,
-
-    'RH-027': `HOW TO TEST:\n1. Navigate to PMS > Running Hrs.\n2. Find the period selector dropdown.\n3. Select "Weekly".\n4. VERIFY: The utilization data reflects the last 7 days (168 hours max).\n5. VERIFY: Column header shows "Weekly" label.`,
-
-    'RH-028': `HOW TO TEST:\n1. Navigate to PMS > Running Hrs.\n2. Select "Monthly" in the period selector.\n3. VERIFY: Utilization data reflects the last 30 days (720 hours max).\n4. VERIFY: Period running hours show the hours accumulated in the last month.`,
-
-    'RH-029': `HOW TO TEST:\n1. Navigate to PMS > Running Hrs.\n2. Select "Quarterly" then "Yearly" in the period selector.\n3. VERIFY: Each period shows appropriate time range data.\n4. Quarterly = 90 days (2160 hours max).\n5. Yearly = 365 days (8760 hours max).\n6. VERIFY: Utilization percentages recalculate for each period.`,
-
-    'RH-030': `HOW TO TEST:\n1. Navigate to PMS > Running Hrs (main view).\n2. Look for an "Export" button (download icon).\n3. Click it.\n4. VERIFY: A CSV file downloads.\n5. Open the CSV file.\n6. VERIFY: It contains all component RH data visible on screen.\n7. VERIFY: Columns match: Vessel, Component, Code, Category, Running Hours, Last Updated, Utilization Rate, Period RH.`,
-
-    'RH-031': `HOW TO TEST:\n1. Navigate to PMS > Running Hrs > History tab.\n2. Select a component and apply filters.\n3. Look for an "Export" button for history data.\n4. Click it.\n5. VERIFY: A CSV file downloads with the filtered history data.\n6. VERIFY: The export respects the applied filters.`,
-
-    'RH-032': `HOW TO TEST:\n1. Export RH data.\n2. Open the exported file.\n3. VERIFY: Numeric values are formatted correctly (no loss of precision).\n4. VERIFY: Dates are in a readable format.\n5. VERIFY: Component names and codes are complete (no truncation).`,
-
-    'RH-033': `HOW TO TEST:\n1. Export RH data for a vessel with many components (50+).\n2. VERIFY: The export includes ALL components (no data missing).\n3. VERIFY: The file opens without errors in Excel.\n4. VERIFY: Export completes in reasonable time (< 30 seconds).`,
-
-    'RH-034': `HOW TO TEST:\n1. Navigate to PMS > Running Hrs.\n2. Find a component with 0 running hours.\n3. Try to update it.\n4. VERIFY: The system handles the 0-to-new-value transition correctly.\n5. VERIFY: No division-by-zero or other math errors occur in utilization calculations.`,
-
-    'RH-035': `HOW TO TEST:\n1. Navigate to PMS > Running Hrs.\n2. Try to enter an extremely large RH value (e.g., 9,999,999).\n3. VERIFY: The system either accepts it or shows a reasonable upper limit error.\n4. VERIFY: The display handles large numbers correctly (proper formatting with commas).\n5. VERIFY: Utilization calculations remain accurate with large values.`
-  };
-
-  return instructions[id] || `HOW TO TEST:\n1. Navigate to PMS > Running Hrs from the sidebar.\n2. ${steps.replace(/\n/g, '\n')}\nVERIFY: ${expected}`;
-}
-
-function generateSparesHowToTest(id, section, scenario, steps, testData, expected) {
-  const instructions = {
-    'SP-001': `HOW TO TEST:\n1. Log in to RSMS and click "PMS" in the top menu bar.\n2. In the left sidebar, click "Spares".\n3. Select a vessel from the vessel dropdown.\n4. VERIFY: The Spares list page loads showing a table of spare parts.\n5. VERIFY: Columns include: Part Number, Part Name, Component, ROB (Remaining on Board), Min Stock, Unit, Location.\n6. VERIFY: Data loads without errors.`,
-
-    'SP-002': `HOW TO TEST:\n1. Navigate to PMS > Spares and select a vessel.\n2. Look at the bottom of the spares table for pagination controls.\n3. VERIFY: Page navigation works (Next, Previous, page numbers).\n4. VERIFY: Items per page can be changed (10, 25, 50).\n5. VERIFY: Total count is displayed.`,
-
-    'SP-003': `HOW TO TEST:\n1. Navigate to PMS > Spares and select a vessel.\n2. Use the search bar to search by part number.\n3. Type a part number (or partial number).\n4. VERIFY: The table filters to show matching parts.\n5. Clear the search and VERIFY the full list returns.`,
-
-    'SP-004': `HOW TO TEST:\n1. Navigate to PMS > Spares.\n2. Search by part name (e.g., "filter" or "gasket").\n3. VERIFY: Matching spare parts are displayed.\n4. VERIFY: Partial name matches work.`,
-
-    'SP-005': `HOW TO TEST:\n1. Navigate to PMS > Spares.\n2. Filter by component (if a component filter exists).\n3. Select a component.\n4. VERIFY: Only spares linked to that component are shown.`,
-
-    'SP-006': `HOW TO TEST:\n1. Navigate to PMS > Spares.\n2. Look for a "Critical" filter or tab.\n3. Apply it.\n4. VERIFY: Only critical spares are shown.\n5. Remove the filter and VERIFY all spares return.`,
-
-    'SP-007': `HOW TO TEST:\n1. Navigate to PMS > Spares.\n2. Look for a "Low Stock" filter or indicator.\n3. VERIFY: Spares where ROB <= Min Stock are highlighted or flagged.\n4. VERIFY: The low stock indicator uses a visible color (red or amber).`,
-
-    'SP-008': `HOW TO TEST:\n1. Navigate to PMS > Spares.\n2. Click column headers to sort the table.\n3. Try sorting by Part Number, Part Name, ROB.\n4. VERIFY: Sorting works in ascending and descending order.\n5. VERIFY: A sort indicator appears on the active column.`,
-
-    'SP-009': `HOW TO TEST:\n1. Navigate to PMS > Spares.\n2. Change the vessel filter.\n3. VERIFY: The spares list updates to show spares for the selected vessel.\n4. VERIFY: Counts and data reflect the new vessel.`,
-
-    'SP-010': `HOW TO TEST:\n1. Navigate to PMS > Spares.\n2. Look for an Export button.\n3. Click to export the spares list.\n4. VERIFY: A file downloads (Excel or CSV).\n5. VERIFY: The exported data matches the on-screen data.`,
-
-    'SP-011': `HOW TO TEST:\n1. Navigate to PMS > Spares.\n2. Look for a total spares count display.\n3. VERIFY: The count is visible and accurate.\n4. Apply a filter and VERIFY the count updates.`,
-
-    'SP-012': `HOW TO TEST:\n1. Navigate to PMS > Spares.\n2. Click the "+ Add Spare" button.\n3. VERIFY: An add spare form opens.\n4. Fill in required fields:\n   - Part Number\n   - Part Name\n   - Component (link to a component)\n   - Unit of measure\n   - Min Stock level\n   - Initial ROB\n5. Click Save.\n6. VERIFY: The spare is created and appears in the list.\n7. VERIFY: A success toast message appears.`,
-
-    'SP-013': `HOW TO TEST:\n1. Open the Add Spare form.\n2. Leave required fields empty.\n3. Click Save.\n4. VERIFY: Validation errors appear for missing required fields.\n5. VERIFY: The form does NOT save until all required fields are filled.`,
-
-    'SP-014': `HOW TO TEST:\n1. Open the Add Spare form.\n2. Enter a part number that already exists.\n3. Fill other fields and click Save.\n4. VERIFY: A duplicate error message appears.\n5. VERIFY: The system prevents duplicate part numbers.`,
-
-    'SP-015': `HOW TO TEST:\n1. Open the Add Spare form.\n2. Enter a negative value for ROB.\n3. VERIFY: The system rejects negative ROB values.\n4. Enter 0 for ROB.\n5. VERIFY: Zero is accepted (valid — no stock on hand).`,
-
-    'SP-016': `HOW TO TEST:\n1. Open the Add Spare form.\n2. Set the "Critical" flag to "Yes".\n3. Save the spare.\n4. VERIFY: The spare is marked as critical in the list.\n5. VERIFY: Critical spares are included in critical stock reports.`,
-
-    'SP-017': `HOW TO TEST:\n1. Click on an existing spare part in the list.\n2. VERIFY: The spare details open for editing.\n3. Modify the Part Name.\n4. Click Save.\n5. VERIFY: Changes are saved and reflected in the list.\n6. VERIFY: A success message appears.`,
-
-    'SP-018': `HOW TO TEST:\n1. Edit an existing spare.\n2. Change the Min Stock level.\n3. Save.\n4. VERIFY: The new min stock is saved.\n5. VERIFY: Low stock indicators update based on the new threshold.\n6. VERIFY: If ROB is now below the new min, a low stock flag appears.`,
-
-    'SP-019': `HOW TO TEST:\n1. Navigate to PMS > Spares and find a spare part.\n2. Look for a "Stock In" or "Receive" button.\n3. Click it and enter a quantity to add (e.g., 10).\n4. Enter a date and optional notes.\n5. Confirm the transaction.\n6. VERIFY: ROB increases by the entered quantity.\n7. VERIFY: The transaction is recorded in the stock history.`,
-
-    'SP-020': `HOW TO TEST:\n1. Find a spare part with ROB > 0.\n2. Look for a "Stock Out" or "Issue" button.\n3. Click it and enter a quantity to issue (e.g., 2).\n4. Confirm the transaction.\n5. VERIFY: ROB decreases by the issued quantity.\n6. VERIFY: The transaction is recorded in history.`,
-
-    'SP-021': `HOW TO TEST:\n1. Find a spare with ROB of 5.\n2. Try to issue more than available (e.g., issue 10).\n3. VERIFY: The system prevents issuing more than ROB.\n4. VERIFY: An error message appears (e.g., "Insufficient stock").`,
-
-    'SP-022': `HOW TO TEST:\n1. Perform a Stock In transaction.\n2. VERIFY: The transaction appears in the stock history with "In" type.\n3. Perform a Stock Out transaction.\n4. VERIFY: It appears in history with "Out" type.\n5. VERIFY: Both transactions show correct quantities, dates, and notes.`,
-
-    'SP-023': `HOW TO TEST:\n1. Perform multiple stock transactions for the same spare.\n2. Check the running ROB balance after each.\n3. VERIFY: ROB calculations are mathematically correct.\n4. VERIFY: The history shows an accurate audit trail.`,
-
-    'SP-024': `HOW TO TEST:\n1. Open a work order and complete it.\n2. In the spares consumption section (Part B), select spares used.\n3. Enter quantities consumed.\n4. Submit the work order.\n5. VERIFY: The spare part's ROB decreases by the consumed quantity.\n6. VERIFY: The consumption is recorded in the spare's transaction history.\n7. VERIFY: The transaction source shows "Work Order".`,
-
-    'SP-025': `HOW TO TEST:\n1. Link a spare part to a work order during completion.\n2. VERIFY: Only spares associated with the work order's component are available for selection.\n3. Enter consumption quantity.\n4. VERIFY: ROB updates correctly after WO submission.`,
-
-    'SP-026': `HOW TO TEST:\n1. Navigate to a spare part's detail page.\n2. Look for a "History" or "Transaction History" section.\n3. VERIFY: All past transactions are listed chronologically.\n4. VERIFY: Each entry shows: date, type (In/Out), quantity, balance after, source, notes.`,
-
-    'SP-027': `HOW TO TEST:\n1. Open stock history for a spare.\n2. Apply date filters.\n3. VERIFY: Only transactions within the selected date range are shown.\n4. Clear filters and VERIFY all transactions return.`,
-
-    'SP-028': `HOW TO TEST:\n1. Open stock history.\n2. VERIFY: Transactions are sorted by date (newest first by default).\n3. Toggle sort order.\n4. VERIFY: Oldest entries appear first when ascending.`,
-
-    'SP-029': `HOW TO TEST:\n1. Check stock history across multiple operations (manual in, manual out, WO consumption).\n2. VERIFY: All transaction types are represented in history.\n3. VERIFY: The running balance is accurate at each point in time.`,
-
-    'SP-030': `HOW TO TEST:\n1. Navigate to PMS > Spares.\n2. Identify spares where ROB is at or below Min Stock.\n3. VERIFY: These spares have a visual low stock indicator (badge, icon, or row highlighting).\n4. VERIFY: The indicator is clearly visible (red or amber color).\n5. Check the Dashboard for low stock count.\n6. VERIFY: Dashboard count matches the number of low-stock spares.`,
-
-    'SP-031': `HOW TO TEST:\n1. Find a spare with ROB = Min Stock.\n2. VERIFY: It is flagged as low stock.\n3. Increase the ROB above Min Stock (stock in).\n4. VERIFY: The low stock indicator is removed.\n5. Decrease ROB to below Min Stock.\n6. VERIFY: The indicator reappears.`,
-
-    'SP-032': `HOW TO TEST:\n1. Navigate to the Dashboard.\n2. Look for "Low Stock" and "Critical Low Stock" count tiles.\n3. VERIFY: Low Stock count matches spares where ROB <= Min.\n4. VERIFY: Critical Low Stock count matches critical spares where ROB <= Min.\n5. VERIFY: Clicking the tile navigates to the filtered spares list.`,
-
-    'SP-033': `HOW TO TEST:\n1. Navigate to PMS > Spares.\n2. Look for a category filter or grouping option.\n3. If available, filter by category (e.g., "Engine Parts", "Deck Parts").\n4. VERIFY: Only spares in the selected category are shown.\n5. Document what category options are available.`,
-
-    'SP-034': `HOW TO TEST:\n1. Add a new spare and assign it to a category.\n2. VERIFY: The spare appears under the correct category.\n3. Edit the spare and change its category.\n4. VERIFY: The spare moves to the new category.`,
-
-    'SP-035': `HOW TO TEST:\n1. Navigate to PMS > Spares.\n2. Look at the ROB column.\n3. VERIFY: ROB values are displayed as non-negative integers.\n4. VERIFY: The unit of measure is shown alongside the ROB.\n5. VERIFY: ROB accurately reflects all stock transactions.`,
-
-    'SP-036': `HOW TO TEST:\n1. Perform a stock transaction (add or remove stock).\n2. VERIFY: The ROB updates immediately after the transaction.\n3. Refresh the page.\n4. VERIFY: The ROB persists — it wasn't a UI-only update.\n5. VERIFY: The ROB matches the expected balance.`,
-
-    'SP-037': `HOW TO TEST:\n1. Find a spare with no transaction history and not linked to any WO.\n2. Click on it and look for a "Delete" button.\n3. Click Delete.\n4. VERIFY: A confirmation dialog appears.\n5. Confirm deletion.\n6. VERIFY: The spare is removed from the list.\n7. VERIFY: A success message appears.`,
-
-    'SP-038': `HOW TO TEST:\n1. Find a spare that is linked to work orders or has transaction history.\n2. Try to delete it.\n3. VERIFY: The system prevents deletion (error message: "Cannot delete spare with existing transactions/WO links").\n4. VERIFY: The spare remains in the list.`,
-
-    'SP-039': `HOW TO TEST:\n1. Find a spare and click Delete.\n2. When the confirmation dialog appears, click "Cancel".\n3. VERIFY: The spare is NOT deleted.\n4. VERIFY: All data remains intact.`,
-
-    'SP-040': `HOW TO TEST:\n1. Navigate to PMS > Admin or Spares management.\n2. Look for a "Bulk Import" or "Upload" option for spares.\n3. If available, prepare a CSV/Excel file with multiple spare parts.\n4. Upload the file.\n5. VERIFY: All valid spares are imported.\n6. VERIFY: Invalid entries are flagged with specific error messages.\n7. VERIFY: A summary shows how many were imported vs rejected.`
-  };
-
-  return instructions[id] || `HOW TO TEST:\n1. Navigate to PMS > Spares from the sidebar.\n2. ${steps.replace(/\n/g, '\n')}\nVERIFY: ${expected}`;
-}
-
-function generateStoresHowToTest(id, section, scenario, steps, testData, expected) {
-  const instructions = {
-    'ST-001': `HOW TO TEST:\n1. Log in to RSMS and click "PMS" in the top menu bar.\n2. In the left sidebar, click "Stores".\n3. Select a vessel from the vessel dropdown.\n4. VERIFY: The Stores inventory page loads showing a table of store items.\n5. VERIFY: Columns include: Item Code, Item Name, Category/Type, ROB, Min Stock, Unit, Location.\n6. VERIFY: Data loads without errors.`,
-
-    'ST-002': `HOW TO TEST:\n1. Navigate to PMS > Stores and select a vessel.\n2. Use the search bar to search by item code.\n3. VERIFY: The table filters to show matching items.\n4. Clear the search and VERIFY the full list returns.`,
-
-    'ST-003': `HOW TO TEST:\n1. Navigate to PMS > Stores.\n2. Search by item name (e.g., "rope" or "paint").\n3. VERIFY: Matching store items are displayed.\n4. VERIFY: Partial name matches work.`,
-
-    'ST-004': `HOW TO TEST:\n1. Navigate to PMS > Stores.\n2. Look at pagination controls at the bottom.\n3. VERIFY: Pagination works (Next, Previous, page numbers).\n4. Change items per page.\n5. VERIFY: Display updates accordingly.`,
-
-    'ST-005': `HOW TO TEST:\n1. Navigate to PMS > Stores.\n2. Click column headers to sort.\n3. VERIFY: Sorting works for Item Code, Item Name, ROB.\n4. VERIFY: Sort indicators appear.`,
-
-    'ST-006': `HOW TO TEST:\n1. Navigate to PMS > Stores.\n2. Click "+ Add Item" or similar button.\n3. VERIFY: An add form opens.\n4. Fill in required fields:\n   - Item Code\n   - Item Name\n   - Category/Type\n   - Unit\n   - Min Stock\n   - Initial ROB\n5. Click Save.\n6. VERIFY: The item is created and appears in the list.\n7. VERIFY: A success message appears.`,
-
-    'ST-007': `HOW TO TEST:\n1. Open the Add Store Item form.\n2. Leave required fields empty.\n3. Click Save.\n4. VERIFY: Validation errors appear.\n5. VERIFY: The form does NOT save.`,
-
-    'ST-008': `HOW TO TEST:\n1. Open the Add Store Item form.\n2. Enter a duplicate item code.\n3. Click Save.\n4. VERIFY: The system prevents duplicates with an error message.`,
-
-    'ST-009': `HOW TO TEST:\n1. Add a store item with minimum valid data.\n2. VERIFY: The item saves successfully.\n3. Add another with maximum data (all optional fields filled).\n4. VERIFY: All data saves correctly.`,
-
-    'ST-010': `HOW TO TEST:\n1. Find a store item and look for "Update Quantity" or "Adjust Stock" option.\n2. Enter a positive adjustment (stock in).\n3. VERIFY: ROB increases.\n4. Enter a negative adjustment (stock out).\n5. VERIFY: ROB decreases.\n6. VERIFY: Transactions are recorded in history.`,
-
-    'ST-011': `HOW TO TEST:\n1. Find a store item with ROB of 5.\n2. Try to decrease ROB by 10 (more than available).\n3. VERIFY: The system prevents going below 0.\n4. VERIFY: An error message appears.`,
-
-    'ST-012': `HOW TO TEST:\n1. Update a store item's quantity.\n2. VERIFY: The change is reflected immediately in the table.\n3. Refresh the page.\n4. VERIFY: The updated quantity persists.`,
-
-    'ST-013': `HOW TO TEST:\n1. Navigate to PMS > Stores.\n2. Look for category filters or tabs.\n3. If available, filter by category.\n4. VERIFY: Only items in the selected category are shown.\n5. Clear the filter and VERIFY all items return.`,
-
-    'ST-014': `HOW TO TEST:\n1. Add a new store item and assign it to a specific category.\n2. VERIFY: The item appears under the correct category.\n3. If category management exists, check available categories.`,
-
-    'ST-015': `HOW TO TEST:\n1. Edit a store item and change its category.\n2. Save.\n3. VERIFY: The item moves to the new category.\n4. VERIFY: The old category no longer shows this item.`,
-
-    'ST-016': `HOW TO TEST:\n1. Look for a "Manage Categories" or similar option.\n2. Try to add a new category.\n3. VERIFY: New categories can be created.\n4. Try to delete an empty category.\n5. VERIFY: Empty categories can be deleted.\n6. Try to delete a category with items.\n7. VERIFY: The system prevents deletion or moves items first.`,
-
-    'ST-017': `HOW TO TEST:\n1. Find a store item and open its transaction history.\n2. VERIFY: All past quantity changes are listed.\n3. VERIFY: Each entry shows: date, type (In/Out), quantity, balance after, notes.\n4. VERIFY: History is sorted by date (newest first).`,
-
-    'ST-018': `HOW TO TEST:\n1. Open transaction history for a store item.\n2. Apply date filters.\n3. VERIFY: Only transactions within the date range are shown.\n4. Clear filters and VERIFY all entries return.`,
-
-    'ST-019': `HOW TO TEST:\n1. Perform several transactions on a store item.\n2. Open the transaction history.\n3. VERIFY: The running balance at each point is correct.\n4. VERIFY: All transactions are accounted for.`,
-
-    'ST-020': `HOW TO TEST:\n1. Click on an existing store item.\n2. VERIFY: The item details open for editing.\n3. Modify the Item Name.\n4. Click Save.\n5. VERIFY: Changes are saved and reflected in the list.\n6. VERIFY: A success message appears.`,
-
-    'ST-021': `HOW TO TEST:\n1. Edit a store item and change the Min Stock level.\n2. Save.\n3. VERIFY: The new min stock is saved.\n4. VERIFY: Low stock indicators update accordingly.\n5. VERIFY: If ROB is now below the new min, a warning appears.`,
-
-    'ST-022': `HOW TO TEST:\n1. Look for a "Bulk Update" or "Import" option for stores.\n2. If available, prepare a file with multiple store items.\n3. Upload it.\n4. VERIFY: All valid items are imported/updated.\n5. VERIFY: Invalid entries are flagged.\n6. VERIFY: A summary report shows results.`,
-
-    'ST-023': `HOW TO TEST:\n1. Find a store item with no transaction history.\n2. Click Delete.\n3. VERIFY: A confirmation dialog appears.\n4. Confirm.\n5. VERIFY: The item is removed from the list.\n6. VERIFY: A success message appears.`,
-
-    'ST-024': `HOW TO TEST:\n1. Find a store item with transaction history.\n2. Try to delete it.\n3. VERIFY: The system either prevents deletion or warns about losing history.\n4. Document the actual behavior.`,
-
-    'ST-025': `HOW TO TEST:\n1. Add a store item with a very long name (200+ characters).\n2. VERIFY: The item saves successfully.\n3. VERIFY: The name displays correctly in the list (truncated if needed).\n4. Add an item with special characters in the name.\n5. VERIFY: Characters are preserved correctly.`
-  };
-
-  return instructions[id] || `HOW TO TEST:\n1. Navigate to PMS > Stores from the sidebar.\n2. ${steps.replace(/\n/g, '\n')}\nVERIFY: ${expected}`;
-}
-
-function generateReportsHowToTest(id, section, scenario, steps, testData, expected) {
-  const instructions = {
-    'RPT-001': `HOW TO TEST:\n1. Log in to RSMS and click "PMS" in the top menu bar.\n2. In the left sidebar, click "Reports".\n3. VERIFY: The Reports module opens showing available report categories.\n4. Look for "Work Order Reports" section.\n5. Click on a WO report type (e.g., "Work Order Summary").\n6. VERIFY: The report generates and displays data.`,
-
-    'RPT-002': `HOW TO TEST:\n1. Navigate to PMS > Reports.\n2. Generate a Work Order Status report.\n3. VERIFY: The report shows WOs grouped by status (Planned, Due, Overdue, Completed).\n4. VERIFY: Counts and percentages are accurate.\n5. VERIFY: The report matches the data on the Work Orders page.`,
-
-    'RPT-003': `HOW TO TEST:\n1. Navigate to PMS > Reports.\n2. Generate a Work Order Completion report for a specific date range.\n3. VERIFY: Only WOs completed within the range are included.\n4. VERIFY: Completion details (date, who, work done) are shown.`,
-
-    'RPT-004': `HOW TO TEST:\n1. Navigate to PMS > Reports.\n2. Generate an Overdue Work Orders report.\n3. VERIFY: All overdue WOs are listed.\n4. VERIFY: The report shows days overdue for each WO.\n5. VERIFY: Critical overdue items are highlighted.`,
-
-    'RPT-005': `HOW TO TEST:\n1. Navigate to PMS > Reports.\n2. Generate a Work Order Trend report.\n3. VERIFY: Monthly trends are shown (completions vs due vs overdue).\n4. VERIFY: The chart (if present) accurately represents the data.\n5. VERIFY: The date range can be adjusted.`,
-
-    'RPT-006': `HOW TO TEST:\n1. Navigate to PMS > Reports.\n2. Find and generate a "Component Report" or "Equipment Report".\n3. VERIFY: The report lists all components with key information.\n4. VERIFY: Component hierarchy is maintained.\n5. VERIFY: Critical components are highlighted.`,
-
-    'RPT-007': `HOW TO TEST:\n1. Generate a Component Maintenance History report.\n2. Select a component or component group.\n3. VERIFY: All maintenance activities are listed chronologically.\n4. VERIFY: Details include: WO number, job title, completion date, work done.`,
-
-    'RPT-008': `HOW TO TEST:\n1. Navigate to PMS > Reports.\n2. Find and generate a "Running Hours Report".\n3. VERIFY: Current RH for all tracked components is listed.\n4. VERIFY: Utilization rates are shown.\n5. VERIFY: Last updated dates are accurate.`,
-
-    'RPT-009': `HOW TO TEST:\n1. Generate an RH History report for a specific component.\n2. VERIFY: All RH update events are listed.\n3. VERIFY: Old and new values are shown for each update.\n4. VERIFY: The source of each update (manual, cascade, WO) is indicated.`,
-
-    'RPT-010': `HOW TO TEST:\n1. Generate an RH Utilization report.\n2. VERIFY: The report shows utilization rates by component.\n3. VERIFY: The selected period (weekly/monthly/etc.) is reflected.\n4. VERIFY: High-utilization components are highlighted.`,
-
-    'RPT-011': `HOW TO TEST:\n1. Navigate to PMS > Reports.\n2. Find and generate a "Spares Report" or "Inventory Report".\n3. VERIFY: All spare parts are listed with current ROB.\n4. VERIFY: Min stock levels are shown.\n5. VERIFY: Low stock items are flagged.`,
-
-    'RPT-012': `HOW TO TEST:\n1. Generate a Spares Consumption report.\n2. Select a date range.\n3. VERIFY: All spare consumption (from WOs and manual issues) is listed.\n4. VERIFY: Quantities consumed are accurate.\n5. VERIFY: The report shows which WOs consumed spares.`,
-
-    'RPT-013': `HOW TO TEST:\n1. Generate a Critical Spares report.\n2. VERIFY: Only spares marked as "Critical" are included.\n3. VERIFY: Current stock levels are shown.\n4. VERIFY: Items below minimum stock are highlighted prominently.`,
-
-    'RPT-014': `HOW TO TEST:\n1. Navigate to PMS > Reports.\n2. Find the "Compliance Reports" section.\n3. Generate a Compliance Summary report.\n4. VERIFY: The report shows overall PMS compliance rates.\n5. VERIFY: Compliance is calculated as completed on-time / total due.\n6. VERIFY: The report can be filtered by vessel and date range.`,
-
-    'RPT-015': `HOW TO TEST:\n1. Generate a compliance report broken down by department.\n2. VERIFY: Each department (Engine, Deck, etc.) has its own compliance rate.\n3. VERIFY: The breakdown totals match the overall rate.`,
-
-    'RPT-016': `HOW TO TEST:\n1. Generate a compliance report broken down by component category.\n2. VERIFY: Each category shows its compliance rate.\n3. VERIFY: Categories with low compliance are highlighted.`,
-
-    'RPT-017': `HOW TO TEST:\n1. Generate compliance reports for multiple consecutive months.\n2. VERIFY: A trend is visible (improving or declining compliance).\n3. VERIFY: Month-over-month changes are clear.`,
-
-    'RPT-018': `HOW TO TEST:\n1. Open any report generation screen.\n2. Look for filter options: Vessel, Date Range, Department, Component.\n3. Apply a vessel filter.\n4. VERIFY: Report data is scoped to the selected vessel.\n5. Apply a date range filter.\n6. VERIFY: Only data within the range is included.`,
-
-    'RPT-019': `HOW TO TEST:\n1. Generate a report with specific filters.\n2. Remove all filters.\n3. Regenerate the report.\n4. VERIFY: The unfiltered report shows ALL data.\n5. VERIFY: The filtered and unfiltered reports are consistent.`,
-
-    'RPT-020': `HOW TO TEST:\n1. Apply invalid filter combinations (e.g., "From" date after "To" date).\n2. VERIFY: The system shows a validation error.\n3. VERIFY: No report is generated with invalid filters.`,
-
-    'RPT-021': `HOW TO TEST:\n1. Navigate to a report and click "Generate" or "Run Report".\n2. VERIFY: A loading indicator appears while the report generates.\n3. VERIFY: The report renders in the preview area.\n4. VERIFY: Generation completes in reasonable time.`,
-
-    'RPT-022': `HOW TO TEST:\n1. Generate a report.\n2. Look for "Export" or "Download" buttons (Excel, PDF).\n3. Click Export to Excel.\n4. VERIFY: An Excel file downloads with the report data.\n5. Click Export to PDF.\n6. VERIFY: A PDF file downloads with the formatted report.`,
-
-    'RPT-023': `HOW TO TEST:\n1. Export a report to PDF.\n2. Open the PDF.\n3. VERIFY: The report has proper formatting: headers, footers, page numbers.\n4. VERIFY: Tables are readable and not cut off.\n5. VERIFY: Charts and graphs (if any) render correctly in the export.`,
-
-    'RPT-024': `HOW TO TEST:\n1. Generate a report.\n2. Look at the report header.\n3. VERIFY: The header includes: Report title, vessel name, date range, generation date.\n4. VERIFY: Company/system branding is present if applicable.`,
-
-    'RPT-025': `HOW TO TEST:\n1. Generate a report with a large dataset (many work orders or components).\n2. VERIFY: The report handles the volume without errors.\n3. VERIFY: All data is included (no truncation).\n4. VERIFY: Performance is acceptable (generates within 30 seconds).`,
-
-    'RPT-026': `HOW TO TEST:\n1. Generate two reports with the same parameters.\n2. Compare them.\n3. VERIFY: The reports produce identical results (deterministic).\n4. VERIFY: No random variations occur.`,
-
-    'RPT-027': `HOW TO TEST:\n1. Generate a compliance report with known data.\n2. Manually calculate expected compliance rates.\n3. VERIFY: The report's calculated rates match your manual calculation.\n4. VERIFY: Percentages add up correctly.`,
-
-    'RPT-028': `HOW TO TEST:\n1. Look for a "Scheduled Reports" or "Auto Reports" option in the Reports module.\n2. If available, set up a scheduled report (e.g., monthly compliance report).\n3. VERIFY: The schedule is saved.\n4. VERIFY: The system indicates when the next report will be generated.\n5. If not available, note "Scheduled Reports not implemented" in Comments.`,
-
-    'RPT-029': `HOW TO TEST:\n1. If scheduled reports exist, check if email delivery is configured.\n2. VERIFY: Reports are sent to the configured recipients.\n3. VERIFY: The email contains the report attachment.\n4. If not available, note "Email delivery not implemented" in Comments.`,
-
-    'RPT-030': `HOW TO TEST:\n1. If scheduled reports exist, edit an existing schedule.\n2. Change the frequency (e.g., weekly to monthly).\n3. VERIFY: The updated schedule saves.\n4. Delete a schedule.\n5. VERIFY: The schedule is removed and no more reports are generated.`,
-
-    'RPT-031': `HOW TO TEST:\n1. Look for a "Custom Report" builder or ad-hoc report option.\n2. If available, select custom fields/columns for the report.\n3. Generate the custom report.\n4. VERIFY: Only selected fields appear in the output.\n5. If not available, note "Custom Reports not implemented" in Comments.`,
-
-    'RPT-032': `HOW TO TEST:\n1. Navigate to PMS > Reports.\n2. Apply filters to a report (vessel, date range, department).\n3. VERIFY: Each filter narrows the data appropriately.\n4. Combine multiple filters.\n5. VERIFY: Combined filters work with AND logic.\n6. Clear all filters.\n7. VERIFY: The report shows unfiltered data.`,
-
-    'RPT-033': `HOW TO TEST:\n1. Generate a report and export it.\n2. VERIFY: The exported file reflects the applied filters.\n3. VERIFY: Filters are indicated in the export (e.g., "Vessel: Vessel 11, Period: Jan-Mar 2026").`,
-
-    'RPT-034': `HOW TO TEST:\n1. Generate several different report types.\n2. VERIFY: Each report loads and generates without errors.\n3. VERIFY: Report generation shows a loading state.\n4. VERIFY: Error messages appear if data is unavailable.`,
-
-    'RPT-035': `HOW TO TEST:\n1. Export a report to both Excel and PDF formats.\n2. Compare the content.\n3. VERIFY: Both formats contain the same data.\n4. VERIFY: Excel has sortable columns.\n5. VERIFY: PDF has proper page breaks and formatting.`
-  };
-
-  return instructions[id] || `HOW TO TEST:\n1. Navigate to PMS > Reports from the sidebar.\n2. ${steps.replace(/\n/g, '\n')}\nVERIFY: ${expected}`;
-}
-
-function generateDashboardHowToTest(id, section, scenario, steps, testData, expected) {
-  const instructions = {
-    'DASH-001': `HOW TO TEST:\n1. Log in to RSMS and click "PMS" in the top menu bar.\n2. In the left sidebar, click "Dashboard" (it should be the default page).\n3. Select a vessel from the vessel dropdown.\n4. VERIFY: The Dashboard loads showing overview tiles, charts, and widgets.\n5. VERIFY: Key sections are visible: KPI tiles at the top, status distribution chart, trend chart, overdue WOs widget.`,
-
-    'DASH-002': `HOW TO TEST:\n1. Navigate to PMS > Dashboard.\n2. Select a specific vessel.\n3. VERIFY: Dashboard data updates to reflect the selected vessel.\n4. Switch to a different vessel.\n5. VERIFY: All tiles, charts, and widgets refresh with the new vessel's data.`,
-
-    'DASH-003': `HOW TO TEST:\n1. Navigate to PMS > Dashboard.\n2. Select "All Vessels" from the vessel dropdown.\n3. VERIFY: Dashboard shows aggregated data across all vessels.\n4. VERIFY: A Fleet Comparison table appears showing each vessel's KPIs.\n5. VERIFY: You can click a vessel name in the fleet table to drill down.`,
-
-    'DASH-004': `HOW TO TEST:\n1. Navigate to PMS > Dashboard.\n2. Look at the overall layout.\n3. VERIFY: KPI tiles are at the top.\n4. VERIFY: Charts (pie chart, trend) are in the middle section.\n5. VERIFY: Detail widgets (overdue list, inventory) are below.\n6. VERIFY: The layout is organized and all sections are readable.`,
-
-    'DASH-005': `HOW TO TEST:\n1. Navigate to PMS > Dashboard and select a vessel.\n2. Find the "Overdue WOs" KPI tile.\n3. VERIFY: It shows the count of overdue work orders.\n4. VERIFY: The count matches the Overdue tab count on the Work Orders page.\n5. VERIFY: The tile has a colored indicator (red if overdue count > 0).`,
-
-    'DASH-006': `HOW TO TEST:\n1. Navigate to PMS > Dashboard and select a vessel.\n2. Find the "Completion Rate" or "Compliance" KPI tile.\n3. VERIFY: It shows a percentage value.\n4. VERIFY: The percentage = (completed on time / total due) * 100.\n5. VERIFY: The gauge or progress indicator reflects the rate.`,
-
-    'DASH-007': `HOW TO TEST:\n1. Navigate to PMS > Dashboard.\n2. Find the "Outstanding Tasks" or similar KPI tile.\n3. VERIFY: It shows the count of open/pending work orders.\n4. VERIFY: The count is consistent with Work Orders page data.`,
-
-    'DASH-008': `HOW TO TEST:\n1. Navigate to PMS > Dashboard.\n2. Find the Status Distribution pie chart.\n3. VERIFY: The chart shows slices for: Planned, Due, Overdue, Pending Approval, Completed.\n4. VERIFY: Slice sizes are proportional to the actual counts.\n5. VERIFY: Each slice has a distinct color matching the status badge colors.\n6. VERIFY: A legend is visible identifying each slice.`,
-
-    'DASH-009': `HOW TO TEST:\n1. On the Dashboard, look at the Status Distribution pie chart.\n2. Click on a pie segment (e.g., "Overdue").\n3. VERIFY: Clicking navigates to the Work Orders page filtered by that status.\n4. VERIFY: The Work Orders page shows the correct tab/filter pre-selected.`,
-
-    'DASH-010': `HOW TO TEST:\n1. On the Dashboard, hover over each slice of the Status Distribution pie chart.\n2. VERIFY: A tooltip appears showing the exact count and percentage for that status.\n3. VERIFY: The tooltip is readable and positioned correctly.\n4. Hover over different slices and VERIFY each shows accurate data.`,
-
-    'DASH-011': `HOW TO TEST:\n1. Navigate to PMS > Dashboard.\n2. Find the 6-month trend chart (line or bar chart).\n3. VERIFY: It shows maintenance activity over the last 6 months.\n4. VERIFY: Each month has a data point.\n5. VERIFY: The chart shows completions, overdue count, or compliance rate trend.\n6. VERIFY: The x-axis shows month labels, y-axis shows counts or percentages.`,
-
-    'DASH-012': `HOW TO TEST:\n1. On the Dashboard trend chart, hover over data points.\n2. VERIFY: A tooltip appears showing the exact value for that month.\n3. VERIFY: Values are formatted correctly (counts as integers, rates as percentages).\n4. Hover over different months and VERIFY accuracy.`,
-
-    'DASH-013': `HOW TO TEST:\n1. Navigate to PMS > Dashboard.\n2. Find the "Top Overdue WOs" widget/list.\n3. VERIFY: It shows the most overdue work orders (sorted by days/hours overdue).\n4. VERIFY: Each entry shows: WO number, job title, component, days overdue.\n5. VERIFY: The list is limited to a reasonable number (e.g., top 5 or 10).`,
-
-    'DASH-014': `HOW TO TEST:\n1. In the Top Overdue WOs widget, click on a work order entry.\n2. VERIFY: You are navigated to the Work Order detail page.\n3. VERIFY: The correct work order is displayed.\n4. Click the browser's back button.\n5. VERIFY: You return to the Dashboard.`,
-
-    'DASH-015': `HOW TO TEST:\n1. In the Top Overdue WOs widget, look for a "View All" link.\n2. Click it.\n3. VERIFY: You are navigated to the Work Orders page, filtered to show all overdue items.\n4. VERIFY: The Overdue tab is pre-selected.`,
-
-    'DASH-016': `HOW TO TEST:\n1. Navigate to PMS > Dashboard.\n2. Find the "Total Spares" count tile.\n3. VERIFY: It shows the total number of spare parts for the selected vessel.\n4. VERIFY: The count matches the total on the Spares page.`,
-
-    'DASH-017': `HOW TO TEST:\n1. Navigate to PMS > Dashboard.\n2. Find the "Low Stock" count tile.\n3. VERIFY: It shows the number of spares where ROB <= Min Stock.\n4. VERIFY: The count matches the actual low stock spares on the Spares page.\n5. VERIFY: If there are low stock items, the tile has a warning color (amber/red).`,
-
-    'DASH-018': `HOW TO TEST:\n1. Navigate to PMS > Dashboard.\n2. Find the "Critical Low Stock" count tile.\n3. VERIFY: It shows spares that are BOTH critical AND below minimum stock.\n4. VERIFY: This is a subset of the Low Stock count.\n5. VERIFY: If there are critical low stock items, the tile shows urgent styling.`,
-
-    'DASH-019': `HOW TO TEST:\n1. Navigate to PMS > Dashboard.\n2. Find the "Total Components" count tile.\n3. VERIFY: It shows the total number of components for the selected vessel.\n4. VERIFY: The count matches what's shown on the Components page.`,
-
-    'DASH-020': `HOW TO TEST:\n1. Navigate to PMS > Dashboard.\n2. Find the "Stores Inventory" or "Total Stores" count tile.\n3. VERIFY: It shows the total number of store items.\n4. VERIFY: The count matches the Stores page total.`,
-
-    'DASH-021': `HOW TO TEST:\n1. Navigate to PMS > Dashboard.\n2. Find the Stock Status pie chart (under Inventory section).\n3. VERIFY: It shows the distribution of spares by stock status.\n4. VERIFY: Segments include: Adequate, Low Stock, Critical Low Stock.\n5. VERIFY: Colors are distinct and a legend is visible.`,
-
-    'DASH-022': `HOW TO TEST:\n1. On the Dashboard, find the Stock Status pie chart.\n2. Click on a segment (e.g., "Low Stock").\n3. VERIFY: Clicking navigates to the Spares page filtered by that stock status.\n4. VERIFY: The filtered view shows the correct spares.`,
-
-    'DASH-023': `HOW TO TEST:\n1. Navigate to PMS > Dashboard.\n2. Look for a "Watch List" widget.\n3. If present, VERIFY it shows items the user has marked for monitoring.\n4. If not visible, note "Watch List widget not visible" in Comments.\n5. Document whether the feature exists and for which roles.`,
-
-    'DASH-024': `HOW TO TEST:\n1. Navigate to PMS > Dashboard.\n2. Find the "Superintendent" tile or notification indicator.\n3. VERIFY: It shows the count of pending superintendent actions (e.g., WOs awaiting approval).\n4. VERIFY: The count is accurate and matches the Superintendent page.`,
-
-    'DASH-025': `HOW TO TEST:\n1. On the Dashboard, find the Superintendent tile.\n2. Click on it.\n3. VERIFY: You are navigated to the Superintendent Notifications page.\n4. VERIFY: The pending items are displayed.\n5. VERIFY: The navigation is smooth (no errors).`,
-
-    'DASH-026': `HOW TO TEST:\n1. Log in as a Sail Admin user.\n2. Navigate to PMS > Dashboard.\n3. Scroll down to find the "Compliance Anomaly Detection" panel.\n4. VERIFY: The panel is visible and shows anomaly categories:\n   - Cycle Skip Rate\n   - Backdating Frequency\n   - Bulk Completion Events\n   - Schedule Drift\n5. VERIFY: Each category has a count and severity indicator.\n6. VERIFY: Individual anomaly entries can be expanded for details.`,
-
-    'DASH-027': `HOW TO TEST:\n1. Log in as a NON-Sail Admin user (e.g., Client Admin, Vessel User).\n2. Navigate to PMS > Dashboard.\n3. Scroll through the entire page.\n4. VERIFY: The "Compliance Anomaly Detection" panel is NOT visible.\n5. VERIFY: No anomaly-related tiles or sections are shown.\n6. Log in as Sail Admin and VERIFY the panel IS visible.`,
-
-    'DASH-028': `HOW TO TEST:\n1. Log in as Sail Admin and go to the Dashboard.\n2. In the Anomaly Detection panel, find the "Cycle Skip Rate" card.\n3. VERIFY: It shows a percentage or count of jobs with skipped maintenance cycles.\n4. Click on it for details.\n5. VERIFY: Details show which jobs/components have skipped cycles.\n6. VERIFY: The rate is calculated accurately.`,
-
-    'DASH-029': `HOW TO TEST:\n1. In the Anomaly Detection panel, find the "Backdating Frequency" card.\n2. VERIFY: It shows how many WOs were completed with backdated dates.\n3. Click for details.\n4. VERIFY: Each backdated WO is listed with the backdating amount.\n5. VERIFY: The count is accurate.`,
-
-    'DASH-030': `HOW TO TEST:\n1. In the Anomaly Detection panel, find the "Bulk Completion Events" card.\n2. VERIFY: It flags dates where an unusually high number of WOs were completed.\n3. Click for details.\n4. VERIFY: The specific dates and WO counts are shown.\n5. VERIFY: The threshold for "bulk" is reasonable.`,
-
-    'DASH-031': `HOW TO TEST:\n1. In the Anomaly Detection panel, find the "Schedule Drift" card.\n2. VERIFY: It shows jobs that are consistently completed earlier or later than scheduled.\n3. Click for details.\n4. VERIFY: Each drifting job shows the average drift amount.\n5. VERIFY: Both early and late drift are detected.`,
-
-    'DASH-032': `HOW TO TEST:\n1. Log in as Sail Admin and go to the Dashboard.\n2. Look for an "Anomaly" KPI tile in the main dashboard tiles section.\n3. VERIFY: The tile shows the total count of detected anomalies.\n4. VERIFY: Clicking the tile scrolls to or navigates to the anomaly detail panel.\n5. VERIFY: The count matches the sum of anomalies in the detail panel.`,
-
-    'DASH-033': `HOW TO TEST:\n1. Log in as a non-Sail Admin user.\n2. Navigate to the Dashboard.\n3. VERIFY: The Anomaly tile is NOT visible in the KPI tiles section.\n4. VERIFY: No anomaly-related information is shown anywhere.\n5. Log in as Sail Admin and VERIFY the tile IS visible.`,
-
-    'DASH-034': `HOW TO TEST:\n1. Log in as Sail Admin and go to the Anomaly panel.\n2. Find the "Severity" filter dropdown.\n3. Select "High".\n4. VERIFY: Only high-severity anomalies are displayed.\n5. Select "Medium".\n6. VERIFY: Only medium-severity anomalies are shown.\n7. Select "All".\n8. VERIFY: All anomalies reappear.`,
-
-    'DASH-035': `HOW TO TEST:\n1. In the Anomaly panel, click the "Refresh" button.\n2. VERIFY: A loading indicator appears.\n3. VERIFY: Anomaly data refreshes.\n4. VERIFY: Any new anomalies since last load appear.\n5. VERIFY: The refresh completes without errors.`,
-
-    'DASH-036': `HOW TO TEST:\n1. Navigate to PMS > Dashboard.\n2. Locate the vessel filter (dropdown at the top).\n3. Select different vessels.\n4. VERIFY: All dashboard tiles, charts, and widgets update to reflect the selected vessel.\n5. Select "All Vessels".\n6. VERIFY: Aggregated data is shown across all vessels.`,
-
-    'DASH-037': `HOW TO TEST:\n1. On the Dashboard, apply various filters (vessel, year).\n2. Look for a "Clear Filters" option.\n3. Click it.\n4. VERIFY: All filters reset to defaults.\n5. VERIFY: Dashboard shows the default view.`,
-
-    'DASH-038': `HOW TO TEST:\n1. Navigate to PMS > Dashboard.\n2. Look for a year selector (e.g., "2025", "2026").\n3. If available, change the year.\n4. VERIFY: Dashboard data updates to reflect the selected year.\n5. VERIFY: Trend charts and compliance data are year-specific.\n6. If not available, note "Year selector not present" in Comments.`,
-
-    'DASH-039': `HOW TO TEST:\n1. Navigate to any page in RSMS.\n2. Look for a notification bell icon in the header/toolbar area.\n3. VERIFY: The bell icon is visible.\n4. VERIFY: If there are unread notifications, a badge with a count appears on the bell.\n5. If no bell icon exists, note "Notification bell not implemented" in Comments.`,
-
-    'DASH-040': `HOW TO TEST:\n1. Find the notification bell icon.\n2. Click it.\n3. VERIFY: A notification panel or dropdown opens.\n4. VERIFY: Recent notifications are listed.\n5. VERIFY: Each notification shows a title, description, and timestamp.\n6. Click outside the panel to close it.\n7. VERIFY: The panel closes.`,
-
-    'DASH-041': `HOW TO TEST:\n1. Open the notification panel.\n2. Review the types of notifications present.\n3. VERIFY: Different notification types exist (e.g., WO approval requests, overdue alerts, stock warnings).\n4. VERIFY: Each type has a distinct icon or color.\n5. Document the notification types available.`,
-
-    'DASH-042': `HOW TO TEST:\n1. Open the notification panel.\n2. Find an unread notification.\n3. Click on it or look for a "Mark as read" button.\n4. VERIFY: The notification visual changes (no longer bold/highlighted).\n5. VERIFY: The unread count badge decreases.\n6. VERIFY: The read status persists after refreshing the page.`,
-
-    'DASH-043': `HOW TO TEST:\n1. Look for a user profile icon/avatar in the header area.\n2. Click it.\n3. VERIFY: A profile dropdown or page opens.\n4. VERIFY: It shows: user name, role, email (if applicable).\n5. VERIFY: The displayed role matches the logged-in user's actual role.`,
-
-    'DASH-044': `HOW TO TEST:\n1. Click on the user profile icon/avatar.\n2. Look for a "Logout" or "Sign Out" option.\n3. Click Logout.\n4. VERIFY: You are redirected to the login page.\n5. VERIFY: You cannot access protected pages after logout.\n6. VERIFY: Logging back in works correctly.`,
-
-    'DASH-045': `HOW TO TEST:\n1. Open RSMS on a desktop browser (1920px+ width).\n2. Navigate to the Dashboard.\n3. VERIFY: The layout uses the full width effectively.\n4. VERIFY: KPI tiles are in a row.\n5. VERIFY: Charts display at full size.\n6. VERIFY: No wasted whitespace or overlapping elements.`,
-
-    'DASH-046': `HOW TO TEST:\n1. Open RSMS on a tablet (or resize browser to ~768px width).\n2. Navigate to the Dashboard.\n3. VERIFY: The layout adapts — tiles may stack or rearrange.\n4. VERIFY: Charts resize to fit.\n5. VERIFY: All content is accessible without horizontal scrolling.\n6. VERIFY: Navigation is usable on a tablet.`,
-
-    'DASH-047': `HOW TO TEST:\n1. Open RSMS on a mobile device (or resize browser to ~375px width).\n2. Navigate to the Dashboard.\n3. VERIFY: Content stacks vertically.\n4. VERIFY: All tiles and charts are readable.\n5. VERIFY: No content is cut off.\n6. VERIFY: Navigation works (sidebar may collapse to a hamburger menu).\n7. VERIFY: Touch targets are adequately sized.`,
-
-    'DASH-048': `HOW TO TEST:\n1. Disconnect from the network (airplane mode or disable WiFi).\n2. Try to load the Dashboard.\n3. VERIFY: An appropriate error message appears (e.g., "Unable to load data" or "Network error").\n4. VERIFY: The page does not crash — it degrades gracefully.\n5. Reconnect and refresh.\n6. VERIFY: The Dashboard loads normally after reconnection.`,
-
-    'DASH-049': `HOW TO TEST:\n1. Log in to RSMS.\n2. Leave the application idle for a long time (until session times out).\n3. Try to navigate to a new page.\n4. VERIFY: The system redirects to the login page (session expired).\n5. VERIFY: An appropriate message is shown (e.g., "Session expired, please log in again").\n6. VERIFY: No data loss occurs — any unsaved work should be warned about before timeout.`,
-
-    'DASH-050': `HOW TO TEST:\n1. Log in as different user roles and navigate to the Dashboard.\n2. As Vessel User: VERIFY you see vessel-specific data only.\n3. As Client Admin: VERIFY you see data for vessels assigned to your company.\n4. As Sail Admin: VERIFY you see all data including anomaly detection.\n5. VERIFY: Each role sees only what they're permitted to see.\n6. VERIFY: No role can access restricted features.`,
-
-    'DASH-051': `HOW TO TEST:\n1. Log in as a Sail Admin user.\n2. Navigate to any page.\n3. Look for a chat button (message/chat bubble icon) in the bottom-right corner.\n4. VERIFY: The chat button is visible.\n5. Click it.\n6. VERIFY: The AI chat panel opens.\n7. VERIFY: You can type and receive responses.`,
-
-    'DASH-052': `HOW TO TEST:\n1. Log in as a NON-Sail Admin user.\n2. Navigate to any page.\n3. Look for the chat button in the bottom-right corner.\n4. VERIFY: The chat button is NOT visible.\n5. VERIFY: There is no way to access the AI chat feature.\n6. Log in as Sail Admin and VERIFY the button IS visible.`
-  };
-
-  return instructions[id] || `HOW TO TEST:\n1. Navigate to PMS > Dashboard.\n2. ${steps.replace(/\n/g, '\n')}\nVERIFY: ${expected}`;
+function buildGeneric(id, scenario, section, steps, testData, expected) {
+  const stepsArr = (steps || '').split(/\d+\.\s*/).filter(s => s.trim());
+  const setupSteps = ['Log in to RSMS.', `Navigate to the ${section || 'relevant'} module from the sidebar.`, 'Select a vessel if applicable.'];
+  const actionSteps = stepsArr.length > 0 ? stepsArr.slice(0, 2).map(s => s.trim()) : ['Perform the action described in the test scenario.'];
+  const intermediateSteps = stepsArr.length > 2 ? stepsArr.slice(2, 4).map(s => s.trim()) : [];
+  const expectedArr = (expected || '').split(/\.\s*/).filter(e => e.trim()).slice(0, 4);
+  const checks = expectedArr.length > 0 ? expectedArr.map((e, i) => [`Check ${i+1}`, e.trim()]) : [['Result', expected || 'Expected behavior is observed']];
+
+  return fmt(id, scenario,
+    `Verify that ${(scenario || 'the feature').toLowerCase()} works as expected.`,
+    setupSteps, actionSteps, intermediateSteps, [],
+    checks,
+    ['No UI errors or console errors during the test', 'All data displays correctly without "undefined" or "null"', 'Smooth navigation and transitions', 'Changes persist after page refresh'],
+    ['Try the action with unexpected input — verify graceful error handling.', 'Test with different user roles to verify access control.', 'Use browser back button — verify state is handled correctly.']
+  );
 }
 
 async function main() {
@@ -872,12 +1051,12 @@ async function main() {
 
     if (headers.length === 0) continue;
 
-    const headerStyle = headerRow.getCell(1).style;
+    const headerStyle = JSON.parse(JSON.stringify(headerRow.getCell(1).style));
 
     const colM = 13;
     const headerCell = headerRow.getCell(colM);
     headerCell.value = 'How to Test';
-    headerCell.style = JSON.parse(JSON.stringify(headerStyle));
+    headerCell.style = headerStyle;
 
     const rowCount = ws.rowCount;
     for (let r = 2; r <= rowCount; r++) {
@@ -892,18 +1071,18 @@ async function main() {
 
       if (!testCase['Test Case ID']) continue;
 
-      const howToTest = generateHowToTest(testCase);
+      const howToTest = generateStructuredHowToTest(testCase);
       const cell = row.getCell(colM);
       cell.value = howToTest;
       cell.alignment = { wrapText: true, vertical: 'top' };
       totalProcessed++;
     }
 
-    ws.getColumn(colM).width = 80;
+    ws.getColumn(colM).width = 90;
   }
 
   await wb.xlsx.writeFile(OUTPUT_FILE);
-  console.log(`SUCCESS: Generated How-to-Test instructions for ${totalProcessed} test cases.`);
+  console.log(`SUCCESS: Generated structured How-to-Test instructions for ${totalProcessed} test cases.`);
   console.log(`Output file: ${OUTPUT_FILE}`);
 }
 
