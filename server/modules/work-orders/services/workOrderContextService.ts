@@ -239,16 +239,16 @@ export async function getWorkOrderContext(workOrderId: string) {
     lastCompletedDate = latestCompletedEntry.completionDate || latestCompletedEntry.workDate || '';
     lastCompletedRH = latestCompletedEntry.runDate || '';
     lastCompletedDateForRH = lastCompletedDate;
-  }
-
-  if (!lastCompletedDate && job?.lastDoneDate) {
-    lastCompletedDate = convertToIsoDate(job.lastDoneDate);
-  }
-  if (!lastCompletedRH && job?.lastDoneRH) {
-    lastCompletedRH = String(job.lastDoneRH);
-  }
-  if (!lastCompletedDateForRH && lastCompletedDate) {
-    lastCompletedDateForRH = lastCompletedDate;
+  } else {
+    if (job?.lastDoneDate) {
+      lastCompletedDate = convertToIsoDate(job.lastDoneDate);
+    }
+    if (job?.lastDoneRH) {
+      lastCompletedRH = String(job.lastDoneRH);
+    }
+    if (lastCompletedDate) {
+      lastCompletedDateForRH = lastCompletedDate;
+    }
   }
 
   // Build templateData from job data (Part A - immutable from job definition)
