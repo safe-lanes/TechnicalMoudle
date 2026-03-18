@@ -1,0 +1,286 @@
+ADD LAST DONE DATE AND LAST DONE RH FIELDS TO PART A - JOB DETAILS
+OBJECTIVE
+Add two new read-only informational fields to the Work Order Form Part A (Job Details section) to provide transparency about when this maintenance job was last completed. These fields will help engineers and supervisors quickly understand the maintenance history without navigating away from the work order form.
+
+LOCATION
+Work Order Form - Part A - Job Details Section
+
+The fields should be added in the existing Part A layout, specifically in the "A1. Job Information" section where other job-related information is displayed (Component Name, Job Code, Maintenance Basis, Frequency, etc.).
+
+NEW FIELDS TO ADD
+1. Last Done Date (for Calendar-based jobs)
+Field Name: Last Done Date
+Display Label: "Last Completed On"
+Field Type: Read-only text display (formatted date)
+Visibility: Show ONLY for Calendar-based maintenance jobs
+Data Source: Fetch from the most recent completed work order for this component and job code combination
+
+Display Format:
+
+If job was completed before: "15-Mar-2026 (3 days ago)"
+
+If job was never completed before: "Never completed" or "First cycle"
+
+Include relative time indicator like "X days ago" or "X months ago" for better context
+
+Example Display:
+
+text
+Last Completed On: 15-Mar-2026 (3 days ago)
+2. Last Done RH (for Running Hours-based jobs)
+Field Name: Last Done RH
+Display Label: "Last Completed At"
+Field Type: Read-only text display (formatted number with "Hours" unit)
+Visibility: Show ONLY for Running Hours-based maintenance jobs
+Data Source: Fetch from the most recent completed work order for this component and job code combination
+
+Display Format:
+
+If job was completed before: "2,250 Hours (on 15-Mar-2026)"
+
+If job was never completed before: "Never completed" or "First cycle"
+
+Include the date when that RH reading was recorded for additional context
+
+Example Display:
+
+text
+Last Completed At: 2,250 Hours (on 15-Mar-2026)
+DETAILED FUNCTIONALITY REQUIREMENTS
+A. Data Fetching Logic
+When a work order form is opened in Part A:
+
+Identify the maintenance basis (Calendar or Running Hours) from the job record
+
+Query the database to find the most recent completed work order matching:
+
+Same component ID
+
+Same job code
+
+Status = "Completed"
+
+Order by completion date descending (most recent first)
+
+Limit to 1 result
+
+For Calendar-based jobs:
+
+Extract the completedAt or completionDate field
+
+Format as DD-MMM-YYYY
+
+Calculate relative time (e.g., "3 days ago", "2 months ago", "1 year ago")
+
+Display both absolute date and relative time
+
+For Running Hours-based jobs:
+
+Extract the completedAtRH or completionRH field (the running hours reading at completion)
+
+Format with thousand separators (e.g., 2,250)
+
+Extract the completedAt date as well
+
+Display RH value with date in parentheses
+
+If no previous completion exists:
+
+Display placeholder text indicating this is the first cycle
+
+Examples: "Never completed", "First maintenance cycle", or "—"
+
+B. UI Placement and Styling
+Layout Position:
+
+Add these fields in the A1. Job Information section
+
+Place them after the existing "Next Due RH" field (for RH-based jobs) or in a logical position after other job details
+
+Use a consistent two-column layout with other fields in Part A
+
+Visual Design:
+
+Read-only styling: Use a light gray background or border to indicate non-editable fields
+
+Icon indicator: Add a small clock icon or history icon before the label for visual clarity
+
+Font styling: Use same font family and size as other read-only fields in Part A
+
+Color coding (optional):
+
+Green text if last completed recently (within expected frequency)
+
+Orange/Yellow if last completed long ago (overdue pattern)
+
+Gray if never completed
+
+Responsive Design:
+
+Ensure fields stack properly on mobile/tablet views
+
+Maintain readability on all screen sizes
+
+C. Conditional Visibility
+Calendar-based Jobs:
+
+Show: "Last Completed On" field
+
+Hide: "Last Done RH" field
+
+Running Hours-based Jobs:
+
+Show: "Last Completed At" field (with RH value)
+
+Hide: "Last Completed On" field
+
+Empty State Handling:
+
+If the job has never been completed before, display a clear placeholder message
+
+Avoid showing "null", "undefined", or blank fields
+
+Use consistent empty state text across both field types
+
+D. Data Accuracy and Edge Cases
+Edge Case 1: Multiple Completions on Same Day
+
+If multiple completions exist for the same job on the same day, use the most recent one based on timestamp
+
+Edge Case 2: Work Order Rejected Then Re-approved
+
+Only count work orders with final status = "Completed"
+
+Ignore work orders that were completed but later rejected or cancelled
+
+Edge Case 3: Component with No History
+
+Display "Never completed" or "First cycle"
+
+Do NOT show errors or system messages
+
+Edge Case 4: Migrated/Imported Data
+
+If historical data was imported from old system, use imported completion dates/RH values if available
+
+If no historical data exists, treat as "never completed"
+
+Edge Case 5: Running Hours Job Without RH Reading
+
+If a completed work order exists but has no RH reading recorded (data inconsistency), display:
+
+"Last completed on [date] (RH not recorded)"
+
+E. Performance Optimization
+Query Optimization:
+
+Create database index on: componentId, jobCode, status, completedAt for fast lookups
+
+Cache the last completion data when loading the work order to avoid repeated queries
+
+Lazy Loading:
+
+Load these fields asynchronously if needed to avoid blocking the main work order form load
+
+Show a loading skeleton or spinner while fetching historical data
+
+F. Additional Enhancements (Optional)
+1. Tooltip with More Details:
+
+When hovering over the "Last Completed On/At" field, show a tooltip with:
+
+Who performed the last completion (rank/name)
+
+How long the work took (duration in hours)
+
+Any missed cycles or backdating flags from that completion
+
+2. Clickable Link to Previous Work Order:
+
+Make the date/RH value clickable
+
+On click, open the previous completed work order in a new tab or modal
+
+This allows users to quickly review what was done last time
+
+3. History Trend Indicator:
+
+If multiple completions exist, show a small trend icon:
+
+↑ if completions are getting more frequent (good)
+
+↓ if completions are getting delayed (concern)
+
+— if pattern is stable
+
+IMPLEMENTATION CHECKLIST
+When implementing this feature, ensure:
+
+✅ Fields appear in Part A - Job Details section
+✅ Fields are read-only (non-editable)
+✅ Correct field is shown based on maintenance basis (Calendar vs Running Hours)
+✅ Data is fetched from most recent completed work order
+✅ Date formatting is consistent (DD-MMM-YYYY)
+✅ Running hours formatting uses thousand separators
+✅ Relative time is calculated correctly ("X days ago")
+✅ Empty state handled gracefully ("Never completed")
+✅ Fields are responsive on mobile/tablet
+✅ No performance degradation when loading work orders
+✅ Fields update correctly when work order is reopened after completion
+
+TESTING SCENARIOS
+Test Case 1: Calendar-based job with previous completion
+
+Open a work order for a monthly job that was completed 15 days ago
+
+Expected: Shows "Last Completed On: 03-Mar-2026 (15 days ago)"
+
+Test Case 2: RH-based job with previous completion
+
+Open a work order for a 500H frequency job last done at 2,000 RH
+
+Expected: Shows "Last Completed At: 2,000 Hours (on 10-Mar-2026)"
+
+Test Case 3: First-time job (never completed)
+
+Open a work order for a newly created job with no completion history
+
+Expected: Shows "Last Completed On: Never completed" or "First cycle"
+
+Test Case 4: Multiple previous completions
+
+Open a work order for a job completed 5 times in the past
+
+Expected: Shows ONLY the most recent completion date/RH
+
+Test Case 5: Completed work order reopened
+
+Complete a work order, save, then reopen the form
+
+Expected: Last Done fields still show the PREVIOUS completion, not the current one being viewed
+
+BENEFITS OF THIS FEATURE
+Transparency: Engineers can immediately see maintenance history without leaving the form
+
+Context: Helps assess urgency and prioritization based on when job was last done
+
+Quality: Prevents forgetting or overlooking long-overdue maintenance
+
+Audit: Provides quick reference for compliance and inspection purposes
+
+Efficiency: Reduces navigation time to find historical data
+
+DELIVERABLE
+After implementation, the Part A - Job Details section should display:
+
+For Calendar jobs: "Last Completed On" with formatted date and relative time
+
+For Running Hours jobs: "Last Completed At" with RH value and completion date
+
+Consistent styling with other read-only fields
+
+Graceful handling of empty states (never completed jobs)
+
+Fast loading with no performance impact
+
+Please implement this feature and confirm when deployed to the development environment for testing.
