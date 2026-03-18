@@ -234,8 +234,8 @@ export async function getWorkOrderContext(workOrderId: string) {
     wo.componentCode === componentCode || wo.component === workOrder.component
   );
   completedForThisComponent.sort((a: any, b: any) => {
-    const dateA = a.completionDateTime || a.dateCompleted || '';
-    const dateB = b.completionDateTime || b.dateCompleted || '';
+    const dateA = convertToIsoDate(a.completionDateTime || a.dateCompleted || '');
+    const dateB = convertToIsoDate(b.completionDateTime || b.dateCompleted || '');
     return dateB.localeCompare(dateA);
   });
   const latestCompletedWO = completedForThisComponent.length > 0 ? completedForThisComponent[0] : null;
