@@ -30,7 +30,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { FileText, ArrowLeft, Plus, Eye, Upload, Download, Menu, Check, X, Edit2, Trash2, Copy, Loader2, Paperclip, Image as ImageIcon, FileSpreadsheet, BarChart3, AlertTriangle, CheckCircle2 } from "lucide-react";
+import { FileText, ArrowLeft, Plus, Eye, Upload, Download, Menu, Check, X, Edit2, Trash2, Copy, Loader2, Paperclip, Image as ImageIcon, FileSpreadsheet, BarChart3, AlertTriangle, CheckCircle2, Clock } from "lucide-react";
 import RHTimelineViewer from "@/components/pms/RHTimelineViewer";
 import sailLogo from "@assets/SAIL logo Transparent_1753957135582.png";
 import {
@@ -63,6 +63,56 @@ import { DocumentPreviewModal } from "@/components/DocumentPreviewModal";
 export interface HistoryWorkOrderPayload {
   template: WorkOrder;
   execution: WorkOrderExecution;
+}
+
+function formatRelativeTime(dateStr: string | null | undefined): string {
+  if (!dateStr) return '';
+  const monthMap: Record<string, number> = {
+    'Jan': 0, 'Feb': 1, 'Mar': 2, 'Apr': 3, 'May': 4, 'Jun': 5,
+    'Jul': 6, 'Aug': 7, 'Sep': 8, 'Oct': 9, 'Nov': 10, 'Dec': 11
+  };
+  let dateObj: Date | null = null;
+  const ddMmmYyyy = dateStr.match(/^(\d{1,2})-([A-Za-z]{3})-(\d{4})$/);
+  if (ddMmmYyyy) {
+    const [, day, mon, year] = ddMmmYyyy;
+    dateObj = new Date(parseInt(year), monthMap[mon] ?? 0, parseInt(day));
+  } else {
+    dateObj = new Date(dateStr);
+  }
+  if (!dateObj || isNaN(dateObj.getTime())) return '';
+  const now = new Date();
+  now.setHours(0, 0, 0, 0);
+  dateObj.setHours(0, 0, 0, 0);
+  const diffMs = now.getTime() - dateObj.getTime();
+  const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+  if (diffDays < 0) return `in ${Math.abs(diffDays)} day${Math.abs(diffDays) !== 1 ? 's' : ''}`;
+  if (diffDays === 0) return 'today';
+  if (diffDays === 1) return '1 day ago';
+  if (diffDays < 30) return `${diffDays} days ago`;
+  const diffMonths = Math.floor(diffDays / 30);
+  if (diffMonths < 12) return `${diffMonths} month${diffMonths !== 1 ? 's' : ''} ago`;
+  const diffYears = Math.floor(diffMonths / 12);
+  return `${diffYears} year${diffYears !== 1 ? 's' : ''} ago`;
+}
+
+function formatDateToDDMMMYYYY(dateStr: string | null | undefined): string {
+  if (!dateStr) return '';
+  const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  const ddMmmYyyy = dateStr.match(/^(\d{1,2})-([A-Za-z]{3})-(\d{4})$/);
+  if (ddMmmYyyy) return dateStr;
+  const dateObj = new Date(dateStr);
+  if (isNaN(dateObj.getTime())) return dateStr;
+  const day = String(dateObj.getDate()).padStart(2, '0');
+  const month = months[dateObj.getMonth()];
+  const year = dateObj.getFullYear();
+  return `${day}-${month}-${year}`;
+}
+
+function formatRHWithSeparators(value: string | number | null | undefined): string {
+  if (value == null || value === '') return '';
+  const num = typeof value === 'string' ? parseFloat(value) : value;
+  if (isNaN(num)) return String(value);
+  return num.toLocaleString('en-US', { maximumFractionDigits: 2 });
 }
 
 interface WorkOrderFormPageProps {
@@ -470,6 +520,10 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
   const [workOrderNo, setWorkOrderNo] = useState("");
   const [workOrderDueDate, setWorkOrderDueDate] = useState("");
 
+  const [lastDoneDate, setLastDoneDate] = useState<string>("");
+  const [lastDoneRH, setLastDoneRH] = useState<string>("");
+  const [lastDoneDateForRH, setLastDoneDateForRH] = useState<string>("");
+
   const [executionData, setExecutionData] = useState({
     woExecutionId: "",
     riskAssessment: "No",
@@ -636,6 +690,18 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
         } else if (normalizedTemplateData.maintenanceBasis === 'Calendar') {
           // Only default to Months if we're in Calendar mode and have no valid unit to preserve
           setLastCalendarUnit(normalizedFrequencyUnit);
+        }
+
+        setLastDoneDate(context.templateData.lastDoneDate || '');
+        setLastDoneRH(context.templateData.lastDoneRH || '');
+
+        if (context.templateData.lastDoneDate) {
+          setLastDoneDateForRH(context.templateData.lastDoneDate);
+        } else if (context.templateData.workHistory?.length > 0) {
+          const latestCompletion = context.templateData.workHistory.find((h: any) => h.status === 'Completed');
+          if (latestCompletion?.completionDate) {
+            setLastDoneDateForRH(latestCompletion.completionDate);
+          }
         }
 
         // Set Modify Mode snapshot if enabled
@@ -2920,6 +2986,46 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                       disabled={isPartAReadOnly}
                       data-testid="WOF.A1.27"
                     />
+                  </div>
+                )}
+
+                {templateData.maintenanceBasis === 'Running Hours' ? (
+                  <div className="space-y-2">
+                    <Label className="text-sm text-[#8798ad] flex items-center gap-1" data-testid="WOF.A1.lastDoneLabel">
+                      <Clock className="h-3.5 w-3.5" />
+                      Last Completed At
+                    </Label>
+                    <div className="text-xs p-2 bg-gray-100 rounded border border-gray-200 text-gray-700" data-testid="text-last-completed-rh">
+                      {lastDoneRH ? (
+                        <>
+                          {formatRHWithSeparators(lastDoneRH)} Hours
+                          {lastDoneDateForRH && (
+                            <span className="text-gray-500"> (on {formatDateToDDMMMYYYY(lastDoneDateForRH)})</span>
+                          )}
+                        </>
+                      ) : (
+                        <span className="text-gray-400 italic">First maintenance cycle</span>
+                      )}
+                    </div>
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    <Label className="text-sm text-[#8798ad] flex items-center gap-1" data-testid="WOF.A1.lastDoneLabel">
+                      <Clock className="h-3.5 w-3.5" />
+                      Last Completed On
+                    </Label>
+                    <div className="text-xs p-2 bg-gray-100 rounded border border-gray-200 text-gray-700" data-testid="text-last-completed-date">
+                      {lastDoneDate ? (
+                        <>
+                          {formatDateToDDMMMYYYY(lastDoneDate)}
+                          {formatRelativeTime(lastDoneDate) && (
+                            <span className="text-gray-500"> ({formatRelativeTime(lastDoneDate)})</span>
+                          )}
+                        </>
+                      ) : (
+                        <span className="text-gray-400 italic">First maintenance cycle</span>
+                      )}
+                    </div>
                   </div>
                 )}
 
