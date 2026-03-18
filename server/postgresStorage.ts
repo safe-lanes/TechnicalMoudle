@@ -7263,7 +7263,8 @@ export class PostgresStorage {
         const existing = await db.select().from(spareComponentLinks).where(
           and(
             eq(spareComponentLinks.spareId, link.spareId),
-            eq(spareComponentLinks.componentId, link.componentId)
+            eq(spareComponentLinks.componentId, link.componentId),
+            eq(spareComponentLinks.vesselId, link.vesselId)
           )
         );
         if (existing.length > 0) return existing[0];
