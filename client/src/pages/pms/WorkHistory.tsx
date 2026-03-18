@@ -4,6 +4,7 @@ import { useLocation } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
+import { useToast } from "@/hooks/use-toast";
 import {
   Select,
   SelectContent,
@@ -77,6 +78,7 @@ const WorkHistory: React.FC = () => {
   const [isExportingExcel, setIsExportingExcel] = useState(false);
   const [isExportingPDF, setIsExportingPDF] = useState(false);
 
+  const { toast } = useToast();
   const currentVessel = vessels.find(v => v.id === vesselId);
   const vesselName = currentVessel?.name || "Vessel";
 
@@ -195,6 +197,7 @@ const WorkHistory: React.FC = () => {
   const handleExportExcel = async () => {
     setIsExportingExcel(true);
     try {
+      // Wrapped in outer try/catch for user-facing error feedback
       const ExcelJS = (await import("exceljs")).default;
       const workbook = new ExcelJS.Workbook();
       workbook.creator = "SAIL PMS";
@@ -360,6 +363,13 @@ const WorkHistory: React.FC = () => {
       link.click();
       document.body.removeChild(link);
       URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error("Excel export failed:", err);
+      toast({
+        variant: "destructive",
+        title: "Export failed",
+        description: "Could not generate the Excel file. Please try again.",
+      });
     } finally {
       setIsExportingExcel(false);
     }
@@ -498,6 +508,13 @@ const WorkHistory: React.FC = () => {
       }
 
       doc.save(exportFilename("pdf"));
+    } catch (err) {
+      console.error("PDF export failed:", err);
+      toast({
+        variant: "destructive",
+        title: "Export failed",
+        description: "Could not generate the PDF file. Please try again.",
+      });
     } finally {
       setIsExportingPDF(false);
     }
