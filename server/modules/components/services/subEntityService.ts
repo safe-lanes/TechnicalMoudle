@@ -161,6 +161,10 @@ export async function listAllMaintenanceHistory() {
   return repo.findAllMaintenanceHistory();
 }
 
+export async function listVesselMaintenanceHistory(vesselId: string) {
+  return repo.findMaintenanceHistoryByVessel(vesselId);
+}
+
 export async function listMaintenanceHistory(componentId: string, user: UserInfo) {
   const component = await repo.findById(componentId);
   if (!component) throw new NotFoundError('Component not found');

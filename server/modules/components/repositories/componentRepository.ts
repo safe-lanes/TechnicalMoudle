@@ -178,6 +178,10 @@ export async function findMaintenanceHistoryItem(id: number) {
   return storage.getComponentMaintenanceHistoryItem(id);
 }
 
+export async function findMaintenanceHistoryByVessel(vesselId: string) {
+  return storage.getMaintenanceHistoryByVessel(vesselId);
+}
+
 // ── Component Sort Order & Hierarchy ──
 
 export async function updateSortOrder(updates: { id: string; sortOrder: number }[]) {

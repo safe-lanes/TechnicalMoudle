@@ -73,6 +73,7 @@ router.delete('/component-requisitions/:id', requirePMSAdmin, asyncHandler(subCt
 // ── Component Maintenance History (read-only) ──
 
 router.get('/component-maintenance-history', asyncHandler(subCtrl.listAllMaintenanceHistory));
+router.get('/component-maintenance-history/vessel/:vesselId', asyncHandler(subCtrl.listVesselMaintenanceHistory));
 router.get('/component-maintenance-history/:componentId', requireAuth, asyncHandler(subCtrl.listMaintenanceHistory));
 router.get('/component-maintenance-history/item/:id', requireAuth, asyncHandler(subCtrl.getMaintenanceHistoryItem));
 

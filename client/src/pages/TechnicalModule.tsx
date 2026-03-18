@@ -9,6 +9,7 @@ import Components from "./pms/Components";
 import WorkOrders from "./pms/WorkOrders";
 import RunningHours from "./pms/RunningHours";
 import MaintenanceRecords from "./pms/MaintenanceRecords";
+import WorkHistory from "./pms/WorkHistory";
 import { ModifyPMS } from "@/components/modifyPms/ModifyPMS";
 import JobsSelector from "./modify-pms/JobsSelector";
 import Spares from "./spares/SparesNew";
@@ -173,6 +174,8 @@ export const TechnicalModule = () => {
             <Components />
           ) : selectedSubModule === "pms" && selectedMenuItem === "work-orders" ? (
             <WorkOrders />
+          ) : selectedSubModule === "pms" && selectedMenuItem === "work-history" ? (
+            <WorkHistory />
           ) : selectedSubModule === "pms" && selectedMenuItem === "running-hrs" ? (
             <RunningHours />
           ) : selectedSubModule === "pms" && selectedMenuItem === "spares" ? (

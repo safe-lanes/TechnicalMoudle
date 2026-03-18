@@ -952,6 +952,7 @@ class MemStorage {
   async getMaintenanceHistoryByJobCode(jobCode: string): Promise<any[]> { return []; }
   async getComponentMaintenanceHistoryItem(id: number): Promise<any> { return undefined; }
   async getMaintenanceHistoryByWorkOrderId(workOrderId: string): Promise<any> { return undefined; }
+  async getMaintenanceHistoryByVessel(vesselId: string): Promise<any[]> { return []; }
   async createComponentMaintenanceHistory(item: any): Promise<any> { return { ...item, id: this.getNextId('maintHistory') }; }
 
   // Component Requisitions

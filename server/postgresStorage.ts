@@ -1626,6 +1626,37 @@ export class PostgresStorage {
     return result[0];
   }
 
+  async getMaintenanceHistoryByVessel(vesselId: string): Promise<any[]> {
+    const db = await getDb();
+    const history = await db.select().from(componentMaintenanceHistory)
+      .where(eq(componentMaintenanceHistory.vesselCode, vesselId))
+      .orderBy(desc(componentMaintenanceHistory.dateCompleted));
+    if (history.length === 0) return [];
+
+    const workOrderIds = [...new Set(history.map(h => h.workOrderId))];
+    const anomalies = await db.select({
+      workOrderId: workOrderAnomalies.workOrderId,
+      daysLate: workOrderAnomalies.daysLate,
+    }).from(workOrderAnomalies)
+      .where(
+        and(
+          eq(workOrderAnomalies.anomalyType, 'BACKDATING'),
+          sql`${workOrderAnomalies.workOrderId} = ANY(ARRAY[${sql.join(workOrderIds.map(id => sql`${id}`), sql`, `)}]::text[])`
+        )
+      );
+
+    const backdatingMap = new Map<string, number>();
+    for (const a of anomalies) {
+      const existing = backdatingMap.get(a.workOrderId) ?? 0;
+      backdatingMap.set(a.workOrderId, Math.max(existing, a.daysLate ?? 0));
+    }
+
+    return history.map(h => ({
+      ...h,
+      backdatingDays: backdatingMap.get(h.workOrderId) ?? 0,
+    }));
+  }
+
   // INSERT ONLY - No update or delete methods per immutability requirement
   async createComponentMaintenanceHistory(history: InsertComponentMaintenanceHistory): Promise<ComponentMaintenanceHistory> {
     const db = await getDb();

@@ -155,6 +155,13 @@ export async function listAllMaintenanceHistory(req: Request, res: Response) {
   res.json(history);
 }
 
+export async function listVesselMaintenanceHistory(req: Request, res: Response) {
+  const { vesselId } = req.params;
+  if (!vesselId) return res.status(400).json({ error: 'vesselId is required' });
+  const history = await subEntityService.listVesselMaintenanceHistory(vesselId);
+  res.json(history);
+}
+
 export async function listMaintenanceHistory(req: Request, res: Response) {
   const user = getUserInfo(req);
   const history = await subEntityService.listMaintenanceHistory(req.params.componentId, user);
