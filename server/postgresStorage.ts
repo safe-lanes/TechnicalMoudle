@@ -7233,14 +7233,15 @@ export class PostgresStorage {
 
     try {
       const result = await db.insert(spareComponentLinks).values(link)
-        .onConflictDoNothing({ target: [spareComponentLinks.spareId, spareComponentLinks.componentId] })
+        .onConflictDoNothing({ target: [spareComponentLinks.spareId, spareComponentLinks.componentId, spareComponentLinks.vesselId] })
         .returning();
 
       if (result.length === 0) {
         const existing = await db.select().from(spareComponentLinks).where(
           and(
             eq(spareComponentLinks.spareId, link.spareId),
-            eq(spareComponentLinks.componentId, link.componentId)
+            eq(spareComponentLinks.componentId, link.componentId),
+            eq(spareComponentLinks.vesselId, link.vesselId)
           )
         );
         return existing[0];

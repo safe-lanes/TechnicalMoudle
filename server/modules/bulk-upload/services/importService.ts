@@ -189,6 +189,8 @@ export async function performImport(
     jobComponentLinksCreated: 0,
     spareComponentLinksCreated: 0,
     spareComponentLinksExpected: 0,
+    spareComponentLinksDbTotal: 0,
+    spareComponentLinksDbDelta: 0,
     rowResults: [] as RowResult[],
     warnings: [] as string[]
   };
@@ -474,7 +476,8 @@ export async function performImport(
     let nextPartCodeNum = maxPartCodeNum + 1;
     console.log(`🔢 Next auto-generated Part Code will be: PT-${String(nextPartCodeNum).padStart(6, '0')}`);
     
-    // Step 4: Process each row with validation
+    const preImportLinkCount = await storage.getSpareComponentLinkCountByVessel(sparesVesselId);
+    
     for (let _spareIdx = 0; _spareIdx < data.length; _spareIdx++) {
       const row = data[_spareIdx];
       const _spareRowNum = row['__meta']?.rowNumber || (_spareIdx + 1);
@@ -861,18 +864,27 @@ export async function performImport(
       }
     }
     
-    const dbLinkCount = await storage.getSpareComponentLinkCountByVessel(sparesVesselId);
-    const newLinksCreated = result.spareComponentLinksCreated;
-    const rowsAttemptingLink = result.spareComponentLinksExpected;
+    const postImportLinkCount = await storage.getSpareComponentLinkCountByVessel(sparesVesselId);
+    const dbDelta = postImportLinkCount - preImportLinkCount;
+    const inMemoryCreated = result.spareComponentLinksCreated;
     
-    if (newLinksCreated > rowsAttemptingLink) {
-      const inflationMsg = `Link inflation detected: ${newLinksCreated} new links created but only ${rowsAttemptingLink} rows attempted link creation. Possible extra linkage from unexpected code path.`;
+    result.spareComponentLinksDbTotal = postImportLinkCount;
+    result.spareComponentLinksDbDelta = dbDelta;
+    
+    if (dbDelta !== inMemoryCreated) {
+      const mismatchMsg = `Linkage integrity warning: in-memory tracker reports ${inMemoryCreated} new links, but DB delta is ${dbDelta} (pre=${preImportLinkCount}, post=${postImportLinkCount}). Possible sibling auto-link leakage or concurrent modification.`;
+      console.warn(`⚠️ ${mismatchMsg}`);
+      result.warnings.push(mismatchMsg);
+    }
+    
+    if (inMemoryCreated > result.spareComponentLinksExpected) {
+      const inflationMsg = `Link inflation detected: ${inMemoryCreated} new links created but only ${result.spareComponentLinksExpected} rows attempted link creation.`;
       console.warn(`⚠️ ${inflationMsg}`);
       result.warnings.push(inflationMsg);
     }
     
     console.log(`✅ Spares import complete: ${result.created} created, ${result.updated} updated, ${result.skipped} skipped`);
-    console.log(`   Links: ${newLinksCreated} new links created out of ${rowsAttemptingLink} rows that attempted linking. DB total links for vessel: ${dbLinkCount}`);
+    console.log(`   Links: ${inMemoryCreated} new (in-memory), DB delta=${dbDelta} (pre=${preImportLinkCount}, post=${postImportLinkCount}), ${result.spareComponentLinksExpected} rows attempted linking`);
   } else if (type === 'stores') {
     console.log(`🚀 Starting stores import: ${data.length} rows, mode: ${mode}, vesselId: ${vesselId}, storeType: ${storeType}`);
     

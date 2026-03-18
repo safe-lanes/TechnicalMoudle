@@ -2432,7 +2432,7 @@ export const spareComponentLinks = pgTable("spare_component_links", {
   spareIdIdx: index("idx_spare_component_link_spare").on(table.spareId),
   componentIdIdx: index("idx_spare_component_link_component").on(table.componentId),
   vesselIdIdx: index("idx_spare_component_link_vessel").on(table.vesselId),
-  uniqueSpareComponent: unique("unique_spare_component_link").on(table.spareId, table.componentId),
+  uniqueSpareComponent: unique("unique_spare_component_link").on(table.spareId, table.componentId, table.vesselId),
 }));
 
 export const insertSpareComponentLinkSchema = createInsertSchema(spareComponentLinks).omit({
