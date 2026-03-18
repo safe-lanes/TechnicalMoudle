@@ -2945,6 +2945,11 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                             <span className="text-gray-500"> (on {normalizeDateToDDMMMYYYY(lastDoneDateForRH) || lastDoneDateForRH})</span>
                           )}
                         </>
+                      ) : lastDoneDateForRH ? (
+                        <>
+                          <span className="text-gray-500 italic">RH not recorded</span>
+                          <span className="text-gray-500"> (on {normalizeDateToDDMMMYYYY(lastDoneDateForRH) || lastDoneDateForRH})</span>
+                        </>
                       ) : (
                         <span className="text-gray-400 italic">First maintenance cycle</span>
                       )}
