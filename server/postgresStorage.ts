@@ -7214,6 +7214,14 @@ export class PostgresStorage {
       .where(eq(spareComponentLinks.spareId, spareId));
   }
 
+  async getSpareComponentLinkCountByVessel(vesselId: string): Promise<number> {
+    const db = await getDb();
+    const result = await db.select({ count: sql<number>`count(*)` })
+      .from(spareComponentLinks)
+      .where(eq(spareComponentLinks.vesselId, vesselId));
+    return Number(result[0]?.count ?? 0);
+  }
+
   async getSpareComponentLinksByComponent(componentId: string): Promise<SpareComponentLink[]> {
     const db = await getDb();
     return await db.select().from(spareComponentLinks)
