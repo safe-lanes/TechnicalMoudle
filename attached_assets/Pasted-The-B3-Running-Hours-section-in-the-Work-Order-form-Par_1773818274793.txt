@@ -1,0 +1,21 @@
+The B3 Running Hours section in the Work Order form Part B is broken. Looking at it live, three things are wrong:
+
+First, the Component Actual RH field is permanently stuck showing "Fetching..." and never resolves to an actual value. The API call to GET /technical/api/running-hours/current?machineryId={componentId} is either failing silently, returning an error, or the componentId being passed is wrong or missing.
+
+Second, the Fetch RH button does nothing when clicked. It should call the same API and populate the Current Reading field, but clicking it produces no visible result and no error message.
+
+Third, the Previous Reading is showing 0.00 instead of the component's actual stored running hours.
+
+Please investigate and fix all three issues. Do the following:
+
+Step 1 - Diagnose the API call. Check what componentId is being passed to the running hours API when B3 loads. Open the browser network tab equivalent in the code and find where the fetch is called. Is the componentId correctly extracted from the work order's component reference? Is it the component's database ID, UUID, or component code? Verify it matches what the running hours API actually expects.
+
+Step 2 - Fix the Component Actual RH fetch. The field must resolve within 2-3 seconds of the page loading. If the API returns an error or empty response, show a clear error message and a Retry button instead of staying stuck on "Fetching..." forever. If the fetch succeeds, display the value as a number followed by "hours" for example "870 hours".
+
+Step 3 - Fix the Fetch RH button. When clicked, it must call the same running hours API with the correct componentId, take the returned value, and populate it into the Current Reading input field. After successfully fetching, show a small success toast saying "Running hours fetched: X hours as of DD-MMM-YYYY". If the fetch fails, show an error toast.
+
+Step 4 - Fix the Previous Reading. This field should show the component's current cumulative running hours from the components table, not 0.00. Check if the work order data being loaded includes the component's running hours. If not, fetch it separately when the B3 section loads using the component ID from the work order.
+
+Step 5 - Fix the validation message. The orange text "Maximum allowed value for Current Reading" is showing before the Component Actual RH has even loaded. This message should only appear after the user enters a value in Current Reading that exceeds the Component Actual RH. Do not show it on page load before any value is entered.
+
+After fixing, test with the current open work order on Vessel 11 and confirm that Component Actual RH shows the correct value from the Running Hours module, the Fetch RH button populates the Current Reading field, and Previous Reading shows a non-zero value matching the component's stored RH.
