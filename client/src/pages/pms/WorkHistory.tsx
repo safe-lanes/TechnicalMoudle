@@ -1,9 +1,8 @@
 import { useState, useMemo } from "react";
-import { Search, Calendar, History, ChevronDown } from "lucide-react";
+import { Search, Calendar, History } from "lucide-react";
 import { useLocation } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import { Input } from "@/components/ui/input";
-import { Button } from "@/components/ui/button";
 import {
   Select,
   SelectContent,
@@ -34,6 +33,12 @@ interface HistoryRecord {
   backdatingDays: number;
 }
 
+interface VesselComponent {
+  id: string;
+  componentCode: string;
+  name: string;
+}
+
 const WorkHistory: React.FC = () => {
   const [, setLocation] = useLocation();
   const { vesselId, vessels } = useVessel();
@@ -47,11 +52,11 @@ const WorkHistory: React.FC = () => {
   const currentVessel = vessels.find(v => v.id === vesselId);
 
   const { data: records = [], isLoading: recordsLoading } = useQuery<HistoryRecord[]>({
-    queryKey: [`/technical/api/component-maintenance-history/vessel/${vesselId}`],
+    queryKey: [`/technical/api/maintenance-history/vessel/${vesselId}`],
     enabled: !!vesselId,
   });
 
-  const { data: components = [], isLoading: componentsLoading } = useQuery<any[]>({
+  const { data: components = [], isLoading: componentsLoading } = useQuery<VesselComponent[]>({
     queryKey: [`/technical/api/components/${vesselId}`],
     enabled: !!vesselId,
   });
@@ -108,6 +113,7 @@ const WorkHistory: React.FC = () => {
           searchTerm === "" ||
           record.jobTitle?.toLowerCase().includes(searchTerm.toLowerCase()) ||
           record.componentCode?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          (componentMap.get(record.componentCode) ?? "").toLowerCase().includes(searchTerm.toLowerCase()) ||
           record.performedBy?.toLowerCase().includes(searchTerm.toLowerCase()) ||
           record.workOrderNo?.toLowerCase().includes(searchTerm.toLowerCase());
 
@@ -120,16 +126,17 @@ const WorkHistory: React.FC = () => {
         if (!b.dateCompleted) return -1;
         return new Date(b.dateCompleted).getTime() - new Date(a.dateCompleted).getTime();
       });
-  }, [records, selectedComponent, searchTerm, selectedDateFilter, customStartDate, customEndDate]);
+  }, [records, selectedComponent, searchTerm, selectedDateFilter, customStartDate, customEndDate, componentMap]);
 
-  const uniqueComponents = useMemo(() => {
-    const codes = [...new Set(records.map(r => r.componentCode).filter(Boolean))];
-    return codes.sort((a, b) => {
-      const nameA = componentMap.get(a) ?? a;
-      const nameB = componentMap.get(b) ?? b;
-      return nameA.localeCompare(nameB);
-    });
-  }, [records, componentMap]);
+  const vesselComponents = useMemo(() => {
+    return [...components]
+      .filter(c => c.componentCode)
+      .sort((a, b) => {
+        const nameA = a.name || a.componentCode;
+        const nameB = b.name || b.componentCode;
+        return nameA.localeCompare(nameB);
+      });
+  }, [components]);
 
   const handleRowClick = (record: HistoryRecord) => {
     setLocation(`/pms/work-order/${record.workOrderId}`);
@@ -196,9 +203,9 @@ const WorkHistory: React.FC = () => {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All Components</SelectItem>
-                  {uniqueComponents.map(code => (
-                    <SelectItem key={code} value={code}>
-                      {componentMap.get(code) ?? code}
+                  {vesselComponents.map(c => (
+                    <SelectItem key={c.componentCode} value={c.componentCode}>
+                      {c.name || c.componentCode}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -250,10 +257,9 @@ const WorkHistory: React.FC = () => {
       <div className="flex-1 overflow-auto p-6">
         <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[900px]">
+            <table className="w-full min-w-[860px]">
               <thead>
                 <tr className="bg-gray-50 border-b border-gray-200">
-                  <th className="text-left py-3 px-4 font-semibold text-sm text-gray-700 whitespace-nowrap">S.No</th>
                   <th className="text-left py-3 px-4 font-semibold text-sm text-gray-700 whitespace-nowrap">Date Completed</th>
                   <th className="text-left py-3 px-4 font-semibold text-sm text-gray-700 whitespace-nowrap">Component</th>
                   <th className="text-left py-3 px-4 font-semibold text-sm text-gray-700 whitespace-nowrap">Job Title</th>
@@ -267,7 +273,7 @@ const WorkHistory: React.FC = () => {
               <tbody className="divide-y divide-gray-200">
                 {filteredRecords.length === 0 ? (
                   <tr>
-                    <td colSpan={9} className="py-16 text-center">
+                    <td colSpan={8} className="py-16 text-center">
                       <div className="flex flex-col items-center justify-center text-gray-500">
                         <History className="h-16 w-16 mb-4 text-gray-300" />
                         <p className="text-lg font-medium">No work history found</p>
@@ -280,7 +286,7 @@ const WorkHistory: React.FC = () => {
                     </td>
                   </tr>
                 ) : (
-                  filteredRecords.map((record, index) => {
+                  filteredRecords.map(record => {
                     const missedCycles = record.missedCycles ?? 0;
                     const backdatingDays = record.backdatingDays ?? 0;
                     const componentName = componentMap.get(record.componentCode) ?? record.componentCode;
@@ -292,8 +298,6 @@ const WorkHistory: React.FC = () => {
                         className="hover:bg-gray-50 cursor-pointer transition-colors"
                         data-testid={`history-row-${record.id}`}
                       >
-                        <td className="py-3 px-4 text-sm text-gray-500">{index + 1}</td>
-
                         <td className="py-3 px-4 text-sm text-gray-900 whitespace-nowrap">
                           {record.dateCompleted
                             ? new Date(record.dateCompleted).toLocaleDateString("en-GB", {
