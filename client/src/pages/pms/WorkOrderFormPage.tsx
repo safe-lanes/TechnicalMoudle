@@ -1990,7 +1990,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
       if ((workOrderContext as any)?.maintenanceBasis === 'Running Hours') {
         if (componentActualRHStatus === 'loading') {
           hardErrors.push('Component running hours are still loading. Please wait for the value to load before saving.');
-        } else if (componentActualRHStatus === 'error' && currentRHValue) {
+        } else if (componentActualRHStatus === 'error') {
           hardErrors.push('Unable to verify component running hours. Please refresh the page or retry loading the component RH before saving.');
         }
         if (currentRHValue) {
@@ -4968,7 +4968,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
             const capRH = rhValidation.componentActualRH;
             const rhExceedsActual = isRHBased && currentRHVal && capRH !== null && Number(currentRHVal) > capRH;
             const rhNotLoaded = isRHBased && componentActualRHStatus === 'loading';
-            const rhFetchFailed = isRHBased && componentActualRHStatus === 'error' && !!currentRHVal;
+            const rhFetchFailed = isRHBased && componentActualRHStatus === 'error';
             const rhInvalid = rhValidation.status === 'invalid';
             const isRHSaveBlocked = rhExceedsActual || rhNotLoaded || rhFetchFailed || rhInvalid;
             const rhBlockReason = rhExceedsActual ? `Cannot save: Current Reading (${currentRHVal}) exceeds component's actual RH (${capRH})` :

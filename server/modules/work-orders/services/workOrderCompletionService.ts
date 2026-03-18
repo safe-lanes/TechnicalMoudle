@@ -131,7 +131,8 @@ export async function completeWorkOrder(
           enteredValue: newRH,
           componentActualRH,
           maxAllowed: componentActualRH,
-          componentId: component.componentCode || workOrder.componentCode,
+          componentId: component.cuuid || component.id,
+          componentCode: component.componentCode || workOrder.componentCode,
           componentName: component.description || component.componentCode || workOrder.componentCode,
           rhCounterType: component.rhCounterType || 'MASTER'
         }
