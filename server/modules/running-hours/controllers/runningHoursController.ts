@@ -176,7 +176,7 @@ export async function getValidRange(req: Request, res: Response) {
 
 export async function validateRHEntry(req: Request, res: Response) {
   try {
-    const { machineryId, completionDate, runningHours } = req.body;
+    const { machineryId, completionDate, runningHours, previousReading } = req.body;
     if (!machineryId || !completionDate || runningHours === undefined) {
       return res.status(400).json({ error: 'machineryId, completionDate, and runningHours are required' });
     }
@@ -194,16 +194,41 @@ export async function validateRHEntry(req: Request, res: Response) {
       exceedsComponentRH = true;
     }
 
-    const cappedValidRange = result.validRange && componentActualRH !== null && componentActualRH > 0
-      ? { ...result.validRange, max: Math.min(result.validRange.max, componentActualRH) }
+    const prevReading = previousReading !== undefined && previousReading !== null ? Number(previousReading) : null;
+
+    let adjustedMin = result.validRange ? result.validRange.min : 0;
+    if (prevReading !== null && !isNaN(prevReading) && result.validRange && prevReading < result.validRange.min) {
+      adjustedMin = prevReading;
+    }
+
+    const adjustedMax = result.validRange && componentActualRH !== null && componentActualRH > 0
+      ? Math.min(result.validRange.max, componentActualRH)
+      : (result.validRange ? result.validRange.max : Infinity);
+
+    const cappedValidRange = result.validRange
+      ? { ...result.validRange, min: adjustedMin, max: adjustedMax }
       : result.validRange;
 
+    let adjustedResult = { ...result };
+    if (!result.isValid && prevReading !== null && !isNaN(prevReading) && componentActualRH !== null) {
+      if (enteredRH >= prevReading && enteredRH <= componentActualRH) {
+        adjustedResult = {
+          ...result,
+          isValid: true,
+          validationStatus: 'VALID' as const,
+          errorMessage: '',
+          requiresJustification: false,
+          anomalyFlags: []
+        };
+      }
+    }
+
     res.json({
-      ...result,
+      ...adjustedResult,
       validRange: cappedValidRange,
       componentActualRH,
       exceedsComponentRH,
-      ...(exceedsComponentRH && result.isValid ? {
+      ...(exceedsComponentRH && adjustedResult.isValid ? {
         isValid: false,
         validationStatus: 'EXCEEDS_COMPONENT_RH',
         errorMessage: `Running hours entered (${enteredRH}) exceeds the component's actual running hours (${componentActualRH}). Please update the component's running hours first in the Running Hours module.`

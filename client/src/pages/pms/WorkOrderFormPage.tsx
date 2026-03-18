@@ -843,7 +843,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
       const res = await fetch('/technical/api/running-hours/validate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ machineryId: componentId, completionDate: dateToUse, runningHours: Number(rhValue) })
+        body: JSON.stringify({ machineryId: componentId, completionDate: dateToUse, runningHours: Number(rhValue), previousReading: executionData.previousReading ? Number(executionData.previousReading) : undefined })
       });
       const result = await res.json();
       if (result.isValid) {
@@ -4206,7 +4206,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                 {/* RH Valid Range Helper */}
                 {rhValidation.validRange && (
                   <div className="text-xs text-blue-600 bg-blue-50 px-2 py-1 rounded" data-testid="text-rh-valid-range">
-                    Valid range: {rhValidation.validRange.min.toFixed(0)} to {rhValidation.componentActualRH !== null && rhValidation.componentActualRH > 0 ? rhValidation.componentActualRH.toLocaleString() : (rhValidation.validRange.max === Infinity ? '∞' : Math.min(rhValidation.validRange.max, rhValidation.componentActualRH || Infinity).toFixed(0))} hours
+                    Valid range: {(() => { const prevR = executionData.previousReading ? Number(executionData.previousReading) : null; const displayMin = prevR !== null && !isNaN(prevR) && prevR < rhValidation.validRange.min ? prevR : rhValidation.validRange.min; return displayMin.toLocaleString(); })()} to {rhValidation.componentActualRH !== null && rhValidation.componentActualRH > 0 ? rhValidation.componentActualRH.toLocaleString() : (rhValidation.validRange.max === Infinity ? '∞' : rhValidation.validRange.max.toLocaleString())} hours
                     {rhValidation.previousEntry && (
                       <span className="ml-1 text-blue-500">
                         | Last: {rhValidation.previousEntry.runningHours.toFixed(0)} hrs on {new Date(rhValidation.previousEntry.date).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}
@@ -4251,7 +4251,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                 )}
                 {rhValidation.status === 'invalid' && rhValidation.validationDetails?.validationStatus !== 'EXCEEDS_COMPONENT_RH' && (
                   <div className="text-xs text-red-600 flex items-center gap-1" data-testid="text-rh-invalid">
-                    <X className="h-3 w-3" /> Invalid: {rhValidation.validRange ? `Valid range: ${rhValidation.validRange.min.toFixed(0)} to ${rhValidation.validRange.max === Infinity ? '∞' : rhValidation.validRange.max.toFixed(0)} hours` : rhValidation.message}
+                    <X className="h-3 w-3" /> Invalid: {rhValidation.validRange ? (() => { const prevR = executionData.previousReading ? Number(executionData.previousReading) : null; const displayMin = prevR !== null && !isNaN(prevR) && prevR < rhValidation.validRange!.min ? prevR : rhValidation.validRange!.min; return `Valid range: ${displayMin.toLocaleString()} to ${rhValidation.validRange!.max === Infinity ? '∞' : rhValidation.validRange!.max.toLocaleString()} hours`; })() : rhValidation.message}
                   </div>
                 )}
                 {rhValidation.status === 'warning' && (
