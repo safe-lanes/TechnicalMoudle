@@ -1,8 +1,9 @@
 import { useState, useMemo } from "react";
-import { Search, Calendar, History } from "lucide-react";
+import { Search, Calendar, History, FileSpreadsheet, FileText, Loader2 } from "lucide-react";
 import { useLocation } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
 import {
   Select,
   SelectContent,
@@ -39,6 +40,31 @@ interface VesselComponent {
   name: string;
 }
 
+const EXCEL_COLORS = {
+  primary: "FF1E5A8E",
+  secondary: "FF5DADE2",
+  textDark: "FF2C3E50",
+  textLight: "FF5A6C7D",
+  textWhite: "FFFFFFFF",
+  bgLight: "FFF7F9FC",
+  bgWhite: "FFFFFFFF",
+  bgAmber: "FFFEF3C7",
+  bgYellow: "FFFFFCE8",
+  border: "FFE1E8ED",
+};
+
+const PDF_COLORS = {
+  primary: [30, 90, 142] as [number, number, number],
+  secondary: [93, 173, 226] as [number, number, number],
+  textDark: [44, 62, 80] as [number, number, number],
+  textLight: [90, 108, 125] as [number, number, number],
+  textWhite: [255, 255, 255] as [number, number, number],
+  bgLight: [247, 249, 252] as [number, number, number],
+  bgAmber: [254, 243, 199] as [number, number, number],
+  bgYellow: [255, 252, 232] as [number, number, number],
+  border: [225, 232, 237] as [number, number, number],
+};
+
 const WorkHistory: React.FC = () => {
   const [, setLocation] = useLocation();
   const { vesselId, vessels } = useVessel();
@@ -48,8 +74,11 @@ const WorkHistory: React.FC = () => {
   const [selectedDateFilter, setSelectedDateFilter] = useState("all");
   const [customStartDate, setCustomStartDate] = useState("");
   const [customEndDate, setCustomEndDate] = useState("");
+  const [isExportingExcel, setIsExportingExcel] = useState(false);
+  const [isExportingPDF, setIsExportingPDF] = useState(false);
 
   const currentVessel = vessels.find(v => v.id === vesselId);
+  const vesselName = currentVessel?.name || "Vessel";
 
   const { data: records = [], isLoading: recordsLoading } = useQuery<HistoryRecord[]>({
     queryKey: [`/technical/api/maintenance-history/vessel/${vesselId}`],
@@ -109,7 +138,6 @@ const WorkHistory: React.FC = () => {
       .filter(record => {
         const matchesComponent =
           selectedComponent === "all" || record.componentCode === selectedComponent;
-
         const matchesSearch =
           searchTerm === "" ||
           record.jobTitle?.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -117,9 +145,7 @@ const WorkHistory: React.FC = () => {
           (componentMap.get(record.componentCode) ?? "").toLowerCase().includes(searchTerm.toLowerCase()) ||
           record.performedBy?.toLowerCase().includes(searchTerm.toLowerCase()) ||
           record.workOrderNo?.toLowerCase().includes(searchTerm.toLowerCase());
-
         const matchesDate = filterByDate(record);
-
         return matchesComponent && matchesSearch && matchesDate;
       })
       .sort((a, b) => {
@@ -138,6 +164,344 @@ const WorkHistory: React.FC = () => {
         return nameA.localeCompare(nameB);
       });
   }, [components]);
+
+  const dateRangeLabel = useMemo(() => {
+    switch (selectedDateFilter) {
+      case "lastMonth": return "Last Month";
+      case "lastQuarter": return "Last Quarter";
+      case "lastYear": return "Last Year";
+      case "custom":
+        if (customStartDate && customEndDate) return `${customStartDate} to ${customEndDate}`;
+        return "Custom Range";
+      default: return "All Time";
+    }
+  }, [selectedDateFilter, customStartDate, customEndDate]);
+
+  const exportFilename = (ext: string) => {
+    const safeVesselName = vesselName.replace(/[^a-zA-Z0-9]/g, "");
+    const dateStr = new Date().toISOString().slice(0, 10);
+    return `work-history-${safeVesselName}-${dateStr}.${ext}`;
+  };
+
+  const formatDateCell = (dateStr: string | null) => {
+    if (!dateStr) return "-";
+    return new Date(dateStr).toLocaleDateString("en-GB", {
+      day: "2-digit",
+      month: "short",
+      year: "numeric",
+    });
+  };
+
+  const handleExportExcel = async () => {
+    setIsExportingExcel(true);
+    try {
+      const ExcelJS = (await import("exceljs")).default;
+      const workbook = new ExcelJS.Workbook();
+      workbook.creator = "SAIL PMS";
+      workbook.created = new Date();
+
+      const ws = workbook.addWorksheet("Work History");
+
+      const columns = [
+        { key: "dateCompleted", header: "Date Completed", width: 16 },
+        { key: "component", header: "Component", width: 30 },
+        { key: "jobTitle", header: "Job Title", width: 42 },
+        { key: "rh", header: "RH at Completion", width: 18 },
+        { key: "missedCycles", header: "Missed Cycles", width: 15 },
+        { key: "backdating", header: "Backdating (Days)", width: 18 },
+        { key: "performedBy", header: "Performed By", width: 20 },
+        { key: "status", header: "Status", width: 14 },
+      ];
+
+      const totalCols = columns.length;
+      const lastColLetter = String.fromCharCode("A".charCodeAt(0) + totalCols - 1);
+
+      ws.columns = columns.map(c => ({ key: c.key, width: c.width }));
+
+      ws.mergeCells(`A1:${lastColLetter}1`);
+      const titleCell = ws.getCell("A1");
+      titleCell.value = "SEAFARER TECHNICAL MANAGEMENT SYSTEM";
+      titleCell.font = { size: 14, bold: true, color: { argb: EXCEL_COLORS.textWhite }, name: "Arial" };
+      titleCell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: EXCEL_COLORS.primary } };
+      titleCell.alignment = { horizontal: "center", vertical: "middle" };
+      ws.getRow(1).height = 30;
+
+      ws.mergeCells(`A2:${lastColLetter}2`);
+      const subtitleCell = ws.getCell("A2");
+      subtitleCell.value = `Work History Report — ${vesselName}`;
+      subtitleCell.font = { size: 12, bold: true, color: { argb: EXCEL_COLORS.textDark }, name: "Arial" };
+      subtitleCell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: EXCEL_COLORS.bgLight } };
+      subtitleCell.alignment = { horizontal: "center", vertical: "middle" };
+      subtitleCell.border = { bottom: { style: "medium", color: { argb: EXCEL_COLORS.primary } } };
+      ws.getRow(2).height = 25;
+
+      ws.getRow(3).height = 8;
+
+      ws.getCell("A4").value = `Vessel: ${vesselName}`;
+      ws.getCell("A4").font = { bold: true, size: 10, color: { argb: EXCEL_COLORS.textDark }, name: "Arial" };
+      ws.getCell("A4").fill = { type: "pattern", pattern: "solid", fgColor: { argb: EXCEL_COLORS.bgLight } };
+
+      const dtCol = String.fromCharCode(lastColLetter.charCodeAt(0) - 1);
+      ws.mergeCells(`${dtCol}4:${lastColLetter}4`);
+      ws.getCell(`${dtCol}4`).value = `Report Date: ${new Date().toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" })}`;
+      ws.getCell(`${dtCol}4`).font = { size: 10, color: { argb: EXCEL_COLORS.textLight }, name: "Arial" };
+      ws.getCell(`${dtCol}4`).alignment = { horizontal: "right" };
+      ws.getRow(4).height = 18;
+
+      ws.getCell("A5").value = `Report Period: ${dateRangeLabel}  |  Total Records: ${filteredRecords.length}`;
+      ws.getCell("A5").font = { size: 9, color: { argb: EXCEL_COLORS.textDark }, name: "Arial" };
+      ws.getCell("A5").fill = { type: "pattern", pattern: "solid", fgColor: { argb: EXCEL_COLORS.bgLight } };
+      ws.getRow(5).height = 16;
+
+      ws.getRow(6).height = 6;
+
+      const headerRow = ws.getRow(7);
+      columns.forEach((col, idx) => {
+        const cell = headerRow.getCell(idx + 1);
+        cell.value = col.header;
+        cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: EXCEL_COLORS.secondary } };
+        cell.font = { bold: true, color: { argb: EXCEL_COLORS.textWhite }, size: 10, name: "Arial" };
+        cell.alignment = { vertical: "middle", horizontal: "center", wrapText: true };
+        cell.border = {
+          top: { style: "thin", color: { argb: EXCEL_COLORS.textWhite } },
+          left: { style: "thin", color: { argb: EXCEL_COLORS.textWhite } },
+          bottom: { style: "thin", color: { argb: EXCEL_COLORS.textWhite } },
+          right: { style: "thin", color: { argb: EXCEL_COLORS.textWhite } },
+        };
+      });
+      headerRow.height = 25;
+
+      filteredRecords.forEach((record, idx) => {
+        const missedCycles = record.missedCycles ?? 0;
+        const backdatingDays = record.backdatingDays ?? 0;
+        const componentName = componentMap.get(record.componentCode) ?? record.componentCode;
+
+        const rowNum = 8 + idx;
+        const row = ws.getRow(rowNum);
+
+        const values = [
+          formatDateCell(record.dateCompleted),
+          `${componentName} (${record.componentCode})`,
+          record.jobTitle || "-",
+          record.runningHoursAtCompletion
+            ? `${parseFloat(record.runningHoursAtCompletion).toLocaleString()} hrs`
+            : "-",
+          missedCycles > 0 ? missedCycles : "-",
+          backdatingDays > 0 ? backdatingDays : "-",
+          record.performedBy || "-",
+          record.status || "-",
+        ];
+
+        values.forEach((v, colIdx) => {
+          row.getCell(colIdx + 1).value = v;
+        });
+
+        const isEven = idx % 2 === 1;
+        let bgColor = isEven ? EXCEL_COLORS.bgLight : EXCEL_COLORS.bgWhite;
+        let fontColor = EXCEL_COLORS.textDark;
+        let isBold = false;
+
+        if (missedCycles > 0) {
+          bgColor = EXCEL_COLORS.bgAmber;
+          fontColor = "FF92400E";
+          isBold = true;
+        } else if (backdatingDays > 0) {
+          bgColor = EXCEL_COLORS.bgYellow;
+          fontColor = "FF713F12";
+          isBold = true;
+        }
+
+        row.eachCell((cell, colNum) => {
+          if (colNum > totalCols) return;
+          cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: bgColor } };
+          cell.font = { color: { argb: fontColor }, size: 9, name: "Arial", bold: isBold };
+          cell.border = {
+            top: { style: "thin", color: { argb: EXCEL_COLORS.border } },
+            left: { style: "thin", color: { argb: EXCEL_COLORS.border } },
+            bottom: { style: "thin", color: { argb: EXCEL_COLORS.border } },
+            right: { style: "thin", color: { argb: EXCEL_COLORS.border } },
+          };
+          cell.alignment = { horizontal: "left", vertical: "middle" };
+        });
+        row.height = 20;
+      });
+
+      const lastDataRow = 7 + filteredRecords.length + 1;
+      const summaryRow = ws.getRow(lastDataRow + 1);
+      summaryRow.getCell(1).value = "SUMMARY";
+      summaryRow.getCell(1).font = { bold: true, size: 10, color: { argb: EXCEL_COLORS.primary }, name: "Arial" };
+
+      const totalMissed = filteredRecords.filter(r => (r.missedCycles ?? 0) > 0).length;
+      const totalBackdated = filteredRecords.filter(r => (r.backdatingDays ?? 0) > 0).length;
+
+      ws.getRow(lastDataRow + 2).getCell(1).value = `Total Records: ${filteredRecords.length}`;
+      ws.getRow(lastDataRow + 3).getCell(1).value = `Records with Missed Cycles: ${totalMissed}`;
+      ws.getRow(lastDataRow + 3).getCell(1).fill = { type: "pattern", pattern: "solid", fgColor: { argb: EXCEL_COLORS.bgAmber } };
+      ws.getRow(lastDataRow + 4).getCell(1).value = `Records with Backdating: ${totalBackdated}`;
+      ws.getRow(lastDataRow + 4).getCell(1).fill = { type: "pattern", pattern: "solid", fgColor: { argb: EXCEL_COLORS.bgYellow } };
+
+      ws.pageSetup = {
+        orientation: "landscape",
+        paperSize: 9,
+        fitToPage: true,
+        fitToWidth: 1,
+        fitToHeight: 0,
+      };
+
+      const buffer = await workbook.xlsx.writeBuffer();
+      const blob = new Blob([buffer], {
+        type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = exportFilename("xlsx");
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+    } finally {
+      setIsExportingExcel(false);
+    }
+  };
+
+  const handleExportPDF = async () => {
+    setIsExportingPDF(true);
+    try {
+      const { default: jsPDF } = await import("jspdf");
+      const { default: autoTable } = await import("jspdf-autotable");
+
+      const doc = new jsPDF({ orientation: "landscape", unit: "mm", format: "a4" });
+      const pageWidth = doc.internal.pageSize.getWidth();
+      const margin = 10;
+
+      doc.setFillColor(...PDF_COLORS.primary);
+      doc.rect(0, 0, pageWidth, 34, "F");
+
+      doc.setTextColor(...PDF_COLORS.textWhite);
+      doc.setFontSize(18);
+      doc.setFont("helvetica", "bold");
+      doc.text("WORK HISTORY REPORT", margin, 14);
+
+      doc.setFontSize(10);
+      doc.setFont("helvetica", "normal");
+      doc.text(vesselName, margin, 22);
+
+      doc.setFontSize(8);
+      doc.text(`Period: ${dateRangeLabel}`, margin, 29);
+
+      doc.setFontSize(8);
+      doc.text(`Vessel: ${vesselName}`, pageWidth - margin, 12, { align: "right" });
+      doc.text(
+        `Generated: ${new Date().toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" })}`,
+        pageWidth - margin,
+        18,
+        { align: "right" }
+      );
+      doc.text(`Records: ${filteredRecords.length}`, pageWidth - margin, 24, { align: "right" });
+
+      const headers = [
+        "Date Completed",
+        "Component",
+        "Job Title",
+        "RH at Completion",
+        "Missed Cycles",
+        "Backdating",
+        "Performed By",
+        "Status",
+      ];
+
+      const body = filteredRecords.map(record => {
+        const missedCycles = record.missedCycles ?? 0;
+        const backdatingDays = record.backdatingDays ?? 0;
+        const componentName = componentMap.get(record.componentCode) ?? record.componentCode;
+
+        return [
+          formatDateCell(record.dateCompleted),
+          `${componentName}\n${record.componentCode}`,
+          record.jobTitle || "-",
+          record.runningHoursAtCompletion
+            ? `${parseFloat(record.runningHoursAtCompletion).toLocaleString()} hrs`
+            : "-",
+          missedCycles > 0 ? `⚠ ${missedCycles} cycle${missedCycles !== 1 ? "s" : ""}` : "—",
+          backdatingDays > 0 ? `${backdatingDays} day${backdatingDays !== 1 ? "s" : ""}` : "—",
+          record.performedBy || "-",
+          record.status || "-",
+        ];
+      });
+
+      autoTable(doc, {
+        head: [headers],
+        body,
+        startY: 40,
+        margin: { left: margin, right: margin },
+        styles: {
+          fontSize: 8,
+          cellPadding: 2.5,
+          overflow: "linebreak",
+          lineColor: PDF_COLORS.border,
+          lineWidth: 0.1,
+        },
+        headStyles: {
+          fillColor: PDF_COLORS.secondary,
+          textColor: PDF_COLORS.textWhite,
+          fontStyle: "bold",
+          halign: "center",
+          fontSize: 8,
+        },
+        alternateRowStyles: {
+          fillColor: PDF_COLORS.bgLight,
+        },
+        columnStyles: {
+          0: { cellWidth: 25 },
+          1: { cellWidth: 38 },
+          2: { cellWidth: 60 },
+          3: { cellWidth: 26 },
+          4: { cellWidth: 24 },
+          5: { cellWidth: 22 },
+          6: { cellWidth: 30 },
+          7: { cellWidth: 22 },
+        },
+        didParseCell: (hookData) => {
+          if (hookData.section !== "body") return;
+          const record = filteredRecords[hookData.row.index];
+          if (!record) return;
+
+          const missedCycles = record.missedCycles ?? 0;
+          const backdatingDays = record.backdatingDays ?? 0;
+
+          if (missedCycles > 0) {
+            hookData.cell.styles.fillColor = PDF_COLORS.bgAmber;
+            hookData.cell.styles.textColor = [146, 64, 14];
+          } else if (backdatingDays > 0) {
+            hookData.cell.styles.fillColor = PDF_COLORS.bgYellow;
+            hookData.cell.styles.textColor = [113, 63, 18];
+          }
+        },
+      });
+
+      const totalPages = doc.getNumberOfPages();
+      for (let i = 1; i <= totalPages; i++) {
+        doc.setPage(i);
+        const pageHeight = doc.internal.pageSize.getHeight();
+        doc.setDrawColor(...PDF_COLORS.border);
+        doc.line(margin, pageHeight - 12, pageWidth - margin, pageHeight - 12);
+        doc.setFontSize(7);
+        doc.setTextColor(...PDF_COLORS.textLight);
+        doc.text("SAIL — Seafarer Technical Management System", margin, pageHeight - 7);
+        doc.text(
+          `Page ${i} of ${totalPages}`,
+          pageWidth - margin,
+          pageHeight - 7,
+          { align: "right" }
+        );
+      }
+
+      doc.save(exportFilename("pdf"));
+    } finally {
+      setIsExportingPDF(false);
+    }
+  };
 
   const handleRowClick = (record: HistoryRecord) => {
     setLocation(`/pms/work-order/${record.workOrderId}`);
@@ -162,6 +526,8 @@ const WorkHistory: React.FC = () => {
     );
   }
 
+  const canExport = filteredRecords.length > 0;
+
   return (
     <div className="h-full flex flex-col bg-white">
       {/* Header */}
@@ -173,18 +539,54 @@ const WorkHistory: React.FC = () => {
               <div>
                 <h1 className="text-2xl font-bold text-gray-900">Work History</h1>
                 <p className="text-sm text-gray-500 mt-0.5">
-                  {currentVessel?.name || "Selected Vessel"} — Vessel-Level Maintenance History
+                  {vesselName} — Vessel-Level Maintenance History
                 </p>
               </div>
             </div>
-            <div className="text-sm text-gray-500">
-              {filteredRecords.length} record{filteredRecords.length !== 1 ? "s" : ""}
+
+            <div className="flex items-center gap-3">
+              <span className="text-sm text-gray-500">
+                {filteredRecords.length} record{filteredRecords.length !== 1 ? "s" : ""}
+              </span>
+
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleExportExcel}
+                disabled={!canExport || isExportingExcel}
+                title={!canExport ? "No records to export" : "Export to Excel"}
+                data-testid="button-export-excel"
+                className="gap-2"
+              >
+                {isExportingExcel ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <FileSpreadsheet className="h-4 w-4 text-green-600" />
+                )}
+                Export Excel
+              </Button>
+
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleExportPDF}
+                disabled={!canExport || isExportingPDF}
+                title={!canExport ? "No records to export" : "Export to PDF"}
+                data-testid="button-export-pdf"
+                className="gap-2"
+              >
+                {isExportingPDF ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <FileText className="h-4 w-4 text-red-600" />
+                )}
+                Export PDF
+              </Button>
             </div>
           </div>
 
           {/* Filters row */}
           <div className="space-y-3">
-            {/* Search + Component filter */}
             <div className="flex gap-3">
               <div className="relative flex-1">
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
@@ -300,13 +702,7 @@ const WorkHistory: React.FC = () => {
                         data-testid={`history-row-${record.id}`}
                       >
                         <td className="py-3 px-4 text-sm text-gray-900 whitespace-nowrap">
-                          {record.dateCompleted
-                            ? new Date(record.dateCompleted).toLocaleDateString("en-GB", {
-                                day: "2-digit",
-                                month: "short",
-                                year: "numeric",
-                              })
-                            : "-"}
+                          {formatDateCell(record.dateCompleted)}
                         </td>
 
                         <td className="py-3 px-4 text-sm text-gray-900">
@@ -371,7 +767,7 @@ const WorkHistory: React.FC = () => {
           </div>
 
           {/* Footer */}
-          <div className="bg-gray-50 border-t border-gray-200 px-4 py-3">
+          <div className="bg-gray-50 border-t border-gray-200 px-4 py-3 flex items-center justify-between">
             <p className="text-sm text-gray-600">
               Showing{" "}
               <span className="font-medium">{filteredRecords.length}</span>{" "}
@@ -380,6 +776,18 @@ const WorkHistory: React.FC = () => {
                 <span className="text-gray-400"> (of {records.length} total)</span>
               )}
             </p>
+            {filteredRecords.length > 0 && (
+              <div className="flex items-center gap-4 text-xs text-gray-500">
+                <span className="flex items-center gap-1.5">
+                  <span className="inline-block w-3 h-3 rounded bg-amber-100 border border-amber-300"></span>
+                  Missed cycles
+                </span>
+                <span className="flex items-center gap-1.5">
+                  <span className="inline-block w-3 h-3 rounded bg-yellow-100 border border-yellow-300"></span>
+                  Backdated
+                </span>
+              </div>
+            )}
           </div>
         </div>
       </div>
