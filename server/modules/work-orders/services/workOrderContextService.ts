@@ -234,6 +234,20 @@ export async function getWorkOrderContext(workOrderId: string) {
   let lastCompletedDate: string = '';
   let lastCompletedRH: string = '';
   let lastCompletedDateForRH: string = '';
+  let lastCompletedCurrentReading: string = '';
+
+  const sameComponentWOs = workHistoryWOs.filter((wo: any) =>
+    (wo.componentCode === workOrder.componentCode || wo.component === workOrder.component)
+  );
+  sameComponentWOs.sort((a: any, b: any) => {
+    const dateA = a.completionDateTime || a.dateCompleted || '';
+    const dateB = b.completionDateTime || b.dateCompleted || '';
+    return dateB.localeCompare(dateA);
+  });
+  const latestSameComponentWO = sameComponentWOs[0];
+  if (latestSameComponentWO) {
+    lastCompletedCurrentReading = latestSameComponentWO.currentReading?.toString() || latestSameComponentWO.runningHours?.toString() || '';
+  }
 
   if (latestCompletedEntry) {
     lastCompletedDate = latestCompletedEntry.completionDate || latestCompletedEntry.workDate || '';
@@ -249,6 +263,10 @@ export async function getWorkOrderContext(workOrderId: string) {
     if (lastCompletedDate) {
       lastCompletedDateForRH = lastCompletedDate;
     }
+  }
+
+  if (!lastCompletedCurrentReading && lastCompletedRH) {
+    lastCompletedCurrentReading = lastCompletedRH;
   }
 
   // Build templateData from job data (Part A - immutable from job definition)
@@ -282,6 +300,7 @@ export async function getWorkOrderContext(workOrderId: string) {
     lastCompletedDate,
     lastCompletedRH,
     lastCompletedDateForRH,
+    lastCompletedCurrentReading,
     briefWorkDescription: job.briefWorkDescription || job.jobDescription,
     jobDescription: job.jobDescription,
     requiredSpareParts: enrichedSpareParts,
@@ -316,6 +335,7 @@ export async function getWorkOrderContext(workOrderId: string) {
     lastCompletedDate,
     lastCompletedRH,
     lastCompletedDateForRH,
+    lastCompletedCurrentReading,
     briefWorkDescription: workOrder.briefWorkDescription,
     jobDescription: workOrder.briefWorkDescription,
     requiredSpareParts: [],

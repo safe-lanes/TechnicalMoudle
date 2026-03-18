@@ -194,8 +194,13 @@ export async function validateRHEntry(req: Request, res: Response) {
       exceedsComponentRH = true;
     }
 
+    const cappedValidRange = result.validRange && componentActualRH !== null && componentActualRH > 0
+      ? { ...result.validRange, max: Math.min(result.validRange.max, componentActualRH) }
+      : result.validRange;
+
     res.json({
       ...result,
+      validRange: cappedValidRange,
       componentActualRH,
       exceedsComponentRH,
       ...(exceedsComponentRH && result.isValid ? {

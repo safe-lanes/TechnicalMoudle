@@ -678,11 +678,13 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
         const savedPreviousReading = context.executionData?.previousReading;
         const hasNoSavedPreviousReading = savedPreviousReading === '' || savedPreviousReading == null || savedPreviousReading === undefined;
         const savedIsZero = savedPreviousReading === '0' || savedPreviousReading === '0.00' || savedPreviousReading === '0.0';
+        const lastCompletedCR = context.templateData?.lastCompletedCurrentReading;
         const componentRH = context.component?.currentCumulativeRH;
-        const componentRHNum = componentRH != null ? parseFloat(String(componentRH)) : 0;
-        const shouldUseFallback = (hasNoSavedPreviousReading || (savedIsZero && componentRHNum > 0)) && componentRH != null;
+        const fallbackSource = lastCompletedCR || (componentRH != null ? String(componentRH) : undefined);
+        const fallbackSourceNum = fallbackSource ? parseFloat(fallbackSource) : 0;
+        const shouldUseFallback = (hasNoSavedPreviousReading || (savedIsZero && fallbackSourceNum > 0)) && fallbackSource;
         const fallbackPreviousReading = shouldUseFallback
-          ? String(componentRH)
+          ? fallbackSource
           : undefined;
 
         // Single consolidated setExecutionData call to prevent React batching race conditions
@@ -698,11 +700,11 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
           // Use nullish check (not falsy) to preserve 0-hour readings correctly
           ...(fallbackPreviousReading ? { previousReading: fallbackPreviousReading } : {})
         }));
-      } else if (context.component?.currentCumulativeRH != null) {
-        // No executionData at all (brand new WO) - populate previousReading from component RH
+      } else if (context.templateData?.lastCompletedCurrentReading || context.component?.currentCumulativeRH != null) {
+        const prevReading = context.templateData?.lastCompletedCurrentReading || String(context.component?.currentCumulativeRH || '0');
         setExecutionData(prev => ({
           ...prev,
-          previousReading: String(context.component.currentCumulativeRH)
+          previousReading: prevReading
         }));
       }
 
@@ -4204,7 +4206,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                 {/* RH Valid Range Helper */}
                 {rhValidation.validRange && (
                   <div className="text-xs text-blue-600 bg-blue-50 px-2 py-1 rounded" data-testid="text-rh-valid-range">
-                    Valid range: {rhValidation.validRange.min.toFixed(0)} to {rhValidation.componentActualRH !== null && rhValidation.componentActualRH > 0 ? rhValidation.componentActualRH : (rhValidation.validRange.max === Infinity ? '∞' : rhValidation.validRange.max.toFixed(0))} hours
+                    Valid range: {rhValidation.validRange.min.toFixed(0)} to {rhValidation.componentActualRH !== null && rhValidation.componentActualRH > 0 ? rhValidation.componentActualRH.toLocaleString() : (rhValidation.validRange.max === Infinity ? '∞' : Math.min(rhValidation.validRange.max, rhValidation.componentActualRH || Infinity).toFixed(0))} hours
                     {rhValidation.previousEntry && (
                       <span className="ml-1 text-blue-500">
                         | Last: {rhValidation.previousEntry.runningHours.toFixed(0)} hrs on {new Date(rhValidation.previousEntry.date).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}

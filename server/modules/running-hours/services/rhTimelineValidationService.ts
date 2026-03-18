@@ -425,6 +425,22 @@ export async function getCurrentRH(machineryId: string): Promise<{
   if (component.rhCounterType === 'INHERITED') {
     rhSource = component.rhCurrentInheritedCached || component.currentCumulativeRH;
     rhLastUpdated = component.rhInheritedUpdatedAt || component.rhMasterUpdatedAt;
+    if ((!rhSource || parseFloat(rhSource) === 0) && component.rhMasterComponentId) {
+      try {
+        let masterComponent = await repo.getComponent(component.rhMasterComponentId);
+        if (!masterComponent && component.vesselId) {
+          const allComponents = await repo.getComponents(component.vesselId);
+          masterComponent = allComponents.find((c: any) => c.componentCode === component.rhMasterComponentId);
+        }
+        if (masterComponent) {
+          const masterRH = masterComponent.rhCurrentMaster || masterComponent.currentCumulativeRH;
+          if (masterRH && parseFloat(masterRH) > 0) {
+            rhSource = masterRH;
+            rhLastUpdated = masterComponent.rhMasterUpdatedAt || masterComponent.updatedAt;
+          }
+        }
+      } catch {}
+    }
   } else {
     rhSource = component.rhCurrentMaster || component.currentCumulativeRH;
     rhLastUpdated = component.rhMasterUpdatedAt;
