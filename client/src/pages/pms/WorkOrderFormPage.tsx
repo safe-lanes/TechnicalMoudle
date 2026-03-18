@@ -884,7 +884,8 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
         setRhValidation(prev => ({ ...prev, componentActualRH: result.currentRH }));
         setComponentActualRHStatus('loaded');
         setComponentActualRHLastUpdated(result.lastUpdated || null);
-        toast({ title: "RH Fetched", description: `Running hours fetched: ${result.currentRH} hours as of ${new Date(result.lastUpdated).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}` });
+        const fetchedDate = result.lastUpdated ? new Date(result.lastUpdated).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }).replace(/ /g, '-') : 'N/A';
+        toast({ title: "RH Fetched", description: `Running hours fetched: ${result.currentRH} hours as of ${fetchedDate}` });
         performRHValidation(String(result.currentRH));
       }
     } catch {
