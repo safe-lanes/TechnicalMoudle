@@ -7222,6 +7222,18 @@ export class PostgresStorage {
 
   async createSpareComponentLink(link: InsertSpareComponentLink, skipSiblingSync: boolean = false): Promise<SpareComponentLink> {
     const db = await getDb();
+
+    const existing = await db.select().from(spareComponentLinks).where(
+      and(
+        eq(spareComponentLinks.spareId, link.spareId),
+        eq(spareComponentLinks.componentId, link.componentId),
+        eq(spareComponentLinks.vesselId, link.vesselId)
+      )
+    );
+    if (existing.length > 0) {
+      return existing[0];
+    }
+
     const result = await db.insert(spareComponentLinks).values(link).returning();
     const created = result[0];
 

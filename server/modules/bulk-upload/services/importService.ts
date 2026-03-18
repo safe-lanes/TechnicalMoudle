@@ -44,7 +44,7 @@ export async function processSpareInventory(params: {
         componentId,
         vesselId,
         linkedBy: userId,
-      });
+      }, true);
       console.log(`🔗 Linked spare ${spareId} to component ${componentId}`);
     }
 
@@ -187,7 +187,8 @@ export async function performImport(
     archived: 0,
     jobComponentLinksCreated: 0,
     spareComponentLinksCreated: 0,
-    rowResults: [] as RowResult[]
+    rowResults: [] as RowResult[],
+    warnings: [] as string[]
   };
 
   if (type === 'components') {
@@ -513,7 +514,7 @@ export async function performImport(
                   spareUuid: existingSpare.suuid,
                   componentId: component.cuuid,
                   linkedBy: 'system-bulk-import',
-                });
+                }, true);
                 result.spareComponentLinksCreated++;
                 console.log(`🔗 Linked spare ${partCode} to additional component ${componentCode}`);
                 
@@ -721,7 +722,7 @@ export async function performImport(
                   spareUuid: existingSpare.suuid,
                   componentId: component.cuuid,
                   linkedBy: 'system-bulk-import',
-                });
+                }, true);
                 result.spareComponentLinksCreated++;
                 console.log(`🔗 Linked spare ${partCode} to additional component ${componentCode} (upsert mode)`);
               }
@@ -852,7 +853,17 @@ export async function performImport(
       }
     }
     
-    console.log(`✅ Spares import complete: ${result.created} created, ${result.updated} updated, ${result.skipped} skipped, ${result.spareComponentLinksCreated} spare-component links created`);
+    const validRowCount = result.created + result.updated;
+    const linkCount = result.spareComponentLinksCreated;
+    if (linkCount !== validRowCount) {
+      const mismatchMsg = `Linkage count mismatch: ${linkCount} links created vs ${validRowCount} valid rows processed. Some rows may have had pre-existing links.`;
+      console.warn(`⚠️ ${mismatchMsg}`);
+      result.warnings.push(mismatchMsg);
+    } else {
+      console.log(`✅ Linkage count validated: ${linkCount} links match ${validRowCount} valid rows`);
+    }
+    
+    console.log(`✅ Spares import complete: ${result.created} created, ${result.updated} updated, ${result.skipped} skipped, ${linkCount} spare-component links created`);
   } else if (type === 'stores') {
     console.log(`🚀 Starting stores import: ${data.length} rows, mode: ${mode}, vesselId: ${vesselId}, storeType: ${storeType}`);
     
