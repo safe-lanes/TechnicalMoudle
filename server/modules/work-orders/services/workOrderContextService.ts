@@ -345,43 +345,68 @@ export async function getWorkOrderContext(workOrderId: string) {
     vesselId: workOrder.vesselId
   };
 
+  // CORRECTIVE: Detect stuck rejected WOs (wasRejected=true + approvalAction='rejected' but status still 'Pending Approval')
+  // This can happen if the rejection PATCH didn't fully persist the status change.
+  // Correct the status in-memory so the form treats it as 'Due' and fix the DB asynchronously.
+  const correctedWorkOrder = { ...workOrder } as any;
+  let wasStuckRejection = false;
+  if (correctedWorkOrder.wasRejected === true &&
+      correctedWorkOrder.approvalAction === 'rejected' &&
+      correctedWorkOrder.status === 'Pending Approval') {
+    console.warn(`⚠️ CORRECTIVE: WO ${correctedWorkOrder.workOrderNo || correctedWorkOrder.id} has wasRejected=true but status is still 'Pending Approval'. Correcting to 'Due'.`);
+    correctedWorkOrder.status = 'Due';
+    correctedWorkOrder.completionDateTime = null;
+    correctedWorkOrder.dateCompleted = null;
+    correctedWorkOrder.approvalTier = null;
+    wasStuckRejection = true;
+    // Fire-and-forget DB correction
+    repo.update(workOrder.id || (workOrder as any).wouuid, {
+      status: 'Due',
+      completionDateTime: null,
+      dateCompleted: null,
+      approvalTier: null,
+      daysLate: null,
+      approvalBlockReason: null,
+    }).catch(err => console.error('⚠️ Failed to auto-correct stuck rejected WO status:', err));
+  }
+
   // Build executionData from work order (Part B - editable execution record)
   const executionData = {
     // B1 - Risk Assessment, Checklists & Records
-    riskAssessmentStatus: workOrder.riskAssessmentStatus || '',
-    safetyChecklistsStatus: workOrder.safetyChecklistsStatus || '',
-    operationalFormsStatus: workOrder.operationalFormsStatus || '',
-    uploadedDocuments: workOrder.uploadedDocuments || [],
+    riskAssessmentStatus: correctedWorkOrder.riskAssessmentStatus || '',
+    safetyChecklistsStatus: correctedWorkOrder.safetyChecklistsStatus || '',
+    operationalFormsStatus: correctedWorkOrder.operationalFormsStatus || '',
+    uploadedDocuments: correctedWorkOrder.uploadedDocuments || [],
     // B2 - Work Duration
-    startDateTime: workOrder.startDateTime || '',
-    completionDateTime: workOrder.completionDateTime || '',
-    executionAssignedTo: workOrder.executionAssignedTo || '',
-    performedBy: workOrder.performedBy || '',
-    noOfPersons: workOrder.noOfPersons || '',
-    totalTimeHours: workOrder.totalTimeHours || '',
-    manhours: workOrder.manhours || '',
-    workCarriedOut: workOrder.workCarriedOut || '',
-    jobExperienceNotes: workOrder.jobExperienceNotes || '',
+    startDateTime: correctedWorkOrder.startDateTime || '',
+    completionDateTime: correctedWorkOrder.completionDateTime || '',
+    executionAssignedTo: correctedWorkOrder.executionAssignedTo || '',
+    performedBy: correctedWorkOrder.performedBy || '',
+    noOfPersons: correctedWorkOrder.noOfPersons || '',
+    totalTimeHours: correctedWorkOrder.totalTimeHours || '',
+    manhours: correctedWorkOrder.manhours || '',
+    workCarriedOut: correctedWorkOrder.workCarriedOut || '',
+    jobExperienceNotes: correctedWorkOrder.jobExperienceNotes || '',
     // B3 - Running Hours
-    previousReading: workOrder.previousReading?.toString() || '',
-    currentReading: workOrder.currentReading?.toString() || '',
-    runningHoursDifference: workOrder.runningHoursDifference?.toString() || '',
-    readingDate: workOrder.readingDate || '',
-    runningHours: workOrder.runningHours || '',
+    previousReading: correctedWorkOrder.previousReading?.toString() || '',
+    currentReading: correctedWorkOrder.currentReading?.toString() || '',
+    runningHoursDifference: correctedWorkOrder.runningHoursDifference?.toString() || '',
+    readingDate: correctedWorkOrder.readingDate || '',
+    runningHours: correctedWorkOrder.runningHours || '',
     // B4 - Spare Parts Consumed
-    consumedSpareParts: workOrder.consumedSpareParts || [],
+    consumedSpareParts: correctedWorkOrder.consumedSpareParts || [],
     // Metadata
-    woExecutionId: workOrder.woExecutionId || '',
-    remarks: workOrder.remarks || '',
-    dateCompleted: workOrder.dateCompleted || '',
-    completionRemarks: workOrder.completionRemarks || ''
+    woExecutionId: correctedWorkOrder.woExecutionId || '',
+    remarks: correctedWorkOrder.remarks || '',
+    dateCompleted: correctedWorkOrder.dateCompleted || '',
+    completionRemarks: correctedWorkOrder.completionRemarks || ''
   };
 
   // Use actual database data - no dummy data overrides
   const finalTemplateData: any = { ...templateData };
 
   return {
-    workOrder,
+    workOrder: correctedWorkOrder,
     templateData: finalTemplateData,
     executionData,
     job,

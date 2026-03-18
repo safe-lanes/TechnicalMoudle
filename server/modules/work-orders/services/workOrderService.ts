@@ -776,11 +776,15 @@ export async function updateWorkOrder(id: string, body: any) {
   if (isBeingRejected) {
     updateData.completionDateTime = null;
     updateData.dateCompleted = null;
-    updateData.dateOfCompletion = null;
     updateData.rejectionDate = new Date().toISOString();
     updateData.wasRejected = true;
     updateData.status = 'Due';
-    console.log('📝 Work order rejected - setting status to Due, wasRejected=true for rework');
+    updateData.approvalTier = null;
+    updateData.daysLate = null;
+    updateData.approvalBlockReason = null;
+    updateData.superintendentNotifiedAt = null;
+    updateData.superintendentAcknowledged = null;
+    console.log('📝 Work order rejected - setting status to Due, wasRejected=true, clearing approval tier for rework');
   }
 
   // REJECTED WO RESUBMISSION

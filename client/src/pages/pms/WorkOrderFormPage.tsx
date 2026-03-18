@@ -409,7 +409,9 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
 
   const isReadOnly = embedded || currentWorkOrderStatus === 'Completed';
 
-  const isPartBReadOnly = isReadOnly || currentWorkOrderStatus === 'Completed' || currentWorkOrderStatus === 'Pending Approval';
+  const isRejectedWO = !!(context?.workOrder?.wasRejected === true && currentWorkOrderStatus !== 'Completed' && currentWorkOrderStatus !== 'Pending Approval');
+
+  const isPartBReadOnly = isReadOnly || currentWorkOrderStatus === 'Completed' || (currentWorkOrderStatus === 'Pending Approval' && !isRejectedWO);
 
   const [templateData, setTemplateData] = useState({
     woTitle: "",
@@ -2009,7 +2011,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
         }
       }
 
-      if (rhValidation.status === 'invalid') {
+      if (rhValidation.status === 'invalid' && !isRejectedWO) {
         hardErrors.push(rhValidation.message || 'Running hours validation failed. Please correct the Current Reading value.');
       }
 
@@ -2166,8 +2168,8 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
             }
           }
 
-          // Layer 7: Use server-side timeline validation
-          if (rhValidation.status === 'invalid') {
+          // Layer 7: Use server-side timeline validation (skip blocking for rejected WOs — they need to resubmit)
+          if (rhValidation.status === 'invalid' && !isRejectedWO) {
             setRhErrorDetails(rhValidation.validationDetails);
             setRhErrorModalOpen(true);
             return;
@@ -2514,6 +2516,21 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
         return (
           <div className={`sticky top-0 z-50 ${cfg.bg} border-b px-4 py-2`} data-testid="banner-top-approval-tier">
             <span className={`text-sm font-medium ${cfg.text}`}>{cfg.message}</span>
+          </div>
+        );
+      })()}
+      {!embedded && isRejectedWO && (() => {
+        const rc = (workOrderContext as any)?.workOrder?.rejectionComments || '';
+        return (
+          <div className="sticky top-0 z-50 bg-red-50 border-b border-red-300 px-4 py-3" data-testid="banner-rejection">
+            <div className="flex items-center gap-2">
+              <span className="text-sm font-semibold text-red-800">⚠️ REJECTED — Please make corrections and resubmit.</span>
+            </div>
+            {rc && (
+              <div className="text-sm text-red-700 mt-1" data-testid="text-rejection-reason">
+                Reason: {rc}
+              </div>
+            )}
           </div>
         );
       })()}
@@ -4974,15 +4991,15 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
             </>
           )}
 
-          {/* Save Button at Bottom - Hidden for Pending Approval, Completed work orders, and embedded mode */}
-          {!embedded && currentWorkOrderStatus !== 'Pending Approval' && currentWorkOrderStatus !== 'Completed' && (() => {
+          {/* Save Button at Bottom - Hidden for Pending Approval (unless rejected), Completed work orders, and embedded mode */}
+          {!embedded && (currentWorkOrderStatus !== 'Pending Approval' || isRejectedWO) && currentWorkOrderStatus !== 'Completed' && (() => {
             const isRHBased = (workOrderContext as any)?.maintenanceBasis === 'Running Hours';
             const currentRHVal = executionData.currentReading;
             const capRH = rhValidation.componentActualRH;
             const rhExceedsActual = isRHBased && currentRHVal && capRH !== null && Number(currentRHVal) > capRH;
             const rhNotLoaded = isRHBased && componentActualRHStatus === 'loading';
             const rhFetchFailed = isRHBased && componentActualRHStatus === 'error';
-            const rhInvalid = rhValidation.status === 'invalid';
+            const rhInvalid = rhValidation.status === 'invalid' && !isRejectedWO;
             const isRHSaveBlocked = rhExceedsActual || rhNotLoaded || rhFetchFailed || rhInvalid;
             const rhBlockReason = rhExceedsActual ? `Cannot save: Current Reading (${currentRHVal}) exceeds component's actual RH (${capRH})` :
               rhNotLoaded ? 'Cannot save: Component running hours are still loading' :
