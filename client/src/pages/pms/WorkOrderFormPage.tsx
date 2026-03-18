@@ -2050,6 +2050,9 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
 
         const result = await response.json();
         if (!response.ok) {
+          if (result.code === 'INVALID_RUNNING_HOURS') {
+            throw new Error(`Current Reading (${result.enteredValue} hrs) exceeds component actual RH (${result.componentActualRH} hrs). Update running hours in the RH module first, or enter a value ≤ ${result.maxAllowed} hrs.`);
+          }
           throw new Error(result.error || 'Failed to save work order');
         }
 
@@ -2213,6 +2216,9 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
       const result = await response.json();
 
       if (!response.ok) {
+        if (result.code === 'INVALID_RUNNING_HOURS') {
+          throw new Error(`Current Reading (${result.enteredValue} hrs) exceeds component actual RH (${result.componentActualRH} hrs). Update running hours in the RH module first, or enter a value ≤ ${result.maxAllowed} hrs.`);
+        }
         throw new Error(result.error || 'Failed to save work order');
       }
 
@@ -4226,7 +4232,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                       ACTION REQUIRED: Update the component's running hours in the Running Hours module first, or enter a Current Reading value ≤ {rhValidation.componentActualRH} hours.
                     </p>
                     <a
-                      href={`/pms/running-hours?vesselId=${encodeURIComponent((workOrderContext as any)?.workOrder?.vesselId || '')}`}
+                      href={`/pms/running-hours?vesselId=${encodeURIComponent((workOrderContext as any)?.workOrder?.vesselId || '')}&componentCode=${encodeURIComponent(templateData.componentCode || '')}`}
                       target="_blank"
                       rel="noopener noreferrer"
                       className="inline-flex items-center gap-1 text-xs text-blue-600 hover:text-blue-800 mt-2 underline"
@@ -4250,7 +4256,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                 {!isPartBReadOnly && (workOrderContext as any)?.maintenanceBasis === 'Running Hours' && componentActualRHStatus === 'loaded' && (
                   <div className="mt-1">
                     <a
-                      href={`/pms/running-hours?vesselId=${encodeURIComponent((workOrderContext as any)?.workOrder?.vesselId || '')}`}
+                      href={`/pms/running-hours?vesselId=${encodeURIComponent((workOrderContext as any)?.workOrder?.vesselId || '')}&componentCode=${encodeURIComponent(templateData.componentCode || '')}`}
                       target="_blank"
                       rel="noopener noreferrer"
                       className="inline-flex items-center gap-1 text-xs text-blue-500 hover:text-blue-700"
