@@ -7,24 +7,40 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import { Calendar as CalendarPicker } from "@/components/ui/calendar";
+import { Label } from "@/components/ui/label";
 import { useQuery } from "@tanstack/react-query";
 import { pdfReportGenerator } from "@/lib/pdfReportGenerator";
 import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
+import { cn } from "@/lib/utils";
 import {
   LineChart, Line, BarChart, Bar, PieChart, Pie, Cell,
   XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
 } from "recharts";
 import {
-  ArrowLeft, Package, TrendingDown, Activity, Calendar,
+  ArrowLeft, Package, TrendingDown, Activity, Calendar as CalendarIcon,
   AlertTriangle, FileText, Download, Loader2, ArrowUpDown,
   ChevronDown, ChevronUp,
 } from "lucide-react";
 import { TablePagination, usePagination } from "@/components/reports/TablePagination";
 
+const MONTH_FULL = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+const formatDateForDisplay = (d: Date | undefined) => {
+  if (!d) return "";
+  return `${d.getDate().toString().padStart(2, "0")} ${MONTH_FULL[d.getMonth()]} ${d.getFullYear()}`;
+};
+
 interface SparesConsumptionPatternReportProps {
   onBack: () => void;
   vesselId: string | null;
+  initialDateFrom?: Date | null;
+  initialDateTo?: Date | null;
 }
 
 type ActiveTab = "trends" | "items" | "categories" | "efficiency" | "forecast";
@@ -33,13 +49,16 @@ type SortDirection = "asc" | "desc";
 
 const PIE_COLORS = ["#3b82f6", "#ef4444", "#22c55e", "#f59e0b", "#8b5cf6", "#06b6d4", "#ec4899", "#84cc16"];
 
-const SparesConsumptionPatternReport: React.FC<SparesConsumptionPatternReportProps> = ({ onBack, vesselId }) => {
+const SparesConsumptionPatternReport: React.FC<SparesConsumptionPatternReportProps> = ({ onBack, vesselId, initialDateFrom, initialDateTo }) => {
   const { toast } = useToast();
 
-  const [startDate, setStartDate] = useState("");
-  const [endDate, setEndDate] = useState("");
+  const toDateStr = (d: Date | null | undefined) => d ? format(d, "yyyy-MM-dd") : "";
+  const [dateFrom, setDateFrom] = useState<Date | undefined>(initialDateFrom ?? undefined);
+  const [dateTo, setDateTo] = useState<Date | undefined>(initialDateTo ?? undefined);
+  const [startDate, setStartDate] = useState(toDateStr(initialDateFrom));
+  const [endDate, setEndDate] = useState(toDateStr(initialDateTo));
   const [category, setCategory] = useState("");
-  const [appliedFilters, setAppliedFilters] = useState({ startDate: "", endDate: "", category: "" });
+  const [appliedFilters, setAppliedFilters] = useState({ startDate: toDateStr(initialDateFrom), endDate: toDateStr(initialDateTo), category: "" });
   const [activeTab, setActiveTab] = useState<ActiveTab>("trends");
   const [sortField, setSortField] = useState<SortField>("totalConsumed");
   const [sortDirection, setSortDirection] = useState<SortDirection>("desc");
@@ -47,6 +66,43 @@ const SparesConsumptionPatternReport: React.FC<SparesConsumptionPatternReportPro
   const [nonMovingOpen, setNonMovingOpen] = useState(false);
   const [generatingExcel, setGeneratingExcel] = useState(false);
   const { currentPage, pageSize, handlePageChange, handlePageSizeChange, resetPage, paginateItems } = usePagination(25);
+
+  const [datePopoverOpen, setDatePopoverOpen] = useState(false);
+  const [pendingFrom, setPendingFrom] = useState<Date | undefined>(dateFrom);
+  const [pendingTo, setPendingTo] = useState<Date | undefined>(dateTo);
+  const [showFromCal, setShowFromCal] = useState(false);
+  const [showToCal, setShowToCal] = useState(false);
+  const [pendingDateFrom, setPendingDateFrom] = useState<Date | undefined>(undefined);
+  const [pendingDateTo, setPendingDateTo] = useState<Date | undefined>(undefined);
+
+  useEffect(() => {
+    const newFrom = initialDateFrom ?? undefined;
+    const newTo = initialDateTo ?? undefined;
+    setDateFrom(newFrom);
+    setDateTo(newTo);
+    setPendingFrom(newFrom);
+    setPendingTo(newTo);
+    const sf = toDateStr(initialDateFrom);
+    const ef = toDateStr(initialDateTo);
+    setStartDate(sf);
+    setEndDate(ef);
+    setAppliedFilters(prev => ({ ...prev, startDate: sf, endDate: ef }));
+  }, [initialDateFrom, initialDateTo]);
+
+  const formatDateRange = () => {
+    if (!dateFrom && !dateTo) return "Select date range";
+    if (dateFrom && !dateTo) return `From ${format(dateFrom, "MMM dd, yyyy")}`;
+    if (!dateFrom && dateTo) return `Until ${format(dateTo, "MMM dd, yyyy")}`;
+    if (dateFrom && dateTo) return `${format(dateFrom, "MMM dd")} - ${format(dateTo, "MMM dd, yyyy")}`;
+    return "Select date range";
+  };
+
+  const handleDateRangeApply = (from: Date | undefined, to: Date | undefined) => {
+    setDateFrom(from);
+    setDateTo(to);
+    setStartDate(from ? format(from, "yyyy-MM-dd") : "");
+    setEndDate(to ? format(to, "yyyy-MM-dd") : "");
+  };
 
   useEffect(() => {
     resetPage();
@@ -239,19 +295,112 @@ const SparesConsumptionPatternReport: React.FC<SparesConsumptionPatternReportPro
       </div>
 
       <div className="flex flex-wrap items-end gap-3">
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">From</label>
-          <input type="date" value={startDate} onChange={e => setStartDate(e.target.value)} className="border border-gray-300 rounded-md px-3 py-2 text-sm" data-testid="input-start-date" />
+        <div className="min-w-[220px]">
+          <Label className="text-xs font-medium text-gray-500 mb-1 block">Date Range</Label>
+          <Popover open={datePopoverOpen} onOpenChange={(isOpen) => {
+            setDatePopoverOpen(isOpen);
+            if (isOpen) {
+              setPendingFrom(dateFrom);
+              setPendingTo(dateTo);
+              setShowFromCal(false);
+              setShowToCal(false);
+            }
+          }}>
+            <PopoverTrigger asChild>
+              <Button
+                variant="outline"
+                className={cn(
+                  "w-full justify-start text-left font-normal h-9",
+                  !dateFrom && !dateTo && "text-muted-foreground"
+                )}
+                data-testid="button-consumption-date-range"
+              >
+                <CalendarIcon className="mr-2 h-4 w-4" />
+                {formatDateRange()}
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-auto p-4" align="start">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <div className="text-xs font-medium text-muted-foreground mb-1.5">From</div>
+                  <Popover open={showFromCal} onOpenChange={(isOpen) => {
+                    setShowFromCal(isOpen);
+                    if (isOpen) setPendingDateFrom(pendingFrom);
+                  }}>
+                    <PopoverTrigger asChild>
+                      <button
+                        type="button"
+                        className="flex items-center gap-2 w-full h-8 px-2 rounded-md border border-input bg-background text-xs cursor-pointer"
+                        data-testid="button-consumption-date-from"
+                      >
+                        <CalendarIcon className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+                        <span className={pendingFrom ? "text-foreground" : "text-muted-foreground"}>
+                          {pendingFrom ? formatDateForDisplay(pendingFrom) : "Select date"}
+                        </span>
+                      </button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0" align="start">
+                      <CalendarPicker
+                        mode="single"
+                        selected={pendingDateFrom}
+                        onSelect={(d) => setPendingDateFrom(d || undefined)}
+                        initialFocus
+                      />
+                      <div className="flex justify-end gap-2 p-3 pt-0 border-t mt-2">
+                        <Button size="sm" variant="outline" className="text-xs" onClick={() => setShowFromCal(false)} data-testid="button-consumption-date-from-cancel">Cancel</Button>
+                        <Button size="sm" className="text-xs" onClick={() => { setPendingFrom(pendingDateFrom); setShowFromCal(false); }} data-testid="button-consumption-date-from-ok">OK</Button>
+                      </div>
+                    </PopoverContent>
+                  </Popover>
+                </div>
+                <div>
+                  <div className="text-xs font-medium text-muted-foreground mb-1.5">To</div>
+                  <Popover open={showToCal} onOpenChange={(isOpen) => {
+                    setShowToCal(isOpen);
+                    if (isOpen) setPendingDateTo(pendingTo);
+                  }}>
+                    <PopoverTrigger asChild>
+                      <button
+                        type="button"
+                        className="flex items-center gap-2 w-full h-8 px-2 rounded-md border border-input bg-background text-xs cursor-pointer"
+                        data-testid="button-consumption-date-to"
+                      >
+                        <CalendarIcon className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+                        <span className={pendingTo ? "text-foreground" : "text-muted-foreground"}>
+                          {pendingTo ? formatDateForDisplay(pendingTo) : "Select date"}
+                        </span>
+                      </button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0" align="start">
+                      <CalendarPicker
+                        mode="single"
+                        selected={pendingDateTo}
+                        onSelect={(d) => setPendingDateTo(d || undefined)}
+                        initialFocus
+                      />
+                      <div className="flex justify-end gap-2 p-3 pt-0 border-t mt-2">
+                        <Button size="sm" variant="outline" className="text-xs" onClick={() => setShowToCal(false)} data-testid="button-consumption-date-to-cancel">Cancel</Button>
+                        <Button size="sm" className="text-xs" onClick={() => { setPendingTo(pendingDateTo); setShowToCal(false); }} data-testid="button-consumption-date-to-ok">OK</Button>
+                      </div>
+                    </PopoverContent>
+                  </Popover>
+                </div>
+              </div>
+              <div className="flex items-center justify-between gap-2 pt-3 mt-3 border-t">
+                <Button variant="outline" size="sm" onClick={() => { handleDateRangeApply(undefined, undefined); setDatePopoverOpen(false); }} className="text-xs" data-testid="button-clear-consumption-date-range">Clear</Button>
+                <div className="flex items-center gap-2">
+                  <Button variant="outline" size="sm" onClick={() => setDatePopoverOpen(false)} className="text-xs" data-testid="button-consumption-date-range-cancel">Cancel</Button>
+                  <Button size="sm" className="text-xs" onClick={() => { handleDateRangeApply(pendingFrom, pendingTo); setDatePopoverOpen(false); }} data-testid="button-consumption-date-range-ok">OK</Button>
+                </div>
+              </div>
+            </PopoverContent>
+          </Popover>
         </div>
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">To</label>
-          <input type="date" value={endDate} onChange={e => setEndDate(e.target.value)} className="border border-gray-300 rounded-md px-3 py-2 text-sm" data-testid="input-end-date" />
+          <Label className="text-xs font-medium text-gray-500 mb-1 block">Category</Label>
+          <input type="text" value={category} onChange={e => setCategory(e.target.value)} placeholder="Filter by category..." className="border border-gray-300 rounded-md px-3 py-2 text-sm w-48 h-9" data-testid="input-category" />
         </div>
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Category</label>
-          <input type="text" value={category} onChange={e => setCategory(e.target.value)} placeholder="Filter by category..." className="border border-gray-300 rounded-md px-3 py-2 text-sm w-48" data-testid="input-category" />
-        </div>
-        <Button onClick={handleApplyFilters} data-testid="button-apply-filters">Apply Filters</Button>
+        <Button onClick={handleApplyFilters} data-testid="button-apply-filters" className="h-9">Apply Filters</Button>
       </div>
 
       {isLoading && (
@@ -313,7 +462,7 @@ const SparesConsumptionPatternReport: React.FC<SparesConsumptionPatternReportPro
                   <CardDescription>Data Period</CardDescription>
                   <CardTitle className="text-2xl">{summary?.dataQuality?.daysOfData ?? 0} <span className="text-sm font-normal text-gray-500">days</span></CardTitle>
                 </div>
-                <Calendar className="h-8 w-8 text-green-500" />
+                <CalendarIcon className="h-8 w-8 text-green-500" />
               </CardHeader>
             </Card>
           </div>

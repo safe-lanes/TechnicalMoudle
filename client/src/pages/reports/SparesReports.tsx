@@ -473,6 +473,8 @@ const SparesReports: React.FC<SparesReportsProps> = ({ onBack, globalFilters }) 
       <SparesConsumptionPatternReport
         onBack={() => setActiveDetailReport(null)}
         vesselId={effectiveVesselId}
+        initialDateFrom={categoryFilters.dateRange.from}
+        initialDateTo={categoryFilters.dateRange.to}
       />
     );
   }
