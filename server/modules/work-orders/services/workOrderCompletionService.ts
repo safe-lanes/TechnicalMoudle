@@ -122,14 +122,18 @@ export async function completeWorkOrder(
       : null;
     if (componentActualRH !== null && !isNaN(componentActualRH) && newRH > componentActualRH) {
       throw new ValidationError(
-        `Running hours entered (${newRH}) exceeds the component's actual running hours (${componentActualRH}). ` +
-        `Please update the component's running hours first in the Running Hours module before completing this work order.`,
+        `Current Reading (${newRH} hours) exceeds component's actual running hours (${componentActualRH} hours). ` +
+        `You cannot complete maintenance at a running hour that the component has not reached yet. ` +
+        `Please update the component's running hours in the Running Hours module first, then return to complete this work order. ` +
+        `Or enter a Current Reading value ≤ ${componentActualRH} hours.`,
         {
-          code: 'EXCEEDS_COMPONENT_RH',
-          enteredRH: newRH,
+          code: 'INVALID_RUNNING_HOURS',
+          enteredValue: newRH,
           componentActualRH,
-          rhCounterType: component.rhCounterType || 'MASTER',
-          componentCode: component.componentCode || workOrder.componentCode
+          maxAllowed: componentActualRH,
+          componentId: component.componentCode || workOrder.componentCode,
+          componentName: component.description || component.componentCode || workOrder.componentCode,
+          rhCounterType: component.rhCounterType || 'MASTER'
         }
       );
     }

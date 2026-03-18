@@ -30,7 +30,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { FileText, ArrowLeft, Plus, Eye, Upload, Download, Menu, Check, X, Edit2, Trash2, Copy, Loader2, Paperclip, Image as ImageIcon, FileSpreadsheet, BarChart3, AlertTriangle, CheckCircle2, Clock } from "lucide-react";
+import { FileText, ArrowLeft, Plus, Eye, Upload, Download, Menu, Check, X, Edit2, Trash2, Copy, Loader2, Paperclip, Image as ImageIcon, FileSpreadsheet, BarChart3, AlertTriangle, CheckCircle2, Clock, ExternalLink, RefreshCw } from "lucide-react";
 import RHTimelineViewer from "@/components/pms/RHTimelineViewer";
 import sailLogo from "@assets/SAIL logo Transparent_1753957135582.png";
 import {
@@ -457,6 +457,8 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
     validationDetails: any;
     componentActualRH: number | null;
   }>({ status: 'idle', message: '', validRange: null, utilizationRate: 0, previousEntry: null, nextEntry: null, validationDetails: null, componentActualRH: null });
+  const [componentActualRHStatus, setComponentActualRHStatus] = useState<'loading' | 'loaded' | 'error'>('loading');
+  const [componentActualRHLastUpdated, setComponentActualRHLastUpdated] = useState<string | null>(null);
   const [rhJustificationModalOpen, setRhJustificationModalOpen] = useState(false);
   const [rhJustificationText, setRhJustificationText] = useState('');
   const [rhJustificationConfirmed, setRhJustificationConfirmed] = useState(false);
@@ -875,6 +877,9 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
       const result = await res.json();
       if (result.currentRH !== undefined) {
         setExecutionData(prev => ({ ...prev, currentReading: String(result.currentRH) }));
+        setRhValidation(prev => ({ ...prev, componentActualRH: result.currentRH }));
+        setComponentActualRHStatus('loaded');
+        setComponentActualRHLastUpdated(result.lastUpdated || null);
         toast({ title: "RH Fetched", description: `Current running hours (${result.currentRH}) fetched from RH Module. Last updated: ${new Date(result.lastUpdated).toLocaleDateString()}.` });
         performRHValidation(String(result.currentRH));
       }
@@ -883,18 +888,31 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
     }
   };
 
-  useEffect(() => {
+  const fetchComponentActualRH = async () => {
     const context = workOrderContext as any;
     const componentId = context?.component?.cuuid;
     if (!componentId) return;
-    fetch(`/technical/api/running-hours/current?machineryId=${encodeURIComponent(componentId)}`)
-      .then(res => res.json())
-      .then(result => {
-        if (result.currentRH !== undefined) {
-          setRhValidation(prev => ({ ...prev, componentActualRH: result.currentRH }));
-        }
-      })
-      .catch(() => {});
+    setComponentActualRHStatus('loading');
+    try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 10000);
+      const res = await fetch(`/technical/api/running-hours/current?machineryId=${encodeURIComponent(componentId)}`, { signal: controller.signal });
+      clearTimeout(timeoutId);
+      const result = await res.json();
+      if (result.currentRH !== undefined) {
+        setRhValidation(prev => ({ ...prev, componentActualRH: result.currentRH }));
+        setComponentActualRHStatus('loaded');
+        setComponentActualRHLastUpdated(result.lastUpdated || null);
+      } else {
+        setComponentActualRHStatus('error');
+      }
+    } catch {
+      setComponentActualRHStatus('error');
+    }
+  };
+
+  useEffect(() => {
+    fetchComponentActualRH();
   }, [(workOrderContext as any)?.component?.cuuid]);
 
   const handleExecutionChange = (field: string, value: string) => {
@@ -1969,11 +1987,18 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
         }
       }
 
-      if ((workOrderContext as any)?.maintenanceBasis === 'Running Hours' && currentRHValue) {
-        const enteredRH = Number(currentRHValue);
-        const capRH = rhValidation.componentActualRH ?? (executionData.previousReading ? Number(executionData.previousReading) : null);
-        if (capRH !== null && !isNaN(enteredRH) && !isNaN(capRH) && enteredRH > capRH) {
-          hardErrors.push(`Running hours entered (${enteredRH}) exceeds the component's actual running hours (${capRH}). Please update the component's running hours in the Running Hours module first.`);
+      if ((workOrderContext as any)?.maintenanceBasis === 'Running Hours') {
+        if (componentActualRHStatus === 'loading') {
+          hardErrors.push('Component running hours are still loading. Please wait for the value to load before saving.');
+        } else if (componentActualRHStatus === 'error' && currentRHValue) {
+          hardErrors.push('Unable to verify component running hours. Please refresh the page or retry loading the component RH before saving.');
+        }
+        if (currentRHValue) {
+          const enteredRH = Number(currentRHValue);
+          const capRH = rhValidation.componentActualRH ?? (executionData.previousReading ? Number(executionData.previousReading) : null);
+          if (capRH !== null && !isNaN(enteredRH) && !isNaN(capRH) && enteredRH > capRH) {
+            hardErrors.push(`Running hours entered (${enteredRH}) exceeds the component's actual running hours (${capRH}). You cannot complete maintenance at a running hour that the component has not reached yet. Please update the component's running hours in the Running Hours module first, or enter a value ≤ ${capRH} hours.`);
+          }
         }
       }
 
@@ -4082,15 +4107,55 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
 
               <div className="space-y-2">
                 <Label className="text-sm text-[#8798ad]" data-testid="text-component-actual-rh-label">Component Actual RH</Label>
-                <Input
-                  value={rhValidation.componentActualRH !== null ? `${rhValidation.componentActualRH} hrs` : 'Fetching...'}
-                  className={`text-sm font-semibold ${rhValidation.componentActualRH !== null ? 'bg-amber-50 border-amber-200 text-amber-800' : 'bg-gray-50 border-gray-200 text-gray-400 italic'}`}
-                  disabled
-                  data-testid="text-component-actual-rh"
-                />
-                <div className="text-xs text-amber-600" data-testid="text-rh-cap-hint">
-                  Maximum allowed value for Current Reading
+                <div className="flex gap-2 items-center">
+                  <Input
+                    value={
+                      componentActualRHStatus === 'loading' ? 'Loading...' :
+                      componentActualRHStatus === 'error' ? 'Failed to load' :
+                      rhValidation.componentActualRH !== null ? `${rhValidation.componentActualRH.toLocaleString()} hrs` : 'N/A'
+                    }
+                    className={`text-sm font-semibold flex-1 ${
+                      componentActualRHStatus === 'loaded' && rhValidation.componentActualRH !== null ? 'bg-green-50 border-green-300 text-green-800' :
+                      componentActualRHStatus === 'error' ? 'bg-red-50 border-red-300 text-red-700' :
+                      'bg-gray-50 border-gray-200 text-gray-400 italic'
+                    }`}
+                    disabled
+                    data-testid="text-component-actual-rh"
+                  />
+                  {componentActualRHStatus === 'error' && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={fetchComponentActualRH}
+                      className="shrink-0 text-xs border-red-300 text-red-600 hover:bg-red-50"
+                      data-testid="button-retry-rh-fetch"
+                      title="Retry loading component RH"
+                    >
+                      <RefreshCw className="h-3.5 w-3.5 mr-1" />
+                      Retry
+                    </Button>
+                  )}
                 </div>
+                {componentActualRHStatus === 'loaded' && rhValidation.componentActualRH !== null && (
+                  <div className="text-xs text-green-600" data-testid="text-rh-cap-hint">
+                    Maximum allowed: {rhValidation.componentActualRH.toLocaleString()} hours
+                    {componentActualRHLastUpdated && (
+                      <span className="ml-1 text-gray-500">
+                        (updated {new Date(componentActualRHLastUpdated).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })})
+                      </span>
+                    )}
+                  </div>
+                )}
+                {componentActualRHStatus === 'error' && (
+                  <div className="text-xs text-red-600" data-testid="text-rh-fetch-error">
+                    Unable to fetch component RH. Please retry or refresh the page.
+                  </div>
+                )}
+                {componentActualRHStatus === 'loading' && (
+                  <div className="text-xs text-gray-500 flex items-center gap-1" data-testid="text-rh-loading">
+                    <Loader2 className="h-3 w-3 animate-spin" /> Fetching component running hours...
+                  </div>
+                )}
               </div>
 
               <div className="space-y-2">
@@ -4149,8 +4214,26 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                   </div>
                 )}
                 {rhValidation.status === 'invalid' && rhValidation.validationDetails?.validationStatus === 'EXCEEDS_COMPONENT_RH' && (
-                  <div className="text-xs text-red-600 flex items-center gap-1" data-testid="text-rh-exceeds-component">
-                    <X className="h-3 w-3" /> Cannot exceed component's actual RH ({rhValidation.componentActualRH} hrs). Update RH in the Running Hours module first.
+                  <div className="mt-2 p-3 bg-red-50 border border-red-300 rounded-md" data-testid="text-rh-exceeds-component">
+                    <div className="flex items-center gap-1.5 text-sm font-semibold text-red-800 mb-1">
+                      <AlertTriangle className="h-4 w-4 text-red-600" /> Invalid Running Hours Entry
+                    </div>
+                    <p className="text-xs text-red-700 mb-1.5">
+                      The Current Reading you entered ({executionData.currentReading} hours) exceeds the component's actual running hours ({rhValidation.componentActualRH} hours).
+                      You cannot complete maintenance at a running hour that the component has not reached yet.
+                    </p>
+                    <p className="text-xs text-red-700 font-medium">
+                      ACTION REQUIRED: Update the component's running hours in the Running Hours module first, or enter a Current Reading value ≤ {rhValidation.componentActualRH} hours.
+                    </p>
+                    <a
+                      href={`/pms/running-hours?vesselId=${encodeURIComponent((workOrderContext as any)?.workOrder?.vesselId || '')}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1 text-xs text-blue-600 hover:text-blue-800 mt-2 underline"
+                      data-testid="link-rh-module"
+                    >
+                      <ExternalLink className="h-3 w-3" /> Open Running Hours Module
+                    </a>
                   </div>
                 )}
                 {rhValidation.status === 'invalid' && rhValidation.validationDetails?.validationStatus !== 'EXCEEDS_COMPONENT_RH' && (
@@ -4161,6 +4244,20 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                 {rhValidation.status === 'warning' && (
                   <div className="text-xs text-orange-600 flex items-center gap-1" data-testid="text-rh-warning">
                     <AlertTriangle className="h-3 w-3" /> High utilization: {rhValidation.utilizationRate.toFixed(1)} hrs/day — justification required
+                  </div>
+                )}
+
+                {!isPartBReadOnly && (workOrderContext as any)?.maintenanceBasis === 'Running Hours' && componentActualRHStatus === 'loaded' && (
+                  <div className="mt-1">
+                    <a
+                      href={`/pms/running-hours?vesselId=${encodeURIComponent((workOrderContext as any)?.workOrder?.vesselId || '')}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1 text-xs text-blue-500 hover:text-blue-700"
+                      data-testid="link-view-rh-module"
+                    >
+                      <BarChart3 className="h-3 w-3" /> View Component Running Hours
+                    </a>
                   </div>
                 )}
               </div>
@@ -4865,18 +4962,39 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
           )}
 
           {/* Save Button at Bottom - Hidden for Pending Approval, Completed work orders, and embedded mode */}
-          {!embedded && currentWorkOrderStatus !== 'Pending Approval' && currentWorkOrderStatus !== 'Completed' && (
-            <div className="flex justify-end mt-6 pb-6" data-testid="WOF6"><Marker id="WOF6" />
-              <Button
-                onClick={isNewJobCreation ? handleSaveNewJob : handleSave}
-                className="bg-[hsl(var(--primary))] hover:bg-[hsl(var(--primary))]/90 text-white font-bold px-12 py-2.5 h-auto text-sm shadow-md"
-                data-testid="WOF6.1"
-              >
-                <Marker id="WOF6.1" />
-                {isNewJobCreation ? 'Create Job' : 'Save'}
-              </Button>
-            </div>
-          )}
+          {!embedded && currentWorkOrderStatus !== 'Pending Approval' && currentWorkOrderStatus !== 'Completed' && (() => {
+            const isRHBased = (workOrderContext as any)?.maintenanceBasis === 'Running Hours';
+            const currentRHVal = executionData.currentReading;
+            const capRH = rhValidation.componentActualRH;
+            const rhExceedsActual = isRHBased && currentRHVal && capRH !== null && Number(currentRHVal) > capRH;
+            const rhNotLoaded = isRHBased && componentActualRHStatus === 'loading';
+            const rhFetchFailed = isRHBased && componentActualRHStatus === 'error' && !!currentRHVal;
+            const rhInvalid = rhValidation.status === 'invalid';
+            const isRHSaveBlocked = rhExceedsActual || rhNotLoaded || rhFetchFailed || rhInvalid;
+            const rhBlockReason = rhExceedsActual ? `Cannot save: Current Reading (${currentRHVal}) exceeds component's actual RH (${capRH})` :
+              rhNotLoaded ? 'Cannot save: Component running hours are still loading' :
+              rhFetchFailed ? 'Cannot save: Unable to verify component running hours' :
+              rhInvalid ? 'Cannot save: Running hours validation failed' : '';
+            return (
+              <div className="flex justify-end mt-6 pb-6" data-testid="WOF6"><Marker id="WOF6" />
+                <div title={isRHSaveBlocked ? rhBlockReason : ''}>
+                  <Button
+                    onClick={isNewJobCreation ? handleSaveNewJob : handleSave}
+                    disabled={!!isRHSaveBlocked}
+                    className={`font-bold px-12 py-2.5 h-auto text-sm shadow-md ${
+                      isRHSaveBlocked
+                        ? 'bg-gray-400 text-gray-200 cursor-not-allowed hover:bg-gray-400'
+                        : 'bg-[hsl(var(--primary))] hover:bg-[hsl(var(--primary))]/90 text-white'
+                    }`}
+                    data-testid="WOF6.1"
+                  >
+                    <Marker id="WOF6.1" />
+                    {isNewJobCreation ? 'Create Job' : 'Save'}
+                  </Button>
+                </div>
+              </div>
+            );
+          })()}
           </div>
         </div>
       </div>

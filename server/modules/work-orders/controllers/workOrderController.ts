@@ -90,16 +90,14 @@ export async function completeWorkOrder(req: Request, res: Response) {
     if (error.name === 'ZodError') {
       return res.status(400).json({ error: "Invalid completion data", details: error.errors });
     }
-    // ValidationError with extra details (code: DEPARTMENT_MISMATCH, etc.)
     if (error instanceof ValidationError) {
-      return res.status(400).json({ error: error.message, ...error.details });
+      return res.status(400).json({ success: false, error: error.message, ...error.details });
     }
-    // Return 400 for inventory enforcement errors
     if (error.message?.includes('LOCATION_REQUIRED') ||
         error.message?.includes('SPARE_NOT_FOUND') ||
         error.message?.includes('INSUFFICIENT_STOCK') ||
         error.message?.includes('NEGATIVE_STOCK_PREVENTED')) {
-      return res.status(400).json({ error: error.message });
+      return res.status(400).json({ success: false, error: error.message });
     }
     throw error;
   }

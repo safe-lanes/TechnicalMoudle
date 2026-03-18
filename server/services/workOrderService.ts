@@ -247,15 +247,27 @@ export class WorkOrderService {
           updatesAny.rhJustificationDate = new Date();
         }
 
-        // Create audit trail for the RH snapshot (isolated — does NOT modify RH Module)
         try {
           const wo = await storage.getWorkOrder(id);
           if (wo) {
-            const { validateRHEntry } = await import('../modules/running-hours/services/rhTimelineValidationService');
+            const { validateRHEntry, getCurrentRH } = await import('../modules/running-hours/services/rhTimelineValidationService');
             const allComponents = wo.vesselId ? await storage.getComponents(wo.vesselId) : [];
             const component = allComponents.find((c: any) => c.name === wo.component || c.componentCode === (wo as any).componentCode);
 
             if (component) {
+              const rhSource = component.rhCounterType === 'INHERITED'
+                ? (component.rhCurrentInheritedCached || component.currentCumulativeRH)
+                : (component.rhCurrentMaster || component.currentCumulativeRH);
+              const componentActualRH = rhSource !== null && rhSource !== undefined
+                ? parseInt(rhSource)
+                : null;
+              if (componentActualRH !== null && !isNaN(componentActualRH) && runningHours > componentActualRH) {
+                throw new Error(
+                  `Current Reading (${runningHours} hours) exceeds component's actual running hours (${componentActualRH} hours). ` +
+                  `Please update the component's running hours in the Running Hours module first, or enter a value ≤ ${componentActualRH} hours.`
+                );
+              }
+
               const completionDate = updatesAny.dateOfCompletion || updatesAny.completionDateTime?.split('T')[0] || new Date().toISOString().split('T')[0];
               const validation = await validateRHEntry(component.cuuid, completionDate, runningHours);
 
