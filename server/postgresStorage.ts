@@ -7223,29 +7223,44 @@ export class PostgresStorage {
   async createSpareComponentLink(link: InsertSpareComponentLink, skipSiblingSync: boolean = false): Promise<SpareComponentLink> {
     const db = await getDb();
 
-    const existing = await db.select().from(spareComponentLinks).where(
-      and(
-        eq(spareComponentLinks.spareId, link.spareId),
-        eq(spareComponentLinks.componentId, link.componentId),
-        eq(spareComponentLinks.vesselId, link.vesselId)
-      )
-    );
-    if (existing.length > 0) {
-      return existing[0];
-    }
+    try {
+      const result = await db.insert(spareComponentLinks).values(link)
+        .onConflictDoNothing({ target: [spareComponentLinks.spareId, spareComponentLinks.componentId] })
+        .returning();
 
-    const result = await db.insert(spareComponentLinks).values(link).returning();
-    const created = result[0];
-
-    if (!skipSiblingSync && link.componentId && link.vesselId) {
-      try {
-        await this.createSiblingLinks(link.spareId, link.spareUuid, link.componentId, link.vesselId, link.linkedBy);
-      } catch (siblingError: any) {
-        console.warn(`[createSpareComponentLink] Sibling sync failed for spare ${link.spareId}: ${siblingError.message}`);
+      if (result.length === 0) {
+        const existing = await db.select().from(spareComponentLinks).where(
+          and(
+            eq(spareComponentLinks.spareId, link.spareId),
+            eq(spareComponentLinks.componentId, link.componentId)
+          )
+        );
+        return existing[0];
       }
-    }
 
-    return created;
+      const created = result[0];
+
+      if (!skipSiblingSync && link.componentId && link.vesselId) {
+        try {
+          await this.createSiblingLinks(link.spareId, link.spareUuid, link.componentId, link.vesselId, link.linkedBy);
+        } catch (siblingError: any) {
+          console.warn(`[createSpareComponentLink] Sibling sync failed for spare ${link.spareId}: ${siblingError.message}`);
+        }
+      }
+
+      return created;
+    } catch (insertError: any) {
+      if (insertError.message?.includes('duplicate') || insertError.code === '23505') {
+        const existing = await db.select().from(spareComponentLinks).where(
+          and(
+            eq(spareComponentLinks.spareId, link.spareId),
+            eq(spareComponentLinks.componentId, link.componentId)
+          )
+        );
+        if (existing.length > 0) return existing[0];
+      }
+      throw insertError;
+    }
   }
 
   async getComponentSiblings(componentId: string): Promise<Array<{ cuuid: string; name: string }>> {

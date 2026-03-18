@@ -187,6 +187,7 @@ export async function performImport(
     archived: 0,
     jobComponentLinksCreated: 0,
     spareComponentLinksCreated: 0,
+    spareComponentLinksExpected: 0,
     rowResults: [] as RowResult[],
     warnings: [] as string[]
   };
@@ -507,6 +508,7 @@ export async function performImport(
               const existingLinks = await storage.getSpareComponentLinksBySpare(existingSpare.id);
               const linkAlreadyExists = existingLinks.some(link => link.componentId === component.cuuid);
               
+              result.spareComponentLinksExpected++;
               if (!linkAlreadyExists) {
                 await storage.createSpareComponentLink({
                   vesselId: sparesVesselId,
@@ -521,6 +523,7 @@ export async function performImport(
                 result.updated++;
                 result.rowResults.push({ rowNumber: _spareRowNum, primaryIdentifier: partCode, action: 'updated' });
               } else {
+                result.spareComponentLinksCreated++;
                 console.log(`⏭️ Spare ${partCode} already linked to component ${componentCode}, skipping`);
                 result.skipped++;
                 result.rowResults.push({ rowNumber: _spareRowNum, primaryIdentifier: partCode, action: 'skipped', error: 'Already linked to component' });
@@ -593,6 +596,7 @@ export async function performImport(
           }
           
           // Process inventory: create location entities, links, and stock records
+          result.spareComponentLinksExpected++;
           await processSpareInventory({
             spareId: newSpare.id,
             spareUuid: newSpare.suuid,
@@ -605,7 +609,7 @@ export async function performImport(
             isNewSpare: true,
             userId: 'system-import',
           });
-          result.spareComponentLinksCreated++; // Link created by processSpareInventory
+          result.spareComponentLinksCreated++;
           result.rowResults.push({ rowNumber: _spareRowNum, primaryIdentifier: partCode, action: 'created' });
           
           console.log(`✅ Created spare: ${partCode} - ${newSpare.partName}`);
@@ -673,6 +677,7 @@ export async function performImport(
           }
           
           // Process inventory for updated spare (updates links and stock, no opening balance)
+          result.spareComponentLinksExpected++;
           await processSpareInventory({
             spareId: updatedSpare.id,
             spareUuid: updatedSpare.suuid,
@@ -685,6 +690,7 @@ export async function performImport(
             isNewSpare: false,
             userId: 'system-import',
           });
+          result.spareComponentLinksCreated++;
           
           result.rowResults.push({ rowNumber: _spareRowNum, primaryIdentifier: partCode, action: 'updated' });
           console.log(`🔄 Updated spare: ${partCode} - ${updatedSpare.partName}`);
@@ -715,6 +721,7 @@ export async function performImport(
               const existingLinks = await storage.getSpareComponentLinksBySpare(existingSpare.id);
               const linkAlreadyExists = existingLinks.some(link => link.componentId === component.cuuid);
               
+              result.spareComponentLinksExpected++;
               if (!linkAlreadyExists) {
                 await storage.createSpareComponentLink({
                   vesselId: sparesVesselId,
@@ -725,6 +732,8 @@ export async function performImport(
                 }, true);
                 result.spareComponentLinksCreated++;
                 console.log(`🔗 Linked spare ${partCode} to additional component ${componentCode} (upsert mode)`);
+              } else {
+                result.spareComponentLinksCreated++;
               }
               
               // Always update the spare with latest data (upsert behavior)
@@ -827,6 +836,7 @@ export async function performImport(
             }
             
             // Process inventory for upsert-created spare
+            result.spareComponentLinksExpected++;
             await processSpareInventory({
               spareId: newSpare.id,
               spareUuid: newSpare.suuid,
@@ -839,7 +849,7 @@ export async function performImport(
               isNewSpare: true,
               userId: 'system-import',
             });
-            result.spareComponentLinksCreated++; // Link created by processSpareInventory
+            result.spareComponentLinksCreated++;
             result.rowResults.push({ rowNumber: _spareRowNum, primaryIdentifier: partCode, action: 'created' });
             
             console.log(`✅ Created spare (upsert): ${partCode} - ${newSpare.partName}`);
@@ -853,17 +863,17 @@ export async function performImport(
       }
     }
     
-    const validRowCount = result.created + result.updated;
-    const linkCount = result.spareComponentLinksCreated;
-    if (linkCount !== validRowCount) {
-      const mismatchMsg = `Linkage count mismatch: ${linkCount} links created vs ${validRowCount} valid rows processed. Some rows may have had pre-existing links.`;
+    const expectedLinks = result.spareComponentLinksExpected || 0;
+    const actualLinks = result.spareComponentLinksCreated;
+    if (actualLinks !== expectedLinks) {
+      const mismatchMsg = `Linkage count mismatch: ${actualLinks} links created vs ${expectedLinks} rows that required link creation. Possible pre-existing links or duplicate rows in Excel.`;
       console.warn(`⚠️ ${mismatchMsg}`);
       result.warnings.push(mismatchMsg);
     } else {
-      console.log(`✅ Linkage count validated: ${linkCount} links match ${validRowCount} valid rows`);
+      console.log(`✅ Linkage count validated: ${actualLinks} links created matching ${expectedLinks} link-required rows`);
     }
     
-    console.log(`✅ Spares import complete: ${result.created} created, ${result.updated} updated, ${result.skipped} skipped, ${linkCount} spare-component links created`);
+    console.log(`✅ Spares import complete: ${result.created} created, ${result.updated} updated, ${result.skipped} skipped, ${actualLinks}/${expectedLinks} spare-component links created/expected`);
   } else if (type === 'stores') {
     console.log(`🚀 Starting stores import: ${data.length} rows, mode: ${mode}, vesselId: ${vesselId}, storeType: ${storeType}`);
     
