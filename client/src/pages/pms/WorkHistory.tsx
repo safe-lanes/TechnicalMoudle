@@ -96,6 +96,7 @@ const WorkHistory: React.FC = () => {
         if (!customStartDate || !customEndDate) return true;
         const start = new Date(customStartDate);
         const end = new Date(customEndDate);
+        end.setHours(23, 59, 59, 999);
         return completedDate >= start && completedDate <= end;
       }
       default:
