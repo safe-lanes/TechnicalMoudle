@@ -7343,7 +7343,7 @@ export class PostgresStorage {
         INSERT INTO spare_component_links (spare_id, spare_uuid, component_id, vessel_id, linked_by)
         SELECT spare_id, spare_uuid, sibling_cuuid, vessel_id, 'system-sibling-backfill'
         FROM sibling_pairs
-        ON CONFLICT (spare_id, component_id) DO NOTHING
+        ON CONFLICT (spare_id, component_id, vessel_id) DO NOTHING
         RETURNING spare_id
       )
       SELECT

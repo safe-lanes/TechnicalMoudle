@@ -877,10 +877,12 @@ export async function performImport(
       result.warnings.push(mismatchMsg);
     }
     
-    if (inMemoryCreated > result.spareComponentLinksExpected) {
-      const inflationMsg = `Link inflation detected: ${inMemoryCreated} new links created but only ${result.spareComponentLinksExpected} rows attempted link creation.`;
-      console.warn(`⚠️ ${inflationMsg}`);
-      result.warnings.push(inflationMsg);
+    if (inMemoryCreated !== result.spareComponentLinksExpected) {
+      const countMsg = inMemoryCreated > result.spareComponentLinksExpected
+        ? `Link inflation: ${inMemoryCreated} new links created but only ${result.spareComponentLinksExpected} rows attempted link creation.`
+        : `Link shortfall: ${inMemoryCreated} new links created out of ${result.spareComponentLinksExpected} rows that attempted link creation. ${result.spareComponentLinksExpected - inMemoryCreated} rows had pre-existing links or failed.`;
+      console.warn(`⚠️ ${countMsg}`);
+      result.warnings.push(countMsg);
     }
     
     console.log(`✅ Spares import complete: ${result.created} created, ${result.updated} updated, ${result.skipped} skipped`);
