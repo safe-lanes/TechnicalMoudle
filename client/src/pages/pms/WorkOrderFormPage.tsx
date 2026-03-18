@@ -2931,50 +2931,42 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                   </div>
                 )}
 
-                {templateData.maintenanceBasis === 'Running Hours' ? (
+                {templateData.maintenanceBasis === 'Running Hours' && (
                   <div className="space-y-2">
-                    <Label className="text-sm text-[#8798ad] flex items-center gap-1" data-testid="WOF.A1.lastDoneLabel">
+                    <Label className="text-sm text-[#8798ad] flex items-center gap-1" data-testid="WOF.A1.lastDoneRHLabel">
                       <Clock className="h-3.5 w-3.5" />
                       Last Completed At
                     </Label>
                     <div className="text-xs p-2 bg-gray-100 rounded border border-gray-200 text-gray-700" data-testid="text-last-completed-rh">
                       {lastDoneRH ? (
-                        <>
-                          {formatRHWithSeparators(lastDoneRH)} Hours
-                          {lastDoneDateForRH && (
-                            <span className="text-gray-500"> (on {normalizeDateToDDMMMYYYY(lastDoneDateForRH) || lastDoneDateForRH})</span>
-                          )}
-                        </>
+                        <>{formatRHWithSeparators(lastDoneRH)} Hours</>
                       ) : lastDoneDateForRH ? (
-                        <>
-                          <span className="text-gray-500 italic">RH not recorded</span>
-                          <span className="text-gray-500"> (on {normalizeDateToDDMMMYYYY(lastDoneDateForRH) || lastDoneDateForRH})</span>
-                        </>
-                      ) : (
-                        <span className="text-gray-400 italic">First maintenance cycle</span>
-                      )}
-                    </div>
-                  </div>
-                ) : (
-                  <div className="space-y-2">
-                    <Label className="text-sm text-[#8798ad] flex items-center gap-1" data-testid="WOF.A1.lastDoneLabel">
-                      <Clock className="h-3.5 w-3.5" />
-                      Last Completed On
-                    </Label>
-                    <div className="text-xs p-2 bg-gray-100 rounded border border-gray-200 text-gray-700" data-testid="text-last-completed-date">
-                      {lastDoneDate ? (
-                        <>
-                          {normalizeDateToDDMMMYYYY(lastDoneDate) || lastDoneDate}
-                          {formatRelativeTime(lastDoneDate) && (
-                            <span className="text-gray-500"> ({formatRelativeTime(lastDoneDate)})</span>
-                          )}
-                        </>
+                        <span className="text-gray-500 italic">RH not recorded</span>
                       ) : (
                         <span className="text-gray-400 italic">First maintenance cycle</span>
                       )}
                     </div>
                   </div>
                 )}
+
+                <div className="space-y-2">
+                  <Label className="text-sm text-[#8798ad] flex items-center gap-1" data-testid="WOF.A1.lastDoneLabel">
+                    <Clock className="h-3.5 w-3.5" />
+                    Last Completed On
+                  </Label>
+                  <div className="text-xs p-2 bg-gray-100 rounded border border-gray-200 text-gray-700" data-testid="text-last-completed-date">
+                    {(lastDoneDate || lastDoneDateForRH) ? (
+                      <>
+                        {normalizeDateToDDMMMYYYY(lastDoneDateForRH || lastDoneDate) || lastDoneDateForRH || lastDoneDate}
+                        {formatRelativeTime(lastDoneDateForRH || lastDoneDate) && (
+                          <span className="text-gray-500"> ({formatRelativeTime(lastDoneDateForRH || lastDoneDate)})</span>
+                        )}
+                      </>
+                    ) : (
+                      <span className="text-gray-400 italic">First maintenance cycle</span>
+                    )}
+                  </div>
+                </div>
 
                 <div className="space-y-2">
                   <Label className="text-sm text-[#8798ad]" data-testid="WOF.A1.28"><Marker id="WOF.A1.28" />Department</Label>
