@@ -229,25 +229,15 @@ export async function getWorkOrderContext(workOrderId: string) {
     return dateB.localeCompare(dateA);
   });
 
-  const componentCode = workOrder.componentCode || component.componentCode;
-  const completedForThisComponent = workHistoryWOs.filter((wo: any) =>
-    wo.componentCode === componentCode || wo.component === workOrder.component
-  );
-  completedForThisComponent.sort((a: any, b: any) => {
-    const dateA = convertToIsoDate(a.completionDateTime || a.dateCompleted || '');
-    const dateB = convertToIsoDate(b.completionDateTime || b.dateCompleted || '');
-    return dateB.localeCompare(dateA);
-  });
-  const latestCompletedWO = completedForThisComponent.length > 0 ? completedForThisComponent[0] : null;
+  const latestCompletedEntry = workHistory.find((h: any) => !h.isSkipped && h.status === 'Completed');
 
   let lastCompletedDate: string = '';
   let lastCompletedRH: string = '';
   let lastCompletedDateForRH: string = '';
 
-  if (latestCompletedWO) {
-    lastCompletedDate = latestCompletedWO.completionDateTime || latestCompletedWO.dateCompleted || '';
-    const rhValue = latestCompletedWO.completionRH || latestCompletedWO.runningHoursAtCompletion || latestCompletedWO.runningHours || '';
-    lastCompletedRH = rhValue ? String(rhValue) : '';
+  if (latestCompletedEntry) {
+    lastCompletedDate = latestCompletedEntry.completionDate || latestCompletedEntry.workDate || '';
+    lastCompletedRH = latestCompletedEntry.runDate || '';
     lastCompletedDateForRH = lastCompletedDate;
   }
 
