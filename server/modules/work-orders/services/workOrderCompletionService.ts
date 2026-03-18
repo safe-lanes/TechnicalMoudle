@@ -1,6 +1,6 @@
 import * as repo from '../repositories/workOrderRepository';
 import { NotFoundError, ValidationError } from '../../shared/errors';
-import { calculateMissedCycles as calcMissedCyclesShared } from '@shared/dateUtils';
+import { calculateMissedCycles as calcMissedCyclesShared, calculateMissedCyclesRH } from '@shared/dateUtils';
 import { detectAndLogAnomalies } from './anomalyDetectionService';
 import { validateRHEntry } from '../../running-hours/services/rhTimelineValidationService';
 
@@ -202,16 +202,34 @@ export async function completeWorkOrder(
     });
   }
 
-  const missedCycles = workOrder.maintenanceBasis === 'Running Hours'
-    ? 0
-    : calcMissedCyclesShared(
+  let missedCycles: number;
+  if (workOrder.maintenanceBasis === 'Running Hours' && runningHours) {
+    const completionRHValue = parseInt(runningHours);
+    const dueRH = workOrder.nextDueReading ? parseFloat(workOrder.nextDueReading) : null;
+    let jobIntervalRH: number | null = null;
+    if (workOrder.jobId) {
+      const jobForRH = await repo.findJob(workOrder.jobId);
+      if (jobForRH?.intervalRunningHour) {
+        jobIntervalRH = jobForRH.intervalRunningHour;
+      }
+    }
+    if (!jobIntervalRH && workOrder.frequencyValue) {
+      jobIntervalRH = parseInt(String(workOrder.frequencyValue));
+    }
+    missedCycles = calculateMissedCyclesRH(dueRH, completionRHValue, jobIntervalRH);
+    if (missedCycles > 0) {
+      console.log(`⚠️ Skipped cycle detection (RH): ${missedCycles} cycle(s) missed for WO ${workOrder.workOrderNo} (dueRH: ${dueRH}, completionRH: ${completionRHValue}, interval: ${jobIntervalRH})`);
+    }
+  } else {
+    missedCycles = calcMissedCyclesShared(
         workOrder.nextDueDate,
         dateOfCompletion,
         workOrder.frequencyValue,
         workOrder.frequencyUnit
       );
-  if (missedCycles > 0) {
-    console.log(`⚠️ Skipped cycle detection: ${missedCycles} cycle(s) missed for WO ${workOrder.workOrderNo} (due: ${workOrder.nextDueDate}, completed: ${dateOfCompletion})`);
+    if (missedCycles > 0) {
+      console.log(`⚠️ Skipped cycle detection: ${missedCycles} cycle(s) missed for WO ${workOrder.workOrderNo} (due: ${workOrder.nextDueDate}, completed: ${dateOfCompletion})`);
+    }
   }
 
   const originalDueDate = workOrder.nextDueDate || workOrder.dueDate || null;
@@ -276,7 +294,7 @@ export async function completeWorkOrder(
         componentId: component.cuuid,
         componentCode: workOrder.componentCode || component.componentCode,
         vesselCode: workOrder.vesselId,
-        jobId: parentJob?.id || workOrder.jobId || null,
+        jobId: parentJob?.juuid || parentJob?.id || workOrder.jobId || null,
         jobCode: parentJobNo || null,
         workOrderId: workOrder.wouuid,
         workOrderNo: workOrder.templateCode || `WO-${workOrder.id}`,
@@ -305,22 +323,52 @@ export async function completeWorkOrder(
     console.error('Failed to create maintenance history record:', historyError);
   }
 
-  if (missedCycles >= 1 && workOrder.maintenanceBasis === 'Calendar' && component) {
+  if (missedCycles >= 1 && component) {
     try {
-      const { createSkippedCycleRecords } = await import('../utils/skippedCycleBackfill');
-      await createSkippedCycleRecords({
-        workOrderId: workOrder.wouuid || workOrder.id,
-        componentId: component.cuuid,
-        componentCode: workOrder.componentCode || component.componentCode || null,
-        vesselCode: workOrder.vesselId || component.vesselId || null,
-        jobId: workOrder.jobId || null,
-        jobCode: workOrder.jobCode || null,
-        jobTitle: workOrder.jobTitle || null,
-        originalDueDate,
-        missedCycles,
-        frequencyValue: workOrder.frequencyValue,
-        frequencyUnit: workOrder.frequencyUnit
-      });
+      if (workOrder.maintenanceBasis === 'Running Hours' && runningHours) {
+        const { createSkippedCycleRecordsRH } = await import('../utils/skippedCycleBackfill');
+        const completionRHValue = parseInt(runningHours);
+        const dueRH = workOrder.nextDueReading ? parseFloat(workOrder.nextDueReading) : 0;
+        let jobIntervalRH = 0;
+        if (workOrder.jobId) {
+          const jobForBackfill = await repo.findJob(workOrder.jobId);
+          if (jobForBackfill?.intervalRunningHour) {
+            jobIntervalRH = jobForBackfill.intervalRunningHour;
+          }
+        }
+        if (!jobIntervalRH && workOrder.frequencyValue) {
+          jobIntervalRH = parseInt(String(workOrder.frequencyValue));
+        }
+        await createSkippedCycleRecordsRH({
+          workOrderId: workOrder.wouuid || workOrder.id,
+          workOrderNo: workOrder.workOrderNo || null,
+          componentId: component.cuuid,
+          componentCode: workOrder.componentCode || component.componentCode || null,
+          vesselCode: workOrder.vesselId || component.vesselId || null,
+          jobId: workOrder.jobId || null,
+          jobCode: workOrder.jobCode || null,
+          jobTitle: workOrder.jobTitle || null,
+          dueRH,
+          completionRH: completionRHValue,
+          intervalRH: jobIntervalRH,
+          missedCycles
+        });
+      } else if (workOrder.maintenanceBasis === 'Calendar') {
+        const { createSkippedCycleRecords } = await import('../utils/skippedCycleBackfill');
+        await createSkippedCycleRecords({
+          workOrderId: workOrder.wouuid || workOrder.id,
+          componentId: component.cuuid,
+          componentCode: workOrder.componentCode || component.componentCode || null,
+          vesselCode: workOrder.vesselId || component.vesselId || null,
+          jobId: workOrder.jobId || null,
+          jobCode: workOrder.jobCode || null,
+          jobTitle: workOrder.jobTitle || null,
+          originalDueDate,
+          missedCycles,
+          frequencyValue: workOrder.frequencyValue,
+          frequencyUnit: workOrder.frequencyUnit
+        });
+      }
     } catch (err) {
       console.error('[BACKFILL ERROR] Failed to create skipped cycle records:', err);
     }

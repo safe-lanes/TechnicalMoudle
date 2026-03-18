@@ -3,7 +3,7 @@ import { NotFoundError, ValidationError } from '../../shared/errors';
 import { computeWorkOrderStatus } from '@shared/workOrders/status';
 import { WORK_ORDER_THRESHOLDS } from '@shared/workOrders/constants';
 import { computeSpareConsumptionDelta, ConsumedSpareEntry } from '../utils/spareConsumptionDelta';
-import { calculateMissedCycles } from '@shared/dateUtils';
+import { calculateMissedCycles, calculateMissedCyclesRH } from '@shared/dateUtils';
 import { storage } from '../../../storage';
 
 function calculateBackdatingDaysForApproval(completionDate: string | null | undefined, submittedDate: string | null | undefined): number {
@@ -236,10 +236,15 @@ export async function listWorkOrders(vesselId?: string) {
 
     let liveMissedCycles = wo.missedCycles || 0;
     if (liveMissedCycles === 0 &&
-        (woComputedStatus === 'Overdue' || woComputedStatus === 'Due' || woComputedStatus === 'Due (Grace P)') &&
-        wo.maintenanceBasis !== 'Running Hours' &&
-        wo.dueDate && wo.frequencyValue && wo.frequencyUnit) {
-      liveMissedCycles = calculateMissedCycles(wo.dueDate, new Date().toISOString(), wo.frequencyValue, wo.frequencyUnit);
+        (woComputedStatus === 'Overdue' || woComputedStatus === 'Due' || woComputedStatus === 'Due (Grace P)')){
+      if (wo.maintenanceBasis === 'Running Hours' && dueRH != null && currentRH != null) {
+        const interval = parseRH(job?.intervalRunningHour);
+        if (interval && interval > 0) {
+          liveMissedCycles = calculateMissedCyclesRH(dueRH, currentRH, interval);
+        }
+      } else if (wo.maintenanceBasis !== 'Running Hours' && wo.dueDate && wo.frequencyValue && wo.frequencyUnit) {
+        liveMissedCycles = calculateMissedCycles(wo.dueDate, new Date().toISOString(), wo.frequencyValue, wo.frequencyUnit);
+      }
     }
 
     return {

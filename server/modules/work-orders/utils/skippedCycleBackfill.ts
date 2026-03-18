@@ -74,17 +74,17 @@ export async function createSkippedCycleRecords(params: {
 
     await repo.createMaintenanceHistory({
       componentId,
-      componentCode: componentCode || undefined,
-      vesselCode: vesselCode || undefined,
+      componentCode: componentCode || 'UNKNOWN',
+      vesselCode: vesselCode || 'UNKNOWN',
       jobId: jobId || undefined,
       jobCode: jobCode || undefined,
-      jobTitle: jobTitle || undefined,
-      workOrderId: null,
-      workOrderNo: null,
-      maintenanceType: null,
+      jobTitle: jobTitle || 'Unknown Job',
+      workOrderId: workOrderId || 'SKIPPED',
+      workOrderNo: `SKIPPED-${jobCode || jobId || 'UNKNOWN'}`,
+      maintenanceType: 'Servicing',
       dateCompleted: formattedDate,
       runningHoursAtCompletion: null,
-      performedBy: null,
+      performedBy: 'System',
       approvedBy: null,
       approvalDate: null,
       status: 'SKIPPED',
@@ -101,4 +101,65 @@ export async function createSkippedCycleRecords(params: {
   }
 
   console.log(`[BACKFILL] Created ${cyclesToCreate} SKIPPED cycle records for job ${jobCode || jobId}, triggered by WO ${workOrderId}`);
+}
+
+export async function createSkippedCycleRecordsRH(params: {
+  workOrderId: string;
+  workOrderNo: string | null;
+  componentId: string;
+  componentCode: string | null;
+  vesselCode: string | null;
+  jobId: string | null;
+  jobCode: string | null;
+  jobTitle: string | null;
+  dueRH: number;
+  completionRH: number;
+  intervalRH: number;
+  missedCycles: number;
+}): Promise<void> {
+  const {
+    workOrderId, workOrderNo, componentId, componentCode, vesselCode,
+    jobId, jobCode, jobTitle, dueRH, completionRH, intervalRH, missedCycles
+  } = params;
+
+  if (!missedCycles || missedCycles <= 0) return;
+
+  let cyclesToCreate = missedCycles;
+  if (cyclesToCreate > MAX_SKIPPED_RECORDS) {
+    console.warn(`[BACKFILL-RH WARNING] missedCycles=${missedCycles} exceeds cap of ${MAX_SKIPPED_RECORDS}. Creating only ${MAX_SKIPPED_RECORDS} SKIPPED records.`);
+    cyclesToCreate = MAX_SKIPPED_RECORDS;
+  }
+
+  for (let i = 1; i <= cyclesToCreate; i++) {
+    const skippedAtRH = dueRH + (intervalRH * i);
+
+    await repo.createMaintenanceHistory({
+      componentId,
+      componentCode: componentCode || 'UNKNOWN',
+      vesselCode: vesselCode || 'UNKNOWN',
+      jobId: jobId || undefined,
+      jobCode: jobCode || undefined,
+      jobTitle: jobTitle || 'Unknown Job',
+      workOrderId,
+      workOrderNo: workOrderNo || `SKIPPED-RH-${workOrderId}`,
+      maintenanceType: 'Servicing',
+      dateCompleted: format(new Date(), 'yyyy-MM-dd'),
+      runningHoursAtCompletion: skippedAtRH.toString(),
+      performedBy: 'System',
+      approvedBy: null,
+      approvalDate: null,
+      status: 'SKIPPED',
+      workDescription: `Maintenance cycle not performed at ${skippedAtRH} RH — automatically recorded as SKIPPED`,
+      sparesUsed: null,
+      remarks: null,
+      isComponentReplaced: false,
+      missedCycles: 0,
+      originalDueDate: null,
+      isSkipped: true,
+      skippedCycleDate: null,
+      sourceWorkOrderId: workOrderId
+    });
+  }
+
+  console.log(`[BACKFILL-RH] Created ${cyclesToCreate} SKIPPED cycle records for job ${jobCode || jobId} (dueRH: ${dueRH}, completionRH: ${completionRH}, interval: ${intervalRH}), triggered by WO ${workOrderId}`);
 }

@@ -255,6 +255,25 @@ export function formatRelativeTime(dateStr: string | null | undefined): string {
   return `${years} year${years !== 1 ? 's' : ''} ago`;
 }
 
+export function calculateMissedCyclesRH(
+  dueRH: number | string | null | undefined,
+  completionRH: number | string | null | undefined,
+  intervalRH: number | string | null | undefined
+): number {
+  if (dueRH == null || completionRH == null || intervalRH == null) return 0;
+
+  const due = typeof dueRH === 'string' ? parseFloat(dueRH) : dueRH;
+  const completion = typeof completionRH === 'string' ? parseFloat(completionRH) : completionRH;
+  const interval = typeof intervalRH === 'string' ? parseFloat(intervalRH) : intervalRH;
+
+  if (isNaN(due) || isNaN(completion) || isNaN(interval) || interval <= 0) return 0;
+
+  const delay = completion - due;
+  if (delay <= 0) return 0;
+
+  return Math.floor(delay / interval);
+}
+
 export function formatRHWithSeparators(value: string | number | null | undefined): string {
   if (value == null || value === '') return '';
   const num = typeof value === 'string' ? parseFloat(value) : value;
