@@ -1,0 +1,258 @@
+FIX "LAST COMPLETED ON" DATA ISSUE - FETCH LIVE DATA INSTEAD OF HARDCODED VALUES
+PROBLEM IDENTIFIED
+There is a critical data accuracy issue with the "Last Completed On" and "Last Completed At RH" fields that were recently added to Part A - Job Details section of the Work Order Form.
+
+Evidence of the Issue:
+
+Work Order: MKR-IN-00073-702.005.02-2026-004 (Vessel 11)
+Component: FO PURIFIER, NO.2 (702.005.02)
+Job: FO PURIFIER, OIL CHANGE - 250H
+
+What the system is showing:
+
+Part A displays: "Last Completed On: 14-Aug-2015 (10 years ago)"
+
+What the actual data shows:
+
+A4 Work History section shows: An entry dated 31-Aug-2015 (2015-08-31)
+
+This is 17 days MORE RECENT than the date shown in "Last Completed On"
+
+Conclusion: The "Last Completed On" field is displaying incorrect hardcoded or corrupted data instead of fetching the actual most recent completion date from the database.
+
+ROOT CAUSE ANALYSIS
+The issue suggests one of the following problems:
+
+Hardcoded/Cached Data: The "Last Completed On" field may be pulling from a pre-calculated or cached field in the database that contains old/incorrect data, rather than querying the actual completed work orders dynamically.
+
+Incorrect Query Logic: The query fetching the last completion may have wrong sorting, filtering, or is not fetching the true most recent entry.
+
+Data Migration Issues: During data import or migration to Vessel 11, the "last completed date" field may have been populated with incorrect values that don't match the actual work history.
+
+REQUIRED FIX
+OBJECTIVE:
+Ensure that the "Last Completed On" (for calendar jobs) and "Last Completed At" (for RH jobs) fields in Part A ALWAYS display live, accurate data by querying the actual completed work orders from the database in real-time, NOT from pre-populated or cached fields.
+
+IMPLEMENTATION REQUIREMENTS
+A. Remove Hardcoded/Cached Data Dependency
+Current (WRONG) Implementation:
+The system may be fetching "Last Completed On" from a pre-populated field like:
+
+job.lastCompletedDate or job.lastDoneDate from the Jobs table
+
+component.lastMaintenanceDate from the Components table
+
+Any other cached/stored field
+
+Required (CORRECT) Implementation:
+The system MUST fetch the last completion date by querying the actual WorkOrders collection dynamically every time the work order form is opened.
+
+B. Correct Query Logic
+When displaying "Last Completed On" or "Last Completed At RH" in Part A, use the following logic:
+
+For Calendar-Based Jobs:
+
+Query: Search the WorkOrders collection for:
+
+componentId = current work order's component ID
+
+jobCode = current work order's job code
+
+status = "Completed"
+
+Sort by completedAt or completionDate in DESCENDING order (most recent first)
+
+Limit: 1 result
+
+Exclude: The current work order itself (if viewing a completed work order, don't count it as the "previous" completion)
+
+Extract: The completedAt or completionDate field from the result
+
+Display: Format as "DD-MMM-YYYY (X days/months/years ago)"
+
+Handle Empty: If no previous completion exists, display "Never completed" or "First cycle"
+
+For Running Hours-Based Jobs:
+
+Query: Same as above, but also extract the completedAtRH or completionRH field
+
+Display: Format as "X,XXX Hours (on DD-MMM-YYYY)"
+
+C. Data Correction for Vessel 11
+Step 1: Audit All Work Orders in Vessel 11
+
+Run a database audit to identify all work orders in Vessel 11 where the displayed "Last Completed On/At" data is incorrect.
+
+Audit Query Logic:
+For each active/planned work order in Vessel 11:
+
+Check what "lastCompletedDate" or "lastDoneDate" is stored in the job/component record
+
+Query the actual most recent completed work order for that component + job code combination
+
+Compare the two dates
+
+If they don't match → flag as CORRUPT DATA
+
+Expected Output:
+
+List of all work orders with data mismatches
+
+Show: Work Order Code, Component, Job, Stored Date, Actual Date, Difference
+
+Step 2: Clean Corrupt Data
+
+For all work orders in Vessel 11, remove or nullify any pre-populated "last completed" fields that are storing incorrect data.
+
+Affected Fields to Clean:
+
+In the jobs collection: lastCompletedDate, lastDoneDate, lastCompletedRH, lastDoneRH
+
+In the components collection: Any cached maintenance date fields
+
+In the workOrders collection: Any cached "previous completion" fields
+
+Action:
+
+Set these fields to null or remove them entirely
+
+This forces the system to rely on live queries instead of corrupted cached data
+
+Step 3: Implement Live Data Fetching
+
+Update the Work Order Form (Part A) to fetch last completion data using the correct query logic described in Section B above.
+
+Where to Implement:
+
+Frontend: Work Order Form component (Part A - Job Details section)
+
+Backend API: Endpoint that provides work order details (e.g., GET /api/work-orders/:id)
+
+Implementation Steps:
+
+Backend API Enhancement:
+
+When fetching work order details, include a function to query the last completed work order
+
+Return the last completion date/RH as part of the API response
+
+Ensure the query excludes the current work order if it's completed
+
+Frontend Display:
+
+Display the dynamically fetched last completion data in Part A
+
+Show loading state while fetching
+
+Handle empty state gracefully ("Never completed")
+
+Performance Optimization:
+
+Add database index on: componentId, jobCode, status, completedAt for fast queries
+
+Cache the result in memory for the duration of the page session (but NOT in database)
+
+Re-fetch if user refreshes or reopens the work order
+
+D. Validation and Testing
+After implementing the fix, perform these validation checks:
+
+Test Case 1: Verify Correct Date Display
+
+Work Order: MKR-IN-00073-702.005.02-2026-004 (Vessel 11)
+
+Expected "Last Completed On": 31-Aug-2015 (not 14-Aug-2015)
+
+Check: Does Part A now show the correct date matching A4 Work History?
+
+Test Case 2: Verify Multiple Completions
+
+Find a job with 3+ completed work orders
+
+Expected: Part A shows the MOST RECENT completion date
+
+Check: Does it match the latest entry in A4 Work History?
+
+Test Case 3: Verify First-Time Job
+
+Find a work order for a job that has never been completed before
+
+Expected: "Last Completed On: Never completed" or "First cycle"
+
+Check: No errors, graceful empty state
+
+Test Case 4: Verify RH-Based Jobs
+
+Open an RH-based work order in Vessel 11
+
+Expected: "Last Completed At: X,XXX Hours (on DD-MMM-YYYY)"
+
+Check: Does the RH value and date match the most recent entry in A4 Work History?
+
+Test Case 5: Verify Across All Vessel 11 Work Orders
+
+Randomly check 10-15 work orders in Vessel 11
+
+Expected: All show correct last completion data matching Work History
+
+Check: No discrepancies found
+
+DELIVERABLES
+After completing this fix, provide the following:
+
+✅ Confirmation that the system now fetches last completion data from live queries, not cached fields
+
+✅ Audit Report showing:
+
+How many work orders in Vessel 11 had corrupt data
+
+List of affected work orders (Component, Job, Old Date, Correct Date)
+
+✅ Code Changes summary explaining:
+
+What query logic was implemented
+
+Which cached/hardcoded fields were removed
+
+Where the live data fetching is now happening
+
+✅ Testing Results:
+
+Screenshot or confirmation that Work Order MKR-IN-00073-702.005.02-2026-004 now shows "Last Completed On: 31-Aug-2015"
+
+Confirmation that all test cases passed
+
+✅ Performance Impact:
+
+Confirm that live queries don't slow down work order page load times
+
+Database indexes created for optimization
+
+SUMMARY
+Current Issue:
+
+"Last Completed On" showing 14-Aug-2015
+
+Actual last completion was 31-Aug-2015 (17 days later)
+
+Data is hardcoded/cached instead of live
+
+Required Fix:
+
+Remove all cached/corrupt "last completed" data from Vessel 11
+
+Implement live database queries to fetch actual most recent completion
+
+Ensure Part A always displays accurate, real-time data
+
+Validate across all work orders in Vessel 11
+
+Success Criteria:
+
+Part A "Last Completed On/At" matches the most recent entry in A4 Work History
+
+No hardcoded or cached dates
+
+All Vessel 11 work orders display correct data
+
+Please implement this fix and confirm when deployed for testing.
