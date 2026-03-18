@@ -156,7 +156,7 @@ export async function createSkippedCycleRecordsRH(params: {
       missedCycles: 0,
       originalDueDate: null,
       isSkipped: true,
-      skippedCycleDate: null,
+      skippedCycleDate: format(new Date(), 'yyyy-MM-dd'),
       sourceWorkOrderId: workOrderId
     });
   }
