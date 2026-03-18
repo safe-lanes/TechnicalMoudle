@@ -2938,7 +2938,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                       Last Completed At
                     </Label>
                     <div className="text-xs p-2 bg-gray-100 rounded border border-gray-200 text-gray-700" data-testid="text-last-completed-rh">
-                      {lastDoneRH ? (
+                      {lastDoneRH !== '' && lastDoneRH != null ? (
                         <>{formatRHWithSeparators(lastDoneRH)} Hours</>
                       ) : lastDoneDateForRH ? (
                         <span className="text-gray-500 italic">RH not recorded</span>
