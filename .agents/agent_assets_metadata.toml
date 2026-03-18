@@ -24,3 +24,9 @@ id = "pR1gHwnnFo_vEbxgzpiEL"
 uri = "file://SAIL_PMS_Module_User_Manual.docx"
 type = "word_document"
 title = "SAIL PMS Module User Manual (35 annotated screenshots)"
+
+[[outputs]]
+id = "o8nD_gFPxRVg8U-b4begS"
+uri = "file://PMS_Additional_Test_Cases_Complete.xlsx"
+type = "table"
+title = "PMS Additional UAT Test Cases (365 cases)"
