@@ -221,14 +221,27 @@ export async function completeWorkOrder(
       console.log(`⚠️ Skipped cycle detection (RH): ${missedCycles} cycle(s) missed for WO ${workOrder.workOrderNo} (dueRH: ${dueRH}, completionRH: ${completionRHValue}, interval: ${jobIntervalRH})`);
     }
   } else {
+    let calendarDueDate = workOrder.nextDueDate || workOrder.dueDate || null;
+    // Legacy WOs may have no nextDueDate stored on the record — fall back to the job's current nextDueDate
+    if (!calendarDueDate && workOrder.jobId) {
+      const jobForDueDate = await repo.findJob(workOrder.jobId);
+      if (jobForDueDate?.nextDueDate) {
+        calendarDueDate = jobForDueDate.nextDueDate;
+        console.log(`[MissedCycles] WO ${workOrder.workOrderNo} has no nextDueDate — falling back to job nextDueDate: ${calendarDueDate}`);
+      }
+    }
     missedCycles = calcMissedCyclesShared(
-        workOrder.nextDueDate,
+        calendarDueDate,
         dateOfCompletion,
         workOrder.frequencyValue,
         workOrder.frequencyUnit
       );
     if (missedCycles > 0) {
-      console.log(`⚠️ Skipped cycle detection: ${missedCycles} cycle(s) missed for WO ${workOrder.workOrderNo} (due: ${workOrder.nextDueDate}, completed: ${dateOfCompletion})`);
+      console.log(`⚠️ Skipped cycle detection: ${missedCycles} cycle(s) missed for WO ${workOrder.workOrderNo} (due: ${calendarDueDate}, completed: ${dateOfCompletion})`);
+    }
+    // Overwrite so originalDueDate below picks up the resolved due date
+    if (calendarDueDate && !workOrder.nextDueDate) {
+      (workOrder as any).nextDueDate = calendarDueDate;
     }
   }
 
