@@ -677,8 +677,12 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
         // - For new WOs (no saved previousReading): use component's currentCumulativeRH as initial value
         const savedPreviousReading = context.executionData?.previousReading;
         const hasNoSavedPreviousReading = savedPreviousReading === '' || savedPreviousReading == null || savedPreviousReading === undefined;
-        const fallbackPreviousReading = (hasNoSavedPreviousReading && context.component?.currentCumulativeRH != null)
-          ? String(context.component.currentCumulativeRH)
+        const savedIsZero = savedPreviousReading === '0' || savedPreviousReading === '0.00' || savedPreviousReading === '0.0';
+        const componentRH = context.component?.currentCumulativeRH;
+        const componentRHNum = componentRH != null ? parseFloat(String(componentRH)) : 0;
+        const shouldUseFallback = (hasNoSavedPreviousReading || (savedIsZero && componentRHNum > 0)) && componentRH != null;
+        const fallbackPreviousReading = shouldUseFallback
+          ? String(componentRH)
           : undefined;
 
         // Single consolidated setExecutionData call to prevent React batching race conditions
@@ -692,7 +696,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
           woExecutionId: prev.woExecutionId || context.executionData.woExecutionId || generateWOExecutionId(),
           // Preserve saved previousReading; only use fallback for new WOs
           // Use nullish check (not falsy) to preserve 0-hour readings correctly
-          ...(fallbackPreviousReading && (context.executionData.previousReading === '' || context.executionData.previousReading == null) ? { previousReading: fallbackPreviousReading } : {})
+          ...(fallbackPreviousReading ? { previousReading: fallbackPreviousReading } : {})
         }));
       } else if (context.component?.currentCumulativeRH != null) {
         // No executionData at all (brand new WO) - populate previousReading from component RH
@@ -826,7 +830,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
 
   const performRHValidation = async (rhValue: string, completionDate?: string) => {
     const context = workOrderContext as any;
-    const componentId = context?.component?.cuuid;
+    const componentId = context?.component?.id;
     if (!componentId || !rhValue || isNaN(Number(rhValue))) {
       setRhValidation(prev => ({ status: 'idle', message: '', validRange: null, utilizationRate: 0, previousEntry: null, nextEntry: null, validationDetails: null, componentActualRH: prev.componentActualRH }));
       return;
@@ -870,7 +874,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
 
   const fetchCurrentRHFromModule = async () => {
     const context = workOrderContext as any;
-    const componentId = context?.component?.cuuid;
+    const componentId = context?.component?.id;
     if (!componentId) return;
     try {
       const res = await fetch(`/technical/api/running-hours/current?machineryId=${encodeURIComponent(componentId)}`);
@@ -880,7 +884,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
         setRhValidation(prev => ({ ...prev, componentActualRH: result.currentRH }));
         setComponentActualRHStatus('loaded');
         setComponentActualRHLastUpdated(result.lastUpdated || null);
-        toast({ title: "RH Fetched", description: `Current running hours (${result.currentRH}) fetched from RH Module. Last updated: ${new Date(result.lastUpdated).toLocaleDateString()}.` });
+        toast({ title: "RH Fetched", description: `Running hours fetched: ${result.currentRH} hours as of ${new Date(result.lastUpdated).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}` });
         performRHValidation(String(result.currentRH));
       }
     } catch {
@@ -890,7 +894,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
 
   const fetchComponentActualRH = async () => {
     const context = workOrderContext as any;
-    const componentId = context?.component?.cuuid;
+    const componentId = context?.component?.id;
     if (!componentId) return;
     setComponentActualRHStatus('loading');
     try {
@@ -913,7 +917,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
 
   useEffect(() => {
     fetchComponentActualRH();
-  }, [(workOrderContext as any)?.component?.cuuid]);
+  }, [(workOrderContext as any)?.component?.id]);
 
   const handleExecutionChange = (field: string, value: string) => {
     setExecutionData(prev => {
@@ -4142,8 +4146,8 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                     </Button>
                   )}
                 </div>
-                {componentActualRHStatus === 'loaded' && rhValidation.componentActualRH !== null && (
-                  <div className="text-xs text-green-600" data-testid="text-rh-cap-hint">
+                {componentActualRHStatus === 'loaded' && rhValidation.componentActualRH !== null && executionData.currentReading && Number(executionData.currentReading) > rhValidation.componentActualRH && (
+                  <div className="text-xs text-red-600" data-testid="text-rh-cap-hint">
                     Maximum allowed: {rhValidation.componentActualRH.toLocaleString()} hours
                     {componentActualRHLastUpdated && (
                       <span className="ml-1 text-gray-500">
@@ -4289,7 +4293,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
             )}
 
             {/* View RH Timeline Button */}
-            {(workOrderContext as any)?.component?.cuuid && (
+            {(workOrderContext as any)?.component?.id && (
               <div className="mt-2 flex justify-end">
                 <Button
                   variant="ghost"
@@ -5464,9 +5468,9 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
       </Dialog>
 
       {/* Layer 7: RH Timeline Viewer */}
-      {(workOrderContext as any)?.component?.cuuid && (
+      {(workOrderContext as any)?.component?.id && (
         <RHTimelineViewer
-          machineryId={(workOrderContext as any).component.cuuid}
+          machineryId={(workOrderContext as any).component.id}
           machineryName={(workOrderContext as any).component.name || templateData.componentName || 'Component'}
           machineryCode={templateData.componentCode}
           open={rhTimelineOpen}
