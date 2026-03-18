@@ -229,7 +229,7 @@ export async function getWorkOrderContext(workOrderId: string) {
     return dateB.localeCompare(dateA);
   });
 
-  const latestCompletedEntry = workHistory.find((h: any) => !h.isSkipped && h.status === 'Completed');
+  const latestCompletedEntry = workHistory.find((h: any) => !h.isSkipped && (h.status === 'Completed' || h.status === 'completed'));
 
   let lastCompletedDate: string = '';
   let lastCompletedRH: string = '';
