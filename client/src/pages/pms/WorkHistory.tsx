@@ -1,5 +1,5 @@
-import { useState, useMemo } from "react";
-import { Search, Calendar, History, FileSpreadsheet, FileText, Loader2 } from "lucide-react";
+import { useState, useMemo, useEffect } from "react";
+import { Search, Calendar, History, FileSpreadsheet, FileText, Loader2, Ship } from "lucide-react";
 import { useLocation } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import { Input } from "@/components/ui/input";
@@ -68,7 +68,7 @@ const PDF_COLORS = {
 
 const WorkHistory: React.FC = () => {
   const [, setLocation] = useLocation();
-  const { vesselId, vessels } = useVessel();
+  const { vesselId, setVesselId, vessels } = useVessel();
 
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedComponent, setSelectedComponent] = useState("all");
@@ -79,6 +79,20 @@ const WorkHistory: React.FC = () => {
   const [isExportingPDF, setIsExportingPDF] = useState(false);
 
   const { toast } = useToast();
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const urlVesselId = params.get("vesselId");
+    if (urlVesselId && urlVesselId !== vesselId) {
+      setVesselId(urlVesselId);
+    }
+  }, []);
+
+  useEffect(() => {
+    setSelectedComponent("all");
+    setSearchTerm("");
+  }, [vesselId]);
+
   const currentVessel = vessels.find(v => v.id === vesselId);
   const vesselName = currentVessel?.name || "Vessel";
 
@@ -562,6 +576,23 @@ const WorkHistory: React.FC = () => {
             </div>
 
             <div className="flex items-center gap-3">
+              {/* Vessel Selector */}
+              <div className="flex items-center gap-2">
+                <Ship className="h-4 w-4 text-blue-500 shrink-0" />
+                <Select value={vesselId} onValueChange={setVesselId}>
+                  <SelectTrigger className="w-[160px] h-8 text-sm bg-blue-50 border-blue-200" data-testid="select-vessel-work-history">
+                    <SelectValue placeholder="Select vessel" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {vessels.map(v => (
+                      <SelectItem key={v.id} value={v.id}>{v.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="h-5 w-px bg-gray-200" />
+
               <span className="text-sm text-gray-500">
                 {filteredRecords.length} record{filteredRecords.length !== 1 ? "s" : ""}
               </span>
