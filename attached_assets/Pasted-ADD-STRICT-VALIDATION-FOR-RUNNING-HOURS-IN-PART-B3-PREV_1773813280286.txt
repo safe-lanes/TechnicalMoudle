@@ -1,0 +1,354 @@
+ADD STRICT VALIDATION FOR RUNNING HOURS IN PART B3 - PREVENT RH VALUES EXCEEDING COMPONENT ACTUAL RH
+CRITICAL PROBLEM IDENTIFIED
+There is a severe data integrity issue in the Work Order Form Part B - Section B3 (Running Hours) that is corrupting the entire maintenance cycle tracking system.
+
+Problem Evidence:
+
+Component: FO PURIFIER, NO.2 (702.005.02) - Vessel 11
+Component's Actual RH in Running Hours Module: 870 hours
+Current Reading entered in Work Order: 890 hours
+
+Issue: The system allowed a user to enter 890 hours as the Current Reading when the component has only actually run 870 hours in total.
+
+This is IMPOSSIBLE and creates the following problems:
+
+❌ Data corruption: Work order shows maintenance done at 890 RH when component was only at 870 RH
+
+❌ Broken cycle tracking: Next due RH calculated as 890 + 250 = 1,140 RH (incorrect)
+
+❌ False history: Work history shows job done at a running hour that never happened
+
+❌ Cascade failures: All future work orders for this component will have wrong due dates
+
+❌ Loss of trust: System data becomes unreliable and cannot be used for compliance
+
+Root Cause: The validation in Part B3 is NOT checking if the entered Current Reading exceeds the component's actual running hours from the Running Hours module.
+
+REQUIRED VALIDATION LOGIC
+VALIDATION RULE:
+When a user enters a value in the "Current Reading" field in Part B3 - Running Hours section:
+
+The entered value MUST NOT be greater than the component's actual current running hours as recorded in the Running Hours module.
+
+Formula:
+
+text
+IF (Entered Current Reading > Component Actual RH from Running Hours Module)
+THEN
+    BLOCK SAVE
+    SHOW ERROR
+ELSE
+    ALLOW SAVE
+DETAILED IMPLEMENTATION REQUIREMENTS
+A. Real-Time Validation on Current Reading Field
+Location: Work Order Form - Part B - Section B3 - "Current Reading" input field
+
+When to Trigger Validation:
+
+When user types in the Current Reading field (on blur/change event)
+
+Before saving the work order (on Save button click)
+
+Before submitting for approval
+
+Validation Steps:
+
+Fetch Component Actual RH:
+
+Get the component ID from the current work order
+
+Query the Running Hours module/database for this component's current RH
+
+This should be the same value shown in the "Component Actual RH" column (which currently shows "Fetching...")
+
+Get Entered Value:
+
+Read the value entered by the user in "Current Reading" field
+
+Convert to number and remove any formatting (commas, etc.)
+
+Perform Comparison:
+
+If Entered Current Reading > Component Actual RH:
+
+Block the save operation
+
+Show error message (detailed below)
+
+Highlight the Current Reading field with red border
+
+Do NOT allow form submission
+
+If Entered Current Reading ≤ Component Actual RH:
+
+Allow save to proceed
+
+Show green border on Current Reading field (valid entry)
+
+B. Error Message Display
+Error Message Text:
+
+text
+❌ Invalid Running Hours Entry
+
+The Current Reading you entered (890 hours) exceeds the component's actual running hours (870 hours).
+
+You cannot complete maintenance at a running hour that the component has not reached yet.
+
+ACTION REQUIRED:
+Please update the component's running hours in the Running Hours module first, then return to complete this work order.
+
+Or enter a Current Reading value ≤ 870 hours.
+Error Display Format:
+
+Toast/Alert Notification: Show prominently at top of page or as modal dialog
+
+Inline Error Below Field: Display red error text immediately below the Current Reading input field
+
+Visual Indicators:
+
+Red border around Current Reading input field
+
+Red warning icon next to the field
+
+Disable Save button until error is resolved
+
+Error Message Styling:
+
+Background: Light red (#FEE2E2)
+
+Border: Red (#DC2626)
+
+Text: Dark red (#991B1B)
+
+Icon: Red warning/error icon
+
+C. Component Actual RH Display Enhancement
+Current Issue: The "Component Actual RH" column shows "Fetching..." but the value never appears or loads too slowly.
+
+Required Fix:
+
+Fetch component actual RH immediately when Part B loads
+
+Display the value prominently in the "Component Actual RH" column
+
+Show loading state only for 1-2 seconds maximum
+
+If fetch fails: Show error message "Unable to fetch component RH. Please refresh page."
+
+Display Format:
+
+Show actual RH with comma separator: "870 hours"
+
+Add last updated timestamp: "870 hours (updated 30-Aug-2015)"
+
+Color code:
+
+Green: RH value loaded successfully
+
+Gray: Loading...
+
+Red: Failed to load
+
+D. Helper Text and User Guidance
+Add Helper Text Below Current Reading Field:
+
+text
+ℹ️ Maximum allowed: 870 hours (component's current running hours)
+
+Enter the running hours reading at the time this maintenance was completed. 
+This value cannot exceed the component's actual running hours.
+
+If the component has run more hours, update Running Hours module first.
+Add Link to Running Hours Module:
+
+text
+[📊 View Component Running Hours] (clickable link that opens Running Hours module in new tab)
+E. Save Button Logic
+Before Allowing Save:
+
+Run all validations including the new RH validation
+
+Check if any validation errors exist
+
+If Current Reading > Component Actual RH:
+
+Disable Save button (grayed out)
+
+Show tooltip on disabled button: "Cannot save: Current Reading exceeds component's actual RH"
+
+Do NOT proceed with save
+
+If all validations pass:
+
+Enable Save button
+
+Proceed with normal save workflow
+
+F. Validation Error Response Codes
+Backend API Validation:
+
+Even if frontend validation is bypassed, the backend API must also validate before saving.
+
+API Response on Invalid RH:
+
+json
+{
+  "success": false,
+  "error": "INVALID_RUNNING_HOURS",
+  "message": "Current Reading (890 hours) exceeds component's actual running hours (870 hours)",
+  "details": {
+    "enteredValue": 890,
+    "componentActualRH": 870,
+    "maxAllowed": 870,
+    "componentId": "702.005.02",
+    "componentName": "FO PURIFIER, NO.2"
+  }
+}
+HTTP Status Code: 400 Bad Request
+
+TESTING REQUIREMENTS
+After implementing this validation, perform the following tests:
+
+Test Case 1: Entered RH > Component RH (SHOULD FAIL)
+Component: FO PURIFIER, NO.2 (Actual RH: 870)
+
+Enter Current Reading: 890
+
+Expected Result:
+
+❌ Error message displayed
+
+❌ Save button disabled
+
+❌ Red border on Current Reading field
+
+❌ Cannot save work order
+
+Test Case 2: Entered RH = Component RH (SHOULD PASS)
+Component: FO PURIFIER, NO.2 (Actual RH: 870)
+
+Enter Current Reading: 870
+
+Expected Result:
+
+✅ No error
+
+✅ Save button enabled
+
+✅ Green border on field
+
+✅ Work order can be saved
+
+Test Case 3: Entered RH < Component RH (SHOULD PASS)
+Component: FO PURIFIER, NO.2 (Actual RH: 870)
+
+Enter Current Reading: 850
+
+Expected Result:
+
+✅ No error
+
+✅ Save button enabled
+
+✅ Work order can be saved
+
+Test Case 4: Component RH Not Loaded (EDGE CASE)
+Component Actual RH fails to load from Running Hours module
+
+Expected Result:
+
+⚠️ Warning message: "Cannot validate RH. Please refresh page."
+
+❌ Do NOT allow save until component RH is loaded
+
+Show option to retry fetching component RH
+
+Test Case 5: Backend Validation Bypass Attempt
+Try to save via API directly with invalid RH value
+
+Expected Result:
+
+❌ Backend API rejects with 400 error
+
+❌ Work order not saved
+
+Error message returned to frontend
+
+DATA CLEANUP FOR EXISTING CORRUPT WORK ORDERS
+Identify Corrupt Data:
+
+Run a database query to find all work orders in Vessel 11 where:
+
+text
+workOrder.completionRH > component.currentRunningHours (at the time of completion)
+Expected Findings:
+
+FO PURIFIER, NO.2: Work order completed at 890 RH when component was at 870 RH
+
+Possibly other work orders with similar issues
+
+Cleanup Actions:
+
+Flag corrupt work orders for manual review
+
+Generate report showing:
+
+Work Order Code
+
+Component
+
+Entered RH
+
+Component Actual RH at that time
+
+Difference (how much it exceeds)
+
+Options for cleanup:
+
+Option A (Recommended): Mark these work orders with a warning flag "⚠️ Historical data - RH may be inaccurate"
+
+Option B: Allow admin to manually correct the completion RH values
+
+Option C: Recalculate next due dates based on corrected RH
+
+BENEFITS OF THIS VALIDATION
+✅ Prevents data corruption: Impossible RH values cannot be entered
+✅ Maintains cycle integrity: Next due RH calculations remain accurate
+✅ Enforces workflow: Users must update Running Hours module first
+✅ Improves data quality: System only contains valid, trustworthy data
+✅ Compliance ready: Accurate records for audits and inspections
+✅ User guidance: Clear error messages help users understand what to do
+
+SUMMARY
+Current Problem:
+
+Users can enter Current Reading > Component Actual RH
+
+Example: Entered 890 hours when component only has 870 hours
+
+This corrupts all future maintenance cycle calculations
+
+Required Fix:
+
+Add strict validation: Current Reading MUST be ≤ Component Actual RH
+
+Block save if validation fails
+
+Show clear error message with action required
+
+Backend validation as safety net
+
+Cleanup existing corrupt data in Vessel 11
+
+Success Criteria:
+
+❌ Cannot save work order with Current Reading > Component Actual RH
+
+✅ Clear error message guides user to update Running Hours module first
+
+✅ All existing corrupt work orders in Vessel 11 identified and flagged
+
+✅ Future work orders guaranteed to have valid RH data
+
+Please implement this critical validation immediately and confirm when deployed for testing.
