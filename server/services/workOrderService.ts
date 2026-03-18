@@ -1,4 +1,5 @@
 import { storage } from "../storage";
+import { ValidationError } from "../modules/shared/errors";
 import type { WorkOrder, InsertWorkOrder, WorkOrderExecution, InsertWorkOrderExecution, Job, PmsVesselSettings, Component } from "@shared/schema";
 import { computeWorkOrderStatus, VesselGraceSettings } from "@shared/workOrders/status";
 import { WORK_ORDER_THRESHOLDS } from "@shared/workOrders/constants";
@@ -262,9 +263,19 @@ export class WorkOrderService {
                 ? parseInt(rhSource)
                 : null;
               if (componentActualRH !== null && !isNaN(componentActualRH) && runningHours > componentActualRH) {
-                throw new Error(
+                throw new ValidationError(
                   `Current Reading (${runningHours} hours) exceeds component's actual running hours (${componentActualRH} hours). ` +
-                  `Please update the component's running hours in the Running Hours module first, or enter a value ≤ ${componentActualRH} hours.`
+                  `Please update the component's running hours in the Running Hours module first, or enter a value ≤ ${componentActualRH} hours.`,
+                  {
+                    code: 'INVALID_RUNNING_HOURS',
+                    enteredValue: runningHours,
+                    componentActualRH,
+                    maxAllowed: componentActualRH,
+                    componentId: component.cuuid || component.id,
+                    componentCode: component.componentCode || existingWO.componentCode,
+                    componentName: component.description || component.componentCode || existingWO.componentCode,
+                    rhCounterType: component.rhCounterType || 'MASTER'
+                  }
                 );
               }
 
