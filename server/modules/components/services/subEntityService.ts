@@ -161,7 +161,10 @@ export async function listAllMaintenanceHistory() {
   return repo.findAllMaintenanceHistory();
 }
 
-export async function listVesselMaintenanceHistory(vesselId: string) {
+export async function listVesselMaintenanceHistory(vesselId: string, user?: UserInfo) {
+  if (user?.role === 'Ship' && user.vesselId && user.vesselId !== vesselId) {
+    throw new ForbiddenError('Cannot access maintenance history for other vessels');
+  }
   return repo.findMaintenanceHistoryByVessel(vesselId);
 }
 
