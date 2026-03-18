@@ -55,6 +55,7 @@ interface RunningHoursData {
   maxPossibleHours?: number | null;
   periodDays?: number | null;
   dataQualityWarning?: string | null;
+  lastUpdatedRaw?: string | null;
   averageDailyHours?: number | null;
   currentCumulativeRHRaw?: number | null;
 }
@@ -209,6 +210,7 @@ const RunningHours = () => {
     componentCategory: parent.category || '',
     runningHours: `${parseFloat(parent.currentCumulativeRH || '0').toLocaleString()} hrs`,
     lastUpdated: formatProfessionalDateTime(parent.latestUpdate || parent.lastUpdated),
+    lastUpdatedRaw: parent.latestUpdate || parent.lastUpdated || null,
     utilizationRate: parent.utilizationRate ?? 0,
     periodRunningHours: parent.periodRunningHours ?? 0,
     inheritedCount: parent.inheritedCount || 0,
@@ -1570,7 +1572,35 @@ const RunningHours = () => {
             </div>
             
             <div>
-              <Label className="text-sm text-gray-600">Date Updated</Label>
+              <div className="flex items-center justify-between">
+                <Label className="text-sm text-gray-600">Date Updated</Label>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="h-6 text-xs px-2 text-blue-600 border-blue-300 hover:bg-blue-50"
+                  data-testid="button-same-as-last-date"
+                  onClick={() => {
+                    const raw = selectedComponent?.lastUpdatedRaw;
+                    if (raw) {
+                      const parsed = new Date(raw);
+                      if (!isNaN(parsed.getTime())) {
+                        const yyyy = parsed.getFullYear();
+                        const mm = String(parsed.getMonth() + 1).padStart(2, '0');
+                        const dd = String(parsed.getDate()).padStart(2, '0');
+                        handleUpdateFormChange('dateUpdated', `${yyyy}-${mm}-${dd}`);
+                      } else {
+                        toast({ title: "No previous date", description: "Could not parse the last update date for this component.", variant: "destructive" });
+                      }
+                    } else {
+                      toast({ title: "No previous date", description: "No previous running hours update found for this component.", variant: "destructive" });
+                    }
+                  }}
+                >
+                  <Clock className="h-3 w-3 mr-1" />
+                  Same as last Date
+                </Button>
+              </div>
               <Input 
                 type="date"
                 value={updateForm.dateUpdated}
