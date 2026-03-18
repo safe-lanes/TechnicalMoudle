@@ -234,3 +234,30 @@ export function shouldGenerateWorkOrder(
     return false;
   }
 }
+
+export function formatRelativeTime(dateStr: string | null | undefined): string {
+  if (!dateStr) return '';
+  const normalized = normalizeDateToDDMMMYYYY(dateStr);
+  if (!normalized) return '';
+  const parsed = parse(normalized, 'dd-MMM-yyyy', new Date());
+  if (!isValid(parsed)) return '';
+  const now = new Date();
+  now.setHours(0, 0, 0, 0);
+  parsed.setHours(0, 0, 0, 0);
+  const diffDays = differenceInCalendarDays(now, parsed);
+  if (diffDays < 0) return `in ${Math.abs(diffDays)} day${Math.abs(diffDays) !== 1 ? 's' : ''}`;
+  if (diffDays === 0) return 'today';
+  if (diffDays === 1) return '1 day ago';
+  if (diffDays < 30) return `${diffDays} days ago`;
+  const months = differenceInMonths(now, parsed);
+  if (months < 12) return `${months} month${months !== 1 ? 's' : ''} ago`;
+  const years = differenceInYears(now, parsed);
+  return `${years} year${years !== 1 ? 's' : ''} ago`;
+}
+
+export function formatRHWithSeparators(value: string | number | null | undefined): string {
+  if (value == null || value === '') return '';
+  const num = typeof value === 'string' ? parseFloat(value) : value;
+  if (isNaN(num)) return String(value);
+  return num.toLocaleString('en-US', { maximumFractionDigits: 2 });
+}

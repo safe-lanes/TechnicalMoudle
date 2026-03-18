@@ -229,6 +229,38 @@ export async function getWorkOrderContext(workOrderId: string) {
     return dateB.localeCompare(dateA);
   });
 
+  const componentCode = workOrder.componentCode || component.componentCode;
+  const completedForThisComponent = workHistoryWOs.filter((wo: any) =>
+    wo.componentCode === componentCode || wo.component === workOrder.component
+  );
+  completedForThisComponent.sort((a: any, b: any) => {
+    const dateA = a.completionDateTime || a.dateCompleted || '';
+    const dateB = b.completionDateTime || b.dateCompleted || '';
+    return dateB.localeCompare(dateA);
+  });
+  const latestCompletedWO = completedForThisComponent.length > 0 ? completedForThisComponent[0] : null;
+
+  let lastCompletedDate: string = '';
+  let lastCompletedRH: string = '';
+  let lastCompletedDateForRH: string = '';
+
+  if (latestCompletedWO) {
+    lastCompletedDate = latestCompletedWO.completionDateTime || latestCompletedWO.dateCompleted || '';
+    const rhValue = latestCompletedWO.completionRH || latestCompletedWO.runningHoursAtCompletion || latestCompletedWO.runningHours || '';
+    lastCompletedRH = rhValue ? String(rhValue) : '';
+    lastCompletedDateForRH = lastCompletedDate;
+  }
+
+  if (!lastCompletedDate && job?.lastDoneDate) {
+    lastCompletedDate = convertToIsoDate(job.lastDoneDate);
+  }
+  if (!lastCompletedRH && job?.lastDoneRH) {
+    lastCompletedRH = String(job.lastDoneRH);
+  }
+  if (!lastCompletedDateForRH && lastCompletedDate) {
+    lastCompletedDateForRH = lastCompletedDate;
+  }
+
   // Build templateData from job data (Part A - immutable from job definition)
   // This ensures Section A is populated from the job template
   const rawSpareParts = job?.requiredSpareParts || [];
@@ -257,6 +289,9 @@ export async function getWorkOrderContext(workOrderId: string) {
     nextDueDate: convertToIsoDate(job.nextDueDate),
     lastDoneRH: job.lastDoneRH?.toString() || '',
     nextDueRH: job.nextDueRH?.toString() || '',
+    lastCompletedDate,
+    lastCompletedRH,
+    lastCompletedDateForRH,
     briefWorkDescription: job.briefWorkDescription || job.jobDescription,
     jobDescription: job.jobDescription,
     requiredSpareParts: enrichedSpareParts,
@@ -288,6 +323,9 @@ export async function getWorkOrderContext(workOrderId: string) {
     nextDueDate: convertToIsoDate(workOrder.dueDate),
     lastDoneRH: '',
     nextDueRH: '',
+    lastCompletedDate,
+    lastCompletedRH,
+    lastCompletedDateForRH,
     briefWorkDescription: workOrder.briefWorkDescription,
     jobDescription: workOrder.briefWorkDescription,
     requiredSpareParts: [],
