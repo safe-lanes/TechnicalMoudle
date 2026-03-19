@@ -345,13 +345,34 @@ export default function CertificatesPage() {
     mutationFn: async ({ id, updates }: { id: string; updates: Partial<CertificateData> }) => {
       return apiRequest('PATCH', `/technical/api/certificates/${id}`, updates);
     },
-    onSuccess: () => {
-      // Invalidate all certificate queries (any page/filter combination)
-      queryClient.invalidateQueries({ queryKey: ['/technical/api/certificates'] });
+    onSuccess: (_data, variables) => {
+      // Optimistic cache update: patch the changed row in-place to avoid full grid re-render
+      queryClient.setQueriesData<CertificatesApiResponse>(
+        { queryKey: ['/technical/api/certificates'] },
+        (old) => {
+          if (!old) return old;
+          return {
+            ...old,
+            certificates: old.certificates.map((cert) => {
+              const certKey = cert.vesselId && cert.masterId
+                ? `${cert.vesselId}::${cert.masterId}`
+                : cert.id;
+              if (certKey === variables.id) {
+                return { ...cert, ...variables.updates };
+              }
+              return cert;
+            }),
+          };
+        }
+      );
       toast({
         title: 'Updated',
         description: 'Certificate updated successfully.',
       });
+      // Debounced background refetch to eventually sync with server
+      setTimeout(() => {
+        queryClient.invalidateQueries({ queryKey: ['/technical/api/certificates'] });
+      }, 3000);
     },
     onError: (error: any) => {
       toast({
@@ -881,6 +902,7 @@ export default function CertificatesPage() {
                   onCellEditingStopped={handleCellEditingStopped}
                   onSortChanged={onSortChanged}
                   context={gridContext}
+                  getRowId={(params) => `${params.data.vesselId}::${params.data.masterId}`}
                   autoHeight={false}
                   height="100%"
                   minHeight="300px"
