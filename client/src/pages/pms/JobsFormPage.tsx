@@ -416,8 +416,11 @@ const JobsFormPage: React.FC = () => {
 
   const calcDaysLate = (originalDueDate: string | null | undefined, completionDate: string | null | undefined): number => {
     if (!originalDueDate || !completionDate) return 0;
-    const due = new Date(originalDueDate);
-    const completed = new Date(completionDate);
+    // Normalize to date-only (YYYY-MM-DD) to avoid timezone/time-of-day skew
+    const dueStr = originalDueDate.slice(0, 10);
+    const compStr = completionDate.slice(0, 10);
+    const due = new Date(dueStr + 'T00:00:00Z');
+    const completed = new Date(compStr + 'T00:00:00Z');
     if (isNaN(due.getTime()) || isNaN(completed.getTime())) return 0;
     return Math.max(0, Math.floor((completed.getTime() - due.getTime()) / 86400000));
   };
@@ -469,7 +472,7 @@ const JobsFormPage: React.FC = () => {
         { key: 'performedBy', header: 'Performed By', width: 22 },
         { key: 'runDate', header: 'Running Hours', width: 16 },
         { key: 'status', header: 'Status', width: 14 },
-        { key: 'daysLate', header: 'Days Late', width: 13 },
+        { key: 'daysLate', header: 'Backdating', width: 14 },
         { key: 'remarks', header: 'Remarks', width: 30 },
         { key: 'missedCycles', header: 'Missed Cycles', width: 15 },
       ];
@@ -596,7 +599,7 @@ const JobsFormPage: React.FC = () => {
       doc.text(`Generated: ${new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}`, pageWidth - margin, 20, { align: 'right' });
       doc.text(`Records: ${exportData.length}`, pageWidth - margin, 27, { align: 'right' });
 
-      const headers = ['Date', 'Work Order No', 'Description', 'Performed By', 'Run. Hours', 'Status', 'Days Late', 'Remarks', 'Missed Cycles'];
+      const headers = ['Date', 'Work Order No', 'Description', 'Performed By', 'Run. Hours', 'Status', 'Backdating', 'Remarks', 'Missed Cycles'];
       const body = exportData.map(r => {
         const fmtDate = (d: string | null) => d ? new Date(d).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : '-';
         const daysLateCell = r.isSkipped ? '—' : (r.daysLate > 0 ? `${r.daysLate}d late` : '—');
@@ -1190,7 +1193,7 @@ const JobsFormPage: React.FC = () => {
                       <th className="text-left p-2 font-medium text-gray-700" data-testid="JF.A5.6"><Marker id="JF.A5.6" />PERFORMED BY</th>
                       <th className="text-left p-2 font-medium text-gray-700" data-testid="JF.A5.7"><Marker id="JF.A5.7" />RUN. HOURS</th>
                       <th className="text-left p-2 font-medium text-gray-700" data-testid="JF.A5.8"><Marker id="JF.A5.8" />STATUS</th>
-                      <th className="text-left p-2 font-medium text-gray-700">DAYS LATE</th>
+                      <th className="text-left p-2 font-medium text-gray-700">BACKDATING</th>
                       <th className="text-left p-2 font-medium text-gray-700">REMARKS</th>
                     </tr>
                   </thead>

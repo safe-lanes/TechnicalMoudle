@@ -452,8 +452,11 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
 
   const calcDaysLate = (originalDueDate: string | null | undefined, completionDate: string | null | undefined): number => {
     if (!originalDueDate || !completionDate) return 0;
-    const due = new Date(originalDueDate);
-    const completed = new Date(completionDate);
+    // Normalize to date-only (YYYY-MM-DD) to avoid timezone/time-of-day skew
+    const dueStr = originalDueDate.slice(0, 10);
+    const compStr = completionDate.slice(0, 10);
+    const due = new Date(dueStr + 'T00:00:00Z');
+    const completed = new Date(compStr + 'T00:00:00Z');
     if (isNaN(due.getTime()) || isNaN(completed.getTime())) return 0;
     return Math.max(0, Math.floor((completed.getTime() - due.getTime()) / 86400000));
   };
@@ -505,7 +508,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
         { key: 'performedBy', header: 'Performed By', width: 22 },
         { key: 'runDate', header: 'Running Hours', width: 16 },
         { key: 'status', header: 'Status', width: 14 },
-        { key: 'daysLate', header: 'Days Late', width: 13 },
+        { key: 'daysLate', header: 'Backdating', width: 14 },
         { key: 'remarks', header: 'Remarks', width: 30 },
         { key: 'missedCycles', header: 'Missed Cycles', width: 15 },
       ];
@@ -632,7 +635,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
       doc.text(`Generated: ${new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}`, pageWidth - margin, 20, { align: 'right' });
       doc.text(`Records: ${exportData.length}`, pageWidth - margin, 27, { align: 'right' });
 
-      const headers = ['Date', 'Work Order No', 'Description', 'Performed By', 'Run. Hours', 'Status', 'Days Late', 'Remarks', 'Missed Cycles'];
+      const headers = ['Date', 'Work Order No', 'Description', 'Performed By', 'Run. Hours', 'Status', 'Backdating', 'Remarks', 'Missed Cycles'];
       const body = exportData.map(r => {
         const fmtDate = (d: string | null) => d ? new Date(d).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : '-';
         const daysLateCell = r.isSkipped ? '—' : (r.daysLate > 0 ? `${r.daysLate}d late` : '—');
@@ -3696,9 +3699,9 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                             )}
                           </div>
                         )},
-                        { key: 'daysLate', label: 'Days Late', width: '9%', render: (value: any, row: any) => (
+                        { key: 'daysLate', label: 'Backdating', width: '9%', render: (value: any, row: any) => (
                           row.isSkipped || !value ? <span className="text-gray-400">—</span> : (
-                            <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-800 whitespace-nowrap" data-testid={`badge-days-late-${row.workOrder}`}>
+                            <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-800 whitespace-nowrap" data-testid={`badge-backdating-${row.workOrder}`}>
                               ⚠ {value}d late
                             </span>
                           )
@@ -3755,9 +3758,9 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                           )}
                         </div>
                       )},
-                      { key: 'daysLate', label: 'Days Late', width: '9%', render: (value: any, row: any) => (
+                      { key: 'daysLate', label: 'Backdating', width: '9%', render: (value: any, row: any) => (
                         row.isSkipped || !value ? <span className="text-gray-400">—</span> : (
-                          <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-800 whitespace-nowrap" data-testid={`badge-days-late-${row.workOrder}`}>
+                          <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-800 whitespace-nowrap" data-testid={`badge-backdating-${row.workOrder}`}>
                             ⚠ {value}d late
                           </span>
                         )
