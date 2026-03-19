@@ -43,24 +43,35 @@ export default function ImportProgressOverlay({
   useEffect(() => {
     if (!visible) return;
 
-    const handler = (e: BeforeUnloadEvent) => {
-      if (!complete && !error) {
+    const isActive = !complete && !error;
+
+    const beforeUnloadHandler = (e: BeforeUnloadEvent) => {
+      if (isActive) {
         e.preventDefault();
         e.returnValue = "";
       }
     };
 
-    window.addEventListener("beforeunload", handler);
+    const popStateHandler = (e: PopStateEvent) => {
+      if (isActive) {
+        e.preventDefault();
+        window.history.pushState(null, "", window.location.href);
+      }
+    };
 
-    const isActive = !complete && !error;
+    window.addEventListener("beforeunload", beforeUnloadHandler);
+
     if (isActive) {
+      window.history.pushState(null, "", window.location.href);
+      window.addEventListener("popstate", popStateHandler);
       document.body.style.pointerEvents = "none";
       const overlayEl = document.querySelector('[data-testid="import-progress-overlay"]') as HTMLElement | null;
       if (overlayEl) overlayEl.style.pointerEvents = "auto";
     }
 
     return () => {
-      window.removeEventListener("beforeunload", handler);
+      window.removeEventListener("beforeunload", beforeUnloadHandler);
+      window.removeEventListener("popstate", popStateHandler);
       document.body.style.pointerEvents = "";
     };
   }, [visible, complete, error]);
@@ -93,6 +104,9 @@ export default function ImportProgressOverlay({
             <div className="flex justify-between text-sm text-muted-foreground">
               <span data-testid="import-progress-count">
                 {progress?.processed ?? 0} / {progress?.total ?? 0} processed
+              </span>
+              <span data-testid="import-progress-remaining">
+                {progress?.remaining ?? 0} remaining
               </span>
               <span data-testid="import-progress-percent">{percent}%</span>
             </div>
@@ -226,6 +240,8 @@ export function useImportStream() {
 
     const decoder = new TextDecoder();
     let buffer = "";
+    let receivedComplete = false;
+    let receivedError = false;
 
     while (true) {
       const { done, value } = await reader.read();
@@ -247,14 +263,20 @@ export function useImportStream() {
             if (currentEvent === "progress") {
               callbacks.onProgress(data);
             } else if (currentEvent === "complete") {
+              receivedComplete = true;
               callbacks.onComplete(data);
             } else if (currentEvent === "error") {
+              receivedError = true;
               callbacks.onError(data.message || "Unknown error");
             }
           } catch {}
           currentEvent = "";
         }
       }
+    }
+
+    if (!receivedComplete && !receivedError) {
+      callbacks.onError("Import stream ended unexpectedly. The import may have partially completed — please check the data before retrying.");
     }
   };
 
