@@ -58,7 +58,7 @@ export const TopMenuBar: React.FC<TopMenuBarProps> = ({
   ];
 
   return (
-    <div className="relative sticky top-0 z-50" style={{ backgroundColor: '#f1f1f1', borderBottom: '1px solid #e5e7eb' }}>
+    <div className="relative sticky top-0 z-50" style={{ backgroundColor: '#f1f1f1', borderBottom: '2px solid #52baf3' }}>
       <div className="flex items-stretch h-16" style={{ backgroundColor: '#f1f1f1' }}>
         <div className="flex items-center px-4" style={{ backgroundColor: '#f1f1f1' }}>
           <img 
