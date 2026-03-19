@@ -34,6 +34,7 @@ import { useVessels } from "@/hooks/useVessels";
 
 interface Spare {
   id: number;
+  suuid?: string;
   partCode: string;
   partName: string;
   componentId: string;
@@ -64,6 +65,9 @@ interface Spare {
   ihm?: string;
   remarks?: string;
   criticality?: string;
+  fleetEquipmentCode?: string;
+  evidenceType?: string;
+  linkedComponents?: Array<{ componentId: string; componentCode: string; componentName: string }>;
 }
 
 interface SpareHistory {
@@ -1903,7 +1907,7 @@ const Spares: React.FC = () => {
       }
       switch (field.key) {
         case 'partCode': row[field.header] = spare.partCode || ''; break;
-        case 'fleetEquipmentCode': row[field.header] = (spare as any).fleetEquipmentCode || ''; break;
+        case 'fleetEquipmentCode': row[field.header] = spare.fleetEquipmentCode || ''; break;
         case 'fleetEquipmentName': row[field.header] = ''; break;
         case 'componentCode': row[field.header] = componentCode || spare.componentCode || ''; break;
         case 'componentName': row[field.header] = componentName || spare.componentName || ''; break;
@@ -1927,7 +1931,7 @@ const Spares: React.FC = () => {
         case 'minimumStock': row[field.header] = spare.min ?? 0; break;
         case 'isActive': row[field.header] = spare.isActive === false ? 'No' : 'Yes'; break;
         case 'ihm': row[field.header] = spare.ihm || ''; break;
-        case 'evidenceType': row[field.header] = (spare as any).evidenceType || ''; break;
+        case 'evidenceType': row[field.header] = spare.evidenceType || ''; break;
         default: row[field.header] = ''; break;
       }
     }
@@ -2031,14 +2035,16 @@ const Spares: React.FC = () => {
       const links: Array<{ spareId: number; spareUuid: string; componentId: string; vesselId: string }> = linksJson.data || [];
 
       const sparesArray = Array.isArray(sparesData) ? sparesData : [];
-      const spareById = new Map<number, any>();
+      const spareById = new Map<number, Spare>();
+      const spareByUuid = new Map<string, Spare>();
       for (const s of sparesArray) {
         spareById.set(s.id, s);
+        if (s.suuid) spareByUuid.set(s.suuid, s);
       }
 
       const componentsMap = new Map<string, { code: string; name: string }>();
       for (const s of sparesArray) {
-        const lcs = (s as any).linkedComponents || [];
+        const lcs = s.linkedComponents || [];
         for (const lc of lcs) {
           if (!componentsMap.has(lc.componentId)) {
             componentsMap.set(lc.componentId, { code: lc.componentCode, name: lc.componentName });
@@ -2050,16 +2056,22 @@ const Spares: React.FC = () => {
       const ts = now.toISOString().replace(/[-:]/g, '').replace('T', '_').slice(0, 15);
       const fname = `component_spares_${vesselId}_${ts}.xlsx`;
       const exportRows: Record<string, any>[] = [];
-      let skippedCount = 0;
 
       for (const link of links) {
-        const spare = spareById.get(link.spareId);
-        if (!spare) {
-          skippedCount++;
-          continue;
-        }
+        const spare = spareById.get(link.spareId) || spareByUuid.get(link.spareUuid);
         const comp = componentsMap.get(link.componentId);
-        exportRows.push(mapSpareToTemplateRow(spare, comp?.code || spare.componentCode || '', comp?.name || spare.componentName || ''));
+        if (spare) {
+          exportRows.push(mapSpareToTemplateRow(spare, comp?.code || spare.componentCode || '', comp?.name || spare.componentName || ''));
+        } else {
+          const placeholderRow: Record<string, string> = {};
+          for (const field of SPARES_TEMPLATE_FIELDS) {
+            placeholderRow[field.header] = field.key === 'componentCode' ? (comp?.code || '')
+              : field.key === 'componentName' ? (comp?.name || '')
+              : field.key === 'partCode' ? `(spare #${link.spareId})`
+              : '';
+          }
+          exportRows.push(placeholderRow);
+        }
       }
 
       const hdrs = SPARES_TEMPLATE_FIELDS.map(f => f.header);
@@ -2069,10 +2081,9 @@ const Spares: React.FC = () => {
       XLSX.utils.book_append_sheet(wb, ws, 'Component Spares');
       XLSX.writeFile(wb, fname);
 
-      const warnSuffix = skippedCount > 0 ? ` (${skippedCount} links skipped — spare data not loaded)` : '';
       toast({
         title: "Export Successful",
-        description: `Exported ${exportRows.length} component-spare entries to ${fname}${warnSuffix}`
+        description: `Exported ${exportRows.length} of ${links.length} component-spare entries to ${fname}`
       });
       setExportDialogOpen(false);
     } catch (err: any) {
