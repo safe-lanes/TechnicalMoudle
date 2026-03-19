@@ -469,7 +469,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
         workOrder: h.woNo || '—',
         description: h.description || '-',
         performedBy: h.performedBy || '-',
-        status: h.status || '-',
+        status: h.status?.toLowerCase() === 'completed' ? 'Completed' : 'Postponed',
         remarks: h.remarks || '-',
         missedCycles: h.missedCycles || 0,
         isSkipped: false,
