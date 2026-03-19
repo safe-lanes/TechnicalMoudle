@@ -1019,6 +1019,7 @@ const Spares: React.FC = () => {
   };
 
   const handleDeleteSpare = (spare: Spare) => {
+    if (!canDeleteSpare) return;
     setIsBulkDeleteMode(true);
     setSelectedSpareIds(new Set([spare.id]));
   };
@@ -1060,12 +1061,14 @@ const Spares: React.FC = () => {
   };
 
   const confirmBulkDeactivate = () => {
+    if (!canDeleteSpare) return;
     if (selectedSpareIds.size > 0) {
       setShowDeactivateDialog(true);
     }
   };
 
   const executeBulkDeactivate = () => {
+    if (!canDeleteSpare) return;
     if (selectedSpareIds.size > 0) {
       bulkDeactivateMutation.mutate(Array.from(selectedSpareIds));
     }
