@@ -205,7 +205,31 @@ export default function ShipsSurveysAdmin() {
         companySequence: s.companySequence || s.company_sequence || undefined,
       }));
 
-      const companyItems = mappedSurveys.filter((s: any) => s.applicableToCompany);
+      const masterOnly: typeof mappedSurveys = [];
+      const companyOnly: typeof mappedSurveys = [];
+      const vesselOnly: typeof mappedSurveys = [];
+
+      for (const s of mappedSurveys) {
+        const mid = s.masterId || '';
+        if (s.category === 'Company' || mid.startsWith('CMP-')) {
+          companyOnly.push(s);
+        } else if (s.category === 'Vessel' || mid.startsWith('VES-')) {
+          vesselOnly.push(s);
+        } else {
+          masterOnly.push(s);
+        }
+      }
+
+      setCompanyOnlySurveys(companyOnly.map(s => ({
+        ...s,
+        surveyLabel: s.surveyLabel || s.surveyName,
+      })));
+      setVesselOnlySurveys(vesselOnly.map(s => ({
+        ...s,
+        surveyLabel: s.surveyLabel || s.surveyName,
+      })));
+
+      const companyItems = masterOnly.filter((s: any) => s.applicableToCompany);
       const effectiveSeqs = companyItems.map((s: any) => s.companySequence ?? s.sequence);
       const hasMissing = companyItems.some((s: any) => s.companySequence === undefined);
       const hasDuplicates = new Set(effectiveSeqs).size !== effectiveSeqs.length;
@@ -219,7 +243,7 @@ export default function ShipsSurveysAdmin() {
           companySeqMap.set(id, idx + 1);
         });
 
-        const normalized = mappedSurveys.map((s: any) => {
+        const normalized = masterOnly.map((s: any) => {
           if (s.applicableToCompany && companySeqMap.has(s.id)) {
             return { ...s, companySequence: companySeqMap.get(s.id) };
           }
@@ -227,7 +251,7 @@ export default function ShipsSurveysAdmin() {
         });
         setMasterData(normalized);
       } else {
-        setMasterData(mappedSurveys);
+        setMasterData(masterOnly);
       }
       setHasUnsavedChanges(false);
     }
@@ -363,7 +387,8 @@ export default function ShipsSurveysAdmin() {
     
     let maxCmpSeq = 0;
     let maxVesSeq = 0;
-    for (const survey of dataToSave) {
+    const allSurveysForSeqScan = [...dataToSave, ...companyOnlySurveys, ...vesselOnlySurveys];
+    for (const survey of allSurveysForSeqScan) {
       const cmpMatch = survey.masterId.match(/^CMP-(\d+)$/);
       if (cmpMatch) {
         const seq = parseInt(cmpMatch[1], 10);
@@ -387,6 +412,12 @@ export default function ShipsSurveysAdmin() {
         ...survey,
         masterId: newMasterId,
         sequence: dataToSave.length + idx + 1,
+        category: 'Company',
+        group: survey.companyGroup || 'Company Specific',
+        surveyName: survey.surveyLabel,
+        applicableToCompany: true,
+        companyId: survey.companyId || newMasterId.replace('CMP-', 'CV'),
+        companySequence: dataToSave.length + idx + 1,
       };
     });
     

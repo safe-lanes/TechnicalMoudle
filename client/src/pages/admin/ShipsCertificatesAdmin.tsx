@@ -287,7 +287,7 @@ export default function ShipsCertificatesAdmin() {
         const storedCompanyId = cert.companyId || cert.company_id;
         const category = cert.category;
 
-        if (category === 'Company') {
+        if (category === 'Company' || masterId?.startsWith('CMP-')) {
           companyRecords.push({
             id: cert.id,
             masterId: masterId,
@@ -297,7 +297,7 @@ export default function ShipsCertificatesAdmin() {
             companyGroup: cert.companyGroup || cert.company_group || "",
             ranking: "-",
           });
-        } else if (category === 'Vessel') {
+        } else if (category === 'Vessel' || masterId?.startsWith('VES-')) {
           vesselRecords.push({
             id: cert.id,
             masterId: masterId,
