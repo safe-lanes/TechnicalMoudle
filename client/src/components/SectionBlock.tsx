@@ -7,19 +7,27 @@ interface SectionBlockProps {
   description?: string;
   headerMarker?: string;
   descriptionMarker?: string;
+  headerActions?: React.ReactNode;
   children: React.ReactNode;
   className?: string;
 }
 
-export function SectionBlock({ id, number, title, description, headerMarker, descriptionMarker, children, className = '' }: SectionBlockProps) {
+export function SectionBlock({ id, number, title, description, headerMarker, descriptionMarker, headerActions, children, className = '' }: SectionBlockProps) {
   return (
     <section id={id} className={`bg-blue-50 rounded-md border border-blue-100 p-1 ${className}`}>
       <div className="bg-white rounded-t-sm px-6 py-3">
-        <h2 className="text-sm font-bold text-[hsl(var(--primary))] flex items-start gap-1.5" data-testid={headerMarker}>
-          {headerMarker && <Marker id={headerMarker} />}
-          {number && <span>{number}.</span>}
-          <span>{title}</span>
-        </h2>
+        <div className="flex items-center justify-between">
+          <h2 className="text-sm font-bold text-[hsl(var(--primary))] flex items-start gap-1.5" data-testid={headerMarker}>
+            {headerMarker && <Marker id={headerMarker} />}
+            {number && <span>{number}.</span>}
+            <span>{title}</span>
+          </h2>
+          {headerActions && (
+            <div className="flex items-center gap-2">
+              {headerActions}
+            </div>
+          )}
+        </div>
         {description && (
           <p className="text-xs text-gray-600 mt-1 ml-6" data-testid={descriptionMarker}>
             {descriptionMarker && <Marker id={descriptionMarker} />}

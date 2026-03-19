@@ -79,7 +79,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
   onClose
 }) => {
   const { toast } = useToast();
-  const { vesselId: contextVesselId } = useVessel();
+  const { vesselId: contextVesselId, vessels } = useVessel();
   const { isVessel } = useUIRole();
   const [location, navigate] = useLocation();
   const [, params] = useRoute("/pms/work-order/:id");
@@ -508,7 +508,9 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
 
       ws.mergeCells(`A2:${lastColLetter}2`);
       const s = ws.getCell('A2');
-      s.value = `Work History — ${templateData.componentName || templateData.componentCode || 'Component'} — ${workOrderNo || 'Work Order'}`;
+      const exportVesselName = vessels.find(v => v.id === (vesselId || contextVesselId))?.name || 'Vessel';
+      const exportJobTitle = templateData.woTitle || templateData.jobTitle || '';
+      s.value = `Work History — ${exportJobTitle || templateData.componentName || templateData.componentCode || 'Component'} — ${workOrderNo || 'Work Order'}`;
       s.font = { size: 12, bold: true, color: { argb: 'FF2C3E50' }, name: 'Arial' };
       s.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF7F9FC' } };
       s.alignment = { horizontal: 'center', vertical: 'middle' };
@@ -517,7 +519,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
 
       ws.getRow(3).height = 8;
       const exportData = buildWorkHistoryForExport();
-      ws.getCell('A4').value = `Component: ${templateData.componentName || templateData.componentCode || '-'}`;
+      ws.getCell('A4').value = `Vessel: ${exportVesselName}  |  Component: ${templateData.componentName || templateData.componentCode || '-'}`;
       ws.getCell('A4').font = { bold: true, size: 10, color: { argb: 'FF2C3E50' }, name: 'Arial' };
       ws.getCell('A4').fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF7F9FC' } };
 
@@ -597,19 +599,22 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
       const pageWidth = doc.internal.pageSize.getWidth();
       const margin = 10;
 
+      const pdfVesselName = vessels.find(v => v.id === (vesselId || contextVesselId))?.name || 'Vessel';
+      const pdfJobTitle = templateData.woTitle || templateData.jobTitle || templateData.componentName || templateData.componentCode || '';
       doc.setFillColor(30, 90, 142);
-      doc.rect(0, 0, pageWidth, 34, 'F');
+      doc.rect(0, 0, pageWidth, 38, 'F');
       doc.setTextColor(255, 255, 255);
-      doc.setFontSize(18);
+      doc.setFontSize(16);
       doc.setFont('helvetica', 'bold');
-      doc.text('WORK HISTORY REPORT', margin, 14);
+      doc.text('WORK HISTORY REPORT', margin, 12);
       doc.setFontSize(10);
       doc.setFont('helvetica', 'normal');
-      doc.text(`${templateData.componentName || templateData.componentCode || 'Component'}`, margin, 22);
+      doc.text(pdfJobTitle, margin, 20);
       doc.setFontSize(8);
-      doc.text(`Work Order: ${workOrderNo || '-'}`, margin, 29);
-      doc.text(`Generated: ${new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}`, pageWidth - margin, 18, { align: 'right' });
-      doc.text(`Records: ${exportData.length}`, pageWidth - margin, 24, { align: 'right' });
+      doc.text(`Component: ${templateData.componentName || templateData.componentCode || '-'}  |  Vessel: ${pdfVesselName}`, margin, 27);
+      doc.text(`Work Order: ${workOrderNo || '-'}`, margin, 33);
+      doc.text(`Generated: ${new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}`, pageWidth - margin, 20, { align: 'right' });
+      doc.text(`Records: ${exportData.length}`, pageWidth - margin, 27, { align: 'right' });
 
       const headers = ['Date', 'Work Order No', 'Description', 'Performed By', 'Status', 'Remarks', 'Missed Cycles'];
       const body = exportData.map(r => {
@@ -620,7 +625,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
       autoTable(doc, {
         head: [headers],
         body,
-        startY: 40,
+        startY: 44,
         margin: { left: margin, right: margin },
         styles: { fontSize: 8, cellPadding: 2.5, overflow: 'linebreak', lineColor: [225, 232, 237], lineWidth: 0.1 },
         headStyles: { fillColor: [93, 173, 226], textColor: [255, 255, 255], fontStyle: 'bold', halign: 'center', fontSize: 8 },
@@ -3576,6 +3581,34 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
             number="A4"
             title="Work History"
             description="Previous executions and completion history for this work order"
+            headerActions={
+              <>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={handleExportWorkHistoryExcel}
+                  disabled={isExportingHistoryExcel || (templateData.workHistory || []).length === 0}
+                  data-testid="button-export-history-excel"
+                  className="h-7 text-xs border-green-600 text-green-700 hover:bg-green-50 disabled:opacity-40"
+                >
+                  {isExportingHistoryExcel
+                    ? <><Loader2 className="h-3 w-3 animate-spin mr-1" />Exporting…</>
+                    : <><FileSpreadsheet className="h-3 w-3 mr-1" />Export Excel</>}
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={handleExportWorkHistoryPDF}
+                  disabled={isExportingHistoryPDF || (templateData.workHistory || []).length === 0}
+                  data-testid="button-export-history-pdf"
+                  className="h-7 text-xs border-red-500 text-red-600 hover:bg-red-50 disabled:opacity-40"
+                >
+                  {isExportingHistoryPDF
+                    ? <><Loader2 className="h-3 w-3 animate-spin mr-1" />Exporting…</>
+                    : <><FileText className="h-3 w-3 mr-1" />Export PDF</>}
+                </Button>
+              </>
+            }
           >
             <div className="flex flex-wrap gap-1 mb-2">
               <span data-testid="WOF.A5.3"><Marker id="WOF.A5.3" /></span>
@@ -3584,32 +3617,6 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
               <span data-testid="WOF.A5.6"><Marker id="WOF.A5.6" /></span>
               <span data-testid="WOF.A5.7"><Marker id="WOF.A5.7" /></span>
               <span data-testid="WOF.A5.8"><Marker id="WOF.A5.8" /></span>
-            </div>
-            <div className="flex justify-end gap-2 mb-3">
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={handleExportWorkHistoryExcel}
-                disabled={isExportingHistoryExcel || (templateData.workHistory || []).length === 0}
-                data-testid="button-export-history-excel"
-                className="h-7 text-xs border-green-600 text-green-700 hover:bg-green-50 disabled:opacity-40"
-              >
-                {isExportingHistoryExcel
-                  ? <><Loader2 className="h-3 w-3 animate-spin mr-1" />Exporting…</>
-                  : <><FileSpreadsheet className="h-3 w-3 mr-1" />Export Excel</>}
-              </Button>
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={handleExportWorkHistoryPDF}
-                disabled={isExportingHistoryPDF || (templateData.workHistory || []).length === 0}
-                data-testid="button-export-history-pdf"
-                className="h-7 text-xs border-red-500 text-red-600 hover:bg-red-50 disabled:opacity-40"
-              >
-                {isExportingHistoryPDF
-                  ? <><Loader2 className="h-3 w-3 animate-spin mr-1" />Exporting…</>
-                  : <><FileText className="h-3 w-3 mr-1" />Export PDF</>}
-              </Button>
             </div>
             {(() => {
               const allHistory = (templateData.workHistory || []).map((history: any) => {
