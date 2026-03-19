@@ -297,7 +297,10 @@ export async function listWorkOrders(vesselId?: string) {
 // ── Get Single Work Order with Enrichment ──
 
 export async function getWorkOrder(id: string) {
-  const workOrder = await repo.findById(id);
+  let workOrder = await repo.findById(id);
+  if (!workOrder) {
+    workOrder = await repo.findByCode(id);
+  }
   if (!workOrder) {
     throw new NotFoundError('Work order not found');
   }

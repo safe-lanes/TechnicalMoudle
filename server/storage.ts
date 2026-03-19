@@ -539,6 +539,7 @@ export interface IStorage {
   // Work Order methods
   getWorkOrders(vesselId?: string): Promise<WorkOrder[]>;
   getWorkOrder(id: string): Promise<WorkOrder | undefined>;
+  getWorkOrderByCode(code: string): Promise<WorkOrder | undefined>;
   getWorkOrdersByJobId(jobId: string): Promise<WorkOrder[]>;
   createWorkOrder(workOrder: InsertWorkOrder): Promise<WorkOrder>;
   updateWorkOrder(id: string, updates: Partial<InsertWorkOrder>): Promise<WorkOrder>;

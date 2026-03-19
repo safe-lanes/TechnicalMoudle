@@ -2063,6 +2063,12 @@ export class PostgresStorage {
     return result[0];
   }
 
+  async getWorkOrderByCode(code: string): Promise<WorkOrder | undefined> {
+    const db = await getDb();
+    const result = await db.select().from(workOrders).where(eq(workOrders.workOrderNo, code));
+    return result[0];
+  }
+
   async getWorkOrdersByJobId(jobId: string): Promise<WorkOrder[]> {
     const db = await getDb();
     return await db.select().from(workOrders)

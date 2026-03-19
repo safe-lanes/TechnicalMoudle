@@ -10,6 +10,10 @@ export async function findById(id: string) {
   return storage.getWorkOrder(id);
 }
 
+export async function findByCode(code: string) {
+  return storage.getWorkOrderByCode(code);
+}
+
 export async function create(data: any) {
   return storage.createWorkOrder(data);
 }

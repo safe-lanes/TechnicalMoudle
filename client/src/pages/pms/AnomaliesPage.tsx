@@ -108,7 +108,7 @@ export default function AnomaliesPage() {
   const queryClient = useQueryClient();
 
   const [severityFilter, setSeverityFilter] = useState<string>('ALL');
-  const [statusFilter, setStatusFilter] = useState<string>('PENDING');
+  const [statusFilter, setStatusFilter] = useState<string>('PENDING_REVIEW');
 
   const canView = isSailAdmin || isClientAdmin || isHeadOfDept;
   const canAcknowledge = isSailAdmin || isClientAdmin;

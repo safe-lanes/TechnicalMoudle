@@ -654,6 +654,9 @@ class MemStorage {
     if (this.data.workOrders && this.data.workOrders[id]) return this.data.workOrders[id];
     return toArray(this.data.workOrders).find((w: any) => w.id === id); 
   }
+  async getWorkOrderByCode(code: string): Promise<any> {
+    return toArray(this.data.workOrders).find((w: any) => w.workOrderNo === code || w.work_order_no === code);
+  }
   async createWorkOrder(workOrder: any): Promise<any> {
     if (!this.data.workOrders) this.data.workOrders = {};
     const newWO = { ...workOrder, id: workOrder.id || this.getNextId('workOrders') };
