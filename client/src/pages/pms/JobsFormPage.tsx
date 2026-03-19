@@ -414,6 +414,14 @@ const JobsFormPage: React.FC = () => {
   const [isExportingHistoryExcel, setIsExportingHistoryExcel] = useState(false);
   const [isExportingHistoryPDF, setIsExportingHistoryPDF] = useState(false);
 
+  const calcDaysLate = (originalDueDate: string | null | undefined, completionDate: string | null | undefined): number => {
+    if (!originalDueDate || !completionDate) return 0;
+    const due = new Date(originalDueDate);
+    const completed = new Date(completionDate);
+    if (isNaN(due.getTime()) || isNaN(completed.getTime())) return 0;
+    return Math.max(0, Math.floor((completed.getTime() - due.getTime()) / 86400000));
+  };
+
   const buildWorkHistoryForExport = () =>
     (templateData.workHistory || []).map((h: any) => {
       if (h.isSkipped) {
@@ -422,18 +430,23 @@ const JobsFormPage: React.FC = () => {
           workOrder: '—',
           description: 'Cycle not performed',
           performedBy: '—',
+          runDate: '—',
           status: 'SKIPPED',
+          daysLate: 0,
           remarks: `Automatically recorded. See WO: ${h.sourceWorkOrderId ? h.sourceWorkOrderId.slice(-8) : '—'}`,
           missedCycles: 0,
           isSkipped: true,
         };
       }
+      const daysLate = calcDaysLate(h.originalDueDate, h.completionDate || h.workDate);
       return {
         date: h.completionDate || h.workDate,
         workOrder: h.woNo || '—',
         description: h.description || '-',
         performedBy: h.performedBy || '-',
+        runDate: h.runDate || '—',
         status: h.status?.toLowerCase() === 'completed' ? 'Completed' : 'Postponed',
+        daysLate,
         remarks: h.remarks || '-',
         missedCycles: h.missedCycles || 0,
         isSkipped: false,
@@ -452,10 +465,12 @@ const JobsFormPage: React.FC = () => {
       const cols = [
         { key: 'date', header: 'Date', width: 16 },
         { key: 'workOrder', header: 'Work Order No', width: 24 },
-        { key: 'description', header: 'Description', width: 42 },
+        { key: 'description', header: 'Description', width: 40 },
         { key: 'performedBy', header: 'Performed By', width: 22 },
+        { key: 'runDate', header: 'Running Hours', width: 16 },
         { key: 'status', header: 'Status', width: 14 },
-        { key: 'remarks', header: 'Remarks', width: 32 },
+        { key: 'daysLate', header: 'Days Late', width: 13 },
+        { key: 'remarks', header: 'Remarks', width: 30 },
         { key: 'missedCycles', header: 'Missed Cycles', width: 15 },
       ];
       const totalCols = cols.length;
@@ -514,7 +529,8 @@ const JobsFormPage: React.FC = () => {
       exportData.forEach((record, idx) => {
         const row = ws.getRow(8 + idx);
         const fmtDate = (d: string | null) => d ? new Date(d).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : '-';
-        [fmtDate(record.date), record.workOrder, record.description, record.performedBy, record.status, record.remarks, record.missedCycles > 0 ? record.missedCycles : '-']
+        const daysLateVal = record.isSkipped ? '—' : (record.daysLate > 0 ? `${record.daysLate}d late` : '—');
+        [fmtDate(record.date), record.workOrder, record.description, record.performedBy, record.runDate, record.status, daysLateVal, record.remarks, record.missedCycles > 0 ? record.missedCycles : '-']
           .forEach((v, ci) => { row.getCell(ci + 1).value = v; });
 
         const isEven = idx % 2 === 1;
@@ -580,10 +596,11 @@ const JobsFormPage: React.FC = () => {
       doc.text(`Generated: ${new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}`, pageWidth - margin, 20, { align: 'right' });
       doc.text(`Records: ${exportData.length}`, pageWidth - margin, 27, { align: 'right' });
 
-      const headers = ['Date', 'Work Order No', 'Description', 'Performed By', 'Status', 'Remarks', 'Missed Cycles'];
+      const headers = ['Date', 'Work Order No', 'Description', 'Performed By', 'Run. Hours', 'Status', 'Days Late', 'Remarks', 'Missed Cycles'];
       const body = exportData.map(r => {
         const fmtDate = (d: string | null) => d ? new Date(d).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : '-';
-        return [fmtDate(r.date), r.workOrder, r.description, r.performedBy, r.status, r.remarks, r.missedCycles > 0 ? `⚠ ${r.missedCycles}` : '—'];
+        const daysLateCell = r.isSkipped ? '—' : (r.daysLate > 0 ? `${r.daysLate}d late` : '—');
+        return [fmtDate(r.date), r.workOrder, r.description, r.performedBy, r.runDate, r.status, daysLateCell, r.remarks, r.missedCycles > 0 ? `⚠ ${r.missedCycles}` : '—'];
       });
 
       autoTable(doc, {
@@ -591,10 +608,10 @@ const JobsFormPage: React.FC = () => {
         body,
         startY: 44,
         margin: { left: margin, right: margin },
-        styles: { fontSize: 8, cellPadding: 2.5, overflow: 'linebreak', lineColor: [225, 232, 237], lineWidth: 0.1 },
-        headStyles: { fillColor: [93, 173, 226], textColor: [255, 255, 255], fontStyle: 'bold', halign: 'center', fontSize: 8 },
+        styles: { fontSize: 7.5, cellPadding: 2, overflow: 'linebreak', lineColor: [225, 232, 237], lineWidth: 0.1 },
+        headStyles: { fillColor: [93, 173, 226], textColor: [255, 255, 255], fontStyle: 'bold', halign: 'center', fontSize: 7.5 },
         alternateRowStyles: { fillColor: [247, 249, 252] },
-        columnStyles: { 0: { cellWidth: 22 }, 1: { cellWidth: 32 }, 2: { cellWidth: 60 }, 3: { cellWidth: 28 }, 4: { cellWidth: 20 }, 5: { cellWidth: 50 }, 6: { cellWidth: 18 } },
+        columnStyles: { 0: { cellWidth: 20 }, 1: { cellWidth: 28 }, 2: { cellWidth: 50 }, 3: { cellWidth: 24 }, 4: { cellWidth: 16 }, 5: { cellWidth: 18 }, 6: { cellWidth: 16 }, 7: { cellWidth: 44 }, 8: { cellWidth: 16 } },
         didParseCell: (hookData) => {
           if (hookData.section !== 'body') return;
           const record = exportData[hookData.row.index];
@@ -1171,46 +1188,61 @@ const JobsFormPage: React.FC = () => {
                       <th className="text-left p-2 font-medium text-gray-700" data-testid="JF.A5.4"><Marker id="JF.A5.4" />WORK ORDER</th>
                       <th className="text-left p-2 font-medium text-gray-700" data-testid="JF.A5.5"><Marker id="JF.A5.5" />DESCRIPTION</th>
                       <th className="text-left p-2 font-medium text-gray-700" data-testid="JF.A5.6"><Marker id="JF.A5.6" />PERFORMED BY</th>
-                      <th className="text-left p-2 font-medium text-gray-700" data-testid="JF.A5.7"><Marker id="JF.A5.7" />STATUS</th>
-                      <th className="text-left p-2 font-medium text-gray-700" data-testid="JF.A5.8"><Marker id="JF.A5.8" />REMARKS</th>
+                      <th className="text-left p-2 font-medium text-gray-700" data-testid="JF.A5.7"><Marker id="JF.A5.7" />RUN. HOURS</th>
+                      <th className="text-left p-2 font-medium text-gray-700" data-testid="JF.A5.8"><Marker id="JF.A5.8" />STATUS</th>
+                      <th className="text-left p-2 font-medium text-gray-700">DAYS LATE</th>
+                      <th className="text-left p-2 font-medium text-gray-700">REMARKS</th>
                     </tr>
                   </thead>
                   <tbody>
                     {(templateData.workHistory || []).length === 0 ? (
                       <tr>
-                        <td colSpan={6} className="text-center p-4 text-gray-500 italic">
+                        <td colSpan={8} className="text-center p-4 text-gray-500 italic">
                           No data available
                         </td>
                       </tr>
                     ) : (
-                      (templateData.workHistory || []).map((record: any, index) => (
-                        <tr key={index} className="border-b border-gray-200 hover:bg-gray-50">
-                          <td className="p-2" data-testid={index === 0 ? "JF.A5.9" : `text-history-date-${index}`}>{index === 0 && <Marker id="JF.A5.9" />}{formatDate(record.isSkipped ? (record.skippedCycleDate || record.completionDate || record.workDate) : (record.completionDate || record.workDate))}</td>
-                          <td className="p-2" data-testid={index === 0 ? "JF.A5.10" : `text-history-wo-${index}`}>{index === 0 && <Marker id="JF.A5.10" />}{record.woNo || '-'}</td>
-                          <td className="p-2 max-w-[200px] truncate" data-testid={index === 0 ? "JF.A5.11" : `text-history-description-${index}`} title={record.description || '-'}>{index === 0 && <Marker id="JF.A5.11" />}{record.isSkipped ? 'Cycle not performed' : (record.description || '-')}</td>
-                          <td className="p-2" data-testid={index === 0 ? "JF.A5.12" : `text-history-performed-by-${index}`}>{index === 0 && <Marker id="JF.A5.12" />}{record.isSkipped ? '—' : (record.performedBy || '-')}</td>
-                          <td className="p-2" data-testid={index === 0 ? "JF.A5.13" : `text-history-status-${index}`}>
-                            {index === 0 && <Marker id="JF.A5.13" />}
-                            <div className="flex flex-col gap-1">
-                              {record.isSkipped ? (
-                                <span className="px-2 py-0.5 rounded-full text-xs font-medium text-white whitespace-nowrap" style={{ backgroundColor: '#EF4444' }} data-testid={`badge-status-skipped-${index}`}>
-                                  SKIPPED
-                                </span>
+                      (templateData.workHistory || []).map((record: any, index) => {
+                        const daysLate = calcDaysLate(record.originalDueDate, record.completionDate || record.workDate);
+                        return (
+                          <tr key={index} className="border-b border-gray-200 hover:bg-gray-50">
+                            <td className="p-2" data-testid={index === 0 ? "JF.A5.9" : `text-history-date-${index}`}>{index === 0 && <Marker id="JF.A5.9" />}{formatDate(record.isSkipped ? (record.skippedCycleDate || record.completionDate || record.workDate) : (record.completionDate || record.workDate))}</td>
+                            <td className="p-2" data-testid={index === 0 ? "JF.A5.10" : `text-history-wo-${index}`}>{index === 0 && <Marker id="JF.A5.10" />}{record.isSkipped ? '—' : (record.woNo || '-')}</td>
+                            <td className="p-2 max-w-[180px] truncate" data-testid={index === 0 ? "JF.A5.11" : `text-history-description-${index}`} title={record.description || '-'}>{index === 0 && <Marker id="JF.A5.11" />}{record.isSkipped ? 'Cycle not performed' : (record.description || '-')}</td>
+                            <td className="p-2" data-testid={index === 0 ? "JF.A5.12" : `text-history-performed-by-${index}`}>{index === 0 && <Marker id="JF.A5.12" />}{record.isSkipped ? '—' : (record.performedBy || '-')}</td>
+                            <td className="p-2 text-gray-600" data-testid={`text-history-rh-${index}`}>{record.isSkipped ? '—' : (record.runDate || '—')}</td>
+                            <td className="p-2" data-testid={index === 0 ? "JF.A5.13" : `text-history-status-${index}`}>
+                              {index === 0 && <Marker id="JF.A5.13" />}
+                              <div className="flex flex-col gap-1">
+                                {record.isSkipped ? (
+                                  <span className="px-2 py-0.5 rounded-full text-xs font-medium text-white whitespace-nowrap" style={{ backgroundColor: '#EF4444' }} data-testid={`badge-status-skipped-${index}`}>
+                                    SKIPPED
+                                  </span>
+                                ) : (
+                                  <>
+                                    <StatusPill status={(record.status?.toLowerCase() === 'completed' ? 'completed' : 'postponed') as any} />
+                                    {(record.missedCycles || 0) >= 1 && (
+                                      <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-amber-500 text-white whitespace-nowrap" data-testid={`badge-history-skipped-${record.woNo || index}`}>
+                                        ⚠ {record.missedCycles} Skipped
+                                      </span>
+                                    )}
+                                  </>
+                                )}
+                              </div>
+                            </td>
+                            <td className="p-2" data-testid={`text-history-days-late-${index}`}>
+                              {record.isSkipped || !daysLate ? (
+                                <span className="text-gray-400">—</span>
                               ) : (
-                                <>
-                                  <StatusPill status={(record.status?.toLowerCase() === 'completed' ? 'completed' : 'postponed') as any} />
-                                  {(record.missedCycles || 0) >= 1 && (
-                                    <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-amber-500 text-white whitespace-nowrap" data-testid={`badge-history-skipped-${record.woNo || index}`}>
-                                      ⚠ {record.missedCycles} Skipped
-                                    </span>
-                                  )}
-                                </>
+                                <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-800 whitespace-nowrap" data-testid={`badge-days-late-${record.woNo || index}`}>
+                                  ⚠ {daysLate}d late
+                                </span>
                               )}
-                            </div>
-                          </td>
-                          <td className="p-2" data-testid={index === 0 ? "JF.A5.14" : `text-history-remarks-${index}`}>{index === 0 && <Marker id="JF.A5.14" />}{record.isSkipped ? `Auto-recorded. See WO: ${record.sourceWorkOrderId ? record.sourceWorkOrderId.slice(-8) : '—'}` : (record.remarks || '-')}</td>
-                        </tr>
-                      ))
+                            </td>
+                            <td className="p-2" data-testid={index === 0 ? "JF.A5.14" : `text-history-remarks-${index}`}>{index === 0 && <Marker id="JF.A5.14" />}{record.isSkipped ? `Auto-recorded. See WO: ${record.sourceWorkOrderId ? record.sourceWorkOrderId.slice(-8) : '—'}` : (record.remarks || '-')}</td>
+                          </tr>
+                        );
+                      })
                     )}
                   </tbody>
                 </table>

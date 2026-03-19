@@ -450,6 +450,14 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
   const WORK_HISTORY_COLLAPSED_COUNT = 2;
   const WORK_HISTORY_PAGE_SIZE = 5;
 
+  const calcDaysLate = (originalDueDate: string | null | undefined, completionDate: string | null | undefined): number => {
+    if (!originalDueDate || !completionDate) return 0;
+    const due = new Date(originalDueDate);
+    const completed = new Date(completionDate);
+    if (isNaN(due.getTime()) || isNaN(completed.getTime())) return 0;
+    return Math.max(0, Math.floor((completed.getTime() - due.getTime()) / 86400000));
+  };
+
   const buildWorkHistoryForExport = () =>
     (templateData.workHistory || []).map((h: any) => {
       if (h.isSkipped) {
@@ -458,18 +466,23 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
           workOrder: '—',
           description: 'Cycle not performed',
           performedBy: '—',
+          runDate: '—',
           status: 'SKIPPED',
+          daysLate: 0,
           remarks: `Automatically recorded. See WO: ${h.sourceWorkOrderId ? h.sourceWorkOrderId.slice(-8) : '—'}`,
           missedCycles: 0,
           isSkipped: true,
         };
       }
+      const daysLate = calcDaysLate(h.originalDueDate, h.completionDate || h.workDate);
       return {
         date: h.completionDate || h.workDate,
         workOrder: h.woNo || '—',
         description: h.description || '-',
         performedBy: h.performedBy || '-',
+        runDate: h.runDate || '—',
         status: h.status?.toLowerCase() === 'completed' ? 'Completed' : 'Postponed',
+        daysLate,
         remarks: h.remarks || '-',
         missedCycles: h.missedCycles || 0,
         isSkipped: false,
@@ -488,10 +501,12 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
       const cols = [
         { key: 'date', header: 'Date', width: 16 },
         { key: 'workOrder', header: 'Work Order No', width: 24 },
-        { key: 'description', header: 'Description', width: 42 },
+        { key: 'description', header: 'Description', width: 40 },
         { key: 'performedBy', header: 'Performed By', width: 22 },
+        { key: 'runDate', header: 'Running Hours', width: 16 },
         { key: 'status', header: 'Status', width: 14 },
-        { key: 'remarks', header: 'Remarks', width: 32 },
+        { key: 'daysLate', header: 'Days Late', width: 13 },
+        { key: 'remarks', header: 'Remarks', width: 30 },
         { key: 'missedCycles', header: 'Missed Cycles', width: 15 },
       ];
       const totalCols = cols.length;
@@ -550,7 +565,8 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
       exportData.forEach((record, idx) => {
         const row = ws.getRow(8 + idx);
         const fmtDate = (d: string | null) => d ? new Date(d).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : '-';
-        [fmtDate(record.date), record.workOrder, record.description, record.performedBy, record.status, record.remarks, record.missedCycles > 0 ? record.missedCycles : '-']
+        const daysLateVal = record.isSkipped ? '—' : (record.daysLate > 0 ? `${record.daysLate}d late` : '—');
+        [fmtDate(record.date), record.workOrder, record.description, record.performedBy, record.runDate, record.status, daysLateVal, record.remarks, record.missedCycles > 0 ? record.missedCycles : '-']
           .forEach((v, ci) => { row.getCell(ci + 1).value = v; });
 
         const isEven = idx % 2 === 1;
@@ -616,10 +632,11 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
       doc.text(`Generated: ${new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}`, pageWidth - margin, 20, { align: 'right' });
       doc.text(`Records: ${exportData.length}`, pageWidth - margin, 27, { align: 'right' });
 
-      const headers = ['Date', 'Work Order No', 'Description', 'Performed By', 'Status', 'Remarks', 'Missed Cycles'];
+      const headers = ['Date', 'Work Order No', 'Description', 'Performed By', 'Run. Hours', 'Status', 'Days Late', 'Remarks', 'Missed Cycles'];
       const body = exportData.map(r => {
         const fmtDate = (d: string | null) => d ? new Date(d).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : '-';
-        return [fmtDate(r.date), r.workOrder, r.description, r.performedBy, r.status, r.remarks, r.missedCycles > 0 ? `⚠ ${r.missedCycles}` : '—'];
+        const daysLateCell = r.isSkipped ? '—' : (r.daysLate > 0 ? `${r.daysLate}d late` : '—');
+        return [fmtDate(r.date), r.workOrder, r.description, r.performedBy, r.runDate, r.status, daysLateCell, r.remarks, r.missedCycles > 0 ? `⚠ ${r.missedCycles}` : '—'];
       });
 
       autoTable(doc, {
@@ -627,10 +644,10 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
         body,
         startY: 44,
         margin: { left: margin, right: margin },
-        styles: { fontSize: 8, cellPadding: 2.5, overflow: 'linebreak', lineColor: [225, 232, 237], lineWidth: 0.1 },
-        headStyles: { fillColor: [93, 173, 226], textColor: [255, 255, 255], fontStyle: 'bold', halign: 'center', fontSize: 8 },
+        styles: { fontSize: 7.5, cellPadding: 2, overflow: 'linebreak', lineColor: [225, 232, 237], lineWidth: 0.1 },
+        headStyles: { fillColor: [93, 173, 226], textColor: [255, 255, 255], fontStyle: 'bold', halign: 'center', fontSize: 7.5 },
         alternateRowStyles: { fillColor: [247, 249, 252] },
-        columnStyles: { 0: { cellWidth: 22 }, 1: { cellWidth: 32 }, 2: { cellWidth: 60 }, 3: { cellWidth: 28 }, 4: { cellWidth: 20 }, 5: { cellWidth: 50 }, 6: { cellWidth: 18 } },
+        columnStyles: { 0: { cellWidth: 20 }, 1: { cellWidth: 28 }, 2: { cellWidth: 50 }, 3: { cellWidth: 24 }, 4: { cellWidth: 16 }, 5: { cellWidth: 18 }, 6: { cellWidth: 16 }, 7: { cellWidth: 44 }, 8: { cellWidth: 16 } },
         didParseCell: (hookData) => {
           if (hookData.section !== 'body') return;
           const record = exportData[hookData.row.index];
@@ -3626,18 +3643,23 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                     workOrder: '—',
                     description: 'Cycle not performed',
                     performedBy: '—',
+                    runDate: '—',
                     status: 'skipped' as const,
+                    daysLate: 0,
                     remarks: `Automatically recorded. See WO: ${history.sourceWorkOrderId ? history.sourceWorkOrderId.slice(-8) : '—'}`,
                     missedCycles: 0,
                     isSkipped: true
                   };
                 }
+                const daysLate = calcDaysLate(history.originalDueDate, history.completionDate || history.workDate);
                 return {
                   date: history.completionDate || history.workDate,
                   workOrder: history.woNo,
                   description: history.description || '-',
                   performedBy: history.performedBy,
+                  runDate: history.runDate || '—',
                   status: history.status?.toLowerCase() === 'completed' ? ('completed' as const) : ('postponed' as const),
+                  daysLate,
                   remarks: history.remarks || '-',
                   missedCycles: history.missedCycles || 0,
                   isSkipped: false
@@ -3651,11 +3673,12 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                   <>
                     <WorkOrderDataTable
                       columns={[
-                        { key: 'date', label: 'Date', width: '12%' },
-                        { key: 'workOrder', label: 'Work Order', width: '15%' },
-                        { key: 'description', label: 'Description', width: '25%' },
-                        { key: 'performedBy', label: 'Performed By', width: '15%' },
-                        { key: 'status', label: 'Status', width: '13%', render: (value: any, row: any) => (
+                        { key: 'date', label: 'Date', width: '10%' },
+                        { key: 'workOrder', label: 'Work Order', width: '13%' },
+                        { key: 'description', label: 'Description', width: '22%' },
+                        { key: 'performedBy', label: 'Performed By', width: '12%' },
+                        { key: 'runDate', label: 'Run. Hours', width: '8%' },
+                        { key: 'status', label: 'Status', width: '12%', render: (value: any, row: any) => (
                           <div className="flex flex-col gap-1">
                             {value === 'skipped' ? (
                               <span className="px-2 py-0.5 rounded-full text-xs font-medium text-white whitespace-nowrap" style={{ backgroundColor: '#EF4444' }} data-testid={`badge-status-skipped-${row.date}`}>
@@ -3673,7 +3696,14 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                             )}
                           </div>
                         )},
-                        { key: 'remarks', label: 'Remarks', width: '20%' }
+                        { key: 'daysLate', label: 'Days Late', width: '9%', render: (value: any, row: any) => (
+                          row.isSkipped || !value ? <span className="text-gray-400">—</span> : (
+                            <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-800 whitespace-nowrap" data-testid={`badge-days-late-${row.workOrder}`}>
+                              ⚠ {value}d late
+                            </span>
+                          )
+                        )},
+                        { key: 'remarks', label: 'Remarks', width: '14%' }
                       ]}
                       data={displayData}
                       showActions={false}
@@ -3702,11 +3732,12 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                 <>
                   <WorkOrderDataTable
                     columns={[
-                      { key: 'date', label: 'Date', width: '12%' },
-                      { key: 'workOrder', label: 'Work Order', width: '15%' },
-                      { key: 'description', label: 'Description', width: '25%' },
-                      { key: 'performedBy', label: 'Performed By', width: '15%' },
-                      { key: 'status', label: 'Status', width: '13%', render: (value: any, row: any) => (
+                      { key: 'date', label: 'Date', width: '10%' },
+                      { key: 'workOrder', label: 'Work Order', width: '13%' },
+                      { key: 'description', label: 'Description', width: '22%' },
+                      { key: 'performedBy', label: 'Performed By', width: '12%' },
+                      { key: 'runDate', label: 'Run. Hours', width: '8%' },
+                      { key: 'status', label: 'Status', width: '12%', render: (value: any, row: any) => (
                         <div className="flex flex-col gap-1">
                           {value === 'skipped' ? (
                             <span className="px-2 py-0.5 rounded-full text-xs font-medium text-white whitespace-nowrap" style={{ backgroundColor: '#EF4444' }} data-testid={`badge-status-skipped-${row.date}`}>
@@ -3724,7 +3755,14 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                           )}
                         </div>
                       )},
-                      { key: 'remarks', label: 'Remarks', width: '20%' }
+                      { key: 'daysLate', label: 'Days Late', width: '9%', render: (value: any, row: any) => (
+                        row.isSkipped || !value ? <span className="text-gray-400">—</span> : (
+                          <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-800 whitespace-nowrap" data-testid={`badge-days-late-${row.workOrder}`}>
+                            ⚠ {value}d late
+                          </span>
+                        )
+                      )},
+                      { key: 'remarks', label: 'Remarks', width: '14%' }
                     ]}
                     data={displayData}
                     showActions={false}

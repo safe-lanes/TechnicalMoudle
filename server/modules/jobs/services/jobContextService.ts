@@ -34,11 +34,11 @@ export async function getJobContext(jobId: string) {
     parentComponent = await repo.findComponent(component.parentId as string);
   }
 
-  // Fetch completed work orders for this job (Work History - Section A5)
+  // Fetch completed work orders for this job (Work History - Section A4)
   const allWorkOrdersForJob = await repo.findWorkOrdersByJobId(job.juuid);
-  const completedWorkOrders = allWorkOrdersForJob.filter(wo => wo.status === 'Completed');
+  const completedWorkOrders = allWorkOrdersForJob.filter((wo: any) => wo.status === 'Completed');
 
-  const workHistory = completedWorkOrders.map(wo => {
+  const workHistory: any[] = completedWorkOrders.map((wo: any) => {
     const formDataRemarks = (wo.formData as any)?.sectionB2?.remarks ||
                             (wo.formData as any)?.remarks || '';
     return {
@@ -50,8 +50,70 @@ export async function getJobContext(jobId: string) {
       completionDate: wo.completionDateTime || wo.dateCompleted || '',
       status: wo.status || 'Completed',
       description: wo.workCarriedOut || wo.jobTitle || 'Maintenance completed',
-      remarks: wo.completionRemarks || wo.remarks || wo.jobExperienceNotes || formDataRemarks || ''
+      remarks: wo.completionRemarks || wo.remarks || wo.jobExperienceNotes || formDataRemarks || '',
+      missedCycles: wo.missedCycles || 0,
+      originalDueDate: wo.originalDueDate || null,
+      isSkipped: false,
+      skippedCycleDate: null,
+      sourceWorkOrderId: null
     };
+  });
+
+  // Also fetch from component_maintenance_history to pick up skipped cycles and
+  // entries that may not have a corresponding work_orders row (mirrors WO Form logic)
+  if (job.juuid) {
+    try {
+      const maintenanceHistoryRecords = await repo.findMaintenanceHistoryByJobId(job.juuid);
+      const existingWoIds = new Set(completedWorkOrders.map((wo: any) => wo.wouuid).filter(Boolean));
+
+      for (const h of maintenanceHistoryRecords) {
+        if (h.isSkipped) {
+          workHistory.push({
+            woNo: '-',
+            assignedTo: '-',
+            performedBy: '-',
+            workDate: h.skippedCycleDate || h.dateCompleted || '',
+            runDate: '',
+            completionDate: h.dateCompleted || h.skippedCycleDate || '',
+            status: 'SKIPPED',
+            description: h.workDescription || 'Cycle not performed',
+            remarks: h.remarks || '',
+            missedCycles: 0,
+            originalDueDate: h.originalDueDate || null,
+            isSkipped: true,
+            skippedCycleDate: h.skippedCycleDate || null,
+            sourceWorkOrderId: h.sourceWorkOrderId || null
+          });
+        } else if (h.workOrderId && !existingWoIds.has(h.workOrderId)) {
+          existingWoIds.add(h.workOrderId);
+          workHistory.push({
+            woNo: h.workOrderNo || '-',
+            assignedTo: '-',
+            performedBy: h.performedBy || '-',
+            workDate: h.dateCompleted || '',
+            runDate: h.runningHoursAtCompletion?.toString() || '',
+            completionDate: h.dateCompleted || '',
+            status: h.status === 'Approved' ? 'Completed' : (h.status || 'Completed'),
+            description: h.workDescription || h.jobTitle || 'Maintenance completed',
+            remarks: h.remarks || '',
+            missedCycles: h.missedCycles || 0,
+            originalDueDate: h.originalDueDate || null,
+            isSkipped: false,
+            skippedCycleDate: null,
+            sourceWorkOrderId: null
+          });
+        }
+      }
+    } catch (err) {
+      console.error('[JOB CONTEXT] Failed to fetch maintenance history records:', err);
+    }
+  }
+
+  // Sort descending by completion date
+  workHistory.sort((a: any, b: any) => {
+    const dateA = a.completionDate || a.workDate || '';
+    const dateB = b.completionDate || b.workDate || '';
+    return dateB.localeCompare(dateA);
   });
 
   // Get spare parts, tools, safety requirements
