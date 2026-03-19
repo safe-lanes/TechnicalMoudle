@@ -2115,28 +2115,6 @@ const migrations: Migration[] = [
     sql: `ALTER TABLE superintendent_notifications ADD COLUMN IF NOT EXISTS backdating_days INTEGER DEFAULT 0`
   },
   {
-    id: '069a_seed_pms_spares_access_control',
-    name: 'Seed default access control permissions for pms-spares',
-    description: 'Creates adm_role_menu_access rows for pms-spares menu entry for all existing roles. Admin roles get full CRUD, other roles get view-only by default.',
-    sql: `
-      INSERT INTO adm_role_menu_access (role_ruid, menu_muid, can_view, can_create, can_edit, can_delete)
-      SELECT
-        rm.ruid,
-        mm.muid,
-        true,
-        CASE WHEN rm.assigned_role IN ('Sail Admin', 'PMS Admin', 'Super Admin', 'Admin', 'Vessel Admin') THEN true ELSE false END,
-        CASE WHEN rm.assigned_role IN ('Sail Admin', 'PMS Admin', 'Super Admin', 'Admin', 'Vessel Admin', 'Vessel Management') THEN true ELSE false END,
-        CASE WHEN rm.assigned_role IN ('Sail Admin', 'PMS Admin', 'Super Admin', 'Admin', 'Vessel Admin') THEN true ELSE false END
-      FROM admn_role_master rm
-      CROSS JOIN adm_menumaster_ac mm
-      WHERE mm.name = 'pms-spares'
-        AND NOT EXISTS (
-          SELECT 1 FROM adm_role_menu_access rma
-          WHERE rma.role_ruid = rm.ruid AND rma.menu_muid = mm.muid
-        );
-    `
-  },
-  {
     id: '069_fix_superintendent_notifications_vessel_name',
     name: 'Fix vessel_name data in superintendent_notifications',
     description: 'Corrects vessel_name values that contain UUIDs instead of actual vessel names by looking up the vessels table',
