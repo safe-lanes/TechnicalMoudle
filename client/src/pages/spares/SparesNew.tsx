@@ -8,7 +8,7 @@ import { Marker } from "@/components/Marker";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Search, ChevronRight, ChevronLeft, ChevronDown, Edit, Edit2, Trash2, Plus, PlusCircle, Square, FileSpreadsheet, X, Minus, AlertCircle, CheckCircle, HelpCircle, MapPin, Info, Download, Settings2, Check, ChevronsUpDown, ChevronsLeft, ChevronsRight, Expand, Minimize2, RotateCcw } from "lucide-react";
+import { Search, ChevronRight, ChevronLeft, ChevronDown, Edit, Edit2, Trash2, Plus, PlusCircle, Square, FileSpreadsheet, X, Minus, AlertCircle, CheckCircle, HelpCircle, MapPin, Info, Download, Settings2, Check, ChevronsUpDown, ChevronsLeft, ChevronsRight, Expand, Minimize2, RotateCcw, FileText, Loader2 } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import * as XLSX from "xlsx";
@@ -105,6 +105,8 @@ const Spares: React.FC = () => {
     return "";
   });
   const { vesselId, setVesselId } = useVessel();
+  const [exportDialogOpen, setExportDialogOpen] = useState(false);
+  const [exportingType, setExportingType] = useState<string | null>(null);
   
   // Pagination state - Inventory
   const [currentPage, setCurrentPage] = useState(1);
@@ -1932,78 +1934,144 @@ const Spares: React.FC = () => {
     return row;
   };
 
-  const exportSparesToExcel = () => {
-    if (activeTab === 'history') {
-      const now = new Date();
-      const timestamp = now.toISOString().replace(/[-:]/g, '').replace('T', '_').slice(0, 15);
-      const filename = `spares_history_${vesselId}_${timestamp}.xlsx`;
-      
-      const data = historyData.map((history: SpareHistory) => {
-        let dateDisplay = '-';
-        try {
-          const isDateOnly = history.dateLocal && /^\d{4}-\d{2}-\d{2}$/.test(history.dateLocal.trim());
-          if (history.dateLocal) {
-            const dateStr = isDateOnly ? `${history.dateLocal.trim()}T00:00:00` : history.dateLocal;
-            const date = new Date(dateStr);
-            if (!isNaN(date.getTime())) {
-              dateDisplay = format(date, 'dd-MMM-yyyy');
-            }
-          } else if (history.timestampUTC) {
-            const date = new Date(history.timestampUTC);
-            if (!isNaN(date.getTime())) {
-              dateDisplay = format(date, 'dd-MMM-yyyy');
-            }
+  const exportHistoryToExcel = () => {
+    const now = new Date();
+    const timestamp = now.toISOString().replace(/[-:]/g, '').replace('T', '_').slice(0, 15);
+    const filename = `spares_history_${vesselId}_${timestamp}.xlsx`;
+    
+    const data = historyData.map((history: SpareHistory) => {
+      let dateDisplay = '-';
+      try {
+        const isDateOnly = history.dateLocal && /^\d{4}-\d{2}-\d{2}$/.test(history.dateLocal.trim());
+        if (history.dateLocal) {
+          const dateStr = isDateOnly ? `${history.dateLocal.trim()}T00:00:00` : history.dateLocal;
+          const date = new Date(dateStr);
+          if (!isNaN(date.getTime())) {
+            dateDisplay = format(date, 'dd-MMM-yyyy');
           }
-        } catch {
-          dateDisplay = '-';
+        } else if (history.timestampUTC) {
+          const date = new Date(history.timestampUTC);
+          if (!isNaN(date.getTime())) {
+            dateDisplay = format(date, 'dd-MMM-yyyy');
+          }
         }
-        
-        return {
-          'Date': dateDisplay,
-          'Part Code': history.partCode,
-          'Part Name': history.partName,
-          'Component': history.componentName,
-          'Part Number': history.partNumber || '-',
-          'Event': history.eventType,
-          'Qty Change': history.qtyChange,
-          'ROB After': history.robAfter,
-          'Reference': history.reference || '-'
-        };
-      });
+      } catch {
+        dateDisplay = '-';
+      }
       
-      const ws = XLSX.utils.json_to_sheet(data);
-      const wb = XLSX.utils.book_new();
-      XLSX.utils.book_append_sheet(wb, ws, 'Spares History');
-      XLSX.writeFile(wb, filename);
-      
-      toast({ 
-        title: "Export Successful", 
-        description: `Exported ${data.length} history records to ${filename}` 
-      });
-    } else {
-      const now2 = new Date();
-      const ts = now2.toISOString().replace(/[-:]/g, '').replace('T', '_').slice(0, 15);
+      return {
+        'Date': dateDisplay,
+        'Part Code': history.partCode,
+        'Part Name': history.partName,
+        'Component': history.componentName,
+        'Part Number': history.partNumber || '-',
+        'Event': history.eventType,
+        'Qty Change': history.qtyChange,
+        'ROB After': history.robAfter,
+        'Reference': history.reference || '-'
+      };
+    });
+    
+    const ws = XLSX.utils.json_to_sheet(data);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Spares History');
+    XLSX.writeFile(wb, filename);
+    
+    toast({ 
+      title: "Export Successful", 
+      description: `Exported ${data.length} history records to ${filename}` 
+    });
+  };
+
+  const exportUniqueSparesToExcel = () => {
+    setExportingType('unique');
+    try {
+      const now = new Date();
+      const ts = now.toISOString().replace(/[-:]/g, '').replace('T', '_').slice(0, 15);
       const fname = `spares_master_${vesselId}_${ts}.xlsx`;
+      const sparesArray = Array.isArray(sparesData) ? sparesData : [];
       const seenCodes = new Set<string>();
       const exportRows: Record<string, any>[] = [];
 
-      for (const spare of filteredSpares) {
+      for (const spare of sparesArray) {
         if (seenCodes.has(spare.partCode)) continue;
         seenCodes.add(spare.partCode);
         exportRows.push(mapSpareToTemplateRow(spare));
       }
 
       const hdrs = SPARES_TEMPLATE_FIELDS.map(f => f.header);
-      const ws2 = XLSX.utils.json_to_sheet(exportRows, { header: hdrs });
-      ws2['!cols'] = SPARES_TEMPLATE_FIELDS.map(f => ({ wch: f.width }));
-      const wb2 = XLSX.utils.book_new();
-      XLSX.utils.book_append_sheet(wb2, ws2, 'Unique Spare Master');
-      XLSX.writeFile(wb2, fname);
+      const ws = XLSX.utils.json_to_sheet(exportRows, { header: hdrs });
+      ws['!cols'] = SPARES_TEMPLATE_FIELDS.map(f => ({ wch: f.width }));
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, 'Unique Spare Master');
+      XLSX.writeFile(wb, fname);
 
       toast({
         title: "Export Successful",
         description: `Exported ${exportRows.length} unique spare master entries to ${fname}`
       });
+      setExportDialogOpen(false);
+    } catch (err: any) {
+      console.error('Export unique spares failed:', err);
+      toast({
+        title: "Export Failed",
+        description: err?.message || 'An error occurred while exporting unique spares',
+        variant: "destructive"
+      });
+    } finally {
+      setExportingType(null);
+    }
+  };
+
+  const exportComponentSparesToExcel = () => {
+    setExportingType('component');
+    try {
+      const now = new Date();
+      const ts = now.toISOString().replace(/[-:]/g, '').replace('T', '_').slice(0, 15);
+      const fname = `component_spares_${vesselId}_${ts}.xlsx`;
+      const sparesArray = Array.isArray(sparesData) ? sparesData : [];
+      const exportRows: Record<string, any>[] = [];
+
+      for (const spare of sparesArray) {
+        const linkedComps = (spare as any).linkedComponents || [];
+        if (linkedComps.length === 0) {
+          exportRows.push(mapSpareToTemplateRow(spare));
+        } else {
+          for (const lc of linkedComps) {
+            exportRows.push(mapSpareToTemplateRow(spare, lc.componentCode, lc.componentName));
+          }
+        }
+      }
+
+      const hdrs = SPARES_TEMPLATE_FIELDS.map(f => f.header);
+      const ws = XLSX.utils.json_to_sheet(exportRows, { header: hdrs });
+      ws['!cols'] = SPARES_TEMPLATE_FIELDS.map(f => ({ wch: f.width }));
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, 'Component Spares');
+      XLSX.writeFile(wb, fname);
+
+      toast({
+        title: "Export Successful",
+        description: `Exported ${exportRows.length} component-spare entries to ${fname}`
+      });
+      setExportDialogOpen(false);
+    } catch (err: any) {
+      console.error('Export component spares failed:', err);
+      toast({
+        title: "Export Failed",
+        description: err?.message || 'An error occurred while exporting component spares',
+        variant: "destructive"
+      });
+    } finally {
+      setExportingType(null);
+    }
+  };
+
+  const handleExportClick = () => {
+    if (activeTab === 'history') {
+      exportHistoryToExcel();
+    } else {
+      setExportDialogOpen(true);
     }
   };
 
@@ -2563,7 +2631,7 @@ const Spares: React.FC = () => {
             variant="outline" 
             size="sm"
             className="text-xs text-[#8798ad] border-[#e1e8ed]"
-            onClick={exportSparesToExcel}
+            onClick={handleExportClick}
             data-testid="E9"
           >
             <Marker id="E9" />
@@ -3347,6 +3415,56 @@ const Spares: React.FC = () => {
           )}
         </div>
       </div>
+      {/* Export Options Dialog */}
+      <Dialog open={exportDialogOpen} onOpenChange={setExportDialogOpen}>
+        <DialogContent className="sm:max-w-md" data-testid="dialog-export-spares">
+          <DialogHeader>
+            <DialogTitle className="text-lg font-semibold">Export Spares</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 pt-2">
+            <div className="border rounded-lg p-4 space-y-3" data-testid="export-section-unique-spares">
+              <div className="flex items-center gap-2">
+                <FileText className="h-4 w-4 text-[#1E5A8E]" />
+                <span className="font-medium text-gray-900">Export Unique Spares</span>
+              </div>
+              <p className="text-sm text-gray-500">Deduplicated spare master data — one row per unique spare part code</p>
+              <div className="flex gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={exportUniqueSparesToExcel}
+                  disabled={!!exportingType || !Array.isArray(sparesData) || sparesData.length === 0}
+                  data-testid="button-export-unique-excel"
+                >
+                  {exportingType === 'unique' ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <Download className="h-4 w-4 mr-1" />}
+                  Excel
+                </Button>
+              </div>
+            </div>
+
+            <div className="border rounded-lg p-4 space-y-3" data-testid="export-section-component-spares">
+              <div className="flex items-center gap-2">
+                <FileText className="h-4 w-4 text-[#1E5A8E]" />
+                <span className="font-medium text-gray-900">Export Component Spares</span>
+              </div>
+              <p className="text-sm text-gray-500">All spare-component linkages — one row per spare linked to each component, in import template format</p>
+              <div className="flex gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={exportComponentSparesToExcel}
+                  disabled={!!exportingType || !Array.isArray(sparesData) || sparesData.length === 0}
+                  data-testid="button-export-component-excel"
+                >
+                  {exportingType === 'component' ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <Download className="h-4 w-4 mr-1" />}
+                  Excel
+                </Button>
+              </div>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
       {/* Bulk Update Modal */}
       <Dialog open={isBulkUpdateModalOpen} onOpenChange={setIsBulkUpdateModalOpen}>
         <DialogContent className="max-w-6xl max-h-[85vh] overflow-y-auto">
