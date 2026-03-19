@@ -1185,7 +1185,7 @@ const JobsFormPage: React.FC = () => {
                     ) : (
                       (templateData.workHistory || []).map((record: any, index) => (
                         <tr key={index} className="border-b border-gray-200 hover:bg-gray-50">
-                          <td className="p-2" data-testid={index === 0 ? "JF.A5.9" : `text-history-date-${index}`}>{index === 0 && <Marker id="JF.A5.9" />}{formatDate(record.completionDate || record.workDate)}</td>
+                          <td className="p-2" data-testid={index === 0 ? "JF.A5.9" : `text-history-date-${index}`}>{index === 0 && <Marker id="JF.A5.9" />}{formatDate(record.isSkipped ? (record.skippedCycleDate || record.completionDate || record.workDate) : (record.completionDate || record.workDate))}</td>
                           <td className="p-2" data-testid={index === 0 ? "JF.A5.10" : `text-history-wo-${index}`}>{index === 0 && <Marker id="JF.A5.10" />}{record.woNo || '-'}</td>
                           <td className="p-2 max-w-[200px] truncate" data-testid={index === 0 ? "JF.A5.11" : `text-history-description-${index}`} title={record.description || '-'}>{index === 0 && <Marker id="JF.A5.11" />}{record.isSkipped ? 'Cycle not performed' : (record.description || '-')}</td>
                           <td className="p-2" data-testid={index === 0 ? "JF.A5.12" : `text-history-performed-by-${index}`}>{index === 0 && <Marker id="JF.A5.12" />}{record.isSkipped ? '—' : (record.performedBy || '-')}</td>
