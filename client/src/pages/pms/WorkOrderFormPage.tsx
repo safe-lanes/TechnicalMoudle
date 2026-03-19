@@ -4733,6 +4733,14 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
               </div>
             </div>
 
+            {/* CE Approval Remarks (for completed WOs) */}
+            {(workOrderContext as any)?.workOrder?.status === 'Completed' && (workOrderContext as any)?.workOrder?.ceApprovalRemarks && (
+              <div className="mt-3 p-3 bg-blue-50 border border-blue-200 rounded-lg text-sm" data-testid="ce-approval-remarks-display">
+                <div className="font-medium text-blue-800 mb-1">CE Approval Remarks</div>
+                <p className="text-blue-900 text-xs whitespace-pre-wrap">{(workOrderContext as any).workOrder.ceApprovalRemarks}</p>
+              </div>
+            )}
+
             {/* Completion RH Info (for completed WOs) */}
             {(workOrderContext as any)?.workOrder?.status === 'Completed' && (workOrderContext as any)?.workOrder?.completionRH && (
               <div className="mt-3 p-3 bg-gray-50 rounded-lg text-sm" data-testid="rh-completion-info">
@@ -5220,7 +5228,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                   return {
                     bg: '#dc2626', color: '#ffffff',
                     title: 'HIGH SEVERITY \u2014 APPROVAL LOCKED \u2014 SUPERINTENDENT ACTION REQUIRED',
-                    body: `This work order has high severity issues (${approvalMissedCycles >= 3 ? `${approvalMissedCycles} missed cycles` : ''}${approvalDaysLate >= 21 ? `${approvalMissedCycles >= 3 ? ', ' : ''}${approvalDaysLate} days late` : ''}). It is LOCKED and cannot be approved by the Chief Engineer until the Superintendent has acknowledged it. CE remarks are mandatory (minimum 20 characters).`
+                    body: `This work order has high severity issues (${approvalMissedCycles >= 3 ? `${approvalMissedCycles} missed cycles` : ''}${approvalDaysLate >= 21 ? `${approvalMissedCycles >= 3 ? ', ' : ''}${approvalDaysLate} days late` : ''}). It is LOCKED and cannot be approved by the Chief Engineer until the Superintendent has acknowledged it. Once acknowledged, the CE will be required to enter detailed remarks (minimum 20 characters) before approving.`
                   };
                 case 'superintendent_notification':
                   return {
