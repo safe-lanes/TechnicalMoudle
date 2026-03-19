@@ -338,8 +338,8 @@ export interface IStorage {
   getAllSpares(): Promise<Spare[]>;
   getSpares(vesselId: string): Promise<Spare[]>;
   getSpare(id: string): Promise<Spare | undefined>;
-  createSpare(spare: InsertSpare): Promise<Spare>;
-  updateSpare(id: string, data: Partial<Spare>): Promise<Spare>;
+  createSpare(spare: InsertSpare, skipSiblingSync?: boolean): Promise<Spare>;
+  updateSpare(id: string, data: Partial<Spare>, skipSiblingSync?: boolean): Promise<Spare>;
   deleteSpare(id: string): Promise<void>;
   consumeSpare(id: string, quantity: number, userId: string, remarks?: string, place?: string, dateLocal?: string, tz?: string): Promise<Spare>;
   consumeSpareFromLocation(id: string, quantity: number, location: 'A' | 'B', userId: string, remarks?: string, workOrderRef?: string, dateLocal?: string): Promise<{

@@ -1183,11 +1183,11 @@ export async function undoImport(req: Request, res: Response) {
             console.log(`  ✓ Deleted spare ${log.entityId}`);
           } else if (log.operation === 'updated') {
             const previousData = log.previousData as any;
-            await storage.updateSpare(spareId, previousData);
+            await storage.updateSpare(spareId, previousData, true);
             result.restored++;
             console.log(`  ✓ Restored spare ${log.entityId}`);
           } else if (log.operation === 'archived') {
-            await storage.updateSpare(spareId, { isActive: true });
+            await storage.updateSpare(spareId, { isActive: true }, true);
             result.unarchived++;
             console.log(`  ✓ Unarchived spare ${log.entityId}`);
           }
@@ -1237,7 +1237,7 @@ export async function undoImport(req: Request, res: Response) {
               await storage.updateStoresItem(change.log.entityId, change.previousState);
               console.log(`  ↩️ Rolled back stores item ${change.log.entityId}`);
             } else if (change.log.entityType === 'spare') {
-              await storage.updateSpare(change.log.entityId, change.previousState);
+              await storage.updateSpare(change.log.entityId, change.previousState, true);
               console.log(`  ↩️ Rolled back spare ${change.log.entityId}`);
             }
           }

@@ -588,7 +588,7 @@ export async function performImport(
             remarks: row['Evidence Type'] ? String(row['Evidence Type']).trim() : null,
             fleetEquipmentCode: row['Fleet Equipment Code'] ? String(row['Fleet Equipment Code']).trim() : null,
             dataScope: 'vessel'
-          });
+          }, true);
           
           sparesByPartCode.set(partCode, newSpare);
           result.created++;
@@ -670,7 +670,7 @@ export async function performImport(
             ihm: ihmValUpdate === 'Yes' || ihmValUpdate === true ? 'Yes' : (ihmValUpdate === 'No' ? 'No' : existingSpare.ihm),
             remarks: row['Evidence Type'] ? String(row['Evidence Type']).trim() : existingSpare.remarks,
             fleetEquipmentCode: row['Fleet Equipment Code'] ? String(row['Fleet Equipment Code']).trim() : existingSpare.fleetEquipmentCode
-          });
+          }, true);
           
           sparesByPartCode.set(partCode, updatedSpare);
           result.updated++;
@@ -765,7 +765,7 @@ export async function performImport(
                 ihm: ihmValUpsert === 'Yes' || ihmValUpsert === true ? 'Yes' : (ihmValUpsert === 'No' ? 'No' : existingSpare.ihm),
                 remarks: row['Evidence Type'] ? String(row['Evidence Type']).trim() : existingSpare.remarks,
                 fleetEquipmentCode: row['Fleet Equipment Code'] ? String(row['Fleet Equipment Code']).trim() : existingSpare.fleetEquipmentCode
-              });
+              }, true);
               
               sparesByPartCode.set(partCode, updatedSpare);
               result.updated++;
@@ -827,7 +827,7 @@ export async function performImport(
               remarks: row['Evidence Type'] ? String(row['Evidence Type']).trim() : null,
               fleetEquipmentCode: row['Fleet Equipment Code'] ? String(row['Fleet Equipment Code']).trim() : null,
               dataScope: 'vessel'
-            });
+            }, true);
             
             sparesByPartCode.set(partCode, newSpare);
             result.created++;

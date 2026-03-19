@@ -2271,7 +2271,7 @@ export class PostgresStorage {
     return result[0];
   }
 
-  async createSpare(spare: InsertSpare): Promise<Spare> {
+  async createSpare(spare: InsertSpare, skipSiblingSync: boolean = false): Promise<Spare> {
     const db = await getDb();
     const robA = spare.robLocationA ?? 0;
     const robB = spare.robLocationB ?? 0;
@@ -2301,7 +2301,7 @@ export class PostgresStorage {
             componentId: createdSpare.componentId,
             vesselId: createdSpare.vesselId,
             linkedBy: spare.createdBy || 'System',
-          });
+          }, skipSiblingSync);
         }
       } catch (linkError: any) {
         console.warn(`[createSpare] Failed to create spare_component_link for spare ${createdSpare.id} → component ${createdSpare.componentId}: ${linkError.message}`);
@@ -2333,7 +2333,7 @@ export class PostgresStorage {
     return createdSpare;
   }
 
-  async updateSpare(id: string, data: Partial<Spare>): Promise<Spare> {
+  async updateSpare(id: string, data: Partial<Spare>, skipSiblingSync: boolean = false): Promise<Spare> {
     const db = await getDb();
     // Filter out undefined/null partCode to prevent NOT NULL constraint violation
     const { partCode, ...restData } = data;
@@ -2366,7 +2366,7 @@ export class PostgresStorage {
             componentId: data.componentId,
             vesselId: updatedSpare.vesselId,
             linkedBy: data.updatedBy || 'System',
-          });
+          }, skipSiblingSync);
         }
       } catch (linkError: any) {
         console.warn(`[updateSpare] Failed to create spare_component_link for spare ${id} → component ${data.componentId}: ${linkError.message}`);
