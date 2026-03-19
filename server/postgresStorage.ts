@@ -2290,7 +2290,8 @@ export class PostgresStorage {
     const createdSpare = result[0];
 
     // SYNC: Create spare_component_links entry when componentId is present
-    if (createdSpare.componentId && createdSpare.vesselId) {
+    // When skipSiblingSync=true (bulk import), skip entirely — processSpareInventory() handles link creation
+    if (!skipSiblingSync && createdSpare.componentId && createdSpare.vesselId) {
       try {
         const existingLinks = await this.getSpareComponentLinksBySpare(createdSpare.id);
         const alreadyLinked = existingLinks.some((link: any) => link.componentId === createdSpare.componentId);
@@ -2301,7 +2302,7 @@ export class PostgresStorage {
             componentId: createdSpare.componentId,
             vesselId: createdSpare.vesselId,
             linkedBy: spare.createdBy || 'System',
-          }, skipSiblingSync);
+          });
         }
       } catch (linkError: any) {
         console.warn(`[createSpare] Failed to create spare_component_link for spare ${createdSpare.id} → component ${createdSpare.componentId}: ${linkError.message}`);
@@ -2355,7 +2356,8 @@ export class PostgresStorage {
     const updatedSpare = result[0];
 
     // SYNC: Create spare_component_links entry when componentId is updated
-    if (data.componentId && updatedSpare.vesselId) {
+    // When skipSiblingSync=true (bulk import), skip entirely — processSpareInventory() handles link creation
+    if (!skipSiblingSync && data.componentId && updatedSpare.vesselId) {
       try {
         const existingLinks = await this.getSpareComponentLinksBySpare(updatedSpare.id);
         const alreadyLinked = existingLinks.some((link: any) => link.componentId === data.componentId);
@@ -2366,7 +2368,7 @@ export class PostgresStorage {
             componentId: data.componentId,
             vesselId: updatedSpare.vesselId,
             linkedBy: data.updatedBy || 'System',
-          }, skipSiblingSync);
+          });
         }
       } catch (linkError: any) {
         console.warn(`[updateSpare] Failed to create spare_component_link for spare ${id} → component ${data.componentId}: ${linkError.message}`);
