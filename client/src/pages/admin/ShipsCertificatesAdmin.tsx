@@ -494,10 +494,19 @@ export default function ShipsCertificatesAdmin() {
     const allCertificates = [...masterData.filter(c => !deletedSet.has(c.masterId)), ...companyCertsForSave, ...vesselOnlyCertsWithIds];
     
     // Get selected vessel info (ID and name) for vessel-specific certificate applicability
-    const targetVessels = vesselMasterData
+    const targetVessels = (vesselMasterData || [])
       .filter(v => selectedVessels.includes(v.name))
       .map(v => ({ id: String(v.id), name: v.name }));
     const vesselMasterIds = vesselOnlyCertsWithIds.map(c => c.masterId);
+    
+    if (vesselMasterIds.length > 0 && targetVessels.length === 0) {
+      toast({
+        title: "Please select a vessel first",
+        description: "Vessel-specific certificates require at least one vessel to be selected on the Vessel tab.",
+        variant: "destructive",
+      });
+      return;
+    }
     
     saveMutation.mutate({ 
       certificates: allCertificates,
@@ -2201,8 +2210,14 @@ export default function ShipsCertificatesAdmin() {
                   );
                 })}
                 
-                {/* Vessel-only certificates (not from Company) */}
-                {selectedVessels.length > 0 && vesselOnlyCerts.map((cert, idx) => {
+                {/* Vessel-only certificates (not from Company) — filtered by vessel applicability */}
+                {selectedVessels.length > 0 && vesselOnlyCerts.filter(cert => {
+                  if (cert.id >= 2000) return true;
+                  const vesselIds = getSelectedVesselIds();
+                  return vesselIds.some(vesselId =>
+                    vesselApplicabilityData.some((a: any) => a.vesselId === vesselId && a.masterId === cert.masterId && a.isApplicable === true)
+                  );
+                }).map((cert, idx) => {
                   const companyGroupLabel = companyGroupLabels.find(g => g.key === cert.companyGroup)?.label || "";
                   const displayCompanyGroup = cert.companyGroup ? `${cert.companyGroup}. ${companyGroupLabel}` : "";
                   

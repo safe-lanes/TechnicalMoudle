@@ -447,10 +447,19 @@ export default function ShipsSurveysAdmin() {
     const allSurveys = [...dataToSave, ...companyOnlySurveysWithIds, ...vesselOnlySurveysWithIds];
     
     // Get selected vessel info for vessel-specific survey applicability
-    const targetVessels = vesselMasterData
-      ?.filter((v: any) => selectedVessels.includes(v.name))
-      .map((v: any) => ({ id: String(v.id), name: v.name })) || [];
+    const targetVessels = (vesselMasterData || [])
+      .filter((v: any) => selectedVessels.includes(v.name))
+      .map((v: any) => ({ id: String(v.id), name: v.name }));
     const vesselMasterIds = vesselOnlySurveysWithIds.map(s => s.masterId);
+    
+    if (vesselMasterIds.length > 0 && targetVessels.length === 0) {
+      toast({
+        title: "Please select a vessel first",
+        description: "Vessel-specific surveys require at least one vessel to be selected on the Vessel tab.",
+        variant: "destructive",
+      });
+      return;
+    }
     
     // Then save all surveys
     saveMutation.mutate({ 
@@ -1783,8 +1792,14 @@ export default function ShipsSurveysAdmin() {
                       );
                     })}
                     
-                    {/* Vessel-only surveys (VES-) */}
-                    {selectedVessels.length > 0 && vesselOnlySurveys.map((survey, idx) => {
+                    {/* Vessel-only surveys (VES-) — filtered by vessel applicability */}
+                    {selectedVessels.length > 0 && vesselOnlySurveys.filter(survey => {
+                      if (survey.id >= 2000) return true;
+                      const vesselIds = getSelectedVesselIdsArray();
+                      return vesselIds.some(vesselId =>
+                        vesselApplicabilityData?.some((a: any) => a.vesselId === vesselId && a.masterId === survey.masterId && a.isApplicable === true)
+                      );
+                    }).map((survey, idx) => {
                       const companyGroupLabel = companyGroupLabels.find(g => g.key === survey.companyGroup)?.label || "";
                       const displayCompanyGroup = survey.companyGroup ? `${survey.companyGroup}. ${companyGroupLabel}` : "";
                       
