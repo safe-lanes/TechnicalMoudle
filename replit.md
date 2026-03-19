@@ -42,7 +42,7 @@ Preferred communication style: Simple, everyday language.
 ### Feature Specifications
 -   **Spare-Component Sibling Link Distribution**: Spares linked to a component are automatically linked to all sibling components.
 -   **Fleet Table Schema Contract**: All `fleet_*` tables must include mandatory columns like `uuid`, `sortOrder`, `createdAt`, `updatedAt`, `createdByUuid`, `updatedByUuid`, `isDeleted`, and `isSync`.
--   **Bulk Import Functionality**: Includes maker validation against `maker_list` and displays an `ImportSummaryModal` with statistics and row-by-row status after import.
+-   **Bulk Import Functionality**: Includes maker validation against `maker_list` and displays an `ImportSummaryModal` with statistics and row-by-row status after import. Real-time SSE progress streaming via `POST /bulk/import-stream` and `POST /bulk/locations/import-stream` endpoints. `ImportProgressOverlay` component provides a full-screen locked overlay with progress bar, record counts, status phases, and completion summary during imports across all bulk upload screens (UniformBulkUpload and LocationsUpload).
 -   **Equipment/System Department Validation**: Field restricted to 6 predefined, validated values.
 -   **Maker Searchable Dropdown**: Auto-fills Maker Code from `maker_list`.
 -   **Inventory Transaction Location Picker**: Interactive, searchable comboboxes for selecting and creating locations.

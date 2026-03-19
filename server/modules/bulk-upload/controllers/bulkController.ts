@@ -884,6 +884,236 @@ export async function doImport(req: Request, res: Response) {
   }
 }
 
+// ── SSE Streaming Import ──
+export async function doImportStream(req: Request, res: Response) {
+  const historyId = uuidv4();
+  const startedAt = new Date();
+
+  res.setHeader('Content-Type', 'text/event-stream');
+  res.setHeader('Cache-Control', 'no-cache');
+  res.setHeader('Connection', 'keep-alive');
+  res.setHeader('X-Accel-Buffering', 'no');
+  res.flushHeaders();
+
+  const sendEvent = (event: string, data: any) => {
+    res.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
+  };
+
+  try {
+    const { fileToken, type, mode, archiveMissing, vesselId, rowIndices, storeType } = req.body;
+
+    const cachedData = dryRunCache.get(fileToken);
+    if (!cachedData) {
+      sendEvent('error', { message: 'Invalid or expired file token' });
+      return res.end();
+    }
+
+    let dataToImport = cachedData.normalizedData || cachedData.data;
+
+    if (rowIndices && Array.isArray(rowIndices)) {
+      dataToImport = dataToImport.filter((_: any, index: number) => rowIndices.includes(index + 1));
+    } else {
+      if (cachedData.results.summary.errors > 0) {
+        sendEvent('error', { message: 'Cannot import file with errors. Use rowIndices parameter to import only valid rows.' });
+        return res.end();
+      }
+    }
+
+    const effectiveType = cachedData.type || type;
+    const totalRows = dataToImport.length;
+
+    sendEvent('progress', { processed: 0, total: totalRows, remaining: totalRows, percent: 0, status: 'Initializing Import…', errors: 0 });
+
+    await storeImportHistory({
+      id: historyId,
+      type: effectiveType,
+      mode,
+      archiveMissing: archiveMissing || false,
+      userId: (req as any).user?.id || 'system',
+      vesselId,
+      originalName: cachedData.originalName,
+      fileSize: cachedData.file.length,
+      created: 0,
+      updated: 0,
+      skipped: 0,
+      archived: 0,
+      startedAt: startedAt,
+      finishedAt: null,
+      status: 'in_progress'
+    });
+
+    const importResult = await performImport(
+      effectiveType,
+      dataToImport,
+      mode,
+      archiveMissing,
+      vesselId,
+      (req as any).user?.id || 'system',
+      undefined,
+      storeType,
+      (info) => {
+        const percent = totalRows > 0 ? Math.round((info.processed / totalRows) * 100) : 0;
+        const remaining = totalRows - info.processed;
+        const status = info.processed >= totalRows ? 'Finalizing…' : info.status;
+        sendEvent('progress', { processed: info.processed, total: totalRows, remaining, percent, status, errors: info.errors });
+      }
+    );
+
+    let storedFilePath: string | null = null;
+    try {
+      const { Client } = await import('@replit/object-storage');
+      const client = new Client();
+      const timestamp = Date.now();
+      const safeFileName = cachedData.originalName.replace(/[^a-zA-Z0-9.-]/g, '_');
+      const objectPath = `bulk-imports/${effectiveType}/${timestamp}_${safeFileName}`;
+      await client.uploadFromBytes(objectPath, cachedData.file);
+      storedFilePath = `replit:${objectPath}`;
+    } catch (uploadError) {
+      try {
+        const uploadsDir = path.join(process.cwd(), 'uploads', 'bulk-imports', effectiveType);
+        await fsPromises.mkdir(uploadsDir, { recursive: true });
+        const timestamp = Date.now();
+        const safeFileName = cachedData.originalName.replace(/[^a-zA-Z0-9.-]/g, '_');
+        const localFilePath = path.join(uploadsDir, `${timestamp}_${safeFileName}`);
+        await fsPromises.writeFile(localFilePath, cachedData.file);
+        storedFilePath = `local:${localFilePath}`;
+      } catch (_localError) {
+        // File storage is optional
+      }
+    }
+
+    await updateFileBasedHistory(historyId, {
+      ...importResult,
+      completedAt: new Date().toISOString(),
+      status: 'complete',
+      originalName: cachedData.originalName,
+      storedFilePath: storedFilePath
+    });
+
+    dryRunCache.delete(fileToken);
+
+    sendEvent('complete', { ...importResult, historyId });
+    res.end();
+  } catch (error: any) {
+    console.error('Import stream error:', error);
+
+    try {
+      await updateFileBasedHistory(historyId, {
+        completedAt: new Date().toISOString(),
+        status: 'failed'
+      });
+    } catch (_updateError) {
+      // Ignore history update errors
+    }
+
+    sendEvent('error', { message: error?.message || 'Unknown error' });
+    res.end();
+  }
+}
+
+// ── SSE Streaming Locations Import ──
+export async function doLocationsImportStream(req: Request, res: Response) {
+  res.setHeader('Content-Type', 'text/event-stream');
+  res.setHeader('Cache-Control', 'no-cache');
+  res.setHeader('Connection', 'keep-alive');
+  res.setHeader('X-Accel-Buffering', 'no');
+  res.flushHeaders();
+
+  const sendEvent = (event: string, data: any) => {
+    res.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
+  };
+
+  try {
+    const file = req.file;
+    if (!file) {
+      sendEvent('error', { message: 'No file uploaded' });
+      return res.end();
+    }
+
+    const vesselId = req.query.vesselId as string;
+    if (!vesselId) {
+      sendEvent('error', { message: 'vesselId query parameter is required' });
+      return res.end();
+    }
+
+    const userId = (req as any).user?.username || 'system';
+
+    const workbook = XLSX.read(file.buffer, { type: 'buffer' });
+    const sheetName = workbook.SheetNames.find(name =>
+      name.toLowerCase().includes('location')
+    ) || workbook.SheetNames[0];
+
+    const worksheet = workbook.Sheets[sheetName];
+    const data: any[] = XLSX.utils.sheet_to_json(worksheet);
+    const totalRows = data.length;
+
+    sendEvent('progress', { processed: 0, total: totalRows, remaining: totalRows, percent: 0, status: 'Initializing Import…', errors: 0 });
+
+    const results = { created: 0, updated: 0, skipped: 0, errors: [] as string[] };
+    const seenNames = new Set<string>();
+
+    for (let i = 0; i < data.length; i++) {
+      const row: any = data[i];
+      const rowNum = i + 2;
+
+      const locationName = row['Location Name'] || row['location_name'] || row['locationName'] || row['location name'] || row['Name'] || row['name'];
+      const locationType = row['Location Type'] || row['location_type'] || row['locationType'] || row['location type'] || row['Type'] || row['type'];
+
+      if (!locationName || String(locationName).trim() === '') {
+        results.errors.push(`Row ${rowNum}: Location Name is required`);
+        results.skipped++;
+        sendEvent('progress', { processed: i + 1, total: totalRows, remaining: totalRows - (i + 1), percent: Math.round(((i + 1) / totalRows) * 100), status: 'Processing Locations…', errors: results.errors.length });
+        continue;
+      }
+
+      const trimmedName = String(locationName).trim();
+      const normalizedName = trimmedName.toLowerCase();
+
+      if (seenNames.has(normalizedName)) {
+        results.errors.push(`Row ${rowNum}: Duplicate location name "${trimmedName}" within file`);
+        results.skipped++;
+        sendEvent('progress', { processed: i + 1, total: totalRows, remaining: totalRows - (i + 1), percent: Math.round(((i + 1) / totalRows) * 100), status: 'Processing Locations…', errors: results.errors.length });
+        continue;
+      }
+      seenNames.add(normalizedName);
+
+      try {
+        const existing = await storage.getLocationByName(vesselId, trimmedName);
+        const trimmedType = locationType ? String(locationType).trim() : null;
+
+        if (existing) {
+          if (trimmedType && trimmedType !== existing.locationType) {
+            await storage.updateLocation(existing.id, { locationType: trimmedType });
+            results.updated++;
+          } else {
+            results.skipped++;
+          }
+        } else {
+          await storage.createLocation({
+            vesselId,
+            locationName: trimmedName,
+            locationType: trimmedType,
+            createdBy: userId,
+          });
+          results.created++;
+        }
+      } catch (error: any) {
+        results.errors.push(`Row ${rowNum}: ${error.message}`);
+        results.skipped++;
+      }
+
+      sendEvent('progress', { processed: i + 1, total: totalRows, remaining: totalRows - (i + 1), percent: Math.round(((i + 1) / totalRows) * 100), status: 'Processing Locations…', errors: results.errors.length });
+    }
+
+    sendEvent('complete', { created: results.created, updated: results.updated, skipped: results.skipped, failed: results.errors.length, errors: results.errors });
+    res.end();
+  } catch (error: any) {
+    console.error('Error importing locations (stream):', error);
+    sendEvent('error', { message: error?.message || 'Failed to import locations' });
+    res.end();
+  }
+}
+
 // ── History ──
 export async function getHistoryList(req: Request, res: Response) {
   try {

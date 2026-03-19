@@ -170,6 +170,13 @@ export interface RowResult {
   error?: string;
 }
 
+export type ProgressCallback = (info: {
+  processed: number;
+  total: number;
+  status: string;
+  errors: number;
+}) => void;
+
 // Perform actual import
 export async function performImport(
   type: string,
@@ -179,7 +186,8 @@ export async function performImport(
   vesselId: string | undefined,
   userId: string,
   importHistoryId?: string,
-  storeType?: string
+  storeType?: string,
+  onProgress?: ProgressCallback
 ) {
   const result = {
     created: 0,
@@ -193,6 +201,16 @@ export async function performImport(
     spareComponentLinksDbDelta: 0,
     rowResults: [] as RowResult[],
     warnings: [] as string[]
+  };
+
+  let _processedCount = 0;
+  const _totalRows = data.length;
+  const _emitProgress = (status: string) => {
+    if (onProgress) {
+      _processedCount++;
+      const errorCount = result.rowResults.filter(r => r.action === 'failed').length;
+      onProgress({ processed: _processedCount, total: _totalRows, status, errors: errorCount });
+    }
   };
 
   if (type === 'components') {
@@ -425,6 +443,7 @@ export async function performImport(
         result.skipped++;
         result.rowResults.push({ rowNumber: rowNum, primaryIdentifier: componentCode, action: 'failed', error: rowError.message });
       }
+      _emitProgress('Processing Components…');
     }
     
     // Step 5: Archive missing components if requested
@@ -862,6 +881,7 @@ export async function performImport(
         const _errPartCode = row['Part Code'] ? String(row['Part Code']).trim() : `row-${_spareRowNum}`;
         result.rowResults.push({ rowNumber: _spareRowNum, primaryIdentifier: _errPartCode, action: 'failed', error: error.message });
       }
+      _emitProgress('Processing Spares…');
     }
     
     const postImportLinkCount = await storage.getSpareComponentLinkCountByVessel(sparesVesselId);
@@ -1075,6 +1095,7 @@ export async function performImport(
         const _errItemCode = String(row['Item Code'] || '').trim() || `row-${_storeRowNum}`;
         result.rowResults.push({ rowNumber: _storeRowNum, primaryIdentifier: _errItemCode, action: 'failed', error: error.message });
       }
+      _emitProgress('Processing Stores…');
     }
     
     console.log(`✅ Stores import complete: ${result.created} created, ${result.updated} updated, ${result.skipped} skipped`);
@@ -1183,6 +1204,7 @@ export async function performImport(
         result.skipped++;
         result.rowResults.push({ rowNumber: _woRowNum, primaryIdentifier: templateCode, action: 'failed', error: woError.message });
       }
+      _emitProgress('Processing Work Orders…');
     }
     
     // Step 3: Archive missing work orders if requested
@@ -1629,6 +1651,7 @@ export async function performImport(
           }
         }
       }
+      _emitProgress('Processing Jobs…');
     }
     
     // Step 3: Archive missing jobs if requested
@@ -1746,6 +1769,7 @@ export async function performImport(
         result.skipped++;
         result.rowResults.push({ rowNumber: _makerRowNum, primaryIdentifier: makerCode, action: 'failed', error: makerError.message });
       }
+      _emitProgress('Processing Makers…');
     }
     
     console.log(`✅ Makers import complete: ${result.created} created, ${result.updated} updated, ${result.skipped} skipped`);
@@ -1849,6 +1873,7 @@ export async function performImport(
         result.skipped++;
         result.rowResults.push({ rowNumber: _fcRowNum, primaryIdentifier: fleetEquipmentCode, action: 'failed', error: fcError.message });
       }
+      _emitProgress('Processing Fleet Components…');
     }
     
     console.log(`✅ Fleet components import complete: ${result.created} created, ${result.updated} updated, ${result.skipped} skipped`);
@@ -2000,6 +2025,7 @@ export async function performImport(
         result.skipped++;
         result.rowResults.push({ rowNumber: _fjRowNum, primaryIdentifier: jobCode, action: 'failed', error: fjError.message });
       }
+      _emitProgress('Processing Fleet Jobs…');
     }
     
     console.log(`✅ Fleet jobs import complete: ${result.created} created, ${result.updated} updated, ${result.skipped} skipped`);
@@ -2134,6 +2160,7 @@ export async function performImport(
         result.skipped++;
         result.rowResults.push({ rowNumber: _fsRowNum, primaryIdentifier: partCode, action: 'failed', error: fsError.message });
       }
+      _emitProgress('Processing Fleet Spares…');
     }
     
     console.log(`✅ Fleet spares import complete: ${result.created} created, ${result.updated} updated, ${result.skipped} skipped`);

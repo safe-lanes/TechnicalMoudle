@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -6,6 +6,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { Download, Upload, CheckCircle, AlertTriangle, AlertCircle, FileSpreadsheet, MapPin } from "lucide-react";
+import ImportProgressOverlay, { useImportStream, type ImportProgressData, type ImportCompleteData } from "@/components/admin/ImportProgressOverlay";
 
 const FIELD_MAPPINGS = [
   { field: "Location Name", required: true, description: "Unique name for the storage location (e.g., Engine Room Store, Deck Locker)" },
@@ -27,8 +28,20 @@ export default function LocationsUpload({ vesselId }: LocationsUploadProps) {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   const [importResult, setImportResult] = useState<ImportResult | null>(null);
+  const [sseOverlayVisible, setSseOverlayVisible] = useState(false);
+  const [sseProgress, setSseProgress] = useState<ImportProgressData | null>(null);
+  const [sseComplete, setSseComplete] = useState<ImportCompleteData | null>(null);
+  const [sseError, setSseError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
+  const { consumeStream } = useImportStream();
+
+  const handleCloseOverlay = useCallback(() => {
+    setSseOverlayVisible(false);
+    setSseProgress(null);
+    setSseComplete(null);
+    setSseError(null);
+  }, []);
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -90,48 +103,71 @@ export default function LocationsUpload({ vesselId }: LocationsUploadProps) {
 
     setIsUploading(true);
     setImportResult(null);
+    setSseProgress(null);
+    setSseComplete(null);
+    setSseError(null);
+    setSseOverlayVisible(true);
+
+    const formData = new FormData();
+    formData.append('file', selectedFile);
 
     try {
-      const formData = new FormData();
-      formData.append('file', selectedFile);
+      await consumeStream(
+        `/technical/api/bulk/locations/import-stream?vesselId=${encodeURIComponent(vesselId)}`,
+        {
+          method: 'POST',
+          body: formData,
+        },
+        {
+          onProgress: (data) => setSseProgress(data),
+          onComplete: (result) => {
+            setSseComplete(result);
 
-      const response = await fetch(`/technical/api/bulk/locations/import?vesselId=${encodeURIComponent(vesselId)}`, {
-        method: 'POST',
-        body: formData,
-      });
+            const locResult: ImportResult = {
+              created: result.created || 0,
+              updated: result.updated || 0,
+              skipped: result.skipped || 0,
+              errors: (result.errors as string[]) || [],
+            };
+            setImportResult(locResult);
 
-      const result = await response.json();
+            if (locResult.errors.length === 0) {
+              toast({
+                title: 'Import Successful',
+                description: `${locResult.created} created, ${locResult.updated} updated, ${locResult.skipped} skipped.`
+              });
+            } else {
+              toast({
+                title: 'Import Completed with Issues',
+                description: `${locResult.created} created, ${locResult.updated} updated. ${locResult.errors.length} error(s).`,
+                variant: 'destructive'
+              });
+            }
 
-      if (!response.ok) {
-        throw new Error(result.error || 'Import failed');
-      }
-
-      setImportResult(result);
-
-      if (result.errors.length === 0) {
-        toast({
-          title: 'Import Successful',
-          description: `${result.created} created, ${result.updated} updated, ${result.skipped} skipped.`
-        });
-      } else {
-        toast({
-          title: 'Import Completed with Issues',
-          description: `${result.created} created, ${result.updated} updated. ${result.errors.length} error(s).`,
-          variant: 'destructive'
-        });
-      }
-
-      setSelectedFile(null);
-      if (fileInputRef.current) {
-        fileInputRef.current.value = '';
-      }
+            setSelectedFile(null);
+            if (fileInputRef.current) {
+              fileInputRef.current.value = '';
+            }
+            setIsUploading(false);
+          },
+          onError: (message) => {
+            setSseError(message);
+            toast({
+              title: 'Import Failed',
+              description: message || 'An error occurred during import.',
+              variant: 'destructive'
+            });
+            setIsUploading(false);
+          },
+        }
+      );
     } catch (error: any) {
+      setSseError(error.message || 'An error occurred during import.');
       toast({
         title: 'Import Failed',
         description: error.message || 'An error occurred during import.',
         variant: 'destructive'
       });
-    } finally {
       setIsUploading(false);
     }
   };
@@ -329,6 +365,15 @@ export default function LocationsUpload({ vesselId }: LocationsUploadProps) {
           </Card>
         </TabsContent>
       </Tabs>
+
+      <ImportProgressOverlay
+        visible={sseOverlayVisible}
+        progress={sseProgress}
+        complete={sseComplete}
+        error={sseError}
+        onClose={handleCloseOverlay}
+        entityLabel="locations"
+      />
     </div>
   );
 }

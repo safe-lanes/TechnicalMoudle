@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { useUIRole } from "@/contexts/UIRoleContext";
@@ -57,6 +57,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useQuery } from "@tanstack/react-query";
 import { queryClient } from "@/lib/queryClient";
 import { invalidateAfterBulkImport } from "@/lib/cacheInvalidation";
+import ImportProgressOverlay, { useImportStream, type ImportProgressData, type ImportCompleteData } from "@/components/admin/ImportProgressOverlay";
 import { LucideIcon } from "lucide-react";
 import ImportSummaryModal, { ImportSummaryRow } from "./ImportSummaryModal";
 
@@ -178,7 +179,12 @@ export default function UniformBulkUpload({
   const [importSummaryData, setImportSummaryData] = useState<ImportSummaryRow[]>([]);
   const [importCounts, setImportCounts] = useState<{ created: number; updated: number; skipped: number; archived: number }>({ created: 0, updated: 0, skipped: 0, archived: 0 });
   const [importFileName, setImportFileName] = useState<string>('');
+  const [sseOverlayVisible, setSseOverlayVisible] = useState(false);
+  const [sseProgress, setSseProgress] = useState<ImportProgressData | null>(null);
+  const [sseComplete, setSseComplete] = useState<ImportCompleteData | null>(null);
+  const [sseError, setSseError] = useState<string | null>(null);
   const { toast } = useToast();
+  const { consumeStream } = useImportStream();
 
   const { data: historyData, isLoading: historyLoading } = useQuery<{items: ImportHistory[], total: number}>({
     queryKey: ['/technical/api/bulk/history', templateType],
@@ -379,6 +385,13 @@ export default function UniformBulkUpload({
     }
   };
 
+  const handleCloseOverlay = useCallback(() => {
+    setSseOverlayVisible(false);
+    setSseProgress(null);
+    setSseComplete(null);
+    setSseError(null);
+  }, []);
+
   const handleImport = async (skipErrors: boolean = false) => {
     if (!dryRunResult) return;
 
@@ -390,66 +403,81 @@ export default function UniformBulkUpload({
           .map(row => row.row)
       : undefined;
 
+    const requestBody: any = {
+      fileToken: dryRunResult.fileToken,
+      type: templateType,
+      mode: importMode,
+      vesselId: vesselId,
+      archiveMissing: false,
+      rowIndices
+    };
+
+    if (templateType === 'stores' && selectedStoreType) {
+      requestBody.storeType = selectedStoreType;
+    }
+
+    setSseProgress(null);
+    setSseComplete(null);
+    setSseError(null);
+    setSseOverlayVisible(true);
+
     try {
-      const requestBody: any = {
-        fileToken: dryRunResult.fileToken,
-        type: templateType,
-        mode: importMode,
-        vesselId: vesselId,
-        archiveMissing: false,
-        rowIndices
-      };
-      
-      if (templateType === 'stores' && selectedStoreType) {
-        requestBody.storeType = selectedStoreType;
-      }
+      await consumeStream(
+        '/technical/api/bulk/import-stream',
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(requestBody),
+        },
+        {
+          onProgress: (data) => setSseProgress(data),
+          onComplete: (result) => {
+            setSseComplete(result);
 
-      const response = await fetch('/technical/api/bulk/import', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(requestBody)
-      });
+            toast({
+              title: 'Import Successful',
+              description: `Created: ${result.created}, Updated: ${result.updated}, Skipped: ${result.skipped}`
+            });
 
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.error || 'Import failed');
-      }
+            const summaryRows: ImportSummaryRow[] = buildImportSummary(result, dryRunResult, skipErrors);
+            setImportCounts({
+              created: result.created || 0,
+              updated: result.updated || 0,
+              skipped: result.skipped || 0,
+              archived: result.archived || 0,
+            });
+            setImportSummaryData(summaryRows);
+            setImportFileName(selectedFile?.name || 'import');
 
-      const result = await response.json();
+            setPartialImportDialogOpen(false);
 
-      toast({
-        title: 'Import Successful',
-        description: `Created: ${result.created}, Updated: ${result.updated}, Skipped: ${result.skipped}`
-      });
+            queryClient.invalidateQueries({ queryKey: ['/technical/api/bulk/history', templateType] });
+            invalidateAfterBulkImport(templateType, vesselId);
 
-      const summaryRows: ImportSummaryRow[] = buildImportSummary(result, dryRunResult, skipErrors);
+            if (onRefreshData) {
+              onRefreshData();
+            }
 
-      setImportCounts({
-        created: result.created || 0,
-        updated: result.updated || 0,
-        skipped: result.skipped || 0,
-        archived: result.archived || 0,
-      });
-      setImportSummaryData(summaryRows);
-      setImportFileName(selectedFile?.name || 'import');
-      setImportSummaryOpen(true);
-
-      setPartialImportDialogOpen(false);
-      
-      queryClient.invalidateQueries({ queryKey: ['/technical/api/bulk/history', templateType] });
-      
-      invalidateAfterBulkImport(templateType, vesselId);
-      
-      if (onRefreshData) {
-        onRefreshData();
-      }
+            setIsImporting(false);
+          },
+          onError: (message) => {
+            setSseError(message);
+            toast({
+              title: 'Import Failed',
+              description: message || 'Failed to import data',
+              variant: 'destructive'
+            });
+            setIsImporting(false);
+          },
+        }
+      );
     } catch (error: any) {
+      setSseError(error.message || 'Failed to import data');
       toast({
         title: 'Import Failed',
         description: error.message || 'Failed to import data',
         variant: 'destructive'
       });
-    } finally {
       setIsImporting(false);
     }
   };
@@ -1334,6 +1362,20 @@ export default function UniformBulkUpload({
         templateType={templateType}
         previewColumns={previewColumns}
         fileName={importFileName}
+      />
+
+      <ImportProgressOverlay
+        visible={sseOverlayVisible}
+        progress={sseProgress}
+        complete={sseComplete}
+        error={sseError}
+        onClose={() => {
+          handleCloseOverlay();
+          if (sseComplete) {
+            setImportSummaryOpen(true);
+          }
+        }}
+        entityLabel={templateType.replace(/-/g, ' ')}
       />
     </div>
   );

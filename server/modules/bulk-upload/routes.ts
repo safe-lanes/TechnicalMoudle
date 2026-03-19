@@ -22,6 +22,7 @@ router.post('/bulk/sheets', upload.single('file'), asyncHandler(ctrl.getSheets))
 // ── Dry-Run & Import ──
 router.post('/bulk/dry-run', upload.single('file'), asyncHandler(ctrl.dryRun));
 router.post('/bulk/import', asyncHandler(ctrl.doImport));
+router.post('/bulk/import-stream', asyncHandler(ctrl.doImportStream));
 router.post('/bulk/export-summary', asyncHandler(ctrl.exportSummary));
 
 // ── History (specific routes before parameterized) ──
@@ -52,6 +53,7 @@ router.post('/bulk/sfi-details/import', upload.single('file'), asyncHandler(ctrl
 // ── Locations ──
 router.get('/bulk/locations/template', asyncHandler(ctrl.get_locations_template));
 router.post('/bulk/locations/import', upload.single('file'), asyncHandler(ctrl.post_locations_import));
+router.post('/bulk/locations/import-stream', upload.single('file'), asyncHandler(ctrl.doLocationsImportStream));
 router.get('/bulk/locations', asyncHandler(ctrl.get_locations));
 router.put('/bulk/locations/:id', asyncHandler(ctrl.put_locationsByid));
 router.delete('/bulk/locations/:id', asyncHandler(ctrl.delete_locationsByid));
