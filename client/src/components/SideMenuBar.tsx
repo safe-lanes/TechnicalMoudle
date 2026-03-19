@@ -23,7 +23,6 @@ import {
   Flag,
   RefreshCw,
   List,
-  History,
 } from "lucide-react";
 
 interface SideMenuBarProps {
@@ -45,7 +44,6 @@ const menuConfigs: Record<string, MenuItem[]> = {
     { id: "dashboard", label: "Dashboard", icon: LayoutDashboard },
     { id: "components", label: "Components", icon: Package },
     { id: "work-orders", label: "Work orders", icon: ClipboardList },
-    { id: "work-history", label: "Work History", icon: History },
     { id: "running-hrs", label: "Running Hrs", icon: Clock },
     { id: "spares", label: "Spares", icon: Archive },
     { id: "stores", label: "Stores", icon: Store },
