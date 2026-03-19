@@ -445,8 +445,216 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
 
   const [workHistoryExpanded, setWorkHistoryExpanded] = useState(false);
   const [workHistoryPage, setWorkHistoryPage] = useState(0);
+  const [isExportingHistoryExcel, setIsExportingHistoryExcel] = useState(false);
+  const [isExportingHistoryPDF, setIsExportingHistoryPDF] = useState(false);
   const WORK_HISTORY_COLLAPSED_COUNT = 2;
   const WORK_HISTORY_PAGE_SIZE = 5;
+
+  const buildWorkHistoryForExport = () =>
+    (templateData.workHistory || []).map((h: any) => {
+      if (h.isSkipped) {
+        return {
+          date: h.skippedCycleDate || h.completionDate || h.workDate,
+          workOrder: '—',
+          description: 'Cycle not performed',
+          performedBy: '—',
+          status: 'SKIPPED',
+          remarks: `Automatically recorded. See WO: ${h.sourceWorkOrderId ? h.sourceWorkOrderId.slice(-8) : '—'}`,
+          missedCycles: 0,
+          isSkipped: true,
+        };
+      }
+      return {
+        date: h.completionDate || h.workDate,
+        workOrder: h.woNo || '—',
+        description: h.description || '-',
+        performedBy: h.performedBy || '-',
+        status: h.status || '-',
+        remarks: h.remarks || '-',
+        missedCycles: h.missedCycles || 0,
+        isSkipped: false,
+      };
+    });
+
+  const handleExportWorkHistoryExcel = async () => {
+    setIsExportingHistoryExcel(true);
+    try {
+      const ExcelJS = (await import('exceljs')).default;
+      const wb = new ExcelJS.Workbook();
+      wb.creator = 'SAIL PMS';
+      wb.created = new Date();
+      const ws = wb.addWorksheet('Work History');
+
+      const cols = [
+        { key: 'date', header: 'Date', width: 16 },
+        { key: 'workOrder', header: 'Work Order No', width: 24 },
+        { key: 'description', header: 'Description', width: 42 },
+        { key: 'performedBy', header: 'Performed By', width: 22 },
+        { key: 'status', header: 'Status', width: 14 },
+        { key: 'remarks', header: 'Remarks', width: 32 },
+        { key: 'missedCycles', header: 'Missed Cycles', width: 15 },
+      ];
+      const totalCols = cols.length;
+      const lastColLetter = String.fromCharCode('A'.charCodeAt(0) + totalCols - 1);
+      ws.columns = cols.map(c => ({ key: c.key, width: c.width }));
+
+      ws.mergeCells(`A1:${lastColLetter}1`);
+      const t = ws.getCell('A1');
+      t.value = 'SEAFARER TECHNICAL MANAGEMENT SYSTEM';
+      t.font = { size: 14, bold: true, color: { argb: 'FFFFFFFF' }, name: 'Arial' };
+      t.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1E5A8E' } };
+      t.alignment = { horizontal: 'center', vertical: 'middle' };
+      ws.getRow(1).height = 30;
+
+      ws.mergeCells(`A2:${lastColLetter}2`);
+      const s = ws.getCell('A2');
+      s.value = `Work History — ${templateData.componentName || templateData.componentCode || 'Component'} — ${workOrderNo || 'Work Order'}`;
+      s.font = { size: 12, bold: true, color: { argb: 'FF2C3E50' }, name: 'Arial' };
+      s.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF7F9FC' } };
+      s.alignment = { horizontal: 'center', vertical: 'middle' };
+      s.border = { bottom: { style: 'medium', color: { argb: 'FF1E5A8E' } } };
+      ws.getRow(2).height = 25;
+
+      ws.getRow(3).height = 8;
+      const exportData = buildWorkHistoryForExport();
+      ws.getCell('A4').value = `Component: ${templateData.componentName || templateData.componentCode || '-'}`;
+      ws.getCell('A4').font = { bold: true, size: 10, color: { argb: 'FF2C3E50' }, name: 'Arial' };
+      ws.getCell('A4').fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF7F9FC' } };
+
+      const dtCol = String.fromCharCode(lastColLetter.charCodeAt(0) - 1);
+      ws.mergeCells(`${dtCol}4:${lastColLetter}4`);
+      ws.getCell(`${dtCol}4`).value = `Report Date: ${new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}`;
+      ws.getCell(`${dtCol}4`).font = { size: 10, color: { argb: 'FF5A6C7D' }, name: 'Arial' };
+      ws.getCell(`${dtCol}4`).alignment = { horizontal: 'right' };
+      ws.getRow(4).height = 18;
+
+      ws.getCell('A5').value = `Work Order: ${workOrderNo || '-'}  |  Total Records: ${exportData.length}`;
+      ws.getCell('A5').font = { size: 9, color: { argb: 'FF2C3E50' }, name: 'Arial' };
+      ws.getCell('A5').fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF7F9FC' } };
+      ws.getRow(5).height = 16;
+      ws.getRow(6).height = 6;
+
+      const hdrRow = ws.getRow(7);
+      cols.forEach((col, idx) => {
+        const cell = hdrRow.getCell(idx + 1);
+        cell.value = col.header;
+        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF5DADE2' } };
+        cell.font = { bold: true, color: { argb: 'FFFFFFFF' }, size: 10, name: 'Arial' };
+        cell.alignment = { vertical: 'middle', horizontal: 'center', wrapText: true };
+        cell.border = { top: { style: 'thin', color: { argb: 'FFFFFFFF' } }, left: { style: 'thin', color: { argb: 'FFFFFFFF' } }, bottom: { style: 'thin', color: { argb: 'FFFFFFFF' } }, right: { style: 'thin', color: { argb: 'FFFFFFFF' } } };
+      });
+      hdrRow.height = 25;
+
+      exportData.forEach((record, idx) => {
+        const row = ws.getRow(8 + idx);
+        const fmtDate = (d: string | null) => d ? new Date(d).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : '-';
+        [fmtDate(record.date), record.workOrder, record.description, record.performedBy, record.status, record.remarks, record.missedCycles > 0 ? record.missedCycles : '-']
+          .forEach((v, ci) => { row.getCell(ci + 1).value = v; });
+
+        const isEven = idx % 2 === 1;
+        let bg = isEven ? 'FFF7F9FC' : 'FFFFFFFF';
+        let fc = 'FF2C3E50';
+        let bold = false;
+        if (record.isSkipped) { bg = 'FFFEE2E2'; fc = 'FF991B1B'; bold = true; }
+        else if (record.missedCycles > 0) { bg = 'FFFEF3C7'; fc = 'FF92400E'; bold = true; }
+
+        row.eachCell((cell, cn) => {
+          if (cn > totalCols) return;
+          cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: bg } };
+          cell.font = { color: { argb: fc }, size: 9, name: 'Arial', bold };
+          cell.border = { top: { style: 'thin', color: { argb: 'FFE1E8ED' } }, left: { style: 'thin', color: { argb: 'FFE1E8ED' } }, bottom: { style: 'thin', color: { argb: 'FFE1E8ED' } }, right: { style: 'thin', color: { argb: 'FFE1E8ED' } } };
+          cell.alignment = { horizontal: 'left', vertical: 'middle' };
+        });
+        row.height = 20;
+      });
+
+      ws.pageSetup = { orientation: 'landscape', paperSize: 9, fitToPage: true, fitToWidth: 1, fitToHeight: 0 };
+      const buffer = await wb.xlsx.writeBuffer();
+      const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `work-history-${(workOrderNo || 'WO').replace(/[^a-zA-Z0-9]/g, '-')}-${new Date().toISOString().slice(0, 10)}.xlsx`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error('Excel export failed:', err);
+      toast({ variant: 'destructive', title: 'Export failed', description: 'Could not generate the Excel file. Please try again.' });
+    } finally {
+      setIsExportingHistoryExcel(false);
+    }
+  };
+
+  const handleExportWorkHistoryPDF = async () => {
+    setIsExportingHistoryPDF(true);
+    try {
+      const { default: jsPDF } = await import('jspdf');
+      const { default: autoTable } = await import('jspdf-autotable');
+      const exportData = buildWorkHistoryForExport();
+      const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
+      const pageWidth = doc.internal.pageSize.getWidth();
+      const margin = 10;
+
+      doc.setFillColor(30, 90, 142);
+      doc.rect(0, 0, pageWidth, 34, 'F');
+      doc.setTextColor(255, 255, 255);
+      doc.setFontSize(18);
+      doc.setFont('helvetica', 'bold');
+      doc.text('WORK HISTORY REPORT', margin, 14);
+      doc.setFontSize(10);
+      doc.setFont('helvetica', 'normal');
+      doc.text(`${templateData.componentName || templateData.componentCode || 'Component'}`, margin, 22);
+      doc.setFontSize(8);
+      doc.text(`Work Order: ${workOrderNo || '-'}`, margin, 29);
+      doc.text(`Generated: ${new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}`, pageWidth - margin, 18, { align: 'right' });
+      doc.text(`Records: ${exportData.length}`, pageWidth - margin, 24, { align: 'right' });
+
+      const headers = ['Date', 'Work Order No', 'Description', 'Performed By', 'Status', 'Remarks', 'Missed Cycles'];
+      const body = exportData.map(r => {
+        const fmtDate = (d: string | null) => d ? new Date(d).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : '-';
+        return [fmtDate(r.date), r.workOrder, r.description, r.performedBy, r.status, r.remarks, r.missedCycles > 0 ? `⚠ ${r.missedCycles}` : '—'];
+      });
+
+      autoTable(doc, {
+        head: [headers],
+        body,
+        startY: 40,
+        margin: { left: margin, right: margin },
+        styles: { fontSize: 8, cellPadding: 2.5, overflow: 'linebreak', lineColor: [225, 232, 237], lineWidth: 0.1 },
+        headStyles: { fillColor: [93, 173, 226], textColor: [255, 255, 255], fontStyle: 'bold', halign: 'center', fontSize: 8 },
+        alternateRowStyles: { fillColor: [247, 249, 252] },
+        columnStyles: { 0: { cellWidth: 22 }, 1: { cellWidth: 32 }, 2: { cellWidth: 60 }, 3: { cellWidth: 28 }, 4: { cellWidth: 20 }, 5: { cellWidth: 50 }, 6: { cellWidth: 18 } },
+        didParseCell: (hookData) => {
+          if (hookData.section !== 'body') return;
+          const record = exportData[hookData.row.index];
+          if (!record) return;
+          if (record.isSkipped) {
+            hookData.cell.styles.fillColor = [254, 226, 226];
+            hookData.cell.styles.textColor = [153, 27, 27];
+          } else if (record.missedCycles > 0) {
+            hookData.cell.styles.fillColor = [254, 243, 199];
+            hookData.cell.styles.textColor = [146, 64, 14];
+          }
+        },
+        didDrawPage: (hookData) => {
+          const pageCount = (doc as any).internal.getNumberOfPages();
+          const currentPage = hookData.pageNumber;
+          doc.setFontSize(7);
+          doc.setTextColor(90, 108, 125);
+          doc.text(`Work History — ${workOrderNo || ''}  |  Page ${currentPage} of ${pageCount}`, pageWidth / 2, doc.internal.pageSize.getHeight() - 5, { align: 'center' });
+        },
+      });
+
+      doc.save(`work-history-${(workOrderNo || 'WO').replace(/[^a-zA-Z0-9]/g, '-')}-${new Date().toISOString().slice(0, 10)}.pdf`);
+    } catch (err) {
+      console.error('PDF export failed:', err);
+      toast({ variant: 'destructive', title: 'Export failed', description: 'Could not generate the PDF file. Please try again.' });
+    } finally {
+      setIsExportingHistoryPDF(false);
+    }
+  };
 
   // Layer 7: RH Validation & Isolation state
   const [rhValidation, setRhValidation] = useState<{
@@ -3376,6 +3584,32 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
               <span data-testid="WOF.A5.6"><Marker id="WOF.A5.6" /></span>
               <span data-testid="WOF.A5.7"><Marker id="WOF.A5.7" /></span>
               <span data-testid="WOF.A5.8"><Marker id="WOF.A5.8" /></span>
+            </div>
+            <div className="flex justify-end gap-2 mb-3">
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={handleExportWorkHistoryExcel}
+                disabled={isExportingHistoryExcel || (templateData.workHistory || []).length === 0}
+                data-testid="button-export-history-excel"
+                className="h-7 text-xs border-green-600 text-green-700 hover:bg-green-50 disabled:opacity-40"
+              >
+                {isExportingHistoryExcel
+                  ? <><Loader2 className="h-3 w-3 animate-spin mr-1" />Exporting…</>
+                  : <><FileSpreadsheet className="h-3 w-3 mr-1" />Export Excel</>}
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={handleExportWorkHistoryPDF}
+                disabled={isExportingHistoryPDF || (templateData.workHistory || []).length === 0}
+                data-testid="button-export-history-pdf"
+                className="h-7 text-xs border-red-500 text-red-600 hover:bg-red-50 disabled:opacity-40"
+              >
+                {isExportingHistoryPDF
+                  ? <><Loader2 className="h-3 w-3 animate-spin mr-1" />Exporting…</>
+                  : <><FileText className="h-3 w-3 mr-1" />Export PDF</>}
+              </Button>
             </div>
             {(() => {
               const allHistory = (templateData.workHistory || []).map((history: any) => {
