@@ -1989,11 +1989,10 @@ const Spares: React.FC = () => {
       const now = new Date();
       const ts = now.toISOString().replace(/[-:]/g, '').replace('T', '_').slice(0, 15);
       const fname = `spares_master_${vesselId}_${ts}.xlsx`;
-      const sparesArray = Array.isArray(sparesData) ? sparesData : [];
       const seenCodes = new Set<string>();
       const exportRows: Record<string, any>[] = [];
 
-      for (const spare of sparesArray) {
+      for (const spare of filteredSpares) {
         if (seenCodes.has(spare.partCode)) continue;
         seenCodes.add(spare.partCode);
         exportRows.push(mapSpareToTemplateRow(spare));
