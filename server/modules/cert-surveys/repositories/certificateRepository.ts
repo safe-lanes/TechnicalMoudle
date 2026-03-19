@@ -27,12 +27,7 @@ export async function getMasterCertificatesByIds(masterIds: string[]) {
   const db = await getDb();
   if (!db) return null;
   return db.select().from(shipCertificatesMaster)
-    .where(
-      and(
-        eq(shipCertificatesMaster.applicableToCompany, true),
-        inArray(shipCertificatesMaster.masterId, masterIds)
-      )
-    )
+    .where(inArray(shipCertificatesMaster.masterId, masterIds))
     .orderBy(asc(shipCertificatesMaster.companySequence));
 }
 
