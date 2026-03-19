@@ -55,7 +55,8 @@ export async function getJobContext(jobId: string) {
       originalDueDate: wo.originalDueDate || null,
       isSkipped: false,
       skippedCycleDate: null,
-      sourceWorkOrderId: null
+      sourceWorkOrderId: null,
+      componentCode: wo.componentCode || (component as any)?.componentCode || (job as any).componentCode || ''
     };
   });
 
@@ -82,7 +83,8 @@ export async function getJobContext(jobId: string) {
             originalDueDate: h.originalDueDate || null,
             isSkipped: true,
             skippedCycleDate: h.skippedCycleDate || null,
-            sourceWorkOrderId: h.sourceWorkOrderId || null
+            sourceWorkOrderId: h.sourceWorkOrderId || null,
+            componentCode: (h as any).componentCode || (component as any)?.componentCode || (job as any).componentCode || ''
           });
         } else if (h.workOrderId && !existingWoIds.has(h.workOrderId)) {
           existingWoIds.add(h.workOrderId);
@@ -100,7 +102,8 @@ export async function getJobContext(jobId: string) {
             originalDueDate: h.originalDueDate || null,
             isSkipped: false,
             skippedCycleDate: null,
-            sourceWorkOrderId: null
+            sourceWorkOrderId: null,
+            componentCode: (h as any).componentCode || (component as any)?.componentCode || (job as any).componentCode || ''
           });
         }
       }

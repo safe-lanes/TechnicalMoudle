@@ -1,10 +1,10 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, Fragment } from "react";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { FileText, ArrowLeft, Menu, AlertTriangle, Save, X, Pencil, Trash2, Loader2, FileSpreadsheet } from "lucide-react";
+import { FileText, ArrowLeft, Menu, AlertTriangle, Save, X, Pencil, Trash2, Loader2, FileSpreadsheet, ChevronDown } from "lucide-react";
 import { Marker } from "@/components/Marker";
 import sailLogo from "@assets/SAIL logo Transparent_1753957135582.png";
 import {
@@ -413,6 +413,13 @@ const JobsFormPage: React.FC = () => {
 
   const [isExportingHistoryExcel, setIsExportingHistoryExcel] = useState(false);
   const [isExportingHistoryPDF, setIsExportingHistoryPDF] = useState(false);
+  const WORK_HISTORY_PAGE_SIZE = 5;
+  const [workHistoryExpanded, setWorkHistoryExpanded] = useState(false);
+  const [workHistoryPage, setWorkHistoryPage] = useState(0);
+  const [historyComponentFilter, setHistoryComponentFilter] = useState('');
+  const [historyDateFrom, setHistoryDateFrom] = useState('');
+  const [historyDateTo, setHistoryDateTo] = useState('');
+  const [expandedHistoryIndex, setExpandedHistoryIndex] = useState<number | null>(null);
 
   const calcDaysLate = (originalDueDate: string | null | undefined, completionDate: string | null | undefined): number => {
     if (!originalDueDate || !completionDate) return 0;
@@ -425,36 +432,46 @@ const JobsFormPage: React.FC = () => {
     return Math.max(0, Math.floor((completed.getTime() - due.getTime()) / 86400000));
   };
 
-  const buildWorkHistoryForExport = () =>
-    (templateData.workHistory || []).map((h: any) => {
-      if (h.isSkipped) {
+  const buildWorkHistoryForExport = () => {
+    const raw = templateData.workHistory || [];
+    return raw
+      .filter((h: any) => {
+        const dateStr = (h.isSkipped ? (h.skippedCycleDate || h.completionDate || h.workDate) : (h.completionDate || h.workDate))?.slice(0, 10) || '';
+        if (historyComponentFilter && (h.componentCode || '') !== historyComponentFilter) return false;
+        if (historyDateFrom && dateStr < historyDateFrom) return false;
+        if (historyDateTo && dateStr > historyDateTo) return false;
+        return true;
+      })
+      .map((h: any) => {
+        if (h.isSkipped) {
+          return {
+            date: h.skippedCycleDate || h.completionDate || h.workDate,
+            workOrder: '—',
+            description: 'Cycle not performed',
+            performedBy: '—',
+            runDate: '—',
+            status: 'SKIPPED',
+            daysLate: 0,
+            remarks: `Automatically recorded. See WO: ${h.sourceWorkOrderId ? h.sourceWorkOrderId.slice(-8) : '—'}`,
+            missedCycles: 0,
+            isSkipped: true,
+          };
+        }
+        const daysLate = calcDaysLate(h.originalDueDate, h.completionDate || h.workDate);
         return {
-          date: h.skippedCycleDate || h.completionDate || h.workDate,
-          workOrder: '—',
-          description: 'Cycle not performed',
-          performedBy: '—',
-          runDate: '—',
-          status: 'SKIPPED',
-          daysLate: 0,
-          remarks: `Automatically recorded. See WO: ${h.sourceWorkOrderId ? h.sourceWorkOrderId.slice(-8) : '—'}`,
-          missedCycles: 0,
-          isSkipped: true,
+          date: h.completionDate || h.workDate,
+          workOrder: h.woNo || '—',
+          description: h.description || '-',
+          performedBy: h.performedBy || '-',
+          runDate: h.runDate || '—',
+          status: h.status?.toLowerCase() === 'completed' ? 'Completed' : 'Postponed',
+          daysLate,
+          remarks: h.remarks || '-',
+          missedCycles: h.missedCycles || 0,
+          isSkipped: false,
         };
-      }
-      const daysLate = calcDaysLate(h.originalDueDate, h.completionDate || h.workDate);
-      return {
-        date: h.completionDate || h.workDate,
-        workOrder: h.woNo || '—',
-        description: h.description || '-',
-        performedBy: h.performedBy || '-',
-        runDate: h.runDate || '—',
-        status: h.status?.toLowerCase() === 'completed' ? 'Completed' : 'Postponed',
-        daysLate,
-        remarks: h.remarks || '-',
-        missedCycles: h.missedCycles || 0,
-        isSkipped: false,
-      };
-    });
+      });
+  };
 
   const handleExportWorkHistoryExcel = async () => {
     setIsExportingHistoryExcel(true);
@@ -1183,73 +1200,265 @@ const JobsFormPage: React.FC = () => {
                 </>
               }
             >
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm border border-gray-200">
-                  <thead>
-                    <tr className="bg-gray-50 border-b border-gray-200">
-                      <th className="text-left p-2 font-medium text-gray-700" data-testid="JF.A5.3"><Marker id="JF.A5.3" />DATE</th>
-                      <th className="text-left p-2 font-medium text-gray-700" data-testid="JF.A5.4"><Marker id="JF.A5.4" />WORK ORDER</th>
-                      <th className="text-left p-2 font-medium text-gray-700" data-testid="JF.A5.5"><Marker id="JF.A5.5" />DESCRIPTION</th>
-                      <th className="text-left p-2 font-medium text-gray-700" data-testid="JF.A5.6"><Marker id="JF.A5.6" />PERFORMED BY</th>
-                      <th className="text-left p-2 font-medium text-gray-700" data-testid="JF.A5.7"><Marker id="JF.A5.7" />RUN. HOURS</th>
-                      <th className="text-left p-2 font-medium text-gray-700" data-testid="JF.A5.8"><Marker id="JF.A5.8" />STATUS</th>
-                      <th className="text-left p-2 font-medium text-gray-700">BACKDATING</th>
-                      <th className="text-left p-2 font-medium text-gray-700">REMARKS</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {(templateData.workHistory || []).length === 0 ? (
-                      <tr>
-                        <td colSpan={8} className="text-center p-4 text-gray-500 italic">
-                          No data available
-                        </td>
-                      </tr>
-                    ) : (
-                      (templateData.workHistory || []).map((record: any, index) => {
-                        const daysLate = calcDaysLate(record.originalDueDate, record.completionDate || record.workDate);
-                        return (
-                          <tr key={index} className="border-b border-gray-200 hover:bg-gray-50">
-                            <td className="p-2" data-testid={index === 0 ? "JF.A5.9" : `text-history-date-${index}`}>{index === 0 && <Marker id="JF.A5.9" />}{formatDate(record.isSkipped ? (record.skippedCycleDate || record.completionDate || record.workDate) : (record.completionDate || record.workDate))}</td>
-                            <td className="p-2" data-testid={index === 0 ? "JF.A5.10" : `text-history-wo-${index}`}>{index === 0 && <Marker id="JF.A5.10" />}{record.isSkipped ? '—' : (record.woNo || '-')}</td>
-                            <td className="p-2 max-w-[180px] truncate" data-testid={index === 0 ? "JF.A5.11" : `text-history-description-${index}`} title={record.description || '-'}>{index === 0 && <Marker id="JF.A5.11" />}{record.isSkipped ? 'Cycle not performed' : (record.description || '-')}</td>
-                            <td className="p-2" data-testid={index === 0 ? "JF.A5.12" : `text-history-performed-by-${index}`}>{index === 0 && <Marker id="JF.A5.12" />}{record.isSkipped ? '—' : (record.performedBy || '-')}</td>
-                            <td className="p-2 text-gray-600" data-testid={`text-history-rh-${index}`}>{record.isSkipped ? '—' : (record.runDate || '—')}</td>
-                            <td className="p-2" data-testid={index === 0 ? "JF.A5.13" : `text-history-status-${index}`}>
-                              {index === 0 && <Marker id="JF.A5.13" />}
-                              <div className="flex flex-col gap-1">
-                                {record.isSkipped ? (
-                                  <span className="px-2 py-0.5 rounded-full text-xs font-medium text-white whitespace-nowrap" style={{ backgroundColor: '#EF4444' }} data-testid={`badge-status-skipped-${index}`}>
-                                    SKIPPED
-                                  </span>
-                                ) : (
-                                  <>
-                                    <StatusPill status={(record.status?.toLowerCase() === 'completed' ? 'completed' : 'postponed') as any} />
-                                    {(record.missedCycles || 0) >= 1 && (
-                                      <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-amber-500 text-white whitespace-nowrap" data-testid={`badge-history-skipped-${record.woNo || index}`}>
-                                        ⚠ {record.missedCycles} Skipped
+              {(() => {
+                const rawHistory = templateData.workHistory || [];
+                const uniqueComponents = Array.from(new Set<string>(rawHistory.map((h: any) => h.componentCode).filter(Boolean)));
+
+                const filteredHistory = rawHistory.filter((h: any) => {
+                  const dateStr = (h.isSkipped ? (h.skippedCycleDate || h.completionDate || h.workDate) : (h.completionDate || h.workDate))?.slice(0, 10) || '';
+                  if (historyComponentFilter && (h.componentCode || '') !== historyComponentFilter) return false;
+                  if (historyDateFrom && dateStr < historyDateFrom) return false;
+                  if (historyDateTo && dateStr > historyDateTo) return false;
+                  return true;
+                });
+
+                const hasFilters = !!(historyComponentFilter || historyDateFrom || historyDateTo);
+                const totalCount = filteredHistory.length;
+                const displayHistory = workHistoryExpanded
+                  ? filteredHistory.slice(workHistoryPage * WORK_HISTORY_PAGE_SIZE, (workHistoryPage + 1) * WORK_HISTORY_PAGE_SIZE)
+                  : filteredHistory.slice(0, 2);
+                const totalPages = Math.ceil(totalCount / WORK_HISTORY_PAGE_SIZE);
+
+                return (
+                  <>
+                    {/* Filter bar */}
+                    <div className="flex flex-wrap gap-2 items-center mb-3 p-2 bg-gray-50 rounded border border-gray-200" data-testid="history-filter-bar">
+                      <select
+                        value={historyComponentFilter}
+                        onChange={e => { setHistoryComponentFilter(e.target.value); setExpandedHistoryIndex(null); }}
+                        data-testid="select-history-component"
+                        className="text-xs border border-gray-300 rounded px-2 py-1 bg-white text-gray-700 focus:outline-none focus:ring-1 focus:ring-blue-400"
+                      >
+                        <option value="">All Components</option>
+                        {uniqueComponents.map(code => (
+                          <option key={code} value={code}>{code}</option>
+                        ))}
+                      </select>
+                      <span className="text-xs text-gray-400">From</span>
+                      <input
+                        type="date"
+                        value={historyDateFrom}
+                        onChange={e => { setHistoryDateFrom(e.target.value); setExpandedHistoryIndex(null); }}
+                        data-testid="input-history-date-from"
+                        className="text-xs border border-gray-300 rounded px-2 py-1 bg-white text-gray-700 focus:outline-none focus:ring-1 focus:ring-blue-400"
+                      />
+                      <span className="text-xs text-gray-400">To</span>
+                      <input
+                        type="date"
+                        value={historyDateTo}
+                        onChange={e => { setHistoryDateTo(e.target.value); setExpandedHistoryIndex(null); }}
+                        data-testid="input-history-date-to"
+                        className="text-xs border border-gray-300 rounded px-2 py-1 bg-white text-gray-700 focus:outline-none focus:ring-1 focus:ring-blue-400"
+                      />
+                      {hasFilters && (
+                        <button
+                          type="button"
+                          onClick={() => { setHistoryComponentFilter(''); setHistoryDateFrom(''); setHistoryDateTo(''); setExpandedHistoryIndex(null); }}
+                          data-testid="button-clear-history-filters"
+                          className="text-xs text-gray-500 hover:text-gray-800 px-2 py-1 rounded border border-gray-200 bg-white hover:bg-gray-100"
+                        >
+                          Clear
+                        </button>
+                      )}
+                      <span className="ml-auto text-xs text-gray-500" data-testid="text-history-filter-count">
+                        {hasFilters ? `${totalCount} of ${rawHistory.length}` : `${rawHistory.length}`} entries
+                      </span>
+                    </div>
+
+                    {/* Table */}
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-sm border border-gray-200">
+                        <thead>
+                          <tr className="bg-gray-50 border-b border-gray-200">
+                            <th className="text-left p-2 font-medium text-gray-700" data-testid="JF.A5.3"><Marker id="JF.A5.3" />DATE</th>
+                            <th className="text-left p-2 font-medium text-gray-700" data-testid="JF.A5.4"><Marker id="JF.A5.4" />WORK ORDER</th>
+                            <th className="text-left p-2 font-medium text-gray-700" data-testid="JF.A5.5"><Marker id="JF.A5.5" />DESCRIPTION</th>
+                            <th className="text-left p-2 font-medium text-gray-700" data-testid="JF.A5.6"><Marker id="JF.A5.6" />PERFORMED BY</th>
+                            <th className="text-left p-2 font-medium text-gray-700" data-testid="JF.A5.7"><Marker id="JF.A5.7" />RUN. HOURS</th>
+                            <th className="text-left p-2 font-medium text-gray-700" data-testid="JF.A5.8"><Marker id="JF.A5.8" />STATUS</th>
+                            <th className="text-left p-2 font-medium text-gray-700">BACKDATING</th>
+                            <th className="text-left p-2 font-medium text-gray-700">REMARKS</th>
+                            <th className="w-8 p-2"></th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {displayHistory.length === 0 ? (
+                            <tr>
+                              <td colSpan={9} className="text-center p-4 text-gray-500 italic">
+                                {hasFilters ? 'No entries match the current filters' : 'No data available'}
+                              </td>
+                            </tr>
+                          ) : displayHistory.map((record: any, index: number) => {
+                            const daysLate = calcDaysLate(record.originalDueDate, record.completionDate || record.workDate);
+                            const isExpanded = expandedHistoryIndex === index;
+                            return (
+                              <Fragment key={index}>
+                                <tr
+                                  onClick={() => setExpandedHistoryIndex(isExpanded ? null : index)}
+                                  className={`border-b border-gray-200 cursor-pointer transition-colors ${isExpanded ? 'bg-blue-50' : 'hover:bg-gray-50'}`}
+                                  data-testid={`row-history-${index}`}
+                                >
+                                  <td className="p-2" data-testid={index === 0 ? "JF.A5.9" : `text-history-date-${index}`}>{index === 0 && <Marker id="JF.A5.9" />}{formatDate(record.isSkipped ? (record.skippedCycleDate || record.completionDate || record.workDate) : (record.completionDate || record.workDate))}</td>
+                                  <td className="p-2" data-testid={index === 0 ? "JF.A5.10" : `text-history-wo-${index}`}>{index === 0 && <Marker id="JF.A5.10" />}{record.isSkipped ? '—' : (record.woNo || '-')}</td>
+                                  <td className="p-2 max-w-[180px] truncate" data-testid={index === 0 ? "JF.A5.11" : `text-history-description-${index}`} title={record.description || '-'}>{index === 0 && <Marker id="JF.A5.11" />}{record.isSkipped ? 'Cycle not performed' : (record.description || '-')}</td>
+                                  <td className="p-2" data-testid={index === 0 ? "JF.A5.12" : `text-history-performed-by-${index}`}>{index === 0 && <Marker id="JF.A5.12" />}{record.isSkipped ? '—' : (record.performedBy || '-')}</td>
+                                  <td className="p-2 text-gray-600" data-testid={`text-history-rh-${index}`}>{record.isSkipped ? '—' : (record.runDate || '—')}</td>
+                                  <td className="p-2" data-testid={index === 0 ? "JF.A5.13" : `text-history-status-${index}`}>
+                                    {index === 0 && <Marker id="JF.A5.13" />}
+                                    <div className="flex flex-col gap-1">
+                                      {record.isSkipped ? (
+                                        <span className="px-2 py-0.5 rounded-full text-xs font-medium text-white whitespace-nowrap" style={{ backgroundColor: '#EF4444' }} data-testid={`badge-status-skipped-${index}`}>
+                                          SKIPPED
+                                        </span>
+                                      ) : (
+                                        <>
+                                          <StatusPill status={(record.status?.toLowerCase() === 'completed' ? 'completed' : 'postponed') as any} />
+                                          {(record.missedCycles || 0) >= 1 && (
+                                            <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-amber-500 text-white whitespace-nowrap" data-testid={`badge-history-skipped-${record.woNo || index}`}>
+                                              ⚠ {record.missedCycles} Skipped
+                                            </span>
+                                          )}
+                                        </>
+                                      )}
+                                    </div>
+                                  </td>
+                                  <td className="p-2" data-testid={`text-history-days-late-${index}`}>
+                                    {record.isSkipped || !daysLate ? (
+                                      <span className="text-gray-400">—</span>
+                                    ) : (
+                                      <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-800 whitespace-nowrap" data-testid={`badge-days-late-${record.woNo || index}`}>
+                                        ⚠ {daysLate}d late
                                       </span>
                                     )}
-                                  </>
+                                  </td>
+                                  <td className="p-2 max-w-[120px] truncate text-gray-600" data-testid={index === 0 ? "JF.A5.14" : `text-history-remarks-${index}`}>{index === 0 && <Marker id="JF.A5.14" />}{record.isSkipped ? `Auto-recorded. See WO: ${record.sourceWorkOrderId ? record.sourceWorkOrderId.slice(-8) : '—'}` : (record.remarks || '-')}</td>
+                                  <td className="p-2 text-gray-400">
+                                    <ChevronDown className={`h-4 w-4 transition-transform duration-150 ${isExpanded ? 'rotate-180 text-blue-500' : ''}`} />
+                                  </td>
+                                </tr>
+                                {isExpanded && (
+                                  <tr key={`detail-${index}`}>
+                                    <td colSpan={9} className="bg-blue-50 border-b border-blue-100 p-0">
+                                      <div className="grid grid-cols-2 gap-x-8 gap-y-2 px-6 py-4 text-sm" data-testid={`panel-history-detail-${index}`}>
+                                        {record.isSkipped ? (
+                                          <>
+                                            <div>
+                                              <span className="font-medium text-gray-600">Skipped Cycle Date:</span>{' '}
+                                              <span className="text-gray-800">{formatDate(record.skippedCycleDate) || '—'}</span>
+                                            </div>
+                                            <div>
+                                              <span className="font-medium text-gray-600">Source Work Order:</span>{' '}
+                                              <span className="text-gray-800">{record.sourceWorkOrderId ? record.sourceWorkOrderId.slice(-8) : '—'}</span>
+                                            </div>
+                                            <div className="col-span-2">
+                                              <span className="font-medium text-gray-600">Note:</span>{' '}
+                                              <span className="text-gray-500 italic">This cycle was automatically recorded as skipped.</span>
+                                            </div>
+                                          </>
+                                        ) : (
+                                          <>
+                                            <div>
+                                              <span className="font-medium text-gray-600">Completion Date:</span>{' '}
+                                              <span className="text-gray-800">{record.completionDate || record.workDate || '—'}</span>
+                                            </div>
+                                            <div>
+                                              <span className="font-medium text-gray-600">Running Hours:</span>{' '}
+                                              <span className="text-gray-800">{record.runDate || '—'}</span>
+                                            </div>
+                                            {daysLate > 0 && (
+                                              <div>
+                                                <span className="font-medium text-gray-600">Backdating:</span>{' '}
+                                                <span className="text-amber-700 font-medium">{daysLate} day{daysLate !== 1 ? 's' : ''} late</span>
+                                              </div>
+                                            )}
+                                            {(record.missedCycles || 0) > 0 && (
+                                              <div>
+                                                <span className="font-medium text-gray-600">Missed Cycles:</span>{' '}
+                                                <span className="text-amber-700 font-medium">{record.missedCycles}</span>
+                                              </div>
+                                            )}
+                                            <div>
+                                              <span className="font-medium text-gray-600">Performed By:</span>{' '}
+                                              <span className="text-gray-800">{record.performedBy || '—'}</span>
+                                            </div>
+                                            {record.componentCode && (
+                                              <div>
+                                                <span className="font-medium text-gray-600">Component:</span>{' '}
+                                                <span className="text-gray-800">{record.componentCode}</span>
+                                              </div>
+                                            )}
+                                            <div className="col-span-2">
+                                              <span className="font-medium text-gray-600">Full Description:</span>{' '}
+                                              <span className="text-gray-800">{record.description || '—'}</span>
+                                            </div>
+                                            <div className="col-span-2">
+                                              <span className="font-medium text-gray-600">Remarks:</span>{' '}
+                                              <span className="text-gray-800">{record.remarks || '—'}</span>
+                                            </div>
+                                          </>
+                                        )}
+                                      </div>
+                                    </td>
+                                  </tr>
                                 )}
-                              </div>
-                            </td>
-                            <td className="p-2" data-testid={`text-history-days-late-${index}`}>
-                              {record.isSkipped || !daysLate ? (
-                                <span className="text-gray-400">—</span>
-                              ) : (
-                                <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-800 whitespace-nowrap" data-testid={`badge-days-late-${record.woNo || index}`}>
-                                  ⚠ {daysLate}d late
-                                </span>
-                              )}
-                            </td>
-                            <td className="p-2" data-testid={index === 0 ? "JF.A5.14" : `text-history-remarks-${index}`}>{index === 0 && <Marker id="JF.A5.14" />}{record.isSkipped ? `Auto-recorded. See WO: ${record.sourceWorkOrderId ? record.sourceWorkOrderId.slice(-8) : '—'}` : (record.remarks || '-')}</td>
-                          </tr>
-                        );
-                      })
+                              </Fragment>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+
+                    {/* Show All / Pagination */}
+                    {!workHistoryExpanded && totalCount > 2 && (
+                      <div className="flex justify-center mt-3">
+                        <button
+                          type="button"
+                          data-testid="button-show-all-history"
+                          className="text-sm text-blue-600 hover:text-blue-800 font-medium px-4 py-1.5 rounded border border-blue-200 hover:bg-blue-50 transition-colors"
+                          onClick={() => { setWorkHistoryExpanded(true); setWorkHistoryPage(0); setExpandedHistoryIndex(null); }}
+                        >
+                          Show All History ({totalCount} entries)
+                        </button>
+                      </div>
                     )}
-                  </tbody>
-                </table>
-              </div>
+                    {workHistoryExpanded && (
+                      <div className="flex items-center justify-between mt-3">
+                        <button
+                          type="button"
+                          data-testid="button-show-less-history"
+                          className="text-sm text-gray-600 hover:text-gray-800 font-medium px-4 py-1.5 rounded border border-gray-200 hover:bg-gray-50 transition-colors"
+                          onClick={() => { setWorkHistoryExpanded(false); setWorkHistoryPage(0); setExpandedHistoryIndex(null); }}
+                        >
+                          Show Less
+                        </button>
+                        {totalPages > 1 && (
+                          <div className="flex items-center gap-2 text-sm text-gray-600">
+                            <button
+                              type="button"
+                              data-testid="button-history-prev-page"
+                              className="px-2 py-1 rounded border border-gray-200 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed"
+                              disabled={workHistoryPage === 0}
+                              onClick={() => { setWorkHistoryPage(p => Math.max(0, p - 1)); setExpandedHistoryIndex(null); }}
+                            >
+                              &laquo; Prev
+                            </button>
+                            <span data-testid="text-history-page-info">Page {workHistoryPage + 1} of {totalPages}</span>
+                            <button
+                              type="button"
+                              data-testid="button-history-next-page"
+                              className="px-2 py-1 rounded border border-gray-200 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed"
+                              disabled={workHistoryPage >= totalPages - 1}
+                              onClick={() => { setWorkHistoryPage(p => Math.min(totalPages - 1, p + 1)); setExpandedHistoryIndex(null); }}
+                            >
+                              Next &raquo;
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </>
+                );
+              })()}
             </SectionBlock>
 
             {/* Save for Approval Button (only in modify mode) */}

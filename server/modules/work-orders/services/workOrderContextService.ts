@@ -144,7 +144,8 @@ export async function getWorkOrderContext(workOrderId: string) {
     originalDueDate: wo.originalDueDate || null,
     isSkipped: false,
     skippedCycleDate: null,
-    sourceWorkOrderId: null
+    sourceWorkOrderId: null,
+    componentCode: wo.componentCode || workOrder.componentCode || (component as any)?.componentCode || ''
   }));
 
   const existingWoIds = new Set(workHistoryWOs.map((wo: any) => wo.wouuid).filter(Boolean));
@@ -168,7 +169,8 @@ export async function getWorkOrderContext(workOrderId: string) {
           originalDueDate: ownHistory.originalDueDate || null,
           isSkipped: false,
           skippedCycleDate: null,
-          sourceWorkOrderId: null
+          sourceWorkOrderId: null,
+          componentCode: workOrder.componentCode || (component as any)?.componentCode || ''
         });
       }
     } catch (err) {
@@ -196,7 +198,8 @@ export async function getWorkOrderContext(workOrderId: string) {
             originalDueDate: h.originalDueDate || null,
             isSkipped: true,
             skippedCycleDate: h.skippedCycleDate || null,
-            sourceWorkOrderId: h.sourceWorkOrderId || null
+            sourceWorkOrderId: h.sourceWorkOrderId || null,
+            componentCode: (h as any).componentCode || workOrder.componentCode || (component as any)?.componentCode || ''
           });
         } else if (h.workOrderId && !existingWoIds.has(h.workOrderId)) {
           existingWoIds.add(h.workOrderId);
@@ -214,7 +217,8 @@ export async function getWorkOrderContext(workOrderId: string) {
             originalDueDate: h.originalDueDate || null,
             isSkipped: false,
             skippedCycleDate: null,
-            sourceWorkOrderId: null
+            sourceWorkOrderId: null,
+            componentCode: (h as any).componentCode || workOrder.componentCode || (component as any)?.componentCode || ''
           });
         }
       }
