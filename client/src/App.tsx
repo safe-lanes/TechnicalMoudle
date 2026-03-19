@@ -17,6 +17,7 @@ import TestE2E from "./pages/TestE2E";
 import DefectFormWizard from "./pages/defects/DefectFormWizard";
 import WorkOrderFormPage from "./pages/pms/WorkOrderFormPage";
 import JobsFormPage from "./pages/pms/JobsFormPage";
+import AnomaliesPage from "./pages/pms/AnomaliesPage";
 import AddEditFleetComponent from "./pages/admin/AddEditFleetComponent";
 import BulkUpdateSpares from "./pages/spares/BulkUpdateSpares";
 import BulkUpdateStores from "./pages/stores/BulkUpdateStores";
@@ -41,6 +42,11 @@ function App() {
                 <Route path="/" component={TechnicalModule} />
                 <Route path="/pms" component={TechnicalModule} />
                 <Route path="/pms/maintenance-records/:componentId" component={TechnicalModule} />
+                
+                {/* Anomalies page - standalone, no TechnicalModule layout */}
+                <Route path="/pms/anomalies">
+                  {() => <ProtectedRoute><AnomaliesPage /></ProtectedRoute>}
+                </Route>
                 
                 {/* Work Order form routes - standalone, no TechnicalModule layout */}
                 <Route path="/pms/work-order/new/:componentId">

@@ -374,7 +374,7 @@ export function ComplianceAnomalyPanel({ vesselId }: ComplianceAnomalyPanelProps
   const [activeModal, setActiveModal] = useState<string | null>(null);
   const { isSailAdmin, isClientAdmin, isHeadOfDept, isVessel } = useUIRole();
 
-  const canViewPanel = isSailAdmin || isClientAdmin || isHeadOfDept;
+  const canViewPanel = isSailAdmin;
   const isRestricted = isVessel;
 
   const queryUrl = vesselId && vesselId !== "all"

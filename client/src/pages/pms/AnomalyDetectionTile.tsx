@@ -348,7 +348,7 @@ export default function AnomalyDetectionTile({ vesselId }: AnomalyDetectionTileP
                               cursor: 'pointer',
                               textDecoration: 'underline',
                             }}
-                            onClick={() => setLocation(`/pms/work-orders/${anomaly.workOrderId}`)}
+                            onClick={() => setLocation(`/pms/work-order/${anomaly.workOrderCode || anomaly.workOrderId}`)}
                             data-testid={`link-wo-${anomaly.id}`}
                           >
                             {anomaly.workOrderCode || anomaly.workOrderId}
@@ -408,7 +408,7 @@ export default function AnomalyDetectionTile({ vesselId }: AnomalyDetectionTileP
                         </span>
                         <div style={{ display: 'flex', gap: '4px' }}>
                           <button
-                            onClick={() => setLocation(`/pms/work-orders/${anomaly.workOrderId}`)}
+                            onClick={() => setLocation(`/pms/work-order/${anomaly.workOrderCode || anomaly.workOrderId}`)}
                             style={{
                               fontSize: '10px',
                               padding: '3px 8px',
@@ -472,6 +472,7 @@ export default function AnomalyDetectionTile({ vesselId }: AnomalyDetectionTileP
           alignItems: 'center',
         }}>
           <span
+            onClick={() => setLocation('/pms/anomalies')}
             style={{ fontSize: '12px', color: '#1565C0', cursor: 'pointer', fontWeight: 500, display: 'flex', alignItems: 'center', gap: '4px' }}
             data-testid="link-view-all-anomalies"
           >
