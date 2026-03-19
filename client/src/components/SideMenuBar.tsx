@@ -131,7 +131,7 @@ export const SideMenuBar: React.FC<SideMenuBarProps> = ({
               !isSelected && "hover:bg-white/[0.08]",
               "group relative"
             )}
-            style={isSelected ? { backgroundColor: 'rgba(255,255,255,0.12)', borderLeft: '3px solid rgba(255,255,255,0.9)' } : undefined}
+            style={isSelected ? { backgroundColor: '#52baf3' } : undefined}
             role="link"
             aria-label={item.sublabel ? `${item.label}, ${item.sublabel}` : item.label}
             aria-current={isSelected ? "page" : undefined}

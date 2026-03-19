@@ -58,9 +58,9 @@ export const TopMenuBar: React.FC<TopMenuBarProps> = ({
   ];
 
   return (
-    <div className="relative sticky top-0 z-50" style={{ backgroundColor: '#ffffff', borderBottom: '1px solid #e5e7eb' }}>
-      <div className="flex items-stretch h-16" style={{ backgroundColor: '#ffffff' }}>
-        <div className="flex items-center px-4" style={{ backgroundColor: '#ffffff' }}>
+    <div className="relative sticky top-0 z-50" style={{ backgroundColor: '#f1f1f1', borderBottom: '1px solid #e5e7eb' }}>
+      <div className="flex items-stretch h-16" style={{ backgroundColor: '#f1f1f1' }}>
+        <div className="flex items-center px-4" style={{ backgroundColor: '#f1f1f1' }}>
           <img 
             src={sailLogoPath} 
             alt="SAIL Logo" 
@@ -86,7 +86,7 @@ export const TopMenuBar: React.FC<TopMenuBarProps> = ({
                 <DropdownMenuTrigger asChild>
                   <div
                     className="flex flex-col items-center justify-center w-[110px] transition-all duration-200 relative cursor-pointer select-none"
-                    style={{ backgroundColor: '#ffffff', borderRight: '1px solid #e5e7eb' }}
+                    style={{ backgroundColor: '#f1f1f1', borderRight: '1px solid #e5e7eb' }}
                     data-testid="dropdown-technical-module"
                   >
                     <Icon className="h-5 w-5 mb-1" style={{ color: '#4b5563' }} />
@@ -116,15 +116,12 @@ export const TopMenuBar: React.FC<TopMenuBarProps> = ({
               key={item.id}
               onClick={() => onSubModuleChange(item.id)}
               className="flex flex-col items-center justify-center w-[110px] transition-all duration-200 relative"
-              style={{ backgroundColor: '#ffffff' }}
+              style={{ backgroundColor: isSelected ? '#52baf3' : '#f1f1f1' }}
             >
-              <Icon className="h-5 w-5 mb-1" style={{ color: isSelected ? '#1a6eb5' : '#4b5563' }} />
-              <span className="text-xs font-medium" style={{ color: isSelected ? '#1a6eb5' : '#4b5563' }}>
+              <Icon className="h-5 w-5 mb-1" style={{ color: isSelected ? '#ffffff' : '#4b5563' }} />
+              <span className="text-xs font-medium" style={{ color: isSelected ? '#ffffff' : '#4b5563' }}>
                 {item.label}
               </span>
-              {isSelected && (
-                <div className="absolute bottom-0 left-0 right-0 z-10" style={{ height: '3px', backgroundColor: '#1a6eb5' }} />
-              )}
             </button>
           );
         })}
