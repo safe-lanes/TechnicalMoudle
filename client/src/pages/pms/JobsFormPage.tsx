@@ -1225,7 +1225,7 @@ const JobsFormPage: React.FC = () => {
                     <div className="flex flex-wrap gap-2 items-center mb-3 p-2 bg-gray-50 rounded border border-gray-200" data-testid="history-filter-bar">
                       <select
                         value={historyComponentFilter}
-                        onChange={e => { setHistoryComponentFilter(e.target.value); setExpandedHistoryIndex(null); }}
+                        onChange={e => { setHistoryComponentFilter(e.target.value); setWorkHistoryPage(0); setExpandedHistoryIndex(null); }}
                         data-testid="select-history-component"
                         className="text-xs border border-gray-300 rounded px-2 py-1 bg-white text-gray-700 focus:outline-none focus:ring-1 focus:ring-blue-400"
                       >
@@ -1238,7 +1238,7 @@ const JobsFormPage: React.FC = () => {
                       <input
                         type="date"
                         value={historyDateFrom}
-                        onChange={e => { setHistoryDateFrom(e.target.value); setExpandedHistoryIndex(null); }}
+                        onChange={e => { setHistoryDateFrom(e.target.value); setWorkHistoryPage(0); setExpandedHistoryIndex(null); }}
                         data-testid="input-history-date-from"
                         className="text-xs border border-gray-300 rounded px-2 py-1 bg-white text-gray-700 focus:outline-none focus:ring-1 focus:ring-blue-400"
                       />
@@ -1246,14 +1246,14 @@ const JobsFormPage: React.FC = () => {
                       <input
                         type="date"
                         value={historyDateTo}
-                        onChange={e => { setHistoryDateTo(e.target.value); setExpandedHistoryIndex(null); }}
+                        onChange={e => { setHistoryDateTo(e.target.value); setWorkHistoryPage(0); setExpandedHistoryIndex(null); }}
                         data-testid="input-history-date-to"
                         className="text-xs border border-gray-300 rounded px-2 py-1 bg-white text-gray-700 focus:outline-none focus:ring-1 focus:ring-blue-400"
                       />
                       {hasFilters && (
                         <button
                           type="button"
-                          onClick={() => { setHistoryComponentFilter(''); setHistoryDateFrom(''); setHistoryDateTo(''); setExpandedHistoryIndex(null); }}
+                          onClick={() => { setHistoryComponentFilter(''); setHistoryDateFrom(''); setHistoryDateTo(''); setWorkHistoryPage(0); setExpandedHistoryIndex(null); }}
                           data-testid="button-clear-history-filters"
                           className="text-xs text-gray-500 hover:text-gray-800 px-2 py-1 rounded border border-gray-200 bg-white hover:bg-gray-100"
                         >
@@ -1285,7 +1285,7 @@ const JobsFormPage: React.FC = () => {
                           {displayHistory.length === 0 ? (
                             <tr>
                               <td colSpan={9} className="text-center p-4 text-gray-500 italic">
-                                {hasFilters ? 'No entries match the current filters' : 'No data available'}
+                                {hasFilters ? 'No matching history entries' : 'No data available'}
                               </td>
                             </tr>
                           ) : displayHistory.map((record: any, index: number) => {
