@@ -2023,24 +2023,40 @@ const Spares: React.FC = () => {
     }
   };
 
-  const exportComponentSparesToExcel = () => {
+  const exportComponentSparesToExcel = async () => {
     setExportingType('component');
     try {
+      const linksRes = await fetch(`/technical/api/inventory/spare-links/${vesselId}`);
+      if (!linksRes.ok) throw new Error('Failed to fetch spare-component links');
+      const linksJson = await linksRes.json();
+      const links: Array<{ spareId: number; spareUuid: string; componentId: string; vesselId: string }> = linksJson.data || [];
+
+      const sparesArray = Array.isArray(sparesData) ? sparesData : [];
+      const spareById = new Map<number, any>();
+      for (const s of sparesArray) {
+        spareById.set(s.id, s);
+      }
+
+      const componentsMap = new Map<string, { code: string; name: string }>();
+      for (const s of sparesArray) {
+        const lcs = (s as any).linkedComponents || [];
+        for (const lc of lcs) {
+          if (!componentsMap.has(lc.componentId)) {
+            componentsMap.set(lc.componentId, { code: lc.componentCode, name: lc.componentName });
+          }
+        }
+      }
+
       const now = new Date();
       const ts = now.toISOString().replace(/[-:]/g, '').replace('T', '_').slice(0, 15);
       const fname = `component_spares_${vesselId}_${ts}.xlsx`;
-      const sparesArray = Array.isArray(sparesData) ? sparesData : [];
       const exportRows: Record<string, any>[] = [];
 
-      for (const spare of sparesArray) {
-        const linkedComps = (spare as any).linkedComponents || [];
-        if (linkedComps.length === 0) {
-          exportRows.push(mapSpareToTemplateRow(spare));
-        } else {
-          for (const lc of linkedComps) {
-            exportRows.push(mapSpareToTemplateRow(spare, lc.componentCode, lc.componentName));
-          }
-        }
+      for (const link of links) {
+        const spare = spareById.get(link.spareId);
+        if (!spare) continue;
+        const comp = componentsMap.get(link.componentId);
+        exportRows.push(mapSpareToTemplateRow(spare, comp?.code || '', comp?.name || ''));
       }
 
       const hdrs = SPARES_TEMPLATE_FIELDS.map(f => f.header);
