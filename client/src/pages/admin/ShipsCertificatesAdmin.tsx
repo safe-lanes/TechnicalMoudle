@@ -613,26 +613,37 @@ export default function ShipsCertificatesAdmin() {
   const [initializedVesselIds, setInitializedVesselIds] = useState<Set<string>>(new Set());
   
   // Initialize selected vessels when they are first selected
+  // Skip if master certificates haven't been saved to the database yet
+  const hasSavedMasterData = savedCertificates && Array.isArray(savedCertificates) && savedCertificates.length > 0;
+  
   useEffect(() => {
+    if (!hasSavedMasterData) return;
     if (selectedVessels.length > 0 && vesselMasterData.length > 0 && !isLoadingApplicability) {
       const existingVesselIds = new Set(vesselApplicabilityData.map((a: {vesselId: string}) => a.vesselId));
       
-      // Find vessels that need initialization (not in DB and not already being initialized)
+      const vesselsToInit: Array<{ vesselId: string; vesselName: string }> = [];
       selectedVessels.forEach(vesselName => {
         const vesselData = vesselMasterData.find(v => v.name === vesselName);
         if (vesselData) {
           const vesselId = String(vesselData.id);
-          const needsInit = !existingVesselIds.has(vesselId) && !initializedVesselIds.has(vesselId);
-          
-          if (needsInit) {
-            // Mark as being initialized to prevent duplicate requests
-            setInitializedVesselIds(prev => new Set(Array.from(prev).concat([vesselId])));
-            initializeVesselMutation.mutate({ vesselId, vesselName });
+          if (!existingVesselIds.has(vesselId) && !initializedVesselIds.has(vesselId)) {
+            vesselsToInit.push({ vesselId, vesselName });
           }
         }
       });
+
+      if (vesselsToInit.length > 0) {
+        setInitializedVesselIds(prev => {
+          const newSet = new Set(Array.from(prev));
+          vesselsToInit.forEach(v => newSet.add(v.vesselId));
+          return newSet;
+        });
+        vesselsToInit.forEach(v => {
+          initializeVesselMutation.mutate(v);
+        });
+      }
     }
-  }, [selectedVessels, vesselMasterData, vesselApplicabilityData, isLoadingApplicability, initializedVesselIds]);
+  }, [selectedVessels, vesselMasterData, vesselApplicabilityData, isLoadingApplicability, hasSavedMasterData]);
   
   // Get Company certificates (those with applicableToCompany = true)
   // For VES-xxx certificates, only show if selected vessels have applicability records
