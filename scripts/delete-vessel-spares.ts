@@ -9,7 +9,10 @@ if (!VESSEL_ID) {
 }
 
 async function deleteVesselSpares(vesselId: string) {
-  const client = await pool!.connect();
+  if (!pool) {
+    throw new Error('Database pool not available — DATABASE_URL not configured');
+  }
+  const client = await pool.connect();
 
   try {
     const vessel = await client.query(
@@ -17,8 +20,7 @@ async function deleteVesselSpares(vesselId: string) {
       [vesselId],
     );
     if (vessel.rows.length === 0) {
-      console.error(`Vessel ${vesselId} not found`);
-      process.exit(1);
+      throw new Error(`Vessel ${vesselId} not found`);
     }
     const vName = vessel.rows[0].name;
     const vCode = vessel.rows[0].code;
@@ -92,7 +94,7 @@ async function deleteVesselSpares(vesselId: string) {
     throw err;
   } finally {
     client.release();
-    await pool!.end();
+    await pool.end();
   }
 }
 
