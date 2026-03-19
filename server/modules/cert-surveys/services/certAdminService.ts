@@ -328,14 +328,22 @@ export async function initializeApplicability(body: any) {
     isApplicable: true,
   }));
 
-  const insertedRecords = await certAdminRepo.insertApplicability(insertData);
-  if (!insertedRecords) {
-    throw Object.assign(new Error("Database not available"), { statusCode: 503 });
+  try {
+    const insertedRecords = await certAdminRepo.insertApplicability(insertData);
+    if (!insertedRecords) {
+      throw Object.assign(new Error("Database not available"), { statusCode: 503 });
+    }
+
+    console.log(`Initialized ${insertedRecords.length} certificate applicability records for vessel ${vesselName}`);
+
+    return { success: true, message: `Initialized ${insertedRecords.length} certificates for vessel`, records: insertedRecords };
+  } catch (error: any) {
+    if (error.code === '23503') {
+      console.log(`Vessel ${vesselName} (${vesselId}) not found in vessels table - skipping applicability initialization`);
+      return { success: true, message: "Vessel not yet registered in local database, skipping initialization", records: [] };
+    }
+    throw error;
   }
-
-  console.log(`Initialized ${insertedRecords.length} certificate applicability records for vessel ${vesselName}`);
-
-  return { success: true, message: `Initialized ${insertedRecords.length} certificates for vessel`, records: insertedRecords };
 }
 
 // ── PATCH /admin/vessel-certificate-applicability ──
