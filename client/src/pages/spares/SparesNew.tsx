@@ -2050,12 +2050,16 @@ const Spares: React.FC = () => {
       const ts = now.toISOString().replace(/[-:]/g, '').replace('T', '_').slice(0, 15);
       const fname = `component_spares_${vesselId}_${ts}.xlsx`;
       const exportRows: Record<string, any>[] = [];
+      let skippedCount = 0;
 
       for (const link of links) {
         const spare = spareById.get(link.spareId);
-        if (!spare) continue;
+        if (!spare) {
+          skippedCount++;
+          continue;
+        }
         const comp = componentsMap.get(link.componentId);
-        exportRows.push(mapSpareToTemplateRow(spare, comp?.code || '', comp?.name || ''));
+        exportRows.push(mapSpareToTemplateRow(spare, comp?.code || spare.componentCode || '', comp?.name || spare.componentName || ''));
       }
 
       const hdrs = SPARES_TEMPLATE_FIELDS.map(f => f.header);
@@ -2065,9 +2069,10 @@ const Spares: React.FC = () => {
       XLSX.utils.book_append_sheet(wb, ws, 'Component Spares');
       XLSX.writeFile(wb, fname);
 
+      const warnSuffix = skippedCount > 0 ? ` (${skippedCount} links skipped — spare data not loaded)` : '';
       toast({
         title: "Export Successful",
-        description: `Exported ${exportRows.length} component-spare entries to ${fname}`
+        description: `Exported ${exportRows.length} component-spare entries to ${fname}${warnSuffix}`
       });
       setExportDialogOpen(false);
     } catch (err: any) {
