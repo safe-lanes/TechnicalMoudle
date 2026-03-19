@@ -1,4 +1,5 @@
 import * as certAdminRepo from '../repositories/certAdminRepository';
+import { ensureVesselExists } from './vesselEnsureService';
 
 // ══════════════════════════════════════════════════════════
 // Master Certificate Admin
@@ -320,6 +321,8 @@ export async function initializeApplicability(body: any) {
     return { success: true, message: "No company certificates to initialize", records: [] };
   }
 
+  await ensureVesselExists(vesselId, vesselName);
+
   // Create applicability records for all company certificates
   const insertData = companyCertificates.map(cert => ({
     vesselId,
@@ -328,22 +331,14 @@ export async function initializeApplicability(body: any) {
     isApplicable: true,
   }));
 
-  try {
-    const insertedRecords = await certAdminRepo.insertApplicability(insertData);
-    if (!insertedRecords) {
-      throw Object.assign(new Error("Database not available"), { statusCode: 503 });
-    }
-
-    console.log(`Initialized ${insertedRecords.length} certificate applicability records for vessel ${vesselName}`);
-
-    return { success: true, message: `Initialized ${insertedRecords.length} certificates for vessel`, records: insertedRecords };
-  } catch (error: any) {
-    if (error.code === '23503') {
-      console.log(`Vessel ${vesselName} (${vesselId}) not found in vessels table - skipping applicability initialization`);
-      return { success: true, message: "Vessel not yet registered in local database, skipping initialization", records: [] };
-    }
-    throw error;
+  const insertedRecords = await certAdminRepo.insertApplicability(insertData);
+  if (!insertedRecords) {
+    throw Object.assign(new Error("Database not available"), { statusCode: 503 });
   }
+
+  console.log(`Initialized ${insertedRecords.length} certificate applicability records for vessel ${vesselName}`);
+
+  return { success: true, message: `Initialized ${insertedRecords.length} certificates for vessel`, records: insertedRecords };
 }
 
 // ── PATCH /admin/vessel-certificate-applicability ──

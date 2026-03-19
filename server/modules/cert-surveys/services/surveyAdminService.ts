@@ -1,4 +1,5 @@
 import * as surveyAdminRepo from '../repositories/surveyAdminRepository';
+import { ensureVesselExists } from './vesselEnsureService';
 
 // ══════════════════════════════════════════════════════════
 // Master Survey Admin
@@ -299,22 +300,16 @@ export async function initializeApplicability(body: any) {
     isApplicable: true,
   }));
 
-  try {
-    const insertedRecords = await surveyAdminRepo.insertApplicabilityBulk(insertData);
-    if (!insertedRecords) {
-      throw Object.assign(new Error("Database not available"), { statusCode: 503 });
-    }
+  await ensureVesselExists(vesselId, vesselName);
 
-    console.log(`Initialized ${insertedRecords.length} survey applicability records for vessel ${vesselName}`);
-
-    return { success: true, message: `Initialized ${insertedRecords.length} surveys for vessel`, records: insertedRecords };
-  } catch (error: any) {
-    if (error.code === '23503') {
-      console.log(`Vessel ${vesselName} (${vesselId}) not found in vessels table - skipping survey applicability initialization`);
-      return { success: true, message: "Vessel not yet registered in local database, skipping initialization", records: [] };
-    }
-    throw error;
+  const insertedRecords = await surveyAdminRepo.insertApplicabilityBulk(insertData);
+  if (!insertedRecords) {
+    throw Object.assign(new Error("Database not available"), { statusCode: 503 });
   }
+
+  console.log(`Initialized ${insertedRecords.length} survey applicability records for vessel ${vesselName}`);
+
+  return { success: true, message: `Initialized ${insertedRecords.length} surveys for vessel`, records: insertedRecords };
 }
 
 // ── POST /admin/vessel-survey-applicability/bulk-update ──
