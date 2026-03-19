@@ -2125,7 +2125,7 @@ const migrations: Migration[] = [
         mm.muid,
         true,
         CASE WHEN rm.assigned_role IN ('Sail Admin', 'PMS Admin', 'Super Admin', 'Admin', 'Vessel Admin') THEN true ELSE false END,
-        CASE WHEN rm.assigned_role IN ('Sail Admin', 'PMS Admin', 'Super Admin', 'Admin', 'Vessel Admin') THEN true ELSE false END,
+        CASE WHEN rm.assigned_role IN ('Sail Admin', 'PMS Admin', 'Super Admin', 'Admin', 'Vessel Admin', 'Vessel Management') THEN true ELSE false END,
         CASE WHEN rm.assigned_role IN ('Sail Admin', 'PMS Admin', 'Super Admin', 'Admin', 'Vessel Admin') THEN true ELSE false END
       FROM admn_role_master rm
       CROSS JOIN adm_menumaster_ac mm
