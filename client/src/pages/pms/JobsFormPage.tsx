@@ -1312,7 +1312,7 @@ const JobsFormPage: React.FC = () => {
                                         </span>
                                       ) : (
                                         <>
-                                          <StatusPill status={(record.status?.toLowerCase() === 'completed' ? 'completed' : 'postponed') as any} />
+                                          <StatusPill status={record.status?.toLowerCase() === 'completed' ? 'completed' : 'postponed'} />
                                           {(record.missedCycles || 0) >= 1 && (
                                             <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-amber-500 text-white whitespace-nowrap" data-testid={`badge-history-skipped-${record.woNo || index}`}>
                                               ⚠ {record.missedCycles} Skipped
@@ -1381,6 +1381,10 @@ const JobsFormPage: React.FC = () => {
                                               <span className="font-medium text-gray-600">Performed By:</span>{' '}
                                               <span className="text-gray-800">{record.performedBy || '—'}</span>
                                             </div>
+                                            <div>
+                                              <span className="font-medium text-gray-600">Approved By:</span>{' '}
+                                              <span className="text-gray-800">{record.approvedBy || '—'}</span>
+                                            </div>
                                             {record.componentCode && (
                                               <div>
                                                 <span className="font-medium text-gray-600">Component:</span>{' '}
@@ -1395,6 +1399,18 @@ const JobsFormPage: React.FC = () => {
                                               <span className="font-medium text-gray-600">Remarks:</span>{' '}
                                               <span className="text-gray-800">{record.remarks || '—'}</span>
                                             </div>
+                                            {(record.sparesUsed || []).length > 0 && (
+                                              <div className="col-span-2">
+                                                <span className="font-medium text-gray-600">Spare Parts Used:</span>
+                                                <ul className="mt-1 space-y-0.5">
+                                                  {(record.sparesUsed as any[]).map((sp: any, si: number) => (
+                                                    <li key={si} className="text-gray-800">
+                                                      {sp.partName || sp.partCode || 'Unknown'}{sp.quantity != null ? ` — qty: ${sp.quantity}` : ''}
+                                                    </li>
+                                                  ))}
+                                                </ul>
+                                              </div>
+                                            )}
                                           </>
                                         )}
                                       </div>

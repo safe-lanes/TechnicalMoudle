@@ -3863,6 +3863,10 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                                             <span className="font-medium text-gray-600">Performed By:</span>{' '}
                                             <span className="text-gray-800">{row.performedBy || '—'}</span>
                                           </div>
+                                          <div>
+                                            <span className="font-medium text-gray-600">Approved By:</span>{' '}
+                                            <span className="text-gray-800">{row.approvedBy || '—'}</span>
+                                          </div>
                                           {row.componentCode && (
                                             <div>
                                               <span className="font-medium text-gray-600">Component:</span>{' '}
@@ -3877,6 +3881,18 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                                             <span className="font-medium text-gray-600">Remarks:</span>{' '}
                                             <span className="text-gray-800">{row.remarks !== '-' ? row.remarks : '—'}</span>
                                           </div>
+                                          {(row.sparesUsed || []).length > 0 && (
+                                            <div className="col-span-2">
+                                              <span className="font-medium text-gray-600">Spare Parts Used:</span>
+                                              <ul className="mt-1 space-y-0.5">
+                                                {(row.sparesUsed as any[]).map((sp: any, si: number) => (
+                                                  <li key={si} className="text-gray-800">
+                                                    {sp.partName || sp.partCode || 'Unknown'}{sp.quantity != null ? ` — qty: ${sp.quantity}` : ''}
+                                                  </li>
+                                                ))}
+                                              </ul>
+                                            </div>
+                                          )}
                                         </>
                                       )}
                                     </div>
