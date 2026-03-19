@@ -3647,6 +3647,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
             {(() => {
               const rawHistory = templateData.workHistory || [];
               const uniqueComponents = Array.from(new Set<string>(rawHistory.map((h: any) => h.componentCode).filter(Boolean)));
+              type SpareUsedItem = { partName?: string; partCode?: string; quantity?: number | null };
               const allHistory = rawHistory.map((history: any) => {
                 if (history.isSkipped) {
                   return {
@@ -3654,10 +3655,12 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                     workOrder: '—',
                     description: 'Cycle not performed',
                     performedBy: '—',
+                    approvedBy: null as string | null,
                     runDate: '—',
                     status: 'skipped' as const,
                     daysLate: 0,
                     remarks: `Automatically recorded. See WO: ${history.sourceWorkOrderId ? history.sourceWorkOrderId.slice(-8) : '—'}`,
+                    sparesUsed: [] as SpareUsedItem[],
                     missedCycles: 0,
                     isSkipped: true,
                     componentCode: history.componentCode || '',
@@ -3672,10 +3675,12 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                   workOrder: history.woNo,
                   description: history.description || '-',
                   performedBy: history.performedBy,
+                  approvedBy: (history.approvedBy as string | null) || null,
                   runDate: history.runDate || '—',
                   status: history.status?.toLowerCase() === 'completed' ? ('completed' as const) : ('postponed' as const),
                   daysLate,
                   remarks: history.remarks || '-',
+                  sparesUsed: (history.sparesUsed as SpareUsedItem[]) || [],
                   missedCycles: history.missedCycles || 0,
                   isSkipped: false,
                   componentCode: history.componentCode || '',
@@ -3881,11 +3886,11 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                                             <span className="font-medium text-gray-600">Remarks:</span>{' '}
                                             <span className="text-gray-800">{row.remarks !== '-' ? row.remarks : '—'}</span>
                                           </div>
-                                          {(row.sparesUsed || []).length > 0 && (
+                                          {(row.sparesUsed.length > 0) && (
                                             <div className="col-span-2">
                                               <span className="font-medium text-gray-600">Spare Parts Used:</span>
                                               <ul className="mt-1 space-y-0.5">
-                                                {(row.sparesUsed as any[]).map((sp: any, si: number) => (
+                                                {row.sparesUsed.map((sp, si) => (
                                                   <li key={si} className="text-gray-800">
                                                     {sp.partName || sp.partCode || 'Unknown'}{sp.quantity != null ? ` — qty: ${sp.quantity}` : ''}
                                                   </li>

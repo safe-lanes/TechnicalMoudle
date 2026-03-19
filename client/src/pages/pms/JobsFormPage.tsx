@@ -1399,11 +1399,11 @@ const JobsFormPage: React.FC = () => {
                                               <span className="font-medium text-gray-600">Remarks:</span>{' '}
                                               <span className="text-gray-800">{record.remarks || '—'}</span>
                                             </div>
-                                            {(record.sparesUsed || []).length > 0 && (
+                                            {((record.sparesUsed || []) as Array<{ partName?: string; partCode?: string; quantity?: number | null }>).length > 0 && (
                                               <div className="col-span-2">
                                                 <span className="font-medium text-gray-600">Spare Parts Used:</span>
                                                 <ul className="mt-1 space-y-0.5">
-                                                  {(record.sparesUsed as any[]).map((sp: any, si: number) => (
+                                                  {(record.sparesUsed as Array<{ partName?: string; partCode?: string; quantity?: number | null }>).map((sp, si) => (
                                                     <li key={si} className="text-gray-800">
                                                       {sp.partName || sp.partCode || 'Unknown'}{sp.quantity != null ? ` — qty: ${sp.quantity}` : ''}
                                                     </li>
