@@ -379,7 +379,7 @@ export async function performImport(
       const existingComponent = existingComponentsMap.get(componentCode);
       const rowNum = row['__meta']?.rowNumber || 0;
 
-      try {
+      try { try {
         const makerValue = (row['Maker'] || row['Maker Name'] || '').toString().trim();
         if (makerValue && !validMakerNames.has(makerValue.toLowerCase())) {
           result.skipped++;
@@ -442,8 +442,7 @@ export async function performImport(
         console.error(`Error processing component row ${componentCode}:`, rowError.message);
         result.skipped++;
         result.rowResults.push({ rowNumber: rowNum, primaryIdentifier: componentCode, action: 'failed', error: rowError.message });
-      }
-      _emitProgress('Processing Components…');
+      } } finally { _emitProgress('Processing Components…'); }
     }
     
     // Step 5: Archive missing components if requested
@@ -500,8 +499,7 @@ export async function performImport(
     for (let _spareIdx = 0; _spareIdx < data.length; _spareIdx++) {
       const row = data[_spareIdx];
       const _spareRowNum = row['__meta']?.rowNumber || (_spareIdx + 1);
-      try {
-        // Validate Component Code exists
+      try { try {
         const componentCode = String(row['Component Code']).trim();
         const component = componentsByCode.get(componentCode);
         
@@ -880,8 +878,7 @@ export async function performImport(
         result.skipped++;
         const _errPartCode = row['Part Code'] ? String(row['Part Code']).trim() : `row-${_spareRowNum}`;
         result.rowResults.push({ rowNumber: _spareRowNum, primaryIdentifier: _errPartCode, action: 'failed', error: error.message });
-      }
-      _emitProgress('Processing Spares…');
+      } } finally { _emitProgress('Processing Spares…'); }
     }
     
     const postImportLinkCount = await storage.getSpareComponentLinkCountByVessel(sparesVesselId);
@@ -922,7 +919,7 @@ export async function performImport(
     for (let _storeIdx = 0; _storeIdx < data.length; _storeIdx++) {
       const row = data[_storeIdx];
       const _storeRowNum = row['__meta']?.rowNumber || (_storeIdx + 1);
-      try {
+      try { try {
         const itemCode = String(row['Item Code'] || '').trim();
         if (!itemCode) {
           console.log('⏭️ Skipping row with empty Item Code');
@@ -1094,8 +1091,7 @@ export async function performImport(
         result.skipped++;
         const _errItemCode = String(row['Item Code'] || '').trim() || `row-${_storeRowNum}`;
         result.rowResults.push({ rowNumber: _storeRowNum, primaryIdentifier: _errItemCode, action: 'failed', error: error.message });
-      }
-      _emitProgress('Processing Stores…');
+      } } finally { _emitProgress('Processing Stores…'); }
     }
     
     console.log(`✅ Stores import complete: ${result.created} created, ${result.updated} updated, ${result.skipped} skipped`);
@@ -1145,7 +1141,7 @@ export async function performImport(
       
       const existingWorkOrder = workOrdersByTemplateCode.get(templateCode);
 
-      try {
+      try { try {
         if (mode === 'add') {
           if (!existingWorkOrder) {
             const newWorkOrder = await createWorkOrderFromRow(row, templateCode, vesselId);
@@ -1203,8 +1199,7 @@ export async function performImport(
         console.error(`Error processing work order row ${templateCode}:`, woError.message);
         result.skipped++;
         result.rowResults.push({ rowNumber: _woRowNum, primaryIdentifier: templateCode, action: 'failed', error: woError.message });
-      }
-      _emitProgress('Processing Work Orders…');
+      } } finally { _emitProgress('Processing Work Orders…'); }
     }
     
     // Step 3: Archive missing work orders if requested
@@ -1266,10 +1261,10 @@ export async function performImport(
     for (let _jobIdx = 0; _jobIdx < data.length; _jobIdx++) {
       const row = data[_jobIdx];
       const _jobRowNum = row['__meta']?.rowNumber || (_jobIdx + 1);
+      try {
       const componentCode = String(row['Component Code']).trim();
       const vesselCodeFromExcel = String(row['Vessel Code']).trim();
       
-      // Resolve actual component from prefetched map
       const component = componentsByCode.get(componentCode);
       if (!component) {
         console.error(`⚠️ Component not found: ${componentCode}, skipping job`);
@@ -1279,8 +1274,6 @@ export async function performImport(
         continue;
       }
       
-      // Use canonical vesselId from request parameter (FK reference)
-      // vesselCode is for display/tracking only
       const canonicalVesselId = vesselId || vesselCodeFromExcel;
       
       const ALLOWED_TASK_TYPES = ['Inspection', 'Overhaul', 'Service', 'Test', 'Renew/Replace', 'Measurement/Calibration', 'Megger Test', 'Cleaning', 'Lubrication', 'Survey', 'Analysis', 'Checks'];
@@ -1651,7 +1644,7 @@ export async function performImport(
           }
         }
       }
-      _emitProgress('Processing Jobs…');
+      } finally { _emitProgress('Processing Jobs…'); }
     }
     
     // Step 3: Archive missing jobs if requested
@@ -1703,6 +1696,7 @@ export async function performImport(
     for (let _makerIdx = 0; _makerIdx < data.length; _makerIdx++) {
       const row = data[_makerIdx];
       const _makerRowNum = row['__meta']?.rowNumber || (_makerIdx + 1);
+      try {
       const makerCode = row['Maker Code'];
       const makerName = row['Maker Name'];
       const address = row['Address'] || null;
@@ -1769,7 +1763,7 @@ export async function performImport(
         result.skipped++;
         result.rowResults.push({ rowNumber: _makerRowNum, primaryIdentifier: makerCode, action: 'failed', error: makerError.message });
       }
-      _emitProgress('Processing Makers…');
+      } finally { _emitProgress('Processing Makers…'); }
     }
     
     console.log(`✅ Makers import complete: ${result.created} created, ${result.updated} updated, ${result.skipped} skipped`);
@@ -1786,6 +1780,7 @@ export async function performImport(
     for (let _fcIdx = 0; _fcIdx < data.length; _fcIdx++) {
       const row = data[_fcIdx];
       const _fcRowNum = row['__meta']?.rowNumber || (_fcIdx + 1);
+      try {
       const fleetEquipmentCode = row['Fleet Equipment Code'];
       const fleetEquipmentName = row['Fleet Equipment Name'];
       const parentFleetEquipmentCode = row['Parent Fleet Equipment Code'] || null;
@@ -1873,7 +1868,7 @@ export async function performImport(
         result.skipped++;
         result.rowResults.push({ rowNumber: _fcRowNum, primaryIdentifier: fleetEquipmentCode, action: 'failed', error: fcError.message });
       }
-      _emitProgress('Processing Fleet Components…');
+      } finally { _emitProgress('Processing Fleet Components…'); }
     }
     
     console.log(`✅ Fleet components import complete: ${result.created} created, ${result.updated} updated, ${result.skipped} skipped`);
@@ -1894,6 +1889,7 @@ export async function performImport(
     for (let _fjIdx = 0; _fjIdx < data.length; _fjIdx++) {
       const row = data[_fjIdx];
       const _fjRowNum = row['__meta']?.rowNumber || (_fjIdx + 1);
+      try {
       const jobCode = row['Job Code'];
       const fleetEquipmentCode = row['Fleet Equipment Code'];
       const fleetEquipmentName = row['Fleet Equipment Name'];
@@ -2025,7 +2021,7 @@ export async function performImport(
         result.skipped++;
         result.rowResults.push({ rowNumber: _fjRowNum, primaryIdentifier: jobCode, action: 'failed', error: fjError.message });
       }
-      _emitProgress('Processing Fleet Jobs…');
+      } finally { _emitProgress('Processing Fleet Jobs…'); }
     }
     
     console.log(`✅ Fleet jobs import complete: ${result.created} created, ${result.updated} updated, ${result.skipped} skipped`);
@@ -2046,6 +2042,7 @@ export async function performImport(
     for (let _fsIdx = 0; _fsIdx < data.length; _fsIdx++) {
       const row = data[_fsIdx];
       const _fsRowNum = row['__meta']?.rowNumber || (_fsIdx + 1);
+      try {
       const partCode = row['Part Code'];
       const fleetEquipmentCode = row['Fleet Equipment Code'];
       const fleetEquipmentName = row['Fleet Equipment Name'];
@@ -2160,7 +2157,7 @@ export async function performImport(
         result.skipped++;
         result.rowResults.push({ rowNumber: _fsRowNum, primaryIdentifier: partCode, action: 'failed', error: fsError.message });
       }
-      _emitProgress('Processing Fleet Spares…');
+      } finally { _emitProgress('Processing Fleet Spares…'); }
     }
     
     console.log(`✅ Fleet spares import complete: ${result.created} created, ${result.updated} updated, ${result.skipped} skipped`);

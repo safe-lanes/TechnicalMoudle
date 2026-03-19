@@ -51,7 +51,18 @@ export default function ImportProgressOverlay({
     };
 
     window.addEventListener("beforeunload", handler);
-    return () => window.removeEventListener("beforeunload", handler);
+
+    const isActive = !complete && !error;
+    if (isActive) {
+      document.body.style.pointerEvents = "none";
+      const overlayEl = document.querySelector('[data-testid="import-progress-overlay"]') as HTMLElement | null;
+      if (overlayEl) overlayEl.style.pointerEvents = "auto";
+    }
+
+    return () => {
+      window.removeEventListener("beforeunload", handler);
+      document.body.style.pointerEvents = "";
+    };
   }, [visible, complete, error]);
 
   if (!visible) return null;
