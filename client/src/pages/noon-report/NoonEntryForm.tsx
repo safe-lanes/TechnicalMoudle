@@ -176,6 +176,9 @@ function NumericInput({
   disabled,
   hint,
   error,
+  min,
+  max,
+  step,
 }: {
   label: string;
   name: keyof FormValues;
@@ -185,6 +188,9 @@ function NumericInput({
   disabled?: boolean;
   hint?: string;
   error?: string;
+  min?: number;
+  max?: number;
+  step?: number | string;
 }) {
   return (
     <div className="flex flex-col gap-1">
@@ -194,7 +200,9 @@ function NumericInput({
       <Input
         {...register(name)}
         type="number"
-        step="any"
+        step={step ?? "any"}
+        min={min}
+        max={max}
         placeholder={placeholder || "0.0"}
         disabled={disabled}
         className={`h-9 text-sm ${error ? "border-red-400" : ""}`}
@@ -781,7 +789,7 @@ export default function NoonEntryForm({ reportId }: Props) {
 
       {/* Draft save timestamp (Fix 7) */}
       {draftStatusMsg && (
-        <p className="text-xs text-gray-400 italic" data-testid="text-draft-status">
+        <p className="text-xs text-gray-400 italic animate-fade-in" data-testid="text-draft-status">
           {draftStatusMsg}
         </p>
       )}
@@ -897,6 +905,8 @@ export default function NoonEntryForm({ reportId }: Props) {
                     name="distanceToGo"
                     unit="NM"
                     placeholder="0.0"
+                    min={0}
+                    step={0.1}
                     register={register}
                     disabled={isSubmitted}
                     error={errors.distanceToGo?.message}
@@ -986,6 +996,9 @@ export default function NoonEntryForm({ reportId }: Props) {
                     name="airTemperature"
                     unit="°C"
                     placeholder="0.0"
+                    min={-30}
+                    max={60}
+                    step={0.1}
                     register={register}
                     disabled={isSubmitted}
                     error={errors.airTemperature?.message}
@@ -995,6 +1008,9 @@ export default function NoonEntryForm({ reportId }: Props) {
                     name="seaTemperature"
                     unit="°C"
                     placeholder="0.0"
+                    min={-5}
+                    max={45}
+                    step={0.1}
                     register={register}
                     disabled={isSubmitted}
                     error={errors.seaTemperature?.message}
