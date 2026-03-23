@@ -2113,6 +2113,19 @@ const Stores: React.FC = () => {
             />
           </div>
         </div>
+        <Button
+          variant="outline"
+          className="text-gray-600"
+          onClick={() => {
+            setHistorySearch("");
+            setHistoryEventFilter("all");
+            setHistoryDateFrom("");
+            setHistoryDateTo("");
+          }}
+          data-testid="button-clear-history-filters"
+        >
+          Clear
+        </Button>
       </div>
       )}
       </div>

@@ -2817,6 +2817,20 @@ const Spares: React.FC = () => {
             data-testid="input-history-date-to"
           />
         </div>
+        <Button
+          variant="outline"
+          className="text-gray-600"
+          onClick={() => {
+            setHistorySearch("");
+            setHistoryEventFilter("all");
+            setHistoryDateFrom("");
+            setHistoryDateTo("");
+            setHistoryPage(1);
+          }}
+          data-testid="button-clear-history-filters"
+        >
+          Clear
+        </Button>
       </div>
       ) : (
       <div className="flex gap-3 items-center mb-4">
