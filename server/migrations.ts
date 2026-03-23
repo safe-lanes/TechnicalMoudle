@@ -2140,8 +2140,25 @@ const migrations: Migration[] = [
     description: 'Drops the incorrect 2-column unique_spare_component_link constraint and recreates it with 3 columns (spare_id, component_id, vessel_id) to match the Drizzle schema. Also adds unique_spare_location_stock on (spare_id, location_id) if missing. Deduplicates rows before creating constraints.',
     sql: `
       DO $$ 
+      DECLARE
+        scl_cols text;
+        sls_cols text;
       BEGIN
-        -- Drop existing unique_spare_component_link constraint/index on spare_component_links (scoped to table OID)
+        SELECT string_agg(a.attname, ',' ORDER BY array_position(c.conkey, a.attnum)) INTO scl_cols
+        FROM pg_constraint c
+        JOIN pg_attribute a ON a.attrelid = c.conrelid AND a.attnum = ANY(c.conkey)
+        WHERE c.conname = 'unique_spare_component_link' AND c.conrelid = 'spare_component_links'::regclass;
+
+        SELECT string_agg(a.attname, ',' ORDER BY array_position(c.conkey, a.attnum)) INTO sls_cols
+        FROM pg_constraint c
+        JOIN pg_attribute a ON a.attrelid = c.conrelid AND a.attnum = ANY(c.conkey)
+        WHERE c.conname = 'unique_spare_location_stock' AND c.conrelid = 'spare_location_stock'::regclass;
+
+        IF scl_cols = 'spare_id,component_id,vessel_id' AND sls_cols = 'spare_id,location_id' THEN
+          RAISE NOTICE 'Constraints already correct (likely applied by 072), skipping 070';
+          RETURN;
+        END IF;
+
         IF EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'unique_spare_component_link' AND conrelid = 'spare_component_links'::regclass) THEN
           ALTER TABLE spare_component_links DROP CONSTRAINT unique_spare_component_link;
         END IF;
@@ -2149,19 +2166,16 @@ const migrations: Migration[] = [
           DROP INDEX unique_spare_component_link;
         END IF;
 
-        -- Deduplicate spare_component_links keeping highest id per (spare_id, component_id, vessel_id)
         DELETE FROM spare_component_links
         WHERE id NOT IN (
           SELECT MAX(id) FROM spare_component_links
           GROUP BY spare_id, component_id, vessel_id
         );
 
-        -- Create correct 3-column unique constraint (matches Drizzle schema unique())
         IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'unique_spare_component_link' AND conrelid = 'spare_component_links'::regclass) THEN
           ALTER TABLE spare_component_links ADD CONSTRAINT unique_spare_component_link UNIQUE (spare_id, component_id, vessel_id);
         END IF;
 
-        -- Drop existing unique_spare_location_stock constraint/index on spare_location_stock (scoped to table OID)
         IF EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'unique_spare_location_stock' AND conrelid = 'spare_location_stock'::regclass) THEN
           ALTER TABLE spare_location_stock DROP CONSTRAINT unique_spare_location_stock;
         END IF;
@@ -2169,14 +2183,12 @@ const migrations: Migration[] = [
           DROP INDEX unique_spare_location_stock;
         END IF;
 
-        -- Deduplicate spare_location_stock keeping highest id per (spare_id, location_id) — latest row wins
         DELETE FROM spare_location_stock
         WHERE id NOT IN (
           SELECT MAX(id) FROM spare_location_stock
           GROUP BY spare_id, location_id
         );
 
-        -- Create unique constraint on (spare_id, location_id) (matches Drizzle schema unique())
         IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'unique_spare_location_stock' AND conrelid = 'spare_location_stock'::regclass) THEN
           ALTER TABLE spare_location_stock ADD CONSTRAINT unique_spare_location_stock UNIQUE (spare_id, location_id);
         END IF;
@@ -2189,7 +2201,25 @@ const migrations: Migration[] = [
     description: 'Migration 070 may have dropped old constraints but failed to create new ones on some databases. This migration ensures the correct unique constraints exist by dropping any leftover index/constraint, deduplicating, and recreating as proper UNIQUE constraints.',
     sql: `
       DO $$ 
+      DECLARE
+        scl_cols text;
+        sls_cols text;
       BEGIN
+        SELECT string_agg(a.attname, ',' ORDER BY array_position(c.conkey, a.attnum)) INTO scl_cols
+        FROM pg_constraint c
+        JOIN pg_attribute a ON a.attrelid = c.conrelid AND a.attnum = ANY(c.conkey)
+        WHERE c.conname = 'unique_spare_component_link' AND c.conrelid = 'spare_component_links'::regclass;
+
+        SELECT string_agg(a.attname, ',' ORDER BY array_position(c.conkey, a.attnum)) INTO sls_cols
+        FROM pg_constraint c
+        JOIN pg_attribute a ON a.attrelid = c.conrelid AND a.attnum = ANY(c.conkey)
+        WHERE c.conname = 'unique_spare_location_stock' AND c.conrelid = 'spare_location_stock'::regclass;
+
+        IF scl_cols = 'spare_id,component_id,vessel_id' AND sls_cols = 'spare_id,location_id' THEN
+          RAISE NOTICE 'Constraints already correct (likely applied by 072), skipping 071';
+          RETURN;
+        END IF;
+
         IF EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'unique_spare_component_link' AND conrelid = 'spare_component_links'::regclass) THEN
           ALTER TABLE spare_component_links DROP CONSTRAINT unique_spare_component_link;
         END IF;
@@ -2217,6 +2247,68 @@ const migrations: Migration[] = [
           SELECT MAX(id) FROM spare_location_stock
           GROUP BY spare_id, location_id
         );
+
+        ALTER TABLE spare_location_stock ADD CONSTRAINT unique_spare_location_stock UNIQUE (spare_id, location_id);
+      END $$;
+    `
+  },
+  {
+    id: '072_optimized_spare_unique_constraints',
+    name: 'Optimized spare unique constraints (replaces slow dedup in 070/071)',
+    description: 'Uses ROW_NUMBER() window function for O(n) dedup instead of NOT IN (SELECT MAX...) O(n²) pattern. Idempotent — safe on databases where 070/071 already succeeded (0 duplicates found, constraints already exist).',
+    sql: `
+      DO $$
+      DECLARE
+        deleted_scl integer;
+        deleted_sls integer;
+      BEGIN
+        -- === spare_component_links ===
+        IF EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'unique_spare_component_link' AND conrelid = 'spare_component_links'::regclass) THEN
+          ALTER TABLE spare_component_links DROP CONSTRAINT unique_spare_component_link;
+        END IF;
+        IF EXISTS (SELECT 1 FROM pg_indexes WHERE indexname = 'unique_spare_component_link' AND tablename = 'spare_component_links') THEN
+          DROP INDEX unique_spare_component_link;
+        END IF;
+
+        WITH ranked AS (
+          SELECT id, ROW_NUMBER() OVER (
+            PARTITION BY spare_id, component_id, vessel_id
+            ORDER BY id DESC
+          ) AS rn
+          FROM spare_component_links
+        )
+        DELETE FROM spare_component_links
+        WHERE id IN (SELECT id FROM ranked WHERE rn > 1);
+
+        GET DIAGNOSTICS deleted_scl = ROW_COUNT;
+        IF deleted_scl > 0 THEN
+          RAISE NOTICE 'Deduplicated spare_component_links: removed % duplicate rows', deleted_scl;
+        END IF;
+
+        ALTER TABLE spare_component_links ADD CONSTRAINT unique_spare_component_link UNIQUE (spare_id, component_id, vessel_id);
+
+        -- === spare_location_stock ===
+        IF EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'unique_spare_location_stock' AND conrelid = 'spare_location_stock'::regclass) THEN
+          ALTER TABLE spare_location_stock DROP CONSTRAINT unique_spare_location_stock;
+        END IF;
+        IF EXISTS (SELECT 1 FROM pg_indexes WHERE indexname = 'unique_spare_location_stock' AND tablename = 'spare_location_stock') THEN
+          DROP INDEX unique_spare_location_stock;
+        END IF;
+
+        WITH ranked AS (
+          SELECT id, ROW_NUMBER() OVER (
+            PARTITION BY spare_id, location_id
+            ORDER BY id DESC
+          ) AS rn
+          FROM spare_location_stock
+        )
+        DELETE FROM spare_location_stock
+        WHERE id IN (SELECT id FROM ranked WHERE rn > 1);
+
+        GET DIAGNOSTICS deleted_sls = ROW_COUNT;
+        IF deleted_sls > 0 THEN
+          RAISE NOTICE 'Deduplicated spare_location_stock: removed % duplicate rows', deleted_sls;
+        END IF;
 
         ALTER TABLE spare_location_stock ADD CONSTRAINT unique_spare_location_stock UNIQUE (spare_id, location_id);
       END $$;
