@@ -13,10 +13,8 @@ export async function getVesselById(vesselId: string) {
     imoNumber: vessels.imoNumber,
     flag: vessels.flag,
     vesselType: vessels.vesselType,
-    grossTonnage: vessels.grossTonnage,
-    deadweight: vessels.deadweight,
   }).from(vessels).where(eq(vessels.vuuid, vesselId)).limit(1);
-  return result[0] || null;
+  return result[0] ?? null;
 }
 
 export async function getAllVessels() {
@@ -39,5 +37,5 @@ export async function getUserById(userId: string) {
     role: users.role,
     vesselId: users.vesselId,
   }).from(users).where(eq(users.id, numericId)).limit(1);
-  return result[0] || null;
+  return result[0] ?? null;
 }

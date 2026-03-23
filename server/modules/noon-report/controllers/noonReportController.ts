@@ -131,6 +131,7 @@ export async function getFuelDashboard(req: Request, res: Response) {
     const dashboard = await service.getFuelDashboard(vesselId);
     res.json(dashboard);
   } catch (error: any) {
+    console.error('[getFuelDashboard] Error:', error?.stack ?? error);
     res.status(500).json({ error: 'Failed to fetch fuel dashboard', details: error.message });
   }
 }

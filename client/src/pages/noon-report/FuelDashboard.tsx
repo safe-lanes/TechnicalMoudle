@@ -2,7 +2,6 @@ import { useContext } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { VesselContext } from "@/contexts/VesselContext";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   LineChart,
@@ -26,11 +25,12 @@ interface DashboardData {
   enduranceDays: Record<string, number | null>;
   avg7DayByFuel: Record<string, number | null>;
   totalEnduranceDays: number | null;
-  totalEnduranceNm: number | null;
+  totalEnduranceNM: number | null;
   avg7DayConsumption: number;
   avg7DaySpeed: number;
   ciiRating: string | null;
   aer: number | null;
+  ciiRefLine: number | null;
   ytdDistanceNm: number | null;
   ytdCo2Mt: number | null;
   minBunkerToNextPort: number | null;
@@ -69,13 +69,29 @@ const FUEL_COLORS: Record<FuelKey, string> = {
   lpg: "#b45309",
 };
 
+// ── Recharts tooltip payload types ────────────────────────────────────────────
+
+interface TooltipPayloadEntry {
+  dataKey: string;
+  value: number;
+  name: string;
+  color: string;
+  payload: Record<string, unknown>;
+}
+
+interface ChartTooltipProps {
+  active?: boolean;
+  payload?: TooltipPayloadEntry[];
+  label?: string;
+}
+
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 function robBadge(enduranceDays: number | null) {
-  if (enduranceDays === null) return { label: "No data", variant: "secondary" as const, color: "bg-gray-100 text-gray-500" };
-  if (enduranceDays < 5) return { label: "Critical", variant: "destructive" as const, color: "bg-red-100 text-red-700 border-red-200" };
-  if (enduranceDays < 10) return { label: "Low", variant: "outline" as const, color: "bg-amber-100 text-amber-700 border-amber-200" };
-  return { label: "OK", variant: "outline" as const, color: "bg-green-100 text-green-700 border-green-200" };
+  if (enduranceDays === null) return { label: "No data", color: "bg-gray-100 text-gray-500 border-gray-200" };
+  if (enduranceDays < 5) return { label: "Critical", color: "bg-red-100 text-red-700 border-red-200" };
+  if (enduranceDays < 10) return { label: "Low", color: "bg-amber-100 text-amber-700 border-amber-200" };
+  return { label: "OK", color: "bg-green-100 text-green-700 border-green-200" };
 }
 
 function fmt(n: number | null | undefined, decimals = 1): string {
@@ -93,15 +109,25 @@ function fmtDate(d: string): string {
 
 // ── CII Gauge ─────────────────────────────────────────────────────────────────
 
-const CII_BANDS: Array<{ rating: string; color: string; label: string }> = [
-  { rating: "A", color: "#166534", label: "A" },
-  { rating: "B", color: "#16a34a", label: "B" },
-  { rating: "C", color: "#d97706", label: "C" },
-  { rating: "D", color: "#ea580c", label: "D" },
-  { rating: "E", color: "#dc2626", label: "E" },
+const CII_BANDS: Array<{ rating: string; color: string }> = [
+  { rating: "A", color: "#166534" },
+  { rating: "B", color: "#16a34a" },
+  { rating: "C", color: "#d97706" },
+  { rating: "D", color: "#ea580c" },
+  { rating: "E", color: "#dc2626" },
 ];
 
-function CIIGauge({ ciiRating, aer, ytdDistanceNm }: { ciiRating: string | null; aer: number | null; ytdDistanceNm: number | null }) {
+function CIIGauge({
+  ciiRating,
+  aer,
+  ciiRefLine,
+  ytdDistanceNm,
+}: {
+  ciiRating: string | null;
+  aer: number | null;
+  ciiRefLine: number | null;
+  ytdDistanceNm: number | null;
+}) {
   const noData = ciiRating === null;
 
   return (
@@ -143,11 +169,7 @@ function CIIGauge({ ciiRating, aer, ytdDistanceNm }: { ciiRating: string | null;
         {CII_BANDS.map(band => {
           const isActive = ciiRating === band.rating;
           return (
-            <div
-              key={band.rating}
-              className="flex-1 flex flex-col items-center gap-0.5"
-              style={{ transition: "all 0.2s" }}
-            >
+            <div key={band.rating} className="flex-1 flex flex-col items-center gap-0.5">
               {isActive && (
                 <div
                   className="w-0 h-0"
@@ -164,37 +186,44 @@ function CIIGauge({ ciiRating, aer, ytdDistanceNm }: { ciiRating: string | null;
                   backgroundColor: band.color,
                   height: isActive ? "40px" : "28px",
                   transition: "height 0.2s",
-                  fontWeight: isActive ? 900 : 600,
-                  border: isActive ? `2px solid ${band.color}` : "none",
                   boxShadow: isActive ? `0 0 6px ${band.color}88` : "none",
                 }}
                 data-testid={`cii-band-${band.rating}${isActive ? "-active" : ""}`}
               >
-                {band.label}
+                {band.rating}
               </div>
             </div>
           );
         })}
       </div>
 
-      {/* AER and YTD info */}
-      {(aer !== null || ytdDistanceNm !== null) && (
-        <div className="text-xs text-gray-500 text-center space-y-0.5 mt-1">
-          {aer !== null && (
-            <p data-testid="cii-aer-value">AER: {aer.toFixed(4)} g CO₂/t·NM</p>
-          )}
-          {ytdDistanceNm !== null && (
-            <p data-testid="cii-ytd-distance">YTD Distance: {Math.round(ytdDistanceNm).toLocaleString()} NM</p>
-          )}
-        </div>
-      )}
+      {/* AER, reference line, and YTD info */}
+      <div className="text-xs text-gray-500 text-center space-y-0.5 mt-1">
+        {aer !== null && (
+          <p data-testid="cii-aer-value">AER: {aer.toFixed(4)} g CO₂/t·NM</p>
+        )}
+        {ciiRefLine !== null && (
+          <p data-testid="cii-ref-line">Ref. line: {ciiRefLine.toFixed(4)} g CO₂/t·NM</p>
+        )}
+        {ytdDistanceNm !== null && (
+          <p data-testid="cii-ytd-distance">YTD Distance: {Math.round(ytdDistanceNm).toLocaleString()} NM</p>
+        )}
+      </div>
     </div>
   );
 }
 
 // ── ROB Status Cards ──────────────────────────────────────────────────────────
 
-function RobCard({ fuelKey, rob, enduranceDays }: { fuelKey: FuelKey; rob: number; enduranceDays: number | null }) {
+function RobCard({
+  fuelKey,
+  rob,
+  enduranceDays,
+}: {
+  fuelKey: FuelKey;
+  rob: number;
+  enduranceDays: number | null;
+}) {
   const badge = robBadge(enduranceDays);
   const hasData = rob > 0 || enduranceDays !== null;
 
@@ -215,7 +244,7 @@ function RobCard({ fuelKey, rob, enduranceDays }: { fuelKey: FuelKey; rob: numbe
         ) : (
           <>
             <p
-              className="text-2xl font-bold text-gray-800 mt-0.5"
+              className="text-2xl font-bold mt-0.5"
               style={{ color: FUEL_COLORS[fuelKey] }}
               data-testid={`rob-value-${fuelKey}`}
             >
@@ -231,11 +260,11 @@ function RobCard({ fuelKey, rob, enduranceDays }: { fuelKey: FuelKey; rob: numbe
   );
 }
 
-// ── Custom Scatter Tooltip ────────────────────────────────────────────────────
+// ── Custom Chart Tooltips ─────────────────────────────────────────────────────
 
-function ScatterTooltipContent({ active, payload }: any) {
+function ScatterTooltipContent({ active, payload }: ChartTooltipProps) {
   if (!active || !payload?.length) return null;
-  const d = payload[0]?.payload;
+  const d = payload[0]?.payload as { date?: string; speed?: number; consumption?: number };
   return (
     <div className="bg-white border border-gray-200 rounded shadow-sm p-2 text-xs">
       <p className="font-medium">{d?.date ? fmtDate(d.date) : ""}</p>
@@ -245,12 +274,12 @@ function ScatterTooltipContent({ active, payload }: any) {
   );
 }
 
-function TrendTooltipContent({ active, payload, label }: any) {
+function TrendTooltipContent({ active, payload, label }: ChartTooltipProps) {
   if (!active || !payload?.length) return null;
   return (
     <div className="bg-white border border-gray-200 rounded shadow-sm p-2 text-xs space-y-0.5">
-      <p className="font-semibold">{fmtDate(label)}</p>
-      {payload.map((p: any) => (
+      <p className="font-semibold">{fmtDate(label ?? "")}</p>
+      {payload.map(p => (
         <p key={p.dataKey} style={{ color: p.color }}>
           {p.name}: {fmt(p.value)} MT
         </p>
@@ -284,7 +313,7 @@ export default function FuelDashboard() {
     queryFn: async () => {
       const res = await fetch(`/technical/api/nr-fuel-dashboard/${vesselId}`);
       if (!res.ok) throw new Error("Failed to fetch fuel dashboard");
-      return res.json();
+      return res.json() as Promise<DashboardData>;
     },
     enabled: !!vesselId,
     refetchInterval: 60_000,
@@ -404,6 +433,7 @@ export default function FuelDashboard() {
                 <CIIGauge
                   ciiRating={data?.ciiRating ?? null}
                   aer={data?.aer ?? null}
+                  ciiRefLine={data?.ciiRefLine ?? null}
                   ytdDistanceNm={data?.ytdDistanceNm ?? null}
                 />
               </div>
@@ -447,8 +477,8 @@ export default function FuelDashboard() {
               <div className="space-y-0.5" data-testid="bunker-total-endurance-nm">
                 <p className="text-xs text-gray-500 uppercase tracking-wide">Endurance (NM)</p>
                 <p className="text-2xl font-bold text-gray-800">
-                  {data?.totalEnduranceNm !== null && data?.totalEnduranceNm !== undefined
-                    ? Math.round(data.totalEnduranceNm).toLocaleString()
+                  {data?.totalEnduranceNM !== null && data?.totalEnduranceNM !== undefined
+                    ? Math.round(data.totalEnduranceNM).toLocaleString()
                     : "—"}
                   <span className="text-sm font-medium text-gray-400 ml-1">NM</span>
                 </p>
@@ -519,7 +549,6 @@ export default function FuelDashboard() {
                   data={data.speedConsumptionData}
                   fill="#3b82f6"
                   opacity={0.75}
-                  data-testid="scatter-points"
                 />
               </ScatterChart>
             </ResponsiveContainer>

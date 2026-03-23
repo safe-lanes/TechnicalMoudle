@@ -1,11 +1,10 @@
 import * as repo from '../repositories/noonReportRepository';
 import { db } from '../../../db';
 import { nrNoonReports, nrFuelRob, nrCiiTracking } from '@shared/schema';
-import { eq, and, desc, gte, lte, asc } from 'drizzle-orm';
-import type { InsertNrNoonReport } from '@shared/schema';
+import type { InsertNrNoonReport, NrNoonReport } from '@shared/schema';
+import { eq, and, desc, asc } from 'drizzle-orm';
 import { runCalculations } from './calculationEngine';
-import * as adapter from '../utils/existingDataAdapter';
-import { BUNKER_SAFETY_MARGIN_PCT, FUEL_TYPES, FUEL_CONSUMPTION_FIELDS } from '../utils/fuelConversionFactors';
+import { BUNKER_SAFETY_MARGIN_PCT, FUEL_TYPES } from '../utils/fuelConversionFactors';
 
 // ── Report CRUD ──────────────────────────────────────────────────────────────
 
@@ -55,7 +54,7 @@ export async function submitReport(id: number, submittedBy: string) {
 
   const submitted = await repo.submitNoonReport(id, submittedBy);
 
-  // Update fuel ROB after submission
+  // Update fuel ROB after submission (clamp to 0 if negative)
   await updateFuelRobFromReport(submitted);
 
   // Run calculation engine (rolling averages, CII tracking, EEOI)
@@ -77,18 +76,20 @@ export async function getFuelRob(vesselId: string) {
   return repo.getFuelRobByVessel(vesselId);
 }
 
-async function updateFuelRobFromReport(report: any) {
-  const fuelTypes = [
-    { type: 'HFO', rob: report.hfoRob },
+async function updateFuelRobFromReport(report: NrNoonReport): Promise<void> {
+  const fuelTypes: Array<{ type: string; rob: string | null | undefined }> = [
+    { type: 'HFO',   rob: report.hfoRob },
     { type: 'LSMGO', rob: report.lsmgoRob },
-    { type: 'MGO', rob: report.mgoRob },
+    { type: 'MGO',   rob: report.mgoRob },
     { type: 'VLSFO', rob: report.vlsfoRob },
-    { type: 'LPG', rob: report.lpgRob },
+    { type: 'LPG',   rob: report.lpgRob },
   ];
 
   for (const { type, rob } of fuelTypes) {
     if (rob !== null && rob !== undefined) {
-      await repo.upsertFuelRob(report.vesselId, type, Number(rob), report.id);
+      // Clamp to 0 — ROB cannot be negative
+      const clampedRob = Math.max(0, Number(rob));
+      await repo.upsertFuelRob(report.vesselId, type, clampedRob, report.id);
     }
   }
 }
@@ -136,7 +137,7 @@ export async function getFuelDashboard(vesselId: string) {
     ? last7.map(r => toNum(r.speed) ?? 0).reduce((a, b) => a + b, 0) / last7.length
     : 0;
 
-  const totalEnduranceNm = totalEnduranceDays !== null && avg7DaySpeed > 0
+  const totalEnduranceNM = totalEnduranceDays !== null && avg7DaySpeed > 0
     ? totalEnduranceDays * 24 * avg7DaySpeed
     : null;
 
@@ -152,19 +153,23 @@ export async function getFuelDashboard(vesselId: string) {
   // minBunkerToNextPort = distanceToGo × (totalAvg7Day / avgDistanceSailed7Day)
   let minBunkerToNextPort: number | null = null;
   let recommendedBunker: number | null = null;
-  if (distanceToGo && distanceToGo > 0 && avgDistanceSailed7Day > 0 && totalAvg7Day > 0) {
+  if (distanceToGo !== null && distanceToGo > 0 && avgDistanceSailed7Day > 0 && totalAvg7Day > 0) {
     minBunkerToNextPort = distanceToGo * (totalAvg7Day / avgDistanceSailed7Day);
     recommendedBunker = minBunkerToNextPort * (1 + BUNKER_SAFETY_MARGIN_PCT / 100);
   }
 
   // CII tracking for current year
   const currentYear = new Date().getFullYear();
-  const ciiRow = await db.select()
+  const ciiRows = await db.select()
     .from(nrCiiTracking)
     .where(and(eq(nrCiiTracking.vesselId, vesselId), eq(nrCiiTracking.year, currentYear)))
     .limit(1);
 
-  const ciiTracking = ciiRow[0] ?? null;
+  const ciiTracking = ciiRows[0] ?? null;
+
+  // DWT is not currently stored in the vessels table.
+  // CII reference line remains null until DWT data is available.
+  const ciiRefLine: number | null = null;
 
   // Last 30 submitted reports in ascending date order for trend chart
   const last30Raw = await db.select()
@@ -226,11 +231,12 @@ export async function getFuelDashboard(vesselId: string) {
     enduranceDays: enduranceDaysByFuel,
     avg7DayByFuel,
     totalEnduranceDays: totalEnduranceDays !== null ? round2(totalEnduranceDays) : null,
-    totalEnduranceNm: totalEnduranceNm !== null ? Math.round(totalEnduranceNm) : null,
+    totalEnduranceNM: totalEnduranceNM !== null ? Math.round(totalEnduranceNM) : null,
     avg7DayConsumption: round2(totalAvg7Day),
     avg7DaySpeed: round2(avg7DaySpeed),
     ciiRating: ciiTracking?.ciiRating ?? null,
     aer: ciiTracking?.aer !== null && ciiTracking?.aer !== undefined ? toNum(ciiTracking.aer) : null,
+    ciiRefLine: ciiRefLine !== null ? round4(ciiRefLine) : null,
     ytdDistanceNm: ciiTracking?.ytdDistanceNm !== null ? toNum(ciiTracking?.ytdDistanceNm) : null,
     ytdCo2Mt: ciiTracking?.ytdCo2Mt !== null ? toNum(ciiTracking?.ytdCo2Mt) : null,
     minBunkerToNextPort: minBunkerToNextPort !== null ? round2(minBunkerToNextPort) : null,
@@ -251,7 +257,7 @@ export async function getVesselKPIs(vesselId: string) {
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
-function toNum(val: any): number | null {
+function toNum(val: string | number | null | undefined): number | null {
   if (val === null || val === undefined || val === '') return null;
   const n = Number(val);
   return isNaN(n) ? null : n;
@@ -259,4 +265,8 @@ function toNum(val: any): number | null {
 
 function round2(n: number): number {
   return Math.round(n * 100) / 100;
+}
+
+function round4(n: number): number {
+  return Math.round(n * 10000) / 10000;
 }

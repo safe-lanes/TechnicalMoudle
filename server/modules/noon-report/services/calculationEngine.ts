@@ -6,11 +6,9 @@ import { db } from '../../../db';
 import { nrNoonReports, nrFuelRob, nrVoyageLegs, nrCiiTracking } from '@shared/schema';
 import { eq, and, desc, gte, lte } from 'drizzle-orm';
 import type { NrNoonReport } from '@shared/schema';
-import * as adapter from '../utils/existingDataAdapter';
 import {
   CO2_FACTORS,
   FUEL_TYPES,
-  FUEL_CONSUMPTION_FIELDS,
   computeCiiRefLine,
   assignCiiRating,
 } from '../utils/fuelConversionFactors';
@@ -18,14 +16,15 @@ import {
 // ── Main entry point ──────────────────────────────────────────────────────────
 
 export async function runCalculations(report: NrNoonReport): Promise<void> {
-  try {
-    await Promise.all([
-      computeRollingAveragesAndEndurance(report),
-      computeCiiTracking(report),
-      computeEeoi(report),
-    ]);
-  } catch (err) {
-    console.error('[calculationEngine] Error running calculations:', err);
+  const results = await Promise.allSettled([
+    computeRollingAveragesAndEndurance(report),
+    computeCiiTracking(report),
+    computeEeoi(report),
+  ]);
+  for (const result of results) {
+    if (result.status === 'rejected') {
+      console.error('[calculationEngine] Calculation step failed:', result.reason);
+    }
   }
 }
 
@@ -40,39 +39,43 @@ async function computeRollingAveragesAndEndurance(report: NrNoonReport): Promise
   const avgSpeed7 = avg(last7.map(r => toNum(r.speed)));
 
   for (const fuelType of FUEL_TYPES) {
-    const consField = FUEL_CONSUMPTION_FIELDS[fuelType] as keyof NrNoonReport;
-
-    const cons7 = last7.map(r => toNum(r[consField] as any)).filter(v => v !== null) as number[];
-    const cons3 = last3.map(r => toNum(r[consField] as any)).filter(v => v !== null) as number[];
+    const cons7 = last7
+      .map(r => getReportConsumption(r, fuelType))
+      .filter((v): v is number => v !== null);
+    const cons3 = last3
+      .map(r => getReportConsumption(r, fuelType))
+      .filter((v): v is number => v !== null);
 
     const avg7Day = cons7.length > 0 ? cons7.reduce((a, b) => a + b, 0) / cons7.length : null;
     const avg3Day = cons3.length > 0 ? cons3.reduce((a, b) => a + b, 0) / cons3.length : null;
 
     // Get current ROB from database (already updated by updateFuelRobFromReport)
-    const robRow = await db.select()
+    const robRows = await db.select()
       .from(nrFuelRob)
       .where(and(eq(nrFuelRob.vesselId, report.vesselId), eq(nrFuelRob.fuelType, fuelType)))
       .limit(1);
 
-    const currentRob = robRow.length > 0 ? toNum(robRow[0].currentRob) : null;
+    const robRow = robRows[0] ?? null;
+    // Clamp to 0 if stored ROB is negative (safety floor)
+    const currentRob = robRow !== null ? Math.max(0, toNum(robRow.currentRob) ?? 0) : null;
 
     let enduranceDays: number | null = null;
-    let enduranceNm: number | null = null;
+    let enduranceNM: number | null = null;
 
     if (currentRob !== null && avg7Day !== null && avg7Day > 0) {
       enduranceDays = currentRob / avg7Day;
       const speed = avgSpeed7 ?? 0;
-      enduranceNm = enduranceDays * 24 * speed;
+      enduranceNM = enduranceDays * 24 * speed;
     }
 
     // Upsert the averages and endurance into nr_fuel_rob
-    if (robRow.length > 0) {
+    if (robRow !== null) {
       await db.update(nrFuelRob)
         .set({
           avg3Day: avg3Day !== null ? String(avg3Day) : null,
           avg7Day: avg7Day !== null ? String(avg7Day) : null,
           enduranceDays: enduranceDays !== null ? String(enduranceDays) : null,
-          enduranceNm: enduranceNm !== null ? String(enduranceNm) : null,
+          enduranceNm: enduranceNM !== null ? String(enduranceNM) : null,
         })
         .where(and(eq(nrFuelRob.vesselId, report.vesselId), eq(nrFuelRob.fuelType, fuelType)));
     } else if (avg7Day !== null) {
@@ -85,7 +88,7 @@ async function computeRollingAveragesAndEndurance(report: NrNoonReport): Promise
         avg3Day: avg3Day !== null ? String(avg3Day) : null,
         avg7Day: String(avg7Day),
         enduranceDays: enduranceDays !== null ? String(enduranceDays) : null,
-        enduranceNm: enduranceNm !== null ? String(enduranceNm) : null,
+        enduranceNm: enduranceNM !== null ? String(enduranceNM) : null,
       });
     }
   }
@@ -120,24 +123,23 @@ async function computeCiiTracking(report: NrNoonReport): Promise<void> {
       ytdCo2Mt += toNum(r.co2Total) ?? 0;
     } else {
       for (const fuelType of FUEL_TYPES) {
-        const consField = FUEL_CONSUMPTION_FIELDS[fuelType] as keyof NrNoonReport;
-        const cons = toNum(r[consField] as any) ?? 0;
+        const cons = getReportConsumption(r, fuelType) ?? 0;
         ytdCo2Mt += cons * (CO2_FACTORS[fuelType] ?? 0);
       }
     }
     ytdDistanceNm += toNum(r.distanceSailed) ?? 0;
   }
 
-  // Fetch vessel DWT
-  const vessel = await adapter.getVesselById(report.vesselId);
-  const dwt = vessel?.deadweight ? toNum(vessel.deadweight) : null;
+  // DWT is not currently stored in the vessels table.
+  // CII/AER will be null until DWT data is available.
+  const dwt: number | null = null;
 
   // AER = (ytdCO2 in grams) / (DWT × ytdDistanceNM)
   // ytdCo2Mt is in tonnes → multiply by 1e6 to get grams
   let aer: number | null = null;
   let ciiRating: string | null = null;
 
-  if (dwt && dwt > 0 && ytdDistanceNm > 0) {
+  if (dwt !== null && dwt > 0 && ytdDistanceNm > 0) {
     const ytdCo2Grams = ytdCo2Mt * 1_000_000;
     aer = ytdCo2Grams / (dwt * ytdDistanceNm);
     const refLine = computeCiiRefLine(dwt);
@@ -189,8 +191,7 @@ async function computeEeoi(report: NrNoonReport): Promise<void> {
     totalCo2Mt = toNum(report.co2Total) ?? 0;
   } else {
     for (const fuelType of FUEL_TYPES) {
-      const consField = FUEL_CONSUMPTION_FIELDS[fuelType] as keyof NrNoonReport;
-      const cons = toNum(report[consField] as any) ?? 0;
+      const cons = getReportConsumption(report, fuelType) ?? 0;
       totalCo2Mt += cons * (CO2_FACTORS[fuelType] ?? 0);
     }
   }
@@ -219,6 +220,18 @@ async function computeEeoi(report: NrNoonReport): Promise<void> {
   }
 }
 
+// ── Typed consumption accessor (no 'as any') ──────────────────────────────────
+
+function getReportConsumption(report: NrNoonReport, fuelType: typeof FUEL_TYPES[number]): number | null {
+  switch (fuelType) {
+    case 'HFO':   return toNum(report.hfoConsumption);
+    case 'LSMGO': return toNum(report.lsmgoConsumption);
+    case 'MGO':   return toNum(report.mgoConsumption);
+    case 'VLSFO': return toNum(report.vlsfoConsumption);
+    case 'LPG':   return toNum(report.lpgConsumption);
+  }
+}
+
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 async function getLastNSubmitted(vesselId: string, n: number): Promise<NrNoonReport[]> {
@@ -229,13 +242,13 @@ async function getLastNSubmitted(vesselId: string, n: number): Promise<NrNoonRep
     .limit(n) as Promise<NrNoonReport[]>;
 }
 
-function toNum(val: any): number | null {
+function toNum(val: string | number | null | undefined): number | null {
   if (val === null || val === undefined || val === '') return null;
   const n = Number(val);
   return isNaN(n) ? null : n;
 }
 
 function avg(vals: (number | null)[]): number | null {
-  const valid = vals.filter(v => v !== null) as number[];
+  const valid = vals.filter((v): v is number => v !== null);
   return valid.length > 0 ? valid.reduce((a, b) => a + b, 0) / valid.length : null;
 }
