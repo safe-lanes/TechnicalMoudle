@@ -2156,9 +2156,10 @@ const migrations: Migration[] = [
           GROUP BY spare_id, component_id, vessel_id
         );
 
-        -- Create correct 3-column unique index
-        CREATE UNIQUE INDEX unique_spare_component_link 
-          ON spare_component_links(spare_id, component_id, vessel_id);
+        -- Create correct 3-column unique constraint (matches Drizzle schema unique())
+        IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'unique_spare_component_link' AND conrelid = 'spare_component_links'::regclass) THEN
+          ALTER TABLE spare_component_links ADD CONSTRAINT unique_spare_component_link UNIQUE (spare_id, component_id, vessel_id);
+        END IF;
 
         -- Drop existing unique_spare_location_stock constraint/index on spare_location_stock (scoped to table OID)
         IF EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'unique_spare_location_stock' AND conrelid = 'spare_location_stock'::regclass) THEN
@@ -2175,9 +2176,10 @@ const migrations: Migration[] = [
           GROUP BY spare_id, location_id
         );
 
-        -- Create unique index on (spare_id, location_id)
-        CREATE UNIQUE INDEX unique_spare_location_stock 
-          ON spare_location_stock(spare_id, location_id);
+        -- Create unique constraint on (spare_id, location_id) (matches Drizzle schema unique())
+        IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'unique_spare_location_stock' AND conrelid = 'spare_location_stock'::regclass) THEN
+          ALTER TABLE spare_location_stock ADD CONSTRAINT unique_spare_location_stock UNIQUE (spare_id, location_id);
+        END IF;
       END $$;
     `
   }
