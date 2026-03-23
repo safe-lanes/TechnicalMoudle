@@ -115,6 +115,11 @@ const Spares: React.FC = () => {
   // Pagination state - Inventory
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(10);
+  // History filter state
+  const [historySearch, setHistorySearch] = useState("");
+  const [historyEventFilter, setHistoryEventFilter] = useState("all");
+  const [historyDateFrom, setHistoryDateFrom] = useState("");
+  const [historyDateTo, setHistoryDateTo] = useState("");
   // Pagination state - History
   const [historyPage, setHistoryPage] = useState(1);
   const [historyItemsPerPage, setHistoryItemsPerPage] = useState(10);
@@ -1843,24 +1848,79 @@ const Spares: React.FC = () => {
     setExpandedNodes(new Set());
   };
 
+  // History filtering
+  const filteredHistoryData = useMemo(() => {
+    const parseHistoryDate = (dateStr: string): Date | null => {
+      if (!dateStr) return null;
+      const months: Record<string, number> = {
+        'Jan': 0, 'Feb': 1, 'Mar': 2, 'Apr': 3, 'May': 4, 'Jun': 5,
+        'Jul': 6, 'Aug': 7, 'Sep': 8, 'Oct': 9, 'Nov': 10, 'Dec': 11
+      };
+      const parts = dateStr.split('-');
+      if (parts.length !== 3) return null;
+      const day = parseInt(parts[0], 10);
+      const month = months[parts[1]];
+      const year = parseInt(parts[2], 10);
+      if (isNaN(day) || month === undefined || isNaN(year)) return null;
+      return new Date(year, month, day);
+    };
+
+    const fromDate = historyDateFrom ? new Date(historyDateFrom + 'T00:00:00') : null;
+    const toDate = historyDateTo ? new Date(historyDateTo + 'T23:59:59') : null;
+
+    return historyData.filter((item: SpareHistory) => {
+      if (historySearch) {
+        const term = historySearch.toLowerCase();
+        if (!item.partCode?.toLowerCase().includes(term) &&
+            !item.partName?.toLowerCase().includes(term) &&
+            !item.componentName?.toLowerCase().includes(term)) {
+          return false;
+        }
+      }
+      if (historyEventFilter !== "all" && item.eventType !== historyEventFilter) {
+        return false;
+      }
+      if (fromDate || toDate) {
+        let itemDate: Date | null = null;
+        if (item.dateLocal) {
+          const isDateOnly = /^\d{4}-\d{2}-\d{2}$/.test(item.dateLocal.trim());
+          if (isDateOnly) {
+            itemDate = new Date(item.dateLocal.trim() + 'T00:00:00');
+          } else {
+            const parsed = parseHistoryDate(item.dateLocal);
+            if (parsed) itemDate = parsed;
+          }
+        }
+        if (!itemDate && item.timestampUTC) {
+          itemDate = new Date(item.timestampUTC);
+        }
+        if (itemDate && !isNaN(itemDate.getTime())) {
+          if (fromDate && itemDate < fromDate) return false;
+          if (toDate && itemDate > toDate) return false;
+        }
+      }
+      return true;
+    });
+  }, [historyData, historySearch, historyEventFilter, historyDateFrom, historyDateTo]);
+
   // History pagination calculations
-  const historyTotalPages = Math.ceil(historyData.length / historyItemsPerPage);
+  const historyTotalPages = Math.ceil(filteredHistoryData.length / historyItemsPerPage);
   const paginatedHistory = useMemo(() => {
     const startIndex = (historyPage - 1) * historyItemsPerPage;
-    return historyData.slice(startIndex, startIndex + historyItemsPerPage);
-  }, [historyData, historyPage, historyItemsPerPage]);
+    return filteredHistoryData.slice(startIndex, startIndex + historyItemsPerPage);
+  }, [filteredHistoryData, historyPage, historyItemsPerPage]);
 
   useEffect(() => {
     setHistoryPage(1);
-  }, [vesselId, historyItemsPerPage]);
+  }, [vesselId, historyItemsPerPage, historySearch, historyEventFilter, historyDateFrom, historyDateTo]);
 
   useEffect(() => {
     if (historyTotalPages > 0 && historyPage > historyTotalPages) {
       setHistoryPage(historyTotalPages);
-    } else if (historyTotalPages === 0 && historyData.length === 0) {
+    } else if (historyTotalPages === 0 && filteredHistoryData.length === 0) {
       setHistoryPage(1);
     }
-  }, [historyTotalPages, historyPage, historyData.length]);
+  }, [historyTotalPages, historyPage, filteredHistoryData.length]);
 
   const goToInventoryPage = (page: number) => {
     const p = Math.max(1, Math.min(page, totalPages || 1));
@@ -1943,7 +2003,7 @@ const Spares: React.FC = () => {
     const timestamp = now.toISOString().replace(/[-:]/g, '').replace('T', '_').slice(0, 15);
     const filename = `spares_history_${vesselId}_${timestamp}.xlsx`;
     
-    const data = historyData.map((history: SpareHistory) => {
+    const data = filteredHistoryData.map((history: SpareHistory) => {
       let dateDisplay = '-';
       try {
         const isDateOnly = history.dateLocal && /^\d{4}-\d{2}-\d{2}$/.test(history.dateLocal.trim());
@@ -2702,6 +2762,53 @@ const Spares: React.FC = () => {
         </div>
       </div>
       {/* Search and Filters */}
+      {activeTab === 'history' ? (
+      <div className="flex gap-4 mb-4">
+        <div className="relative w-80" data-testid="history-search">
+          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+          <Input
+            placeholder="Search history..."
+            value={historySearch}
+            onChange={(e) => setHistorySearch(e.target.value)}
+            className="pl-10"
+            data-testid="input-history-search"
+          />
+        </div>
+        <div>
+          <Select value={historyEventFilter} onValueChange={setHistoryEventFilter}>
+            <SelectTrigger className="w-40 text-sm" data-testid="select-history-event-filter">
+              <SelectValue placeholder="All Events" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Events</SelectItem>
+              <SelectItem value="RECEIVE">Receive</SelectItem>
+              <SelectItem value="CONSUME">Consume</SelectItem>
+              <SelectItem value="ADJUST">Adjust</SelectItem>
+              <SelectItem value="INITIAL">Initial</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+        <div className="flex items-center gap-2">
+          <Input
+            type="date"
+            value={historyDateFrom}
+            onChange={(e) => setHistoryDateFrom(e.target.value)}
+            className="text-sm"
+            placeholder="From"
+            data-testid="input-history-date-from"
+          />
+          <span className="text-gray-500">to</span>
+          <Input
+            type="date"
+            value={historyDateTo}
+            onChange={(e) => setHistoryDateTo(e.target.value)}
+            className="text-sm"
+            placeholder="To"
+            data-testid="input-history-date-to"
+          />
+        </div>
+      </div>
+      ) : (
       <div className="flex gap-3 items-center mb-4">
         {/* Vessel selector - visible for Sail Admin, Client Admin, or in change mode */}
         {(isSailAdmin || isClientAdmin || isChangeMode) && (
@@ -2783,6 +2890,7 @@ const Spares: React.FC = () => {
           </Button>
         )}
       </div>
+      )}
       </div>
 
       {/* Main Content - Scrollable */}
@@ -3328,7 +3436,7 @@ const Spares: React.FC = () => {
 
               {/* History Table Body */}
               <div className="overflow-y-auto flex-1">
-                {historyData.length === 0 ? (
+                {filteredHistoryData.length === 0 ? (
                   <div className="p-8 text-center text-gray-500">
                     No history records found.
                   </div>
@@ -3390,7 +3498,7 @@ const Spares: React.FC = () => {
               </div>
 
               {/* History Pagination Footer */}
-              {historyData.length > 0 && (
+              {filteredHistoryData.length > 0 && (
                 <div className="p-4 bg-gray-50 border-t border-gray-200 flex items-center justify-between" data-testid="history-pagination-footer">
                   <div className="flex items-center gap-2 text-sm text-gray-600">
                     <span>Show</span>
@@ -3410,7 +3518,7 @@ const Spares: React.FC = () => {
                   </div>
                   <div className="flex items-center gap-2 text-sm text-gray-600" data-testid="history-pagination-info">
                     <span>
-                      Showing {((historyPage - 1) * historyItemsPerPage) + 1} - {Math.min(historyPage * historyItemsPerPage, historyData.length)} of {historyData.length} transactions
+                      Showing {((historyPage - 1) * historyItemsPerPage) + 1} - {Math.min(historyPage * historyItemsPerPage, filteredHistoryData.length)} of {filteredHistoryData.length} transactions
                     </span>
                   </div>
                   <div className="flex items-center gap-1">
