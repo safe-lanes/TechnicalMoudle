@@ -34,32 +34,28 @@ export async function processSpareInventory(params: {
   const { spareId, spareUuid, vesselId, componentId, locationAName, locationBName, robLocationA, robLocationB, isNewSpare, userId } = params;
   let linkCreated = false;
 
-  try {
-    const existingLinks = await storage.getSpareComponentLinksBySpare(spareId);
-    const alreadyLinked = existingLinks.some((link: any) => link.componentId === componentId);
-    if (!alreadyLinked) {
-      await storage.createSpareComponentLink({
-        spareId,
-        spareUuid,
-        componentId,
-        vesselId,
-        linkedBy: userId,
-      }, true);
-      linkCreated = true;
-      console.log(`🔗 Linked spare ${spareId} to component ${componentId}`);
-    }
+  const existingLinks = await storage.getSpareComponentLinksBySpare(spareId);
+  const alreadyLinked = existingLinks.some((link: any) => link.componentId === componentId);
+  if (!alreadyLinked) {
+    await storage.createSpareComponentLink({
+      spareId,
+      spareUuid,
+      componentId,
+      vesselId,
+      linkedBy: userId,
+    }, true);
+    linkCreated = true;
+    console.log(`🔗 Linked spare ${spareId} to component ${componentId}`);
+  }
 
-    // 2. Process Location A if provided (always sync if location name is given)
+  try {
     if (locationAName && locationAName.trim()) {
-      // Use findOrCreateLocation for proper normalization
       const locationA = await storage.findOrCreateLocation(vesselId, locationAName.trim(), userId);
 
-      // Get current stock to compute proper before/after values
       const currentTotalRobA = await storage.getSpareRobTotal(spareId);
       const currentLocStockA = await storage.getSpareLocationStockItem(spareId, locationA.id);
       const currentLocQtyA = currentLocStockA?.qty ?? 0;
 
-      // Always sync stock to spreadsheet value (allows setting to 0)
       if (robLocationA >= 0) {
         await storage.upsertSpareLocationStock({
           vesselId,
@@ -91,17 +87,13 @@ export async function processSpareInventory(params: {
       }
     }
 
-    // 3. Process Location B if provided (always sync if location name is given)
     if (locationBName && locationBName.trim()) {
-      // Use findOrCreateLocation for proper normalization
       const locationB = await storage.findOrCreateLocation(vesselId, locationBName.trim(), userId);
 
-      // Get current stock AFTER location A processing to compute proper before/after
       const currentTotalRobB = await storage.getSpareRobTotal(spareId);
       const currentLocStockB = await storage.getSpareLocationStockItem(spareId, locationB.id);
       const currentLocQtyB = currentLocStockB?.qty ?? 0;
 
-      // Always sync stock to spreadsheet value (allows setting to 0)
       if (robLocationB >= 0) {
         await storage.upsertSpareLocationStock({
           vesselId,
@@ -133,7 +125,7 @@ export async function processSpareInventory(params: {
       }
     }
   } catch (error: any) {
-    console.error(`⚠️ Error processing inventory for spare ${spareId}:`, error.message);
+    console.error(`⚠️ Error processing location/stock for spare ${spareId} (link was ${linkCreated ? 'created' : 'skipped'}):`, error.message);
   }
   return { linkCreated };
 }
