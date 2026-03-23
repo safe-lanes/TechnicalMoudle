@@ -66,6 +66,8 @@ export const vessels = pgTable("vessels", {
   imoNumber: text("imo_number"), // IMO number if applicable
   vesselType: text("vessel_type"), // e.g., Tanker, Bulk Carrier, Container
   flag: text("flag"), // Flag state
+  deadweight: numeric("deadweight"), // Deadweight tonnage (DWT) — used for CII/AER calculation
+  grossTonnage: numeric("gross_tonnage"), // Gross tonnage
   vesselSequence: integer("vessel_sequence"), // Numeric sequence for vessel (1, 2, 3... for defect IDs)
   isActive: boolean("is_active").notNull().default(true),
   createdAt: timestamp("created_at").notNull().defaultNow(),

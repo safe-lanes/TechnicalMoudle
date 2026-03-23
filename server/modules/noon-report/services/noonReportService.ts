@@ -4,7 +4,8 @@ import { nrNoonReports, nrFuelRob, nrCiiTracking } from '@shared/schema';
 import type { InsertNrNoonReport, NrNoonReport } from '@shared/schema';
 import { eq, and, desc, asc } from 'drizzle-orm';
 import { runCalculations } from './calculationEngine';
-import { BUNKER_SAFETY_MARGIN_PCT, FUEL_TYPES } from '../utils/fuelConversionFactors';
+import { BUNKER_SAFETY_MARGIN_PCT, FUEL_TYPES, computeCiiRefLine } from '../utils/fuelConversionFactors';
+import { getVesselById } from '../utils/existingDataAdapter';
 
 // ── Report CRUD ──────────────────────────────────────────────────────────────
 
@@ -167,9 +168,10 @@ export async function getFuelDashboard(vesselId: string) {
 
   const ciiTracking = ciiRows[0] ?? null;
 
-  // DWT is not currently stored in the vessels table.
-  // CII reference line remains null until DWT data is available.
-  const ciiRefLine: number | null = null;
+  // CII reference line — computed from vessel DWT; null if DWT not configured
+  const vessel = await getVesselById(vesselId);
+  const dwt = vessel?.deadweight ? toNum(vessel.deadweight) : null;
+  const ciiRefLine = dwt !== null && dwt > 0 ? computeCiiRefLine(dwt) : null;
 
   // Last 30 submitted reports in ascending date order for trend chart
   const last30Raw = await db.select()

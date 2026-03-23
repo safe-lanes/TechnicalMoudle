@@ -13,6 +13,8 @@ export async function getVesselById(vesselId: string) {
     imoNumber: vessels.imoNumber,
     flag: vessels.flag,
     vesselType: vessels.vesselType,
+    deadweight: vessels.deadweight,
+    grossTonnage: vessels.grossTonnage,
   }).from(vessels).where(eq(vessels.vuuid, vesselId)).limit(1);
   return result[0] ?? null;
 }
