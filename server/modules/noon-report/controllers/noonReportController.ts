@@ -175,13 +175,11 @@ export async function getAllAlerts(req: Request, res: Response) {
 }
 
 // ── PATCH /nr-alerts/:alertId/acknowledge ────────────────────────────────────
-// Acknowledges an alert. Restricted to office / admin users (not ship users).
+// Acknowledges an alert. Authorization is enforced at the route level via
+// requireOfficeOrAdmin middleware; this controller only extracts the actor name.
 export async function acknowledgeAlert(req: Request, res: Response) {
   try {
     const user = (req as any).user;
-    if (user?.userType === 'Ship') {
-      return res.status(403).json({ error: 'Ship users cannot acknowledge alerts' });
-    }
     const alertId = parseInt(req.params.alertId);
     if (isNaN(alertId)) return res.status(400).json({ error: 'Invalid alert ID' });
     const acknowledgedBy = user?.fullName || user?.username || 'Office';

@@ -11,7 +11,7 @@ import {
   nrAlerts,
 } from '@shared/schema';
 import type { NrNoonReport, AlertType } from '@shared/schema';
-import { eq, and, isNull, desc, inArray } from 'drizzle-orm';
+import { eq, and, isNull, ne, desc, inArray } from 'drizzle-orm';
 import { ALERT_THRESHOLDS, FUEL_TYPES } from '../utils/fuelConversionFactors';
 
 // CII rating severity order (A = best, E = worst)
@@ -77,11 +77,15 @@ async function ruleConsumptionSpike(report: NrNoonReport): Promise<void> {
   const pctAbove = (todayTotal - avg7Day) / avg7Day;
 
   if (pctAbove >= ALERT_THRESHOLDS.consumptionSpike.critical) {
+    // Escalated to critical — resolve any open warning-tier alert first to avoid contradictory active alerts
+    await resolveOpenAlert(report.vesselId, 'HIGH_CONSUMPTION');
     await upsertAlert(report.vesselId, report.id, 'VERY_HIGH_CONSUMPTION', 'critical',
       `Total fuel consumption is ${(pctAbove * 100).toFixed(1)}% above the 7-day average ` +
       `(${todayTotal.toFixed(2)} mt vs avg ${avg7Day.toFixed(2)} mt).`,
       todayTotal, avg7Day * (1 + ALERT_THRESHOLDS.consumptionSpike.critical));
   } else if (pctAbove >= ALERT_THRESHOLDS.consumptionSpike.warning) {
+    // Warning tier — resolve any open critical-tier alert (de-escalation) first
+    await resolveOpenAlert(report.vesselId, 'VERY_HIGH_CONSUMPTION');
     await upsertAlert(report.vesselId, report.id, 'HIGH_CONSUMPTION', 'warning',
       `Total fuel consumption is ${(pctAbove * 100).toFixed(1)}% above the 7-day average ` +
       `(${todayTotal.toFixed(2)} mt vs avg ${avg7Day.toFixed(2)} mt).`,
@@ -106,11 +110,15 @@ async function ruleRobEndurance(report: NrNoonReport): Promise<void> {
   const enduranceDays = totalRob / totalAvg7Day;
 
   if (enduranceDays < ALERT_THRESHOLDS.enduranceDays.critical) {
+    // Critical tier — resolve any open warning-tier alert first
+    await resolveOpenAlert(report.vesselId, 'LOW_ROB');
     await upsertAlert(report.vesselId, report.id, 'CRITICAL_ROB', 'critical',
       `Combined fuel endurance is critically low: ${enduranceDays.toFixed(1)} days remaining ` +
       `(total ROB ${totalRob.toFixed(1)} mt, avg daily consumption ${totalAvg7Day.toFixed(2)} mt/day).`,
       enduranceDays, ALERT_THRESHOLDS.enduranceDays.critical);
   } else if (enduranceDays < ALERT_THRESHOLDS.enduranceDays.warning) {
+    // Warning tier — resolve any open critical-tier alert (de-escalation) first
+    await resolveOpenAlert(report.vesselId, 'CRITICAL_ROB');
     await upsertAlert(report.vesselId, report.id, 'LOW_ROB', 'warning',
       `Combined fuel endurance is low: ${enduranceDays.toFixed(1)} days remaining ` +
       `(total ROB ${totalRob.toFixed(1)} mt, avg daily consumption ${totalAvg7Day.toFixed(2)} mt/day).`,
@@ -119,29 +127,28 @@ async function ruleRobEndurance(report: NrNoonReport): Promise<void> {
 }
 
 // ── Rule: AE_HOURS_SPIKE ─────────────────────────────────────────────────────
-// Compare today's aeRunningHours vs the avg of the last 7 prior submitted reports.
-// Skip if fewer than aeMinDataPoints data points available.
+// Compare today's aeRunningHours vs the avg of the last 7 *prior* submitted reports.
+// The current report is explicitly excluded by filtering id != report.id.
+// Skip if fewer than aeMinDataPoints data points are available in the baseline.
 
 async function ruleAeHoursSpike(report: NrNoonReport): Promise<void> {
   const currentAeHours = toNum(report.aeRunningHours);
   if (currentAeHours === null || currentAeHours <= 0) return;
 
-  // Get last 7 prior reports (excluding current)
+  // Fetch up to 7 prior submitted reports for this vessel, excluding current report by ID
   const prior = await db.select({ aeRunningHours: nrNoonReports.aeRunningHours })
     .from(nrNoonReports)
     .where(and(
       eq(nrNoonReports.vesselId, report.vesselId),
       eq(nrNoonReports.status, 'submitted'),
+      ne(nrNoonReports.id, report.id),
     ))
     .orderBy(desc(nrNoonReports.reportDate))
-    .limit(8);
+    .limit(7);
 
-  // Exclude the current report from the window
   const priorHours = prior
-    .filter(r => r.aeRunningHours !== null && r.aeRunningHours !== undefined)
-    .map(r => toNum(r.aeRunningHours)!)
-    .filter((v): v is number => v !== null && v > 0)
-    .slice(0, 7); // exclude current if it appears first
+    .map(r => toNum(r.aeRunningHours))
+    .filter((v): v is number => v !== null && v > 0);
 
   if (priorHours.length < ALERT_THRESHOLDS.aeMinDataPoints) return;
 
@@ -262,6 +269,19 @@ async function autoResolveCleared(report: NrNoonReport): Promise<void> {
       eq(nrAlerts.vesselId, report.vesselId),
       isNull(nrAlerts.acknowledgedAt),
       inArray(nrAlerts.alertType, toResolve),
+    ));
+}
+
+// ── Resolve a single open alert of a given type (used for tier-switching) ────
+// Marks the alert as system-acknowledged without permanently deleting it.
+
+async function resolveOpenAlert(vesselId: string, alertType: AlertType): Promise<void> {
+  await db.update(nrAlerts)
+    .set({ acknowledgedAt: new Date(), acknowledgedBy: 'system' })
+    .where(and(
+      eq(nrAlerts.vesselId, vesselId),
+      eq(nrAlerts.alertType, alertType),
+      isNull(nrAlerts.acknowledgedAt),
     ));
 }
 

@@ -68,10 +68,18 @@ function SeverityBadge({ severity }: { severity: string }) {
       </Badge>
     );
   }
+  if (severity === "warning") {
+    return (
+      <Badge className="bg-yellow-100 text-yellow-800 border-yellow-200 gap-1">
+        <AlertTriangle className="h-3 w-3" />
+        Warning
+      </Badge>
+    );
+  }
   return (
-    <Badge className="bg-yellow-100 text-yellow-800 border-yellow-200 gap-1">
-      <AlertTriangle className="h-3 w-3" />
-      Warning
+    <Badge className="bg-blue-100 text-blue-800 border-blue-200 gap-1">
+      <Bell className="h-3 w-3" />
+      Info
     </Badge>
   );
 }

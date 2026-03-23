@@ -1,6 +1,7 @@
 import { Router, Request, Response } from 'express';
 import { NOON_MODULE_ENABLED } from './config';
 import { asyncHandler } from '../shared/middleware';
+import { requireOfficeOrAdmin } from '../../middleware/auth';
 import * as ctrl from './controllers/noonReportController';
 
 const router = Router();
@@ -60,7 +61,7 @@ if (!NOON_MODULE_ENABLED) {
   router.get('/nr-alerts/:vesselId', asyncHandler(ctrl.getActiveAlerts));
 
   // PATCH /nr-alerts/:alertId/acknowledge — acknowledge an alert (office/admin only)
-  router.patch('/nr-alerts/:alertId/acknowledge', asyncHandler(ctrl.acknowledgeAlert));
+  router.patch('/nr-alerts/:alertId/acknowledge', requireOfficeOrAdmin, asyncHandler(ctrl.acknowledgeAlert));
 
 }
 

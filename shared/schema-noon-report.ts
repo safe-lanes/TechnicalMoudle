@@ -205,7 +205,7 @@ export type NrCiiTracking = typeof nrCiiTracking.$inferSelect;
 
 // ── nr_alerts ─────────────────────────────────────────────────────────────────
 // Threshold-based alerts generated automatically after each noon report submission
-export type AlertSeverity = 'warning' | 'critical';
+export type AlertSeverity = 'info' | 'warning' | 'critical';
 export type AlertType =
   | 'HIGH_CONSUMPTION'
   | 'VERY_HIGH_CONSUMPTION'
