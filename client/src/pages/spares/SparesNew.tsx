@@ -1922,6 +1922,16 @@ const Spares: React.FC = () => {
     }
   }, [historyTotalPages, historyPage, filteredHistoryData.length]);
 
+  useEffect(() => {
+    if (activeTab !== 'history') {
+      setHistorySearch("");
+      setHistoryEventFilter("all");
+      setHistoryDateFrom("");
+      setHistoryDateTo("");
+      setHistoryPage(1);
+    }
+  }, [activeTab]);
+
   const goToInventoryPage = (page: number) => {
     const p = Math.max(1, Math.min(page, totalPages || 1));
     setCurrentPage(p);
