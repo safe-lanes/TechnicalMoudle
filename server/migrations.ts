@@ -2133,6 +2133,53 @@ const migrations: Migration[] = [
         AND sn.vessel_name != ''
         AND sn.vessel_name NOT IN (SELECT name FROM vessels)
     `
+  },
+  {
+    id: '070_fix_spare_unique_constraints',
+    name: 'Fix spare_component_links and spare_location_stock unique constraints',
+    description: 'Drops the incorrect 2-column unique_spare_component_link constraint and recreates it with 3 columns (spare_id, component_id, vessel_id) to match the Drizzle schema. Also adds unique_spare_location_stock on (spare_id, location_id) if missing. Deduplicates rows before creating constraints.',
+    sql: `
+      DO $$ 
+      BEGIN
+        -- Drop existing unique_spare_component_link constraint/index on spare_component_links (scoped to table OID)
+        IF EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'unique_spare_component_link' AND conrelid = 'spare_component_links'::regclass) THEN
+          ALTER TABLE spare_component_links DROP CONSTRAINT unique_spare_component_link;
+        END IF;
+        IF EXISTS (SELECT 1 FROM pg_indexes WHERE indexname = 'unique_spare_component_link' AND tablename = 'spare_component_links') THEN
+          DROP INDEX unique_spare_component_link;
+        END IF;
+
+        -- Deduplicate spare_component_links keeping highest id per (spare_id, component_id, vessel_id)
+        DELETE FROM spare_component_links
+        WHERE id NOT IN (
+          SELECT MAX(id) FROM spare_component_links
+          GROUP BY spare_id, component_id, vessel_id
+        );
+
+        -- Create correct 3-column unique index
+        CREATE UNIQUE INDEX unique_spare_component_link 
+          ON spare_component_links(spare_id, component_id, vessel_id);
+
+        -- Drop existing unique_spare_location_stock constraint/index on spare_location_stock (scoped to table OID)
+        IF EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'unique_spare_location_stock' AND conrelid = 'spare_location_stock'::regclass) THEN
+          ALTER TABLE spare_location_stock DROP CONSTRAINT unique_spare_location_stock;
+        END IF;
+        IF EXISTS (SELECT 1 FROM pg_indexes WHERE indexname = 'unique_spare_location_stock' AND tablename = 'spare_location_stock') THEN
+          DROP INDEX unique_spare_location_stock;
+        END IF;
+
+        -- Deduplicate spare_location_stock keeping highest id per (spare_id, location_id) — latest row wins
+        DELETE FROM spare_location_stock
+        WHERE id NOT IN (
+          SELECT MAX(id) FROM spare_location_stock
+          GROUP BY spare_id, location_id
+        );
+
+        -- Create unique index on (spare_id, location_id)
+        CREATE UNIQUE INDEX unique_spare_location_stock 
+          ON spare_location_stock(spare_id, location_id);
+      END $$;
+    `
   }
 ];
 
