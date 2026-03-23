@@ -96,6 +96,12 @@ function formatDate(iso: string) {
 
 // ── Alert row component ───────────────────────────────────────────────────────
 
+function formatMetric(value: string | null): string {
+  if (value === null || value === undefined) return "—";
+  const n = parseFloat(value);
+  return isNaN(n) ? "—" : n.toFixed(2);
+}
+
 function AlertRow({
   alert,
   canAck,
@@ -116,27 +122,34 @@ function AlertRow({
       data-testid={`row-alert-${alert.id}`}
       className={alert.severity === "critical" && isActive ? "bg-red-50/40" : undefined}
     >
-      <TableCell className="w-32">
+      <TableCell className="w-28">
         <SeverityBadge severity={alert.severity} />
       </TableCell>
-      <TableCell className="font-medium text-sm w-44">
+      <TableCell className="font-medium text-sm w-40">
         <span data-testid={`text-alert-type-${alert.id}`}>{label}</span>
         {needsManualAck && isActive && (
-          <span className="ml-1 text-xs text-amber-600">(manual ack)</span>
+          <div className="text-[10px] text-amber-600 mt-0.5">manual ack required</div>
         )}
       </TableCell>
-      <TableCell className="text-sm text-gray-700 max-w-sm">
+      <TableCell className="text-sm text-gray-700 max-w-xs">
         <span data-testid={`text-alert-message-${alert.id}`}>{alert.message}</span>
       </TableCell>
-      <TableCell className="text-xs text-gray-500 w-36">
+      <TableCell className="text-xs w-28 text-right font-mono" data-testid={`text-metric-${alert.id}`}>
+        <span className="text-gray-900">{formatMetric(alert.metricValue)}</span>
+        {alert.thresholdValue !== null && (
+          <div className="text-gray-400 text-[10px]">
+            thr: {formatMetric(alert.thresholdValue)}
+          </div>
+        )}
+      </TableCell>
+      <TableCell className="text-xs text-gray-500 w-32">
         {formatDate(alert.createdAt)}
       </TableCell>
       <TableCell className="w-36 text-xs text-gray-500">
         {alert.acknowledgedAt ? (
           <span data-testid={`text-ack-by-${alert.id}`}>
             {alert.acknowledgedBy === "system" ? "Auto-resolved" : `By: ${alert.acknowledgedBy}`}
-            <br />
-            {formatDate(alert.acknowledgedAt)}
+            <div className="text-gray-400 text-[10px]">{formatDate(alert.acknowledgedAt)}</div>
           </span>
         ) : (
           <span className="text-gray-400">—</span>
@@ -313,6 +326,7 @@ export default function AlertsPanel() {
                         <TableHead>Severity</TableHead>
                         <TableHead>Type</TableHead>
                         <TableHead>Message</TableHead>
+                        <TableHead className="text-right">Metric / Threshold</TableHead>
                         <TableHead>Triggered</TableHead>
                         <TableHead>Resolved</TableHead>
                         <TableHead className="text-right">Action</TableHead>
@@ -372,6 +386,7 @@ export default function AlertsPanel() {
                           <TableHead>Severity</TableHead>
                           <TableHead>Type</TableHead>
                           <TableHead>Message</TableHead>
+                          <TableHead className="text-right">Metric / Threshold</TableHead>
                           <TableHead>Triggered</TableHead>
                           <TableHead>Resolved by</TableHead>
                           <TableHead className="text-right">Status</TableHead>
