@@ -122,3 +122,15 @@ export async function getVesselKPIs(req: Request, res: Response) {
     res.status(500).json({ error: 'Failed to fetch KPIs', details: error.message });
   }
 }
+
+// ── GET /nr-fuel-dashboard/:vesselId ──────────────────────────────────────────
+export async function getFuelDashboard(req: Request, res: Response) {
+  try {
+    const { vesselId } = req.params;
+    if (!vesselId) return res.status(400).json({ error: 'vesselId is required' });
+    const dashboard = await service.getFuelDashboard(vesselId);
+    res.json(dashboard);
+  } catch (error: any) {
+    res.status(500).json({ error: 'Failed to fetch fuel dashboard', details: error.message });
+  }
+}

@@ -1,4 +1,4 @@
-import { pgTable, text, integer, boolean, timestamp, decimal, numeric, serial, date, index } from "drizzle-orm/pg-core";
+import { pgTable, text, integer, boolean, timestamp, decimal, numeric, serial, date, index, uniqueIndex } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
@@ -139,6 +139,11 @@ export const nrFuelRob = pgTable("nr_fuel_rob", {
   currentRob: numeric("current_rob").notNull().default("0"),
   lastUpdated: timestamp("last_updated").notNull().defaultNow(),
   lastReportId: integer("last_report_id"),
+  // Phase 2: rolling averages and endurance
+  avg3Day: numeric("avg3_day"), // 3-day rolling avg consumption (MT/day)
+  avg7Day: numeric("avg7_day"), // 7-day rolling avg consumption (MT/day)
+  enduranceDays: numeric("endurance_days"), // days of fuel remaining at 7-day avg rate
+  enduranceNm: numeric("endurance_nm"), // nautical miles remaining at 7-day avg rate
 }, (table) => [
   index("idx_nr_rob_vessel_fuel").on(table.vesselId, table.fuelType),
 ]);
@@ -160,6 +165,7 @@ export const nrVoyageLegs = pgTable("nr_voyage_legs", {
   departureDate: text("departure_date"), // YYYY-MM-DD
   arrivalDate: text("arrival_date"), // YYYY-MM-DD
   status: text("status").notNull().default("active"), // active | completed
+  eeoi: numeric("eeoi"), // Phase 2: Energy Efficiency Operational Indicator
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 }, (table) => [
@@ -173,3 +179,25 @@ export const insertNrVoyageLegSchema = createInsertSchema(nrVoyageLegs).omit({
 });
 export type InsertNrVoyageLeg = z.infer<typeof insertNrVoyageLegSchema>;
 export type NrVoyageLeg = typeof nrVoyageLegs.$inferSelect;
+
+// ── nr_cii_tracking ──────────────────────────────────────────────────────────
+// Year-to-date CII (Carbon Intensity Indicator) tracking per vessel per year
+export const nrCiiTracking = pgTable("nr_cii_tracking", {
+  id: serial("id").primaryKey(),
+  vesselId: text("vessel_id").notNull(),
+  year: integer("year").notNull(),
+  ytdCo2Mt: numeric("ytd_co2_mt"), // year-to-date CO₂ in metric tonnes
+  ytdDistanceNm: numeric("ytd_distance_nm"), // year-to-date distance sailed (NM)
+  aer: numeric("aer"), // Annual Efficiency Ratio (null if DWT missing)
+  ciiRating: text("cii_rating"), // A | B | C | D | E (null if DWT missing)
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+}, (table) => [
+  uniqueIndex("idx_nr_cii_vessel_year").on(table.vesselId, table.year),
+]);
+
+export const insertNrCiiTrackingSchema = createInsertSchema(nrCiiTracking).omit({
+  id: true,
+  updatedAt: true,
+});
+export type InsertNrCiiTracking = z.infer<typeof insertNrCiiTrackingSchema>;
+export type NrCiiTracking = typeof nrCiiTracking.$inferSelect;

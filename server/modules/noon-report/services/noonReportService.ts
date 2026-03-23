@@ -1,5 +1,11 @@
 import * as repo from '../repositories/noonReportRepository';
+import { db } from '../../../db';
+import { nrNoonReports, nrFuelRob, nrCiiTracking } from '@shared/schema';
+import { eq, and, desc, gte, lte, asc } from 'drizzle-orm';
 import type { InsertNrNoonReport } from '@shared/schema';
+import { runCalculations } from './calculationEngine';
+import * as adapter from '../utils/existingDataAdapter';
+import { BUNKER_SAFETY_MARGIN_PCT, FUEL_TYPES, FUEL_CONSUMPTION_FIELDS } from '../utils/fuelConversionFactors';
 
 // ── Report CRUD ──────────────────────────────────────────────────────────────
 
@@ -52,6 +58,9 @@ export async function submitReport(id: number, submittedBy: string) {
   // Update fuel ROB after submission
   await updateFuelRobFromReport(submitted);
 
+  // Run calculation engine (rolling averages, CII tracking, EEOI)
+  await runCalculations(submitted);
+
   return submitted;
 }
 
@@ -84,61 +93,170 @@ async function updateFuelRobFromReport(report: any) {
   }
 }
 
-// ── Rolling averages & KPIs ───────────────────────────────────────────────────
+// ── Fuel Dashboard ────────────────────────────────────────────────────────────
 
-export async function getVesselKPIs(vesselId: string) {
+export async function getFuelDashboard(vesselId: string) {
+  // Fetch ROB records (includes averages from calculation engine)
+  const robRecords = await db.select()
+    .from(nrFuelRob)
+    .where(eq(nrFuelRob.vesselId, vesselId));
+
+  // Build ROB, endurance, and avg maps by fuel type
+  const robByFuelType: Record<string, number> = {};
+  const enduranceDaysByFuel: Record<string, number | null> = {};
+  const avg7DayByFuel: Record<string, number | null> = {};
+
+  for (const fuelType of FUEL_TYPES) {
+    robByFuelType[fuelType.toLowerCase()] = 0;
+    enduranceDaysByFuel[fuelType.toLowerCase()] = null;
+    avg7DayByFuel[fuelType.toLowerCase()] = null;
+  }
+
+  for (const row of robRecords) {
+    const key = row.fuelType.toLowerCase();
+    robByFuelType[key] = toNum(row.currentRob) ?? 0;
+    enduranceDaysByFuel[key] = toNum(row.enduranceDays);
+    avg7DayByFuel[key] = toNum(row.avg7Day);
+  }
+
+  // Total 7-day avg consumption across all fuel types
+  const totalAvg7Day = Object.values(avg7DayByFuel)
+    .filter((v): v is number => v !== null)
+    .reduce((a, b) => a + b, 0);
+
+  // Total endurance: sum all ROBs / total avg daily consumption
+  const totalRob = Object.values(robByFuelType).reduce((a, b) => a + b, 0);
+  const totalEnduranceDays = totalRob > 0 && totalAvg7Day > 0
+    ? totalRob / totalAvg7Day
+    : null;
+
+  // Avg 7-day speed from last 7 reports
   const last7 = await repo.getLastNReports(vesselId, 7);
-  const last3 = last7.slice(0, 3);
-  const rob = await repo.getFuelRobByVessel(vesselId);
+  const avg7DaySpeed = last7.length > 0
+    ? last7.map(r => toNum(r.speed) ?? 0).reduce((a, b) => a + b, 0) / last7.length
+    : 0;
 
-  const avg7HFO = average(last7.map(r => Number(r.hfoConsumption || 0)));
-  const avg3HFO = average(last3.map(r => Number(r.hfoConsumption || 0)));
-  const totalDailyConsumption = average(last7.map(r =>
-    (Number(r.hfoConsumption || 0) + Number(r.lsmgoConsumption || 0) +
-     Number(r.mgoConsumption || 0) + Number(r.vlsfoConsumption || 0))
-  ));
+  const totalEnduranceNm = totalEnduranceDays !== null && avg7DaySpeed > 0
+    ? totalEnduranceDays * 24 * avg7DaySpeed
+    : null;
 
-  const robMap: Record<string, number> = {};
-  for (const r of rob) robMap[r.fuelType] = Number(r.currentRob);
+  // Latest report for distanceToGo
+  const latestReport = last7[0] ?? null;
+  const distanceToGo = latestReport ? toNum(latestReport.distanceToGo) : null;
 
-  const totalRob = Object.values(robMap).reduce((a, b) => a + b, 0);
-  const enduranceDays = totalDailyConsumption > 0 ? totalRob / totalDailyConsumption : 999;
-  const avgSpeed = average(last7.map(r => Number(r.speed || 0)));
-  const enduranceNm = enduranceDays * 24 * avgSpeed;
+  // avgDistanceSailed7Day
+  const avgDistanceSailed7Day = last7.length > 0
+    ? last7.map(r => toNum(r.distanceSailed) ?? 0).reduce((a, b) => a + b, 0) / last7.length
+    : 0;
 
-  const latestCII = last7[0]?.ciiRating || null;
+  // minBunkerToNextPort = distanceToGo × (totalAvg7Day / avgDistanceSailed7Day)
+  let minBunkerToNextPort: number | null = null;
+  let recommendedBunker: number | null = null;
+  if (distanceToGo && distanceToGo > 0 && avgDistanceSailed7Day > 0 && totalAvg7Day > 0) {
+    minBunkerToNextPort = distanceToGo * (totalAvg7Day / avgDistanceSailed7Day);
+    recommendedBunker = minBunkerToNextPort * (1 + BUNKER_SAFETY_MARGIN_PCT / 100);
+  }
 
-  const speedConsumptionData = last7.map(r => ({
-    speed: Number(r.speed || 0),
-    consumption: Number(r.hfoConsumption || 0) + Number(r.lsmgoConsumption || 0) +
-      Number(r.mgoConsumption || 0) + Number(r.vlsfoConsumption || 0),
-    date: r.reportDate,
-  }));
+  // CII tracking for current year
+  const currentYear = new Date().getFullYear();
+  const ciiRow = await db.select()
+    .from(nrCiiTracking)
+    .where(and(eq(nrCiiTracking.vesselId, vesselId), eq(nrCiiTracking.year, currentYear)))
+    .limit(1);
 
-  const consumptionTrend = last7.map(r => ({
-    date: r.reportDate,
-    hfo: Number(r.hfoConsumption || 0),
-    lsmgo: Number(r.lsmgoConsumption || 0),
-    mgo: Number(r.mgoConsumption || 0),
-    total: Number(r.hfoConsumption || 0) + Number(r.lsmgoConsumption || 0) +
-      Number(r.mgoConsumption || 0) + Number(r.vlsfoConsumption || 0),
-  })).reverse();
+  const ciiTracking = ciiRow[0] ?? null;
+
+  // Last 30 submitted reports in ascending date order for trend chart
+  const last30Raw = await db.select()
+    .from(nrNoonReports)
+    .where(and(eq(nrNoonReports.vesselId, vesselId), eq(nrNoonReports.status, 'submitted')))
+    .orderBy(desc(nrNoonReports.reportDate))
+    .limit(30);
+
+  const last30 = [...last30Raw].reverse().map(r => {
+    const hfo = toNum(r.hfoConsumption) ?? 0;
+    const lsmgo = toNum(r.lsmgoConsumption) ?? 0;
+    const mgo = toNum(r.mgoConsumption) ?? 0;
+    const vlsfo = toNum(r.vlsfoConsumption) ?? 0;
+    const lpg = toNum(r.lpgConsumption) ?? 0;
+    return {
+      date: r.reportDate,
+      hfo,
+      lsmgo,
+      mgo,
+      vlsfo,
+      lpg,
+      total: hfo + lsmgo + mgo + vlsfo + lpg,
+    };
+  });
+
+  // Compute 7-day rolling average overlay for trend chart
+  const last30WithAvg = last30.map((row, idx) => {
+    const window = last30.slice(Math.max(0, idx - 6), idx + 1);
+    const windowAvg = window.map(r => r.total).reduce((a, b) => a + b, 0) / window.length;
+    return { ...row, avg7Day: Math.round(windowAvg * 100) / 100 };
+  });
+
+  // Speed vs consumption scatter data (all submitted reports)
+  const allReports = await db.select({
+    speed: nrNoonReports.speed,
+    hfoConsumption: nrNoonReports.hfoConsumption,
+    lsmgoConsumption: nrNoonReports.lsmgoConsumption,
+    mgoConsumption: nrNoonReports.mgoConsumption,
+    vlsfoConsumption: nrNoonReports.vlsfoConsumption,
+    lpgConsumption: nrNoonReports.lpgConsumption,
+    reportDate: nrNoonReports.reportDate,
+  })
+    .from(nrNoonReports)
+    .where(and(eq(nrNoonReports.vesselId, vesselId), eq(nrNoonReports.status, 'submitted')))
+    .orderBy(asc(nrNoonReports.reportDate))
+    .limit(500);
+
+  const speedConsumptionData = allReports
+    .filter(r => r.speed !== null && r.speed !== undefined)
+    .map(r => ({
+      speed: toNum(r.speed) ?? 0,
+      consumption: (toNum(r.hfoConsumption) ?? 0) + (toNum(r.lsmgoConsumption) ?? 0) +
+        (toNum(r.mgoConsumption) ?? 0) + (toNum(r.vlsfoConsumption) ?? 0) + (toNum(r.lpgConsumption) ?? 0),
+      date: r.reportDate,
+    }));
 
   return {
-    rob: robMap,
-    enduranceDays: Math.round(enduranceDays * 10) / 10,
-    enduranceNm: Math.round(enduranceNm),
-    avgSpeed,
-    avg7DayHFO: Math.round(avg7HFO * 100) / 100,
-    avg3DayHFO: Math.round(avg3HFO * 100) / 100,
-    totalDailyConsumption: Math.round(totalDailyConsumption * 100) / 100,
-    ciiRating: latestCII,
+    robByFuelType,
+    enduranceDays: enduranceDaysByFuel,
+    avg7DayByFuel,
+    totalEnduranceDays: totalEnduranceDays !== null ? round2(totalEnduranceDays) : null,
+    totalEnduranceNm: totalEnduranceNm !== null ? Math.round(totalEnduranceNm) : null,
+    avg7DayConsumption: round2(totalAvg7Day),
+    avg7DaySpeed: round2(avg7DaySpeed),
+    ciiRating: ciiTracking?.ciiRating ?? null,
+    aer: ciiTracking?.aer !== null && ciiTracking?.aer !== undefined ? toNum(ciiTracking.aer) : null,
+    ytdDistanceNm: ciiTracking?.ytdDistanceNm !== null ? toNum(ciiTracking?.ytdDistanceNm) : null,
+    ytdCo2Mt: ciiTracking?.ytdCo2Mt !== null ? toNum(ciiTracking?.ytdCo2Mt) : null,
+    minBunkerToNextPort: minBunkerToNextPort !== null ? round2(minBunkerToNextPort) : null,
+    recommendedBunker: recommendedBunker !== null ? round2(recommendedBunker) : null,
+    safetyMarginPct: BUNKER_SAFETY_MARGIN_PCT,
+    distanceToGo,
+    hasData: last30.length > 0,
+    last30DaysConsumption: last30WithAvg,
     speedConsumptionData,
-    consumptionTrend,
   };
 }
 
-function average(nums: number[]) {
-  if (nums.length === 0) return 0;
-  return nums.reduce((a, b) => a + b, 0) / nums.length;
+// ── Legacy KPIs (kept for backward compat) ────────────────────────────────────
+
+export async function getVesselKPIs(vesselId: string) {
+  return getFuelDashboard(vesselId);
+}
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
+
+function toNum(val: any): number | null {
+  if (val === null || val === undefined || val === '') return null;
+  const n = Number(val);
+  return isNaN(n) ? null : n;
+}
+
+function round2(n: number): number {
+  return Math.round(n * 100) / 100;
 }

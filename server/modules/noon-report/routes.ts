@@ -45,6 +45,9 @@ if (!NOON_MODULE_ENABLED) {
   // GET /nr-kpis — get rolling averages, endurance, CII for a vessel
   router.get('/nr-kpis', asyncHandler(ctrl.getVesselKPIs));
 
+  // GET /nr-fuel-dashboard/:vesselId — full fuel dashboard payload
+  router.get('/nr-fuel-dashboard/:vesselId', asyncHandler(ctrl.getFuelDashboard));
+
 }
 
 export default router;
