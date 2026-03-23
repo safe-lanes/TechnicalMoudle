@@ -7233,17 +7233,22 @@ export class PostgresStorage {
   async createSpareComponentLink(link: InsertSpareComponentLink, skipSiblingSync: boolean = false): Promise<SpareComponentLink> {
     const db = await getDb();
 
-    const existing = await db.select().from(spareComponentLinks).where(
-      and(
-        eq(spareComponentLinks.spareId, link.spareId),
-        eq(spareComponentLinks.componentId, link.componentId),
-        eq(spareComponentLinks.vesselId, link.vesselId)
-      )
-    );
-    if (existing.length > 0) return existing[0];
-
     try {
-      const result = await db.insert(spareComponentLinks).values(link).returning();
+      const result = await db.insert(spareComponentLinks).values(link)
+        .onConflictDoNothing({ target: [spareComponentLinks.spareId, spareComponentLinks.componentId, spareComponentLinks.vesselId] })
+        .returning();
+
+      if (result.length === 0) {
+        const existing = await db.select().from(spareComponentLinks).where(
+          and(
+            eq(spareComponentLinks.spareId, link.spareId),
+            eq(spareComponentLinks.componentId, link.componentId),
+            eq(spareComponentLinks.vesselId, link.vesselId)
+          )
+        );
+        return existing[0];
+      }
+
       const created = result[0];
 
       if (!skipSiblingSync && link.componentId && link.vesselId) {
@@ -7257,14 +7262,14 @@ export class PostgresStorage {
       return created;
     } catch (insertError: any) {
       if (insertError.message?.includes('duplicate') || insertError.code === '23505') {
-        const dup = await db.select().from(spareComponentLinks).where(
+        const existing = await db.select().from(spareComponentLinks).where(
           and(
             eq(spareComponentLinks.spareId, link.spareId),
             eq(spareComponentLinks.componentId, link.componentId),
             eq(spareComponentLinks.vesselId, link.vesselId)
           )
         );
-        if (dup.length > 0) return dup[0];
+        if (existing.length > 0) return existing[0];
       }
       throw insertError;
     }
@@ -7339,14 +7344,9 @@ export class PostgresStorage {
       ),
       inserted AS (
         INSERT INTO spare_component_links (spare_id, spare_uuid, component_id, vessel_id, linked_by)
-        SELECT sp.spare_id, sp.spare_uuid, sp.sibling_cuuid, sp.vessel_id, 'system-sibling-backfill'
-        FROM sibling_pairs sp
-        WHERE NOT EXISTS (
-          SELECT 1 FROM spare_component_links scl2
-          WHERE scl2.spare_id = sp.spare_id
-            AND scl2.component_id = sp.sibling_cuuid
-            AND scl2.vessel_id = sp.vessel_id
-        )
+        SELECT spare_id, spare_uuid, sibling_cuuid, vessel_id, 'system-sibling-backfill'
+        FROM sibling_pairs
+        ON CONFLICT (spare_id, component_id, vessel_id) DO NOTHING
         RETURNING spare_id
       )
       SELECT
