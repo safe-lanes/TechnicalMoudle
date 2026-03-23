@@ -2318,7 +2318,9 @@ const migrations: Migration[] = [
           RAISE NOTICE 'Deduplicated spare_component_links: removed % duplicate rows', deleted_scl;
         END IF;
 
-        ALTER TABLE spare_component_links ADD CONSTRAINT unique_spare_component_link UNIQUE (spare_id, component_id, vessel_id);
+        IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'unique_spare_component_link' AND conrelid = 'spare_component_links'::regclass) THEN
+          ALTER TABLE spare_component_links ADD CONSTRAINT unique_spare_component_link UNIQUE (spare_id, component_id, vessel_id);
+        END IF;
 
         -- === spare_location_stock ===
         IF EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'unique_spare_location_stock' AND conrelid = 'spare_location_stock'::regclass) THEN
@@ -2343,7 +2345,9 @@ const migrations: Migration[] = [
           RAISE NOTICE 'Deduplicated spare_location_stock: removed % duplicate rows', deleted_sls;
         END IF;
 
-        ALTER TABLE spare_location_stock ADD CONSTRAINT unique_spare_location_stock UNIQUE (spare_id, location_id);
+        IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'unique_spare_location_stock' AND conrelid = 'spare_location_stock'::regclass) THEN
+          ALTER TABLE spare_location_stock ADD CONSTRAINT unique_spare_location_stock UNIQUE (spare_id, location_id);
+        END IF;
       END $$;
     `
   }
