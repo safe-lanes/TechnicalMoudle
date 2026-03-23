@@ -2063,14 +2063,14 @@ const Stores: React.FC = () => {
       ) : (
       /* History Filters */
       <div className="flex gap-4 mb-6">
-        <div className="flex-1 relative">
+        <div className="relative w-80">
           <Marker id={getMarkerId(activeTab, "2.9")} />
           <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
           <Input
             placeholder="Search history..."
             value={historySearch}
             onChange={(e) => setHistorySearch(e.target.value)}
-            className="pl-10 text-sm"
+            className="pl-10"
             data-testid={getMarkerId(activeTab, "2.9")}
           />
         </div>
