@@ -2133,6 +2133,46 @@ const migrations: Migration[] = [
         AND sn.vessel_name != ''
         AND sn.vessel_name NOT IN (SELECT name FROM vessels)
     `
+  },
+  {
+    id: '070_add_unique_constraints_spare_tables',
+    name: 'Add unique constraints to spare_component_links and spare_location_stock',
+    description: 'Creates unique constraints required by ON CONFLICT clauses in createSpareComponentLink and upsertSpareLocationStock. Deduplicates existing rows first (keeps newest by id).',
+    sql: `
+      DO $$ BEGIN
+        -- 1. Deduplicate spare_component_links: keep row with highest id per (spare_id, component_id, vessel_id)
+        DELETE FROM spare_component_links
+        WHERE id NOT IN (
+          SELECT MAX(id) FROM spare_component_links
+          GROUP BY spare_id, component_id, vessel_id
+        );
+
+        -- 2. Create unique constraint if not exists
+        IF NOT EXISTS (
+          SELECT 1 FROM pg_constraint WHERE conname = 'unique_spare_component_link'
+        ) THEN
+          ALTER TABLE spare_component_links
+            ADD CONSTRAINT unique_spare_component_link
+            UNIQUE (spare_id, component_id, vessel_id);
+        END IF;
+
+        -- 3. Deduplicate spare_location_stock: keep row with highest id per (spare_id, location_id)
+        DELETE FROM spare_location_stock
+        WHERE id NOT IN (
+          SELECT MAX(id) FROM spare_location_stock
+          GROUP BY spare_id, location_id
+        );
+
+        -- 4. Create unique constraint if not exists
+        IF NOT EXISTS (
+          SELECT 1 FROM pg_constraint WHERE conname = 'unique_spare_location_stock'
+        ) THEN
+          ALTER TABLE spare_location_stock
+            ADD CONSTRAINT unique_spare_location_stock
+            UNIQUE (spare_id, location_id);
+        END IF;
+      END $$
+    `
   }
 ];
 
