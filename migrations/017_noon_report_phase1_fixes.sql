@@ -30,6 +30,8 @@ ALTER TABLE nr_noon_reports ADD COLUMN IF NOT EXISTS general_remarks TEXT;
 ALTER TABLE nr_noon_reports ADD COLUMN IF NOT EXISTS machinery_remarks TEXT;
 
 -- Track migration
+-- Note: This project's schema_migrations PK column is 'id' (varchar), not 'version'.
+-- Actual verified schema: id, name, description, applied_at, sort_order, created_at.
 INSERT INTO schema_migrations (id, name, description, applied_at)
 VALUES ('017', '017_noon_report_phase1_fixes', 'Noon Report Phase 1 field corrections and fixes', NOW())
 ON CONFLICT (id) DO NOTHING;

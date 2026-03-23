@@ -157,6 +157,15 @@ function calcCo2(consumption: string | undefined, factor: number): number {
   return isNaN(v) ? 0 : v * factor;
 }
 
+// Typed map from override field name → form key (avoids dynamic string construction)
+const CO2_FIELD_MAP: Readonly<Record<string, keyof FormValues>> = {
+  hfo: "co2Hfo",
+  lsmgo: "co2Lsmgo",
+  mgo: "co2Mgo",
+  vlsfo: "co2Vlsfo",
+  lpg: "co2Lpg",
+};
+
 // ── NumericInput ──────────────────────────────────────────────────────────────
 function NumericInput({
   label,
@@ -306,7 +315,7 @@ export default function NoonEntryForm({ reportId }: Props) {
         const camelKey = key.replace(/_([a-z])/g, (_, c) => c.toUpperCase());
         if (camelKey in form.getValues()) {
           const val = existingReport[key];
-          (setValue as any)(camelKey as keyof FormValues, val != null ? String(val) : "");
+          setValue(camelKey as keyof FormValues, val != null ? String(val) : "");
         }
       });
       // Show draft restored message
@@ -459,9 +468,23 @@ export default function NoonEntryForm({ reportId }: Props) {
     };
   }
 
+  function getMissingOverrideReasonFields(): string[] {
+    return Object.keys(overrides).filter((k) => overrides[k] && !overrideReasons[k]?.trim());
+  }
+
   function handleSaveDraft() {
     const values = getValues();
     if (!vesselId) return toast({ title: "No vessel selected", variant: "destructive" });
+    const missing = getMissingOverrideReasonFields();
+    if (missing.length > 0) {
+      setActiveTab(3);
+      toast({
+        title: "Override reason required",
+        description: `Please provide a reason for each CO₂ override before saving (${missing.map((f) => f.toUpperCase()).join(", ")}).`,
+        variant: "destructive",
+      });
+      return;
+    }
     const payload = buildPayload(values);
     if (!reportId) {
       createMutation.mutate(payload);
@@ -473,6 +496,16 @@ export default function NoonEntryForm({ reportId }: Props) {
   function handleSubmit() {
     if (!reportId) {
       toast({ title: "Save draft first", description: "Please save a draft before submitting.", variant: "destructive" });
+      return;
+    }
+    const missing = getMissingOverrideReasonFields();
+    if (missing.length > 0) {
+      setActiveTab(3);
+      toast({
+        title: "Override reason required",
+        description: `All CO₂ overrides must have a reason before submitting (${missing.map((f) => f.toUpperCase()).join(", ")}).`,
+        variant: "destructive",
+      });
       return;
     }
     submitMutation.mutate();
@@ -500,7 +533,8 @@ export default function NoonEntryForm({ reportId }: Props) {
   function resetOverride(field: string, autoValue: number) {
     setOverrides((prev) => { const n = { ...prev }; delete n[field]; return n; });
     setOverrideReasons((prev) => { const n = { ...prev }; delete n[field]; return n; });
-    (setValue as any)(`co2${field.charAt(0).toUpperCase() + field.slice(1)}` as keyof FormValues, autoValue.toFixed(3));
+    const formKey = CO2_FIELD_MAP[field];
+    if (formKey) setValue(formKey, autoValue.toFixed(3));
   }
 
   // Format submitted_at for display
