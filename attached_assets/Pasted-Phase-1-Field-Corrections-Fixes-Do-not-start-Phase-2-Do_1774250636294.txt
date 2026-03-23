@@ -1,0 +1,215 @@
+Phase 1 — Field Corrections & Fixes
+Do not start Phase 2. Do not modify any existing PMS files. Only make the changes listed below inside the noon-report module. Apply all fixes in one go, confirm each one is done, then stop.
+
+FIX 1 — Tab 1 (Navigation): Add 3 Missing Fields
+After the "Distance Sailed (NM)" field, add a new sub-section row with these three fields:
+
+text
+[ Next Port (text input) ] [ ETA to Next Port (datetime-local input) ] [ Distance to Go — NM (number input) ]
+Next Port — free text input, placeholder: "e.g. JPYOK"
+
+ETA to Next Port — datetime-local input, label: "ETA to Next Port (UTC)"
+
+Distance to Go (NM) — number input, min: 0, step: 0.1
+
+Add all three fields to the nr_noon_reports schema in shared/schema-noon-report.ts as:
+
+nextPort — text, nullable
+
+etaNextPort — timestamp, nullable
+
+distanceToGo — numeric, nullable
+
+FIX 2 — Tab 2 (Weather): Add 2 Missing Fields
+After the "Visibility" dropdown, add these two fields in the same row grid:
+
+text
+[ Air Temperature °C (number) ] [ Sea Temperature °C (number) ]
+Air Temperature (°C) — number input, step: 0.1, range: -30 to 60, placeholder: "0.0"
+
+Sea Temperature (°C) — number input, step: 0.1, range: -5 to 45, placeholder: "0.0"
+
+Add to schema:
+
+airTemperature — numeric, nullable
+
+seaTemperature — numeric, nullable
+
+FIX 3 — Tab 3 (Fuel & Machinery): Add Consumables Sub-Section
+After the existing "ROB at Noon (MT)" section, add a new clearly labelled sub-section titled "Consumables" with these three fields in a single row:
+
+text
+[ Lube Oil Consumption (liters) ] [ Fresh Water Consumption (tons) ] [ Fresh Water Produced (tons) ]
+Lube Oil Consumption (L) — number input, min: 0, step: 0.1, placeholder: "0.0"
+
+Fresh Water Consumption (tons) — number input, min: 0, step: 0.1, placeholder: "0.0"
+
+Fresh Water Produced (tons) — number input, min: 0, step: 0.1, placeholder: "0.0"
+
+Add to schema:
+
+lubeOilConsumption — numeric, nullable
+
+freshWaterConsumption — numeric, nullable
+
+freshWaterProduced — numeric, nullable
+
+FIX 4 — Tab 4 (Emissions): Replace Empty State with Live Calculated Fields
+Remove the current "Emission data will appear after the report is submitted" empty state entirely.
+
+Replace it with a live read-only calculation panel that updates in real time as the user types fuel values in Tab 3. Use react-hook-form's watch() to subscribe to the fuel consumption fields and compute emissions instantly client-side.
+
+Calculation logic (IMO conversion factors):
+
+text
+CO₂ from HFO     = hfoConsumption × 3.114
+CO₂ from LSMGO   = lsmgoConsumption × 3.206
+CO₂ from MGO     = mgoConsumption × 3.206
+CO₂ from VLSFO   = vlsfoConsumption × 3.151
+CO₂ from LPG     = lpgConsumption × 3.030
+Total CO₂ (MT)   = sum of all above
+UI Layout for Tab 4:
+
+text
+┌─────────────────────────────────────────────────────────────────┐
+│  ℹ️  Emission figures are auto-calculated from Tab 3 fuel data.  │
+│     Values update live as you enter fuel consumption.            │
+└─────────────────────────────────────────────────────────────────┘
+
+Per Fuel Type CO₂ Breakdown
+┌──────────────┬──────────────┬──────────────┬──────────────┬──────────────┐
+│ CO₂ - HFO   │ CO₂ - LSMGO │ CO₂ - MGO   │ CO₂ - VLSFO │ CO₂ - LPG   │
+│ [0.000 MT]  │ [0.000 MT]  │ [0.000 MT]  │ [0.000 MT]  │ [0.000 MT]  │
+│ (read-only) │ (read-only) │ (read-only) │ (read-only) │ (read-only) │
+└──────────────┴──────────────┴──────────────┴──────────────┴──────────────┘
+
+┌──────────────────────────────────────────┐
+│  Total CO₂ Emitted Today                 │
+│  [ 0.000 MT ]  ← large, bold display     │
+└──────────────────────────────────────────┘
+Styling rules:
+
+All CO₂ fields must use a light gray background (bg-gray-50) and cursor-not-allowed to visually signal they are read-only
+
+Add a small italic label beneath each field: "auto-calculated"
+
+Total CO₂ card should use the same <Card> style with a slightly larger font (text-xl bold) to stand out
+
+If all fuel inputs are zero, show Total CO₂ as "0.000 MT" — never blank or NaN
+
+Manual Override (per field):
+
+Add a small [Override] link/button (outline, text-xs) next to each individual CO₂ field
+
+Clicking Override: unlocks that specific field, changes background to white, shows a small "Reason for override" text input directly below it (required before submission)
+
+Overridden fields show an amber ⚠ Manual badge next to the value
+
+Clicking [Reset] restores the auto-calculated value and removes the override reason
+
+Store in schema:
+
+co2Hfo, co2Lsmgo, co2Mgo, co2Vlsfo, co2Lpg, co2Total — all numeric, nullable
+
+emissionOverrideNotes — text, nullable (stores JSON of any per-field override reasons)
+
+FIX 5 — Tab 5 (Cargo & Remarks): Split Remarks into Two Fields
+The current single "Remarks" textarea must be split into two separate textareas:
+
+Field 1 — Keep existing, rename label:
+
+Label: General Remarks
+
+Placeholder: "Any remarks, delays, port calls, weather events..."
+
+Maps to: generalRemarks in schema
+
+Field 2 — Add new textarea directly below:
+
+Label: Machinery Defects / Abnormalities
+
+Placeholder: "Any machinery issues, defects, abnormal observations, or running hour deviations..."
+
+Maps to: machineryRemarks in schema
+
+Same height and style as General Remarks
+
+Update schema:
+
+Rename existing remarks → generalRemarks — text, nullable
+
+Add machineryRemarks — text, nullable
+
+FIX 6 — Validation Rules: Add Missing Guards
+Inside the form validation (zod schema), add the following rules that are currently missing:
+
+Field	Rule	Error Message
+Speed (SOG)	If > 30, show warning (do not block)	"Speed above 30 knots — please verify"
+Wind Force	Must be 0–12	"Beaufort scale is 0–12"
+Sea State	Must be 0–9	"Douglas scale is 0–9"
+Any ROB field	Cannot be negative	"ROB cannot be negative"
+Any Fuel Consumption field	Cannot be negative	"Consumption cannot be negative"
+Distance Sailed	Cannot be negative	"Distance cannot be negative"
+Distance to Go	Cannot be negative	"Distance cannot be negative"
+Air Temperature	Must be between -30 and 60	"Enter a valid air temperature"
+Sea Temperature	Must be between -5 and 45	"Enter a valid sea temperature"
+Speed warning (> 30 knots) must be a yellow inline warning banner below the field — it should NOT block form submission.
+All other rules above are hard errors that block submission.
+
+FIX 7 — Draft Save Visual Indicator
+Currently there is no visual feedback when "Save Draft" is clicked. Add the following:
+
+After a successful draft save, show a small gray italic text below the tab bar:
+"Draft saved at HH:MM" — updates timestamp on every save
+
+This text fades in on save and persists until the next save or submission
+
+On page reload, if a draft exists for today's date, auto-restore the draft and show:
+"Draft restored from HH:MM" in the same position
+
+FIX 8 — Post-Submission Lock State
+Currently the lock/submitted state behavior after submission is not confirmed. Implement the following:
+
+All form inputs become disabled (greyed out, not hidden — data must still be readable)
+
+Both "Save Draft" and "Submit" buttons are hidden
+
+A green "Submitted" badge appears in the page title row next to "New Noon Report"
+
+A green banner appears above the tab bar:
+"✓ This report was submitted on [Date] at [Time] by [Username]. It is now locked and cannot be edited."
+
+Tab navigation still works — user can read all 5 tabs but cannot type in any field
+
+Previous / Next navigation buttons remain visible for reading
+
+FIX 9 — Schema Migration
+After all field additions above, run db:push to apply the updated shared/schema-noon-report.ts to the database.
+
+Confirm the following tables exist with all columns:
+
+nr_noon_reports — including all new fields from Fix 1–5
+
+DONE CRITERIA
+After applying all fixes, confirm each item with a ✅:
+
+ Tab 1: Next Port, ETA to Next Port, Distance to Go added
+
+ Tab 2: Air Temperature, Sea Temperature added
+
+ Tab 3: Lube Oil, Fresh Water Consumed, Fresh Water Produced added under "Consumables"
+
+ Tab 4: Live CO₂ calculation panel replacing empty state, with override toggle per field
+
+ Tab 5: Two separate textareas — General Remarks + Machinery Defects
+
+ Validation rules applied for all fields listed in Fix 6
+
+ Draft save shows "Draft saved at HH:MM" timestamp below tab bar
+
+ Post-submission shows green banner + all fields disabled + buttons hidden
+
+ db:push run and schema confirmed
+
+Do not begin Phase 2 until all 9 items above are checked. Confirm completion with the checklist.
+
