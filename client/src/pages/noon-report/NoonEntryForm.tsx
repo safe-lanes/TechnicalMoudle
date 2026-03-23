@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -12,7 +12,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { useToast } from "@/hooks/use-toast";
@@ -29,11 +29,33 @@ import {
   CheckCircle,
   Clock,
   Loader2,
+  AlertTriangle,
+  Info,
 } from "lucide-react";
 import { useLocation } from "wouter";
 
 interface Props {
   reportId?: string;
+}
+
+// ── helpers ──────────────────────────────────────────────────────────────────
+function numOpt(msg: string) {
+  return z.string().optional().refine(
+    (v) => !v || !isNaN(parseFloat(v)),
+    { message: msg }
+  );
+}
+function numMin(min: number, msg: string) {
+  return z.string().optional().refine(
+    (v) => !v || parseFloat(v) >= min,
+    { message: msg }
+  );
+}
+function numRange(min: number, max: number, msg: string) {
+  return z.string().optional().refine(
+    (v) => !v || (parseFloat(v) >= min && parseFloat(v) <= max),
+    { message: msg }
+  );
 }
 
 const formSchema = z.object({
@@ -42,7 +64,8 @@ const formSchema = z.object({
   voyageNo: z.string().optional(),
   portFrom: z.string().optional(),
   portTo: z.string().optional(),
-  // Navigation
+
+  // Tab 1: Navigation
   latDegrees: z.string().optional(),
   latMinutes: z.string().optional(),
   latDirection: z.string().optional(),
@@ -50,40 +73,61 @@ const formSchema = z.object({
   lonMinutes: z.string().optional(),
   lonDirection: z.string().optional(),
   course: z.string().optional(),
-  speed: z.string().optional(),
-  distanceSailed: z.string().optional(),
-  // Weather
+  speed: z.string().optional(), // warning only if > 30, not a hard error
+  distanceSailed: numMin(0, "Distance cannot be negative"),
+  nextPort: z.string().optional(),
+  etaNextPort: z.string().optional(),
+  distanceToGo: numMin(0, "Distance cannot be negative"),
+
+  // Tab 2: Weather
   windDirection: z.string().optional(),
-  windForce: z.string().optional(),
-  seaState: z.string().optional(),
+  windForce: numRange(0, 12, "Beaufort scale is 0–12"),
+  seaState: numRange(0, 9, "Douglas scale is 0–9"),
   swellHeight: z.string().optional(),
   swellDirection: z.string().optional(),
   visibility: z.string().optional(),
   currentDirection: z.string().optional(),
   currentSpeed: z.string().optional(),
-  // Machinery
+  airTemperature: numRange(-30, 60, "Enter a valid air temperature"),
+  seaTemperature: numRange(-5, 45, "Enter a valid sea temperature"),
+
+  // Tab 3: Fuel
   meLoad: z.string().optional(),
   meRpm: z.string().optional(),
   meHours: z.string().optional(),
   aeRunningHours: z.string().optional(),
   boilerHours: z.string().optional(),
-  hfoConsumption: z.string().optional(),
-  lsmgoConsumption: z.string().optional(),
-  mgoConsumption: z.string().optional(),
-  vlsfoConsumption: z.string().optional(),
-  lpgConsumption: z.string().optional(),
-  hfoRob: z.string().optional(),
-  lsmgoRob: z.string().optional(),
-  mgoRob: z.string().optional(),
-  vlsfoRob: z.string().optional(),
-  lpgRob: z.string().optional(),
-  // Cargo / Remarks
+  hfoConsumption: numMin(0, "Consumption cannot be negative"),
+  lsmgoConsumption: numMin(0, "Consumption cannot be negative"),
+  mgoConsumption: numMin(0, "Consumption cannot be negative"),
+  vlsfoConsumption: numMin(0, "Consumption cannot be negative"),
+  lpgConsumption: numMin(0, "Consumption cannot be negative"),
+  hfoRob: numMin(0, "ROB cannot be negative"),
+  lsmgoRob: numMin(0, "ROB cannot be negative"),
+  mgoRob: numMin(0, "ROB cannot be negative"),
+  vlsfoRob: numMin(0, "ROB cannot be negative"),
+  lpgRob: numMin(0, "ROB cannot be negative"),
+  lubeOilConsumption: numMin(0, "Cannot be negative"),
+  freshWaterConsumption: numMin(0, "Cannot be negative"),
+  freshWaterProduced: numMin(0, "Cannot be negative"),
+
+  // Tab 4: Emissions (overridable)
+  co2Hfo: z.string().optional(),
+  co2Lsmgo: z.string().optional(),
+  co2Mgo: z.string().optional(),
+  co2Vlsfo: z.string().optional(),
+  co2Lpg: z.string().optional(),
+  co2Total: z.string().optional(),
+  emissionOverrideNotes: z.string().optional(),
+
+  // Tab 5: Cargo & Remarks
   draftForward: z.string().optional(),
   draftAft: z.string().optional(),
   condition: z.string().optional(),
   cargoQuantity: z.string().optional(),
   cargoDescription: z.string().optional(),
-  remarks: z.string().optional(),
+  generalRemarks: z.string().optional(),
+  machineryRemarks: z.string().optional(),
 });
 
 type FormValues = z.infer<typeof formSchema>;
@@ -99,6 +143,21 @@ const TABS = [
 const WIND_DIRS = ["N", "NE", "E", "SE", "S", "SW", "W", "NW"];
 const VISIBILITY_OPTIONS = ["Good", "Moderate", "Poor", "Fog"];
 
+// CO₂ conversion factors (IMO)
+const CO2_FACTORS = {
+  hfo: 3.114,
+  lsmgo: 3.206,
+  mgo: 3.206,
+  vlsfo: 3.151,
+  lpg: 3.030,
+};
+
+function calcCo2(consumption: string | undefined, factor: number): number {
+  const v = parseFloat(consumption || "0");
+  return isNaN(v) ? 0 : v * factor;
+}
+
+// ── NumericInput ──────────────────────────────────────────────────────────────
 function NumericInput({
   label,
   name,
@@ -107,6 +166,7 @@ function NumericInput({
   register,
   disabled,
   hint,
+  error,
 }: {
   label: string;
   name: keyof FormValues;
@@ -115,6 +175,7 @@ function NumericInput({
   register: any;
   disabled?: boolean;
   hint?: string;
+  error?: string;
 }) {
   return (
     <div className="flex flex-col gap-1">
@@ -127,14 +188,29 @@ function NumericInput({
         step="any"
         placeholder={placeholder || "0.0"}
         disabled={disabled}
-        className="h-9 text-sm"
+        className={`h-9 text-sm ${error ? "border-red-400" : ""}`}
         data-testid={`input-${name}`}
       />
       {hint && <span className="text-xs text-gray-400">{hint}</span>}
+      {error && <span className="text-xs text-red-500">{error}</span>}
     </div>
   );
 }
 
+// ── InfoCard (read-only display) ──────────────────────────────────────────────
+function InfoCard({ label, value, unit }: { label: string; value: any; unit: string }) {
+  return (
+    <div className="flex flex-col gap-1 bg-gray-50 rounded p-3 border border-gray-100">
+      <span className="text-xs text-gray-500">{label}</span>
+      <span className="text-lg font-semibold text-gray-800">
+        {value != null ? Number(value).toFixed(2) : "—"}
+        {unit && <span className="text-xs font-normal text-gray-400 ml-1">{unit}</span>}
+      </span>
+    </div>
+  );
+}
+
+// ── Main Component ────────────────────────────────────────────────────────────
 export default function NoonEntryForm({ reportId }: Props) {
   const [activeTab, setActiveTab] = useState(0);
   const [, setLocation] = useLocation();
@@ -143,6 +219,13 @@ export default function NoonEntryForm({ reportId }: Props) {
   const authCtx = useAuth();
   const vesselId = vesselCtx?.vesselId || "";
   const today = new Date().toISOString().split("T")[0];
+
+  // Draft save timestamp state
+  const [draftStatusMsg, setDraftStatusMsg] = useState<string | null>(null);
+
+  // Override state for Tab 4 per-fuel CO₂ fields
+  const [overrides, setOverrides] = useState<Record<string, boolean>>({});
+  const [overrideReasons, setOverrideReasons] = useState<Record<string, string>>({});
 
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
@@ -164,6 +247,52 @@ export default function NoonEntryForm({ reportId }: Props) {
     ? (parseFloat(draftAft) - parseFloat(draftForward)).toFixed(2)
     : "—";
 
+  // Watch speed for warning
+  const speedVal = watch("speed");
+  const showSpeedWarning = speedVal ? parseFloat(speedVal) > 30 : false;
+
+  // Watch fuel consumptions for live CO₂ calc
+  const hfoC = watch("hfoConsumption");
+  const lsmgoC = watch("lsmgoConsumption");
+  const mgoC = watch("mgoConsumption");
+  const vlsfoC = watch("vlsfoConsumption");
+  const lpgC = watch("lpgConsumption");
+
+  const autoCo2 = {
+    hfo: calcCo2(hfoC, CO2_FACTORS.hfo),
+    lsmgo: calcCo2(lsmgoC, CO2_FACTORS.lsmgo),
+    mgo: calcCo2(mgoC, CO2_FACTORS.mgo),
+    vlsfo: calcCo2(vlsfoC, CO2_FACTORS.vlsfo),
+    lpg: calcCo2(lpgC, CO2_FACTORS.lpg),
+  };
+
+  // Override values for each CO₂ field (string in form)
+  const co2HfoVal = watch("co2Hfo");
+  const co2LsmgoVal = watch("co2Lsmgo");
+  const co2MgoVal = watch("co2Mgo");
+  const co2VlsfoVal = watch("co2Vlsfo");
+  const co2LpgVal = watch("co2Lpg");
+
+  // Effective CO₂ values (override or auto)
+  const effectiveCo2 = {
+    hfo: overrides.hfo ? parseFloat(co2HfoVal || "0") : autoCo2.hfo,
+    lsmgo: overrides.lsmgo ? parseFloat(co2LsmgoVal || "0") : autoCo2.lsmgo,
+    mgo: overrides.mgo ? parseFloat(co2MgoVal || "0") : autoCo2.mgo,
+    vlsfo: overrides.vlsfo ? parseFloat(co2VlsfoVal || "0") : autoCo2.vlsfo,
+    lpg: overrides.lpg ? parseFloat(co2LpgVal || "0") : autoCo2.lpg,
+  };
+  const totalCo2 = Object.values(effectiveCo2).reduce((a, b) => a + (isNaN(b) ? 0 : b), 0);
+
+  // Sync auto CO₂ values into form when not overridden
+  useEffect(() => {
+    if (!overrides.hfo) setValue("co2Hfo", autoCo2.hfo.toFixed(3));
+    if (!overrides.lsmgo) setValue("co2Lsmgo", autoCo2.lsmgo.toFixed(3));
+    if (!overrides.mgo) setValue("co2Mgo", autoCo2.mgo.toFixed(3));
+    if (!overrides.vlsfo) setValue("co2Vlsfo", autoCo2.vlsfo.toFixed(3));
+    if (!overrides.lpg) setValue("co2Lpg", autoCo2.lpg.toFixed(3));
+    setValue("co2Total", totalCo2.toFixed(3));
+  }, [hfoC, lsmgoC, mgoC, vlsfoC, lpgC, overrides]);
+
   // Fetch existing report if editing
   const { data: existingReport, isLoading: reportLoading } = useQuery<any>({
     queryKey: ["/technical/api/nr-reports", reportId],
@@ -180,6 +309,25 @@ export default function NoonEntryForm({ reportId }: Props) {
           (setValue as any)(camelKey as keyof FormValues, val != null ? String(val) : "");
         }
       });
+      // Show draft restored message
+      if (existingReport.status === "draft" && existingReport.draft_saved_at) {
+        const t = new Date(existingReport.draft_saved_at).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" });
+        setDraftStatusMsg(`Draft restored from ${t}`);
+      }
+      // Restore override notes if any
+      if (existingReport.emission_override_notes) {
+        try {
+          const parsed = JSON.parse(existingReport.emission_override_notes);
+          const newOverrides: Record<string, boolean> = {};
+          const newReasons: Record<string, string> = {};
+          Object.keys(parsed).forEach((k) => {
+            newOverrides[k] = true;
+            newReasons[k] = parsed[k];
+          });
+          setOverrides(newOverrides);
+          setOverrideReasons(newReasons);
+        } catch {}
+      }
     }
   }, [existingReport]);
 
@@ -193,6 +341,8 @@ export default function NoonEntryForm({ reportId }: Props) {
     },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ["/technical/api/nr-reports"] });
+      const t = new Date().toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" });
+      setDraftStatusMsg(`Draft saved at ${t}`);
       toast({ title: "Draft saved", description: "Report created as draft." });
       setLocation(`/noon-report/entry/${data.id}`);
     },
@@ -206,6 +356,8 @@ export default function NoonEntryForm({ reportId }: Props) {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/technical/api/nr-reports", reportId] });
+      const t = new Date().toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" });
+      setDraftStatusMsg(`Draft saved at ${t}`);
       toast({ title: "Draft saved", description: "Changes auto-saved." });
     },
     onError: () => toast({ title: "Error", description: "Failed to save draft.", variant: "destructive" }),
@@ -230,6 +382,13 @@ export default function NoonEntryForm({ reportId }: Props) {
     const trimVal = values.draftForward && values.draftAft
       ? String(parseFloat(values.draftAft) - parseFloat(values.draftForward))
       : undefined;
+
+    // Build override notes JSON
+    const overrideNotes: Record<string, string> = {};
+    Object.keys(overrides).forEach((k) => {
+      if (overrides[k] && overrideReasons[k]) overrideNotes[k] = overrideReasons[k];
+    });
+
     return {
       vesselId,
       reportDate: values.reportDate,
@@ -237,6 +396,7 @@ export default function NoonEntryForm({ reportId }: Props) {
       voyageNo: values.voyageNo,
       portFrom: values.portFrom,
       portTo: values.portTo,
+      // Tab 1
       latDegrees: values.latDegrees,
       latMinutes: values.latMinutes,
       latDirection: values.latDirection,
@@ -246,6 +406,10 @@ export default function NoonEntryForm({ reportId }: Props) {
       course: values.course,
       speed: values.speed,
       distanceSailed: values.distanceSailed,
+      nextPort: values.nextPort,
+      etaNextPort: values.etaNextPort || undefined,
+      distanceToGo: values.distanceToGo,
+      // Tab 2
       windDirection: values.windDirection,
       windForce: values.windForce,
       seaState: values.seaState,
@@ -254,6 +418,9 @@ export default function NoonEntryForm({ reportId }: Props) {
       visibility: values.visibility,
       currentDirection: values.currentDirection,
       currentSpeed: values.currentSpeed,
+      airTemperature: values.airTemperature,
+      seaTemperature: values.seaTemperature,
+      // Tab 3
       meLoad: values.meLoad,
       meRpm: values.meRpm,
       meHours: values.meHours,
@@ -269,13 +436,26 @@ export default function NoonEntryForm({ reportId }: Props) {
       mgoRob: values.mgoRob,
       vlsfoRob: values.vlsfoRob,
       lpgRob: values.lpgRob,
+      lubeOilConsumption: values.lubeOilConsumption,
+      freshWaterConsumption: values.freshWaterConsumption,
+      freshWaterProduced: values.freshWaterProduced,
+      // Tab 4 — computed CO₂
+      co2Hfo: effectiveCo2.hfo.toFixed(3),
+      co2Lsmgo: effectiveCo2.lsmgo.toFixed(3),
+      co2Mgo: effectiveCo2.mgo.toFixed(3),
+      co2Vlsfo: effectiveCo2.vlsfo.toFixed(3),
+      co2Lpg: effectiveCo2.lpg.toFixed(3),
+      co2Total: totalCo2.toFixed(3),
+      emissionOverrideNotes: Object.keys(overrideNotes).length ? JSON.stringify(overrideNotes) : undefined,
+      // Tab 5
       draftForward: values.draftForward,
       draftAft: values.draftAft,
       trim: trimVal,
       condition: values.condition,
       cargoQuantity: values.cargoQuantity,
       cargoDescription: values.cargoDescription,
-      remarks: values.remarks,
+      generalRemarks: values.generalRemarks,
+      machineryRemarks: values.machineryRemarks,
     };
   }
 
@@ -300,6 +480,7 @@ export default function NoonEntryForm({ reportId }: Props) {
 
   function handleNewReport() {
     setLocation("/noon-report/entry");
+    setDraftStatusMsg(null);
     form.reset({
       reportDate: today,
       reportTime: "12:00",
@@ -309,10 +490,100 @@ export default function NoonEntryForm({ reportId }: Props) {
     });
   }
 
+  function toggleOverride(field: string) {
+    setOverrides((prev) => ({ ...prev, [field]: !prev[field] }));
+    if (overrides[field]) {
+      setOverrideReasons((prev) => { const n = { ...prev }; delete n[field]; return n; });
+    }
+  }
+
+  function resetOverride(field: string, autoValue: number) {
+    setOverrides((prev) => { const n = { ...prev }; delete n[field]; return n; });
+    setOverrideReasons((prev) => { const n = { ...prev }; delete n[field]; return n; });
+    (setValue as any)(`co2${field.charAt(0).toUpperCase() + field.slice(1)}` as keyof FormValues, autoValue.toFixed(3));
+  }
+
+  // Format submitted_at for display
+  function formatSubmittedDate(submittedAt: string | null) {
+    if (!submittedAt) return "";
+    const d = new Date(submittedAt);
+    return d.toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" });
+  }
+  function formatSubmittedTime(submittedAt: string | null) {
+    if (!submittedAt) return "";
+    const d = new Date(submittedAt);
+    return d.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" });
+  }
+
   if (reportLoading) {
     return (
       <div className="flex items-center justify-center h-48 text-gray-500">
         <Loader2 className="h-5 w-5 animate-spin mr-2" /> Loading report…
+      </div>
+    );
+  }
+
+  // ── CO₂ field component ───────────────────────────────────────────────────
+  function Co2Field({ field, label, autoValue }: { field: string; label: string; autoValue: number }) {
+    const formKey = `co2${field.charAt(0).toUpperCase() + field.slice(1)}` as keyof FormValues;
+    const isOverridden = overrides[field];
+    return (
+      <div className="flex flex-col gap-1">
+        <div className="flex items-center justify-between mb-0.5">
+          <Label className="text-xs font-medium text-gray-600">{label}</Label>
+          <div className="flex items-center gap-1">
+            {isOverridden && (
+              <span className="text-xs text-amber-600 font-medium flex items-center gap-0.5">
+                <AlertTriangle className="h-3 w-3" /> Manual
+              </span>
+            )}
+            {!isSubmitted && (
+              isOverridden ? (
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="h-5 text-xs px-1.5 py-0 border-gray-300"
+                  onClick={() => resetOverride(field, autoValue)}
+                >
+                  Reset
+                </Button>
+              ) : (
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="h-5 text-xs px-1.5 py-0 border-gray-300"
+                  onClick={() => toggleOverride(field)}
+                >
+                  Override
+                </Button>
+              )
+            )}
+          </div>
+        </div>
+        <Input
+          {...register(formKey)}
+          type="number"
+          step="0.001"
+          disabled={!isOverridden || isSubmitted}
+          className={`h-9 text-sm ${isOverridden ? "bg-white" : "bg-gray-50 cursor-not-allowed"}`}
+          data-testid={`input-co2-${field}`}
+        />
+        <span className="text-xs text-gray-400 italic">auto-calculated</span>
+        {isOverridden && !isSubmitted && (
+          <Input
+            type="text"
+            placeholder="Reason for override (required)"
+            value={overrideReasons[field] || ""}
+            onChange={(e) => setOverrideReasons((prev) => ({ ...prev, [field]: e.target.value }))}
+            className="h-7 text-xs border-amber-300 mt-0.5"
+            data-testid={`input-co2-override-reason-${field}`}
+          />
+        )}
+        {isOverridden && overrideReasons[field] && (
+          <span className="text-xs text-amber-600 italic">{overrideReasons[field]}</span>
+        )}
       </div>
     );
   }
@@ -436,6 +707,21 @@ export default function NoonEntryForm({ reportId }: Props) {
         </CardContent>
       </Card>
 
+      {/* Post-Submission Green Banner (Fix 8) */}
+      {isSubmitted && (
+        <div className="flex items-center gap-2 bg-green-50 border border-green-200 text-green-800 rounded px-4 py-2.5 text-sm" data-testid="banner-submitted">
+          <CheckCircle className="h-4 w-4 text-green-600 flex-shrink-0" />
+          <span>
+            This report was submitted on{" "}
+            <strong>{formatSubmittedDate(existingReport?.submitted_at)}</strong>
+            {" "}at{" "}
+            <strong>{formatSubmittedTime(existingReport?.submitted_at)}</strong>
+            {existingReport?.submitted_by ? ` by ${existingReport.submitted_by}` : ""}.
+            {" "}It is now locked and cannot be edited.
+          </span>
+        </div>
+      )}
+
       {/* Tab Navigation */}
       <div className="flex items-center gap-1 border-b border-gray-200">
         {TABS.map((tab) => {
@@ -459,10 +745,18 @@ export default function NoonEntryForm({ reportId }: Props) {
         })}
       </div>
 
+      {/* Draft save timestamp (Fix 7) */}
+      {draftStatusMsg && (
+        <p className="text-xs text-gray-400 italic" data-testid="text-draft-status">
+          {draftStatusMsg}
+        </p>
+      )}
+
       {/* Tab Content */}
       <Card className="border border-gray-200">
         <CardContent className="pt-5">
-          {/* Tab 0: Navigation */}
+
+          {/* ── Tab 0: Navigation ─────────────────────────────────────────── */}
           {activeTab === 0 && (
             <div className="space-y-5">
               <div>
@@ -502,18 +796,83 @@ export default function NoonEntryForm({ reportId }: Props) {
                   <div />
                 </div>
               </div>
+
               <div className="border-t border-gray-100 pt-4">
                 <p className="text-sm font-medium text-gray-700 mb-3">Speed & Distance</p>
                 <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
                   <NumericInput label="Course" name="course" unit="°T" placeholder="000" register={register} disabled={isSubmitted} />
-                  <NumericInput label="Speed (SOG)" name="speed" unit="kts" placeholder="0.0" register={register} disabled={isSubmitted} />
-                  <NumericInput label="Distance Sailed" name="distanceSailed" unit="NM" placeholder="0" register={register} disabled={isSubmitted} />
+                  <div className="flex flex-col gap-1">
+                    <Label className="text-xs font-medium text-gray-600">
+                      Speed (SOG) <span className="text-gray-400 font-normal">(kts)</span>
+                    </Label>
+                    <Input
+                      {...register("speed")}
+                      type="number"
+                      step="any"
+                      placeholder="0.0"
+                      disabled={isSubmitted}
+                      className={`h-9 text-sm ${errors.speed ? "border-red-400" : ""}`}
+                      data-testid="input-speed"
+                    />
+                    {errors.speed && <span className="text-xs text-red-500">{errors.speed.message}</span>}
+                    {showSpeedWarning && !errors.speed && (
+                      <div className="flex items-center gap-1.5 bg-amber-50 border border-amber-200 text-amber-700 rounded px-2 py-1 text-xs mt-0.5" data-testid="warning-speed">
+                        <AlertTriangle className="h-3 w-3 flex-shrink-0" />
+                        Speed above 30 knots — please verify
+                      </div>
+                    )}
+                  </div>
+                  <NumericInput
+                    label="Distance Sailed"
+                    name="distanceSailed"
+                    unit="NM"
+                    placeholder="0"
+                    register={register}
+                    disabled={isSubmitted}
+                    error={errors.distanceSailed?.message}
+                  />
+                </div>
+              </div>
+
+              {/* Fix 1: Next Port, ETA, Distance to Go */}
+              <div className="border-t border-gray-100 pt-4">
+                <p className="text-sm font-medium text-gray-700 mb-3">Voyage Progress</p>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                  <div className="flex flex-col gap-1">
+                    <Label className="text-xs font-medium text-gray-600">Next Port</Label>
+                    <Input
+                      {...register("nextPort")}
+                      placeholder="e.g. JPYOK"
+                      disabled={isSubmitted}
+                      className="h-9 text-sm"
+                      data-testid="input-nextPort"
+                    />
+                  </div>
+                  <div className="flex flex-col gap-1">
+                    <Label className="text-xs font-medium text-gray-600">ETA to Next Port (UTC)</Label>
+                    <Input
+                      {...register("etaNextPort")}
+                      type="datetime-local"
+                      disabled={isSubmitted}
+                      className="h-9 text-sm"
+                      data-testid="input-etaNextPort"
+                    />
+                  </div>
+                  <NumericInput
+                    label="Distance to Go"
+                    name="distanceToGo"
+                    unit="NM"
+                    placeholder="0.0"
+                    register={register}
+                    disabled={isSubmitted}
+                    error={errors.distanceToGo?.message}
+                  />
                 </div>
               </div>
             </div>
           )}
 
-          {/* Tab 1: Weather */}
+          {/* ── Tab 1: Weather ─────────────────────────────────────────────── */}
           {activeTab === 1 && (
             <div className="space-y-4">
               <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
@@ -528,8 +887,24 @@ export default function NoonEntryForm({ reportId }: Props) {
                     </SelectContent>
                   </Select>
                 </div>
-                <NumericInput label="Wind Force (Beaufort)" name="windForce" unit="Bft" placeholder="0" register={register} disabled={isSubmitted} />
-                <NumericInput label="Sea State (Douglas)" name="seaState" unit="0–9" placeholder="0" register={register} disabled={isSubmitted} />
+                <NumericInput
+                  label="Wind Force (Beaufort)"
+                  name="windForce"
+                  unit="Bft"
+                  placeholder="0"
+                  register={register}
+                  disabled={isSubmitted}
+                  error={errors.windForce?.message}
+                />
+                <NumericInput
+                  label="Sea State (Douglas)"
+                  name="seaState"
+                  unit="0–9"
+                  placeholder="0"
+                  register={register}
+                  disabled={isSubmitted}
+                  error={errors.seaState?.message}
+                />
                 <NumericInput label="Swell Height" name="swellHeight" unit="m" placeholder="0.0" register={register} disabled={isSubmitted} />
               </div>
               <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
@@ -568,10 +943,34 @@ export default function NoonEntryForm({ reportId }: Props) {
                 </div>
                 <NumericInput label="Current Speed" name="currentSpeed" unit="kts" placeholder="0.0" register={register} disabled={isSubmitted} />
               </div>
+              {/* Fix 2: Temperature fields */}
+              <div className="border-t border-gray-100 pt-4">
+                <p className="text-sm font-medium text-gray-700 mb-3">Temperature</p>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                  <NumericInput
+                    label="Air Temperature"
+                    name="airTemperature"
+                    unit="°C"
+                    placeholder="0.0"
+                    register={register}
+                    disabled={isSubmitted}
+                    error={errors.airTemperature?.message}
+                  />
+                  <NumericInput
+                    label="Sea Temperature"
+                    name="seaTemperature"
+                    unit="°C"
+                    placeholder="0.0"
+                    register={register}
+                    disabled={isSubmitted}
+                    error={errors.seaTemperature?.message}
+                  />
+                </div>
+              </div>
             </div>
           )}
 
-          {/* Tab 2: Fuel & Machinery */}
+          {/* ── Tab 2: Fuel & Machinery ─────────────────────────────────────── */}
           {activeTab === 2 && (
             <div className="space-y-5">
               <div>
@@ -587,60 +986,103 @@ export default function NoonEntryForm({ reportId }: Props) {
               <div className="border-t border-gray-100 pt-4">
                 <p className="text-sm font-medium text-gray-700 mb-3">Fuel Consumption (MT)</p>
                 <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
-                  <NumericInput label="HFO" name="hfoConsumption" unit="MT" placeholder="0.0" register={register} disabled={isSubmitted} />
-                  <NumericInput label="LSMGO" name="lsmgoConsumption" unit="MT" placeholder="0.0" register={register} disabled={isSubmitted} />
-                  <NumericInput label="MGO" name="mgoConsumption" unit="MT" placeholder="0.0" register={register} disabled={isSubmitted} />
-                  <NumericInput label="VLSFO" name="vlsfoConsumption" unit="MT" placeholder="0.0" register={register} disabled={isSubmitted} />
-                  <NumericInput label="LPG" name="lpgConsumption" unit="MT" placeholder="0.0" register={register} disabled={isSubmitted} />
+                  <NumericInput label="HFO" name="hfoConsumption" unit="MT" placeholder="0.0" register={register} disabled={isSubmitted} error={errors.hfoConsumption?.message} />
+                  <NumericInput label="LSMGO" name="lsmgoConsumption" unit="MT" placeholder="0.0" register={register} disabled={isSubmitted} error={errors.lsmgoConsumption?.message} />
+                  <NumericInput label="MGO" name="mgoConsumption" unit="MT" placeholder="0.0" register={register} disabled={isSubmitted} error={errors.mgoConsumption?.message} />
+                  <NumericInput label="VLSFO" name="vlsfoConsumption" unit="MT" placeholder="0.0" register={register} disabled={isSubmitted} error={errors.vlsfoConsumption?.message} />
+                  <NumericInput label="LPG" name="lpgConsumption" unit="MT" placeholder="0.0" register={register} disabled={isSubmitted} error={errors.lpgConsumption?.message} />
                 </div>
               </div>
               <div className="border-t border-gray-100 pt-4">
                 <p className="text-sm font-medium text-gray-700 mb-3">ROB at Noon (MT)</p>
                 <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
-                  <NumericInput label="HFO ROB" name="hfoRob" unit="MT" placeholder="0.0" register={register} disabled={isSubmitted} />
-                  <NumericInput label="LSMGO ROB" name="lsmgoRob" unit="MT" placeholder="0.0" register={register} disabled={isSubmitted} />
-                  <NumericInput label="MGO ROB" name="mgoRob" unit="MT" placeholder="0.0" register={register} disabled={isSubmitted} />
-                  <NumericInput label="VLSFO ROB" name="vlsfoRob" unit="MT" placeholder="0.0" register={register} disabled={isSubmitted} />
-                  <NumericInput label="LPG ROB" name="lpgRob" unit="MT" placeholder="0.0" register={register} disabled={isSubmitted} />
+                  <NumericInput label="HFO ROB" name="hfoRob" unit="MT" placeholder="0.0" register={register} disabled={isSubmitted} error={errors.hfoRob?.message} />
+                  <NumericInput label="LSMGO ROB" name="lsmgoRob" unit="MT" placeholder="0.0" register={register} disabled={isSubmitted} error={errors.lsmgoRob?.message} />
+                  <NumericInput label="MGO ROB" name="mgoRob" unit="MT" placeholder="0.0" register={register} disabled={isSubmitted} error={errors.mgoRob?.message} />
+                  <NumericInput label="VLSFO ROB" name="vlsfoRob" unit="MT" placeholder="0.0" register={register} disabled={isSubmitted} error={errors.vlsfoRob?.message} />
+                  <NumericInput label="LPG ROB" name="lpgRob" unit="MT" placeholder="0.0" register={register} disabled={isSubmitted} error={errors.lpgRob?.message} />
+                </div>
+              </div>
+              {/* Fix 3: Consumables */}
+              <div className="border-t border-gray-100 pt-4">
+                <p className="text-sm font-medium text-gray-700 mb-3">Consumables</p>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                  <NumericInput
+                    label="Lube Oil Consumption"
+                    name="lubeOilConsumption"
+                    unit="L"
+                    placeholder="0.0"
+                    register={register}
+                    disabled={isSubmitted}
+                    error={errors.lubeOilConsumption?.message}
+                  />
+                  <NumericInput
+                    label="Fresh Water Consumption"
+                    name="freshWaterConsumption"
+                    unit="tons"
+                    placeholder="0.0"
+                    register={register}
+                    disabled={isSubmitted}
+                    error={errors.freshWaterConsumption?.message}
+                  />
+                  <NumericInput
+                    label="Fresh Water Produced"
+                    name="freshWaterProduced"
+                    unit="tons"
+                    placeholder="0.0"
+                    register={register}
+                    disabled={isSubmitted}
+                    error={errors.freshWaterProduced?.message}
+                  />
                 </div>
               </div>
             </div>
           )}
 
-          {/* Tab 3: Emissions (read-only calculated) */}
+          {/* ── Tab 3: Emissions ────────────────────────────────────────────── */}
           {activeTab === 3 && (
-            <div className="space-y-4">
-              <p className="text-sm text-gray-500 bg-blue-50 border border-blue-100 rounded px-3 py-2">
-                Emission figures are auto-calculated from fuel consumption data upon submission.
-              </p>
-              {existingReport?.co2_emissions ? (
-                <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-                  <InfoCard label="CO₂ Emissions" value={existingReport.co2_emissions} unit="t" />
-                  <InfoCard label="SOx Emissions" value={existingReport.sox_emissions} unit="t" />
-                  <InfoCard label="NOx Emissions" value={existingReport.nox_emissions} unit="t" />
-                  <InfoCard label="EEOI" value={existingReport.eeoi} unit="g CO₂/t·NM" />
-                  <InfoCard label="AER" value={existingReport.aer} unit="" />
-                  <div className="flex flex-col gap-1 bg-gray-50 rounded p-3 border border-gray-100">
-                    <span className="text-xs text-gray-500">CII Rating</span>
-                    <span className={`text-2xl font-bold ${
-                      existingReport.cii_rating === "A" ? "text-green-600" :
-                      existingReport.cii_rating === "B" ? "text-green-500" :
-                      existingReport.cii_rating === "C" ? "text-yellow-600" :
-                      existingReport.cii_rating === "D" ? "text-orange-500" :
-                      "text-red-600"
-                    }`}>{existingReport.cii_rating || "—"}</span>
-                  </div>
+            <div className="space-y-5">
+              {/* Info banner */}
+              <div className="flex items-start gap-2 bg-blue-50 border border-blue-100 text-blue-800 rounded px-3 py-2.5 text-sm">
+                <Info className="h-4 w-4 flex-shrink-0 mt-0.5 text-blue-500" />
+                <span>
+                  Emission figures are auto-calculated from Tab 3 fuel data.
+                  Values update live as you enter fuel consumption.
+                </span>
+              </div>
+
+              {/* Per-fuel CO₂ breakdown */}
+              <div>
+                <p className="text-sm font-medium text-gray-700 mb-3">Per Fuel Type CO₂ Breakdown</p>
+                <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+                  <Co2Field field="hfo" label="CO₂ — HFO" autoValue={autoCo2.hfo} />
+                  <Co2Field field="lsmgo" label="CO₂ — LSMGO" autoValue={autoCo2.lsmgo} />
+                  <Co2Field field="mgo" label="CO₂ — MGO" autoValue={autoCo2.mgo} />
+                  <Co2Field field="vlsfo" label="CO₂ — VLSFO" autoValue={autoCo2.vlsfo} />
+                  <Co2Field field="lpg" label="CO₂ — LPG" autoValue={autoCo2.lpg} />
                 </div>
-              ) : (
-                <div className="text-center text-gray-400 py-12">
-                  <BarChart3 className="h-10 w-10 mx-auto mb-2 opacity-30" />
-                  <p className="text-sm">Emission data will appear after the report is submitted.</p>
-                </div>
-              )}
+              </div>
+
+              {/* Total CO₂ */}
+              <div className="border-t border-gray-100 pt-4">
+                <Card className="border border-gray-200 bg-gray-50">
+                  <CardContent className="py-4 px-5">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-sm font-medium text-gray-600 mb-0.5">Total CO₂ Emitted Today</p>
+                        <p className="text-xl font-bold text-gray-900" data-testid="text-co2-total">
+                          {totalCo2.toFixed(3)} MT
+                        </p>
+                      </div>
+                      <BarChart3 className="h-8 w-8 text-gray-300" />
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
             </div>
           )}
 
-          {/* Tab 4: Cargo & Remarks */}
+          {/* ── Tab 4: Cargo & Remarks ──────────────────────────────────────── */}
           {activeTab === 4 && (
             <div className="space-y-5">
               <div>
@@ -695,15 +1137,28 @@ export default function NoonEntryForm({ reportId }: Props) {
                   </div>
                 </div>
               </div>
-              <div className="border-t border-gray-100 pt-4">
-                <Label className="text-xs font-medium text-gray-600 mb-2 block">Remarks</Label>
-                <Textarea
-                  {...register("remarks")}
-                  placeholder="Any remarks, delays, engine issues, port calls…"
-                  rows={4}
-                  disabled={isSubmitted}
-                  data-testid="input-remarks"
-                />
+              {/* Fix 5: Split remarks */}
+              <div className="border-t border-gray-100 pt-4 space-y-4">
+                <div>
+                  <Label className="text-xs font-medium text-gray-600 mb-2 block">General Remarks</Label>
+                  <Textarea
+                    {...register("generalRemarks")}
+                    placeholder="Any remarks, delays, port calls, weather events..."
+                    rows={4}
+                    disabled={isSubmitted}
+                    data-testid="input-generalRemarks"
+                  />
+                </div>
+                <div>
+                  <Label className="text-xs font-medium text-gray-600 mb-2 block">Machinery Defects / Abnormalities</Label>
+                  <Textarea
+                    {...register("machineryRemarks")}
+                    placeholder="Any machinery issues, defects, abnormal observations, or running hour deviations..."
+                    rows={4}
+                    disabled={isSubmitted}
+                    data-testid="input-machineryRemarks"
+                  />
+                </div>
               </div>
             </div>
           )}
@@ -732,18 +1187,6 @@ export default function NoonEntryForm({ reportId }: Props) {
           Next <ChevronRight className="h-4 w-4 ml-1" />
         </Button>
       </div>
-    </div>
-  );
-}
-
-function InfoCard({ label, value, unit }: { label: string; value: any; unit: string }) {
-  return (
-    <div className="flex flex-col gap-1 bg-gray-50 rounded p-3 border border-gray-100">
-      <span className="text-xs text-gray-500">{label}</span>
-      <span className="text-lg font-semibold text-gray-800">
-        {value != null ? Number(value).toFixed(2) : "—"}
-        {unit && <span className="text-xs font-normal text-gray-400 ml-1">{unit}</span>}
-      </span>
     </div>
   );
 }

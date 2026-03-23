@@ -40,6 +40,11 @@ export const nrNoonReports = pgTable("nr_noon_reports", {
   speed: numeric("speed"), // knots
   distanceSailed: numeric("distance_sailed"), // NM
 
+  // Fix 1: Navigation extras
+  nextPort: text("next_port"),
+  etaNextPort: timestamp("eta_next_port"),
+  distanceToGo: numeric("distance_to_go"), // NM
+
   // Tab 2: Weather
   windDirection: text("wind_direction"),
   windForce: integer("wind_force"), // Beaufort 0-12
@@ -49,6 +54,10 @@ export const nrNoonReports = pgTable("nr_noon_reports", {
   visibility: text("visibility"), // Good | Moderate | Poor | Fog
   currentDirection: text("current_direction"),
   currentSpeed: numeric("current_speed"), // knots
+
+  // Fix 2: Temperature fields
+  airTemperature: numeric("air_temperature"), // °C
+  seaTemperature: numeric("sea_temperature"), // °C
 
   // Tab 3: Machinery & Fuel
   meLoad: numeric("me_load"), // % MCR
@@ -71,13 +80,27 @@ export const nrNoonReports = pgTable("nr_noon_reports", {
   vlsfoRob: numeric("vlsfo_rob"),
   lpgRob: numeric("lpg_rob"),
 
-  // Tab 4: Emissions (some calculated server-side)
-  co2Emissions: numeric("co2_emissions"), // tonnes
+  // Fix 3: Consumables
+  lubeOilConsumption: numeric("lube_oil_consumption"), // litres
+  freshWaterConsumption: numeric("fresh_water_consumption"), // tons
+  freshWaterProduced: numeric("fresh_water_produced"), // tons
+
+  // Tab 4: Emissions — legacy aggregate fields
+  co2Emissions: numeric("co2_emissions"), // tonnes (legacy)
   soxEmissions: numeric("sox_emissions"),
   noxEmissions: numeric("nox_emissions"),
   eeoi: numeric("eeoi"),
   ciiRating: text("cii_rating"), // A | B | C | D | E
   aer: numeric("aer"),
+
+  // Fix 4: Per-fuel CO₂ breakdown + override
+  co2Hfo: numeric("co2_hfo"),
+  co2Lsmgo: numeric("co2_lsmgo"),
+  co2Mgo: numeric("co2_mgo"),
+  co2Vlsfo: numeric("co2_vlsfo"),
+  co2Lpg: numeric("co2_lpg"),
+  co2Total: numeric("co2_total"),
+  emissionOverrideNotes: text("emission_override_notes"), // JSON string
 
   // Tab 5: Cargo / Remarks
   draftForward: numeric("draft_forward"), // metres
@@ -86,7 +109,11 @@ export const nrNoonReports = pgTable("nr_noon_reports", {
   condition: text("condition"), // ballast | laden | in_port
   cargoQuantity: numeric("cargo_quantity"), // MT
   cargoDescription: text("cargo_description"),
-  remarks: text("remarks"),
+
+  // Fix 5: Split remarks (keep old remarks for backward compat)
+  remarks: text("remarks"), // legacy
+  generalRemarks: text("general_remarks"),
+  machineryRemarks: text("machinery_remarks"),
 
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
