@@ -2173,6 +2173,51 @@ const migrations: Migration[] = [
         END IF;
       END $$
     `
+  },
+  {
+    id: '071_fix_spare_component_link_constraint_columns',
+    name: 'Fix unique_spare_component_link to include vessel_id',
+    description: 'The unique_spare_component_link constraint may exist with only 2 columns (spare_id, component_id) instead of the required 3 (spare_id, component_id, vessel_id). Drops the incorrect constraint and recreates it correctly.',
+    sql: `
+      DO $$ BEGIN
+        IF EXISTS (
+          SELECT 1 FROM pg_constraint WHERE conname = 'unique_spare_component_link'
+        ) THEN
+          DECLARE
+            col_count INTEGER;
+          BEGIN
+            SELECT COUNT(*) INTO col_count
+            FROM pg_constraint c
+            JOIN pg_attribute a ON a.attnum = ANY(c.conkey) AND a.attrelid = c.conrelid
+            WHERE c.conname = 'unique_spare_component_link';
+
+            IF col_count < 3 THEN
+              ALTER TABLE spare_component_links DROP CONSTRAINT unique_spare_component_link;
+
+              DELETE FROM spare_component_links
+              WHERE id NOT IN (
+                SELECT MAX(id) FROM spare_component_links
+                GROUP BY spare_id, component_id, vessel_id
+              );
+
+              ALTER TABLE spare_component_links
+                ADD CONSTRAINT unique_spare_component_link
+                UNIQUE (spare_id, component_id, vessel_id);
+            END IF;
+          END;
+        ELSE
+          DELETE FROM spare_component_links
+          WHERE id NOT IN (
+            SELECT MAX(id) FROM spare_component_links
+            GROUP BY spare_id, component_id, vessel_id
+          );
+
+          ALTER TABLE spare_component_links
+            ADD CONSTRAINT unique_spare_component_link
+            UNIQUE (spare_id, component_id, vessel_id);
+        END IF;
+      END $$
+    `
   }
 ];
 
