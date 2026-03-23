@@ -34,18 +34,23 @@ export async function processSpareInventory(params: {
   const { spareId, spareUuid, vesselId, componentId, locationAName, locationBName, robLocationA, robLocationB, isNewSpare, userId } = params;
   let linkCreated = false;
 
-  const existingLinks = await storage.getSpareComponentLinksBySpare(spareId);
-  const alreadyLinked = existingLinks.some((link: any) => link.componentId === componentId);
-  if (!alreadyLinked) {
-    await storage.createSpareComponentLink({
-      spareId,
-      spareUuid,
-      componentId,
-      vesselId,
-      linkedBy: userId,
-    }, true);
-    linkCreated = true;
-    console.log(`🔗 Linked spare ${spareId} to component ${componentId}`);
+  try {
+    const existingLinks = await storage.getSpareComponentLinksBySpare(spareId);
+    const alreadyLinked = existingLinks.some((link: any) => link.componentId === componentId);
+    if (!alreadyLinked) {
+      await storage.createSpareComponentLink({
+        spareId,
+        spareUuid,
+        componentId,
+        vesselId,
+        linkedBy: userId,
+      }, true);
+      linkCreated = true;
+      console.log(`🔗 Linked spare ${spareId} to component ${componentId}`);
+    }
+  } catch (linkError: any) {
+    console.error(`❌ Failed to create spare-component link: spareId=${spareId}, componentId=${componentId}, vesselId=${vesselId}, error=${linkError.message}`, linkError.stack);
+    throw linkError;
   }
 
   try {
