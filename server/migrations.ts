@@ -2155,7 +2155,7 @@ const migrations: Migration[] = [
         WHERE c.conname = 'unique_spare_location_stock' AND c.conrelid = 'spare_location_stock'::regclass;
 
         IF scl_cols = 'spare_id,component_id,vessel_id' AND sls_cols = 'spare_id,location_id' THEN
-          RAISE NOTICE 'Constraints already correct (likely applied by 072), skipping 070';
+          RAISE NOTICE 'Constraints already correct, skipping 070';
           RETURN;
         END IF;
 
@@ -2166,11 +2166,15 @@ const migrations: Migration[] = [
           DROP INDEX unique_spare_component_link;
         END IF;
 
+        WITH ranked AS (
+          SELECT id, ROW_NUMBER() OVER (
+            PARTITION BY spare_id, component_id, vessel_id
+            ORDER BY id DESC
+          ) AS rn
+          FROM spare_component_links
+        )
         DELETE FROM spare_component_links
-        WHERE id NOT IN (
-          SELECT MAX(id) FROM spare_component_links
-          GROUP BY spare_id, component_id, vessel_id
-        );
+        WHERE id IN (SELECT id FROM ranked WHERE rn > 1);
 
         IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'unique_spare_component_link' AND conrelid = 'spare_component_links'::regclass) THEN
           ALTER TABLE spare_component_links ADD CONSTRAINT unique_spare_component_link UNIQUE (spare_id, component_id, vessel_id);
@@ -2183,11 +2187,15 @@ const migrations: Migration[] = [
           DROP INDEX unique_spare_location_stock;
         END IF;
 
+        WITH ranked AS (
+          SELECT id, ROW_NUMBER() OVER (
+            PARTITION BY spare_id, location_id
+            ORDER BY id DESC
+          ) AS rn
+          FROM spare_location_stock
+        )
         DELETE FROM spare_location_stock
-        WHERE id NOT IN (
-          SELECT MAX(id) FROM spare_location_stock
-          GROUP BY spare_id, location_id
-        );
+        WHERE id IN (SELECT id FROM ranked WHERE rn > 1);
 
         IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'unique_spare_location_stock' AND conrelid = 'spare_location_stock'::regclass) THEN
           ALTER TABLE spare_location_stock ADD CONSTRAINT unique_spare_location_stock UNIQUE (spare_id, location_id);
@@ -2216,7 +2224,7 @@ const migrations: Migration[] = [
         WHERE c.conname = 'unique_spare_location_stock' AND c.conrelid = 'spare_location_stock'::regclass;
 
         IF scl_cols = 'spare_id,component_id,vessel_id' AND sls_cols = 'spare_id,location_id' THEN
-          RAISE NOTICE 'Constraints already correct (likely applied by 072), skipping 071';
+          RAISE NOTICE 'Constraints already correct, skipping 071';
           RETURN;
         END IF;
 
@@ -2227,11 +2235,15 @@ const migrations: Migration[] = [
           DROP INDEX unique_spare_component_link;
         END IF;
 
+        WITH ranked AS (
+          SELECT id, ROW_NUMBER() OVER (
+            PARTITION BY spare_id, component_id, vessel_id
+            ORDER BY id DESC
+          ) AS rn
+          FROM spare_component_links
+        )
         DELETE FROM spare_component_links
-        WHERE id NOT IN (
-          SELECT MAX(id) FROM spare_component_links
-          GROUP BY spare_id, component_id, vessel_id
-        );
+        WHERE id IN (SELECT id FROM ranked WHERE rn > 1);
 
         ALTER TABLE spare_component_links ADD CONSTRAINT unique_spare_component_link UNIQUE (spare_id, component_id, vessel_id);
 
@@ -2242,11 +2254,15 @@ const migrations: Migration[] = [
           DROP INDEX unique_spare_location_stock;
         END IF;
 
+        WITH ranked AS (
+          SELECT id, ROW_NUMBER() OVER (
+            PARTITION BY spare_id, location_id
+            ORDER BY id DESC
+          ) AS rn
+          FROM spare_location_stock
+        )
         DELETE FROM spare_location_stock
-        WHERE id NOT IN (
-          SELECT MAX(id) FROM spare_location_stock
-          GROUP BY spare_id, location_id
-        );
+        WHERE id IN (SELECT id FROM ranked WHERE rn > 1);
 
         ALTER TABLE spare_location_stock ADD CONSTRAINT unique_spare_location_stock UNIQUE (spare_id, location_id);
       END $$;
@@ -2255,13 +2271,30 @@ const migrations: Migration[] = [
   {
     id: '072_optimized_spare_unique_constraints',
     name: 'Optimized spare unique constraints (replaces slow dedup in 070/071)',
-    description: 'Uses ROW_NUMBER() window function for O(n) dedup instead of NOT IN (SELECT MAX...) O(n²) pattern. Idempotent — safe on databases where 070/071 already succeeded (0 duplicates found, constraints already exist).',
+    description: 'Uses ROW_NUMBER() window function for O(n) dedup instead of NOT IN (SELECT MAX...) O(n²) pattern. Fully idempotent — safe on databases where 070/071 already succeeded.',
     sql: `
       DO $$
       DECLARE
+        scl_cols text;
+        sls_cols text;
         deleted_scl integer;
         deleted_sls integer;
       BEGIN
+        SELECT string_agg(a.attname, ',' ORDER BY array_position(c.conkey, a.attnum)) INTO scl_cols
+        FROM pg_constraint c
+        JOIN pg_attribute a ON a.attrelid = c.conrelid AND a.attnum = ANY(c.conkey)
+        WHERE c.conname = 'unique_spare_component_link' AND c.conrelid = 'spare_component_links'::regclass;
+
+        SELECT string_agg(a.attname, ',' ORDER BY array_position(c.conkey, a.attnum)) INTO sls_cols
+        FROM pg_constraint c
+        JOIN pg_attribute a ON a.attrelid = c.conrelid AND a.attnum = ANY(c.conkey)
+        WHERE c.conname = 'unique_spare_location_stock' AND c.conrelid = 'spare_location_stock'::regclass;
+
+        IF scl_cols = 'spare_id,component_id,vessel_id' AND sls_cols = 'spare_id,location_id' THEN
+          RAISE NOTICE 'Both constraints already correct, skipping 072';
+          RETURN;
+        END IF;
+
         -- === spare_component_links ===
         IF EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'unique_spare_component_link' AND conrelid = 'spare_component_links'::regclass) THEN
           ALTER TABLE spare_component_links DROP CONSTRAINT unique_spare_component_link;
