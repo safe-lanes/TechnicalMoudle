@@ -135,3 +135,60 @@ export async function getFuelDashboard(req: Request, res: Response) {
     res.status(500).json({ error: 'Failed to fetch fuel dashboard', details: error.message });
   }
 }
+
+// ── GET /nr-alerts/:vesselId ──────────────────────────────────────────────────
+// Returns all unacknowledged alerts for the vessel.
+export async function getActiveAlerts(req: Request, res: Response) {
+  try {
+    const { vesselId } = req.params;
+    const alerts = await service.getActiveAlerts(vesselId);
+    res.json(alerts);
+  } catch (error: any) {
+    res.status(500).json({ error: 'Failed to fetch alerts', details: error.message });
+  }
+}
+
+// ── GET /nr-alerts/:vesselId/count ───────────────────────────────────────────
+// Returns count of unacknowledged alerts (used by sidebar badge).
+export async function getActiveAlertCount(req: Request, res: Response) {
+  try {
+    const { vesselId } = req.params;
+    const count = await service.getActiveAlertCount(vesselId);
+    res.json({ count });
+  } catch (error: any) {
+    res.status(500).json({ error: 'Failed to fetch alert count', details: error.message });
+  }
+}
+
+// ── GET /nr-alerts/:vesselId/all ─────────────────────────────────────────────
+// Returns paginated alert history (including acknowledged).
+export async function getAllAlerts(req: Request, res: Response) {
+  try {
+    const { vesselId } = req.params;
+    const page = parseInt(String(req.query.page ?? '1')) || 1;
+    const limit = parseInt(String(req.query.limit ?? '20')) || 20;
+    const result = await service.getAllAlerts(vesselId, page, limit);
+    res.json(result);
+  } catch (error: any) {
+    res.status(500).json({ error: 'Failed to fetch alert history', details: error.message });
+  }
+}
+
+// ── PATCH /nr-alerts/:alertId/acknowledge ────────────────────────────────────
+// Acknowledges an alert. Restricted to office / admin users (not ship users).
+export async function acknowledgeAlert(req: Request, res: Response) {
+  try {
+    const user = (req as any).user;
+    if (user?.userType === 'Ship') {
+      return res.status(403).json({ error: 'Ship users cannot acknowledge alerts' });
+    }
+    const alertId = parseInt(req.params.alertId);
+    if (isNaN(alertId)) return res.status(400).json({ error: 'Invalid alert ID' });
+    const acknowledgedBy = user?.fullName || user?.username || 'Office';
+    const updated = await service.acknowledgeAlert(alertId, acknowledgedBy);
+    if (!updated) return res.status(404).json({ error: 'Alert not found' });
+    res.json(updated);
+  } catch (error: any) {
+    res.status(500).json({ error: 'Failed to acknowledge alert', details: error.message });
+  }
+}

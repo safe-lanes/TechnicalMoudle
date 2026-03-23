@@ -1,8 +1,8 @@
 import * as repo from '../repositories/noonReportRepository';
 import { db } from '../../../db';
-import { nrNoonReports, nrFuelRob, nrCiiTracking } from '@shared/schema';
+import { nrNoonReports, nrFuelRob, nrCiiTracking, nrAlerts } from '@shared/schema';
 import type { InsertNrNoonReport, NrNoonReport } from '@shared/schema';
-import { eq, and, desc, asc } from 'drizzle-orm';
+import { eq, and, desc, asc, isNull, count } from 'drizzle-orm';
 import { runCalculations } from './calculationEngine';
 import { BUNKER_SAFETY_MARGIN_PCT, FUEL_TYPES, computeCiiRefLine } from '../utils/fuelConversionFactors';
 import { getVesselDwt } from '../utils/existingDataAdapter';
@@ -256,6 +256,69 @@ export async function getFuelDashboard(vesselId: string) {
 
 export async function getVesselKPIs(vesselId: string) {
   return getFuelDashboard(vesselId);
+}
+
+// ── Alert CRUD ────────────────────────────────────────────────────────────────
+
+/** Active (unacknowledged) alerts for a vessel, newest first. */
+export async function getActiveAlerts(vesselId: string) {
+  return db.select()
+    .from(nrAlerts)
+    .where(and(eq(nrAlerts.vesselId, vesselId), isNull(nrAlerts.acknowledgedAt)))
+    .orderBy(desc(nrAlerts.createdAt));
+}
+
+/** Paginated alert history for a vessel (all alerts, including acknowledged). */
+export async function getAllAlerts(vesselId: string, page: number, limit: number) {
+  const safeLimit = Math.min(Math.max(1, limit), 100);
+  const safePage = Math.max(1, page);
+  const offset = (safePage - 1) * safeLimit;
+
+  const [data, totalRows] = await Promise.all([
+    db.select()
+      .from(nrAlerts)
+      .where(eq(nrAlerts.vesselId, vesselId))
+      .orderBy(desc(nrAlerts.createdAt))
+      .limit(safeLimit)
+      .offset(offset),
+    db.select({ total: count() })
+      .from(nrAlerts)
+      .where(eq(nrAlerts.vesselId, vesselId)),
+  ]);
+
+  const total = totalRows[0]?.total ?? 0;
+  return {
+    data,
+    total,
+    page: safePage,
+    limit: safeLimit,
+    totalPages: Math.ceil(total / safeLimit),
+  };
+}
+
+/** Unacknowledged alert count for a vessel (used by sidebar badge). */
+export async function getActiveAlertCount(vesselId: string): Promise<number> {
+  const rows = await db.select({ total: count() })
+    .from(nrAlerts)
+    .where(and(eq(nrAlerts.vesselId, vesselId), isNull(nrAlerts.acknowledgedAt)));
+  return rows[0]?.total ?? 0;
+}
+
+/** Acknowledge a single alert by id. Returns 404 if not found. */
+export async function acknowledgeAlert(alertId: number, acknowledgedBy: string) {
+  const existing = await db.select({ id: nrAlerts.id })
+    .from(nrAlerts)
+    .where(eq(nrAlerts.id, alertId))
+    .limit(1);
+
+  if (existing.length === 0) return null;
+
+  const updated = await db.update(nrAlerts)
+    .set({ acknowledgedAt: new Date(), acknowledgedBy })
+    .where(eq(nrAlerts.id, alertId))
+    .returning();
+
+  return updated[0] ?? null;
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────

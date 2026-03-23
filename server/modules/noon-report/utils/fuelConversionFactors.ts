@@ -30,6 +30,8 @@ export const BUNKER_SAFETY_MARGIN_PCT = 15;
 export const ALERT_THRESHOLDS = {
   consumptionSpike: { warning: 0.15, critical: 0.25 }, // fraction above 7-day avg
   enduranceDays: { warning: 10, critical: 5 }, // days remaining
+  aeHoursSpike: { warning: 0.20 }, // fraction above 7-day avg AE hours
+  aeMinDataPoints: 3, // minimum prior reports required to compute AE hours spike
 };
 
 // Fuel types used throughout the module

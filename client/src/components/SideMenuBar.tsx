@@ -1,8 +1,10 @@
-import React from "react";
+import React, { useContext } from "react";
 import { cn } from "@/lib/utils";
 import { useLocation } from "wouter";
 import { usePermissions } from "@/contexts/PermissionsContext";
 import { useUIRole } from "@/contexts/UIRoleContext";
+import { VesselContext } from "@/contexts/VesselContext";
+import { useQuery } from "@tanstack/react-query";
 import {
   LayoutDashboard,
   Package,
@@ -104,6 +106,23 @@ export const SideMenuBar: React.FC<SideMenuBarProps> = ({
   const [, setLocation] = useLocation();
   const { canViewSidebarItem } = usePermissions();
   const { isSailAdmin } = useUIRole();
+  const vesselCtx = useContext(VesselContext);
+  const vesselId = vesselCtx?.vesselId ?? "";
+
+  // Sidebar badge: unacknowledged noon-report alert count
+  const { data: alertCountData } = useQuery<{ count: number }>({
+    queryKey: ["/technical/api/nr-alerts", vesselId, "count"],
+    queryFn: async () => {
+      if (!vesselId) return { count: 0 };
+      const res = await fetch(`/technical/api/nr-alerts/${vesselId}/count`);
+      if (!res.ok) return { count: 0 };
+      return res.json();
+    },
+    enabled: subModule === "noon-report" && !!vesselId,
+    refetchInterval: subModule === "noon-report" && !!vesselId ? 300_000 : false,
+  });
+  const nrAlertCount = alertCountData?.count ?? 0;
+
   const allMenuItems = menuConfigs[subModule] || menuConfigs.pms;
   const menuItems = allMenuItems.filter((item) => {
     if (item.id === "access-control") return isSailAdmin;
@@ -154,6 +173,9 @@ export const SideMenuBar: React.FC<SideMenuBarProps> = ({
         const isSelected = item.id === selectedItem || 
           (item.id === "modify-pms" && selectedItem?.startsWith("modify-pms/"));
 
+        // Show badge on the Alerts item when there are unacknowledged alerts
+        const showBadge = subModule === "noon-report" && item.id === "alerts" && nrAlertCount > 0;
+
         return (
           <button
             key={item.id}
@@ -167,11 +189,22 @@ export const SideMenuBar: React.FC<SideMenuBarProps> = ({
             role="link"
             aria-label={item.sublabel ? `${item.label}, ${item.sublabel}` : item.label}
             aria-current={isSelected ? "page" : undefined}
+            data-testid={`nav-${subModule}-${item.id}`}
           >
-            <Icon
-              className="h-6 w-6 mb-1"
-              style={{ color: isSelected ? '#ffffff' : 'rgba(255,255,255,0.75)' }}
-            />
+            <div className="relative">
+              <Icon
+                className="h-6 w-6 mb-1"
+                style={{ color: isSelected ? '#ffffff' : 'rgba(255,255,255,0.75)' }}
+              />
+              {showBadge && (
+                <span
+                  className="absolute -top-1 -right-1.5 bg-red-500 text-white text-[9px] font-bold rounded-full min-w-[14px] h-[14px] flex items-center justify-center px-[3px] leading-none"
+                  data-testid="badge-alert-count"
+                >
+                  {nrAlertCount > 99 ? "99+" : nrAlertCount}
+                </span>
+              )}
+            </div>
             <span className="text-center leading-tight break-words text-[10px]" style={{ color: isSelected ? '#ffffff' : 'rgba(255,255,255,0.75)' }}>
               {item.label}
             </span>
@@ -184,6 +217,7 @@ export const SideMenuBar: React.FC<SideMenuBarProps> = ({
             {/* Tooltip on hover */}
             <div className="absolute left-full ml-2 px-2 py-1 bg-gray-900 text-white text-xs rounded opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none whitespace-nowrap z-10">
               {item.sublabel ? `${item.label} - ${item.sublabel}` : item.label}
+              {showBadge ? ` (${nrAlertCount} active)` : ""}
             </div>
           </button>
         );

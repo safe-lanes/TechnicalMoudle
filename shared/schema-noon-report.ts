@@ -190,6 +190,7 @@ export const nrCiiTracking = pgTable("nr_cii_tracking", {
   ytdDistanceNm: numeric("ytd_distance_nm"), // year-to-date distance sailed (NM)
   aer: numeric("aer"), // Annual Efficiency Ratio (null if DWT missing)
   ciiRating: text("cii_rating"), // A | B | C | D | E (null if DWT missing)
+  previousCiiRating: text("previous_cii_rating"), // rating before last upsert (for band-drop detection)
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 }, (table) => [
   uniqueIndex("idx_nr_cii_vessel_year").on(table.vesselId, table.year),
@@ -201,3 +202,39 @@ export const insertNrCiiTrackingSchema = createInsertSchema(nrCiiTracking).omit(
 });
 export type InsertNrCiiTracking = z.infer<typeof insertNrCiiTrackingSchema>;
 export type NrCiiTracking = typeof nrCiiTracking.$inferSelect;
+
+// ── nr_alerts ─────────────────────────────────────────────────────────────────
+// Threshold-based alerts generated automatically after each noon report submission
+export type AlertSeverity = 'warning' | 'critical';
+export type AlertType =
+  | 'HIGH_CONSUMPTION'
+  | 'VERY_HIGH_CONSUMPTION'
+  | 'LOW_ROB'
+  | 'CRITICAL_ROB'
+  | 'AE_HOURS_SPIKE'
+  | 'CII_BAND_DROP'
+  | 'NEGATIVE_ROB_RISK';
+
+export const nrAlerts = pgTable("nr_alerts", {
+  id: serial("id").primaryKey(),
+  vesselId: text("vessel_id").notNull(),
+  reportId: integer("report_id"), // nullable — links to triggering report
+  alertType: text("alert_type").notNull(), // AlertType
+  severity: text("severity").notNull(), // 'warning' | 'critical'
+  message: text("message").notNull(),
+  metricValue: numeric("metric_value"), // actual measured value
+  thresholdValue: numeric("threshold_value"), // configured threshold
+  acknowledgedAt: timestamp("acknowledged_at"),
+  acknowledgedBy: text("acknowledged_by"), // user name or 'system'
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+}, (table) => [
+  index("idx_nr_alerts_vessel").on(table.vesselId),
+  index("idx_nr_alerts_type_vessel").on(table.vesselId, table.alertType),
+]);
+
+export const insertNrAlertSchema = createInsertSchema(nrAlerts).omit({
+  id: true,
+  createdAt: true,
+});
+export type InsertNrAlert = z.infer<typeof insertNrAlertSchema>;
+export type NrAlert = typeof nrAlerts.$inferSelect;

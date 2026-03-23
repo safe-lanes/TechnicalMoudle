@@ -14,30 +14,46 @@ import {
   assignCiiRating,
 } from '../utils/fuelConversionFactors';
 
-// ── Main entry point ──────────────────────────────────────────────────────────
+// ── Main entry point (two-phase) ──────────────────────────────────────────────
+// Phase 1: run KPI steps concurrently; Phase 2: run alert engine sequentially
+// after Phase 1 so previousCiiRating and updated endurance are already persisted.
 
-const STEP_NAMES = ['rollingAverages', 'ciiTracking', 'eeoi'] as const;
-type StepName = typeof STEP_NAMES[number];
+const PHASE1_STEPS = ['rollingAverages', 'ciiTracking', 'eeoi'] as const;
+const ALL_STEPS = [...PHASE1_STEPS, 'alertEngine'] as const;
+type StepName = typeof ALL_STEPS[number];
 
 export async function runCalculations(report: NrNoonReport): Promise<void> {
-  const steps: Array<[StepName, Promise<void>]> = [
+  // Lazy import to avoid circular deps between engine and alertEngine
+  const { generateAlerts } = await import('./alertEngine');
+
+  // ── Phase 1: KPI updates (concurrent) ──────────────────────────────────────
+  const phase1: Array<[typeof PHASE1_STEPS[number], Promise<void>]> = [
     ['rollingAverages', computeRollingAveragesAndEndurance(report)],
     ['ciiTracking', computeCiiTracking(report)],
     ['eeoi', computeEeoi(report)],
   ];
-  const results = await Promise.allSettled(steps.map(([, p]) => p));
+  const phase1Results = await Promise.allSettled(phase1.map(([, p]) => p));
   const failed: StepName[] = [];
-  results.forEach((result, i) => {
+  phase1Results.forEach((result, i) => {
     if (result.status === 'rejected') {
-      const name = steps[i][0];
+      const name = phase1[i][0];
       failed.push(name);
       console.error(`[calculationEngine] Step "${name}" failed for vessel=${report.vesselId} report=${report.id}:`, result.reason);
     }
   });
+
+  // ── Phase 2: Alert engine (sequential, after Phase 1 persisted) ────────────
+  try {
+    await generateAlerts(report);
+  } catch (err) {
+    failed.push('alertEngine');
+    console.error(`[calculationEngine] Step "alertEngine" failed for vessel=${report.vesselId} report=${report.id}:`, err);
+  }
+
   if (failed.length > 0) {
     console.warn(
-      `[calculationEngine] ${failed.length}/${steps.length} KPI steps failed (${failed.join(', ')}). ` +
-      `Submission succeeded but KPI data may be stale for vessel=${report.vesselId} report=${report.id}.`
+      `[calculationEngine] ${failed.length}/${ALL_STEPS.length} steps failed (${failed.join(', ')}). ` +
+      `Submission succeeded but some data may be stale for vessel=${report.vesselId} report=${report.id}.`
     );
   }
 }
@@ -159,11 +175,13 @@ async function computeCiiTracking(report: NrNoonReport): Promise<void> {
     ciiRating = assignCiiRating(aer, refLine);
   }
 
-  // Upsert into nr_cii_tracking
+  // Upsert into nr_cii_tracking — capture existing rating for band-drop detection
   const existing = await db.select()
     .from(nrCiiTracking)
     .where(and(eq(nrCiiTracking.vesselId, report.vesselId), eq(nrCiiTracking.year, year)))
     .limit(1);
+
+  const previousCiiRating = existing[0]?.ciiRating ?? null;
 
   if (existing.length > 0) {
     await db.update(nrCiiTracking)
@@ -172,6 +190,7 @@ async function computeCiiTracking(report: NrNoonReport): Promise<void> {
         ytdDistanceNm: String(ytdDistanceNm),
         aer: aer !== null ? String(aer) : null,
         ciiRating,
+        previousCiiRating, // store old rating before overwriting
         updatedAt: new Date(),
       })
       .where(and(eq(nrCiiTracking.vesselId, report.vesselId), eq(nrCiiTracking.year, year)));
@@ -183,6 +202,7 @@ async function computeCiiTracking(report: NrNoonReport): Promise<void> {
       ytdDistanceNm: String(ytdDistanceNm),
       aer: aer !== null ? String(aer) : null,
       ciiRating,
+      previousCiiRating: null, // first submission — no previous
     });
   }
 }

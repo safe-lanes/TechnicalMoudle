@@ -48,6 +48,20 @@ if (!NOON_MODULE_ENABLED) {
   // GET /nr-fuel-dashboard/:vesselId — full fuel dashboard payload
   router.get('/nr-fuel-dashboard/:vesselId', asyncHandler(ctrl.getFuelDashboard));
 
+  // ── Alerts ───────────────────────────────────────────────────────────────
+
+  // GET /nr-alerts/:vesselId/count — unacknowledged alert count (sidebar badge)
+  router.get('/nr-alerts/:vesselId/count', asyncHandler(ctrl.getActiveAlertCount));
+
+  // GET /nr-alerts/:vesselId/all — paginated full alert history
+  router.get('/nr-alerts/:vesselId/all', asyncHandler(ctrl.getAllAlerts));
+
+  // GET /nr-alerts/:vesselId — active (unacknowledged) alerts
+  router.get('/nr-alerts/:vesselId', asyncHandler(ctrl.getActiveAlerts));
+
+  // PATCH /nr-alerts/:alertId/acknowledge — acknowledge an alert (office/admin only)
+  router.patch('/nr-alerts/:alertId/acknowledge', asyncHandler(ctrl.acknowledgeAlert));
+
 }
 
 export default router;
