@@ -1,0 +1,79 @@
+Before writing any frontend code for the Noon Report module, answer the following questions clearly. Do not write any code yet — only describe your plan in detail.
+
+SECTION 1 — Navigation & Placement
+Where exactly in the app will "Noon Report" appear?
+
+Will it be a new item in the top menu bar (alongside PMS, Defects, etc.), or inside an existing top menu item as a sub-section?
+
+Show me the exact position in the top nav bar — what is to its left and what is to its right?
+
+How does the sidebar behave when Noon Report is selected?
+
+Does the existing sidebar replace its current items with Noon Report sub-items, or does it open a separate sidebar?
+
+List every sidebar sub-item label, its URL path, and its icon (if applicable)
+
+Does selecting a Noon Report sub-page change the main content area only, or does it change the entire page layout?
+
+Is the layout consistent with how PMS / Defects pages are structured?
+
+SECTION 2 — Page-by-Page UI Layout
+For each of the following pages, describe the exact layout — what is at the top, middle, and bottom of the page. Name every UI component you plan to use (cards, tables, charts, modals, tabs, etc.):
+
+Daily Noon Entry Form — How are the 5 tabs displayed? Are they horizontal tabs or a stepper/wizard? Where is the Submit button? Where do validation errors appear?
+
+Report History — Is this a table or a card list? What columns does the table have? What actions (view, edit, delete) appear per row and how (inline buttons, dropdown menu, or row click)?
+
+Fuel Dashboard — Describe the exact grid layout. How many columns? Where are the ROB Status Cards placed? Where are the charts? Are charts stacked vertically or in a grid?
+
+Bunker Management — Is there a split layout (form on left, list on right) or separate pages for entry and list? How is the Cost Summary displayed?
+
+Reports & Export — Is this a list of cards, a table, or a wizard? How does the date range picker appear — inline or in a modal?
+
+Fleet Overview Dashboard — Full-width table or a card grid per vessel? Where are the KPI summary cards (if any)? Where is the search/filter bar?
+
+SECTION 3 — UI Components & Design System
+Which existing shadcn/UI components are you planning to reuse? List them specifically — e.g., <Card>, <Table>, <Badge>, <Dialog>, <Tabs>, <Select>, <Input>, <Button>, etc.
+
+For the 5-tab entry form, which component handles the tabs — is it shadcn <Tabs>, a custom component, or something else already used in the PMS?
+
+For charts on the Fuel Dashboard, which chart library and which specific chart components are you using — and are these the same ones used elsewhere in the existing app?
+
+For the Fleet Overview table, are you using AG Grid (same as existing tables in the app) or a different table component?
+
+For status badges (ROB: OK / Low / Critical, CII: A / B / C / D / E, Alert: Warning / Critical), what exact color scheme do you plan to use and is it consistent with the existing badge colors in the app?
+
+For modals/dialogs (e.g., confirming submission, viewing a full report), which component handles this — shadcn <Dialog>, a drawer, or something else already in the app?
+
+SECTION 4 — Responsive & State Behaviour
+When NOON_MODULE_ENABLED = false, confirm exactly what disappears from the UI — nav item only, or also sidebar items, page routes, and API routes?
+
+Draft auto-save on the entry form — how is the draft state indicated to the user visually? Is there a "Saved as draft" label, a timestamp, or nothing visible?
+
+After a noon report is submitted and locked, how does the form look — greyed out fields, a read-only view, a "Submitted" banner, or a redirect to Report History?
+
+Alert badge counter on the sidebar — where exactly does it appear, what color is it, and does it update in real time or on page load?
+
+SECTION 5 — Wireframe / ASCII Layout Request
+For the following two pages, draw a simple ASCII wireframe or text layout diagram showing the arrangement of components on screen:
+
+Fuel Dashboard page
+
+Fleet Overview page
+
+Example format:
+
+text
+┌─────────────────────────────────────────────────┐
+│  Top Menu Bar                                   │
+├──────────┬──────────────────────────────────────┤
+│ Sidebar  │  Page Title          [Refresh]        │
+│          ├──────────────────────────────────────┤
+│ Daily    │  [ROB Card]  [ROB Card]  [ROB Card]  │
+│ Entry    ├──────────────────────────────────────┤
+│ History  │  Consumption Chart  │  CII Gauge     │
+│ Fuel DB  ├──────────────────────────────────────┤
+│ Bunker   │  Bunker Planning Card                │
+└──────────┴──────────────────────────────────────┘
+Do not write any code until you have answered all questions above. Your answers will be reviewed and approved before development begins.
+

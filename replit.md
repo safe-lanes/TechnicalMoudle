@@ -72,6 +72,18 @@ Preferred communication style: Simple, everyday language.
 -   **Role Master Table (admn_role_master)**: Seeds 15 role records during migration.
 -   **Access Control System**: Three-table architecture (`admn_role_master`, `adm_menumaster_ac`, `adm_role_menu_access`) for role-based menu permissions. Admin UI at `/admin/access-control` allows assigning view/create/edit/delete permissions per role per menu item. Frontend enforcement via `PermissionsContext` dynamically filters top navigation, sidebar menus, and blocks unauthorized page access. When no permissions are configured for a role, all access is granted (backwards-compatible). API: `GET /admin/role-by-name/:roleName`, `GET /admin/roles`, `GET /admin/menu-items`, `GET/PUT /admin/access-control/:roleRuid`.
 
+## Noon Report & Fuel Management Module (Tasks #49–#54)
+
+-   **Schema Isolation**: All noon report tables use `nr_` prefix and are defined in `shared/schema-noon-report.ts`, re-exported from `shared/schema.ts` via a single `export * from './schema-noon-report'` line. Do NOT add `nr_` tables to the main `shared/schema.ts`.
+-   **Tables**: `nr_noon_reports` (full daily report with 5-tab data), `nr_fuel_rob` (current ROB per vessel/fuel type), `nr_voyage_legs` (voyage tracking).
+-   **Existing Data Adapter**: `server/modules/noon-report/utils/existingDataAdapter.ts` is the ONLY file in the noon-report module permitted to read from existing tables (`vessels`, `users`). Read-only access, never writes.
+-   **Backend Module**: Mounted at `server/modules/noon-report/`. Routes use `/nr-reports`, `/nr-fuel-rob`, `/nr-kpis` prefixes under `/technical/api/`.
+-   **Feature Flag**: `NOON_MODULE_ENABLED` in `server/modules/noon-report/config.ts` and `client/src/modules/noon-report/config.ts`. Set to `false` to hide nav tab and return 404 for all API routes.
+-   **Navigation**: "Noon Report" tab added to `TopMenuBar.tsx` (with Anchor icon). Sidebar in `SideMenuBar.tsx` has 7 items: Daily Entry, Report History, Fuel Dashboard, Alerts, Bunker Mgmt, Reports & Export, Fleet Overview. Routes registered in `App.tsx` and `TechnicalModule.tsx`.
+-   **Daily Entry Form**: 5-tab form (Navigation, Weather, Fuel & Machinery, Emissions, Cargo & Remarks). Supports draft auto-save and submission lock. Tab 5 includes Draft Forward, Draft Aft, auto-calculated read-only Trim (Aft − Forward), and Ballast/Laden/In Port radio selector.
+-   **Phase Status**: Phase 1 (Foundation & Form) — COMPLETE. Phases 2–6 (Fuel Dashboard, Alerts, Bunker, Reports, Fleet) — placeholder pages, to be built.
+-   **Migration**: `migrations/016_noon_report_tables.sql` creates all 3 nr_ tables.
+
 ## External Dependencies
 
 -   **Frontend Libraries**: `@radix-ui/*`, `@tanstack/react-query`, `wouter`, `tailwindcss`, `lucide-react`, `ag-grid-enterprise`, `ag-charts-react`, `crypto-js`.

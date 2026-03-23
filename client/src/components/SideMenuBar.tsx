@@ -23,6 +23,13 @@ import {
   Flag,
   RefreshCw,
   List,
+  FileEdit,
+  History,
+  Gauge,
+  Bell,
+  Fuel,
+  FileDown,
+  Ship,
 } from "lucide-react";
 
 interface SideMenuBarProps {
@@ -76,6 +83,17 @@ const menuConfigs: Record<string, MenuItem[]> = {
     // { id: "permissions", label: "Permissions", icon: Shield },
     // { id: "bulk-data-import", label: "Data Management", icon: FileSpreadsheet },
   ],
+  // ====== NOON REPORT MODULE NAV LINK — START (remove to disable) ======
+  "noon-report": [
+    { id: "entry", label: "Daily Entry", icon: FileEdit },
+    { id: "history", label: "Report History", icon: History },
+    { id: "fuel-dashboard", label: "Fuel Dashboard", icon: Gauge },
+    { id: "alerts", label: "Alerts", icon: Bell },
+    { id: "bunker", label: "Bunker Mgmt", icon: Fuel },
+    { id: "reports", label: "Reports & Export", icon: FileDown },
+    { id: "fleet", label: "Fleet Overview", icon: Ship },
+  ],
+  // ====== NOON REPORT MODULE NAV LINK — END ======
 };
 
 export const SideMenuBar: React.FC<SideMenuBarProps> = ({
@@ -120,6 +138,10 @@ export const SideMenuBar: React.FC<SideMenuBarProps> = ({
       }
     } else if (subModule === "cert-surveys") {
       setLocation(`/cert-surveys/${itemId}`);
+    // ====== NOON REPORT MODULE — START ======
+    } else if (subModule === "noon-report") {
+      setLocation(`/noon-report/${itemId}`);
+    // ====== NOON REPORT MODULE — END ======
     }
     // Still call the callback for state management if provided
     onItemSelect?.(itemId);

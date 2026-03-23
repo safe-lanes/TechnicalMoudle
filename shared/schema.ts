@@ -3161,3 +3161,6 @@ export const insertAdmRoleMenuAccessSchema = createInsertSchema(admRoleMenuAcces
 
 export type InsertAdmRoleMenuAccess = z.infer<typeof insertAdmRoleMenuAccessSchema>;
 export type AdmRoleMenuAccess = typeof admRoleMenuAccess.$inferSelect;
+
+// ====== NOON REPORT MODULE SCHEMA — remove this line to disable ======
+export * from './schema-noon-report';

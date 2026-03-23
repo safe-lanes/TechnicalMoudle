@@ -31,6 +31,15 @@ import DataMasters from "./admin/DataMasters";
 import ShipsCertificatesAdmin from "./admin/ShipsCertificatesAdmin";
 import ShipsSurveysAdmin from "./admin/ShipsSurveysAdmin";
 import AccessControl from "./admin/AccessControl";
+// ====== NOON REPORT MODULE — START (remove to disable) ======
+import NoonEntryForm from "./noon-report/NoonEntryForm";
+import ReportHistory from "./noon-report/ReportHistory";
+import FuelDashboardPlaceholder from "./noon-report/FuelDashboard";
+import AlertsPanelPlaceholder from "./noon-report/AlertsPanel";
+import BunkerManagementPlaceholder from "./noon-report/BunkerManagement";
+import ReportsExportPlaceholder from "./noon-report/ReportsExport";
+import FleetOverviewPlaceholder from "./noon-report/FleetOverview";
+// ====== NOON REPORT MODULE — END ======
 
 export const TechnicalModule = () => {
   const [location, setLocation] = useLocation();
@@ -74,6 +83,13 @@ export const TechnicalModule = () => {
     } else if (location.startsWith("/cert-surveys/")) {
       const subpage = location.replace("/cert-surveys/", "");
       return { subModule: "cert-surveys", menuItem: subpage };
+    // ====== NOON REPORT MODULE — START ======
+    } else if (location === "/noon-report") {
+      return { subModule: "noon-report", menuItem: "entry" };
+    } else if (location.startsWith("/noon-report/")) {
+      const subpage = location.replace("/noon-report/", "");
+      return { subModule: "noon-report", menuItem: subpage };
+    // ====== NOON REPORT MODULE — END ======
     }
     return { subModule: "pms", menuItem: "dashboard" };
   };
@@ -107,6 +123,11 @@ export const TechnicalModule = () => {
     } else if (subModule === "cert-surveys") {
       setSelectedMenuItem("certificates");
       setLocation("/cert-surveys");
+    // ====== NOON REPORT MODULE — START ======
+    } else if (subModule === "noon-report") {
+      setSelectedMenuItem("entry");
+      setLocation("/noon-report/entry");
+    // ====== NOON REPORT MODULE — END ======
     } else {
       setSelectedMenuItem("dashboard"); // Default to dashboard for other modules
     }
@@ -241,6 +262,24 @@ export const TechnicalModule = () => {
             <CertificatesPage />
           ) : selectedSubModule === "cert-surveys" && selectedMenuItem === "surveys" ? (
             <SurveysPage />
+          // ====== NOON REPORT MODULE — START ======
+          ) : selectedSubModule === "noon-report" && selectedMenuItem === "entry" ? (
+            <NoonEntryForm />
+          ) : selectedSubModule === "noon-report" && selectedMenuItem.startsWith("entry/") ? (
+            <NoonEntryForm reportId={selectedMenuItem.replace("entry/", "")} />
+          ) : selectedSubModule === "noon-report" && selectedMenuItem === "history" ? (
+            <ReportHistory />
+          ) : selectedSubModule === "noon-report" && selectedMenuItem === "fuel-dashboard" ? (
+            <FuelDashboardPlaceholder />
+          ) : selectedSubModule === "noon-report" && selectedMenuItem === "alerts" ? (
+            <AlertsPanelPlaceholder />
+          ) : selectedSubModule === "noon-report" && selectedMenuItem === "bunker" ? (
+            <BunkerManagementPlaceholder />
+          ) : selectedSubModule === "noon-report" && selectedMenuItem === "reports" ? (
+            <ReportsExportPlaceholder />
+          ) : selectedSubModule === "noon-report" && selectedMenuItem === "fleet" ? (
+            <FleetOverviewPlaceholder />
+          // ====== NOON REPORT MODULE — END ======
           ) : (
             <div className="p-6">
               <div className="bg-white rounded-lg shadow-sm p-6">

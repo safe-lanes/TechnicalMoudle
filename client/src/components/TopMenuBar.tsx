@@ -6,8 +6,12 @@ import {
   FileCheck, 
   AlertTriangle, 
   Wrench,
-  Shield
+  Shield,
+  Anchor,
 } from "lucide-react";
+// ====== NOON REPORT MODULE NAV LINK — START (remove to disable) ======
+import { NOON_MODULE_ENABLED } from "@/modules/noon-report/config";
+// ====== NOON REPORT MODULE NAV LINK — END ======
 import { cn } from "@/lib/utils";
 import sailLogoPath from "@assets/SAIL logo Transparent_1753957135582.png";
 import { SyncStatusIndicator } from "./SyncStatusIndicator";
@@ -58,6 +62,13 @@ export const TopMenuBar: React.FC<TopMenuBarProps> = ({
       label: "Admin",
       icon: Shield,
     },
+    // ====== NOON REPORT MODULE NAV LINK — START (remove to disable) ======
+    ...(NOON_MODULE_ENABLED ? [{
+      id: "noon-report",
+      label: "Noon Report",
+      icon: Anchor,
+    }] : []),
+    // ====== NOON REPORT MODULE NAV LINK — END ======
   ];
 
   return (

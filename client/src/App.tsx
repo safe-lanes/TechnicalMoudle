@@ -100,6 +100,12 @@ function App() {
                 <Route path="/cert-surveys" component={TechnicalModule} />
                 <Route path="/cert-surveys/:subpage" component={TechnicalModule} />
                 
+                {/* ====== NOON REPORT MODULE ROUTES — START (remove to disable) ====== */}
+                <Route path="/noon-report" component={TechnicalModule} />
+                <Route path="/noon-report/entry/:id" component={TechnicalModule} />
+                <Route path="/noon-report/:subpage" component={TechnicalModule} />
+                {/* ====== NOON REPORT MODULE ROUTES — END ====== */}
+                
                 <Route path="/test-e2e" component={TestE2E} />
                 <Route component={NotFound} />
               </Switch>

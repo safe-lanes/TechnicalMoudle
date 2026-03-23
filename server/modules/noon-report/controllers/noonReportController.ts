@@ -1,0 +1,124 @@
+import { Request, Response } from 'express';
+import * as service from '../services/noonReportService';
+import { insertNrNoonReportSchema } from '@shared/schema';
+import { z } from 'zod';
+
+// ── GET /nr-reports ──────────────────────────────────────────────────────────
+export async function getNoonReports(req: Request, res: Response) {
+  try {
+    const { vesselId, status } = req.query;
+    const reports = await service.getNoonReports({
+      vesselId: vesselId as string,
+      status: status as string,
+    });
+    res.json(reports);
+  } catch (error: any) {
+    res.status(500).json({ error: 'Failed to fetch noon reports', details: error.message });
+  }
+}
+
+// ── GET /nr-reports/:id ──────────────────────────────────────────────────────
+export async function getNoonReport(req: Request, res: Response) {
+  try {
+    const id = parseInt(req.params.id);
+    if (isNaN(id)) return res.status(400).json({ error: 'Invalid report ID' });
+    const report = await service.getNoonReport(id);
+    if (!report) return res.status(404).json({ error: 'Report not found' });
+    res.json(report);
+  } catch (error: any) {
+    res.status(500).json({ error: 'Failed to fetch noon report', details: error.message });
+  }
+}
+
+// ── POST /nr-reports ─────────────────────────────────────────────────────────
+export async function createNoonReport(req: Request, res: Response) {
+  try {
+    const parsed = insertNrNoonReportSchema.partial().parse(req.body);
+    if (!parsed.vesselId || !parsed.reportDate) {
+      return res.status(400).json({ error: 'vesselId and reportDate are required' });
+    }
+    const report = await service.createDraftReport(parsed as any);
+    res.status(201).json(report);
+  } catch (error: any) {
+    if (error.name === 'ZodError') return res.status(400).json({ error: 'Validation failed', details: error.errors });
+    res.status(500).json({ error: 'Failed to create noon report', details: error.message });
+  }
+}
+
+// ── PATCH /nr-reports/:id ────────────────────────────────────────────────────
+export async function updateNoonReport(req: Request, res: Response) {
+  try {
+    const id = parseInt(req.params.id);
+    if (isNaN(id)) return res.status(400).json({ error: 'Invalid report ID' });
+    const report = await service.updateDraftReport(id, req.body);
+    if (!report) return res.status(404).json({ error: 'Report not found' });
+    res.json(report);
+  } catch (error: any) {
+    if (error.message === 'Cannot edit a submitted report') return res.status(409).json({ error: error.message });
+    res.status(500).json({ error: 'Failed to update noon report', details: error.message });
+  }
+}
+
+// ── PATCH /nr-reports/:id/draft ──────────────────────────────────────────────
+export async function saveDraft(req: Request, res: Response) {
+  try {
+    const id = parseInt(req.params.id);
+    if (isNaN(id)) return res.status(400).json({ error: 'Invalid report ID' });
+    const report = await service.saveDraft(id, req.body);
+    if (!report) return res.status(404).json({ error: 'Report not found' });
+    res.json(report);
+  } catch (error: any) {
+    res.status(500).json({ error: 'Failed to save draft', details: error.message });
+  }
+}
+
+// ── POST /nr-reports/:id/submit ──────────────────────────────────────────────
+export async function submitNoonReport(req: Request, res: Response) {
+  try {
+    const id = parseInt(req.params.id);
+    if (isNaN(id)) return res.status(400).json({ error: 'Invalid report ID' });
+    const submittedBy = (req as any).user?.fullName || req.body.submittedBy || 'Unknown';
+    const report = await service.submitReport(id, submittedBy);
+    res.json(report);
+  } catch (error: any) {
+    if (error.message === 'Report already submitted') return res.status(409).json({ error: error.message });
+    res.status(500).json({ error: 'Failed to submit report', details: error.message });
+  }
+}
+
+// ── DELETE /nr-reports/:id ───────────────────────────────────────────────────
+export async function deleteNoonReport(req: Request, res: Response) {
+  try {
+    const id = parseInt(req.params.id);
+    if (isNaN(id)) return res.status(400).json({ error: 'Invalid report ID' });
+    await service.deleteReport(id);
+    res.json({ success: true });
+  } catch (error: any) {
+    if (error.message === 'Cannot delete a submitted report') return res.status(409).json({ error: error.message });
+    res.status(500).json({ error: 'Failed to delete noon report', details: error.message });
+  }
+}
+
+// ── GET /nr-fuel-rob ─────────────────────────────────────────────────────────
+export async function getFuelRob(req: Request, res: Response) {
+  try {
+    const { vesselId } = req.query;
+    if (!vesselId) return res.status(400).json({ error: 'vesselId is required' });
+    const rob = await service.getFuelRob(vesselId as string);
+    res.json(rob);
+  } catch (error: any) {
+    res.status(500).json({ error: 'Failed to fetch fuel ROB', details: error.message });
+  }
+}
+
+// ── GET /nr-kpis ─────────────────────────────────────────────────────────────
+export async function getVesselKPIs(req: Request, res: Response) {
+  try {
+    const { vesselId } = req.query;
+    if (!vesselId) return res.status(400).json({ error: 'vesselId is required' });
+    const kpis = await service.getVesselKPIs(vesselId as string);
+    res.json(kpis);
+  } catch (error: any) {
+    res.status(500).json({ error: 'Failed to fetch KPIs', details: error.message });
+  }
+}
