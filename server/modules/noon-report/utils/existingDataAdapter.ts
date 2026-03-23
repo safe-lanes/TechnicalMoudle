@@ -4,7 +4,7 @@
 
 import { db } from '../../../db';
 import { vessels, users } from '@shared/schema';
-import { eq } from 'drizzle-orm';
+import { eq, sql } from 'drizzle-orm';
 
 export async function getVesselById(vesselId: string) {
   const result = await db.select({
@@ -13,10 +13,25 @@ export async function getVesselById(vesselId: string) {
     imoNumber: vessels.imoNumber,
     flag: vessels.flag,
     vesselType: vessels.vesselType,
-    deadweight: vessels.deadweight,
-    grossTonnage: vessels.grossTonnage,
   }).from(vessels).where(eq(vessels.vuuid, vesselId)).limit(1);
   return result[0] ?? null;
+}
+
+/**
+ * Fetch the deadweight tonnage (DWT) for a vessel using a raw SQL query.
+ * The `deadweight` column exists in the `vessels` table in the database
+ * but is not declared in the Drizzle schema to avoid modifying shared/schema.ts.
+ * Returns null if the vessel is not found or DWT is not configured.
+ */
+export async function getVesselDwt(vesselId: string): Promise<number | null> {
+  type DwtRow = { deadweight: string | null };
+  const result = await db.execute(
+    sql`SELECT deadweight FROM vessels WHERE vuuid = ${vesselId} LIMIT 1`
+  );
+  const row = (result.rows as DwtRow[])[0] ?? null;
+  if (!row?.deadweight) return null;
+  const n = Number(row.deadweight);
+  return isNaN(n) || n <= 0 ? null : n;
 }
 
 export async function getAllVessels() {

@@ -6,7 +6,7 @@ import { db } from '../../../db';
 import { nrNoonReports, nrFuelRob, nrVoyageLegs, nrCiiTracking } from '@shared/schema';
 import { eq, and, desc, gte, lte } from 'drizzle-orm';
 import type { NrNoonReport } from '@shared/schema';
-import * as adapter from '../utils/existingDataAdapter';
+import { getVesselDwt } from '../utils/existingDataAdapter';
 import {
   CO2_FACTORS,
   FUEL_TYPES,
@@ -132,8 +132,7 @@ async function computeCiiTracking(report: NrNoonReport): Promise<void> {
   }
 
   // Fetch vessel DWT — null if vessel not found or DWT not configured
-  const vessel = await adapter.getVesselById(report.vesselId);
-  const dwt = vessel?.deadweight ? toNum(vessel.deadweight) : null;
+  const dwt = await getVesselDwt(report.vesselId);
 
   // AER = (ytdCO2 in grams) / (DWT × ytdDistanceNM)
   // ytdCo2Mt is in tonnes → multiply by 1e6 to get grams

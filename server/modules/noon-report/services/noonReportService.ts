@@ -5,7 +5,7 @@ import type { InsertNrNoonReport, NrNoonReport } from '@shared/schema';
 import { eq, and, desc, asc } from 'drizzle-orm';
 import { runCalculations } from './calculationEngine';
 import { BUNKER_SAFETY_MARGIN_PCT, FUEL_TYPES, computeCiiRefLine } from '../utils/fuelConversionFactors';
-import { getVesselById } from '../utils/existingDataAdapter';
+import { getVesselDwt } from '../utils/existingDataAdapter';
 
 // ── Report CRUD ──────────────────────────────────────────────────────────────
 
@@ -169,9 +169,8 @@ export async function getFuelDashboard(vesselId: string) {
   const ciiTracking = ciiRows[0] ?? null;
 
   // CII reference line — computed from vessel DWT; null if DWT not configured
-  const vessel = await getVesselById(vesselId);
-  const dwt = vessel?.deadweight ? toNum(vessel.deadweight) : null;
-  const ciiRefLine = dwt !== null && dwt > 0 ? computeCiiRefLine(dwt) : null;
+  const dwt = await getVesselDwt(vesselId);
+  const ciiRefLine = dwt !== null ? computeCiiRefLine(dwt) : null;
 
   // Last 30 submitted reports in ascending date order for trend chart
   const last30Raw = await db.select()
@@ -216,17 +215,19 @@ export async function getFuelDashboard(vesselId: string) {
   })
     .from(nrNoonReports)
     .where(and(eq(nrNoonReports.vesselId, vesselId), eq(nrNoonReports.status, 'submitted')))
-    .orderBy(asc(nrNoonReports.reportDate))
-    .limit(500);
+    .orderBy(asc(nrNoonReports.reportDate));
 
-  const speedConsumptionData = allReports
-    .filter(r => r.speed !== null && r.speed !== undefined)
-    .map(r => ({
-      speed: toNum(r.speed) ?? 0,
-      consumption: (toNum(r.hfoConsumption) ?? 0) + (toNum(r.lsmgoConsumption) ?? 0) +
-        (toNum(r.mgoConsumption) ?? 0) + (toNum(r.vlsfoConsumption) ?? 0) + (toNum(r.lpgConsumption) ?? 0),
-      date: r.reportDate,
-    }));
+  const speedConsumptionData = allReports.flatMap(r => {
+    const speed = toNum(r.speed);
+    if (speed === null) return [];
+    const consumption =
+      (toNum(r.hfoConsumption) ?? 0) +
+      (toNum(r.lsmgoConsumption) ?? 0) +
+      (toNum(r.mgoConsumption) ?? 0) +
+      (toNum(r.vlsfoConsumption) ?? 0) +
+      (toNum(r.lpgConsumption) ?? 0);
+    return [{ speed, consumption, date: r.reportDate }];
+  });
 
   return {
     robByFuelType,
