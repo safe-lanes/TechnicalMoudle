@@ -2182,6 +2182,45 @@ const migrations: Migration[] = [
         END IF;
       END $$;
     `
+  },
+  {
+    id: '071_ensure_spare_unique_constraints',
+    name: 'Ensure spare unique constraints exist (fix for databases where 070 partially applied)',
+    description: 'Migration 070 may have dropped old constraints but failed to create new ones on some databases. This migration ensures the correct unique constraints exist by dropping any leftover index/constraint, deduplicating, and recreating as proper UNIQUE constraints.',
+    sql: `
+      DO $$ 
+      BEGIN
+        IF EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'unique_spare_component_link' AND conrelid = 'spare_component_links'::regclass) THEN
+          ALTER TABLE spare_component_links DROP CONSTRAINT unique_spare_component_link;
+        END IF;
+        IF EXISTS (SELECT 1 FROM pg_indexes WHERE indexname = 'unique_spare_component_link' AND tablename = 'spare_component_links') THEN
+          DROP INDEX unique_spare_component_link;
+        END IF;
+
+        DELETE FROM spare_component_links
+        WHERE id NOT IN (
+          SELECT MAX(id) FROM spare_component_links
+          GROUP BY spare_id, component_id, vessel_id
+        );
+
+        ALTER TABLE spare_component_links ADD CONSTRAINT unique_spare_component_link UNIQUE (spare_id, component_id, vessel_id);
+
+        IF EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'unique_spare_location_stock' AND conrelid = 'spare_location_stock'::regclass) THEN
+          ALTER TABLE spare_location_stock DROP CONSTRAINT unique_spare_location_stock;
+        END IF;
+        IF EXISTS (SELECT 1 FROM pg_indexes WHERE indexname = 'unique_spare_location_stock' AND tablename = 'spare_location_stock') THEN
+          DROP INDEX unique_spare_location_stock;
+        END IF;
+
+        DELETE FROM spare_location_stock
+        WHERE id NOT IN (
+          SELECT MAX(id) FROM spare_location_stock
+          GROUP BY spare_id, location_id
+        );
+
+        ALTER TABLE spare_location_stock ADD CONSTRAINT unique_spare_location_stock UNIQUE (spare_id, location_id);
+      END $$;
+    `
   }
 ];
 
