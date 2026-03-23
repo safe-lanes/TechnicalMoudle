@@ -3,6 +3,7 @@ import { useModifyMode } from "@/hooks/useModifyMode";
 import { useVessel } from "@/contexts/VesselContext";
 import { useUIRole } from "@/contexts/UIRoleContext";
 import { useChangeMode } from "@/contexts/ChangeModeContext";
+import { usePermissions } from "@/contexts/PermissionsContext";
 import { useLocation } from "wouter";
 import { Marker } from "@/components/Marker";
 import { Button } from "@/components/ui/button";
@@ -136,6 +137,10 @@ const Spares: React.FC = () => {
   
   // UI Role context for role-based visibility
   const { isVessel, isHeadOfDept, isSailAdmin, isClientAdmin } = useUIRole();
+  const { canCreate: canCreatePerm, canEdit: canEditPerm, canDelete: canDeletePerm } = usePermissions();
+  const canCreateSpare = canCreatePerm("pms-spares");
+  const canEditSpare = canEditPerm("pms-spares");
+  const canDeleteSpare = canDeletePerm("pms-spares");
   const [showModifySubmitFooter, setShowModifySubmitFooter] = useState(false);
   const [originalSpareData, setOriginalSpareData] = useState<Spare | null>(null);
   const [modifiedSpareData, setModifiedSpareData] = useState<Partial<Spare>>({});
@@ -311,6 +316,10 @@ const Spares: React.FC = () => {
   };
   
   const handleSaveLocation = async (spareId: number) => {
+    if (!canEditSpare) {
+      toast({ title: "Permission Denied", description: "You do not have permission to edit spare locations.", variant: "destructive" });
+      return;
+    }
     const locations = editingLocations[spareId];
     const original = originalLocationValues[spareId];
     if (!locations) return;
@@ -426,6 +435,10 @@ const Spares: React.FC = () => {
   const [isSavingLocRob, setIsSavingLocRob] = useState(false);
 
   const handleSaveAllLocRob = async () => {
+    if (!canEditSpare) {
+      toast({ title: "Permission Denied", description: "You do not have permission to edit spare locations.", variant: "destructive" });
+      return;
+    }
     if (!selectedLocationId) {
       toast({ title: "Error", description: "No location selected.", variant: "destructive" });
       return;
@@ -1061,12 +1074,20 @@ const Spares: React.FC = () => {
   };
 
   const executeBulkDeactivate = () => {
+    if (!canDeleteSpare) {
+      toast({ title: "Permission Denied", description: "You do not have permission to deactivate spares.", variant: "destructive" });
+      return;
+    }
     if (selectedSpareIds.size > 0) {
       bulkDeactivateMutation.mutate(Array.from(selectedSpareIds));
     }
   };
 
   const handleReactivateSpare = (spare: Spare) => {
+    if (!canEditSpare) {
+      toast({ title: "Permission Denied", description: "You do not have permission to reactivate spares.", variant: "destructive" });
+      return;
+    }
     reactivateSpareMutation.mutate(spare.id);
   };
 
@@ -1554,6 +1575,10 @@ const Spares: React.FC = () => {
 
   // Handle edit spare submit
   const handleEditSpareSubmit = () => {
+    if (!canEditSpare) {
+      toast({ title: "Permission Denied", description: "You do not have permission to edit spares.", variant: "destructive" });
+      return;
+    }
     if (!selectedSpare) return;
 
     if (editSpareForm.maker && !makerListData.some(m => m.makerName.toLowerCase() === editSpareForm.maker.trim().toLowerCase())) {
@@ -2148,6 +2173,10 @@ const Spares: React.FC = () => {
 
   // Handle adjustment submit
   const handleAdjustSubmit = async () => {
+    if (!canEditSpare) {
+      toast({ title: "Permission Denied", description: "You do not have permission to adjust spare ROB.", variant: "destructive" });
+      return;
+    }
     if (!selectedSpare || !adjustForm.date) {
       toast({ title: "Error", description: "Please fill in the date", variant: "destructive" });
       return;
@@ -2452,6 +2481,10 @@ const Spares: React.FC = () => {
 
   // Handle add spare submit
   const handleAddSpareSubmit = () => {
+    if (!canCreateSpare) {
+      toast({ title: "Permission Denied", description: "You do not have permission to create spares.", variant: "destructive" });
+      return;
+    }
     if (!addSpareForm.partCode || !addSpareForm.partName || !addSpareForm.componentId) {
       toast({ title: "Error", description: "Please fill in all required fields", variant: "destructive" });
       return;
@@ -2510,6 +2543,10 @@ const Spares: React.FC = () => {
 
   // Save bulk updates
   const saveBulkUpdates = () => {
+    if (!canEditSpare) {
+      toast({ title: "Permission Denied", description: "You do not have permission to update spares.", variant: "destructive" });
+      return;
+    }
     // Validate all rows first
     const sparesArrayLocal = Array.isArray(sparesData) ? sparesData : [];
     const hasErrors = Object.entries(bulkUpdateData).some(([id, data]) => {
@@ -2687,16 +2724,18 @@ const Spares: React.FC = () => {
             </>
           ) : (
             <>
-              {(isSailAdmin || isClientAdmin || isChangeMode) && (
+              {(isSailAdmin || isClientAdmin || isChangeMode) && canCreateSpare && (
                 <Button size="sm" className="bg-[#5dc86f] hover:bg-[#4db85f] text-white" onClick={() => setIsAddSpareModalOpen(true)} data-testid="E10">
                   <Marker id="E10" />
                   + Add Spare
                 </Button>
               )}
+              {canEditSpare && (
               <Button size="sm" className="bg-[#5dc86f] hover:bg-[#4db85f] text-white" onClick={openBulkUpdateModal} data-testid="E11">
                 <Marker id="E11" />
                 Bulk Update Spares
               </Button>
+              )}
             </>
           )}
         </div>
@@ -3004,7 +3043,7 @@ const Spares: React.FC = () => {
                             {isFirstRow && <Marker id="E34" />}
                             <Info className="h-4 w-4 text-blue-600" />
                           </Button>
-                          {(isSailAdmin || isClientAdmin || isHeadOfDept || isChangeMode) && (
+                          {(isSailAdmin || isClientAdmin || isHeadOfDept || isChangeMode) && canEditSpare && (
                             <Button 
                               size="sm" 
                               variant="ghost"
@@ -3016,6 +3055,7 @@ const Spares: React.FC = () => {
                               <Edit2 className="h-4 w-4" />
                             </Button>
                           )}
+                          {canEditSpare && (
                           <Button 
                             size="sm" 
                             variant="ghost"
@@ -3025,7 +3065,8 @@ const Spares: React.FC = () => {
                           >
                             <Settings2 className="h-4 w-4 text-orange-500" />
                           </Button>
-                          {(isSailAdmin || isClientAdmin || isChangeMode) && !isInactive && (
+                          )}
+                          {(isSailAdmin || isClientAdmin || isChangeMode) && !isInactive && canDeleteSpare && (
                             <Button 
                               size="sm" 
                               variant="ghost"
@@ -3037,7 +3078,7 @@ const Spares: React.FC = () => {
                               <Trash2 className="h-4 w-4 text-red-500" />
                             </Button>
                           )}
-                          {(isSailAdmin || isClientAdmin) && isInactive && (
+                          {(isSailAdmin || isClientAdmin) && isInactive && canEditSpare && (
                             <Button 
                               size="sm" 
                               variant="ghost"
