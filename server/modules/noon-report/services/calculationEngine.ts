@@ -16,16 +16,29 @@ import {
 
 // ── Main entry point ──────────────────────────────────────────────────────────
 
+const STEP_NAMES = ['rollingAverages', 'ciiTracking', 'eeoi'] as const;
+type StepName = typeof STEP_NAMES[number];
+
 export async function runCalculations(report: NrNoonReport): Promise<void> {
-  const results = await Promise.allSettled([
-    computeRollingAveragesAndEndurance(report),
-    computeCiiTracking(report),
-    computeEeoi(report),
-  ]);
-  for (const result of results) {
+  const steps: Array<[StepName, Promise<void>]> = [
+    ['rollingAverages', computeRollingAveragesAndEndurance(report)],
+    ['ciiTracking', computeCiiTracking(report)],
+    ['eeoi', computeEeoi(report)],
+  ];
+  const results = await Promise.allSettled(steps.map(([, p]) => p));
+  const failed: StepName[] = [];
+  results.forEach((result, i) => {
     if (result.status === 'rejected') {
-      console.error('[calculationEngine] Calculation step failed:', result.reason);
+      const name = steps[i][0];
+      failed.push(name);
+      console.error(`[calculationEngine] Step "${name}" failed for vessel=${report.vesselId} report=${report.id}:`, result.reason);
     }
+  });
+  if (failed.length > 0) {
+    console.warn(
+      `[calculationEngine] ${failed.length}/${steps.length} KPI steps failed (${failed.join(', ')}). ` +
+      `Submission succeeded but KPI data may be stale for vessel=${report.vesselId} report=${report.id}.`
+    );
   }
 }
 
