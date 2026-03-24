@@ -238,12 +238,32 @@ export default function SurveysPage() {
     mutationFn: async ({ id, updates }: { id: string; updates: Partial<SurveyData> }) => {
       return apiRequest('PATCH', `/technical/api/surveys/${id}`, updates);
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/technical/api/surveys'] });
+    onSuccess: (_data, variables) => {
+      // Optimistic cache update: patch the changed row in-place to avoid full grid re-render
+      queryClient.setQueriesData<SurveysApiResponse>(
+        { queryKey: ['/technical/api/surveys'] },
+        (old) => {
+          if (!old) return old;
+          return {
+            ...old,
+            surveys: old.surveys.map((survey) => {
+              const surveyKey = `${survey.vesselId}::${survey.masterId}`;
+              if (surveyKey === variables.id) {
+                return { ...survey, ...variables.updates };
+              }
+              return survey;
+            }),
+          };
+        }
+      );
       toast({
         title: 'Updated',
         description: 'Survey updated successfully.',
       });
+      // Debounced background refetch to eventually sync with server
+      setTimeout(() => {
+        queryClient.invalidateQueries({ queryKey: ['/technical/api/surveys'] });
+      }, 3000);
     },
     onError: (error: any) => {
       toast({
@@ -592,6 +612,7 @@ export default function SurveysPage() {
                   onGridReady={onGridReady}
                   onCellEditingStopped={handleCellEditingStopped}
                   context={gridContext}
+                  getRowId={(params) => `${params.data.vesselId}::${params.data.masterId}`}
                   autoHeight={false}
                   height="100%"
                   minHeight="300px"

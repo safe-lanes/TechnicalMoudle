@@ -17,7 +17,7 @@ import {
   DialogTitle,
   DialogFooter,
 } from "@/components/ui/dialog";
-import { Plus, Pencil, Trash2, Search, Save, X, ChevronUp, ChevronDown, Loader2, Check, ChevronsUpDown, Ship } from "lucide-react";
+import { Plus, Pencil, Trash2, Search, Save, X, ChevronUp, ChevronDown, Loader2, Check, ChevronsUpDown, Ship, Undo2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import {
@@ -395,14 +395,14 @@ export default function ShipsCertificatesAdmin() {
     if (cert.masterId) {
       setDeletedMasterIds(prev => [...prev, cert.masterId]);
     }
-    setMasterData(prev => {
-      const filtered = prev.filter(c => c.id !== id);
-      return filtered.map((c, idx) => ({
-        ...c,
-        sequence: idx + 1,
-      }));
-    });
     setHasUnsavedChanges(true);
+  };
+
+  const undoDeleteRow = (masterId: string) => {
+    setDeletedMasterIds(prev => prev.filter(id => id !== masterId));
+    if (deletedMasterIds.length <= 1) {
+      setHasUnsavedChanges(masterData.some(c => c.isSystemDefined === false));
+    }
   };
 
   // Handle save button click
@@ -490,7 +490,8 @@ export default function ShipsCertificatesAdmin() {
     
     // Send Master data + Company certs + Vessel certs as separate items but in one payload
     // Company certs have category='Company' — on reload they route to companyOnlyCerts, not masterData
-    const allCertificates = [...masterData, ...companyCertsForSave, ...vesselOnlyCertsWithIds];
+    const deletedSet = new Set(deletedMasterIds);
+    const allCertificates = [...masterData.filter(c => !deletedSet.has(c.masterId)), ...companyCertsForSave, ...vesselOnlyCertsWithIds];
     
     // Get selected vessel info (ID and name) for vessel-specific certificate applicability
     const targetVessels = vesselMasterData
@@ -1336,8 +1337,10 @@ export default function ShipsCertificatesAdmin() {
                 </tr>
               </thead>
               <tbody className="divide-y">
-                {filteredData.map((cert, idx) => (
-                  <tr key={cert.id} className="hover:bg-gray-50">
+                {filteredData.map((cert, idx) => {
+                  const isPendingDelete = deletedMasterIds.includes(cert.masterId);
+                  return (
+                  <tr key={cert.id} className={cn("hover:bg-gray-50", isPendingDelete && "bg-red-50 opacity-60")}>
                     {viewModes.master === "edit" && (
                       <td className="px-3 py-3 text-sm text-center">
                         <Input
@@ -1356,9 +1359,9 @@ export default function ShipsCertificatesAdmin() {
                         />
                       </td>
                     )}
-                    <td className="px-3 py-3 text-sm">{idx + 1}</td>
-                    <td className="px-3 py-3 text-sm font-medium text-blue-600">{cert.masterId}</td>
-                    <td className="px-3 py-3 text-sm">{cert.certificateName}</td>
+                    <td className={cn("px-3 py-3 text-sm", isPendingDelete && "line-through")}>{idx + 1}</td>
+                    <td className={cn("px-3 py-3 text-sm font-medium text-blue-600", isPendingDelete && "line-through")}>{cert.masterId}</td>
+                    <td className={cn("px-3 py-3 text-sm", isPendingDelete && "line-through")}>{cert.certificateName}</td>
                     <td className="px-3 py-3 text-sm">
                       {viewModes.master === "edit" ? (
                         <Select defaultValue={cert.category}>
@@ -1436,7 +1439,11 @@ export default function ShipsCertificatesAdmin() {
                     {viewModes.master === "edit" && (
                       <td className="px-3 py-3">
                         <div className="flex items-center justify-center gap-1">
-                          {cert.isSystemDefined ? (
+                          {isPendingDelete ? (
+                            <Button size="icon" variant="ghost" className="h-8 w-8 text-amber-600" onClick={() => undoDeleteRow(cert.masterId)} data-testid={`button-undo-delete-${cert.id}`} title="Undo deletion">
+                              <Undo2 className="h-4 w-4" />
+                            </Button>
+                          ) : cert.isSystemDefined ? (
                             <Button size="icon" variant="ghost" className="h-8 w-8 text-muted-foreground opacity-30 cursor-not-allowed" disabled data-testid={`button-delete-disabled-${cert.id}`}>
                               <Trash2 className="h-4 w-4" />
                             </Button>
@@ -1449,7 +1456,7 @@ export default function ShipsCertificatesAdmin() {
                       </td>
                     )}
                   </tr>
-                ))}
+                )})}
                 {/* New Entry Row */}
                 {viewModes.master === "edit" && isAddingNew && (
                   <tr className="bg-green-50 border-2 border-green-300">
