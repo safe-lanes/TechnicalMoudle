@@ -101,7 +101,7 @@ const fmt = (v: string | number | null | undefined, dp = 2) => {
   return isNaN(n) || v === null || v === undefined ? "—" : n.toFixed(dp);
 };
 
-const str = (v: any) => v ?? "—";
+const str = (v: unknown) => (v !== null && v !== undefined ? String(v) : "—");
 
 const totalCons = (r: NoonReport) =>
   (Number(r.hfoConsumption || 0) +
@@ -311,7 +311,7 @@ function EmailDialog({ report, vesselName, smtpConfigured, onClose }: EmailDialo
   const emailMutation = useMutation({
     mutationFn: () =>
       apiRequest("POST", `/technical/api/nr-reports/${report.id}/email`, { to, cc, vesselName }),
-    onSuccess: (data: any) => {
+    onSuccess: (data: { success?: boolean; message?: string; previewUrl?: string }) => {
       toast({
         title: "Email sent",
         description: data?.message ?? `Report dispatched to ${to}`,
@@ -409,11 +409,12 @@ export default function ReportsExport() {
   const { toast } = useToast();
 
   const [search, setSearch] = useState("");
-  const [filterStatus, setFilterStatus] = useState<"all" | "submitted" | "draft">("all");
+  type StatusFilter = "all" | "submitted" | "draft";
+  const [filterStatus, setFilterStatus] = useState<StatusFilter>("all");
   const [selectedReport, setSelectedReport] = useState<NoonReport | null>(null);
   const [emailOpen, setEmailOpen] = useState(false);
 
-  const vesselName = vessels?.find((v: any) => v.vessel_id === vesselId || v.id === vesselId)?.vessel_name
+  const vesselName = vessels?.find((v) => v.id === vesselId)?.name
     ?? vesselId ?? "Unknown Vessel";
 
   const { data: reports = [], isLoading } = useQuery<NoonReport[]>({
@@ -448,8 +449,8 @@ export default function ReportsExport() {
     try {
       exportSingleReportToPdf(report, vesselName);
       toast({ title: "PDF downloaded", description: `noon-report-${report.reportDate}.pdf` });
-    } catch (e: any) {
-      toast({ title: "Export failed", description: e.message, variant: "destructive" });
+    } catch (e) {
+      toast({ title: "Export failed", description: e instanceof Error ? e.message : "Unknown error", variant: "destructive" });
     }
   }
 
@@ -461,8 +462,8 @@ export default function ReportsExport() {
     try {
       exportHistoryToPdf(filtered, vesselName);
       toast({ title: "PDF downloaded", description: `${filtered.length} reports exported` });
-    } catch (e: any) {
-      toast({ title: "Export failed", description: e.message, variant: "destructive" });
+    } catch (e) {
+      toast({ title: "Export failed", description: e instanceof Error ? e.message : "Unknown error", variant: "destructive" });
     }
   }
 
@@ -474,8 +475,8 @@ export default function ReportsExport() {
     try {
       exportHistoryToExcel(filtered, vesselName);
       toast({ title: "Excel downloaded", description: `${filtered.length} reports exported` });
-    } catch (e: any) {
-      toast({ title: "Export failed", description: e.message, variant: "destructive" });
+    } catch (e) {
+      toast({ title: "Export failed", description: e instanceof Error ? e.message : "Unknown error", variant: "destructive" });
     }
   }
 
@@ -567,7 +568,7 @@ export default function ReportsExport() {
           />
         </div>
 
-        <Select value={filterStatus} onValueChange={(v) => setFilterStatus(v as any)}>
+        <Select value={filterStatus} onValueChange={(v) => setFilterStatus(v as StatusFilter)}>
           <SelectTrigger className="h-9 w-36 text-sm" data-testid="select-status-filter">
             <SelectValue placeholder="All statuses" />
           </SelectTrigger>
