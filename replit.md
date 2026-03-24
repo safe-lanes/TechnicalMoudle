@@ -84,6 +84,47 @@ Preferred communication style: Simple, everyday language.
 -   **Phase Status**: Phase 1 (Foundation & Form) — COMPLETE. Phases 2–6 (Fuel Dashboard, Alerts, Bunker, Reports, Fleet) — placeholder pages, to be built.
 -   **Migration**: `migrations/016_noon_report_tables.sql` creates all 3 nr_ tables.
 
+## Database Standards — MUST follow for ALL new tables
+
+### Required Base Columns
+Every new table MUST include:
+- `created_at`: timestamp, DEFAULT NOW()
+- `updated_at`: timestamp, DEFAULT NOW() (with auto-update via `$onUpdateFn` or DB trigger)
+- `created_by_uuid`: TEXT (FK to users table, tracks who created the record)
+- `updated_by_uuid`: TEXT (FK to users table, tracks who last modified)
+
+### Primary Keys
+- Use TEXT type for primary keys with UUID values (`gen_random_uuid()`)
+- Follow the naming convention: `{table_abbreviation}uuid` (e.g., `vuuid`, `cuuid`, `juuid`)
+
+### Foreign Key Constraints
+- ALL relationships MUST have DB-level FK constraints — no application-only enforcement
+- Vessel references: `FOREIGN KEY (vessel_id) REFERENCES vessels(vuuid)` — NO ON DELETE clause (defaults to NO ACTION, blocks deletion if data exists)
+- Never use `ON DELETE CASCADE` on vessel FKs — data loss risk
+- Internal FKs (child-to-parent within same module): `ON DELETE SET NULL` is acceptable
+- Use idempotent migration pattern: `DO $$ BEGIN ... EXCEPTION WHEN duplicate_object THEN NULL; END $$`
+
+### Column Naming
+- Use snake_case for all column names
+- Use `updated_at` not `last_updated`
+- Use `created_at` not `date_created`
+- UUID columns: `{abbreviation}uuid` (vuuid, cuuid, juuid, wouuid, suuid, stuuid, duuid)
+
+### Migrations
+- Add SQL file to `migrations/` folder with next sequential number prefix (e.g., `022_my_feature.sql`)
+- Use `IF NOT EXISTS` / idempotent SQL patterns
+- Never drop and recreate tables — always `ALTER TABLE`
+- Update `shared/schema-noon-report.ts` (for nr_ tables) or `shared/schema.ts` (for all other tables) with matching Drizzle schema changes
+
+### Existing FK Pattern Reference (72+ constraints across 12 parent tables)
+- `vessels.vuuid` ← 33 child FKs
+- `components.cuuid` ← 15 child FKs
+- `work_orders.wouuid` ← 5 child FKs
+- `jobs.juuid` ← 4 child FKs
+- `spares.suuid` ← 4 child FKs
+- `defects.duuid` ← 3 child FKs
+- Plus: `alert_policies`, `alert_events`, `form_definitions`, `form_versions`, `stores_items`, `bulk_import_history`
+
 ## External Dependencies
 
 -   **Frontend Libraries**: `@radix-ui/*`, `@tanstack/react-query`, `wouter`, `tailwindcss`, `lucide-react`, `ag-grid-enterprise`, `ag-charts-react`, `crypto-js`.
