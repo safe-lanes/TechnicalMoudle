@@ -125,7 +125,7 @@ export const nrNoonReports = pgTable("nr_noon_reports", {
   // Soft-delete / sync flags (established pattern)
   isDeleted: boolean("is_deleted").notNull().default(false),
   isSync: boolean("is_sync").notNull().default(false),
-  uuid: text("uuid").notNull().default(sql`gen_random_uuid()`),
+  nruuid: text("nruuid").notNull().default(sql`gen_random_uuid()`),
 }, (table) => [
   index("idx_nr_reports_vessel_date").on(table.vesselId, table.reportDate),
   index("idx_nr_reports_status").on(table.status),
@@ -133,7 +133,7 @@ export const nrNoonReports = pgTable("nr_noon_reports", {
 
 export const insertNrNoonReportSchema = createInsertSchema(nrNoonReports).omit({
   id: true,
-  uuid: true,
+  nruuid: true,
   createdAt: true,
   updatedAt: true,
 });
@@ -161,14 +161,14 @@ export const nrFuelRob = pgTable("nr_fuel_rob", {
   // Soft-delete / sync flags (established pattern)
   isDeleted: boolean("is_deleted").notNull().default(false),
   isSync: boolean("is_sync").notNull().default(false),
-  uuid: text("uuid").notNull().default(sql`gen_random_uuid()`),
+  nfruuid: text("nfruuid").notNull().default(sql`gen_random_uuid()`),
 }, (table) => [
   index("idx_nr_rob_vessel_fuel").on(table.vesselId, table.fuelType),
 ]);
 
 export const insertNrFuelRobSchema = createInsertSchema(nrFuelRob).omit({
   id: true,
-  uuid: true,
+  nfruuid: true,
   updatedAt: true,
 });
 export type InsertNrFuelRob = z.infer<typeof insertNrFuelRobSchema>;
@@ -194,14 +194,14 @@ export const nrVoyageLegs = pgTable("nr_voyage_legs", {
   // Soft-delete / sync flags (established pattern)
   isDeleted: boolean("is_deleted").notNull().default(false),
   isSync: boolean("is_sync").notNull().default(false),
-  uuid: text("uuid").notNull().default(sql`gen_random_uuid()`),
+  nvluuid: text("nvluuid").notNull().default(sql`gen_random_uuid()`),
 }, (table) => [
   index("idx_nr_voyage_vessel").on(table.vesselId),
 ]);
 
 export const insertNrVoyageLegSchema = createInsertSchema(nrVoyageLegs).omit({
   id: true,
-  uuid: true,
+  nvluuid: true,
   createdAt: true,
   updatedAt: true,
 });
@@ -314,7 +314,7 @@ export const nrBunkerRecords = pgTable("nr_bunker_records", {
   // Soft-delete / sync flags (established pattern)
   isDeleted: boolean("is_deleted").notNull().default(false),
   isSync: boolean("is_sync").notNull().default(false),
-  uuid: text("uuid").notNull().default(sql`gen_random_uuid()`),
+  nbruuid: text("nbruuid").notNull().default(sql`gen_random_uuid()`),
 }, (table) => [
   index("idx_nr_bunker_vessel").on(table.vesselId),
   index("idx_nr_bunker_vessel_date").on(table.vesselId, table.bunkeredDate),
@@ -322,7 +322,7 @@ export const nrBunkerRecords = pgTable("nr_bunker_records", {
 
 export const insertNrBunkerRecordSchema = createInsertSchema(nrBunkerRecords).omit({
   id: true,
-  uuid: true,
+  nbruuid: true,
   createdAt: true,
   updatedAt: true,
 });
