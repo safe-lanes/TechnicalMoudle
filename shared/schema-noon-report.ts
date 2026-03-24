@@ -115,6 +115,9 @@ export const nrNoonReports = pgTable("nr_noon_reports", {
   generalRemarks: text("general_remarks"),
   machineryRemarks: text("machinery_remarks"),
 
+  // Audit columns
+  createdByUuid: text("created_by_uuid"),
+  updatedByUuid: text("updated_by_uuid"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 }, (table) => [
@@ -137,20 +140,23 @@ export const nrFuelRob = pgTable("nr_fuel_rob", {
   vesselId: text("vessel_id").notNull(),
   fuelType: text("fuel_type").notNull(), // HFO | LSMGO | MGO | VLSFO | LPG
   currentRob: numeric("current_rob").notNull().default("0"),
-  lastUpdated: timestamp("last_updated").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(), // renamed from last_updated
   lastReportId: integer("last_report_id"),
   // Phase 2: rolling averages and endurance
   avg3Day: numeric("avg3_day"), // 3-day rolling avg consumption (MT/day)
   avg7Day: numeric("avg7_day"), // 7-day rolling avg consumption (MT/day)
   enduranceDays: numeric("endurance_days"), // days of fuel remaining at 7-day avg rate
   enduranceNm: numeric("endurance_nm"), // nautical miles remaining at 7-day avg rate
+  // Audit columns
+  createdByUuid: text("created_by_uuid"),
+  updatedByUuid: text("updated_by_uuid"),
 }, (table) => [
   index("idx_nr_rob_vessel_fuel").on(table.vesselId, table.fuelType),
 ]);
 
 export const insertNrFuelRobSchema = createInsertSchema(nrFuelRob).omit({
   id: true,
-  lastUpdated: true,
+  updatedAt: true,
 });
 export type InsertNrFuelRob = z.infer<typeof insertNrFuelRobSchema>;
 export type NrFuelRob = typeof nrFuelRob.$inferSelect;
@@ -166,6 +172,9 @@ export const nrVoyageLegs = pgTable("nr_voyage_legs", {
   arrivalDate: text("arrival_date"), // YYYY-MM-DD
   status: text("status").notNull().default("active"), // active | completed
   eeoi: numeric("eeoi"), // Phase 2: Energy Efficiency Operational Indicator
+  // Audit columns
+  createdByUuid: text("created_by_uuid"),
+  updatedByUuid: text("updated_by_uuid"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 }, (table) => [
@@ -191,6 +200,10 @@ export const nrCiiTracking = pgTable("nr_cii_tracking", {
   aer: numeric("aer"), // Annual Efficiency Ratio (null if DWT missing)
   ciiRating: text("cii_rating"), // A | B | C | D | E (null if DWT missing)
   previousCiiRating: text("previous_cii_rating"), // rating before last upsert (for band-drop detection)
+  // Audit columns
+  createdByUuid: text("created_by_uuid"),
+  updatedByUuid: text("updated_by_uuid"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 }, (table) => [
   uniqueIndex("idx_nr_cii_vessel_year").on(table.vesselId, table.year),
@@ -198,6 +211,7 @@ export const nrCiiTracking = pgTable("nr_cii_tracking", {
 
 export const insertNrCiiTrackingSchema = createInsertSchema(nrCiiTracking).omit({
   id: true,
+  createdAt: true,
   updatedAt: true,
 });
 export type InsertNrCiiTracking = z.infer<typeof insertNrCiiTrackingSchema>;
@@ -226,6 +240,9 @@ export const nrAlerts = pgTable("nr_alerts", {
   thresholdValue: numeric("threshold_value"), // configured threshold
   acknowledgedAt: timestamp("acknowledged_at"),
   acknowledgedBy: text("acknowledged_by"), // user name or 'system'
+  // Audit columns
+  createdByUuid: text("created_by_uuid"),
+  updatedByUuid: text("updated_by_uuid"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 }, (table) => [
   index("idx_nr_alerts_vessel").on(table.vesselId),
@@ -257,6 +274,9 @@ export const nrBunkerRecords = pgTable("nr_bunker_records", {
   bdnNumber: text("bdn_number"),
   sampleSealNumber: text("sample_seal_number"), // MARPOL traceability
   remarks: text("remarks"),
+  // Audit columns
+  createdByUuid: text("created_by_uuid"),
+  updatedByUuid: text("updated_by_uuid"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 }, (table) => [

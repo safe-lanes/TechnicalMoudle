@@ -89,7 +89,7 @@ export async function upsertFuelRob(vesselId: string, fuelType: string, currentR
 
   if (existing.length > 0) {
     await db.update(nrFuelRob)
-      .set({ currentRob: String(currentRob), lastUpdated: new Date(), lastReportId: reportId })
+      .set({ currentRob: String(currentRob), updatedAt: new Date(), lastReportId: reportId })
       .where(and(eq(nrFuelRob.vesselId, vesselId), eq(nrFuelRob.fuelType, fuelType)));
   } else {
     await db.insert(nrFuelRob).values({

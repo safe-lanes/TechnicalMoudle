@@ -34,13 +34,13 @@ export async function adjustRobForBunker(
       vesselId,
       fuelType,
       currentRob: String(newRob),
-      lastUpdated: new Date(),
+      updatedAt: new Date(),
     });
   } else {
     const current = Number(rows[0].currentRob) || 0;
     const updated = Math.max(0, current + deltaMt);
     await db.update(nrFuelRob)
-      .set({ currentRob: String(updated), lastUpdated: new Date() })
+      .set({ currentRob: String(updated), updatedAt: new Date() })
       .where(and(eq(nrFuelRob.vesselId, vesselId), eq(nrFuelRob.fuelType, fuelType)));
   }
 }
