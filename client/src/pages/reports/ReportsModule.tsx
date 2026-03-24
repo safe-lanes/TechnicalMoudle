@@ -347,7 +347,14 @@ const ReportsModule = () => {
 
       {/* Report Categories - Full Width Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        {reportCategories.map((category, index) => {
+        {reportCategories
+          .filter(category => {
+            if (!searchQuery.trim()) return true;
+            const q = searchQuery.toLowerCase();
+            return category.title.toLowerCase().includes(q) ||
+                   category.description.toLowerCase().includes(q);
+          })
+          .map((category, index) => {
           const Icon = category.icon;
           const markerId = `G${21 + index}`;
           return (

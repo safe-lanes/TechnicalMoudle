@@ -1,7 +1,7 @@
 # Seafarer Technical Management System
 
 ## Overview
-This project is a full-stack Technical Module for a maritime Planned Maintenance System (PMS), designed to manage equipment maintenance, scheduling, and performance tracking. It includes Certificate & Surveys management, Defect Reporting, and core PMS operations. The system aims to provide a robust, scalable solution for technical management, enhancing operational efficiency and compliance in the maritime sector. Key capabilities include comprehensive technical data management, automated maintenance scheduling, compliance monitoring, and advanced reporting. The business vision is to minimize vessel downtime, optimize operational costs, and ensure regulatory adherence for maritime organizations.
+This project is a full-stack Technical Module for a maritime Planned Maintenance System (PMS), managing equipment maintenance, scheduling, and performance tracking. It includes Certificate & Surveys management, Defect Reporting, and core PMS operations. The system aims to provide a robust, scalable solution for technical management, enhancing operational efficiency and compliance in the maritime sector. Key capabilities include comprehensive technical data management, automated maintenance scheduling, compliance monitoring, and advanced reporting. The business vision is to minimize vessel downtime, optimize operational costs, and ensure regulatory adherence for maritime organizations.
 
 ## User Preferences
 Preferred communication style: Simple, everyday language.
@@ -12,7 +12,7 @@ Preferred communication style: Simple, everyday language.
 -   **Module-Based Architecture**: Backend code is organized into domain-specific modules.
 -   **UUID-Based Identity System**: Canonical UUID columns are used for primary identity in foreign key relationships.
 -   **Immutable Tables**: Certain tables (e.g., `component_maintenance_history`) are INSERT-only audit trails.
--   **Dual Migration System**: Combines frozen code-based migrations (`server/migrations.ts`) with auto-generated Drizzle SQL migrations (`migrations/*.sql`). Schema changes are made in `shared/schema.ts`.
+-   **Dual Migration System**: Combines frozen code-based migrations with auto-generated Drizzle SQL migrations. Schema changes are made in `shared/schema.ts`.
 -   **Migration Discipline Rule**: Every new column in `shared/schema.ts` requires a corresponding, idempotent migration in `server/migrations.ts` in the same code change.
 -   **Database Safety Patterns**: Migrations include safety guards (`IF NOT EXISTS`, `IF EXISTS`) and orphan cleanup.
 -   **API Route Prefix**: All API endpoints use the `/technical/api` prefix.
@@ -37,18 +37,18 @@ Preferred communication style: Simple, everyday language.
 -   **Component Styling**: Standardized styling for various chart types and interactive elements.
 -   **Table Styling**: Specific styling for overdue and dot matrix tables.
 -   **Scrollbars**: Custom WebKit scrollbar styling.
--   **Standardized Filter Bar Layout**: All PMS modules follow a consistent single-row filter bar pattern matching the Spares/Components reference: [Vessel dropdown (role-gated, w-[200px])] [Search bar (fixed w-80)] [Module-specific filters] [Clear/action buttons]. Uses `flex-wrap` for responsive wrapping. Dashboard header uses `justify-between` with vessel controls left-aligned and year/filters right-aligned.
+-   **Standardized Filter Bar Layout**: All PMS modules follow a consistent single-row filter bar pattern with `flex-wrap` for responsiveness.
 
 ### Feature Specifications
 -   **Spare-Component Sibling Link Distribution**: Spares linked to a component are automatically linked to all sibling components.
 -   **Fleet Table Schema Contract**: All `fleet_*` tables must include mandatory columns like `uuid`, `sortOrder`, `createdAt`, `updatedAt`, `createdByUuid`, `updatedByUuid`, `isDeleted`, and `isSync`.
--   **Bulk Import Functionality**: Includes maker validation against `maker_list` and displays an `ImportSummaryModal` with statistics and row-by-row status after import. Real-time SSE progress streaming via `POST /bulk/import-stream` and `POST /bulk/locations/import-stream` endpoints. `ImportProgressOverlay` component provides a full-screen locked overlay with progress bar, record counts, status phases, and completion summary during imports across all bulk upload screens (UniformBulkUpload and LocationsUpload).
+-   **Bulk Import Functionality**: Includes maker validation, `ImportSummaryModal` with statistics, and real-time SSE progress streaming via `ImportProgressOverlay`.
 -   **Equipment/System Department Validation**: Field restricted to 6 predefined, validated values.
 -   **Maker Searchable Dropdown**: Auto-fills Maker Code from `maker_list`.
 -   **Inventory Transaction Location Picker**: Interactive, searchable comboboxes for selecting and creating locations.
 -   **Component Mandatory Field Validation**: Add/Edit Component forms enforce 10 mandatory fields with conditional logic.
 -   **RH Counter Type & Source Selection**: Components can define `rhCounterType` and `rhMasterComponentId` with searchable dropdowns.
--   **Period-Based Utilization Rate**: Calculated using a two-point meter reading formula: `min(((currentRH - rhAtPeriodStart) / maxPeriodHours) × 100, 100)`. Uses rolling windows (7/30/90/365 days). Fallback logic: if no audit entry before period start, uses oldest available entry; if no audit history exists, uses 0 as baseline. Returns metadata (rhAtPeriodStart, periodStartDate, maxPossibleHours, dataQualityWarning, averageDailyHours) for detailed tooltip. Color coding: gray (0%), green (0.1-50%), yellow (51-75%), orange (76-90%), red (91-100%). Warning indicators for data quality issues (meter reset, capped at 100%, no baseline).
+-   **Period-Based Utilization Rate**: Calculated using a two-point meter reading formula, with rolling windows (7/30/90/365 days) and fallback logic. Includes metadata and color coding for data quality.
 -   **Component Tree Management**: Supports drag-and-drop reordering and reparenting.
 -   **Soft Delete for Entities**: Functionality for deactivating Components, Jobs, Spares, and Store Items, retaining data with specific rules for dependencies and visibility.
 -   **Work Order Part B Validation & Integrity Rules**: Enforces 8 validation rules including read-only states, character limits, draft save logic, and audit trails.
@@ -60,70 +60,33 @@ Preferred communication style: Simple, everyday language.
 -   **Next Due Date Calculation**: `calculateNextDueDate()` uses the actual completion date as the base: `nextDueDate = completionDate + frequencyInterval`.
 -   **Mandatory Backfill of Skipped Work Orders (Layer 3)**: Automatically creates SKIPPED history records for missed cycles in `component_maintenance_history`.
 -   **Mandatory CE Justification for Skipped Cycles (Layer 4B)**: Requires a written justification from the Chief Engineer for approving WOs with missed cycles.
--   **Tiered Approval Workflow Hardening (Layer 5)**: Adds 4 approval tiers based on days late, missed cycles, and backdating days, with varying justification requirements and superintendent notifications. Thresholds: HIGH (≥3 missed cycles OR ≥21 days late OR ≥7 days backdating) → superintendent_locked; MEDIUM (2 missed cycles OR 14–20 days late OR 3–6 days backdating) → superintendent_notification; LOW (1 missed cycle OR 7–13 days late OR 1–2 days backdating) → ce_with_justification; STANDARD → no action. Includes a Superintendent dashboard page. Notifications store resolved vessel names (not UUIDs) and include backdating_days tracking.
+-   **Tiered Approval Workflow Hardening (Layer 5)**: Adds 4 approval tiers based on days late, missed cycles, and backdating days, with varying justification requirements and superintendent notifications. Includes a Superintendent dashboard page.
 -   **Compliance Anomaly Detection (Layer 6)**: Dashboard-level panel surfacing red flags by analyzing work order patterns (Cycle Skip Rate, Backdating Frequency, Bulk Completion Events, Schedule Drift). Role-based visibility and detailed modals.
--   **Work Order Anomaly Detection System (Layer 6 Extension)**: Persistent anomaly detection system logging individual anomaly events (BACKDATING, MISSED_CYCLES, SUSPICIOUS_PATTERN) with severity (HIGH/MEDIUM/LOW) upon WO completion. High severity anomalies generate superintendent notifications.
--   **Running Hours Validation & Isolation (Layer 7)**: Work orders store read-only RH snapshots. Timeline-based validation uses forward + backward checks (max 24 hrs/day). High utilization requires mandatory justification. Includes real-time RH input validation, valid range helper text, and a RH Timeline Viewer. **Strict RH Cap Validation**: Current Reading in Part B3 cannot exceed component's actual RH from the Running Hours module. Component Actual RH shows loading/loaded/error states with retry button, last-updated timestamp, and green/red color coding. Save button is disabled with tooltip when RH validation fails. Detailed inline error panel shows when RH exceeds cap, with link to Running Hours module. Backend returns structured INVALID_RUNNING_HOURS error response (400) with enteredValue, componentActualRH, maxAllowed, componentId, componentName.
+-   **Work Order Anomaly Detection System (Layer 6 Extension)**: Persistent anomaly detection system logging individual anomaly events (BACKDATING, MISSED_CYCLES, SUSPICIOUS_PATTERN) with severity upon WO completion. High severity anomalies generate superintendent notifications.
+-   **Running Hours Validation & Isolation (Layer 7)**: Work orders store read-only RH snapshots. Timeline-based validation uses forward + backward checks (max 24 hrs/day). High utilization requires mandatory justification. Includes real-time RH input validation, valid range helper text, and a RH Timeline Viewer. Strict RH Cap Validation ensures Part B3 RH cannot exceed component's actual RH, with UI feedback and structured error responses.
 -   **Live Missed Cycles on WO List**: `missedCycles` calculated on-the-fly for overdue/due WOs.
 -   **Auto-Populated Maintenance History Remarks**: Remarks are auto-populated for maintenance history based on `missedCycles`.
 -   **A4 Work History Display**: Displays the current WO's own maintenance history record and non-skipped records from other WOs.
 -   **UI Role Detection (Single Source of Truth)**: UI role is determined by `mapLoggedRoleToUIRole(userType, profileRole)` for consistent role mapping.
--   **User Role System**: Supports 7 `UserRole` values ("Ship", "Office", "PMS Admin", "Sail Admin", "Super Admin", "Vessel Admin", "Vessel User").
+-   **User Role System**: Supports 7 `UserRole` values.
 -   **Role Master Table (admn_role_master)**: Seeds 15 role records during migration.
--   **Access Control System**: Three-table architecture (`admn_role_master`, `adm_menumaster_ac`, `adm_role_menu_access`) for role-based menu permissions. Admin UI at `/admin/access-control` allows assigning view/create/edit/delete permissions per role per menu item. Frontend enforcement via `PermissionsContext` dynamically filters top navigation, sidebar menus, and blocks unauthorized page access. When no permissions are configured for a role, all access is granted (backwards-compatible). API: `GET /admin/role-by-name/:roleName`, `GET /admin/roles`, `GET /admin/menu-items`, `GET/PUT /admin/access-control/:roleRuid`.
+-   **Access Control System**: Three-table architecture (`admn_role_master`, `adm_menumaster_ac`, `adm_role_menu_access`) for role-based menu permissions. Admin UI at `/admin/access-control` allows assigning view/create/edit/delete permissions per role per menu item. Frontend enforcement via `PermissionsContext` dynamically filters navigation and blocks unauthorized page access.
 
-## Noon Report & Fuel Management Module (Tasks #49–#54)
-
--   **Schema Isolation**: All noon report tables use `nr_` prefix and are defined in `shared/schema-noon-report.ts`, re-exported from `shared/schema.ts` via a single `export * from './schema-noon-report'` line. Do NOT add `nr_` tables to the main `shared/schema.ts`.
--   **Tables**: `nr_noon_reports` (full daily report with 5-tab data), `nr_fuel_rob` (current ROB per vessel/fuel type), `nr_voyage_legs` (voyage tracking).
--   **Existing Data Adapter**: `server/modules/noon-report/utils/existingDataAdapter.ts` is the ONLY file in the noon-report module permitted to read from existing tables (`vessels`, `users`). Read-only access, never writes.
+### Noon Report & Fuel Management Module
+-   **Schema Isolation**: All noon report tables use `nr_` prefix and are defined in `shared/schema-noon-report.ts`.
+-   **Tables**: `nr_noon_reports`, `nr_fuel_rob`, `nr_voyage_legs`.
+-   **Existing Data Adapter**: `server/modules/noon-report/utils/existingDataAdapter.ts` is the ONLY file in the noon-report module permitted to read from existing tables (`vessels`, `users`) in a read-only manner.
 -   **Backend Module**: Mounted at `server/modules/noon-report/`. Routes use `/nr-reports`, `/nr-fuel-rob`, `/nr-kpis` prefixes under `/technical/api/`.
--   **Feature Flag**: `NOON_MODULE_ENABLED` in `server/modules/noon-report/config.ts` and `client/src/modules/noon-report/config.ts`. Set to `false` to hide nav tab and return 404 for all API routes.
--   **Navigation**: "Noon Report" tab added to `TopMenuBar.tsx` (with Anchor icon). Sidebar in `SideMenuBar.tsx` has 7 items: Daily Entry, Report History, Fuel Dashboard, Alerts, Bunker Mgmt, Reports & Export, Fleet Overview. Routes registered in `App.tsx` and `TechnicalModule.tsx`.
--   **Daily Entry Form**: 5-tab form (Navigation, Weather, Fuel & Machinery, Emissions, Cargo & Remarks). Supports draft auto-save and submission lock. Tab 5 includes Draft Forward, Draft Aft, auto-calculated read-only Trim (Aft − Forward), and Ballast/Laden/In Port radio selector.
--   **Phase Status**: Phase 1 (Foundation & Form) — COMPLETE. Phases 2–6 (Fuel Dashboard, Alerts, Bunker, Reports, Fleet) — placeholder pages, to be built.
--   **Migration**: `migrations/016_noon_report_tables.sql` creates all 3 nr_ tables.
+-   **Feature Flag**: `NOON_MODULE_ENABLED` controls visibility and API access.
+-   **Navigation**: "Noon Report" tab in `TopMenuBar.tsx` with sidebar in `SideMenuBar.tsx` containing 7 items.
+-   **Daily Entry Form**: 5-tab form (Navigation, Weather, Fuel & Machinery, Emissions, Cargo & Remarks) with draft auto-save and submission lock.
 
-## Database Standards — MUST follow for ALL new tables
-
-### Required Base Columns
-Every new table MUST include:
-- `created_at`: timestamp, DEFAULT NOW()
-- `updated_at`: timestamp, DEFAULT NOW() (with auto-update via `$onUpdateFn` or DB trigger)
-- `created_by_uuid`: TEXT (FK to users table, tracks who created the record)
-- `updated_by_uuid`: TEXT (FK to users table, tracks who last modified)
-
-### Primary Keys
-- Use TEXT type for primary keys with UUID values (`gen_random_uuid()`)
-- Follow the naming convention: `{table_abbreviation}uuid` (e.g., `vuuid`, `cuuid`, `juuid`)
-
-### Foreign Key Constraints
-- ALL relationships MUST have DB-level FK constraints — no application-only enforcement
-- Vessel references: `FOREIGN KEY (vessel_id) REFERENCES vessels(vuuid)` — NO ON DELETE clause (defaults to NO ACTION, blocks deletion if data exists)
-- Never use `ON DELETE CASCADE` on vessel FKs — data loss risk
-- Internal FKs (child-to-parent within same module): `ON DELETE SET NULL` is acceptable
-- Use idempotent migration pattern: `DO $$ BEGIN ... EXCEPTION WHEN duplicate_object THEN NULL; END $$`
-
-### Column Naming
-- Use snake_case for all column names
-- Use `updated_at` not `last_updated`
-- Use `created_at` not `date_created`
-- UUID columns: `{abbreviation}uuid` (vuuid, cuuid, juuid, wouuid, suuid, stuuid, duuid)
-
-### Migrations
-- Add SQL file to `migrations/` folder with next sequential number prefix (e.g., `022_my_feature.sql`)
-- Use `IF NOT EXISTS` / idempotent SQL patterns
-- Never drop and recreate tables — always `ALTER TABLE`
-- Update `shared/schema-noon-report.ts` (for nr_ tables) or `shared/schema.ts` (for all other tables) with matching Drizzle schema changes
-
-### Existing FK Pattern Reference (72+ constraints across 12 parent tables)
-- `vessels.vuuid` ← 33 child FKs
-- `components.cuuid` ← 15 child FKs
-- `work_orders.wouuid` ← 5 child FKs
-- `jobs.juuid` ← 4 child FKs
-- `spares.suuid` ← 4 child FKs
-- `defects.duuid` ← 3 child FKs
-- Plus: `alert_policies`, `alert_events`, `form_definitions`, `form_versions`, `stores_items`, `bulk_import_history`
+### Database Standards
+-   **Required Base Columns**: Every new table MUST include `created_at`, `updated_at`, `created_by_uuid`, `updated_by_uuid`.
+-   **Primary Keys**: Use TEXT type with UUID values (`gen_random_uuid()`) and naming convention `{table_abbreviation}uuid`.
+-   **Foreign Key Constraints**: ALL relationships MUST have DB-level FK constraints. Vessel references use `NO ACTION`. Internal FKs can use `ON DELETE SET NULL`. Never use `ON DELETE CASCADE` on vessel FKs. Use idempotent migration patterns.
+-   **Column Naming**: Use `snake_case` for all column names (`created_at`, `updated_at`). UUID columns: `{abbreviation}uuid`.
+-   **Migrations**: Add SQL file to `migrations/` folder with next sequential number prefix. Use `IF NOT EXISTS` / idempotent SQL patterns. Never drop and recreate tables; always `ALTER TABLE`. Update corresponding Drizzle schema (`shared/schema-noon-report.ts` or `shared/schema.ts`).
 
 ## External Dependencies
 
