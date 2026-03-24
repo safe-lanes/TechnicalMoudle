@@ -238,3 +238,36 @@ export const insertNrAlertSchema = createInsertSchema(nrAlerts).omit({
 });
 export type InsertNrAlert = z.infer<typeof insertNrAlertSchema>;
 export type NrAlert = typeof nrAlerts.$inferSelect;
+
+// ── nr_bunker_records ─────────────────────────────────────────────────────────
+// Bunkering Delivery Note (BDN) records — one per bunkering event per fuel type
+export const nrBunkerRecords = pgTable("nr_bunker_records", {
+  id: serial("id").primaryKey(),
+  vesselId: text("vessel_id").notNull(),
+  voyageNo: text("voyage_no"),            // links to nr_voyage_legs if set
+  port: text("port").notNull(),
+  bunkeredDate: text("bunkered_date").notNull(), // YYYY-MM-DD
+  fuelType: text("fuel_type").notNull(),  // HFO | LSMGO | MGO | VLSFO | LPG
+  quantityMt: numeric("quantity_mt").notNull(),
+  density: numeric("density"),            // kg/m³
+  sulphurPct: numeric("sulphur_pct"),     // % m/m
+  pricePmt: numeric("price_pmt"),         // USD per metric tonne
+  totalCost: numeric("total_cost"),       // USD (quantity × price, auto-computed on save)
+  supplier: text("supplier"),
+  bdnNumber: text("bdn_number"),
+  sampleSealNumber: text("sample_seal_number"), // MARPOL traceability
+  remarks: text("remarks"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+}, (table) => [
+  index("idx_nr_bunker_vessel").on(table.vesselId),
+  index("idx_nr_bunker_vessel_date").on(table.vesselId, table.bunkeredDate),
+]);
+
+export const insertNrBunkerRecordSchema = createInsertSchema(nrBunkerRecords).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+export type InsertNrBunkerRecord = z.infer<typeof insertNrBunkerRecordSchema>;
+export type NrBunkerRecord = typeof nrBunkerRecords.$inferSelect;

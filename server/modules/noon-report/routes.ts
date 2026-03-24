@@ -9,8 +9,6 @@ const router = Router();
 // Feature flag — return 404 for all routes when module is disabled
 if (!NOON_MODULE_ENABLED) {
   router.all('/nr-*', (_req: Request, res: Response) => res.status(404).json({ error: 'Noon Report module is disabled' }));
-  // eslint-disable-next-line no-undef
-  module.exports = router;
 } else {
 
   // ── Noon Reports ──────────────────────────────────────────────────────────
@@ -62,6 +60,26 @@ if (!NOON_MODULE_ENABLED) {
 
   // PATCH /nr-alerts/:alertId/acknowledge — acknowledge an alert (office/admin only)
   router.patch('/nr-alerts/:alertId/acknowledge', requireOfficeOrAdmin, asyncHandler(ctrl.acknowledgeAlert));
+
+  // ── Bunker Records ────────────────────────────────────────────────────────
+
+  // GET  /nr-bunker — list records (filter by vesselId, optional voyageNo)
+  router.get('/nr-bunker', asyncHandler(ctrl.getBunkerRecords));
+
+  // POST /nr-bunker — create new BDN record + increment ROB
+  router.post('/nr-bunker', asyncHandler(ctrl.createBunkerRecord));
+
+  // GET  /nr-bunker-cost — cost summary per fuel type
+  router.get('/nr-bunker-cost', asyncHandler(ctrl.getBunkerCostSummary));
+
+  // GET  /nr-bunker/:id — single record
+  router.get('/nr-bunker/:id', asyncHandler(ctrl.getBunkerRecord));
+
+  // PATCH /nr-bunker/:id — update record + adjust ROB delta
+  router.patch('/nr-bunker/:id', asyncHandler(ctrl.updateBunkerRecord));
+
+  // DELETE /nr-bunker/:id — delete record + decrement ROB
+  router.delete('/nr-bunker/:id', asyncHandler(ctrl.deleteBunkerRecord));
 
 }
 
