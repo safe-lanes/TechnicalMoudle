@@ -654,7 +654,7 @@ const RunningHours = () => {
       meterReplaced,
       oldMeterFinal: meterReplaced ? updateForm.oldMeterFinal : undefined,
       newMeterStart: meterReplaced ? updateForm.newMeterStart : undefined,
-      isRenewalReset: meterReplaced && newValue === 0 ? true : undefined,
+      isRenewalReset: meterReplaced ? true : undefined,
       renewalActionType: meterReplaced && meterReplacedConfirmation ? meterReplacedConfirmation.renewalActionType : undefined,
       renewalReason: meterReplaced && meterReplacedConfirmation ? meterReplacedConfirmation.renewalReason : undefined,
       renewalReference: meterReplaced && meterReplacedConfirmation ? meterReplacedConfirmation.renewalReference : undefined,
