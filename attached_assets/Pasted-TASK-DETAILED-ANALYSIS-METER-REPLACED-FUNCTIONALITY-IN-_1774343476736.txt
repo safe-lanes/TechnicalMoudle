@@ -1,0 +1,140 @@
+TASK: DETAILED ANALYSIS – "METER REPLACED" FUNCTIONALITY IN UPDATE RUNNING HOURS (RH)
+
+Objective:
+
+Perform a **complete functional and technical analysis** of the **“Meter Replaced” (✔ tick mark)** option in the **Update Running Hours (RH) screen**.
+
+--------------------------------------------------
+
+1. Functional Understanding Required
+
+Analyze and explain:
+
+• What happens when **Meter Replaced is checked**  
+• What happens when it is **not checked**  
+• When should a user use this option  
+• Business logic behind meter replacement  
+
+--------------------------------------------------
+
+2. Running Hours (RH) Behavior
+
+Explain clearly:
+
+A. When Meter is NOT Replaced
+
+• How RH is calculated  
+• Increment logic (previous RH + new reading)  
+• Validation rules  
+
+B. When Meter IS Replaced
+
+• Does RH reset to 0 or take new input?  
+• How system handles new meter reading  
+• Whether cumulative RH is maintained or restarted  
+• How continuity of equipment life is ensured  
+
+--------------------------------------------------
+
+3. Old Meter Reading Handling
+
+Analyze:
+
+• Where the **old RH / old meter reading** is stored  
+• Is it stored in:
+  - Running Hours History table  
+  - Event log / audit table  
+  - Separate meter replacement log  
+
+• What fields are captured:
+  - Old RH  
+  - New RH  
+  - Replacement date  
+  - User who performed action  
+
+--------------------------------------------------
+
+4. Database-Level Analysis
+
+Identify:
+
+• Tables involved:
+  - Running Hours table  
+  - RH History table  
+  - Component table (if applicable)  
+  - Any Meter Replacement log table  
+
+• Data flow:
+
+  - Before replacement  
+  - During replacement  
+  - After replacement  
+
+--------------------------------------------------
+
+5. Data Integrity & Continuity
+
+Verify:
+
+• Whether total lifetime running hours is preserved  
+• Whether reporting uses:
+  - Current RH OR  
+  - Cumulative RH  
+
+• Impact on:
+  - Maintenance schedules  
+  - Job triggering  
+  - Alerts  
+
+--------------------------------------------------
+
+6. Edge Cases
+
+Analyze behavior for:
+
+• Meter replaced with incorrect RH  
+• Multiple replacements for same component  
+• Backdated replacement entry  
+• RH entry after replacement  
+• Replacement without prior RH data  
+
+--------------------------------------------------
+
+7. UI & Validation Behavior
+
+Check:
+
+• What validations are triggered when checkbox is selected  
+• Whether additional fields are enabled (e.g., new meter reading)  
+• Whether confirmation is required  
+
+--------------------------------------------------
+
+8. Reporting Impact
+
+Analyze:
+
+• How reports reflect:
+  - Old meter data  
+  - New meter data  
+• Whether history is traceable  
+• Whether reports show cumulative or segmented RH  
+
+--------------------------------------------------
+
+9. Expected Output
+
+Provide:
+
+• Step-by-step functional explanation  
+• Backend data handling flow  
+• Table-wise storage explanation  
+• Identified gaps (if any)  
+• Recommended corrections (if logic is flawed)  
+
+--------------------------------------------------
+
+Important Instruction:
+
+Do a **deep system-level analysis** covering UI behavior, backend logic, and database storage.  
+Ensure clarity on how **old RH is preserved and how new RH is calculated post meter replacement**.
