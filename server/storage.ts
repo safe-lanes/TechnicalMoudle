@@ -705,6 +705,7 @@ export interface IStorage {
     mappedBy: string;
   }): Promise<any[]>;
   deleteFleetVesselMapping(id: string): Promise<void>;
+  getVessel(id: string): Promise<Vessel | undefined>;
   getVessels(): Promise<Array<{id: string, vuuid: string, name: string, code: string}>>;
   
   // On-Demand Work Order Generation (Rule #4)

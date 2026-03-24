@@ -1,4 +1,5 @@
 import * as certAdminRepo from '../repositories/certAdminRepository';
+import { ensureVesselExists } from './vesselEnsureService';
 
 // ══════════════════════════════════════════════════════════
 // Master Certificate Admin
@@ -319,6 +320,8 @@ export async function initializeApplicability(body: any) {
   if (companyCertificates.length === 0) {
     return { success: true, message: "No company certificates to initialize", records: [] };
   }
+
+  await ensureVesselExists(vesselId, vesselName);
 
   // Create applicability records for all company certificates
   const insertData = companyCertificates.map(cert => ({

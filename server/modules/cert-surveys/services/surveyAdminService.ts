@@ -1,4 +1,5 @@
 import * as surveyAdminRepo from '../repositories/surveyAdminRepository';
+import { ensureVesselExists } from './vesselEnsureService';
 
 // ══════════════════════════════════════════════════════════
 // Master Survey Admin
@@ -298,6 +299,8 @@ export async function initializeApplicability(body: any) {
     masterId: survey.masterId,
     isApplicable: true,
   }));
+
+  await ensureVesselExists(vesselId, vesselName);
 
   const insertedRecords = await surveyAdminRepo.insertApplicabilityBulk(insertData);
   if (!insertedRecords) {
