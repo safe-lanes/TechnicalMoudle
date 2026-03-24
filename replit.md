@@ -82,7 +82,7 @@ Preferred communication style: Simple, everyday language.
 -   **Daily Entry Form**: 5-tab form (Navigation, Weather, Fuel & Machinery, Emissions, Cargo & Remarks) with draft auto-save and submission lock.
 
 ### Database Standards
--   **Required Base Columns**: Every new table MUST include `created_at`, `updated_at`, `created_by_uuid`, `updated_by_uuid`.
+-   **Required Base Columns**: Every new table MUST include: `uuid` (TEXT NOT NULL, DEFAULT gen_random_uuid(), omit from insertSchema), `created_at` (timestamp, DEFAULT NOW()), `updated_at` (timestamp, DEFAULT NOW()), `created_by_uuid` (TEXT, FK to users), `updated_by_uuid` (TEXT, FK to users), `is_deleted` (BOOLEAN NOT NULL, DEFAULT false), `is_sync` (BOOLEAN NOT NULL, DEFAULT false).
 -   **Primary Keys**: Use TEXT type with UUID values (`gen_random_uuid()`) and naming convention `{table_abbreviation}uuid`.
 -   **Foreign Key Constraints**: ALL relationships MUST have DB-level FK constraints. Vessel references use `NO ACTION`. Internal FKs can use `ON DELETE SET NULL`. Never use `ON DELETE CASCADE` on vessel FKs. Use idempotent migration patterns.
 -   **Column Naming**: Use `snake_case` for all column names (`created_at`, `updated_at`). UUID columns: `{abbreviation}uuid`.
