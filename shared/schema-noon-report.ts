@@ -208,7 +208,7 @@ export const insertNrVoyageLegSchema = createInsertSchema(nrVoyageLegs).omit({
 export type InsertNrVoyageLeg = z.infer<typeof insertNrVoyageLegSchema>;
 export type NrVoyageLeg = typeof nrVoyageLegs.$inferSelect;
 
-// ── nr_cii_tracking ──────────────────────────────────────────────────────────
+// ── nr_alerts ──────────────────────────────────────────────────────────
 // Year-to-date CII (Carbon Intensity Indicator) tracking per vessel per year
 export const nrCiiTracking = pgTable("nr_cii_tracking", {
   id: serial("id").primaryKey(),
