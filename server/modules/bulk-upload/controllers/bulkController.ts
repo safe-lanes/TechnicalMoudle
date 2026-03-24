@@ -993,7 +993,8 @@ export async function doImportStream(req: Request, res: Response) {
     dryRunCache.delete(fileToken);
 
     const failedCount = importResult.rowResults ? importResult.rowResults.filter((r: any) => r.action === 'failed').length : 0;
-    sendEvent('complete', { ...importResult, failed: failedCount, historyId });
+    const { rowResults, ...summaryResult } = importResult;
+    sendEvent('complete', { ...summaryResult, failed: failedCount, historyId });
     res.end();
   } catch (error: any) {
     console.error('Import stream error:', error);

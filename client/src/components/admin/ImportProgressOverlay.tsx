@@ -269,7 +269,9 @@ export function useImportStream() {
               receivedError = true;
               callbacks.onError(data.message || "Unknown error");
             }
-          } catch {}
+          } catch (parseErr) {
+            console.warn('SSE JSON parse error for event:', currentEvent, parseErr);
+          }
           currentEvent = "";
         }
       }
