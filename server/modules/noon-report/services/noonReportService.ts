@@ -321,6 +321,84 @@ export async function acknowledgeAlert(alertId: number, acknowledgedBy: string) 
   return updated[0] ?? null;
 }
 
+// ── Fleet Summary (all vessels) ───────────────────────────────────────────────
+
+export interface VesselFleetSummary {
+  vesselId: string;
+  lastReportDate: string | null;
+  lastVoyageNo: string | null;
+  lastPortFrom: string | null;
+  lastPortTo: string | null;
+  lastCiiRating: string | null;
+  lastCondition: string | null;
+  totalReports: number;
+  submittedReports: number;
+  activeAlerts: number;
+  totalHfoRob: number;
+  totalAllRob: number;
+  avg7DayConsumption: number | null;
+  enduranceDays: number | null;
+}
+
+export async function getFleetSummary(vesselIds: string[]): Promise<VesselFleetSummary[]> {
+  const results: VesselFleetSummary[] = [];
+
+  for (const vesselId of vesselIds) {
+    // Latest submitted report
+    const latestReports = await db.select()
+      .from(nrNoonReports)
+      .where(and(eq(nrNoonReports.vesselId, vesselId), eq(nrNoonReports.status, 'submitted')))
+      .orderBy(desc(nrNoonReports.reportDate))
+      .limit(1);
+    const latest = latestReports[0] ?? null;
+
+    // Report counts
+    const allReports = await db.select()
+      .from(nrNoonReports)
+      .where(eq(nrNoonReports.vesselId, vesselId));
+    const totalReports = allReports.length;
+    const submittedReports = allReports.filter(r => r.status === 'submitted').length;
+
+    // Active alerts
+    const alertRows = await db.select({ total: count() })
+      .from(nrAlerts)
+      .where(and(eq(nrAlerts.vesselId, vesselId), isNull(nrAlerts.acknowledgedAt)));
+    const activeAlerts = alertRows[0]?.total ?? 0;
+
+    // ROB & averages from nr_fuel_rob
+    const robRows = await db.select()
+      .from(nrFuelRob)
+      .where(eq(nrFuelRob.vesselId, vesselId));
+    const totalHfoRob = toNum(robRows.find(r => r.fuelType === 'HFO')?.currentRob) ?? 0;
+    const totalAllRob = robRows.reduce((acc, r) => acc + (toNum(r.currentRob) ?? 0), 0);
+    const avg7Day = robRows.reduce((acc, r) => acc + (toNum(r.avg7Day) ?? 0), 0) || null;
+
+    // Total endurance
+    const totalEndurance = avg7Day && totalAllRob > 0
+      ? round2(totalAllRob / avg7Day)
+      : null;
+
+    results.push({
+      vesselId,
+      lastReportDate: latest?.reportDate ?? null,
+      lastVoyageNo: latest?.voyageNo ?? null,
+      lastPortFrom: latest?.portFrom ?? null,
+      lastPortTo: latest?.portTo ?? null,
+      lastCiiRating: latest?.ciiRating ?? null,
+      lastCondition: latest?.condition ?? null,
+      totalReports,
+      submittedReports,
+      activeAlerts: Number(activeAlerts),
+      totalHfoRob,
+      totalAllRob: round2(totalAllRob),
+      avg7DayConsumption: avg7Day ? round2(avg7Day) : null,
+      enduranceDays: totalEndurance,
+    });
+  }
+
+  return results;
+}
+
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 function toNum(val: string | number | null | undefined): number | null {

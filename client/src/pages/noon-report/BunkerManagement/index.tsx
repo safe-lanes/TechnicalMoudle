@@ -70,6 +70,18 @@ export default function BunkerManagement() {
   const [editRecord, setEditRecord] = useState<NrBunkerRecord | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<NrBunkerRecord | null>(null);
 
+  // Fetch latest submitted report to get current active voyage number
+  const { data: latestReports } = useQuery<Array<{ voyageNo: string | null }>>({
+    queryKey: ["/api/nr-reports-latest", vesselId],
+    queryFn: () =>
+      fetch(`/technical/api/nr-reports?vesselId=${vesselId}&status=submitted`)
+        .then(r => r.json()),
+    enabled: !!vesselId,
+    select: (data) => data.slice(0, 1),
+    refetchOnWindowFocus: false,
+  });
+  const activeVoyageNo = latestReports?.[0]?.voyageNo ?? undefined;
+
   // Fetch bunker records
   const { data: records, isLoading } = useQuery<NrBunkerRecord[]>({
     queryKey: ["/api/nr-bunker", vesselId],
@@ -81,7 +93,7 @@ export default function BunkerManagement() {
 
   // Delete mutation
   const deleteMutation = useMutation({
-    mutationFn: (id: number) => apiRequest("DELETE", `/api/nr-bunker/${id}`),
+    mutationFn: (id: number) => apiRequest("DELETE", `/technical/api/nr-bunker/${id}`),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/nr-bunker"] });
       queryClient.invalidateQueries({ queryKey: ["/api/nr-bunker-cost"] });
@@ -139,7 +151,7 @@ export default function BunkerManagement() {
       </div>
 
       {/* Cost Summary */}
-      <BunkerCostSummary vesselId={vesselId} />
+      <BunkerCostSummary vesselId={vesselId} voyageNo={activeVoyageNo} />
 
       {/* Records Table */}
       <div className="bg-white rounded-lg border border-gray-200 shadow-sm overflow-hidden">
@@ -256,6 +268,7 @@ export default function BunkerManagement() {
           onClose={handleCloseForm}
           vesselId={vesselId}
           record={editRecord}
+          activeVoyageNo={activeVoyageNo}
         />
       )}
 

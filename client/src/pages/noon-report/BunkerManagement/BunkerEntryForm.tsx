@@ -60,11 +60,12 @@ interface Props {
   onClose: () => void;
   vesselId: string;
   record?: NrBunkerRecord | null;
+  activeVoyageNo?: string;
 }
 
 // ── Component ────────────────────────────────────────────────────────────────
 
-export default function BunkerEntryForm({ open, onClose, vesselId, record }: Props) {
+export default function BunkerEntryForm({ open, onClose, vesselId, record, activeVoyageNo }: Props) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
@@ -72,7 +73,7 @@ export default function BunkerEntryForm({ open, onClose, vesselId, record }: Pro
     resolver: zodResolver(bunkerSchema),
     defaultValues: {
       vesselId,
-      voyageNo: record?.voyageNo ?? "",
+      voyageNo: record?.voyageNo ?? activeVoyageNo ?? "",
       port: record?.port ?? "",
       bunkeredDate: record?.bunkeredDate ?? new Date().toISOString().slice(0, 10),
       fuelType: (record?.fuelType as BunkerFormValues["fuelType"]) ?? "HFO",
@@ -97,9 +98,9 @@ export default function BunkerEntryForm({ open, onClose, vesselId, record }: Pro
         pricePmt: data.pricePmt !== "" && data.pricePmt !== undefined ? String(data.pricePmt) : undefined,
       };
       if (record) {
-        return apiRequest("PATCH", `/api/nr-bunker/${record.id}`, payload);
+        return apiRequest("PATCH", `/technical/api/nr-bunker/${record.id}`, payload);
       }
-      return apiRequest("POST", "/api/nr-bunker", payload);
+      return apiRequest("POST", "/technical/api/nr-bunker", payload);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/nr-bunker"] });

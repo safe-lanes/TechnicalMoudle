@@ -1,6 +1,7 @@
 import { Request, Response } from 'express';
 import * as service from '../services/noonReportService';
 import * as bunkerService from '../services/bunkerService';
+import { sendReportEmail, isSmtpConfigured } from '../services/reportEmailService';
 import { insertNrNoonReportSchema, insertNrBunkerRecordSchema } from '@shared/schema';
 import { z } from 'zod';
 
@@ -274,5 +275,54 @@ export async function getBunkerCostSummary(req: Request, res: Response) {
     res.json(summary);
   } catch (error: any) {
     res.status(500).json({ error: 'Failed to fetch bunker cost summary', details: error.message });
+  }
+}
+
+// ── GET /nr-fleet-summary — multi-vessel summary for fleet overview ───────────
+export async function getFleetSummary(req: Request, res: Response) {
+  try {
+    const { vesselIds } = req.query;
+    if (!vesselIds) return res.status(400).json({ error: 'vesselIds query param required (comma-separated)' });
+    const ids = (vesselIds as string).split(',').map(id => id.trim()).filter(Boolean);
+    if (ids.length === 0) return res.status(400).json({ error: 'At least one vesselId required' });
+    if (ids.length > 50) return res.status(400).json({ error: 'Maximum 50 vessels per request' });
+    const summary = await service.getFleetSummary(ids);
+    res.json(summary);
+  } catch (error: any) {
+    res.status(500).json({ error: 'Failed to fetch fleet summary', details: error.message });
+  }
+}
+
+// ── GET /nr-smtp-status — check if SMTP is configured ────────────────────────
+export async function getSmtpStatus(req: Request, res: Response) {
+  res.json({ configured: isSmtpConfigured() });
+}
+
+// ── POST /nr-reports/:id/email — send noon report by email ───────────────────
+export async function emailNoonReport(req: Request, res: Response) {
+  try {
+    const id = parseInt(req.params.id);
+    if (isNaN(id)) return res.status(400).json({ error: 'Invalid report ID' });
+
+    const report = await service.getNoonReport(id);
+    if (!report) return res.status(404).json({ error: 'Report not found' });
+
+    const { to, cc, vesselName } = req.body;
+    if (!to) return res.status(400).json({ error: '"to" email address is required' });
+
+    const result = await sendReportEmail({
+      report,
+      vesselName: vesselName || report.vesselId,
+      to,
+      cc,
+    });
+
+    if (result.success) {
+      res.json({ success: true, message: result.message, previewUrl: result.previewUrl });
+    } else {
+      res.status(503).json({ success: false, message: result.message });
+    }
+  } catch (error: any) {
+    res.status(500).json({ error: 'Failed to send email', details: error.message });
   }
 }

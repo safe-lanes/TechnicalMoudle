@@ -81,6 +81,19 @@ if (!NOON_MODULE_ENABLED) {
   // DELETE /nr-bunker/:id — delete record + decrement ROB
   router.delete('/nr-bunker/:id', asyncHandler(ctrl.deleteBunkerRecord));
 
+  // ── Fleet Overview ────────────────────────────────────────────────────────
+
+  // GET /nr-fleet-summary?vesselIds=id1,id2,… — aggregated per-vessel KPIs
+  router.get('/nr-fleet-summary', asyncHandler(ctrl.getFleetSummary));
+
+  // ── Reports Export & Email ─────────────────────────────────────────────────
+
+  // GET /nr-smtp-status — check if SMTP email is configured
+  router.get('/nr-smtp-status', asyncHandler(ctrl.getSmtpStatus));
+
+  // POST /nr-reports/:id/email — send a noon report by email
+  router.post('/nr-reports/:id/email', asyncHandler(ctrl.emailNoonReport));
+
 }
 
 export default router;

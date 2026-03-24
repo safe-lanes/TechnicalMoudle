@@ -14,6 +14,37 @@ import {
   assignCiiRating,
 } from '../utils/fuelConversionFactors';
 
+// ── Bunker ROB adjustment (called by bunkerService on BDN create/update/delete) ──
+// Exported here (in the calculation engine) per architectural requirement so
+// all nr_fuel_rob mutations go through a single service.
+
+export async function adjustRobForBunker(
+  vesselId: string,
+  fuelType: string,
+  deltaMt: number,
+): Promise<void> {
+  const rows = await db.select()
+    .from(nrFuelRob)
+    .where(and(eq(nrFuelRob.vesselId, vesselId), eq(nrFuelRob.fuelType, fuelType)))
+    .limit(1);
+
+  if (rows.length === 0) {
+    const newRob = Math.max(0, deltaMt);
+    await db.insert(nrFuelRob).values({
+      vesselId,
+      fuelType,
+      currentRob: String(newRob),
+      lastUpdated: new Date(),
+    });
+  } else {
+    const current = Number(rows[0].currentRob) || 0;
+    const updated = Math.max(0, current + deltaMt);
+    await db.update(nrFuelRob)
+      .set({ currentRob: String(updated), lastUpdated: new Date() })
+      .where(and(eq(nrFuelRob.vesselId, vesselId), eq(nrFuelRob.fuelType, fuelType)));
+  }
+}
+
 // ── Main entry point (two-phase) ──────────────────────────────────────────────
 // Phase 1: run KPI steps concurrently; Phase 2: run alert engine sequentially
 // after Phase 1 so previousCiiRating and updated endurance are already persisted.
