@@ -614,11 +614,23 @@ const RunningHours = () => {
       hour12: false
     });
     
-    const newValue = parseFloat(updateForm.newValue);
+    const effectiveNewValue = meterReplaced && (!updateForm.newValue || updateForm.newValue.trim() === "")
+      ? updateForm.newMeterStart || "0"
+      : updateForm.newValue;
+    const newValue = parseFloat(effectiveNewValue);
     const previousRH = parseFloat(updateForm.oldValue.replace(/,/g, ''));
     
-    // Check if user is trying to set RH to 0 - require confirmation
-    if (updateMode === 'setTotal' && newValue === 0) {
+    if (isNaN(newValue)) {
+      toast({
+        title: "Error",
+        description: "Please enter a valid number for the new value.",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    // Check if user is trying to set RH to 0 - require confirmation (skip if meter replaced, already confirmed)
+    if (updateMode === 'setTotal' && newValue === 0 && !meterReplaced) {
       setPendingZeroRHUpdate({
         componentId: selectedComponent.id,
         componentName: selectedComponent.component,
@@ -642,6 +654,7 @@ const RunningHours = () => {
       meterReplaced,
       oldMeterFinal: meterReplaced ? updateForm.oldMeterFinal : undefined,
       newMeterStart: meterReplaced ? updateForm.newMeterStart : undefined,
+      isRenewalReset: meterReplaced && newValue === 0 ? true : undefined,
       renewalActionType: meterReplaced && meterReplacedConfirmation ? meterReplacedConfirmation.renewalActionType : undefined,
       renewalReason: meterReplaced && meterReplacedConfirmation ? meterReplacedConfirmation.renewalReason : undefined,
       renewalReference: meterReplaced && meterReplacedConfirmation ? meterReplacedConfirmation.renewalReference : undefined,

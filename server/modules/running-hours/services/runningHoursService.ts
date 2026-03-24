@@ -75,44 +75,56 @@ export async function cascadeUpdate(body: unknown) {
     targetRH = currentRH + validatedData.value;
   }
 
-  // Validate running hours increase against daily limits
-  // Use same fallback logic as the Running Hours display
-  const componentLastUpdated = resolveLastUpdated(parentComponent);
+  // Skip daily-limit validation for meter replacements (physical device swap, not normal accumulation)
+  if (!validatedData.meterReplaced) {
+    // Validate running hours increase against daily limits
+    // Use same fallback logic as the Running Hours display
+    const componentLastUpdated = resolveLastUpdated(parentComponent);
 
-  console.log('[RH Validation Debug] componentLastUpdated:', componentLastUpdated);
-  console.log('[RH Validation Debug] newUpdateDate:', validatedData.dateUpdated);
-  console.log('[RH Validation Debug] currentRH:', currentRH, 'targetRH:', targetRH);
+    console.log('[RH Validation Debug] componentLastUpdated:', componentLastUpdated);
+    console.log('[RH Validation Debug] newUpdateDate:', validatedData.dateUpdated);
+    console.log('[RH Validation Debug] currentRH:', currentRH, 'targetRH:', targetRH);
 
-  const validation = validateRunningHoursIncrease({
-    currentRH: currentRH,
-    newRH: targetRH,
-    componentLastUpdated: componentLastUpdated,
-    newUpdateDate: validatedData.dateUpdated,
-    userRole: validatedData.userRole || 'Ship',
-    adminOverride: validatedData.adminOverride || false
-  });
+    const validation = validateRunningHoursIncrease({
+      currentRH: currentRH,
+      newRH: targetRH,
+      componentLastUpdated: componentLastUpdated,
+      newUpdateDate: validatedData.dateUpdated,
+      userRole: validatedData.userRole || 'Ship',
+      adminOverride: validatedData.adminOverride || false
+    });
 
-  console.log('[RH Validation Debug] result:', validation);
+    console.log('[RH Validation Debug] result:', validation);
 
-  if (!validation.allowed) {
-    throw new ValidationError(validation.message, {
+    if (!validation.allowed) {
+      throw new ValidationError(validation.message, {
+        validation: {
+          maxAllowedIncrease: validation.maxAllowedIncrease,
+          requestedIncrease: validation.requestedIncrease,
+          daysSinceLastUpdate: validation.daysSinceLastUpdate,
+          lastUpdateDate: validation.lastUpdateDate,
+          requiresAdminOverride: validation.requiresAdminOverride,
+          canOverride: canAdminOverride(validatedData.userRole || 'Ship')
+        }
+      });
+    }
+
+    const result = await repo.cascadeRunningHoursUpdate(validatedData);
+    return {
+      ...result,
       validation: {
         maxAllowedIncrease: validation.maxAllowedIncrease,
-        requestedIncrease: validation.requestedIncrease,
-        daysSinceLastUpdate: validation.daysSinceLastUpdate,
-        lastUpdateDate: validation.lastUpdateDate,
-        requiresAdminOverride: validation.requiresAdminOverride,
-        canOverride: canAdminOverride(validatedData.userRole || 'Ship')
+        actualIncrease: validation.requestedIncrease
       }
-    });
+    };
   }
 
   const result = await repo.cascadeRunningHoursUpdate(validatedData);
   return {
     ...result,
     validation: {
-      maxAllowedIncrease: validation.maxAllowedIncrease,
-      actualIncrease: validation.requestedIncrease
+      maxAllowedIncrease: null,
+      actualIncrease: null
     }
   };
 }
