@@ -3462,7 +3462,8 @@ const Components: React.FC = () => {
             )}
             {(isSailAdmin || isClientAdmin) && !isChangeRequestMode && !isChangeMode && canCreateComponent && (
               <Button 
-                className="bg-[#5dc86f] hover:bg-[#4db85f] text-white"
+                className="bg-green-600 hover:bg-green-700 text-white"
+                size="sm"
                 onClick={() => {
                   setEditingComponentId(null);
                   setEditingComponentCode(null);
@@ -3470,7 +3471,7 @@ const Components: React.FC = () => {
                 }}
                 data-testid="B5"
               >
-                <Marker id="B5" /> + Add / Edit Component
+                <Marker id="B5" /> <Plus className="h-4 w-4 mr-1" /> Add / Edit Component
               </Button>
             )}
           </div>
