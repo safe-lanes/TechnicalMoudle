@@ -1,5 +1,5 @@
-import React, { useState, useEffect, useCallback } from "react";
-import { Search, ChevronRight, ChevronDown, ChevronUp, ChevronLeft, Edit2, FileText, ArrowLeft, Plus, Check, Package, X, AlertCircle, CheckCircle, HelpCircle, File, FileImage, FileCheck, Upload, Download, Lock, Wrench, User, ClipboardList, MessageSquare, MapPin, Pencil, Expand, Minimize2, GripVertical, Trash2 } from "lucide-react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
+import { Search, ChevronRight, ChevronDown, ChevronUp, ChevronLeft, Edit2, FileText, ArrowLeft, Plus, Check, Package, X, AlertCircle, CheckCircle, HelpCircle, File, FileImage, FileCheck, Upload, Download, Lock, Wrench, User, ClipboardList, MessageSquare, MapPin, Pencil, Expand, Minimize2, GripVertical, Trash2, Eye, Loader2 } from "lucide-react";
 import * as XLSX from "xlsx";
 import { Marker } from "@/components/Marker";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -1768,46 +1768,13 @@ const SparesSection: React.FC<{ selectedComponent: ComponentNode | null }> = ({ 
 
 const DrawingsAndManualsSection: React.FC<{ selectedComponent: ComponentNode | null }> = ({ selectedComponent }) => {
   const { canViewDocument, canDownloadDocument } = useAuth();
-  
-  // Pagination state
-  const [isTableExpanded, setIsTableExpanded] = useState(false);
-  const [currentPage, setCurrentPage] = useState(1);
-  const COLLAPSED_ROWS = 2;
-  const ROWS_PER_PAGE = 10;
-  
-  // Fetch documents for the selected component
-  const { data: documents = [], isLoading } = useQuery<any[]>({
-    queryKey: [`/technical/api/component-documents/${selectedComponent?.id}`],
-    enabled: !!selectedComponent?.id,
-  });
-  
-  const getFileTypeIcon = (fileType: string) => {
-    switch (fileType) {
-      case 'Manual': return FileText;
-      case 'Drawing': return FileImage;
-      case 'Certificate': return FileCheck;
-      default: return File;
-    }
-  };
-  
-  // Filter documents based on role permissions
-  const viewableDocuments = documents.filter(doc => canViewDocument(doc));
-  
-  // Calculate visible documents based on expand state and pagination
-  const totalDocs = viewableDocuments.length;
-  const totalPages = Math.ceil(totalDocs / ROWS_PER_PAGE);
-  const visibleDocs = isTableExpanded 
-    ? viewableDocuments.slice((currentPage - 1) * ROWS_PER_PAGE, currentPage * ROWS_PER_PAGE)
-    : viewableDocuments.slice(0, COLLAPSED_ROWS);
-  
-  if (!selectedComponent) {
-    return <div className="text-sm text-gray-500">Select a component to view documents</div>;
-  }
-  
-  if (isLoading) {
-    return <div className="text-sm text-gray-500">Loading documents...</div>;
-  }
-  
+  const { toast } = useToast();
+  const { canEdit } = usePermissions();
+  const canUpload = canEdit("pms-components");
+
+  const [uploadingDocType, setUploadingDocType] = useState<string | null>(null);
+  const fileInputRefs = useRef<Record<string, HTMLInputElement | null>>({});
+
   const documentTypes = [
     { id: "1", type: "Equipment Drawing", fileType: "Drawing" },
     { id: "2", type: "Maintenance Manual", fileType: "Manual" },
@@ -1815,149 +1782,190 @@ const DrawingsAndManualsSection: React.FC<{ selectedComponent: ComponentNode | n
     { id: "4", type: "Trouble shooting Guide", fileType: "Manual" },
   ];
 
+  // Fetch documents using the actual database UUID (actualId), not the display code (id)
+  const { data: documents = [], isLoading, refetch: refetchDocuments } = useQuery<any[]>({
+    queryKey: ['/technical/api/component-documents', selectedComponent?.actualId],
+    queryFn: async () => {
+      if (!selectedComponent?.actualId) return [];
+      const response = await fetch(`/technical/api/component-documents/${selectedComponent.actualId}`, {
+        credentials: 'include',
+      });
+      if (!response.ok) {
+        if (response.status === 404) return [];
+        throw new Error('Failed to fetch documents');
+      }
+      return response.json();
+    },
+    enabled: !!selectedComponent?.actualId,
+  });
+
+  // Filter documents based on role permissions
+  const viewableDocuments = documents.filter((doc: any) => canViewDocument(doc));
+
   const getDocumentForType = (typeName: string) =>
     viewableDocuments.find(
-      (doc) =>
+      (doc: any) =>
         doc.fileName?.toLowerCase().includes(typeName.toLowerCase()) ||
         doc.fileType?.toLowerCase() === typeName.toLowerCase() ||
         doc.notes?.toLowerCase().includes(typeName.toLowerCase())
     );
 
-  if (viewableDocuments.length === 0) {
-    return (
-      <div className="space-y-2">
-        {documentTypes.map((docType) => (
-          <div key={docType.id} className="flex items-center justify-between p-2 border border-[#52baf3] rounded">
-            <span className="text-sm text-[#52baf3]">{docType.type}</span>
-            <Upload className="h-4 w-4 text-[#52baf3]" />
-          </div>
-        ))}
-      </div>
-    );
+  const handleUploadClick = (docType: string) => {
+    fileInputRefs.current[docType]?.click();
+  };
+
+  const handleFileSelected = async (
+    event: React.ChangeEvent<HTMLInputElement>,
+    docType: string,
+    fileType: string
+  ) => {
+    const file = event.target.files?.[0];
+    if (!file || !selectedComponent?.actualId) return;
+
+    const validTypes = [
+      'application/pdf',
+      'image/jpeg',
+      'image/jpg',
+      'image/png',
+      'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      'application/msword',
+    ];
+    const maxSize = 25 * 1024 * 1024;
+
+    if (!validTypes.includes(file.type)) {
+      toast({
+        title: "Invalid file type",
+        description: "Please upload PDF, Word, or image files only.",
+        variant: "destructive",
+      });
+      event.target.value = '';
+      return;
+    }
+
+    if (file.size > maxSize) {
+      toast({
+        title: "File too large",
+        description: "File size must be less than 25MB.",
+        variant: "destructive",
+      });
+      event.target.value = '';
+      return;
+    }
+
+    setUploadingDocType(docType);
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+      formData.append('componentId', selectedComponent.actualId);
+      formData.append('componentCode', selectedComponent.code);
+      formData.append('vesselCode', (selectedComponent as any).vesselCode || (selectedComponent as any).vesselId || '');
+      formData.append('fileName', `${docType} - ${file.name}`);
+      formData.append('fileType', fileType);
+      formData.append('version', '1.0');
+      formData.append('canShipView', 'true');
+      formData.append('canShipDownload', 'true');
+      formData.append('notes', docType);
+
+      const response = await fetch('/technical/api/component-documents', {
+        method: 'POST',
+        credentials: 'include',
+        body: formData,
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error((errorData as any).error || 'Failed to upload document');
+      }
+
+      toast({
+        title: "Document Uploaded",
+        description: `${docType} has been uploaded successfully.`,
+      });
+      refetchDocuments();
+    } catch (error: any) {
+      toast({
+        title: "Upload Failed",
+        description: error.message || "Failed to upload document.",
+        variant: "destructive",
+      });
+    } finally {
+      setUploadingDocType(null);
+      if (event.target) {
+        event.target.value = '';
+      }
+    }
+  };
+
+  const handleViewDocument = (docId: number) => {
+    window.open(`/technical/api/component-documents/${docId}/download`, '_blank');
+  };
+
+  if (!selectedComponent) {
+    return <div className="text-sm text-gray-500">Select a component to view documents</div>;
   }
-  
+
+  if (isLoading) {
+    return <div className="text-sm text-gray-500">Loading documents...</div>;
+  }
+
   return (
-    <div className="space-y-4">
-      <div className="flex items-center justify-between mb-4">
-        <div className="text-sm text-gray-600" data-testid="B7.F.2">
-          <Marker id="B7.F.2" /> <span className="font-semibold">{viewableDocuments.length}</span> document(s) available
-        </div>
-        <AdminOnly>
-          <Button size="sm" variant="outline" className="text-xs" data-testid="B7.F.3">
-            <Marker id="B7.F.3" /> <Upload className="h-3 w-3 mr-1" />
-            Upload Document
-          </Button>
-        </AdminOnly>
-      </div>
-      
-      <div className="grid grid-cols-2 gap-3">
-        {visibleDocs.map((doc, index) => {
-          const IconComponent = getFileTypeIcon(doc.fileType);
-          const hasDownloadAccess = canDownloadDocument(doc);
-          
-          return (
-            <div
-              key={index}
-              className={`flex items-center gap-3 p-3 rounded-md border ${
-                hasDownloadAccess 
-                  ? 'hover:bg-blue-50 cursor-pointer border-gray-200' 
-                  : 'bg-gray-50 border-gray-100 cursor-not-allowed'
-              }`}
-              data-testid="B7.F.4"
-              onClick={() => {
-                if (hasDownloadAccess) {
-                  console.log('Download document:', doc.fileName);
-                }
-              }}
+    <div className="space-y-2">
+      {documentTypes.map((docType) => {
+        const existingDoc = getDocumentForType(docType.type);
+        const isUploading = uploadingDocType === docType.type;
+        return (
+          <div
+            key={docType.id}
+            className="flex items-center justify-between p-2 border border-[#52baf3] rounded"
+            data-testid={`row-document-${docType.id}`}
+          >
+            <span
+              className={`text-sm text-[#52baf3] flex-1 truncate ${existingDoc ? 'cursor-pointer hover:underline' : ''}`}
+              onClick={() => existingDoc && handleViewDocument(existingDoc.id)}
+              title={existingDoc ? existingDoc.fileName : docType.type}
             >
-              <IconComponent className={`h-5 w-5 ${hasDownloadAccess ? 'text-blue-600' : 'text-gray-400'}`} />
-              <div className="flex-1 min-w-0">
-                <div className={`text-sm font-medium truncate ${hasDownloadAccess ? 'text-gray-900' : 'text-gray-500'}`}>
-                  {doc.fileName}
-                </div>
-                <div className="flex items-center gap-2 mt-1">
-                  <span className="text-xs text-gray-500">{doc.fileType}</span>
-                  {doc.version && (
-                    <>
-                      <span className="text-xs text-gray-400">•</span>
-                      <span className="text-xs text-gray-500">v{doc.version}</span>
-                    </>
+              {existingDoc ? existingDoc.fileName : docType.type}
+            </span>
+            <div className="flex items-center gap-2 ml-2 shrink-0">
+              {existingDoc && (
+                <button
+                  type="button"
+                  onClick={() => handleViewDocument(existingDoc.id)}
+                  className="text-[#52baf3] hover:text-blue-700 cursor-pointer"
+                  title="View document"
+                  data-testid={`btn-view-document-${docType.id}`}
+                >
+                  <Eye className="h-4 w-4" />
+                </button>
+              )}
+              {canUpload && (
+                <>
+                  {isUploading ? (
+                    <Loader2 className="h-4 w-4 animate-spin text-[#52baf3]" />
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => handleUploadClick(docType.type)}
+                      className="text-[#52baf3] hover:text-blue-700 cursor-pointer"
+                      title={existingDoc ? `Replace ${docType.type}` : `Upload ${docType.type}`}
+                      data-testid={`btn-upload-document-${docType.id}`}
+                    >
+                      <Upload className="h-4 w-4" />
+                    </button>
                   )}
-                  {!hasDownloadAccess && (
-                    <>
-                      <span className="text-xs text-gray-400">•</span>
-                      <span className="text-xs text-amber-600 flex items-center gap-1">
-                        <Lock className="h-3 w-3" /> View Only
-                      </span>
-                    </>
-                  )}
-                </div>
-              </div>
-              {hasDownloadAccess && (
-                <span data-testid="B7.F.5"><Marker id="B7.F.5" /> <Download className="h-4 w-4 text-gray-400" /></span>
+                  <input
+                    type="file"
+                    ref={(el) => { fileInputRefs.current[docType.type] = el; }}
+                    onChange={(e) => handleFileSelected(e, docType.type, docType.fileType)}
+                    className="hidden"
+                    accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
+                  />
+                </>
               )}
             </div>
-          );
-        })}
-      </div>
-      
-      {/* Expand/Collapse and Pagination Controls */}
-      {totalDocs > COLLAPSED_ROWS && (
-        <div className="flex items-center justify-between mt-3 pt-3 border-t border-gray-100">
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => {
-              setIsTableExpanded(!isTableExpanded);
-              setCurrentPage(1);
-            }}
-            className="text-xs text-blue-600 hover:text-blue-800"
-            data-testid="btn-expand-documents"
-          >
-            {isTableExpanded ? (
-              <>
-                <Minimize2 className="h-3 w-3 mr-1" />
-                Collapse ({totalDocs} total)
-              </>
-            ) : (
-              <>
-                <Expand className="h-3 w-3 mr-1" />
-                Show All ({totalDocs} documents)
-              </>
-            )}
-          </Button>
-          
-          {isTableExpanded && totalPages > 1 && (
-            <div className="flex items-center gap-2">
-              <Button
-                variant="outline"
-                size="icon"
-                onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
-                disabled={currentPage === 1}
-                data-testid="btn-prev-page-documents"
-              >
-                <ChevronLeft className="h-4 w-4" />
-              </Button>
-              <span className="text-xs text-gray-600">
-                Page {currentPage} of {totalPages}
-              </span>
-              <Button
-                variant="outline"
-                size="icon"
-                onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
-                disabled={currentPage === totalPages}
-                data-testid="btn-next-page-documents"
-              >
-                <ChevronRight className="h-4 w-4" />
-              </Button>
-            </div>
-          )}
-        </div>
-      )}
-      
-      <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded text-xs text-blue-700" data-testid="B7.F.6">
-        <Marker id="B7.F.6" /> Document access is controlled by role-based permissions
-      </div>
+          </div>
+        );
+      })}
     </div>
   );
 };
