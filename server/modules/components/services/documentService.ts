@@ -1,3 +1,5 @@
+import * as fs from 'fs';
+import * as path from 'path';
 import * as repo from '../repositories/componentRepository';
 import { objectStorageClient, ObjectNotFoundError } from '../../../objectStorage';
 import { insertComponentDocumentSchema } from '@shared/schema';
@@ -9,12 +11,39 @@ interface UserInfo {
   vesselId?: string;
 }
 
+const LOCAL_STORAGE_DIR = path.resolve(process.cwd(), '.private', 'component-docs');
+
+function useObjectStorage(): boolean {
+  return !!process.env.DEFAULT_OBJECT_STORAGE_BUCKET_ID;
+}
+
+function saveToLocalFS(buffer: Buffer, fileKey: string): string {
+  const fullPath = path.join(LOCAL_STORAGE_DIR, fileKey);
+  const dir = path.dirname(fullPath);
+  fs.mkdirSync(dir, { recursive: true });
+  fs.writeFileSync(fullPath, buffer);
+  return fileKey;
+}
+
+function readFromLocalFS(fileKey: string): Buffer {
+  const fullPath = path.join(LOCAL_STORAGE_DIR, fileKey);
+  if (!fs.existsSync(fullPath)) {
+    throw new NotFoundError('Document file not found in local storage');
+  }
+  return fs.readFileSync(fullPath);
+}
+
+function deleteFromLocalFS(fileKey: string): void {
+  const fullPath = path.join(LOCAL_STORAGE_DIR, fileKey);
+  if (fs.existsSync(fullPath)) {
+    fs.unlinkSync(fullPath);
+  }
+}
+
 export async function listDocuments(componentId: string, user: UserInfo) {
-  // Verify the component exists and check vessel access
   const component = await repo.findById(componentId);
   if (!component) throw new NotFoundError('Component not found');
 
-  // For Ship users, enforce vessel scoping
   if (user.role === 'Ship' && user.vesselId) {
     if (component.vesselCode !== user.vesselId) {
       throw new ForbiddenError('Cannot access documents for components from other vessels');
@@ -23,7 +52,6 @@ export async function listDocuments(componentId: string, user: UserInfo) {
 
   const documents = await repo.findDocuments(componentId);
 
-  // Filter documents based on user role and permissions
   return documents.filter((doc: any) => {
     if (user.role === 'PMS Admin' || user.role === 'Sail Admin' || user.role === 'Office') return true;
     if (user.role === 'Ship') return doc.canShipView;
@@ -32,46 +60,41 @@ export async function listDocuments(componentId: string, user: UserInfo) {
 }
 
 export async function createDocument(body: any, file: Express.Multer.File, user: UserInfo) {
-  // Validate componentId exists
   const component = await repo.findById(body.componentId);
   if (!component) throw new ValidationError('Invalid componentId - component not found');
 
-  // Verify componentCode matches
   if (component.componentCode !== body.componentCode) {
     throw new ValidationError('componentCode mismatch - does not match component\'s code');
   }
 
-  // Verify vesselCode matches
   if (component.vesselCode !== body.vesselCode) {
     throw new ValidationError('vesselCode mismatch - does not match component\'s vessel');
   }
 
-  // Upload file to object storage
   const timestamp = Date.now();
   const safeFileName = file.originalname.replace(/[^a-zA-Z0-9.-]/g, '_');
   const fileKey = `${component.componentCode}/${timestamp}_${safeFileName}`;
   const fileSize = file.size;
-  const storageBackend: 'object' = 'object';
+  const storageBackend: 'object' | 'local' = useObjectStorage() ? 'object' : 'local';
 
-  const bucketId = process.env.DEFAULT_OBJECT_STORAGE_BUCKET_ID;
-  if (!bucketId) {
-    console.error('❌ Object storage not configured - DEFAULT_OBJECT_STORAGE_BUCKET_ID is not set');
-    throw new Error('Object storage not configured. Please set up object storage in the Replit Object Storage panel.');
+  if (storageBackend === 'object') {
+    const bucketId = process.env.DEFAULT_OBJECT_STORAGE_BUCKET_ID!;
+    try {
+      const bucket = objectStorageClient.bucket(bucketId);
+      const storageFile = bucket.file(`.private/documents/${fileKey}`);
+      await storageFile.save(file.buffer, {
+        metadata: { contentType: file.mimetype }
+      });
+      console.log(`📤 Uploaded file to object storage: ${fileKey}`);
+    } catch (storageError) {
+      console.error('❌ Object storage upload failed:', storageError);
+      throw new Error('Failed to upload file to object storage');
+    }
+  } else {
+    saveToLocalFS(file.buffer, fileKey);
+    console.log(`📤 Saved file to local storage: ${fileKey}`);
   }
 
-  try {
-    const bucket = objectStorageClient.bucket(bucketId);
-    const storageFile = bucket.file(`.private/documents/${fileKey}`);
-    await storageFile.save(file.buffer, {
-      metadata: { contentType: file.mimetype }
-    });
-    console.log(`📤 Uploaded file to object storage: ${fileKey}`);
-  } catch (storageError) {
-    console.error('❌ Object storage upload failed:', storageError);
-    throw new Error('Failed to upload file to object storage');
-  }
-
-  // Coerce types explicitly
   const coercedBody = {
     componentId: component.cuuid,
     componentCode: component.componentCode,
@@ -95,12 +118,16 @@ export async function createDocument(body: any, file: Express.Multer.File, user:
   try {
     return await repo.createDocument(documentData);
   } catch (dbError) {
-    // Rollback: delete uploaded file if DB insert fails
     console.error('Failed to create document in database, rolling back file upload:', dbError);
     try {
-      const bucket = objectStorageClient.bucket(bucketId);
-      const storageFile = bucket.file(`.private/documents/${fileKey}`);
-      await storageFile.delete();
+      if (storageBackend === 'object') {
+        const bucketId = process.env.DEFAULT_OBJECT_STORAGE_BUCKET_ID!;
+        const bucket = objectStorageClient.bucket(bucketId);
+        const storageFile = bucket.file(`.private/documents/${fileKey}`);
+        await storageFile.delete();
+      } else {
+        deleteFromLocalFS(fileKey);
+      }
     } catch (deleteError) {
       console.error('Failed to cleanup uploaded file after DB error:', deleteError);
     }
@@ -139,6 +166,22 @@ export async function updateDocument(id: number, body: any) {
 }
 
 export async function deleteDocument(id: number) {
+  const document = await repo.findDocument(id);
+  if (document) {
+    try {
+      if (document.storageBackend === 'local' || !useObjectStorage()) {
+        deleteFromLocalFS(document.fileKey);
+      } else {
+        const bucketId = process.env.DEFAULT_OBJECT_STORAGE_BUCKET_ID!;
+        const bucket = objectStorageClient.bucket(bucketId);
+        const storageFile = bucket.file(`.private/documents/${document.fileKey}`);
+        await storageFile.delete();
+      }
+      console.log(`🗑️ Deleted file from storage: ${document.fileKey}`);
+    } catch (err) {
+      console.error('Failed to delete file from storage (continuing with DB cleanup):', err);
+    }
+  }
   await repo.deleteDocument(id);
 }
 
@@ -146,36 +189,38 @@ export async function downloadDocument(id: number, user: UserInfo): Promise<{ bu
   const document = await repo.findDocument(id);
   if (!document) throw new NotFoundError('Document not found');
 
-  // Verify vessel access for Ship users
   if (user.role === 'Ship' && user.vesselId) {
     if (user.vesselId !== document.vesselCode) {
       throw new ForbiddenError('Cannot access documents from other vessels');
     }
   }
 
-  // Check download permissions for Ship users
   if (user.role === 'Ship' && !document.canShipDownload) {
     throw new ForbiddenError('Insufficient permissions to download this document');
   }
 
-  const bucketId = process.env.DEFAULT_OBJECT_STORAGE_BUCKET_ID;
-  if (!bucketId) {
-    console.error('❌ Object storage not configured - DEFAULT_OBJECT_STORAGE_BUCKET_ID is not set');
-    throw new Error('Object storage not configured. Please set up object storage in the Replit Object Storage panel.');
-  }
-
   let fileBuffer: Buffer;
-  try {
-    const bucket = objectStorageClient.bucket(bucketId);
-    const storageFile = bucket.file(`.private/documents/${document.fileKey}`);
-    [fileBuffer] = await storageFile.download();
-    console.log(`📤 Serving file from object storage: ${document.fileKey}`);
-  } catch (objectError) {
-    if (objectError instanceof ObjectNotFoundError) {
-      throw new NotFoundError('Document file not found in storage');
+
+  if (document.storageBackend === 'local' || !useObjectStorage()) {
+    fileBuffer = readFromLocalFS(document.fileKey);
+    console.log(`📤 Serving file from local storage: ${document.fileKey}`);
+  } else {
+    const bucketId = process.env.DEFAULT_OBJECT_STORAGE_BUCKET_ID;
+    if (!bucketId) {
+      throw new Error('Object storage not configured');
     }
-    console.error('Failed to download from object storage:', objectError);
-    throw new NotFoundError('Document file not found in object storage');
+    try {
+      const bucket = objectStorageClient.bucket(bucketId);
+      const storageFile = bucket.file(`.private/documents/${document.fileKey}`);
+      [fileBuffer] = await storageFile.download();
+      console.log(`📤 Serving file from object storage: ${document.fileKey}`);
+    } catch (objectError) {
+      if (objectError instanceof ObjectNotFoundError) {
+        throw new NotFoundError('Document file not found in storage');
+      }
+      console.error('Failed to download from object storage:', objectError);
+      throw new NotFoundError('Document file not found in object storage');
+    }
   }
 
   return {

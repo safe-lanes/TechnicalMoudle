@@ -1774,6 +1774,7 @@ const DrawingsAndManualsSection: React.FC<{ selectedComponent: ComponentNode | n
   const { canEdit } = usePermissions();
   const canUpload = canEdit("pms-components");
 
+  const MAX_FILES_PER_TYPE = 5;
   const [uploadingDocType, setUploadingDocType] = useState<string | null>(null);
   const fileInputRefs = useRef<Record<string, HTMLInputElement | null>>({});
 
@@ -1784,7 +1785,6 @@ const DrawingsAndManualsSection: React.FC<{ selectedComponent: ComponentNode | n
     { id: "4", type: "Trouble shooting Guide", fileType: "Manual" },
   ];
 
-  // Fetch documents using the actual database UUID (actualId), not the display code (id)
   const { data: documents = [], isLoading, refetch: refetchDocuments } = useQuery<any[]>({
     queryKey: ['/technical/api/component-documents', selectedComponent?.actualId],
     queryFn: async () => {
@@ -1801,11 +1801,10 @@ const DrawingsAndManualsSection: React.FC<{ selectedComponent: ComponentNode | n
     enabled: !!selectedComponent?.actualId,
   });
 
-  // Filter documents based on role permissions
   const viewableDocuments = documents.filter((doc: any) => canViewDocument(doc));
 
-  const getDocumentForType = (typeName: string) =>
-    viewableDocuments.find(
+  const getDocumentsForType = (typeName: string): any[] =>
+    viewableDocuments.filter(
       (doc: any) =>
         doc.fileName?.toLowerCase().includes(typeName.toLowerCase()) ||
         doc.fileType?.toLowerCase() === typeName.toLowerCase() ||
@@ -1902,6 +1901,21 @@ const DrawingsAndManualsSection: React.FC<{ selectedComponent: ComponentNode | n
     window.open(`/technical/api/component-documents/${docId}/download`, '_blank');
   };
 
+  const handleDeleteDocument = async (docId: number, docName: string) => {
+    if (!confirm(`Are you sure you want to delete "${docName}"?`)) return;
+    try {
+      const response = await fetch(`/technical/api/component-documents/${docId}`, {
+        method: 'DELETE',
+        credentials: 'include',
+      });
+      if (!response.ok) throw new Error('Failed to delete document');
+      toast({ title: "Document Deleted", description: `${docName} has been deleted.` });
+      refetchDocuments();
+    } catch (error: any) {
+      toast({ title: "Delete Failed", description: error.message, variant: "destructive" });
+    }
+  };
+
   if (!selectedComponent) {
     return <div className="text-sm text-gray-500">Select a component to view documents</div>;
   }
@@ -1913,58 +1927,74 @@ const DrawingsAndManualsSection: React.FC<{ selectedComponent: ComponentNode | n
   return (
     <div className="space-y-2">
       {documentTypes.map((docType) => {
-        const existingDoc = getDocumentForType(docType.type);
+        const existingDocs = getDocumentsForType(docType.type);
         const isUploading = uploadingDocType === docType.type;
+        const canAddMore = existingDocs.length < MAX_FILES_PER_TYPE;
         return (
-          <div
-            key={docType.id}
-            className="flex items-center justify-between p-2 border border-[#52baf3] rounded"
-            data-testid={`row-document-${docType.id}`}
-          >
-            <span
-              className={`text-sm text-[#52baf3] flex-1 truncate ${existingDoc ? 'cursor-pointer hover:underline' : ''}`}
-              onClick={() => existingDoc && handleViewDocument(existingDoc.id)}
-              title={existingDoc ? existingDoc.fileName : docType.type}
-            >
-              {existingDoc ? existingDoc.fileName : docType.type}
-            </span>
-            <div className="flex items-center gap-2 ml-2 shrink-0">
-              {existingDoc && (
-                <button
-                  type="button"
-                  onClick={() => handleViewDocument(existingDoc.id)}
-                  className="text-[#52baf3] hover:text-blue-700 cursor-pointer"
-                  title="View document"
-                  data-testid={`btn-view-document-${docType.id}`}
-                >
-                  <Eye className="h-4 w-4" />
-                </button>
-              )}
-              {canUpload && (
-                <>
-                  {isUploading ? (
-                    <Loader2 className="h-4 w-4 animate-spin text-[#52baf3]" />
-                  ) : (
-                    <button
-                      type="button"
-                      onClick={() => handleUploadClick(docType.type)}
-                      className="text-[#52baf3] hover:text-blue-700 cursor-pointer"
-                      title={existingDoc ? `Replace ${docType.type}` : `Upload ${docType.type}`}
-                      data-testid={`btn-upload-document-${docType.id}`}
-                    >
-                      <Upload className="h-4 w-4" />
-                    </button>
-                  )}
-                  <input
-                    type="file"
-                    ref={(el) => { fileInputRefs.current[docType.type] = el; }}
-                    onChange={(e) => handleFileSelected(e, docType.type, docType.fileType)}
-                    className="hidden"
-                    accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
-                  />
-                </>
-              )}
+          <div key={docType.id} className="border border-[#52baf3] rounded overflow-hidden" data-testid={`row-document-${docType.id}`}>
+            <div className="flex items-center justify-between p-2 bg-[#f0f9ff]">
+              <span className="text-sm font-medium text-[#52baf3]">{docType.type}</span>
+              <div className="flex items-center gap-2">
+                {existingDocs.length > 0 && (
+                  <span className="text-xs text-gray-400">{existingDocs.length}/{MAX_FILES_PER_TYPE}</span>
+                )}
+                {canUpload && canAddMore && (
+                  <>
+                    {isUploading ? (
+                      <Loader2 className="h-4 w-4 animate-spin text-[#52baf3]" />
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => handleUploadClick(docType.type)}
+                        className="text-[#52baf3] hover:text-blue-700 cursor-pointer"
+                        title={`Upload ${docType.type}`}
+                        data-testid={`btn-upload-document-${docType.id}`}
+                      >
+                        <Upload className="h-4 w-4" />
+                      </button>
+                    )}
+                    <input
+                      type="file"
+                      ref={(el) => { fileInputRefs.current[docType.type] = el; }}
+                      onChange={(e) => handleFileSelected(e, docType.type, docType.fileType)}
+                      className="hidden"
+                      accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
+                    />
+                  </>
+                )}
+              </div>
             </div>
+            {existingDocs.length > 0 && (
+              <div className="divide-y divide-blue-100">
+                {existingDocs.map((doc: any) => (
+                  <div key={doc.id} className="flex items-center justify-between px-3 py-1.5">
+                    <span className="text-xs text-gray-700 truncate flex-1" title={doc.fileName}>{doc.fileName}</span>
+                    <div className="flex items-center gap-1.5 ml-2 shrink-0">
+                      <button
+                        type="button"
+                        onClick={() => handleViewDocument(doc.id)}
+                        className="text-[#52baf3] hover:text-blue-700 cursor-pointer"
+                        title="View document"
+                        data-testid={`btn-view-document-${doc.id}`}
+                      >
+                        <Eye className="h-3.5 w-3.5" />
+                      </button>
+                      {canUpload && (
+                        <button
+                          type="button"
+                          onClick={() => handleDeleteDocument(doc.id, doc.fileName)}
+                          className="text-red-400 hover:text-red-600 cursor-pointer"
+                          title="Delete document"
+                          data-testid={`btn-delete-document-${doc.id}`}
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         );
       })}
