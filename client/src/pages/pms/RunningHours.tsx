@@ -6,7 +6,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import { Search, FileSpreadsheet, Calendar, Users, Settings, Pencil, AlertTriangle, Download, Clock, History, ArrowUpDown, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight } from "lucide-react";
+import { Search, FileSpreadsheet, Calendar, Users, Settings, Pencil, AlertTriangle, Download, Clock, History, ArrowUpDown, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Plus } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
@@ -1008,10 +1008,11 @@ const RunningHours = () => {
               </Button>
               <Button 
                 className="bg-[#5dc86f] hover:bg-[#4db85f] text-white"
+                size="sm"
                 onClick={openBulkUpdate}
                 data-testid="D5"
               >
-                <Marker id="D5" /><span className="mr-2">+</span>
+                <Marker id="D5" /><Plus className="h-4 w-4 mr-1" />
                 Bulk Update RH
               </Button>
             </div>
