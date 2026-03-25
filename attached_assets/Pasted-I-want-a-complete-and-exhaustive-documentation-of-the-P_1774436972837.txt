@@ -1,0 +1,139 @@
+I want a complete and exhaustive documentation of the PMS Assistant chatbot that is currently built in this application. Do not write any code. Just explain everything about the chatbot in plain English — how it works, what it knows, how it responds, what its UI looks like, and what its limitations are. Cover every single aspect listed below:
+
+1. CURRENT UI & APPEARANCE
+
+Describe the complete visual design of the chatbot:
+
+Where is it positioned on the screen?
+
+What does the trigger button look like — icon, color, size, position?
+
+When opened, what does the chat panel look like — width, height, header, background color?
+
+What does the message input area look like?
+
+How are user messages displayed vs assistant messages — alignment, bubble color, font?
+
+Are there any suggested questions shown? If yes, list all of them exactly as they appear
+
+Is there a close button? A clear/reset button? Any other controls?
+
+What happens when the chat is open and user navigates to a different page — does it stay open or close?
+
+Is the chatbot visible to all users or only specific roles?
+
+2. WHAT THE CHATBOT CURRENTLY KNOWS
+
+Explain exactly what data and context the chatbot has access to:
+
+Does it have access to live database data — work orders, components, spares, running hours, stores?
+
+If yes, which specific collections or data sources does it query?
+
+Does it know the current vessel selected by the user?
+
+Does it know the current user's role (Chief Engineer, 4th Engineer, etc.)?
+
+Does it know today's date and can it calculate things like "overdue since X days"?
+
+Can it read work order details — job titles, due dates, completion status, missed cycles, backdating flags?
+
+Can it read spare parts stock levels — current stock, minimum stock, critical items?
+
+Can it read running hours — current RH, last updated, utilization rates?
+
+Does it have access to anomaly data — high/medium/low severity anomalies?
+
+Does it have access to superintendent notifications?
+
+What is the scope of its knowledge — one vessel, all vessels, or depends on user role?
+
+3. HOW IT PROCESSES QUESTIONS
+
+Explain the logic behind how the chatbot understands and answers:
+
+What AI model or API is being used — OpenAI GPT, a local model, rule-based logic, or something else?
+
+How is the system prompt structured — what instructions are given to the AI at the start of every conversation?
+
+When a user asks a question, does the chatbot query the database in real time and inject the results into the prompt, or is it relying on static/pre-loaded data?
+
+How does it handle questions it cannot answer — does it say it doesn't know, make up an answer, or redirect?
+
+Does it maintain conversation history within a session — meaning does it remember what was said earlier in the same chat?
+
+Does it remember anything across sessions — if user closes and reopens the chat, does it remember previous conversations?
+
+What is the maximum number of messages or context length it can handle before losing earlier parts of the conversation?
+
+Can it perform calculations — e.g., total manhours this month, average delay per rank, number of missed cycles across all components?
+
+4. WHAT QUESTIONS IT CAN AND CANNOT ANSWER TODAY
+
+Give a clear breakdown:
+
+List the types of questions it handles well today with examples
+
+List the types of questions it currently fails at or gives wrong/incomplete answers for
+
+Can it answer questions about a specific work order by number — e.g., "What is the status of MKR-IN-00073?"
+
+Can it answer trend questions — e.g., "Which component has the most missed cycles this year?"
+
+Can it answer comparisons — e.g., "Which rank has the most overdue jobs?"
+
+Can it answer stock questions — e.g., "Which spare parts are critically low?"
+
+Can it draft text — e.g., "Draft a maintenance briefing for this week"
+
+Can it give recommendations — e.g., "What should I prioritize today?"
+
+5. SUGGESTED QUESTIONS
+
+List every single suggested/quick question currently shown in the chatbot panel exactly as written, and explain what query or logic each one triggers when clicked.
+
+6. CURRENT LIMITATIONS & KNOWN GAPS
+
+Be completely honest about what the chatbot cannot do right now:
+
+Is it aware of all 7 modules — Components, Work Orders, Running Hours, Spares, Stores, Reports, Dashboard?
+
+Can it navigate the user to a page — e.g., "Take me to overdue work orders"?
+
+Can it take actions — e.g., "Approve this work order" or "Add this spare part"?
+
+Can it generate or export reports?
+
+Can it handle multi-step questions that require joining data from two modules?
+
+Does it know about the anti-fraud layers — backdating detection, missed cycles, CE remarks, superintendent lock?
+
+7. HOW IT IS TRAINED OR CONFIGURED
+
+Explain the configuration:
+
+Is there a system prompt — if yes, what does it say exactly, paste the full text?
+
+Is there a temperature or creativity setting on the AI model?
+
+Is there any fine-tuning or custom training done, or is it purely prompt-based?
+
+Are there any guardrails — things the bot is explicitly told NOT to do or say?
+
+Is there a token/character limit on responses?
+
+What happens when the API call fails — is there a fallback message?
+
+8. IMPROVEMENT AREAS TO CONSIDER
+
+Based on what is currently built, tell me:
+
+What data is available in the system that the chatbot is NOT currently using but could use to give better answers?
+
+What new suggested questions would make the chatbot more useful for a Chief Engineer or Superintendent?
+
+What would need to change technically to allow the chatbot to answer fleet-wide questions across all vessels?
+
+What would need to change to allow the chatbot to take actions, not just answer questions?
+
+Is the current architecture capable of supporting voice input in the future?
