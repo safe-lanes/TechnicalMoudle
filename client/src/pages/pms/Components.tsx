@@ -1808,12 +1808,30 @@ const DrawingsAndManualsSection: React.FC<{ selectedComponent: ComponentNode | n
     return <div className="text-sm text-gray-500">Loading documents...</div>;
   }
   
+  const documentTypes = [
+    { id: "1", type: "Equipment Drawing", fileType: "Drawing" },
+    { id: "2", type: "Maintenance Manual", fileType: "Manual" },
+    { id: "3", type: "Installation Guide", fileType: "Manual" },
+    { id: "4", type: "Trouble shooting Guide", fileType: "Manual" },
+  ];
+
+  const getDocumentForType = (typeName: string) =>
+    viewableDocuments.find(
+      (doc) =>
+        doc.fileName?.toLowerCase().includes(typeName.toLowerCase()) ||
+        doc.fileType?.toLowerCase() === typeName.toLowerCase() ||
+        doc.notes?.toLowerCase().includes(typeName.toLowerCase())
+    );
+
   if (viewableDocuments.length === 0) {
     return (
-      <div className="text-center py-8">
-        <div className="text-gray-400 text-sm">
-          Feature coming soon
-        </div>
+      <div className="space-y-2">
+        {documentTypes.map((docType) => (
+          <div key={docType.id} className="flex items-center justify-between p-2 border border-[#52baf3] rounded">
+            <span className="text-sm text-[#52baf3]">{docType.type}</span>
+            <Upload className="h-4 w-4 text-[#52baf3]" />
+          </div>
+        ))}
       </div>
     );
   }
@@ -1959,64 +1977,81 @@ const ClassificationRegulatorySection: React.FC<{ selectedComponent: ComponentNo
     return <div className="text-sm text-gray-500">Loading classification & regulatory data...</div>;
   }
   
-  if (classRegData.length === 0) {
-    return (
-      <div className="text-center py-8">
-        <div className="text-gray-400 text-sm">
-          Feature coming soon
-        </div>
-      </div>
-    );
-  }
-  
+  const record = classRegData[0] || {};
+
   return (
-    <div className="space-y-4">
-      <div className="flex items-center justify-between mb-4">
-        <div className="text-sm text-gray-600">
-          <span className="font-semibold">{classRegData.length}</span> survey record(s)
-        </div>
-        <AdminOnly>
-          <Button size="sm" variant="outline" className="text-xs" data-testid="button-add-survey">
-            <Plus className="h-3 w-3 mr-1" />
-            Add Survey
-          </Button>
-        </AdminOnly>
+    <div className="grid grid-cols-4 gap-4">
+      <div>
+        <label className="text-xs font-medium text-gray-600 block mb-1">Classification Society</label>
+        <Input
+          readOnly
+          value={record.classificationSociety || ""}
+          className="h-8 text-sm border-[#52baf3] border-2 focus:border-[#52baf3] bg-gray-50"
+          data-testid="view-classification-society"
+        />
       </div>
-      
-      <div className="overflow-x-auto">
-        <table className="w-full text-sm">
-          <thead>
-            <tr className="border-b border-gray-200">
-              <th className="text-left py-2 px-3 font-medium text-gray-600">Classification Society</th>
-              <th className="text-left py-2 px-3 font-medium text-gray-600">Survey Type</th>
-              <th className="text-left py-2 px-3 font-medium text-gray-600">Certificate No.</th>
-              <th className="text-left py-2 px-3 font-medium text-gray-600">Last Survey</th>
-              <th className="text-left py-2 px-3 font-medium text-gray-600">Next Due</th>
-              <th className="text-left py-2 px-3 font-medium text-gray-600">Status</th>
-            </tr>
-          </thead>
-          <tbody>
-            {classRegData.map((item, index) => (
-              <tr key={index} className="border-b border-gray-100">
-                <td className="py-3 px-3 text-gray-900">{item.classificationSociety}</td>
-                <td className="py-3 px-3 text-gray-900">{item.surveyType}</td>
-                <td className="py-3 px-3 text-gray-900">{item.certificateNumber}</td>
-                <td className="py-3 px-3 text-gray-900">{item.lastClassSurvey}</td>
-                <td className="py-3 px-3 text-gray-900">{item.nextSurveyDue}</td>
-                <td className="py-3 px-3">
-                  <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                    item.surveyStatus === 'Active' ? 'bg-green-100 text-green-800' :
-                    item.surveyStatus === 'Pending' ? 'bg-yellow-100 text-yellow-800' :
-                    item.surveyStatus === 'Expired' ? 'bg-red-100 text-red-800' :
-                    'bg-gray-100 text-gray-800'
-                  }`}>
-                    {item.surveyStatus || 'Active'}
-                  </span>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+      <div>
+        <label className="text-xs font-medium text-gray-600 block mb-1">Certificate No.</label>
+        <Input
+          readOnly
+          value={record.certificateNo || record.certificateNumber || ""}
+          className="h-8 text-sm border-[#52baf3] border-2 focus:border-[#52baf3] bg-gray-50"
+          data-testid="view-certificate-no"
+        />
+      </div>
+      <div>
+        <label className="text-xs font-medium text-gray-600 block mb-1">Last Class Survey</label>
+        <Input
+          readOnly
+          value={record.lastClassSurvey || ""}
+          className="h-8 text-sm border-[#52baf3] border-2 focus:border-[#52baf3] bg-gray-50"
+          data-testid="view-last-class-survey"
+        />
+      </div>
+      <div>
+        <label className="text-xs font-medium text-gray-600 block mb-1">Next Class Survey</label>
+        <Input
+          readOnly
+          value={record.nextClassSurvey || record.nextSurveyDue || ""}
+          className="h-8 text-sm border-[#52baf3] border-2 focus:border-[#52baf3] bg-gray-50"
+          data-testid="view-next-class-survey"
+        />
+      </div>
+      <div>
+        <label className="text-xs font-medium text-gray-600 block mb-1">Survey Type</label>
+        <Input
+          readOnly
+          value={record.surveyType || ""}
+          className="h-8 text-sm border-[#52baf3] border-2 focus:border-[#52baf3] bg-gray-50"
+          data-testid="view-survey-type"
+        />
+      </div>
+      <div>
+        <label className="text-xs font-medium text-gray-600 block mb-1">Class Requirements</label>
+        <Input
+          readOnly
+          value={record.classRequirements || ""}
+          className="h-8 text-sm border-[#52baf3] border-2 focus:border-[#52baf3] bg-gray-50"
+          data-testid="view-class-requirements"
+        />
+      </div>
+      <div>
+        <label className="text-xs font-medium text-gray-600 block mb-1">Class Code</label>
+        <Input
+          readOnly
+          value={record.classCode || ""}
+          className="h-8 text-sm border-[#52baf3] border-2 focus:border-[#52baf3] bg-gray-50"
+          data-testid="view-class-code"
+        />
+      </div>
+      <div>
+        <label className="text-xs font-medium text-gray-600 block mb-1">Information</label>
+        <Input
+          readOnly
+          value={record.information || ""}
+          className="h-8 text-sm border-[#52baf3] border-2 focus:border-[#52baf3] bg-gray-50"
+          data-testid="view-class-information"
+        />
       </div>
     </div>
   );
