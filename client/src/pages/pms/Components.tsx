@@ -1931,35 +1931,6 @@ const DrawingsAndManualsSection: React.FC<{ selectedComponent: ComponentNode | n
     return <Paperclip className="h-5 w-5" />;
   };
 
-  const renderDocIcons = (docs: any[]) => {
-    if (docs.length === 0) return null;
-    return (
-      <div className="mt-1 flex items-center gap-1 flex-wrap">
-        {docs.map((doc: any) => (
-          <div key={doc.id} className="relative group/doc" data-testid={`doc-icon-${doc.id}`}>
-            <div className="p-1.5 rounded border border-gray-200 bg-gray-50 text-gray-500 hover:bg-blue-50 hover:border-blue-300 hover:text-blue-600 cursor-pointer transition-colors">
-              {getFileIcon(doc.fileName)}
-            </div>
-            <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 hidden group-hover/doc:flex flex-col items-start bg-white rounded-lg shadow-lg border border-gray-200 p-2 z-50 min-w-[180px]">
-              <span className="text-xs text-gray-700 font-medium truncate max-w-[170px] mb-1" title={doc.fileName}>{doc.fileName}</span>
-              <span className="text-[10px] text-gray-400 mb-2">{formatFileSize(doc.fileSize)}</span>
-              <div className="flex items-center gap-1 w-full">
-                <Button variant="outline" size="sm" className="h-7 text-xs flex-1" onClick={() => handleViewDocument(doc.id)} data-testid={`btn-view-document-${doc.id}`}>
-                  <Eye className="h-3.5 w-3.5 mr-1" /> Preview
-                </Button>
-                {canUpload && (
-                  <Button variant="outline" size="sm" className="h-7 text-xs text-red-500 hover:text-red-700 hover:border-red-300" onClick={() => handleDeleteDocument(doc.id, doc.fileName)} data-testid={`btn-delete-document-${doc.id}`}>
-                    <Trash2 className="h-3.5 w-3.5" />
-                  </Button>
-                )}
-              </div>
-            </div>
-          </div>
-        ))}
-      </div>
-    );
-  };
-
   if (!selectedComponent) {
     return <div className="text-sm text-gray-500">Select a component to view documents</div>;
   }
@@ -1975,35 +1946,55 @@ const DrawingsAndManualsSection: React.FC<{ selectedComponent: ComponentNode | n
         const isUploading = uploadingDocType === docType.type;
         const canAddMore = existingDocs.length < MAX_FILES_PER_TYPE;
         return (
-          <div key={docType.id} data-testid={`row-document-${docType.id}`}>
-            <div className="flex items-center justify-between py-3 border-b border-gray-100">
-              <span className="text-sm text-gray-700">{docType.type}</span>
-              <div className="flex items-center gap-2">
-                {canUpload && canAddMore && (
-                  <>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => handleUploadClick(docType.type)}
-                      disabled={uploadingDocType !== null}
-                      data-testid={`btn-upload-document-${docType.id}`}
-                    >
-                      {isUploading ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <Upload className="h-4 w-4 mr-1" />}
-                      Upload
-                    </Button>
-                    <input
-                      type="file"
-                      ref={(el) => { fileInputRefs.current[docType.type] = el; }}
-                      onChange={(e) => handleFileSelected(e, docType.type, docType.fileType)}
-                      className="hidden"
-                      accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
-                    />
-                  </>
-                )}
-                <span className="text-xs text-gray-400">{existingDocs.length}/{MAX_FILES_PER_TYPE}</span>
-              </div>
+          <div key={docType.id} className="flex items-center py-3 border-b border-gray-100" data-testid={`row-document-${docType.id}`}>
+            <span className="text-sm text-gray-700 shrink-0 w-[180px]">{docType.type}</span>
+            <div className="flex items-center gap-1 flex-1 min-w-0">
+              {existingDocs.map((doc: any) => (
+                <div key={doc.id} className="relative group/doc" data-testid={`doc-icon-${doc.id}`}>
+                  <div className="p-1.5 rounded border border-gray-200 bg-gray-50 text-gray-500 hover:bg-blue-50 hover:border-blue-300 hover:text-blue-600 cursor-pointer transition-colors">
+                    {getFileIcon(doc.fileName)}
+                  </div>
+                  <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 hidden group-hover/doc:flex flex-col items-start bg-white rounded-lg shadow-lg border border-gray-200 p-2 z-50 min-w-[180px]">
+                    <span className="text-xs text-gray-700 font-medium truncate max-w-[170px] mb-1" title={doc.fileName}>{doc.fileName}</span>
+                    <span className="text-[10px] text-gray-400 mb-2">{formatFileSize(doc.fileSize)}</span>
+                    <div className="flex items-center gap-1 w-full">
+                      <Button variant="outline" size="sm" className="h-7 text-xs flex-1" onClick={() => handleViewDocument(doc.id)} data-testid={`btn-view-document-${doc.id}`}>
+                        <Eye className="h-3.5 w-3.5 mr-1" /> Preview
+                      </Button>
+                      {canUpload && (
+                        <Button variant="outline" size="sm" className="h-7 text-xs text-red-500 hover:text-red-700 hover:border-red-300" onClick={() => handleDeleteDocument(doc.id, doc.fileName)} data-testid={`btn-delete-document-${doc.id}`}>
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </Button>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              ))}
             </div>
-            {renderDocIcons(existingDocs)}
+            <div className="flex items-center gap-2 shrink-0">
+              {canUpload && canAddMore && (
+                <>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handleUploadClick(docType.type)}
+                    disabled={uploadingDocType !== null}
+                    data-testid={`btn-upload-document-${docType.id}`}
+                  >
+                    {isUploading ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <Upload className="h-4 w-4 mr-1" />}
+                    Upload
+                  </Button>
+                  <input
+                    type="file"
+                    ref={(el) => { fileInputRefs.current[docType.type] = el; }}
+                    onChange={(e) => handleFileSelected(e, docType.type, docType.fileType)}
+                    className="hidden"
+                    accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
+                  />
+                </>
+              )}
+              <span className="text-xs text-gray-400">{existingDocs.length}/{MAX_FILES_PER_TYPE}</span>
+            </div>
           </div>
         );
       })}
