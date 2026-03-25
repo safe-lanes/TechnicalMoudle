@@ -1890,59 +1890,72 @@ export default function ComponentRegisterAddEdit({
                 </CardHeader>
                 {!collapsedSections['F'] && (
                 <CardContent className="pt-4 pb-4 px-4 border-t border-gray-100">
-                  <div className="flex items-center justify-between mb-3">
-                    <div />
-                    <Button
-                      size="sm"
-                      className="bg-[#52baf3] hover:bg-[#4aa3d9] text-white"
-                      data-testid="button-add-document"
-                    >
-                      <Plus className="h-4 w-4 mr-1" />
-                      Add Document
-                    </Button>
-                  </div>
-                  <div className="space-y-2">
-                    {documentTypes.map((docType) => {
-                      const existingDoc = getDocumentForType(docType.type);
-                      const isUploading = uploadingDocType === docType.type;
-                      return (
-                        <div key={docType.id} className="flex items-center justify-between p-2 border border-[#52baf3] rounded">
-                          <div
-                            className={`flex items-center gap-2 flex-1 ${existingDoc ? 'cursor-pointer' : ''}`}
-                            onClick={() => existingDoc && handleViewDocument(existingDoc.id)}
-                            data-testid={`row-document-${docType.id}`}
-                          >
-                            <span className="text-sm text-[#52baf3]">
-                              {existingDoc ? existingDoc.fileName : docType.type}
-                            </span>
-                          </div>
-                          <div className="flex items-center gap-2">
-                            {isUploading ? (
-                              <Loader2 className="h-4 w-4 animate-spin text-[#52baf3]" />
-                            ) : (
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                className="h-7 text-xs border-[#52baf3] text-[#52baf3] hover:bg-[#52baf3] hover:text-white"
-                                onClick={() => handleUploadClick(docType.type)}
-                                data-testid={`button-upload-${docType.id}`}
+                  {!isEditMode ? (
+                    <div className="text-sm text-gray-500 text-center py-4">
+                      Documents will be available after component is created
+                    </div>
+                  ) : isLoadingDocuments ? (
+                    <div className="flex items-center gap-2 text-sm text-gray-500 py-4">
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      Loading documents...
+                    </div>
+                  ) : (
+                    <>
+                      <div className="flex items-center justify-between mb-3">
+                        <div />
+                        <Button
+                          size="sm"
+                          className="bg-[#52baf3] hover:bg-[#4aa3d9] text-white"
+                          data-testid="button-add-document"
+                        >
+                          <Plus className="h-4 w-4 mr-1" />
+                          Add Document
+                        </Button>
+                      </div>
+                      <div className="space-y-2">
+                        {documentTypes.map((docType) => {
+                          const existingDoc = getDocumentForType(docType.type);
+                          const isUploading = uploadingDocType === docType.type;
+                          return (
+                            <div key={docType.id} className="flex items-center justify-between p-2 border border-[#52baf3] rounded">
+                              <div
+                                className={`flex items-center gap-2 flex-1 ${existingDoc ? 'cursor-pointer' : ''}`}
+                                onClick={() => existingDoc && handleViewDocument(existingDoc.id)}
+                                data-testid={`row-document-${docType.id}`}
                               >
-                                <Upload className="h-3 w-3 mr-1" />
-                                Upload
-                              </Button>
-                            )}
-                            <input
-                              type="file"
-                              ref={(el) => { fileInputRefs.current[docType.type] = el; }}
-                              onChange={(e) => handleFileSelected(e, docType.type, docType.fileType)}
-                              className="hidden"
-                              accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
-                            />
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
+                                <span className="text-sm text-[#52baf3]">
+                                  {existingDoc ? existingDoc.fileName : docType.type}
+                                </span>
+                              </div>
+                              <div className="flex items-center gap-2">
+                                {isUploading ? (
+                                  <Loader2 className="h-4 w-4 animate-spin text-[#52baf3]" />
+                                ) : (
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    className="h-7 text-xs border-[#52baf3] text-[#52baf3] hover:bg-[#52baf3] hover:text-white"
+                                    onClick={() => handleUploadClick(docType.type)}
+                                    data-testid={`button-upload-${docType.id}`}
+                                  >
+                                    <Upload className="h-3 w-3 mr-1" />
+                                    Upload
+                                  </Button>
+                                )}
+                                <input
+                                  type="file"
+                                  ref={(el) => { fileInputRefs.current[docType.type] = el; }}
+                                  onChange={(e) => handleFileSelected(e, docType.type, docType.fileType)}
+                                  className="hidden"
+                                  accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
+                                />
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </>
+                  )}
                 </CardContent>
                 )}
               </Card>
