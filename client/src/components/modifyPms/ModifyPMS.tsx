@@ -219,10 +219,11 @@ export function ModifyPMS() {
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold text-black dark:text-white">Modify PMS - Change Requests</h1>
         <Button 
-          className="bg-[#5dc86f] hover:bg-[#4db85f] text-white px-6"
+          className="bg-[#5dc86f] hover:bg-[#4db85f] text-white"
+          size="sm"
           onClick={() => setIsNewRequestModalOpen(true)}
         >
-          <Plus className="w-4 h-4 mr-2" />
+          <Plus className="h-4 w-4 mr-1" />
           New Change Request
         </Button>
       </div>
