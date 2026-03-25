@@ -55,6 +55,8 @@ interface ComponentNode {
   code: string;
   name: string;
   actualId?: string; // The actual database UUID for API calls
+  vesselCode?: string;
+  vesselId?: string;
   children?: ComponentNode[];
   isExpanded?: boolean;
   critical?: boolean;
@@ -1858,7 +1860,7 @@ const DrawingsAndManualsSection: React.FC<{ selectedComponent: ComponentNode | n
       formData.append('file', file);
       formData.append('componentId', selectedComponent.actualId);
       formData.append('componentCode', selectedComponent.code);
-      formData.append('vesselCode', (selectedComponent as any).vesselCode || (selectedComponent as any).vesselId || '');
+      formData.append('vesselCode', selectedComponent.vesselCode || selectedComponent.vesselId || '');
       formData.append('fileName', `${docType} - ${file.name}`);
       formData.append('fileType', fileType);
       formData.append('version', '1.0');
