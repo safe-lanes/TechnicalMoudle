@@ -1948,7 +1948,7 @@ const DrawingsAndManualsSection: React.FC<{ selectedComponent: ComponentNode | n
         return (
           <div key={docType.id} className="flex items-center py-3 border-b border-gray-100" data-testid={`row-document-${docType.id}`}>
             <span className="text-sm text-gray-700 shrink-0 w-[180px]">{docType.type}</span>
-            <div className="flex items-center gap-1 flex-1 min-w-0">
+            <div className="flex items-center gap-1 flex-1 min-w-0 justify-end mr-2 flex-wrap">
               {existingDocs.map((doc: any) => (
                 <div key={doc.id} className="relative group/doc" data-testid={`doc-icon-${doc.id}`}>
                   <div className="p-1.5 rounded border border-gray-200 bg-gray-50 text-gray-500 hover:bg-blue-50 hover:border-blue-300 hover:text-blue-600 cursor-pointer transition-colors">
