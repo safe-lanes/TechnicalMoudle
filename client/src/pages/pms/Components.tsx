@@ -3462,7 +3462,7 @@ const Components: React.FC = () => {
             )}
             {(isSailAdmin || isClientAdmin) && !isChangeRequestMode && !isChangeMode && canCreateComponent && (
               <Button 
-                className="bg-green-600 hover:bg-green-700 text-white"
+                className="bg-[#5dc86f] hover:bg-[#4db85f] text-white"
                 size="sm"
                 onClick={() => {
                   setEditingComponentId(null);
