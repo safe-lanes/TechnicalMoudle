@@ -1820,8 +1820,20 @@ const DrawingsAndManualsSection: React.FC<{ selectedComponent: ComponentNode | n
     docType: string,
     fileType: string
   ) => {
-    const file = event.target.files?.[0];
-    if (!file || !selectedComponent?.actualId) return;
+    const files = event.target.files;
+    if (!files || files.length === 0 || !selectedComponent?.actualId) return;
+
+    const existingDocs = getDocumentsForType(docType);
+    const slotsAvailable = MAX_FILES_PER_TYPE - existingDocs.length;
+    if (slotsAvailable <= 0) {
+      toast({
+        title: "Limit reached",
+        description: `Maximum ${MAX_FILES_PER_TYPE} documents per type. Delete an existing document first.`,
+        variant: "destructive",
+      });
+      event.target.value = '';
+      return;
+    }
 
     const validTypes = [
       'application/pdf',
@@ -1833,62 +1845,88 @@ const DrawingsAndManualsSection: React.FC<{ selectedComponent: ComponentNode | n
     ];
     const maxSize = 25 * 1024 * 1024;
 
-    if (!validTypes.includes(file.type)) {
-      toast({
-        title: "Invalid file type",
-        description: "Please upload PDF, Word, or image files only.",
-        variant: "destructive",
-      });
+    const validFiles: File[] = [];
+    for (let i = 0; i < files.length; i++) {
+      const file = files[i];
+      if (!validTypes.includes(file.type)) {
+        toast({
+          title: "Invalid file type",
+          description: `"${file.name}" is not a supported file type. Skipped.`,
+          variant: "destructive",
+        });
+        continue;
+      }
+      if (file.size > maxSize) {
+        toast({
+          title: "File too large",
+          description: `"${file.name}" exceeds 25MB. Skipped.`,
+          variant: "destructive",
+        });
+        continue;
+      }
+      validFiles.push(file);
+    }
+
+    if (validFiles.length === 0) {
       event.target.value = '';
       return;
     }
 
-    if (file.size > maxSize) {
+    const filesToUpload = validFiles.slice(0, slotsAvailable);
+    if (validFiles.length > slotsAvailable) {
       toast({
-        title: "File too large",
-        description: "File size must be less than 25MB.",
+        title: "Some files skipped",
+        description: `Only ${slotsAvailable} slot(s) remaining. ${validFiles.length - slotsAvailable} file(s) were not uploaded.`,
         variant: "destructive",
       });
-      event.target.value = '';
-      return;
     }
 
     setUploadingDocType(docType);
+    let successCount = 0;
+    let failCount = 0;
     try {
-      const formData = new FormData();
-      formData.append('file', file);
-      formData.append('componentId', selectedComponent.actualId);
-      formData.append('componentCode', selectedComponent.code);
-      formData.append('vesselCode', selectedComponent.vesselCode || selectedComponent.vesselId || '');
-      formData.append('fileName', `${docType} - ${file.name}`);
-      formData.append('fileType', fileType);
-      formData.append('version', '1.0');
-      formData.append('canShipView', 'true');
-      formData.append('canShipDownload', 'true');
-      formData.append('notes', docType);
+      for (const file of filesToUpload) {
+        try {
+          const formData = new FormData();
+          formData.append('file', file);
+          formData.append('componentId', selectedComponent.actualId);
+          formData.append('componentCode', selectedComponent.code);
+          formData.append('vesselCode', selectedComponent.vesselCode || selectedComponent.vesselId || '');
+          formData.append('fileName', `${docType} - ${file.name}`);
+          formData.append('fileType', fileType);
+          formData.append('version', '1.0');
+          formData.append('canShipView', 'true');
+          formData.append('canShipDownload', 'true');
+          formData.append('notes', docType);
 
-      const response = await fetch('/technical/api/component-documents', {
-        method: 'POST',
-        credentials: 'include',
-        body: formData,
-      });
+          const response = await fetch('/technical/api/component-documents', {
+            method: 'POST',
+            credentials: 'include',
+            body: formData,
+          });
 
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        throw new Error((errorData as any).error || 'Failed to upload document');
+          if (!response.ok) {
+            const errorData = await response.json().catch(() => ({}));
+            throw new Error((errorData as any).error || 'Failed to upload document');
+          }
+          successCount++;
+        } catch (err: any) {
+          failCount++;
+          toast({
+            title: "Upload Failed",
+            description: `"${file.name}": ${err.message || "Failed to upload."}`,
+            variant: "destructive",
+          });
+        }
       }
 
-      toast({
-        title: "Document Uploaded",
-        description: `${docType} has been uploaded successfully.`,
-      });
-      refetchDocuments();
-    } catch (error: any) {
-      toast({
-        title: "Upload Failed",
-        description: error.message || "Failed to upload document.",
-        variant: "destructive",
-      });
+      if (successCount > 0) {
+        toast({
+          title: "Documents Uploaded",
+          description: `${successCount} file(s) uploaded successfully for ${docType}.`,
+        });
+        refetchDocuments();
+      }
     } finally {
       setUploadingDocType(null);
       if (event.target) {
@@ -1989,6 +2027,7 @@ const DrawingsAndManualsSection: React.FC<{ selectedComponent: ComponentNode | n
                     ref={(el) => { fileInputRefs.current[docType.type] = el; }}
                     onChange={(e) => handleFileSelected(e, docType.type, docType.fileType)}
                     className="hidden"
+                    multiple
                     accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
                   />
                 </>
