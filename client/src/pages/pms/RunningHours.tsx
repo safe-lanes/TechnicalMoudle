@@ -999,11 +999,11 @@ const RunningHours = () => {
               <Button 
                 variant="outline" 
                 size="sm"
-                className="text-xs text-[#8798ad] border-[#e1e8ed]"
+                className="h-8 gap-2 bg-white dark:bg-gray-800 text-[#0f172a] dark:text-white border-gray-300 dark:border-gray-600"
                 onClick={exportToCSV}
                 data-testid="D3"
               >
-                <Marker id="D3" /><Download className="h-3.5 w-3.5 mr-1" />
+                <Marker id="D3" /><Download className="h-4 w-4" />
                 Export
               </Button>
               <Button 
