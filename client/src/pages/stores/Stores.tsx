@@ -1852,12 +1852,13 @@ const Stores: React.FC = () => {
               </Button>
               <Button 
                 className="bg-[#5dc86f] hover:bg-[#4db85f] text-white" 
+                size="sm"
                 onClick={openBulkUpdateModal}
                 data-testid={viewMode === "inventory" ? getMarkerId(activeTab, "3") : getMarkerId(activeTab, "2.6")}
               >
                 {viewMode === "inventory" && <Marker id={getMarkerId(activeTab, "3")} />}
                 {viewMode === "history" && <Marker id={getMarkerId(activeTab, "2.6")} />}
-                + Bulk Update {activeTab.charAt(0).toUpperCase() + activeTab.slice(1)}
+                <Plus className="h-4 w-4 mr-1" /> Bulk Update {activeTab.charAt(0).toUpperCase() + activeTab.slice(1)}
               </Button>
             </>
           )}
