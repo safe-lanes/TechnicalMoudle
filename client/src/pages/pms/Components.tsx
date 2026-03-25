@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from "react";
-import { Search, ChevronRight, ChevronDown, ChevronUp, ChevronLeft, Edit2, FileText, ArrowLeft, Plus, Check, Package, X, AlertCircle, CheckCircle, HelpCircle, File, FileImage, FileCheck, Upload, Download, Lock, Wrench, User, ClipboardList, MessageSquare, MapPin, Pencil, Expand, Minimize2, GripVertical, Trash2, Eye, Loader2, Paperclip, FileSpreadsheet } from "lucide-react";
+import { Search, ChevronRight, ChevronDown, ChevronUp, ChevronLeft, Edit2, FileText, ArrowLeft, Plus, Check, Package, X, AlertCircle, CheckCircle, HelpCircle, File, FileImage, FileCheck, Upload, Download, Lock, Wrench, User, ClipboardList, MessageSquare, MapPin, Pencil, Expand, Minimize2, GripVertical, Trash2, Eye, Loader2, Paperclip, FileSpreadsheet, Image as ImageIcon } from "lucide-react";
 import * as XLSX from "xlsx";
 import { Marker } from "@/components/Marker";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -1925,7 +1925,7 @@ const DrawingsAndManualsSection: React.FC<{ selectedComponent: ComponentNode | n
 
   const getFileIcon = (fileName: string) => {
     const ext = fileName.split('.').pop()?.toLowerCase() || '';
-    if (['jpg', 'jpeg', 'png', 'gif', 'bmp', 'webp'].includes(ext)) return <FileImage className="h-5 w-5" />;
+    if (['jpg', 'jpeg', 'png', 'gif', 'bmp', 'webp'].includes(ext)) return <ImageIcon className="h-5 w-5" />;
     if (['pdf'].includes(ext)) return <FileText className="h-5 w-5" />;
     if (['xls', 'xlsx'].includes(ext)) return <FileSpreadsheet className="h-5 w-5" />;
     return <Paperclip className="h-5 w-5" />;
