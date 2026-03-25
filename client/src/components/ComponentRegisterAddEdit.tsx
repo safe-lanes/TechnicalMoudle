@@ -1890,48 +1890,59 @@ export default function ComponentRegisterAddEdit({
                 </CardHeader>
                 {!collapsedSections['F'] && (
                 <CardContent className="pt-4 pb-4 px-4 border-t border-gray-100">
-                  {!isEditMode ? (
-                    <div className="text-sm text-gray-500 text-center py-4">
-                      Documents will be available after component is created
-                    </div>
-                  ) : isLoadingDocuments ? (
-                    <div className="flex items-center gap-2 text-sm text-gray-500 py-4">
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                      Loading documents...
-                    </div>
-                  ) : componentDocuments.length === 0 ? (
-                    <div className="text-center py-8">
-                      <div className="text-gray-400 text-sm">No drawings or manuals available for this component</div>
-                      {canEditPerm("pms-components") && (
-                        <p className="text-xs text-gray-500 mt-2">Upload technical documents using the upload options</p>
-                      )}
-                    </div>
-                  ) : (
-                    <div className="space-y-4">
-                      <div className="flex items-center justify-between mb-2">
-                        <div className="text-sm text-gray-600">
-                          <span className="font-semibold">{componentDocuments.length}</span> document(s) available
-                        </div>
-                      </div>
-                      <div className="grid grid-cols-2 gap-3">
-                        {componentDocuments.map((doc) => (
+                  <div className="flex items-center justify-between mb-3">
+                    <div />
+                    <Button
+                      size="sm"
+                      className="bg-[#52baf3] hover:bg-[#4aa3d9] text-white"
+                      data-testid="button-add-document"
+                    >
+                      <Plus className="h-4 w-4 mr-1" />
+                      Add Document
+                    </Button>
+                  </div>
+                  <div className="space-y-2">
+                    {documentTypes.map((docType) => {
+                      const existingDoc = getDocumentForType(docType.type);
+                      const isUploading = uploadingDocType === docType.type;
+                      return (
+                        <div key={docType.id} className="flex items-center justify-between p-2 border border-[#52baf3] rounded">
                           <div
-                            key={doc.id}
-                            className="flex items-center gap-3 p-3 rounded-md border border-gray-200 hover:bg-blue-50 cursor-pointer"
-                            onClick={() => handleViewDocument(doc.id)}
-                            data-testid={`card-document-${doc.id}`}
+                            className={`flex items-center gap-2 flex-1 ${existingDoc ? 'cursor-pointer' : ''}`}
+                            onClick={() => existingDoc && handleViewDocument(existingDoc.id)}
+                            data-testid={`row-document-${docType.id}`}
                           >
-                            <FileText className="h-5 w-5 text-blue-600" />
-                            <div className="flex-1 min-w-0">
-                              <div className="text-sm font-medium text-gray-900 truncate">{doc.fileName}</div>
-                              <div className="text-xs text-gray-500">{doc.fileType}</div>
-                            </div>
-                            <Download className="h-4 w-4 text-gray-400" />
+                            <span className="text-sm text-[#52baf3]">
+                              {existingDoc ? existingDoc.fileName : docType.type}
+                            </span>
                           </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
+                          <div className="flex items-center gap-2">
+                            {isUploading ? (
+                              <Loader2 className="h-4 w-4 animate-spin text-[#52baf3]" />
+                            ) : (
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                className="h-7 text-xs border-[#52baf3] text-[#52baf3] hover:bg-[#52baf3] hover:text-white"
+                                onClick={() => handleUploadClick(docType.type)}
+                                data-testid={`button-upload-${docType.id}`}
+                              >
+                                <Upload className="h-3 w-3 mr-1" />
+                                Upload
+                              </Button>
+                            )}
+                            <input
+                              type="file"
+                              ref={(el) => { fileInputRefs.current[docType.type] = el; }}
+                              onChange={(e) => handleFileSelected(e, docType.type, docType.fileType)}
+                              className="hidden"
+                              accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
+                            />
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
                 </CardContent>
                 )}
               </Card>
@@ -1947,14 +1958,13 @@ export default function ComponentRegisterAddEdit({
                 </CardHeader>
                 {!collapsedSections['G'] && (
                 <CardContent className="pt-4 pb-4 px-4 border-t border-gray-100">
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-4 gap-4">
                     <div>
                       <label className="text-xs font-medium text-gray-600 block mb-1">Classification Society</label>
                       <Input
                         value={classRegData.classificationSociety}
                         onChange={(e) => setClassRegData(prev => ({ ...prev, classificationSociety: e.target.value }))}
-                        className="h-8 text-sm"
-                        placeholder="e.g. Lloyd's Register"
+                        className="h-8 text-sm border-[#52baf3] border-2 focus:border-[#52baf3]"
                         data-testid="input-classification-society"
                       />
                     </div>
@@ -1963,29 +1973,8 @@ export default function ComponentRegisterAddEdit({
                       <Input
                         value={classRegData.certificateNo}
                         onChange={(e) => setClassRegData(prev => ({ ...prev, certificateNo: e.target.value }))}
-                        className="h-8 text-sm"
-                        placeholder="Certificate number"
+                        className="h-8 text-sm border-[#52baf3] border-2 focus:border-[#52baf3]"
                         data-testid="input-certificate-no"
-                      />
-                    </div>
-                    <div>
-                      <label className="text-xs font-medium text-gray-600 block mb-1">Survey Type</label>
-                      <Input
-                        value={classRegData.surveyType}
-                        onChange={(e) => setClassRegData(prev => ({ ...prev, surveyType: e.target.value }))}
-                        className="h-8 text-sm"
-                        placeholder="e.g. Annual, Special"
-                        data-testid="input-survey-type"
-                      />
-                    </div>
-                    <div>
-                      <label className="text-xs font-medium text-gray-600 block mb-1">Class Code</label>
-                      <Input
-                        value={classRegData.classCode}
-                        onChange={(e) => setClassRegData(prev => ({ ...prev, classCode: e.target.value }))}
-                        className="h-8 text-sm"
-                        placeholder="Class code"
-                        data-testid="input-class-code"
                       />
                     </div>
                     <div>
@@ -1994,7 +1983,7 @@ export default function ComponentRegisterAddEdit({
                         type="date"
                         value={classRegData.lastClassSurvey}
                         onChange={(e) => setClassRegData(prev => ({ ...prev, lastClassSurvey: e.target.value }))}
-                        className="h-8 text-sm"
+                        className="h-8 text-sm border-[#52baf3] border-2 focus:border-[#52baf3]"
                         data-testid="input-last-class-survey"
                       />
                     </div>
@@ -2004,29 +1993,43 @@ export default function ComponentRegisterAddEdit({
                         type="date"
                         value={classRegData.nextClassSurvey}
                         onChange={(e) => setClassRegData(prev => ({ ...prev, nextClassSurvey: e.target.value }))}
-                        className="h-8 text-sm"
+                        className="h-8 text-sm border-[#52baf3] border-2 focus:border-[#52baf3]"
                         data-testid="input-next-class-survey"
                       />
                     </div>
-                    <div className="col-span-2">
+                    <div>
+                      <label className="text-xs font-medium text-gray-600 block mb-1">Survey Type</label>
+                      <Input
+                        value={classRegData.surveyType}
+                        onChange={(e) => setClassRegData(prev => ({ ...prev, surveyType: e.target.value }))}
+                        className="h-8 text-sm border-[#52baf3] border-2 focus:border-[#52baf3]"
+                        data-testid="input-survey-type"
+                      />
+                    </div>
+                    <div>
                       <label className="text-xs font-medium text-gray-600 block mb-1">Class Requirements</label>
-                      <Textarea
+                      <Input
                         value={classRegData.classRequirements}
                         onChange={(e) => setClassRegData(prev => ({ ...prev, classRequirements: e.target.value }))}
-                        className="text-sm resize-none"
-                        rows={2}
-                        placeholder="Classification requirements"
+                        className="h-8 text-sm border-[#52baf3] border-2 focus:border-[#52baf3]"
                         data-testid="input-class-requirements"
                       />
                     </div>
-                    <div className="col-span-2">
+                    <div>
+                      <label className="text-xs font-medium text-gray-600 block mb-1">Class Code</label>
+                      <Input
+                        value={classRegData.classCode}
+                        onChange={(e) => setClassRegData(prev => ({ ...prev, classCode: e.target.value }))}
+                        className="h-8 text-sm border-[#52baf3] border-2 focus:border-[#52baf3]"
+                        data-testid="input-class-code"
+                      />
+                    </div>
+                    <div>
                       <label className="text-xs font-medium text-gray-600 block mb-1">Information</label>
-                      <Textarea
+                      <Input
                         value={classRegData.information}
                         onChange={(e) => setClassRegData(prev => ({ ...prev, information: e.target.value }))}
-                        className="text-sm resize-none"
-                        rows={2}
-                        placeholder="Additional information"
+                        className="h-8 text-sm border-[#52baf3] border-2 focus:border-[#52baf3]"
                         data-testid="input-class-information"
                       />
                     </div>
