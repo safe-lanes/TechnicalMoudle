@@ -1842,12 +1842,13 @@ const Stores: React.FC = () => {
               </Button>
               <Button 
                 className="bg-[#5dc86f] hover:bg-[#4db85f] text-white" 
+                size="sm"
                 onClick={openAddStoreModal}
                 data-testid={viewMode === "inventory" ? getMarkerId(activeTab, "3a") : getMarkerId(activeTab, "2.6a")}
               >
                 {viewMode === "inventory" && <Marker id={getMarkerId(activeTab, "3a")} />}
                 {viewMode === "history" && <Marker id={getMarkerId(activeTab, "2.6a")} />}
-                + Add Store
+                <Plus className="h-4 w-4 mr-1" /> Add Store
               </Button>
               <Button 
                 className="bg-[#5dc86f] hover:bg-[#4db85f] text-white" 
