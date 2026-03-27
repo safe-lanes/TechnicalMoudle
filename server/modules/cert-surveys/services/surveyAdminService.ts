@@ -45,12 +45,11 @@ export async function saveMasterSurveys(body: any) {
   const newlyInsertedMasterIds: string[] = [];
   const vesselSpecificSet = new Set(vesselSpecificSurveys);
 
-  // Fetch distinct vessels from existing applicability records
-  const distinctVessels = await surveyAdminRepo.getDistinctVessels();
-  if (!distinctVessels) {
+  const allVesselsResult = await surveyAdminRepo.getAllVessels();
+  if (!allVesselsResult) {
     throw Object.assign(new Error("Database not available"), { statusCode: 503 });
   }
-  const allVessels = distinctVessels.map(v => ({ id: v.vesselId, name: v.vesselName }));
+  const allVessels = allVesselsResult.map(v => ({ id: v.vesselId, name: v.vesselName }));
 
   for (const survey of surveys) {
     const existing = await surveyAdminRepo.getMasterSurveyByMasterId(survey.masterId);
@@ -278,38 +277,43 @@ export async function initializeApplicability(body: any) {
     throw Object.assign(new Error("Database not available"), { statusCode: 503 });
   }
 
-  if (existingRecords.length > 0) {
-    return { success: true, message: "Vessel already initialized", records: existingRecords };
-  }
-
-  // Get all company surveys
   const companySurveys = await surveyAdminRepo.getCompanySurveys();
   if (companySurveys === null) {
     throw Object.assign(new Error("Database not available"), { statusCode: 503 });
   }
 
   if (companySurveys.length === 0) {
+    if (existingRecords.length > 0) {
+      return { success: true, message: "Vessel already initialized", records: existingRecords };
+    }
     return { success: true, message: "No company surveys to initialize", records: [] };
   }
 
-  // Create applicability records for all company surveys
-  const insertData = companySurveys.map(survey => ({
+  await ensureVesselExists(vesselId, vesselName);
+
+  const existingMasterIds = new Set(existingRecords.map(r => r.masterId));
+  const missingSurveys = companySurveys.filter(survey => !existingMasterIds.has(survey.masterId));
+
+  if (missingSurveys.length === 0) {
+    return { success: true, message: "Vessel already initialized", records: existingRecords };
+  }
+
+  const insertData = missingSurveys.map(survey => ({
     vesselId,
     vesselName,
     masterId: survey.masterId,
     isApplicable: true,
   }));
 
-  await ensureVesselExists(vesselId, vesselName);
-
   const insertedRecords = await surveyAdminRepo.insertApplicabilityBulk(insertData);
   if (!insertedRecords) {
     throw Object.assign(new Error("Database not available"), { statusCode: 503 });
   }
 
-  console.log(`Initialized ${insertedRecords.length} survey applicability records for vessel ${vesselName}`);
+  const allRecords = [...existingRecords, ...insertedRecords];
+  console.log(`Initialized ${insertedRecords.length} new survey applicability records for vessel ${vesselName} (${existingRecords.length} already existed)`);
 
-  return { success: true, message: `Initialized ${insertedRecords.length} surveys for vessel`, records: insertedRecords };
+  return { success: true, message: `Initialized ${insertedRecords.length} new surveys for vessel`, records: allRecords };
 }
 
 // ── POST /admin/vessel-survey-applicability/bulk-update ──

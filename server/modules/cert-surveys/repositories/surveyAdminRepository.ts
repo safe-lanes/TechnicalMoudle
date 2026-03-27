@@ -3,8 +3,9 @@ import {
   shipSurveysMaster,
   shipSurveysLabelsConfig,
   vesselSurveyApplicability,
+  vessels,
 } from '@shared/schema';
-import { eq, and, inArray } from 'drizzle-orm';
+import { eq, and, inArray, or, like } from 'drizzle-orm';
 
 // ── Helpers ──
 
@@ -137,10 +138,25 @@ export async function getAllApplicability() {
   }).from(vesselSurveyApplicability);
 }
 
+export async function getAllVessels() {
+  const db = await getDb();
+  if (!db) return null;
+  return db.select({
+    vesselId: vessels.vuuid,
+    vesselName: vessels.name,
+  }).from(vessels)
+    .where(eq(vessels.isActive, true));
+}
+
 export async function getCompanySurveys() {
   const db = await getDb();
   if (!db) return null;
   return db.select()
     .from(shipSurveysMaster)
-    .where(eq(shipSurveysMaster.applicableToCompany, true));
+    .where(
+      or(
+        eq(shipSurveysMaster.applicableToCompany, true),
+        like(shipSurveysMaster.masterId, 'CMP-%')
+      )
+    );
 }

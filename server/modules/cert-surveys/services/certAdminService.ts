@@ -64,12 +64,11 @@ export async function saveMasterCertificates(body: any) {
   const newlyInsertedMasterIds: string[] = [];
   const vesselSpecificSet = new Set(vesselSpecificCerts);
 
-  // Fetch distinct vessels from existing applicability records
-  const distinctVessels = await certAdminRepo.getDistinctVessels();
-  if (!distinctVessels) {
+  const allVesselsResult = await certAdminRepo.getAllVessels();
+  if (!allVesselsResult) {
     throw Object.assign(new Error("Database not available"), { statusCode: 503 });
   }
-  const allVessels = distinctVessels.map(v => ({ id: v.vesselId, name: v.vesselName }));
+  const allVessels = allVesselsResult.map(v => ({ id: v.vesselId, name: v.vesselName }));
 
   for (const cert of certificates) {
     const existing = await certAdminRepo.getMasterCertificateByMasterId(cert.masterId);
@@ -307,24 +306,28 @@ export async function initializeApplicability(body: any) {
     throw Object.assign(new Error("Database not available"), { statusCode: 503 });
   }
 
-  if (existingRecords.length > 0) {
-    return { success: true, message: "Vessel already initialized", records: existingRecords };
-  }
-
-  // Get all company certificates
   const companyCertificates = await certAdminRepo.getCompanyCertificates();
   if (companyCertificates === null) {
     throw Object.assign(new Error("Database not available"), { statusCode: 503 });
   }
 
   if (companyCertificates.length === 0) {
+    if (existingRecords.length > 0) {
+      return { success: true, message: "Vessel already initialized", records: existingRecords };
+    }
     return { success: true, message: "No company certificates to initialize", records: [] };
   }
 
   await ensureVesselExists(vesselId, vesselName);
 
-  // Create applicability records for all company certificates
-  const insertData = companyCertificates.map(cert => ({
+  const existingMasterIds = new Set(existingRecords.map(r => r.masterId));
+  const missingCerts = companyCertificates.filter(cert => !existingMasterIds.has(cert.masterId));
+
+  if (missingCerts.length === 0) {
+    return { success: true, message: "Vessel already initialized", records: existingRecords };
+  }
+
+  const insertData = missingCerts.map(cert => ({
     vesselId,
     vesselName,
     masterId: cert.masterId,
@@ -336,9 +339,10 @@ export async function initializeApplicability(body: any) {
     throw Object.assign(new Error("Database not available"), { statusCode: 503 });
   }
 
-  console.log(`Initialized ${insertedRecords.length} certificate applicability records for vessel ${vesselName}`);
+  const allRecords = [...existingRecords, ...insertedRecords];
+  console.log(`Initialized ${insertedRecords.length} new certificate applicability records for vessel ${vesselName} (${existingRecords.length} already existed)`);
 
-  return { success: true, message: `Initialized ${insertedRecords.length} certificates for vessel`, records: insertedRecords };
+  return { success: true, message: `Initialized ${insertedRecords.length} new certificates for vessel`, records: allRecords };
 }
 
 // ── PATCH /admin/vessel-certificate-applicability ──
