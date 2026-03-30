@@ -233,8 +233,7 @@ const CriticalSparesReport: React.FC<CriticalSparesReportProps> = ({ onBack, ves
       pdfReportGenerator.generateReport(
         { title: 'Critical Spares Report', subtitle: 'Status of Critical and Essential Spare Parts Inventory', vessel: data.reportMeta.vesselName, orientation: 'landscape', dateRange: 'All Time' },
         columns,
-        exportData,
-        summaryData
+        exportData
       );
       toast({ title: "PDF Generated", description: "Report downloaded successfully." });
     } catch (e) {

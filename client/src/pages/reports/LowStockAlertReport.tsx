@@ -404,8 +404,7 @@ const LowStockAlertReport: React.FC<LowStockAlertReportProps> = ({ onBack, vesse
           dateRange: 'All Time',
         },
         columns,
-        exportData,
-        summaryData
+        exportData
       );
       toast({ title: "PDF Generated", description: "Low stock alert report downloaded" });
     } catch (err) {

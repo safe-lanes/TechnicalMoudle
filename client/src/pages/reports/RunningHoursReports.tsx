@@ -240,8 +240,7 @@ const RunningHoursReports: React.FC<RunningHoursReportsProps> = ({ onBack, globa
             dateRange: formatReportDateRange(categoryFilters.dateRange?.from, categoryFilters.dateRange?.to)
           },
           columns,
-          utilizationData,
-          summaryItems
+          utilizationData
         );
         break;
       }
@@ -327,8 +326,7 @@ const RunningHoursReports: React.FC<RunningHoursReportsProps> = ({ onBack, globa
             dateRange: formatReportDateRange(categoryFilters.dateRange?.from, categoryFilters.dateRange?.to)
           },
           columns,
-          formattedData,
-          summaryItems
+          formattedData
         );
         break;
       }

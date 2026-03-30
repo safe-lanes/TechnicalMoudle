@@ -251,7 +251,7 @@ const AlertsApprovalsAdminReports: React.FC<AlertsApprovalsAdminReportsProps> = 
           setPreviewData({ title: 'System Alerts & Notifications', subtitle: 'Active alerts and warnings', vessel: vesselName, dateRange: formatReportDateRange(categoryFilters.dateRange?.from, categoryFilters.dateRange?.to), columns, data: finalData, summary });
           return;
         }
-        pdfReportGenerator.generateReport({ title: 'System Alerts & Notifications', subtitle: 'Active alerts and warnings', vessel: vesselName, dateRange: formatReportDateRange(categoryFilters.dateRange?.from, categoryFilters.dateRange?.to) }, columns, finalData, summary);
+        pdfReportGenerator.generateReport({ title: 'System Alerts & Notifications', subtitle: 'Active alerts and warnings', vessel: vesselName, dateRange: formatReportDateRange(categoryFilters.dateRange?.from, categoryFilters.dateRange?.to) }, columns, finalData);
         break;
       }
 
@@ -291,7 +291,7 @@ const AlertsApprovalsAdminReports: React.FC<AlertsApprovalsAdminReportsProps> = 
           setPreviewData({ title: 'Pending Approvals Report', subtitle: 'Items awaiting approval', vessel: vesselName, dateRange: formatReportDateRange(categoryFilters.dateRange?.from, categoryFilters.dateRange?.to), columns, data: finalData, summary });
           return;
         }
-        pdfReportGenerator.generateReport({ title: 'Pending Approvals Report', subtitle: 'Items awaiting approval', vessel: vesselName, dateRange: formatReportDateRange(categoryFilters.dateRange?.from, categoryFilters.dateRange?.to) }, columns, finalData, summary);
+        pdfReportGenerator.generateReport({ title: 'Pending Approvals Report', subtitle: 'Items awaiting approval', vessel: vesselName, dateRange: formatReportDateRange(categoryFilters.dateRange?.from, categoryFilters.dateRange?.to) }, columns, finalData);
         break;
       }
 
@@ -356,7 +356,7 @@ const AlertsApprovalsAdminReports: React.FC<AlertsApprovalsAdminReportsProps> = 
           setPreviewData({ title: 'Overdue Items Alert Report', subtitle: 'All overdue items requiring attention', vessel: vesselName, dateRange: formatReportDateRange(categoryFilters.dateRange?.from, categoryFilters.dateRange?.to), columns, data: finalData, summary });
           return;
         }
-        pdfReportGenerator.generateReport({ title: 'Overdue Items Alert Report', subtitle: 'All overdue items requiring attention', vessel: vesselName, dateRange: formatReportDateRange(categoryFilters.dateRange?.from, categoryFilters.dateRange?.to) }, columns, finalData, summary);
+        pdfReportGenerator.generateReport({ title: 'Overdue Items Alert Report', subtitle: 'All overdue items requiring attention', vessel: vesselName, dateRange: formatReportDateRange(categoryFilters.dateRange?.from, categoryFilters.dateRange?.to) }, columns, finalData);
         break;
       }
 

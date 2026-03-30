@@ -249,8 +249,7 @@ const SparesReports: React.FC<SparesReportsProps> = ({ onBack, globalFilters, em
         pdfReportGenerator.generateReport(
           { title: 'Low Stock Alert Report', subtitle: 'Items requiring immediate attention', vessel: vesselName, dateRange: formatReportDateRange(categoryFilters.dateRange?.from, categoryFilters.dateRange?.to) },
           columns,
-          data,
-          summary
+          data
         );
         break;
       }
@@ -298,8 +297,7 @@ const SparesReports: React.FC<SparesReportsProps> = ({ onBack, globalFilters, em
         pdfReportGenerator.generateReport(
           { title: 'Critical Spares Report', subtitle: 'Status of Critical and Essential Spare Parts Inventory', vessel: vesselName, orientation: 'landscape', dateRange: formatReportDateRange(categoryFilters.dateRange?.from, categoryFilters.dateRange?.to) },
           columns,
-          data,
-          summary
+          data
         );
         break;
       }
@@ -358,8 +356,7 @@ const SparesReports: React.FC<SparesReportsProps> = ({ onBack, globalFilters, em
         pdfReportGenerator.generateReport(
           { title: 'Consumption Pattern Analysis', subtitle: 'Spare parts consumption patterns and trends', vessel: vesselName, orientation: 'landscape', dateRange: formatReportDateRange(categoryFilters.dateRange?.from, categoryFilters.dateRange?.to) },
           columns,
-          data,
-          summary
+          data
         );
         break;
       }

@@ -369,8 +369,7 @@ const ChemicalsExpiryReport: React.FC<ChemicalsExpiryReportProps> = ({ onBack, v
       pdfReportGenerator.generateReport(
         { title: 'Chemicals Inventory & Expiry Report', subtitle: 'Expiry tracking & SDS compliance', dateRange: 'All Time' },
         columns,
-        exportData,
-        summaryData
+        exportData
       );
       toast({ title: "PDF Generated", description: "Report downloaded successfully." });
     } catch (e) {

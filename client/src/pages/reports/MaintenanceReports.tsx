@@ -387,8 +387,7 @@ const MaintenanceReports: React.FC<MaintenanceReportsProps> = ({ onBack, globalF
         pdfReportGenerator.generateReport(
           { title: 'Due Jobs (7 Days)', subtitle: 'Work orders due in the next 7 days (including overdue)', vessel: vesselName, dateRange: formatReportDateRange(categoryFilters.dateRange?.from, categoryFilters.dateRange?.to) },
           columns,
-          data,
-          summary
+          data
         );
         break;
       }
@@ -520,8 +519,7 @@ const MaintenanceReports: React.FC<MaintenanceReportsProps> = ({ onBack, globalF
             dateRange: formatReportDateRange(categoryFilters.dateRange?.from, categoryFilters.dateRange?.to)
           },
           columns,
-          data,
-          summary
+          data
         );
         break;
       }
@@ -849,8 +847,7 @@ const MaintenanceReports: React.FC<MaintenanceReportsProps> = ({ onBack, globalF
         pdfReportGenerator.generateReport(
           { title: 'Monthly Maintenance Summary', subtitle: `Performance metrics for ${periodLabel}`, vessel: vesselName, dateRange: periodLabel },
           columns,
-          data,
-          summary
+          data
         );
         break;
       }
@@ -910,7 +907,6 @@ const MaintenanceReports: React.FC<MaintenanceReportsProps> = ({ onBack, globalF
           },
           columns,
           data,
-          summary,
           metadata
         );
         break;
@@ -968,7 +964,6 @@ const MaintenanceReports: React.FC<MaintenanceReportsProps> = ({ onBack, globalF
           },
           columns,
           unplannedData,
-          summary,
           metadata
         );
         break;
@@ -1032,8 +1027,7 @@ const MaintenanceReports: React.FC<MaintenanceReportsProps> = ({ onBack, globalF
             dateRange: formatReportDateRange(categoryFilters.dateRange?.from, categoryFilters.dateRange?.to)
           },
           columns,
-          data,
-          summary
+          data
         );
         break;
       }
@@ -1224,8 +1218,7 @@ const MaintenanceReports: React.FC<MaintenanceReportsProps> = ({ onBack, globalF
         pdfReportGenerator.generateReport(
           { title: 'Crew Workload Distribution', subtitle: 'Task distribution across crew ranks and assignments', vessel: vesselName, dateRange: formatReportDateRange(categoryFilters.dateRange?.from, categoryFilters.dateRange?.to) },
           columns,
-          data,
-          summary
+          data
         );
         break;
       }

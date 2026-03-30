@@ -262,7 +262,7 @@ const StoresReports: React.FC<StoresReportsProps> = ({ onBack, globalFilters, em
         }
         pdfReportGenerator.generateReport(
           { title: 'Stores Inventory Status', subtitle: 'Complete inventory listing', vessel: vesselName, dateRange: formatReportDateRange(categoryFilters.dateRange?.from, categoryFilters.dateRange?.to) },
-          columns, data, summary
+          columns, data
         );
         break;
       }
@@ -303,7 +303,7 @@ const StoresReports: React.FC<StoresReportsProps> = ({ onBack, globalFilters, em
         }
         pdfReportGenerator.generateReport(
           { title: 'Lubricants & Oil Analysis', subtitle: 'Stock levels and status', vessel: vesselName, dateRange: formatReportDateRange(categoryFilters.dateRange?.from, categoryFilters.dateRange?.to) },
-          columns, data, summary
+          columns, data
         );
         break;
       }
@@ -366,7 +366,7 @@ const StoresReports: React.FC<StoresReportsProps> = ({ onBack, globalFilters, em
         }
         pdfReportGenerator.generateReport(
           { title: 'Chemicals Inventory & Expiry', subtitle: 'Chemical stock tracking with expiry & SDS compliance', vessel: vesselName, dateRange: formatReportDateRange(categoryFilters.dateRange?.from, categoryFilters.dateRange?.to) },
-          columns, data, summary
+          columns, data
         );
         break;
       }
@@ -426,7 +426,7 @@ const StoresReports: React.FC<StoresReportsProps> = ({ onBack, globalFilters, em
         }
         pdfReportGenerator.generateReport(
           { title: 'Low Stock Alert Report', subtitle: 'Items requiring reorder', vessel: vesselName, orientation: 'landscape', dateRange: formatReportDateRange(categoryFilters.dateRange?.from, categoryFilters.dateRange?.to) },
-          columns, data, summary
+          columns, data
         );
         break;
       }

@@ -247,8 +247,7 @@ const IhmInventoryStatusReport: React.FC<IhmInventoryStatusReportProps> = ({ onB
       pdfReportGenerator.generateReport(
         { title: 'IHM Inventory Status Report', subtitle: 'Confirmed hazardous materials present on board', vessel: vesselName, dateRange: 'All Time' },
         columns,
-        exportData,
-        summaryData
+        exportData
       );
       toast({ title: "PDF Generated", description: "Report downloaded successfully." });
     } catch (e: any) {

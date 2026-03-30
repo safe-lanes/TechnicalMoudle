@@ -306,8 +306,7 @@ const ChangeRequestReports: React.FC<ChangeRequestReportsProps> = ({ onBack, glo
             dateRange: formatReportDateRange(categoryFilters.dateRange?.from, categoryFilters.dateRange?.to)
           },
           columns,
-          finalData,
-          summaryItems
+          finalData
         );
         break;
       }

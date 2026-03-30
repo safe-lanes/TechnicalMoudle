@@ -238,8 +238,7 @@ const LsaFfaReports: React.FC<LsaFfaReportsProps> = ({ onBack, globalFilters, em
           dateRange: formatReportDateRange(categoryFilters.dateRange?.from, categoryFilters.dateRange?.to)
         },
         columns,
-        finalData,
-        summaryItems
+        finalData
       );
     } else if (reportId === 'lsa-ffa-maintenance-schedule') {
       if (!scheduleData) {
@@ -318,8 +317,7 @@ const LsaFfaReports: React.FC<LsaFfaReportsProps> = ({ onBack, globalFilters, em
           dateRange: formatReportDateRange(categoryFilters.dateRange?.from, categoryFilters.dateRange?.to)
         },
         columns,
-        finalData,
-        summaryItems
+        finalData
       );
     } else {
       toast({ title: "Report Not Available", description: "This report is not yet implemented", variant: "destructive" });

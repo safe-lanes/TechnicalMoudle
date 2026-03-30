@@ -487,8 +487,7 @@ const StoresInventoryStatusReport: React.FC<StoresInventoryStatusReportProps> = 
       pdfReportGenerator.generateReport(
         { title, subtitle, dateRange: 'All Time' },
         columns,
-        exportData,
-        summaryData
+        exportData
       );
       toast({ title: "PDF Generated", description: "Report downloaded successfully." });
     } catch (e) {

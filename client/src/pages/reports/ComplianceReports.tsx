@@ -235,7 +235,7 @@ const ComplianceReports: React.FC<ComplianceReportsProps> = ({ onBack, globalFil
           setPreviewData({ title: 'Certificates Status Report', subtitle: 'Certificate validity overview', vessel: vesselName, dateRange: formatReportDateRange(categoryFilters.dateRange?.from, categoryFilters.dateRange?.to), columns, data, summary });
           return;
         }
-        pdfReportGenerator.generateReport({ title: 'Certificates Status Report', subtitle: 'Certificate validity overview', vessel: vesselName, dateRange: formatReportDateRange(categoryFilters.dateRange?.from, categoryFilters.dateRange?.to) }, columns, data, summary);
+        pdfReportGenerator.generateReport({ title: 'Certificates Status Report', subtitle: 'Certificate validity overview', vessel: vesselName, dateRange: formatReportDateRange(categoryFilters.dateRange?.from, categoryFilters.dateRange?.to) }, columns, data);
         break;
       }
 
@@ -267,7 +267,7 @@ const ComplianceReports: React.FC<ComplianceReportsProps> = ({ onBack, globalFil
           setPreviewData({ title: 'Surveys Due Report', subtitle: 'Upcoming and overdue surveys', vessel: vesselName, dateRange: formatReportDateRange(categoryFilters.dateRange?.from, categoryFilters.dateRange?.to), columns, data, summary });
           return;
         }
-        pdfReportGenerator.generateReport({ title: 'Surveys Due Report', subtitle: 'Upcoming and overdue surveys', vessel: vesselName, dateRange: formatReportDateRange(categoryFilters.dateRange?.from, categoryFilters.dateRange?.to) }, columns, data, summary);
+        pdfReportGenerator.generateReport({ title: 'Surveys Due Report', subtitle: 'Upcoming and overdue surveys', vessel: vesselName, dateRange: formatReportDateRange(categoryFilters.dateRange?.from, categoryFilters.dateRange?.to) }, columns, data);
         break;
       }
 
@@ -303,7 +303,7 @@ const ComplianceReports: React.FC<ComplianceReportsProps> = ({ onBack, globalFil
           setPreviewData({ title: 'Expiring Certificates Alert', subtitle: 'Certificates requiring urgent attention', vessel: vesselName, dateRange: formatReportDateRange(categoryFilters.dateRange?.from, categoryFilters.dateRange?.to), columns, data, summary });
           return;
         }
-        pdfReportGenerator.generateReport({ title: 'Expiring Certificates Alert', subtitle: 'Certificates requiring urgent attention', vessel: vesselName, dateRange: formatReportDateRange(categoryFilters.dateRange?.from, categoryFilters.dateRange?.to) }, columns, data, summary);
+        pdfReportGenerator.generateReport({ title: 'Expiring Certificates Alert', subtitle: 'Certificates requiring urgent attention', vessel: vesselName, dateRange: formatReportDateRange(categoryFilters.dateRange?.from, categoryFilters.dateRange?.to) }, columns, data);
         break;
       }
 
@@ -352,7 +352,7 @@ const ComplianceReports: React.FC<ComplianceReportsProps> = ({ onBack, globalFil
           setPreviewData({ title: 'Compliance Summary Report', subtitle: 'Overall compliance status', vessel: vesselName, dateRange: formatReportDateRange(categoryFilters.dateRange?.from, categoryFilters.dateRange?.to), columns, data, summary });
           return;
         }
-        pdfReportGenerator.generateReport({ title: 'Compliance Summary Report', subtitle: 'Overall compliance status', vessel: vesselName, dateRange: formatReportDateRange(categoryFilters.dateRange?.from, categoryFilters.dateRange?.to) }, columns, data, summary);
+        pdfReportGenerator.generateReport({ title: 'Compliance Summary Report', subtitle: 'Overall compliance status', vessel: vesselName, dateRange: formatReportDateRange(categoryFilters.dateRange?.from, categoryFilters.dateRange?.to) }, columns, data);
         break;
       }
 

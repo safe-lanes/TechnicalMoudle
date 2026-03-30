@@ -121,8 +121,7 @@ class PDFReportGenerator {
   generateReport(
     config: PDFReportConfig,
     columns: TableColumn[],
-    data: any[],
-    summaryData?: { label: string; value: string | number }[]
+    data: any[]
   ): void {
     this.doc = new jsPDF({
       orientation: config.orientation || 'landscape',
@@ -369,8 +368,7 @@ class PDFReportGenerator {
   generateOverdueJobsReport(
     config: PDFReportConfig,
     columns: TableColumn[],
-    data: any[],
-    summaryData?: { label: string; value: string | number; color?: string }[]
+    data: any[]
   ): void {
     // Force landscape and A3 for better column visibility (15 columns)
     this.doc = new jsPDF({
@@ -418,47 +416,6 @@ class PDFReportGenerator {
     });
 
     let startY = config.dateRange ? 47 : 42;
-
-    // Summary section - simplified, no severity-based colors
-    // Only highlight critical equipment count
-    if (summaryData && summaryData.length > 0) {
-      this.doc.setTextColor(...PDF_COLORS.primary); // Deep blue for heading
-      this.doc.setFontSize(14);
-      this.doc.setFont('helvetica', 'bold');
-      this.doc.text('SUMMARY', margin, startY);
-
-      startY += 8;
-      const boxWidth = 50;
-      const boxHeight = 22;
-      const gap = 4;
-      
-      summaryData.forEach((item, index) => {
-        const x = margin + (index % 6) * (boxWidth + gap);
-        const y = startY + Math.floor(index / 6) * (boxHeight + gap);
-
-        // SIMPLIFIED color coding - only highlight critical equipment
-        if (item.color === 'highlight' || item.label.toLowerCase().includes('critical')) {
-          this.doc!.setFillColor(...PDF_COLORS.bgDanger); // Light red bg for critical
-          this.doc!.setTextColor(...PDF_COLORS.textDarkRed);
-        } else {
-          this.doc!.setFillColor(...PDF_COLORS.bgLight); // Light gray bg
-          this.doc!.setTextColor(...PDF_COLORS.textDark);
-        }
-
-        this.doc!.roundedRect(x, y, boxWidth, boxHeight, 2, 2, 'F');
-
-        this.doc!.setFontSize(7);
-        this.doc!.setFont('helvetica', 'normal');
-        this.doc!.text(item.label, x + 3, y + 7);
-
-        this.doc!.setFontSize(14);
-        this.doc!.setFont('helvetica', 'bold');
-        this.doc!.text(String(item.value), x + 3, y + 17);
-      });
-
-      const rows = Math.ceil(summaryData.length / 6);
-      startY = startY + rows * (boxHeight + gap) + 8;
-    }
 
     // Build table data
     const headers = columns.map(col => col.header);
@@ -852,7 +809,6 @@ class PDFReportGenerator {
     config: PDFReportConfig,
     columns: TableColumn[],
     data: any[],
-    summaryData?: { label: string; value: string | number; color?: string }[],
     metadata?: {
       totalCriticalEquipment: number;
       criticalOnly: number;
@@ -911,49 +867,6 @@ class PDFReportGenerator {
     });
 
     let startY = config.dateRange ? 43 : 38;
-
-    // SUMMARY SECTION
-    if (summaryData && summaryData.length > 0) {
-      this.doc.setTextColor(...PDF_COLORS.primary);
-      this.doc.setFontSize(12);
-      this.doc.setFont('helvetica', 'bold');
-      this.doc.text('SUMMARY', margin, startY);
-
-      startY += 6;
-      const boxWidth = 42;
-      const boxHeight = 18;
-      const gap = 4;
-      
-      summaryData.forEach((item, index) => {
-        const x = margin + (index % 6) * (boxWidth + gap);
-        const y = startY + Math.floor(index / 6) * (boxHeight + gap);
-
-        // Color coding for overdue items
-        if (item.color === 'highlight' || item.label.toLowerCase().includes('overdue')) {
-          this.doc!.setFillColor(...PDF_COLORS.bgDanger);
-          this.doc!.setTextColor(...PDF_COLORS.textDarkRed);
-        } else if (item.label.toLowerCase().includes('due soon')) {
-          this.doc!.setFillColor(...PDF_COLORS.bgWarning);
-          this.doc!.setTextColor(...PDF_COLORS.textDarkOrange);
-        } else {
-          this.doc!.setFillColor(...PDF_COLORS.bgLight);
-          this.doc!.setTextColor(...PDF_COLORS.textDark);
-        }
-
-        this.doc!.roundedRect(x, y, boxWidth, boxHeight, 2, 2, 'F');
-
-        this.doc!.setFontSize(7);
-        this.doc!.setFont('helvetica', 'normal');
-        this.doc!.text(item.label, x + 3, y + 6);
-
-        this.doc!.setFontSize(12);
-        this.doc!.setFont('helvetica', 'bold');
-        this.doc!.text(String(item.value), x + 3, y + 14);
-      });
-
-      const rows = Math.ceil(summaryData.length / 6);
-      startY = startY + rows * (boxHeight + gap) + 6;
-    }
 
     // Build table data
     const headers = columns.map(col => col.header);
@@ -1093,7 +1006,6 @@ class PDFReportGenerator {
     config: PDFReportConfig,
     columns: TableColumn[],
     data: any[],
-    summaryData?: { label: string; value: string | number }[],
     metadata?: {
       totalUnplannedJobs: number;
       totalManhours: string;
@@ -1148,40 +1060,6 @@ class PDFReportGenerator {
     });
 
     let startY = config.dateRange ? 43 : 38;
-
-    // SUMMARY SECTION
-    if (summaryData && summaryData.length > 0) {
-      this.doc.setTextColor(...PDF_COLORS.primary);
-      this.doc.setFontSize(12);
-      this.doc.setFont('helvetica', 'bold');
-      this.doc.text('SUMMARY', margin, startY);
-
-      startY += 6;
-      const boxWidth = 50;
-      const boxHeight = 18;
-      const gap = 4;
-      
-      summaryData.forEach((item, index) => {
-        const x = margin + (index % 5) * (boxWidth + gap);
-        const y = startY + Math.floor(index / 5) * (boxHeight + gap);
-
-        this.doc!.setFillColor(...PDF_COLORS.bgLight);
-        this.doc!.setTextColor(...PDF_COLORS.textDark);
-
-        this.doc!.roundedRect(x, y, boxWidth, boxHeight, 2, 2, 'F');
-
-        this.doc!.setFontSize(7);
-        this.doc!.setFont('helvetica', 'normal');
-        this.doc!.text(item.label, x + 3, y + 6);
-
-        this.doc!.setFontSize(12);
-        this.doc!.setFont('helvetica', 'bold');
-        this.doc!.text(String(item.value), x + 3, y + 14);
-      });
-
-      const rows = Math.ceil(summaryData.length / 5);
-      startY = startY + rows * (boxHeight + gap) + 6;
-    }
 
     // Build table data
     const headers = columns.map(col => col.header);

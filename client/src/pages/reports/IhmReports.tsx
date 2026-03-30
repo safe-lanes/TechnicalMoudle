@@ -190,8 +190,7 @@ const IhmReports: React.FC<IhmReportsProps> = ({ onBack, globalFilters, embedded
         pdfReportGenerator.generateReport(
           { title: 'IHM Inventory Status Report', subtitle: 'Confirmed hazardous materials present on board', vessel: vesselName, dateRange: formatReportDateRange(categoryFilters.dateRange?.from, categoryFilters.dateRange?.to) },
           columns,
-          data,
-          summary
+          data
         );
         break;
       }

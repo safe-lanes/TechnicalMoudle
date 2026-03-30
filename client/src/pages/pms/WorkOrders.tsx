@@ -550,8 +550,7 @@ const WorkOrders: React.FC = () => {
       pdfReportGenerator.generateReport(
         { title: 'All Work Orders', subtitle: 'Complete work order listing', vessel: vesselName, orientation: 'landscape' },
         columns,
-        data,
-        summary
+        data
       );
 
       toast({ title: "Export Complete", description: `Exported ${data.length} work orders to PDF` });
