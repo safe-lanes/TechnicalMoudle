@@ -86,11 +86,17 @@ const SparesReports: React.FC<SparesReportsProps> = ({ onBack, globalFilters, em
     }
   }, [globalFilters?.dateRange]);
 
+  const sparesDetailReportIds = ['spares-low-stock', 'spares-critical-parts', 'spares-consumption-analysis'];
+
   useEffect(() => {
     if (embedded && selectedReportId) {
       setPreviewData(null);
-      setActiveDetailReport(null);
-      handlePreviewReport(selectedReportId);
+      if (sparesDetailReportIds.includes(selectedReportId)) {
+        setActiveDetailReport(selectedReportId);
+      } else {
+        setActiveDetailReport(null);
+        handlePreviewReport(selectedReportId);
+      }
     }
   }, [embedded, selectedReportId]);
 
@@ -470,12 +476,6 @@ const SparesReports: React.FC<SparesReportsProps> = ({ onBack, globalFilters, em
 
   const lowStockCount = spares.filter((s: any) => (s.rob || 0) < (s.min || 0)).length;
   const highPriorityCount = reports.filter(r => r.priority === 'high').length;
-
-  useEffect(() => {
-    if (embedded && selectedReportId) {
-      setActiveDetailReport(selectedReportId);
-    }
-  }, [embedded, selectedReportId]);
 
   if (activeDetailReport === 'spares-low-stock') {
     return (

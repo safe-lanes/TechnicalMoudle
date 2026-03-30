@@ -88,11 +88,17 @@ const StoresReports: React.FC<StoresReportsProps> = ({ onBack, globalFilters, em
     }
   }, [globalFilters?.dateRange]);
 
+  const storesDetailReportIds = ['stores-inventory-status', 'chemicals-tracking', 'low-stock-alert', 'stores-consumption-analysis'];
+
   useEffect(() => {
     if (embedded && selectedReportId) {
       setPreviewData(null);
-      setSelectedReport(null);
-      handlePreviewReport(selectedReportId);
+      if (storesDetailReportIds.includes(selectedReportId)) {
+        setSelectedReport(selectedReportId);
+      } else {
+        setSelectedReport(null);
+        handlePreviewReport(selectedReportId);
+      }
     }
   }, [embedded, selectedReportId]);
 
@@ -593,12 +599,6 @@ const StoresReports: React.FC<StoresReportsProps> = ({ onBack, globalFilters, em
   const lubesCount = storesItems.filter((s: any) => s.itemType === 'lubes').length;
   const chemicalsCount = storesItems.filter((s: any) => s.itemType === 'chemicals').length;
   const lowStockCount = storesItems.filter((s: any) => (s.rob || 0) < (s.min || 0)).length;
-
-  useEffect(() => {
-    if (embedded && selectedReportId) {
-      setSelectedReport(selectedReportId);
-    }
-  }, [embedded, selectedReportId]);
 
   if (selectedReport === 'stores-inventory-status') {
     return (
