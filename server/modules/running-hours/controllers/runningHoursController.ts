@@ -22,11 +22,10 @@ function resolveUserId(req: Request): string {
 }
 
 function resolveUserUuid(req: Request): string | undefined {
-  const user = (req as any).user;
-  if (user?.userUuid) return user.userUuid;
   const bodyUuid = (req.body?.userUuid as string) || '';
   if (bodyUuid) return bodyUuid;
-  return undefined;
+  const user = (req as any).user;
+  return user?.userUuid || undefined;
 }
 
 // ── Running Hours Audits (from routes.ts) ──
