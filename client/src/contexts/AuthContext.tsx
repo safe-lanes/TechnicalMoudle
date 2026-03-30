@@ -17,10 +17,10 @@ function resolveProfileName(profile: Record<string, any>): { fullName: string | 
     || profile.name
     || profile.displayName
     || profile.display_name
-    || profile.userName
     || [profile.firstname, profile.lastname].filter(Boolean).join(' ')
     || [profile.first_name, profile.last_name].filter(Boolean).join(' ')
     || [profile.firstName, profile.lastName].filter(Boolean).join(' ')
+    || profile.userName
     || null;
   const username = profile.username
     || profile.user_name
