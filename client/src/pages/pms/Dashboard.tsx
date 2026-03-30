@@ -1091,6 +1091,9 @@ const Dashboard = () => {
           </div>
 
           <div className="flex items-center gap-3">
+            <div style={{ fontSize: '18px', fontWeight: 700, color: '#1a2b4a' }} data-testid="text-current-year">
+              {new Date().getFullYear()}
+            </div>
             <Button
               variant="outline"
               size="sm"
