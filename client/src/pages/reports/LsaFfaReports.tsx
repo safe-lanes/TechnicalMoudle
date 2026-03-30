@@ -26,6 +26,7 @@ import {
 import { format } from "date-fns";
 import { pdfReportGenerator, formatReportDateRange } from "@/lib/pdfReportGenerator";
 import ReportPreviewModal, { ReportPreviewData } from "@/components/reports/ReportPreviewModal";
+import InlineReportPreview from "@/components/reports/InlineReportPreview";
 import { useToast } from "@/hooks/use-toast";
 import { useVessels } from "@/hooks/useVessels";
 import { useVessel } from "@/contexts/VesselContext";
@@ -42,6 +43,7 @@ interface LsaFfaReportsProps {
   };
   embedded?: boolean;
   selectedReportId?: string | null;
+  actionTrigger?: { type: 'preview' | 'pdf' | 'excel'; ts: number } | null;
 }
 
 interface LsaFfaReport {
@@ -55,7 +57,7 @@ interface LsaFfaReport {
   outputs: string[];
 }
 
-const LsaFfaReports: React.FC<LsaFfaReportsProps> = ({ onBack, globalFilters, embedded, selectedReportId }) => {
+const LsaFfaReports: React.FC<LsaFfaReportsProps> = ({ onBack, globalFilters, embedded, selectedReportId, actionTrigger }) => {
   const [categoryFilters, setCategoryFilters] = useState<CategoryFilterValues>({
     searchQuery: "",
     vessel: globalFilters?.vessel || "all",
@@ -80,6 +82,23 @@ const LsaFfaReports: React.FC<LsaFfaReportsProps> = ({ onBack, globalFilters, em
       setCategoryFilters(prev => ({ ...prev, dateRange: globalFilters.dateRange }));
     }
   }, [globalFilters?.dateRange]);
+
+  useEffect(() => {
+    if (embedded && selectedReportId && !previewData) {
+      handlePreviewReport(selectedReportId);
+    }
+  }, [embedded, selectedReportId]);
+
+  useEffect(() => {
+    if (!actionTrigger || !embedded || !selectedReportId) return;
+    if (actionTrigger.type === 'preview') {
+      handlePreviewReport(selectedReportId);
+    } else if (actionTrigger.type === 'pdf') {
+      handleGenerateReport(selectedReportId, 'PDF');
+    } else if (actionTrigger.type === 'excel') {
+      handleGenerateReport(selectedReportId, 'Excel');
+    }
+  }, [actionTrigger]);
 
   const effectiveVesselId = categoryFilters.vessel === 'all'
     ? 'all'
@@ -589,44 +608,7 @@ const LsaFfaReports: React.FC<LsaFfaReportsProps> = ({ onBack, globalFilters, em
       )}
 
       {embedded && previewData && (
-        <div className="mt-6 border border-gray-200 rounded-lg p-4 bg-gray-50">
-          <div className="flex items-center justify-between mb-3">
-            <h3 className="text-lg font-semibold text-gray-900">{previewData.title} - Preview</h3>
-            <Button variant="ghost" size="sm" onClick={() => setPreviewData(null)}>Close Preview</Button>
-          </div>
-          <div className="bg-white rounded border p-4 max-h-96 overflow-y-auto">
-            {previewData.sections?.map((section: any, idx: number) => (
-              <div key={idx} className="mb-4">
-                {section.title && <h4 className="font-medium text-gray-800 mb-2">{section.title}</h4>}
-                {section.type === 'table' && section.data && (
-                  <table className="w-full text-sm border-collapse">
-                    <thead><tr className="bg-gray-100">{section.columns?.map((col: string, i: number) => (
-                      <th key={i} className="text-left py-1.5 px-2 border text-xs font-medium">{col}</th>
-                    ))}</tr></thead>
-                    <tbody>{section.data.slice(0, 20).map((row: any, i: number) => (
-                      <tr key={i} className="hover:bg-gray-50">{section.columns?.map((col: string, j: number) => (
-                        <td key={j} className="py-1 px-2 border text-xs">{row[col] ?? '-'}</td>
-                      ))}</tr>
-                    ))}</tbody>
-                  </table>
-                )}
-                {section.type === 'summary' && section.items && (
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                    {section.items.map((item: any, i: number) => (
-                      <div key={i} className="bg-gray-50 p-2 rounded text-center">
-                        <div className="text-lg font-bold">{item.value}</div>
-                        <div className="text-xs text-gray-500">{item.label}</div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-            ))}
-            {(!previewData.sections || previewData.sections.length === 0) && (
-              <p className="text-sm text-gray-500">Preview data is being generated...</p>
-            )}
-          </div>
-        </div>
+        <InlineReportPreview reportData={previewData} />
       )}
       {!embedded && (
         <ReportPreviewModal

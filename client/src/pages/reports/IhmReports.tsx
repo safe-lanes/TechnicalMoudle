@@ -45,9 +45,10 @@ interface IhmReportsProps {
   };
   embedded?: boolean;
   selectedReportId?: string | null;
+  actionTrigger?: { type: 'preview' | 'pdf' | 'excel'; ts: number } | null;
 }
 
-const IhmReports: React.FC<IhmReportsProps> = ({ onBack, globalFilters, embedded, selectedReportId }) => {
+const IhmReports: React.FC<IhmReportsProps> = ({ onBack, globalFilters, embedded, selectedReportId, actionTrigger }) => {
   const [categoryFilters, setCategoryFilters] = useState<CategoryFilterValues>({
     searchQuery: "",
     vessel: globalFilters?.vessel || "all",
@@ -70,6 +71,23 @@ const IhmReports: React.FC<IhmReportsProps> = ({ onBack, globalFilters, embedded
       setCategoryFilters(prev => ({ ...prev, dateRange: globalFilters.dateRange }));
     }
   }, [globalFilters?.dateRange]);
+
+  useEffect(() => {
+    if (embedded && selectedReportId && !viewingReport) {
+      setViewingReport(selectedReportId);
+    }
+  }, [embedded, selectedReportId]);
+
+  useEffect(() => {
+    if (!actionTrigger || !embedded || !selectedReportId) return;
+    if (actionTrigger.type === 'preview') {
+      setViewingReport(selectedReportId);
+    } else if (actionTrigger.type === 'pdf') {
+      handleGenerateReport(selectedReportId, 'PDF');
+    } else if (actionTrigger.type === 'excel') {
+      handleGenerateReport(selectedReportId, 'Excel');
+    }
+  }, [actionTrigger]);
 
   const effectiveVesselId = categoryFilters.vessel === 'all' 
     ? 'all' 

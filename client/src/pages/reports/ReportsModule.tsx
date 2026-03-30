@@ -124,12 +124,18 @@ const REPORT_CATEGORIES: ReportCategory[] = [
   },
 ];
 
+export interface ReportActionTrigger {
+  type: 'preview' | 'pdf' | 'excel';
+  ts: number;
+}
+
 const ReportsModule = () => {
   const { setVesselId } = useVessel();
   const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set());
   const [selectedCategoryId, setSelectedCategoryId] = useState<string | null>(null);
   const [selectedReportId, setSelectedReportId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
+  const [actionTrigger, setActionTrigger] = useState<ReportActionTrigger | null>(null);
   const [globalFilters, setGlobalFilters] = useState<FilterValues>({
     vessel: "all",
     department: "all",
@@ -152,6 +158,7 @@ const ReportsModule = () => {
   const handleReportSelect = (categoryId: string, reportId: string) => {
     setSelectedCategoryId(categoryId);
     setSelectedReportId(reportId);
+    setActionTrigger(null);
     if (!expandedCategories.has(categoryId)) {
       setExpandedCategories(prev => new Set(prev).add(categoryId));
     }
@@ -202,24 +209,25 @@ const ReportsModule = () => {
     if (!selectedCategoryId) return null;
 
     const noop = () => {};
+    const embeddedProps = { onBack: noop, globalFilters, embedded: true as const, selectedReportId, actionTrigger };
 
     switch (selectedCategoryId) {
       case "maintenance":
-        return <MaintenanceReports onBack={noop} globalFilters={globalFilters} embedded selectedReportId={selectedReportId} />;
+        return <MaintenanceReports {...embeddedProps} />;
       case "running-hours":
-        return <RunningHoursReports onBack={noop} globalFilters={globalFilters} embedded selectedReportId={selectedReportId} />;
+        return <RunningHoursReports {...embeddedProps} />;
       case "spares":
-        return <SparesReports onBack={noop} globalFilters={globalFilters} embedded selectedReportId={selectedReportId} />;
+        return <SparesReports {...embeddedProps} />;
       case "stores":
-        return <StoresReports onBack={noop} globalFilters={globalFilters} embedded selectedReportId={selectedReportId} />;
+        return <StoresReports {...embeddedProps} />;
       case "ihm":
-        return <IhmReports onBack={noop} globalFilters={globalFilters} embedded selectedReportId={selectedReportId} />;
+        return <IhmReports {...embeddedProps} />;
       case "change-requests":
-        return <ChangeRequestReports onBack={noop} globalFilters={globalFilters} embedded selectedReportId={selectedReportId} />;
+        return <ChangeRequestReports {...embeddedProps} />;
       case "critical-equipment":
-        return <CriticalEquipmentReports onBack={noop} globalFilters={globalFilters} embedded selectedReportId={selectedReportId} />;
+        return <CriticalEquipmentReports {...embeddedProps} />;
       case "lsa-ffa-equipment":
-        return <LsaFfaReports onBack={noop} globalFilters={globalFilters} embedded selectedReportId={selectedReportId} />;
+        return <LsaFfaReports {...embeddedProps} />;
       default:
         return null;
     }
@@ -345,15 +353,18 @@ const ReportsModule = () => {
                   <p className="text-xs text-gray-500 dark:text-muted-foreground">{REPORT_CATEGORIES.find(c => c.id === selectedCategoryId)?.title}</p>
                 </div>
                 <div className="flex items-center gap-2" data-testid="report-action-buttons">
-                  <Button variant="outline" size="sm" className="gap-1.5" data-testid="button-report-preview">
+                  <Button variant="outline" size="sm" className="gap-1.5" data-testid="button-report-preview"
+                    onClick={() => setActionTrigger({ type: 'preview', ts: Date.now() })}>
                     <Eye className="h-3.5 w-3.5" />
                     Preview
                   </Button>
-                  <Button variant="outline" size="sm" className="gap-1.5" data-testid="button-report-pdf">
+                  <Button variant="outline" size="sm" className="gap-1.5" data-testid="button-report-pdf"
+                    onClick={() => setActionTrigger({ type: 'pdf', ts: Date.now() })}>
                     <FileText className="h-3.5 w-3.5" />
                     PDF
                   </Button>
-                  <Button variant="outline" size="sm" className="gap-1.5" data-testid="button-report-excel">
+                  <Button variant="outline" size="sm" className="gap-1.5" data-testid="button-report-excel"
+                    onClick={() => setActionTrigger({ type: 'excel', ts: Date.now() })}>
                     <Download className="h-3.5 w-3.5" />
                     Excel
                   </Button>
