@@ -1141,7 +1141,7 @@ const Dashboard = () => {
           <div className="p-4 space-y-4">
 
             {/* ROW 1: Three cards side by side */}
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 lg:grid-cols-[1fr_2fr_2fr] gap-4">
 
               {/* Card 1: Work Order KPIs */}
               <div className={cardStyle} data-testid="column-wo-kpis">
