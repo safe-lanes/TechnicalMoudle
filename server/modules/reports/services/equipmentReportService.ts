@@ -5,13 +5,11 @@ import {
   applyStandardHeader,
   applyStandardTableHeader,
   applyStandardDataRows,
-  applyStandardSummary,
   applyStandardPageSetup,
   generateFilename,
   getLastColumnLetter,
   type ColumnDef,
   type ConditionalStyle,
-  type SummaryItem,
 } from '../../../lib/excelReportStyles';
 
 // ═══════════════════════════════════════════════════════════════
@@ -769,17 +767,8 @@ export async function getCriticalComponentsList(
     applyStandardTableHeader(ws, columns);
     applyStandardDataRows(ws, data, columns);
 
-    const summaryItems: SummaryItem[] = [
-      { label: 'Total Critical Components', value: data.length },
-      { label: 'Class Items', value: classItemCount },
-      { label: 'Non-Class Items', value: nonClassCount },
-      { label: 'Active', value: activeCount },
-      { label: 'Inactive', value: inactiveCount }
-    ];
-
-    const summaryStartRow = 8 + data.length + 1;
-    const lastRow = applyStandardSummary(ws, summaryItems, summaryStartRow, columns.length);
-    applyStandardPageSetup(ws, 7, columns.length, lastRow, vesselName);
+    const lastDataRow = 7 + data.length;
+    applyStandardPageSetup(ws, 7, columns.length, lastDataRow, vesselName);
 
     const buffer = await wb.xlsx.writeBuffer();
     const filename = generateFilename('Critical_Components_List', vesselName);
@@ -882,17 +871,8 @@ export async function getLsaFfaMasterList(
     applyStandardTableHeader(ws, columns);
     applyStandardDataRows(ws, data, columns);
 
-    const summaryItems: SummaryItem[] = [
-      { label: 'Total LSA Components', value: lsaCount },
-      { label: 'Total FFA Components', value: ffaCount },
-      { label: 'Total Combined', value: data.length },
-      { label: 'Active', value: activeCount },
-      { label: 'Inactive', value: inactiveCount }
-    ];
-
-    const summaryStartRow = 8 + data.length + 1;
-    const lastRow = applyStandardSummary(ws, summaryItems, summaryStartRow, columns.length);
-    applyStandardPageSetup(ws, 7, columns.length, lastRow, vesselName);
+    const lastDataRow = 7 + data.length;
+    applyStandardPageSetup(ws, 7, columns.length, lastDataRow, vesselName);
 
     const buffer = await wb.xlsx.writeBuffer();
     const filename = generateFilename('LSA_FFA_Equipment_Master_List', vesselName);
@@ -1132,16 +1112,8 @@ export async function getLsaFfaMaintenanceSchedule(
     applyStandardTableHeader(ws, columns);
     applyStandardDataRows(ws, scheduleItems, columns, 8, conditionalStyles);
 
-    const summaryItems: SummaryItem[] = [
-      { label: 'Total Items', value: scheduleItems.length },
-      { label: 'On Schedule', value: onScheduleCount },
-      { label: 'Due Soon', value: dueSoonCount, highlight: true },
-      { label: 'Overdue', value: overdueCount, highlight: true }
-    ];
-
-    const summaryStartRow = 8 + scheduleItems.length + 1;
-    const lastRow = applyStandardSummary(ws, summaryItems, summaryStartRow, columns.length);
-    applyStandardPageSetup(ws, 7, columns.length, lastRow, vesselName);
+    const lastDataRow = 7 + scheduleItems.length;
+    applyStandardPageSetup(ws, 7, columns.length, lastDataRow, vesselName);
 
     const buffer = await wb.xlsx.writeBuffer();
     const filename = generateFilename('LSA_FFA_Maintenance_Schedule', vesselName);
@@ -1380,17 +1352,8 @@ export async function getCriticalEquipmentSchedule(
     applyStandardTableHeader(ws, columns);
     applyStandardDataRows(ws, scheduleItems, columns, 8, conditionalStyles);
 
-    const summaryItems: SummaryItem[] = [
-      { label: 'Total Schedule Items', value: scheduleItems.length },
-      { label: 'On Schedule', value: onScheduleCount },
-      { label: 'Due Soon', value: dueSoonCount, highlight: true },
-      { label: 'Overdue', value: overdueCount, highlight: true },
-      { label: 'Avg Days Until Due', value: avgDaysUntilDue }
-    ];
-
-    const summaryStartRow = 8 + scheduleItems.length + 1;
-    const lastRow = applyStandardSummary(ws, summaryItems, summaryStartRow, columns.length);
-    applyStandardPageSetup(ws, 7, columns.length, lastRow, vesselName);
+    const lastDataRow = 7 + scheduleItems.length;
+    applyStandardPageSetup(ws, 7, columns.length, lastDataRow, vesselName);
 
     const buffer = await wb.xlsx.writeBuffer();
     const filename = generateFilename('Critical_Equipment_Schedule', vesselName);

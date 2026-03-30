@@ -5,13 +5,11 @@ import {
   applyStandardHeader,
   applyStandardTableHeader,
   applyStandardDataRows,
-  applyStandardSummary,
   applyStandardPageSetup,
   generateFilename,
   getLastColumnLetter,
   type ColumnDef,
   type ConditionalStyle,
-  type SummaryItem,
 } from '../../../lib/excelReportStyles';
 
 // ═══════════════════════════════════════════════════════════════
@@ -449,30 +447,6 @@ export async function exportCriticalSparesExcel(
   ];
 
   applyStandardDataRows(worksheet, reportRows, columns, 8, conditionalStyles);
-
-  const totalZeroStock = reportRows.filter(r => r.stockStatus === 'ZERO').length;
-  const totalLowStock = reportRows.filter(r => r.stockStatus === 'LOW').length;
-  const totalOkStock = reportRows.filter(r => r.stockStatus === 'OK').length;
-  const totalNotSet = reportRows.filter(r => r.stockStatus === 'NOT_SET').length;
-  const totalCritical = reportRows.filter(r => r.criticalityLevel === 'CRITICAL').length;
-  const totalEssential = reportRows.filter(r => r.criticalityLevel === 'ESSENTIAL').length;
-  const totalNormal = reportRows.filter(r => r.criticalityLevel === 'NORMAL').length;
-  const totalShortage = reportRows.reduce((sum, r) => sum + r.shortageQty, 0);
-
-  const summaryItems: SummaryItem[] = [
-    { label: 'Total Spare Parts', value: reportRows.length },
-    { label: 'Zero Stock (Out of Stock)', value: totalZeroStock, highlight: totalZeroStock > 0 },
-    { label: 'Low Stock', value: totalLowStock, highlight: totalLowStock > 0 },
-    { label: 'OK Stock', value: totalOkStock },
-    { label: 'Min Not Set', value: totalNotSet },
-    { label: 'Critical (Linked to Critical Equipment)', value: totalCritical, highlight: totalCritical > 0 },
-    { label: 'Essential (Low/Zero but not Critical)', value: totalEssential },
-    { label: 'Normal', value: totalNormal },
-    { label: 'Total Shortage Quantity', value: totalShortage, highlight: totalShortage > 0 },
-  ];
-
-  const summaryStartRow = 8 + reportRows.length + 2;
-  applyStandardSummary(worksheet, summaryItems, summaryStartRow, columns.length);
 
   worksheet.views = [{ state: 'frozen', ySplit: 7, xSplit: 0 }];
 

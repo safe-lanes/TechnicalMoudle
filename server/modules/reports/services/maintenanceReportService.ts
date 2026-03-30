@@ -4,9 +4,9 @@ import { computeWorkOrderStatus } from '@shared/workOrders/status';
 import {
   COLORS, STATUS_COLORS, STANDARD_WORK_ORDER_COLUMNS,
   applyStandardHeader, applyStandardTableHeader,
-  applyWorkOrderDataRows, applyStandardSummary,
+  applyWorkOrderDataRows,
   applyStandardPageSetup, generateFilename, getLastColumnLetter,
-  type ColumnDef, type SummaryItem, type WorkOrderStatus, type WorkOrderRowData
+  type ColumnDef, type WorkOrderStatus, type WorkOrderRowData
 } from '../../../lib/excelReportStyles';
 
 // ═══════════════════════════════════════════════════════════════
@@ -217,11 +217,6 @@ export async function exportDueJobs7Days(vesselId: string): Promise<{ buffer: Bu
     return (priorityOrder[b.priority] || 0) - (priorityOrder[a.priority] || 0);
   });
 
-  const overdueCnt = dueJobs.filter(j => j.isOverdue).length;
-  const criticalPriorityCnt = dueJobs.filter(j => j.priority === 'Critical').length;
-  const criticalEquipmentCnt = dueJobs.filter(j => j.critical === 'Yes').length;
-  const urgentCnt = dueJobs.filter(j => j.statusIndicator === 'URGENT').length;
-
   const workbook = new ExcelJS.Workbook();
   workbook.creator = 'PMS System';
   workbook.created = new Date();
@@ -278,23 +273,9 @@ export async function exportDueJobs7Days(vesselId: string): Promise<{ buffer: Bu
   applyWorkOrderDataRows(worksheet, preparedData, columns, dataStartRow);
 
   const lastDataRowNum = dataStartRow + Math.max(dueJobs.length - 1, 0);
-  const summaryStartRow = lastDataRowNum + 3;
-
-  const summary: SummaryItem[] = [
-    { label: 'Total Jobs Due:', value: dueJobs.length },
-    { label: 'Overdue Jobs:', value: overdueCnt, highlight: true },
-    { label: 'Critical Priority Jobs:', value: criticalPriorityCnt },
-    { label: 'Critical Equipment Jobs:', value: criticalEquipmentCnt },
-    { label: 'Urgent Jobs (≤2 days/48 RH):', value: urgentCnt }
-  ];
-
-  const lastSummaryRow = applyStandardSummary(
-    worksheet, summary, summaryStartRow, totalColumns,
-    overdueCnt > 0 ? 'Overdue jobs require immediate attention - prioritize completion or obtain postponement approval' : undefined
-  );
 
   worksheet.autoFilter = { from: { row: headerRowNum, column: 1 }, to: { row: headerRowNum, column: totalColumns } };
-  applyStandardPageSetup(worksheet, headerRowNum, totalColumns, lastSummaryRow, vesselName);
+  applyStandardPageSetup(worksheet, headerRowNum, totalColumns, lastDataRowNum, vesselName);
 
   const buffer = await workbook.xlsx.writeBuffer();
   const filename = generateFilename('DueJobs7Days', vesselName);
@@ -426,13 +407,6 @@ export async function exportOverdueJobs(vesselId: string): Promise<{ buffer: Buf
     return (a.componentName || '').localeCompare(b.componentName || '');
   });
 
-  const avgDaysPastDue = overdueJobs.length > 0
-    ? (overdueJobs.reduce((sum, j) => sum + j.daysPastDue, 0) / overdueJobs.length).toFixed(1)
-    : '0';
-  const maxDaysPastDue = overdueJobs.length > 0
-    ? Math.max(...overdueJobs.map(j => j.daysPastDue))
-    : 0;
-
   const workbook = new ExcelJS.Workbook();
   workbook.creator = 'PMS System';
   workbook.created = new Date();
@@ -481,24 +455,9 @@ export async function exportOverdueJobs(vesselId: string): Promise<{ buffer: Buf
   applyWorkOrderDataRows(worksheet, preparedData, columns, dataStartRow);
 
   const lastDataRowNum = dataStartRow + Math.max(overdueJobs.length - 1, 0);
-  const summaryStartRow = lastDataRowNum + 3;
-
-  const summary: SummaryItem[] = [
-    { label: 'Total Overdue Jobs:', value: overdueJobs.length, highlight: true },
-    { label: 'Critical Equipment Overdue:', value: debugStats.criticalEquipment, highlight: true },
-    { label: 'Average Days Overdue:', value: avgDaysPastDue },
-    { label: 'Longest Overdue:', value: `${maxDaysPastDue} days`, highlight: true },
-    { label: 'Calendar Overdue:', value: debugStats.calendarOverdue },
-    { label: 'RH Overdue:', value: debugStats.rhOverdue }
-  ];
-
-  const lastSummaryRow = applyStandardSummary(
-    worksheet, summary, summaryStartRow, totalColumns,
-    "ACTION REQUIRED: All overdue jobs must be completed or officially postponed with Master's approval"
-  );
 
   worksheet.autoFilter = { from: { row: headerRowNum, column: 1 }, to: { row: headerRowNum, column: totalColumns } };
-  applyStandardPageSetup(worksheet, headerRowNum, totalColumns, lastSummaryRow, vesselName);
+  applyStandardPageSetup(worksheet, headerRowNum, totalColumns, lastDataRowNum, vesselName);
 
   const buffer = await workbook.xlsx.writeBuffer();
   const filename = generateFilename('OverdueJobs', vesselName);
@@ -932,26 +891,9 @@ export async function exportUnplannedJobs(vesselId: string, dateFrom?: string, d
   applyWorkOrderDataRows(worksheet, preparedData, columns, dataStartRow);
 
   const lastDataRowNum = dataStartRow + Math.max(unplannedJobs.length - 1, 0);
-  const summaryStartRow = lastDataRowNum + 3;
-
-  const criticalEquipmentCount = unplannedJobs.filter(j => j.critical === 'Yes').length;
-  const completedCount = unplannedJobs.filter(j => j.woStatus === 'Completed').length;
-  const activeCount = unplannedJobs.filter(j => j.woStatus !== 'Completed').length;
-
-  const summary: SummaryItem[] = [
-    { label: 'Total Unplanned Jobs:', value: unplannedJobs.length },
-    { label: 'Active:', value: activeCount },
-    { label: 'Completed:', value: completedCount },
-    { label: 'Critical Equipment:', value: criticalEquipmentCount }
-  ];
-
-  const lastSummaryRow = applyStandardSummary(
-    worksheet, summary, summaryStartRow, totalColumns,
-    "NOTE: Breakdown jobs require root cause analysis and corrective actions"
-  );
 
   worksheet.autoFilter = { from: { row: headerRowNum, column: 1 }, to: { row: headerRowNum, column: totalColumns } };
-  applyStandardPageSetup(worksheet, headerRowNum, totalColumns, lastSummaryRow, vesselName);
+  applyStandardPageSetup(worksheet, headerRowNum, totalColumns, lastDataRowNum, vesselName);
 
   const buffer = await workbook.xlsx.writeBuffer();
   const filename = generateFilename('UnplannedJobs', vesselName);
@@ -1170,28 +1112,9 @@ export async function exportPostponementLog(
   }
 
   const lastDataRowNum = dataStartRow + Math.max(postponedJobs.length - 1, 0);
-  const summaryStartRow = lastDataRowNum + 3;
-
-  const criticalCount = postponedJobs.filter((j: any) => j.critical === 'Yes').length;
-  const pendingCount = postponedJobs.filter((j: any) => j.status === 'Pending' || j.status === 'Submitted').length;
-  const approvedCount = postponedJobs.filter((j: any) => j.status === 'Approved').length;
-  const rejectedCount = postponedJobs.filter((j: any) => j.status === 'Rejected').length;
-
-  const summaryItems: SummaryItem[] = [
-    { label: 'Total Postponement Records:', value: postponedJobs.length },
-    { label: 'Pending Approval:', value: pendingCount },
-    { label: 'Approved:', value: approvedCount },
-    { label: 'Rejected:', value: rejectedCount },
-    { label: 'Critical Equipment Postponed:', value: criticalCount, highlight: true }
-  ];
-
-  const lastSummaryRow = applyStandardSummary(
-    worksheet, summaryItems, summaryStartRow, totalColumns,
-    "NOTE: All postponements require Master's approval and documented justification. Multiple postponements of the same work order are tracked separately."
-  );
 
   worksheet.autoFilter = { from: { row: headerRowNum, column: 1 }, to: { row: headerRowNum, column: totalColumns } };
-  applyStandardPageSetup(worksheet, headerRowNum, totalColumns, lastSummaryRow, vesselName);
+  applyStandardPageSetup(worksheet, headerRowNum, totalColumns, lastDataRowNum, vesselName);
 
   const buffer = await workbook.xlsx.writeBuffer();
   const filename = generateFilename('PostponementLog', vesselName);

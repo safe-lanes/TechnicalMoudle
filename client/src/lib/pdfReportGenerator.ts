@@ -138,10 +138,6 @@ class PDFReportGenerator {
 
     let startY = config.dateRange ? (config.subtitle ? 37 : 31) : 32;
 
-    if (summaryData && summaryData.length > 0) {
-      startY = this.addSummarySection(summaryData, startY, margin);
-    }
-
     this.addDataTable(columns, data, startY, margin);
 
     this.addFooter(pageWidth, pageHeight, margin);
