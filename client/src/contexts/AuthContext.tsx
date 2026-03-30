@@ -11,6 +11,24 @@ import { mapLoggedRoleToUIRole } from "@shared/uiRoles";
 import { secureGetItem } from "@/utils/secureStorage";
 import { analyzeLocalStorage } from "@/utils/localStorageAnalyzer";
 
+function resolveProfileName(profile: Record<string, any>): { fullName: string | null; username: string | null } {
+  const fullName = profile.fullName
+    || profile.full_name
+    || profile.name
+    || profile.displayName
+    || profile.display_name
+    || profile.userName
+    || [profile.first_name, profile.last_name].filter(Boolean).join(' ')
+    || [profile.firstName, profile.lastName].filter(Boolean).join(' ')
+    || null;
+  const username = profile.username
+    || profile.user_name
+    || profile.userName
+    || profile.login
+    || null;
+  return { fullName, username };
+}
+
 const DEFAULT_USER: PublicUser = {
   id: 1,
   username: "munawer.modak",
@@ -59,6 +77,22 @@ export function AuthProvider({ children }: AuthProviderProps) {
     const encryptedProfile = secureGetItem<Record<string, any>>("userProfile");
     const encryptedUserType = secureGetItem<string>("userType");
 
+    if (encryptedProfile && import.meta.env.DEV) {
+      console.log('[AuthContext] userProfile keys:', Object.keys(encryptedProfile));
+      console.log('[AuthContext] name-related fields:', {
+        fullName: encryptedProfile.fullName,
+        full_name: encryptedProfile.full_name,
+        name: encryptedProfile.name,
+        displayName: encryptedProfile.displayName,
+        userName: encryptedProfile.userName,
+        username: encryptedProfile.username,
+        firstName: encryptedProfile.firstName,
+        lastName: encryptedProfile.lastName,
+        first_name: encryptedProfile.first_name,
+        last_name: encryptedProfile.last_name,
+      });
+    }
+
     if (encryptedUserType && encryptedProfile?.role) {
       resolvedUserType = mapLoggedRoleToUIRole(
         encryptedUserType,
@@ -66,10 +100,11 @@ export function AuthProvider({ children }: AuthProviderProps) {
       );
 
       const role = (encryptedProfile.role as UserRole) || "Office";
+      const resolved = resolveProfileName(encryptedProfile);
       resolvedUser = {
         id: encryptedProfile.id || 0,
-        username: encryptedProfile.username || "user",
-        fullName: encryptedProfile.fullName || encryptedProfile.name || "User",
+        username: resolved.username || "user",
+        fullName: resolved.fullName || resolved.username || "User",
         email: encryptedProfile.email || null,
         role: role,
         userType:
@@ -100,10 +135,11 @@ export function AuthProvider({ children }: AuthProviderProps) {
         );
 
         const role = (plainProfile.role as UserRole) || "Office";
+        const resolved = resolveProfileName(plainProfile);
         resolvedUser = {
           id: plainProfile.id || 0,
-          username: plainProfile.username || "user",
-          fullName: plainProfile.fullName || plainProfile.name || "User",
+          username: resolved.username || "user",
+          fullName: resolved.fullName || resolved.username || "User",
           email: plainProfile.email || null,
           role: role,
           userType:

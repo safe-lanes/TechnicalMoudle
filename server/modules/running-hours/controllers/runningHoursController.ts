@@ -3,6 +3,17 @@ import * as rhService from '../services/runningHoursService';
 import * as rhTimelineValidation from '../services/rhTimelineValidationService';
 import { ValidationError } from '../../shared/errors';
 
+const PLACEHOLDER_USER_IDS = ['admin', 'system', 'User', 'user', ''];
+
+function resolveUserId(req: Request): string {
+  const user = (req as any).user;
+  const bodyUserId = (req.body?.userId as string) || '';
+  if (!bodyUserId || PLACEHOLDER_USER_IDS.includes(bodyUserId)) {
+    return user?.fullName || user?.username || bodyUserId || 'system';
+  }
+  return bodyUserId;
+}
+
 // ── Running Hours Audits (from routes.ts) ──
 
 export async function getAudits(req: Request, res: Response) {
@@ -12,6 +23,7 @@ export async function getAudits(req: Request, res: Response) {
 
 export async function createAudit(req: Request, res: Response) {
   try {
+    req.body.userId = resolveUserId(req);
     const audit = await rhService.createAudit(req.body);
     res.status(201).json(audit);
   } catch (error: any) {
@@ -26,10 +38,7 @@ export async function createAudit(req: Request, res: Response) {
 
 export async function cascadeUpdate(req: Request, res: Response) {
   try {
-    const user = (req as any).user;
-    if (!req.body.userId || req.body.userId === 'admin' || req.body.userId === 'system') {
-      req.body.userId = user?.fullName || user?.username || req.body.userId || 'system';
-    }
+    req.body.userId = resolveUserId(req);
     const result = await rhService.cascadeUpdate(req.body);
     res.json(result);
   } catch (error: any) {
@@ -75,6 +84,7 @@ export async function listChildren(req: Request, res: Response) {
 
 export async function updateChildRH(req: Request, res: Response) {
   try {
+    req.body.userId = resolveUserId(req);
     const result = await rhService.updateChildRH(req.params.componentId, req.body);
     res.json(result);
   } catch (error: any) {
@@ -88,6 +98,7 @@ export async function updateChildRH(req: Request, res: Response) {
 
 export async function resetChildRH(req: Request, res: Response) {
   try {
+    req.body.userId = resolveUserId(req);
     const result = await rhService.resetChildRH(req.params.componentId, req.body);
     res.json(result);
   } catch (error: any) {
@@ -136,6 +147,7 @@ export async function updateRHConfig(req: Request, res: Response) {
 
 export async function updateMasterRH(req: Request, res: Response) {
   try {
+    req.body.userId = resolveUserId(req);
     const result = await rhService.updateMasterRH(req.params.componentId, req.body);
     res.json(result);
   } catch (error: any) {
@@ -275,7 +287,7 @@ export async function getCurrentRH(req: Request, res: Response) {
 export async function propagateAll(req: Request, res: Response) {
   try {
     const vesselId = (req.query.vesselId as string) || '743ef9d1-841a-11ed-aa7c-7003bca91a86';
-    const userId = (req.body.userId as string) || 'system';
+    const userId = resolveUserId(req);
     const result = await rhService.propagateAll(vesselId, userId);
     res.json(result);
   } catch (error: any) {
