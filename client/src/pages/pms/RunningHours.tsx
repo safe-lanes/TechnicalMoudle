@@ -972,11 +972,9 @@ const RunningHours = () => {
   return (
     <div className="flex flex-col" style={{ height: 'calc(100vh - 120px)' }}>
       {/* Header - Fixed */}
-      <div className="flex-shrink-0 space-y-6 mb-6">
+      <div className="flex-shrink-0 space-y-4">
         <div className="flex items-center justify-between relative">
-          <div className="flex items-center gap-4">
-            <h1 className="text-2xl font-bold text-gray-900" data-testid="D1"><Marker id="D1" />Running Hours</h1>
-          </div>
+          <h1 className="text-2xl font-bold text-gray-900" data-testid="D1"><Marker id="D1" />Running Hours</h1>
           <div className="absolute left-1/2 -translate-x-1/2 bg-gray-100 rounded-md p-1 flex items-center gap-1" data-testid="rh-tab-switcher">
             <button
               onClick={() => setActiveTab("main")}
@@ -1055,7 +1053,7 @@ const RunningHours = () => {
               <Clock className="h-4 w-4 text-gray-500" />
               <span className="text-sm text-gray-600 whitespace-nowrap">Utilization Period:</span>
               <Select value={utilizationPeriod} onValueChange={setUtilizationPeriod}>
-                <SelectTrigger className="w-[180px] h-9" data-testid="select-utilization-period">
+                <SelectTrigger className="w-[180px]" data-testid="select-utilization-period">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
