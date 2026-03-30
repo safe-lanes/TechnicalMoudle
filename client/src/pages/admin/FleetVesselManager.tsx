@@ -151,6 +151,8 @@ function DroppableClassZone({
   children,
   vesselCount,
   isActive,
+  fleetId,
+  classId,
   onRename,
   onDelete,
   isUnclassified,
