@@ -50,6 +50,8 @@ export async function cascadeRunningHoursUpdate(params: {
   value: number;
   dateUpdated: string;
   comments?: string;
+  userId?: string;
+  userUuid?: string;
   meterReplaced?: boolean;
   oldMeterFinal?: string;
   newMeterStart?: string;
