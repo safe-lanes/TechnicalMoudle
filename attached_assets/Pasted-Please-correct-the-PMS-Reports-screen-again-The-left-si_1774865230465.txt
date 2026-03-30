@@ -1,0 +1,186 @@
+Please correct the PMS Reports screen again. The left-side tree navigation is now in place, which is good, so keep that structure. However, there are still two major problems in the current implementation that must be fixed consistently across all reports.
+
+The first problem is that some reports still show summary tiles, KPI cards, stat boxes, or report-specific dashboard widgets in the right pane when selected. That is not what is required. In the redesigned PMS Reports page, clicking a report in the left tree should open that report directly in view mode in the right pane. It should not first show summary cards, metrics blocks, or any dashboard-style top section unless that content is literally the actual report output itself. In most cases, these tiles are just leftover UI from the old design and must be removed.
+
+The second problem is that some reports are directly downloading when clicked in the left tree instead of opening in preview/view mode. This is wrong. Clicking a report name in the left tree must never directly download a file. A tree click is a selection/navigation action only. Export/download must happen only when the user explicitly clicks the PDF or Excel button for the currently selected report.
+
+Please read that carefully because this is the main expected behavior for the redesigned PMS Reports page:
+
+User clicks a report name in the left tree.
+
+That report becomes selected.
+
+The report opens in the right pane in preview/view mode.
+
+The right pane shows only the report viewer and the top export buttons.
+
+A file download should happen only if the user explicitly clicks Export PDF or Export Excel.
+
+That behavior must be consistent for every report in the tree. No exceptions.
+
+Do not redesign the page from scratch. Do not remove the tree. Do not revert to tiles. Keep the current left tree + right content-pane layout. This is a correction and normalization task. The goal is to make every report behave consistently inside the new structure.
+
+What must be removed
+From the selected report view in the right pane, remove all unnecessary summary UI that appears before the actual report content. This includes, but is not limited to:
+
+KPI tiles,
+
+report stat cards,
+
+count widgets,
+
+mini dashboard summaries,
+
+“total” cards,
+
+“high priority” cards,
+
+“low stock” cards,
+
+“critical parts” cards,
+
+or any equivalent top metric strip that is appearing because of reused old report UI.
+
+For example, if a report like “Critical Spares Report” opens and shows metric cards such as Total Critical Spares, Critical Equipment Spares, Out of Stock Critical Parts, or Low Stock Critical Parts before the report table, that is not desired in this redesigned reports browser and should be removed from the right-pane report view. The right pane should directly show the actual report content, not a dashboard summary wrapper.
+
+Also remove any report metadata wrappers that may still appear above the content, such as secondary title cards, action rows embedded inside the report body, report frequency labels, estimated time badges, priority chips, or duplicate action icons that repeat functionality already provided by the top export buttons.
+
+What the right pane should contain
+Once a report is selected from the tree, the right pane should contain only these elements in a clean and predictable order:
+
+The selected report header if needed, such as the report title and maybe a very small subtitle/category line if helpful.
+
+Two top actions only for that selected report: Export PDF and Export Excel.
+
+The actual report content/preview itself.
+
+Nothing else before the report content unless it is an essential part of the real report.
+
+Do not place any other buttons in the report viewer if they duplicate those export actions. Do not place any back buttons such as “Back to Reports” inside the right pane unless absolutely necessary, because the left tree already acts as the navigation control. In this layout, the tree is the browser and the right pane is the viewer.
+
+Click behavior rules
+Please enforce these click behavior rules across all report items in the left tree:
+
+Clicking a parent category should only expand or collapse that category.
+
+Clicking a child report should only select and open that report in the right pane.
+
+Clicking a child report must not directly trigger Excel export.
+
+Clicking a child report must not directly trigger PDF export.
+
+Clicking a child report must not redirect to another page unless the viewer architecture absolutely requires internal routing.
+
+Clicking a child report must not open a modal instead of the right pane.
+
+Clicking a child report must not open a system download immediately.
+
+If some existing reports currently have click handlers that are still wired to legacy export actions, detach that behavior from the tree item selection. The left-tree item should only call the preview/open action. Export must remain attached only to the explicit PDF/Excel buttons shown for the selected report.
+
+Normalization across all reports
+The most important issue now is inconsistency. Right now, some reports appear to preview, some show summary cards, and some directly download. That means the screen is mixing old report behaviors inside the new navigation shell. Fix this by normalizing all report entries to one consistent pattern.
+
+Every report in the tree should follow one uniform lifecycle:
+
+select report,
+
+load report into right pane,
+
+show preview,
+
+allow explicit export via buttons.
+
+Even if some reports were originally built as export-first actions in the older PMS UI, they should now be adapted to this new preview-first interaction model. If needed, use an internal wrapper/view component so that these legacy reports can still be shown inside the right pane before exporting. But do not change the actual report logic or data generation. Only standardize how the user accesses them from the tree.
+
+Keep existing logic, change only the interaction flow
+Do not change:
+
+backend logic,
+
+report calculation logic,
+
+report datasets,
+
+API endpoints,
+
+filter behavior,
+
+user permission logic,
+
+report availability conditions,
+
+export generation logic,
+
+file generation logic.
+
+Do change:
+
+how the report is opened from the left tree,
+
+what appears in the right pane before the actual report content,
+
+and where export actions are triggered from.
+
+In short: preserve business logic, fix UI behavior and event wiring.
+
+Filters and page header
+The top-level page filters such as vessel selector, report search, and date range may remain where they are if they already work properly. Those belong to the reports page as a whole. But do not let those top-level controls be confused with report-level summary widgets. The right-side viewer should still remain clean and focused even while the page-level filters exist above the layout.
+
+Empty state behavior
+If no report is selected yet, the right pane may show a simple placeholder telling the user to select a report from the tree. That is fine. But as soon as the user clicks any report:
+
+the placeholder must disappear,
+
+the report must load in the viewer,
+
+no auto-download should happen,
+
+and no unnecessary stat cards should appear before the actual report content.
+
+Visual and UX expectations
+The final screen should feel like a report explorer:
+
+left side is the report navigation tree,
+
+right side is the report viewer,
+
+top right of viewer has explicit export actions,
+
+selected report opens cleanly and predictably.
+
+Avoid making the right pane feel like a dashboard. It is a viewer, not a report landing page. Remove elements that create extra noise or force the user through an extra interpretation layer before they can see the report itself.
+
+Also keep the selected state in the tree visually clear, so the user always knows which report is active. Expanded categories should stay readable. The tree should remain stable while reports change on the right side.
+
+Things to specifically inspect and fix
+Please explicitly inspect all reports in the left tree and verify these two questions for each one:
+
+Does clicking it open in the right pane instead of downloading?
+
+Does it show only the direct report view instead of extra summary tiles or stat cards?
+
+Do not assume that fixing one report fixes all reports. Check every report category and its child reports. The issue appears to be report-specific, so you need to validate all report entries rather than only one or two examples.
+
+Final acceptance criteria
+Do not consider the task complete until all of the following are true:
+
+The left tree remains intact and functional.
+
+Maintenance Planner stays hidden if already removed.
+
+Clicking a report name in the left tree always opens the selected report in the right pane.
+
+Clicking a report name never directly downloads a file.
+
+Export happens only through explicit PDF and Excel buttons.
+
+The right pane no longer shows unnecessary KPI tiles, summary cards, or old dashboard widgets before the actual report content.
+
+The right pane shows a clean report view for every report.
+
+Legacy per-report behaviors are normalized into one preview-first interaction pattern.
+
+Existing report logic and export logic still work behind the scenes.
+
+Important: this is not a feature expansion. This is a cleanup and correction of the current implementation so that the new tree-based PMS Reports UI behaves consistently and matches the intended user flow.
+
