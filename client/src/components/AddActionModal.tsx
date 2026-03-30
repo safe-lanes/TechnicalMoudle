@@ -300,14 +300,14 @@ export default function AddActionModal({ open, onOpenChange, onSave, initialData
               variant="ghost"
               onClick={handleDiscard}
               data-testid="button-discard"
-              className="text-[#1976d2] hover:text-[#1565c0] hover:bg-blue-50"
+              className="text-[#1976d2] hover:text-[#16569e] hover:bg-blue-50"
             >
               DISCARD
             </Button>
             <Button
               type="submit"
               data-testid="button-save-action"
-              className="bg-[#1976d2] hover:bg-[#1565c0] text-white px-8"
+              className="bg-[#1976d2] hover:bg-[#16569e] text-white px-8"
             >
               SAVE
             </Button>
