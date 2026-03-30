@@ -58,7 +58,7 @@ interface MaintenanceReportsProps {
   };
   embedded?: boolean;
   selectedReportId?: string | null;
-  actionTrigger?: { type: 'preview' | 'pdf' | 'excel'; ts: number } | null;
+  actionTrigger?: { type: 'pdf' | 'excel'; ts: number } | null;
 }
 
 const MaintenanceReports: React.FC<MaintenanceReportsProps> = ({ onBack, globalFilters, embedded, selectedReportId, actionTrigger }) => {
@@ -87,16 +87,16 @@ const MaintenanceReports: React.FC<MaintenanceReportsProps> = ({ onBack, globalF
   }, [globalFilters?.dateRange]);
 
   useEffect(() => {
-    if (embedded && selectedReportId && !previewData) {
+    if (embedded && selectedReportId) {
+      setPreviewData(null);
+      setPreviewOpen(false);
       handlePreviewReport(selectedReportId);
     }
   }, [embedded, selectedReportId]);
 
   useEffect(() => {
     if (!actionTrigger || !embedded || !selectedReportId) return;
-    if (actionTrigger.type === 'preview') {
-      handlePreviewReport(selectedReportId);
-    } else if (actionTrigger.type === 'pdf') {
+    if (actionTrigger.type === 'pdf') {
       handleGenerateReport(selectedReportId, 'PDF');
     } else if (actionTrigger.type === 'excel') {
       handleGenerateReport(selectedReportId, 'Excel');

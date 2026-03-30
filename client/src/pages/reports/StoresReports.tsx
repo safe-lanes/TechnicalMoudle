@@ -60,7 +60,7 @@ interface StoresReportsProps {
   };
   embedded?: boolean;
   selectedReportId?: string | null;
-  actionTrigger?: { type: 'preview' | 'pdf' | 'excel'; ts: number } | null;
+  actionTrigger?: { type: 'pdf' | 'excel'; ts: number } | null;
 }
 
 const StoresReports: React.FC<StoresReportsProps> = ({ onBack, globalFilters, embedded, selectedReportId, actionTrigger }) => {
@@ -89,16 +89,16 @@ const StoresReports: React.FC<StoresReportsProps> = ({ onBack, globalFilters, em
   }, [globalFilters?.dateRange]);
 
   useEffect(() => {
-    if (embedded && selectedReportId && !previewData && !selectedReport) {
+    if (embedded && selectedReportId) {
+      setPreviewData(null);
+      setSelectedReport(null);
       handlePreviewReport(selectedReportId);
     }
   }, [embedded, selectedReportId]);
 
   useEffect(() => {
     if (!actionTrigger || !embedded || !selectedReportId) return;
-    if (actionTrigger.type === 'preview') {
-      handlePreviewReport(selectedReportId);
-    } else if (actionTrigger.type === 'pdf') {
+    if (actionTrigger.type === 'pdf') {
       handleGenerateReport(selectedReportId, 'PDF');
     } else if (actionTrigger.type === 'excel') {
       handleGenerateReport(selectedReportId, 'Excel');

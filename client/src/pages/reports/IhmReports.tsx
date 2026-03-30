@@ -45,7 +45,7 @@ interface IhmReportsProps {
   };
   embedded?: boolean;
   selectedReportId?: string | null;
-  actionTrigger?: { type: 'preview' | 'pdf' | 'excel'; ts: number } | null;
+  actionTrigger?: { type: 'pdf' | 'excel'; ts: number } | null;
 }
 
 const IhmReports: React.FC<IhmReportsProps> = ({ onBack, globalFilters, embedded, selectedReportId, actionTrigger }) => {
@@ -73,16 +73,14 @@ const IhmReports: React.FC<IhmReportsProps> = ({ onBack, globalFilters, embedded
   }, [globalFilters?.dateRange]);
 
   useEffect(() => {
-    if (embedded && selectedReportId && !viewingReport) {
+    if (embedded && selectedReportId) {
       setViewingReport(selectedReportId);
     }
   }, [embedded, selectedReportId]);
 
   useEffect(() => {
     if (!actionTrigger || !embedded || !selectedReportId) return;
-    if (actionTrigger.type === 'preview') {
-      setViewingReport(selectedReportId);
-    } else if (actionTrigger.type === 'pdf') {
+    if (actionTrigger.type === 'pdf') {
       handleGenerateReport(selectedReportId, 'PDF');
     } else if (actionTrigger.type === 'excel') {
       handleGenerateReport(selectedReportId, 'Excel');

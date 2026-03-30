@@ -17,7 +17,6 @@ import {
   ChevronDown,
   FileText,
   Download,
-  Eye,
 } from "lucide-react";
 import MaintenanceReports from "./MaintenanceReports";
 import RunningHoursReports from "./RunningHoursReports";
@@ -125,7 +124,7 @@ const REPORT_CATEGORIES: ReportCategory[] = [
 ];
 
 export interface ReportActionTrigger {
-  type: 'preview' | 'pdf' | 'excel';
+  type: 'pdf' | 'excel';
   ts: number;
 }
 
@@ -353,11 +352,6 @@ const ReportsModule = () => {
                   <p className="text-xs text-gray-500 dark:text-muted-foreground">{REPORT_CATEGORIES.find(c => c.id === selectedCategoryId)?.title}</p>
                 </div>
                 <div className="flex items-center gap-2" data-testid="report-action-buttons">
-                  <Button variant="outline" size="sm" className="gap-1.5" data-testid="button-report-preview"
-                    onClick={() => setActionTrigger({ type: 'preview', ts: Date.now() })}>
-                    <Eye className="h-3.5 w-3.5" />
-                    Preview
-                  </Button>
                   <Button variant="outline" size="sm" className="gap-1.5" data-testid="button-report-pdf"
                     onClick={() => setActionTrigger({ type: 'pdf', ts: Date.now() })}>
                     <FileText className="h-3.5 w-3.5" />

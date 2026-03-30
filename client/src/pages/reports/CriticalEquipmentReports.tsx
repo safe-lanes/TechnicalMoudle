@@ -54,7 +54,7 @@ interface CriticalEquipmentReportsProps {
   };
   embedded?: boolean;
   selectedReportId?: string | null;
-  actionTrigger?: { type: 'preview' | 'pdf' | 'excel'; ts: number } | null;
+  actionTrigger?: { type: 'pdf' | 'excel'; ts: number } | null;
 }
 
 const CriticalEquipmentReports: React.FC<CriticalEquipmentReportsProps> = ({ onBack, globalFilters, embedded, selectedReportId, actionTrigger }) => {
@@ -84,16 +84,15 @@ const CriticalEquipmentReports: React.FC<CriticalEquipmentReportsProps> = ({ onB
   }, [globalFilters?.dateRange]);
 
   useEffect(() => {
-    if (embedded && selectedReportId && !previewData) {
+    if (embedded && selectedReportId) {
+      setPreviewData(null);
       handlePreviewReport(selectedReportId);
     }
   }, [embedded, selectedReportId]);
 
   useEffect(() => {
     if (!actionTrigger || !embedded || !selectedReportId) return;
-    if (actionTrigger.type === 'preview') {
-      handlePreviewReport(selectedReportId);
-    } else if (actionTrigger.type === 'pdf') {
+    if (actionTrigger.type === 'pdf') {
       handleGenerateReport(selectedReportId, 'PDF');
     } else if (actionTrigger.type === 'excel') {
       handleGenerateReport(selectedReportId, 'Excel');
